@@ -347,6 +347,7 @@ fn shell(spec: &EntitySpec, docked_vehicle: bool, expanded: bool) -> EntityNode 
         fallback: None,
         choice: GeometryChoice::Main,
         own_skin: None,
+        paint_appearance: None,
         vehicle: None,
         landing_gear: Arc::from([]),
         landing_system_component: spec

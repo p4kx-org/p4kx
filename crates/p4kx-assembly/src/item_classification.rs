@@ -4,6 +4,9 @@
 use p4kx_dataforge::{RecordTree, StructValue, Value, ValueError};
 use p4kx_extraction::{SourceLocation, SourceValue};
 
+use crate::read;
+use crate::vehicle_paint::{self, PaintItem};
+
 /// Type and subtype selected from an Entity's original `AttachDef`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ItemClassification {
@@ -12,6 +15,7 @@ pub struct ItemClassification {
     item_type: Field,
     subtype: Field,
     scope: Scope,
+    paint: Option<Box<PaintItem>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -64,12 +68,18 @@ impl ItemClassification {
                 Scope::Components,
             )
         };
+        let paint = attachable
+            .filter(|_| vehicle_paint::is_paint_type(text(&item_type.value)))
+            .and_then(|(_, component)| read::struct_field(component, "AttachDef"))
+            .map(PaintItem::read)
+            .map(Box::new);
         Self {
             record: Some(tree.record_index()),
             component,
             item_type,
             subtype,
             scope,
+            paint,
         }
     }
 
@@ -80,6 +90,7 @@ impl ItemClassification {
             item_type: Field::of(SourceValue::Unreadable),
             subtype: Field::of(SourceValue::Unreadable),
             scope: Scope::Unresolved,
+            paint: None,
         }
     }
 
@@ -105,6 +116,10 @@ impl ItemClassification {
     #[must_use]
     pub fn subtype_location(&self) -> Option<SourceLocation> {
         self.location("SubType", &self.subtype)
+    }
+
+    pub(crate) fn paint(&self) -> Option<&PaintItem> {
+        self.paint.as_deref()
     }
 
     pub(crate) const fn component(&self) -> Option<usize> {

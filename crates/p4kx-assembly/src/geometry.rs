@@ -5,7 +5,7 @@ use p4kx_dataforge::{Guid, StructValue, Value, ValueError};
 use p4kx_extraction::SourceLocation;
 
 use crate::character_path::is_rigged_path_outside_human_rigs;
-use crate::read::{indexed_struct_items, struct_field, text};
+use crate::read::{struct_field, text};
 
 #[path = "geometry_source.rs"]
 mod source;
@@ -15,7 +15,14 @@ pub use source::{GeometrySource, visit_geometry_sources};
 #[path = "geometry_origins.rs"]
 mod origins;
 
+use self::origins::MaterialPosition;
 pub(crate) use self::origins::{GeometryComponent, GeometrySelectors};
+use crate::MaterialVariantSelection;
+
+#[path = "geometry_variants.rs"]
+mod variants;
+
+pub(crate) use self::variants::AppearanceOnlyVariant;
 
 /// The tint palette an Entity's geometry names (`Palette.TintPaletteRef`): the `TintPaletteTree`
 /// Record and the child of its tree.
@@ -179,40 +186,6 @@ impl Geometry {
         Self::of_node(struct_field(component, "Geometry")?, owner, &[])
     }
 
-    /// Reads the geometry of the sub-nodes of the main node of a `SGeometryResourceParams`
-    /// component that name a model, with their tags: the children of the main node first, then
-    /// the sub-nodes nested in them, which carry the tags of the nodes they are nested in as well
-    /// as their own.
-    pub(crate) fn read_variants(
-        component: &StructValue<'_>,
-        owner: GeometryComponent,
-    ) -> Vec<GeometryVariant> {
-        let Some(node) = struct_field(component, "Geometry") else {
-            return Vec::new();
-        };
-        let mut variants = Vec::new();
-        let mut level = vec![(node, Vec::<String>::new(), Vec::<usize>::new())];
-        while !level.is_empty() {
-            let mut next = Vec::new();
-            for (parent, inherited, source) in &level {
-                for (slot, sub) in indexed_struct_items(parent, "SubGeometry") {
-                    let slots: Vec<_> = source.iter().copied().chain([slot]).collect();
-                    let mut tags = inherited.clone();
-                    tags.extend(text(sub, "Tags").split_whitespace().map(str::to_owned));
-                    if let Some(geometry) = Self::of_node(sub, owner, &slots) {
-                        variants.push(GeometryVariant {
-                            tags: tags.clone(),
-                            geometry,
-                        });
-                    }
-                    next.push((sub, tags, slots));
-                }
-            }
-            level = next;
-        }
-        variants
-    }
-
     /// Returns the physical Record field that names this geometry.
     #[must_use]
     pub fn model_field(&self) -> Option<SourceLocation> {
@@ -229,6 +202,18 @@ impl Geometry {
             material: material_from_geometry
                 .then(|| self.origins.material.clone())
                 .flatten(),
+        }
+    }
+
+    pub(crate) fn apply_material_variant(&mut self, variant: &MaterialVariantSelection<'_>) {
+        if let Some(material) = variant.material() {
+            self.material = Some(material.to_owned());
+            self.origins.material = variant
+                .material_location()
+                .map(|location| MaterialPosition::Authored(std::sync::Arc::new(location)));
+        }
+        if let Some(palette) = variant.palette() {
+            self.palette = Some(palette);
         }
     }
 
@@ -254,10 +239,16 @@ impl Geometry {
 
     fn of_node(node: &StructValue<'_>, owner: GeometryComponent, slots: &[usize]) -> Option<Self> {
         let data = struct_field(node, "Geometry")?;
-        let path = struct_field(data, "Geometry").map(|resource| text(resource, "path"))?;
-        if path.is_empty() {
-            return None;
-        }
+        let path = model_path(data)?;
+        Some(Self::from_data(data, owner, slots, path))
+    }
+
+    fn from_data(
+        data: &StructValue<'_>,
+        owner: GeometryComponent,
+        slots: &[usize],
+        path: &str,
+    ) -> Self {
         let material = struct_field(data, "Material")
             .map(|resource| text(resource, "path"))
             .filter(|path| !path.is_empty());
@@ -271,13 +262,18 @@ impl Geometry {
                     .map(|position| position.at(".Geometry.Palette.RootRecord")),
             );
         }
-        Some(Self {
+        Self {
             path: path.to_owned(),
             material: material.map(str::to_owned),
             palette,
             origins,
-        })
+        }
     }
+}
+
+fn model_path<'source>(data: &StructValue<'source>) -> Option<&'source str> {
+    let path = text(struct_field(data, "Geometry")?, "path");
+    (!path.is_empty()).then_some(path)
 }
 
 #[cfg(test)]

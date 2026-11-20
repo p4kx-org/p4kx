@@ -40,7 +40,8 @@ pub(crate) fn run(args: &EntityGlbArgs, as_json: bool) -> Result<()> {
     let files = ArchiveFiles::new(&archive);
     let mut resolver = LoadoutResolver::new(&forge)
         .with_forge_entry(&entry)
-        .with_files(&files);
+        .with_files(&files)
+        .with_vehicle_appearance();
     if !args.expand_docked_vehicles {
         resolver = resolver.stopping_at_docked_vehicles();
     }

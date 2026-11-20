@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::ControlFlow;
 use std::slice;
 
 use p4kx_dataforge::StructValue;
@@ -55,6 +56,13 @@ impl<'variant> MaterialVariantSelection<'variant> {
         self.field_location("")
     }
 
+    fn from_branch(variant: &'variant MaterialVariant, ancestors: &[Branch<'variant>]) -> Self {
+        Self {
+            variant,
+            ancestors: ancestors.iter().map(|branch| branch.node.slot).collect(),
+        }
+    }
+
     fn field_location(&self, member: &str) -> SourceLocation {
         let owner = self.variant.owner;
         let mut path = format!("Components[{}].Material", owner.ordinal);
@@ -74,7 +82,11 @@ impl<'variant> MaterialVariantSelection<'variant> {
 struct Branch<'variant> {
     node: &'variant MaterialVariant,
     siblings: slice::Iter<'variant, MaterialVariant>,
+    selected_descendant: bool,
 }
+
+/// Several authored branches can supply the appearance.
+pub(crate) struct AmbiguousMaterialVariant;
 
 impl MaterialVariant {
     /// Borrows the source node's whitespace-separated tags.
@@ -105,7 +117,7 @@ impl MaterialVariant {
             variants,
             active,
             |node| node.material.is_some(),
-            |node, _| node.material(),
+            |node, _| ControlFlow::Break(node.material()),
         )
         .flatten()
     }
@@ -121,19 +133,43 @@ impl MaterialVariant {
         Self::find(
             variants,
             active,
-            |node| node.material.is_some() || node.palette.is_some(),
-            |variant, parents| MaterialVariantSelection {
-                variant,
-                ancestors: parents.iter().map(|branch| branch.node.slot).collect(),
+            Self::has_appearance,
+            |variant, parents| {
+                ControlFlow::Break(MaterialVariantSelection::from_branch(variant, parents))
             },
         )
+    }
+
+    /// Selects one authored appearance, keeping descendants ahead of their ancestor.
+    pub(crate) fn select_unique<'variants>(
+        variants: &'variants [Self],
+        active: &[&str],
+    ) -> Result<Option<MaterialVariantSelection<'variants>>, AmbiguousMaterialVariant> {
+        let mut selected = None;
+        let ambiguous = Self::find(
+            variants,
+            active,
+            Self::has_appearance,
+            |variant, parents| {
+                if selected.is_some() {
+                    return ControlFlow::Break(AmbiguousMaterialVariant);
+                }
+                selected = Some(MaterialVariantSelection::from_branch(variant, parents));
+                ControlFlow::Continue(())
+            },
+        );
+        ambiguous.map_or(Ok(selected), Err)
+    }
+
+    const fn has_appearance(&self) -> bool {
+        self.material.is_some() || self.palette.is_some()
     }
 
     fn find<'variants, Tag: AsRef<str>, Output>(
         variants: &'variants [Self],
         active: &[Tag],
         fits: impl Fn(&Self) -> bool,
-        select: impl FnOnce(&'variants Self, &[Branch<'variants>]) -> Output,
+        mut select: impl FnMut(&'variants Self, &[Branch<'variants>]) -> ControlFlow<Output>,
     ) -> Option<Output> {
         let mut siblings = variants.iter();
         let mut parents = Vec::new();
@@ -142,15 +178,24 @@ impl MaterialVariant {
                 if !node.matches(active) {
                     continue;
                 }
-                parents.push(Branch { node, siblings });
+                parents.push(Branch {
+                    node,
+                    siblings,
+                    selected_descendant: false,
+                });
                 siblings = node.children.iter();
-            } else if let Some(branch) = parents.pop() {
-                if fits(branch.node) {
-                    return Some(select(branch.node, &parents));
+            } else {
+                let branch = parents.pop()?;
+                let selected = !branch.selected_descendant && fits(branch.node);
+                if selected && let ControlFlow::Break(output) = select(branch.node, &parents) {
+                    return Some(output);
+                }
+                if (selected || branch.selected_descendant)
+                    && let Some(parent) = parents.last_mut()
+                {
+                    parent.selected_descendant = true;
                 }
                 siblings = branch.siblings;
-            } else {
-                return None;
             }
         }
     }

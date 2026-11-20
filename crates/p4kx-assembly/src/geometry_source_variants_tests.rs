@@ -46,7 +46,9 @@ fn complete(missing_geometry: Option<usize>) -> TestResult {
             record: tree.record_index(),
             ordinal: 1,
         },
-    );
+        None,
+    )
+    .models;
     let expected: Vec<_> = (1..=LEVELS)
         .flat_map(|level| ["a", "b"].map(move |branch| (branch, level)))
         .filter(|(branch, level)| *branch != "a" || Some(*level) != missing_geometry)
@@ -100,7 +102,7 @@ fn an_inherited_material_keeps_its_own_authored_geometry_position() -> TestResul
         ordinal: 1,
     };
     let main = Geometry::read(component, owner).ok_or("main geometry")?;
-    let variants = Geometry::read_variants(component, owner);
+    let variants = Geometry::read_variants(component, owner, None).models;
     let mut variant = variants.first().ok_or("first variant")?.geometry().clone();
     assert_eq!(
         variant.material_field(),

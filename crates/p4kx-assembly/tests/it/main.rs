@@ -21,6 +21,7 @@ mod assembly_limits;
 mod assembly_palettes;
 mod assembly_skin;
 mod assembly_support;
+mod assembly_vehicle_paint;
 mod audio_bank_route_fixture;
 mod audio_bank_route_source;
 mod audio_bank_route_tests;

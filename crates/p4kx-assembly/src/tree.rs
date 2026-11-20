@@ -38,6 +38,7 @@ pub struct EntityNode {
     /// The own skin of a story character's head for this part, see
     /// `EntityNode::wear_own_head_skins`; drawn when the Archive holds it, else `geometry`.
     pub(crate) own_skin: Option<OwnSkin>,
+    pub(crate) paint_appearance: Option<Box<crate::vehicle_paint::PaintAppearance>>,
     pub(crate) vehicle: Option<Arc<VehicleImplementation>>,
     pub(crate) landing_gear: Arc<[LandingGear]>,
     pub(crate) landing_system_component: Option<usize>,

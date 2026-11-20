@@ -7,6 +7,10 @@ impl IssueKind {
     /// Returns a stable code for the kind, e.g. `geometry_missing`, for scripts; the message is
     /// text for people.
     #[must_use]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "The exhaustive lookup keeps stable diagnostic codes in one mapping."
+    )]
     pub const fn code(&self) -> &'static str {
         match self {
             Self::Unresolved(_) => "unresolved",
@@ -18,6 +22,7 @@ impl IssueKind {
             Self::GeometryUnreadable { .. } => "geometry_unreadable",
             Self::MaterialLibrary { .. } => "material_library",
             Self::Palette { .. } => "palette",
+            Self::PaintAppearance { .. } => "paint_appearance",
             Self::HelperNotFound { .. } => "helper_not_found",
             Self::AttachmentsLeftOut { .. } => "attachments_left_out",
             Self::SkeletonMissing { .. } => "skeleton_missing",

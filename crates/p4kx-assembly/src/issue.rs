@@ -67,6 +67,14 @@ pub enum IssueKind {
         /// What is wrong.
         reason: String,
     },
+    /// The fitted paint cannot choose a unique appearance for the root.
+    #[error("the paint on {port}: {reason}; the base appearance is used")]
+    PaintAppearance {
+        /// The port of the fitted item.
+        port: String,
+        /// The failed selection or compatibility rule.
+        reason: &'static str,
+    },
     /// The helper of a port or of an object container is no node of the model of the Entity it
     /// belongs to, so the part or the container sits at that Entity's origin.
     #[error("the helper {helper} is no node of the Entity's model")]

@@ -118,23 +118,7 @@ fn all_original_material_siblings_survive_beyond_four_thousand_nodes() -> TestRe
 
 #[test]
 fn a_palette_only_variant_retains_its_original_sparse_position() -> TestResult {
-    let palette_only = material_node("detail", "", Vec::new()).value(
-        "Palette",
-        TestValue::Struct(
-            TestInstance::new("PaletteRef")
-                .value("RootRecord", TestValue::Reference(PALETTE))
-                .value("ChildPath", TestValue::text("synthetic/finish")),
-        ),
-    );
-    let bytes = database(vec![
-        TestValue::Null,
-        node(
-            "livery",
-            "materials/parent.mtl",
-            vec![TestValue::Null, TestValue::Struct(palette_only)],
-        ),
-        node("livery", "materials/sibling.mtl", Vec::new()),
-    ]);
+    let bytes = sparse_palette_database();
     let forge = DataForge::open(&bytes)?;
     let tree = forge
         .record(0)
@@ -180,6 +164,26 @@ fn a_palette_only_variant_retains_its_original_sparse_position() -> TestResult {
         Some("materials/parent.mtl")
     );
     Ok(())
+}
+
+fn sparse_palette_database() -> Vec<u8> {
+    let palette_only = material_node("detail", "", Vec::new()).value(
+        "Palette",
+        TestValue::Struct(
+            TestInstance::new("PaletteRef")
+                .value("RootRecord", TestValue::Reference(PALETTE))
+                .value("ChildPath", TestValue::text("synthetic/finish")),
+        ),
+    );
+    database(vec![
+        TestValue::Null,
+        node(
+            "livery",
+            "materials/parent.mtl",
+            vec![TestValue::Null, TestValue::Struct(palette_only)],
+        ),
+        node("livery", "materials/sibling.mtl", Vec::new()),
+    ])
 }
 
 fn geometry_component<'tree, 'forge>(

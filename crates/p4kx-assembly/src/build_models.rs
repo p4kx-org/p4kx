@@ -167,7 +167,7 @@ fn retreat<'t>(
         let node = draft.node;
         let back = match step {
             Retreat::OwnSkin => draft.own_skin().and(node.geometry.as_ref()),
-            Retreat::SubGeometry => node.fallback.as_ref(),
+            Retreat::SubGeometry => node.model_fallback(),
         };
         let (Some(chosen), Some(back)) = (draft.geometry, back) else {
             continue;

@@ -92,6 +92,21 @@ The shared layer cache retains its separate relative layer-path contract.
 Synthetic and optional local consumer verification is documented in
 [material-reference-verification.md](material-reference-verification.md).
 
+## Fitted vehicle paints
+
+Entity GLB and Blender package exports resolve the root vehicle's fitted item on its effective
+`Paints` port. An explicit replacement must satisfy the shared vehicle and paint tag requirements,
+including values from the applied vehicle XML modification.
+
+The fitted item's `@Tag` can select a physical entry in `Geometry.SubGeometry` or
+`Material.materialVariants`. A variant can supply just material or palette. It then uses the
+base model and keeps the selected material or palette coordinates. A matching descendant takes
+precedence over its parent and competing authored rows produce a
+`paint_appearance` diagnostic and use the base appearance.
+
+SDK callers preparing a vehicle model can request the same selection with
+`LoadoutResolver::with_vehicle_appearance()` before building the Assembly.
+
 ## Plain colours in glTF
 
 | glTF | from |

@@ -97,7 +97,7 @@ pub(crate) fn flatten(root: &EntityNode, max_parts: usize) -> Flat<'_> {
                 gear: None,
                 node: root,
                 parent: None,
-                geometry: root.geometry(),
+                geometry: root.painted_geometry().or_else(|| root.geometry()),
                 library: None,
                 hidden: false,
             }],
@@ -107,6 +107,9 @@ pub(crate) fn flatten(root: &EntityNode, max_parts: usize) -> Flat<'_> {
         full: false,
         max_parts,
     };
+    if let Some(issue) = root.paint_issue() {
+        walker.issue("", root.class_name(), issue.clone());
+    }
     walker.gears(root, 0, "");
     walker.ports(root.ports(), 0, "", 1);
     walker.flat

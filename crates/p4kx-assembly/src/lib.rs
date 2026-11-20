@@ -188,6 +188,7 @@ mod spec_loadout;
 mod tree;
 mod tree_walk;
 mod vehicle;
+mod vehicle_paint;
 mod walk;
 mod xml;
 

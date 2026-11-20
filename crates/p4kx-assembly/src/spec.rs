@@ -8,6 +8,12 @@ use p4kx_dataforge::{Guid, RecordTree, StructValue};
 
 use crate::ItemClassification;
 use crate::LoadoutXmlClassUse;
+
+#[path = "vehicle_spec.rs"]
+mod vehicle_spec;
+
+pub(crate) use self::vehicle_spec::VehicleSpec;
+use self::vehicle_spec::read_vehicle;
 use crate::armour::{ZoneList, read_zones};
 use crate::geometry::GeometryComponent;
 use crate::loadout_path::PathRead;
@@ -96,26 +102,6 @@ pub(crate) struct PortSpec {
     pub(crate) default_item: TargetSpec,
 }
 
-/// The vehicle implementation a Record names and the Modification it selects.
-#[derive(Debug, Clone)]
-pub(crate) struct VehicleSpec {
-    pub(crate) definition: LoadoutPath,
-    pub(crate) modification: LoadoutPath,
-    pub(crate) class_name: Option<LoadoutPath>,
-    pub(crate) landing_system: Option<LoadoutReference>,
-    pub(crate) component: usize,
-}
-
-impl PartialEq for VehicleSpec {
-    fn eq(&self, other: &Self) -> bool {
-        self.definition == other.definition
-            && self.modification == other.modification
-            && self.landing_system == other.landing_system
-    }
-}
-
-impl Eq for VehicleSpec {}
-
 /// What the Loadout tree needs of one Entity Record.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct EntitySpec {
@@ -161,18 +147,22 @@ impl EntitySpec {
         };
         let geometry = geometry_component
             .and_then(|(ordinal, component)| Geometry::read(component, position(ordinal)));
-        let variants = geometry_component.map_or_default(|(ordinal, component)| {
-            Geometry::read_variants(component, position(ordinal))
-        });
-        let vehicle = component_slots(tree)
-            .find(|(_, component)| component.type_name() == VEHICLE_PARAMS)
-            .map(|(ordinal, component)| read_vehicle(component, ordinal, tree, paths));
         let attachable = attachable_component(tree);
         let definition = attachable.and_then(|(_, component)| struct_field(component, "AttachDef"));
+        let attach_tags = definition.map_or_default(|definition| text(definition, "Tags"));
+        let mut vehicle = component_slots(tree)
+            .find(|(_, component)| component.type_name() == VEHICLE_PARAMS)
+            .map(|(ordinal, component)| read_vehicle(component, ordinal, tree, paths, attach_tags));
+        let variants = geometry_component.map_or_default(|(ordinal, component)| {
+            let hull_base = geometry.as_ref().filter(|_| vehicle.is_some());
+            Geometry::read_variants(component, position(ordinal), hull_base)
+        });
+        if let Some(vehicle) = &mut vehicle {
+            vehicle.appearance_only = variants.appearance_only;
+        }
         let classification = ItemClassification::read(tree, attachable);
         Self {
-            attach_tags: definition
-                .map_or_default(|definition| tag_words(text(definition, "Tags"))),
+            attach_tags: tag_words(attach_tags),
             material_variants: geometry_component.map_or_default(|(ordinal, component)| {
                 MaterialVariant::read(component, position(ordinal))
             }),
@@ -197,7 +187,7 @@ impl EntitySpec {
             loadout,
             outfit,
             geometry,
-            variants,
+            variants: variants.models,
             vehicle,
         }
     }
@@ -339,27 +329,6 @@ pub(crate) fn read_item_facts(tree: &RecordTree<'_>) -> ItemFacts {
         item_type: classification.item_type_text().to_owned(),
         sub_type: classification.subtype_text().to_owned(),
         size: definition.and_then(|definition| unsigned(definition, "Size")),
-    }
-}
-
-fn read_vehicle(
-    component: &StructValue<'_>,
-    ordinal: usize,
-    tree: &RecordTree<'_>,
-    paths: &PathRead<'_>,
-) -> VehicleSpec {
-    VehicleSpec {
-        component: ordinal,
-        definition: paths.field(component, "vehicleDefinition", LoadoutPathOperation::Trim),
-        modification: paths.field(component, "modification", LoadoutPathOperation::Trim),
-        class_name: paths.record_name(tree),
-        landing_system: match component
-            .field("landingSystem")
-            .map(|value| target_spec::reference_target_at(component, value, paths))
-        {
-            Some(TargetSpec::Reference(reference)) => Some(reference),
-            _ => None,
-        },
     }
 }
 

@@ -87,6 +87,7 @@ pub(crate) fn run(args: &EntityPackageArgs, as_json: bool) -> Result<()> {
     let mut resolver = LoadoutResolver::new(&forge)
         .with_forge_entry(&entry)
         .with_files(&files)
+        .with_vehicle_appearance()
         .stopping_at_docked_vehicles();
     let record = resolver.entities().find(&args.entity)?;
     let applied = resolver.resolve_changed(&record, &changes)?;

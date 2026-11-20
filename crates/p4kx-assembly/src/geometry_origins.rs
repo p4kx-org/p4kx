@@ -34,10 +34,16 @@ impl Position {
     }
 }
 
+#[derive(Debug, Clone)]
+pub(super) enum MaterialPosition {
+    Geometry(Arc<Position>),
+    Authored(Arc<SourceLocation>),
+}
+
 #[derive(Debug, Clone, Default)]
 pub(crate) struct GeometrySelectors {
     pub(super) model: Option<Arc<Position>>,
-    pub(super) material: Option<Arc<Position>>,
+    pub(super) material: Option<MaterialPosition>,
 }
 
 impl GeometrySelectors {
@@ -47,7 +53,7 @@ impl GeometrySelectors {
             slots: slots.into(),
         });
         Self {
-            material: has_material.then(|| Arc::clone(&position)),
+            material: has_material.then(|| MaterialPosition::Geometry(Arc::clone(&position))),
             model: Some(position),
         }
     }
@@ -57,6 +63,9 @@ impl GeometrySelectors {
     }
 
     pub(crate) fn material_field(&self) -> Option<SourceLocation> {
-        Some(self.material.as_ref()?.at(".Geometry.Material.path"))
+        Some(match self.material.as_ref()? {
+            MaterialPosition::Geometry(position) => position.at(".Geometry.Material.path"),
+            MaterialPosition::Authored(location) => location.as_ref().clone(),
+        })
     }
 }

@@ -75,6 +75,7 @@ pub struct LoadoutResolver<'f> {
     /// Lower-case names of the assortment groups met while resolving with picks.
     pub(crate) seen_groups: HashSet<String>,
     pub(crate) stop_at_docked: bool,
+    pub(crate) vehicle_appearance: bool,
     stop: Option<&'f (dyn Fn() -> bool + Sync)>,
     pub(crate) serial_reads: usize,
     pub(crate) tag_tree: OnceLock<TagTree>,
@@ -118,6 +119,7 @@ impl<'f> LoadoutResolver<'f> {
             picks: LoadoutPicks::new(),
             seen_groups: HashSet::new(),
             stop_at_docked: false,
+            vehicle_appearance: false,
             stop: None,
             serial_reads: 0,
             tag_tree: OnceLock::new(),
@@ -140,6 +142,13 @@ impl<'f> LoadoutResolver<'f> {
     #[must_use]
     pub const fn stopping_at_docked_vehicles(mut self) -> Self {
         self.stop_at_docked = true;
+        self
+    }
+
+    /// Prepares the root vehicle's fitted paint for model assembly.
+    #[must_use]
+    pub const fn with_vehicle_appearance(mut self) -> Self {
+        self.vehicle_appearance = true;
         self
     }
 
@@ -195,6 +204,7 @@ impl<'f> LoadoutResolver<'f> {
             return Err(LoadoutError::ObservationStopped);
         }
         self.dress_body(&mut node);
+        self.prepare_vehicle_paint(spec, &mut node);
         if entity.is_from(self.entities.forge()) {
             node.forge_origin = self.forge_origin.clone();
         }
@@ -303,6 +313,7 @@ impl<'f> LoadoutResolver<'f> {
             return Err(LoadoutError::ObservationStopped.into());
         }
         self.dress_body(&mut node);
+        self.prepare_vehicle_paint(spec, &mut node);
         if entity.is_from(self.entities.forge()) {
             node.forge_origin = self.forge_origin.clone();
         }
