@@ -402,9 +402,9 @@ applied and no embedded textures.
 
 From 1.1 every glTF material in the file has `extras` `{"p4kx_index": <index>}`, its index in the
 file's `materials` array, the `index` of the matching entry in the manifest's `materials` list of
-the mesh. Blender's glTF importer creates materials in first-use order and renames duplicates
-(`.001`), so an importer matches materials by this custom property, not by name. `p4kx entity
-glb` files do not carry it.
+the mesh. Blender can create separate materials for primitives with and without vertex colours
+that use the same glTF slot. The add-on applies the slot's description to every material with
+the matching index. `p4kx entity glb` files omit this package property.
 The package preflight rejects a static mesh whose explicit slot tag differs from its GLB
 material array index. Older meshes with missing tags can still use the name fallback.
 

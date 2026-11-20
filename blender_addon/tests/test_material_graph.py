@@ -496,12 +496,18 @@ def test_shared_groups_are_described_once_each() -> None:
 def test_pairing_prefers_the_p4kx_index_over_names() -> None:
     manifest = [(0, "Mat"), (1, "Mat"), (2, "Other")]
     created = [("Mat", 1), ("Mat.001", 0), ("Other", None)]
-    assert pair_by_index(manifest, created) == {0: "Mat.001", 1: "Mat", 2: "Other"}
+    assert pair_by_index(manifest, created) == {0: ["Mat.001"], 1: ["Mat"], 2: ["Other"]}
 
 
 def test_pairing_falls_back_to_names_without_extras() -> None:
     manifest = [(0, "A"), (1, "B")]
-    assert pair_by_index(manifest, [("B", None), ("A", None)]) == {0: "A", 1: "B"}
+    assert pair_by_index(manifest, [("B", None), ("A", None)]) == {0: ["A"], 1: ["B"]}
+
+
+def test_pairing_reserves_every_indexed_variant_before_legacy_name_matching() -> None:
+    manifest = [(0, "Paint"), (1, "Paint"), (2, "Paint.003")]
+    created = [("Paint.002", None), ("Paint.003", 99), ("Paint.001", 0), ("Paint", 0)]
+    assert pair_by_index(manifest, created) == {0: ["Paint", "Paint.001"], 1: ["Paint.002"]}
 
 
 def test_index_property_values() -> None:

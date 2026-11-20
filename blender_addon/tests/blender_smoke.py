@@ -411,11 +411,43 @@ def check_layered_material(folder: Path) -> None:
     """Imports a 1.1 package and checks the node tree of a layered, tinted material."""
     bpy.ops.wm.read_factory_settings(use_empty=True)
     addon_utils.enable("io_scene_gltf2", default_set=False)
-    scene = synthetic.write_package(folder, synthetic_materials.manifest_11())
+    manifest = synthetic_materials.manifest_11()
+    gun = manifest["meshes"][0]
+    gun["triangles"] = 2
+    scene = synthetic.write_package(folder, manifest)
+    primitives = [
+        {"attributes": {"POSITION": 0}, "material": 0},
+        {"attributes": {"POSITION": 0, "COLOR_0": 0}, "material": 0},
+    ]
+    (folder / gun["file"]).write_bytes(
+        synthetic.glb(
+            gun["id"],
+            [entry["name"] for entry in gun["materials"]],
+            external={"meshes": [{"primitives": primitives}]},
+            extras=True,
+        )
+    )
     loaded = package.load_package(scene)
     check(loaded.version == (1, 1) and not loaded.warnings, f"loaded: {loaded.warnings}")
     result = importer.import_package(bpy.context, loaded)
     check(any("WeirdShader" in w for w in result.warnings), f"warnings: {result.warnings}")
+
+    instance = bpy.data.objects["hardpoint_a/Gun"]
+    slot_materials = {
+        obj.data.materials[poly.material_index]
+        for obj in instance.instance_collection.all_objects
+        if obj.type == "MESH"
+        for poly in obj.data.polygons
+    }
+    check(len(slot_materials) == 2, "one glTF slot yields two drawn Blender materials")
+    for variant in slot_materials:
+        check(variant.get("p4kx_index") == 0, "each variant retains the same physical slot index")
+        check(variant.get("p4kx_material") == "x0001", "both drawn variants use the authored description")
+        check(
+            any(node.type == "GROUP" and node.node_tree.name == "P4KX Layer Blend v1"
+                for node in variant.node_tree.nodes),
+            "both drawn variants receive the layer graph",
+        )
 
     material = bpy.data.materials["Gun_mat"]
     check(material.get("p4kx_index") == 0, "glTF extras arrive as a custom property")

@@ -63,4 +63,4 @@ def test_preflight_checks_material_tag_even_when_display_names_repeat(
 def test_correct_tags_pair_repeated_material_names_in_output_slot_order() -> None:
     manifest_slots = [(0, "duplicate"), (1, "duplicate")]
     blender_materials = [("duplicate", 1), ("duplicate.001", 0)]
-    assert pair_by_index(manifest_slots, blender_materials) == {0: "duplicate.001", 1: "duplicate"}
+    assert pair_by_index(manifest_slots, blender_materials) == {0: ["duplicate.001"], 1: ["duplicate"]}
