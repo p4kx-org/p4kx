@@ -8,6 +8,7 @@ use crate::{
     SourceEvidenceError, SourceUseRole, SourceUses,
 };
 
+use super::directory_range;
 use super::source::EntryDirectorySource;
 
 pub(crate) fn write(
@@ -28,7 +29,7 @@ pub(crate) fn write(
             .get(*index)
             .filter(|_| !issue.is_archive_wide());
         let (path_origin, check_origin) = if let Some(entry) = original {
-            observe(archive, entry, issue, uses)?
+            observe(archive, entry, issue, position, uses)?
         } else {
             (uses.origin(&[], false), uses.origin(&[], false))
         };
@@ -48,6 +49,7 @@ fn observe(
     archive: &Archive,
     entry: &Entry,
     issue: &EntryIssue,
+    position: usize,
     uses: &SourceUses,
 ) -> Result<(FieldOrigin, FieldOrigin), SourceEvidenceError> {
     let source = EntryDirectorySource::observe(archive, entry, uses.clone(), SourceDetails::Full)?;
@@ -60,6 +62,7 @@ fn observe(
         source.path.clone()
     };
     let check_origin = match *issue {
+        EntryIssue::DataOutsideFile => v2_data_range_origin(archive, position, &source, uses)?,
         EntryIssue::PathNotUtf8 if lossy => {
             let value = source.directory_fact("path", SourceUseRole::Conversion)?;
             source.origin(&[value])
@@ -81,6 +84,47 @@ fn observe(
         _ => source.origin_when(&[], false),
     };
     Ok((path_origin, check_origin))
+}
+
+fn v2_data_range_origin(
+    archive: &Archive,
+    position: usize,
+    source: &EntryDirectorySource,
+    uses: &SourceUses,
+) -> Result<FieldOrigin, SourceEvidenceError> {
+    let Some(bounds) = archive.observed_v2_data_outside_file(position) else {
+        return Ok(source.origin_when(&[], false));
+    };
+    let Some(root) = uses.root_directory_scope(archive)? else {
+        return Ok(source.origin_when(&[], false));
+    };
+    let role = SourceUseRole::Conversion;
+    Ok(source.origin(&[
+        source.directory_subresource(
+            directory_range(
+                "entryDirectoryRecord",
+                "data_offset",
+                bounds.data_offset().range(),
+            ),
+            role,
+        )?,
+        source.directory_subresource(
+            directory_range(
+                "entryDirectoryRecord",
+                "compressed_size",
+                bounds.compressed_size().range(),
+            ),
+            role,
+        )?,
+        root.at(
+            directory_range(
+                "archiveV2Trailer",
+                "v2/payloadEnd",
+                bounds.payload_end().range(),
+            ),
+            role,
+        )?,
+    ]))
 }
 
 fn descriptor(

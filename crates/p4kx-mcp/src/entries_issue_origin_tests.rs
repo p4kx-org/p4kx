@@ -87,10 +87,14 @@ fn issue_fields_bind_original_cached_root_metadata() -> TestResult {
             .is_some_and(Vec::is_empty),
         "the unsupported defect has no fabricated metadata contributor"
     );
-    assert!(
-        info.pointer("/fieldOrigins/~1structuredContent~1issue_count")
-            .is_none(),
-        "the issue list does not certify the full diagnostic count"
+    assert_eq!(
+        info.pointer("/fieldOrigins/~1structuredContent~1issue_count"),
+        Some(&json!({
+            "containsEncryptedSource": null,
+            "sourceUsesRefs": [],
+            "sourceSetComplete": false,
+        })),
+        "MCP explicitly marks the full count unknown independently of the sourced Issue sample"
     );
     Ok(())
 }

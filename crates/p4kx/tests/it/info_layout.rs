@@ -65,9 +65,19 @@ fn info_json_uses_the_shared_cached_layout_without_changing_existing_counts() ->
             "the complete original admitted inventory supplies {key}"
         );
     }
-    assert!(
-        origins.get("/issue_count").is_none(),
-        "the summary has no exact validation receipt for the issue count"
+    assert_eq!(
+        info.get("issue_count").and_then(Value::as_u64),
+        Some(0),
+        "the empty plain Entry has no eager directory defect"
+    );
+    assert_eq!(
+        info.pointer("/fieldOrigins/~1issue_count"),
+        Some(&json!({
+            "containsEncryptedSource": null,
+            "sourceUsesRefs": [],
+            "sourceSetComplete": false,
+        })),
+        "CLI explicitly marks the missing complete directory-validation receipt as unknown"
     );
     check_manifest_origins(&info, origins)
 }

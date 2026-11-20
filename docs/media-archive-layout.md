@@ -95,9 +95,11 @@ MCP `archive_info` addresses the listed Issue members under
 `/structuredContent/issues/<row>/path` and `/structuredContent/issues/<row>/issue`.
 A physical Issue path uses the original directory path and its lossy decoding when applicable.
 Invalid UTF-8, encryption word and encryption block length messages use the actual cached
-directory data. Entry payload encryption does not taint root directory evidence. Issues without
-their original checker operands carry incomplete origins. The listed sample does not establish
-the provenance of the full `issue_count`.
+directory data. A normal v2 `DataOutsideFile` issue resolves to the original Entry data offset,
+stored compressed size and trailer payload-end word, including when the offset addition
+overflows. Root directory evidence has its own encryption state. Recovery and other issues
+whose checker operands are unavailable carry incomplete origins. The full `issue_count` has
+an explicit unknown marker, independently of the listed sample.
 
 The reader's [source metadata contract](archive-source-metadata.md) defines record ownership,
 section extents, recovery limits and lazy-access failures.

@@ -111,7 +111,8 @@ returns the same object. `fieldOrigins` addresses each layout field at `/metadat
 and `/structuredContent/metadata/…` in MCP. Resolve each field's `sourceUsesRefs` against
 `provenance`. The companion also addresses the four admitted-directory totals and the original
 Build manifest fields. The launcher-derived `public_patch` has incomplete contributors.
-`issue_count` has no full directory-validation receipt in this companion. MCP `archive_info`
+`issue_count` carries an explicit unknown marker because its full directory-validation receipt
+is unavailable. MCP `archive_info`
 additionally addresses its listed Issue paths and cached descriptor evidence.
 [Archive source layout](media-archive-layout.md) defines the field evidence.
 

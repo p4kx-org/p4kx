@@ -89,6 +89,7 @@ mod ui_imports;
 mod ui_movie;
 mod ui_render;
 mod ui_render_text_sources;
+mod v2_archive_issue_origins;
 mod verification;
 
 mod texture_topology_complete;

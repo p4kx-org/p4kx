@@ -160,6 +160,15 @@ fn check_summary_origins(origins: &Value, provenance: &Value) -> TestResult {
             "the original admitted directory is complete for {key}"
         );
     }
+    assert_eq!(
+        origins.get("/structuredContent/issue_count"),
+        Some(&json!({
+            "containsEncryptedSource": null,
+            "sourceUsesRefs": [],
+            "sourceSetComplete": false,
+        })),
+        "the actual MCP response retains an explicit unknown origin for the diagnostic total"
+    );
     let references = origins
         .get("/structuredContent/encrypted_count")
         .and_then(|marker| marker.get("sourceUsesRefs"))

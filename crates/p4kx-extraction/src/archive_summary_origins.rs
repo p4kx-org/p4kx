@@ -54,6 +54,7 @@ fn write_directory(
         "entry_count",
         uses.origin(entry_count.as_slice(), complete && entry_count.is_some()),
     )?;
+    put(fields, path, "issue_count", uses.origin(&[], false))?;
     let scope = uses.root_directory_scope(archive)?;
     for (key, original) in [
         ("encrypted_count", "encryption_declarations"),
