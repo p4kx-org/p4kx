@@ -110,7 +110,9 @@ pub(super) fn read_inputs<'source>(
     }))
 }
 
-fn magazine_coverage(ledger: ExportLedger) -> Result<CatalogRecordCoverage, CatalogError> {
+pub(super) fn magazine_coverage(
+    ledger: ExportLedger,
+) -> Result<CatalogRecordCoverage, CatalogError> {
     let mut coverage = CatalogRecordCoverage::default();
     for row in ledger.sources {
         match row.disposition {

@@ -4,11 +4,11 @@
 use p4kx_extraction::{CancelToken, DataForge, RecordTree};
 
 use super::record_query;
-use super::rows::{Family, Projector};
+use super::rows::{Family, Projector, ReadOptions};
 use crate::CatalogError;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::scoped_source_read::ScopedSourceRead;
-use crate::catalog_v3::catalog_item_alignment::AlignmentOptions;
+
 use crate::catalog_v3::catalog_item_components::{self, ItemEquipmentFamily};
 use crate::record_observation::RecordObservation;
 
@@ -29,7 +29,7 @@ impl Projector for ShieldGeneratorRows {
         tree: &RecordTree<'source>,
         projection: &CatalogProjection<'_, 'source>,
         admission: &RecordObservation<'_, 'source>,
-        _: &AlignmentOptions<'_>,
+        _: &ReadOptions<'_>,
         cancel: Option<&CancelToken>,
     ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
         catalog_item_components::read_shield_generators(tree, projection, admission, cancel)
@@ -47,7 +47,7 @@ impl Projector for QuantumDriveRows {
         tree: &RecordTree<'source>,
         projection: &CatalogProjection<'_, 'source>,
         admission: &RecordObservation<'_, 'source>,
-        _: &AlignmentOptions<'_>,
+        _: &ReadOptions<'_>,
         cancel: Option<&CancelToken>,
     ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
         catalog_item_components::read_quantum_drives(tree, projection, admission, cancel)

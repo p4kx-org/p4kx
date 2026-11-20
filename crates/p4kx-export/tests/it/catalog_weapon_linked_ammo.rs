@@ -10,6 +10,8 @@ use crate::health_origin_assertions as proof;
 
 #[path = "catalog_weapon_linked_ammo_fixture.rs"]
 mod fixture;
+#[path = "catalog_weapon_magazine_dependency_sdk.rs"]
+mod magazine_sdk;
 #[path = "catalog_projectile_ammo_sdk.rs"]
 mod sdk;
 

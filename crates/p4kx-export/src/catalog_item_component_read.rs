@@ -113,7 +113,9 @@ pub(crate) fn read_magazine_resolution<'source>(
     projection: &CatalogProjection<'_, 'source>,
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
-) -> Result<ScopedSourceRead<Vec<resolution::WeaponMagazineResolution>>, CatalogError> {
+    dependencies: Option<&resolution::MagazineDependencies<'_, 'source>>,
+) -> Result<ScopedSourceRead<Option<resolution::WeaponMagazineResolution>>, CatalogError> {
+    crate::catalog_query_session::checkpoint(cancel)?;
     let input = projection.original();
     input.check_forge(forge)?;
     let result = with_primary_magazine(
@@ -127,7 +129,7 @@ pub(crate) fn read_magazine_resolution<'source>(
                     Some(Value::Error(error)) if error.dangling_guid().is_none()
                 );
                 return Ok::<_, CatalogError>(ScopedSourceRead::new(
-                    Vec::new(),
+                    None,
                     Vec::new(),
                     component_selection_complete(tree) && !failed,
                 ));
@@ -141,20 +143,17 @@ pub(crate) fn read_magazine_resolution<'source>(
                 &fields,
                 observed,
                 cancel,
-                None,
+                dependencies,
             )?;
             let complete = row
                 .as_ref()
                 .is_some_and(|row| row.outcome().origin().source_set_complete());
-            Ok(ScopedSourceRead::new(
-                row.into_iter().collect(),
-                Vec::new(),
-                complete,
-            ))
+            Ok(ScopedSourceRead::new(row, Vec::new(), complete))
         },
     )?;
+    crate::catalog_query_session::checkpoint(cancel)?;
     Ok(result.unwrap_or_else(|| {
-        ScopedSourceRead::new(Vec::new(), Vec::new(), component_selection_complete(tree))
+        ScopedSourceRead::new(None, Vec::new(), component_selection_complete(tree))
     }))
 }
 

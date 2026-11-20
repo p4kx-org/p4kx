@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::equipment::{WeaponMagazineOutcome, WeaponMagazineSnapshot};
+use p4kx_export::catalog_queries::equipment::{
+    WeaponMagazineDependencySnapshot, WeaponMagazineOutcome, WeaponMagazineSnapshot,
+};
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogQuerySession};
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog, build_catalog_from};
 use p4kx_extraction::Filter;
@@ -37,6 +39,47 @@ fn magazine_sdk_matches_canonical_own_and_linked_routes() -> TestResult {
 }
 
 #[test]
+fn magazine_dependency_admission_uses_the_same_catalog_item_filter() -> TestResult {
+    let builder = fixture::magazine_database(fixture::MagazineCase::Resolved);
+    let (_folder, archive) = common::open(&builder, DcbOrigin::Encrypted)?;
+    let session =
+        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
+    let parsed = session.parsed(None)?;
+    let filter = Filter::new("fixture_personal");
+
+    for (item_filter, expected) in [(None, 0), (Some(&filter), 1)] {
+        parsed.with_weapon_magazine_dependencies(
+            source::PERSONAL_INDEX,
+            item_filter,
+            None,
+            |snapshot| -> TestResult {
+                let [owner] = snapshot.rows() else {
+                    return Err("one primary attempt for the selected weapon".into());
+                };
+                assert_eq!(
+                    owner.dependencies.len(),
+                    expected,
+                    "dependency admission tracks the requested Catalog filter"
+                );
+                Ok(())
+            },
+        )??;
+    }
+    parsed.with_weapon_magazine_dependencies(
+        source::DIRECT_INDEX,
+        Some(&filter),
+        None,
+        |snapshot| {
+            assert!(
+                snapshot.rows().is_empty(),
+                "a filter may exclude the explicitly named caller"
+            );
+        },
+    )?;
+    Ok(())
+}
+
+#[test]
 fn magazine_sdk_keeps_an_unreadable_reached_target_scoped_to_its_caller() -> TestResult {
     let mut bytes = fixture::magazine_database(fixture::MagazineCase::Resolved).build();
     resolution::break_instance(&mut bytes, source::PRIMARY_INDEX)?;
@@ -63,6 +106,12 @@ fn magazine_sdk_keeps_an_unreadable_reached_target_scoped_to_its_caller() -> Tes
     };
     let catalog: Value =
         serde_json::from_slice(build_catalog_from(&input.archive, &input.entry, &options)?.json())?;
+    parsed.with_weapon_magazine_dependencies(
+        source::PERSONAL_INDEX,
+        Some(&filter),
+        None,
+        |snapshot| verify_unreadable_dependency(&snapshot),
+    )??;
     parsed.with_weapon_magazine_resolutions(source::PERSONAL_INDEX, None, |snapshot| {
         compare(
             &snapshot,
@@ -72,31 +121,51 @@ fn magazine_sdk_keeps_an_unreadable_reached_target_scoped_to_its_caller() -> Tes
             true,
         )
     })??;
-    parsed.with_weapon_magazine_resolutions(
-        source::DIRECT_INDEX,
-        None,
-        |snapshot| -> TestResult {
-            let [row] = snapshot.rows() else {
-                return Err("one own route despite an unreadable external target".into());
-            };
-            assert!(
-                matches!(
-                    row.outcome().value(),
-                    Some(WeaponMagazineOutcome::OwnContainer { .. })
-                ),
-                "the own route does not activate the external target"
-            );
-            assert!(
-                row.outcome().origin().source_set_complete(),
-                "the own selection is complete"
-            );
-            assert!(
-                snapshot.coverage().incomplete_fields.is_empty(),
-                "the unreadable target stays out of scope"
-            );
-            Ok(())
-        },
-    )??;
+    parsed.with_weapon_magazine_resolutions(source::DIRECT_INDEX, None, |snapshot| {
+        verify_unrelated_own_route(&snapshot)
+    })?
+}
+
+fn verify_unreadable_dependency(snapshot: &WeaponMagazineDependencySnapshot<'_>) -> TestResult {
+    let [owner] = snapshot.rows() else {
+        return Err("one attempted magazine dependency".into());
+    };
+    assert!(
+        owner.dependencies.is_empty(),
+        "an unreadable magazine never fabricates dependency rows"
+    );
+    assert_eq!(
+        owner.dependency_coverage.unreadable_bodies,
+        vec![source::PRIMARY_INDEX],
+        "the reached physical body remains visible"
+    );
+    assert_eq!(
+        snapshot.coverage().incomplete_fields,
+        vec![source::PERSONAL_INDEX],
+        "the selected weapon reports incomplete dependency coverage"
+    );
+    Ok(())
+}
+
+fn verify_unrelated_own_route(snapshot: &WeaponMagazineSnapshot<'_>) -> TestResult {
+    let [row] = snapshot.rows() else {
+        return Err("one own route despite an unreadable external target".into());
+    };
+    assert!(
+        matches!(
+            row.outcome().value(),
+            Some(WeaponMagazineOutcome::OwnContainer { .. })
+        ),
+        "the own route does not activate the external target"
+    );
+    assert!(
+        row.outcome().origin().source_set_complete(),
+        "the own selection is complete"
+    );
+    assert!(
+        snapshot.coverage().incomplete_fields.is_empty(),
+        "the unreadable target stays out of scope"
+    );
     Ok(())
 }
 

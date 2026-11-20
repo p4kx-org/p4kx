@@ -1192,8 +1192,8 @@ The authored query reads components owned by the selected Item. An admitted maga
 can be queried separately by its physical Record index. Magazine and Ammo References
 report original header resolution. A filtered Catalog can include a linked container outside
 the ordinary Item selection as a dependency. The authored query covers the selected owner
-and does not enumerate those dependency rows. Use the projectile ammunition query for a
-resolved action route and its reached Ammo.
+and leaves those dependency rows to the primary magazine dependency query. Use the projectile
+ammunition query for a resolved action route and its reached Ammo.
 
 ## Primary weapon magazine resolutions
 
@@ -1209,6 +1209,21 @@ within its reported coverage. Read the authored bindings separately to inspect
 links that were never followed. Source-body reads are scoped to the selected
 Item and any magazine reached by its primary route. Projectile actions, Ammo
 definitions and localization are outside the query scope.
+
+Use `equipment::with_weapon_magazine_dependencies` to include the identical primary resolution
+and the canonical `configurations.ammoContainers` and `declarations.ammoBindings` dependency
+rows. The optional Catalog Item filter applies to both the physical weapon and the reached
+magazine. With no filter, an ordinary Item magazine can be read with
+`equipment::with_weapon_sources`. A linked magazine outside the ordinary Item selection
+contributes the container slot and its binding to this dependency query. Those two rows share
+the magazine's physical Record index and component ordinal, and carry each original field's
+source evidence. Both rows belong to the snapshot's source inventory.
+
+This query follows the Catalog's legacy first primary route. Read the typed resolution and
+dependency coverage to distinguish a proved absence from unreadable or incomplete source
+data. For a GUID alias, the physical target is the one the original primary Reference
+resolves through DataForge. Action-specific admission remains in the projectile ammunition
+query.
 
 Verify the primary magazine SDK against one original own container and one
 original linked magazine without generating a Catalog. Set `P4KX_DATA_P4K_B`

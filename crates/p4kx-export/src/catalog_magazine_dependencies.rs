@@ -26,8 +26,8 @@ use crate::{CatalogError, ExportAccountingError, Kind};
 
 /// The canonical component and binding needed by a selected weapon's linked magazine.
 pub(crate) struct MagazineDependency<'source> {
-    container: AmmoContainer<'source>,
-    binding: AmmoBinding<'source>,
+    pub(crate) container: AmmoContainer<'source>,
+    pub(crate) binding: AmmoBinding<'source>,
     numbers: Vec<CapturedNumber>,
 }
 

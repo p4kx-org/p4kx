@@ -4,11 +4,11 @@
 use p4kx_extraction::{CancelToken, DataForge, RecordTree};
 
 use super::record_query;
-use super::rows::{Family, Projector};
+use super::rows::{Family, Projector, ReadOptions};
 use crate::CatalogError;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::scoped_source_read::ScopedSourceRead;
-use crate::catalog_v3::catalog_item_alignment::AlignmentOptions;
+
 use crate::catalog_v3::inventory_container_definition::{self, InventoryContainerDefinition};
 use crate::record_observation::RecordObservation;
 
@@ -23,7 +23,7 @@ impl Projector for InventoryContainerRows {
         tree: &RecordTree<'source>,
         projection: &CatalogProjection<'_, 'source>,
         admission: &RecordObservation<'_, 'source>,
-        _: &AlignmentOptions<'_>,
+        _: &ReadOptions<'_>,
         cancel: Option<&CancelToken>,
     ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
         let (row, notes) =

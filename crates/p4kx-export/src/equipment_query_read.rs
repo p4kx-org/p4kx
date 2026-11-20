@@ -4,12 +4,13 @@
 use std::sync::Arc;
 
 use p4kx_extraction::{
-    Archive, CancelToken, CanonicalReadObserver, DataForge, DataForgeEntry, Language,
+    Archive, CancelToken, CanonicalReadObserver, DataForge, DataForgeEntry, Filter, Language,
 };
 
-use super::rows::{Family, Projector};
+use super::rows::{Family, Projector, ReadOptions};
 use super::snapshot::EquipmentSnapshot;
 use crate::CatalogError;
+use crate::Kind;
 use crate::build::catalog_queries::unlocalized_record_query::plan::{Owner, Plan};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
@@ -19,6 +20,7 @@ use crate::catalog_queries::{
 };
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_v3::catalog_item_alignment::AlignmentOptions;
+use crate::entity_selection::{self, Selected};
 use crate::guid_text::CatalogGuid;
 use crate::record_observation::RecordObservation;
 use crate::texts::{TextSources, Texts};
@@ -85,7 +87,16 @@ impl<'query> Query<'query> {
         observer: Option<Arc<dyn CanonicalReadObserver>>,
         inspect: impl for<'source> FnOnce(EquipmentSnapshot<'source, P::Row<'source>>) -> T,
     ) -> Result<T, CatalogError> {
-        let mut plan = self.plan(P::FAMILY, observer)?;
+        self.run_with_item_filter::<P, T>(observer, None, inspect)
+    }
+
+    pub(super) fn run_with_item_filter<P: Projector, T>(
+        self,
+        observer: Option<Arc<dyn CanonicalReadObserver>>,
+        item_filter: Option<&Filter>,
+        inspect: impl for<'source> FnOnce(EquipmentSnapshot<'source, P::Row<'source>>) -> T,
+    ) -> Result<T, CatalogError> {
+        let mut plan = self.plan(P::FAMILY, observer, item_filter)?;
         let requested = self.requested(P::FAMILY);
         let selected_languages = if plan.owners.is_empty() {
             &[]
@@ -104,10 +115,13 @@ impl<'query> Query<'query> {
         let registry = CatalogTextRegistry::default();
         let projection =
             CatalogProjection::new(&texts, &input, &registry).for_kind(P::FAMILY.kind());
-        let options = if matches!(P::FAMILY, Family::Attachments) {
-            AlignmentOptions::read(self.forge, self.cancel)?
-        } else {
-            AlignmentOptions::default()
+        let options = ReadOptions {
+            alignment: if matches!(P::FAMILY, Family::Attachments) {
+                AlignmentOptions::read(self.forge, self.cancel)?
+            } else {
+                AlignmentOptions::default()
+            },
+            item_filter,
         };
         let rows = project::<P>(
             self.forge,
@@ -148,9 +162,27 @@ impl<'query> Query<'query> {
         &self,
         family: Family,
         observer: Option<Arc<dyn CanonicalReadObserver>>,
+        item_filter: Option<&Filter>,
     ) -> Result<Plan<'query>, CatalogError> {
         checkpoint(self.cancel)?;
         let mut plan = match family {
+            Family::MagazineResolutions if item_filter.is_some() => Plan::read_with(
+                self.forge,
+                self.selection,
+                self.cancel,
+                observer,
+                |record, _, coverage| {
+                    match entity_selection::select(record, item_filter) {
+                        Err(_) => coverage.unreadable_headers.push(record.index()),
+                        Ok(Some(Selected::Leftover(Kind::Items))) => {
+                            coverage.skipped_leftovers += 1;
+                        }
+                        Ok(Some(Selected::Entity(Kind::Items))) => return Ok(true),
+                        Ok(_) => {}
+                    }
+                    Ok(false)
+                },
+            )?,
             Family::Definitions
             | Family::ItemSources
             | Family::InventoryContainers
@@ -225,7 +257,7 @@ fn project<'source, P: Projector>(
     forge: &'source DataForge<'source>,
     owners: Vec<Owner<'source>>,
     projection: &CatalogProjection<'_, 'source>,
-    options: &AlignmentOptions<'_>,
+    options: &ReadOptions<'_>,
     coverage: &mut CatalogRecordCoverage,
     cancel: Option<&CancelToken>,
 ) -> Result<Vec<P::Row<'source>>, CatalogError> {

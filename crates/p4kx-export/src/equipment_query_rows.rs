@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{CancelToken, DataForge, RecordTree};
+use p4kx_extraction::{CancelToken, DataForge, Filter, RecordTree};
 
 use super::{InventoryOwnerBounds, ItemAttachmentComponent, ItemDefinition, ItemSource};
 use crate::catalog_projection::CatalogProjection;
@@ -111,6 +111,11 @@ impl Family {
     }
 }
 
+pub(super) struct ReadOptions<'query> {
+    pub(super) alignment: AlignmentOptions<'query>,
+    pub(super) item_filter: Option<&'query Filter>,
+}
+
 pub(super) trait Projector {
     type Row<'source>;
     const FAMILY: Family;
@@ -120,7 +125,7 @@ pub(super) trait Projector {
         tree: &RecordTree<'source>,
         projection: &CatalogProjection<'_, 'source>,
         admission: &RecordObservation<'_, 'source>,
-        options: &AlignmentOptions<'_>,
+        options: &ReadOptions<'_>,
         cancel: Option<&CancelToken>,
     ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError>;
 }
@@ -135,6 +140,7 @@ pub(super) struct WeaponSources;
 pub(super) struct ProjectileAmmo;
 pub(super) struct WeaponCombatBases;
 pub(super) struct MagazineResolutions;
+pub(super) struct MagazineDependencies;
 
 impl Projector for MagazineResolutions {
     type Row<'source> = super::WeaponMagazineResolution;
@@ -145,11 +151,35 @@ impl Projector for MagazineResolutions {
         tree: &RecordTree<'source>,
         projection: &CatalogProjection<'_, 'source>,
         admission: &RecordObservation<'_, 'source>,
-        _: &AlignmentOptions<'_>,
+        _: &ReadOptions<'_>,
         cancel: Option<&CancelToken>,
     ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
-        catalog_item_components::read_magazine_resolution(
-            forge, tree, projection, admission, cancel,
+        let read = catalog_item_components::read_magazine_resolution(
+            forge, tree, projection, admission, cancel, None,
+        )?;
+        Ok(read.map(|row| row.into_iter().collect()))
+    }
+}
+
+impl Projector for MagazineDependencies {
+    type Row<'source> = super::WeaponMagazineDependencyOwner<'source>;
+    const FAMILY: Family = Family::MagazineResolutions;
+
+    fn read<'source>(
+        forge: &'source DataForge<'source>,
+        tree: &RecordTree<'source>,
+        projection: &CatalogProjection<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        options: &ReadOptions<'_>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
+        super::weapon_magazine_dependency_read::read(
+            forge,
+            tree,
+            projection,
+            admission,
+            cancel,
+            options.item_filter,
         )
     }
 }
@@ -163,7 +193,7 @@ impl Projector for WeaponCombatBases {
         tree: &RecordTree<'source>,
         projection: &CatalogProjection<'_, 'source>,
         admission: &RecordObservation<'_, 'source>,
-        _: &AlignmentOptions<'_>,
+        _: &ReadOptions<'_>,
         cancel: Option<&CancelToken>,
     ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
         super::weapon_combat_read::read(forge, tree, projection, admission, cancel)
@@ -179,7 +209,7 @@ impl Projector for ProjectileAmmo {
         tree: &RecordTree<'source>,
         projection: &CatalogProjection<'_, 'source>,
         admission: &RecordObservation<'_, 'source>,
-        _: &AlignmentOptions<'_>,
+        _: &ReadOptions<'_>,
         cancel: Option<&CancelToken>,
     ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
         super::projectile_ammo_read::read(forge, tree, projection, admission, cancel)
@@ -195,7 +225,7 @@ impl Projector for WeaponSources {
         tree: &RecordTree<'source>,
         projection: &CatalogProjection<'_, 'source>,
         admission: &RecordObservation<'_, 'source>,
-        _: &AlignmentOptions<'_>,
+        _: &ReadOptions<'_>,
         cancel: Option<&CancelToken>,
     ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
         catalog_item_components::read_weapon_source(tree, projection, admission, cancel)
@@ -211,7 +241,7 @@ impl Projector for AmmoDefinitions {
         tree: &RecordTree<'source>,
         projection: &CatalogProjection<'_, 'source>,
         admission: &RecordObservation<'_, 'source>,
-        _: &AlignmentOptions<'_>,
+        _: &ReadOptions<'_>,
         cancel: Option<&CancelToken>,
     ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
         let (prepared, notes) =
@@ -233,7 +263,7 @@ impl Projector for Definitions {
         tree: &RecordTree<'source>,
         projection: &CatalogProjection<'_, 'source>,
         admission: &RecordObservation<'_, 'source>,
-        _: &AlignmentOptions<'_>,
+        _: &ReadOptions<'_>,
         cancel: Option<&CancelToken>,
     ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
         let read = definition_read::read(tree, projection, admission, cancel)?;
@@ -250,7 +280,7 @@ impl Projector for ItemSources {
         tree: &RecordTree<'source>,
         projection: &CatalogProjection<'_, 'source>,
         admission: &RecordObservation<'_, 'source>,
-        _: &AlignmentOptions<'_>,
+        _: &ReadOptions<'_>,
         cancel: Option<&CancelToken>,
     ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
         let read = definition_read::with_definition(
@@ -278,11 +308,15 @@ impl Projector for Attachments {
         tree: &RecordTree<'source>,
         projection: &CatalogProjection<'_, 'source>,
         admission: &RecordObservation<'_, 'source>,
-        options: &AlignmentOptions<'_>,
+        options: &ReadOptions<'_>,
         cancel: Option<&CancelToken>,
     ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
         catalog_entity_configurations::read_attachment_constraints(
-            tree, projection, admission, options, cancel,
+            tree,
+            projection,
+            admission,
+            &options.alignment,
+            cancel,
         )
     }
 }
@@ -296,10 +330,17 @@ impl Projector for CargoGrids {
         tree: &RecordTree<'source>,
         projection: &CatalogProjection<'_, 'source>,
         admission: &RecordObservation<'_, 'source>,
-        options: &AlignmentOptions<'_>,
+        options: &ReadOptions<'_>,
         cancel: Option<&CancelToken>,
     ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
-        super::cargo_read::read(forge, tree, projection, admission, options, cancel)
+        super::cargo_read::read(
+            forge,
+            tree,
+            projection,
+            admission,
+            &options.alignment,
+            cancel,
+        )
     }
 }
 
@@ -312,11 +353,15 @@ impl Projector for Bounds {
         tree: &RecordTree<'source>,
         projection: &CatalogProjection<'_, 'source>,
         admission: &RecordObservation<'_, 'source>,
-        options: &AlignmentOptions<'_>,
+        options: &ReadOptions<'_>,
         cancel: Option<&CancelToken>,
     ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
         catalog_entity_configurations::read_item_bounds(
-            tree, projection, admission, options, cancel,
+            tree,
+            projection,
+            admission,
+            &options.alignment,
+            cancel,
         )
     }
 }
@@ -334,10 +379,16 @@ macro_rules! configuration_projector {
                 tree: &RecordTree<'source>,
                 projection: &CatalogProjection<'_, 'source>,
                 admission: &RecordObservation<'_, 'source>,
-                options: &AlignmentOptions<'_>,
+                options: &ReadOptions<'_>,
                 cancel: Option<&CancelToken>,
             ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
-                catalog_entity_configurations::$read(tree, projection, admission, options, cancel)
+                catalog_entity_configurations::$read(
+                    tree,
+                    projection,
+                    admission,
+                    &options.alignment,
+                    cancel,
+                )
             }
         }
     };

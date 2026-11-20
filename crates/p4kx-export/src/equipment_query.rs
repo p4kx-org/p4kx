@@ -106,6 +106,8 @@ mod weapon_combat;
 mod weapon_combat_read;
 #[path = "equipment_weapon_magazine_query.rs"]
 mod weapon_magazine;
+#[path = "equipment_weapon_magazine_dependency_read.rs"]
+mod weapon_magazine_dependency_read;
 #[path = "equipment_weapon_recoil_query.rs"]
 mod weapon_recoil;
 
@@ -165,7 +167,9 @@ pub use weapon_combat::{
 };
 
 pub use weapon_magazine::{
+    LinkedMagazineSources, WeaponMagazineDependencyOwner, WeaponMagazineDependencySnapshot,
     WeaponMagazineOutcome, WeaponMagazineResolution, WeaponMagazineSnapshot,
+    with_weapon_magazine_dependencies, with_weapon_magazine_dependencies_from,
     with_weapon_magazine_resolutions, with_weapon_magazine_resolutions_from,
 };
 
