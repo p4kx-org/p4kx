@@ -170,6 +170,7 @@ fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
         .iter()
         .copied()
         .chain(routes::loot_datasets())
+        .chain(routes::contract_datasets())
     {
         assert_ne!(
             gaps.get(path),

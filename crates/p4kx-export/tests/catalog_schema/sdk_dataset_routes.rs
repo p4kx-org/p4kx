@@ -43,6 +43,8 @@ mod component_parity;
 mod component_tools;
 #[path = "sdk_container_placement_routes.rs"]
 mod container_placements;
+#[path = "sdk_contract_routes.rs"]
+mod contracts;
 #[path = "sdk_flight_configuration_routes.rs"]
 mod flight_configurations;
 #[path = "sdk_fuel_routes.rs"]
@@ -82,6 +84,10 @@ const ROOT_XML: &[u8] = br#"<ObjectContainer version="14" gridRadius="2"><Physic
     <Child external="true" name="Data\ObjectContainers\PU\fixture\missing.socpak" pos="1,0,0" rot="1,0,0,0"/>
 </ChildObjectContainers></ObjectContainer>"#;
 
+pub(super) fn contract_datasets() -> impl Iterator<Item = &'static str> {
+    contracts::DATASETS.iter().copied()
+}
+
 pub(super) fn loot_datasets() -> impl Iterator<Item = &'static str> {
     loot::datasets()
 }
@@ -113,6 +119,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         unresolved,
     ];
     routes.extend(blueprint_pools::read()?);
+    routes.extend(contracts::read()?);
     routes.extend(blueprint_physical::read()?);
     routes.extend(component_definitions::read()?);
     routes.extend(flight_configurations::read()?);

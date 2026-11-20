@@ -53,7 +53,17 @@ fn schema() -> Vec<TestStruct> {
             .field("paramOverrides", class("Params"))
             .field("contractResults", class("ResultBlock"))
             .array("additionalPrerequisites", pointer("Prerequisite")),
-        TestStruct::new("Params").array("stringParamOverrides", class("StringParam")),
+        TestStruct::new("Params")
+            .array("stringParamOverrides", class("StringParam"))
+            .array("propertyOverrides", pointer("MissionProperty")),
+        TestStruct::new("MissionProperty")
+            .field("missionVariableName", TestType::String)
+            .field("extendedTextToken", TestType::String)
+            .field("value", pointer("BaseMissionPropertyValue")),
+        TestStruct::new("BaseMissionPropertyValue"),
+        TestStruct::new("MissionPropertyValue_Boolean")
+            .parent("BaseMissionPropertyValue")
+            .field("value", TestType::Bool),
         TestStruct::new("StringParam")
             .field("param", TestType::String)
             .field("value", TestType::Locale),
@@ -94,14 +104,32 @@ fn contract(guid: u128, title: &str) -> TestInstance {
         .value("debugName", TestValue::text("Canonical"))
         .value(
             "paramOverrides",
-            structure(TestInstance::new("Params").value(
-                "stringParamOverrides",
-                array(vec![structure(
-                        TestInstance::new("StringParam")
-                            .value("param", TestValue::text("Title"))
-                            .value("value", TestValue::text(title)),
-                    )]),
-            )),
+            structure(
+                TestInstance::new("Params")
+                    .value(
+                        "propertyOverrides",
+                        array(vec![structure(
+                            TestInstance::new("MissionProperty")
+                                .value("missionVariableName", TestValue::text("ExampleFlag"))
+                                .value("extendedTextToken", TestValue::text("ExampleFlag"))
+                                .value(
+                                    "value",
+                                    structure(
+                                        TestInstance::new("MissionPropertyValue_Boolean")
+                                            .value("value", TestValue::Bool(true)),
+                                    ),
+                                ),
+                        )]),
+                    )
+                    .value(
+                        "stringParamOverrides",
+                        array(vec![structure(
+                            TestInstance::new("StringParam")
+                                .value("param", TestValue::text("Title"))
+                                .value("value", TestValue::text(title)),
+                        )]),
+                    ),
+            ),
         )
 }
 
