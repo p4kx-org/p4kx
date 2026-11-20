@@ -64,6 +64,7 @@ pub(crate) struct SystemRead {
     #[cfg(test)]
     pub(crate) unresolved: Vec<UnresolvedContainerLink>,
     pub(crate) jump_endpoints: Vec<JumpEndpoint>,
+    pub(crate) location_physics: crate::location_physics::GridObservations,
 }
 
 /// A container the walk opened and the starmap record it hangs below.
@@ -152,10 +153,11 @@ pub(crate) struct SelectedContainerRows {
     pub(crate) external_child_step_indices: Option<Vec<usize>>,
     pub(crate) instances: Vec<ContainerInstance>,
     pub(crate) unresolved: Vec<UnresolvedContainerLink>,
+    pub(crate) location_physics: crate::location_physics::GridObservations,
 }
 
 impl SelectedContainerRows {
-    pub(crate) const fn new(
+    pub(crate) fn new(
         child_node_indices: Option<Vec<u32>>,
         external_child_step_indices: Option<Vec<usize>>,
     ) -> Self {
@@ -164,6 +166,7 @@ impl SelectedContainerRows {
             external_child_step_indices,
             instances: Vec::new(),
             unresolved: Vec::new(),
+            location_physics: crate::location_physics::GridObservations::default(),
         }
     }
 

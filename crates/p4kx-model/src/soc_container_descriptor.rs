@@ -5,6 +5,7 @@ use p4kx_cryxml::{SourceAttribute, SourceDocument, SourceElement, SourceElementP
 use p4kx_cryxml::{SourceReadError, SourceReadOptions};
 use thiserror::Error;
 
+use crate::soc_location_physics::SocLocationPhysics;
 use crate::soc_source_node::{SocSourceNode, SocSourceValue};
 use crate::soc_tile_port::SocTileItemPort;
 
@@ -51,6 +52,12 @@ impl<'input> SocContainerDescriptor<'input> {
             sections(section.element(), "Child")
                 .map(move |node| SocContainerDeclaration { section, node })
         })
+    }
+
+    /// Returns authored physics-grid declarations and radius of this location descriptor.
+    #[must_use]
+    pub fn location_physics(&self) -> SocLocationPhysics<'_> {
+        SocLocationPhysics::new(self.document.root())
     }
 
     /// Visits original tile item ports in descriptor order.

@@ -103,7 +103,13 @@ fn read_main(
     let source = EntrySource::inner(capture, archive, socpak, &container, xml)?
         .dependency()
         .operation(EntryOperation::ContainerXml);
-    match EntryRead::read(source.receipt().clone(), &container, xml, MAX_XML_LEN)? {
+    match EntryRead::read_bounded_complete(
+        source.receipt().clone(),
+        &container,
+        xml,
+        MAX_XML_LEN,
+        None,
+    )? {
         Ok(bytes) => Ok(Ok(MainXml {
             container,
             source,

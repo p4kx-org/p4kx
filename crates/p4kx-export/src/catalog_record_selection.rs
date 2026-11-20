@@ -44,3 +44,17 @@ impl CatalogRecordSelection {
         Ok(())
     }
 }
+
+/// Physical Records that could not be read fully, or were skipped by selection policy.
+#[derive(Debug, Default)]
+#[non_exhaustive]
+pub struct CatalogRecordCoverage {
+    /// Physical indices whose headers could not be classified.
+    pub unreadable_headers: Vec<u32>,
+    /// Selected physical indices whose bodies could not be read.
+    pub unreadable_bodies: Vec<u32>,
+    /// Selected physical indices with recoverable field projection issues.
+    pub incomplete_fields: Vec<u32>,
+    /// The number of development leftovers excluded by catalog policy.
+    pub skipped_leftovers: usize,
+}

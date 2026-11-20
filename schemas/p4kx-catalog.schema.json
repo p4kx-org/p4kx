@@ -6022,6 +6022,9 @@
         "locationInstances": {
           "$ref": "#/$defs/CatalogTableOfLocationInstance"
         },
+        "locationPhysicsGrids": {
+          "$ref": "#/$defs/CatalogTableOfLocationPhysicsGrid"
+        },
         "resourceNetworkLinkBindings": {
           "$ref": "#/$defs/CatalogTableOfResourceNetworkLinkBinding"
         },
@@ -6045,6 +6048,7 @@
         "installedConfigurations",
         "jumpEndpoints",
         "locationInstances",
+        "locationPhysicsGrids",
         "resourceNetworkLinkBindings",
         "resourceNetworkNodes",
         "roomAssociationBindings",
@@ -7762,6 +7766,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/LocationInstance"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfLocationPhysicsGrid": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/LocationPhysicsGrid"
           },
           "type": "array"
         }
@@ -28637,6 +28660,189 @@
       ],
       "type": "object"
     },
+    "LocationPhysicsDeclaration": {
+      "description": "One typed declaration at an original position in an `ObjectContainer` descriptor.",
+      "properties": {
+        "fields": {
+          "$ref": "#/$defs/LocationPhysicsFields",
+          "description": "Typed original settings of the declaration."
+        },
+        "owner": {
+          "$ref": "#/$defs/SourcedValueOfSourceLocation",
+          "description": "The original parent element's coordinate."
+        },
+        "position": {
+          "$ref": "#/$defs/SourcedValueOfSourceLocation",
+          "description": "The actual source element's coordinate."
+        },
+        "siblingOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint64",
+          "description": "Position among all original sibling elements."
+        }
+      },
+      "required": [
+        "fields",
+        "owner",
+        "position",
+        "siblingOrdinal"
+      ],
+      "type": "object"
+    },
+    "LocationPhysicsFields": {
+      "description": "The settings specific to each location-physics source declaration.",
+      "oneOf": [
+        {
+          "description": "One declared grid with its original controls.",
+          "properties": {
+            "controls": {
+              "$ref": "#/$defs/LocationPhysicsGridControls",
+              "description": "The controls authored on this grid occurrence."
+            },
+            "type": {
+              "const": "grid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "controls"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "One original part.",
+          "properties": {
+            "shape": {
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "Original shape label."
+            },
+            "type": {
+              "const": "part",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "shape"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "One original voxel resource declaration.",
+          "properties": {
+            "filename": {
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "Original filename, including an authored empty string."
+            },
+            "target": {
+              "$ref": "#/$defs/SourcedValueOfLocationVoxelTarget",
+              "description": "Directory resolution in the descriptor's own container and root P4K."
+            },
+            "type": {
+              "const": "voxel",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "filename",
+            "target"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "Original child-part group. It can have no children.",
+          "properties": {
+            "type": {
+              "const": "childParts",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
+    },
+    "LocationPhysicsGrid": {
+      "description": "One physically selected `ObjectContainer` with authored location physics.",
+      "properties": {
+        "container": {
+          "$ref": "#/$defs/SourcedValueOfPhysicalEntryRef",
+          "description": "The physical container joined by the exact placement row's container reference."
+        },
+        "declarations": {
+          "description": "Ordered physics declarations, with the physical XML coordinates of their owners.",
+          "items": {
+            "$ref": "#/$defs/LocationPhysicsDeclaration"
+          },
+          "type": "array"
+        },
+        "descriptor": {
+          "$ref": "#/$defs/SourcedValueOfPhysicalEntryRef",
+          "description": "The exact original descriptor member."
+        },
+        "gridRadius": {
+          "$ref": "#/$defs/SourcedValueOfdouble",
+          "description": "The authored descriptor-wide grid radius."
+        },
+        "sourceElements": {
+          "description": "Source elements under the declared physics roots, including unknown members.",
+          "items": {
+            "$ref": "#/$defs/ProfileElement"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "container",
+        "declarations",
+        "descriptor",
+        "gridRadius",
+        "sourceElements"
+      ],
+      "type": "object"
+    },
+    "LocationPhysicsGridControls": {
+      "description": "The exact authored controls on one physical location grid.",
+      "properties": {
+        "cellSize": {
+          "$ref": "#/$defs/SourcedValueOfdouble",
+          "description": "Original cell size."
+        },
+        "gravity": {
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_double",
+          "description": "Three authored gravity components in source order."
+        },
+        "gridType": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original grid type label."
+        },
+        "hasPart": {
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Author's part-presence switch."
+        },
+        "inheritGravity": {
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Selection of inherited gravity."
+        },
+        "portalExclusiveMode": {
+          "$ref": "#/$defs/SourcedValueOfint64",
+          "description": "Original numeric portal mode."
+        }
+      },
+      "required": [
+        "cellSize",
+        "gravity",
+        "gridType",
+        "hasPart",
+        "inheritGravity",
+        "portalExclusiveMode"
+      ],
+      "type": "object"
+    },
     "LocationPrerequisite": {
       "description": "A `ContractPrerequisite_LocationProperty`: the contract is offered at the location another\nproperty resolves to.",
       "properties": {
@@ -28903,6 +29109,90 @@
         "raw"
       ],
       "type": "object"
+    },
+    "LocationVoxelTarget": {
+      "description": "Directory lookup result for an original voxel filename.",
+      "oneOf": [
+        {
+          "description": "The original filename is repeated, empty or cannot form a supported path.",
+          "properties": {
+            "type": {
+              "const": "invalid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "The physical directories contain no matching path.",
+          "properties": {
+            "type": {
+              "const": "missing",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "The complete root directory could not be established.",
+          "properties": {
+            "type": {
+              "const": "unavailable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "The winning directory tier supplies one exact physical target.",
+          "properties": {
+            "entry": {
+              "$ref": "#/$defs/PhysicalEntryRef",
+              "description": "The exact original target Entry."
+            },
+            "type": {
+              "const": "matched",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "entry"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "The winning directory tier supplies several physical targets.",
+          "properties": {
+            "candidates": {
+              "description": "Original targets in physical order.",
+              "items": {
+                "$ref": "#/$defs/PhysicalEntryRef"
+              },
+              "type": "array"
+            },
+            "type": {
+              "const": "ambiguous",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "candidates"
+          ],
+          "type": "object"
+        }
+      ],
+      "required": []
     },
     "Logout": {
       "description": "The authored interactions that support logging out and respawning at a facility.",
@@ -38060,6 +38350,7 @@
       "description": "The narrow eligibility result used by the nominal-GUID inverse relation.",
       "oneOf": [
         {
+          "description": "This physical definition qualifies for inverse selection.",
           "properties": {
             "status": {
               "const": "eligible",
@@ -38072,6 +38363,7 @@
           "type": "object"
         },
         {
+          "description": "The definition cannot supply a member set.",
           "properties": {
             "reason": {
               "$ref": "#/$defs/QuantizationIneligibility"
@@ -38091,13 +38383,28 @@
     },
     "QuantizationIneligibility": {
       "description": "Original source decisions that exclude a complete raw definition from inverse lookup.",
-      "enum": [
-        "noInlineBands",
-        "emptyBands",
-        "invalidBands",
-        "unavailable"
+      "oneOf": [
+        {
+          "const": "noInlineBands",
+          "description": "The selected declaration supplies no inline band array.",
+          "type": "string"
+        },
+        {
+          "const": "emptyBands",
+          "description": "The original band array contains no slots.",
+          "type": "string"
+        },
+        {
+          "const": "invalidBands",
+          "description": "At least one band or its array shape does not qualify.",
+          "type": "string"
+        },
+        {
+          "const": "unavailable",
+          "description": "The original declaration could not be evaluated.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "QuantumBoost": {
@@ -98983,6 +99290,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/LocationTag"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfLocationVoxelTarget": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/LocationVoxelTarget"
               }
             }
           }

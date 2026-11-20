@@ -18,6 +18,7 @@ mod row_schema;
 const LANGUAGE_SOURCES: &str = "/texts/languageSources";
 const ITEM_DEFINITIONS: &str = "/definitions/items";
 const MANUFACTURERS: &str = "/definitions/manufacturers";
+const FACTION_IDENTITIES: &str = "/definitions/factionIdentities";
 const COMMODITY_DEFINITIONS: &str = "/definitions/commodities";
 const COMMODITY_PRESENTATIONS: &str = "/projections/commodityPresentation";
 const SHOP_INVENTORIES: &str = "/definitions/shopInventories";
@@ -33,8 +34,12 @@ const BLUEPRINT_DEFINITIONS: &str = "/definitions/blueprints";
 const BLUEPRINT_TIERS: &str = "/configurations/blueprintTiers";
 const BLUEPRINT_PRESENTATION: &str = "/projections/blueprintPresentation";
 const CRAFTING_GLOBAL: &str = "/configurations/craftingGlobal";
+const QUALITY_DISTRIBUTIONS: &str = "/definitions/qualityDistributions";
+const QUALITY_QUANTIZATIONS: &str = "/definitions/qualityQuantizations";
+const QUALITY_QUANTIZATION_RESOURCES: &str = "/projections/qualityQuantizationResources";
 const SUIT_ARMOR: &str = "/configurations/suitArmor";
 const VEHICLE_ARMOR: &str = "/configurations/vehicleArmor";
+const LOOT_GENERATION: &str = "/configurations/lootGeneration";
 const RESOURCE_GROUPS: &str = "/definitions/resourceGroups";
 const RESOURCE_GROUP_MEMBERS: &str = "/declarations/resourceGroupMembers";
 const RESOURCE_GROUP_PARENTS: &str = "/projections/resourceGroupParents";
@@ -60,6 +65,7 @@ const WEAPON_COMBAT: &str = "/projections/weaponCombatBases";
 const WEAPON_RECOIL: &str = "/definitions/weaponActionRecoilDefinitions";
 const WEAPON_ANIMATION: &str = "/projections/weaponPlayerAnimationCandidates";
 const CONTAINERS: &str = "/placements/containerInstances";
+const LOCATION_PHYSICS_GRIDS: &str = "/placements/locationPhysicsGrids";
 const UNRESOLVED: &str = "/placements/unresolvedContainerLinks";
 const NO_WITNESS: &str = "no query witness recorded by the audit";
 const EXPORT_ATTEMPT_FIELDS: &[&str] = &["/schemaVersion", "/completeness", "/exportHealth"];
@@ -103,6 +109,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     LANGUAGE_SOURCES,
     ITEM_DEFINITIONS,
     MANUFACTURERS,
+    FACTION_IDENTITIES,
     COMMODITY_DEFINITIONS,
     COMMODITY_PRESENTATIONS,
     LOCATION_ENTITIES,
@@ -113,8 +120,12 @@ const REQUIRED_WITNESSES: &[&str] = &[
     BLUEPRINT_TIERS,
     BLUEPRINT_PRESENTATION,
     CRAFTING_GLOBAL,
+    QUALITY_DISTRIBUTIONS,
+    QUALITY_QUANTIZATIONS,
+    QUALITY_QUANTIZATION_RESOURCES,
     SUIT_ARMOR,
     VEHICLE_ARMOR,
+    LOOT_GENERATION,
     RESOURCE_GROUPS,
     RESOURCE_GROUP_MEMBERS,
     RESOURCE_GROUP_PARENTS,
@@ -145,6 +156,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     WEAPON_RECOIL,
     WEAPON_ANIMATION,
     CONTAINERS,
+    LOCATION_PHYSICS_GRIDS,
     UNRESOLVED,
 ];
 

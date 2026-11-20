@@ -81,6 +81,8 @@ const CONTROL_TYPES: &[&str] = &[
     "SourceUseRole",
     "SourceValueState",
     "StandingOperator",
+    "SubsumptionEventField",
+    "SubsumptionEventFormat",
     "TagEvidence",
     "TemplateModifierKind",
     "TemplateTagInterpretation",

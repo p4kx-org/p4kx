@@ -16,6 +16,9 @@ pub enum CatalogError {
     /// Building or querying the original Archive directory index failed.
     #[error(transparent)]
     ArchivePathIndex(#[from] p4kx_extraction::PathIndexError),
+    /// A location physics voxel directory lookup could not be completed.
+    #[error(transparent)]
+    LocationPhysicsTarget(#[from] p4kx_assembly::SocCaptureError),
     /// The original Archive or its Build changed during a scoped query.
     #[error(transparent)]
     ArchiveChanged(#[from] ArchiveChanged),

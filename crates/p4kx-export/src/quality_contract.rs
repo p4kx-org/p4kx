@@ -55,8 +55,11 @@ pub struct QualityQuantizationDefinition<'source> {
 /// The narrow eligibility result used by the nominal-GUID inverse relation.
 #[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
 #[serde(tag = "status", content = "reason", rename_all = "camelCase")]
-pub(crate) enum QuantizationEligibility {
+#[non_exhaustive]
+pub enum QuantizationEligibility {
+    /// This physical definition qualifies for inverse selection.
     Eligible,
+    /// The definition cannot supply a member set.
     NotEligible(QuantizationIneligibility),
 }
 
@@ -64,10 +67,15 @@ pub(crate) enum QuantizationEligibility {
 #[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(crate) enum QuantizationIneligibility {
+#[non_exhaustive]
+pub enum QuantizationIneligibility {
+    /// The selected declaration supplies no inline band array.
     NoInlineBands,
+    /// The original band array contains no slots.
     EmptyBands,
+    /// At least one band or its array shape does not qualify.
     InvalidBands,
+    /// The original declaration could not be evaluated.
     Unavailable,
 }
 
@@ -75,7 +83,7 @@ pub(crate) enum QuantizationIneligibility {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct QualityQuantizationResources {
+pub struct QualityQuantizationResources {
     #[serde(skip)]
     pub(crate) physical_guid: CatalogGuid,
     #[serde(skip)]
@@ -84,6 +92,32 @@ pub(crate) struct QualityQuantizationResources {
     pub(crate) record_index: SourcedValue<u32>,
     pub(crate) eligibility: SourcedValue<QuantizationEligibility>,
     pub(crate) resource_type_guids: SourcedValue<Vec<SourcedValue<CatalogGuid>>>,
+}
+
+impl QualityQuantizationResources {
+    /// Borrows the original quantizer GUID.
+    #[must_use]
+    pub const fn guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.guid
+    }
+
+    /// Borrows the quantizer's physical Record identity in this DataForge.
+    #[must_use]
+    pub const fn record_index(&self) -> &SourcedValue<u32> {
+        &self.record_index
+    }
+
+    /// Borrows the original evidence for eligibility.
+    #[must_use]
+    pub const fn eligibility(&self) -> &SourcedValue<QuantizationEligibility> {
+        &self.eligibility
+    }
+
+    /// Borrows ordered resource members and the observed membership survey.
+    #[must_use]
+    pub const fn resource_type_guids(&self) -> &SourcedValue<Vec<SourcedValue<CatalogGuid>>> {
+        &self.resource_type_guids
+    }
 }
 
 impl<'source> QualityDistributionDefinition<'source> {

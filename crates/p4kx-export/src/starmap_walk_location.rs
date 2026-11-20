@@ -30,6 +30,9 @@ impl System<'_> {
             world: path.transform,
         };
         let row = instance.project(file, self.capture)?;
+        self.read
+            .location_physics
+            .record(file.reference(), &file.location_physics)?;
         match &mut self.rows {
             PlacementRows::Spool { containers, .. } => {
                 containers.append(&row, self.cancel).map_err(Into::into)

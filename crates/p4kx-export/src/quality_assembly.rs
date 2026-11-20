@@ -109,18 +109,27 @@ impl<'source> Assembly<'source> {
         eligibility: Eligibility,
         retention: Retention,
     ) {
-        self.quantizers.push(Quantizer {
-            owner: Some(row.owner),
-            guid: row.owner.guid.0,
-            record_index: row.owner.record_index,
-            eligibility,
-            retention,
-        });
+        self.retain_quantizer(row.owner, eligibility, retention);
         match retention {
             Retention::Selected => self.rows.quantizations.push(row),
             Retention::Leftover => self.rows.skipped_quantizations += 1,
             Retention::Dependency => {}
         }
+    }
+
+    pub(crate) fn retain_quantizer(
+        &mut self,
+        owner: QualityOwner<'source>,
+        eligibility: Eligibility,
+        retention: Retention,
+    ) {
+        self.quantizers.push(Quantizer {
+            owner: Some(owner),
+            guid: owner.guid.0,
+            record_index: owner.record_index,
+            eligibility,
+            retention,
+        });
     }
 
     pub(crate) fn finish(

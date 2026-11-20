@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::ops::Range;
 use std::sync::Arc;
 
-use p4kx_extraction::{EntryOrigin, ObservedEntryBinding, PathIndex};
+use p4kx_extraction::{ArchiveWatch, CancelToken, EntryOrigin, ObservedEntryBinding, PathIndex};
 use p4kx_model::{IncludedPathSlot, SocEntityFile};
 
 use crate::interior;
@@ -144,11 +144,50 @@ fn resolve(
     let Some(path) = std::str::from_utf8(slot.path_bytes())
         .ok()
         .filter(|_| slot.bytes().contains(&0))
-        .map(str::trim)
-        .filter(|path| !path.is_empty() && interior::plain_container_path(path))
     else {
         return Ok(SocGeometryTarget::InvalidSelector);
     };
+    resolve_path(path, layers, check)
+}
+
+/// Resolves one original SOC path against ordered physical directory tiers without opening its body.
+///
+/// # Errors
+/// Returns an error if the directory is unbound, lookup is cancelled or the Archive changes.
+pub fn resolve_soc_geometry_path(
+    path: &str,
+    layers: &[PathIndex<'_>],
+    cancel: Option<&CancelToken>,
+) -> Result<SocGeometryTarget, SocCaptureError> {
+    let first = layers.first().ok_or(SocCaptureError::Root)?;
+    let origin = first.archive().input_origin();
+    if layers
+        .iter()
+        .any(|index| !origin.is_same_input(index.archive().input_origin()))
+    {
+        return Err(SocCaptureError::Origin);
+    }
+    let local = CancelToken::new();
+    let watch = ArchiveWatch::new(first.archive());
+    let check = CaptureCheck {
+        watch: &watch,
+        cancel: cancel.unwrap_or(&local),
+    };
+    check.poll()?;
+    let selected = resolve_path(path, layers, check)?;
+    watch.check()?;
+    Ok(selected)
+}
+
+pub(super) fn resolve_path(
+    path: &str,
+    layers: &[PathIndex<'_>],
+    check: CaptureCheck<'_>,
+) -> Result<SocGeometryTarget, SocCaptureError> {
+    let path = path.trim();
+    if path.is_empty() || !interior::plain_container_path(path) {
+        return Ok(SocGeometryTarget::InvalidSelector);
+    }
     let [prefixed, relative] = provider::archive_entry_candidates(path);
     for (depth, index) in layers.iter().enumerate() {
         for (kind, path) in [

@@ -14,3 +14,10 @@
 The source carries the encounter preset as an enum. An EncounterIndex can group spawn sets by the same authored enum token. NPC archetype branches and AutoSpawnData carry separate physical FactionIdentity references. A Faction supplies faction configuration, and a FactionReputation supplies reputation configuration. Consumers can join those definitions through their respective original references.
 
 Every sourced field and list element carries its immediate provenance. Empty arrays, null, invalid and unsupported data retain separate states. A resolved original target retains its identity when excluded from the catalog, and a dangling Reference retains its declared GUID. Extra authored declarations remain in `authoredFields`.
+
+The scoped SDK route is `catalog_queries::faction_identities::with_faction_identities`.
+Use `CatalogRecordSelection::All`, `Guid` or `RecordIndex` within the supplied Build.
+A GUID selection retains every physical match. An index selection selects that one original
+Record and still applies the family admission rule. The result provides the canonical rows,
+their protected text definitions for the requested languages, original provenance and coverage.
+Use `CatalogQuerySession` to share a parsed DataForge across scoped queries.

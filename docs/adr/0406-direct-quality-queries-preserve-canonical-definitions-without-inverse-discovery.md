@@ -4,7 +4,7 @@ The SDK exposes complete canonical distribution/location-override and quantizati
 without constructing the full Catalog or computing the inverse ResourceType projection. These
 are independently useful datasets: an authored quantizer can be read even when it is ineligible
 for inverse lookup, its reference target is missing, or another same-GUID physical declaration
-wins the existing inverse policy. The inverse is a separate remaining SDK endpoint.
+wins the existing inverse policy. The inverse has a separate opt-in SDK endpoint.
 
 A narrow `catalog_queries::quality` module supplies free Archive/decoded-Entry functions and
 session methods. All, GUID and RecordIndex selection use existing canonical source rules and

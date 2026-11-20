@@ -20,11 +20,17 @@ pub(crate) struct ContainerFile {
     reference: SourcedValue<PhysicalEntryRef>,
     path: SourcedValue<HealthText>,
     root: XmlNodeSource,
+    pub(crate) location_physics: crate::location_physics::GridRead,
 }
 
 impl ContainerFile {
     pub(crate) const fn reference(&self) -> &SourcedValue<PhysicalEntryRef> {
         &self.reference
+    }
+
+    #[cfg(test)]
+    pub(crate) fn descriptor_selector(&self) -> Result<SourceUse, CatalogError> {
+        self.root.selected()
     }
 
     pub(crate) fn from_xml(
@@ -37,6 +43,7 @@ impl ContainerFile {
             reference: receipt.physical_reference(capture)?.into_cell(sources),
             path: receipt.physical_path()?.into_cell(sources),
             root: xml.node_source(xml.root())?,
+            location_physics: crate::location_physics::GridRead::Unavailable,
         })
     }
 }

@@ -1,11 +1,23 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::{CatalogPublicationMode, Filter, build_catalog};
-use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
+use p4kx_export::catalog_queries::faction_identities::{
+    FactionIdentityDefinition, FactionIdentitySnapshot,
+};
+use p4kx_export::catalog_queries::{
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
+};
+use p4kx_export::{CatalogError, CatalogOptions, CatalogPublicationMode, Filter, build_catalog};
+use p4kx_extraction::Guid;
+use p4kx_testkit::TestType;
 use serde_json::{Value, json};
 
+use crate::canonical_header::json::assert_canonical;
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult, at, guid};
+
+#[path = "catalog_faction_identity/fixture.rs"]
+mod fixture;
+use fixture::{database, export, identity};
 
 const FACTION: u128 = 0x1085_0001;
 const TAG: u128 = 0x1085_0002;
@@ -13,10 +25,7 @@ const SECURITY_FIRST: u128 = 0x1085_0003;
 const SECURITY_SECOND: u128 = 0x1085_0004;
 const FIRST: u128 = 0x1085_0005;
 const SECOND: u128 = 0x1085_0006;
-const ARCHETYPE: u128 = 0x1085_0007;
 const MISSING: u128 = 0x1085_00ff;
-const WEIGHT: &str = "EncounterPresetWeight";
-const PRESET: &str = "EncounterPreset";
 const NAME: &str = "FixtureFactionIdentityName";
 const DESCRIPTION: &str = "FixtureFactionIdentityDescription";
 
@@ -208,122 +217,123 @@ fn malformed_encounter_weight_retains_its_original_member_and_health() -> TestRe
     Ok(())
 }
 
-fn export(filter: Option<&Filter>, weight: TestType, diagnostic: bool) -> TestResult<Value> {
-    let (_directory, archive) = common::open(&database(weight), DcbOrigin::Encrypted)?;
-    let mut options = common::options();
-    options.filter = filter;
-    if diagnostic {
-        options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    }
-    Ok(serde_json::from_slice(
-        build_catalog(&archive, &options)?.json(),
-    )?)
-}
-
-fn database(weight: TestType) -> DataForgeBuilder {
-    let weight_values = if matches!(weight, TestType::Single) {
-        [TestValue::Single(-0.0), TestValue::Single(1.25)]
-    } else {
-        [
-            TestValue::text("Fixture invalid weight"),
-            TestValue::text("Fixture other weight"),
-        ]
+#[test]
+fn faction_identity_sdk_selects_canonical_rows_and_physical_duplicates() -> TestResult {
+    let database = database(TestType::Single).record(identity(
+        SECOND,
+        "identities/second_duplicate",
+        SECURITY_FIRST,
+        "resource_name",
+    ));
+    let (_directory, archive) = common::open(&database, DcbOrigin::Encrypted)?;
+    assert!(
+        matches!(
+            build_catalog(&archive, &common::options()),
+            Err(CatalogError::IncompleteExport(_))
+        ),
+        "a complete catalog refuses ambiguous physical owners"
+    );
+    let options = CatalogOptions {
+        publication_mode: CatalogPublicationMode::DiagnosticPartial,
+        ..common::options()
     };
-    let encounters = ["FixtureAlpha", "FixtureFuture"]
-        .into_iter()
-        .zip(weight_values)
-        .map(|(preset, weight)| {
-            TestValue::Struct(
-                TestInstance::new(WEIGHT)
-                    .value("encounterPreset", TestValue::text(preset))
-                    .value("weight", weight),
-            )
-        })
-        .collect();
-    schema(weight)
-        .record(record(FACTION, "Faction", "factions/shared"))
-        .record(record(TAG, "Tag", "tags/original"))
-        .record(record(
-            SECURITY_FIRST,
-            "SecurityNetworkManifest",
-            "security/first",
-        ))
-        .record(record(
-            SECURITY_SECOND,
-            "SecurityNetworkManifest",
-            "security/second",
-        ))
-        .record(identity(SECOND, "identities/second", SECURITY_SECOND))
-        .record(
-            identity(FIRST, "identities/first", SECURITY_FIRST)
-                .value("encounterPresetWeights", TestValue::Array(encounters))
-                .value(
-                    "lootPoolThemeTags",
-                    TestValue::Array(vec![
-                        TestValue::Reference(TAG),
-                        TestValue::Null,
-                        TestValue::Reference(MISSING),
-                    ]),
-                ),
-        )
-        .record(record(ARCHETYPE, "NPCArchetype", "archetypes/owner").value(
-            "identity",
-            TestValue::Array(vec![
-                    TestValue::Struct(TestInstance::new("NPCIdentityToArchetype")
-                        .value("identity", TestValue::Reference(FIRST))),
-                ]),
-        ))
+    let catalog = build_catalog(&archive, &options)?;
+    let catalog: Value = serde_json::from_slice(catalog.json())?;
+    let definitions = at(&catalog, "/definitions/factionIdentities/rows")?;
+    let session =
+        CatalogQuerySession::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
+    let parsed = session.parsed(None)?;
+    let (duplicate_guid, index) =
+        parsed.with_faction_identities(CatalogRecordSelection::All, None, |snapshot| {
+            inspect_all(&snapshot, definitions, &catalog)
+        })??;
+    let duplicate_indices = parsed.with_faction_identities(
+        CatalogRecordSelection::Guid(duplicate_guid),
+        None,
+        |s| physical_indices(&s),
+    )??;
+    let [first, second] = duplicate_indices.as_slice() else {
+        return Err("both physical owners of the requested GUID".into());
+    };
+    assert!(*first < *second, "tied GUID owners retain physical order");
+    assert_eq!(
+        *second, index,
+        "the query retains the last physical duplicate"
+    );
+    parsed.with_faction_identities(CatalogRecordSelection::RecordIndex(index), None, |s| {
+        assert_eq!(
+            physical_indices(&s)?,
+            [index],
+            "physical selection narrows the duplicate GUID"
+        );
+        Ok::<(), Box<dyn std::error::Error>>(())
+    })??;
+    parsed.with_faction_identities(CatalogRecordSelection::RecordIndex(0), None, |s| {
+        assert!(
+            s.rows.is_empty(),
+            "a different Record family is not admitted"
+        );
+        assert!(
+            s.available_languages.is_empty(),
+            "empty selection reads no locale"
+        );
+    })?;
+    Ok(())
 }
 
-fn schema(weight: TestType) -> DataForgeBuilder {
-    let reference = |name: &str| TestType::ReferenceTo(name.to_owned());
-    let class = |name: &str| TestType::Class(name.to_owned());
-    DataForgeBuilder::new()
-        .version(8)
-        .enumeration(PRESET, ["FixtureAlpha", "FixtureFuture"])
-        .structure(TestStruct::new("Faction"))
-        .structure(TestStruct::new("Tag"))
-        .structure(TestStruct::new("SecurityNetworkManifest"))
-        .structure(TestStruct::new("NPCClassPool"))
-        .structure(
-            TestStruct::new("NPCIdentityToArchetype")
-                .field("identity", reference("FactionIdentity"))
-                .array("npcPools", reference("NPCClassPool")),
-        )
-        .structure(
-            TestStruct::new("NPCArchetype").array("identity", class("NPCIdentityToArchetype")),
-        )
-        .structure(
-            TestStruct::new(WEIGHT)
-                .field("encounterPreset", TestType::Enum(PRESET.to_owned()))
-                .field("weight", weight),
-        )
-        .structure(
-            TestStruct::new("FactionIdentity")
-                .field("name", TestType::Locale)
-                .field("description", TestType::Locale)
-                .field("factionTag", reference("Tag"))
-                .field("factionRef", reference("Faction"))
-                .field("securityNetworkRef", reference("SecurityNetworkManifest"))
-                .array("encounterPresetWeights", class(WEIGHT))
-                .array("lootPoolThemeTags", reference("Tag")),
-        )
+fn inspect_all(
+    snapshot: &FactionIdentitySnapshot<'_>,
+    definitions: &Value,
+    catalog: &Value,
+) -> TestResult<(Guid, u32)> {
+    assert!(
+        matches!(snapshot.availability, DatasetAvailability::Available),
+        "the FactionIdentity family is declared"
+    );
+    assert!(
+        snapshot.coverage.incomplete_fields.is_empty(),
+        "typed fields are covered"
+    );
+    let [_, _, duplicate] = snapshot.rows.as_slice() else {
+        return Err("all three physical rows".into());
+    };
+    assert_canonical(&snapshot.rows, definitions, "canonical faction identities")?;
+    let typed = duplicate.name();
+    assert_eq!(
+        typed.origin().contains_encrypted_source(),
+        Some(true),
+        "the encrypted original locale marker survives the typed API"
+    );
+    let text = snapshot
+        .game_text(typed.value().ok_or("authored protected name link")?)
+        .ok_or("protected name row")?;
+    let key = text.id().value().ok_or("protected text identity")?;
+    let original = common::text_row(catalog, "gameTexts", &json!(key))?;
+    assert_canonical(text, original, "protected name and translations")?;
+    assert_eq!(
+        text.translations()
+            .value()
+            .map(std::collections::BTreeMap::len),
+        Some(2),
+        "both available locales contribute to the selected protected text"
+    );
+    let guid = duplicate
+        .source()
+        .guid()
+        .value()
+        .copied()
+        .ok_or("duplicate GUID")?;
+    Ok((guid, physical_index(duplicate)?))
 }
 
-fn identity(id: u128, path: &str, security: u128) -> TestRecord {
-    record(id, "FactionIdentity", path)
-        .value("name", TestValue::text(NAME))
-        .value("description", TestValue::text(DESCRIPTION))
-        .value("factionTag", TestValue::Reference(TAG))
-        .value("factionRef", TestValue::Reference(FACTION))
-        .value("securityNetworkRef", TestValue::Reference(security))
+fn physical_indices(snapshot: &FactionIdentitySnapshot<'_>) -> TestResult<Vec<u32>> {
+    snapshot.rows.iter().map(physical_index).collect()
 }
 
-fn record(id: u128, family: &str, path: &str) -> TestRecord {
-    TestRecord::new(
-        id,
-        family,
-        format!("{family}.Fixture{id}"),
-        format!("libs/foundry/records/faction_identity_fixture/{path}.xml"),
-    )
+fn physical_index(row: &FactionIdentityDefinition<'_>) -> TestResult<u32> {
+    row.source()
+        .record_index()
+        .value()
+        .copied()
+        .ok_or_else(|| "physical Record index".into())
 }

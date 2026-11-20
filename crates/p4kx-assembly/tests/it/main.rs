@@ -146,6 +146,7 @@ mod soc_container_capture;
 mod soc_entity_index;
 mod soc_geometry_capture;
 mod soc_light_class;
+mod soc_location_grid;
 mod soc_room_index;
 mod soc_tile_ports;
 mod stinger_indexed_bank;

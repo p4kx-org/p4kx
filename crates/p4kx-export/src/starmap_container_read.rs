@@ -31,6 +31,16 @@ enum PlacementStorage<'directory> {
     Harvest(&'directory HarvestSurvey<'directory>),
 }
 
+impl PlacementStorage<'_> {
+    const fn descriptor_scope(self, jump_endpoints: bool) -> DescriptorScope {
+        if matches!(self, Self::Harvest(_)) {
+            DescriptorScope::Harvest
+        } else {
+            DescriptorScope::Catalog { jump_endpoints }
+        }
+    }
+}
+
 impl Placements {
     #[cfg(test)]
     pub(crate) fn read(
@@ -99,6 +109,21 @@ impl Placements {
         )
     }
 
+    fn empty_inventory(archive: &Archive, endpoint_inventory_complete: bool) -> Self {
+        Self {
+            instance_availability: Some(DatasetAvailability::Absent),
+            spools: PlacementSpools {
+                location_physics_availability: Some(crate::location_physics::stage::availability(
+                    grid_directory_complete(archive),
+                    false,
+                )),
+                ..PlacementSpools::default()
+            },
+            endpoint_inventory_complete,
+            ..Self::default()
+        }
+    }
+
     fn read_scoped(
         archive: &Archive,
         cancel: Option<&CancelToken>,
@@ -113,21 +138,15 @@ impl Placements {
         let index = Index::new(archive);
         let systems = index.systems();
         if systems.is_empty() && matches!(scope, PlacementScope::ArchiveInventory) {
-            return Ok(Self {
-                instance_availability: Some(DatasetAvailability::Absent),
-                endpoint_inventory_complete: endpoints.is_some_and(|records| records.complete),
-                ..Self::default()
-            });
+            return Ok(Self::empty_inventory(
+                archive,
+                endpoints.is_some_and(|records| records.complete),
+            ));
         }
         let system_count = systems.len();
         let mut root_ledger = ExportLedger::default();
         let systems = unique_system_roots(archive, &index, capture, systems, &mut root_ledger)?;
         let roots: Vec<usize> = systems.iter().map(|(_, entry)| *entry).collect();
-        let descriptor_scope = if matches!(storage, PlacementStorage::Harvest(_)) {
-            DescriptorScope::HARVEST
-        } else {
-            DescriptorScope::catalog(endpoints.is_some())
-        };
         let Read {
             bodies, mut ledger, ..
         } = crate::starmap_parse::read_all_scoped(
@@ -135,11 +154,14 @@ impl Placements {
             &index,
             &roots,
             cancel,
-            (limits.source_children, descriptor_scope),
+            (
+                limits.source_children,
+                storage.descriptor_scope(endpoints.is_some()),
+            ),
             capture,
         )?;
         check_cancelled(cancel)?;
-        let (read, spools) = walk_systems(
+        let (read, mut spools) = walk_systems(
             &index,
             &bodies,
             &systems,
@@ -152,23 +174,72 @@ impl Placements {
         check_cancelled(cancel)?;
         let routes_complete = finish_route_coverage(&read, &mut ledger);
         ledger.merge(root_ledger);
+        spools.finish_grid_scope(
+            storage,
+            archive,
+            routes_complete && roots.len() == system_count,
+            &ledger,
+        );
         let mut placements = Self {
             ledger,
             spools,
             ..Self::default()
         };
         placements.finish(&index, system_count, read, scope, (archive, capture))?;
-        placements.endpoint_inventory_complete = routes_complete
-            && !placements
+        placements.endpoint_inventory_complete =
+            placements.has_complete_endpoints(routes_complete, endpoints);
+        placements.report.elapsed = started.elapsed();
+        Ok(placements)
+    }
+
+    fn has_complete_endpoints(
+        &self,
+        routes_complete: bool,
+        endpoints: Option<&JumpEndpointRecords>,
+    ) -> bool {
+        routes_complete
+            && !self
                 .ledger
                 .incomplete_inventories
                 .contains(&Kind::StarmapObjects)
             && endpoints.is_some_and(|records| records.complete)
-            && placements.counts.unreadable == 0
-            && placements.counts.missing == 0;
-        placements.report.elapsed = started.elapsed();
-        Ok(placements)
+            && self.counts.unreadable == 0
+            && self.counts.missing == 0
     }
+}
+
+impl PlacementSpools {
+    fn finish_grid_scope(
+        &mut self,
+        storage: PlacementStorage<'_>,
+        archive: &Archive,
+        routes_complete: bool,
+        ledger: &ExportLedger,
+    ) {
+        if !matches!(storage, PlacementStorage::Spool(_)) {
+            return;
+        }
+        let readable = routes_complete
+            && grid_directory_complete(archive)
+            && !ledger
+                .incomplete_inventories
+                .contains(&Kind::StarmapObjects);
+        if matches!(
+            self.location_physics_availability,
+            Some(DatasetAvailability::Available)
+        ) {
+            return;
+        }
+        if !readable {
+            self.location_physics_availability = Some(DatasetAvailability::Unavailable);
+        } else if self.location_physics_availability.is_none() {
+            self.location_physics_availability = Some(DatasetAvailability::Absent);
+        }
+    }
+}
+
+fn grid_directory_complete(archive: &Archive) -> bool {
+    crate::export_archive_health::inventory(archive).is_none()
 }
 
 pub(crate) fn finish_route_coverage(read: &[SystemRead], ledger: &mut ExportLedger) -> bool {
@@ -307,10 +378,13 @@ fn walk_spooled_systems(
             ),
         )?);
     }
+    let grid = crate::location_physics::stage::write(&reads, directory, cancel)?;
     let spools = PlacementSpools {
         containers: Some(containers.finish(cancel)?),
         locations: Some(locations.finish(cancel)?),
         unresolved: Some(unresolved.finish(cancel)?),
+        location_physics_grids: grid.spool,
+        location_physics_availability: Some(grid.availability),
     };
     Ok((reads, spools))
 }

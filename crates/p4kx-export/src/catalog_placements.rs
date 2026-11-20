@@ -45,6 +45,8 @@ pub(crate) struct CatalogPlacements {
     #[schemars(with = "CatalogTable<UnresolvedContainerLink>")]
     unresolved_container_links: StagedCatalogTable,
     jump_endpoints: CatalogTable<JumpEndpoint>,
+    #[schemars(with = "CatalogTable<crate::location_physics::LocationPhysicsGrid>")]
+    location_physics_grids: StagedCatalogTable,
 }
 
 impl CatalogPlacements {
@@ -52,6 +54,7 @@ impl CatalogPlacements {
         u128::from(self.container_instances.stored_bytes())
             + u128::from(self.location_instances.stored_bytes())
             + u128::from(self.unresolved_container_links.stored_bytes())
+            + u128::from(self.location_physics_grids.stored_bytes())
     }
 
     pub(crate) fn take_row_spool_failure(&self) -> Option<RowSpoolError> {
@@ -59,6 +62,7 @@ impl CatalogPlacements {
             .take_failure()
             .or_else(|| self.location_instances.take_failure())
             .or_else(|| self.unresolved_container_links.take_failure())
+            .or_else(|| self.location_physics_grids.take_failure())
     }
 }
 
@@ -119,6 +123,13 @@ impl<'source> Collected<'source> {
                 cancel,
             ),
             jump_endpoints: placements.take_jump_endpoints(),
+            location_physics_grids: StagedCatalogTable::new(
+                spools
+                    .location_physics_availability
+                    .unwrap_or(crate::catalog_table::DatasetAvailability::Unavailable),
+                spools.location_physics_grids,
+                cancel,
+            ),
         };
         Ok((placements, topology.declarations))
     }

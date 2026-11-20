@@ -227,6 +227,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "facilityInstances": absent_table(),
             "facilityInteriorCoverage": [],
             "containerInstances": absent_table(),
+            "locationPhysicsGrids": absent_table(),
             "unresolvedContainerLinks": absent_table()
         },
         "texts": {

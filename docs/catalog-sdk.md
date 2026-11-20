@@ -294,8 +294,28 @@ These unlocalized endpoints open selected owner bodies only. They compute no qua
 eligibility or inverse ResourceType relation and open no sibling quality, Resource, locale,
 world or placement payload to obtain such a relation. A successful query is not a completeness
 certificate: inspect header, body and field coverage separately before publishing consumer-owned
-cache data after outer success. The independent `projections.qualityQuantizationResources`
-SDK endpoint remains outstanding. [ADR-0406](adr/0406-direct-quality-queries-preserve-canonical-definitions-without-inverse-discovery.md)
+cache data after outer success. [ADR-0406](adr/0406-direct-quality-queries-preserve-canonical-definitions-without-inverse-discovery.md)
+
+### Quantization-to-resource membership
+
+Use `catalog_queries::quality::with_quantization_resources`, its decoded-Entry form, or the
+session's `with_quality_quantization_resources` method for
+`projections.qualityQuantizationResources`. All, GUID and RecordIndex select physical
+output rows. The first eligible quantizer in original Record order still receives the
+members, including when that candidate is outside the output selection or is a skipped
+development leftover. Later same-GUID definitions keep their own eligibility and empty
+membership. Distinct matching resource GUIDs are in canonical GUID order.
+
+The snapshot's `projection` supplies rows, schema availability, source inventory and
+selected owner coverage. Each row retains its physical index, eligibility evidence,
+member-specific origins and the complete membership survey when it won the first match.
+Read `dependency_coverage` separately to detect unsuccessful dependency lookups. Publish
+consumer state only after outer success and the necessary coverage checks.
+
+A request without an admitted quantizer performs no dependency survey. A request with
+admitted owners surveys original quantizer candidates and only opens ResourceType bodies
+when a selected quantizer is eligible. It shares the Catalog's original relationship
+rules and opens no unrelated crafting, locale, world or media bodies.
 
 ## Mining globals and refining processes
 
@@ -625,6 +645,21 @@ effect slots, and per-value source facts. The consumable capacity retains its au
 Use the physical indices in the mining global and consumable subtype links with the queries
 below. Subtype text selection belongs to the separate definition query. Component queries
 expose read completeness through `coverage()`.
+
+## Loot-generation components
+
+Use `catalog_queries::equipment::loot_generation::with_loot_generation_components` for
+`configurations.lootGeneration`. The decoded-Entry `_from` form, Archive session and parsed
+view accept all matching owners, a GUID including physical aliases, or one physical
+Record index. Compare the original component ordinal within each owner to identify an
+occurrence. Owners outside the item and ship families are eligible.
+
+The snapshot supplies the same ordered authored-field arena as the Catalog, along with
+source inventory and coverage. Resolve arena-local links within their own row and
+provenance references through this snapshot. Authored theme and secondary references keep
+their physical selectors for a separate definition query. The query projects the selected
+owner's configuration without reading world containers or computing runtime loot outcomes.
+See [Loot source definitions](catalog-loot-source.md).
 
 ## Vehicle armor
 

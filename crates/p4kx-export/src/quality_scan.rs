@@ -14,7 +14,7 @@ use crate::record_observation::RecordObservation;
 use crate::selection::Kind;
 use crate::template_field_capture::TemplateFieldCapture;
 
-use super::{Input, Retention, eligibility, read, resource_links};
+use super::{Eligibility, Input, Retention, eligibility, read, resource_links};
 
 pub(crate) fn distribution<'f>(
     tree: &RecordTree<'f>,
@@ -76,13 +76,26 @@ pub(crate) fn quantization<'f>(
     })
 }
 
+/// Reads the inverse decision at a canonical quantization candidate.
+pub(crate) fn inverse_candidate<'source>(
+    tree: &RecordTree<'source>,
+    admission: &RecordObservation<'_, 'source>,
+    input: &OriginalCatalogInput<'_, 'source>,
+    role: ExportSourceRole,
+    cancel: Option<&CancelToken>,
+) -> Result<Eligibility, CatalogError> {
+    let scope = input.record_scope(admission.record(), tree)?;
+    let original = OriginalFlowFields::read(&scope, cancel)?;
+    quantization_eligibility(tree, input.origins(), &original, role, cancel)
+}
+
 fn quantization_eligibility<'source>(
     tree: &RecordTree<'source>,
     origins: &CatalogOrigins,
     original: &OriginalFlowFields<'_, '_, 'source>,
     role: ExportSourceRole,
     cancel: Option<&CancelToken>,
-) -> Result<eligibility::Eligibility, CatalogError> {
+) -> Result<Eligibility, CatalogError> {
     let mut eligible = eligibility::read(tree, origins, original, cancel)?;
     let context = origins.record(tree.record_index());
     for field in [

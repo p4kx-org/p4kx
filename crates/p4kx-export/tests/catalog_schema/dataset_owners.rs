@@ -262,6 +262,7 @@ const GROUPS: &[Group] = &[
             "installedConfigurations",
             "jumpEndpoints",
             "locationInstances",
+            "locationPhysicsGrids",
             "resourceNetworkLinkBindings",
             "resourceNetworkNodes",
             "roomAssociationBindings",

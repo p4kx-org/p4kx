@@ -65,6 +65,7 @@ impl CatalogError {
             | Self::EntryPayloadAllocation { .. }
             | Self::JsonSourceAllocation(_)
             | Self::ArchivePathIndex(_)
+            | Self::LocationPhysicsTarget(_)
             | Self::MissionTextLength
             | Self::MissionTextAllocation(_)
             | Self::MissionTextPlan

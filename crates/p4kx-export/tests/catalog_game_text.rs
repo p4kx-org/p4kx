@@ -129,28 +129,33 @@ fn exactly_the_game_text_fields_carry_the_game_text_annotation() {
         marked += usize::from(carries);
     }
     assert_eq!(
-        marked, 111,
+        marked, 113,
         "every protected field in the canonical schema is accounted for"
     );
 }
 
+const RECOVERY_NOTIFICATION_TEXTS: &[&str] = &[
+    "itemBricked_Title",
+    "itemBricked_Body",
+    "vehicleBrickedWithItems_Body",
+    "itemBricking_Title",
+    "itemBricking_Body",
+    "vehicleBrickingWithItems_Body",
+    "onBrickedItemUsed_Title",
+    "onBrickedItemUsed_CannotEquip",
+    "onBrickedItemUsed_CannotFire",
+    "onBrickedItemUsed_CannotUse",
+];
+
 fn expected_annotation(owner: &str, name: &str, field: &Value, schema: &Value) -> bool {
     match (owner, name) {
+        ("RecoveryNotifications", name) if RECOVERY_NOTIFICATION_TEXTS.contains(&name) => true,
         (
-            "RecoveryNotifications",
-            "itemBricked_Title"
-            | "itemBricked_Body"
-            | "vehicleBrickedWithItems_Body"
-            | "itemBricking_Title"
-            | "itemBricking_Body"
-            | "vehicleBrickingWithItems_Body"
-            | "onBrickedItemUsed_Title"
-            | "onBrickedItemUsed_CannotEquip"
-            | "onBrickedItemUsed_CannotFire"
-            | "onBrickedItemUsed_CannotUse",
-        )
-        | (
-            "BlueprintPresentation" | "FactionIdentityDefinition" | "PlanetResource" | "Ecosystem",
+            "BlueprintPresentation"
+            | "FactionIdentityDefinition"
+            | "PlanetResource"
+            | "Ecosystem"
+            | "SubsumptionEvent",
             "name",
         )
         | ("GroundLayer", "surfaceTypeName" | "surfaceGroupName")
@@ -179,7 +184,9 @@ fn expected_annotation(owner: &str, name: &str, field: &Value, schema: &Value) -
         | ("IfcsAeroSurface", "name" | "detachParentPartName" | "transformParentPartName")
         | ("ProjectedMissionText", "key" | "translations" | "itemTokens")
         | ("RadarAudioDatum", "token") => true,
-        ("FlareValue", "value") => field["type"] == "string" && field.get("format").is_none(),
+        ("FlareValue" | "SubsumptionEventValue", "value") => {
+            field["type"] == "string" && field.get("format").is_none()
+        }
         ("SharedInteraction", "displayType")
         | ("ConsumableType" | "ConsumableSubtype", "typeName") => false,
         ("BlackboardPropertyBody", "value") | ("LocationEntityType", "targetDescription") => {

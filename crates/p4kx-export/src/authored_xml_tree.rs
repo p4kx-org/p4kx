@@ -116,9 +116,19 @@ pub(crate) fn read(
 pub(crate) fn visit(
     xml: &EntrySourceXml<'_>,
     cancel: Option<&CancelToken>,
+    observe: impl FnMut(SourceElement<'_>, &AuthoredXmlElement) -> Result<(), CatalogError>,
+) -> Result<Vec<AuthoredXmlElement>, CatalogError> {
+    visit_roots(xml, std::iter::once(xml.root()), cancel, observe)
+}
+
+pub(crate) fn visit_roots<'document>(
+    xml: &EntrySourceXml<'_>,
+    roots: impl IntoIterator<Item = SourceElement<'document>>,
+    cancel: Option<&CancelToken>,
     mut observe: impl FnMut(SourceElement<'_>, &AuthoredXmlElement) -> Result<(), CatalogError>,
 ) -> Result<Vec<AuthoredXmlElement>, CatalogError> {
-    let mut pending = vec![(xml.root(), None)];
+    let mut pending: Vec<_> = roots.into_iter().map(|root| (root, None)).collect();
+    pending.reverse();
     let mut elements = Vec::new();
     while let Some((node, parent)) = pending.pop() {
         parsed_entry_json::check_cancel(cancel)?;

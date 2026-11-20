@@ -7,6 +7,7 @@ mod fault;
 mod mode;
 mod project;
 mod projection;
+mod quality_dependencies;
 mod read;
 mod resource_scope;
 mod selection;
@@ -18,6 +19,7 @@ use super::Crafting;
 
 pub(crate) use commodity_dependencies::CommodityDependencies;
 pub(crate) use mode::ReadMode;
+pub(crate) use quality_dependencies::QualityDependencies;
 pub(crate) use read::{read, read_catalog};
 pub(crate) use selection::{gameplay_property, pool_record};
 

@@ -30,7 +30,7 @@ type RecordLink<'source> = SourcedValue<Box<SourceRecordReference<'source>>>;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct FactionIdentityDefinition<'source> {
+pub struct FactionIdentityDefinition<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     #[schemars(extend("x-gameText" = true))]
@@ -53,6 +53,64 @@ pub(crate) type PreparedFactionIdentity<'source> =
     PreparedDefinition<'source, FactionIdentityDefinition<'source>>;
 
 impl<'source> FactionIdentityDefinition<'source> {
+    /// The physical identity and original header fields.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// The reference to the protected name text.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<GameTextRef> {
+        &self.name
+    }
+
+    /// The reference to the protected description text.
+    #[must_use]
+    pub const fn description(&self) -> &SourcedValue<GameTextRef> {
+        &self.description
+    }
+
+    /// The authored faction tag reference.
+    #[must_use]
+    pub const fn faction_tag(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.faction_tag
+    }
+
+    /// The authored faction definition reference.
+    #[must_use]
+    pub const fn faction_ref(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.faction_ref
+    }
+
+    /// The authored security network reference.
+    #[must_use]
+    pub const fn security_network_ref(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.security_network_ref
+    }
+
+    /// The authored encounter preset weights in source order.
+    #[must_use]
+    pub const fn encounter_preset_weights(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<EncounterPresetWeight<'source>>>> {
+        &self.encounter_preset_weights
+    }
+
+    /// The authored loot theme tags in source order.
+    #[must_use]
+    pub const fn loot_pool_theme_tags(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>> {
+        &self.loot_pool_theme_tags
+    }
+
+    /// The original declarations outside the typed fields.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     fn read(
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,
@@ -104,7 +162,7 @@ impl<'source> FactionIdentityDefinition<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct EncounterPresetWeight<'source> {
+pub struct EncounterPresetWeight<'source> {
     source_type: SourcedValue<&'source str>,
     encounter_preset: SourcedValue<&'source str>,
     weight: SourcedValue<ResourceFloat32>,
@@ -112,6 +170,30 @@ struct EncounterPresetWeight<'source> {
 }
 
 impl<'source> EncounterPresetWeight<'source> {
+    /// The original declaration type of this array member.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// The original encounter preset enum name.
+    #[must_use]
+    pub const fn encounter_preset(&self) -> &SourcedValue<&'source str> {
+        &self.encounter_preset
+    }
+
+    /// The original single-precision preset weight.
+    #[must_use]
+    pub const fn weight(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.weight
+    }
+
+    /// The original declarations outside the typed fields.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

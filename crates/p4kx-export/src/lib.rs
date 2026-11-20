@@ -196,6 +196,7 @@ mod loadout_owner_value;
 mod loadout_port;
 mod localization_table;
 mod location_hauling_targets;
+mod location_physics;
 mod location_template;
 mod loot_container_source;
 mod loot_containers;

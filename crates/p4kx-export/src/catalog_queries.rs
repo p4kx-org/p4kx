@@ -13,12 +13,15 @@ mod record_selection;
 #[path = "unlocalized_record_query.rs"]
 mod unlocalized_record_query;
 
-pub use record_selection::CatalogRecordSelection;
+pub use record_selection::{CatalogRecordCoverage, CatalogRecordSelection};
 
 #[path = "commodity_query.rs"]
 pub mod commodities;
 #[path = "loot_query.rs"]
 pub mod loot;
+
+#[path = "faction_identity_query.rs"]
+pub mod faction_identities;
 
 #[path = "contract_query.rs"]
 mod contracts;
@@ -240,20 +243,6 @@ pub struct BlueprintCategoryListSnapshot {
     pub source_inventory: SourceInventory,
     /// Coverage of the headers and bodies considered by the selection.
     pub coverage: CatalogRecordCoverage,
-}
-
-/// Physical Records that could not be read fully, or were skipped by selection policy.
-#[derive(Debug, Default)]
-#[non_exhaustive]
-pub struct CatalogRecordCoverage {
-    /// Physical indices whose headers could not be classified.
-    pub unreadable_headers: Vec<u32>,
-    /// Selected physical indices whose bodies could not be read.
-    pub unreadable_bodies: Vec<u32>,
-    /// Selected physical indices with recoverable field projection issues.
-    pub incomplete_fields: Vec<u32>,
-    /// The number of development leftovers excluded by catalog policy.
-    pub skipped_leftovers: usize,
 }
 
 /// Reads category-list declarations from the Archive's original DataForge.

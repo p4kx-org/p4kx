@@ -83,6 +83,8 @@ pub(crate) struct PlacementSpools {
     pub(crate) containers: Option<RowSpool>,
     pub(crate) locations: Option<RowSpool>,
     pub(crate) unresolved: Option<RowSpool>,
+    pub(crate) location_physics_grids: Option<RowSpool>,
+    pub(crate) location_physics_availability: Option<DatasetAvailability>,
 }
 
 /// The placements of the Starmap Records in the system containers of an Archive.

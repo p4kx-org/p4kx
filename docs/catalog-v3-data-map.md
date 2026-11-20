@@ -107,6 +107,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | loadouts | C.itemPorts; P.loadoutItems | source definitions/restrictions vs resolved default attachments/full path/parent and merge evidence |
 | starmapObjects | D.starmapObjects; P.starmapPlacements | identity/navigation definition vs physical placement/world projection |
 | object-container XML | P.containerInstances | resolved physical SOCpak occurrences with system-local instance keys, exact declaring paths and local/world transforms |
+| location physics grid XML | P.locationPhysicsGrids | typed descriptor ownership, ordered original controls and voxel references joined by the exact physical container |
 | unresolved external Child links | P.unresolvedContainerLinks | authored occurrences with exact descriptor/Child identity, raw sourced attributes, poses, directory resolution and target read status |
 | typed location Children | P.locationInstances | authored hierarchy and component declarations along the same physical container routes, with independent source-backed local and system transforms |
 | contracts | D.contractGenerators; V.contracts; V.missionTitles; A.contractPropertySetLinks | complete physical Generator arena, actual contract/subcontract occurrences, derived title and description with immediate per-language origin, and standing/reward/fact precedence ([contract](catalog-contract-generators.md)) |

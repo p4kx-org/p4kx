@@ -11,6 +11,9 @@ use p4kx_extraction::Archive;
 use p4kx_testkit::{TestContainer, TestElement, TestEntry};
 use serde_json::{Map, Value, json};
 
+#[path = "starmap_location_physics_query.rs"]
+mod location_physics;
+
 use crate::health_origin_assertions as proof;
 use crate::health_origin_fixture::{self as fixture, Fixture, Input, TestResult};
 

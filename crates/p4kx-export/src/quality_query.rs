@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Direct canonical quality definitions without inverse resource discovery.
+//! Direct canonical quality definitions and selective inverse resource membership.
 
 #[path = "quality_query_api.rs"]
 mod api;
 #[path = "quality_query_family.rs"]
 mod family;
+#[path = "quality_inverse_query.rs"]
+mod inverse;
 #[path = "quality_query_read.rs"]
 mod read;
 #[path = "quality_query_rows.rs"]
@@ -20,7 +22,8 @@ pub use crate::catalog_record_reference::CatalogRecordReference;
 pub use crate::definition_reference::DefinitionStatus;
 pub use crate::guid_text::CatalogGuid;
 pub use crate::quality_catalog::contract::{
-    QualityDistributionDefinition, QualityQuantizationDefinition,
+    QualityDistributionDefinition, QualityQuantizationDefinition, QualityQuantizationResources,
+    QuantizationEligibility, QuantizationIneligibility,
 };
 pub use crate::quality_source::{
     InlineQuality, QualityBandSource, QualityCurveSource, QualityOverrideFields,
@@ -32,6 +35,9 @@ pub use crate::resource_integer::ResourceInt64;
 pub use crate::resource_number::ResourceNumber;
 pub use api::{
     with_distributions, with_distributions_from, with_quantizations, with_quantizations_from,
+};
+pub use inverse::{
+    QuantizationResourceSnapshot, with_quantization_resources, with_quantization_resources_from,
 };
 pub use snapshot::{DistributionSnapshot, QualityDefinitionSnapshot, QuantizationSnapshot};
 

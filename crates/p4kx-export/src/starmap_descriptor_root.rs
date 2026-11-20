@@ -42,7 +42,7 @@ pub(super) fn read(
     let pending_external = reader.pending_external;
     let guids = reader.entity_guids;
     let entities = files.scan(&guids, &xml, ledger)?;
-    let (gate, gate_proof) = if bounds.scope.jump_endpoints {
+    let (gate, gate_proof) = if bounds.scope.reads_jump_endpoints() {
         let readers = GateFiles {
             archive: files.archive,
             outer: files.outer,
@@ -57,10 +57,20 @@ pub(super) fn read(
     } else {
         (None, None)
     };
+    let mut file = ContainerFile::from_xml(&xml, files.capture)?;
+    if bounds.scope.resolves_placements() {
+        file.location_physics = crate::location_physics::read(
+            read,
+            &xml,
+            files,
+            &bounds.location_grid_paths,
+            bounds.directory.as_ref(),
+        )?;
+    }
     Ok(Ok(ParsedRoot {
         root,
-        file: ContainerFile::from_xml(&xml, files.capture)?,
         pending_external,
+        file,
         entities,
         gate,
         gate_proof,

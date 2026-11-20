@@ -28,7 +28,7 @@ use crate::recovery::{self, ItemRecoveryPolicy, Recovery};
 use crate::schema_fields::every_field_required;
 use crate::{CatalogError, CatalogOptions};
 use entity_animation_controller::EntityAnimationController;
-use loot_generation_component::LootGenerationComponent;
+use loot_generation_component::{KIND as LOOT_GENERATION, LootGenerationComponent};
 
 #[path = "consumable_tables.rs"]
 pub(crate) mod consumables;
@@ -43,7 +43,7 @@ mod jump_point;
 #[path = "jump_point_globals.rs"]
 mod jump_point_globals;
 #[path = "loot_generation_component.rs"]
-mod loot_generation_component;
+pub(crate) mod loot_generation_component;
 #[path = "mining_configuration_tables.rs"]
 pub(crate) mod mining_configurations;
 #[path = "catalog_ordered_curve.rs"]
@@ -261,10 +261,6 @@ const ANIMATION_CONTROLLERS: ComponentKind = ComponentKind {
 const MISSION_BOARDS: ComponentKind = ComponentKind {
     source_type: catalog_mission_board::COMPONENT,
     inspection: ConfigurationInspection::MissionBoard,
-};
-const LOOT_GENERATION: ComponentKind = ComponentKind {
-    source_type: loot_generation_component::COMPONENT,
-    inspection: ConfigurationInspection::LootGeneration,
 };
 const JUMP_POINTS: ComponentKind = ComponentKind {
     source_type: jump_point::COMPONENT,

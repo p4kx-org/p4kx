@@ -279,6 +279,7 @@ const EXPECTED_KINDS: &[&str] = &[
     "shopInventories",
     "particleLibraries",
     "flareLibraries",
+    "subsumptionEvents",
     "planetResources",
     "creatures",
     "climateAssets",

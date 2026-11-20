@@ -20,7 +20,14 @@ use crate::starmap_walk::{PlacementRows, SelectedContainerRows, System, SystemRe
 use crate::{CatalogError, Kind, StarmapTraversalBudget};
 
 pub use crate::catalog_read::original::{PhysicalEntryRef, SourcedXmlAttribute};
+pub use crate::catalog_table::DatasetAvailability;
 pub use crate::export_entry_counts::ExportEntryCounts;
+pub use crate::location_physics::{
+    LocationPhysicsDeclaration, LocationPhysicsDescriptorSelection,
+    LocationPhysicsDescriptorSnapshot, LocationPhysicsDescriptorStatus, LocationPhysicsFields,
+    LocationPhysicsGrid, LocationPhysicsGridControls, LocationVoxelTarget,
+    read_location_physics_descriptor,
+};
 pub use crate::starmap_containers::instance::{ContainerInstance, ContainerInstanceKey};
 pub use crate::starmap_containers::unresolved::{
     ContainerTargetReadStatus, ContainerTargetStatus, UnresolvedChild, UnresolvedContainerLink,
@@ -190,6 +197,10 @@ pub struct ContainerPlacementSnapshot {
     pub container_instances: Vec<ContainerInstance>,
     /// Unresolved external Child rows in original traversal order.
     pub unresolved_container_links: Vec<UnresolvedContainerLink>,
+    /// Presence of location grids within the admitted and selected source scope.
+    pub location_physics_availability: DatasetAvailability,
+    /// Physical descriptors joined to exact route rows by their container reference.
+    pub location_physics_grids: Vec<Arc<LocationPhysicsGrid>>,
     /// Measured coverage of the selected descriptor graph and traversal.
     pub coverage: ContainerPlacementCoverage,
     /// Original sources and uses for the selected read and returned rows.
@@ -227,7 +238,10 @@ pub fn read_container_placements(
             external_child_step_indices,
             instances,
             unresolved,
+            location_physics,
         } = rows;
+        let complete = coverage.is_complete() && !location_physics.unavailable;
+        let grids = location_physics.into_rows();
         Ok(ContainerPlacementSnapshot {
             build: archive.build().cloned(),
             root_entry_index,
@@ -235,6 +249,11 @@ pub fn read_container_placements(
             external_child_step_indices,
             container_instances: instances,
             unresolved_container_links: unresolved,
+            location_physics_availability: crate::location_physics::stage::availability(
+                complete,
+                !grids.is_empty(),
+            ),
+            location_physics_grids: grids,
             coverage,
             source_inventory,
         })
@@ -282,7 +301,7 @@ fn read_selected(
     };
     let RootRead {
         attempted_descriptors,
-        system,
+        mut system,
         observations,
     } = read_root(
         archive,
@@ -294,6 +313,7 @@ fn read_selected(
         rows,
     )?;
     ledger.merge(observations);
+    rows.location_physics = std::mem::take(&mut system.location_physics);
     ContainerPlacementCoverage::measure(
         ContainerRootStatus::Selected,
         directory_complete,
@@ -327,10 +347,7 @@ fn read_root(
         index,
         &[position],
         cancel,
-        (
-            budget.source_children,
-            DescriptorScope::CONTAINER_PLACEMENTS,
-        ),
+        (budget.source_children, DescriptorScope::ContainerPlacements),
         capture,
     )?;
     checkpoint(cancel)?;

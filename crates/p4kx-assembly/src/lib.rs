@@ -307,7 +307,9 @@ pub use skeleton::{MAX_SKELETON_LEN, SkeletonProblem};
 pub use soc_container_capture::{
     SocArchiveMember, SocCaptureError, SocChildInput, SocChildState, SocContainerCapture,
     SocContainerOccurrence, SocGeometryCandidateKind, SocGeometryReference, SocGeometryTarget,
-    SocGeometryTier, SocMemberError, SocMemberSelection, SocMemberSelector, SocStreamInput,
+    SocGeometryTier, SocLocationGridError, SocLocationGridSelection, SocLocationGridSource,
+    SocMemberError, SocMemberSelection, SocMemberSelector, SocPhysicsVoxelTarget, SocStreamInput,
+    resolve_soc_geometry_path,
 };
 pub use soc_entity_index::{SocEntityIndex, SocEntitySite, SocEntityTarget};
 pub use soc_light_class::{SocLightClass, SocLightClassSelector, SocLightClassSource};

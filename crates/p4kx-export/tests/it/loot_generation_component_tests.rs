@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_export::catalog_queries::equipment::loot_generation::{
+    LootGenerationSnapshot, with_loot_generation_components_from,
+};
+use p4kx_export::catalog_queries::{
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
+};
 use p4kx_export::{ExportHealthStatus, build_catalog_from};
 use p4kx_extraction::{Filter, SourceUseRole, Value as Original};
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
@@ -151,6 +157,81 @@ fn loot_generation_filter_excludes_other_holders_but_keeps_authored_references()
     Ok(())
 }
 
+#[test]
+fn sdk_loot_generation_selects_physical_aliases_and_preserves_encrypted_fields() -> TestResult {
+    let input = Input::Encrypted;
+    let fixture = Fixture::open(&database_with_other_owner(OWNER_ID), input, Vec::new())?;
+    let forge = fixture.entry.open()?;
+    let guid = forge.record(0).ok_or("first physical owner")?.guid();
+    let session = CatalogQuerySession::from_entry(
+        &fixture.archive,
+        &fixture.entry,
+        CatalogLanguageSelection::Selected(&[]),
+        None,
+    )?;
+    let parsed = session.parsed(None)?;
+    parsed.with_loot_generation_components(
+        CatalogRecordSelection::Guid(guid),
+        None,
+        |snapshot| {
+            let positions: Vec<_> = snapshot
+                .rows()
+                .iter()
+                .map(|row| {
+                    let owner = row.owner();
+                    (
+                        owner.record_index().value().copied(),
+                        owner.component_ordinal().value().copied(),
+                    )
+                })
+                .collect();
+            assert_eq!(
+                positions,
+                [(Some(0), Some(1)), (Some(0), Some(3)), (Some(3), Some(1))],
+                "the shared GUID retains both physical owners and all original component positions"
+            );
+        },
+    )?;
+    with_loot_generation_components_from(
+        &fixture.archive,
+        &fixture.entry,
+        CatalogRecordSelection::RecordIndex(0),
+        None,
+        |snapshot| verify_sdk_score(&snapshot, input),
+    )??;
+    Ok(())
+}
+
+fn verify_sdk_score(snapshot: &LootGenerationSnapshot<'_>, input: Input) -> TestResult {
+    let [first, _] = snapshot.rows() else {
+        return Err("only the selected owner's two original components".into());
+    };
+    assert_eq!(
+        first.source_type().value(),
+        Some(&COMPONENT),
+        "authored component type"
+    );
+    assert_eq!(
+        first.authored_fields().roots().len(),
+        1,
+        "one authored root field"
+    );
+    let row = serde_json::to_value(first)?;
+    let graph = graph_for(&row)?;
+    let score = graph.field(constraints(&graph)?, "futureScore")?;
+    origin::verify(
+        score.get("value").ok_or("original raw score")?,
+        snapshot.source_inventory(),
+        &ExpectedOrigin {
+            encrypted: input.marker(),
+            complete: true,
+            uses: &[origin::value_use(11, "$value", SourceUseRole::Payload)],
+        },
+    )
+    .map_err(|error| format!("scoped original score evidence: {error:?}"))?;
+    Ok(())
+}
+
 fn rows(catalog: &Value) -> TestResult<&[Value]> {
     let table = catalog
         .pointer(TABLE)
@@ -173,6 +254,10 @@ fn constraints<'catalog>(graph: &Graph<'catalog>) -> TestResult<&'catalog [Value
 }
 
 fn database() -> Vec<u8> {
+    database_with_other_owner(OWNER_ID + 1)
+}
+
+fn database_with_other_owner(other_owner: u128) -> Vec<u8> {
     DataForgeBuilder::new()
         .version(8)
         .structure(TestStruct::new(ENTITY).array(COMPONENTS, TestType::StrongPointer(POOL.into())))
@@ -224,7 +309,7 @@ fn database() -> Vec<u8> {
             "Fixture.Layer",
             "synthetic-targets/layer.xml",
         ))
-        .record(owner(OWNER_ID + 1, OTHER_OWNER, vec![component(false)]))
+        .record(owner(other_owner, OTHER_OWNER, vec![component(false)]))
         .build()
 }
 

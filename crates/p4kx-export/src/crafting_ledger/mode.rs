@@ -107,23 +107,7 @@ impl<'context, 'source> ReadMode<'context, 'source> {
         let Some(input) = self.input() else {
             return Ok((selection::choose(record, filter), Evidence::default()));
         };
-        let context = input.record_context(record)?;
-        let mut inventory = Evidence::default();
-        inventory.header(
-            &context,
-            RecordHeaderInput::Field(RecordHeaderField::RecordIndex),
-            true,
-        )?;
-        let mut failure = None;
-        let selected = selection::choose_observed(record, filter, |field, readable| {
-            if failure.is_none() {
-                failure = inventory.header(&context, field, readable).err();
-            }
-        });
-        if let Some(error) = failure {
-            return Err(error);
-        }
-        Ok((selected, inventory))
+        observe_selection(input, record, filter)
     }
 
     pub(super) fn project<'f>(
@@ -274,31 +258,63 @@ impl<'context, 'source> ReadMode<'context, 'source> {
         record: &Record<'f>,
         action: Option<Action>,
     ) -> Result<Step<'f>, CatalogError> {
-        let mut step = Step::default();
         let Some(input) = self.input() else {
-            return Ok(step);
+            return Ok(Step::default());
         };
-        if !matches!(action, Some(Action::Quantization | Action::ResourceLinks)) {
-            return Ok(step);
-        }
-        let context = input.record_context(record)?;
-        let mut evidence = Evidence::default();
-        evidence.header(
-            &context,
-            RecordHeaderInput::Field(RecordHeaderField::RecordIndex),
-            true,
-        )?;
-        evidence.keep(context.observe("", SourceUseRole::Attempted)?)?;
-        evidence.complete = false;
-        if matches!(action, Some(Action::Quantization)) {
-            step.input = Some(Input::UnavailableQuantization {
-                guid: record.guid(),
-                record_index: record.index(),
-                evidence,
-            });
-        } else {
-            step.inventory = evidence;
-        }
-        Ok(step)
+        failed_quality(input, record, action)
     }
+}
+
+pub(super) fn observe_selection(
+    input: &OriginalCatalogInput<'_, '_>,
+    record: &Record<'_>,
+    filter: Option<&Filter>,
+) -> Result<(Result<Option<Selection>, DataForgeError>, Evidence), CatalogError> {
+    let context = input.record_context(record)?;
+    let mut inventory = Evidence::default();
+    inventory.header(
+        &context,
+        RecordHeaderInput::Field(RecordHeaderField::RecordIndex),
+        true,
+    )?;
+    let mut failure = None;
+    let selected = selection::choose_observed(record, filter, |field, readable| {
+        if failure.is_none() {
+            failure = inventory.header(&context, field, readable).err();
+        }
+    });
+    if let Some(error) = failure {
+        return Err(error);
+    }
+    Ok((selected, inventory))
+}
+
+pub(super) fn failed_quality<'source>(
+    input: &OriginalCatalogInput<'_, '_>,
+    record: &Record<'source>,
+    action: Option<Action>,
+) -> Result<Step<'source>, CatalogError> {
+    let mut step = Step::default();
+    if !matches!(action, Some(Action::Quantization | Action::ResourceLinks)) {
+        return Ok(step);
+    }
+    let context = input.record_context(record)?;
+    let mut evidence = Evidence::default();
+    evidence.header(
+        &context,
+        RecordHeaderInput::Field(RecordHeaderField::RecordIndex),
+        true,
+    )?;
+    evidence.keep(context.observe("", SourceUseRole::Attempted)?)?;
+    evidence.complete = false;
+    if matches!(action, Some(Action::Quantization)) {
+        step.input = Some(Input::UnavailableQuantization {
+            guid: record.guid(),
+            record_index: record.index(),
+            evidence,
+        });
+    } else {
+        step.inventory = evidence;
+    }
+    Ok(step)
 }

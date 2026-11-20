@@ -105,7 +105,7 @@ impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
             pose,
             node: child,
         } = authored;
-        let mut location = if self.bounds.scope.location_enrichment {
+        let mut location = if self.bounds.scope.enriches_locations() {
             ChildLocation::read(xml, child, xml.capture())?
         } else {
             None
@@ -127,7 +127,7 @@ impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
             .filter(|path| {
                 let candidates = self.index.candidates(path.as_str());
                 candidates.is_empty()
-                    || (self.bounds.scope.unresolved_links && candidates.len() > 1)
+                    || (self.bounds.scope.resolves_placements() && candidates.len() > 1)
             })
             .map(|path| UnresolvedChild::capture(xml, child, path, self.bounds.directory.clone()))
             .transpose()?;
@@ -150,7 +150,8 @@ impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
         path: Option<&AuthoredEntryPath>,
     ) -> Result<Option<Box<DeferredChild>>, CatalogError> {
         path.filter(|path| {
-            self.bounds.scope.unresolved_links && self.index.candidates(path.as_str()).len() == 1
+            self.bounds.scope.resolves_placements()
+                && self.index.candidates(path.as_str()).len() == 1
         })
         .map(|_| {
             DeferredChild::capture(self.xml, node, self.bounds.directory.clone()).map(Box::new)

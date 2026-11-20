@@ -3,10 +3,10 @@
 
 use std::collections::{HashMap, HashSet};
 use std::mem;
-use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::{Arc, OnceLock};
 
-use p4kx_extraction::{Archive, CancelToken, Guid, SourceUse};
+use p4kx_extraction::{Archive, CancelToken, Guid, PathKeys, SourceUse};
 use rayon::prelude::*;
 
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture};
@@ -132,32 +132,29 @@ pub(crate) enum Body {
 
 /// The placement details needed by the consumer of the descriptor walk.
 #[derive(Clone, Copy)]
-pub(crate) struct DescriptorScope {
-    location_enrichment: bool,
-    unresolved_links: bool,
-    jump_endpoints: bool,
+pub(crate) enum DescriptorScope {
+    Catalog { jump_endpoints: bool },
+    ContainerPlacements,
+    Harvest,
 }
 
 impl DescriptorScope {
-    pub(crate) const fn catalog(jump_endpoints: bool) -> Self {
-        Self {
-            location_enrichment: true,
-            unresolved_links: true,
-            jump_endpoints,
-        }
+    const fn enriches_locations(self) -> bool {
+        matches!(self, Self::Catalog { .. })
     }
 
-    pub(crate) const CONTAINER_PLACEMENTS: Self = Self {
-        location_enrichment: false,
-        unresolved_links: true,
-        jump_endpoints: false,
-    };
+    const fn resolves_placements(self) -> bool {
+        !matches!(self, Self::Harvest)
+    }
 
-    pub(crate) const HARVEST: Self = Self {
-        location_enrichment: false,
-        unresolved_links: false,
-        jump_endpoints: false,
-    };
+    const fn reads_jump_endpoints(self) -> bool {
+        matches!(
+            self,
+            Self::Catalog {
+                jump_endpoints: true
+            }
+        )
+    }
 }
 
 /// The shared Child count and read controls for the discovered containers.
@@ -166,6 +163,7 @@ struct Bounds<'a> {
     children: Option<AtomicUsize>,
     scope: DescriptorScope,
     directory: Option<SourceUse>,
+    location_grid_paths: OnceLock<PathKeys>,
 }
 
 impl Bounds<'_> {
@@ -237,10 +235,15 @@ fn parse_body(
         return Ok(Body::Unparsed);
     };
     let loss = children::source_loss(&mut root, &entities, capture.source_uses(), bounds.cancel)?;
-    if loss.inventory {
+    let grid_failed = bounds.scope.resolves_placements()
+        && matches!(
+            file.location_physics,
+            crate::location_physics::GridRead::Unavailable
+        );
+    if loss.inventory || grid_failed {
         ledger.incomplete_inventory(Kind::StarmapObjects);
     }
-    let disposition = if loss.projection {
+    let disposition = if loss.projection || grid_failed {
         SourceDisposition::ProjectionFailed
     } else {
         SourceDisposition::Projected
@@ -283,7 +286,12 @@ pub(crate) fn read_all(
         index,
         roots,
         cancel,
-        (children, DescriptorScope::catalog(false)),
+        (
+            children,
+            DescriptorScope::Catalog {
+                jump_endpoints: false,
+            },
+        ),
         capture,
     )
 }
@@ -299,6 +307,7 @@ pub(crate) fn read_all_scoped(
     let bounds = Bounds {
         cancel,
         children: children.map(AtomicUsize::new),
+        location_grid_paths: OnceLock::new(),
         scope,
         directory: capture
             .source_uses()
@@ -329,13 +338,13 @@ pub(crate) fn read_all_scoped(
             &mut ledger,
         )?;
         for (entry, (body, observed)) in read {
-            if scope.unresolved_links {
+            if scope.resolves_placements() {
                 failed_links::observe(entry, &body, &mut pending);
             }
             bodies.insert(entry, body);
             ledger.merge(observed);
         }
-        if scope.unresolved_links {
+        if scope.resolves_placements() {
             failed_links::finish(&mut bodies, &mut pending, index, capture, cancel)?;
         }
         frontier = next
@@ -343,7 +352,7 @@ pub(crate) fn read_all_scoped(
             .filter(|entry| !bodies.contains_key(entry))
             .collect();
     }
-    if scope.unresolved_links {
+    if scope.resolves_placements() {
         failed_links::completed(&pending, cancel)?;
     }
     Ok(Read {

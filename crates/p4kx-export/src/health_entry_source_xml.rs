@@ -13,6 +13,9 @@ use super::health_entry_metadata::EntryMetadata;
 use super::{EntryCapture, EntryRead, EntryReceipt};
 use crate::{CatalogError, ExportAccountingError};
 
+#[path = "health_entry_source_xml_physics.rs"]
+mod physics;
+
 /// One original XML attribute and its spelling, namespace and value.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[schemars(transform = crate::schema_fields::every_field_required)]

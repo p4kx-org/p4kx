@@ -30,6 +30,10 @@ pub mod flight;
 #[path = "equipment_fuel_query.rs"]
 pub mod fuel;
 
+/// Selective reads of authored loot-generation components and their original values.
+#[path = "equipment_loot_generation_query.rs"]
+pub mod loot_generation;
+
 /// Selective reads of authored mining lasers and attachable modifiers.
 #[path = "equipment_mining_tool_query.rs"]
 pub mod mining_tools;

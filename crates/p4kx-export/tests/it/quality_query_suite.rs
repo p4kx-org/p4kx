@@ -5,6 +5,8 @@
 mod fixture;
 #[path = "quality_query_identity.rs"]
 mod identity;
+#[path = "quality_inverse_sdk.rs"]
+mod inverse;
 #[path = "quality_query_parity.rs"]
 mod parity;
 #[path = "quality_query_states.rs"]

@@ -19,10 +19,29 @@ pub(crate) fn read_jump_witness_body(
     entry: usize,
     capture: &EntryCapture<'_>,
 ) -> Result<Body, CatalogError> {
+    read_witness_body(
+        archive,
+        index,
+        entry,
+        DescriptorScope::Catalog {
+            jump_endpoints: true,
+        },
+        capture,
+    )
+}
+
+pub(crate) fn read_witness_body(
+    archive: &Archive,
+    index: &Index<'_>,
+    entry: usize,
+    scope: DescriptorScope,
+    capture: &EntryCapture<'_>,
+) -> Result<Body, CatalogError> {
     let bounds = Bounds {
         cancel: None,
+        location_grid_paths: std::sync::OnceLock::new(),
         children: None,
-        scope: DescriptorScope::catalog(true),
+        scope,
         directory: capture
             .source_uses()
             .observe_root_directory_paths(archive)?,
