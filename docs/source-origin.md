@@ -301,6 +301,18 @@ whose contributing reads cannot be proved carry an incomplete origin. A
 successfully written partial model has a companion for its actual bytes and
 retains its existing issue and exit-code behavior.
 
+## Rigid worn mounts
+
+`p4kx armour glb` publishes a sibling `<file>.p4kx-origin.jsonl` for emitted rigid
+worn mounts. Each `glbJsonField` points to the actual child entry under a bone
+or an emitted transform of the mounted root. The contributors include the
+original physical port record, the selected bone fields and the applied item
+locator when observed. An unproved contributor set stays partial.
+
+Character packages carry the same projection under `rig.worn_mount_provenance`
+as of package format 1.21. The package validates the bound GLB file and its
+addressed fields at import. See [Blender package provenance](blender-package.md#worn-mount-provenance).
+
 ## Merged DDS
 
 `p4kx texture merge` writes `<file>.p4kx-origin.jsonl` beside the standard DDS.
