@@ -5,11 +5,18 @@ use std::error::Error;
 use std::thread;
 
 use crate::MaterialVariant;
+use crate::geometry::GeometryComponent;
 
 fn node(tags: &str, material: Option<&str>, children: Vec<MaterialVariant>) -> MaterialVariant {
     MaterialVariant {
         tags: tags.split_whitespace().map(str::to_owned).collect(),
         material: material.map(str::to_owned),
+        palette: None,
+        owner: GeometryComponent {
+            record: 0,
+            ordinal: 0,
+        },
+        slot: 0,
         children,
     }
 }

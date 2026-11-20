@@ -4,7 +4,7 @@
 use std::fmt;
 use std::mem;
 
-use crate::MaterialVariant;
+use crate::{MaterialVariant, PaletteRef};
 
 impl Clone for MaterialVariant {
     fn clone(&self) -> Self {
@@ -31,6 +31,9 @@ fn copy_fields(node: &MaterialVariant) -> MaterialVariant {
     MaterialVariant {
         tags: node.tags.clone(),
         material: node.material.clone(),
+        palette: node.palette.clone(),
+        owner: node.owner,
+        slot: node.slot,
         children: Vec::with_capacity(node.children.len()),
     }
 }
@@ -41,6 +44,8 @@ impl PartialEq for MaterialVariant {
         while let Some((left, right)) = pending.pop() {
             if left.tags != right.tags
                 || left.material != right.material
+                || left.palette != right.palette
+                || left.slot != right.slot
                 || left.children.len() != right.children.len()
             {
                 return false;
@@ -77,6 +82,8 @@ struct DebugNode<'node> {
     depth: usize,
     tags: &'node [String],
     material: Option<&'node str>,
+    palette: Option<&'node PaletteRef>,
+    slot: usize,
     children: usize,
 }
 
@@ -90,6 +97,8 @@ impl fmt::Debug for DebugNodes<'_> {
                 depth,
                 tags: node.tags(),
                 material: node.material(),
+                palette: node.palette.as_ref(),
+                slot: node.slot,
                 children: node.children().len(),
             })
         });
@@ -104,6 +113,8 @@ impl fmt::Debug for DebugNode<'_> {
             .field("depth", &self.depth)
             .field("tags", &self.tags)
             .field("material", &self.material)
+            .field("palette", &self.palette)
+            .field("slot", &self.slot)
             .field("children", &self.children)
             .finish()
     }

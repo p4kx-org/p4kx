@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+pub(crate) use p4kx_assembly::PaintPort;
 use p4kx_assembly::{LoadoutError, VehicleImplementation};
 
 #[cfg(test)]
@@ -10,32 +11,6 @@ use crate::guid_text::CatalogGuid;
 use crate::variants::ShipKey;
 
 const PAINTS: &str = "Paints";
-
-/// An item port of paints, in a ship's Record or its vehicle implementation: the tags an item
-/// needs to carry to fit it and the tags the port offers, as lower-case tag names.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub(crate) struct PaintPort {
-    pub(crate) port_tags: Vec<String>,
-    pub(crate) required_tags: Vec<String>,
-}
-
-impl PaintPort {
-    /// Returns the port with the white-space separated tag lists `port_tags` and `required_tags`.
-    pub(crate) fn new(port_tags: Option<&str>, required_tags: Option<&str>) -> Self {
-        Self {
-            port_tags: tags(port_tags),
-            required_tags: tags(required_tags),
-        }
-    }
-}
-
-fn tags(value: Option<&str>) -> Vec<String> {
-    value
-        .unwrap_or_default()
-        .split_whitespace()
-        .map(str::to_ascii_lowercase)
-        .collect()
-}
 
 /// What the paints of a ship are derived from: the paint ports of its Record and of the vehicle
 /// implementation the ship base data read.

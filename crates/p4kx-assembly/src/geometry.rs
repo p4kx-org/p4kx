@@ -54,6 +54,20 @@ impl PaletteRef {
     pub fn child_path(&self) -> &str {
         &self.child_path
     }
+
+    pub(crate) fn read(data: &StructValue<'_>) -> Option<Self> {
+        let reference = struct_field(data, "Palette")?;
+        let guid = match reference.field("RootRecord")? {
+            Value::Reference(link) => link.guid(),
+            Value::Error(ValueError::DanglingReference { guid }) => *guid,
+            _ => return None,
+        };
+        Some(Self {
+            guid,
+            child_path: text(reference, "ChildPath").trim().to_owned(),
+            selector: PaletteReferenceSource::Named(None),
+        })
+    }
 }
 
 /// The geometry an Entity Record names (`SGeometryResourceParams`): the model file, the material
@@ -248,7 +262,7 @@ impl Geometry {
             .map(|resource| text(resource, "path"))
             .filter(|path| !path.is_empty());
         let origins = GeometrySelectors::of(owner, slots, material.is_some());
-        let mut palette = read_palette(data);
+        let mut palette = PaletteRef::read(data);
         if let Some(palette) = &mut palette {
             palette.selector = PaletteReferenceSource::Named(
                 origins
@@ -264,20 +278,6 @@ impl Geometry {
             origins,
         })
     }
-}
-
-fn read_palette(data: &StructValue<'_>) -> Option<PaletteRef> {
-    let reference = struct_field(data, "Palette")?;
-    let guid = match reference.field("RootRecord")? {
-        Value::Reference(link) => link.guid(),
-        Value::Error(ValueError::DanglingReference { guid }) => *guid,
-        _ => return None,
-    };
-    Some(PaletteRef {
-        guid,
-        child_path: text(reference, "ChildPath").trim().to_owned(),
-        selector: PaletteReferenceSource::Named(None),
-    })
 }
 
 #[cfg(test)]

@@ -3,7 +3,8 @@
 
 use std::collections::{HashMap, HashSet};
 
-use p4kx_extraction::{CancelToken, TagTree};
+use p4kx_assembly::PaintTagIndex;
+use p4kx_extraction::CancelToken;
 use rayon::prelude::*;
 
 use crate::catalog_v3::tag_catalog::TagDependencies;
@@ -71,7 +72,7 @@ pub(crate) fn paints<'f>(
     unreadable_files.sort_unstable();
     unreadable_files.dedup();
     ledger.merge(tags.ledger);
-    let index = TagIndex::new(tags.tree.tree());
+    let index = PaintTagIndex::new(tags.tree.tree());
     let mut paints: Vec<Paint> = candidates
         .par_iter()
         .map(|item| {
@@ -112,17 +113,10 @@ struct ShipPorts {
 }
 
 impl ShipPorts {
-    fn accepts(&self, have: &[String], required: &[String], index: &TagIndex<'_>) -> bool {
-        self.ports.iter().any(|port| {
-            fits(port, have, index)
-                && required.iter().all(|wanted| {
-                    port.port_tags
-                        .iter()
-                        .chain(&port.required_tags)
-                        .chain(&self.tags)
-                        .any(|offered| index.matches(offered, wanted))
-                })
-        })
+    fn accepts(&self, have: &[String], required: &[String], index: &PaintTagIndex<'_>) -> bool {
+        self.ports
+            .iter()
+            .any(|port| port.accepts(have, required, &self.tags, index))
     }
 }
 
@@ -173,48 +167,4 @@ fn summarise(paints: &[Paint], unreadable_vehicles: usize) -> PaintSummary {
 
 fn lowered(tags: &[&str]) -> Vec<String> {
     tags.iter().map(|tag| tag.to_ascii_lowercase()).collect()
-}
-
-fn fits(port: &PaintPort, have: &[String], index: &TagIndex<'_>) -> bool {
-    !port.required_tags.is_empty()
-        && port
-            .required_tags
-            .iter()
-            .all(|wanted| have.iter().any(|tag| index.matches(tag, wanted)))
-}
-
-/// The tags of the tag tree by lower-case name.
-struct TagIndex<'t> {
-    tree: &'t TagTree,
-    positions: HashMap<String, Vec<usize>>,
-}
-
-impl<'t> TagIndex<'t> {
-    fn new(tree: &'t TagTree) -> Self {
-        let mut positions: HashMap<String, Vec<usize>> = HashMap::new();
-        for tag in tree.iter() {
-            positions
-                .entry(tag.name().to_ascii_lowercase())
-                .or_default()
-                .push(tag.position());
-        }
-        Self { tree, positions }
-    }
-
-    /// Returns whether the tag `have` is the tag `wanted` or lies below a tag of that name.
-    fn matches(&self, have: &str, wanted: &str) -> bool {
-        if have == wanted {
-            return true;
-        }
-        let (Some(below), Some(above)) = (self.positions.get(have), self.positions.get(wanted))
-        else {
-            return false;
-        };
-        below.iter().filter_map(|&at| self.tree.at(at)).any(|tag| {
-            above
-                .iter()
-                .filter_map(|&at| self.tree.at(at))
-                .any(|ancestor| tag.is_within(&ancestor))
-        })
-    }
 }

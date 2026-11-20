@@ -173,8 +173,9 @@ impl EntitySpec {
         Self {
             attach_tags: definition
                 .map_or_default(|definition| tag_words(text(definition, "Tags"))),
-            material_variants: geometry_component
-                .map_or_default(|(_, component)| MaterialVariant::read(component)),
+            material_variants: geometry_component.map_or_default(|(ordinal, component)| {
+                MaterialVariant::read(component, position(ordinal))
+            }),
             size: definition.and_then(|definition| unsigned(definition, "Size")),
             docked_vehicle: is_docked_vehicle_type(classification.item_type_text()),
             classification,

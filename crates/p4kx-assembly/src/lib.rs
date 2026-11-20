@@ -155,6 +155,7 @@ mod node_notes;
 mod object_containers;
 mod outfit;
 mod outfit_read;
+mod paint_port;
 mod palette;
 mod path_match;
 mod pick;
@@ -162,6 +163,7 @@ mod placement;
 mod plan;
 mod port;
 mod port_placement_origin;
+mod port_sub_helper;
 mod positioned_loadout;
 mod prefab;
 mod provider;
@@ -267,7 +269,7 @@ pub use loadout_request::LoadoutRequest;
 pub use loadout_xml::{LoadoutXmlDecoding, XmlLoadoutPathSite};
 pub use loadout_xml_record_selector::LoadoutXmlRecordSelector;
 pub use loadout_xml_use::LoadoutXmlClassUse;
-pub use material_variant::MaterialVariant;
+pub use material_variant::{MaterialVariant, MaterialVariantSelection};
 pub use merge::port_key;
 pub use model_cache::{CachedModels, DEFAULT_MODEL_CACHE_BYTES, ModelCache};
 pub use model_placement_sources::ModelPlacementInput;
@@ -275,6 +277,7 @@ pub use node_body::CharacterBody;
 pub use object_containers::{ContainerSource, ObjectContainerRef};
 pub use outfit::{Outfit, OutfitReport};
 pub use p4kx_character as character;
+pub use paint_port::{PaintPort, PaintTagIndex};
 pub use palette::{
     ForgePalettes, PaletteFailure, PaletteProvider, PaletteRead, PaletteRecordSelection,
     PaletteRecords, PaletteSelection, PaletteSource,
@@ -283,6 +286,7 @@ pub use pick::LoadoutPicks;
 pub use placement::offset_transform;
 pub use port::{PortDefinition, PortDefinitionPosition, PortTransform, PortType};
 pub use port_placement_origin::{PortPlacementField, PortPlacementSource};
+pub use port_sub_helper::PortSubHelper;
 pub use positioned_loadout::{PositionedLoadout, PositionedLoadoutNode};
 pub use prefab::{
     MAX_PREFAB_DEPTH, MAX_PREFAB_ISSUES, MAX_PREFAB_LIBRARY_LEN, MAX_PREFAB_OBJECTS,

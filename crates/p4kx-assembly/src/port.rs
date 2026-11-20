@@ -3,6 +3,7 @@
 
 use p4kx_dataforge::StructValue;
 
+use crate::port_sub_helper::{self, PortSubHelper};
 use crate::read::{flag, struct_field, struct_items, text, texts, unsigned, xyz};
 
 const ATTACHMENT_PREFIX: &str = "SItemPortDefAttachmentImplementation";
@@ -21,6 +22,8 @@ pub struct PortDefinition {
     pub(crate) port_tags: String,
     pub(crate) required_tags: String,
     pub(crate) transform: Option<PortTransform>,
+    root_helper_tags: Option<Box<str>>,
+    sub_helpers: Box<[PortSubHelper]>,
     pub(crate) skin: bool,
     pub(crate) no_rotation: bool,
     pub(crate) detach_direction: [f32; 3],
@@ -97,10 +100,23 @@ impl PortDefinition {
         self.skin
     }
 
-    /// Returns where the port sits, or `None` when the Record gives no attachment helper.
+    /// Returns the root attachment helper's transform.
     #[must_use]
     pub const fn transform(&self) -> Option<&PortTransform> {
         self.transform.as_ref()
+    }
+
+    /// Returns the root helper's authored tag selector.
+    #[must_use]
+    pub fn root_helper_tags(&self) -> Option<&str> {
+        self.root_helper_tags.as_deref()
+    }
+
+    /// Returns the authored subhelpers in depth-first source order.
+    /// Static placement uses the root transform.
+    #[must_use]
+    pub fn sub_helpers(&self) -> &[PortSubHelper] {
+        &self.sub_helpers
     }
 }
 
@@ -198,6 +214,21 @@ impl PortTransform {
     pub const fn rotation(&self) -> [f32; 3] {
         self.rotation
     }
+
+    pub(crate) fn read(node: &StructValue<'_>, attachment: &str) -> Option<Self> {
+        let helper = struct_field(node, "Helper")?;
+        let offset = struct_field(helper, "Offset");
+        let position = offset.and_then(|offset| struct_field(offset, "Position"));
+        let rotation = offset.and_then(|offset| struct_field(offset, "Rotation"));
+        Some(Self {
+            attachment: attachment.to_owned(),
+            helper: text(helper, "Name").to_owned(),
+            offset_helper: text(helper, "ItemOffsetHelperName").to_owned(),
+            position: xyz(position),
+            rotation: xyz(rotation),
+            offset_fields: [position.is_some(), rotation.is_some()],
+        })
+    }
 }
 
 /// Reads one `SItemPortDef`.
@@ -206,6 +237,8 @@ pub(crate) fn read_definition(
     position: PortDefinitionPosition,
 ) -> PortDefinition {
     let attachment = struct_field(port, "AttachmentImplementation");
+    let helper = attachment.and_then(|attachment| struct_field(attachment, "Helper"));
+    let kind = attachment.map_or("", attachment_kind);
     PortDefinition {
         position,
         display_name: text(port, "DisplayName").to_owned(),
@@ -220,8 +253,10 @@ pub(crate) fn read_definition(
             .collect(),
         port_tags: text(port, "PortTags").to_owned(),
         required_tags: text(port, "RequiredPortTags").to_owned(),
-        transform: attachment.and_then(read_transform),
-        skin: attachment.is_some_and(|attachment| attachment_kind(attachment) == SKIN_ATTACHMENT),
+        transform: helper.and_then(|helper| PortTransform::read(helper, kind)),
+        root_helper_tags: helper.and_then(port_sub_helper::tags),
+        sub_helpers: helper.map_or_else(Box::default, |helper| port_sub_helper::read(helper, kind)),
+        skin: kind == SKIN_ATTACHMENT,
         no_rotation: attachment
             .and_then(|attachment| struct_field(attachment, "constraintParams"))
             .is_some_and(|constraints| flag(constraints, "noRotation")),
@@ -232,20 +267,4 @@ pub(crate) fn read_definition(
 fn attachment_kind<'a>(attachment: &StructValue<'a>) -> &'a str {
     let kind = attachment.type_name();
     kind.strip_prefix(ATTACHMENT_PREFIX).unwrap_or(kind)
-}
-
-fn read_transform(attachment: &StructValue<'_>) -> Option<PortTransform> {
-    let helper =
-        struct_field(attachment, "Helper").and_then(|node| struct_field(node, "Helper"))?;
-    let offset = struct_field(helper, "Offset");
-    let position = offset.and_then(|offset| struct_field(offset, "Position"));
-    let rotation = offset.and_then(|offset| struct_field(offset, "Rotation"));
-    Some(PortTransform {
-        attachment: attachment_kind(attachment).to_owned(),
-        helper: text(helper, "Name").to_owned(),
-        offset_helper: text(helper, "ItemOffsetHelperName").to_owned(),
-        position: xyz(position),
-        rotation: xyz(rotation),
-        offset_fields: [position.is_some(), rotation.is_some()],
-    })
 }
