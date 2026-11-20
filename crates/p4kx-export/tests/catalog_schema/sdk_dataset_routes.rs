@@ -54,6 +54,8 @@ mod fixtures;
 mod flight_configurations;
 #[path = "sdk_fuel_routes.rs"]
 mod fuel;
+#[path = "sdk_generator_facet_routes.rs"]
+mod generator_facets;
 #[path = "sdk_inventory_container_route.rs"]
 mod inventory_containers;
 #[path = "sdk_item_configuration_routes.rs"]
@@ -151,6 +153,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(blueprint_pools::read()?);
     routes.extend(blueprint_taxonomy::read()?);
     routes.extend(contracts::read()?);
+    routes.extend(generator_facets::read()?);
     routes.extend(blueprint_physical::read()?);
     routes.extend(component_definitions::read()?);
     routes.extend(flight_configurations::read()?);

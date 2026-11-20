@@ -13,11 +13,18 @@ use crate::catalog_query_session::{CatalogQuerySession, ParsedCatalogQueries, ch
 use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::mission_generator::GeneratorDefinition;
 
+#[path = "contract_generator_facets_query.rs"]
+mod facets;
 #[path = "contract_generator_query_notes.rs"]
 mod notes;
 #[path = "contract_generator_query_read.rs"]
 mod read;
 
+pub use facets::{
+    ContractGeneratorFacetSnapshot, ContractScenarioRequirements,
+    LocalContractGeneratorConfiguration, with_contract_generator_facets,
+    with_contract_generator_facets_from,
+};
 pub use notes::{ContractGeneratorProjectionFailure, ContractGeneratorProjectionNote};
 
 /// Selected physical Generator definitions and their original source evidence.

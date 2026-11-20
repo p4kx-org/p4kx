@@ -40,10 +40,44 @@ struct RequirementSource {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ContractScenarioRequirements<'source> {
+pub struct ContractScenarioRequirements<'source> {
     source: RequirementSource,
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
     scenarios: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
+}
+
+impl<'source> ContractScenarioRequirements<'source> {
+    /// Borrows the physical source shared with the Generator definition.
+    #[must_use]
+    pub const fn input_ref(&self) -> &PhysicalSourceRef {
+        &self.source.input_ref
+    }
+
+    /// Returns the physical Generator Record index.
+    #[must_use]
+    pub const fn record_index(&self) -> u32 {
+        self.source.record_index
+    }
+
+    /// Returns the arena reference of the owned declaration, when it has a parent value.
+    #[must_use]
+    pub const fn owner(&self) -> Option<SourceValueRef> {
+        self.source.owner
+    }
+
+    /// Returns the original scenario array's arena reference.
+    #[must_use]
+    pub const fn scenarios_value(&self) -> SourceValueRef {
+        self.source.scenarios_value
+    }
+
+    /// Borrows the original ordered scenario links.
+    #[must_use]
+    pub const fn scenarios(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>> {
+        &self.scenarios
+    }
 }
 
 pub(crate) fn read<'source>(

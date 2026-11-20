@@ -559,6 +559,15 @@ identity. Both return the selected titles, property sets, location queries and s
 their actual source and dependency closure. Forward inputs are prepared only when the shared
 canonical interpreter needs their typed lookup. Check coverage before replacing a consumer cache.
 
+Use `with_contract_generator_facets` for `configurations.localContractGenerators` and
+`declarations.contractScenarioRequirements`. The unlocalized query reads the selected
+Generator owners and preserves the original ordered Handler settings and scenario
+reference arrays. Join each row to its Generator's raw arena by `input_ref()` and
+`record_index()`. The `handler()`, `owner()` and `scenarios_value()` links identify
+occurrences within that arena. Retrieve the arena for that owner through
+`with_contract_generators` when needed. Scenario references retain their original target
+headers for independent lookup.
+
 See [Contract queries](catalog-contract-queries.md) for callback lifetimes, parsed-session reuse,
 global duplicate and intro semantics, complete original views and source-inventory ownership.
 

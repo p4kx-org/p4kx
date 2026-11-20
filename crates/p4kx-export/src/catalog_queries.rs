@@ -232,8 +232,10 @@ pub use crate::template_value_meaning::{
     TemplateDatasetCondition, TemplateMissionItemSelection, TemplateSpecificItems,
 };
 pub use contract_generators::{
-    ContractGeneratorProjectionFailure, ContractGeneratorProjectionNote, ContractGeneratorSnapshot,
-    with_contract_generators, with_contract_generators_from,
+    ContractGeneratorFacetSnapshot, ContractGeneratorProjectionFailure,
+    ContractGeneratorProjectionNote, ContractGeneratorSnapshot, ContractScenarioRequirements,
+    LocalContractGeneratorConfiguration, with_contract_generator_facets,
+    with_contract_generator_facets_from, with_contract_generators, with_contract_generators_from,
 };
 
 pub use mining_definitions::{

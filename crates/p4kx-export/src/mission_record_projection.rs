@@ -6,8 +6,8 @@ use p4kx_extraction::{CancelToken, RecordTree};
 use super::{ContractPiece, ObservedPiece, Piece, PieceError, project};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::original::OriginalFlowFields;
-use crate::catalog_v3::mission_sources::{
-    contract_scenario_requirements, local_contract_generator_configuration,
+use crate::catalog_v3::mission_sources::contract_generator_facets::{
+    self, AuthoredGeneratorFacets,
 };
 use crate::contract_generator_definition::{self, DefinitionProjection};
 use crate::export_diagnostic::ExportSourceRole;
@@ -129,7 +129,7 @@ fn finish_observed<'source>(
     admission: &RecordObservation<'_, 'source>,
     role: ExportSourceRole,
     definition: GeneratorDefinition<'source>,
-    authored: Authored<'source>,
+    authored: AuthoredGeneratorFacets<'source>,
     mut ledger: ExportLedger,
 ) -> Result<ObservedPiece<'source>, CatalogError> {
     let piece = match projected {
@@ -166,32 +166,6 @@ fn finish_observed<'source>(
     })
 }
 
-struct Authored<'source> {
-    scenario_requirements:
-        Vec<contract_scenario_requirements::ContractScenarioRequirements<'source>>,
-    local_generators:
-        Vec<local_contract_generator_configuration::LocalContractGeneratorConfiguration<'source>>,
-    notes: Vec<FieldError>,
-}
-
-fn authored<'source>(
-    input: &OriginalCatalogInput<'_, 'source>,
-    tree: &RecordTree<'source>,
-    fields: &OriginalFlowFields<'_, '_, 'source>,
-    capture: &dyn FieldCapture<'source>,
-    mut notes: Vec<FieldError>,
-) -> Result<Authored<'source>, CatalogError> {
-    let scenario_requirements =
-        contract_scenario_requirements::read(input, tree, fields, capture, &mut notes)?;
-    let local_generators =
-        local_contract_generator_configuration::read(input, tree, fields, capture, &mut notes)?;
-    Ok(Authored {
-        scenario_requirements,
-        local_generators,
-        notes,
-    })
-}
-
 fn authored_facets<'source>(
     facets: GeneratorFacets,
     input: &OriginalCatalogInput<'_, 'source>,
@@ -199,13 +173,14 @@ fn authored_facets<'source>(
     fields: &OriginalFlowFields<'_, '_, 'source>,
     capture: &dyn FieldCapture<'source>,
     notes: Vec<FieldError>,
-) -> Result<Authored<'source>, CatalogError> {
+) -> Result<AuthoredGeneratorFacets<'source>, CatalogError> {
     match facets {
-        GeneratorFacets::All => authored(input, tree, fields, capture, notes),
-        GeneratorFacets::Contracts => Ok(Authored {
-            scenario_requirements: Vec::new(),
-            local_generators: Vec::new(),
+        GeneratorFacets::All => {
+            contract_generator_facets::read(input, tree, fields, capture, notes)
+        }
+        GeneratorFacets::Contracts => Ok(AuthoredGeneratorFacets {
             notes,
+            ..AuthoredGeneratorFacets::default()
         }),
     }
 }

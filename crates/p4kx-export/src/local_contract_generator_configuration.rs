@@ -42,13 +42,48 @@ struct LocalContractGeneratorSource {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct LocalContractGeneratorConfiguration<'source> {
+pub struct LocalContractGeneratorConfiguration<'source> {
     source: LocalContractGeneratorSource,
     local_generator_params: SourcedValue<LocalContractGeneratorParams<'source>>,
     default_availability: SourcedValue<ContractBoardAvailability<'source>>,
 }
 
 impl<'source> LocalContractGeneratorConfiguration<'source> {
+    /// Borrows the physical source shared with the Generator definition.
+    #[must_use]
+    pub const fn input_ref(&self) -> &PhysicalSourceRef {
+        &self.source.input_ref
+    }
+
+    /// Returns the physical Generator Record index.
+    #[must_use]
+    pub const fn record_index(&self) -> u32 {
+        self.source.record_index
+    }
+
+    /// Returns the source arena reference of the original Handler.
+    #[must_use]
+    pub const fn handler(&self) -> SourceValueRef {
+        self.source.handler
+    }
+
+    /// Borrows the scope declaration of the owned local generator parameters.
+    #[must_use]
+    pub fn scope(&self) -> Option<&SourcedValue<&'source str>> {
+        Some(&self.local_generator_params.value()?.scope)
+    }
+
+    /// Borrows the original default mission board availability declaration.
+    #[must_use]
+    pub fn mission_board_availability(&self) -> Option<&SourcedValue<&'source str>> {
+        Some(
+            &self
+                .default_availability
+                .value()?
+                .mission_board_availability,
+        )
+    }
+
     fn read(
         source: LocalContractGeneratorSource,
         fields: Observed<'_, '_, '_, 'source>,

@@ -51,6 +51,8 @@ const BLUEPRINT_CATEGORY_LISTS: &str = "/declarations/blueprintCategoryLists";
 const BLUEPRINT_CATEGORIES: &str = "/definitions/blueprintCategories";
 const GAMEPLAY_PROPERTIES: &str = "/definitions/gameplayProperties";
 const BLUEPRINT_REWARDS: &str = "/declarations/blueprintRewardSources";
+const LOCAL_CONTRACT_GENERATORS: &str = "/configurations/localContractGenerators";
+const CONTRACT_SCENARIO_REQUIREMENTS: &str = "/declarations/contractScenarioRequirements";
 const BLUEPRINT_DEFINITIONS: &str = "/definitions/blueprints";
 const BLUEPRINT_TIERS: &str = "/configurations/blueprintTiers";
 const BLUEPRINT_PRESENTATION: &str = "/projections/blueprintPresentation";
@@ -164,6 +166,8 @@ const REQUIRED_WITNESSES: &[&str] = &[
     BLUEPRINT_CATEGORIES,
     GAMEPLAY_PROPERTIES,
     BLUEPRINT_REWARDS,
+    LOCAL_CONTRACT_GENERATORS,
+    CONTRACT_SCENARIO_REQUIREMENTS,
     BLUEPRINT_DEFINITIONS,
     BLUEPRINT_TIERS,
     BLUEPRINT_PRESENTATION,

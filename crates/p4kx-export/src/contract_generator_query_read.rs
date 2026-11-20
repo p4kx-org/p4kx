@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{CancelToken, DataForge, Record, TreeBuilder, Value};
+use p4kx_extraction::{
+    CancelToken, DataForge, DataForgeError, Record, RecordTree, TreeBuilder, Value,
+};
 
 use super::notes::{ContractGeneratorProjectionFailure, ContractGeneratorProjectionNote};
 use crate::CatalogError;
@@ -29,18 +31,9 @@ pub(super) fn read<'source>(
     cancel: Option<&CancelToken>,
 ) -> Result<SelectedGenerators<'source>, CatalogError> {
     let mut result = SelectedGenerators::default();
-    let mut trees = TreeBuilder::new();
-    selection.for_each(forge, cancel, |record| {
-        if !selected(record, &mut result.coverage) {
-            return Ok(());
-        }
-        checkpoint(cancel)?;
-        let Ok(tree) = trees.build(record) else {
-            result.coverage.unreadable_bodies.push(record.index());
-            return Ok(());
-        };
+    let coverage = visit_selected(forge, selection, cancel, |record, tree| {
         let admission = RecordObservation::capture(input, record)?;
-        let scope = input.record_scope(record, &tree)?;
+        let scope = input.record_scope(record, tree)?;
         let mut unreadable = false;
         let indexed = source_value_catalog::read_indexed_arena(&scope, cancel, |site| {
             unreadable |= matches!(site.value(), Value::Error(_));
@@ -48,15 +41,47 @@ pub(super) fn read<'source>(
         let capture = TemplateFieldCapture::new(&indexed.facts, input, &admission)?;
         let projected = contract_generator_definition::read(
             input,
-            &tree,
+            tree,
             &indexed.facts,
             indexed.source,
             &capture,
         )?;
-        result.take(record.index(), projected, unreadable)?;
+        result.take(record.index(), projected, unreadable)
+    })?;
+    result.coverage = coverage;
+    Ok(result)
+}
+
+pub(super) fn visit_selected<'source>(
+    forge: &'source DataForge<'source>,
+    selection: CatalogRecordSelection,
+    cancel: Option<&CancelToken>,
+    mut project_incomplete: impl FnMut(
+        &Record<'source>,
+        &RecordTree<'source>,
+    ) -> Result<bool, CatalogError>,
+) -> Result<CatalogRecordCoverage, CatalogError> {
+    let mut coverage = CatalogRecordCoverage::default();
+    let mut trees = TreeBuilder::new();
+    selection.for_each(forge, cancel, |record| {
+        if !selected(record, &mut coverage) {
+            return Ok(());
+        }
+        checkpoint(cancel)?;
+        let tree = match trees.build(record) {
+            Ok(tree) => tree,
+            Err(DataForgeError::ObservationStopped) => return Err(CatalogError::Cancelled),
+            Err(_) => {
+                coverage.unreadable_bodies.push(record.index());
+                return Ok(());
+            }
+        };
+        if project_incomplete(record, &tree)? {
+            coverage.incomplete_fields.push(record.index());
+        }
         Ok(())
     })?;
-    Ok(result)
+    Ok(coverage)
 }
 
 fn selected(record: &Record<'_>, coverage: &mut CatalogRecordCoverage) -> bool {
@@ -85,7 +110,7 @@ impl<'source> SelectedGenerators<'source> {
         record_index: u32,
         projected: DefinitionProjection<'source>,
         unreadable: bool,
-    ) -> Result<(), CatalogError> {
+    ) -> Result<bool, CatalogError> {
         let DefinitionProjection {
             definition,
             item_error,
@@ -109,10 +134,7 @@ impl<'source> SelectedGenerators<'source> {
             self.failures
                 .push(ContractGeneratorProjectionFailure::new(record_index, error));
         }
-        if incomplete {
-            self.coverage.incomplete_fields.push(record_index);
-        }
         self.rows.push(definition);
-        Ok(())
+        Ok(incomplete)
     }
 }
