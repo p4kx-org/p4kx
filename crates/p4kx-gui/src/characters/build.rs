@@ -10,9 +10,9 @@ use p4kx_assembly::{
     ForgeItems, ForgePalettes, Head, LoadoutResolver, ModelFailure, ModelProvider, Piece,
     ProvidedModel, Replaced,
 };
-use p4kx_extraction::DataForge;
 use p4kx_extraction::model::{LayerBudget, MaterialStatus};
 use p4kx_extraction::{CancelToken, Guid};
+use p4kx_extraction::{DataForge, DataForgeEntry};
 
 use crate::assembly_export::{Stoppable, failure_of};
 use crate::forge_cache::ForgeSource;
@@ -117,11 +117,13 @@ type Worn = (Vec<Piece>, Vec<Replaced>, Option<String>);
 
 /// Returns the pieces to wear, the Loadout's with the given ones on top, and the head's.
 fn worn(
-    forge: &DataForge<'_>,
+    (forge, entry): (&DataForge<'_>, &DataForgeEntry),
     files: &ArchiveFiles<'_>,
     request: &Request,
 ) -> Result<Worn, String> {
-    let mut resolver = LoadoutResolver::new(forge).with_files(files);
+    let mut resolver = LoadoutResolver::new(forge)
+        .with_forge_entry(entry)
+        .with_files(files);
     let given: Vec<Piece> = request
         .pieces
         .iter()
@@ -191,14 +193,17 @@ pub(super) fn run(
         return NoEntries.into();
     };
     let files = ArchiveFiles::new(archive);
-    let (pieces, replaced, npc_folder) = match worn(&forge, &files, request) {
+    let (pieces, replaced, npc_folder) = match worn((&forge, &source.entry), &files, request) {
         Ok(worn) => worn,
         Err(reason) => return failed(reason),
     };
     if cancel.is_cancelled() {
         return Ended::Cancelled;
     }
-    let archive_models = ArchiveModels::new(archive);
+    let mut archive_models = ArchiveModels::new(archive);
+    if pieces.iter().any(Piece::has_port_mount) {
+        archive_models = archive_models.with_model_node_sources();
+    }
     let stoppable = Stoppable {
         models: &archive_models,
         cancel,

@@ -5,7 +5,8 @@ use std::io::{self, Write};
 
 use p4kx_gltf::{
     GlbOptions, GlbSummary, GltfError, MeshVertexMap, RigAnimation, RiggedGlbEmission,
-    TextureLoader, write_rigged_glb_animated_observed, write_rigged_glb_with_vertex_maps,
+    TextureLoader, write_rigged_glb_animated_observed,
+    write_rigged_glb_animated_observed_with_vertex_maps, write_rigged_glb_with_vertex_maps,
 };
 
 use super::{Armour, ArmourPart, CharacterAnimations, RigArchiveRead};
@@ -56,13 +57,7 @@ impl Armour {
             options,
             textures,
             out,
-            &mut |map| {
-                let part = self
-                    .parts
-                    .get(map.part)
-                    .ok_or_else(|| io::Error::other("rigged mesh lost its producing part"))?;
-                visitor(map, part)
-            },
+            &mut vertex_origin_visitor(&self.parts, visitor),
         )
     }
 
@@ -86,5 +81,41 @@ impl Armour {
             textures,
             out,
         )
+    }
+
+    /// Writes the rigged GLB with emission evidence and visits each output vertex mapping.
+    ///
+    /// # Errors
+    /// Returns ordinary rigged write failures or an error from the visitor.
+    pub fn write_glb_animated_observed_with_vertex_origins(
+        &self,
+        animations: &CharacterAnimations<'_>,
+        options: &GlbOptions,
+        textures: &dyn TextureLoader,
+        out: &mut impl Write,
+        visitor: &mut impl FnMut(MeshVertexMap<'_>, &ArmourPart) -> io::Result<()>,
+    ) -> Result<(GlbSummary, RiggedGlbEmission), GltfError> {
+        let pieces = self.rig_pieces();
+        write_rigged_glb_animated_observed_with_vertex_maps(
+            &self.skeleton.bones,
+            &pieces,
+            &animations.rig_animations(),
+            options,
+            textures,
+            out,
+            &mut vertex_origin_visitor(&self.parts, visitor),
+        )
+    }
+}
+
+fn vertex_origin_visitor<'armour>(
+    parts: &'armour [ArmourPart],
+    visitor: &'armour mut impl FnMut(MeshVertexMap<'_>, &ArmourPart) -> io::Result<()>,
+) -> impl FnMut(MeshVertexMap<'_>) -> io::Result<()> + 'armour {
+    move |map| {
+        let part = parts
+            .get(map.part)
+            .ok_or_else(|| io::Error::other("rigged mesh lost its producing part"))?;
+        visitor(map, part)
     }
 }

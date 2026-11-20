@@ -1,16 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::io;
 use std::path::Path;
 use std::sync::atomic::AtomicBool;
 
-use p4kx_assembly::{Armour, CharacterAnimations, PartOrigin};
-use p4kx_gltf::{GlbOptions, GlbSummary, TextureLoader};
+use p4kx_assembly::{Armour, ArmourPart, CharacterAnimations, PartOrigin};
+use p4kx_gltf::{GlbOptions, GlbSummary, GltfError, MeshVertexMap, TextureLoader};
 
 use crate::build::assembly_issue;
 use crate::manifest::{CharacterSource, EntityRef, Manifest, Node, NodeKind, Source};
 use crate::manifest_rig::{Rig, RigClip, RigPart, RigPartOrigin};
-use crate::rig_package::{RigScene, rig_manifest, write_rig_package};
+use crate::mesh_vertex_map::Writer;
+use crate::rig_package::{RigScene, RigWriter, WrittenRig, rig_manifest, write_rig_package};
 use crate::{PackageInfo, PackageResult, PackageSummary};
 
 /// A Character ready to be written as a package: its [`Armour`] with the body, head and pieces it
@@ -110,28 +112,57 @@ pub fn write_character_package_with_context(
         character.name,
         options,
         context,
-        |options, writer, map| {
-            if let Some(map) = map {
-                character.armour.write_glb_with_vertex_origins(
-                    character.animations,
-                    options,
-                    textures,
-                    writer,
-                    &mut |row, part| {
-                        map.observe(&row, part.model(), part.model_archive_sources(), context)
-                    },
-                )
-            } else {
-                character.armour.write_glb_animated_with(
-                    character.animations,
-                    options,
-                    textures,
-                    writer,
-                )
-            }
-        },
+        |options, writer, map| write_mesh(character, textures, options, writer, map, context),
         |written| manifest(character, info, options, written),
     )
+}
+
+fn write_mesh(
+    character: &CharacterScene<'_>,
+    textures: &dyn TextureLoader,
+    options: &GlbOptions,
+    writer: &mut RigWriter<'_, '_>,
+    map: Option<&mut Writer>,
+    context: &crate::PackageWriteContext<'_>,
+) -> Result<WrittenRig, GltfError> {
+    let armour = character.armour;
+    let animations = character.animations;
+    let visitor = map.map(|map| {
+        move |row: MeshVertexMap<'_>, part: &ArmourPart| {
+            map.observe(&row, part.model(), part.model_archive_sources(), context)
+        }
+    });
+    if !armour
+        .parts()
+        .iter()
+        .any(|part| part.mount_source().is_some())
+    {
+        return match visitor {
+            Some(mut visitor) => armour
+                .write_glb_with_vertex_origins(animations, options, textures, writer, &mut visitor)
+                .map(WrittenRig::geometry),
+            None => armour
+                .write_glb_animated_with(animations, options, textures, writer)
+                .map(WrittenRig::geometry),
+        };
+    }
+    let (summary, emission) = match visitor {
+        Some(mut visitor) => armour.write_glb_animated_observed_with_vertex_origins(
+            animations,
+            options,
+            textures,
+            writer,
+            &mut visitor,
+        ),
+        None => armour.write_glb_animated_observed(animations, options, textures, writer),
+    }?;
+    let origins = armour
+        .worn_mount_origins(&emission)
+        .map_err(|error| GltfError::Write(io::Error::other(error)))?;
+    Ok(WrittenRig {
+        summary,
+        worn_origins: Some(origins),
+    })
 }
 
 fn source(character: &CharacterScene<'_>, info: &PackageInfo) -> Source {
@@ -197,6 +228,7 @@ fn manifest(
 fn rig(armour: &Armour, written: &GlbSummary) -> Rig {
     Rig {
         body: Some(armour.variant().code().to_owned()),
+        worn_mount_provenance: None,
         skeleton: armour.skeleton_file().to_owned(),
         bones: written.bones,
         skinned_meshes: written.skinned_meshes,

@@ -4,7 +4,7 @@
 use std::error::Error;
 use std::fs;
 use std::io::{self, Write as _};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use p4kx_extraction::OriginDigestWriter;
 use p4kx_testkit::{MOUNT_BONE, MOUNT_COURIER, check_glb, mounted_item_entries, test_key};
@@ -161,22 +161,7 @@ fn mounted_armour_glb_receipt_binds_physical_port_and_applied_model_fields() -> 
     for (label, encrypted) in [("encrypted", Some(true)), ("plain", None)] {
         let case = directory.path().join(label);
         fs::create_dir(&case)?;
-        let archive = super::chf_glb::archive(
-            &case,
-            mounted_item_entries()
-                .into_iter()
-                .map(|entry| {
-                    let dataforge = Path::new(entry.path())
-                        .extension()
-                        .is_some_and(|extension| extension.eq_ignore_ascii_case("dcb"));
-                    if encrypted.is_some() && dataforge {
-                        entry.encrypted()
-                    } else {
-                        entry
-                    }
-                })
-                .collect(),
-        )?;
+        let archive = mount_archive(&case, encrypted.is_some())?;
         let mut command = p4kx_testkit::p4kx()?;
         command
             .args(["armour", "glb"])
@@ -201,6 +186,130 @@ fn mounted_armour_glb_receipt_binds_physical_port_and_applied_model_fields() -> 
             );
         }
         prior = Some(bytes);
+    }
+    Ok(())
+}
+
+fn mount_archive(folder: &Path, encrypted: bool) -> Result<PathBuf, Box<dyn Error>> {
+    let entries = mounted_item_entries()
+        .into_iter()
+        .map(|entry| {
+            let dataforge = Path::new(entry.path())
+                .extension()
+                .is_some_and(|extension| extension.eq_ignore_ascii_case("dcb"));
+            if encrypted && dataforge {
+                entry.encrypted()
+            } else {
+                entry
+            }
+        })
+        .collect();
+    super::chf_glb::archive(folder, entries)
+}
+
+#[test]
+fn character_package_worn_mount_provenance_binds_glb_with_optional_vertex_maps() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let mut prior = None;
+    for (label, encrypted, vertex_maps) in [
+        ("with-maps", Some(true), true),
+        ("without-maps", None, false),
+    ] {
+        let case = directory.path().join(label);
+        fs::create_dir(&case)?;
+        let archive = mount_archive(&case, encrypted.is_some())?;
+        let out = case.join("character");
+        let mut command = p4kx_testkit::p4kx()?;
+        command
+            .args(["character", "package"])
+            .arg(&archive)
+            .args([
+                "--loadout",
+                MOUNT_COURIER,
+                "--materials",
+                "colours",
+                "--out",
+            ])
+            .arg(&out);
+        if encrypted.is_some() {
+            command.args(["--key", &test_key().to_hex()]);
+        }
+        if vertex_maps {
+            command.arg("--vertex-maps");
+        }
+        let result = command.output()?;
+        assert!(
+            result.status.success(),
+            "{label} fixture Character export failed: {}",
+            String::from_utf8_lossy(&result.stderr),
+        );
+        let manifest: Value = serde_json::from_slice(&fs::read(out.join("scene.json"))?)?;
+        let mesh = manifest.pointer("/meshes/0").ok_or("character rig mesh")?;
+        assert_eq!(
+            mesh.get("vertex_map").is_some(),
+            vertex_maps,
+            "the requested vertex-map policy is preserved",
+        );
+        let bytes = fs::read(out.join("meshes/m0001.glb"))?;
+        check_package_mount(mesh, &bytes, encrypted)?;
+        if let Some(prior) = &prior {
+            assert_eq!(
+                &bytes, prior,
+                "mount evidence and encryption preserve the GLB"
+            );
+        }
+        prior = Some(bytes);
+    }
+    Ok(())
+}
+
+fn check_package_mount(mesh: &Value, bytes: &[u8], encrypted: Option<bool>) -> TestResult {
+    let proof = mesh
+        .pointer("/rig/worn_mount_provenance")
+        .ok_or("rig mount provenance")?;
+    assert_eq!(
+        proof.get("glb"),
+        mesh.get("file"),
+        "the proof identifies its owner"
+    );
+    let mut measured = OriginDigestWriter::new(io::sink());
+    measured.write_all(bytes)?;
+    assert_eq!(
+        proof.get("artifact"),
+        Some(&serde_json::to_value(measured.finish()?)?),
+        "the proof binds exactly the bytes written in the package",
+    );
+    let (parent, translation) = exact_mount_paths(bytes)?;
+    let fields = proof
+        .get("fieldOrigins")
+        .and_then(Value::as_object)
+        .ok_or("mount field origin map")?;
+    let uses = proof
+        .pointer("/sourceInventory/uses")
+        .and_then(Value::as_array)
+        .ok_or("mount source uses")?;
+    for (address, field) in [(parent, "Name"), (translation, "Offset.Position")] {
+        let origin = fields.get(&address).ok_or("exact mounted node address")?;
+        assert_eq!(
+            origin.get("containsEncryptedSource"),
+            Some(&serde_json::to_value(encrypted)?),
+            "the GLB field reports the observed encryption state",
+        );
+        let references = origin
+            .get("sourceUsesRefs")
+            .and_then(Value::as_array)
+            .ok_or("mount source references")?;
+        assert!(
+            uses.iter().any(
+                |row| row.get("id").is_some_and(|id| references.contains(id))
+                    && row
+                        .pointer("/location/field")
+                        .and_then(Value::as_str)
+                        .is_some_and(|path| path
+                            .ends_with(&format!("AttachmentImplementation.Helper.Helper.{field}")))
+            ),
+            "{address} cites the authored mount port field",
+        );
     }
     Ok(())
 }

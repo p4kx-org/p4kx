@@ -6,10 +6,12 @@ use std::error::Error;
 use p4kx_chunks::{ChunkFile, ivo};
 use p4kx_gltf::{
     GlbOptions, LoadedTexture, MeshPrimitiveMap, PrimitiveMaterialSource, RigPiece,
-    TextureLoadError, TextureLoader, write_glb, write_glb_observed, write_rigged_glb_animated_with,
-    write_rigged_glb_with_vertex_maps,
+    TextureLoadError, TextureLoader, write_glb, write_glb_observed,
+    write_rigged_glb_animated_observed, write_rigged_glb_animated_observed_with_vertex_maps,
+    write_rigged_glb_animated_with, write_rigged_glb_with_vertex_maps,
 };
 use p4kx_model::{CompanionError, CompanionPath, Material, Model};
+use p4kx_testkit::gltf::mesh::Semantic;
 use p4kx_testkit::{
     CUBE_MATERIAL_LIBRARY, TestChunkFile, TestModel, TestMtl, TestMtlMaterial, TestNode,
     TestSubmesh, check_glb,
@@ -64,6 +66,66 @@ fn rigged_material_slots_use_the_actual_supplied_fallback_and_source_rows() -> T
         "rigged primitive capture does not change GLB bytes"
     );
     fixture.assert_output(&glb, &rows, PrimitiveMaterialSource::SuppliedFallback)
+}
+
+#[test]
+fn rigged_glb_collects_emission_and_vertex_maps_in_one_write() -> TestResult {
+    let fixture = Fixture::new(0x900);
+    let model = fixture.model()?;
+    let fallback = Material::engine_default();
+    let pieces = [RigPiece::new("rig", &model, &model.materials).with_fallback(&fallback)];
+    let options = GlbOptions::default();
+    let textures = NoTextures;
+    let mut ordinary = Vec::new();
+    let (_, expected) = write_rigged_glb_animated_observed(
+        &model.bones,
+        &pieces,
+        &[],
+        &options,
+        &textures,
+        &mut ordinary,
+    )?;
+    let mut combined = Vec::new();
+    let mut rows = Vec::new();
+    let mut positions = Vec::new();
+    let (_, emission) = write_rigged_glb_animated_observed_with_vertex_maps(
+        &model.bones,
+        &pieces,
+        &[],
+        &options,
+        &textures,
+        &mut combined,
+        &mut |mesh| {
+            rows.extend(mesh.primitives());
+            positions.push((mesh.mesh, mesh.position_accessor, mesh.vertices));
+            Ok(())
+        },
+    )?;
+    assert_eq!(
+        combined, ordinary,
+        "combined observation writes exactly the same GLB"
+    );
+    assert_eq!(
+        emission, expected,
+        "vertex observation retains the ordinary emission evidence"
+    );
+    let checked = check_glb(&combined)?;
+    let mesh = checked.document.meshes().next().ok_or("output mesh")?;
+    let position = mesh
+        .primitives()
+        .next()
+        .and_then(|primitive| primitive.get(&Semantic::Positions))
+        .ok_or("output POSITION accessor")?;
+    assert_eq!(
+        positions,
+        [(
+            mesh.index(),
+            position.index(),
+            u64::try_from(position.count())?
+        )],
+        "the map identifies the exact emitted POSITION accessor and count"
+    );
+    fixture.assert_output(&combined, &rows, PrimitiveMaterialSource::SuppliedFallback)
 }
 
 #[test]

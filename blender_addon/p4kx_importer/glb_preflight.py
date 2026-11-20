@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
 from struct import Struct
@@ -36,18 +37,22 @@ class GlbInfo:
     primitive_bindings: tuple[tuple[tuple[int | None, int | None], ...], ...]
 
 
-def check_glb(path: Path) -> GlbInfo:
+def check_glb(
+    path: Path, *, inspect_json: Callable[[dict[str, Any]], None] | None = None
+) -> GlbInfo:
     """Returns structural facts for an embedded GLB or raises a package error."""
     try:
         with path.open("rb") as stream:
-            return _check_stream(stream)
+            return _check_stream(stream, inspect_json)
     except PackageError as error:
         raise PackageError(f"{path.name}: {error}") from error
     except OSError as error:
         raise PackageError(f"Cannot read {path.name}: {error.strerror}.") from error
 
 
-def _check_stream(stream: BinaryIO) -> GlbInfo:
+def _check_stream(
+    stream: BinaryIO, inspect_json: Callable[[dict[str, Any]], None] | None = None
+) -> GlbInfo:
     actual_size = stream.seek(0, 2)
     stream.seek(0)
     raw = stream.read(_HEADER.size)
@@ -76,6 +81,8 @@ def _check_stream(stream: BinaryIO) -> GlbInfo:
         padding = stream.read(bin_length - data_length)
         if padding != bytes(bin_length - data_length):
             raise PackageError("GLB BIN padding is invalid.")
+    if inspect_json is not None:
+        inspect_json(document)
     return GlbInfo(
         actual_size,
         material_count,

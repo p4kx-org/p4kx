@@ -39,7 +39,7 @@ from .soc_scene import parse_ref as parse_soc_ref
 
 FORMAT_NAME = "p4kx-blender-package"
 SUPPORTED_MAJOR = 1
-SUPPORTED_MINOR = 20
+SUPPORTED_MINOR = 21
 MANIFEST_NAME = "scene.json"
 MAX_MANIFEST_BYTES = 64 * 1024 * 1024
 BLENDER_NAME_BYTES = 63
@@ -354,12 +354,15 @@ def _parse_meshes(
             for slot, material in enumerate(read_array(entry.get("materials"), f"{where}.materials"))
         )
         palette_id = entry.get("palette_id")
+        rig = _rig(entry.get("rig"), f"{where}.rig")
+        if rig is not None and rig.worn_mount_provenance is not None:
+            rig.worn_mount_provenance.check_mesh(file, version)
         meshes[mesh_id] = Mesh(
             mesh_id,
             file,
             materials,
             palette_id if isinstance(palette_id, str) else None,
-            _rig(entry.get("rig"), f"{where}.rig"),
+            rig,
             _mesh_count(entry, "bytes", where),
             _mesh_count(entry, "vertices", where),
             _mesh_count(entry, "triangles", where),

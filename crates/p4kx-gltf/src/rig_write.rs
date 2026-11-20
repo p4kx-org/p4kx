@@ -47,7 +47,7 @@ pub fn write_rigged_glb_animated_with<'m>(
         options,
         textures,
         out,
-        Observation::None,
+        Observation::default(),
     )
 }
 
@@ -63,6 +63,43 @@ pub fn write_rigged_glb_animated_observed<'m>(
     textures: &dyn TextureLoader,
     out: &mut impl Write,
 ) -> Result<(GlbSummary, RiggedGlbEmission), GltfError> {
+    write_observed(skeleton, pieces, animations, options, textures, out, None)
+}
+
+/// Writes the rigged GLB with emission evidence and visits its source vertex maps.
+/// The visitor runs after the GLB bytes are written.
+///
+/// # Errors
+/// Returns ordinary rigged write failures or an error from the visitor.
+pub fn write_rigged_glb_animated_observed_with_vertex_maps<'m>(
+    skeleton: &'m [Bone],
+    pieces: &'m [RigPiece<'m>],
+    animations: &[RigAnimation<'m>],
+    options: &GlbOptions,
+    textures: &dyn TextureLoader,
+    out: &mut impl Write,
+    visitor: &mut impl FnMut(MeshVertexMap<'_>) -> io::Result<()>,
+) -> Result<(GlbSummary, RiggedGlbEmission), GltfError> {
+    write_observed(
+        skeleton,
+        pieces,
+        animations,
+        options,
+        textures,
+        out,
+        Some(visitor),
+    )
+}
+
+fn write_observed<'m, 'visitor>(
+    skeleton: &'m [Bone],
+    pieces: &'m [RigPiece<'m>],
+    animations: &[RigAnimation<'m>],
+    options: &GlbOptions,
+    textures: &dyn TextureLoader,
+    out: &mut impl Write,
+    vertex_map: Option<&'visitor mut ObserveMesh<'visitor>>,
+) -> Result<(GlbSummary, RiggedGlbEmission), GltfError> {
     let mut emission = RiggedGlbEmission::default();
     let summary = write_rigged(
         skeleton,
@@ -71,7 +108,10 @@ pub fn write_rigged_glb_animated_observed<'m>(
         options,
         textures,
         out,
-        Observation::Emission(&mut emission),
+        Observation {
+            emission: Some(&mut emission),
+            vertex_map,
+        },
     )?;
     Ok((summary, emission))
 }
@@ -96,14 +136,17 @@ pub fn write_rigged_glb_with_vertex_maps<'m>(
         options,
         textures,
         out,
-        Observation::VertexMap(visitor),
+        Observation {
+            vertex_map: Some(visitor),
+            ..Observation::default()
+        },
     )
 }
 
-enum Observation<'a> {
-    None,
-    Emission(&'a mut RiggedGlbEmission),
-    VertexMap(&'a mut ObserveMesh<'a>),
+#[derive(Default)]
+struct Observation<'emission, 'visitor> {
+    emission: Option<&'emission mut RiggedGlbEmission>,
+    vertex_map: Option<&'visitor mut ObserveMesh<'visitor>>,
 }
 
 fn write_rigged<'m>(
@@ -113,7 +156,7 @@ fn write_rigged<'m>(
     options: &GlbOptions,
     textures: &dyn TextureLoader,
     out: &mut impl Write,
-    observe: Observation<'_>,
+    observe: Observation<'_, '_>,
 ) -> Result<GlbSummary, GltfError> {
     let (instances, fallbacks) = instances_of(pieces, options);
     let binds = inverse_binds(skeleton);
@@ -147,15 +190,12 @@ fn write_rigged<'m>(
         push_animations(&mut root, buffer, &layout, &plans);
     }
     let total = write_file(&root, &layout, &images, options.json_byte_budget, out)?;
-    match observe {
-        Observation::None => {}
-        Observation::Emission(emission) => {
-            let addresses = Addresses::of(&root, &layout, &instances, &materials, &plans, &total);
-            *emission = RiggedGlbEmission::of(&instances, &layout, &mut images, addresses);
-        }
-        Observation::VertexMap(visitor) => {
-            mesh_vertex_map::observe(&root, &layout, &instances, options.lod, visitor)?;
-        }
+    if let Some(visitor) = observe.vertex_map {
+        mesh_vertex_map::observe(&root, &layout, &instances, options.lod, visitor)?;
+    }
+    if let Some(emission) = observe.emission {
+        let addresses = Addresses::of(&root, &layout, &instances, &materials, &plans, &total);
+        *emission = RiggedGlbEmission::of(&instances, &layout, &mut images, addresses);
     }
     let defaulted = instances
         .iter()

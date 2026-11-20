@@ -79,6 +79,7 @@ mod player_source_port_helper;
 mod player_tag_definitions;
 mod player_weapon_motion_sources;
 mod rename;
+mod rig_mount_provenance;
 mod rig_package;
 mod roles;
 mod schema;

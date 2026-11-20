@@ -41,7 +41,7 @@ fn rigged_creature_vertex_map_preserves_both_physical_producers_and_replacement(
     let original = fs::read(package.join("meshes/m0001.glb"))?;
     write(&archive, &assembly, &package, true)?;
     let manifest: Manifest = serde_json::from_slice(&fs::read(package.join("scene.json"))?)?;
-    assert_eq!(manifest.version, "1.20", "same additive package contract");
+    assert_eq!(manifest.version, "1.21", "same additive package contract");
     let combined = manifest.meshes.first().ok_or("creature GLB")?;
     let map = combined
         .vertex_map

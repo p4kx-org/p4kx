@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Iterable
 from dataclasses import dataclass
+from functools import partial
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -69,7 +70,12 @@ def _preflight_mesh(root: Path, mesh: Mesh) -> tuple[Path, bool]:
     path = resolve_file(root, mesh.file)
     if not path.is_file():
         raise PackageError(f"{path.name} is missing or is not a regular file.")
-    info = check_glb(path)
+    rig = mesh.rig
+    if rig is not None and (mount_origins := rig.worn_mount_provenance) is not None:
+        info = check_glb(path, inspect_json=partial(mount_origins.inspect, bones=rig.bones))
+        mount_origins.check_artifact(path, info.bytes)
+    else:
+        info = check_glb(path)
     if mesh.rig is None and info.material_slot_issue is not None:
         raise PackageError(f"{path.name}: {info.material_slot_issue}")
     if mesh.bytes and mesh.bytes != info.bytes:

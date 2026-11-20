@@ -35,7 +35,7 @@ fn archive_geometry_vertex_sidecar_binds_actual_glb_and_original_encrypted_range
     let observed = out.path().join("observed");
     write_pair(&archive, &plain, &observed)?;
     let manifest: Manifest = serde_json::from_slice(&fs::read(observed.join("scene.json"))?)?;
-    assert_eq!(manifest.version, "1.20", "opt-in enables the additive wire");
+    assert_eq!(manifest.version, "1.21", "opt-in enables the additive wire");
     let root = manifest.meshes.first().ok_or("root GLB")?;
     let map = root
         .vertex_map

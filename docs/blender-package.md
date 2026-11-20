@@ -199,7 +199,7 @@ written (there are no `null`s).
 | Field | Meaning |
 | --- | --- |
 | `format` | Always `p4kx-blender-package`. |
-| `version` | `<major>.<minor>` of the package format, matching `^[0-9]+\.[0-9]+$`; `1.20` for current exports. |
+| `version` | `<major>.<minor>` of the package format, matching `^[0-9]+\.[0-9]+$`; `1.21` for current exports. |
 | `generator` | `name` (`p4kx`) and `version` of the program that wrote the package. |
 | `source` | `channel` (the Channel folder, e.g. `LIVE`), `build` (`branch`, `version`, `public_patch`, `change_number`, `build_id` of the Archive's build manifest) and `entity` (`class_name`, `guid`). `channel` and `build` are absent when unknown. A Character package (1.3) also has `character` (`name`, `body`, `chf`, `loadout`), see "Characters", and puts the Character's name in `entity.class_name` with an empty `guid`. |
 | `coordinates` | `basis` is `gltf_y_up` and `unit` is `metre`. A reader refuses a `basis` or `unit` it does not know. |
@@ -690,6 +690,23 @@ The bounds a package keeps, asserted by the real-Archive tests
   `source` and `source_rendition` pair has one output, all texture IDs and files are unique, and
   material and DDNA texture references resolve to emitted textures.
 
+### Worn mount provenance
+
+A Character's mesh can carry `rig.worn_mount_provenance` in package version 1.21.
+`glb` names the same package-relative file as the owning mesh. `artifact` binds
+its measured SHA-256 and byte length. `fieldOrigins` maps JSON Pointers in that GLB's
+JSON chunk to immediate origin values. A joint's child-array element points to the
+mounted rigid root. Other addresses name the translation, rotation and scale fields
+actually written on that root.
+
+Resolve `sourceUsesRefs` through this section's `sourceInventory`. Original port
+fields and observed model placement fields contribute to the reported values.
+An encrypted contributing value sets `containsEncryptedSource` to `true`.
+The marker remains `null` when the contributing source set is incomplete and no
+encrypted contribution is known. The package validator checks the artifact binding,
+the joint-child links and the root transform addresses. Vertex maps and mount
+provenance use the same GLB generation and can be present together.
+
 ### What a Character package holds
 
 The Character of the real-Archive test (`masculinedefault.chf`, the armour Loadout
@@ -801,6 +818,7 @@ separate DDS normal and smoothness pairs with linked source and per-file evidenc
 **1.19** adds the optional vertex-map companion.
 **1.20** adds exact primitive bindings to that companion, identifies the texture rendition and
 stores authored material libraries and their field provenance in independent gzip JSONL files.
+**1.21** adds optional per-field provenance for the rigid worn mounts of a Character mesh.
 
 ### Authored Entity Glow
 
@@ -876,7 +894,7 @@ Use `--vertex-maps` with `entity package`, `interior package` or `character pack
 `meshes/mNNNN.vertex-map.jsonl` alongside each emitted GLB. In Rust, enable this
 option with `PackageWriteContext::with_vertex_maps`. The package declares each file
 as `mesh.vertex_map`, and `receipt.json` records its SHA-256. The package uses minor
-version 1.20 when it contains a map. A rigged GLB has one map with a row for each emitted mesh,
+version 1.19 or later when it contains a map. A rigged GLB has one map with a row for each emitted mesh,
 linked to the Character part, creature part, or attachment that supplied it.
 When two instances share one GLB mesh, the source is the writer's first producer
 instance.

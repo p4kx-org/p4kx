@@ -296,13 +296,15 @@ Generate the opt-in worn fixture under a new absolute directory with
 Its `worn-helper.p4k` and synthetic key are test inputs. Export two packages
 from the same `Mount_Courier` loadout into separate `original` and
 `replacement` subdirectories under an absolute package directory.
+The Blender step verifies package format 1.21, the committed file digests and
+the worn mount provenance before importing either rig.
 
 ```powershell
 $arguments = @('--key-file', "$fixtureDirectory/synthetic.key", 'character', 'package',
     "$fixtureDirectory/worn-helper.p4k", '--body', 'male', '--loadout', 'Mount_Courier',
     '--materials', 'colours')
 & $p4kx @arguments --name original --out "$packageDirectory/original"
-& $p4kx @arguments --piece Mount_New_Carrier --name replacement --out "$packageDirectory/replacement"
+& $p4kx @arguments --piece Mount_New_Carrier --name replacement --vertex-maps --out "$packageDirectory/replacement"
 $addon = (Resolve-Path -LiteralPath 'blender_addon').ProviderPath
 & $blender --background --factory-startup --offline-mode --disable-autoexec --threads 1 --python-exit-code 1 --python-expr 'import sys; sys.dont_write_bytecode = True' --python blender_addon/tests/blender_worn_helper_package.py -- $addon $packageDirectory
 ```

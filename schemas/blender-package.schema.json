@@ -4400,6 +4400,17 @@
           "format": "uint",
           "minimum": 0,
           "type": "integer"
+        },
+        "worn_mount_provenance": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/WornMountProvenance"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Source uses of the emitted bone links and transforms for rigid worn parts."
         }
       },
       "required": [
@@ -6737,6 +6748,29 @@
           "type": "string"
         }
       ]
+    },
+    "WornMountProvenance": {
+      "properties": {
+        "artifact": {
+          "$ref": "#/$defs/OriginArtifactDigest"
+        },
+        "fieldOrigins": {
+          "$ref": "#/$defs/FieldOrigins"
+        },
+        "glb": {
+          "type": "string"
+        },
+        "sourceInventory": {
+          "$ref": "#/$defs/SourceInventory"
+        }
+      },
+      "required": [
+        "glb",
+        "artifact",
+        "sourceInventory",
+        "fieldOrigins"
+      ],
+      "type": "object"
     }
   },
   "$schema": "https://json-schema.org/draft/2020-12/schema",

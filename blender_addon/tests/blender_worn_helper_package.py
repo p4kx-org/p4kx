@@ -94,15 +94,23 @@ def verify_pose(armature: bpy.types.Object, satchel: bpy.types.Object, helper: b
 def verify_package(folder: Path, *, carrier: str, offset: float) -> dict[str, object]:
     """Import one normal Character package and check its authored mount and evaluated pose."""
     from p4kx_importer import importer, package
+    from p4kx_importer.validate_package import validate_package
 
-    bpy.ops.wm.read_factory_settings(use_empty=True)
-    addon_utils.enable("io_scene_gltf2", default_set=False)
     scene_file = folder / "scene.json"
+    report = validate_package(scene_file)
+    structure, digests = report["structure"], report["digests"]
+    require(structure["status"] == "valid", f"{folder.name}: invalid package structure: {structure}")
+    require(digests["status"] == "verified", f"{folder.name}: unverified package digests: {digests}")
     loaded = package.load_package(scene_file)
+    require(loaded.version == (1, 21), f"{folder.name}: expected package format 1.21")
     (rig,) = (mesh.rig for mesh in loaded.meshes.values() if mesh.rig is not None)
+    require(rig.worn_mount_provenance is not None, f"{folder.name}: missing worn mount provenance")
     pieces = {part.name for part in rig.parts if part.origin == "piece"}
     require(pieces == {carrier, "pack/Mount_Satchel"}, f"{folder.name}: incorrect worn source pieces")
     require(rig.body == "male" and rig.bones == 3 and not rig.animations, "fixture rig or pose controls differ")
+
+    bpy.ops.wm.read_factory_settings(use_empty=True)
+    addon_utils.enable("io_scene_gltf2", default_set=False)
     result = importer.import_package(bpy.context, loaded)
     require(result.meshes == 1 and result.armatures == 1, f"{folder.name}: rigged package import failed")
     require(not result.warnings, f"{folder.name}: unexpected import warnings: {result.warnings}")

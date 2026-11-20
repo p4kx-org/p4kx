@@ -8,6 +8,7 @@ use std::io::{self, BufWriter};
 use std::path::Path;
 
 use crate::mesh_options::package_mesh_options;
+use p4kx_assembly::WornMountOrigins;
 use p4kx_extraction::OriginDigestWriter;
 use p4kx_gltf::{GlbOptions, GlbSummary, GltfError};
 
@@ -22,6 +23,7 @@ use crate::mesh_vertex_map::Writer;
 
 use crate::package_receipt::{self, PackageFile, PackageTotals};
 use crate::plan::mesh_id;
+use crate::rig_mount_provenance;
 use crate::stage::Staging;
 use crate::stoppable::Stoppable;
 use crate::{PackageError, PackageInfo, PackageResult, PackageSummary, PackageWriteContext};
@@ -104,6 +106,20 @@ pub(crate) type RigWriter<'a, 'sink> =
 
 type OptionalMap<'a> = Option<&'a mut Writer>;
 
+pub(crate) struct WrittenRig {
+    pub(crate) summary: GlbSummary,
+    pub(crate) worn_origins: Option<WornMountOrigins>,
+}
+
+impl WrittenRig {
+    pub(crate) const fn geometry(summary: GlbSummary) -> Self {
+        Self {
+            summary,
+            worn_origins: None,
+        }
+    }
+}
+
 /// Writes a package into the folder `out` whose only mesh, `meshes/m0001.glb`, `write_glb` writes
 /// to the writer it is given with the GLB options of a package mesh (`options` with the vertex
 /// colours of layered surfaces, which the add-on reads as layer shares), and whose manifest `manifest_of` makes from what was written.
@@ -120,7 +136,7 @@ pub(crate) fn write_rig_package(
         &GlbOptions,
         &mut RigWriter<'_, '_>,
         OptionalMap<'_>,
-    ) -> Result<GlbSummary, GltfError>,
+    ) -> Result<WrittenRig, GltfError>,
     manifest_of: impl FnOnce(&GlbSummary) -> Manifest,
 ) -> PackageResult<PackageSummary> {
     let staging = Staging::create(out, *cancelled)?;
@@ -145,7 +161,7 @@ fn write_rig_files(
         &GlbOptions,
         &mut RigWriter<'_, '_>,
         OptionalMap<'_>,
-    ) -> Result<GlbSummary, GltfError>,
+    ) -> Result<WrittenRig, GltfError>,
     manifest_of: impl FnOnce(&GlbSummary) -> Manifest,
 ) -> PackageResult<PackageSummary> {
     cancelled.check()?;
@@ -161,7 +177,10 @@ fn write_rig_files(
     let (file, ownership) = cancelled.create_file(&path)?.into_parts();
     let mut sink = BufWriter::new(file);
     let mut writer = Stoppable::new(OriginDigestWriter::new(&mut sink), cancelled);
-    let written = write_glb(&package_mesh_options(options), &mut writer, map.as_mut())
+    let WrittenRig {
+        summary: written,
+        worn_origins,
+    } = write_glb(&package_mesh_options(options), &mut writer, map.as_mut())
         .map_err(|error| glb_error(error, &path, (&id, name), cancelled))?;
     let digest = writer
         .into_inner()
@@ -186,6 +205,8 @@ fn write_rig_files(
         })?;
         mesh.vertex_map = Some(sidecar.path.clone());
     }
+    rig_mount_provenance::bind(&mut manifest, &relative, &digest, worn_origins)
+        .map_err(|source| PackageError::write(&path, source))?;
     sanitise(&mut manifest);
     let files = std::iter::once(PackageFile::new(relative, &digest))
         .chain(sidecar)

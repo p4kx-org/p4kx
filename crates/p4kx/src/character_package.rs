@@ -15,7 +15,7 @@ use p4kx_blender::{
     write_character_package_with_context,
 };
 use p4kx_channels::channel_name;
-use p4kx_extraction::{Archive, DataForgeEntry, GlbOptions, MaterialMode, is_same_file};
+use p4kx_extraction::{Archive, DataForge, DataForgeEntry, GlbOptions, MaterialMode, is_same_file};
 
 use crate::armour_loadout::{Files, Selection};
 use crate::chf::{InvalidChf, read_capped};
@@ -70,20 +70,9 @@ fn package(args: &CharacterPackageArgs, as_json: bool) -> Result<()> {
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let files = Files::open(ArchiveFiles::new(&archive), args.loadout.as_deref())?;
-    let mut resolver = LoadoutResolver::new(&forge).with_files(&files);
-    let expressions = expressions_choice(&args.expressions, args.no_expressions);
-    let mut selection = Selection::gather(
-        &mut resolver,
-        &files,
-        (&args.pieces, args.loadout.as_deref()),
-        &expressions,
-    )?;
-    let head = chf
-        .as_ref()
-        .map(|chf| dress(&expressions, chf, &mut resolver))
-        .transpose()?;
+    let (mut selection, head) = select_character(args, &entry, &forge, &files, chf.as_ref())?;
     let (variant, pieces) = worn(args, &mut selection, head.as_ref());
-    let models = ArchiveModels::new(&archive);
+    let models = character_models(&archive, &pieces);
     let options = AssemblyOptions::default().with_lod(args.lod);
     let armour = Armour::build_with_palettes(
         variant,
@@ -119,6 +108,41 @@ fn package(args: &CharacterPackageArgs, as_json: bool) -> Result<()> {
     };
     report::print(&shown, &summary, as_json)?;
     failure(&armour, &args.out).map_or(Ok(()), Err)
+}
+
+fn select_character<'a>(
+    args: &'a CharacterPackageArgs,
+    entry: &DataForgeEntry,
+    forge: &DataForge<'_>,
+    files: &Files<'_>,
+    chf: Option<&Chf>,
+) -> Result<(Selection<'a>, Option<Head>)> {
+    let mut resolver = LoadoutResolver::new(forge)
+        .with_forge_entry(entry)
+        .with_files(files);
+    let expressions = expressions_choice(&args.expressions, args.no_expressions);
+    let selection = Selection::gather(
+        &mut resolver,
+        files,
+        (&args.pieces, args.loadout.as_deref()),
+        &expressions,
+    )?;
+    let head = chf
+        .map(|chf| dress(&expressions, chf, &mut resolver))
+        .transpose()?;
+    Ok((selection, head))
+}
+
+fn character_models<'archive>(
+    archive: &'archive Archive,
+    pieces: &[Piece],
+) -> ArchiveModels<'archive> {
+    let models = ArchiveModels::new(archive);
+    if pieces.iter().any(Piece::has_port_mount) {
+        models.with_model_node_sources()
+    } else {
+        models
+    }
 }
 
 fn origin_chf_name(args: &CharacterPackageArgs) -> Option<&str> {
