@@ -33,6 +33,7 @@ mod look;
 mod materials;
 mod model_origins;
 mod mount;
+mod mount_source;
 mod normals;
 mod npc;
 mod own_face;
@@ -57,8 +58,8 @@ use p4kx_extraction::{
     ArchiveDefaultMaterial, EntryOrigin, MaterialArchiveOrigins, ModelArchiveSource, SourceLocation,
 };
 use p4kx_gltf::{
-    GlbOptions, GlbSummary, GltfError, MorphTarget, RigMount, RigPiece, TextureLoader,
-    write_rigged_glb, write_rigged_glb_with,
+    GlbOptions, GlbSummary, GltfError, MorphTarget, RigPiece, TextureLoader, write_rigged_glb,
+    write_rigged_glb_with,
 };
 use p4kx_model::{MaterialStatus, Model, UnresolvedLayers};
 
@@ -72,6 +73,7 @@ pub use forge_items::ForgeItems;
 pub use head::{Head, HeadError};
 pub use loadout::{Replaced, is_worn_type};
 pub use look::Look;
+pub use mount_source::{MountModelSource, WornMountSource};
 pub use npc::NpcHead;
 pub use piece::Piece;
 pub use shape::MAX_DNA_RIG_LEN;
@@ -111,14 +113,14 @@ pub struct ArmourPart {
     pub(crate) morphs: Vec<MorphTarget>,
     pub(crate) follows: Vec<usize>,
     pub(crate) face: Option<Arc<facial::FaceLink>>,
-    pub(crate) mount: Option<RigMount>,
+    mount: Option<Box<mount::Placed>>,
 }
 
 impl ArmourPart {
     pub(crate) fn rig_piece(&self) -> RigPiece<'_> {
         RigPiece::new(&self.name, &self.model, &self.materials)
             .with_morphs(&self.morphs)
-            .mounted(self.mount)
+            .mounted(self.mount.as_ref().map(|mount| mount.frame))
     }
 
     /// Returns the name of the part's node: `body` for the skin of the body, else the name of

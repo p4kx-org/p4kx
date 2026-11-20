@@ -793,6 +793,10 @@ candidate survey could not be established leaves the affected contributor set in
 
 `--materials textures` (default `colours`) and `--texture-mip N` embed the textures as for
 `p4kx chf glb`, counted in `textured_materials`, `textures` and `texture_pixels`.
+An export that mounts a rigid worn item publishes a digest-bound `<out>.p4kx-origin.jsonl`.
+Its GLB addresses identify the actual child entry under a bone and the transformation fields
+written for the mounted model root. The source uses include the original port declaration and
+observed model placement fields. Coverage is partial, so an unproven encryption state stays `null`.
 `unresolved_layers` and `first_unresolved_layer` (absent when there is none) are those of
 `p4kx entity glb`, for the material libraries of the parts. `files` of `loadout` lists the XML
 Loadout files the Loadout is made of in the order they are laid over each other: an Entity whose

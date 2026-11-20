@@ -10,8 +10,8 @@ use p4kx_assembly::{Assembly, AttachedModel, Part};
 use p4kx_extraction::model::{Model, ModelFile};
 use p4kx_extraction::{
     ArchiveWriteProtection, CancelToken, ConversionError, EntryOrigin, FieldOrigin, FileReceipt,
-    ModelArchiveSource, OriginArtifactBinding, OriginOutputAddress, SourceLocation, SourceUse,
-    SourceUseRole, write_origin_companion,
+    ModelArchiveSource, OriginArtifactBinding, OriginOutputAddress, SourceUse, SourceUseRole,
+    write_origin_companion,
 };
 use p4kx_render::{
     AssemblyPieceSource, AssemblyScene, MaterialSuppressionEffect, MaterialSuppressionReason,
@@ -349,20 +349,8 @@ fn port_placement(
     sources: &mut Vec<SourceUse>,
 ) -> Result<()> {
     if let Some(placement) = part.port_placement_source() {
-        let position = placement.port();
-        for field in placement.fields() {
-            sources.push(projection.scope().at(
-                SourceLocation::DataForge {
-                    record_index: position.record_index(),
-                    field: format!(
-                        "Components[{}].Ports[{}].{}",
-                        position.component_ordinal(),
-                        position.port_ordinal(),
-                        field.name(),
-                    ),
-                },
-                SourceUseRole::Conversion,
-            )?);
+        for (_, location) in placement.locations() {
+            sources.push(projection.scope().at(location, SourceUseRole::Conversion)?);
         }
     }
     Ok(())

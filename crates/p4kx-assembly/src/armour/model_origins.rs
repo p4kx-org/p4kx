@@ -5,10 +5,16 @@ use std::sync::Arc;
 
 use p4kx_extraction::{EntryOrigin, MaterialArchiveOrigins, ModelArchiveSource, SourceLocation};
 
-use super::{Armour, ArmourPart, ShapeArchiveSources};
+use super::{Armour, ArmourPart, ShapeArchiveSources, WornMountSource};
 use crate::PaletteRecords;
 
 impl ArmourPart {
+    /// Returns the authored port and known model inputs of this placed rigid part.
+    #[must_use]
+    pub fn mount_source(&self) -> Option<&WornMountSource> {
+        self.mount.as_ref().map(|mount| &mount.source)
+    }
+
     /// Returns the original DataForge field that selected the model path.
     #[must_use]
     pub const fn geometry_selector(&self) -> Option<&SourceLocation> {

@@ -37,12 +37,6 @@ const fn row([a, b, c]: [f64; 3], shift: f32) -> [f32; 4] {
     [a as f32, b as f32, c as f32, shift]
 }
 
-/// Returns the transform from the space of the node of `model` named `name`, ignoring ASCII
-/// case, to the model's space, or `None` when the model has no such node.
-pub(crate) fn node_transform(model: &Model, name: &str) -> Option<Transform> {
-    node_placement(model, name).map(|placement| placement.transform)
-}
-
 #[derive(Clone, Copy)]
 pub(crate) struct NodePlacement {
     pub(crate) transform: Transform,
@@ -81,16 +75,6 @@ pub(crate) fn is_character_item(item_type: &str) -> bool {
     item_type
         .get(..CHARACTER_PREFIX.len())
         .is_some_and(|start| start.eq_ignore_ascii_case(CHARACTER_PREFIX))
-}
-
-/// Returns the transform from the bind-pose space of the bone of `model` named `name`, ignoring
-/// ASCII case, to the model's space, or `None` when the model has no such bone or its pose is
-/// not finite.
-///
-/// Only the bones of the first level of detail count, and of several bones with the same name the
-/// first wins.
-pub(crate) fn bone_transform(model: &Model, name: &str) -> Option<Transform> {
-    bone_placement(model, name).map(|placement| placement.transform)
 }
 
 #[derive(Debug, Clone, Copy)]

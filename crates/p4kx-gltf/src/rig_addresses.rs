@@ -75,6 +75,19 @@ pub enum RiggedJsonAddress {
         /// The originating model part.
         part: usize,
     },
+    /// An emitted rigid root and its physical child index under a bone node.
+    MountedNode {
+        /// The GLB node index of the placed root.
+        index: usize,
+        /// The originating model part.
+        part: usize,
+        /// The GLB node index of the parent bone.
+        bone: usize,
+        /// The ordinal in that bone's children array.
+        child: usize,
+        /// Which of translation, rotation and scale were written.
+        trs: [bool; 3],
+    },
     /// A bone node by its GLB node index.
     Bone(usize),
     /// An authored material and the actual part and slot that supplied it.
@@ -326,6 +339,7 @@ fn scene_addresses(
         found.extend((next_node..end).map(|index| RiggedJsonAddress::Node { index, part }));
         next_node = end;
     }
+    add_mount_addresses(document, &mut found);
     found.extend((next_node..document.nodes.len()).map(RiggedJsonAddress::Bone));
     let mut authors = vec![None; document.materials.len()];
     for (part, (instance, ids)) in instances.iter().zip(materials).enumerate() {
@@ -351,4 +365,30 @@ fn scene_addresses(
     }
     found.extend(authors.into_iter().flatten());
     found
+}
+
+fn add_mount_addresses(document: &Root, addresses: &mut Vec<RiggedJsonAddress>) {
+    let model_node_count = addresses.len();
+    for (bone, node) in document.nodes.iter().enumerate().skip(model_node_count) {
+        for (child, index) in node.children.iter().flatten().enumerate() {
+            let Some(&RiggedJsonAddress::Node { index, part }) = addresses.get(index.value())
+            else {
+                continue;
+            };
+            let Some(node) = document.nodes.get(index) else {
+                continue;
+            };
+            addresses.push(RiggedJsonAddress::MountedNode {
+                index,
+                part,
+                bone,
+                child,
+                trs: [
+                    node.translation.is_some(),
+                    node.rotation.is_some(),
+                    node.scale.is_some(),
+                ],
+            });
+        }
+    }
 }

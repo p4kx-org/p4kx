@@ -8,6 +8,7 @@ mod animation_support;
 mod archive_key;
 mod armour_glb;
 mod armour_loadout;
+mod armour_mount_origins;
 mod armour_new_piece_mount;
 mod armour_npc;
 mod armour_npc_face;

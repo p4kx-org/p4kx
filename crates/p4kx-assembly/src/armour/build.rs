@@ -125,7 +125,7 @@ impl Armour {
             ));
         }
         let (skeleton, parts) = finish_parts(
-            body.skeleton,
+            (body.skeleton, body.archive_source.as_slice()),
             parts,
             heads,
             part_jobs,
@@ -146,14 +146,14 @@ impl Armour {
 }
 
 fn finish_parts(
-    skeleton: Model,
+    body: (Model, &[ModelArchiveSource]),
     mut parts: Vec<ArmourPart>,
     heads: Vec<Found>,
     jobs: Vec<&Job>,
     level: u32,
     issues: &mut Vec<Issue>,
 ) -> (Model, Vec<ArmourPart>) {
-    let skeleton = settled(skeleton, &mut parts, heads, &jobs, level, issues);
+    let skeleton = settled(body, &mut parts, heads, &jobs, level, issues);
     check_follows(&mut parts, issues);
     let parts = parts
         .into_iter()

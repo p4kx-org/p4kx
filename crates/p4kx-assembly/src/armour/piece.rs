@@ -21,6 +21,7 @@ pub(crate) struct Mount {
     pub(crate) helper: String,
     pub(crate) offset_helper: String,
     pub(crate) helper_diagnostic: Option<Box<PortHelperDiagnostic>>,
+    pub(super) offset_fields: [bool; 2],
     position: [u32; 3],
     rotation: [u32; 3],
 }
@@ -40,6 +41,7 @@ impl Mount {
             helper: port.helper().to_owned(),
             offset_helper: port.offset_helper().to_owned(),
             helper_diagnostic: diagnostic.map(Box::new),
+            offset_fields: port.offset_fields(),
             position: port.position().map(f32::to_bits),
             rotation: port.rotation().map(f32::to_bits),
         }
@@ -156,6 +158,12 @@ impl Piece {
             Source::Wearable(wearable) => wearable.hidden_ports(),
             _ => &[],
         }
+    }
+
+    /// Returns whether the Piece has an authored port used for rigid placement.
+    #[must_use]
+    pub const fn has_port_mount(&self) -> bool {
+        self.mount.is_some()
     }
 
     pub(crate) fn mounted(mut self, mount: Mount) -> Self {

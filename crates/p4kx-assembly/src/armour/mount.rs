@@ -7,21 +7,28 @@ use p4kx_model::{Bone, BoneMatch, Model};
 use super::ArmourPart;
 use super::jobs::{Job, issue};
 use super::layered_worn::OverlayMount;
+use super::mount_source::{PlacementModel, WornMountSource};
 use super::piece::Mount;
 use super::read_models::Loaded;
-use crate::placement::{bone_transform, is_unskinned, node_transform, offset_transform};
-use crate::{Issue, IssueKind};
+use crate::placement::{bone_placement, is_unskinned, node_placement, offset_transform};
+use crate::{Issue, IssueKind, PortPlacementSource};
 
 /// The turn about X in degrees from the frame of a bone, which has Z up, to the frame of the
 /// helper of an item, which has Y up (ADR-0231).
 const BONE_TO_HELPER: [f32; 3] = [90.0, 0.0, 0.0];
+
+#[derive(Debug, Clone)]
+pub(super) struct Placed {
+    pub(super) frame: RigMount,
+    pub(super) source: WornMountSource,
+}
 
 /// Hangs the unskinned parts that have a mount on the bone of the skeleton their port is
 /// attached to; a helper that is no bone of its holder is listed and leaves the part at the origin.
 pub(super) fn place(
     jobs: &[&Job],
     parts: &mut [ArmourPart],
-    skeleton: &Model,
+    skeleton: PlacementModel<'_>,
     level: u32,
     issues: &mut Vec<Issue>,
 ) {
@@ -42,7 +49,7 @@ pub(super) fn place(
                     ));
                 }
                 if let Some(part) = parts.get_mut(index) {
-                    part.mount = Some(placed);
+                    part.mount = Some(Box::new(placed));
                 }
             }
             Err(_) if job.overlay_mount.requires_mount() => issues.push(issue(
@@ -79,7 +86,7 @@ pub(super) fn included(part: ArmourPart, job: &Job, level: u32) -> Option<Armour
     .then_some(part)
 }
 
-/// Returns the bones of the first level of `model`, the ones [`bone_transform`] looks in.
+/// Returns the bones of the first level of `model`, the ones [`bone_placement`] looks in.
 fn bones_of(model: &Model) -> &[Bone] {
     model
         .lods
@@ -94,9 +101,9 @@ fn holder<'a>(
     jobs: &[&Job],
     mount: &Mount,
     binding: OverlayMount,
-    skeleton: &'a Model,
+    skeleton: PlacementModel<'a>,
     level: u32,
-) -> Option<&'a Model> {
+) -> Option<PlacementModel<'a>> {
     let Some(name) = &mount.holder else {
         return Some(skeleton);
     };
@@ -112,12 +119,12 @@ fn holder<'a>(
         {
             return None;
         }
-        return Some(&part.model);
+        return Some(PlacementModel::part(part));
     }
     parts
         .iter()
         .find(|part| part.name == *name)
-        .map(|part| &*part.model)
+        .map(PlacementModel::part)
 }
 
 /// Returns the bone of the skeleton the part `index` hangs on and where it sits below it: the
@@ -132,40 +139,54 @@ fn mounted(
     jobs: &[&Job],
     index: usize,
     mount: &Mount,
-    skeleton: &Model,
+    skeleton: PlacementModel<'_>,
     level: u32,
-) -> Result<RigMount, String> {
+) -> Result<Placed, String> {
     let missing = || mount.helper.clone();
     let binding = jobs.get(index).ok_or_else(missing)?.overlay_mount;
     let holder = holder(parts, jobs, mount, binding, skeleton, level).ok_or_else(missing)?;
-    let held = bones_of(holder);
+    let held = bones_of(holder.model);
     let at = held
         .iter()
         .position(|bone| bone.name.eq_ignore_ascii_case(&mount.helper))
         .ok_or_else(missing)?;
     let bone = usize::from(
-        BoneMatch::new(&skeleton.bones, held).target(u16::try_from(at).map_err(|_| missing())?),
+        BoneMatch::new(&skeleton.model.bones, held)
+            .target(u16::try_from(at).map_err(|_| missing())?),
     );
     let anchor = skeleton
+        .model
         .bones
         .get(bone)
-        .and_then(|anchor| bone_transform(skeleton, &anchor.name))
-        .and_then(|pose| pose.inverse());
-    let (Some(held_pose), Some(anchor)) = (bone_transform(holder, &mount.helper), anchor) else {
-        return Err(missing());
-    };
+        .and_then(|anchor| bone_placement(skeleton.model, &anchor.name))
+        .ok_or_else(missing)?;
+    let inverse = anchor.transform.inverse().ok_or_else(missing)?;
+    let held = bone_placement(holder.model, &mount.helper).ok_or_else(missing)?;
     let own = parts.get(index).and_then(|part| {
-        let name = mount.offset_helper.as_str();
-        (!name.is_empty())
-            .then(|| node_transform(&part.model, name)?.inverse())
-            .flatten()
+        if mount.offset_helper.is_empty() {
+            return None;
+        }
+        let placement = node_placement(&part.model, &mount.offset_helper)?;
+        Some((
+            placement.transform.inverse()?,
+            PlacementModel::part(part).node_source(placement.node),
+        ))
     });
-    let at_port = anchor
-        .then(&held_pose)
+    let at_port = inverse
+        .then(&held.transform)
         .then(&offset_transform([0.0; 3], BONE_TO_HELPER))
         .then(&offset_transform(mount.position(), mount.rotation()));
-    Ok(RigMount::new(
-        bone,
-        own.map_or(at_port, |inner| at_port.then(&inner)),
-    ))
+    let port = PortPlacementSource::worn(mount.port, mount.offset_fields, own.is_some());
+    let (transform, locator) = own.map_or((at_port, None), |(inner, source)| {
+        (at_port.then(&inner), source)
+    });
+    Ok(Placed {
+        frame: RigMount::new(bone, transform),
+        source: WornMountSource::new(
+            port,
+            holder.bone_source(held.selection),
+            skeleton.bone_source(anchor.selection),
+            locator,
+        ),
+    })
 }

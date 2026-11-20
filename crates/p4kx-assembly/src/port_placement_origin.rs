@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::SourceLocation;
+
 use crate::{PortDefinitionPosition, PortNode, PortSource, PortTransform};
 
 /// One original port declaration used while placing an Assembly part.
@@ -53,6 +55,39 @@ impl PortPlacementSource {
     /// Returns the original fields whose values were used.
     pub fn fields(&self) -> impl Iterator<Item = PortPlacementField> + '_ {
         self.fields.iter().copied().flatten()
+    }
+
+    /// Iterates the exact DataForge coordinates of the fields used in placement.
+    pub fn locations(&self) -> impl Iterator<Item = (PortPlacementField, SourceLocation)> + '_ {
+        self.fields().map(|field| {
+            let location = SourceLocation::DataForge {
+                record_index: self.port.record_index(),
+                field: format!(
+                    "Components[{}].Ports[{}].{}",
+                    self.port.component_ordinal(),
+                    self.port.port_ordinal(),
+                    field.name(),
+                ),
+            };
+            (field, location)
+        })
+    }
+
+    pub(crate) fn worn(
+        port: PortDefinitionPosition,
+        [position, rotation]: [bool; 2],
+        offset_helper: bool,
+    ) -> Self {
+        Self {
+            port,
+            fields: [
+                Some(PortPlacementField::Helper),
+                position.then_some(PortPlacementField::Position),
+                rotation.then_some(PortPlacementField::Rotation),
+                offset_helper.then_some(PortPlacementField::ItemOffsetHelper),
+                None,
+            ],
+        }
     }
 
     pub(crate) fn skin(port: &PortNode) -> Option<Self> {
