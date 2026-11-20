@@ -15,7 +15,7 @@ import bpy
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from blender_signal_probe import render_linear_signals  # noqa: E402
+from blender_foreground_roughness_probe import render_roughness_pairs  # noqa: E402
 from p4kx_importer.importer import import_package  # noqa: E402
 from p4kx_importer.package import load_package  # noqa: E402
 
@@ -80,36 +80,21 @@ def verify(root: Path) -> None:
     triangles = witness["triangles"]
     assert triangles > 0
     package, glb, uvs = _import_pair(root, triangles)
-    probes, coordinates, labels = [], [], []
-    width, height = 64, 256
-    for ordinal, uv in enumerate(uvs):
-        for consumer, material in (("ordinary-addon", package), ("gltf-importer", glb)):
-            row = 16 + len(probes) * 32
-            y = 2.0 * (row - height // 2) / width
-            probes.append((material, "Roughness", y))
-            coordinates.append(uv)
-            labels.append((ordinal, consumer, row))
-    pixels = render_linear_signals(tuple(probes), root / "roughness-linear.exr", width, height,
-                                   uvs=tuple(coordinates))
-    observed = {}
-    for ordinal, consumer, row in labels:
-        start = (row * width + width // 2) * 4
-        sample = tuple(pixels[start:start + 3])
-        assert all(math.isfinite(value) and -1e-5 <= value <= 1.00001 for value in sample), sample
-        observed[(ordinal, consumer)] = sample
+    readback = render_roughness_pairs(package, glb, uvs, root / "roughness-linear.exr")
     comparisons = []
-    for ordinal, uv in enumerate(uvs):
-        addon = observed[(ordinal, "ordinary-addon")]
-        gltf = observed[(ordinal, "gltf-importer")]
-        error = max(abs(a - b) for a, b in zip(addon, gltf, strict=True))
+    for ordinal, (uv, (addon, gltf)) in enumerate(zip(uvs, readback.pairs, strict=True)):
+        error = abs(addon - gltf)
         assert error <= QUANTIZATION_TOLERANCE, (ordinal, uv, addon, gltf, error)
-        comparisons.append({"ordinal": ordinal, "uv": uv, "addon": addon, "gltf": gltf,
+        comparisons.append({"ordinal": ordinal, "uv": uv, "addon": (addon,) * 3, "gltf": (gltf,) * 3,
                             "maxAbsoluteError": error})
     receipt = {"schema": 1, "blender": bpy.app.version_string,
                "blenderBuild": bpy.app.build_hash.decode("ascii"), "mip": witness["mip"],
                "triangles": triangles, "sourcePins": witness["inputPins"],
                "scope": "linear-emission-roughness-at-original-subset-uvs",
                "absoluteTolerance": QUANTIZATION_TOLERANCE, "comparisons": comparisons,
+               "foregroundControls": {"foregroundPixels": readback.foreground_pixels,
+                                      "scalarControls": readback.scalar_controls,
+                                      "backgroundPixels": readback.background_pixels},
                "gameAppearanceProven": False, "runtimePermutation": None}
     (root / "blender-readback.private.json").write_text(json.dumps(receipt, indent=2) + "\n",
                                                        encoding="utf-8")

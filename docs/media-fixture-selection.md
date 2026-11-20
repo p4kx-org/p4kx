@@ -198,11 +198,16 @@ headers alongside the selected texture families. No Catalog, full ship or Assemb
 `blender_addon/tests/blender_installed_palette_subset.py` consumes the completed private output
 with the normal package and glTF importers. Both exported meshes retain all original UV float bits;
 the probe compares linear Roughness at four original triangle UV centroids with tolerance `2/255`.
+A square orthographic render verifies the projection and distinct foreground identity of every
+sample. Four known linear scalar values and two transparent background pixels check the readback.
 The selected draw ranges invalidate original first-use vertex traversal, so this test deliberately
 requests no vertex-map sidecar. Its direct scene carries no invented Assembly palette provenance.
-On installed LIVE 13165946, native Blender 5.3.0 (`02f0899d78e3`) agreed at all four probes. The
-shared-helper synthetic Gloss regression also passed with a freshly generated package. These are
-consumer-projection checks; runtime shader activation and game appearance remain separate.
+
+The first installed-subset readback sampled the background because automatic camera fitting
+placed the planes on different rows. The corrected native Blender 5.3.0 (`02f0899d78e3`) readback
+on the retained LIVE 13165946 outputs agreed at all four UVs with foreground and scalar controls.
+The separate synthetic Gloss regression passed with a freshly generated package. These
+consumer-projection checks leave runtime shader activation and game appearance open.
 
 ### Independently bound installed shader operations
 

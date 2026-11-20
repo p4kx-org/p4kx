@@ -76,6 +76,10 @@ Build and each selected original member before comparing supported LIVE and PTU 
 
 The installed original-subset witness retains the decoded source UV bits in both ordinary
 producers and compares their imported Roughness signals at four original triangle UV centroids.
+A square orthographic render verifies each sample's projected position and unique foreground
+identity. Four known linear scalar probes and two transparent background probes validate the
+readback before comparison. The native Blender 5.3 check uses the retained
+outputs from the installed LIVE subset.
 Its private selection binds physical geometry, material, palette and texture Entries, including
 split alpha headers. Verification receipts count actual checksum-to-EOF streams separately from
 logical texture requests. Filtering draw ranges invalidates original first-use vertex coordinates;
