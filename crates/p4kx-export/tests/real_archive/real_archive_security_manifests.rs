@@ -102,7 +102,11 @@ fn verify_records(
     Ok(rows.len())
 }
 
-fn verify_manifest(forge: &DataForge<'_>, source: &StructValue<'_>, row: &Value) -> TestResult {
+pub(super) fn verify_manifest(
+    forge: &DataForge<'_>,
+    source: &StructValue<'_>,
+    row: &Value,
+) -> TestResult {
     for name in ["isNeutralTerritory", "teleportPlayerOut"] {
         verify_scalar(source.field(name), field(row, name)?)?;
     }

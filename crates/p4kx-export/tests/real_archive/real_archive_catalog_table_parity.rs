@@ -171,7 +171,9 @@ pub(crate) fn capture_rows<Row: Serialize, Id: Eq + Hash>(
         }
         rows.push(row);
     }
-    origins.extend(inventory, &rows)?;
+    if !rows.is_empty() {
+        origins.extend(inventory, &rows)?;
+    }
     Ok(Table {
         availability: serde_json::to_value(availability)?,
         rows,

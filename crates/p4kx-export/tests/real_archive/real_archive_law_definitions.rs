@@ -9,7 +9,7 @@ use p4kx_export::{
     CatalogOptions, CatalogPublicationMode, ExportDiagnosticSeverity, Kind, build_catalog_from,
 };
 use p4kx_extraction::{
-    Archive, ArchiveWatch, DataForge, DataForgeEntry, Filter, StructValue, TreeBuilder,
+    Archive, ArchiveWatch, DataForge, DataForgeEntry, Filter, RecordTree, StructValue, TreeBuilder,
     Value as Original,
 };
 use p4kx_testkit::{real_archive_key, real_archive_path};
@@ -137,10 +137,8 @@ fn verify_family(
         let tree = builder
             .build(&record)
             .map_err(|_| "read original law Record body")?;
-        let witness = law::Witness::new(forge, &tree, origins, texts);
-        witness.verify(kind, tree.root(), row)?;
+        counts.checks += verify_law_projection(forge, &tree, kind, row, origins, texts)?;
         counts.records += 1;
-        counts.checks += witness.checks();
     }
     assert!(expected.is_empty(), "every physical definition of {kind}");
     assert!(
@@ -148,6 +146,19 @@ fn verify_family(
         "GUID and physical ordinal order of {kind}"
     );
     Ok(counts)
+}
+
+pub(super) fn verify_law_projection<'source>(
+    forge: &'source DataForge<'source>,
+    tree: &RecordTree<'source>,
+    kind: Kind,
+    row: &Value,
+    origins: &Origins<'_>,
+    texts: &TextIndex<'_>,
+) -> TestResult<usize> {
+    let witness = law::Witness::new(forge, tree, origins, texts);
+    witness.verify(kind, tree.root(), row)?;
+    Ok(witness.checks())
 }
 
 pub(super) fn verify_class<'source>(
