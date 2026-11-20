@@ -83,3 +83,51 @@ jobs:
             ${{ env.P4KX_CONTROL_TASK }}/*.log
             ${{ env.P4KX_CONTROL_TASK }}/diagnostics/*
           if-no-files-found: error
+      - name: Start the harmless native successive observer
+        id: successive-start
+        timeout-minutes: 1
+        run: .github/scripts/invoke-msi-successive-control.ps1 -Stage Start -Directory ($env:P4KX_CONTROL_TASK+'-successive')
+      - name: Observe the original harmless worker immediately
+        id: successive-first
+        timeout-minutes: 2
+        run: .github/scripts/invoke-msi-successive-control.ps1 -Stage Snapshot -Sequence 1 -Directory ($env:P4KX_CONTROL_TASK+'-successive')
+      - name: Upload the first harmless observer checkpoint
+        if: ${{ always() && !cancelled() && steps.successive-start.outcome == 'success' && steps.successive-first.outcome != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        timeout-minutes: 1
+        with:
+          name: windows-msi-successive-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-1
+          path: |
+            ${{ env.P4KX_CONTROL_TASK }}-successive/snapshot-budget-01.json
+            ${{ env.P4KX_CONTROL_TASK }}-successive/observer/checkpoints/01/*
+            ${{ env.P4KX_CONTROL_TASK }}-successive/observer/snapshots/01/*
+          if-no-files-found: error
+      - name: Observe the same harmless worker after the waited interval
+        id: successive-second
+        timeout-minutes: 2
+        run: .github/scripts/invoke-msi-successive-control.ps1 -Stage Snapshot -Sequence 2 -Directory ($env:P4KX_CONTROL_TASK+'-successive')
+      - name: Upload the second harmless observer checkpoint
+        if: ${{ always() && !cancelled() && steps.successive-start.outcome == 'success' && steps.successive-second.outcome != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        timeout-minutes: 1
+        with:
+          name: windows-msi-successive-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-2
+          path: |
+            ${{ env.P4KX_CONTROL_TASK }}-successive/snapshot-budget-02.json
+            ${{ env.P4KX_CONTROL_TASK }}-successive/observer/checkpoints/02/*
+            ${{ env.P4KX_CONTROL_TASK }}-successive/observer/snapshots/02/*
+          if-no-files-found: error
+      - name: Release and verify the held harmless original
+        if: ${{ always() && !cancelled() && steps.successive-second.outcome == 'success' }}
+        timeout-minutes: 1
+        run: .github/scripts/invoke-msi-successive-control.ps1 -Stage Finish -Directory ($env:P4KX_CONTROL_TASK+'-successive')
+      - name: Upload harmless control completion
+        if: ${{ always() && !cancelled() && steps.successive-second.outcome == 'success' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        timeout-minutes: 1
+        with:
+          name: windows-msi-successive-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}-final
+          path: |
+            ${{ env.P4KX_CONTROL_TASK }}-successive/observer/observer-result.json
+            ${{ env.P4KX_CONTROL_TASK }}-successive/observer/checkpoints/09/*
+          if-no-files-found: error

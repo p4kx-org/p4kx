@@ -5,7 +5,7 @@ param(
     [ValidateSet('Lifecycle','Control')][string]$Mode='Lifecycle',
     [ValidateRange(1,9)][int]$Sequence=1,
     [ValidateRange(0,75000)][int]$WaitMilliseconds=75000,
-    [ValidateRange(1,10000)][int]$ControlMilliseconds=10000
+    [ValidateRange(1,100000)][int]$ControlMilliseconds=10000
 )
 $ErrorActionPreference = 'Stop'
 if ($Stage -ceq 'Snapshot') {

@@ -35,7 +35,7 @@ function New-P4kxMsiObserverRequest {
         $milliseconds = [int]$env:P4KX_MSI_STEP_MINUTES*60000
         $script = 'check-msi.ps1'
     } else {
-        if ($ControlMilliseconds -le 0 -or $ControlMilliseconds -gt 10000) { throw 'Invalid harmless observer allowance.' }
+        if ($ControlMilliseconds -le 0 -or $ControlMilliseconds -gt 100000) { throw 'Invalid harmless observer allowance.' }
         $milliseconds = [int][Math]::Min($ControlMilliseconds, (Get-P4kxMsiRemainingBudget $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC $prepared))
         $script = 'msi-feedback-worker-fixture.ps1'
     }
@@ -74,7 +74,7 @@ function Assert-P4kxMsiObserverBinding {
     if ($Request.mode -ceq 'Lifecycle') {
         Assert-P4kxMsiStepAdmission $Request.deadline_utc $Request.step_minutes $Request.step_computed_at_utc $prepared
         if ($Request.observer_budget_ms -ne [int]$Request.step_minutes*60000) { throw 'MSI observer changed its original step allowance.' }
-    } elseif ($Request.observer_budget_ms -gt 10000) { throw 'Harmless observer allowance exceeds its control bound.' }
+    } elseif ($Request.observer_budget_ms -gt 100000) { throw 'Harmless observer allowance exceeds its control bound.' }
     if ($Request.script -cne $script -or $Request.script_sha256 -cne (Get-P4kxDetachedDigest (Join-Path $PSScriptRoot $script))) { throw 'MSI observer worker selection differs.' }
     $expected = @(Get-P4kxMsiObserverSources)
     $names = [Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal)

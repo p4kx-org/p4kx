@@ -11,6 +11,7 @@ if(-not $LifecycleWorker -or $Msi -cnotin @('complete','timeout','outer-runner',
 Set-Location -LiteralPath $WorkerLocation
 [IO.Directory]::SetCurrentDirectory($WorkerProcessDirectory)
 . (Join-Path $FixtureDirectory 'msi-diagnostic-phase.ps1')
+. (Join-Path $FixtureDirectory 'msi-diagnostic-budget.ps1')
 $context=New-P4kxMsiPhaseContext (Join-Path $OutputDirectory 'diagnostics') $Target
 $worker=Start-P4kxMsiPhase $context 'worker'
 $wait=Start-P4kxMsiPhase $context 'fixture/wait'
@@ -20,7 +21,7 @@ $wait=Start-P4kxMsiPhase $context 'fixture/wait'
 [Console]::Error.Flush()
 if($Msi -ceq 'observer-wait'){
     [IO.File]::WriteAllText((Join-Path $OutputDirectory 'observer-control-active.json'),'{"schema":1,"role":"harmless-msi-observer-active"}')
-    $limit=[DateTimeOffset]::UtcNow.AddSeconds(5)
+    $limit=ConvertFrom-P4kxMsiBudgetTimestamp $env:P4KX_MSI_WORKER_DEADLINE_UTC
     while(-not [IO.File]::Exists((Join-Path $OutputDirectory 'observer-control-release.json'))){
         if([DateTimeOffset]::UtcNow -ge $limit){throw 'Harmless observer fixture release deadline reached.'}
         Start-Sleep -Milliseconds 25
