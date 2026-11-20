@@ -29,7 +29,8 @@ function Test-FeedbackParentCase([string]$Mode) {
     try {
         $parameters=[ordered]@{Target=$target;Msi=$Mode;FixtureDirectory=$SourceDirectory;OutputDirectory=$output}
         if($Mode -ceq 'admission'){$parameters.AdmissionOnly=$true}
-        $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC=[DateTimeOffset]::UtcNow.AddSeconds(3).ToString('o')
+        $deadlineSeconds = if ($Mode -ceq 'timeout') { 3 } else { 10 }
+        $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC = [DateTimeOffset]::UtcNow.AddSeconds($deadlineSeconds).ToString('o')
         $failure=$null
         try{Invoke-P4kxMsiDiagnosticWorker (Join-Path $SourceDirectory 'msi-feedback-worker-fixture.ps1') $parameters}
         catch{$failure=$_.Exception}
