@@ -175,8 +175,12 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
         admission: &RecordObservation<'_, 'f>,
         tree: &RecordTree<'f>,
     ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
-        let (value, notes) =
-            medical_tier_config::read(tree, &self.projection, admission, self.scan.options.cancel)?;
+        let (value, notes) = medical_tier_config::read(
+            tree,
+            self.projection.original(),
+            admission,
+            self.scan.options.cancel,
+        )?;
         Ok((Picked::MedicalItemTierConfig(Box::new(value)), notes))
     }
 

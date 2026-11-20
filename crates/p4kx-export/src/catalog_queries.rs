@@ -26,6 +26,9 @@ pub mod faction_identities;
 #[path = "law_query.rs"]
 pub mod law;
 
+#[path = "medical_tier_query.rs"]
+pub mod medical;
+
 #[path = "contract_query.rs"]
 mod contracts;
 pub use contracts::{

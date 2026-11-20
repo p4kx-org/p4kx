@@ -55,6 +55,8 @@ mod law;
 mod loot;
 #[path = "sdk_loot_generation_route.rs"]
 mod loot_generation;
+#[path = "sdk_medical_tier_route.rs"]
+mod medical_tier;
 #[path = "sdk_mineable_entity_route.rs"]
 mod mineable_entity;
 #[path = "sdk_planet_resource_route.rs"]
@@ -138,6 +140,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.extend(commodities::read(&archive)?);
     routes.extend(loot::read()?);
     routes.extend(law::read()?);
+    routes.push(medical_tier::read()?);
     routes.push(mineable_entity::read()?);
     routes.push(planet_resource::read()?);
     routes.extend(component_tools::read()?);

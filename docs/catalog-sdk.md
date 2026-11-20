@@ -655,6 +655,21 @@ selection even when the source family is available. Use the snapshot's own inven
 field origins. This query opens the original DataForge with no locale, loadout or placement reads.
 For resolved Cargo Grid capacity and its associated storage component, use `with_cargo_grids`.
 
+## Original medical item tier definitions
+
+Use `catalog_queries::medical::with_medical_item_tier_configs` for
+`/definitions/medicalItemTierConfigs`. `CatalogQuerySession` and
+`ParsedCatalogQueries` expose the same query and can reuse the decoded DataForge.
+Select every original definition, all physical Records with a GUID, or one
+`CatalogRecordSelection::RecordIndex`. The snapshot supplies Build identity,
+availability, physical coverage and the source inventory for its values.
+
+The rows use the same projector and order as the Catalog. They retain the
+ordered bed tiers and drug declarations, original resource references and
+amounts in their concrete units, plus additional authored fields. The query
+reads the selected family directly from DataForge. Facilities, placements, referenced
+resource definitions and localization have their own source scopes.
+
 ## Direct flight configurations
 
 Use `catalog_queries::equipment::flight` to query `configurations.flightControllers` with

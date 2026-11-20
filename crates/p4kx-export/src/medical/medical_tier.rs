@@ -19,10 +19,11 @@ const CONSUMABLE_EFFICACY: &str = "DrugEfficacyForConsumableType";
 
 pub(super) type MedicalList<T> = SourcedValue<Vec<SourcedValue<T>>>;
 
+/// One original med-bed tier declaration.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct MedBedTier<'source> {
+pub struct MedBedTier<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     #[serde(rename = "medBedTier")]
@@ -33,6 +34,38 @@ pub(super) struct MedBedTier<'source> {
 }
 
 impl<'source> MedBedTier<'source> {
+    /// Returns the original class and additional authored fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.source
+    }
+
+    /// Returns the authored tier label.
+    #[must_use]
+    pub const fn tier(&self) -> &SourcedValue<&'source str> {
+        &self.tier
+    }
+
+    /// Returns the authored default respawn range.
+    #[must_use]
+    pub const fn default_respawn_range(&self) -> &SourcedValue<i64> {
+        &self.default_respawn_range
+    }
+
+    /// Returns the authored efficacy declarations by consumable type.
+    #[must_use]
+    pub const fn drug_efficacy_for_consumable_types(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<UnitSource<'source>>>> {
+        &self.drug_efficacy_for_consumable_types
+    }
+
+    /// Returns the original ordered stat labels treated at this tier.
+    #[must_use]
+    pub const fn stat_types_to_heal(&self) -> &SourcedValue<Vec<SourcedValue<&'source str>>> {
+        &self.stat_types_to_heal
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

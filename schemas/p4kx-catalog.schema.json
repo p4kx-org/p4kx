@@ -30512,7 +30512,7 @@
       "type": "object"
     },
     "MedBedResourceConsumption": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "One original medical facility resource consumption declaration.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -30608,7 +30608,7 @@
       "type": "object"
     },
     "MedBedTier": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "One original med-bed tier declaration.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"

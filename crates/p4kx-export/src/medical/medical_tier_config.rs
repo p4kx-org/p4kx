@@ -11,9 +11,9 @@ use super::super::interaction_source;
 use super::super::prepared_definition::PreparedDefinition;
 use super::med_bed_resource_consumption::{self, MedBedResourceConsumption};
 use super::medical_tier::{self, MedBedTier, MedicalList};
+use crate::build::original_input::OriginalCatalogInput;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_number_capture::CapturedNumber;
-use crate::catalog_projection::CatalogProjection;
 use crate::catalog_table::CatalogTable;
 use crate::record_observation::RecordObservation;
 use crate::schema_fields::every_field_required;
@@ -29,7 +29,7 @@ const DRUG_TYPE: &str = "DrugTypeToApply";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct MedicalItemTierConfig<'source> {
+pub struct MedicalItemTierConfig<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     med_bed_configs: MedicalList<MedBedTier<'source>>,
@@ -43,10 +43,49 @@ pub(crate) type PreparedMedicalTier<'source> =
     PreparedDefinition<'source, MedicalItemTierConfig<'source>>;
 
 impl<'source> MedicalItemTierConfig<'source> {
+    /// Returns the original physical Record header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Returns the ordered med-bed tier declarations.
+    #[must_use]
+    pub const fn med_bed_configs(&self) -> &SourcedValue<Vec<SourcedValue<MedBedTier<'source>>>> {
+        &self.med_bed_configs
+    }
+
+    /// Returns the original drug efficacy declarations for item types.
+    #[must_use]
+    pub const fn drug_efficacy_config(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<UnitSource<'source>>>> {
+        &self.drug_efficacy_config
+    }
+
+    /// Returns the original declarations of available drug types.
+    #[must_use]
+    pub const fn available_drug_types(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<UnitSource<'source>>>> {
+        &self.available_drug_types
+    }
+
+    /// Returns the declared resource consumption and original units.
+    #[must_use]
+    pub const fn resource_consumption(&self) -> &SourcedValue<MedBedResourceConsumption<'source>> {
+        &self.resource_consumption
+    }
+
+    /// Returns original fields outside the typed definition.
+    #[must_use]
+    pub const fn additional_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.additional_fields
+    }
+
     fn read(
         header: CanonicalRecordHeader<'source>,
         source: Observed<'_, '_, '_, 'source>,
-        _projection: &CatalogProjection<'_, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
         let med_bed_configs = source.class_array_to(
@@ -92,20 +131,14 @@ impl<'source> MedicalItemTierConfig<'source> {
 
 pub(crate) fn read<'source>(
     tree: &RecordTree<'source>,
-    projection: &CatalogProjection<'_, 'source>,
+    input: &OriginalCatalogInput<'_, 'source>,
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
 ) -> Result<(PreparedMedicalTier<'source>, Vec<FieldError>), CatalogError> {
     if tree.type_name() != SOURCE_TYPE {
         return Err(ExportAccountingError::ConflictingSourceDatum.into());
     }
-    PreparedDefinition::read(
-        tree,
-        projection,
-        admission,
-        cancel,
-        MedicalItemTierConfig::read,
-    )
+    PreparedDefinition::read_original(tree, input, admission, cancel, MedicalItemTierConfig::read)
 }
 
 pub(crate) fn order(rows: &mut [PreparedMedicalTier<'_>]) {

@@ -3,7 +3,7 @@
 
 pub(super) mod med_bed;
 mod med_bed_links;
-mod med_bed_resource_consumption;
+pub(crate) mod med_bed_resource_consumption;
 mod med_bed_surgery_names;
-mod medical_tier;
+pub(crate) mod medical_tier;
 pub(crate) mod medical_tier_config;

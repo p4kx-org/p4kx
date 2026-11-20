@@ -14,6 +14,7 @@ use crate::CatalogError;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
+use crate::source_value_catalog::SourceRecordReference;
 
 pub(super) const SOURCE_TYPE: &str = "MedBedResourceConsumptionParams";
 const RESOURCE_TYPE: &str = "ResourceType";
@@ -24,10 +25,11 @@ const CLONING: &str = "resourceAmountForCloning";
 
 pub(super) type Capacity<'source> = SourcedValue<ResourceCapacity<'source>>;
 
+/// One original medical facility resource consumption declaration.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct MedBedResourceConsumption<'source> {
+pub struct MedBedResourceConsumption<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
@@ -43,6 +45,42 @@ pub(super) struct MedBedResourceConsumption<'source> {
 }
 
 impl<'source> MedBedResourceConsumption<'source> {
+    /// Returns the original class and additional authored fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.source
+    }
+
+    /// Returns the authored resource reference.
+    #[must_use]
+    pub const fn bed_resource(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.bed_resource
+    }
+
+    /// Returns the authored resource amount for tier-one surgery.
+    #[must_use]
+    pub const fn surgery_t1(&self) -> &SourcedValue<ResourceCapacity<'source>> {
+        &self.surgery_t1
+    }
+
+    /// Returns the authored resource amount for tier-two surgery.
+    #[must_use]
+    pub const fn surgery_t2(&self) -> &SourcedValue<ResourceCapacity<'source>> {
+        &self.surgery_t2
+    }
+
+    /// Returns the authored resource amount for tier-three surgery.
+    #[must_use]
+    pub const fn surgery_t3(&self) -> &SourcedValue<ResourceCapacity<'source>> {
+        &self.surgery_t3
+    }
+
+    /// Returns the authored resource amount for cloning.
+    #[must_use]
+    pub const fn cloning(&self) -> &SourcedValue<ResourceCapacity<'source>> {
+        &self.cloning
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

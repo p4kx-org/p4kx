@@ -18,6 +18,7 @@ mod row_schema;
 const LANGUAGE_SOURCES: &str = "/texts/languageSources";
 const ITEM_DEFINITIONS: &str = "/definitions/items";
 const INVENTORY_CONTAINERS: &str = "/definitions/inventoryContainers";
+const MEDICAL_ITEM_TIER_CONFIGS: &str = "/definitions/medicalItemTierConfigs";
 const MANUFACTURERS: &str = "/definitions/manufacturers";
 const FACTION_IDENTITIES: &str = "/definitions/factionIdentities";
 const REPUTATION_REWARD_AMOUNTS: &str = "/definitions/reputationRewardAmounts";
@@ -112,6 +113,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     LANGUAGE_SOURCES,
     ITEM_DEFINITIONS,
     INVENTORY_CONTAINERS,
+    MEDICAL_ITEM_TIER_CONFIGS,
     MANUFACTURERS,
     FACTION_IDENTITIES,
     REPUTATION_REWARD_AMOUNTS,
