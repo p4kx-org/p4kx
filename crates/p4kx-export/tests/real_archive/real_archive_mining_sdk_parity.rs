@@ -16,6 +16,7 @@ use serde_json::{Value, json};
 use crate::catalog_capture::CatalogCapture;
 use crate::catalog_v3_consumer as consumer;
 use crate::real_archive_catalog_size::artifact;
+use crate::real_archive_catalog_table_parity::first_difference;
 use crate::real_archive_shop_inventory_v3::verify_build;
 use crate::real_archive_verification::print_line;
 
@@ -204,13 +205,16 @@ fn compare_ordered<T: Serialize>(catalog: &Value, path: &str, sdk: &[T]) -> Test
         return Err(format!("mismatched or empty Catalog and SDK rows at {path}").into());
     }
     for (position, (actual, typed)) in exported.iter().zip(sdk).enumerate() {
-        if actual != &serde_json::to_value(typed)? {
-            return Err(
-                format!("Catalog and SDK rows differ at {path} position {position}").into(),
-            );
+        let projected = wire_value(typed)?;
+        if let Some(field) = first_difference(actual, &projected) {
+            return Err(format!("Catalog and SDK rows differ at {path}/{position}{field}").into());
         }
     }
     Ok(())
+}
+
+fn wire_value<T: Serialize>(value: &T) -> serde_json::Result<Value> {
+    serde_json::from_slice(&serde_json::to_vec(value)?)
 }
 
 fn compare_starmap(catalog: &Value, snapshot: &MiningLocationSnapshot) -> TestResult {
@@ -298,11 +302,7 @@ fn compare_resources(catalog: &Value, snapshot: &MiningLocationSnapshot) -> Test
             return Err("SDK resource Record is duplicated or not a matching dependency".into());
         }
         let resource = resources.get(&index).ok_or("Catalog resource Record")?;
-        compare_fields(
-            resource,
-            &serde_json::to_value(row)?,
-            "reachable resource cells",
-        )?;
+        compare_fields(resource, &wire_value(row)?, "reachable resource cells")?;
     }
     Ok(())
 }
@@ -360,5 +360,23 @@ fn require_equal(actual: Option<&Value>, expected: Option<&Value>, scope: &str) 
     if actual.is_none() || actual != expected {
         return Err(format!("catalog comparison differs for {scope}").into());
     }
+    Ok(())
+}
+
+#[test]
+fn ordered_mining_rows_compare_the_wire_decimal_for_binary32_cells() -> TestResult {
+    #[derive(Serialize)]
+    struct Tuning {
+        finite: f32,
+    }
+
+    let catalog = serde_json::from_str(r#"{"mineableElements":[{"finite":0.1}]}"#)?;
+    compare_ordered(&catalog, "/mineableElements", &[Tuning { finite: 0.1 }])?;
+
+    let mismatch = compare_ordered(&catalog, "/mineableElements", &[Tuning { finite: 0.2 }]);
+    assert!(
+        mismatch.is_err_and(|error| error.to_string().contains("/mineableElements/0/finite")),
+        "a different wire value still fails at the original field"
+    );
     Ok(())
 }
