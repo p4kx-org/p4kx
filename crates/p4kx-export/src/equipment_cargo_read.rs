@@ -7,7 +7,7 @@ use crate::catalog_projection::CatalogProjection;
 use crate::catalog_queries::CatalogRecordCoverage;
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_read::scoped_source_read::ScopedSourceRead;
-use crate::catalog_v3::catalog_entity_configurations;
+use crate::catalog_v3::catalog_entity_configurations::{self, FacilitySelection};
 use crate::catalog_v3::catalog_facility::Facility;
 use crate::catalog_v3::catalog_item_alignment::AlignmentOptions;
 use crate::catalog_v3::inventory_container_definition::{
@@ -17,13 +17,13 @@ use crate::catalog_v3::inventory_owner_storage::InventoryOwnerStorage;
 use crate::record_observation::RecordObservation;
 use crate::{CatalogError, ExportAccountingError};
 
-/// Cargo Grid facilities, storage configurations and reached container for one physical owner.
+/// Canonical facilities and any capacity dependencies on one physical owner.
 #[derive(Debug)]
 #[non_exhaustive]
-pub struct CargoGridOwner<'source> {
-    /// Canonical Cargo Grid rows in original component order.
+pub struct FacilityOwner<'source> {
+    /// Canonical facility rows in original component order.
     pub facilities: Vec<Facility<'source>>,
-    /// Canonical item storage configurations on this owner.
+    /// Co-owned item storage configurations consulted for Cargo Grid capacity.
     pub inventory_configurations: Vec<InventoryOwnerStorage<'source>>,
     /// The one physical inventory definition admitted to the capacity calculation.
     pub inventory_container: Option<InventoryContainerDefinition<'source>>,
@@ -32,37 +32,42 @@ pub struct CargoGridOwner<'source> {
     pub dependency_coverage: CatalogRecordCoverage,
 }
 
+/// A facility owner selected through the Cargo Grid query.
+pub type CargoGridOwner<'source> = FacilityOwner<'source>;
+
 pub(super) fn read<'source>(
     forge: &'source DataForge<'source>,
     tree: &RecordTree<'source>,
     projection: &CatalogProjection<'_, 'source>,
     admission: &RecordObservation<'_, 'source>,
     options: &AlignmentOptions<'_>,
+    selection: FacilitySelection,
     cancel: Option<&CancelToken>,
-) -> Result<ScopedSourceRead<Vec<CargoGridOwner<'source>>>, CatalogError> {
-    let mut rows = catalog_entity_configurations::read_cargo_configurations(
-        tree, projection, admission, options, cancel,
+) -> Result<ScopedSourceRead<Vec<FacilityOwner<'source>>>, CatalogError> {
+    let mut rows = catalog_entity_configurations::read_facility_configurations(
+        tree, projection, admission, options, selection, cancel,
     )?;
-    if !rows.value.has_cargo_grids() {
+    if !rows.value.has_facilities() {
         return Ok(rows.map(|_| Vec::new()));
     }
-    projection.original().check_forge(forge)?;
-    let target = rows.value.cargo_container_index(forge)?;
     let mut dependency_coverage = CatalogRecordCoverage::default();
-    let container = match target {
-        Some(index) => read_container(forge, index, projection, cancel, &mut dependency_coverage)?,
-        None => None,
-    };
-    rows.value.resolve_cargo_capacities(
-        forge,
-        container.as_slice(),
-        &projection.origins().uses,
-        None,
-        cancel,
-    )?;
+    let mut container = None;
+    if rows.value.has_cargo_grids() {
+        projection.original().check_forge(forge)?;
+        if let Some(index) = rows.value.cargo_container_index(forge)? {
+            container = read_container(forge, index, projection, cancel, &mut dependency_coverage)?;
+        }
+        rows.value.resolve_cargo_capacities(
+            forge,
+            container.as_slice(),
+            &projection.origins().uses,
+            None,
+            cancel,
+        )?;
+    }
     Ok(rows.map(|rows| {
         let (facilities, inventory_configurations) = rows.into_cargo_rows();
-        vec![CargoGridOwner {
+        vec![FacilityOwner {
             facilities,
             inventory_configurations,
             inventory_container: container.map(PreparedInventoryContainer::into_definition),

@@ -77,6 +77,19 @@ impl<'source> InventoryOwnerStorage<'source> {
         }
     }
 
+    /// Borrows the original container Reference when this is vehicle storage.
+    #[must_use]
+    pub const fn vehicle_container_params(
+        &self,
+    ) -> Option<&SourcedValue<Box<SourceRecordReference<'source>>>> {
+        match &self.fields {
+            StorageFields::ItemStorage(_) => None,
+            StorageFields::VehicleStorage {
+                inventory_container_params,
+            } => Some(inventory_container_params),
+        }
+    }
+
     /// Borrows the physical component's authored type.
     #[must_use]
     pub const fn source_type(&self) -> &SourcedValue<&'source str> {

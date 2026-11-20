@@ -13,6 +13,7 @@ use crate::catalog_v3::catalog_item_alignment::{
 };
 use crate::catalog_v3::item_alignment_options::AlignmentOptions;
 use crate::catalog_v3::item_component_owner::ComponentOwner;
+use crate::catalog_v3::{inventory_owner_storage, room_associations};
 use crate::export_field_inspection::ConfigurationInspection;
 use crate::source_fields::FieldError;
 use crate::{CatalogError, ExportAccountingError};
@@ -24,6 +25,9 @@ pub(super) enum Scope {
     Attachments,
     Bounds,
     CargoGrids,
+    Facilities,
+    FacilitiesWithCargoStorage,
+    InventoryConfigurations,
     VehicleArmor,
     ResourceComponents,
     ResourceConnections,
@@ -47,15 +51,31 @@ impl Scope {
                 occupancy: false,
             });
         }
+        if matches!(self, Self::InventoryConfigurations) {
+            return match value.type_name() {
+                inventory_owner_storage::ITEM_COMPONENT => {
+                    Some(ConfigurationKind::InventoryStorage)
+                }
+                room_associations::VEHICLE => Some(ConfigurationKind::RoomAssociations),
+                _ => None,
+            };
+        }
         let kind = ConfigurationKind::of(value, input)?;
         self.accepts(kind).then_some(kind)
     }
 
-    pub(super) fn includes_owner(self, components: &[Value<'_>]) -> bool {
-        !matches!(self, Self::CargoGrids)
-            || components.iter().any(|slot| {
-                matches!(slot, Value::Struct(component) if component.type_name() == CARGO_GRID_SOURCE_TYPE)
-            })
+    pub(super) fn for_owner(self, components: &[Value<'_>]) -> Option<Self> {
+        if !matches!(self, Self::CargoGrids | Self::Facilities) {
+            return Some(self);
+        }
+        let has_cargo_grid = components.iter().any(|slot| {
+            matches!(slot, Value::Struct(component) if component.type_name() == CARGO_GRID_SOURCE_TYPE)
+        });
+        match (self, has_cargo_grid) {
+            (Self::CargoGrids, false) => None,
+            (Self::Facilities, true) => Some(Self::FacilitiesWithCargoStorage),
+            _ => Some(self),
+        }
     }
 
     fn accepts(self, kind: ConfigurationKind) -> bool {
@@ -81,13 +101,18 @@ impl Scope {
                 ConfigurationKind::Facility(FacilityKind::CargoGrid)
                     | ConfigurationKind::InventoryStorage
             ),
+            Self::Facilities => matches!(kind, ConfigurationKind::Facility(_)),
+            Self::FacilitiesWithCargoStorage => matches!(
+                kind,
+                ConfigurationKind::Facility(_) | ConfigurationKind::InventoryStorage
+            ),
             Self::VehicleArmor => matches!(kind, ConfigurationKind::VehicleArmor),
             Self::ResourceComponents => matches!(kind, ConfigurationKind::Resource),
             Self::ResourceConnections => matches!(kind, ConfigurationKind::Connection(_)),
             Self::Fuel(requested) => {
                 matches!(kind, ConfigurationKind::Fuel(actual) if actual == requested)
             }
-            Self::Ports => false,
+            Self::Ports | Self::InventoryConfigurations => false,
         }
     }
 
@@ -133,7 +158,13 @@ impl Scope {
                     self.attachment_complete(component, input)
                 }
                 Value::Struct(_) | Value::Null => true,
-                _ => !matches!(self, Self::CargoGrids),
+                _ => !matches!(
+                    self,
+                    Self::CargoGrids
+                        | Self::Facilities
+                        | Self::FacilitiesWithCargoStorage
+                        | Self::InventoryConfigurations
+                ),
             };
             if !complete {
                 return Ok(false);
@@ -176,6 +207,8 @@ impl Scope {
         match self {
             Self::All
             | Self::CargoGrids
+            | Self::Facilities
+            | Self::FacilitiesWithCargoStorage
             | Self::VehicleArmor
             | Self::ResourceComponents
             | Self::ResourceConnections
@@ -189,6 +222,13 @@ impl Scope {
                 rows.alignment
                     .push(alignment, owner, source, options, projection, notes)
             }
+            Self::InventoryConfigurations => match configuration {
+                ConfigurationKind::InventoryStorage => rows.inventory.storage(owner, source, notes),
+                ConfigurationKind::RoomAssociations => {
+                    rows.inventory.vehicle_storage(&owner, source, notes)
+                }
+                _ => Err(ExportAccountingError::ConflictingSourceDatum.into()),
+            },
             Self::Bounds => match configuration {
                 ConfigurationKind::Alignment {
                     occupancy: true, ..

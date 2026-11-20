@@ -37,10 +37,10 @@ use crate::{CatalogError, ExportAccountingError};
 #[path = "catalog_configuration_record_read.rs"]
 mod record_read;
 pub(crate) use record_read::{
-    read, read_attachment_constraints, read_cargo_configurations, read_fuel_intakes,
-    read_fuel_tanks, read_item_bounds, read_item_ports, read_item_ports_scoped,
-    read_resource_components, read_resource_connections, read_resource_containers,
-    read_vehicle_armor,
+    FacilitySelection, read, read_attachment_constraints, read_facility_configurations,
+    read_fuel_intakes, read_fuel_tanks, read_inventory_configurations, read_item_bounds,
+    read_item_ports, read_item_ports_scoped, read_resource_components, read_resource_connections,
+    read_resource_containers, read_vehicle_armor,
 };
 
 pub use super::authored_damage::{DamageChannels, DamageParameters};
@@ -212,6 +212,10 @@ impl<'source> EntityConfigurationRows<'source> {
         self.inventory.stage_bounds(staging)
     }
 
+    pub(crate) const fn has_facilities(&self) -> bool {
+        !self.facilities.is_empty()
+    }
+
     pub(crate) const fn has_cargo_grids(&self) -> bool {
         !self.cargo_owners.is_empty()
     }
@@ -335,7 +339,9 @@ impl ConfigurationKind {
         match value.type_name() {
             catalog_resource_component::COMPONENT => return Some(Self::Resource),
             inventory_owner_storage::ITEM_COMPONENT => return Some(Self::InventoryStorage),
-            inventory_owner_bounds::METADATA_COMPONENT => return Some(Self::ObjectMetadataBounds),
+            inventory_owner_bounds::METADATA_COMPONENT => {
+                return Some(Self::ObjectMetadataBounds);
+            }
             catalog_vehicle_armor::COMPONENT => return Some(Self::VehicleArmor),
             _ => {}
         }

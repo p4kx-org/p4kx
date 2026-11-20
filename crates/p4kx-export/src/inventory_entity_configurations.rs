@@ -17,6 +17,11 @@ use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::{CatalogError, ExportAccountingError};
 
+pub(crate) const STORAGE_SOURCE_TYPES: &[&str] = &[
+    inventory_owner_storage::ITEM_COMPONENT,
+    room_associations::VEHICLE,
+];
+
 pub(crate) const BOUNDS_SOURCE_TYPES: &[&str] = &[
     inventory_item_occupancy::ITEM_DEFINITION,
     room_associations::VEHICLE,
@@ -90,6 +95,16 @@ impl<'source> InventoryEntityRows<'source> {
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<(), CatalogError> {
+        self.vehicle_storage(owner, source, notes)?;
+        self.vehicle_bounds(owner, source, notes)
+    }
+
+    pub(super) fn vehicle_storage(
+        &mut self,
+        owner: &ComponentOwner,
+        source: Observed<'_, '_, '_, 'source>,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<(), CatalogError> {
         if source.has_member(inventory_owner_storage::VEHICLE_FIELD)? {
             self.storage.push(InventoryOwnerStorage::vehicle(
                 owner.clone(),
@@ -97,7 +112,7 @@ impl<'source> InventoryEntityRows<'source> {
                 notes,
             )?);
         }
-        self.vehicle_bounds(owner, source, notes)
+        Ok(())
     }
 
     pub(super) fn vehicle_bounds(
@@ -151,14 +166,7 @@ impl<'source> InventoryEntityRows<'source> {
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
         self.storage.sort_by_key(|row| row.owner.key());
         Ok(InventoryEntityTables {
-            inventory_configurations: CatalogTable::new(
-                forge,
-                &[
-                    inventory_owner_storage::ITEM_COMPONENT,
-                    room_associations::VEHICLE,
-                ],
-                self.storage,
-            ),
+            inventory_configurations: CatalogTable::new(forge, STORAGE_SOURCE_TYPES, self.storage),
             item_bounds,
         })
     }

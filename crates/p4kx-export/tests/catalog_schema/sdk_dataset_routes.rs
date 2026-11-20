@@ -50,6 +50,10 @@ mod container_placements;
 mod contracts;
 #[path = "sdk_countermeasure_emitter_route.rs"]
 mod countermeasure_emitters;
+#[path = "sdk_facility_route.rs"]
+mod facilities;
+#[path = "../it/catalog_facility_medbed_fixture.rs"]
+mod facility_medbed_fixture;
 #[path = "sdk_faction_trigger_configuration_route.rs"]
 mod faction_trigger_configuration;
 #[path = "sdk_dataset_fixtures.rs"]
@@ -180,6 +184,8 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(resource_network::read()?);
     routes.extend(fuel::read()?);
     routes.push(inventory_containers::read()?);
+    routes.push(inventory_containers::read_configurations()?);
+    routes.push(facilities::read()?);
     routes.push(client_profiles::read()?);
     routes.extend(read_cargo_globals(archive)?);
     routes.extend(quality::read()?);

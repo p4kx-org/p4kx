@@ -3,24 +3,30 @@
 
 use p4kx_extraction::{CancelToken, DataForge, Filter, RecordTree};
 
-use super::{InventoryOwnerBounds, ItemAttachmentComponent, ItemDefinition, ItemSource};
+use super::{
+    InventoryOwnerBounds, InventoryOwnerStorage, ItemAttachmentComponent, ItemDefinition,
+    ItemSource,
+};
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::scoped_source_read::ScopedSourceRead;
 use crate::catalog_table::DatasetAvailability;
 use crate::catalog_v3::ammo_definition;
 use crate::catalog_v3::catalog_entity_configurations::{
-    self, FuelConfigurationKind, FuelIntake, FuelTank, RESOURCE_COMPONENT_TYPES,
+    self, FacilitySelection, FuelConfigurationKind, FuelIntake, FuelTank, RESOURCE_COMPONENT_TYPES,
     RESOURCE_CONNECTION_TYPES, ResourceComponent, ResourceConnection, ResourceContainer,
     VEHICLE_ARMOR_TYPES, VehicleArmor,
 };
 use crate::catalog_v3::catalog_item_alignment::{ATTACHABLE, AlignmentOptions};
 use crate::catalog_v3::catalog_item_components::{ItemEquipmentFamily, definition_read};
-use crate::catalog_v3::inventory_entity_configurations::BOUNDS_SOURCE_TYPES;
+use crate::catalog_v3::inventory_entity_configurations::{
+    BOUNDS_SOURCE_TYPES, STORAGE_SOURCE_TYPES,
+};
 use crate::record_observation::RecordObservation;
 use crate::{CatalogError, Kind};
 
 #[derive(Clone, Copy)]
 pub(super) enum ConfigurationFamily {
+    InventoryConfigurations,
     VehicleArmor,
     ResourceComponents,
     ResourceConnections,
@@ -30,6 +36,7 @@ pub(super) enum ConfigurationFamily {
 impl ConfigurationFamily {
     pub(super) const fn source_types(self) -> &'static [&'static str] {
         match self {
+            Self::InventoryConfigurations => STORAGE_SOURCE_TYPES,
             Self::VehicleArmor => VEHICLE_ARMOR_TYPES,
             Self::ResourceComponents => RESOURCE_COMPONENT_TYPES,
             Self::ResourceConnections => RESOURCE_CONNECTION_TYPES,
@@ -45,6 +52,7 @@ pub(super) enum Family {
     Attachments,
     Bounds,
     CargoGrids,
+    Facilities,
     InventoryContainers,
     CargoLoadingGlobals,
     ShopCommodityGlobals,
@@ -72,6 +80,7 @@ impl Family {
             | Self::Attachments
             | Self::Bounds
             | Self::CargoGrids
+            | Self::Facilities
             | Self::Configuration(_)
             | Self::ItemEquipment(_)
             | Self::WeaponSources
@@ -91,6 +100,7 @@ impl Family {
             Self::Configuration(family) => family.source_types(),
             Self::ItemEquipment(family) => family.source_types(),
             Self::CargoGrids => &[crate::catalog_v3::catalog_facility::CARGO_GRID_SOURCE_TYPE],
+            Self::Facilities => crate::catalog_v3::catalog_facility::SOURCE_TYPES,
             Self::InventoryContainers | Self::CargoLoadingGlobals | Self::ShopCommodityGlobals => {
                 return DatasetAvailability::from_source_declarations(forge, |name| {
                     name == self.kind().records().type_name
@@ -132,7 +142,6 @@ pub(super) struct Definitions;
 pub(super) struct ItemSources;
 pub(super) struct Attachments;
 pub(super) struct Bounds;
-pub(super) struct CargoGrids;
 
 impl Projector for Definitions {
     type Row<'source> = ItemDefinition<'source>;
@@ -201,28 +210,38 @@ impl Projector for Attachments {
     }
 }
 
-impl Projector for CargoGrids {
-    type Row<'source> = super::cargo_read::CargoGridOwner<'source>;
-    const FAMILY: Family = Family::CargoGrids;
+macro_rules! facility_projector {
+    ($projector:ident, $selection:ident) => {
+        pub(super) struct $projector;
 
-    fn read<'source>(
-        forge: &'source DataForge<'source>,
-        tree: &RecordTree<'source>,
-        projection: &CatalogProjection<'_, 'source>,
-        admission: &RecordObservation<'_, 'source>,
-        options: &ReadOptions<'_>,
-        cancel: Option<&CancelToken>,
-    ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
-        super::cargo_read::read(
-            forge,
-            tree,
-            projection,
-            admission,
-            &options.alignment,
-            cancel,
-        )
-    }
+        impl Projector for $projector {
+            type Row<'source> = super::cargo_read::FacilityOwner<'source>;
+            const FAMILY: Family = Family::$projector;
+
+            fn read<'source>(
+                forge: &'source DataForge<'source>,
+                tree: &RecordTree<'source>,
+                projection: &CatalogProjection<'_, 'source>,
+                admission: &RecordObservation<'_, 'source>,
+                options: &ReadOptions<'_>,
+                cancel: Option<&CancelToken>,
+            ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError> {
+                super::cargo_read::read(
+                    forge,
+                    tree,
+                    projection,
+                    admission,
+                    &options.alignment,
+                    FacilitySelection::$selection,
+                    cancel,
+                )
+            }
+        }
+    };
 }
+
+facility_projector!(CargoGrids, CargoGrids);
+facility_projector!(Facilities, All);
 
 impl Projector for Bounds {
     type Row<'source> = InventoryOwnerBounds<'source>;
@@ -274,6 +293,12 @@ macro_rules! configuration_projector {
     };
 }
 
+configuration_projector!(
+    InventoryConfigurationRows,
+    InventoryOwnerStorage,
+    ConfigurationFamily::InventoryConfigurations,
+    read_inventory_configurations
+);
 configuration_projector!(
     VehicleArmorRows,
     VehicleArmor,

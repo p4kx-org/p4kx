@@ -19,6 +19,7 @@ use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::catalog_facility::{Facility, OwnerComponents};
 use crate::catalog_v3::catalog_item_alignment::{ItemAttachmentComponent, ItemPortContainer};
 use crate::catalog_v3::inventory_owner_bounds::InventoryOwnerBounds;
+use crate::catalog_v3::inventory_owner_storage::InventoryOwnerStorage;
 use crate::catalog_v3::item_alignment_options::AlignmentOptions;
 use crate::catalog_v3::item_component_owner::ComponentOwner;
 use crate::export_diagnostic::ExportDiagnosticSeverity;
@@ -94,21 +95,43 @@ pub(crate) fn read_item_bounds<'source>(
     Ok(read.map(|rows| rows.inventory.into_bounds()))
 }
 
-pub(crate) fn read_cargo_configurations<'source>(
+pub(crate) fn read_inventory_configurations<'source>(
     tree: &RecordTree<'source>,
     projection: &CatalogProjection<'_, 'source>,
     admission: &RecordObservation<'_, 'source>,
     options: &AlignmentOptions<'_>,
     cancel: Option<&CancelToken>,
-) -> Result<ScopedSourceRead<EntityConfigurationRows<'source>>, CatalogError> {
-    read_scope(
+) -> Result<ScopedSourceRead<Vec<InventoryOwnerStorage<'source>>>, CatalogError> {
+    let read = read_scope(
         tree,
         projection,
         admission,
         options,
         cancel,
-        Scope::CargoGrids,
-    )
+        Scope::InventoryConfigurations,
+    )?;
+    Ok(read.map(|rows| rows.inventory.into_storage()))
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum FacilitySelection {
+    CargoGrids,
+    All,
+}
+
+pub(crate) fn read_facility_configurations<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    options: &AlignmentOptions<'_>,
+    selection: FacilitySelection,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<EntityConfigurationRows<'source>>, CatalogError> {
+    let scope = match selection {
+        FacilitySelection::CargoGrids => Scope::CargoGrids,
+        FacilitySelection::All => Scope::Facilities,
+    };
+    read_scope(tree, projection, admission, options, cancel, scope)
 }
 
 pub(crate) fn read_vehicle_armor<'source>(
@@ -319,9 +342,7 @@ fn selected_components<'scope, 'source>(
     let authored @ Value::Array(components) = tree.field("Components")? else {
         return None;
     };
-    if !requested.includes_owner(components) {
-        return None;
-    }
+    let requested = requested.for_owner(components)?;
     let selected = components.iter().filter_map(move |component| {
         let Value::Struct(value) = component else {
             return None;

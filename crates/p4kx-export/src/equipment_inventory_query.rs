@@ -4,12 +4,13 @@
 use p4kx_extraction::{CancelToken, DataForge, RecordTree};
 
 use super::record_query;
-use super::rows::{Family, Projector, ReadOptions};
+use super::rows::{Family, InventoryConfigurationRows, Projector, ReadOptions};
 use crate::CatalogError;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::scoped_source_read::ScopedSourceRead;
 
 use crate::catalog_v3::inventory_container_definition::{self, InventoryContainerDefinition};
+use crate::catalog_v3::inventory_owner_storage::InventoryOwnerStorage;
 use crate::record_observation::RecordObservation;
 
 struct InventoryContainerRows;
@@ -43,4 +44,13 @@ record_query::unlocalized!(
     InventoryContainerSnapshot,
     with_inventory_containers,
     with_inventory_containers_from
+);
+
+record_query::unlocalized!(
+    InventoryConfigurationRows,
+    InventoryOwnerStorage,
+    /// Selected authored Item and Vehicle storage configurations.
+    InventoryConfigurationSnapshot,
+    with_inventory_configurations,
+    with_inventory_configurations_from
 );

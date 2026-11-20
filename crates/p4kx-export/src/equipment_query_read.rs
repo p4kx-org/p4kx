@@ -212,7 +212,7 @@ impl<'query> Query<'query> {
                 self.cancel,
                 observer,
             )?,
-            Family::Attachments | Family::Bounds | Family::CargoGrids => {
+            Family::Attachments | Family::Bounds | Family::CargoGrids | Family::Facilities => {
                 Plan::read_entities(self.forge, self.selection, self.cancel, observer)?
             }
         };
@@ -245,6 +245,7 @@ fn order(family: Family, owners: &mut [Owner<'_>]) {
         Family::Attachments
         | Family::Bounds
         | Family::CargoGrids
+        | Family::Facilities
         | Family::Configuration(_)
         | Family::ItemEquipment(_)
         | Family::WeaponSources

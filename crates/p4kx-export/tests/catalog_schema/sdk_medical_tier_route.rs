@@ -17,10 +17,7 @@ use p4kx_testkit::{
 use serde_json::{Value, json};
 
 use super::super::MEDICAL_ITEM_TIER_CONFIGS;
-use super::{Route, TestResult};
-
-#[path = "../it/catalog_facility_medbed_fixture.rs"]
-mod fixture;
+use super::{Route, TestResult, facility_medbed_fixture as fixture};
 
 const FAMILY: &str = "MedicalItemTierConfig";
 const CONFIG_RECORD: u32 = 1;

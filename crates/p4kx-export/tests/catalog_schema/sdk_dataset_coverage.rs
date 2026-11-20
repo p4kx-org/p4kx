@@ -26,6 +26,8 @@ const TAG_DEFINITIONS: &str = "/definitions/tags";
 const TAG_ROOTS: &str = "/declarations/tagRoots";
 const TAG_PATHS: &str = "/projections/tagPaths";
 const INVENTORY_CONTAINERS: &str = "/definitions/inventoryContainers";
+const INVENTORY_CONFIGURATIONS: &str = "/configurations/inventoryConfigurations";
+const FACILITIES: &str = "/configurations/facilities";
 const MEDICAL_ITEM_TIER_CONFIGS: &str = "/definitions/medicalItemTierConfigs";
 const MANUFACTURERS: &str = "/definitions/manufacturers";
 const FACTION_IDENTITIES: &str = "/definitions/factionIdentities";
@@ -153,6 +155,8 @@ const REQUIRED_WITNESSES: &[&str] = &[
     TAG_ROOTS,
     TAG_PATHS,
     INVENTORY_CONTAINERS,
+    INVENTORY_CONFIGURATIONS,
+    FACILITIES,
     MEDICAL_ITEM_TIER_CONFIGS,
     MANUFACTURERS,
     FACTION_IDENTITIES,

@@ -1381,6 +1381,31 @@ The result carries Build, original provenance and selected-scope coverage. Check
 Entry failures, malformed or blocked routes and caller-selected traversal allowances remain visible
 even if the query could emit some rows.
 
+## Authored facilities
+
+Use `equipment::with_facilities`, its decoded-Entry form or the equivalent session methods.
+Select by physical Entity Record index, GUID or the entire facility dataset. A GUID retains
+all admitted physical owners carrying that identifier. The result preserves the canonical
+`configurations.facilities` row for each Seat, Medical Bed, Cargo Grid, Logout and Outfit Hanger
+component in its original order. It resolves the same authored Cargo Grid capacities as the
+Catalog. When a Grid is present, the owner supplies the co-owned storage rows and any inventory
+definition admitted to the capacity calculation. Check owner and dependency coverage before
+caching the result. Use the typed kind to distinguish facility families. A serialized Facility
+row includes all authored fields and provenance for that family. The Cargo Grid accessor also
+provides typed capacity and its operands.
+
+## Authored inventory configurations
+
+Use `equipment::with_inventory_configurations`, its decoded-Entry form or the equivalent
+session methods to read canonical Item and Vehicle storage configurations. Choose all matching
+owners, one GUID with its physical occurrences, or a physical Record index. The rows preserve
+component order, authored container References and their provenance. The Vehicle row uses its
+declared `inventoryContainerParams`; the item row retains the original item storage component.
+
+Use `item_container_params` or `vehicle_container_params` for the typed original Reference
+and `with_inventory_containers` to read the linked inventory definition. The storage query
+projects its own component fields. Bounds and room associations have their own datasets.
+
 ## Cargo Grid configurations
 
 Use `equipment::with_cargo_grids`, its decoded-Entry form or the equivalent session methods with one

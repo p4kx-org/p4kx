@@ -23,8 +23,16 @@ use serde_json::{Value, json};
 use super::super::INVENTORY_CONTAINERS;
 use super::{Route, TestResult};
 
+#[path = "sdk_inventory_configuration_route.rs"]
+mod configurations;
+#[path = "../it/catalog_inventory_entities_fixture.rs"]
+mod entities;
 #[path = "../it/catalog_inventory_container_fixture.rs"]
 mod fixture;
+
+pub(super) fn read_configurations() -> TestResult<Route> {
+    configurations::read()
+}
 
 const CONTAINER: &str = "InventoryContainer";
 const UNRELATED: &str = "UnrelatedFixtureRecord";

@@ -30,7 +30,7 @@ mod outfit_hanger;
 
 pub(crate) const CARGO_GRID_SOURCE_TYPE: &str = cargo_grid::COMPONENT;
 
-pub(super) const SOURCE_TYPES: &[&str] = &[
+pub(crate) const SOURCE_TYPES: &[&str] = &[
     catalog_seat::COMPONENT,
     med_bed::COMPONENT,
     cargo_grid::COMPONENT,
@@ -38,12 +38,19 @@ pub(super) const SOURCE_TYPES: &[&str] = &[
     outfit_hanger::COMPONENT,
 ];
 
-#[derive(Clone, Copy)]
-pub(super) enum FacilityKind {
+/// The authored family of a facility component.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum FacilityKind {
+    /// A seat and its controls.
     Seat,
+    /// A medical bed and its authored services.
     MedBed,
+    /// A Cargo Grid and its capacity operands.
     CargoGrid,
+    /// An authored logout or respawn interaction.
     Logout,
+    /// An outfit hanger and its interaction settings.
     OutfitHanger,
 }
 
@@ -84,7 +91,19 @@ enum FacilityFields<'source> {
 
 impl<'source> Facility<'source> {
     pub(super) const fn cargo_grid(&self) -> bool {
-        matches!(self.fields, FacilityFields::CargoGrid(_))
+        matches!(self.kind(), FacilityKind::CargoGrid)
+    }
+
+    /// Returns the exact authored facility family.
+    #[must_use]
+    pub const fn kind(&self) -> FacilityKind {
+        match self.fields {
+            FacilityFields::Seat(_) => FacilityKind::Seat,
+            FacilityFields::MedBed(_) => FacilityKind::MedBed,
+            FacilityFields::CargoGrid(_) => FacilityKind::CargoGrid,
+            FacilityFields::Logout(_) => FacilityKind::Logout,
+            FacilityFields::OutfitHanger(_) => FacilityKind::OutfitHanger,
+        }
     }
 
     /// Borrows the sourced kind declaration of this facility.
