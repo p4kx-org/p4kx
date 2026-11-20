@@ -17,6 +17,7 @@ mod items;
 pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
     check_family_aliases(catalog, Kind::BlueprintCategoryLists)?;
     check_family_aliases(catalog, Kind::BlueprintPools)?;
+    check_family_aliases(catalog, Kind::MissionLocalities)?;
     check_family_aliases(catalog, Kind::GameplayProperties)?;
     check_family_aliases(catalog, Kind::ReputationContexts)?;
     check_family_aliases(catalog, Kind::FactionReputations)?;
@@ -29,10 +30,7 @@ pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
         .into_iter()
         .filter(|kind| !kind.is_derived() && !matches!(kind, Kind::Contracts | Kind::Crafters));
     for kind in kinds {
-        let physical_aliases = matches!(
-            kind,
-            Kind::BlueprintCategoryLists | Kind::CargoManifests | Kind::MissionTypes
-        );
+        let physical_aliases = keeps_physical_aliases(kind);
         if physical_aliases {
             definition_identity::check(catalog, kind)?;
         }
@@ -73,6 +71,17 @@ pub(crate) fn check_unique_guids(catalog: &Value) -> TestResult {
         }
     }
     Ok(())
+}
+
+const fn keeps_physical_aliases(kind: Kind) -> bool {
+    matches!(
+        kind,
+        Kind::BlueprintCategoryLists
+            | Kind::CargoManifests
+            | Kind::MissionTypes
+            | Kind::MissionLocalities
+            | Kind::DismantleProcesses
+    )
 }
 
 fn check_contract_order(catalog: &Value) -> TestResult {
@@ -160,3 +169,7 @@ fn check_family_aliases(catalog: &Value, owner: Kind) -> TestResult {
 #[cfg(test)]
 #[path = "catalog_v3_blueprint_pool_identity_tests.rs"]
 mod pool_identity_tests;
+
+#[cfg(test)]
+#[path = "catalog_v3_mission_locality_identity_tests.rs"]
+mod locality_identity_tests;

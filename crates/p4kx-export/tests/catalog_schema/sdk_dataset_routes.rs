@@ -51,6 +51,8 @@ mod container_placements;
 mod contracts;
 #[path = "sdk_countermeasure_emitter_route.rs"]
 mod countermeasure_emitters;
+#[path = "sdk_dismantle_process_route.rs"]
+pub(super) mod dismantle;
 #[path = "sdk_facility_route.rs"]
 mod facilities;
 #[path = "../it/catalog_facility_medbed_fixture.rs"]
@@ -83,6 +85,8 @@ mod medical_tier;
 mod mineable_entity;
 #[path = "sdk_mining_family_routes.rs"]
 mod mining_families;
+#[path = "sdk_mission_locality_route.rs"]
+mod mission_locality;
 #[path = "sdk_mission_location_route.rs"]
 mod mission_location;
 #[path = "sdk_mission_type_route.rs"]
@@ -134,6 +138,11 @@ pub(super) fn law_datasets() -> impl Iterator<Item = &'static str> {
     law::PATHS.into_iter()
 }
 
+pub(super) fn mission_datasets() -> impl Iterator<Item = &'static str> {
+    use super::{MISSION_LOCATION_TEMPLATES as LOCATION_TEMPLATES, MISSION_TYPES};
+    [LOCATION_TEMPLATES, MISSION_TYPES, mission_locality::DATASET].into_iter()
+}
+
 pub(super) fn read() -> TestResult<Vec<Route>> {
     let (_directory, archive) = fixtures::open()?;
     let [containers, location_physics, loot_documents, unresolved] =
@@ -150,11 +159,13 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         magazine,
         read_weapon_recoil(&archive)?,
         countermeasure_emitters::read()?,
+        dismantle::read()?,
         weapon_animation::read()?,
         read_language_sources(&archive)?,
         read_location_entities(&archive)?,
         mission_location::read()?,
         mission_type::read()?,
+        mission_locality::read()?,
         read_shop_inventory(&archive)?,
         read_flare_library(&archive)?,
         read_faction_identities(&archive)?,

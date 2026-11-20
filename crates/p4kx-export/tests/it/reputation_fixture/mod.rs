@@ -264,7 +264,9 @@ fn database(high_drift_hours: f32) -> DataForgeBuilder {
             TestValue::Array(vec![
                 TestValue::Reference(PLAIN_A),
                 TestValue::Reference(MISSING),
+                TestValue::Null,
                 TestValue::Reference(PLAIN_B),
+                TestValue::Reference(PLAIN_A),
             ]),
         ),
         record(PLAIN_A, "Placeholder", "a", "misc/a"),

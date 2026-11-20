@@ -178,7 +178,7 @@ pub(super) fn dismantle(guid: u128, name: &str) -> TestRecord {
                 TestValue::Struct(
                     TestInstance::new("GenericCraftingProcess_Dismantle")
                         .value("efficiency", TestValue::Single(0.5))
-                        .value("dismantleTime", time(0, 15.0)),
+                        .value("dismantleTime", time(0, 14.75)),
                 ),
             ),
         ),

@@ -69,14 +69,21 @@ fn a_locality_and_its_pickup_places_retain_every_resolved_object() -> TestResult
     let contract = entry(&catalog, B, None)?;
     assert_eq!(contract["pickupPlaces"].as_array().map(Vec::len), Some(7));
     assert_eq!(contract["offeredAt"]["localityGuids"], json!([LOC_B]));
-    let localities = catalog["missionLocalities"]
-        .as_array()
+    let localities = catalog
+        .pointer("/definitions/missionLocalities/rows")
+        .and_then(Value::as_array)
         .ok_or("localities")?;
     let all = localities
         .iter()
-        .find(|locality| locality["guid"] == LOC_B)
+        .find(|locality| locality.pointer("/guid/value") == Some(&json!(LOC_B)))
         .ok_or("locality")?;
-    assert_eq!(all["starmapObjectGuids"].as_array().map(Vec::len), Some(7));
+    assert_eq!(
+        all.pointer("/availableLocations/value")
+            .and_then(Value::as_array)
+            .map(Vec::len),
+        Some(7),
+        "the original locality contains the same authored slots"
+    );
     Ok(())
 }
 

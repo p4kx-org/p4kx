@@ -268,7 +268,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.qualityDistributions` | Physical distribution and location-override source declarations with exact numbers and immediate per-field origins ([contract](catalog-quality.md)) |
 | `definitions.qualityQuantizations`, `projections.qualityQuantizationResources` | Ordered raw bands, explicit eligibility and the genuine first-eligible nominal-GUID resource inverse ([contract](catalog-quality.md)) |
 | `definitions.blueprintPools`, `projections.blueprintPoolWeights`, `declarations.blueprintRewardSources` | Physical Blueprint pools, derived weight sums and original declarations that reference those pools |
-| `dismantleProcesses` | The dismantle processes, ordered by GUID |
+| `definitions.dismantleProcesses` | Physical generic dismantle process Records with sourced original settings and derived duration |
 | `paints` | The paints, each the `itemGuid` of an entry of `items` with the ships it fits, ordered by `itemGuid` |
 | `loadouts` | The ports of every ship and of every item that has ports, with the Entity the Default Loadout attaches to each, ordered by `entityGuid` |
 | `definitions.starmapObjects` | Authored starmap objects with original links, presentation and navigation settings, ordered by GUID and physical Record index |
@@ -306,7 +306,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.locationClasses`, `definitions.locationFunctions`, `definitions.locationSizes` and `definitions.locationRegistries` | Physical definitions and ordered registry members for mission location classification. [Location vocabulary](catalog-location-vocabulary.md) |
 | `definitions.reputationContexts` | Physical reputation contexts with authored scope order, original references and display properties |
 | `definitions.missionTypes` | Physical mission-type definitions, linked by `contracts[].missionTypeGuid`, in GUID order |
-| `missionLocalities` | The mission localities, named sets of starmap objects, ordered by GUID |
+| `definitions.missionLocalities` | Physical locality Records with ordered original location references and per-field origins |
 | `contractScenarios` | The contract scenarios with the reward tiers of each faction, ordered by GUID |
 | `cargoManifests` | `definitions.cargoManifests`, the physical cargo manifests with their fill and spawn rules |
 | `missionLocationTemplates` | The mission location templates with the tags a location query matches, ordered by GUID |
@@ -935,7 +935,7 @@ matches the record path and marks selected-kind scope partial independently of s
 | `definitions.blueprintPools` | Physical `BlueprintPoolRecord` owners with the shared sourced header and ordered `blueprintRewards`. Each slot keeps its concrete type, original `blueprintRecord` Reference and exact `weight`. Local `additionalFields` arenas preserve remaining owner and slot declarations. References can resolve to Blueprint owners outside the current selection. |
 | `projections.blueprintPoolWeights` | `pool` identifies the physical owner by input, original `recordIndex` and nominal `guid`. `totalWeight` is the sourced f32 sum of positive finite decoded weights in slot order. It carries raw bits even when accumulation overflows. |
 | `declarations.blueprintRewardSources` | One row per observed direct scalar Record link to a selected pool. `poolStorage` distinguishes `reference` from a foreign Record root `weakPointer`. Local and self weak pointers are excluded. The sourced header identifies the enclosing Record and `sourceOrdinal` identifies the occurrence within it. `pool` preserves the authored link and `chance` keeps its original numeric storage and source state. |
-| `dismantleProcesses` | `efficiency` (0.5 on LIVE) and `timeSeconds` (15 on LIVE) of the `GenericCraftingProcess_Dismantle` |
+| `definitions.dismantleProcesses` | `blueprint.value.processSpecificData.value` carries the authored `efficiency` and the four original `dismantleTime` components with numeric storage and origins. Derived `timeSeconds` cites the converted inputs and is a signed decimal string |
 
 `contractId` comes from the nearest enclosing owner with a readable GUID `id`, including the
 Record root. `contractName` takes that owner's `debugName`. When no owner has a readable GUID
@@ -1252,7 +1252,7 @@ that the rule on equal `guid` and `subContractGuid` above drops.
 | `missionTypeGuid`, `missionType` | The selected `MissionType` Record GUID and its sourced `GameTextRef` into `texts.gameTexts`. The reference keeps the exact original type name even when the definition is outside the Filter. It is `null` if the selected Record is unavailable. |
 | `contractor` | The sourced protected text reference for the `Contractor` parameter |
 | `pickupPlaces` | Every eligible resolved starmap object the contract is offered at, each `starmapObjectGuid`, `objectType` and the canonical name in `place` |
-| `offeredAt` | Every place the contract is offered at, uncapped (see "Offered at"): `localityGuids` (entries of `missionLocalities`) and `locations` (starmap objects, each `starmapObjectGuid`, `objectType`, `place`), and `brokerFallback` (`true` when `locations` is the broker entry's location because no place is stated) |
+| `offeredAt` | Every place the contract is offered at, uncapped (see "Offered at"): `localityGuids` (physical GUIDs in `definitions.missionLocalities.rows`) and `locations` (starmap objects, each `starmapObjectGuid`, `objectType`, `place`), and `brokerFallback` (`true` when `locations` is the broker entry's location because no place is stated) |
 | `faction` | The `factionReputation` of the handler as stored: `guid`, Record `name` and `displayName` (game text), `null` when the handler names none |
 | `giverFaction` | The faction of the contract and where it was found: `source` (`handler`, `reputationResult` or `reputationPrerequisite`) and `faction` (`guid`, `name`, `displayName`), `null` when none names one (see "Giver faction") |
 | `blueprintRewards` | The blueprint pools the contract hands out, each `poolGuid` (a nominal GUID in `definitions.blueprintPools`), `source` (`result` or `temporaryModifier`) and `chance` as stored, `null` for a modifier (see "Blueprint rewards") |
@@ -1359,7 +1359,7 @@ objects out leaves `pickupPlaces` empty.
 **Offered at (ADR-0273).** The same prerequisites as the pickup places, read as authored and
 without a filter on the object type. `localityGuids` lists the `MissionLocality` Record of each
 `ContractPrerequisite_Locality`, in stored order and none twice; a consumer reads its places in
-`missionLocalities[].starmapObjectGuids` and their names in `starmapObjects`. `locations` lists the
+`definitions.missionLocalities.rows[].availableLocations.value` and the names in `definitions.starmapObjects`. `locations` lists the
 object of each `ContractPrerequisite_Location` as stated. A star stays. For a selected object
 `place` carries the same canonical name cell as in `pickupPlaces`. An unresolved or filtered
 object retains its `starmapObjectGuid` and has `objectType` and `place` set to `null`. As for
@@ -1615,9 +1615,12 @@ field states, original values and selected source coordinates in one diagnostic 
 the available source and display forms. A missing, placeholder or literal name provides no
 reference. Every `missionTypeGuid` of `contracts` points to a mission type.
 
-**Mission localities (`missionLocalities`).** `starmapObjectGuids` are the `availableLocations` in
-stored order (218 on LIVE, all in `starmapObjects`). The game does not localise the name of a
-locality; the `className` (`Pyro`) is the only name.
+**Mission localities (`definitions.missionLocalities`).** Match each `offeredAt.localityGuids` value
+to `rows[].guid.value`. The authored `availableLocations` array retains its original order,
+including empty, repeated and dangling slots. A resolved slot carries the original reference GUID
+and separate target-header evidence. A dangling slot retains its GUID and resolution status.
+The game's name for the locality is its sourced `className`. Contract pickup places continue to
+use the resolved original members.
 
 **Contract scenarios (`contractScenarios`).** A `ScenarioProgress` Record. `factionRewardTiers`
 hold the authored `factionGuid`, which joins to `definitions.factions` when the row is present.
@@ -1876,7 +1879,7 @@ contract templates (see there).
 |-------|---------|
 | `guid`, `className`, `recordPath`, `notForRelease` | The Record and its flag as stored |
 | `debugName`, `title`, `hudTitle`, `description`, `missionGiver`, `commsChannelName`, `giverFragmentTags` | The `playerFacingDebugName`, the five game texts and the `missionGiverFragmentTags` |
-| `missionTypeGuid`, `locationGuid`, `localityGuid` | Links to `definitions.missionTypes.rows`, `starmapObjects` (the `locationMissionAvailable`) and `missionLocalities` |
+| `missionTypeGuid`, `locationGuid`, `localityGuid` | Links to `definitions.missionTypes.rows`, `starmapObjects` (the `locationMissionAvailable`) and `definitions.missionLocalities.rows` |
 | `giverGuid` | The `missionGiverRecord`; no kind lists these Records |
 | `invitationMissionGuid`, `linkedMissionGuid`, `associatedMissionGuids`, `requiredMissionGuids`, `unlessAvailableMissionGuids` | Links to entries of this kind (`invitationMission`, `linkedMission`, `associatedMissions`, `requiredMissions`, `onlyAvailableIfAllMissionsNotAvailable`); a GUID the Archive lacks is kept |
 | `journalEntriesOnComplete`, `journalEntriesOnRemove` | GUIDs of journal Records; no kind lists these |

@@ -16,6 +16,14 @@ pub use crate::catalog_v3::crafting_global::{
 pub use api::{with_global_params, with_global_params_from};
 pub use snapshot::CraftingGlobalSnapshot;
 
+#[path = "dismantle_process_query.rs"]
+mod dismantle;
+pub use dismantle::{
+    DismantleBlueprint, DismantleConfiguration, DismantleProcessDefinition,
+    DismantleProcessSnapshot, DismantleTime, with_dismantle_processes,
+    with_dismantle_processes_from,
+};
+
 #[path = "blueprint_pool_query_api.rs"]
 mod pool_api;
 #[path = "blueprint_pool_query_read.rs"]

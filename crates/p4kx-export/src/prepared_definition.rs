@@ -64,9 +64,24 @@ impl<'source, T> PreparedDefinition<'source, T> {
     ) -> Result<(Self, Vec<FieldError>), CatalogError> {
         let scope = input.record_scope(admission.record(), tree)?;
         let originals = OriginalFlowFields::read(&scope, cancel)?;
-        let capture = TemplateFieldCapture::new(&originals, input, admission)?;
+        Self::read_with_fields(tree, input, admission, &originals, project)
+    }
+
+    pub(super) fn read_with_fields(
+        tree: &RecordTree<'source>,
+        input: &OriginalCatalogInput<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        originals: &OriginalFlowFields<'_, '_, 'source>,
+        project: impl FnOnce(
+            CanonicalRecordHeader<'source>,
+            Observed<'_, '_, '_, 'source>,
+            &mut Vec<FieldError>,
+        ) -> Result<T, CatalogError>,
+    ) -> Result<(Self, Vec<FieldError>), CatalogError> {
+        admission.check_tree(tree)?;
+        let capture = TemplateFieldCapture::new(originals, input, admission)?;
         let numbers = RefCell::new(Vec::new());
-        let fields = Observed::definition(&originals, input, &capture, &numbers);
+        let fields = Observed::definition(originals, input, &capture, &numbers);
         let mut notes = Vec::new();
         let source = CanonicalRecordHeader::read(tree, input.origins())?;
         let definition = project(source, fields, &mut notes)?;

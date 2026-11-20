@@ -178,8 +178,8 @@ fn a_blueprint_links_no_dismantle_process_a_filter_left_out() -> TestResult {
     let filter = Filter::new("*/bp_craft_two_tiers");
     let (_, filtered) = build_from(&fixture::database(), Some(&filter))?;
     assert_eq!(
-        filtered["dismantleProcesses"],
-        json!([]),
+        filtered.pointer("/definitions/dismantleProcesses/rows"),
+        Some(&json!([])),
         "the process is out"
     );
     assert_eq!(

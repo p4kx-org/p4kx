@@ -187,6 +187,10 @@ fn verify_catalog(path: &Path, baselined: bool) -> Result<Value, Box<dyn Error>>
                 | Kind::BlueprintCategories
                 | Kind::BlueprintCategoryLists
                 | Kind::GameplayProperties
+                | Kind::CargoManifests
+                | Kind::MissionTypes
+                | Kind::MissionLocalities
+                | Kind::DismantleProcesses
                 | Kind::ReputationContexts
                 | Kind::FactionReputations
                 | Kind::ReputationScopes
@@ -212,6 +216,7 @@ fn verify_catalog(path: &Path, baselined: bool) -> Result<Value, Box<dyn Error>>
         || !list(&catalog, Kind::GameplayProperties)?.is_empty()
         || !list(&catalog, Kind::ExplosionDefinitions)?.is_empty()
         || !list(&catalog, Kind::AmmoDefinitions)?.is_empty()
+        || !list(&catalog, Kind::MissionLocalities)?.is_empty()
     {
         let entry = DataForgeEntry::read(&archive)?;
         let forge = entry.open()?;
@@ -220,6 +225,7 @@ fn verify_catalog(path: &Path, baselined: bool) -> Result<Value, Box<dyn Error>>
         definition_identity::check_original_properties(&catalog, &forge)?;
         definition_identity::check_original_explosions(&catalog, &forge)?;
         definition_identity::check_original_ammo(&catalog, &forge)?;
+        definition_identity::check_original_localities(&catalog, &forge)?;
     }
     check_leftovers(&catalog)?;
     check_texts(&archive, &catalog, baselined)?;
@@ -265,6 +271,7 @@ fn check_leftovers(catalog: &Value) -> TestResult {
                         | Kind::ResourceTypes
                         | Kind::QualityDistributions
                         | Kind::QualityQuantizations
+                        | Kind::MissionLocalities
                 ) {
                     catalog_v3_consumer::field(entity, kind, field)?
                         .as_str()

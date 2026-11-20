@@ -20,6 +20,7 @@ use crate::catalog_v3::faction_definition::FactionDefinition;
 use crate::catalog_v3::faction_identity_definition::FactionIdentityDefinition;
 use crate::catalog_v3::flare_library::FlareLibrary;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
+use crate::catalog_v3::industry_modules::dismantle_process_definition::DismantleProcessDefinition;
 use crate::catalog_v3::inventory_container_definition::InventoryContainerDefinition;
 use crate::catalog_v3::law_kinds::LawTables;
 use crate::catalog_v3::location_vocabulary::LocationVocabularyTables;
@@ -114,6 +115,7 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) items: StagedCatalogTable,
     #[schemars(with = "CatalogTable<crate::blueprint_definition::BlueprintDefinition<'source>>")]
     pub(crate) blueprints: StagedCatalogTable,
+    pub(crate) dismantle_processes: CatalogTable<DismantleProcessDefinition<'source>>,
     #[schemars(with = "CatalogTable<GeneratorDefinition<'source>>")]
     pub(crate) contract_generators: StagedCatalogTable,
     pub(crate) cargo_manifests: CatalogTable<CargoManifestDefinition<'source>>,
@@ -124,6 +126,9 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) mission_scenarios:
         CatalogTable<super::mission_scenario_definition::MissionScenarioDefinition<'source>>,
     pub(crate) mission_types: CatalogTable<crate::contract_mission_data::MissionType<'source>>,
+    pub(crate) mission_localities: CatalogTable<
+        crate::catalog_v3::mission_locality_definition::MissionLocalityDefinition<'source>,
+    >,
     #[schemars(with = "CatalogTable<TemplateDefinition<'source>>")]
     pub(crate) contract_templates: StagedCatalogTable,
     #[schemars(with = "CatalogTable<BrokerDefinition<'source>>")]

@@ -14,6 +14,7 @@ pub(super) const fn uses_owned_number(kind: Kind) -> bool {
             Kind::Blueprints
                 | Kind::Ships
                 | Kind::BlueprintPools
+                | Kind::DismantleProcesses
                 | Kind::Items
                 | Kind::ExplosionDefinitions
                 | Kind::AmmoDefinitions
@@ -35,6 +36,7 @@ pub(super) const fn uses_owned_number(kind: Kind) -> bool {
                 | Kind::Jurisdictions
                 | Kind::SecurityNetworkManifests
                 | Kind::CargoManifests
+                | Kind::MissionLocalities
                 | Kind::MissionScenarios
                 | Kind::MissionModuleDeclarations
                 | Kind::MissionItems
@@ -119,6 +121,7 @@ const fn uses_authored_raw_number(kind: Kind) -> bool {
         kind,
         Kind::Ships
             | Kind::BlueprintPools
+            | Kind::DismantleProcesses
             | Kind::AmmoDefinitions
             | Kind::InventoryContainers
             | Kind::MedicalItemTierConfigs
@@ -138,6 +141,7 @@ const fn uses_authored_raw_number(kind: Kind) -> bool {
             | Kind::Jurisdictions
             | Kind::SecurityNetworkManifests
             | Kind::CargoManifests
+            | Kind::MissionLocalities
             | Kind::MissionScenarios
             | Kind::MissionModuleDeclarations
             | Kind::MissionItems

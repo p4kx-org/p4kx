@@ -154,12 +154,24 @@ pub(super) fn mission_type_text() -> serde_json::Value {
 }
 
 pub(super) fn localities() -> serde_json::Value {
-    json!([{
-        "guid": "64000000-0000-4000-8000-000000000001",
-        "className": "pyro",
-        "recordPath": "libs/foundry/records/missiondata/pu_missionlocality/pyro",
-        "starmapObjectGuids": ["a2000000-0000-4000-8000-000000000001"]
-    }])
+    json!({"availability": "available", "rows": [{
+        "guid": values::present(json!("64000000-0000-4000-8000-000000000001")),
+        "recordName": values::present(json!("MissionLocality.pyro")),
+        "className": values::present(json!("pyro")),
+        "recordPath": values::present(json!("libs/foundry/records/missiondata/pu_missionlocality/pyro")),
+        "recordIndex": values::present(json!(1)),
+        "sourceType": values::present(json!("MissionLocality")),
+        "fileName": values::present(json!("libs/foundry/records/missiondata/pu_missionlocality/pyro.xml")),
+        "metadataTag": values::source(SourceValue::Absent),
+        "availableLocations": values::present(json!([values::present(json!({
+            "guid": values::present(json!("a2000000-0000-4000-8000-000000000001")),
+            "targetRecordIndex": values::present(json!(2)),
+            "recordPath": values::present(json!("libs/foundry/records/starmap/pu/fixture")),
+            "targetType": values::present(json!("StarMapObject")),
+            "status": "present"
+        }))])),
+        "authoredFields": {"roots": [], "values": []}
+    }]})
 }
 
 pub(super) fn scenarios() -> serde_json::Value {

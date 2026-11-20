@@ -101,7 +101,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | qualityDistributions | D.qualityDistributions | complete physical declarations, exact numeric tokens and ordered nullable overrides; shared eight-field header and inline/recordRef/emptyBase forms ([contract](catalog-quality.md)) |
 | qualityQuantizations | D.qualityQuantizations; V.qualityQuantizationResources | all ordered raw bands and physical alternatives; genuine first-eligible nominal-GUID inverse, explicit eligibility and independent per-value sources ([contract](catalog-quality.md)) |
 | blueprintPools | D.blueprintPools; V.blueprintPoolWeights; A.blueprintRewardSources | Physical pool owners, original ordered reward slots, exact weights and authored references, physical-owner weight sums and observed original pool references |
-| dismantleProcesses | D.dismantleProcesses | costs/results, original units/links |
+| dismantleProcesses | D.dismantleProcesses | physical process header, exact efficiency and duration components with derived whole seconds |
 | craftingGlobal | C.craftingGlobal | true global parameters, explicit presence/owner |
 | paints | D.paints; A.paintShipCompatibility | item identity plus fit relationship |
 | loadouts | C.itemPorts; P.loadoutItems | source definitions/restrictions vs resolved default attachments/full path/parent and merge evidence |
@@ -130,7 +130,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | reputationRewardAmounts | D.reputationRewardAmounts | physical reward amount Records with their exact signed amounts |
 | reputationContexts | D.reputationContexts | physical contexts, authored sort order, ordered scope occurrences, protected and original dynamic display properties |
 | missionTypes | D.missionTypes | canonical physical Record headers, per-field provenance and protected source text |
-| missionLocalities | D.missionLocalities | stored starmap-object membership |
+| missionLocalities | D.missionLocalities | sourced physical Record headers and ordered available-location slots with original target resolution |
 | missionScenarios | D.missionScenarios | physical MissionScenario identity, authored variables, cycles, schedule and flags |
 | contractScenarios | D.contractScenarios | faction reward tiers/progression, source flags, no active state |
 | lootTables | D.lootTables | weighted archetype links/order |

@@ -8,6 +8,9 @@ use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_v3::gameplay_property_catalog::{self as gameplay, GameplayPropertyInput};
+use crate::catalog_v3::industry_modules::dismantle_process_definition::{
+    self, PreparedDismantleProcess,
+};
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::ExportLedger;
 use crate::quality_catalog::evidence::Evidence;
@@ -15,12 +18,14 @@ use crate::quality_catalog::{Input, Retention, Step, scan};
 use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
 use crate::record_observation::RecordObservation;
 
+use super::projection::Piece;
 use super::selection::{self, Action, ReadPolicy, Selection};
 
 #[derive(Default)]
 pub(super) struct CraftingRules<'source> {
     pub(super) rules: crate::blueprint_rule_inputs::BlueprintRules,
     pub(super) global: Option<crate::catalog_v3::crafting_global::PreparedCraftingGlobal<'source>>,
+    pub(super) dismantle: Option<Box<PreparedDismantleProcess<'source>>>,
 }
 
 /// Independent current consumers of the shared crafting selection and canonical read.
@@ -197,7 +202,7 @@ impl<'context, 'source> ReadMode<'context, 'source> {
         tree: &RecordTree<'source>,
         ledger: &mut ExportLedger,
         cancel: Option<&CancelToken>,
-    ) -> Result<Option<super::projection::Piece<'source>>, CatalogError> {
+    ) -> Result<Option<Piece<'source>>, CatalogError> {
         if selected.action != Action::Pool || selected.policy == ReadPolicy::SkipAfter {
             return Ok(None);
         }
@@ -215,7 +220,7 @@ impl<'context, 'source> ReadMode<'context, 'source> {
             found.notes,
             ledger,
         )?;
-        Ok(Some(super::projection::Piece::CanonicalPool {
+        Ok(Some(Piece::CanonicalPool {
             prepared: Box::new(found.prepared),
             interpreted: found.interpreted,
         }))
@@ -223,14 +228,14 @@ impl<'context, 'source> ReadMode<'context, 'source> {
 
     pub(super) fn blueprint_rules(
         self,
-        action: Action,
+        selected: Selection,
         admission: &RecordObservation<'_, 'source>,
         tree: &RecordTree<'source>,
+        piece: Option<&Piece<'source>>,
         ledger: &mut ExportLedger,
         cancel: Option<&CancelToken>,
     ) -> Result<CraftingRules<'source>, CatalogError> {
-        use crate::blueprint_rule_inputs::BlueprintRules;
-        match (self.input(), action) {
+        match (self.input(), selected.action) {
             (Some(input), Action::Globals) => {
                 let found =
                     crate::catalog_v3::crafting_global::read(tree, input, admission, cancel)?;
@@ -243,12 +248,35 @@ impl<'context, 'source> ReadMode<'context, 'source> {
                 Ok(CraftingRules {
                     rules: found.rules,
                     global: Some(found.prepared),
+                    dismantle: None,
                 })
             }
-            (Some(input), Action::Dismantle) => Ok(CraftingRules {
-                rules: BlueprintRules::read_dismantle(tree, admission, input, cancel)?,
-                global: None,
-            }),
+            (Some(input), Action::Dismantle) => {
+                let process = match piece {
+                    Some(Piece::Dismantle(process))
+                        if selected.role == ExportSourceRole::Selected
+                            && selected.policy == ReadPolicy::Read =>
+                    {
+                        Some(process)
+                    }
+                    _ => None,
+                };
+                let found =
+                    dismantle_process_definition::read(tree, input, admission, process, cancel)?;
+                crate::source_projection_notes::record(
+                    crate::Kind::DismantleProcesses,
+                    selected.role,
+                    admission,
+                    tree,
+                    found.notes,
+                    ledger,
+                )?;
+                Ok(CraftingRules {
+                    rules: found.rules,
+                    global: None,
+                    dismantle: found.definition.map(Box::new),
+                })
+            }
             _ => Ok(CraftingRules::default()),
         }
     }

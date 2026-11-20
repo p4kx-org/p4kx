@@ -84,8 +84,17 @@ impl BlueprintRules {
     ) -> Result<Self, CatalogError> {
         let scope = input.record_scope(admission.record(), tree)?;
         let fields = OriginalFlowFields::read(&scope, cancel)?;
-        let process = BlueprintField::read(&fields, tree.root(), "blueprint")?
-            .child("processSpecificData")?;
+        Self::dismantle_fields(tree, admission, input, &fields)
+    }
+
+    pub(crate) fn dismantle_fields<'source>(
+        tree: &RecordTree<'source>,
+        admission: &RecordObservation<'_, 'source>,
+        input: &OriginalCatalogInput<'_, 'source>,
+        fields: &OriginalFlowFields<'_, '_, 'source>,
+    ) -> Result<Self, CatalogError> {
+        let process =
+            BlueprintField::read(fields, tree.root(), "blueprint")?.child("processSpecificData")?;
         let context = input.record_context(admission.record())?;
         let mut selectors = Vec::new();
         for header in [

@@ -23,10 +23,8 @@ pub(crate) mod authored_fields;
 mod authored_link;
 #[path = "authored_nodes.rs"]
 mod authored_nodes;
-
 #[path = "cargo_manifest.rs"]
 pub(crate) mod cargo_manifest;
-
 #[path = "catalog_harvest_modules.rs"]
 pub(crate) mod catalog_harvest_modules;
 
@@ -92,6 +90,8 @@ pub(crate) mod location_entity_declaration;
 pub(crate) mod location_vocabulary;
 #[path = "location_vocabulary_definition.rs"]
 mod location_vocabulary_definition;
+#[path = "mission_locality_definition.rs"]
+pub(crate) mod mission_locality_definition;
 #[path = "mission_scenario_definition.rs"]
 pub(crate) mod mission_scenario_definition;
 #[path = "npc_spawn_definition.rs"]

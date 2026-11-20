@@ -26,6 +26,7 @@ use crate::catalog_v3::catalog_resource_network_read::resource_network_global::P
 use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
 use crate::catalog_v3::faction_definition::PreparedFaction;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
+use crate::catalog_v3::industry_modules::dismantle_process_definition::PreparedDismantleProcess;
 use crate::catalog_v3::inventory_container_definition::PreparedInventoryContainer;
 use crate::catalog_v3::law_kinds::LawKinds;
 use crate::catalog_v3::location_vocabulary::LocationVocabulary;
@@ -36,10 +37,10 @@ use crate::catalog_v3::npc_spawn_definitions::NpcSpawnDefinitions;
 use crate::catalog_v3::procedural_planet_audio::PreparedPlanetAudio;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitions;
 use crate::contract::{
-    Commodity, ContractEntry, Crafter, DismantleProcess, HarvestableLocation,
-    HarvestableProviderPreset, Item, LootContainer, MineableComposition, MineableElement,
-    MineableEntity, MiningGlobalParams, Paint, RefiningProcess, ResourceGroup, ResourceType, Ship,
-    Shop, StarmapObject, SubHarvestableMultiConfig,
+    Commodity, ContractEntry, Crafter, HarvestableLocation, HarvestableProviderPreset, Item,
+    LootContainer, MineableComposition, MineableElement, MineableEntity, MiningGlobalParams, Paint,
+    RefiningProcess, ResourceGroup, ResourceType, Ship, Shop, StarmapObject,
+    SubHarvestableMultiConfig,
 };
 use crate::crafting_warning::CraftingWarning;
 use crate::entity_spawn_model::EntitySpawnPool;
@@ -108,7 +109,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) blueprint_pools: Vec<crate::catalog_v3::industry_modules::blueprint_pool_definition::PreparedBlueprintPool<'f>>,
     pub(crate) blueprint_reward_sources: Vec<crate::catalog_v3::industry_modules::blueprint_reward_source::BlueprintRewardSource<'f>>,
     pub(crate) blueprint_reward_numbers: Vec<crate::catalog_number_capture::CapturedNumber>,
-    pub(crate) dismantle_processes: Vec<DismantleProcess<'f>>,
+    pub(crate) dismantle_processes: Vec<PreparedDismantleProcess<'f>>,
     pub(crate) crafting_global: Vec<crate::catalog_v3::crafting_global::PreparedCraftingGlobal<'f>>,
     pub(crate) paints: Vec<Paint>,
     pub(crate) loadouts: StagedLoadouts,

@@ -29,8 +29,8 @@ mod reputation_scope;
 mod sdk;
 
 use crate::reputation_fixture::{
-    CONTEXT, FACTION, LEGACY_FACTION, LOCALITY, MISSION_TYPE, PLAIN_A, PLAIN_B, SCENARIO, SCOPE,
-    STANDING_HIGH, STANDING_LOW, write_archive, write_archive_with_drift,
+    CONTEXT, FACTION, LEGACY_FACTION, LOCALITY, MISSING, MISSION_TYPE, PLAIN_A, PLAIN_B, SCENARIO,
+    SCOPE, STANDING_HIGH, STANDING_LOW, write_archive, write_archive_with_drift,
 };
 
 use crate::health_origin_assertions as proof;
@@ -269,12 +269,57 @@ fn a_mission_type_and_a_locality_keep_their_links() -> TestResult {
         row.pointer("/translations/value/en/displayText/value"),
         Some(&json!("Job")),
     );
-    assert_eq!(
-        entry(&catalog, "missionLocalities", LOCALITY)?["starmapObjectGuids"],
-        json!([guid(PLAIN_A), guid(PLAIN_B)]),
-        "a Reference to no Record is left out"
-    );
-    Ok(())
+    check_locality(&catalog)
+}
+
+fn check_locality(catalog: &Value) -> TestResult {
+    let [row] = proof::rows(catalog, "/definitions/missionLocalities/rows")? else {
+        return Err("exactly one physical locality".into());
+    };
+    let identity = proof::present(row, "guid", &json!(guid(LOCALITY)), Some(true))?;
+    let index = serde_json::from_value::<u32>(proof::at(row, "/recordIndex/value")?.clone())?;
+    proof::header(catalog, identity, index, "guid", "payload", "archiveEntry")?;
+    let slots = proof::rows(row, "/availableLocations/value")?;
+    let expected = [
+        Some((PLAIN_A, "present")),
+        Some((MISSING, "dangling")),
+        None,
+        Some((PLAIN_B, "present")),
+        Some((PLAIN_A, "present")),
+    ];
+    assert_eq!(slots.len(), expected.len(), "every original slot survives");
+    for (ordinal, (slot, expected)) in slots.iter().zip(expected).enumerate() {
+        let slot_number = ordinal + 1;
+        let field = if matches!(expected, Some((_, "dangling"))) {
+            "$error.guid"
+        } else {
+            "$value"
+        };
+        let location = json!({
+            "type": "subresource",
+            "namespace": "dataforgeValue",
+            "indices": [index.to_string(), slot_number.to_string()],
+            "field": field
+        });
+        let inputs = proof::uses(catalog, slot)?;
+        assert!(
+            inputs
+                .iter()
+                .any(|used| used["location"] == location && used["role"] == "selector"),
+            "each reference slot retains its exact original array coordinate"
+        );
+        if let Some((target, status)) = expected {
+            let link = proof::at(slot, "/value")?;
+            proof::present(link, "guid", &json!(guid(target)), Some(true))?;
+            assert_eq!(
+                link["status"], status,
+                "the target resolution state survives"
+            );
+        } else {
+            assert_eq!(slot["state"], "null", "the empty authored slot survives");
+        }
+    }
+    proof::closure(catalog)
 }
 
 #[test]

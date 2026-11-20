@@ -4,7 +4,7 @@
 use p4kx_extraction::RecordTree;
 
 use super::SelectedProjection;
-use crate::catalog_v3::cargo_manifest;
+use crate::catalog_v3::{cargo_manifest, mission_locality_definition};
 use crate::mission_kinds::MissionPick;
 use crate::picked::Picked;
 use crate::record_observation::RecordObservation;
@@ -26,6 +26,23 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
         Ok((
             Picked::Mission(MissionPick::Type(Box::new(definition))),
             Vec::new(),
+        ))
+    }
+
+    pub(super) fn mission_locality_definition(
+        &self,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
+        let (definition, notes) = mission_locality_definition::read(
+            tree,
+            self.projection.original(),
+            admission,
+            self.scan.options.cancel,
+        )?;
+        Ok((
+            Picked::Mission(MissionPick::Locality(Box::new(definition))),
+            notes,
         ))
     }
 

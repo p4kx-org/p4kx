@@ -38,6 +38,10 @@ pub(super) fn check_rows(rows: &[Value], kind: Kind) -> TestResult {
             Kind::BlueprintCategoryLists => source_type == "BlueprintCategoryDatabaseRecord",
             Kind::CargoManifests => source_type == "CargoManifest",
             Kind::MissionTypes => source_type == "MissionType",
+            Kind::MissionLocalities => source_type == "MissionLocality",
+            Kind::DismantleProcesses => {
+                source_type == "CraftingBlueprintRecord" && dismantle_process(row)?
+            }
             Kind::GameplayProperties => source_type == "CraftingGameplayPropertyDef",
             Kind::ExplosionDefinitions => source_type == "ExplosionRecord",
             Kind::AmmoDefinitions => source_type == "AmmoParams",
@@ -59,6 +63,24 @@ pub(super) fn check_rows(rows: &[Value], kind: Kind) -> TestResult {
     Ok(())
 }
 
+fn dismantle_process(row: &Value) -> Result<bool, Box<dyn std::error::Error>> {
+    let path = catalog_v3_consumer::field(row, Kind::DismantleProcesses, "recordPath")?
+        .as_str()
+        .ok_or("the original dismantle source path")?;
+    let process = row
+        .pointer("/blueprint/value/processSpecificData/value")
+        .ok_or("the original dismantle process structure")?;
+    let source_type = catalog_v3_consumer::present(
+        process
+            .get("sourceType")
+            .ok_or("the concrete process type")?,
+    )?;
+    Ok(Kind::DismantleProcesses
+        .rule()
+        .is_some_and(|rule| rule.matches_path(path))
+        && source_type.as_str() == Some("GenericCraftingProcess_Dismantle"))
+}
+
 /// Checks each retained physical list against its original Record metadata.
 pub(super) fn check_original_lists(catalog: &Value, forge: &DataForge<'_>) -> TestResult {
     check_original(catalog, forge, Kind::BlueprintCategoryLists)
@@ -78,6 +100,11 @@ pub(super) fn check_original_ammo(catalog: &Value, forge: &DataForge<'_>) -> Tes
     check_original(catalog, forge, Kind::AmmoDefinitions)
 }
 
+/// Checks each locality header against its original physical Record.
+pub(super) fn check_original_localities(catalog: &Value, forge: &DataForge<'_>) -> TestResult {
+    check_original(catalog, forge, Kind::MissionLocalities)
+}
+
 /// Checks each Item projection against its actual original physical Record.
 pub(super) fn check_original_items(catalog: &Value, forge: &DataForge<'_>) -> TestResult {
     check_original(catalog, forge, Kind::Items)
@@ -90,6 +117,7 @@ fn check_original(catalog: &Value, forge: &DataForge<'_>, kind: Kind) -> TestRes
         Kind::GameplayProperties => "CraftingGameplayPropertyDef",
         Kind::ExplosionDefinitions => "ExplosionRecord",
         Kind::AmmoDefinitions => "AmmoParams",
+        Kind::MissionLocalities => "MissionLocality",
         _ => {
             return Err(
                 "original metadata check requires a declared physical source family".into(),

@@ -417,6 +417,19 @@ reference. Use `snapshot.game_text(reference)` to look up its requested translat
 The query reads the selected mission types and their requested localization inputs.
 Use the per-field source uses and the snapshot's inventory to trace their origin.
 
+## Mission locality definitions
+
+Use `with_mission_localities`, its decoded-Entry variant or the parsed session
+method to read `definitions.missionLocalities` by physical Record index, GUID or
+for the dataset. The query reads selected locality Records and resolves original
+reference targets from their headers. The snapshot includes the Build, source
+inventory and Record coverage.
+
+Each row's `available_locations()` preserves its authored order, repeated
+occurrences, nulls and unresolved GUIDs. A resolved reference carries separate
+source evidence for the array slot and its target header. The query reads no
+localization or contract pickup projections.
+
 ## Mission location templates
 
 Use `with_mission_location_templates`, its `_from` variant or the parsed session method
@@ -1013,6 +1026,19 @@ cargo test --locked -p p4kx-export --test real_archive -- `
     fuel_capacity::sdk_witness::installed_fuel_sdk_preserves_original_values_link_slots_and_origins `
     --ignored --exact --test-threads=1
 ```
+
+## Original dismantle process definitions
+
+Use `crafting::with_dismantle_processes`, its decoded-Entry variant or a parsed
+session to read `definitions.dismantleProcesses` by GUID, physical Record index,
+or for the dataset. The query checks the process subtype inside each admitted
+Blueprint Record and retains its original owned fields and remaining authored
+members. Each duration component retains its numeric representation and source
+origin. The derived seconds cite the components used by the shared conversion.
+
+This query uses the selected process Records, with original referenced target
+headers where applicable. The snapshot's Record coverage distinguishes unreadable
+bodies or incomplete fields in that selection.
 
 ## Original crafting-global configuration
 

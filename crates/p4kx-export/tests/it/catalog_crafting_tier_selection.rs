@@ -69,7 +69,11 @@ fn a_filter_marks_the_crafting_kinds_partial_and_selects_by_record_path() -> Tes
             "no pool matches {path}"
         );
     }
-    assert_eq!(catalog["dismantleProcesses"], json!([]), "filtered by path");
+    assert_eq!(
+        catalog.pointer("/definitions/dismantleProcesses/rows"),
+        Some(&json!([])),
+        "filtered by path"
+    );
     assert_eq!(
         catalog["configurations"]["craftingGlobal"]["rows"][0]["dismantleBlacklistResources"]["value"]
             [0]["value"]["guid"]["value"],

@@ -23,7 +23,6 @@ use crate::source_fields::FieldError;
 mod mining_definition;
 #[path = "scan_definition_projection/mission_definition.rs"]
 mod mission_definition;
-
 impl<'f> SelectedProjection<'_, '_, '_, 'f> {
     pub(super) fn read_definition(
         &self,
@@ -192,6 +191,7 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
     ) -> Result<Option<(Picked<'f>, Vec<FieldError>)>, ScanError> {
         let projection = match kind {
             Kind::MissionTypes => self.mission_type_definition(admission, tree)?,
+            Kind::MissionLocalities => self.mission_locality_definition(admission, tree)?,
             Kind::FactionReputations => self.faction_reputation_definition(admission, tree)?,
             Kind::FactionIdentities => self.faction_identity_definition(admission, tree)?,
             Kind::Infractions

@@ -4,7 +4,6 @@
 //! Mission types, localities and scenarios in the installed catalog.
 
 use std::collections::HashSet;
-use std::error::Error;
 
 use p4kx_export::Kind;
 use serde_json::Value;
@@ -12,15 +11,6 @@ use serde_json::Value;
 use super::{TestResult, assert_resolve, catalog, list, print_line, text};
 use crate::real_archive_canonical_texts::{TextDomain, TextIndex, TextReferenceShape};
 use crate::real_archive_verification::guids as canonical_guids;
-
-fn named<'c>(catalog: &'c Value, kind: &str, class: &str) -> Result<&'c Value, Box<dyn Error>> {
-    list(catalog, kind)?
-        .iter()
-        .find(|entry| {
-            text(entry, "/className").is_some_and(|name| name.eq_ignore_ascii_case(class))
-        })
-        .ok_or_else(|| format!("{kind} has no {class}").into())
-}
 
 fn strings<'c>(entry: &'c Value, field: &str) -> Vec<&'c str> {
     entry[field]
@@ -68,7 +58,7 @@ fn check_mission_type_names(catalog: &Value, types: &[Value]) -> TestResult {
 fn mission_types_localities_and_scenarios_of_a_real_archive_are_linked() -> TestResult {
     let catalog = catalog()?;
     let types = crate::catalog_v3_consumer::rows(&catalog, Kind::MissionTypes)?;
-    let localities = list(&catalog, "missionLocalities")?;
+    let localities = crate::catalog_v3_consumer::rows(&catalog, Kind::MissionLocalities)?;
     let scenarios = list(&catalog, "contractScenarios")?;
     let objects = canonical_guids(&catalog, "starmapObjects")?;
     let pools = canonical_guids(&catalog, "blueprintPools")?;
@@ -82,10 +72,23 @@ fn mission_types_localities_and_scenarios_of_a_real_archive_are_linked() -> Test
     assert!(types.len() >= 30, "the mission types");
     check_mission_type_names(&catalog, types)?;
     assert_eq!(localities.len(), 20, "the mission localities");
-    let pyro = named(&catalog, "missionLocalities", "pyro")?;
+    let pyro = localities
+        .iter()
+        .find(|row| {
+            text(row, "/className/value").is_some_and(|name| name.eq_ignore_ascii_case("pyro"))
+        })
+        .ok_or("the canonical locality for Pyro")?;
     print_line(&format!("locality sample: {pyro}"));
     for locality in localities {
-        let listed = strings(locality, "starmapObjectGuids");
+        let slots = locality
+            .pointer("/availableLocations/value")
+            .and_then(Value::as_array)
+            .ok_or("the original location slots")?;
+        let listed = slots
+            .iter()
+            .filter(|slot| text(slot, "/value/status") == Some("present"))
+            .map(|slot| text(slot, "/value/guid/value").ok_or("resolved location GUID"))
+            .collect::<Result<Vec<_>, _>>()?;
         assert!(!listed.is_empty(), "a locality names objects");
         assert_resolve("the objects of a locality", listed, &objects);
     }

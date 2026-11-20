@@ -102,17 +102,19 @@ pub(super) fn tree<'f>(
             Ok(piece) => piece,
             Err(ProjectError::Catalog(error)) => return Err(error),
             Err(ProjectError::Source(error)) => {
-                return super::read::failure(
-                    selected,
-                    admission,
-                    Fault::Projection(&error),
-                    ledger,
-                    filter,
-                );
+                let fault = Fault::Projection(&error);
+                return super::read::failure(selected, admission, fault, ledger, filter);
             }
         }
     };
-    let rules = mode.blueprint_rules(selected.action, admission, tree, &mut ledger, cancel)?;
+    let rules = mode.blueprint_rules(
+        selected,
+        admission,
+        tree,
+        piece.as_ref(),
+        &mut ledger,
+        cancel,
+    )?;
     ledger.observe(selected.observation(admission, selected.successful_disposition())?);
     Ok(Tracked {
         piece,
@@ -120,6 +122,7 @@ pub(super) fn tree<'f>(
         gameplay,
         blueprint_rules: rules.rules,
         global: rules.global,
+        dismantle: rules.dismantle,
         quality: Step {
             input,
             ..Step::default()

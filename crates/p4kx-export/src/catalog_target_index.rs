@@ -197,6 +197,7 @@ const fn uses_physical_row_identity(kind: Kind) -> bool {
                 | Kind::SecurityNetworkManifests
                 | Kind::MissionScenarios
                 | Kind::CargoManifests
+                | Kind::MissionLocalities
                 | Kind::MissionModuleDeclarations
                 | Kind::MissionItems
                 | Kind::LocationClasses
@@ -219,6 +220,7 @@ const fn uses_physical_row_identity(kind: Kind) -> bool {
                 | Kind::Blueprints
                 | Kind::Ships
                 | Kind::BlueprintPools
+                | Kind::DismantleProcesses
                 | Kind::ExplosionDefinitions
                 | Kind::InventoryContainers
                 | Kind::MedicalItemTierConfigs

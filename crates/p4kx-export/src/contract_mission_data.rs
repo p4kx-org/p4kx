@@ -48,23 +48,6 @@ impl<'source> MissionType<'source> {
     }
 }
 
-/// A mission locality: a `MissionLocality` Record under `missiondata/pu_missionlocality`, a named
-/// set of starmap objects. The game does not localise its name.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct MissionLocality<'a> {
-    /// The GUID of the Record.
-    pub(crate) guid: CatalogGuid,
-    /// The Record name without its type, e.g. `pyro`.
-    pub(crate) class_name: &'a str,
-    /// The record path, without `.xml`.
-    pub(crate) record_path: &'a str,
-    /// The `availableLocations`, the `guid`s of entries of `starmapObjects`, in the stored order.
-    /// A Reference to no Record is left out; a GUID missing from `starmapObjects` is kept.
-    pub(crate) starmap_object_guids: Vec<CatalogGuid>,
-}
-
 /// A contract scenario: a `ScenarioProgress` Record under `contracts/contractscenarios`, the
 /// rewards a community progression hands out.
 #[derive(Debug, Serialize, JsonSchema)]

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{SourceUseRole, SourceValue, SourcedValue, StructValue, Value};
+use p4kx_extraction::{SourcedValue, StructValue, Value};
 
 use crate::blueprint_definition::PhysicalBlueprintRef;
 use crate::blueprint_field_source::{BlueprintField, normalize, value_ref};
@@ -9,7 +9,7 @@ use crate::blueprint_tier_contract::{
     BlueprintCost, BlueprintCostMeaning, BlueprintCostPosition, BlueprintTier,
 };
 use crate::catalog_projection::CatalogProjection;
-use crate::catalog_read::original::{OriginalFlowFields, OriginalValueFact, OriginalValuePart};
+use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_text_contract::GameTextRef;
 use crate::crafting_tier::InterpretedTier;
 use crate::crafting_types::{Cost, CostIndex};
@@ -157,46 +157,8 @@ fn craft_time<'source>(
     source: &StructValue<'source>,
     fields: &OriginalFlowFields<'_, '_, 'source>,
 ) -> Result<SourcedValue<ResourceInt64>, CatalogError> {
-    let field = BlueprintField::read(fields, source, "recipe")?
+    BlueprintField::read(fields, source, "recipe")?
         .child("costs")?
-        .child("craftTime")?;
-    let Some(fact) = field.fact() else {
-        return field.absent();
-    };
-    let Value::Struct(_) = fact.value() else {
-        return field.derived(|value| normalize(value, None));
-    };
-    let mut used = vec![fact.observe(OriginalValuePart::ConcreteType, SourceUseRole::Selector)?];
-    let mut unreadable = false;
-    let mut incomplete = false;
-    for part in ["days", "hours", "minutes", "seconds"] {
-        let part = field.child(part)?;
-        if let Some(value) = part.fact() {
-            let readable = !matches!(value.value(), Value::Error(_));
-            used.push(time_input(value, readable)?);
-            unreadable |= !readable;
-        } else {
-            incomplete = true;
-            used.push(fields.survey(Some(fact))?);
-        }
-    }
-    let result = match tier.tier.craft_time_seconds {
-        Some(value) => SourceValue::Present(ResourceInt64::new(value)),
-        None if unreadable => SourceValue::Unreadable,
-        None if incomplete => SourceValue::Absent,
-        None => SourceValue::Invalid,
-    };
-    Ok(fields.sources().value(result, &used, !unreadable))
-}
-
-fn time_input(
-    fact: &OriginalValueFact<'_, '_, '_>,
-    readable: bool,
-) -> Result<p4kx_extraction::SourceUse, CatalogError> {
-    let role = if readable {
-        SourceUseRole::Conversion
-    } else {
-        SourceUseRole::Attempted
-    };
-    fact.observe(OriginalValuePart::Value, role)
+        .child("craftTime")?
+        .duration_seconds(tier.tier.craft_time_seconds)
 }

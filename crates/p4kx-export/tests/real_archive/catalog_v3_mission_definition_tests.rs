@@ -3,14 +3,20 @@
 
 use p4kx_export::Kind;
 use p4kx_extraction::DataForge;
-use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct};
+use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 use serde_json::{Value, json};
 
 use crate::catalog_v3_consumer as reader;
 use crate::commodity_v3_fixture::{self as fixture, TestResult};
 use crate::real_archive_verification;
 
-const OWNERS: [(Kind, u128, &str, &str); 4] = [
+const BLUEPRINT_RECORD: &str = "CraftingBlueprintRecord";
+const BLUEPRINT: &str = "GenericCraftingBlueprint";
+const PROCESS_BASE: &str = "CraftingProcess";
+const DISMANTLE: &str = "GenericCraftingProcess_Dismantle";
+const CREATION: &str = "CraftingProcess_Creation";
+
+const OWNERS: [(Kind, u128, &str, &str); 5] = [
     (
         Kind::ContractTemplates,
         0x9e01,
@@ -35,21 +41,67 @@ const OWNERS: [(Kind, u128, &str, &str); 4] = [
         "MissionType",
         "libs/foundry/records/missiontype/Acceptance.xml",
     ),
+    (
+        Kind::DismantleProcesses,
+        0x9e05,
+        BLUEPRINT_RECORD,
+        "libs/foundry/records/crafting/blueprints/dismantle/Acceptance.xml",
+    ),
 ];
 
 fn database() -> DataForgeBuilder {
     OWNERS.iter().fold(
-        fixture::database(),
-        |builder, &(_, guid, source_type, file)| {
-            builder
-                .structure(TestStruct::new(source_type))
-                .record(TestRecord::new(
-                    guid,
-                    source_type,
-                    format!("{source_type}.Acceptance"),
-                    file,
-                ))
+        crafting_sources(fixture::database()),
+        |builder, &(kind, guid, source_type, file)| {
+            if kind == Kind::DismantleProcesses {
+                builder.record(blueprint(guid, file, DISMANTLE))
+            } else {
+                builder
+                    .structure(TestStruct::new(source_type))
+                    .record(TestRecord::new(
+                        guid,
+                        source_type,
+                        format!("{source_type}.Acceptance"),
+                        file,
+                    ))
+            }
         },
+    )
+}
+
+fn crafting_sources(database: DataForgeBuilder) -> DataForgeBuilder {
+    database
+        .structure(
+            TestStruct::new(BLUEPRINT_RECORD)
+                .field("blueprint", TestType::StrongPointer(BLUEPRINT.to_owned())),
+        )
+        .structure(TestStruct::new(BLUEPRINT).field(
+            "processSpecificData",
+            TestType::StrongPointer(PROCESS_BASE.to_owned()),
+        ))
+        .structure(TestStruct::new(PROCESS_BASE))
+        .structure(TestStruct::new(DISMANTLE).parent(PROCESS_BASE))
+        .structure(TestStruct::new(CREATION).parent(PROCESS_BASE))
+        .record(blueprint(
+            0x9e06,
+            "libs/foundry/records/crafting/blueprints/dismantle/Creation.xml",
+            CREATION,
+        ))
+}
+
+fn blueprint(guid: u128, file: &str, process: &str) -> TestRecord {
+    TestRecord::new(
+        guid,
+        BLUEPRINT_RECORD,
+        format!("{BLUEPRINT_RECORD}.Acceptance"),
+        file,
+    )
+    .value(
+        "blueprint",
+        TestValue::Struct(TestInstance::new(BLUEPRINT).value(
+            "processSpecificData",
+            TestValue::Struct(TestInstance::new(process)),
+        )),
     )
 }
 
@@ -87,6 +139,9 @@ fn mission_definition_inventory_uses_original_physical_headers() -> TestResult {
             "{kind} retains the original stored file name"
         );
         legacy_distraction(&catalog, kind, row)?;
+        if kind == Kind::DismantleProcesses {
+            rejects_other_blueprint_families(&catalog)?;
+        }
     }
     Ok(())
 }
@@ -116,6 +171,30 @@ fn canonical_contract_rows_are_required_even_when_the_population_is_empty() -> T
         reader::rows(&catalog, Kind::Contracts).is_err(),
         "a missing canonical table cannot become an empty successful population"
     );
+    Ok(())
+}
+
+fn rejects_other_blueprint_families(catalog: &Value) -> TestResult {
+    for (path, foreign) in [
+        (
+            "/recordPath/value",
+            "libs/foundry/records/crafting/blueprints/crafting/acceptance",
+        ),
+        (
+            "/blueprint/value/processSpecificData/value/sourceType/value",
+            CREATION,
+        ),
+    ] {
+        let mut false_catalog = catalog.clone();
+        let pointer = format!("/definitions/dismantleProcesses/rows/0{path}");
+        *false_catalog
+            .pointer_mut(&pointer)
+            .ok_or("authored identity field")? = json!(foreign);
+        assert!(
+            real_archive_verification::check_unique_guids(&false_catalog).is_err(),
+            "the canonical dismantle oracle rejects a wrong source family at {path}"
+        );
+    }
     Ok(())
 }
 

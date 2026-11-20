@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 
 use p4kx_extraction::{DataForge, DataForgeEntry, RecordTree, StructValue, Value as Raw};
 use p4kx_testkit::{TestInstance, TestRecord, TestValue};
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::catalog_crafting_support::blueprint;
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
@@ -57,6 +57,79 @@ fn absent_product_stops_dismantle_evidence_before_the_blacklist() -> TestResult 
         BTreeSet::from([sources.blueprint]),
         "the actual absent product is decisive before any other Record"
     );
+    Ok(())
+}
+
+#[test]
+fn dismantle_process_keeps_exact_duration_inputs_and_their_conversion() -> TestResult {
+    use crate::health_origin_assertions as proof;
+
+    let (catalog, sources) = observed(fixture::TWO_TIERS, Some(fixture::PRODUCT_A))?;
+    let [row] = proof::rows(&catalog, "/definitions/dismantleProcesses/rows")? else {
+        return Err("one physical dismantle definition".into());
+    };
+    let header = proof::present(
+        row,
+        "guid",
+        &json!(common::guid(fixture::DISMANTLE)),
+        Some(true),
+    )?;
+    proof::header(
+        &catalog,
+        header,
+        sources.process,
+        "guid",
+        "payload",
+        "archiveEntry",
+    )?;
+    let process = proof::at(row, "/blueprint/value/processSpecificData/value")?;
+    proof::present(
+        process,
+        "efficiency",
+        &json!({"type": "f32", "rawBits": "3f000000", "finite": 0.5}),
+        Some(true),
+    )?;
+    verify_dismantle_duration(&catalog, process, sources.process)?;
+    proof::closure(&catalog)
+}
+
+fn verify_dismantle_duration(catalog: &Value, process: &Value, record_index: u32) -> TestResult {
+    use crate::health_origin_assertions as proof;
+
+    let elapsed = proof::present(process, "timeSeconds", &json!("15"), Some(true))?;
+    let conversion_uses = proof::uses(catalog, elapsed)?;
+    let duration = proof::at(process, "/dismantleTime/value")?;
+    let zero = json!({"type": "int32", "value": 0});
+    let stored_seconds = json!({"type": "f32", "rawBits": "416c0000", "finite": 14.75});
+    for (field, expected) in [
+        ("days", &zero),
+        ("hours", &zero),
+        ("minutes", &zero),
+        ("seconds", &stored_seconds),
+    ] {
+        let cell = proof::present(duration, field, expected, Some(true))?;
+        let inputs = proof::uses(catalog, cell)?;
+        let payload = inputs
+            .iter()
+            .find(|used| {
+                used["role"] == "payload"
+                    && used.pointer("/location/field").and_then(Value::as_str) == Some("$value")
+            })
+            .ok_or("original duration component payload")?;
+        assert_eq!(
+            payload
+                .pointer("/location/indices/0")
+                .and_then(Value::as_str),
+            Some(record_index.to_string().as_str()),
+            "the original duration belongs to the selected physical process"
+        );
+        assert!(
+            conversion_uses.iter().any(|used| {
+                used["role"] == "conversion" && used["location"] == payload["location"]
+            }),
+            "the converted seconds cites the exact authored component {field}"
+        );
+    }
     Ok(())
 }
 

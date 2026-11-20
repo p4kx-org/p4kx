@@ -19,6 +19,7 @@ use crate::catalog_read::original::EntryCapture;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::catalog_independent_configurations;
 use crate::catalog_v3::catalog_resource_network_read::resource_network_global;
+use crate::catalog_v3::industry_modules::dismantle_process_definition as dismantle;
 use crate::catalog_v3::inventory_container_definition::table as inventory_table;
 use crate::catalog_v3::medical::medical_tier_config;
 use crate::catalog_v3::procedural_planet_audio;
@@ -199,6 +200,7 @@ pub(super) fn assemble<R>(
         definitions: CatalogDefinitions {
             items: collected.item_definitions.table,
             blueprints: blueprint_definitions,
+            dismantle_processes: dismantle::table(&forge, collected.dismantle_processes),
             blueprint_pools: pool_tables.definitions,
             shop_inventories: collected.shop_inventories,
             particle_libraries: collected.particle_libraries,
@@ -238,6 +240,7 @@ pub(super) fn assemble<R>(
             cargo_manifests: collected.mission_kinds.take_manifests(&forge),
             mission_scenarios: collected.mission_kinds.take_scenario_definitions(&forge),
             mission_types: collected.mission_kinds.take_types(&forge),
+            mission_localities: collected.mission_kinds.take_localities(&forge),
             mission_module_declarations: collected.mission_kinds.take_module_declarations(&forge),
             mission_items: collected.mission_kinds.take_items(&forge),
             contract_templates: collected.contract_templates.table,
@@ -350,7 +353,6 @@ pub(super) fn assemble<R>(
         },
         texts: finished_texts.texts,
         provenance: parts::freeze_provenance(&origins.uses, run)?,
-        dismantle_processes: collected.dismantle_processes,
         paints: collected.paints,
         loadouts: collected.loadouts,
         mineable_elements: collected.mineable_elements,
@@ -360,7 +362,6 @@ pub(super) fn assemble<R>(
         harvestable_locations: collected.harvestable_locations,
         loot_containers: collected.loot_containers,
         shops: collected.shops,
-        mission_localities: collected.mission_kinds.localities,
         contract_scenarios: collected.mission_kinds.scenarios,
         loot_tables: collected.loot_kinds.tables,
         loot_archetypes: collected.loot_kinds.archetypes,

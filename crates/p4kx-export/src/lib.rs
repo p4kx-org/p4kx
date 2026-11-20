@@ -133,7 +133,6 @@ mod contract_missions;
 mod contract_offer;
 mod contract_recovery;
 mod contract_reward;
-mod contract_rewards;
 mod contract_shops;
 mod contract_source;
 mod contract_starmap;

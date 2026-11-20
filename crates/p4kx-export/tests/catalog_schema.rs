@@ -168,11 +168,18 @@ fn the_schema_accepts_unknown_fields_and_kinds_but_not_unknown_versions() -> Tes
         json!("CFC0122D-5275-415A-A656-3DCB3346FEB5");
     assert!(!validator.is_valid(&upper_case), "lower-case GUIDs only");
 
-    for kind in ["items", "ships", "dismantleProcesses", "paints", "loadouts"] {
+    for kind in ["items", "ships", "paints", "loadouts"] {
         let mut unknown = catalog.clone();
         unknown[kind][0]["extra"] = json!(true);
         assert!(validator.is_valid(&unknown), "unknown fields in {kind}");
     }
+
+    let mut unknown_process = catalog.clone();
+    unknown_process["definitions"]["dismantleProcesses"]["rows"][0]["extra"] = json!(true);
+    assert!(
+        validator.is_valid(&unknown_process),
+        "unknown fields on a physical dismantle process remain extensible"
+    );
 
     let mut unknown_contract = catalog.clone();
     unknown_contract["projections"]["contracts"]["rows"][0]["extra"] = json!(true);

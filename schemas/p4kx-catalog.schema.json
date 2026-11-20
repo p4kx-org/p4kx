@@ -5584,6 +5584,9 @@
         "damageResistanceMacros": {
           "$ref": "#/$defs/CatalogTableOfDamageResistanceMacro"
         },
+        "dismantleProcesses": {
+          "$ref": "#/$defs/CatalogTableOfDismantleProcessDefinition"
+        },
         "ecosystems": {
           "$ref": "#/$defs/CatalogTableOfEcosystem"
         },
@@ -5691,6 +5694,9 @@
         },
         "missionItems": {
           "$ref": "#/$defs/CatalogTableOfMissionItemDefinition"
+        },
+        "missionLocalities": {
+          "$ref": "#/$defs/CatalogTableOfMissionLocalityDefinition"
         },
         "missionModuleDeclarations": {
           "$ref": "#/$defs/CatalogTableOfMissionModuleDeclaration"
@@ -5826,6 +5832,7 @@
         "contractTemplates",
         "creatures",
         "damageResistanceMacros",
+        "dismantleProcesses",
         "ecosystems",
         "encounterIndices",
         "explosionDefinitions",
@@ -5862,6 +5869,7 @@
         "miningLaserGlobals",
         "missionBrokerEntries",
         "missionItems",
+        "missionLocalities",
         "missionModuleDeclarations",
         "missionScenarios",
         "missionTypes",
@@ -6783,6 +6791,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/Degradation"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfDismantleProcessDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/DismantleProcessDefinition"
           },
           "type": "array"
         }
@@ -8075,6 +8102,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/MissionItemDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfMissionLocalityDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/MissionLocalityDefinition"
           },
           "type": "array"
         }
@@ -14523,44 +14569,131 @@
       ],
       "type": "object"
     },
-    "DismantleProcess": {
-      "description": "A generic dismantle process: a `CraftingBlueprintRecord` under `crafting/blueprints/dismantle`\nwhose process is a `GenericCraftingProcess_Dismantle`.",
+    "DismantleBlueprint": {
+      "description": "The owned blueprint containing a dismantle configuration.",
       "properties": {
-        "className": {
-          "description": "The Record name without its type.",
-          "type": "string"
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
         },
-        "efficiency": {
-          "description": "The share of the costs a dismantled item returns, 0 to 1, `null` when the Record holds\nnone.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "processSpecificData": {
+          "$ref": "#/$defs/SourcedValueOfDismantleConfiguration"
         },
-        "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
-        },
-        "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
-        },
-        "timeSeconds": {
-          "description": "The dismantle time in whole seconds, `null` when the Record holds none.",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         }
       },
       "required": [
-        "className",
+        "authoredFields",
+        "processSpecificData",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "DismantleConfiguration": {
+      "description": "The authored settings for a generic dismantle process.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "dismantleTime": {
+          "$ref": "#/$defs/SourcedValueOfDismantleTime"
+        },
+        "efficiency": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "timeSeconds": {
+          "$ref": "#/$defs/SourcedValueOfResourceInt64"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "dismantleTime",
         "efficiency",
-        "guid",
-        "recordPath",
+        "sourceType",
         "timeSeconds"
+      ],
+      "type": "object"
+    },
+    "DismantleProcessDefinition": {
+      "description": "A physical Blueprint Record defining a generic dismantle process.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "blueprint": {
+          "$ref": "#/$defs/SourcedValueOfDismantleBlueprint"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "blueprint",
+        "className",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
+        "recordPath",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "DismantleTime": {
+      "description": "The partitioned duration with exact original numeric cells.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "days": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "hours": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "minutes": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "seconds": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "days",
+        "hours",
+        "minutes",
+        "seconds",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -32015,34 +32148,51 @@
       ],
       "x-p4kx-vocabularyClass": "control"
     },
-    "MissionLocality": {
-      "description": "A mission locality: a `MissionLocality` Record under `missiondata/pu_missionlocality`, a named\nset of starmap objects. The game does not localise its name.",
+    "MissionLocalityDefinition": {
+      "description": "A physical mission locality and its original location slots.",
       "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "availableLocations": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
         "className": {
-          "description": "The Record name without its type, e.g. `pyro`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
-        "starmapObjectGuids": {
-          "description": "The `availableLocations`, the `guid`s of entries of `starmapObjects`, in the stored order.\nA Reference to no Record is left out; a GUID missing from `starmapObjects` is kept.",
-          "items": {
-            "$ref": "#/$defs/Guid"
-          },
-          "type": "array"
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         }
       },
       "required": [
+        "authoredFields",
+        "availableLocations",
         "className",
+        "fileName",
         "guid",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
         "recordPath",
-        "starmapObjectGuids"
+        "sourceType"
       ],
       "type": "object"
     },
@@ -34046,7 +34196,7 @@
           "type": "boolean"
         },
         "localityGuids": {
-          "description": "The `MissionLocality` Records of the `ContractPrerequisite_Locality` prerequisites, the\n`guid`s of entries of `missionLocalities`, in stored order, none twice. A locality names\nits places through `starmapObjectGuids`.",
+          "description": "Original `ContractPrerequisite_Locality` target GUIDs in authored order without repeats.\nThe rows in `definitions.missionLocalities` retain the original `availableLocations`.",
           "items": {
             "$ref": "#/$defs/Guid"
           },
@@ -81500,6 +81650,396 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/DeviceTrigger"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfDismantleBlueprint": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/DismantleBlueprint"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfDismantleConfiguration": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/DismantleConfiguration"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfDismantleTime": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/DismantleTime"
               }
             }
           }
@@ -141028,13 +141568,6 @@
       "$ref": "#/$defs/CatalogDefinitions",
       "description": "Canonical source-owned definition rows."
     },
-    "dismantleProcesses": {
-      "description": "The dismantle processes, ordered by GUID.",
-      "items": {
-        "$ref": "#/$defs/DismantleProcess"
-      },
-      "type": "array"
-    },
     "exportHealth": {
       "$ref": "#/$defs/ExportHealth",
       "description": "The measured source-read and projection health, separately from Filter selection scope."
@@ -141113,13 +141646,6 @@
       "description": "The mineable elements, ordered by GUID. Several may link to one `ResourceType`.",
       "items": {
         "$ref": "#/$defs/MineableElement"
-      },
-      "type": "array"
-    },
-    "missionLocalities": {
-      "description": "The mission localities, sets of starmap objects, ordered by GUID.",
-      "items": {
-        "$ref": "#/$defs/MissionLocality"
       },
       "type": "array"
     },
@@ -141211,7 +141737,6 @@
     "crafters",
     "declarations",
     "definitions",
-    "dismantleProcesses",
     "exportHealth",
     "harvestableLocations",
     "harvestableProviderPresets",
@@ -141224,7 +141749,6 @@
     "lootTables",
     "mineableCompositions",
     "mineableElements",
-    "missionLocalities",
     "missionLocationTemplates",
     "missionPropertySets",
     "paints",

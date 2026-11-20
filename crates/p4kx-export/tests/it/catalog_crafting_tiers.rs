@@ -219,23 +219,34 @@ fn a_blueprint_links_to_the_dismantle_process_unless_its_item_is_excluded() -> T
         blueprint.presentation["dismantle"]["value"]["tier"],
         blueprint.presentation["firstTier"]
     );
+    let processes = catalog
+        .pointer("/definitions/dismantleProcesses/rows")
+        .and_then(Value::as_array)
+        .ok_or("physical dismantle rows")?;
+    let [process] = processes.as_slice() else {
+        return Err("one physical dismantle process".into());
+    };
     assert_eq!(
-        catalog["dismantleProcesses"],
-        json!([{
-            "guid": text(fixture::DISMANTLE),
-            "className": "GlobalGenericDismantle",
-            "recordPath": "libs/foundry/records/crafting/blueprints/dismantle/globalgenericdismantle",
-            "efficiency": 0.5,
-            "timeSeconds": 15,
-        }])
+        process.pointer("/guid/value"),
+        Some(&json!(text(fixture::DISMANTLE))),
+        "the presentation joins to the physical process"
     );
+    assert_eq!(
+        process.pointer("/blueprint/value/processSpecificData/value/timeSeconds/value"),
+        Some(&json!("15")),
+        "the canonical process retains the compatible normalized duration"
+    );
+    assert_dismantle_blacklist(&catalog)
+}
+
+fn assert_dismantle_blacklist(catalog: &Value) -> TestResult {
     assert!(
         catalog.get("craftingGlobal").is_none(),
         "no merged compatibility root"
     );
-    let globals = &catalog["configurations"]["craftingGlobal"]["rows"];
-    let [global] = globals
-        .as_array()
+    let [global] = catalog
+        .pointer("/configurations/craftingGlobal/rows")
+        .and_then(Value::as_array)
         .ok_or("physical crafting globals")?
         .as_slice()
     else {
@@ -245,16 +256,18 @@ fn a_blueprint_links_to_the_dismantle_process_unless_its_item_is_excluded() -> T
         ("dismantleBlacklistResources", fixture::GOLD),
         ("dismantleBlacklistEntityClasses", fixture::BLACKLISTED),
     ] {
-        let [slot] = global[field]["value"]
-            .as_array()
+        let [slot] = global
+            .get(field)
+            .and_then(|cell| cell.get("value"))
+            .and_then(Value::as_array)
             .ok_or("original exclusion slots")?
             .as_slice()
         else {
             return Err("one original exclusion slot".into());
         };
         assert_eq!(
-            slot["value"]["guid"]["value"],
-            text(guid),
+            slot.pointer("/value/guid/value"),
+            Some(&json!(text(guid))),
             "original exclusion target"
         );
     }
@@ -299,7 +312,10 @@ fn several_dismantle_processes_leave_no_link_and_the_summary_incomplete() -> Tes
         );
     }
     assert_eq!(
-        catalog["dismantleProcesses"].as_array().map(Vec::len),
+        catalog
+            .pointer("/definitions/dismantleProcesses/rows")
+            .and_then(Value::as_array)
+            .map(Vec::len),
         Some(2),
         "both processes are listed"
     );

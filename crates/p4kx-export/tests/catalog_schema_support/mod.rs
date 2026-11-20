@@ -94,7 +94,9 @@ pub(crate) fn minimal_catalog() -> Value {
         "ships": ships::rows(),
         "definitions": {"items": {"availability": "available", "rows": []}, "contractGenerators": absent_table(), "missionScenarios": absent_table(), "blueprints": blueprints::definitions(), "blueprintPools": blueprints::pools(), "contractTemplates": absent_table(), "missionBrokerEntries": absent_table(), "lootPoolFilters": loot::filters(), "blueprintCategories": blueprint_categories::definitions(), "gameplayProperties": gameplay_properties::definitions(), "qualityDistributions": quality::distributions(), "qualityQuantizations": quality::quantizations(), "resourceTypes": resources::table(), "resourceGroups": resource_groups::definitions(),
             "commodities": commodities::definitions(), "manufacturers": manufacturer(),
+            "dismantleProcesses": blueprints::dismantle_processes(),
             "missionTypes": reputation::mission_types(),
+            "missionLocalities": reputation::localities(),
             "refiningProcesses": mining::refining(),
             "mineableEntities": harvest::mineable_entities(),
             "tags": tags::definitions(),
@@ -241,13 +243,6 @@ pub(crate) fn minimal_catalog() -> Value {
         "projections": {"contracts": contracts::contracts(), "missionTitles": contracts::titles(), "blueprintPresentation": blueprints::presentation(), "blueprintPoolWeights": blueprints::pool_weights(), "qualityQuantizationResources": quality::inverse(), "commodityPresentation": commodities::presentation(), "tagPaths": tags::paths(), "resourceGroupParents": resource_groups::parents(), "weaponMagazineResolutions": absent_table(), "weaponProjectileAmmoSelections": absent_table(), "weaponPlayerAnimationCandidates": absent_table(), "weaponCombatBases": absent_table(), "jumpConnections": absent_table()},
         "provenance": {"sources": [], "uses": []},
 
-        "dismantleProcesses": [{
-            "guid": "f1000000-0000-4000-8000-000000000001",
-            "className": "GlobalGenericDismantle",
-            "recordPath": "libs/foundry/records/crafting/blueprints/dismantle/globalgenericdismantle",
-            "efficiency": 0.5,
-            "timeSeconds": 15
-        }],
         "paints": [{
             "itemGuid": "30000000-0000-4000-8000-000000000001",
             "shipGuids": ["90000000-0000-4000-8000-000000000001"]
@@ -259,7 +254,6 @@ pub(crate) fn minimal_catalog() -> Value {
         "subHarvestableMultiConfigs": harvest::multi_configs(),
         "harvestableLocations": harvest::locations(),
         "shops": harvest::shops(),
-        "missionLocalities": reputation::localities(),
         "contractScenarios": reputation::scenarios(),
         "missionLocationTemplates": spawns::location_templates(),
         "contractShipSpawns": spawns::ship_spawns(),

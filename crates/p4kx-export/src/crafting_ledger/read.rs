@@ -19,12 +19,14 @@ use super::resource_scope::ResourceLinkScope;
 use super::selection::{self, Action, ReadPolicy, Selection};
 use super::{ReadCrafting, ReadMode};
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyInput;
+use crate::catalog_v3::industry_modules::dismantle_process_definition::PreparedDismantleProcess;
 use crate::quality_catalog::Step;
 
 pub(super) struct Tracked<'f> {
     pub(super) piece: Option<Piece<'f>>,
     pub(super) blueprint_rules: BlueprintRules,
     pub(super) global: Option<crate::catalog_v3::crafting_global::PreparedCraftingGlobal<'f>>,
+    pub(super) dismantle: Option<Box<PreparedDismantleProcess<'f>>>,
     pub(super) ledger: ExportLedger,
     pub(super) quality: Step<'f>,
     pub(super) gameplay: Option<GameplayPropertyInput<'f>>,
@@ -51,6 +53,7 @@ fn candidate<'f>(
         gameplay: None,
         blueprint_rules: BlueprintRules::failed_header(record),
         global: None,
+        dismantle: None,
     })
 }
 pub(super) fn failure<'f>(
@@ -84,6 +87,7 @@ pub(super) fn failure<'f>(
         gameplay: None,
         blueprint_rules: BlueprintRules::default(),
         global: None,
+        dismantle: None,
     })
 }
 
@@ -108,6 +112,7 @@ fn one<'f>(
             gameplay: None,
             blueprint_rules: BlueprintRules::default(),
             global: None,
+            dismantle: None,
         },
         Ok(None) => return Ok(None),
         Err(error) => {
@@ -140,6 +145,7 @@ fn selected_record<'f>(
             gameplay: None,
             blueprint_rules: BlueprintRules::default(),
             global: None,
+            dismantle: None,
         });
     }
     let tree = match trees.build(record) {

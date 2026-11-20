@@ -130,9 +130,7 @@ impl<'f> Picked<'f> {
     pub(crate) fn entity(kind: Kind, tree: &RecordTree<'f>) -> Option<Self> {
         match kind {
             Kind::Crafters => crafter(tree).map(Self::Crafter),
-            Kind::MissionLocalities | Kind::ContractScenarios => {
-                MissionPick::entity(kind, tree).map(Self::Mission)
-            }
+            Kind::ContractScenarios => MissionPick::entity(kind, tree).map(Self::Mission),
             Kind::LegacyLootTables | Kind::LegacyLootArchetypes => {
                 LootPick::entity(kind, tree).map(Self::Loot)
             }
@@ -182,6 +180,7 @@ impl<'f> Picked<'f> {
             | Kind::SecurityNetworkManifests
             | Kind::MissionScenarios
             | Kind::CargoManifests
+            | Kind::MissionLocalities
             | Kind::MissionTypes
             | Kind::MissionModuleDeclarations
             | Kind::MissionItems

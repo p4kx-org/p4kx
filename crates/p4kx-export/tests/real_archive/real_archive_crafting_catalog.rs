@@ -268,13 +268,18 @@ fn pool_entry_guid(entry: &Value) -> Option<&str> {
 }
 
 fn check_dismantle(catalog: &Value, blueprints: &Blueprints<'_>) -> TestResult {
-    let processes = list(catalog, "dismantleProcesses")?;
+    let processes = at(catalog, "/definitions/dismantleProcesses/rows")
+        .as_array()
+        .ok_or("physical dismantle process rows")?;
     let [process] = processes.as_slice() else {
         return Err(format!("one dismantle process, found {}", processes.len()).into());
     };
     assert_eq!(
-        (&process["efficiency"], &process["timeSeconds"]),
-        (&Value::from(0.5), &Value::from(15)),
+        (
+            process.pointer("/blueprint/value/processSpecificData/value/efficiency/value/finite"),
+            process.pointer("/blueprint/value/processSpecificData/value/timeSeconds/value")
+        ),
+        (Some(&Value::from(0.5)), Some(&Value::from("15"))),
         "efficiency and time"
     );
     let magazine = blueprints.named(LMG_MAGAZINE)?;
@@ -283,7 +288,9 @@ fn check_dismantle(catalog: &Value, blueprints: &Blueprints<'_>) -> TestResult {
             .presentation
             .pointer("/dismantle/value/processGuid")
             .ok_or("magazine dismantle process GUID")?,
-        &process["guid"],
+        process
+            .pointer("/guid/value")
+            .ok_or("physical process GUID")?,
         "the process"
     );
     assert_eq!(
@@ -301,6 +308,11 @@ fn check_dismantle(catalog: &Value, blueprints: &Blueprints<'_>) -> TestResult {
             .is_some_and(|slots| !slots.is_empty())),
         "original excluded resource declarations"
     );
+    report_dismantle_dispositions(blueprints);
+    Ok(())
+}
+
+fn report_dismantle_dispositions(blueprints: &Blueprints<'_>) {
     let unlinked = blueprints
         .rows()
         .iter()
@@ -326,7 +338,6 @@ fn check_dismantle(catalog: &Value, blueprints: &Blueprints<'_>) -> TestResult {
         })
         .count();
     print_line(&format!("default blueprints in the catalog: {defaults}"));
-    Ok(())
 }
 
 #[expect(

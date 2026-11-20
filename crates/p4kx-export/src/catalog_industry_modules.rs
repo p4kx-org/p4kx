@@ -12,6 +12,8 @@ pub(crate) mod blueprint_reward_source;
 
 #[path = "crafting_global.rs"]
 pub(crate) mod crafting_global;
+#[path = "dismantle_process_definition.rs"]
+pub(crate) mod dismantle_process_definition;
 #[path = "mineable_composition_definition.rs"]
 pub(crate) mod mineable_composition_definition;
 #[path = "mineable_element_definition.rs"]

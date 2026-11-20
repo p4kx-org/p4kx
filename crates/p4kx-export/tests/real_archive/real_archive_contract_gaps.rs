@@ -26,20 +26,11 @@ fn catalog() -> Result<Value, Box<dyn Error>> {
     Ok(serde_json::from_slice(built.json())?)
 }
 
-fn guids<'a>(value: &'a Value, field: &str) -> HashSet<&'a str> {
-    value[field]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|item| item["guid"].as_str())
-        .collect()
-}
-
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn every_contract_links_its_places_and_reports_pickup_list_lengths() -> TestResult {
     let catalog = catalog()?;
-    let localities = guids(&catalog, "missionLocalities");
+    let localities = crate::real_archive_verification::guids(&catalog, "missionLocalities")?;
     let objects = crate::real_archive_verification::guids(&catalog, "starmapObjects")?;
     let contracts = crate::real_archive_contracts::v3::rows(&catalog)?;
     let (mut with_places, mut max_pickup, mut unlinked) = (0_usize, 0_usize, 0_usize);

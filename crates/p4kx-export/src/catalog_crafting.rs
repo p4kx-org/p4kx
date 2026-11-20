@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 
-use p4kx_extraction::{DataForge, Filter, Guid};
+use p4kx_extraction::{DataForge, Filter};
 
 use crate::CatalogError;
 use crate::CatalogOptions;
@@ -17,7 +17,7 @@ use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogTable};
 use crate::catalog_v3::crafting_global::PreparedCraftingGlobal;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
 use crate::catalog_v3::industry_modules::blueprint_pool_definition::PreparedBlueprintPool;
-use crate::contract::DismantleProcess;
+use crate::catalog_v3::industry_modules::dismantle_process_definition::PreparedDismantleProcess;
 use crate::crafting::{self, Crafting, ReadCrafting};
 use crate::crafting_types::BlueprintPool;
 use crate::crafting_warning::CraftingWarning;
@@ -38,7 +38,7 @@ pub(crate) struct CraftingKinds<'f> {
         crate::catalog_v3::industry_modules::blueprint_reward_source::BlueprintRewardSource<'f>,
     >,
     pub(crate) reward_numbers: Vec<crate::catalog_number_capture::CapturedNumber>,
-    pub(crate) dismantle: Vec<DismantleProcess<'f>>,
+    pub(crate) dismantle: Vec<PreparedDismantleProcess<'f>>,
     pub(crate) global: Vec<PreparedCraftingGlobal<'f>>,
     pub(crate) skipped: Vec<(Kind, usize)>,
     pub(crate) failures: Vec<CatalogReadFailure<'f>>,
@@ -81,6 +81,7 @@ pub(crate) fn kinds<'f>(
         blueprints,
         blueprint_rules,
         globals,
+        dismantle,
         pools: mut original_pools,
         mut reward_declarations,
         mut reward_numbers,
@@ -100,12 +101,11 @@ pub(crate) fn kinds<'f>(
         &mut reward_numbers,
         &original_pools,
     )?;
-    let (dismantle, dismantle_skipped) = dismantle(&crafting, &mut selected);
-    let kept: HashSet<Guid> = dismantle.iter().map(|process| process.guid.0).collect();
+    let (kept, dismantle_skipped) = dismantle_guids(&crafting, &mut selected);
     let process = crafting
         .dismantle_process()
         .map(|item| item.guid)
-        .filter(|guid| kept.contains(guid));
+        .filter(|guid| kept.contains(&CatalogGuid(*guid)));
     let blueprints = blueprints
         .into_iter()
         .map(|row| blueprint_catalog_rows::row(row, &blueprint_rules, process, origins))
@@ -154,22 +154,16 @@ fn select_pools(
     skipped
 }
 
-fn dismantle<'f>(
-    crafting: &Crafting<'f>,
+fn dismantle_guids(
+    crafting: &Crafting<'_>,
     selected: &mut rows::Selection<'_>,
-) -> (Vec<DismantleProcess<'f>>, usize) {
+) -> (Vec<CatalogGuid>, usize) {
     selected.entities(
         Kind::DismantleProcesses,
         &crafting.dismantle,
         |item| (item.record_path, item.class_name, CatalogGuid(item.guid)),
-        |source| DismantleProcess {
-            guid: CatalogGuid(source.guid),
-            class_name: source.class_name,
-            record_path: source.record_path,
-            efficiency: source.efficiency,
-            time_seconds: source.time_seconds,
-        },
-        |entity| entity.guid,
+        |source| CatalogGuid(source.guid),
+        |guid| *guid,
     )
 }
 

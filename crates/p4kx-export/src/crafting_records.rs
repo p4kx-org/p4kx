@@ -16,7 +16,7 @@ use crate::selection::{Kind, KindRule, starts_with_folder};
 use crate::source_fields::{self, FieldError, Fields};
 
 const ROOT: &str = "libs/foundry/records/crafting/";
-const DISMANTLE_PROCESS: &str = "GenericCraftingProcess_Dismantle";
+pub(crate) const DISMANTLE_PROCESS: &str = "GenericCraftingProcess_Dismantle";
 
 pub(crate) const DISMANTLES: KindRule = Kind::DismantleProcesses.records();
 pub(crate) const PROPERTIES: KindRule = Kind::GameplayProperties.records();

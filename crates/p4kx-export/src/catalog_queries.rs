@@ -84,6 +84,8 @@ pub mod tags;
 pub use mining_definitions::process_api as mining;
 #[path = "location_entity_query.rs"]
 mod location_entity_declarations;
+#[path = "mission_locality_query.rs"]
+mod mission_localities;
 #[path = "mission_location_query.rs"]
 mod mission_location_templates;
 #[path = "mission_type_query.rs"]
@@ -204,6 +206,10 @@ pub use location_entity_declarations::{
     with_location_entity_declarations_from,
 };
 pub use manufacturers::{ManufacturerSnapshot, with_manufacturers, with_manufacturers_from};
+pub use mission_localities::{
+    MissionLocalityDefinition, MissionLocalitySnapshot, with_mission_localities,
+    with_mission_localities_from,
+};
 pub use mission_location_templates::{
     MissionLocationTemplateSnapshot, with_mission_location_templates,
     with_mission_location_templates_from,

@@ -11,8 +11,7 @@ use crate::catalog_projection::{CatalogProjection, ProtectedKey};
 use crate::catalog_read::original::OriginalFlowFields;
 
 use crate::contract_mission_data::{
-    ContractScenario, MissionLocality, MissionType, ScenarioFactionTiers, ScenarioProgression,
-    ScenarioTier,
+    ContractScenario, MissionType, ScenarioFactionTiers, ScenarioProgression, ScenarioTier,
 };
 use crate::guid_text::CatalogGuid;
 use crate::mission_layers::one;
@@ -49,16 +48,6 @@ pub(crate) fn mission_type_key<'source>(
     fields: &OriginalFlowFields<'_, '_, 'source>,
 ) -> Result<ProtectedKey<'source>, CatalogError> {
     ProtectedKey::read(fields, None, "LocalisedTypeName")
-}
-
-/// Returns the mission locality the Record tree `tree` describes.
-pub(crate) fn mission_locality<'f>(tree: &RecordTree<'f>) -> MissionLocality<'f> {
-    MissionLocality {
-        guid: CatalogGuid(tree.guid()),
-        class_name: class_name(tree),
-        record_path: tree.record_path(),
-        starmap_object_guids: references(Some(tree.root()), "availableLocations"),
-    }
 }
 
 /// Returns the contract scenario the Record tree `tree` describes.

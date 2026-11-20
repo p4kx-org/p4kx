@@ -92,6 +92,7 @@ pub(super) fn assemble<'f>(
     let mut pools = Vec::new();
     let mut blueprint_rules = crate::blueprint_rule_inputs::BlueprintRules::default();
     let mut globals = Vec::new();
+    let mut dismantle = Vec::new();
     let mut catalog_failures = Vec::new();
     let mut ledger = ExportLedger::default();
     let mut links = HashMap::new();
@@ -101,6 +102,7 @@ pub(super) fn assemble<'f>(
         ledger.merge(tracked.ledger);
         blueprint_rules.merge(tracked.blueprint_rules);
         globals.extend(tracked.global);
+        dismantle.extend(tracked.dismantle.map(|process| *process));
         quality.add(tracked.quality)?;
         gameplay.add(tracked.gameplay);
         if let Some(piece) = tracked.piece {
@@ -127,6 +129,7 @@ pub(super) fn assemble<'f>(
         blueprints,
         blueprint_rules,
         globals,
+        dismantle,
         pools,
         reward_declarations: Vec::new(),
         reward_numbers: Vec::new(),

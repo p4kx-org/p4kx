@@ -45,6 +45,11 @@ pub(crate) fn snapshot(collected: &mut Collected<'_>, filter: Option<&Filter>) -
 }
 
 fn append_definition_rows(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
+    emitted.extend(
+        crate::catalog_v3::industry_modules::dismantle_process_definition::catalog_rows(
+            &collected.dismantle_processes,
+        ),
+    );
     append(
         emitted,
         Kind::Manufacturers,
@@ -117,6 +122,11 @@ fn append_gameplay_definitions(emitted: &mut Vec<CatalogRow>, collected: &Collec
     emitted.extend(crate::catalog_v3::cargo_manifest::catalog_rows(
         &collected.mission_kinds.manifests,
     ));
+    emitted.extend(
+        crate::catalog_v3::mission_locality_definition::catalog_rows(
+            &collected.mission_kinds.localities,
+        ),
+    );
     emitted.extend(
         collected
             .law

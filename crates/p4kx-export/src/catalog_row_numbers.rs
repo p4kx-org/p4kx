@@ -96,6 +96,12 @@ fn definition_number_groups<'rows>(
                 .iter()
                 .map(|row| (Kind::Ships, row.source_numbers.as_slice())),
         )
+        .chain(
+            crate::catalog_v3::industry_modules::dismantle_process_definition::sources(
+                &collected.dismantle_processes,
+            )
+            .map(|(kind, _, _, numbers)| (kind, numbers)),
+        )
         .chain(collected.mission_kinds.reputation_number_groups())
         .chain(collected.law.number_groups())
         .chain(collected.location_vocabulary.number_groups())
@@ -104,16 +110,7 @@ fn definition_number_groups<'rows>(
             crate::catalog_v3::faction_identity_definition::sources(&collected.faction_identities)
                 .map(|(kind, _, _, numbers)| (kind, numbers)),
         )
-        .chain(
-            collected
-                .mission_kinds
-                .definition_sources()
-                .map(|(kind, _, _, numbers)| (kind, numbers)),
-        )
-        .chain(
-            crate::catalog_v3::cargo_manifest::sources(&collected.mission_kinds.manifests)
-                .map(|(kind, _, _, numbers)| (kind, numbers)),
-        )
+        .chain(mission_definition_number_groups(&collected.mission_kinds))
         .chain(collected.starmap_definitions.number_groups())
         .chain(physical_definition_number_groups(collected))
         .chain(blueprint_number_groups(collected))
@@ -124,6 +121,20 @@ fn definition_number_groups<'rows>(
                 .sources()
                 .map(|(kind, _, _, numbers)| (kind, numbers)),
         )
+}
+
+fn mission_definition_number_groups<'rows>(
+    missions: &'rows crate::mission_kinds::MissionKinds<'_>,
+) -> impl Iterator<Item = (Kind, &'rows [CapturedNumber])> {
+    missions
+        .definition_sources()
+        .chain(crate::catalog_v3::mission_locality_definition::sources(
+            &missions.localities,
+        ))
+        .chain(crate::catalog_v3::cargo_manifest::sources(
+            &missions.manifests,
+        ))
+        .map(|(kind, _, _, numbers)| (kind, numbers))
 }
 
 fn blueprint_number_groups<'rows>(

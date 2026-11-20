@@ -5,6 +5,7 @@ use p4kx_extraction::{DecimalU64, SourceUseRole, SourceValue, SourcedValue, Stru
 
 use crate::CatalogError;
 use crate::catalog_read::original::{OriginalFlowFields, OriginalValueFact, OriginalValuePart};
+use crate::resource_integer::ResourceInt64;
 use crate::source_value_catalog::SourceValueRef;
 
 pub(super) struct BlueprintField<'fields, 'scope, 'read, 'source> {
@@ -91,6 +92,45 @@ impl<'fields, 'scope, 'read, 'source> BlueprintField<'fields, 'scope, 'read, 'so
             || self.absent(),
             |fact| self.bind(fact, value, SourceUseRole::Selector),
         )
+    }
+
+    /// Converts a partitioned duration with evidence for each authored unit.
+    pub(super) fn duration_seconds(
+        &self,
+        value: Option<i64>,
+    ) -> Result<SourcedValue<ResourceInt64>, CatalogError> {
+        let Some(fact) = self.fact() else {
+            return self.absent();
+        };
+        let Value::Struct(_) = fact.value() else {
+            return self.derived(|value| normalize(value, None));
+        };
+        let mut uses =
+            vec![fact.observe(OriginalValuePart::ConcreteType, SourceUseRole::Selector)?];
+        let mut unreadable = false;
+        let mut incomplete = false;
+        for part in ["days", "hours", "minutes", "seconds"] {
+            let part = self.child(part)?;
+            if let Some(value) = part.fact() {
+                let role = if matches!(value.value(), Value::Error(_)) {
+                    unreadable = true;
+                    SourceUseRole::Attempted
+                } else {
+                    SourceUseRole::Conversion
+                };
+                uses.push(value.observe(OriginalValuePart::Value, role)?);
+            } else {
+                incomplete = true;
+                uses.push(self.fields.survey(Some(fact))?);
+            }
+        }
+        let state = match value {
+            Some(value) => SourceValue::Present(ResourceInt64::new(value)),
+            None if unreadable => SourceValue::Unreadable,
+            None if incomplete => SourceValue::Absent,
+            None => SourceValue::Invalid,
+        };
+        Ok(self.fields.sources().value(state, &uses, !unreadable))
     }
 
     pub(super) fn absence_input(&self) -> Result<p4kx_extraction::SourceUse, CatalogError> {

@@ -29,9 +29,8 @@ pub(crate) use crate::contract_loadout::Loadout;
 pub(crate) use crate::contract_loot::{LootArchetype, LootContainer, LootTable};
 pub(crate) use crate::contract_loot_legacy::{LegacyLootArchetype, LegacyLootTable};
 pub(crate) use crate::contract_mining::MineableEntity;
-pub(crate) use crate::contract_mission_data::{ContractScenario, MissionLocality};
+pub(crate) use crate::contract_mission_data::ContractScenario;
 pub(crate) use crate::contract_missions::ContractEntry;
-pub(crate) use crate::contract_rewards::DismantleProcess;
 pub(crate) use crate::contract_shops::Shop;
 pub(crate) use crate::contract_source::{BuildSource, Source};
 pub(crate) use crate::contract_starmap::StarmapObject;
@@ -81,8 +80,6 @@ pub(crate) struct Catalog<'a> {
     pub(crate) provenance: CatalogProvenance,
     /// Public short-name and protected game-text tables.
     pub(crate) texts: CatalogTexts<'a>,
-    /// The dismantle processes, ordered by GUID.
-    pub(crate) dismantle_processes: Vec<DismantleProcess<'a>>,
     /// The paints with the ships they fit, ordered by the GUID of the item.
     pub(crate) paints: Vec<Paint>,
     /// The ports of every ship and of every item that has ports, with what the Default Loadout
@@ -106,8 +103,6 @@ pub(crate) struct Catalog<'a> {
     pub(crate) loot_containers: Vec<LootContainer>,
     /// The shops of the shop registry with kind, brand and place, ordered by `key`.
     pub(crate) shops: Vec<Shop>,
-    /// The mission localities, sets of starmap objects, ordered by GUID.
-    pub(crate) mission_localities: Vec<MissionLocality<'a>>,
     /// The contract scenarios with their reward tiers, ordered by GUID.
     pub(crate) contract_scenarios: Vec<ContractScenario<'a>>,
     /// The loot tables with the weighted archetypes of each, ordered by GUID.

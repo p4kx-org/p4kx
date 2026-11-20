@@ -200,6 +200,43 @@ pub(super) fn presentation() -> Value {
     }]})
 }
 
+pub(super) fn dismantle_processes() -> Value {
+    let empty = || json!({"roots": [], "values": []});
+    let zero = || present(json!({"type": "int32", "value": 0}));
+    let time = present(json!({
+        "sourceType": present(json!("TimeValue_Partitioned")),
+        "days": zero(),
+        "hours": zero(),
+        "minutes": zero(),
+        "seconds": present(json!({"type": "f32", "rawBits": "416c0000", "finite": 14.75})),
+        "authoredFields": empty()
+    }));
+    let process = present(json!({
+        "sourceType": present(json!("GenericCraftingProcess_Dismantle")),
+        "efficiency": present(json!({"type": "f32", "rawBits": "3f000000", "finite": 0.5})),
+        "dismantleTime": time,
+        "timeSeconds": present(json!("15")),
+        "authoredFields": empty()
+    }));
+    let blueprint = present(json!({
+        "sourceType": present(json!("GenericCraftingBlueprint")),
+        "processSpecificData": process,
+        "authoredFields": empty()
+    }));
+    json!({"availability": "available", "rows": [{
+        "guid": present(json!("f1000000-0000-4000-8000-000000000001")),
+        "recordName": present(json!("CraftingBlueprintRecord.GlobalGenericDismantle")),
+        "className": present(json!("GlobalGenericDismantle")),
+        "recordPath": present(json!("libs/foundry/records/crafting/blueprints/dismantle/globalgenericdismantle")),
+        "recordIndex": present(json!(0)),
+        "sourceType": present(json!("CraftingBlueprintRecord")),
+        "fileName": present(json!("libs/foundry/records/crafting/blueprints/dismantle/globalgenericdismantle.xml")),
+        "metadataTag": source(SourceValue::Absent),
+        "blueprint": blueprint,
+        "authoredFields": empty()
+    }]})
+}
+
 pub(super) fn globals() -> Value {
     json!({"availability": "available", "rows": [{
         "guid": present(json!("12000000-0000-4000-8000-000000000002")),

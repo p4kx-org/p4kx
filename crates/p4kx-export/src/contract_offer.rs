@@ -14,9 +14,8 @@ use crate::guid_text::CatalogGuid;
 #[schemars(transform = every_field_required)]
 #[non_exhaustive]
 pub struct OfferedAt<'a> {
-    /// The `MissionLocality` Records of the `ContractPrerequisite_Locality` prerequisites, the
-    /// `guid`s of entries of `missionLocalities`, in stored order, none twice. A locality names
-    /// its places through `starmapObjectGuids`.
+    /// Original `ContractPrerequisite_Locality` target GUIDs in authored order without repeats.
+    /// The rows in `definitions.missionLocalities` retain the original `availableLocations`.
     pub locality_guids: Vec<CatalogGuid>,
     /// The objects of the `ContractPrerequisite_Location` prerequisites, in stored order, none
     /// twice, a star and an object that is not in `starmapObjects` included (its `objectType` and

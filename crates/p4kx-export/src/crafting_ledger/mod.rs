@@ -29,6 +29,11 @@ pub(crate) struct ReadCrafting<'f> {
     pub(crate) blueprints: Vec<crate::blueprint_catalog_read::PreparedBlueprint<'f>>,
     pub(crate) blueprint_rules: crate::blueprint_rule_inputs::BlueprintRules,
     pub(crate) globals: Vec<crate::catalog_v3::crafting_global::PreparedCraftingGlobal<'f>>,
+    pub(crate) dismantle: Vec<
+        crate::catalog_v3::industry_modules::dismantle_process_definition::PreparedDismantleProcess<
+            'f,
+        >,
+    >,
     pub(crate) pools: Vec<
         crate::catalog_v3::industry_modules::blueprint_pool_definition::PreparedBlueprintPool<'f>,
     >,
