@@ -59,68 +59,77 @@ fn vehicle_xml_positions_use_short_opaque_ids() {
 }
 
 #[test]
-fn unsupported_vehicle_xml_coordinates_keep_the_generic_encoding() {
-    let source = PhysicalSourceRef::new("a0.1.2");
-    for (namespace, indices, field, generic) in [
-        ("cryxmlNode", vec![3], "Name", "s?10:cryxmlNode3.:Name"),
+fn unknown_vehicle_xml_names_keep_the_generic_encoding() {
+    assert_generic_xml_coordinate("cryxmlNode", &[3], "Name", "s?10:cryxmlNode3.:Name");
+    assert_generic_xml_coordinate(
+        "cryxmlAttribute",
+        &[1, 2],
+        "é",
+        "s?15:cryxmlAttribute1.2.:é",
+    );
+    assert_generic_xml_coordinate("CryxmlNode", &[3], "$name", "s?10:CryxmlNode3.:$name");
+}
+
+#[test]
+fn invalid_vehicle_xml_coordinates_keep_the_generic_encoding() {
+    let cases: [(&str, &[u64], &str, &str); 7] = [
+        ("cryxmlNode", &[], "$name", "s?10:cryxmlNode:$name"),
         (
             "cryxmlAttribute",
-            vec![1, 2],
-            "é",
-            "s?15:cryxmlAttribute1.2.:é",
-        ),
-        ("cryxmlNode", vec![], "$name", "s?10:cryxmlNode:$name"),
-        (
-            "cryxmlAttribute",
-            vec![1],
+            &[1],
             "skipPart",
             "s?15:cryxmlAttribute1.:skipPart",
         ),
         (
             "textXmlElement",
-            vec![32, 12],
+            &[32, 12],
             "$node",
             "s?14:textXmlElement32.12.:$node",
         ),
         (
             "textXmlAttribute",
-            vec![1, 1],
+            &[1, 1],
             "name",
             "s?16:textXmlAttribute1.1.:name",
         ),
         (
             "textXmlAttribute",
-            vec![1, 2, 3],
+            &[1, 2, 3],
             "name",
             "s?16:textXmlAttribute1.2.3.:name",
         ),
         (
             "cryxmlNode",
-            vec![u64::from(u32::MAX) + 1],
+            &[u64::from(u32::MAX) + 1],
             "$children",
             "s?10:cryxmlNode4294967296.:$children",
         ),
         (
             "cryxmlAttribute",
-            vec![0, u64::from(u32::MAX) + 1],
+            &[0, u64::from(u32::MAX) + 1],
             "skipPart",
             "s?15:cryxmlAttribute0.4294967296.:skipPart",
         ),
-        ("CryxmlNode", vec![3], "$name", "s?10:CryxmlNode3.:$name"),
-    ] {
-        let location = subresource(namespace, &indices, field);
-        let reference = encode(
-            &source,
-            InputScope::Payload,
-            SourceUseRole::Selector,
-            LocationView::Original(&location),
-        );
-        assert_eq!(
-            reference.as_str(),
-            format!("c6:a0.1.2ps{generic}"),
-            "fallback retains the exact original coordinate {location:?}"
-        );
+    ];
+    for (namespace, indices, field, generic) in cases {
+        assert_generic_xml_coordinate(namespace, indices, field, generic);
     }
+}
+
+fn assert_generic_xml_coordinate(namespace: &str, indices: &[u64], field: &str, generic: &str) {
+    let source = PhysicalSourceRef::new("a0.1.2");
+    let location = subresource(namespace, indices, field);
+    let reference = encode(
+        &source,
+        InputScope::Payload,
+        SourceUseRole::Selector,
+        LocationView::Original(&location),
+    );
+    assert_eq!(
+        reference.as_str(),
+        format!("c6:a0.1.2ps{generic}"),
+        "fallback retains the exact original coordinate {location:?}"
+    );
 }
 
 pub(super) fn physical_xml_locations() -> [SourceLocation; 6] {

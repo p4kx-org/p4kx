@@ -109,6 +109,11 @@ fn locations_with_distinct_coordinates() -> Vec<SourceLocation> {
         }
     }
 
+    append_xml_coordinates(&mut locations);
+    locations
+}
+
+fn append_xml_coordinates(locations: &mut Vec<SourceLocation>) {
     for field in ["$name", "@pos", "@rot", "$absent:@pos", "$absent:@rot"] {
         for indices in [vec![], vec![0], vec![64], vec![1, 0], vec![u64::MAX, 63]] {
             locations.push(xml_location(&indices, field));
@@ -135,7 +140,6 @@ fn locations_with_distinct_coordinates() -> Vec<SourceLocation> {
             }
         }
     }
-    locations
 }
 
 #[test]
@@ -209,23 +213,7 @@ fn xml_inventory(reverse: bool) -> Result<Vec<u8>, XmlInventoryError> {
         .par_iter()
         .map(|location| scope.at(location.clone(), SourceUseRole::Conversion))
         .collect::<Result<Vec<_>, _>>()?;
-    for (location, observed) in locations.iter().zip(&uses) {
-        assert_eq!(
-            observed.description().location(),
-            location,
-            "an opaque ID retains its original XML coordinate"
-        );
-        assert_eq!(
-            observed.description().scope(),
-            InputScope::Payload,
-            "the use retains the original byte scope"
-        );
-        assert_eq!(
-            observed.role(),
-            SourceUseRole::Conversion,
-            "the contributor role survives"
-        );
-    }
+    assert_xml_uses(&locations, &uses);
     let cell = inventory.value(SourceValue::Present(true), &uses, true);
     assert_eq!(
         cell.origin().contains_encrypted_source(),
@@ -251,6 +239,26 @@ fn xml_inventory(reverse: bool) -> Result<Vec<u8>, XmlInventoryError> {
         );
     }
     Ok(serde_json::to_vec(&(cell, frozen))?)
+}
+
+fn assert_xml_uses(locations: &[SourceLocation], uses: &[SourceUse]) {
+    for (location, observed) in locations.iter().zip(uses) {
+        assert_eq!(
+            observed.description().location(),
+            location,
+            "an opaque ID retains its original XML coordinate"
+        );
+        assert_eq!(
+            observed.description().scope(),
+            InputScope::Payload,
+            "the use retains the original byte scope"
+        );
+        assert_eq!(
+            observed.role(),
+            SourceUseRole::Conversion,
+            "the contributor role survives"
+        );
+    }
 }
 
 type XmlInventoryError = Box<dyn std::error::Error + Send + Sync>;

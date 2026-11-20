@@ -285,6 +285,8 @@ fn catalog_without_a_german_global_ini_leaves_german_null_and_counts_it() -> Tes
         name["translations"]["value"].get("de").is_none(),
         "no German input"
     );
+    let bytes = fs::metadata(&out)?.len();
+    let summary = summary.replace(&format!(": {bytes} bytes,"), ": [BYTES] bytes,");
     insta::assert_snapshot!("catalog_summary_without_german", summary);
     Ok(())
 }
