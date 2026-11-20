@@ -38,36 +38,7 @@ fn issue_fields_bind_original_cached_root_metadata() -> TestResult {
         Some(&json!(5)),
         "only the first issue of each kind is reported per Entry"
     );
-    assert_eq!(
-        info.pointer("/issues/0/path").and_then(Value::as_str),
-        Some("bad\u{fffd}.bin"),
-        "the lossily decoded path retains its original location"
-    );
-    verify_site(&info, 0, "path", "path", "conversion")?;
-    verify_site(&info, 0, "issue", "path", "conversion")?;
-    verify_site(
-        &info,
-        1,
-        "issue",
-        "encryptionDeclarations[0].declaredBlockLength",
-        "conversion",
-    )?;
-    verify_site(
-        &info,
-        2,
-        "issue",
-        "encryptionDeclarations[0].rawWord",
-        "conversion",
-    )?;
-    verify_site(
-        &info,
-        3,
-        "issue",
-        "encryptionDeclarations[1].declaredBlockLength",
-        "conversion",
-    )?;
-    verify_site(&info, 3, "issue", "encryptionDeclarations[0]", "selector")?;
-    verify_site(&info, 4, "path", "path", "payload")?;
+    verify_sourced_issues(&info)?;
 
     let unknown = marker(&info, 4, "issue")?;
     assert_eq!(
@@ -96,6 +67,40 @@ fn issue_fields_bind_original_cached_root_metadata() -> TestResult {
         })),
         "MCP explicitly marks the full count unknown independently of the sourced Issue sample"
     );
+    Ok(())
+}
+
+fn verify_sourced_issues(info: &Value) -> TestResult {
+    assert_eq!(
+        info.pointer("/issues/0/path").and_then(Value::as_str),
+        Some("bad\u{fffd}.bin"),
+        "the lossily decoded path retains its original location"
+    );
+    verify_site(info, 0, "path", "path", "conversion")?;
+    verify_site(info, 0, "issue", "path", "conversion")?;
+    verify_site(
+        info,
+        1,
+        "issue",
+        "encryptionDeclarations[0].declaredBlockLength",
+        "conversion",
+    )?;
+    verify_site(
+        info,
+        2,
+        "issue",
+        "encryptionDeclarations[0].rawWord",
+        "conversion",
+    )?;
+    verify_site(
+        info,
+        3,
+        "issue",
+        "encryptionDeclarations[1].declaredBlockLength",
+        "conversion",
+    )?;
+    verify_site(info, 3, "issue", "encryptionDeclarations[0]", "selector")?;
+    verify_site(info, 4, "path", "path", "payload")?;
     Ok(())
 }
 

@@ -40,6 +40,11 @@ fn info_json_uses_the_shared_cached_layout_without_changing_existing_counts() ->
         "CLI carries the referenced inventory"
     );
     let origins = info.get("fieldOrigins").ok_or("field origins")?;
+    check_directory_counts(&info, origins)?;
+    check_manifest_origins(&info, origins)
+}
+
+fn check_directory_counts(info: &Value, origins: &Value) -> TestResult {
     for (key, count) in [
         ("entry_count", 1),
         ("encrypted_count", 0),
@@ -79,7 +84,7 @@ fn info_json_uses_the_shared_cached_layout_without_changing_existing_counts() ->
         })),
         "CLI explicitly marks the missing complete directory-validation receipt as unknown"
     );
-    check_manifest_origins(&info, origins)
+    Ok(())
 }
 
 fn check_manifest_origins(info: &Value, origins: &Value) -> TestResult {
