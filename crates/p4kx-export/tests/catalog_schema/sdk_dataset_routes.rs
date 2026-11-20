@@ -26,6 +26,8 @@ use super::{
     SHOP_INVENTORIES, TestResult, WEAPON_RECOIL,
 };
 
+#[path = "sdk_reputation_definition_routes.rs"]
+mod authored_reputation;
 #[path = "sdk_blueprint_physical_routes.rs"]
 mod blueprint_physical;
 #[path = "sdk_blueprint_pool_routes.rs"]
@@ -68,6 +70,10 @@ mod planet_resource;
 mod projectile_ammo;
 #[path = "sdk_quality_routes.rs"]
 mod quality;
+#[path = "sdk_reputation_routes.rs"]
+mod reputation;
+#[path = "../it/reputation_fixture/mod.rs"]
+mod reputation_fixture;
 #[path = "sdk_reputation_reward_route.rs"]
 mod reputation_rewards;
 #[path = "sdk_resource_group_routes.rs"]
@@ -136,6 +142,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.push(vehicle_armor::read()?);
     routes.push(loot_generation::read()?);
     routes.extend(resource_groups::read()?);
+    routes.extend(reputation::read()?);
     routes.push(reputation_rewards::read()?);
     routes.extend(resource_network::read()?);
     routes.extend(fuel::read()?);
@@ -153,6 +160,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.push(mineable_entity::read()?);
     routes.push(planet_resource::read()?);
     routes.extend(component_tools::read()?);
+    routes.extend(authored_reputation::read()?);
     routes.extend(weapon_sources::read()?);
     Ok(routes)
 }

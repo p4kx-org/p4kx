@@ -24,7 +24,7 @@ type Link<'source> = SourcedValue<Box<SourceRecordReference<'source>>>;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct SandboxTrigger<'source> {
+pub struct SandboxTrigger<'source> {
     source_type: SourcedValue<&'source str>,
     #[serde(flatten)]
     body: TriggerBody<'source>,
@@ -52,6 +52,18 @@ enum TriggerBody<'source> {
 }
 
 impl<'source> SandboxTrigger<'source> {
+    /// Borrows the declared concrete trigger type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows additional original fields of the trigger.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     /// Reads the ordered trigger pointers owned by a faction reputation Record.
     pub(super) fn read_array(
         fields: Observed<'_, '_, '_, 'source>,

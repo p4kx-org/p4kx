@@ -453,8 +453,9 @@ describe authored data and do not evaluate in-game enforcement or jurisdiction i
 ## Reputation
 
 Use `with_reputation`, `with_reputation_from` or the parsed session's `with_reputation` to
-read `definitions.factionReputations`, `definitions.reputationScopes` and
-`definitions.reputationStandings`. Each requested family supports `All`, `Guid` and
+read `definitions.factionReputations`, `definitions.reputationScopes`,
+`definitions.reputationStandings`, `definitions.reputationContexts`, `definitions.reputationPerks`
+and `definitions.reputationTriggerRecords`. Each requested family supports `All`, `Guid` and
 `RecordIndex`. A requested family can return an empty result with its own availability and
 coverage. The faction reputation Records carry a separate identity from the game's Faction
 definitions.
@@ -471,7 +472,7 @@ available translations and source evidence. An application can independently app
 display and key-conflict rules. Return consumer-owned results from the callback and publish
 them after the query succeeds. A selection that admits no Record opens no localization payloads.
 
-The three reputation row types expose their complete original values. Use
+The reputation rows serialize with the original values and field-level source evidence. Use
 `FactionReputationDefinition::presentation`, `relations`, `properties_bb` and `authored_fields`
 to inspect the original presentation, typed references, dynamic Blackboard values and retained
 additional occurrences. `FactionText` preserves a protected locale reference separately from a
@@ -484,6 +485,13 @@ and `additional_fields` expose the complete original standing. `drift_time_hours
 original Single in hours; no conversion to days or ordinary floating-point normalization is
 performed. Exact integer widths, IEEE bits, source states and result-local origin references
 remain available through the borrowed values.
+
+Use `ReputationSelection::default()` and set `contexts`, `perks` or `trigger_records`
+to select one of those families independently. Contexts and perk lists can retain protected
+text references. A standalone trigger-record request opens no localization payloads.
+The context preserves authored scope configuration. Perk entries retain their original scope
+and standing links, and each trigger retains its ordered manual slots. The linked Records can
+be queried separately by their original physical Record indices.
 
 Use `with_reputation_reward_amounts`, `with_reputation_reward_amounts_from` or the session
 method to read `definitions.reputationRewardAmounts` without opening localization payloads.

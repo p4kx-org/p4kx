@@ -27,11 +27,33 @@ pub(crate) const SOURCE_TYPE: &str = "SandboxTriggerRecord";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct SandboxTriggerRecordDefinition<'source> {
+pub struct SandboxTriggerRecordDefinition<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     trigger_manual_params: SourcedValue<Vec<SourcedValue<SandboxTrigger<'source>>>>,
     authored_fields: SourceArenaOutput<'source>,
+}
+
+impl<'source> SandboxTriggerRecordDefinition<'source> {
+    /// Borrows the physical Record identity and header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows the ordered original manual trigger slots.
+    #[must_use]
+    pub const fn trigger_manual_params(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<SandboxTrigger<'source>>>> {
+        &self.trigger_manual_params
+    }
+
+    /// Borrows additional original fields of the Record.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
 }
 
 pub(crate) struct PreparedSandboxTriggerRecord<'source> {

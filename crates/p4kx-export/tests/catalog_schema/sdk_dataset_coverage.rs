@@ -25,6 +25,9 @@ const INVENTORY_CONTAINERS: &str = "/definitions/inventoryContainers";
 const MEDICAL_ITEM_TIER_CONFIGS: &str = "/definitions/medicalItemTierConfigs";
 const MANUFACTURERS: &str = "/definitions/manufacturers";
 const FACTION_IDENTITIES: &str = "/definitions/factionIdentities";
+const FACTION_REPUTATIONS: &str = "/definitions/factionReputations";
+const REPUTATION_SCOPES: &str = "/definitions/reputationScopes";
+const REPUTATION_STANDINGS: &str = "/definitions/reputationStandings";
 const REPUTATION_REWARD_AMOUNTS: &str = "/definitions/reputationRewardAmounts";
 const COMMODITY_DEFINITIONS: &str = "/definitions/commodities";
 const COMMODITY_PRESENTATIONS: &str = "/projections/commodityPresentation";
@@ -68,6 +71,9 @@ const SHIELD_GENERATORS: &str = "/configurations/shieldGenerators";
 const QUANTUM_DRIVES: &str = "/configurations/quantumDrives";
 const CLOTHING: &str = "/configurations/clothing";
 const ITEM_RADARS: &str = "/configurations/itemRadars";
+const REPUTATION_CONTEXTS: &str = "/definitions/reputationContexts";
+const REPUTATION_PERKS: &str = "/definitions/reputationPerks";
+const REPUTATION_TRIGGER_RECORDS: &str = "/definitions/reputationTriggerRecords";
 const MINEABLE_ENTITIES: &str = "/definitions/mineableEntities";
 const MINING_LASERS: &str = "/configurations/miningLasers";
 const ATTACHABLE_MODIFIERS: &str = "/configurations/attachableModifiers";
@@ -131,6 +137,9 @@ const REQUIRED_WITNESSES: &[&str] = &[
     MEDICAL_ITEM_TIER_CONFIGS,
     MANUFACTURERS,
     FACTION_IDENTITIES,
+    FACTION_REPUTATIONS,
+    REPUTATION_SCOPES,
+    REPUTATION_STANDINGS,
     REPUTATION_REWARD_AMOUNTS,
     COMMODITY_DEFINITIONS,
     COMMODITY_PRESENTATIONS,
@@ -167,6 +176,9 @@ const REQUIRED_WITNESSES: &[&str] = &[
     CLOTHING,
     ITEM_RADARS,
     MINEABLE_ENTITIES,
+    REPUTATION_CONTEXTS,
+    REPUTATION_PERKS,
+    REPUTATION_TRIGGER_RECORDS,
     MINING_LASERS,
     ATTACHABLE_MODIFIERS,
     CONSUMABLE_CONFIGURATIONS,

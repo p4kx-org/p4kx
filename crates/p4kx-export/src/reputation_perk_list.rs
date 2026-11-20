@@ -29,7 +29,7 @@ const ENTRY: &str = "SPerkReputationParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ReputationPerkList<'source> {
+pub struct ReputationPerkList<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     perks: SourcedValue<Vec<SourcedValue<ReputationPerkEntry<'source>>>>,
@@ -40,7 +40,7 @@ pub(crate) struct ReputationPerkList<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ReputationPerkEntry<'source> {
+pub struct ReputationPerkEntry<'source> {
     source_type: SourcedValue<&'source str>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     scope: SourcedValue<Box<SourceRecordReference<'source>>>,
@@ -50,7 +50,45 @@ struct ReputationPerkEntry<'source> {
     authored_fields: SourceArenaOutput<'source>,
 }
 
+impl<'source> ReputationPerkList<'source> {
+    /// Borrows the physical Record identity and header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows the ordered original perk slots.
+    #[must_use]
+    pub const fn perks(&self) -> &SourcedValue<Vec<SourcedValue<ReputationPerkEntry<'source>>>> {
+        &self.perks
+    }
+
+    /// Borrows additional original fields of the Record.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+}
+
 impl<'source> ReputationPerkEntry<'source> {
+    /// Borrows the original scope reference.
+    #[must_use]
+    pub const fn scope(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.scope
+    }
+
+    /// Borrows the original standing reference.
+    #[must_use]
+    pub const fn standing(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.standing
+    }
+
+    /// Borrows the original owned perk and its source state.
+    #[must_use]
+    pub const fn perk(&self) -> &SourcedValue<ReputationPerk<'source>> {
+        &self.perk
+    }
+
     fn read(
         fields: Observed<'_, '_, '_, 'source>,
         projection: &CatalogProjection<'_, 'source>,

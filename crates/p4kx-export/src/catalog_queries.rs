@@ -206,7 +206,9 @@ pub use mission_location_templates::{
     with_mission_location_templates_from,
 };
 pub use reputation::{
-    ReputationRows, ReputationSelection, ReputationSnapshot, with_reputation, with_reputation_from,
+    ReputationContextDefinition, ReputationPerk, ReputationPerkEntry, ReputationPerkList,
+    ReputationRows, ReputationSelection, ReputationSnapshot, SandboxTrigger,
+    SandboxTriggerRecordDefinition, with_reputation, with_reputation_from,
 };
 pub use reputation_reward_amounts::{
     ReputationRewardAmountDefinition, ReputationRewardAmountSnapshot,

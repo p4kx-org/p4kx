@@ -21,11 +21,17 @@ use crate::catalog_v3::reputation_standing_definition::StandingDefinition;
 use crate::source_value_catalog::SourceRecordReference;
 use crate::texts::{TextSources, Texts};
 
+pub use crate::catalog_v3::reputation_context_definition::ContextDefinition as ReputationContextDefinition;
+pub use crate::catalog_v3::reputation_perk::ReputationPerk;
+pub use crate::catalog_v3::reputation_perk_list::{ReputationPerkEntry, ReputationPerkList};
+pub use crate::catalog_v3::sandbox_trigger::SandboxTrigger;
+pub use crate::catalog_v3::sandbox_trigger_record_definition::SandboxTriggerRecordDefinition;
+
 #[path = "reputation_query_source.rs"]
 mod source;
 use source::SelectedReputation;
 
-/// Selects any combination of the three original reputation definition families.
+/// Selects any combination of the original reputation definition families.
 #[derive(Clone, Copy, Debug, Default)]
 #[non_exhaustive]
 pub struct ReputationSelection {
@@ -35,16 +41,25 @@ pub struct ReputationSelection {
     pub scopes: Option<CatalogRecordSelection>,
     /// Selects original reputation standings when present.
     pub standings: Option<CatalogRecordSelection>,
+    /// Selects the authored reputation display contexts.
+    pub contexts: Option<CatalogRecordSelection>,
+    /// Selects the authored reputation perk lists.
+    pub perks: Option<CatalogRecordSelection>,
+    /// Selects standalone manual reputation trigger Records.
+    pub trigger_records: Option<CatalogRecordSelection>,
 }
 
 impl ReputationSelection {
-    /// Selects every admitted row of all three families.
+    /// Selects every admitted row of the families supported by this query.
     #[must_use]
     pub const fn all() -> Self {
         Self {
             faction_reputations: Some(CatalogRecordSelection::All),
             scopes: Some(CatalogRecordSelection::All),
             standings: Some(CatalogRecordSelection::All),
+            contexts: Some(CatalogRecordSelection::All),
+            perks: Some(CatalogRecordSelection::All),
+            trigger_records: Some(CatalogRecordSelection::All),
         }
     }
 
@@ -53,7 +68,11 @@ impl ReputationSelection {
     pub const fn ranks() -> Self {
         Self {
             faction_reputations: None,
-            ..Self::all()
+            scopes: Some(CatalogRecordSelection::All),
+            standings: Some(CatalogRecordSelection::All),
+            contexts: None,
+            perks: None,
+            trigger_records: None,
         }
     }
 }
@@ -84,6 +103,12 @@ pub struct ReputationSnapshot<'source> {
     pub scopes: Option<ReputationRows<ScopeDefinition<'source>>>,
     /// The standing definitions, when requested.
     pub standings: Option<ReputationRows<StandingDefinition<'source>>>,
+    /// The authored reputation display contexts, when requested.
+    pub contexts: Option<ReputationRows<ReputationContextDefinition<'source>>>,
+    /// The authored reputation perk lists, when requested.
+    pub perks: Option<ReputationRows<ReputationPerkList<'source>>>,
+    /// The standalone manual trigger Records, when requested.
+    pub trigger_records: Option<ReputationRows<SandboxTriggerRecordDefinition<'source>>>,
     /// Canonical public-name entries referenced by the result.
     pub public_names: Vec<CanonicalText<'source, PublicNameRef>>,
     /// Canonical protected text entries referenced by the result.
@@ -208,7 +233,7 @@ fn with_parsed<T>(
     inspect: impl FnOnce(ReputationSnapshot<'_>) -> T,
 ) -> Result<T, CatalogError> {
     let selected = SelectedReputation::read(forge, selection, cancel)?;
-    let selected_languages = if selected.has_records() {
+    let selected_languages = if selected.has_localized_records() {
         requested_languages
     } else {
         &[]
@@ -235,6 +260,9 @@ fn with_parsed<T>(
         faction_reputations: rows.faction_reputations,
         scopes: rows.scopes,
         standings: rows.standings,
+        contexts: rows.contexts,
+        perks: rows.perks,
+        trigger_records: rows.trigger_records,
         public_names: text_rows.public_names,
         game_texts: text_rows.game_texts,
         requested_languages: requested_languages.to_vec(),

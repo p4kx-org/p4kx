@@ -3,7 +3,7 @@
 
 use std::cell::RefCell;
 
-use p4kx_extraction::{CancelToken, DataForge, Guid, RecordTree, SourcedValue};
+use p4kx_extraction::{CancelToken, DataForge, FieldOrigin, Guid, RecordTree, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -30,7 +30,7 @@ const SORT_ORDER: &str = "EReputationSortOrderScope";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ContextDefinition<'source> {
+pub struct ContextDefinition<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     sort_order_scope: SourcedValue<&'source str>,
@@ -72,6 +72,30 @@ impl<'source> ScopeContext<'source> {
 }
 
 impl<'source> ContextDefinition<'source> {
+    /// Borrows the physical Record identity and header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows the original scope sorting declaration.
+    #[must_use]
+    pub const fn sort_order_scope(&self) -> &SourcedValue<&'source str> {
+        &self.sort_order_scope
+    }
+
+    /// Borrows the evidence of the original primary scope configuration.
+    #[must_use]
+    pub const fn primary_scope_context_origin(&self) -> &FieldOrigin {
+        self.primary_scope_context.origin()
+    }
+
+    /// Borrows additional original fields of the Record.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     fn read(
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,

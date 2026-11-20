@@ -24,7 +24,7 @@ type ProjectedField = (&'static str, SourceValueState);
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ReputationPerk<'source> {
+pub struct ReputationPerk<'source> {
     source_type: SourcedValue<&'source str>,
     #[serde(flatten)]
     presentation: PerkPresentation<'source>,
@@ -33,6 +33,24 @@ pub(super) struct ReputationPerk<'source> {
 }
 
 impl<'source> ReputationPerk<'source> {
+    /// Borrows the declared concrete perk type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows the original protected name reference.
+    #[must_use]
+    pub const fn display_name(&self) -> &SourcedValue<GameTextRef> {
+        &self.presentation.display_name
+    }
+
+    /// Borrows additional original fields of the perk.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     pub(super) fn read_field(
         fields: Observed<'_, '_, '_, 'source>,
         projection: &CatalogProjection<'_, 'source>,

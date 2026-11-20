@@ -1,18 +1,23 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{CancelToken, DataForge, Record, RecordTree, TreeBuilder};
+use p4kx_extraction::{CancelToken, DataForge, DataForgeError, Record, RecordTree, TreeBuilder};
 
 use super::super::{CatalogRecordCoverage, CatalogRecordSelection, unlocalized_record_query};
 use super::{ReputationRows, ReputationSelection};
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_table::CatalogTable;
+use crate::catalog_v3::reputation_context_definition::{self as contexts, ContextDefinition};
 use crate::catalog_v3::reputation_faction_definition::{
     self as factions, FactionReputationDefinition,
 };
+use crate::catalog_v3::reputation_perk_list::{self as perks, ReputationPerkList};
 use crate::catalog_v3::reputation_scope_definition::{self as scopes, ScopeDefinition};
 use crate::catalog_v3::reputation_standing_definition::{self as standings, StandingDefinition};
+use crate::catalog_v3::sandbox_trigger_record_definition::{
+    self as triggers, SandboxTriggerRecordDefinition,
+};
 use crate::guid_text::CatalogGuid;
 use crate::record_observation::RecordObservation;
 use crate::source_fields::FieldError;
@@ -50,7 +55,7 @@ impl<'source> SelectedRecords<'source> {
         }))
     }
 
-    fn project<Row>(
+    fn project<Prepared, Row>(
         mut self,
         trees: &mut TreeBuilder<'source>,
         projection: &CatalogProjection<'_, 'source>,
@@ -59,15 +64,20 @@ impl<'source> SelectedRecords<'source> {
             &RecordTree<'source>,
             &CatalogProjection<'_, 'source>,
             &RecordObservation<'_, 'source>,
-        ) -> Result<(Row, Vec<FieldError>), CatalogError>,
-    ) -> Result<(Vec<Row>, CatalogRecordCoverage), CatalogError> {
+        ) -> Result<(Prepared, Vec<FieldError>), CatalogError>,
+        table: impl FnOnce(Vec<Prepared>) -> CatalogTable<Row>,
+    ) -> Result<ReputationRows<Row>, CatalogError> {
         let projection = projection.for_kind(self.kind);
         let mut rows = Vec::new();
         for record in self.records {
             checkpoint(cancel)?;
-            let Ok(tree) = trees.build(&record) else {
-                self.coverage.unreadable_bodies.push(record.index());
-                continue;
+            let tree = match trees.build(&record) {
+                Ok(tree) => tree,
+                Err(DataForgeError::ObservationStopped) => return Err(CatalogError::Cancelled),
+                Err(_) => {
+                    self.coverage.unreadable_bodies.push(record.index());
+                    continue;
+                }
             };
             let admission = RecordObservation::capture(projection.original(), &record)?;
             let (row, notes) = read(&tree, &projection, &admission)?;
@@ -79,7 +89,7 @@ impl<'source> SelectedRecords<'source> {
             }
             rows.push(row);
         }
-        Ok((rows, self.coverage))
+        Ok(reputation_rows(table(rows), self.coverage))
     }
 }
 
@@ -87,6 +97,9 @@ pub(super) struct SelectedReputation<'source> {
     faction_reputations: Option<SelectedRecords<'source>>,
     scopes: Option<SelectedRecords<'source>>,
     standings: Option<SelectedRecords<'source>>,
+    contexts: Option<SelectedRecords<'source>>,
+    perks: Option<SelectedRecords<'source>>,
+    trigger_records: Option<SelectedRecords<'source>>,
 }
 
 impl<'source> SelectedReputation<'source> {
@@ -109,14 +122,33 @@ impl<'source> SelectedReputation<'source> {
                 Kind::ReputationStandings,
                 cancel,
             )?,
+            contexts: SelectedRecords::read(
+                forge,
+                selection.contexts,
+                Kind::ReputationContexts,
+                cancel,
+            )?,
+            perks: SelectedRecords::read(forge, selection.perks, Kind::ReputationPerks, cancel)?,
+            trigger_records: SelectedRecords::read(
+                forge,
+                selection.trigger_records,
+                Kind::ReputationTriggerRecords,
+                cancel,
+            )?,
         })
     }
 
-    pub(super) fn has_records(&self) -> bool {
-        [&self.faction_reputations, &self.scopes, &self.standings]
-            .into_iter()
-            .flatten()
-            .any(|selection| !selection.records.is_empty())
+    pub(super) fn has_localized_records(&self) -> bool {
+        [
+            &self.faction_reputations,
+            &self.scopes,
+            &self.standings,
+            &self.contexts,
+            &self.perks,
+        ]
+        .into_iter()
+        .flatten()
+        .any(|selection| !selection.records.is_empty())
     }
 
     pub(super) fn project(
@@ -126,58 +158,37 @@ impl<'source> SelectedReputation<'source> {
         cancel: Option<&CancelToken>,
     ) -> Result<ProjectedReputation<'source>, CatalogError> {
         let mut trees = TreeBuilder::new();
-        let faction_reputations = self
-            .faction_reputations
-            .map(|selected| {
-                let (rows, coverage) = selected.project(
-                    &mut trees,
-                    projection,
-                    cancel,
-                    |tree, projection, admission| {
-                        let result = factions::read(tree, projection, admission, cancel)?;
-                        Ok((result.value, result.notes))
-                    },
-                )?;
-                Ok::<_, CatalogError>(reputation_rows(
-                    factions::tables(forge, rows).definitions,
-                    coverage,
-                ))
-            })
-            .transpose()?;
-        let scopes = self
-            .scopes
-            .map(|selected| {
-                let (rows, coverage) = selected.project(
-                    &mut trees,
-                    projection,
-                    cancel,
-                    |tree, projection, admission| {
-                        let result = scopes::read(tree, projection, admission, cancel)?;
-                        Ok((result.value, result.notes))
-                    },
-                )?;
-                Ok::<_, CatalogError>(reputation_rows(scopes::table(forge, rows), coverage))
-            })
-            .transpose()?;
-        let standings = self
-            .standings
-            .map(|selected| {
-                let (rows, coverage) = selected.project(
-                    &mut trees,
-                    projection,
-                    cancel,
-                    |tree, projection, admission| {
-                        let result = standings::read(tree, projection, admission, cancel)?;
-                        Ok((result.value, result.notes))
-                    },
-                )?;
-                Ok::<_, CatalogError>(reputation_rows(standings::table(forge, rows), coverage))
-            })
-            .transpose()?;
+        macro_rules! family {
+            ($selected:ident, $projector:ident, $table:expr) => {
+                self.$selected
+                    .map(|records| {
+                        records.project(
+                            &mut trees,
+                            projection,
+                            cancel,
+                            |tree, projection, admission| {
+                                let read = $projector::read(tree, projection, admission, cancel)?;
+                                Ok((read.value, read.notes))
+                            },
+                            $table,
+                        )
+                    })
+                    .transpose()?
+            };
+            ($selected:ident, $projector:ident) => {
+                family!($selected, $projector, |rows| $projector::table(forge, rows))
+            };
+        }
+
         Ok(ProjectedReputation {
-            faction_reputations,
-            scopes,
-            standings,
+            faction_reputations: family!(faction_reputations, factions, |rows| {
+                factions::tables(forge, rows).definitions
+            }),
+            scopes: family!(scopes, scopes),
+            standings: family!(standings, standings),
+            contexts: family!(contexts, contexts),
+            perks: family!(perks, perks),
+            trigger_records: family!(trigger_records, triggers),
         })
     }
 }
@@ -186,6 +197,9 @@ pub(super) struct ProjectedReputation<'source> {
     pub(super) faction_reputations: Option<ReputationRows<FactionReputationDefinition<'source>>>,
     pub(super) scopes: Option<ReputationRows<ScopeDefinition<'source>>>,
     pub(super) standings: Option<ReputationRows<StandingDefinition<'source>>>,
+    pub(super) contexts: Option<ReputationRows<ContextDefinition<'source>>>,
+    pub(super) perks: Option<ReputationRows<ReputationPerkList<'source>>>,
+    pub(super) trigger_records: Option<ReputationRows<SandboxTriggerRecordDefinition<'source>>>,
 }
 
 fn reputation_rows<Row>(

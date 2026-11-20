@@ -41,7 +41,7 @@ pub(crate) mod faction_identity_definition;
 #[path = "reputation_faction_definition.rs"]
 pub(crate) mod reputation_faction_definition;
 #[path = "reputation_perk.rs"]
-mod reputation_perk;
+pub(crate) mod reputation_perk;
 #[path = "reputation_perk_list.rs"]
 pub(crate) mod reputation_perk_list;
 #[path = "reputation_relation.rs"]
@@ -51,7 +51,7 @@ pub(crate) mod reputation_reward_amount_definition;
 #[path = "reputation_trigger_configuration.rs"]
 pub(crate) mod reputation_trigger_configuration;
 #[path = "sandbox_trigger.rs"]
-mod sandbox_trigger;
+pub(crate) mod sandbox_trigger;
 #[path = "sandbox_trigger_record_definition.rs"]
 pub(crate) mod sandbox_trigger_record_definition;
 
