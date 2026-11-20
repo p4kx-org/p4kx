@@ -69,21 +69,33 @@ pub(crate) fn read_completed<T>(
     directory: &Path,
     consume: impl FnOnce(&mut dyn Read) -> support::TestResult<T>,
 ) -> support::TestResult<T> {
+    let (bytes, decoder) = open_completed_input(directory)?;
+    let mut input = BufReader::new(CountingReader::new(decoder));
+    let projection = consume(&mut input)?;
+    if input.read(&mut [0])? != 0 || input.into_inner().byte_count() != bytes {
+        return Err("decoded catalog length differs from the completed measurement".into());
+    }
+    Ok(projection)
+}
+
+pub(crate) fn read_completed_prefix<T>(
+    directory: &Path,
+    consume: impl FnOnce(&mut dyn Read) -> support::TestResult<T>,
+) -> support::TestResult<T> {
+    let (_, decoder) = open_completed_input(directory)?;
+    consume(&mut BufReader::new(decoder))
+}
+
+fn open_completed_input(directory: &Path) -> support::TestResult<(u64, impl Read)> {
     let measurement = Measurement::load(directory)?;
     let frame = open_frame(directory, &measurement.sizes)?;
     let mut decoder = zstd::stream::read::Decoder::new(frame)?;
     decoder.window_log_max(ZSTD_WINDOW_LOG)?;
-    let limit = measurement
-        .sizes
-        .decoded
+    let bytes = measurement.sizes.decoded;
+    let limit = bytes
         .checked_add(1)
         .ok_or("decoded measurement length overflow")?;
-    let mut input = BufReader::new(CountingReader::new(decoder.take(limit)));
-    let projection = consume(&mut input)?;
-    if input.read(&mut [0])? != 0 || input.into_inner().byte_count() != measurement.sizes.decoded {
-        return Err("decoded catalog length differs from the completed measurement".into());
-    }
-    Ok(projection)
+    Ok((bytes, decoder.take(limit)))
 }
 
 fn reconcile(directory: &Path, sizes: &Sizes) -> support::TestResult<sections::Census> {

@@ -5,10 +5,10 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::env;
 use std::path::{Path, PathBuf};
 
+use p4kx_export::SCHEMA_VERSION;
 use p4kx_export::mining_locations::{
     HarvestableLocation, MiningLocationOptions, MiningLocationSnapshot, read_mining_locations,
 };
-use p4kx_export::{Kind, SCHEMA_VERSION};
 use p4kx_extraction::{Archive, ArchiveWatch, Language, utc_rfc3339};
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -22,6 +22,8 @@ use crate::real_archive_verification::print_line;
 
 #[path = "real_archive_mining_catalog_scope.rs"]
 mod occurrence_text;
+#[path = "real_archive_mining_catalog_preflight.rs"]
+mod preflight;
 #[path = "real_archive_mining_catalog_rows.rs"]
 mod rows;
 
@@ -37,6 +39,7 @@ fn installed_mining_sdk_matches_the_same_complete_catalog() -> TestResult {
     let directory = env::var_os("P4KX_CATALOG_MEASUREMENT_DIR")
         .map(PathBuf::from)
         .ok_or("configure the completed catalog measurement")?;
+    preflight::check(&directory)?;
     let path = p4kx_testkit::real_archive_path().map_err(|_| "configure the matching Archive")?;
     let key = p4kx_testkit::real_archive_key().map_err(|_| "read the configured Archive key")?;
     let archive =
@@ -139,15 +142,7 @@ fn require_same_build_and_complete_scope(
             "complete normal export health",
         )?;
     }
-    for kind in Kind::ALL {
-        if catalog
-            .pointer(&format!("/completeness/{}/status", kind.name()))
-            .and_then(Value::as_str)
-            != Some("complete")
-        {
-            return Err("mining parity requires the complete unfiltered Catalog".into());
-        }
-    }
+    preflight::require_complete_selection(catalog.get("completeness"))?;
     if !snapshot.coverage.language_available
         || snapshot.coverage.archive_inventory_incomplete
         || snapshot.coverage.placement_inventory_incomplete
