@@ -17,11 +17,7 @@ use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
     with_location_entity_declarations,
 };
-use p4kx_extraction::{Archive, Language};
-use p4kx_testkit::{
-    ArchiveBuilder, DataForgeBuilder, TestContainer, TestEntity, TestEntry, TestRecord, TestStruct,
-    TestType, TestValue, entity_schema,
-};
+use p4kx_extraction::Archive;
 
 use super::{
     AMMUNITION, CARGO_LOADING_GLOBALS, FACTION_IDENTITIES, FLARE_LIBRARIES, ITEM_DEFINITIONS,
@@ -45,6 +41,8 @@ mod component_tools;
 mod container_placements;
 #[path = "sdk_contract_routes.rs"]
 mod contracts;
+#[path = "sdk_dataset_fixtures.rs"]
+mod fixtures;
 #[path = "sdk_flight_configuration_routes.rs"]
 mod flight_configurations;
 #[path = "sdk_fuel_routes.rs"]
@@ -74,16 +72,6 @@ mod weapon_animation;
 #[path = "sdk_worn_gear_routes.rs"]
 mod worn_gear;
 
-const ROOT: &str = r"Data\ObjectContainers\PU\system\fixture\fixturesystem.socpak";
-const OFFLINE_SHOP: &str = r"Data\Scripts\ShopInventories\Inv_Fixture.json";
-const FLARE_LIBRARY: &str = r"Data\Libs\Flares\fixture.xml";
-const SUBSUMPTION_FIXTURE: &str = "Data/Libs/Subsumption/Events/synthetic.xml";
-const TILE: &str = r"Data\ObjectContainers\PU\fixture\tile.socpak";
-const ROOT_XML: &[u8] = br#"<ObjectContainer version="14" gridRadius="2"><PhysicsGrid/><ChildObjectContainers>
-    <Child external="true" name="Data\ObjectContainers\PU\fixture\tile.socpak" pos="0,0,0" rot="1,0,0,0"/>
-    <Child external="true" name="Data\ObjectContainers\PU\fixture\missing.socpak" pos="1,0,0" rot="1,0,0,0"/>
-</ChildObjectContainers></ObjectContainer>"#;
-
 pub(super) fn contract_datasets() -> impl Iterator<Item = &'static str> {
     contracts::DATASETS.iter().copied()
 }
@@ -93,8 +81,9 @@ pub(super) fn loot_datasets() -> impl Iterator<Item = &'static str> {
 }
 
 pub(super) fn read() -> TestResult<Vec<Route>> {
-    let (_directory, archive) = fixture()?;
-    let [containers, location_physics, unresolved] = container_placements::read(&archive, ROOT)?;
+    let (_directory, archive) = fixtures::open()?;
+    let [containers, location_physics, unresolved] =
+        container_placements::read(&archive, fixtures::ROOT)?;
     let independent_ammo = read_ammunition(&archive)?;
     let [projectile, reached_ammo, combat, magazine] = projectile_ammo::read()?;
     if independent_ammo.schema != reached_ammo.schema {
@@ -142,7 +131,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
 }
 
 pub(super) fn ammunition() -> TestResult<Route> {
-    let (_directory, archive) = fixture()?;
+    let (_directory, archive) = fixtures::open()?;
     read_ammunition(&archive)
 }
 
@@ -261,7 +250,7 @@ fn read_weapon_recoil(archive: &Archive) -> TestResult<Route> {
 }
 
 fn read_flare_library(archive: &Archive) -> TestResult<Route> {
-    let selection = FlareLibrarySelection::ArchivePath(FLARE_LIBRARY);
+    let selection = FlareLibrarySelection::ArchivePath(fixtures::FLARE_LIBRARY);
     let snapshot = read_flare_libraries(archive, selection, None)?;
     Route::queried_rows(
         FLARE_LIBRARIES,
@@ -273,7 +262,7 @@ fn read_flare_library(archive: &Archive) -> TestResult<Route> {
 fn read_subsumption_event(archive: &Archive) -> TestResult<Route> {
     let snapshot = read_subsumption_events(
         archive,
-        SubsumptionEventSelection::ArchivePath(SUBSUMPTION_FIXTURE),
+        SubsumptionEventSelection::ArchivePath(fixtures::SUBSUMPTION_FIXTURE),
         None,
     )?;
     Route::queried_rows(
@@ -284,122 +273,11 @@ fn read_subsumption_event(archive: &Archive) -> TestResult<Route> {
 }
 
 fn read_shop_inventory(archive: &Archive) -> TestResult<Route> {
-    let selection = ShopInventorySelection::ArchivePath(OFFLINE_SHOP);
+    let selection = ShopInventorySelection::ArchivePath(fixtures::OFFLINE_SHOP);
     let snapshot = read_shop_inventories(archive, selection, None)?;
     Route::queried_rows(
         SHOP_INVENTORIES,
         &snapshot.rows,
         "physical Entry and path query available; installed producer parity open",
-    )
-}
-
-fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
-    let folder = tempfile::tempdir()?;
-    let path = folder.path().join("sdk_routes.p4k");
-    ArchiveBuilder::new()
-        .entry(TestEntry::stored(
-            "Data\\Game2.dcb",
-            fixture_database().build(),
-        ))
-        .entry(TestEntry::stored(
-            Language::German.global_ini_path(),
-            b"fixture=Fixture\n",
-        ))
-        .entry(packed(ROOT, "fixturesystem.xml", ROOT_XML))
-        .entry(packed(TILE, "tile.xml", b"<ObjectContainer/>"))
-        .entry(TestEntry::stored(OFFLINE_SHOP, br#"{"Inventory":[]}"#))
-        .entry(TestEntry::stored(
-            "Data/Libs/GameAudio/RadarAudioData.xml",
-            b"<RadarAudioData><DefaultZoom min='0'/></RadarAudioData>",
-        ))
-        .entry(TestEntry::stored(
-            FLARE_LIBRARY,
-            b"<LensFlareLibrary><FlareItem Name='fixture'/></LensFlareLibrary>",
-        ))
-        .entry(TestEntry::stored(
-            SUBSUMPTION_FIXTURE,
-            b"<Subsumption><Event ID='00000000-0000-0000-0000-000000000001'/></Subsumption>",
-        ))
-        .write_to(&path)?;
-    Ok((folder, Archive::open(path)?))
-}
-
-fn fixture_database() -> DataForgeBuilder {
-    let database = entity_schema(DataForgeBuilder::new().version(8))
-        .structure(TestStruct::new("AmmoParams"))
-        .record(TestRecord::new(
-            1,
-            "AmmoParams",
-            "AmmoParams.FixtureBallistic",
-            "libs/foundry/records/ammoparams/fixture_ballistic.xml",
-        ))
-        .structure(TestStruct::new("WeaponProceduralRecoilConfigDef"))
-        .record(TestRecord::new(
-            2,
-            "WeaponProceduralRecoilConfigDef",
-            "WeaponProceduralRecoilConfigDef.Fixture",
-            "libs/foundry/records/fixture/recoil.xml",
-        ))
-        .structure(TestStruct::new("LocationEntityDeclaration"))
-        .record(TestRecord::new(
-            3,
-            "LocationEntityDeclaration",
-            "LocationEntityDeclaration.Fixture",
-            "libs/foundry/records/fixture/location_entity.xml",
-        ))
-        .structure(TestStruct::new("GlobalCargoLoadingParams"))
-        .record(TestRecord::new(
-            4,
-            "GlobalCargoLoadingParams",
-            "GlobalCargoLoadingParams.Fixture",
-            "libs/foundry/records/fixture/cargo_loading.xml",
-        ))
-        .structure(TestStruct::new("GlobalShopCommodityParams"))
-        .record(TestRecord::new(
-            5,
-            "GlobalShopCommodityParams",
-            "GlobalShopCommodityParams.Fixture",
-            "libs/foundry/records/fixture/shop_commodity.xml",
-        ))
-        .structure(TestStruct::new("SCItemManufacturer").field("Code", TestType::String))
-        .record(
-            TestRecord::new(
-                6,
-                "SCItemManufacturer",
-                "SCItemManufacturer.FixtureMaker",
-                "libs/foundry/records/scitemmanufacturer/fixture.xml",
-            )
-            .value("Code", TestValue::text("FIX")),
-        )
-        .record(
-            TestEntity::new(
-                7,
-                "FixtureTool",
-                "libs/foundry/records/entities/scitem/fixture/tool.xml",
-            )
-            .attach_type("Misc")
-            .record(),
-        )
-        .record(commodities::fixture_record());
-    with_faction_identity(database)
-}
-
-fn with_faction_identity(database: DataForgeBuilder) -> DataForgeBuilder {
-    database
-        .structure(TestStruct::new("FactionIdentity"))
-        .record(TestRecord::new(
-            9,
-            "FactionIdentity",
-            "FactionIdentity.Fixture",
-            "libs/foundry/records/fixture/faction_identity.xml",
-        ))
-}
-
-fn packed(path: &str, file: &str, xml: &[u8]) -> TestEntry {
-    TestEntry::stored(
-        path,
-        TestContainer::new()
-            .entry(TestEntry::stored(file, xml))
-            .build(),
     )
 }
