@@ -66,16 +66,13 @@ pub(crate) fn admit(directory: Directory, source: &Source) -> Result<Directory, 
     } = directory;
     let mut admitted = Vec::with_capacity(entries.len());
     let mut kept = IssueLog::default();
-    let mut dropped = 0;
     let mut listed = log.listed.into_iter().peekable();
     let mut raw_paths = log.raw_paths.into_iter().peekable();
     for (position, mut entry) in entries.into_iter().enumerate() {
         let index = admitted.len();
-        let folder = entry.path.ends_with(['\\', '/']) && entry.uncompressed_size == 0;
+        let folder = entry.is_empty_folder();
         while let Some((_, issue)) = listed.next_if(|(at, _)| *at == position) {
-            if folder {
-                dropped += 1;
-            } else {
+            if !folder {
                 kept.listed.push((index, issue));
             }
         }
@@ -94,7 +91,7 @@ pub(crate) fn admit(directory: Directory, source: &Source) -> Result<Directory, 
         entry.index = u32::try_from(index).unwrap_or(u32::MAX);
         admitted.push(entry);
     }
-    kept.count = log.count.saturating_sub(dropped);
+    kept.count = log.count - log.empty_folder_issues;
     check_disjoint(&admitted, source)?;
     Ok(Directory {
         entries: admitted,

@@ -75,7 +75,9 @@ pub(crate) fn parse_entries(
             original_directory_ordinal: Some(ordinal),
             source_len: metadata.source_len(),
         };
+        let count_before = log.count;
         let entry = parse_entry(&mut reader, position, &mut log)?;
+        log.record_empty_folder_issues(&entry, count_before);
         entries.push(entry);
     }
     Ok(Directory {

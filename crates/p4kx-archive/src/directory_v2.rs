@@ -47,6 +47,7 @@ pub(crate) fn read_entries(
     let mut installed = ByteReader::with_base(&progress, trailer.payload_end);
     let mut record_offset = trailer.directory_offset;
     for record in directory.as_chunks::<RECORD_LEN>().0 {
+        let count_before = log.count;
         let mut entry = parse_record(
             record,
             record_offset,
@@ -63,6 +64,7 @@ pub(crate) fn read_entries(
             ));
         }
         entry.installed_bytes = Some(installed_bytes);
+        log.record_empty_folder_issues(&entry, count_before);
         entries.push(entry);
         record_offset += RECORD_LEN as u64;
     }

@@ -211,6 +211,7 @@ fn finish(
         return Ok(Outcome::OverBudget);
     }
     let mut log = IssueLog::default();
+    let count_before = log.count;
     let Ok(header) = parse_header(record, candidate, index, &mut log, source.len()) else {
         return Ok(Outcome::Rejected);
     };
@@ -236,6 +237,7 @@ fn finish(
     {
         log.record(index, EntryIssue::DataOutsideFile);
     }
+    log.record_empty_folder_issues(&entry, count_before);
     Ok(Outcome::Found(Box::new(Found {
         entry,
         len,

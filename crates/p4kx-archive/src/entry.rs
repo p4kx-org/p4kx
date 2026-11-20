@@ -60,6 +60,12 @@ impl Entry {
         self.index as usize
     }
 
+    /// Returns whether container admission removes this empty directory Entry.
+    #[must_use]
+    pub(crate) fn is_empty_folder(&self) -> bool {
+        self.path.ends_with(['\\', '/']) && self.uncompressed_size == 0
+    }
+
     /// Returns the path of the Entry inside the Archive, with backslash separators as stored; the
     /// Entries of a container always use backslashes.
     #[must_use]

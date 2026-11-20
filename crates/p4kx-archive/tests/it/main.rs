@@ -7,6 +7,7 @@ mod archive_key;
 mod archive_metadata;
 mod build;
 mod build_manifest_origin;
+mod container_issue_count;
 mod container_limits;
 mod containers;
 mod decoding;

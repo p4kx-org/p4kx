@@ -83,6 +83,7 @@ impl EntryIssue {
 pub(crate) struct IssueLog {
     pub(crate) listed: Vec<(usize, EntryIssue)>,
     pub(crate) count: usize,
+    pub(crate) empty_folder_issues: usize,
     pub(crate) raw_paths: Vec<(usize, Box<[u8]>)>,
     seen: (usize, u8),
 }
@@ -107,8 +108,16 @@ impl IssueLog {
         }
     }
 
+    /// Retains the diagnostic count of an Entry removed by container admission.
+    pub(crate) fn record_empty_folder_issues(&mut self, entry: &Entry, count_before: usize) {
+        if entry.is_empty_folder() {
+            self.empty_folder_issues += self.count - count_before;
+        }
+    }
+
     /// Takes over the defects `other` recorded, which carry the Entry positions they were read at.
     pub(crate) fn absorb(&mut self, other: Self) {
+        self.empty_folder_issues += other.empty_folder_issues;
         for (index, issue) in other.listed {
             self.record(index, issue);
         }
