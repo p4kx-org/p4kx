@@ -25,6 +25,8 @@ mod head;
 mod head_move;
 mod hidden;
 mod jobs;
+mod layered_worn;
+mod layered_worn_free;
 mod loadout;
 mod lod_morphs;
 mod look;

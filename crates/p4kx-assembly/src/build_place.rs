@@ -125,7 +125,14 @@ pub(crate) fn place(
         return PlacedPart::unanchored(Placement::Origin, None);
     };
     let port_definition = port.definition();
-    let definition = port_definition.and_then(PortDefinition::transform);
+    let resolved = port.placement_helper();
+    if let Some(diagnostic) = resolved.diagnostic {
+        issues.push(issue(
+            draft,
+            IssueKind::PortHelperUnresolved(Box::new(diagnostic)),
+        ));
+    }
+    let definition = resolved.transform;
     let helper = definition
         .map(PortTransform::helper)
         .filter(|helper| !helper.is_empty());

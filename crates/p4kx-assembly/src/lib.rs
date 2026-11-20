@@ -162,12 +162,14 @@ mod pick;
 mod placement;
 mod plan;
 mod port;
+mod port_helper_selection;
 mod port_placement_origin;
 mod port_sub_helper;
 mod positioned_loadout;
 mod prefab;
 mod provider;
 mod read;
+mod resolved_port_helper;
 mod resolver;
 mod resolver_observation;
 mod resolver_path_read;
@@ -286,6 +288,10 @@ pub use palette::{
 pub use pick::LoadoutPicks;
 pub use placement::offset_transform;
 pub use port::{PortDefinition, PortDefinitionPosition, PortTransform, PortType};
+pub use port_helper_selection::{
+    PortHelperChoice, PortHelperObservation, PortHelperPath, PortHelperProblem,
+    PortHelperSelection, PortHelperTagMatch,
+};
 pub use port_placement_origin::{PortPlacementField, PortPlacementSource};
 pub use port_sub_helper::PortSubHelper;
 pub use positioned_loadout::{PositionedLoadout, PositionedLoadoutNode};
@@ -300,6 +306,7 @@ pub use provider::{
     ArchiveModels, ModelFailure, ModelProvider, ProvidedAttachment, ProvidedModel,
     archive_entry_candidates,
 };
+pub use resolved_port_helper::PortHelperDiagnostic;
 pub use resolver::LoadoutResolver;
 pub use resolver_observation::{LoadoutReadEvent, LoadoutReadObserver};
 pub use room_model_helper::RoomModelHelper;

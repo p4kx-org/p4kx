@@ -143,7 +143,7 @@ fn worn(
             let folder = resolver
                 .npc_head(&tree)
                 .and_then(|head| head.folder().map(str::to_owned));
-            let (pieces, replaced) = Piece::layer(resolver.worn(&tree), given);
+            let (pieces, replaced) = resolver.worn_layered(&tree, given);
             (pieces, replaced, folder)
         }
         None => (given, Vec::new(), None),

@@ -11,8 +11,10 @@ use crate::read;
 pub struct PortSubHelper {
     parent: Option<usize>,
     ordinal: usize,
-    tags: Option<Box<str>>,
+    pub(crate) tags: AuthoredHelperTags,
     transform: Option<PortTransform>,
+    pub(crate) children: HelperChildren,
+    pub(crate) helper_unreadable: bool,
 }
 
 impl PortSubHelper {
@@ -31,7 +33,7 @@ impl PortSubHelper {
     /// Returns the authored tag selector.
     #[must_use]
     pub fn tags(&self) -> Option<&str> {
-        self.tags.as_deref()
+        self.tags.text()
     }
 
     /// Returns this node's transform when it declares a helper.
@@ -41,27 +43,88 @@ impl PortSubHelper {
     }
 }
 
-pub(crate) fn tags(node: &StructValue<'_>) -> Option<Box<str>> {
-    match node.field("Tags") {
-        Some(Value::String(tags)) => Some((*tags).into()),
-        _ => None,
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) enum AuthoredHelperTags {
+    #[default]
+    Absent,
+    Text(Box<str>),
+    Unreadable,
+}
+
+impl AuthoredHelperTags {
+    pub(crate) fn text(&self) -> Option<&str> {
+        match self {
+            Self::Text(text) => Some(text),
+            Self::Absent | Self::Unreadable => None,
+        }
     }
 }
 
-pub(crate) fn read(root: &StructValue<'_>, attachment: &str) -> Box<[PortSubHelper]> {
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub(crate) enum HelperChildren {
+    #[default]
+    Read,
+    Unreadable,
+    UnreadableSlot(usize),
+}
+
+#[derive(Debug, Clone, Default, PartialEq)]
+pub(crate) struct PortSubHelpers {
+    pub(crate) root_tags: AuthoredHelperTags,
+    pub(crate) root_unreadable: bool,
+    pub(crate) root_children: HelperChildren,
+    pub(crate) nodes: Box<[PortSubHelper]>,
+}
+
+fn tags(node: &StructValue<'_>) -> AuthoredHelperTags {
+    match node.field("Tags") {
+        None => AuthoredHelperTags::Absent,
+        Some(Value::String(tags)) => AuthoredHelperTags::Text((*tags).into()),
+        _ => AuthoredHelperTags::Unreadable,
+    }
+}
+
+pub(crate) fn read(attachment: Option<&Value<'_>>, kind: &str) -> PortSubHelpers {
+    let root = match attachment {
+        None | Some(Value::Null) => return PortSubHelpers::default(),
+        Some(Value::Struct(attachment)) => attachment.field("Helper"),
+        _ => return unreadable_tree(),
+    };
+    let root = match root {
+        None | Some(Value::Null) => return PortSubHelpers::default(),
+        Some(Value::Struct(root)) => root,
+        _ => return unreadable_tree(),
+    };
     let mut helpers = Vec::new();
     let mut pending = Vec::new();
-    push_children(root, None, &mut pending);
+    let root_children = push_children(root, None, &mut pending);
     while let Some(child) = pending.pop() {
-        push_children(child.node, Some(helpers.len()), &mut pending);
+        let children = push_children(child.node, Some(helpers.len()), &mut pending);
         helpers.push(PortSubHelper {
             parent: child.parent,
             ordinal: child.ordinal,
             tags: tags(child.node),
-            transform: PortTransform::read(child.node, attachment),
+            transform: PortTransform::read(child.node, kind),
+            children,
+            helper_unreadable: matches!(
+                child.node.field("Helper"),
+                Some(value) if !matches!(value, Value::Null | Value::Struct(_))
+            ),
         });
     }
-    helpers.into_boxed_slice()
+    PortSubHelpers {
+        root_tags: tags(root),
+        root_unreadable: false,
+        root_children,
+        nodes: helpers.into_boxed_slice(),
+    }
+}
+
+fn unreadable_tree() -> PortSubHelpers {
+    PortSubHelpers {
+        root_unreadable: true,
+        ..PortSubHelpers::default()
+    }
 }
 
 struct Pending<'tree, 'source> {
@@ -74,23 +137,25 @@ fn push_children<'tree, 'source>(
     node: &'tree StructValue<'source>,
     parent: Option<usize>,
     pending: &mut Vec<Pending<'tree, 'source>>,
-) {
-    let Some(Value::Array(children)) = node.field("SubHelpers") else {
-        return;
+) -> HelperChildren {
+    let children = match node.field("SubHelpers") {
+        None | Some(Value::Null) => return HelperChildren::Read,
+        Some(Value::Array(children)) => children,
+        _ => return HelperChildren::Unreadable,
     };
-    pending.extend(
-        children
-            .iter()
-            .enumerate()
-            .rev()
-            .filter_map(|(ordinal, child)| {
-                read::as_struct(child).map(|node| Pending {
-                    parent,
-                    ordinal,
-                    node,
-                })
-            }),
-    );
+    let mut outcome = HelperChildren::Read;
+    for (ordinal, child) in children.iter().enumerate().rev() {
+        if let Some(node) = read::as_struct(child) {
+            pending.push(Pending {
+                parent,
+                ordinal,
+                node,
+            });
+        } else if !matches!(child, Value::Null) {
+            outcome = HelperChildren::UnreadableSlot(ordinal);
+        }
+    }
+    outcome
 }
 
 #[cfg(test)]

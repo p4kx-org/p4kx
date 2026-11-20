@@ -87,7 +87,8 @@ impl Armour {
         let mut issues = Vec::new();
         let jobs = planned(variant, pieces, models, options.max_parts, &mut issues);
         let loaded = read_models(&jobs, models, options)?;
-        let chosen = choose(&jobs, &loaded, options.max_vertices, &mut issues);
+        let mut chosen = choose(&jobs, &loaded, options.max_vertices, &mut issues);
+        super::mount::omit_unbound(&jobs, &mut chosen, options.lod, &mut issues);
         let libraries = read_libraries(&jobs, &chosen, models);
         let unnamed = Library::from(ArchiveMaterialRead::unobserved(MaterialStatus::Unnamed));
         let covering = covering(&jobs, &chosen, variant);
@@ -123,15 +124,14 @@ impl Armour {
                 dressed.shape_sources,
             ));
         }
-        let skeleton = settled(
+        let (skeleton, parts) = finish_parts(
             body.skeleton,
-            &mut parts,
+            parts,
             heads,
-            &part_jobs,
+            part_jobs,
             options.lod,
             &mut issues,
         );
-        check_follows(&mut parts, &mut issues);
         Ok(Self {
             variant,
             skeleton: Arc::new(skeleton),
@@ -143,6 +143,24 @@ impl Armour {
             lod: options.lod,
         })
     }
+}
+
+fn finish_parts(
+    skeleton: Model,
+    mut parts: Vec<ArmourPart>,
+    heads: Vec<Found>,
+    jobs: Vec<&Job>,
+    level: u32,
+    issues: &mut Vec<Issue>,
+) -> (Model, Vec<ArmourPart>) {
+    let skeleton = settled(skeleton, &mut parts, heads, &jobs, level, issues);
+    check_follows(&mut parts, issues);
+    let parts = parts
+        .into_iter()
+        .zip(jobs)
+        .filter_map(|(part, job)| super::mount::included(part, job, level))
+        .collect();
+    (skeleton, parts)
 }
 
 /// Returns the part a job is worn as, with its model and materials, the morph targets it was built

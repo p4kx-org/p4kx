@@ -18,7 +18,7 @@ enum Holder<'a> {
     /// The character: the root of the tree.
     Body,
     /// A worn piece of this name.
-    Piece(&'a str),
+    Piece(usize, &'a str),
     /// An Entity that is not worn, whose geometry is not drawn.
     Other,
 }
@@ -29,13 +29,20 @@ impl Holder<'_> {
     fn mount(self, port: &PortNode) -> Option<Mount> {
         let holder = match self {
             Self::Body => None,
-            Self::Piece(name) => Some(name.to_owned()),
+            Self::Piece(index, name) => Some((index, name.to_owned())),
             Self::Other => return None,
         };
         let definition = port.definition()?;
-        let transform = definition.transform()?;
-        (!definition.is_skin() && !transform.helper().is_empty())
-            .then(|| Mount::new(holder, transform))
+        let resolved = port.placement_helper();
+        let transform = resolved.transform?;
+        (!definition.is_skin() && !transform.helper().is_empty()).then(|| {
+            Mount::new(
+                holder,
+                definition.position(),
+                transform,
+                resolved.diagnostic,
+            )
+        })
     }
 }
 
@@ -99,13 +106,7 @@ impl Piece {
         let mut replaced = Vec::new();
         let mut pieces = Vec::with_capacity(base.len().saturating_add(over.len()));
         for piece in base {
-            let taken_by = piece.item_type().and_then(|item_type| {
-                over.iter().find(|other| {
-                    other
-                        .item_type()
-                        .is_some_and(|other| other.eq_ignore_ascii_case(item_type))
-                })
-            });
+            let taken_by = replacement_index(&piece, &over).and_then(|index| over.get(index));
             if let (Some(by), Some(item_type)) = (taken_by, piece.item_type()) {
                 replaced.push(Replaced {
                     name: piece.name.clone(),
@@ -119,6 +120,15 @@ impl Piece {
         pieces.extend(over);
         (pieces, replaced)
     }
+}
+
+pub(super) fn replacement_index(piece: &Piece, over: &[Piece]) -> Option<usize> {
+    let item_type = piece.item_type()?;
+    over.iter().position(|other| {
+        other
+            .item_type()
+            .is_some_and(|other| other.eq_ignore_ascii_case(item_type))
+    })
 }
 
 impl<'f> LoadoutResolver<'f> {
@@ -163,6 +173,7 @@ impl<'f> LoadoutResolver<'f> {
             docked_vehicle: false,
 
             attach_tags: Vec::new(),
+            requires_attachment_tags: false,
             material_variants: Vec::new(),
             size: None,
             container: None,
@@ -189,16 +200,30 @@ impl<'f> LoadoutResolver<'f> {
     /// an Entity that is not worn, such as a weapon, is listed as failed, and other Entities are
     /// not pieces.
     pub fn worn(&mut self, tree: &EntityNode) -> Vec<Piece> {
+        self.worn_located(tree, |_, _| {})
+    }
+
+    pub(super) fn worn_located<'node>(
+        &mut self,
+        tree: &'node EntityNode,
+        mut observe: impl FnMut(usize, &'node EntityNode),
+    ) -> Vec<Piece> {
         let mut pieces: Vec<Piece> = failures(tree.issues(), tree.record_path()).collect();
-        self.collect_worn(tree.ports(), (true, Holder::Body), &mut pieces);
+        self.collect_worn(
+            tree.ports(),
+            (true, Holder::Body),
+            &mut pieces,
+            &mut observe,
+        );
         pieces
     }
 
-    fn collect_worn(
+    fn collect_worn<'node>(
         &mut self,
-        ports: &[PortNode],
+        ports: &'node [PortNode],
         (relevant, holder): (bool, Holder<'_>),
         pieces: &mut Vec<Piece>,
+        observe: &mut impl FnMut(usize, &'node EntityNode),
     ) {
         for port in ports {
             let mut below = None;
@@ -206,6 +231,7 @@ impl<'f> LoadoutResolver<'f> {
                 Attachment::Entity(node) => {
                     let name = is_worn_type(node.attach_type())
                         .then(|| format!("{}/{}", port.name(), node.class_name()));
+                    let mut piece_index = None;
                     if let Some(name) = &name
                         && let Some(spec) = self.spec_of(node)
                     {
@@ -219,12 +245,14 @@ impl<'f> LoadoutResolver<'f> {
                             Err(error) => Piece::failed(name.clone(), error.to_string()),
                         };
                         let piece = piece.at_port(port.name());
+                        observe(pieces.len(), node);
+                        piece_index = Some(pieces.len());
                         pieces.push(match holder.mount(port) {
                             Some(mount) => piece.mounted(mount),
                             None => piece,
                         });
                     }
-                    below = Some((node, name));
+                    below = Some((node, name, piece_index));
                 }
                 Attachment::Unresolved(unresolved) if relevant => {
                     let named = match unresolved.target() {
@@ -237,10 +265,12 @@ impl<'f> LoadoutResolver<'f> {
                 }
                 _ => {}
             }
-            self.collect_worn(port.nested(), (relevant, holder), pieces);
-            if let Some((node, name)) = &below {
-                let inside = name.as_deref().map_or(Holder::Other, Holder::Piece);
-                self.collect_worn(node.ports(), (name.is_some(), inside), pieces);
+            self.collect_worn(port.nested(), (relevant, holder), pieces, observe);
+            if let Some((node, name, index)) = &below {
+                let inside = index
+                    .zip(name.as_deref())
+                    .map_or(Holder::Other, |(index, name)| Holder::Piece(index, name));
+                self.collect_worn(node.ports(), (name.is_some(), inside), pieces, observe);
             }
         }
     }

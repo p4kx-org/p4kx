@@ -536,7 +536,10 @@ landing gear, or the bone of a bone attachment, is no node of the Entity's model
 parent's origin, a bone attachment at the part's; not reported when the parent has no model,
 whose own Issue says why) and `too_many_parts`, `too_many_vertices`
 and `too_deep` (a limit of [ADR-0040](adr/0040-the-assembly-places-parts-at-port-helpers-and-owns-their-material-libraries.md)
-was reached). New kinds may be added in later versions.
+was reached). `port_helper_unresolved` records that an authored helper selector or tree
+could not establish a more specific transform. The Issue text identifies the physical port
+and original helper position. A usable root transform still places the attachment.
+New kinds may be added in later versions.
 
 ## `p4kx entity package <archive> <entity> --out <folder> --json`
 
@@ -801,6 +804,11 @@ its sub-type names, else (a generic head) the one the sub-type or model folder o
 `Char_Body` Entity names, which `--body` overrides, `bespoke_folder` the folder of the character's own head skins
 (or `null` when its material library is in no folder of its own) and `parts` the pieces of the
 head. `material` of a part is the material library it is drawn with, `null` when it has none.
+
+`worn_mount_unresolved` has `skipped: true` when an explicit loadout overlay cannot
+bind a rigid mesh to a unique compatible holder port and its helper. `port_helper_unresolved`
+has `skipped: false` when a mounted piece uses the root helper with an unresolved selector.
+The `reason` includes the original physical port and helper position for that note.
 
 `--anim NAME` (repeatable, `all` for every one) and `--anim-from ENTRY` write the animations of
 the body variant's folders on the body skeleton, those of the character's own folder

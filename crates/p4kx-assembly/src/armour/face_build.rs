@@ -151,7 +151,7 @@ fn note_fit(job: &Job, part: &ArmourPart, skeleton: &Model, level: u32, issues: 
         return;
     };
     if is_unskinned(model, level) {
-        if part.mount.is_none() {
+        if part.mount.is_none() && !job.overlay_mount.requires_mount() {
             issues.push(issue(job, IssueKind::NotSkinned));
         }
         return;

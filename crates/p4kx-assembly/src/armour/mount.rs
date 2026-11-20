@@ -6,7 +6,9 @@ use p4kx_model::{Bone, BoneMatch, Model};
 
 use super::ArmourPart;
 use super::jobs::{Job, issue};
+use super::layered_worn::OverlayMount;
 use super::piece::Mount;
+use super::read_models::Loaded;
 use crate::placement::{bone_transform, is_unskinned, node_transform, offset_transform};
 use crate::{Issue, IssueKind};
 
@@ -24,22 +26,57 @@ pub(super) fn place(
     issues: &mut Vec<Issue>,
 ) {
     for (index, job) in jobs.iter().enumerate() {
-        let Some(mount) = &job.mount else { continue };
         if !parts
             .get(index)
             .is_some_and(|part| is_unskinned(&part.model, level))
         {
             continue;
         }
-        match mounted(parts, index, mount, skeleton) {
+        let Some(mount) = &job.mount else { continue };
+        match mounted(parts, jobs, index, mount, skeleton, level) {
             Ok(placed) => {
+                if let Some(diagnostic) = &mount.helper_diagnostic {
+                    issues.push(issue(
+                        job,
+                        IssueKind::PortHelperUnresolved(diagnostic.clone()),
+                    ));
+                }
                 if let Some(part) = parts.get_mut(index) {
                     part.mount = Some(placed);
                 }
             }
+            Err(_) if job.overlay_mount.requires_mount() => issues.push(issue(
+                job,
+                IssueKind::WornMountUnresolved(
+                    "the current holder or its authored helper is absent from the exported model",
+                ),
+            )),
             Err(helper) => issues.push(issue(job, IssueKind::HelperNotFound { helper })),
         }
     }
+}
+
+pub(super) fn omit_unbound(
+    jobs: &[Job],
+    models: &mut [Option<&Loaded>],
+    level: u32,
+    issues: &mut Vec<Issue>,
+) {
+    for (job, model) in jobs.iter().zip(models) {
+        if let OverlayMount::Unresolved(reason) = job.overlay_mount
+            && model.is_some_and(|model| is_unskinned(&model.model, level))
+        {
+            issues.push(issue(job, IssueKind::WornMountUnresolved(reason.message())));
+            *model = None;
+        }
+    }
+}
+
+pub(super) fn included(part: ArmourPart, job: &Job, level: u32) -> Option<ArmourPart> {
+    (!job.overlay_mount.requires_mount()
+        || part.mount.is_some()
+        || !is_unskinned(&part.model, level))
+    .then_some(part)
 }
 
 /// Returns the bones of the first level of `model`, the ones [`bone_transform`] looks in.
@@ -52,10 +89,31 @@ fn bones_of(model: &Model) -> &[Bone] {
 
 /// Returns the model that holds the helper of `mount`: the skeleton of the body, or the piece it
 /// names; `None` when that piece is not worn.
-fn holder<'a>(parts: &'a [ArmourPart], mount: &Mount, skeleton: &'a Model) -> Option<&'a Model> {
+fn holder<'a>(
+    parts: &'a [ArmourPart],
+    jobs: &[&Job],
+    mount: &Mount,
+    binding: OverlayMount,
+    skeleton: &'a Model,
+    level: u32,
+) -> Option<&'a Model> {
     let Some(name) = &mount.holder else {
         return Some(skeleton);
     };
+    if binding == OverlayMount::Bound {
+        let index = mount.holder_index?;
+        let mut matches = parts
+            .iter()
+            .zip(jobs)
+            .filter(|(part, job)| job.overlay_index == Some(index) && part.name == *name);
+        let (part, job) = matches.next()?;
+        if matches.next().is_some()
+            || (job.overlay_mount.requires_mount() && is_unskinned(&part.model, level))
+        {
+            return None;
+        }
+        return Some(&part.model);
+    }
     parts
         .iter()
         .find(|part| part.name == *name)
@@ -71,12 +129,15 @@ fn holder<'a>(parts: &'a [ArmourPart], mount: &Mount, skeleton: &'a Model) -> Op
 /// Returns the name of the helper when the holder has no such bone or it cannot be placed.
 fn mounted(
     parts: &[ArmourPart],
+    jobs: &[&Job],
     index: usize,
     mount: &Mount,
     skeleton: &Model,
+    level: u32,
 ) -> Result<RigMount, String> {
     let missing = || mount.helper.clone();
-    let holder = holder(parts, mount, skeleton).ok_or_else(missing)?;
+    let binding = jobs.get(index).ok_or_else(missing)?.overlay_mount;
+    let holder = holder(parts, jobs, mount, binding, skeleton, level).ok_or_else(missing)?;
     let held = bones_of(holder);
     let at = held
         .iter()

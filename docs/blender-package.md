@@ -310,6 +310,8 @@ animations (`--anim`, `--anim-from`), all as `chf glb` and `armour glb` take the
 ([ADR-0107](adr/0107-a-character-is-written-as-one-rigged-glb-mesh-behind-a-character-node.md)).
 `--materials textures` (the default) embeds the textures at `--texture-mip` in the GLB,
 `--materials colours` writes plain colours. The output rules are those of `entity package`.
+Rigid pieces use the same physical holder port and bone transform as `armour glb`.
+A loadout overlay resolves the slot against its current holder before producing the rig.
 
 A Character package (version 1.3) is the folder above with one mesh and no texture files:
 

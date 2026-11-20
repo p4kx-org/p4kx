@@ -4,7 +4,7 @@
 use thiserror::Error;
 
 use crate::issue_text::{animations_left_out, attachments_left_out};
-use crate::{ContainerAmbiguity, LoadoutError};
+use crate::{ContainerAmbiguity, LoadoutError, PortHelperDiagnostic};
 
 /// What went wrong with a part of an Assembly.
 #[derive(Debug, Clone, PartialEq, Error)]
@@ -28,8 +28,7 @@ pub enum IssueKind {
         /// The path of the sub-geometry.
         path: String,
     },
-    /// The sub-geometry tagged for the body of the character does not exist, so the part has no
-    /// model; the main geometry, a placeholder, is not drawn instead.
+    /// The body variant's model is missing, so the placeholder is left out.
     #[error("the {body} sub-geometry {path} does not exist")]
     BodyGeometryMissing {
         /// The body variant the sub-geometry is tagged for, e.g. `Male`.
@@ -71,22 +70,25 @@ pub enum IssueKind {
         /// The failed selection or compatibility rule.
         reason: &'static str,
     },
-    /// The helper of a port or of an object container is no node of the model of the Entity it
-    /// belongs to, so the part or the container sits at that Entity's origin.
+    /// The attachment uses its root helper while the tag selector remains unresolved.
+    #[error(transparent)]
+    PortHelperUnresolved(Box<PortHelperDiagnostic>),
+    /// The model lacks the named helper, so the attachment stays at the Entity's origin.
     #[error("the helper {helper} is no node of the Entity's model")]
     HelperNotFound {
         /// The helper the port or the container names.
         helper: String,
     },
-    /// The geometry is a character definition (`.cdf`); its skin is drawn and the files of its
-    /// other attachments are not.
+    /// The rigid piece has no valid mount after a worn overlay.
+    #[error("the rigid piece cannot be mounted: {0}")]
+    WornMountUnresolved(&'static str),
+    /// A character definition's skin is drawn and its attachments are omitted.
     #[error("{}", attachments_left_out(.files))]
     AttachmentsLeftOut {
         /// The files of the attachments that are not drawn.
         files: Vec<String>,
     },
-    /// The skeleton file of a character definition (`.cdf`) does not exist; the skin is drawn as
-    /// it is.
+    /// The character definition has no skeleton file, so the skin is drawn as it is.
     #[error("the skeleton {path} the character definition names does not exist")]
     SkeletonMissing {
         /// The path the definition names, with `/` as separator.

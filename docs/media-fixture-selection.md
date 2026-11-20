@@ -288,6 +288,29 @@ native Windows AMD64 with Blender 5.3.0
 (`02f0899d78e3`). The former rendered explicit Emittance. The latter verified packed alpha and
 the palette roughness graph.
 
+## Worn helper placement in Blender
+
+Generate the opt-in worn fixture under a new absolute directory with
+`P4KX_TEST_WORN_HELPER_FIXTURE=1` and
+`cargo run --locked -p p4kx-testkit --example blender_consumer_fixture -- <fixture-directory>`.
+Its `worn-helper.p4k` and synthetic key are test inputs. Export two packages
+from the same `Mount_Courier` loadout into separate `original` and
+`replacement` subdirectories under an absolute package directory.
+
+```powershell
+$arguments = @('--key-file', "$fixtureDirectory/synthetic.key", 'character', 'package',
+    "$fixtureDirectory/worn-helper.p4k", '--body', 'male', '--loadout', 'Mount_Courier',
+    '--materials', 'colours')
+& $p4kx @arguments --name original --out "$packageDirectory/original"
+& $p4kx @arguments --piece Mount_New_Carrier --name replacement --out "$packageDirectory/replacement"
+$addon = (Resolve-Path -LiteralPath 'blender_addon').ProviderPath
+& $blender --background --factory-startup --offline-mode --disable-autoexec --threads 1 --python-exit-code 1 --python-expr 'import sys; sys.dont_write_bytecode = True' --python blender_addon/tests/blender_worn_helper_package.py -- $addon $packageDirectory
+```
+
+Blender 5.3 checks the expected positions of both rigid pieces and their locators,
+their spine parent and one drawn vertex following a pose while the pelvis stays fixed.
+The original fixture uses a 0.2 m port offset. The replacement uses its own 0.8 m offset.
+
 ## Native package exchange in CI
 
 The focused job builds the native P4KX CLI on each row of the

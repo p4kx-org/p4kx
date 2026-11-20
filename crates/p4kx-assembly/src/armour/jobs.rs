@@ -7,6 +7,7 @@ use p4kx_character::Dna;
 use p4kx_extraction::SourceLocation;
 
 use super::hidden;
+use super::layered_worn::OverlayMount;
 use super::piece::{Mount, Note, Source};
 use super::wearable::{Unfit, Worn};
 use super::{BodyVariant, Expressions, Look, PartOrigin, Piece, Wearable, ZoneChunk};
@@ -31,6 +32,8 @@ pub(super) struct Job {
     pub(super) bespoke: bool,
     pub(super) zones: Arc<[ZoneChunk]>,
     pub(super) mount: Option<Mount>,
+    pub(super) overlay_mount: OverlayMount,
+    pub(super) overlay_index: Option<usize>,
 }
 
 impl Job {
@@ -53,6 +56,8 @@ impl Job {
             bespoke: false,
             zones: Arc::default(),
             mount: None,
+            overlay_mount: OverlayMount::Original,
+            overlay_index: None,
         }
     }
 }
@@ -173,6 +178,8 @@ pub(super) fn gather(
         follows_head: piece.follows_head,
         bespoke,
         mount: piece.mount.clone(),
+        overlay_mount: piece.overlay_mount,
+        overlay_index: piece.overlay_index,
     });
 }
 

@@ -4,7 +4,7 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use p4kx_dataforge::{Guid, RecordTree, StructValue};
+use p4kx_dataforge::{Guid, RecordTree, StructValue, Value};
 
 use crate::ItemClassification;
 use crate::LoadoutXmlClassUse;
@@ -121,6 +121,7 @@ pub(crate) struct EntitySpec {
     pub(crate) docked_vehicle: bool,
     pub(crate) classification: ItemClassification,
     pub(crate) attach_tags: Vec<String>,
+    pub(crate) requires_attachment_tags: bool,
     pub(crate) material_variants: Vec<MaterialVariant>,
     pub(crate) size: Option<u32>,
     pub(crate) container: Option<Guid>,
@@ -163,6 +164,8 @@ impl EntitySpec {
         let classification = ItemClassification::read(tree, attachable);
         Self {
             attach_tags: tag_words(attach_tags),
+            requires_attachment_tags: definition
+                .is_some_and(|definition| has_tag_requirements(definition.field("RequiredTags"))),
             material_variants: geometry_component.map_or_default(|(ordinal, component)| {
                 MaterialVariant::read(component, position(ordinal))
             }),
@@ -356,8 +359,16 @@ fn is_docked_vehicle_type(attach_type: &str) -> bool {
         .is_some_and(|prefix| prefix.eq_ignore_ascii_case(DOCKED_VEHICLE_TYPE.as_bytes()))
 }
 
-/// Returns the words of a tag list as the game writes it: white space separated, a word such as
-/// `$$hairVar_Brown++` stands for the tag `hairVar_Brown`.
+/// Returns whether the field has or may have authored tag requirements.
+pub(crate) fn has_tag_requirements(value: Option<&Value<'_>>) -> bool {
+    match value {
+        None | Some(Value::Null) => false,
+        Some(Value::String(tags)) => !tags.trim().is_empty(),
+        _ => true,
+    }
+}
+
+/// Splits an authored tag list, stripping the dollar and plus markers around each word.
 fn tag_words(tags: &str) -> Vec<String> {
     tags.split_whitespace()
         .map(|word| word.trim_matches(['$', '+']))

@@ -23,7 +23,9 @@ impl IssueKind {
             Self::MaterialLibrary { .. } => "material_library",
             Self::Palette { .. } => "palette",
             Self::PaintAppearance { .. } => "paint_appearance",
+            Self::PortHelperUnresolved(_) => "port_helper_unresolved",
             Self::HelperNotFound { .. } => "helper_not_found",
+            Self::WornMountUnresolved(_) => "worn_mount_unresolved",
             Self::AttachmentsLeftOut { .. } => "attachments_left_out",
             Self::SkeletonMissing { .. } => "skeleton_missing",
             Self::SkeletonUnreadable { .. } => "skeleton_unreadable",
@@ -81,6 +83,7 @@ impl IssueKind {
         matches!(
             self,
             Self::Unresolved(_)
+                | Self::WornMountUnresolved(_)
                 | Self::GeometryMissing { .. }
                 | Self::BodyGeometryMissing { .. }
                 | Self::WorldPropNotWorn { .. }

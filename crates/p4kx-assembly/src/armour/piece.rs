@@ -4,9 +4,10 @@
 use p4kx_character::Dna;
 use p4kx_extraction::SourceLocation;
 
+use super::layered_worn::OverlayMount;
 use super::{Expressions, HeadMaterial, Look, Wearable};
-use crate::PortTransform;
 use crate::bespoke::Bespoke;
+use crate::{PortDefinitionPosition, PortHelperDiagnostic, PortTransform};
 
 /// The port an unskinned piece hangs on: the helper of the holder it is placed at, the offset from
 /// it and the helper of the piece that goes there. The offset is kept as the bits of its numbers
@@ -15,19 +16,30 @@ use crate::bespoke::Bespoke;
 pub(crate) struct Mount {
     /// The name of the piece whose model holds the helper; `None` for the body.
     pub(crate) holder: Option<String>,
+    pub(crate) holder_index: Option<usize>,
+    pub(crate) port: PortDefinitionPosition,
     pub(crate) helper: String,
     pub(crate) offset_helper: String,
+    pub(crate) helper_diagnostic: Option<Box<PortHelperDiagnostic>>,
     position: [u32; 3],
     rotation: [u32; 3],
 }
 
 impl Mount {
     /// Returns the mount of an item at the port `port` of `holder`.
-    pub(crate) fn new(holder: Option<String>, port: &PortTransform) -> Self {
+    pub(crate) fn new(
+        holder: Option<(usize, String)>,
+        position: PortDefinitionPosition,
+        port: &PortTransform,
+        diagnostic: Option<PortHelperDiagnostic>,
+    ) -> Self {
         Self {
-            holder,
+            holder_index: holder.as_ref().map(|(index, _)| *index),
+            holder: holder.map(|(_, label)| label),
+            port: position,
             helper: port.helper().to_owned(),
             offset_helper: port.offset_helper().to_owned(),
+            helper_diagnostic: diagnostic.map(Box::new),
             position: port.position().map(f32::to_bits),
             rotation: port.rotation().map(f32::to_bits),
         }
@@ -95,6 +107,8 @@ pub struct Piece {
     pub(crate) variant_tags: Vec<String>,
     pub(crate) bespoke: Option<Bespoke>,
     pub(crate) mount: Option<Mount>,
+    pub(super) overlay_mount: OverlayMount,
+    pub(super) overlay_index: Option<usize>,
     pub(crate) port: Option<String>,
 }
 
@@ -114,6 +128,8 @@ impl Piece {
             variant_tags: Vec::new(),
             bespoke: None,
             mount: None,
+            overlay_mount: OverlayMount::Original,
+            overlay_index: None,
             port: None,
         }
     }

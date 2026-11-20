@@ -97,8 +97,12 @@ fn database() -> DataForgeBuilder {
 /// [`armour_entries`]: crate::armour_entries
 #[must_use]
 pub fn mounted_item_entries() -> Vec<TestEntry> {
+    mounted_entries(&database())
+}
+
+fn mounted_entries(database: &DataForgeBuilder) -> Vec<TestEntry> {
     let satchel = satchel_model();
-    let mut entries = vec![TestEntry::zstd("Data\\Game2.dcb", database().build())];
+    let mut entries = vec![TestEntry::zstd("Data\\Game2.dcb", database.build())];
     entries.extend(armour_files());
     entries.push(TestEntry::stored(
         format!("Data\\{}\\satchel.cgf", MALE_ARMOUR.replace('/', "\\")),
@@ -109,4 +113,93 @@ pub fn mounted_item_entries() -> Vec<TestEntry> {
         satchel.cgfm(),
     ));
     entries
+}
+
+/// Returns the mounted-item fixture with replacement carriers and an explicit satchel.
+#[must_use]
+pub fn mounted_overlay_entries() -> Vec<TestEntry> {
+    let explicit_satchel = TestEntity::new(
+        0x45,
+        "Mount_Explicit_Satchel",
+        "entities/scitem/mount_explicit_satchel.xml",
+    )
+    .attach_type("Char_Armor_Backpack")
+    .geometry_variant("Male", format!("{MALE_ARMOUR}/satchel.cgf"), None);
+    let database = database()
+        .record(explicit_satchel.record())
+        .record(
+            overlay_carrier(0x46, "Mount_New_Carrier")
+                .port(overlay_port())
+                .record(),
+        )
+        .record(
+            overlay_carrier(0x47, "Mount_Duplicate_Carrier")
+                .port(overlay_port())
+                .port(overlay_port())
+                .record(),
+        )
+        .record(
+            overlay_carrier(0x48, "Mount_Incompatible_Carrier")
+                .port(
+                    TestPort::new("pack")
+                        .item_type("Char_Armor_Helmet", Vec::<String>::new())
+                        .helper("cloth", [0.0, 0.1, 0.8], [0.0; 3]),
+                )
+                .record(),
+        );
+    mounted_entries(&with_overlay_occupancy(database))
+}
+
+fn with_overlay_occupancy(database: DataForgeBuilder) -> DataForgeBuilder {
+    database
+        .record(character(0x49, "Mount_Free_Wearer", "Mount_New_Carrier").record())
+        .record(character(0x4a, "Mount_Occupied_Wearer", "Mount_Occupied_Carrier").record())
+        .record(character(0x4b, "Mount_Ambiguous_Wearer", "Mount_Duplicate_Carrier").record())
+        .record(character(0x4c, "Mount_Unknown_Wearer", "Mount_Unknown_Carrier").record())
+        .record(
+            overlay_carrier(0x4d, "Mount_Occupied_Carrier")
+                .port(overlay_port())
+                .loadout(TestLoadout::Manual(vec![TestLoadoutEntry::class(
+                    "pack",
+                    "Mount_Nonworn_Prop",
+                )]))
+                .record(),
+        )
+        .record(
+            TestEntity::new(
+                0x4e,
+                "Mount_Nonworn_Prop",
+                "entities/scitem/nonworn_prop.xml",
+            )
+            .attach_type("Misc")
+            .record(),
+        )
+        .record(
+            overlay_carrier(0x4f, "Mount_Unknown_Carrier")
+                .port(overlay_port().tags("", "SyntheticRequirement"))
+                .record(),
+        )
+        .record(
+            TestEntity::new(
+                0x50,
+                "Mount_Second_Satchel",
+                "entities/scitem/mount_second_satchel.xml",
+            )
+            .attach_type("Char_Armor_Backpack")
+            .geometry_variant("Male", format!("{MALE_ARMOUR}/satchel.cgf"), None)
+            .record(),
+        )
+}
+
+fn overlay_port() -> TestPort {
+    TestPort::new("pack")
+        .item_type("Char_Armor_Backpack", Vec::<String>::new())
+        .helper("cloth", [0.0, 0.1, 0.8], [0.0; 3])
+        .item_helper("satchel_loc")
+}
+
+fn overlay_carrier(guid: u128, class: &str) -> TestEntity {
+    TestEntity::new(guid, class, format!("entities/scitem/{class}.xml"))
+        .attach_type("Char_Armor_Torso")
+        .geometry_variant("Male", format!("{MALE_ARMOUR}/plain.skin"), None)
 }

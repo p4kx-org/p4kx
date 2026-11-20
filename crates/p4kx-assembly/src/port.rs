@@ -3,7 +3,7 @@
 
 use p4kx_dataforge::StructValue;
 
-use crate::port_sub_helper::{self, PortSubHelper};
+use crate::port_sub_helper::{self, PortSubHelper, PortSubHelpers};
 use crate::read::{flag, struct_field, struct_items, text, texts, unsigned, xyz};
 
 const ATTACHMENT_PREFIX: &str = "SItemPortDefAttachmentImplementation";
@@ -21,9 +21,9 @@ pub struct PortDefinition {
     pub(crate) types: Vec<PortType>,
     pub(crate) port_tags: String,
     pub(crate) required_tags: String,
+    pub(crate) requires_attachment_tags: bool,
     pub(crate) transform: Option<PortTransform>,
-    root_helper_tags: Option<Box<str>>,
-    sub_helpers: Box<[PortSubHelper]>,
+    pub(crate) helper_tree: PortSubHelpers,
     pub(crate) skin: bool,
     pub(crate) no_rotation: bool,
     pub(crate) detach_direction: [f32; 3],
@@ -109,14 +109,13 @@ impl PortDefinition {
     /// Returns the root helper's authored tag selector.
     #[must_use]
     pub fn root_helper_tags(&self) -> Option<&str> {
-        self.root_helper_tags.as_deref()
+        self.helper_tree.root_tags.text()
     }
 
     /// Returns the authored subhelpers in depth-first source order.
-    /// Static placement uses the root transform.
     #[must_use]
     pub fn sub_helpers(&self) -> &[PortSubHelper] {
-        &self.sub_helpers
+        &self.helper_tree.nodes
     }
 }
 
@@ -253,9 +252,9 @@ pub(crate) fn read_definition(
             .collect(),
         port_tags: text(port, "PortTags").to_owned(),
         required_tags: text(port, "RequiredPortTags").to_owned(),
+        requires_attachment_tags: crate::spec::has_tag_requirements(port.field("RequiredPortTags")),
         transform: helper.and_then(|helper| PortTransform::read(helper, kind)),
-        root_helper_tags: helper.and_then(port_sub_helper::tags),
-        sub_helpers: helper.map_or_else(Box::default, |helper| port_sub_helper::read(helper, kind)),
+        helper_tree: port_sub_helper::read(port.field("AttachmentImplementation"), kind),
         skin: kind == SKIN_ATTACHMENT,
         no_rotation: attachment
             .and_then(|attachment| struct_field(attachment, "constraintParams"))

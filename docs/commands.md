@@ -364,6 +364,12 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   be resolved, or whose model is missing or unreadable, is skipped and listed; with `--json` the report has
   the shape described in [docs/cli-json.md](cli-json.md). `p4kx armour bodies` lists the
   variants.
+  In a Loadout, a rigid piece follows the skeleton bone resolved from its holder port helper. When `--piece`
+  replaces a holder, each retained rigid attachment resolves its original slot against the
+  current holder's physical port. A new rigid piece needs one demonstrably free, visible,
+  compatible port. `worn_mount_unresolved` reports competing, occupied or unproven slots and
+  the affected rigid mesh is omitted. An unresolved authored `SubHelpers` selector uses the
+  root helper with `port_helper_unresolved` identifying the original port and array position.
 - `p4kx wwise resolve <archive> <trigger>` lists the sound variants reached for an audio trigger with
   its soundbank, WEM ID, source and container path, e.g. `Play_QDrive_Spool in SSQD_QDrive.bnk:
   WEM 98393519 embedded, not located; event 2178236557 > action 98720655 > blend 228967944 > Ã¢â‚¬Â¦`;

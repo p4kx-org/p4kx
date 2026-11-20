@@ -195,7 +195,7 @@ impl<'a> Selection<'a> {
             });
         };
         let found = resolve(resolver, files, text)?;
-        let (mut pieces, replaced) = Piece::layer(resolver.worn(&found.tree), given);
+        let (mut pieces, replaced) = resolver.worn_layered(&found.tree, given);
         let head = resolver
             .npc_head(&found.tree)
             .map(|head| head.with_expressions(expressions));

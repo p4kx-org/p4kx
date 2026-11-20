@@ -6,7 +6,9 @@
 use std::error::Error;
 use std::path::PathBuf;
 
-use p4kx_testkit::{ArchiveBuilder, TestEntry, assembly_entries, livery_entries, test_key};
+use p4kx_testkit::{
+    ArchiveBuilder, TestEntry, assembly_entries, livery_entries, mounted_overlay_entries, test_key,
+};
 
 #[path = "blender_consumer_fixture/character.rs"]
 mod character;
@@ -25,7 +27,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err("fixture directory must be absolute and new".into());
     }
     std::fs::create_dir_all(&output)?;
-    for case in [
+    let cases = [
         Case {
             name: "assembly",
             entries: assembly_entries,
@@ -38,7 +40,12 @@ fn main() -> Result<(), Box<dyn Error>> {
             name: "character",
             entries: character::entries,
         },
-    ] {
+    ];
+    let worn_helper = std::env::var_os("P4KX_TEST_WORN_HELPER_FIXTURE").map(|_| Case {
+        name: "worn-helper",
+        entries: mounted_overlay_entries,
+    });
+    for case in cases.into_iter().chain(worn_helper) {
         (case.entries)()
             .into_iter()
             .fold(ArchiveBuilder::new(), ArchiveBuilder::entry)
