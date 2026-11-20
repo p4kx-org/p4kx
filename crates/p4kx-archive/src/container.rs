@@ -68,6 +68,7 @@ pub(crate) fn admit(directory: Directory, source: &Source) -> Result<Directory, 
     let mut kept = IssueLog::default();
     let mut listed = log.listed.into_iter().peekable();
     let mut raw_paths = log.raw_paths.into_iter().peekable();
+    let mut hashes = log.hash_block_sizes.into_iter().peekable();
     for (position, mut entry) in entries.into_iter().enumerate() {
         let index = admitted.len();
         let folder = entry.is_empty_folder();
@@ -80,6 +81,11 @@ pub(crate) fn admit(directory: Directory, source: &Source) -> Result<Directory, 
             if !folder {
                 kept.raw_paths.push((index, raw));
             }
+        }
+        if let Some((_, range)) = hashes.next_if(|(at, _)| *at == position)
+            && !folder
+        {
+            kept.hash_block_sizes.push((index, range));
         }
         if folder {
             continue;

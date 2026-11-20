@@ -5,8 +5,8 @@ use std::borrow::Cow;
 
 use thiserror::Error;
 
-use crate::Entry;
 use crate::archive_metadata::ArchiveMetadata;
+use crate::{Entry, ObservedHashBlockSize};
 
 /// How many Entry issues [`Archive::issues`](crate::Archive::issues) lists at most;
 /// [`Archive::issue_count`](crate::Archive::issue_count) still counts all of them.
@@ -85,6 +85,7 @@ pub(crate) struct IssueLog {
     pub(crate) count: usize,
     pub(crate) empty_folder_issues: usize,
     pub(crate) raw_paths: Vec<(usize, Box<[u8]>)>,
+    pub(crate) hash_block_sizes: Vec<(usize, ObservedHashBlockSize)>,
     seen: (usize, u8),
 }
 
@@ -94,18 +95,45 @@ impl IssueLog {
     #[cold]
     #[inline(never)]
     pub(crate) fn record(&mut self, index: usize, issue: EntryIssue) {
+        self.record_sample(index, issue);
+    }
+
+    fn record_sample(&mut self, index: usize, issue: EntryIssue) -> bool {
         if self.seen.0 != index {
             self.seen = (index, 0);
         }
         let kind = issue.kind();
         if self.seen.1 & kind != 0 {
-            return;
+            return false;
         }
         self.seen.1 |= kind;
         self.count += 1;
-        if self.listed.len() < MAX_ENTRY_ISSUES {
-            self.listed.push((index, issue));
+        if self.listed.len() == MAX_ENTRY_ISSUES {
+            return false;
         }
+        self.listed.push((index, issue));
+        true
+    }
+
+    pub(crate) fn record_hash_block_size(
+        &mut self,
+        index: usize,
+        size: u16,
+        observed: ObservedHashBlockSize,
+    ) {
+        if self.record_sample(index, EntryIssue::HashBlockSize { size }) {
+            self.hash_block_sizes.push((index, observed));
+        }
+    }
+
+    pub(crate) fn hash_block_size(&self, index: usize) -> Option<ObservedHashBlockSize> {
+        let position = self
+            .hash_block_sizes
+            .binary_search_by_key(&index, |(at, _)| *at)
+            .ok()?;
+        self.hash_block_sizes
+            .get(position)
+            .map(|(_, observed)| *observed)
     }
 
     /// Retains the diagnostic count of an Entry removed by container admission.
@@ -118,8 +146,15 @@ impl IssueLog {
     /// Takes over the defects `other` recorded, which carry the Entry positions they were read at.
     pub(crate) fn absorb(&mut self, other: Self) {
         self.empty_folder_issues += other.empty_folder_issues;
+        let mut hashes = other.hash_block_sizes.into_iter().peekable();
         for (index, issue) in other.listed {
-            self.record(index, issue);
+            if let EntryIssue::HashBlockSize { size } = issue
+                && let Some((_, observed)) = hashes.next_if(|(at, _)| *at == index)
+            {
+                self.record_hash_block_size(index, size, observed);
+            } else {
+                self.record(index, issue);
+            }
         }
         self.raw_paths.extend(other.raw_paths);
     }

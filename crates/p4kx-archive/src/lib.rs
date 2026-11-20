@@ -88,7 +88,7 @@ mod zip_directory_metadata;
 mod zip_end_metadata;
 mod zip_header_metadata;
 
-pub use archive::{Archive, MAX_DECODED_SKIP};
+pub use archive::{Archive, MAX_DECODED_SKIP, ObservedHashBlockSize};
 pub use archive_input_origin::ArchiveInputOrigin;
 pub use archive_metadata::{ArchiveLayoutKind, ArchiveMetadata, ArchiveMetadataStatus};
 pub use available_metadata_span::AvailableMetadataSpan;

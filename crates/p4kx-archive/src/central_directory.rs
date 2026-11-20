@@ -13,7 +13,8 @@ use crate::format_error::FormatError;
 use crate::issue::{Directory, IssueLog, decode_path};
 use crate::metadata_range::MetadataRange;
 use crate::{
-    Checksum, Compression, DosTimestamp, Entry, EntryIssue, EntryMetadata, ZipHeaderMetadata,
+    Checksum, Compression, DosTimestamp, Entry, EntryIssue, EntryMetadata, ObservedHashBlockSize,
+    ZipHeaderMetadata,
 };
 
 pub(crate) const CENTRAL_HEADER_SIGNATURE: u32 = 0x0201_4B50;
@@ -282,7 +283,8 @@ fn parse_extra(
                 );
             }
             BLOCK_CIG_HASH => {
-                fields.sha256 = read_hash(data, stored_len, index, log);
+                fields.sha256 =
+                    read_hash(data, block_offset, block.offset(), stored_len, index, log)?;
             }
             _ => {}
         }
@@ -296,14 +298,18 @@ fn parse_extra(
     Ok(fields)
 }
 
-/// Reads the CIG hash block, whose data is the 32-byte SHA-256. A block of another length is
-/// recorded in `log` and states none. When an Entry carries several, the last one decides.
-fn read_hash(data: &[u8], stored_len: u16, index: usize, log: &mut IssueLog) -> Option<[u8; 32]> {
-    let digest = stated_sha256(data);
-    if digest.is_none() && data.len() != SHA256_LEN {
-        log.record(index, EntryIssue::HashBlockSize { size: stored_len });
+fn read_hash(
+    data: &[u8],
+    start: u64,
+    end: u64,
+    stored_len: u16,
+    index: usize,
+    log: &mut IssueLog,
+) -> Result<Option<[u8; 32]>, FormatError> {
+    if data.len() != SHA256_LEN {
+        log.record_hash_block_size(index, stored_len, ObservedHashBlockSize::at(start, end)?);
     }
-    digest
+    Ok(stated_sha256(data))
 }
 
 /// Reads the CIG encryption block: 0 is plain and 1 encrypted. Any other value and a block of

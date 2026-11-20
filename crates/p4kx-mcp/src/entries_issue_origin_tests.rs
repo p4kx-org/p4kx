@@ -40,24 +40,8 @@ fn issue_fields_bind_original_cached_root_metadata() -> TestResult {
     );
     verify_sourced_issues(&info)?;
 
-    let unknown = marker(&info, 4, "issue")?;
-    assert_eq!(
-        unknown.get("sourceSetComplete").and_then(Value::as_bool),
-        Some(false),
-        "a later valid hash cannot provide the earlier defective block's location"
-    );
-    assert_eq!(
-        unknown.get("containsEncryptedSource"),
-        Some(&Value::Null),
-        "the missing original hash-block observation remains unknown"
-    );
-    assert!(
-        unknown
-            .get("sourceUsesRefs")
-            .and_then(Value::as_array)
-            .is_some_and(Vec::is_empty),
-        "the unsupported defect has no fabricated metadata contributor"
-    );
+    verify_site(&info, 4, "issue", "blockId", "selector")?;
+    verify_site(&info, 4, "issue", "declaredBlockLength", "conversion")?;
     assert_eq!(
         info.pointer("/fieldOrigins/~1structuredContent~1issue_count"),
         Some(&json!({

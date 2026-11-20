@@ -63,6 +63,7 @@ fn observe(
     };
     let check_origin = match *issue {
         EntryIssue::DataOutsideFile => v2_data_range_origin(archive, position, &source, uses)?,
+        EntryIssue::HashBlockSize { .. } => hash_block_origin(archive, position, &source)?,
         EntryIssue::PathNotUtf8 if lossy => {
             let value = source.directory_fact("path", SourceUseRole::Conversion)?;
             source.origin(&[value])
@@ -123,6 +124,30 @@ fn v2_data_range_origin(
                 bounds.payload_end().range(),
             ),
             role,
+        )?,
+    ]))
+}
+
+fn hash_block_origin(
+    archive: &Archive,
+    position: usize,
+    source: &EntryDirectorySource,
+) -> Result<FieldOrigin, SourceEvidenceError> {
+    let Some(header) = archive.observed_hash_block_size(position) else {
+        return Ok(source.origin_when(&[], false));
+    };
+    Ok(source.origin(&[
+        source.directory_subresource(
+            directory_range("zipExtraBlockHeader", "blockId", header.id()),
+            SourceUseRole::Selector,
+        )?,
+        source.directory_subresource(
+            directory_range(
+                "zipExtraBlockHeader",
+                "declaredBlockLength",
+                header.declared_len(),
+            ),
+            SourceUseRole::Conversion,
         )?,
     ]))
 }

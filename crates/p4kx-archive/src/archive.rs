@@ -23,9 +23,12 @@ use crate::{
     EntryReader, InstallationStatus, OpenOptions, entry_reader, layout,
 };
 
+mod hash_block_size;
 mod key;
 mod metadata;
 mod origin;
+
+pub use self::hash_block_size::ObservedHashBlockSize;
 
 /// The most decoded bytes [`Archive::open_entry_at`] skips in a compressed Entry to reach an offset.
 pub const MAX_DECODED_SKIP: u64 = 1 << 30;
