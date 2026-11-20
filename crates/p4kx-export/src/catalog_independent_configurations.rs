@@ -10,7 +10,7 @@ use serde::Serialize;
 use super::catalog_entity_component_read::{
     self as entity_component, ComponentKind, ComponentRead, ComponentSelection,
 };
-use super::catalog_mission_board::{self, MissionBoard};
+use super::catalog_mission_board::{KIND as MISSION_BOARDS, MissionBoard};
 use super::catalog_radar_options::RadarOptionsConfiguration;
 use super::catalog_resource_network_configuration::ResourceNetworkConfiguration;
 use super::catalog_resource_network_read::{self, GameModeRead};
@@ -257,10 +257,6 @@ fn read_game_mode<'source>(
 const ANIMATION_CONTROLLERS: ComponentKind = ComponentKind {
     source_type: entity_animation_controller::COMPONENT,
     inspection: ConfigurationInspection::EntityAnimationController,
-};
-const MISSION_BOARDS: ComponentKind = ComponentKind {
-    source_type: catalog_mission_board::COMPONENT,
-    inspection: ConfigurationInspection::MissionBoard,
 };
 const JUMP_POINTS: ComponentKind = ComponentKind {
     source_type: jump_point::COMPONENT,

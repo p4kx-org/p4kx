@@ -80,9 +80,9 @@ pub(crate) mod planet_tech_definitions;
 #[path = "shading_class.rs"]
 mod shading_class;
 #[path = "soil.rs"]
-mod soil;
+pub(crate) mod soil;
 #[path = "soil_texture_set.rs"]
-mod soil_texture_set;
+pub(crate) mod soil_texture_set;
 #[cfg(test)]
 #[path = "terrain_definition_witness.rs"]
 mod terrain_definition_witness;

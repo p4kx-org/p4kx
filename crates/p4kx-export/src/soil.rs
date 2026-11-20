@@ -5,12 +5,15 @@ use p4kx_extraction::{Archive, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::planet_asset_raw_fields::{self, RawPlanetAssetMember};
-use super::terrain_guid_link::{self, TerrainGuidIndex, TerrainGuidLink};
+use super::planet_asset_raw_fields;
+pub use super::planet_asset_raw_fields::RawPlanetAssetMember;
+use super::terrain_guid_link::{self, TerrainGuidIndex};
+pub use super::terrain_guid_link::{TerrainGuidCandidate, TerrainGuidLink, TerrainGuidLinkState};
 use super::terrain_layers;
+pub use super::terrain_layers::{GroundLayer, LayerTextureLink, LayerTextureLinks, TextureLayer};
 use crate::catalog_read::entry_json_object::{self, EntryJsonObject};
 use crate::catalog_read::loose_definition::{
-    self, DefinitionFamily, DefinitionIssue, LooseDefinition,
+    self, DefinitionFamily, DefinitionIssue, LooseDefinition, Selection,
 };
 use crate::catalog_read::original::{EntryCapture, PhysicalEntryIdentity};
 use crate::catalog_read::parsed_entry_json;
@@ -30,23 +33,37 @@ pub(crate) type SoilTable = CatalogTable<Soil>;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct Soil {
-    identity: PhysicalEntryIdentity,
-    guid: SourcedValue<CatalogGuid>,
-    guid_raw: SourcedValue<String>,
+#[non_exhaustive]
+pub struct Soil {
+    /// The original physical Entry identity.
+    pub identity: PhysicalEntryIdentity,
+    /// The parsed original GUID.
+    pub guid: SourcedValue<CatalogGuid>,
+    /// The original GUID text.
+    pub guid_raw: SourcedValue<String>,
     #[serde(rename = "soilTextureSetGuid")]
-    texture_set_guid: SourcedValue<CatalogGuid>,
+    /// The authored soil texture-set GUID.
+    pub texture_set_guid: SourcedValue<CatalogGuid>,
     #[serde(rename = "soilTextureSetGuidRaw")]
-    texture_set_guid_raw: SourcedValue<String>,
+    /// The authored soil texture-set GUID text.
+    pub texture_set_guid_raw: SourcedValue<String>,
     #[serde(rename = "soilTextureSet")]
-    texture_set: Option<TerrainGuidLink>,
-    beach: SourcedValue<bool>,
-    stagnant_water: SourcedValue<bool>,
-    trash: SourcedValue<bool>,
-    acid: SourcedValue<bool>,
-    ocean_secondary_colour_weight: terrain_layers::Number,
-    additional_fields: Vec<RawPlanetAssetMember>,
-    issues: Vec<DefinitionIssue>,
+    /// The original texture-set candidates and link outcome.
+    pub texture_set: Option<TerrainGuidLink>,
+    /// The authored beach flag.
+    pub beach: SourcedValue<bool>,
+    /// The authored stagnant-water flag.
+    pub stagnant_water: SourcedValue<bool>,
+    /// The authored trash flag.
+    pub trash: SourcedValue<bool>,
+    /// The authored acid flag.
+    pub acid: SourcedValue<bool>,
+    /// The authored ocean secondary color weight.
+    pub ocean_secondary_colour_weight: terrain_layers::Number,
+    /// Additional unprojected original fields.
+    pub additional_fields: Vec<RawPlanetAssetMember>,
+    /// Source issues observed in this owner selection.
+    pub issues: Vec<DefinitionIssue>,
 }
 
 impl LooseDefinition for Soil {
@@ -65,7 +82,25 @@ pub(crate) fn read(
     ledger: &mut ExportLedger,
     options: &CatalogOptions<'_>,
 ) -> Result<SoilTable, CatalogError> {
-    loose_definition::read(archive, capture, ledger, options, FAMILY, Soil::project)
+    read_selected(archive, capture, ledger, options, Selection::All)
+}
+
+pub(crate) fn read_selected(
+    archive: &Archive,
+    capture: &EntryCapture<'_>,
+    ledger: &mut ExportLedger,
+    options: &CatalogOptions<'_>,
+    selection: Selection<'_>,
+) -> Result<SoilTable, CatalogError> {
+    loose_definition::read_selected(
+        archive,
+        capture,
+        ledger,
+        options,
+        FAMILY,
+        selection,
+        Soil::project,
+    )
 }
 
 impl Soil {
@@ -118,7 +153,7 @@ impl Soil {
         })
     }
 
-    pub(super) fn required_guids(&self) -> impl Iterator<Item = CatalogGuid> + '_ {
+    pub(crate) fn required_guids(&self) -> impl Iterator<Item = CatalogGuid> + '_ {
         self.texture_set_guid
             .value()
             .copied()
@@ -126,7 +161,7 @@ impl Soil {
             .filter(|guid| guid.0 != p4kx_extraction::Guid::default())
     }
 
-    pub(super) fn link(
+    pub(crate) fn link(
         &mut self,
         index: &TerrainGuidIndex,
         capture: &EntryCapture<'_>,

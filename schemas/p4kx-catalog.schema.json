@@ -3952,8 +3952,10 @@
       "type": "object"
     },
     "BoardDetails": {
+      "description": "Variants of an authored mission board.",
       "oneOf": [
         {
+          "description": "The original base board type.",
           "properties": {
             "type": {
               "const": "base",
@@ -3966,12 +3968,15 @@
           "type": "object"
         },
         {
+          "description": "A career board with its guild and faction references.",
           "properties": {
             "factions": {
-              "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+              "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference",
+              "description": "The original faction slots in order, including null and unresolved references."
             },
             "guildFactionReputation": {
-              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+              "description": "The original guild reputation reference and its target."
             },
             "type": {
               "const": "career",
@@ -3986,6 +3991,7 @@
           "type": "object"
         },
         {
+          "description": "The original notice board type.",
           "properties": {
             "type": {
               "const": "notice",
@@ -3998,6 +4004,7 @@
           "type": "object"
         },
         {
+          "description": "Another original type retained in the authored fields.",
           "properties": {
             "type": {
               "const": "authored",
@@ -4013,6 +4020,7 @@
       "required": []
     },
     "BoardType": {
+      "description": "One original board type and its variant-specific data.",
       "properties": {
         "authoredFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -14742,43 +14750,54 @@
       "type": "object"
     },
     "DisplaySettings": {
+      "description": "Authored starmap presentation settings.",
       "properties": {
         "assetManagerLocationParams": {
-          "$ref": "#/$defs/SourcedValueOfStarmapAssetManager"
+          "$ref": "#/$defs/SourcedValueOfStarmapAssetManager",
+          "description": "The authored display asset paths."
         },
         "authoredFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "description": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The protected description reference.",
           "x-gameText": true
         },
         "locationMedicalImagePath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored medical image path."
         },
         "minimumDisplaySize": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored minimum display size."
         },
         "navIcon": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored navigation icon token."
         },
         "size": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat64"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat64",
+          "description": "The original display size."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "starMapGeomPath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored geometry path."
         },
         "starMapMaterialPath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored material path."
         },
         "starMapShapePath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored shape path."
         },
         "useHoloMaterial": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "The authored holographic material flag."
         }
       },
       "required": [
@@ -20501,27 +20520,33 @@
       "description": "Original terrain material selectors and scalar flags at one layer occurrence.",
       "properties": {
         "additionalFields": {
+          "description": "Additional unprojected original fields.",
           "items": {
             "$ref": "#/$defs/RawPlanetAssetMember"
           },
           "type": "array"
         },
         "bedrock": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "The authored bedrock flag."
         },
         "gloss": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored integer gloss value."
         },
         "surfaceGroupName": {
           "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored surface group.",
           "x-gameText": true
         },
         "surfaceTypeName": {
           "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored surface type.",
           "x-gameText": true
         },
         "textureName": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored texture selector."
         }
       },
       "required": [
@@ -27401,12 +27426,15 @@
       "type": "object"
     },
     "LayerTextureLink": {
+      "description": "The directory lookup of one authored terrain texture slot.",
       "properties": {
         "ordinal": {
-          "$ref": "#/$defs/DecimalU64"
+          "$ref": "#/$defs/DecimalU64",
+          "description": "The physical position in the source layer array."
         },
         "target": {
-          "$ref": "#/$defs/LooseArchivePath"
+          "$ref": "#/$defs/LooseArchivePath",
+          "description": "The original texture path lookup outcome."
         }
       },
       "required": [
@@ -27419,6 +27447,7 @@
       "description": "Directory lookups for the paths of the corresponding source layer slots.",
       "properties": {
         "slots": {
+          "description": "Resolved directory links in authored array slot order.",
           "items": {
             "$ref": "#/$defs/LayerTextureLink"
           },
@@ -39767,33 +39796,43 @@
       "type": "object"
     },
     "RadarProperties": {
+      "description": "Authored starmap radar properties and signature inputs.",
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Additional original fields."
         },
         "baseSignatureParams": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "The original base signature fields."
         },
         "contactType": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "The original radar contact type reference."
         },
         "crossSectionParams": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "The original cross-section fields."
         },
         "deathParams": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "The original death settings."
         },
         "emissionModifierParams": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "The original emission modifier fields."
         },
         "roomParams": {
-          "$ref": "#/$defs/SourcedValueOfRadarRoomParams"
+          "$ref": "#/$defs/SourcedValueOfRadarRoomParams",
+          "description": "The authored room settings."
         },
         "scanBounds": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "The original scan bounds fields."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original concrete type."
         }
       },
       "required": [
@@ -39810,15 +39849,19 @@
       "type": "object"
     },
     "RadarRoomParams": {
+      "description": "Original starmap radar room settings.",
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Additional original fields."
         },
         "ignoreInteriorVsExteriorCheck": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether to ignore the interior and exterior check."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original concrete type."
         }
       },
       "required": [
@@ -40073,13 +40116,16 @@
       "type": "object"
     },
     "RawPlanetAssetMember": {
+      "description": "An original unprojected JSON member with its own source evidence.",
       "properties": {
         "name": {
           "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The exact authored member name token.",
           "x-gameText": true
         },
         "token": {
           "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The exact authored value token.",
           "x-gameText": true
         }
       },
@@ -46811,34 +46857,42 @@
       "description": "Authored soil flags, weight and texture-set declaration.",
       "properties": {
         "acid": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "The authored acid flag."
         },
         "additionalFields": {
+          "description": "Additional unprojected original fields.",
           "items": {
             "$ref": "#/$defs/RawPlanetAssetMember"
           },
           "type": "array"
         },
         "beach": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "The authored beach flag."
         },
         "guid": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The parsed original GUID."
         },
         "guidRaw": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original GUID text."
         },
         "identity": {
-          "$ref": "#/$defs/PhysicalEntryIdentity"
+          "$ref": "#/$defs/PhysicalEntryIdentity",
+          "description": "The original physical Entry identity."
         },
         "issues": {
+          "description": "Source issues observed in this owner selection.",
           "items": {
             "$ref": "#/$defs/DefinitionIssue"
           },
           "type": "array"
         },
         "oceanSecondaryColourWeight": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored ocean secondary color weight."
         },
         "soilTextureSet": {
           "anyOf": [
@@ -46848,19 +46902,24 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "The original texture-set candidates and link outcome."
         },
         "soilTextureSetGuid": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The authored soil texture-set GUID."
         },
         "soilTextureSetGuidRaw": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored soil texture-set GUID text."
         },
         "stagnantWater": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "The authored stagnant-water flag."
         },
         "trash": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "The authored trash flag."
         }
       },
       "required": [
@@ -46881,15 +46940,18 @@
       "type": "object"
     },
     "SoilTextureSet": {
+      "description": "Original soil texture layers and terrain material settings.",
       "properties": {
         "additionalFields": {
+          "description": "Additional unprojected original fields.",
           "items": {
             "$ref": "#/$defs/RawPlanetAssetMember"
           },
           "type": "array"
         },
         "groundLayers": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfGroundLayer"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfGroundLayer",
+          "description": "The original ground layer slots."
         },
         "groundTextures": {
           "anyOf": [
@@ -46899,34 +46961,43 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Directory links for authored ground texture paths."
         },
         "guid": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The parsed original GUID."
         },
         "guidRaw": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original GUID text."
         },
         "identity": {
-          "$ref": "#/$defs/PhysicalEntryIdentity"
+          "$ref": "#/$defs/PhysicalEntryIdentity",
+          "description": "The original physical Entry identity."
         },
         "issues": {
+          "description": "Source issues observed in this owner selection.",
           "items": {
             "$ref": "#/$defs/DefinitionIssue"
           },
           "type": "array"
         },
         "maxRoughness": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored maximum roughness."
         },
         "mediumLayerHeightScales": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The original medium layer height scales."
         },
         "mediumLayerWeights": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The original medium layer weights."
         },
         "mediumLayers": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfTextureLayer"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfTextureLayer",
+          "description": "The original medium layer slots."
         },
         "mediumTextures": {
           "anyOf": [
@@ -46936,16 +47007,20 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Directory links for authored medium texture paths."
         },
         "minRoughness": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored minimum roughness."
         },
         "sand": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "The authored sand flag."
         },
         "screeContentPerLayer": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The original scree content slots."
         }
       },
       "required": [
@@ -136686,18 +136761,23 @@
       "type": "object"
     },
     "StarmapAssetManager": {
+      "description": "Original starmap location preview assets.",
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Additional original fields."
         },
         "previewIconPath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored preview icon path."
         },
         "previewImagePath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored preview image path."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original concrete type."
         }
       },
       "required": [
@@ -136709,27 +136789,35 @@
       "type": "object"
     },
     "StarmapAsteroidRing": {
+      "description": "An authored asteroid ring and its original dimensions.",
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Additional original fields."
         },
         "densityScale": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored density scale."
         },
         "depth": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The original ring depth."
         },
         "innerRadius": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat64"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat64",
+          "description": "The original inner radius."
         },
         "outerRadius": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat64"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat64",
+          "description": "The original outer radius."
         },
         "sizeScale": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored size scale."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original concrete type."
         }
       },
       "required": [
@@ -136744,21 +136832,27 @@
       "type": "object"
     },
     "StarmapLocation": {
+      "description": "Authored location handling for a starmap object or preset.",
       "properties": {
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Additional original fields."
         },
         "excludeFromLevelLoad": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether to exclude this location from level loading."
         },
         "exposeForPlayerCreatedMissions": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether to expose the location for player-created missions."
         },
         "setEntityLocationOnEnter": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether to set the entity location on entry."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original concrete type."
         }
       },
       "required": [
@@ -136774,33 +136868,42 @@
       "description": "One physical starmap object with its authored settings and relationships.",
       "properties": {
         "affiliation": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "The original legacy faction reference."
         },
         "amenities": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference",
+          "description": "The original amenity references in stored order."
         },
         "assetManagerLocationParams": {
-          "$ref": "#/$defs/SourcedValueOfStarmapAssetManager"
+          "$ref": "#/$defs/SourcedValueOfStarmapAssetManager",
+          "description": "The authored display asset paths."
         },
         "asteroidRings": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfStarmapAsteroidRing"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfStarmapAsteroidRing",
+          "description": "The original asteroid rings in stored order."
         },
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Additional original fields."
         },
         "blockTravel": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether to block travel."
         },
         "callout1": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The first original protected callout.",
           "x-gameText": true
         },
         "callout2": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The second original protected callout.",
           "x-gameText": true
         },
         "callout3": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The third original protected callout.",
           "x-gameText": true
         },
         "className": {
@@ -136808,6 +136911,7 @@
         },
         "description": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The protected description reference.",
           "x-gameText": true
         },
         "fileName": {
@@ -136817,83 +136921,108 @@
           "$ref": "#/$defs/SourcedValueOfGuid"
         },
         "hideInStarmap": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether the map should hide the object."
         },
         "hideInWorld": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether the world should hide the object."
         },
         "hideWhenInAdoptionRadius": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether to hide the object within its adoption radius."
         },
         "isScannable": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether the object is authored as scannable."
         },
         "jurisdiction": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "The original jurisdiction reference."
         },
         "locationAudioPlayTrigger": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "The original audio play trigger fields."
         },
         "locationAudioStopTrigger": {
-          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput"
+          "$ref": "#/$defs/SourcedValueOfSourceArenaOutput",
+          "description": "The original audio stop trigger fields."
         },
         "locationHierarchyTag": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "The original location hierarchy tag reference."
         },
         "locationImagePath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored location image path."
         },
         "locationMedicalImagePath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored medical image path."
         },
         "locationParams": {
-          "$ref": "#/$defs/SourcedValueOfStarmapLocation"
+          "$ref": "#/$defs/SourcedValueOfStarmapLocation",
+          "description": "The optional authored location declaration."
         },
         "metadataTag": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "minimumDisplaySize": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored minimum display size."
         },
         "name": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The original protected object name.",
           "x-gameText": true
         },
         "navIcon": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored navigation icon token."
         },
         "noAutoBodyRecovery": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether to disable automatic body recovery."
         },
         "onlyShowWhenParentSelected": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether to show the object only with its parent selected."
         },
         "overridePermanent": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original permanence override token."
         },
         "overrideRotationSpeed": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether to override rotation speed."
         },
         "overrideRotationSpeedValue": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored rotation speed override value."
         },
         "overrideShowInAllZones": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original all-zone visibility override token."
         },
         "overrideShowInRouteOnly": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original route-only visibility override token."
         },
         "overrideSpawnNavPoints": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original nav-point spawn override token."
         },
         "parent": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "The original starmap parent reference."
         },
         "quantumTravelData": {
-          "$ref": "#/$defs/SourcedValueOfStarmapQuantumTravel"
+          "$ref": "#/$defs/SourcedValueOfStarmapQuantumTravel",
+          "description": "The optional authored quantum travel declaration."
         },
         "radarProperties": {
-          "$ref": "#/$defs/SourcedValueOfRadarProperties"
+          "$ref": "#/$defs/SourcedValueOfRadarProperties",
+          "description": "The optional authored radar properties."
         },
         "recordIndex": {
           "$ref": "#/$defs/SourcedValueOfuint32"
@@ -136905,34 +137034,43 @@
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "respawnLocationType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original respawn type token."
         },
         "showOrbitLine": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether to display an orbit line."
         },
         "size": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat64"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat64",
+          "description": "The original display size."
         },
         "skipCollisionCheckIfInArrivalRadius": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether to skip collision checks within the arrival radius."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "starMapGeomPath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored geometry path."
         },
         "starMapMaterialPath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored material path."
         },
         "starMapShapePath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored shape path."
         },
         "type": {
-          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+          "description": "The original starmap object type reference."
         },
         "useHoloMaterial": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "The authored holographic material flag."
         }
       },
       "required": [
@@ -137092,27 +137230,35 @@
       "type": "object"
     },
     "StarmapQuantumTravel": {
+      "description": "Authored starmap travel radii and offsets.",
       "properties": {
         "adoptionRadius": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored adoption radius."
         },
         "arrivalPointDetectionOffset": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored arrival-point detection offset."
         },
         "arrivalRadius": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored arrival radius."
         },
         "authoredFields": {
-          "$ref": "#/$defs/SourceArenaOutput"
+          "$ref": "#/$defs/SourceArenaOutput",
+          "description": "Additional original fields."
         },
         "obstructionRadius": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored obstruction radius."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original concrete type."
         },
         "subPointRadiusMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored sub-point radius multiplier."
         }
       },
       "required": [
@@ -139685,15 +139831,19 @@
       "type": "object"
     },
     "TerrainGuidCandidate": {
+      "description": "A physical Entry declaring the queried terrain GUID.",
       "properties": {
         "entry": {
-          "$ref": "#/$defs/SourcedValueOfPhysicalEntryRef"
+          "$ref": "#/$defs/SourcedValueOfPhysicalEntryRef",
+          "description": "The target Entry directory identity."
         },
         "guid": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The authored GUID and its original payload evidence."
         },
         "kind": {
-          "$ref": "#/$defs/Kind"
+          "$ref": "#/$defs/Kind",
+          "description": "The original definition family owning the Entry."
         }
       },
       "required": [
@@ -139707,13 +139857,15 @@
       "description": "A declared terrain GUID relation and its original, ordered candidate receipts.",
       "properties": {
         "candidates": {
+          "description": "Original matching Entries in physical directory order.",
           "items": {
             "$ref": "#/$defs/TerrainGuidCandidate"
           },
           "type": "array"
         },
         "state": {
-          "$ref": "#/$defs/SourcedValueOfTerrainGuidLinkState"
+          "$ref": "#/$defs/SourcedValueOfTerrainGuidLinkState",
+          "description": "The sourced link outcome for the original GUID."
         }
       },
       "required": [
@@ -139723,21 +139875,69 @@
       "type": "object"
     },
     "TerrainGuidLinkState": {
-      "enum": [
-        "absent",
-        "null",
-        "invalid",
-        "zero",
-        "unreadable",
-        "unsupported",
-        "unavailable",
-        "missing",
-        "wrongFamily",
-        "ambiguous",
-        "filtered",
-        "resolved"
+      "description": "Resolution of one authored terrain GUID.",
+      "oneOf": [
+        {
+          "const": "absent",
+          "description": "The source field is absent.",
+          "type": "string"
+        },
+        {
+          "const": "null",
+          "description": "The source field is explicitly null.",
+          "type": "string"
+        },
+        {
+          "const": "invalid",
+          "description": "The source field does not contain a valid GUID.",
+          "type": "string"
+        },
+        {
+          "const": "zero",
+          "description": "The source field contains the zero GUID.",
+          "type": "string"
+        },
+        {
+          "const": "unreadable",
+          "description": "The original source field could not be read.",
+          "type": "string"
+        },
+        {
+          "const": "unsupported",
+          "description": "The original source field has an unsupported representation.",
+          "type": "string"
+        },
+        {
+          "const": "unavailable",
+          "description": "An incomplete target survey prevents resolving the original GUID.",
+          "type": "string"
+        },
+        {
+          "const": "missing",
+          "description": "The target survey found no matching candidate.",
+          "type": "string"
+        },
+        {
+          "const": "wrongFamily",
+          "description": "Matching Entries belong to other definition families.",
+          "type": "string"
+        },
+        {
+          "const": "ambiguous",
+          "description": "Multiple physical Entries in the expected family match.",
+          "type": "string"
+        },
+        {
+          "const": "filtered",
+          "description": "The unique expected-family match is outside the export filter.",
+          "type": "string"
+        },
+        {
+          "const": "resolved",
+          "description": "One expected-family match is selected.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "TextForms": {
@@ -139759,15 +139959,18 @@
       "type": "object"
     },
     "TextureLayer": {
+      "description": "An original terrain texture layer.",
       "properties": {
         "additionalFields": {
+          "description": "Additional unprojected original fields.",
           "items": {
             "$ref": "#/$defs/RawPlanetAssetMember"
           },
           "type": "array"
         },
         "textureName": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored texture selector."
         }
       },
       "required": [
@@ -140474,24 +140677,30 @@
       "required": []
     },
     "VisibilitySettings": {
+      "description": "Authored starmap visibility and travel flags.",
       "properties": {
         "authoredFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
         "blockTravel": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether to block travel."
         },
         "hideInStarmap": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether the map should hide the object."
         },
         "hideInWorld": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether the world should hide the object."
         },
         "hideWhenInAdoptionRadius": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether to hide the object within its adoption radius."
         },
         "onlyShowWhenParentSelected": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether to show the object only with its parent selected."
         },
         "sourceType": {
           "$ref": "#/$defs/SourcedValueOfstring"

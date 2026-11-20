@@ -15,15 +15,22 @@ use crate::source_value_catalog::SourceArenaOutput;
 pub(super) const LOCATION_TYPE: &str = "StarMapObjectLocationParams";
 pub(super) const TRAVEL_TYPE: &str = "StarMapQuantumTravelDataParams";
 
+/// Authored location handling for a starmap object or preset.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct StarmapLocation<'source> {
-    source_type: SourcedValue<&'source str>,
-    set_entity_location_on_enter: SourcedValue<bool>,
-    expose_for_player_created_missions: SourcedValue<bool>,
-    exclude_from_level_load: SourcedValue<bool>,
-    authored_fields: SourceArenaOutput<'source>,
+#[non_exhaustive]
+pub struct StarmapLocation<'source> {
+    /// The original concrete type.
+    pub source_type: SourcedValue<&'source str>,
+    /// Whether to set the entity location on entry.
+    pub set_entity_location_on_enter: SourcedValue<bool>,
+    /// Whether to expose the location for player-created missions.
+    pub expose_for_player_created_missions: SourcedValue<bool>,
+    /// Whether to exclude this location from level loading.
+    pub exclude_from_level_load: SourcedValue<bool>,
+    /// Additional original fields.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> StarmapLocation<'source> {
@@ -56,17 +63,26 @@ impl<'source> StarmapLocation<'source> {
     }
 }
 
+/// Authored starmap travel radii and offsets.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct StarmapQuantumTravel<'source> {
-    source_type: SourcedValue<&'source str>,
-    obstruction_radius: SourcedValue<ResourceFloat32>,
-    arrival_radius: SourcedValue<ResourceFloat32>,
-    arrival_point_detection_offset: SourcedValue<ResourceFloat32>,
-    adoption_radius: SourcedValue<ResourceFloat32>,
-    sub_point_radius_multiplier: SourcedValue<ResourceFloat32>,
-    authored_fields: SourceArenaOutput<'source>,
+#[non_exhaustive]
+pub struct StarmapQuantumTravel<'source> {
+    /// The original concrete type.
+    pub source_type: SourcedValue<&'source str>,
+    /// The authored obstruction radius.
+    pub obstruction_radius: SourcedValue<ResourceFloat32>,
+    /// The authored arrival radius.
+    pub arrival_radius: SourcedValue<ResourceFloat32>,
+    /// The authored arrival-point detection offset.
+    pub arrival_point_detection_offset: SourcedValue<ResourceFloat32>,
+    /// The authored adoption radius.
+    pub adoption_radius: SourcedValue<ResourceFloat32>,
+    /// The authored sub-point radius multiplier.
+    pub sub_point_radius_multiplier: SourcedValue<ResourceFloat32>,
+    /// Additional original fields.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> StarmapQuantumTravel<'source> {

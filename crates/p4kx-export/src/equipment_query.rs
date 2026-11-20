@@ -38,6 +38,10 @@ pub mod loot_generation;
 #[path = "equipment_mining_tool_query.rs"]
 pub mod mining_tools;
 
+/// Selective reads of mission board providers and their original board types.
+#[path = "equipment_mission_board_query.rs"]
+pub mod mission_boards;
+
 /// Selective reads of authored ship shield-generator and quantum-drive configurations.
 #[path = "equipment_ship_system_query.rs"]
 pub mod ship_systems;

@@ -10,13 +10,17 @@ use crate::catalog_read::entry_json_object::EntryJsonObject;
 use crate::catalog_read::parsed_entry_json::SourceNode;
 use crate::schema_fields::every_field_required;
 
+/// An original unprojected JSON member with its own source evidence.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-pub(crate) struct RawPlanetAssetMember {
+#[non_exhaustive]
+pub struct RawPlanetAssetMember {
     #[schemars(extend("x-gameText" = true))]
-    name: SourcedValue<String>,
+    /// The exact authored member name token.
+    pub name: SourcedValue<String>,
     #[schemars(extend("x-gameText" = true))]
-    token: SourcedValue<String>,
+    /// The exact authored value token.
+    pub token: SourcedValue<String>,
 }
 
 pub(crate) fn collect(

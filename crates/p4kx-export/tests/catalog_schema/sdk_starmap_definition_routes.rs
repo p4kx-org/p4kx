@@ -23,14 +23,18 @@ use super::{Route, TestResult};
 #[path = "../it/starmap_definitions_fixture.rs"]
 mod fixture;
 
+const OBJECTS: &str = "/definitions/starmapObjects";
 const TYPES: &str = "/definitions/starmapTypes";
 const PRESETS: &str = "/definitions/starmapPresets";
 const AMENITIES: &str = "/definitions/starmapAmenities";
 const LANGUAGES: &[Language] = &[Language::English];
 
-pub(in super::super) const DATASETS: [&str; 3] = [TYPES, PRESETS, AMENITIES];
+pub(in super::super) const DATASETS: [&str; 4] = [OBJECTS, TYPES, PRESETS, AMENITIES];
 
-pub(super) fn read() -> TestResult<[Route; 3]> {
+#[path = "sdk_starmap_object_scope.rs"]
+mod objects;
+
+pub(super) fn read() -> TestResult<[Route; 4]> {
     let (_directory, archive) = open_fixture(TestEntry::stored(
         Language::German.global_ini_path(),
         b"shared=Synthetischer Text\n",
@@ -47,6 +51,7 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
     )?;
     let parsed = session.parsed(None)?;
     Ok([
+        verify_route(&parsed, &catalog, StarmapDefinitionFamily::Objects)?,
         verify_route(&parsed, &catalog, StarmapDefinitionFamily::Types)?,
         verify_route(&parsed, &catalog, StarmapDefinitionFamily::Presets)?,
         verify_route(&parsed, &catalog, StarmapDefinitionFamily::Amenities)?,
@@ -68,6 +73,10 @@ fn verify_route(
 fn verify_family(catalog: &Value, snapshot: &StarmapDefinitionSnapshot<'_>) -> TestResult<Route> {
     let availability = snapshot.availability;
     match &snapshot.rows {
+        StarmapDefinitionRows::Objects(rows) => {
+            objects::verify_pu_objects(snapshot, rows)?;
+            verify_table(catalog, OBJECTS, availability, rows)
+        }
         StarmapDefinitionRows::Types(rows) => {
             let [row] = rows.as_slice() else {
                 return Err("one original starmap type".into());
@@ -272,7 +281,13 @@ fn open_fixture(german: TestEntry) -> TestResult<(tempfile::TempDir, Archive)> {
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("starmap-definitions.p4k");
     ArchiveBuilder::new()
-        .entry(TestEntry::stored("Data/Game2.dcb", fixture::database().build()).encrypted())
+        .entry(
+            TestEntry::stored(
+                "Data/Game2.dcb",
+                objects::extend(fixture::database()).build(),
+            )
+            .encrypted(),
+        )
         .entry(TestEntry::stored(
             Language::English.global_ini_path(),
             b"shared=Synthetic description\n",

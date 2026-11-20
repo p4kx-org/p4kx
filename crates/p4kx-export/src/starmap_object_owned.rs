@@ -16,16 +16,24 @@ use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::source_value_catalog::SourceArenaOutput;
 
+/// Original settings declared inside a starmap object.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct StarmapObjectOwned<'source> {
-    radar_properties: SourcedValue<RadarProperties<'source>>,
-    quantum_travel_data: SourcedValue<StarmapQuantumTravel<'source>>,
-    location_params: SourcedValue<StarmapLocation<'source>>,
-    asteroid_rings: SourcedValue<Vec<SourcedValue<StarmapAsteroidRing<'source>>>>,
-    location_audio_play_trigger: SourcedValue<SourceArenaOutput<'source>>,
-    location_audio_stop_trigger: SourcedValue<SourceArenaOutput<'source>>,
+#[non_exhaustive]
+pub struct StarmapObjectOwned<'source> {
+    /// The optional authored radar properties.
+    pub radar_properties: SourcedValue<RadarProperties<'source>>,
+    /// The optional authored quantum travel declaration.
+    pub quantum_travel_data: SourcedValue<StarmapQuantumTravel<'source>>,
+    /// The optional authored location declaration.
+    pub location_params: SourcedValue<StarmapLocation<'source>>,
+    /// The original asteroid rings in stored order.
+    pub asteroid_rings: SourcedValue<Vec<SourcedValue<StarmapAsteroidRing<'source>>>>,
+    /// The original audio play trigger fields.
+    pub location_audio_play_trigger: SourcedValue<SourceArenaOutput<'source>>,
+    /// The original audio stop trigger fields.
+    pub location_audio_stop_trigger: SourcedValue<SourceArenaOutput<'source>>,
 }
 
 impl<'source> StarmapObjectOwned<'source> {
@@ -86,17 +94,26 @@ fn audio_trigger<'source>(
     })
 }
 
+/// An authored asteroid ring and its original dimensions.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct StarmapAsteroidRing<'source> {
-    source_type: SourcedValue<&'source str>,
-    density_scale: SourcedValue<ResourceFloat32>,
-    size_scale: SourcedValue<ResourceFloat32>,
-    inner_radius: SourcedValue<ResourceFloat64>,
-    outer_radius: SourcedValue<ResourceFloat64>,
-    depth: SourcedValue<ResourceFloat32>,
-    authored_fields: SourceArenaOutput<'source>,
+#[non_exhaustive]
+pub struct StarmapAsteroidRing<'source> {
+    /// The original concrete type.
+    pub source_type: SourcedValue<&'source str>,
+    /// The authored density scale.
+    pub density_scale: SourcedValue<ResourceFloat32>,
+    /// The authored size scale.
+    pub size_scale: SourcedValue<ResourceFloat32>,
+    /// The original inner radius.
+    pub inner_radius: SourcedValue<ResourceFloat64>,
+    /// The original outer radius.
+    pub outer_radius: SourcedValue<ResourceFloat64>,
+    /// The original ring depth.
+    pub depth: SourcedValue<ResourceFloat32>,
+    /// Additional original fields.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> StarmapAsteroidRing<'source> {

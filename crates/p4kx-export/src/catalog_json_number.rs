@@ -9,7 +9,15 @@ use serde::Serialize;
 /// An original JSON number with its full decimal spelling.
 #[derive(Debug, Serialize)]
 #[serde(transparent)]
-pub(crate) struct CatalogJsonNumber(pub(crate) String);
+pub struct CatalogJsonNumber(pub(crate) String);
+
+impl CatalogJsonNumber {
+    /// Borrows the exact original decimal token.
+    #[must_use]
+    pub const fn as_str(&self) -> &str {
+        self.0.as_str()
+    }
+}
 
 impl JsonSchema for CatalogJsonNumber {
     fn schema_name() -> Cow<'static, str> {

@@ -17,10 +17,10 @@ fn mission_board_owners_outside_items_preserve_original_component_slots() -> Tes
     let rows = at(&catalog, BOARDS)?.as_array().ok_or("board rows")?;
     assert_eq!(
         rows.len(),
-        4,
+        5,
         "every authored provider at the selected owner"
     );
-    for (row, ordinal) in rows.iter().zip([1, 2, 4, 5]) {
+    for (row, ordinal) in rows.iter().zip([1, 2, 4, 5, 6]) {
         assert_eq!(
             at(row, "/owner/ownerGuid/value")?,
             &json!(guid(fixture::OWNER))
@@ -50,29 +50,31 @@ fn mission_board_owners_outside_items_preserve_original_component_slots() -> Tes
     assert_eq!(at(first, "/containsEncryptedSource")?, true);
     assert_eq!(at(career, "/factions/value/1/state")?, "null");
     assert_eq!(at(career, "/factions/value/2/value/status")?, "dangling");
-    assert_eq!(
-        at(
-            &catalog,
-            &format!("{BOARDS}/1/boardType/value/details/type")
-        )?,
-        "notice"
-    );
-    assert_eq!(
-        at(
-            &catalog,
-            &format!("{BOARDS}/2/boardType/value/details/type")
-        )?,
-        "authored"
-    );
-    assert_eq!(
-        at(&catalog, &format!("{BOARDS}/3/boardType/state"))?,
-        "null"
-    );
+    verify_other_board_types(&catalog)?;
     let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
     if let Err(error) = validator.validate(&catalog) {
         return Err(format!("{}: {}", error.instance_path(), error).into());
     }
     crate::commodity_v3_source_inventory::reference_closure(&catalog)
+}
+
+fn verify_other_board_types(catalog: &Value) -> TestResult {
+    for (index, expected) in [(1, "notice"), (2, "authored"), (4, "base")] {
+        assert_eq!(
+            at(
+                catalog,
+                &format!("{BOARDS}/{index}/boardType/value/details/type")
+            )?,
+            expected,
+            "the authored board variant remains distinguishable"
+        );
+    }
+    assert_eq!(
+        at(catalog, &format!("{BOARDS}/3/boardType/state"))?,
+        "null",
+        "the empty board pointer remains present as null"
+    );
+    Ok(())
 }
 
 #[test]
@@ -107,7 +109,7 @@ fn a_board_provider_can_share_its_physical_owner_with_a_selected_item() -> TestR
     assert_eq!(items.len(), 1, "the entity also exports as an item");
     assert_eq!(
         boards.len(),
-        4,
+        5,
         "the same entity's board components all survive"
     );
     assert!(

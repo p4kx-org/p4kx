@@ -99,16 +99,23 @@ impl DefinitionIssue {
     }
 }
 
-/// Selects physical Entries and optionally their authored GUID.
-#[derive(Clone, Copy)]
-pub(crate) enum Selection<'path> {
+/// Selects physical original definitions in one Archive.
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+pub enum LooseDefinitionSelection<'path> {
+    /// Every admitted Entry in physical directory order.
     All,
+    /// One physical root directory index in the opened Archive.
     EntryIndex(u32),
-    Path(&'path str),
+    /// Every admitted physical Entry at this Archive-relative path.
+    ArchivePath(&'path str),
+    /// Every admitted physical Entry declaring this nonzero authored GUID.
     Guid(Guid),
 }
 
-impl Selection<'_> {
+pub(crate) use LooseDefinitionSelection as Selection;
+
+impl LooseDefinitionSelection<'_> {
     pub(crate) fn entries(self, archive: &Archive) -> &[Entry] {
         match self {
             Self::EntryIndex(index) => usize::try_from(index)
@@ -162,7 +169,7 @@ pub(crate) fn read_selected<T: LooseDefinition>(
     mut project: impl FnMut(PhysicalEntryIdentity, &EntryJsonObject<'_, '_>) -> Result<T, CatalogError>,
 ) -> Result<CatalogTable<T>, CatalogError> {
     let path = match selection {
-        Selection::Path(path) => Some(starmap_index::key(path)),
+        Selection::ArchivePath(path) => Some(starmap_index::key(path)),
         _ => None,
     };
     let mut available = false;

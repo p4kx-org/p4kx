@@ -14,21 +14,33 @@ use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::source_value_catalog::SourceArenaOutput;
 
+/// Authored starmap presentation settings.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct DisplayFields<'source> {
+#[non_exhaustive]
+pub struct DisplayFields<'source> {
     #[schemars(extend("x-gameText" = true))]
-    description: SourcedValue<GameTextRef>,
-    nav_icon: SourcedValue<&'source str>,
-    size: SourcedValue<ResourceFloat64>,
-    minimum_display_size: SourcedValue<ResourceFloat32>,
-    use_holo_material: SourcedValue<bool>,
-    star_map_geom_path: SourcedValue<&'source str>,
-    star_map_material_path: SourcedValue<&'source str>,
-    star_map_shape_path: SourcedValue<&'source str>,
-    location_medical_image_path: SourcedValue<&'source str>,
-    asset_manager_location_params: SourcedValue<StarmapAssetManager<'source>>,
+    /// The protected description reference.
+    pub description: SourcedValue<GameTextRef>,
+    /// The authored navigation icon token.
+    pub nav_icon: SourcedValue<&'source str>,
+    /// The original display size.
+    pub size: SourcedValue<ResourceFloat64>,
+    /// The authored minimum display size.
+    pub minimum_display_size: SourcedValue<ResourceFloat32>,
+    /// The authored holographic material flag.
+    pub use_holo_material: SourcedValue<bool>,
+    /// The authored geometry path.
+    pub star_map_geom_path: SourcedValue<&'source str>,
+    /// The authored material path.
+    pub star_map_material_path: SourcedValue<&'source str>,
+    /// The authored shape path.
+    pub star_map_shape_path: SourcedValue<&'source str>,
+    /// The authored medical image path.
+    pub location_medical_image_path: SourcedValue<&'source str>,
+    /// The authored display asset paths.
+    pub asset_manager_location_params: SourcedValue<StarmapAssetManager<'source>>,
 }
 
 impl<'source> DisplayFields<'source> {
@@ -112,14 +124,20 @@ impl<'source> DisplaySettings<'source> {
     }
 }
 
+/// Original starmap location preview assets.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct StarmapAssetManager<'source> {
-    source_type: SourcedValue<&'source str>,
-    preview_image_path: SourcedValue<&'source str>,
-    preview_icon_path: SourcedValue<&'source str>,
-    authored_fields: SourceArenaOutput<'source>,
+#[non_exhaustive]
+pub struct StarmapAssetManager<'source> {
+    /// The original concrete type.
+    pub source_type: SourcedValue<&'source str>,
+    /// The authored preview image path.
+    pub preview_image_path: SourcedValue<&'source str>,
+    /// The authored preview icon path.
+    pub preview_icon_path: SourcedValue<&'source str>,
+    /// Additional original fields.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> StarmapAssetManager<'source> {

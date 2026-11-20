@@ -120,6 +120,14 @@ pub mod localization;
 #[path = "shop_inventory_query.rs"]
 pub mod shops;
 
+#[path = "loose_definition_query.rs"]
+mod loose_definitions;
+pub use crate::catalog_read::loose_definition::LooseDefinitionSelection;
+pub use loose_definitions::LooseDefinitionSnapshot;
+
+#[path = "soil_query.rs"]
+pub mod soils;
+
 #[path = "planet_resource_query.rs"]
 pub mod planet_resources;
 

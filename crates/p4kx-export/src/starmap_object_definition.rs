@@ -7,10 +7,12 @@ use serde::Serialize;
 
 use super::authored_fields::Observed;
 use super::prepared_definition::PreparedDefinition;
-use super::starmap_display::DisplayFields;
-use super::starmap_object_links::StarmapObjectLinks;
-use super::starmap_object_owned::StarmapObjectOwned;
-use super::starmap_visibility::VisibilityFields;
+pub use super::starmap_display::{DisplayFields, StarmapAssetManager};
+pub use super::starmap_navigation::{StarmapLocation, StarmapQuantumTravel};
+pub use super::starmap_object_links::StarmapObjectLinks;
+pub use super::starmap_object_owned::{StarmapAsteroidRing, StarmapObjectOwned};
+pub use super::starmap_radar::{RadarProperties, RadarRoomParams};
+pub use super::starmap_visibility::VisibilityFields;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_record_reference::CatalogRecordReference;
@@ -39,18 +41,30 @@ pub(crate) fn read<'source>(
     cancel: Option<&CancelToken>,
     project_object: impl FnOnce(SourcedValue<GameTextRef>) -> StarmapObject<'source>,
 ) -> Result<(StarmapObjectRead<'source>, Vec<FieldError>), CatalogError> {
+    let (definition, notes) = prepare(tree, projection, admission, cancel)?;
+    let object = project_object(definition.definition().text.name.clone());
+    Ok((StarmapObjectRead { definition, object }, notes))
+}
+
+pub(super) type PreparedStarmapObject<'source> =
+    PreparedDefinition<'source, StarmapObjectDefinition<'source>>;
+
+pub(super) fn prepare<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<(PreparedStarmapObject<'source>, Vec<FieldError>), CatalogError> {
     if tree.type_name() != SOURCE_TYPE {
         return Err(ExportAccountingError::ConflictingSourceDatum.into());
     }
-    let (definition, notes) = PreparedDefinition::read(
+    PreparedDefinition::read(
         tree,
         projection,
         admission,
         cancel,
         StarmapObjectDefinition::read,
-    )?;
-    let object = project_object(definition.definition().text.name.clone());
-    Ok((StarmapObjectRead { definition, object }, notes))
+    )
 }
 
 pub(crate) struct AuthoredNavigation<'source> {
@@ -91,22 +105,31 @@ pub(crate) fn read_navigation<'source>(
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct StarmapObjectDefinition<'source> {
+#[non_exhaustive]
+pub struct StarmapObjectDefinition<'source> {
     #[serde(flatten)]
-    source: CanonicalRecordHeader<'source>,
+    /// The physical Record header.
+    pub source: CanonicalRecordHeader<'source>,
     #[serde(flatten)]
-    text: ObjectText,
+    /// The original protected name and callout references.
+    pub text: ObjectText,
     #[serde(flatten)]
-    links: StarmapObjectLinks<'source>,
+    /// The original starmap Record references.
+    pub links: StarmapObjectLinks<'source>,
     #[serde(flatten)]
-    visibility: VisibilityFields,
+    /// The authored visibility and travel flags.
+    pub visibility: VisibilityFields,
     #[serde(flatten)]
-    display: DisplayFields<'source>,
+    /// The authored starmap presentation settings.
+    pub display: DisplayFields<'source>,
     #[serde(flatten)]
-    navigation: ObjectNavigation<'source>,
+    /// The authored navigation settings.
+    pub navigation: ObjectNavigation<'source>,
     #[serde(flatten)]
-    owned: StarmapObjectOwned<'source>,
-    authored_fields: SourceArenaOutput<'source>,
+    /// The original settings defined inside this Record.
+    pub owned: StarmapObjectOwned<'source>,
+    /// Additional original fields.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> StarmapObjectDefinition<'source> {
@@ -144,18 +167,24 @@ impl<'source> StarmapObjectDefinition<'source> {
     }
 }
 
+/// Original starmap object text references.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ObjectText {
+#[non_exhaustive]
+pub struct ObjectText {
     #[schemars(extend("x-gameText" = true))]
-    name: SourcedValue<GameTextRef>,
+    /// The original protected object name.
+    pub name: SourcedValue<GameTextRef>,
     #[schemars(extend("x-gameText" = true))]
-    callout1: SourcedValue<GameTextRef>,
+    /// The first original protected callout.
+    pub callout1: SourcedValue<GameTextRef>,
     #[schemars(extend("x-gameText" = true))]
-    callout2: SourcedValue<GameTextRef>,
+    /// The second original protected callout.
+    pub callout2: SourcedValue<GameTextRef>,
     #[schemars(extend("x-gameText" = true))]
-    callout3: SourcedValue<GameTextRef>,
+    /// The third original protected callout.
+    pub callout3: SourcedValue<GameTextRef>,
 }
 
 impl ObjectText {
@@ -190,22 +219,36 @@ impl ObjectText {
     }
 }
 
+/// Authored navigation settings of one starmap object.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ObjectNavigation<'source> {
-    respawn_location_type: SourcedValue<&'source str>,
-    is_scannable: SourcedValue<bool>,
-    override_spawn_nav_points: SourcedValue<&'source str>,
-    override_show_in_all_zones: SourcedValue<&'source str>,
-    override_show_in_route_only: SourcedValue<&'source str>,
-    override_permanent: SourcedValue<&'source str>,
-    skip_collision_check_if_in_arrival_radius: SourcedValue<bool>,
-    override_rotation_speed: SourcedValue<bool>,
-    override_rotation_speed_value: SourcedValue<ResourceFloat32>,
-    show_orbit_line: SourcedValue<bool>,
-    no_auto_body_recovery: SourcedValue<bool>,
-    location_image_path: SourcedValue<&'source str>,
+#[non_exhaustive]
+pub struct ObjectNavigation<'source> {
+    /// The original respawn type token.
+    pub respawn_location_type: SourcedValue<&'source str>,
+    /// Whether the object is authored as scannable.
+    pub is_scannable: SourcedValue<bool>,
+    /// The original nav-point spawn override token.
+    pub override_spawn_nav_points: SourcedValue<&'source str>,
+    /// The original all-zone visibility override token.
+    pub override_show_in_all_zones: SourcedValue<&'source str>,
+    /// The original route-only visibility override token.
+    pub override_show_in_route_only: SourcedValue<&'source str>,
+    /// The original permanence override token.
+    pub override_permanent: SourcedValue<&'source str>,
+    /// Whether to skip collision checks within the arrival radius.
+    pub skip_collision_check_if_in_arrival_radius: SourcedValue<bool>,
+    /// Whether to override rotation speed.
+    pub override_rotation_speed: SourcedValue<bool>,
+    /// The authored rotation speed override value.
+    pub override_rotation_speed_value: SourcedValue<ResourceFloat32>,
+    /// Whether to display an orbit line.
+    pub show_orbit_line: SourcedValue<bool>,
+    /// Whether to disable automatic body recovery.
+    pub no_auto_body_recovery: SourcedValue<bool>,
+    /// The authored location image path.
+    pub location_image_path: SourcedValue<&'source str>,
 }
 
 impl<'source> ObjectNavigation<'source> {

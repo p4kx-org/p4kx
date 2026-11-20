@@ -6,32 +6,56 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
+use super::catalog_entity_component_read::ComponentKind;
+use super::component_sources::physical_component;
 use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
 use crate::catalog_record_reference::CatalogRecordReference;
+use crate::export_field_inspection::ConfigurationInspection;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
 
-pub(super) const COMPONENT: &str = "EntityComponentMissionBoardUIProvider";
+pub(super) const KIND: ComponentKind = ComponentKind {
+    source_type: "EntityComponentMissionBoardUIProvider",
+    inspection: ConfigurationInspection::MissionBoard,
+};
 const BOARD_BASE: &str = "MissionBoardType_Base";
 const BOARD_CAREER: &str = "MissionBoardType_Career";
 const BOARD_NOTICE: &str = "MissionBoardType_Notice";
 const FACTION_REPUTATION: &str = "FactionReputation";
 
-type RecordLink<'source> = SourcedValue<Box<SourceRecordReference<'source>>>;
+physical_component!(MissionBoardComponents, MissionBoard, KIND);
 
 /// An authored mission board on a physical Entity component.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct MissionBoard<'source> {
+pub struct MissionBoard<'source> {
     pub(super) owner: ComponentOwner,
     board_type: SourcedValue<BoardType<'source>>,
     authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> MissionBoard<'source> {
+    /// Borrows the original physical owner and component slot.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    /// Borrows the sourced original board-type pointer and its content.
+    #[must_use]
+    pub const fn board_type(&self) -> &SourcedValue<BoardType<'source>> {
+        &self.board_type
+    }
+
+    /// Borrows the provider's remaining authored fields.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     pub(super) fn read(
         owner: ComponentOwner,
         fields: Observed<'_, '_, '_, 'source>,
@@ -49,16 +73,35 @@ impl<'source> MissionBoard<'source> {
     }
 }
 
+/// One original board type and its variant-specific data.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct BoardType<'source> {
+pub struct BoardType<'source> {
     source_type: SourcedValue<&'source str>,
     details: BoardDetails<'source>,
     authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> BoardType<'source> {
+    /// Borrows the exact original board-type name.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows the typed details of the original board variant.
+    #[must_use]
+    pub const fn details(&self) -> &BoardDetails<'source> {
+        &self.details
+    }
+
+    /// Borrows original board-type fields outside the typed details.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -97,6 +140,7 @@ impl<'source> BoardType<'source> {
     }
 }
 
+/// Variants of an authored mission board.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(
     tag = "type",
@@ -104,14 +148,21 @@ impl<'source> BoardType<'source> {
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-enum BoardDetails<'source> {
+#[non_exhaustive]
+pub enum BoardDetails<'source> {
+    /// The original base board type.
     Base,
+    /// A career board with its guild and faction references.
     Career {
+        /// The original guild reputation reference and its target.
         #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-        guild_faction_reputation: RecordLink<'source>,
+        guild_faction_reputation: SourcedValue<Box<SourceRecordReference<'source>>>,
+        /// The original faction slots in order, including null and unresolved references.
         #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
-        factions: SourcedValue<Vec<RecordLink<'source>>>,
+        factions: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
     },
+    /// The original notice board type.
     Notice,
+    /// Another original type retained in the authored fields.
     Authored,
 }

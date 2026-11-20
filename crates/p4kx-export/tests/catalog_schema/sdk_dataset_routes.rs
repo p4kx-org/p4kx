@@ -84,6 +84,8 @@ mod medical_tier;
 mod mineable_entity;
 #[path = "sdk_mining_family_routes.rs"]
 mod mining_families;
+#[path = "sdk_mission_board_route.rs"]
+mod mission_board;
 #[path = "sdk_mission_locality_route.rs"]
 mod mission_locality;
 #[path = "sdk_mission_location_route.rs"]
@@ -118,6 +120,8 @@ mod resource_groups;
 mod resource_network;
 #[path = "sdk_ship_system_routes.rs"]
 mod ship_systems;
+#[path = "sdk_soil_routes.rs"]
+mod soils;
 #[path = "sdk_starmap_definition_routes.rs"]
 pub(super) mod starmap_definitions;
 #[path = "sdk_tag_routes.rs"]
@@ -145,10 +149,21 @@ pub(super) fn law_datasets() -> impl Iterator<Item = &'static str> {
 
 pub(super) fn mission_datasets() -> impl Iterator<Item = &'static str> {
     use super::{MISSION_LOCATION_TEMPLATES as LOCATION_TEMPLATES, MISSION_TYPES};
-    [LOCATION_TEMPLATES, MISSION_TYPES, mission_locality::DATASET]
+    [
+        LOCATION_TEMPLATES,
+        MISSION_TYPES,
+        mission_locality::DATASET,
+        mission_board::DATASET,
+    ]
+    .into_iter()
+    .chain(location_vocabulary::datasets())
+    .chain(npc_spawns::datasets())
+}
+
+pub(super) fn world_datasets() -> impl Iterator<Item = &'static str> {
+    starmap_definitions::DATASETS
         .into_iter()
-        .chain(location_vocabulary::datasets())
-        .chain(npc_spawns::datasets())
+        .chain(soils::DATASETS)
 }
 
 pub(super) fn read() -> TestResult<Vec<Route>> {
@@ -202,6 +217,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(worn_gear::read()?);
     routes.push(vehicle_armor::read()?);
     routes.push(loot_generation::read()?);
+    routes.push(mission_board::read()?);
     routes.extend(resource_groups::read()?);
     routes.extend(reputation::read()?);
     routes.push(reputation_rewards::read()?);
@@ -232,6 +248,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(authored_reputation::read()?);
     routes.extend(weapon_sources::read()?);
     routes.extend(starmap_definitions::read()?);
+    routes.extend(soils::read()?);
     Ok(())
 }
 

@@ -11,15 +11,22 @@ use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::source_value_catalog::SourceArenaOutput;
 
+/// Authored starmap visibility and travel flags.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct VisibilityFields {
-    hide_in_starmap: SourcedValue<bool>,
-    hide_in_world: SourcedValue<bool>,
-    hide_when_in_adoption_radius: SourcedValue<bool>,
-    block_travel: SourcedValue<bool>,
-    only_show_when_parent_selected: SourcedValue<bool>,
+#[non_exhaustive]
+pub struct VisibilityFields {
+    /// Whether the map should hide the object.
+    pub hide_in_starmap: SourcedValue<bool>,
+    /// Whether the world should hide the object.
+    pub hide_in_world: SourcedValue<bool>,
+    /// Whether to hide the object within its adoption radius.
+    pub hide_when_in_adoption_radius: SourcedValue<bool>,
+    /// Whether to block travel.
+    pub block_travel: SourcedValue<bool>,
+    /// Whether to show the object only with its parent selected.
+    pub only_show_when_parent_selected: SourcedValue<bool>,
 }
 
 impl VisibilityFields {

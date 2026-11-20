@@ -92,6 +92,7 @@ fn owner(path: &str) -> TestRecord {
         TestValue::Null,
         provider(TestValue::Struct(future)),
         provider(TestValue::Null),
+        provider(TestValue::Struct(TestInstance::new(BOARD_BASE))),
     ];
     TestRecord::new(
         OWNER,

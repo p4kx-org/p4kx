@@ -17,7 +17,8 @@ use super::planet_resource::{self, PlanetResourceTable};
 use super::shading_class::{self, ShadingClassTable};
 use super::soil::{self, SoilTable};
 use super::soil_texture_set::{self, SoilTextureSetTable};
-use super::terrain_guid_link::{TerrainGuidIndex, TerrainTargetFamily};
+pub(crate) use super::terrain_guid_link::TerrainGuidIndex;
+use super::terrain_guid_link::TerrainTargetFamily;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::loose_archive_path::Resolver;
 use crate::catalog_read::original::EntryCapture;
@@ -123,25 +124,12 @@ impl PlanetTechDefinitions {
                 .map_err(CatalogError::JsonSourceAllocation)?;
             wanted.insert(guid);
         }
-        let families = [
-            (Kind::GeologyAssets, planet_geology_asset::FAMILY),
-            (Kind::GeologyTextureSets, geology_texture_set::FAMILY),
-            (Kind::SoilTextureSets, soil_texture_set::FAMILY),
-            (Kind::ShadingClasses, shading_class::FAMILY),
-        ]
-        .into_iter()
-        .map(|(kind, selector)| TerrainTargetFamily {
-            kind,
-            selector,
-            guid_field: "GUID",
-        })
-        .collect();
         let index = TerrainGuidIndex::read(
             archive,
             capture,
             options.cancel,
             options.filter,
-            families,
+            terrain_target_families(),
             &wanted,
         )?;
         for row in &mut self.geology_sets.rows {
@@ -158,4 +146,21 @@ impl PlanetTechDefinitions {
         }
         Ok(())
     }
+}
+
+/// Original definition families that can contribute terrain GUID candidates.
+pub(crate) fn terrain_target_families() -> Vec<TerrainTargetFamily> {
+    [
+        (Kind::GeologyAssets, planet_geology_asset::FAMILY),
+        (Kind::GeologyTextureSets, geology_texture_set::FAMILY),
+        (Kind::SoilTextureSets, soil_texture_set::FAMILY),
+        (Kind::ShadingClasses, shading_class::FAMILY),
+    ]
+    .into_iter()
+    .map(|(kind, selector)| TerrainTargetFamily {
+        kind,
+        selector,
+        guid_field: "GUID",
+    })
+    .collect()
 }

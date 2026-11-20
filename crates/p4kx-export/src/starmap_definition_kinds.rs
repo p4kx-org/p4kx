@@ -7,7 +7,7 @@ use serde::Serialize;
 
 use super::prepared_definition::PreparedDefinition;
 use super::starmap_amenity_definition::{self, StarmapAmenityDefinition};
-use super::starmap_object_definition::{self, StarmapObjectDefinition};
+use super::starmap_object_definition::{self, PreparedStarmapObject, StarmapObjectDefinition};
 use super::starmap_preset_definition::{self, StarmapPresetDefinition};
 use super::starmap_type_definition::{self, StarmapTypeDefinition};
 use crate::catalog_number_capture::CapturedNumber;
@@ -30,6 +30,7 @@ pub(crate) fn kind_for_type(source_type: &str) -> Option<Kind> {
 }
 
 pub(crate) enum StarmapDefinitionPick<'source> {
+    Object(Box<PreparedStarmapObject<'source>>),
     Type(Box<PreparedDefinition<'source, StarmapTypeDefinition<'source>>>),
     Preset(Box<PreparedDefinition<'source, StarmapPresetDefinition<'source>>>),
     Amenity(Box<PreparedDefinition<'source, StarmapAmenityDefinition<'source>>>),
@@ -43,6 +44,10 @@ impl<'source> StarmapDefinitionPick<'source> {
         admission: &RecordObservation<'_, 'source>,
         cancel: Option<&CancelToken>,
     ) -> Result<(Self, Vec<FieldError>), CatalogError> {
+        if kind == Kind::StarmapObjects {
+            return starmap_object_definition::prepare(tree, projection, admission, cancel)
+                .map(|(row, notes)| (Self::Object(Box::new(row)), notes));
+        }
         if kind_for_type(tree.type_name()) != Some(kind) {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         }
@@ -90,7 +95,7 @@ pub(crate) struct StarmapDefinitions<'source> {
 #[schemars(transform = every_field_required)]
 pub(crate) struct StarmapDefinitionTables<'source> {
     #[serde(rename = "starmapObjects")]
-    objects: CatalogTable<StarmapObjectDefinition<'source>>,
+    pub(crate) objects: CatalogTable<StarmapObjectDefinition<'source>>,
     #[serde(rename = "starmapTypes")]
     pub(crate) types: CatalogTable<StarmapTypeDefinition<'source>>,
     #[serde(rename = "starmapPresets")]
@@ -109,6 +114,7 @@ impl<'source> StarmapDefinitions<'source> {
 
     pub(crate) fn push(&mut self, pick: StarmapDefinitionPick<'source>) {
         match pick {
+            StarmapDefinitionPick::Object(row) => self.push_object(*row),
             StarmapDefinitionPick::Type(row) => self.types.push(*row),
             StarmapDefinitionPick::Preset(row) => self.presets.push(*row),
             StarmapDefinitionPick::Amenity(row) => self.amenities.push(*row),

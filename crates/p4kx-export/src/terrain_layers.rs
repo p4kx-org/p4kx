@@ -26,38 +26,55 @@ const TEXTURE: &str = "textureName";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct GroundLayer {
-    texture_name: SourcedValue<String>,
+#[non_exhaustive]
+pub struct GroundLayer {
+    /// The authored texture selector.
+    pub texture_name: SourcedValue<String>,
     #[schemars(extend("x-gameText" = true))]
-    surface_type_name: SourcedValue<String>,
+    /// The authored surface type.
+    pub surface_type_name: SourcedValue<String>,
     #[schemars(extend("x-gameText" = true))]
-    surface_group_name: SourcedValue<String>,
-    gloss: Number,
-    bedrock: SourcedValue<bool>,
-    additional_fields: Vec<RawPlanetAssetMember>,
+    /// The authored surface group.
+    pub surface_group_name: SourcedValue<String>,
+    /// The authored integer gloss value.
+    pub gloss: Number,
+    /// The authored bedrock flag.
+    pub bedrock: SourcedValue<bool>,
+    /// Additional unprojected original fields.
+    pub additional_fields: Vec<RawPlanetAssetMember>,
 }
 
+/// An original terrain texture layer.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct TextureLayer {
-    texture_name: SourcedValue<String>,
-    additional_fields: Vec<RawPlanetAssetMember>,
+#[non_exhaustive]
+pub struct TextureLayer {
+    /// The authored texture selector.
+    pub texture_name: SourcedValue<String>,
+    /// Additional unprojected original fields.
+    pub additional_fields: Vec<RawPlanetAssetMember>,
 }
 
 /// Directory lookups for the paths of the corresponding source layer slots.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-pub(crate) struct LayerTextureLinks {
-    slots: Vec<LayerTextureLink>,
+#[non_exhaustive]
+pub struct LayerTextureLinks {
+    /// Resolved directory links in authored array slot order.
+    pub slots: Vec<LayerTextureLink>,
 }
 
+/// The directory lookup of one authored terrain texture slot.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct LayerTextureLink {
-    ordinal: DecimalU64,
-    target: LooseArchivePath,
+#[non_exhaustive]
+pub struct LayerTextureLink {
+    /// The physical position in the source layer array.
+    pub ordinal: DecimalU64,
+    /// The original texture path lookup outcome.
+    pub target: LooseArchivePath,
 }
 
 pub(super) struct LayerLinks {

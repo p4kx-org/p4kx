@@ -77,6 +77,27 @@ Use `catalog_queries::flares::read_flare_libraries` to read the physical rows fr
 or an exact Archive-relative path. The query reports original parameter origins, directory-only
 texture links, and any required library reads or projections that failed. [Lens flare contract](catalog-flare-libraries.md)
 
+## Original soil definitions
+
+Use `soils::read_soils` or `soils::read_soil_texture_sets` for `definitions.soils`
+and `definitions.soilTextureSets`. Both accept a `LooseDefinitionSelection` by
+all admitted Entries, physical Entry index, Archive path, or authored GUID.
+They retain physical Entry order and preserve original number tokens and field evidence.
+
+A direct Entry or path selection opens only its selected owner definitions.
+Owner duplicate diagnostics apply to returned rows. A direct selection gives no
+evidence of uniqueness outside that scope. A GUID selection discovers all possible
+physical owners and reports unreadable candidates separately.
+
+A nonzero texture-set GUID in a selected soil consults the original GUID fields of the
+four canonical terrain target families. Matching Entries retain their physical identities
+and families. An unreadable possible target can leave the link unavailable while a
+readable owner is complete. The per-value origin reports which original sources were
+actually recorded. Scope completeness describes the owner selection.
+
+Texture sets resolve texture paths from Archive directory metadata. Neither query
+opens DataForge, localization or texture payloads.
+
 ## Original planet resource definitions
 
 Use `catalog_queries::planet_resources::read_planet_resources` for the typed rows under
@@ -871,6 +892,21 @@ Use the physical indices in the mining global and consumable subtype links with 
 below. Subtype text selection belongs to the separate definition query. Component queries
 expose read completeness through `coverage()`.
 
+## Mission boards
+
+Use `equipment::mission_boards::with_mission_boards` or its decoded-Entry and session
+forms to read original board providers in `configurations.missionBoards`. Select a
+physical Entity by Record index, all physical matches of its GUID, or all providers.
+The query selects the original provider component even when its Entity is outside
+the items and ships datasets.
+
+Each row retains its physical owner and original component ordinal. The sourced
+board type exposes Base, Career, Notice, and other authored variants. Career rows
+retain the guild reference and the entire ordered faction list, including null,
+duplicated, and dangling slots. The snapshot supplies immediate source uses for
+original values and resolved target headers. The query reads the selected owners
+that carry a provider component and uses the original header for referenced factions.
+
 ## Loot-generation components
 
 Use `catalog_queries::equipment::loot_generation::with_loot_generation_components` for
@@ -1444,9 +1480,12 @@ cargo test --locked -p p4kx-export --test real_archive real_archive_weapon_comba
 ## Authored Starmap definitions
 
 Use `starmap::with_starmap_definitions` or the corresponding session methods to select
-one physical definition family. `StarmapDefinitionFamily::Types`, `Presets`, and
-`Amenities` return the same typed rows as `definitions.starmapTypes`,
-`definitions.starmapPresets`, and `definitions.starmapAmenities`. Use
+one physical definition family. `StarmapDefinitionFamily::Objects`, `Types`,
+`Presets`, and `Amenities` return the same typed rows as
+`definitions.starmapObjects`, `definitions.starmapTypes`,
+`definitions.starmapPresets`, and `definitions.starmapAmenities`. The object family uses
+the Catalog's original PU path and retains its authored links, presentation,
+and navigation. Placement queries have their own inputs. Use
 `CatalogRecordSelection` to choose all admitted Records, all physical Records with a
 GUID, or one Record index. The rows retain original field evidence and link statuses.
 Presets include their owned display, visibility, travel, location, and radar settings.

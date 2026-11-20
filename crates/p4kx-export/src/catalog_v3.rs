@@ -187,7 +187,7 @@ pub(crate) mod catalog_item_components;
 #[path = "catalog_jump_drive.rs"]
 pub(crate) mod catalog_jump_drive;
 #[path = "catalog_mission_board.rs"]
-mod catalog_mission_board;
+pub(crate) mod catalog_mission_board;
 #[path = "catalog_quantum_drive.rs"]
 pub(crate) mod catalog_quantum_drive;
 #[path = "catalog_quantum_interdiction.rs"]

@@ -7,20 +7,22 @@ use std::cell::OnceCell;
 use std::time::UNIX_EPOCH;
 
 use p4kx_extraction::{
-    Archive, ArchiveWatch, Build, CancelToken, DataForge, DataForgeEntry, DataForgeLoadError,
-    FieldOrigin, Guid, SourceInventory, SourcedValue,
+    Archive, ArchiveWatch, CancelToken, DataForge, DataForgeEntry, DataForgeLoadError, SourcedValue,
 };
 
+use super::loose_definitions::{self, LooseDefinitionSnapshot};
 use super::{CatalogLanguageSelection, CatalogQuerySession, ParsedCatalogQueries};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_query_session::checkpoint;
 pub use crate::catalog_read::loose_archive_path::{LooseArchivePath, LooseArchivePathState};
-pub use crate::catalog_read::loose_definition::DefinitionIssue;
 use crate::catalog_read::loose_definition::Selection;
+pub use crate::catalog_read::loose_definition::{
+    DefinitionIssue, LooseDefinitionSelection as PlanetResourceSelection,
+};
 pub use crate::catalog_read::loose_record_link::LooseRecordCandidate;
 use crate::catalog_read::loose_record_link::LooseRecordLink;
-use crate::catalog_read::original::{EntryCapture, EntryReceipt, with_entry_capture};
+use crate::catalog_read::original::{EntryCapture, with_entry_capture};
 pub use crate::catalog_read::original::{PhysicalEntryIdentity, PhysicalEntryRef};
 use crate::catalog_v3::catalog_definitions::planet_resource;
 pub use crate::catalog_v3::catalog_definitions::planet_resource::{
@@ -30,62 +32,10 @@ use crate::export_archive_health;
 pub use crate::export_entry_counts::ExportEntryCounts;
 use crate::export_ledger::ExportLedger;
 pub use crate::guid_text::CatalogGuid;
-use crate::{CatalogError, CatalogOptions, export_health_entries};
-
-/// Selects original planet resource definitions in one Archive.
-#[derive(Debug, Clone, Copy)]
-#[non_exhaustive]
-pub enum PlanetResourceSelection<'path> {
-    /// Every admitted resource Entry in physical directory order.
-    All,
-    /// One physical root directory index in the opened Archive.
-    EntryIndex(u32),
-    /// Every admitted physical Entry at this Archive-relative path.
-    ArchivePath(&'path str),
-    /// Every admitted physical Entry declaring this nonzero authored GUID.
-    Guid(Guid),
-}
-
-impl<'path> From<PlanetResourceSelection<'path>> for Selection<'path> {
-    fn from(selection: PlanetResourceSelection<'path>) -> Self {
-        match selection {
-            PlanetResourceSelection::All => Self::All,
-            PlanetResourceSelection::EntryIndex(index) => Self::EntryIndex(index),
-            PlanetResourceSelection::ArchivePath(path) => Self::Path(path),
-            PlanetResourceSelection::Guid(guid) => Self::Guid(guid),
-        }
-    }
-}
+use crate::{CatalogError, CatalogOptions};
 
 /// Selected planet resources with their canonical rows and source evidence.
-#[derive(Debug)]
-#[must_use]
-#[non_exhaustive]
-pub struct PlanetResourceSnapshot {
-    /// The Build identified by the Archive, when available.
-    pub build: Option<Build>,
-    /// Availability of eligible physical Entries within the selection.
-    pub availability: super::DatasetAvailability,
-    /// Selected rows in physical Archive directory order, including duplicate GUIDs.
-    pub rows: Vec<PlanetResource>,
-    /// The original directory coordinates used by the selection.
-    pub directory: FieldOrigin,
-    /// Required reads, projections and undecidable selection candidates.
-    pub entries: ExportEntryCounts,
-    /// Original sources and uses referenced by the returned values.
-    pub source_inventory: SourceInventory,
-}
-
-impl PlanetResourceSnapshot {
-    /// Whether the selected scope can prove that no further matching rows were omitted.
-    #[must_use]
-    pub fn is_selection_complete(&self) -> bool {
-        self.directory.source_set_complete()
-            && self.entries.failed_required_reads == 0
-            && self.entries.failed_projections == 0
-            && self.entries.failed_selection_candidates == 0
-    }
-}
+pub type PlanetResourceSnapshot = LooseDefinitionSnapshot<PlanetResource>;
 
 /// Reads original planet resources and their selected tint palette references.
 ///
@@ -106,35 +56,29 @@ pub fn read_planet_resources(
     let snapshot = with_entry_capture(archive, |capture| {
         let loaded = OnceCell::new();
         let records = OnceCell::new();
-        read(
-            archive,
-            capture,
-            selection.into(),
-            cancel,
-            |path, authored| {
-                let (forge, origins) = if let Some(records) = records.get() {
-                    records
-                } else {
-                    let entry = DataForgeEntry::read_until(archive, &|| {
-                        cancel.is_some_and(CancelToken::is_cancelled)
-                    })
-                    .map_err(|error| match error {
-                        DataForgeLoadError::Cancelled => CatalogError::Cancelled,
-                        other => CatalogError::Load(other),
-                    })?;
-                    let entry = loaded.get_or_init(|| entry);
-                    let forge = entry.open().map_err(CatalogError::DataForge)?;
-                    let origins = CatalogOrigins::for_archive_records_with_uses(
-                        archive,
-                        entry,
-                        capture.source_uses().clone(),
-                    )?;
-                    records.get_or_init(|| (forge, origins))
-                };
-                let original = OriginalCatalogInput::new(forge, origins);
-                planet_resource::resolve_tint_record(path, authored, forge, &original, None, cancel)
-            },
-        )
+        read(archive, capture, selection, cancel, |path, authored| {
+            let (forge, origins) = if let Some(records) = records.get() {
+                records
+            } else {
+                let entry = DataForgeEntry::read_until(archive, &|| {
+                    cancel.is_some_and(CancelToken::is_cancelled)
+                })
+                .map_err(|error| match error {
+                    DataForgeLoadError::Cancelled => CatalogError::Cancelled,
+                    other => CatalogError::Load(other),
+                })?;
+                let entry = loaded.get_or_init(|| entry);
+                let forge = entry.open().map_err(CatalogError::DataForge)?;
+                let origins = CatalogOrigins::for_archive_records_with_uses(
+                    archive,
+                    entry,
+                    capture.source_uses().clone(),
+                )?;
+                records.get_or_init(|| (forge, origins))
+            };
+            let original = OriginalCatalogInput::new(forge, origins);
+            planet_resource::resolve_tint_record(path, authored, forge, &original, None, cancel)
+        })
     });
     watch.check()?;
     checkpoint(cancel)?;
@@ -189,17 +133,9 @@ impl ParsedCatalogQueries<'_> {
             let origins = CatalogOrigins::for_archive_records(archive, entry)?;
             let original = OriginalCatalogInput::new(forge, &origins);
             let capture = EntryCapture::for_input(&original);
-            read(
-                archive,
-                &capture,
-                selection.into(),
-                cancel,
-                |path, authored| {
-                    planet_resource::resolve_tint_record(
-                        path, authored, forge, &original, None, cancel,
-                    )
-                },
-            )
+            read(archive, &capture, selection, cancel, |path, authored| {
+                planet_resource::resolve_tint_record(path, authored, forge, &original, None, cancel)
+            })
         })
     }
 }
@@ -226,37 +162,13 @@ fn read(
         selection,
         palette_record,
     )?;
-    let directory = directory_origin(archive, capture, selection, inventory_problem.is_none())?;
-    let observed = export_health_entries::compile(ledger.entries)?;
-    let entries = export_health_entries::counts(planet_resource::KIND, &observed.sources)?;
-    let source_inventory = capture.source_uses().finish_with(|| checkpoint(cancel))?;
-    Ok(PlanetResourceSnapshot {
-        build: archive.build().cloned(),
-        availability: table.availability,
-        rows: table.rows,
-        directory,
-        entries,
-        source_inventory,
-    })
-}
-
-fn directory_origin(
-    archive: &Archive,
-    capture: &EntryCapture<'_>,
-    selection: Selection<'_>,
-    inventory_complete: bool,
-) -> Result<FieldOrigin, CatalogError> {
-    let registry = capture.source_uses();
-    let proof = if matches!(selection, Selection::EntryIndex(_)) {
-        if let [entry] = selection.entries(archive) {
-            let receipt = EntryReceipt::outer(capture, archive, entry)?;
-            let reference = receipt.physical_reference(capture)?;
-            let (uses, complete) = reference.contributions();
-            return Ok(registry.origin(uses, complete));
-        }
-        registry.observe_root_directory_entry_count(archive)?
-    } else {
-        registry.observe_root_directory_paths(archive)?
-    };
-    Ok(registry.origin(proof.as_slice(), proof.is_some() && inventory_complete))
+    loose_definitions::finish(
+        archive,
+        capture,
+        selection,
+        cancel,
+        planet_resource::KIND,
+        table,
+        ledger,
+    )
 }

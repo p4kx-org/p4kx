@@ -15,20 +15,31 @@ use crate::source_value_catalog::SourceRecordReference;
 
 const PROPERTIES_TYPE: &str = "SSCRadarContactProperites";
 
+/// Authored starmap radar properties and signature inputs.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct RadarProperties<'source> {
-    source_type: SourcedValue<&'source str>,
+#[non_exhaustive]
+pub struct RadarProperties<'source> {
+    /// The original concrete type.
+    pub source_type: SourcedValue<&'source str>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    contact_type: SourcedValue<Box<SourceRecordReference<'source>>>,
-    base_signature_params: SourcedValue<SourceArenaOutput<'source>>,
-    cross_section_params: SourcedValue<SourceArenaOutput<'source>>,
-    emission_modifier_params: SourcedValue<SourceArenaOutput<'source>>,
-    death_params: SourcedValue<SourceArenaOutput<'source>>,
-    scan_bounds: SourcedValue<SourceArenaOutput<'source>>,
-    room_params: SourcedValue<RadarRoomParams<'source>>,
-    authored_fields: SourceArenaOutput<'source>,
+    /// The original radar contact type reference.
+    pub contact_type: SourcedValue<Box<SourceRecordReference<'source>>>,
+    /// The original base signature fields.
+    pub base_signature_params: SourcedValue<SourceArenaOutput<'source>>,
+    /// The original cross-section fields.
+    pub cross_section_params: SourcedValue<SourceArenaOutput<'source>>,
+    /// The original emission modifier fields.
+    pub emission_modifier_params: SourcedValue<SourceArenaOutput<'source>>,
+    /// The original death settings.
+    pub death_params: SourcedValue<SourceArenaOutput<'source>>,
+    /// The original scan bounds fields.
+    pub scan_bounds: SourcedValue<SourceArenaOutput<'source>>,
+    /// The authored room settings.
+    pub room_params: SourcedValue<RadarRoomParams<'source>>,
+    /// Additional original fields.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> RadarProperties<'source> {
@@ -89,13 +100,18 @@ impl<'source> RadarProperties<'source> {
     }
 }
 
+/// Original starmap radar room settings.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct RadarRoomParams<'source> {
-    source_type: SourcedValue<&'source str>,
-    ignore_interior_vs_exterior_check: SourcedValue<bool>,
-    authored_fields: SourceArenaOutput<'source>,
+#[non_exhaustive]
+pub struct RadarRoomParams<'source> {
+    /// The original concrete type.
+    pub source_type: SourcedValue<&'source str>,
+    /// Whether to ignore the interior and exterior check.
+    pub ignore_interior_vs_exterior_check: SourcedValue<bool>,
+    /// Additional original fields.
+    pub authored_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> RadarRoomParams<'source> {

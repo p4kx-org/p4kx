@@ -24,36 +24,58 @@ use crate::{CatalogError, Kind};
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct TerrainGuidLink {
-    pub(crate) state: SourcedValue<TerrainGuidLinkState>,
-    candidates: Vec<TerrainGuidCandidate>,
+#[non_exhaustive]
+pub struct TerrainGuidLink {
+    /// The sourced link outcome for the original GUID.
+    pub state: SourcedValue<TerrainGuidLinkState>,
+    /// Original matching Entries in physical directory order.
+    pub candidates: Vec<TerrainGuidCandidate>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(crate) enum TerrainGuidLinkState {
+/// Resolution of one authored terrain GUID.
+#[non_exhaustive]
+pub enum TerrainGuidLinkState {
+    /// The source field is absent.
     Absent,
+    /// The source field is explicitly null.
     Null,
+    /// The source field does not contain a valid GUID.
     Invalid,
+    /// The source field contains the zero GUID.
     Zero,
+    /// The original source field could not be read.
     Unreadable,
+    /// The original source field has an unsupported representation.
     Unsupported,
+    /// An incomplete target survey prevents resolving the original GUID.
     Unavailable,
+    /// The target survey found no matching candidate.
     Missing,
+    /// Matching Entries belong to other definition families.
     WrongFamily,
+    /// Multiple physical Entries in the expected family match.
     Ambiguous,
+    /// The unique expected-family match is outside the export filter.
     Filtered,
+    /// One expected-family match is selected.
     Resolved,
 }
 
+/// A physical Entry declaring the queried terrain GUID.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct TerrainGuidCandidate {
-    kind: Kind,
-    entry: SourcedValue<PhysicalEntryRef>,
-    guid: SourcedValue<CatalogGuid>,
+#[non_exhaustive]
+pub struct TerrainGuidCandidate {
+    /// The original definition family owning the Entry.
+    pub kind: Kind,
+    /// The target Entry directory identity.
+    pub entry: SourcedValue<PhysicalEntryRef>,
+    /// The authored GUID and its original payload evidence.
+    pub guid: SourcedValue<CatalogGuid>,
 }
 
 struct Observation {

@@ -23,6 +23,11 @@ use crate::texts::{TextSources, Texts};
 use crate::{CatalogError, Kind};
 
 pub use crate::catalog_v3::starmap_amenity_definition::StarmapAmenityDefinition;
+pub use crate::catalog_v3::starmap_object_definition::{
+    DisplayFields, ObjectNavigation, ObjectText, RadarProperties, RadarRoomParams,
+    StarmapAssetManager, StarmapAsteroidRing, StarmapLocation, StarmapObjectDefinition,
+    StarmapObjectLinks, StarmapObjectOwned, StarmapQuantumTravel, VisibilityFields,
+};
 pub use crate::catalog_v3::starmap_preset_definition::StarmapPresetDefinition;
 pub use crate::catalog_v3::starmap_type_definition::StarmapTypeDefinition;
 
@@ -30,6 +35,8 @@ pub use crate::catalog_v3::starmap_type_definition::StarmapTypeDefinition;
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
 pub enum StarmapDefinitionFamily {
+    /// Physical starmap object definitions admitted under the PU path.
+    Objects,
     /// Physical starmap object type definitions.
     Types,
     /// Physical starmap presets and their owned settings.
@@ -41,6 +48,7 @@ pub enum StarmapDefinitionFamily {
 impl StarmapDefinitionFamily {
     const fn kind(self) -> Kind {
         match self {
+            Self::Objects => Kind::StarmapObjects,
             Self::Types => Kind::StarmapTypes,
             Self::Presets => Kind::StarmapPresets,
             Self::Amenities => Kind::StarmapAmenities,
@@ -52,6 +60,10 @@ impl StarmapDefinitionFamily {
         tables: StarmapDefinitionTables<'_>,
     ) -> (DatasetAvailability, StarmapDefinitionRows<'_>) {
         match self {
+            Self::Objects => (
+                tables.objects.availability,
+                StarmapDefinitionRows::Objects(tables.objects.rows),
+            ),
             Self::Types => (
                 tables.types.availability,
                 StarmapDefinitionRows::Types(tables.types.rows),
@@ -90,6 +102,8 @@ impl StarmapDefinitionSelection {
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum StarmapDefinitionRows<'source> {
+    /// Canonical authored starmap objects.
+    Objects(Vec<StarmapObjectDefinition<'source>>),
     /// Canonical object type definitions.
     Types(Vec<StarmapTypeDefinition<'source>>),
     /// Canonical preset definitions.

@@ -36,9 +36,12 @@ pub use crate::starmap_containers::unresolved::{
     ContainerTargetReadStatus, ContainerTargetStatus, UnresolvedChild, UnresolvedContainerLink,
 };
 pub use definitions::{
-    StarmapAmenityDefinition, StarmapDefinitionFamily, StarmapDefinitionRows,
-    StarmapDefinitionSelection, StarmapDefinitionSnapshot, StarmapPresetDefinition,
-    StarmapTypeDefinition, with_starmap_definitions, with_starmap_definitions_from,
+    DisplayFields, ObjectNavigation, ObjectText, RadarProperties, RadarRoomParams,
+    StarmapAmenityDefinition, StarmapAssetManager, StarmapAsteroidRing, StarmapDefinitionFamily,
+    StarmapDefinitionRows, StarmapDefinitionSelection, StarmapDefinitionSnapshot, StarmapLocation,
+    StarmapObjectDefinition, StarmapObjectLinks, StarmapObjectOwned, StarmapPresetDefinition,
+    StarmapQuantumTravel, StarmapTypeDefinition, VisibilityFields, with_starmap_definitions,
+    with_starmap_definitions_from,
 };
 
 /// A canonical physical system root or a Child route within it.

@@ -13,7 +13,7 @@ use super::terrain_layers::{
 use crate::catalog_read::entry_json_object::{self, EntryJsonObject};
 use crate::catalog_read::loose_archive_path;
 use crate::catalog_read::loose_definition::{
-    self, DefinitionFamily, DefinitionIssue, LooseDefinition,
+    self, DefinitionFamily, DefinitionIssue, LooseDefinition, Selection,
 };
 use crate::catalog_read::original::{EntryCapture, PhysicalEntryIdentity};
 use crate::catalog_table::CatalogTable;
@@ -44,25 +44,42 @@ pub(super) const FAMILY: DefinitionFamily = DefinitionFamily::new(
 
 pub(crate) type SoilTextureSetTable = CatalogTable<SoilTextureSet>;
 
+/// Original soil texture layers and terrain material settings.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct SoilTextureSet {
-    identity: PhysicalEntryIdentity,
-    guid: SourcedValue<CatalogGuid>,
-    guid_raw: SourcedValue<String>,
-    ground_layers: GroundLayers,
-    medium_layers: TextureLayers,
-    ground_textures: Option<LayerTextureLinks>,
-    medium_textures: Option<LayerTextureLinks>,
-    medium_layer_weights: NumericSlots,
-    medium_layer_height_scales: NumericSlots,
-    scree_content_per_layer: NumericSlots,
-    sand: SourcedValue<bool>,
-    min_roughness: Number,
-    max_roughness: Number,
-    additional_fields: Vec<RawPlanetAssetMember>,
-    issues: Vec<DefinitionIssue>,
+#[non_exhaustive]
+pub struct SoilTextureSet {
+    /// The original physical Entry identity.
+    pub identity: PhysicalEntryIdentity,
+    /// The parsed original GUID.
+    pub guid: SourcedValue<CatalogGuid>,
+    /// The original GUID text.
+    pub guid_raw: SourcedValue<String>,
+    /// The original ground layer slots.
+    pub ground_layers: GroundLayers,
+    /// The original medium layer slots.
+    pub medium_layers: TextureLayers,
+    /// Directory links for authored ground texture paths.
+    pub ground_textures: Option<LayerTextureLinks>,
+    /// Directory links for authored medium texture paths.
+    pub medium_textures: Option<LayerTextureLinks>,
+    /// The original medium layer weights.
+    pub medium_layer_weights: NumericSlots,
+    /// The original medium layer height scales.
+    pub medium_layer_height_scales: NumericSlots,
+    /// The original scree content slots.
+    pub scree_content_per_layer: NumericSlots,
+    /// The authored sand flag.
+    pub sand: SourcedValue<bool>,
+    /// The authored minimum roughness.
+    pub min_roughness: Number,
+    /// The authored maximum roughness.
+    pub max_roughness: Number,
+    /// Additional unprojected original fields.
+    pub additional_fields: Vec<RawPlanetAssetMember>,
+    /// Source issues observed in this owner selection.
+    pub issues: Vec<DefinitionIssue>,
 }
 
 impl LooseDefinition for SoilTextureSet {
@@ -82,13 +99,25 @@ pub(crate) fn read(
     options: &CatalogOptions<'_>,
     paths: &mut loose_archive_path::Resolver<'_, '_, '_>,
 ) -> Result<SoilTextureSetTable, CatalogError> {
+    read_selected(archive, capture, ledger, options, paths, Selection::All)
+}
+
+pub(crate) fn read_selected(
+    archive: &Archive,
+    capture: &EntryCapture<'_>,
+    ledger: &mut ExportLedger,
+    options: &CatalogOptions<'_>,
+    paths: &mut loose_archive_path::Resolver<'_, '_, '_>,
+    selection: Selection<'_>,
+) -> Result<SoilTextureSetTable, CatalogError> {
     let mut resolver = LayerResolver::new(paths, options.cancel);
-    loose_definition::read(
+    loose_definition::read_selected(
         archive,
         capture,
         ledger,
         options,
         FAMILY,
+        selection,
         |identity, object| SoilTextureSet::project(identity, object, &mut resolver),
     )
 }

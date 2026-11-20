@@ -16,22 +16,30 @@ use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::source_value_catalog::SourceRecordReference;
 
+/// Original starmap object relationships.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct StarmapObjectLinks<'source> {
+#[non_exhaustive]
+pub struct StarmapObjectLinks<'source> {
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    affiliation: SourcedValue<Box<SourceRecordReference<'source>>>,
+    /// The original legacy faction reference.
+    pub affiliation: SourcedValue<Box<SourceRecordReference<'source>>>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    jurisdiction: SourcedValue<Box<SourceRecordReference<'source>>>,
+    /// The original jurisdiction reference.
+    pub jurisdiction: SourcedValue<Box<SourceRecordReference<'source>>>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    location_hierarchy_tag: SourcedValue<Box<SourceRecordReference<'source>>>,
+    /// The original location hierarchy tag reference.
+    pub location_hierarchy_tag: SourcedValue<Box<SourceRecordReference<'source>>>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    r#type: SourcedValue<Box<SourceRecordReference<'source>>>,
+    /// The original starmap object type reference.
+    pub r#type: SourcedValue<Box<SourceRecordReference<'source>>>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
-    parent: SourcedValue<Box<SourceRecordReference<'source>>>,
+    /// The original starmap parent reference.
+    pub parent: SourcedValue<Box<SourceRecordReference<'source>>>,
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
-    amenities: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
+    /// The original amenity references in stored order.
+    pub amenities: SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>,
 }
 
 impl<'source> StarmapObjectLinks<'source> {
