@@ -20,6 +20,7 @@ mod original_item_numbers;
 mod original_item_scalar;
 mod real_archive;
 mod real_archive_auto_spawns;
+mod real_archive_batched_catalog_sdk;
 mod real_archive_blueprints;
 mod real_archive_broker_entries;
 mod real_archive_canonical_texts;

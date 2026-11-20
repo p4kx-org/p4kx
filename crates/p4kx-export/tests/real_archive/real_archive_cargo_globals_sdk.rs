@@ -17,7 +17,7 @@ use crate::catalog_v3_consumer;
 use crate::real_archive_catalog_table_parity::first_difference;
 
 #[path = "real_archive_cargo_globals_complete_catalog.rs"]
-mod complete_catalog;
+pub(crate) mod complete_catalog;
 
 pub(super) fn verify(archive: &Archive, entry: &DataForgeEntry, catalog: &Value) -> TestResult {
     let loading = catalog_v3_consumer::rows(catalog, Kind::CargoLoadingGlobals)?;

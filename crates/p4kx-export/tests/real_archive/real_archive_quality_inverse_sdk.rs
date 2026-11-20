@@ -9,7 +9,7 @@ use serde_json::Value;
 use crate::real_archive_catalog_table_parity::{self as parity, Origins, Table, TestResult};
 use crate::real_archive_verification;
 
-const QUANTIZATION_RESOURCES: &str = "/projections/qualityQuantizationResources";
+pub(super) const QUANTIZATION_RESOURCES: &str = "/projections/qualityQuantizationResources";
 
 #[test]
 #[ignore = "same Build: set P4KX_DATA_P4K and P4KX_CATALOG_MEASUREMENT_DIR"]
@@ -23,7 +23,7 @@ fn installed_quality_inverse_sdk_matches_the_same_complete_catalog() -> TestResu
     Ok(())
 }
 
-fn read_sdk(archive: &Archive, origins: &mut Origins) -> TestResult<[Table; 1]> {
+pub(super) fn read_sdk(archive: &Archive, origins: &mut Origins) -> TestResult<[Table; 1]> {
     quality::with_quantization_resources(archive, CatalogRecordSelection::All, None, |snapshot| {
         let projection = &snapshot.projection;
         if projection.build() != archive.build()

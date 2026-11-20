@@ -38,14 +38,20 @@ fn installed_law_sdk_matches_original_physical_definitions() -> TestResult {
 #[test]
 #[ignore = "completed normal installed Catalog: set P4KX_DATA_P4K and P4KX_CATALOG_MEASUREMENT_DIR"]
 fn installed_law_sdk_matches_the_same_complete_catalog() -> TestResult {
-    let parity = verify_tables(FAMILIES.map(|family| family.path), |archive, origins| {
-        inspect_laws(archive, |sdk, _| capture_tables(sdk, origins))
-    })?;
+    let parity = verify_tables(table_paths(), capture_sdk)?;
     print_line(&format!(
         "complete law SDK parity: family rows={:?} sourceUses={} physicalSources={}",
         parity.rows, parity.source_uses, parity.physical_sources,
     ));
     Ok(())
+}
+
+pub(super) fn table_paths() -> [&'static str; 4] {
+    FAMILIES.map(|family| family.path)
+}
+
+pub(super) fn capture_sdk(archive: &Archive, origins: &mut Origins) -> TestResult<[Table; 4]> {
+    inspect_laws(archive, |sdk, _| capture_tables(sdk, origins))
 }
 
 fn inspect_laws<T>(

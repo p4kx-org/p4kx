@@ -26,6 +26,7 @@ use crate::real_archive_shop_inventory_v3::verify_build;
 
 #[path = "real_archive_cargo_globals_sdk.rs"]
 mod sdk;
+pub(super) use sdk::complete_catalog;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 

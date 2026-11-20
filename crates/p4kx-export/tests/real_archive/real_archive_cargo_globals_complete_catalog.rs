@@ -10,13 +10,15 @@ use super::{TestResult, record_index};
 use crate::real_archive_catalog_table_parity::{Origins, Table, capture_table, verify_tables};
 use crate::real_archive_verification::print_line;
 
-const LOADING: &str = "/configurations/cargoLoadingGlobals";
-const PRICES: &str = "/configurations/shopCommodityGlobals";
+pub(crate) const TABLE_PATHS: [&str; 2] = [
+    "/configurations/cargoLoadingGlobals",
+    "/configurations/shopCommodityGlobals",
+];
 
 #[test]
 #[ignore = "same Build: set P4KX_DATA_P4K and P4KX_CATALOG_MEASUREMENT_DIR"]
 fn installed_cargo_sdk_matches_the_same_complete_catalog() -> TestResult {
-    let counts = verify_tables([LOADING, PRICES], read_sdk)?;
+    let counts = verify_tables(TABLE_PATHS, read_sdk)?;
     let [loading, prices] = counts.rows;
     print_line(&format!(
         "cargo SDK parity: loadingRows={loading} shopRows={prices} sourceUses={} physicalSources={}",
@@ -25,7 +27,7 @@ fn installed_cargo_sdk_matches_the_same_complete_catalog() -> TestResult {
     Ok(())
 }
 
-fn read_sdk(archive: &Archive, origins: &mut Origins) -> TestResult<[Table; 2]> {
+pub(crate) fn read_sdk(archive: &Archive, origins: &mut Origins) -> TestResult<[Table; 2]> {
     let session =
         CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
     let parsed = session.parsed(None)?;
