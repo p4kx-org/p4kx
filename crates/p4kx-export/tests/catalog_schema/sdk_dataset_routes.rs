@@ -78,6 +78,8 @@ mod ship_systems;
 mod vehicle_armor;
 #[path = "sdk_weapon_animation_route.rs"]
 mod weapon_animation;
+#[path = "sdk_weapon_source_routes.rs"]
+mod weapon_sources;
 #[path = "sdk_worn_gear_routes.rs"]
 mod worn_gear;
 
@@ -146,6 +148,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.push(mineable_entity::read()?);
     routes.push(planet_resource::read()?);
     routes.extend(component_tools::read()?);
+    routes.extend(weapon_sources::read()?);
     Ok(routes)
 }
 

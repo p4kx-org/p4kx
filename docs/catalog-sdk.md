@@ -1152,8 +1152,12 @@ ordinals. `mode_kind()` classifies each action. For single and rapid projectile 
 Inspect their states and origins independently. An incomplete component selection remains
 visible in the snapshot coverage even when the readable components produce rows.
 
-Magazine and Ammo References in these authored rows report original header resolution.
-Use the projectile ammunition query for a resolved action route and its reached Ammo.
+The authored query reads components owned by the selected Item. An admitted magazine Item
+can be queried separately by its physical Record index. Magazine and Ammo References
+report original header resolution. A filtered Catalog can include a linked container outside
+the ordinary Item selection as a dependency. The authored query covers the selected owner
+and does not enumerate those dependency rows. Use the projectile ammunition query for a
+resolved action route and its reached Ammo.
 
 ## Primary weapon magazine resolutions
 
