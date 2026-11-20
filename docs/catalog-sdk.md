@@ -506,6 +506,14 @@ per-value source-use references in the snapshot's `source_inventory`. This looku
 the authored reward amount for a resolved reference. Contract reward computation has its own
 source operands.
 
+Use `with_reputation_triggers`, its decoded-Entry form or the session method to read
+`configurations.reputationTriggers` from the physical faction reputation Records. An
+unlocalized request supports `All`, `Guid` and `RecordIndex` owner selection. The ordered
+slots retain null pointers, record links, authored variants and their original source
+evidence. The `trigger_records` selection in `with_reputation` reads the reusable targets.
+Faction relationships are part of `definitions.factionReputations` through
+`FactionReputationDefinition::relations()`.
+
 ## Manufacturers
 
 Use `with_manufacturers`, `with_manufacturers_from` or the parsed session's

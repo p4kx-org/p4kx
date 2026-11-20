@@ -85,6 +85,8 @@ mod mission_location_templates;
 mod reputation;
 #[path = "reputation_reward_amount_query.rs"]
 mod reputation_reward_amounts;
+#[path = "reputation_trigger_query.rs"]
+mod reputation_triggers;
 
 #[path = "quality_query.rs"]
 pub mod quality;
@@ -213,6 +215,10 @@ pub use reputation::{
 pub use reputation_reward_amounts::{
     ReputationRewardAmountDefinition, ReputationRewardAmountSnapshot,
     with_reputation_reward_amounts, with_reputation_reward_amounts_from,
+};
+pub use reputation_triggers::{
+    ReputationTriggerConfiguration, ReputationTriggerSnapshot, with_reputation_triggers,
+    with_reputation_triggers_from,
 };
 
 pub use crate::location_condition_kind::LocationConditionKind;

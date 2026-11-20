@@ -17,12 +17,10 @@ use serde::Serialize;
 use serde_json::{Value, json};
 
 use super::super::{REPUTATION_CONTEXTS, REPUTATION_PERKS, REPUTATION_TRIGGER_RECORDS};
-use super::{Route, TestResult, reputation_fixture};
+use super::{Route, TestResult, reputation_fixture, reputation_sandbox_fixture as trigger_fixture};
 
 #[path = "../it/reputation_perk_fixture.rs"]
 mod perk_fixture;
-#[path = "../it/reputation_sandbox_fixture.rs"]
-mod trigger_fixture;
 
 pub(super) fn read() -> TestResult<[Route; 3]> {
     Ok([read_contexts()?, read_perks()?, read_triggers()?])

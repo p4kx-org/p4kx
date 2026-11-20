@@ -46,8 +46,16 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
                 return Err("the selected standing fixture".into());
             };
             let slots = scope.standings().ok_or("ordered original standing slots")?;
+            let relations = faction.relations();
+            let hostile = relations
+                .hostility_params()
+                .value()
+                .ok_or("original hostile standing rule")?;
             for origin in [
                 faction.display_name().origin(),
+                relations.allies().origin(),
+                hostile.scope().origin(),
+                hostile.standing().origin(),
                 slots.origin(),
                 standing.min_reputation().origin(),
             ] {

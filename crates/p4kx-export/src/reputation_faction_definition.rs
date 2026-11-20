@@ -303,6 +303,13 @@ pub(crate) fn tables<'source>(
         .unzip();
     FactionReputationTables {
         definitions: CatalogTable::new(forge, &[SOURCE_TYPE], definitions),
-        triggers: CatalogTable::new(forge, &[SOURCE_TYPE], triggers),
+        triggers: trigger_table(forge, triggers),
     }
+}
+
+pub(crate) fn trigger_table<'source>(
+    forge: &DataForge<'_>,
+    rows: Vec<ReputationTriggerConfiguration<'source>>,
+) -> CatalogTable<ReputationTriggerConfiguration<'source>> {
+    CatalogTable::new(forge, &[SOURCE_TYPE], rows)
 }

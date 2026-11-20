@@ -38,6 +38,7 @@ const RADAR_AUDIO: &str = "/configurations/radarAudio";
 const AMMUNITION: &str = "/definitions/ammoDefinitions";
 const AMMO_BINDINGS: &str = "/declarations/ammoBindings";
 const AMMO_CONTAINERS: &str = "/configurations/ammoContainers";
+const REPUTATION_TRIGGER_CONFIGURATIONS: &str = "/configurations/reputationTriggers";
 const WEAPON_ACTIONS: &str = "/configurations/weaponActions";
 const LOCATION_ENTITIES: &str = "/definitions/locationEntityDeclarations";
 const BLUEPRINT_POOLS: &str = "/definitions/blueprintPools";
@@ -189,6 +190,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     AMMUNITION,
     AMMO_BINDINGS,
     AMMO_CONTAINERS,
+    REPUTATION_TRIGGER_CONFIGURATIONS,
     WEAPON_ACTIONS,
     PROJECTILE_AMMUNITION,
     MAGAZINE_RESOLUTION,

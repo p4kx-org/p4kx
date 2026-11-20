@@ -1,24 +1,30 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{RecordTree, SourceValue, SourceValueState, SourcedValue};
+use std::cell::RefCell;
+
+use p4kx_extraction::{CancelToken, RecordTree, SourceValue, SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
 use super::sandbox_trigger::SandboxTrigger;
 use crate::CatalogError;
+use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
+use crate::catalog_read::original::OriginalFlowFields;
 use crate::guid_text::CatalogGuid;
 use crate::record_header_field::RecordHeaderField;
+use crate::record_observation::RecordObservation;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
+use crate::template_field_capture::TemplateFieldCapture;
 
 /// Original sandbox trigger occurrences owned by one physical faction reputation Record.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ReputationTriggerConfiguration<'source> {
+pub struct ReputationTriggerConfiguration<'source> {
     owner: ReputationTriggerOwner,
     sandbox_triggers: SourcedValue<Vec<SourcedValue<SandboxTrigger<'source>>>>,
 }
@@ -32,6 +38,42 @@ struct ReputationTriggerOwner {
 }
 
 impl<'source> ReputationTriggerConfiguration<'source> {
+    /// Borrows the original GUID of the faction reputation owner.
+    #[must_use]
+    pub const fn owner_guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.owner.guid
+    }
+
+    /// Borrows the original physical Record index of the faction reputation owner.
+    #[must_use]
+    pub const fn owner_record_index(&self) -> &SourcedValue<u32> {
+        &self.owner.record_index
+    }
+
+    /// Borrows the original ordered trigger slots and their individual source states.
+    #[must_use]
+    pub const fn sandbox_triggers(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<SandboxTrigger<'source>>>> {
+        &self.sandbox_triggers
+    }
+
+    pub(crate) fn project(
+        tree: &RecordTree<'source>,
+        input: &OriginalCatalogInput<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(Self, Vec<FieldError>), CatalogError> {
+        let scope = input.record_scope(admission.record(), tree)?;
+        let originals = OriginalFlowFields::read(&scope, cancel)?;
+        let capture = TemplateFieldCapture::new(&originals, input, admission)?;
+        let numbers = RefCell::new(Vec::new());
+        let observed = Observed::definition(&originals, input, &capture, &numbers);
+        let mut notes = Vec::new();
+        let row = Self::read(tree, observed, input.origins(), &mut notes)?;
+        Ok((row, notes))
+    }
+
     /// Reads the owned array and its physical Record identity.
     pub(super) fn read(
         tree: &RecordTree<'source>,

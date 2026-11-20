@@ -46,6 +46,8 @@ mod component_tools;
 mod container_placements;
 #[path = "sdk_contract_routes.rs"]
 mod contracts;
+#[path = "sdk_faction_trigger_configuration_route.rs"]
+mod faction_trigger_configuration;
 #[path = "sdk_dataset_fixtures.rs"]
 mod fixtures;
 #[path = "sdk_flight_configuration_routes.rs"]
@@ -76,6 +78,8 @@ mod reputation;
 mod reputation_fixture;
 #[path = "sdk_reputation_reward_route.rs"]
 mod reputation_rewards;
+#[path = "../it/reputation_sandbox_fixture.rs"]
+mod reputation_sandbox_fixture;
 #[path = "sdk_resource_group_routes.rs"]
 mod resource_groups;
 #[path = "sdk_resource_network_routes.rs"]
@@ -124,6 +128,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         read_shop_inventory(&archive)?,
         read_flare_library(&archive)?,
         read_faction_identities(&archive)?,
+        faction_trigger_configuration::read()?,
         read_subsumption_event(&archive)?,
         read_radar_configuration(&archive)?,
         containers,
