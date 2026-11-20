@@ -24,6 +24,9 @@ mod authored_link;
 #[path = "authored_nodes.rs"]
 mod authored_nodes;
 
+#[path = "cargo_manifest.rs"]
+pub(crate) mod cargo_manifest;
+
 #[path = "catalog_harvest_modules.rs"]
 pub(crate) mod catalog_harvest_modules;
 

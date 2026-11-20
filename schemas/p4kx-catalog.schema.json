@@ -4841,24 +4841,32 @@
       ],
       "type": "object"
     },
-    "CargoFillType": {
-      "description": "How a cargo manifest shares the capacity among its resources.",
-      "type": "string",
-      "x-p4kx-vocabularyClass": "open",
-      "x-values": [
-        {
-          "description": "`CargoFillCapacityValue_Even`: the capacity is split evenly.",
-          "value": "even"
+    "CargoFillCapacity": {
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
         },
-        {
-          "description": "`CargoFillCapacityValue_Random`: the split is random.",
-          "value": "random"
+        "maxCapacityRange": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
-        {
-          "description": "`CargoFillCapacityValue_Custom`: every resource states its own share.",
-          "value": "custom"
+        "minCapacityRange": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "resources": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCargoResourceSlot"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         }
-      ]
+      },
+      "required": [
+        "authoredFields",
+        "maxCapacityRange",
+        "minCapacityRange",
+        "resources",
+        "sourceType"
+      ],
+      "type": "object"
     },
     "CargoGrid": {
       "description": "Original configuration of one cargo grid component.",
@@ -5010,127 +5018,59 @@
       ],
       "type": "object"
     },
-    "CargoManifest": {
-      "description": "A cargo manifest: a `CargoManifest` Record under `cargomanifest`, which tells the game how to\nfill the cargo grid of a ship it spawns.",
+    "CargoManifestDefinition": {
+      "description": "One physical `CargoManifest` definition and its original fill and spawn inputs.",
       "properties": {
-        "className": {
-          "description": "The Record name without its type, e.g. `LegalCargo_TSG`.",
-          "type": "string"
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
         },
-        "fillType": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/CargoFillType"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "How the capacity is shared among `resources`: the type of `cargoFillCapacity`."
+        "cargoFillCapacity": {
+          "$ref": "#/$defs/SourcedValueOfCargoFillCapacity"
+        },
+        "cargoSpawnRules": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCargoSpawnRule"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
+          "$ref": "#/$defs/SourcedValueOfGuid"
         },
         "lockCargoGridsOnSpawn": {
-          "description": "The `lockCargoGridsOnSpawn` flag, `null` when absent.",
-          "type": [
-            "boolean",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfboolean"
         },
-        "maxCapacityRange": {
-          "description": "The highest share of the cargo capacity that is filled (`maxCapacityRange`, 0 to 1);\n`null` for a `custom` fill.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
-        "minCapacityRange": {
-          "description": "The lowest share of the cargo capacity that is filled (`minCapacityRange`, 0 to 1);\n`null` for a `custom` fill, which states shares per resource.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
-        "resources": {
-          "description": "The resources of `cargoFillCapacity`, in stored order.",
-          "items": {
-            "$ref": "#/$defs/CargoManifestResource"
-          },
-          "type": "array"
-        },
-        "spawnRules": {
-          "description": "The `cargoSpawnRules`, in stored order.",
-          "items": {
-            "$ref": "#/$defs/CargoSpawnRule"
-          },
-          "type": "array"
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         }
       },
       "required": [
+        "authoredFields",
+        "cargoFillCapacity",
+        "cargoSpawnRules",
         "className",
-        "fillType",
+        "fileName",
         "guid",
         "lockCargoGridsOnSpawn",
-        "maxCapacityRange",
-        "minCapacityRange",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
         "recordPath",
-        "resources",
-        "spawnRules"
-      ],
-      "type": "object"
-    },
-    "CargoManifestResource": {
-      "description": "One resource of a cargo manifest.",
-      "properties": {
-        "maxAllocation": {
-          "description": "The highest share of the capacity of a `custom` fill\n(`maxResourceAllocationPercentage`, as stored); `null` for the other fills.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "minAllocation": {
-          "description": "The lowest share of the capacity of a `custom` fill\n(`minResourceAllocationPercentage`, as stored); `null` for the other fills.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "probability": {
-          "description": "The `probability` that the resource is picked, as stored.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "resourceGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The GUID of the `ResourceType` Record, the `subtypeGuid` of a commodity; `null` when the\nresource is absent. A GUID that no commodity of the catalog carries is kept."
-        }
-      },
-      "required": [
-        "maxAllocation",
-        "minAllocation",
-        "probability",
-        "resourceGuid"
+        "sourceType"
       ],
       "type": "object"
     },
@@ -5158,82 +5098,115 @@
       ],
       "type": "object"
     },
-    "CargoSpawnKind": {
-      "description": "What a spawn rule of a cargo manifest lists.",
-      "type": "string",
-      "x-p4kx-vocabularyClass": "open",
-      "x-values": [
-        {
-          "description": "`CargoSpawnEntityDef`: entities.",
-          "value": "entities"
-        },
-        {
-          "description": "`CargoSpawnResourceDef`: resources.",
-          "value": "resources"
-        }
-      ]
-    },
-    "CargoSpawnRule": {
-      "description": "A spawn rule of a cargo manifest: a set of entities or resources the game adds to the cargo.",
+    "CargoQuantityAlgorithm": {
       "properties": {
-        "entityGuids": {
-          "description": "The `EntityClassDefinition` Records of an `entities` rule, in stored order.",
-          "items": {
-            "$ref": "#/$defs/Guid"
-          },
-          "type": "array"
-        },
-        "kind": {
-          "$ref": "#/$defs/CargoSpawnKind",
-          "description": "Whether the rule lists entities or resources."
-        },
-        "probability": {
-          "description": "The `probability` of the rule, as stored.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
         },
         "proportion": {
-          "description": "The `proportion` of a proportion quantity; `null` for another algorithm.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "quantity": {
-          "description": "The `quantity` of a fixed quantity; `null` for another algorithm.",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
-        "quantityAlgorithm": {
-          "description": "The struct type of `quantityAlgorithmType`, e.g. `CargoManifestFixedQuantityDef`.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "resourceGuids": {
-          "description": "The `ResourceType` Records of a `resources` rule, in stored order.",
-          "items": {
-            "$ref": "#/$defs/Guid"
-          },
-          "type": "array"
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         }
       },
       "required": [
-        "entityGuids",
-        "kind",
-        "probability",
+        "authoredFields",
         "proportion",
         "quantity",
-        "quantityAlgorithm",
-        "resourceGuids"
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "CargoResource": {
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "probability": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "resource": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "probability",
+        "resource",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "CargoResourceSlot": {
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "maxResourceAllocationPercentage": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "minResourceAllocationPercentage": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "probability": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "resource": {
+          "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+        },
+        "resources": {
+          "$ref": "#/$defs/SourcedValueOfCargoResource"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "maxResourceAllocationPercentage",
+        "minResourceAllocationPercentage",
+        "probability",
+        "resource",
+        "resources",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "CargoSpawnRule": {
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "entities": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "probability": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "quantityAlgorithmType": {
+          "$ref": "#/$defs/SourcedValueOfCargoQuantityAlgorithm"
+        },
+        "resources": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "entities",
+        "probability",
+        "quantityAlgorithmType",
+        "resources",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -5576,6 +5549,9 @@
         "blueprints": {
           "$ref": "#/$defs/CatalogTableOfBlueprintDefinition"
         },
+        "cargoManifests": {
+          "$ref": "#/$defs/CatalogTableOfCargoManifestDefinition"
+        },
         "climateAssets": {
           "$ref": "#/$defs/CatalogTableOfPlanetClimateAsset"
         },
@@ -5832,6 +5808,7 @@
         "blueprintCategories",
         "blueprintPools",
         "blueprints",
+        "cargoManifests",
         "climateAssets",
         "commodities",
         "consumableSubtypes",
@@ -6493,6 +6470,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/CargoLoadingGlobal"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfCargoManifestDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/CargoManifestDefinition"
           },
           "type": "array"
         }
@@ -54161,6 +54157,272 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_of_SourcedValueOfCargoResourceSlot": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfCargoResourceSlot"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfCargoSpawnRule": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfCargoSpawnRule"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber": {
       "allOf": [
         {
@@ -75343,6 +75605,656 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/CargoBoxSizesOfint32"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfCargoFillCapacity": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CargoFillCapacity"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfCargoQuantityAlgorithm": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CargoQuantityAlgorithm"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfCargoResource": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CargoResource"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfCargoResourceSlot": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CargoResourceSlot"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfCargoSpawnRule": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CargoSpawnRule"
               }
             }
           }
@@ -140013,13 +140925,6 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "description": "The versioned P4KX game-data catalog.",
   "properties": {
-    "cargoManifests": {
-      "description": "The cargo manifests, how the game fills the cargo grid of a spawned ship, ordered by GUID.",
-      "items": {
-        "$ref": "#/$defs/CargoManifest"
-      },
-      "type": "array"
-    },
     "completeness": {
       "$ref": "#/$defs/Completeness",
       "description": "Whether each kind is a complete snapshot of the Build."
@@ -140258,7 +141163,6 @@
     }
   },
   "required": [
-    "cargoManifests",
     "completeness",
     "configurations",
     "contractEntitySpawns",

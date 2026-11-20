@@ -126,6 +126,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "starmapPresets": absent_table(),
             "starmapAmenities": absent_table(),
             "ammoDefinitions": absent_table(),
+            "cargoManifests": contracts::manifests(),
             "weaponAnimationSources": {
                 "player": null,
                 "actorBindings": [],
@@ -272,7 +273,6 @@ pub(crate) fn minimal_catalog() -> Value {
         "legacyLootArchetypes": loot::legacy_archetypes(),
         "lootContainers": loot::containers(),
         "crafters": crafters::crafters(),
-        "cargoManifests": contracts::manifests(),
         "shipStoreSlugs": slugs::ship_store_slugs()
     });
     dataset_availability::add_defaults(&mut catalog);

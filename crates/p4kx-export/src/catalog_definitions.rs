@@ -10,6 +10,7 @@ use crate::build_derived::particle_library::ParticleLibrary;
 use crate::catalog_rows::staged::StagedCatalogTable;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::ammo_definition::AmmoDefinition;
+use crate::catalog_v3::cargo_manifest::CargoManifestDefinition;
 use crate::catalog_v3::catalog_independent_configurations::{
     ConsumableDefinitions, DamageResistanceMacro, MiningLaserGlobalDefinition, TurretHealthModifier,
 };
@@ -115,6 +116,7 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) blueprints: StagedCatalogTable,
     #[schemars(with = "CatalogTable<GeneratorDefinition<'source>>")]
     pub(crate) contract_generators: StagedCatalogTable,
+    pub(crate) cargo_manifests: CatalogTable<CargoManifestDefinition<'source>>,
     pub(crate) mission_module_declarations: CatalogTable<MissionModuleDeclaration<'source>>,
     pub(crate) mission_items: CatalogTable<
         crate::catalog_v3::mission_sources::item_definition::MissionItemDefinition<'source>,

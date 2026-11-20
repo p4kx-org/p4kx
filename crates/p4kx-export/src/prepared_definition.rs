@@ -11,6 +11,7 @@ use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_number_capture::{CapturedNumber, NumberCapture};
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
+use crate::catalog_row::CatalogRow;
 use crate::catalog_table::CatalogTable;
 use crate::guid_text::CatalogGuid;
 use crate::record_observation::RecordObservation;
@@ -105,6 +106,15 @@ impl<'source, T> PreparedDefinition<'source, T> {
             &[source_type],
             rows.into_iter().map(|row| row.definition).collect(),
         )
+    }
+
+    pub(super) fn catalog_rows(rows: &[Self], kind: Kind) -> impl Iterator<Item = CatalogRow> + '_ {
+        rows.iter().map(move |row| CatalogRow {
+            kind,
+            guid: row.guid,
+            record_path: row.path.to_owned(),
+            record_index: Some(row.index),
+        })
     }
 
     pub(super) fn sources<'rows>(

@@ -308,7 +308,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `missionTypes` | The mission types, the targets of `contracts[].missionTypeGuid`, ordered by GUID |
 | `missionLocalities` | The mission localities, named sets of starmap objects, ordered by GUID |
 | `contractScenarios` | The contract scenarios with the reward tiers of each faction, ordered by GUID |
-| `cargoManifests` | The cargo manifests (`CargoManifest`) with their fill and spawn rules, ordered by GUID |
+| `cargoManifests` | `definitions.cargoManifests`, the physical cargo manifests with their fill and spawn rules |
 | `missionLocationTemplates` | The mission location templates with the tags a location query matches, ordered by GUID |
 | `contractShipSpawns` | The distinct ship spawn descriptions of the contracts, ordered by identifier |
 | `contractLocationQueries` | The distinct location queries of the contracts, ordered by identifier |
@@ -1966,22 +1966,36 @@ the alternatives for one entity, each an `options` entry with `amount`, `weight`
 
 ### Cargo manifests
 
-`cargoManifests` lists the `CargoManifest` Records under `cargomanifest` (ADR-0265), ordered by GUID,
-with `guid`, `className` and `recordPath`. A manifest tells the game how to fill the cargo grid of a
-ship it spawns. Facts only; the tags and the description tags are not exported.
+`definitions.cargoManifests` owns the physical `CargoManifest` Records under
+`libs/foundry/records/cargomanifest/`. The table uses the same `cargoManifests` filter and
+completeness kind. Rows are ordered by GUID and physical Record index. Each header and stored
+value has its own source state and origin. These declarations describe cargo fill and spawn
+configuration.
 
-| Field | Meaning |
-|-------|---------|
-| `fillType` | `even`, `random` or `custom`: the type of `cargoFillCapacity` (4 `custom`, 34 `even`, 43 `random` on LIVE); `null` for another type |
-| `minCapacityRange`, `maxCapacityRange` | The share of the cargo capacity that is filled, 0 to 1; `null` for `custom`, which states shares per resource |
-| `lockCargoGridsOnSpawn` | The flag as stored, `null` when absent |
-| `resources` | The resources of the fill in stored order: `resourceGuid` (the `subtypeGuid` of a commodity), `probability`, and for `custom` `minAllocation` and `maxAllocation` (the allocation percentages as stored, else `null`) |
-| `spawnRules` | The `cargoSpawnRules` in stored order: `kind` (`entities` or `resources`), `probability`, `entityGuids`, `resourceGuids`, the struct type of the quantity algorithm in `quantityAlgorithm` and its `quantity` (fixed) or `proportion` |
+| Field | Original source |
+| --- | --- |
+| `lockCargoGridsOnSpawn` | The authored flag on the Record. |
+| `cargoFillCapacity` | The original fill definition with its concrete `sourceType`, `minCapacityRange`, `maxCapacityRange` and ordered `resources`. Known types include `CargoFillCapacityValue_Even`, `CargoFillCapacityValue_Random` and `CargoFillCapacityValue_Custom`. |
+| `cargoFillCapacity.value.resources` | Original resource slots. A direct resource has `resource` and `probability`. An allocation has `minResourceAllocationPercentage`, `maxResourceAllocationPercentage` and its nested `resources` value. |
+| `cargoSpawnRules` | Ordered original rules, each with concrete `sourceType`, `probability`, authored `entities` and `resources` references and the original `quantityAlgorithmType`. |
+| `quantityAlgorithmType` | The authored algorithm's concrete `sourceType`, integer `quantity` or numeric `proportion` where declared. |
+| `authoredFields` | Ordered members of this owner outside the typed fields, including additional fields of new concrete variants. |
 
-The Archive refers to a manifest only from the members of an `AIWaveCollection` (the ship
-encounters), never from a contract, so the kind has no link from `contracts`. On LIVE 4.10
-(2026-10-30) the kind holds 81 manifests with 515 resources, 4 of which (4 distinct `ResourceType`
-Records) have no commodity in the catalog, and 2 spawn rules, both of one manifest.
+Numeric cells preserve stored widths and IEEE bits. The decimal projection is available for finite
+floats. References retain their own stored GUID, target evidence and resolution state. A
+`ResourceType` identity remains usable when no commodity carries it. Null and repeated
+occurrences retain their positions.
+
+Manifest tags and description text or localization keys retained in `authoredFields` use the
+protected `gameText` domain with x-`gameText`. They preserve the exact source text/key and its
+encryption origin. The authored member capture adds no translation or public display name.
+
+For a consumer migrating from v2, read `definitions.cargoManifests.rows` for the former
+`cargoManifests` rows. Use the sourced fill type in `cargoFillCapacity.value.sourceType` for the
+former `fillType`, and the corresponding array inside the fill for former `resources` rows.
+Read the nested allocation resource and its outer bounds separately. Replace `spawnRules` with
+`cargoSpawnRules`, and follow the sourced reference cells for former GUID arrays. ADR-0265
+records the independent encounter source and why contracts have no manifest join.
 
 ### Starmap objects
 

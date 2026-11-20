@@ -31,7 +31,7 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
         admission: &RecordObservation<'_, 'f>,
         tree: &RecordTree<'f>,
     ) -> Result<Option<(Picked<'f>, Vec<FieldError>)>, ScanError> {
-        let projection = match kind {
+        Ok(Some(match kind {
             Kind::ExplosionDefinitions => self.explosion_definition(admission, tree)?,
             Kind::InventoryContainers => self.inventory_definition(admission, tree)?,
             Kind::MedicalItemTierConfigs => self.medical_definition(admission, tree)?,
@@ -80,9 +80,9 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
             }
             Kind::MissionModuleDeclarations => self.module_declaration(admission, tree)?,
             Kind::MissionItems => self.mission_item_definition(admission, tree)?,
+            Kind::CargoManifests => self.cargo_manifest_definition(admission, tree)?,
             _ => return self.read_mission_definition(kind, admission, tree),
-        };
-        Ok(Some(projection))
+        }))
     }
 
     fn mineable_element(

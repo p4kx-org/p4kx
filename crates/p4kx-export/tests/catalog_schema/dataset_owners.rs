@@ -53,6 +53,7 @@ const GROUPS: &[Group] = &[
             "autoSpawns",
             "blueprintPools",
             "blueprintCategories",
+            "cargoManifests",
             "blueprints",
             "climateAssets",
             "commodities",
@@ -313,7 +314,6 @@ const GROUPS: &[Group] = &[
         prefix: "",
         shape: Shape::Array,
         members: &[
-            "cargoManifests",
             "contractEntitySpawns",
             "contractLocationQueries",
             "contractNpcSpawns",

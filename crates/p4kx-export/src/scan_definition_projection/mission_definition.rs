@@ -4,6 +4,7 @@
 use p4kx_extraction::RecordTree;
 
 use super::SelectedProjection;
+use crate::catalog_v3::cargo_manifest;
 use crate::mission_kinds::MissionPick;
 use crate::picked::Picked;
 use crate::record_observation::RecordObservation;
@@ -38,6 +39,23 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
         )?;
         Ok((
             Picked::Mission(MissionPick::Item(Box::new(definition))),
+            notes,
+        ))
+    }
+
+    pub(super) fn cargo_manifest_definition(
+        &self,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<(Picked<'f>, Vec<FieldError>), ScanError> {
+        let (definition, notes) = cargo_manifest::read(
+            tree,
+            self.projection.original(),
+            admission,
+            self.scan.options.cancel,
+        )?;
+        Ok((
+            Picked::Mission(MissionPick::Manifest(Box::new(definition))),
             notes,
         ))
     }

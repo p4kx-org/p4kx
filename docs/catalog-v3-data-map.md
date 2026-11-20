@@ -140,7 +140,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | legacyLootArchetypes | D.legacyLootArchetypes | source generation/secondary/spawn-with relationships |
 | mineableEntities | D.mineableEntities | physical entity identity, ordered mining and radar declarations, and a sourced derived scan signature |
 | crafters | D.crafters | station limits/modifiers/queues, identity |
-| cargoManifests | D.cargoManifests | stored cargo fill/spawn configuration, not runtime cargo |
+| cargoManifests | D.cargoManifests | physical CargoManifest definitions with ordered fill and spawn rules, exact numbers, references and authored remainder |
 | missionLocationTemplates | D.missionLocationTemplates; C.locationData | completed #816 remains; actual configuration distinct from placed location |
 | missionBoards | C.missionBoards | physical Entity component owners and authored career, notice and other board variants with original faction References ([contract](catalog-location-vocabulary.md#mission-board-providers)) |
 | locationClasses, locationFunctions, locationSizes, location registries | D.locationClasses/functions/sizes; D.locationRegistries | physical definitions and registries, including zero-field identities and ordered scope and Reference arrays ([contract](catalog-location-vocabulary.md)) |

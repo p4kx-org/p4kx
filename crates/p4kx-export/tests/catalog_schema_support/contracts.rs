@@ -231,28 +231,19 @@ fn orders() -> Value {
 }
 
 pub(super) fn manifests() -> Value {
-    json!([{
-        "guid": "f7000000-0000-4000-8000-000000000001",
-        "className": "LegalCargo_Even",
-        "recordPath": "libs/foundry/records/cargomanifest/civilian/legalcargo_even",
-        "fillType": "even",
-        "minCapacityRange": 0.45,
-        "maxCapacityRange": 0.5,
-        "lockCargoGridsOnSpawn": false,
-        "resources": [{
-            "resourceGuid": "f5000000-0000-4000-8000-000000000001",
-            "probability": 1.0,
-            "minAllocation": null,
-            "maxAllocation": null
-        }],
-        "spawnRules": [{
-            "kind": "entities",
-            "probability": 1.0,
-            "entityGuids": ["f6000000-0000-4000-8000-000000000001"],
-            "resourceGuids": [],
-            "quantityAlgorithm": "CargoManifestFixedQuantityDef",
-            "quantity": 30,
-            "proportion": null
-        }]
-    }])
+    let absent = source(SourceValue::Absent);
+    json!({"availability":"available", "rows":[{
+        "guid": present(json!("f7000000-0000-4000-8000-000000000001")),
+        "recordIndex": present(json!(3)),
+        "sourceType": present(json!("CargoManifest")),
+        "recordName": present(json!("CargoManifest.LegalCargo_Even")),
+        "className": present(json!("LegalCargo_Even")),
+        "recordPath": present(json!("libs/foundry/records/cargomanifest/civilian/legalcargo_even")),
+        "fileName": present(json!("libs/foundry/records/cargomanifest/civilian/legalcargo_even.xml")),
+        "metadataTag": absent,
+        "lockCargoGridsOnSpawn": present(json!(false)),
+        "cargoFillCapacity": absent,
+        "cargoSpawnRules": present(json!([])),
+        "authoredFields":{"roots":[],"values":[]}
+    }]})
 }

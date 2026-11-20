@@ -110,6 +110,10 @@ fn definition_number_groups<'rows>(
                 .definition_sources()
                 .map(|(kind, _, _, numbers)| (kind, numbers)),
         )
+        .chain(
+            crate::catalog_v3::cargo_manifest::sources(&collected.mission_kinds.manifests)
+                .map(|(kind, _, _, numbers)| (kind, numbers)),
+        )
         .chain(collected.starmap_definitions.number_groups())
         .chain(physical_definition_number_groups(collected))
         .chain(blueprint_number_groups(collected))

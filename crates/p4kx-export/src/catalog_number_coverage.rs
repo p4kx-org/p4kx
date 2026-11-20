@@ -34,6 +34,7 @@ pub(super) const fn uses_owned_number(kind: Kind) -> bool {
                 | Kind::InfractionSets
                 | Kind::Jurisdictions
                 | Kind::SecurityNetworkManifests
+                | Kind::CargoManifests
                 | Kind::MissionScenarios
                 | Kind::MissionModuleDeclarations
                 | Kind::MissionItems
@@ -136,6 +137,7 @@ const fn uses_authored_raw_number(kind: Kind) -> bool {
             | Kind::InfractionSets
             | Kind::Jurisdictions
             | Kind::SecurityNetworkManifests
+            | Kind::CargoManifests
             | Kind::MissionScenarios
             | Kind::MissionModuleDeclarations
             | Kind::MissionItems

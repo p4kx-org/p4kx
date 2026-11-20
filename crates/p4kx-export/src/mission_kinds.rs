@@ -4,9 +4,9 @@
 use p4kx_extraction::{DataForge, Guid, RecordTree};
 
 use crate::Kind;
-use crate::cargo_manifest::cargo_manifest;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_table::CatalogTable;
+use crate::catalog_v3::cargo_manifest::{self, CargoManifestDefinition, PreparedCargoManifest};
 use crate::catalog_v3::mission_scenario_definition::{
     self, MissionScenarioDefinition, PreparedMissionScenario,
 };
@@ -31,7 +31,7 @@ use crate::catalog_v3::reputation_standing_definition::{
 use crate::catalog_v3::sandbox_trigger_record_definition::{
     self, PreparedSandboxTriggerRecord, SandboxTriggerRecordDefinition,
 };
-use crate::contract::{CargoManifest, ContractScenario, MissionLocality, MissionType};
+use crate::contract::{ContractScenario, MissionLocality, MissionType};
 use crate::guid_text::{CatalogGuid, sort_by_guid};
 use crate::mission_data::{contract_scenario, mission_locality};
 
@@ -64,7 +64,7 @@ pub(crate) enum MissionPick<'f> {
     /// An authored scenario definition.
     ScenarioDefinition(Box<PreparedMissionScenario<'f>>),
     /// A cargo manifest.
-    Manifest(CargoManifest<'f>),
+    Manifest(Box<PreparedCargoManifest<'f>>),
 }
 
 impl<'f> MissionPick<'f> {
@@ -74,7 +74,6 @@ impl<'f> MissionPick<'f> {
         Some(match kind {
             Kind::MissionLocalities => Self::Locality(mission_locality(tree)),
             Kind::ContractScenarios => Self::Scenario(contract_scenario(tree)),
-            Kind::CargoManifests => Self::Manifest(cargo_manifest(tree)),
             _ => return None,
         })
     }
@@ -96,7 +95,7 @@ pub(crate) struct MissionKinds<'f> {
     pub(crate) scenario_definitions: Vec<PreparedMissionScenario<'f>>,
     module_declarations: Vec<PreparedModuleDeclaration<'f>>,
     items: Vec<PreparedMissionItem<'f>>,
-    pub(crate) manifests: Vec<CargoManifest<'f>>,
+    pub(crate) manifests: Vec<PreparedCargoManifest<'f>>,
 }
 
 pub(crate) struct ReputationTables<'source> {
@@ -126,7 +125,7 @@ impl<'f> MissionKinds<'f> {
             MissionPick::ScenarioDefinition(entity) => self.scenario_definitions.push(*entity),
             MissionPick::ModuleDeclaration(entity) => self.module_declarations.push(*entity),
             MissionPick::Item(entity) => self.items.push(*entity),
-            MissionPick::Manifest(entity) => self.manifests.push(entity),
+            MissionPick::Manifest(entity) => self.manifests.push(*entity),
         }
     }
 
@@ -148,7 +147,6 @@ impl<'f> MissionKinds<'f> {
         sort_by_guid(&mut self.types, |entity| entity.guid);
         sort_by_guid(&mut self.localities, |entity| entity.guid);
         sort_by_guid(&mut self.scenarios, |entity| entity.guid);
-        sort_by_guid(&mut self.manifests, |entity| entity.guid);
     }
 
     /// Takes the physical mission scenario definitions into their catalog table.
@@ -172,6 +170,14 @@ impl<'f> MissionKinds<'f> {
         forge: &DataForge<'_>,
     ) -> CatalogTable<MissionItemDefinition<'f>> {
         item_definition::table(forge, std::mem::take(&mut self.items))
+    }
+
+    /// Takes the physical `CargoManifest` definitions into their canonical table.
+    pub(crate) fn take_manifests(
+        &mut self,
+        forge: &DataForge<'_>,
+    ) -> CatalogTable<CargoManifestDefinition<'f>> {
+        cargo_manifest::table(forge, std::mem::take(&mut self.manifests))
     }
 
     /// Returns source occurrences of physical mission definitions.

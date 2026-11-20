@@ -6,8 +6,8 @@
 use p4kx_testkit::{TestInstance, TestRecord, TestValue};
 
 use super::{
-    CRATE, CRATES, GOLD, MANIFEST_CUSTOM, MANIFEST_EVEN, SCRAP, array, int, record, reference,
-    single, structure,
+    CRATE, CRATES, GOLD, MANIFEST_CUSTOM, MANIFEST_EVEN, MANIFEST_RANDOM, SCRAP, array, int,
+    record, reference, single, structure,
 };
 
 pub(super) fn manifest_even() -> TestRecord {
@@ -89,5 +89,38 @@ pub(super) fn manifest_custom() -> TestRecord {
             TestInstance::new("CargoFillCapacityValue_Custom")
                 .value("resources", array(vec![allocation])),
         ),
+    )
+}
+
+pub(super) fn manifest_random() -> TestRecord {
+    record(
+        MANIFEST_RANDOM,
+        "CargoManifest",
+        "RandomFill",
+        "cargomanifest/civilian/random_fill",
+    )
+    .value(
+        "tags",
+        array(vec![TestValue::text("synthetic-authored-tag")]),
+    )
+    .value(
+        "descriptionTags",
+        array(vec![TestValue::text("@synthetic_manifest_description")]),
+    )
+    .value(
+        "cargoFillCapacity",
+        structure(
+            TestInstance::new("CargoFillCapacityValue_Random")
+                .value("minCapacityRange", single(-0.0))
+                .value("maxCapacityRange", single(f32::from_bits(0x7fc0_002a))),
+        ),
+    )
+    .value(
+        "cargoSpawnRules",
+        array(vec![structure(
+            TestInstance::new("CargoSpawnFutureDef")
+                .value("probability", single(0.75))
+                .value("futureQuota", TestValue::UInt64(u64::MAX)),
+        )]),
     )
 }
