@@ -66,6 +66,8 @@ mod loot_generation;
 mod medical_tier;
 #[path = "sdk_mineable_entity_route.rs"]
 mod mineable_entity;
+#[path = "sdk_mining_family_routes.rs"]
+mod mining_families;
 #[path = "sdk_planet_resource_route.rs"]
 mod planet_resource;
 #[path = "sdk_projectile_ammo_route.rs"]
@@ -163,6 +165,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.extend(law::read()?);
     routes.push(medical_tier::read()?);
     routes.push(mineable_entity::read()?);
+    routes.extend(mining_families::read()?);
     routes.push(planet_resource::read()?);
     routes.extend(component_tools::read()?);
     routes.extend(authored_reputation::read()?);

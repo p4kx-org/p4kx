@@ -76,6 +76,11 @@ const REPUTATION_CONTEXTS: &str = "/definitions/reputationContexts";
 const REPUTATION_PERKS: &str = "/definitions/reputationPerks";
 const REPUTATION_TRIGGER_RECORDS: &str = "/definitions/reputationTriggerRecords";
 const MINEABLE_ENTITIES: &str = "/definitions/mineableEntities";
+const MINEABLE_ELEMENTS: &str = "/mineableElements";
+const MINEABLE_COMPOSITIONS: &str = "/mineableCompositions";
+const REFINING_PROCESSES: &str = "/definitions/refiningProcesses";
+const MINING_GLOBALS: &str = "/configurations/miningGlobal";
+const HARVESTABLE_PROVIDER_PRESETS: &str = "/harvestableProviderPresets";
 const MINING_LASERS: &str = "/configurations/miningLasers";
 const ATTACHABLE_MODIFIERS: &str = "/configurations/attachableModifiers";
 const CONSUMABLE_CONFIGURATIONS: &str = "/configurations/consumables";
@@ -177,6 +182,11 @@ const REQUIRED_WITNESSES: &[&str] = &[
     CLOTHING,
     ITEM_RADARS,
     MINEABLE_ENTITIES,
+    MINEABLE_ELEMENTS,
+    MINEABLE_COMPOSITIONS,
+    REFINING_PROCESSES,
+    MINING_GLOBALS,
+    HARVESTABLE_PROVIDER_PRESETS,
     REPUTATION_CONTEXTS,
     REPUTATION_PERKS,
     REPUTATION_TRIGGER_RECORDS,
