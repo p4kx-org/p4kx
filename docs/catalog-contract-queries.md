@@ -161,7 +161,7 @@ The requested language list is empty. With an existing selector, the test emits 
 bytes and writes no files. It does not build or serialize a Catalog and does not read localization,
 world placements or media payloads. Canonical reverse surveys still examine Generator sources and
 the needed closure can include outside owners. This source witness does not establish an all-data
-parity result or a memory guarantee for a machine with 16 GB total RAM.
+parity result or a memory guarantee for a machine with 16 GiB total system RAM.
 
 If no suitable private selector exists, set
 `P4KX_CONTRACT_SDK_DISCOVER_SELECTOR_FILE` instead to a new absolute private file path. The same
