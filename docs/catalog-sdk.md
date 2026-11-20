@@ -1145,8 +1145,11 @@ cargo test --locked -p p4kx-export --test real_archive real_archive_weapon_comba
 
 Use `starmap::read_container_placements` to read the canonical `placements.containerInstances` and
 `placements.unresolvedContainerLinks` rows for one original system root. Give a physical root Entry
-index or add the full root-to-leaf Child XML ordinal sequence to select one occurrence. These
-coordinates belong to the queried Archive. An empty Child sequence addresses the root itself.
+index to read a whole root. `ContainerPlacementSelection::Occurrence` selects all rows with the
+given root-to-leaf Child XML ordinal sequence. `ExactOccurrence` also selects the positions
+where Children were read from external descriptors. Use this form with the three coordinates
+from a returned `ContainerInstanceKey` when a join needs one physical route. These coordinates
+belong to the queried Archive. Empty Child and external-step sequences address the root itself.
 
 The query checks the selected root's reachable descriptor and placement graph. An occurrence
 selector limits the rows that are projected. The query reads the Archive directory and the reachable

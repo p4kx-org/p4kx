@@ -186,15 +186,22 @@ fn read_occurrence(
     archive: &Archive,
     key: &ContainerInstanceKey,
 ) -> TestResult<ContainerPlacementSnapshot> {
-    Ok(read_container_placements(
+    let selected = read_container_placements(
         archive,
-        ContainerPlacementSelection::Occurrence {
+        ContainerPlacementSelection::ExactOccurrence {
             root_entry_index: key.root_entry_index(),
             child_node_indices: key.child_node_indices(),
+            external_child_step_indices: key.external_child_step_indices(),
         },
         StarmapTraversalBudget::new(),
         None,
-    )?)
+    )?;
+    assert_eq!(
+        selected.external_child_step_indices.as_deref(),
+        Some(key.external_child_step_indices()),
+        "the snapshot preserves the exact selector including an empty step list"
+    );
+    Ok(selected)
 }
 
 fn entry_index(archive: &Archive, path: &str) -> TestResult<u32> {

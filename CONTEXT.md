@@ -126,6 +126,10 @@ A `Game2.dcb` kept on disk, read in place of an Archive by every `p4kx dcb` comm
 DataForge tools and the window; recognised by its content, never written (ADR-0249).
 _Avoid_: dcb copy, stand-in Archive
 
+**Container occurrence**:
+A placement of a Container reached through one authored route from a system root. Reusing the same
+descriptor can create several occurrences with different parents or world transforms.
+
 **Record**:
 One typed object in DataForge, identified by its GUID and addressed by its record path.
 _Avoid_: dcb entry, item (an item is one kind of Record)

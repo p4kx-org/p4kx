@@ -41,10 +41,15 @@ impl LocationInstance {
         &self.declaration
     }
     #[cfg(test)]
-    pub(crate) fn matches_route(&self, root: u32, parent: &[u32], child: u32) -> bool {
-        self.instance_id
-            .value()
-            .is_some_and(|key| key.matches_route(root, parent, child))
+    pub(crate) fn matches_body_child(&self, root: u32, body: &[u32], child: u32) -> bool {
+        self.container_instance_id.value().is_some_and(|key| {
+            key.root_entry_index() == root
+                && key.child_node_indices() == body
+                && key.external_child_step_indices().is_empty()
+        }) && self.instance_id.value().is_some_and(|key| {
+            key.matches_route(root, body, child)
+                && key.external_child_step_indices() == [body.len()]
+        })
     }
 }
 

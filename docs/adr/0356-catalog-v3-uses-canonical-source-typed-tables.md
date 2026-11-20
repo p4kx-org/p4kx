@@ -163,8 +163,8 @@ separately. Deduplicate common sources/texts/use sets without collapsing physica
 The prepared result can hold immutable tables in private temporary storage.
 Emit a finished row there as soon as it has its final wire fields and source-use
 IDs. Retain only the facts needed by later joins in the active projection. For
-container placements those facts include the physical root Entry and Child
-ordinals, the Record lookup and the opened containers. The normal writer
+container placements those facts include the physical root Entry, the Child ordinals and the
+external descriptor step positions, the Record lookup and the opened containers. The normal writer
 replays the stored rows in their original order. The same prepared rows serve
 the size and write passes, with one source traversal and one published document.
 Publication still requires complete health. A staging, cancellation or output

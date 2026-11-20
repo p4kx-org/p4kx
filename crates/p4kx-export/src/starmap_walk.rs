@@ -149,27 +149,42 @@ impl WalkPath {
 
 pub(crate) struct SelectedContainerRows {
     pub(crate) child_node_indices: Option<Vec<u32>>,
+    pub(crate) external_child_step_indices: Option<Vec<usize>>,
     pub(crate) instances: Vec<ContainerInstance>,
     pub(crate) unresolved: Vec<UnresolvedContainerLink>,
 }
 
 impl SelectedContainerRows {
-    pub(crate) const fn new(child_node_indices: Option<Vec<u32>>) -> Self {
+    pub(crate) const fn new(
+        child_node_indices: Option<Vec<u32>>,
+        external_child_step_indices: Option<Vec<usize>>,
+    ) -> Self {
         Self {
             child_node_indices,
+            external_child_step_indices,
             instances: Vec::new(),
             unresolved: Vec::new(),
         }
     }
 
     fn matches(&self, route: Option<&PlacementStep>) -> bool {
-        self.child_node_indices.as_ref().is_none_or(|indices| {
-            route
-                .into_iter()
-                .flat_map(PlacementStep::steps)
-                .map(PlacementStep::child_index)
-                .eq(indices.iter().copied().rev())
-        })
+        let Some(indices) = &self.child_node_indices else {
+            return true;
+        };
+        let steps = || route.into_iter().flat_map(PlacementStep::steps);
+        steps()
+            .map(PlacementStep::child_index)
+            .eq(indices.iter().copied().rev())
+            && self
+                .external_child_step_indices
+                .as_ref()
+                .is_none_or(|expected| {
+                    (0..indices.len())
+                        .rev()
+                        .zip(steps())
+                        .filter_map(|(index, step)| step.via.as_ref().map(|_| index))
+                        .eq(expected.iter().copied().rev())
+                })
     }
 }
 

@@ -73,9 +73,10 @@ stay in the operation ledger unless their contents contribute to a placement.
 ## Container instance table
 
 `placements.containerInstances` contains one row per resolved SOCpak occurrence,
-including each reused file's separate Child route. The instance key is the system
-root Archive entry ordinal and the ordered XML Child node ordinals. The parent key
-identifies the enclosing physical container occurrence. An inline XML Child can
+including each reused file's separate Child route. The instance key holds the system root Archive
+Entry ordinal, the ordered XML Child node ordinals and the positions where the walk entered an
+external descriptor. The parent key identifies the enclosing physical container occurrence.
+[ADR-0414](0414-container-occurrence-keys-record-external-child-steps.md) defines the exact key. An inline XML Child can
 lie between the enclosing physical container and the declaring Child.
 
 Local positions are metres in the immediate XML parent's frame. Local rotations

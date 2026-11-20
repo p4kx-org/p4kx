@@ -113,12 +113,13 @@ struct SelectedRows {
 fn placements_for(mut placements: Placements, source: &Witness<'_>) -> TestResult<SelectedRows> {
     let mut body = None;
     let mut tile = None;
-    let body_key = instance_key(source.system, source.body_route.iter())?;
+    let body_key = instance_key(source.system, source.body_route.iter(), &[])?;
     let tile_key = instance_key(
         source.system,
         source.body_route.iter().chain(&source.tile_route),
+        &[source.body_route.len()],
     )?;
-    let root_key = instance_key(source.system, std::iter::empty())?;
+    let root_key = instance_key(source.system, std::iter::empty(), &[])?;
     for row in placements.take_instances().rows {
         let wanted_body = same_path(row.source_path_for_test(), source.body.path());
         let wanted_tile = same_path(row.source_path_for_test(), source.tile.path());
@@ -148,9 +149,14 @@ fn placements_for(mut placements: Placements, source: &Witness<'_>) -> TestResul
 fn instance_key<'route>(
     root: &Entry,
     route: impl Iterator<Item = &'route AuthoredChild>,
+    external_child_step_indices: &[usize],
 ) -> TestResult<Value> {
     let children: Vec<_> = route.map(|child| child.index).collect();
-    Ok(json!({"rootEntryIndex": u32::try_from(root.index())?, "childNodeIndices": children}))
+    Ok(json!({
+        "rootEntryIndex": u32::try_from(root.index())?,
+        "childNodeIndices": children,
+        "externalChildStepIndices": external_child_step_indices,
+    }))
 }
 
 fn verify_row<'route>(

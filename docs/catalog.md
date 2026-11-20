@@ -1999,9 +1999,12 @@ owner identity has independent DataForge evidence. Sources with undeclared encry
 yield a null encryption marker even when the contributor set is complete.
 
 `placements.containerInstances` keeps a separate row for each resolved physical SOCpak
-occurrence. The instance key identifies the system root and original Child route. Parent
-keys refer to the enclosing physical container occurrence. Reused tiles keep separate
-local and world transforms, the exact declaring path, label and entity name.
+occurrence. The instance key contains `rootEntryIndex` and the ordered document-local
+`childNodeIndices`. The required `externalChildStepIndices` array holds the ascending zero-based
+positions in that Child sequence where the Child was read from an external descriptor reached at
+the preceding step. An inline-only route has an empty array. Parent keys use the same form.
+Reused tiles keep separate local and world transforms, the exact declaring path, label and entity
+name. See [ADR-0414](adr/0414-container-occurrence-keys-record-external-child-steps.md).
 
 `placements.unresolvedContainerLinks` carries each reached external Child with no usable unique
 target body: zero/multiple winning physical Entry candidates, or one target whose body cannot be

@@ -53,13 +53,14 @@ pub(crate) struct ContainerOccurrence<'route> {
     pub(crate) world: Transform,
 }
 
-/// The system root and document-local Child ordinals in root-to-leaf order.
+/// A system root and its Child route across inline and external documents.
 #[derive(Debug, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub struct ContainerInstanceKey {
     root_entry_index: u32,
     child_node_indices: Vec<u32>,
+    external_child_step_indices: Vec<usize>,
 }
 
 impl ContainerInstanceKey {
@@ -74,6 +75,12 @@ impl ContainerInstanceKey {
     pub fn child_node_indices(&self) -> &[u32] {
         &self.child_node_indices
     }
+    /// Returns positions whose Child is read from the preceding Child's external document.
+    #[must_use]
+    pub fn external_child_step_indices(&self) -> &[usize] {
+        &self.external_child_step_indices
+    }
+
     #[cfg(test)]
     pub(crate) fn matches_route(&self, root: u32, parent: &[u32], child: u32) -> bool {
         self.root_entry_index == root
@@ -82,15 +89,23 @@ impl ContainerInstanceKey {
     }
 
     pub(crate) fn from_route(root_entry_index: u32, route: Option<&PlacementStep>) -> Self {
-        let mut child_node_indices: Vec<u32> = route
-            .into_iter()
-            .flat_map(PlacementStep::steps)
-            .map(PlacementStep::child_index)
-            .collect();
+        let mut child_node_indices = Vec::new();
+        let mut external_child_step_indices = Vec::new();
+        for step in route.into_iter().flat_map(PlacementStep::steps) {
+            if step.via.is_some() {
+                external_child_step_indices.push(child_node_indices.len());
+            }
+            child_node_indices.push(step.child_index());
+        }
         child_node_indices.reverse();
+        external_child_step_indices.reverse();
+        for index in &mut external_child_step_indices {
+            *index = child_node_indices.len() - 1 - *index;
+        }
         Self {
             root_entry_index,
             child_node_indices,
+            external_child_step_indices,
         }
     }
 }

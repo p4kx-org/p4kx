@@ -26,29 +26,52 @@ pub use crate::starmap_containers::unresolved::{
     ContainerTargetReadStatus, ContainerTargetStatus, UnresolvedChild, UnresolvedContainerLink,
 };
 
-/// A canonical physical system root or one exact occurrence within it.
+/// A canonical physical system root or a Child route within it.
 #[derive(Debug, Clone, Copy)]
 #[non_exhaustive]
 pub enum ContainerPlacementSelection<'route> {
     /// Every occurrence reached from one canonical original system root.
     SystemRoot(u32),
-    /// One complete authored Child route in the corresponding original Archive.
+    /// All occurrences sharing the complete ordered Child ordinal sequence.
     Occurrence {
         /// Original physical system root Entry index.
         root_entry_index: u32,
         /// Document-local Child XML ordinals in root-to-leaf order.
         child_node_indices: &'route [u32],
     },
+    /// One physical occurrence identified by its Child ordinals and external document steps.
+    ExactOccurrence {
+        /// Original physical system root Entry index.
+        root_entry_index: u32,
+        /// Document-local Child XML ordinals in root-to-leaf order.
+        child_node_indices: &'route [u32],
+        /// Sorted zero-based positions at which traversal entered an external document.
+        external_child_step_indices: &'route [usize],
+    },
 }
 
-impl<'route> ContainerPlacementSelection<'route> {
-    const fn parts(self) -> (u32, Option<&'route [u32]>) {
+impl ContainerPlacementSelection<'_> {
+    fn selected_rows(self) -> (u32, SelectedContainerRows) {
         match self {
-            Self::SystemRoot(root) => (root, None),
+            Self::SystemRoot(root) => (root, SelectedContainerRows::new(None, None)),
             Self::Occurrence {
                 root_entry_index,
                 child_node_indices,
-            } => (root_entry_index, Some(child_node_indices)),
+            } => (
+                root_entry_index,
+                SelectedContainerRows::new(Some(child_node_indices.to_vec()), None),
+            ),
+            Self::ExactOccurrence {
+                root_entry_index,
+                child_node_indices,
+                external_child_step_indices,
+            } => (
+                root_entry_index,
+                SelectedContainerRows::new(
+                    Some(child_node_indices.to_vec()),
+                    Some(external_child_step_indices.to_vec()),
+                ),
+            ),
         }
     }
 }
@@ -159,8 +182,10 @@ pub struct ContainerPlacementSnapshot {
     pub build: Option<Build>,
     /// Requested physical system root Entry index.
     pub root_entry_index: u32,
-    /// Exact requested Child route when the query selected one occurrence.
+    /// Requested Child ordinals when the query selected an occurrence route.
     pub child_node_indices: Option<Vec<u32>>,
+    /// Requested external document step positions for an exact occurrence selection.
+    pub external_child_step_indices: Option<Vec<usize>>,
     /// Resolved container rows in original traversal order.
     pub container_instances: Vec<ContainerInstance>,
     /// Unresolved external Child rows in original traversal order.
@@ -184,9 +209,8 @@ pub fn read_container_placements(
 ) -> Result<ContainerPlacementSnapshot, CatalogError> {
     checkpoint(cancel)?;
     let watch = ArchiveWatch::new(archive);
-    let (root_entry_index, child_node_indices) = selection.parts();
+    let (root_entry_index, mut rows) = selection.selected_rows();
     with_entry_capture(archive, |capture| {
-        let mut rows = SelectedContainerRows::new(child_node_indices.map(<[u32]>::to_vec));
         let coverage = read_selected(
             archive,
             root_entry_index,
@@ -200,6 +224,7 @@ pub fn read_container_placements(
         watch.check()?;
         let SelectedContainerRows {
             child_node_indices,
+            external_child_step_indices,
             instances,
             unresolved,
         } = rows;
@@ -207,6 +232,7 @@ pub fn read_container_placements(
             build: archive.build().cloned(),
             root_entry_index,
             child_node_indices,
+            external_child_step_indices,
             container_instances: instances,
             unresolved_container_links: unresolved,
             coverage,

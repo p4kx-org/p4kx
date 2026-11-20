@@ -55,11 +55,17 @@ fn installed_location_entxml_preserves_authored_harvestable_occurrences() -> Tes
     let parent_route: Vec<_> = witness.body_route.iter().map(|node| node.index).collect();
     let root = u32::try_from(witness.system.index())?;
     let rows = placements.take_locations();
-    let row = rows
+    let mut matches = rows
         .rows
         .iter()
-        .find(|row| row.matches_route(root, &parent_route, original.child))
+        .filter(|row| row.matches_body_child(root, &parent_route, original.child));
+    let row = matches
+        .next()
         .ok_or("the original typed location occurrence is projected")?;
+    assert!(
+        matches.next().is_none(),
+        "one Child in the original body occurrence"
+    );
     let row = serde_json::to_value(row)?;
     verify_link(&row, &original, &body_xml, &entity_xml, &uses)?;
     watch.check()?;

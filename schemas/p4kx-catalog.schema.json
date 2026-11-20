@@ -12066,11 +12066,19 @@
       "type": "object"
     },
     "ContainerInstanceKey": {
-      "description": "The system root and document-local Child ordinals in root-to-leaf order.",
+      "description": "A system root and its Child route across inline and external documents.",
       "properties": {
         "childNodeIndices": {
           "items": {
             "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "externalChildStepIndices": {
+          "items": {
+            "format": "uint",
             "minimum": 0,
             "type": "integer"
           },
@@ -12084,6 +12092,7 @@
       },
       "required": [
         "childNodeIndices",
+        "externalChildStepIndices",
         "rootEntryIndex"
       ],
       "type": "object"

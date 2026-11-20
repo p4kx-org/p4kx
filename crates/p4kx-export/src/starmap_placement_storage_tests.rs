@@ -19,6 +19,9 @@ use crate::catalog_table::CatalogTable;
 use crate::starmap_containers::jump_class::JumpEndpointRecords;
 use crate::starmap_containers::{PlacementScope, Placements};
 
+#[path = "starmap_placement_route_collision_test.rs"]
+mod route_collision;
+
 #[path = "starmap_unresolved_storage_checks.rs"]
 mod unresolved;
 

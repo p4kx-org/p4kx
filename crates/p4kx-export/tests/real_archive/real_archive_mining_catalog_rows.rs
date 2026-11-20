@@ -84,6 +84,7 @@ impl<'snapshot> SelectedKeys<'snapshot> {
 pub(super) struct RouteKey<'route> {
     root: u32,
     ordinals: &'route [u32],
+    external_steps: &'route [usize],
 }
 
 impl<'route> RouteKey<'route> {
@@ -91,6 +92,7 @@ impl<'route> RouteKey<'route> {
         Self {
             root: key.root_entry_index(),
             ordinals: key.child_node_indices(),
+            external_steps: key.external_child_step_indices(),
         }
     }
 }
@@ -102,7 +104,12 @@ pub(super) enum Rows<'keys> {
 }
 
 impl Rows<'_> {
-    fn admits(self, row: &Value, ordinals: &mut Vec<u32>) -> TestResult<bool> {
+    fn admits(
+        self,
+        row: &Value,
+        ordinals: &mut Vec<u32>,
+        external_steps: &mut Vec<usize>,
+    ) -> TestResult<bool> {
         match self {
             Self::Routes(keys) => {
                 let root = row
@@ -118,9 +125,26 @@ impl Rows<'_> {
                     let index = child.as_u64().ok_or("invalid route position")?;
                     ordinals.push(u32::try_from(index)?);
                 }
+                let steps = row
+                    .pointer("/instanceId/value/externalChildStepIndices")
+                    .and_then(Value::as_array)
+                    .ok_or("catalog route needs external document steps from a current producer")?;
+                external_steps.clear();
+                for step in steps {
+                    let index = step.as_u64().ok_or("invalid external document step")?;
+                    external_steps.push(usize::try_from(index)?);
+                }
+                if !external_steps.is_sorted_by(|left, right| left < right)
+                    || external_steps
+                        .last()
+                        .is_some_and(|last| *last >= ordinals.len())
+                {
+                    return Err("catalog route has invalid external document step positions".into());
+                }
                 Ok(keys.contains(&RouteKey {
                     root: u32::try_from(root)?,
                     ordinals,
+                    external_steps,
                 }))
             }
             Self::Texts(keys) => {
@@ -152,9 +176,10 @@ impl<'de> Visitor<'de> for Rows<'_> {
     fn visit_seq<A: SeqAccess<'de>>(self, mut sequence: A) -> Result<Value, A::Error> {
         let mut rows = Vec::new();
         let mut ordinals = Vec::new();
+        let mut external_steps = Vec::new();
         while let Some(row) = sequence.next_element::<Value>()? {
             if self
-                .admits(&row, &mut ordinals)
+                .admits(&row, &mut ordinals, &mut external_steps)
                 .map_err(serde::de::Error::custom)?
             {
                 rows.push(row);
@@ -179,22 +204,32 @@ mod tests {
         let expected = BTreeSet::from([RouteKey {
             root: 7,
             ordinals: &absolute,
+            external_steps: &[1],
         }]);
         let mut projection = CatalogCapture::default();
         projection.project("/selected", Rows::Routes(&expected));
         let catalog = br#"{
             "unrelated":[{"large":"skip"}],
             "selected":[
-                {"instanceId":{"value":{"rootEntryIndex":8,"childNodeIndices":[1,4]}},"sourcePath":"same"},
-                {"instanceId":{"value":{"rootEntryIndex":7,"childNodeIndices":[1,4]}},"sourcePath":"same"},
-                {"instanceId":{"value":{"rootEntryIndex":7,"childNodeIndices":[1,5]}},"sourcePath":"same"}
+                {"instanceId":{"value":{"rootEntryIndex":8,"childNodeIndices":[1,4],"externalChildStepIndices":[1]}},"sourcePath":"same"},
+                {"instanceId":{"value":{"rootEntryIndex":7,"childNodeIndices":[1,4],"externalChildStepIndices":[]}},"sourcePath":"inline"},
+                {"instanceId":{"value":{"rootEntryIndex":7,"childNodeIndices":[1,4],"externalChildStepIndices":[1]}},"sourcePath":"same"},
+                {"instanceId":{"value":{"rootEntryIndex":7,"childNodeIndices":[1,5],"externalChildStepIndices":[1]}},"sourcePath":"same"}
             ]
         }"#;
         let selected = projection.read(catalog.as_slice())?;
         assert_eq!(
             selected,
-            json!({"selected":[{"instanceId":{"value":{"rootEntryIndex":7,"childNodeIndices":[1,4]}},"sourcePath":"same"}]}),
+            json!({"selected":[{"instanceId":{"value":{"rootEntryIndex":7,"childNodeIndices":[1,4],"externalChildStepIndices":[1]}},"sourcePath":"same"}]}),
             "only the admitted physical Child route is retained"
+        );
+        let stale = br#"{"selected":[{"instanceId":{"value":{"rootEntryIndex":7,"childNodeIndices":[1,4]}}}]}"#;
+        let error = projection
+            .read(stale.as_slice())
+            .expect_err("an incomplete historical wire key does not prove the intended occurrence");
+        assert!(
+            error.to_string().contains("external document steps"),
+            "stale catalog names the missing key coordinate"
         );
         Ok(())
     }
