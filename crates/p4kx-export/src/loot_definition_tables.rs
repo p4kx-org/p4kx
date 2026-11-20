@@ -8,6 +8,7 @@ use serde::Serialize;
 use super::{LootDefinition, LootDefinitionKind};
 use crate::Kind;
 use crate::catalog_number_capture::CapturedNumber;
+use crate::catalog_row::CatalogRow;
 use crate::catalog_table::CatalogTable;
 use crate::guid_text::sort_by_guid;
 use crate::schema_fields::every_field_required;
@@ -17,6 +18,10 @@ use crate::schema_fields::every_field_required;
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct LootDefinitionTables<'source> {
+    #[serde(rename = "lootTables")]
+    tables: CatalogTable<LootDefinition<'source>>,
+    #[serde(rename = "lootArchetypes")]
+    archetypes: CatalogTable<LootDefinition<'source>>,
     #[serde(rename = "lootPoolFilters")]
     pool_filters: CatalogTable<LootDefinition<'source>>,
     #[serde(rename = "lootSecondaryChoiceSingleLayers")]
@@ -34,6 +39,8 @@ pub(crate) struct LootDefinitionTables<'source> {
 /// Collected source-owned Loot definitions.
 #[derive(Default)]
 pub(crate) struct LootDefinitions<'source> {
+    tables: Vec<LootDefinition<'source>>,
+    archetypes: Vec<LootDefinition<'source>>,
     pool_filters: Vec<LootDefinition<'source>>,
     secondary_single: Vec<LootDefinition<'source>>,
     secondary_multi: Vec<LootDefinition<'source>>,
@@ -47,6 +54,8 @@ pub(crate) struct LootDefinitions<'source> {
 impl<'source> LootDefinitions<'source> {
     pub(crate) fn push(&mut self, kind: LootDefinitionKind, row: LootDefinition<'source>) {
         match kind {
+            LootDefinitionKind::Table => &mut self.tables,
+            LootDefinitionKind::Archetype => &mut self.archetypes,
             LootDefinitionKind::PoolFilter => &mut self.pool_filters,
             LootDefinitionKind::SecondaryChoiceSingleLayer => &mut self.secondary_single,
             LootDefinitionKind::SecondaryChoiceMultiLayer => &mut self.secondary_multi,
@@ -65,6 +74,8 @@ impl<'source> LootDefinitions<'source> {
 
     pub(crate) fn order(&mut self) {
         for rows in [
+            &mut self.tables,
+            &mut self.archetypes,
             &mut self.pool_filters,
             &mut self.secondary_single,
             &mut self.secondary_multi,
@@ -80,6 +91,17 @@ impl<'source> LootDefinitions<'source> {
 
     pub(crate) const fn count(&self, kind: LootDefinitionKind) -> usize {
         self.rows(kind).len()
+    }
+
+    pub(crate) fn emitted(&self) -> impl Iterator<Item = CatalogRow> {
+        LootDefinitionKind::ALL.into_iter().flat_map(|kind| {
+            self.rows(kind).iter().map(move |row| CatalogRow {
+                kind: kind.kind(),
+                guid: row.physical_guid.0,
+                record_path: row.physical_path.to_owned(),
+                record_index: row.source.record_index.value().copied(),
+            })
+        })
     }
 
     pub(crate) fn sources(
@@ -99,14 +121,17 @@ impl<'source> LootDefinitions<'source> {
 
     pub(crate) fn tables(self, forge: &DataForge<'_>) -> LootDefinitionTables<'source> {
         use LootDefinitionKind::{
-            GlobalParams, HierarchicalContextualDataPreset, PoolFilter, SecondaryChoiceMultiLayer,
-            SecondaryChoiceSingleLayer, SubHarvestableConfig, SubHarvestableMultiConfig, Theme,
+            Archetype, GlobalParams, HierarchicalContextualDataPreset, PoolFilter,
+            SecondaryChoiceMultiLayer, SecondaryChoiceSingleLayer, SubHarvestableConfig,
+            SubHarvestableMultiConfig, Table, Theme,
         };
 
         let table = |kind: LootDefinitionKind, rows| {
             CatalogTable::new(forge, &[kind.rule().type_name], rows)
         };
         LootDefinitionTables {
+            tables: table(Table, self.tables),
+            archetypes: table(Archetype, self.archetypes),
             pool_filters: table(PoolFilter, self.pool_filters),
             secondary_choice_single_layers: table(
                 SecondaryChoiceSingleLayer,
@@ -129,6 +154,8 @@ impl<'source> LootDefinitions<'source> {
 
     const fn rows(&self, kind: LootDefinitionKind) -> &[LootDefinition<'source>] {
         match kind {
+            LootDefinitionKind::Table => self.tables.as_slice(),
+            LootDefinitionKind::Archetype => self.archetypes.as_slice(),
             LootDefinitionKind::PoolFilter => self.pool_filters.as_slice(),
             LootDefinitionKind::SecondaryChoiceSingleLayer => self.secondary_single.as_slice(),
             LootDefinitionKind::SecondaryChoiceMultiLayer => self.secondary_multi.as_slice(),

@@ -6,6 +6,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use p4kx_extraction::Guid;
 
 use crate::catalog_row::{CatalogRow, CatalogRowExclusion, ExcludedCatalogRow};
+use crate::catalog_v3::loot_definition_catalog::LootDefinitionKind;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_field_inspection::FieldInspection;
 use crate::export_ledger::{ExportAccountingError, SourceDisposition, SourceObservation};
@@ -186,6 +187,7 @@ const fn projects_catalog_row(kind: Kind, role: ExportSourceRole) -> bool {
 
 const fn uses_physical_row_identity(kind: Kind) -> bool {
     uses_physical_reputation_identity(kind)
+        || LootDefinitionKind::of(kind).is_some()
         || matches!(
             kind,
             Kind::Manufacturers
@@ -216,14 +218,6 @@ const fn uses_physical_row_identity(kind: Kind) -> bool {
                 | Kind::Blueprints
                 | Kind::Ships
                 | Kind::BlueprintPools
-                | Kind::LootPoolFilters
-                | Kind::LootSecondaryChoiceSingleLayers
-                | Kind::LootSecondaryChoiceMultiLayers
-                | Kind::LootThemes
-                | Kind::HierarchicalContextualDataPresets
-                | Kind::LootGenerationGlobalParams
-                | Kind::SubHarvestableConfigs
-                | Kind::SubHarvestableMultiConfigs
                 | Kind::ExplosionDefinitions
                 | Kind::InventoryContainers
                 | Kind::MedicalItemTierConfigs

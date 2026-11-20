@@ -6,8 +6,12 @@
 
 #[path = "loot_entity_container_publication.rs"]
 mod entity_container_publication;
+#[path = "loot_query_parity.rs"]
+mod query_parity;
 #[path = "loot_unreadable_root_publication.rs"]
 mod unreadable_root_publication;
+#[path = "loot_weighted_definitions.rs"]
+mod weighted_definitions;
 
 use crate::catalog_loot_filter_assertions;
 use crate::loot_fixture::{
@@ -131,9 +135,21 @@ fn an_archetype_selects_entity_classes_without_tags() -> TestResult {
     let (_, catalog) = build()?;
     let archetype = entry(&catalog, "lootArchetypes", ARCHETYPE)?;
     assert_eq!(archetype["className"], "V3LootArchetype_Cargo");
+    let [entry] = crate::health_origin_assertions::rows(archetype, "/entries")? else {
+        return Err("expected one archetype entry".into());
+    };
+    let mut view = entry.as_object().ok_or("archetype entry object")?.clone();
+    let weight_source = view
+        .remove("weightSource")
+        .ok_or("archetype weight origin")?;
     assert_eq!(
-        archetype["entries"],
-        json!([{
+        weight_source.get("state").and_then(Value::as_str),
+        Some("present"),
+        "canonical weight origin is available"
+    );
+    assert_eq!(
+        Value::Object(view),
+        json!({
             "name": "Unique",
             "weight": 1.0,
             "selector": {
@@ -144,7 +160,8 @@ fn an_archetype_selects_entity_classes_without_tags() -> TestResult {
             },
             "stackSize": null,
             "spawnWith": []
-        }])
+        }),
+        "the convenience archetype view retains its fields"
     );
     Ok(())
 }

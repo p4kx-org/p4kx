@@ -58,6 +58,36 @@ Array payloads hold ordered local references. Local references use canonical uns
 strings, are checked at vector access, and refer only inside their owning row. They are controls,
 not game values or original byte/pool/instance positions. References never expand target bodies.
 
+## Weighted loot tables and archetypes
+
+`definitions.lootTables` and `definitions.lootArchetypes` retain the original ordered
+`LootTableV3Record` and `LootArchetypeV3Record` values. The exact path and
+development-leftover selection applies to both tables. The owner-local values preserve
+every `optionalData` slot, concrete subtype and integer width, and every original
+`weight` bit pattern. A linked archetype retains its original Reference and physical
+target metadata. An inline archetype keeps its owned fields in the table's own arena.
+
+The existing root `lootTables` and `lootArchetypes` convenience lists supply finite
+weights and the first readable duplicate limit. Join `recordIndex` to
+`definitions.<kind>.rows[].recordIndex.value`. The immediate source cells `weightSource` and `dupeLimitSource` carry the scalar's
+`containsEncryptedSource`, `sourceUsesRefs` and `sourceSetComplete`. When present,
+follow `weightSource.value` or `dupeLimitSource.value` to a slot in that definition's
+`values` array. An inline archetype uses the table definition's slots. Duplicate-limit
+origins include the array and the candidates considered through the first readable integer.
+An unreadable candidate before the selected value makes the origin incomplete. If no
+duplicate limit can be selected, the source state distinguishes an unreadable candidate,
+an unrepresentable value, an explicit null and an absent candidate. In that order, the
+first applicable state is used. The canonical definition preserves every occurrence,
+including the original error facts and the positions of invalid or unreadable values.
+
+Applications can read one family with `catalog_queries::loot::with_loot_definitions`
+or the equivalent method on `CatalogQuerySession` and `ParsedCatalogQueries`.
+`All`, `Guid` and `RecordIndex` use the same source admission as Catalog generation.
+The snapshot supplies canonical rows, their independently frozen source inventory,
+owner coverage and the weighted view for table or archetype families. It reads
+the DataForge Entry without opening localization, world containers or media.
+The full Catalog retains the placed-container and harvestable location datasets.
+
 ## Immediate data boundaries
 
 Each node has `value: SourcedValue<SourcePayload>` and required nullable `originalError`. A scalar's

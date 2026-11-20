@@ -25,3 +25,7 @@ mod scanning;
 #[cfg(test)]
 #[path = "installed_ship_source_projection.rs"]
 pub(crate) mod installed_ship_projection;
+
+#[cfg(test)]
+#[path = "installed_loot_delta_witness.rs"]
+mod installed_loot_delta_witness;

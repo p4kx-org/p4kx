@@ -133,11 +133,12 @@ impl<'f> Picked<'f> {
             Kind::MissionLocalities | Kind::ContractScenarios | Kind::CargoManifests => {
                 MissionPick::entity(kind, tree).map(Self::Mission)
             }
-            Kind::LootTables
-            | Kind::LootArchetypes
-            | Kind::LegacyLootTables
-            | Kind::LegacyLootArchetypes => LootPick::entity(kind, tree).map(Self::Loot),
+            Kind::LegacyLootTables | Kind::LegacyLootArchetypes => {
+                LootPick::entity(kind, tree).map(Self::Loot)
+            }
             Kind::Items
+            | Kind::LootTables
+            | Kind::LootArchetypes
             | Kind::RefiningProcesses
             | Kind::MiningGlobalParams
             | Kind::MineableElements

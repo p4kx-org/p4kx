@@ -21,6 +21,7 @@ fn archetype_entry() -> Value {
     json!({
         "name": "Ammo",
         "weight": 3.0,
+        "weightSource": values::present(json!({"valueIndex": "1"})),
         "selector": selector(),
         "stackSize": {"min": 1.0, "max": 3.0},
         "spawnWith": [{
@@ -38,23 +39,28 @@ pub(super) fn tables() -> Value {
         "guid": "a9000000-0000-4000-8000-000000000001",
         "className": "V3LootTable_Actor_CQC",
         "recordPath": "libs/foundry/records/lootgeneration/loottables/v3loottable_actor_cqc",
+        "recordIndex": 1,
         "entries": [{
             "name": "Ammo",
             "weight": 10.0,
+            "weightSource": values::present(json!({"valueIndex": "1"})),
             "archetypeGuid": null,
             "archetype": [archetype_entry()],
             "priorityCount": 1,
             "choiceLimit": 2,
             "dupeLimit": 3,
+            "dupeLimitSource": values::present(json!({"valueIndex": "2"})),
             "chanceToExist": 0.75
         }, {
             "name": "Medpens",
             "weight": 1.0,
+            "weightSource": values::present(json!({"valueIndex": "1"})),
             "archetypeGuid": "a9000000-0000-4000-8000-000000000002",
             "archetype": null,
             "priorityCount": null,
             "choiceLimit": null,
             "dupeLimit": null,
+            "dupeLimitSource": values::source(SourceValue::Absent),
             "chanceToExist": null
         }]
     }])
@@ -65,6 +71,7 @@ pub(super) fn archetypes() -> Value {
         "guid": "a9000000-0000-4000-8000-000000000002",
         "className": "V3LootArchetype_Medpen_Healing",
         "recordPath": "libs/foundry/records/lootgeneration/lootarchetypes/v3lootarchetype_medpen_healing",
+        "recordIndex": 2,
         "entries": [archetype_entry()]
     }])
 }

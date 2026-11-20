@@ -5672,6 +5672,9 @@
         "locationSizes": {
           "$ref": "#/$defs/CatalogTableOfLocationDictionaryEntry"
         },
+        "lootArchetypes": {
+          "$ref": "#/$defs/CatalogTableOfLootDefinition"
+        },
         "lootGenerationGlobalParams": {
           "$ref": "#/$defs/CatalogTableOfLootDefinition"
         },
@@ -5682,6 +5685,9 @@
           "$ref": "#/$defs/CatalogTableOfLootDefinition"
         },
         "lootSecondaryChoiceSingleLayers": {
+          "$ref": "#/$defs/CatalogTableOfLootDefinition"
+        },
+        "lootTables": {
           "$ref": "#/$defs/CatalogTableOfLootDefinition"
         },
         "lootThemes": {
@@ -5858,10 +5864,12 @@
         "locationRegistries",
         "locationResourceSlots",
         "locationSizes",
+        "lootArchetypes",
         "lootGenerationGlobalParams",
         "lootPoolFilters",
         "lootSecondaryChoiceMultiLayers",
         "lootSecondaryChoiceSingleLayers",
+        "lootTables",
         "lootThemes",
         "manufacturers",
         "medicalItemTierConfigs",
@@ -29041,6 +29049,12 @@
           "$ref": "#/$defs/Guid",
           "description": "The GUID of the Record."
         },
+        "recordIndex": {
+          "description": "The physical owner to join with `definitions.lootArchetypes`.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
         "recordPath": {
           "description": "The record path, without `.xml`.",
           "type": "string"
@@ -29050,6 +29064,7 @@
         "className",
         "entries",
         "guid",
+        "recordIndex",
         "recordPath"
       ],
       "type": "object"
@@ -29093,6 +29108,10 @@
             "number",
             "null"
           ]
+        },
+        "weightSource": {
+          "$ref": "#/$defs/SourcedValueOfSourceValueRef",
+          "description": "The original weight occurrence and the immediate origin of the convenience value."
         }
       },
       "required": [
@@ -29100,7 +29119,8 @@
         "selector",
         "spawnWith",
         "stackSize",
-        "weight"
+        "weight",
+        "weightSource"
       ],
       "type": "object"
     },
@@ -29535,6 +29555,12 @@
           "$ref": "#/$defs/Guid",
           "description": "The GUID of the Record."
         },
+        "recordIndex": {
+          "description": "The physical owner to join with `definitions.lootTables`.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
         "recordPath": {
           "description": "The record path, without `.xml`.",
           "type": "string"
@@ -29544,6 +29570,7 @@
         "className",
         "entries",
         "guid",
+        "recordIndex",
         "recordPath"
       ],
       "type": "object"
@@ -29596,6 +29623,10 @@
             "null"
           ]
         },
+        "dupeLimitSource": {
+          "$ref": "#/$defs/SourcedValueOfSourceValueRef",
+          "description": "The selected duplicate-limit occurrence and the immediate origin of its selection."
+        },
         "name": {
           "description": "The designer's label of the entry.",
           "type": [
@@ -29618,6 +29649,10 @@
             "number",
             "null"
           ]
+        },
+        "weightSource": {
+          "$ref": "#/$defs/SourcedValueOfSourceValueRef",
+          "description": "The original weight occurrence and the immediate origin of the convenience value."
         }
       },
       "required": [
@@ -29626,9 +29661,11 @@
         "chanceToExist",
         "choiceLimit",
         "dupeLimit",
+        "dupeLimitSource",
         "name",
         "priorityCount",
-        "weight"
+        "weight",
+        "weightSource"
       ],
       "type": "object"
     },

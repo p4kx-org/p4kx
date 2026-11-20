@@ -299,14 +299,8 @@ impl Kind {
                 prefixes: &["libs/foundry/records/cargomanifest/"],
                 type_name: "CargoManifest",
             },
-            Self::LootTables => KindRule {
-                prefixes: &["libs/foundry/records/lootgeneration/loottables/"],
-                type_name: "LootTableV3Record",
-            },
-            Self::LootArchetypes => KindRule {
-                prefixes: &["libs/foundry/records/lootgeneration/lootarchetypes/"],
-                type_name: "LootArchetypeV3Record",
-            },
+            Self::LootTables => LootDefinitionKind::Table.rule(),
+            Self::LootArchetypes => LootDefinitionKind::Archetype.rule(),
             Self::LootPoolFilters => LootDefinitionKind::PoolFilter.rule(),
             Self::LootSecondaryChoiceSingleLayers => {
                 LootDefinitionKind::SecondaryChoiceSingleLayer.rule()

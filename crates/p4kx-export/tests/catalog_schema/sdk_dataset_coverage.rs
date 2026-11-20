@@ -99,64 +99,70 @@ impl Route {
     }
 }
 
+const REQUIRED_WITNESSES: &[&str] = &[
+    LANGUAGE_SOURCES,
+    ITEM_DEFINITIONS,
+    MANUFACTURERS,
+    COMMODITY_DEFINITIONS,
+    COMMODITY_PRESENTATIONS,
+    LOCATION_ENTITIES,
+    BLUEPRINT_POOLS,
+    BLUEPRINT_POOL_WEIGHTS,
+    BLUEPRINT_REWARDS,
+    BLUEPRINT_DEFINITIONS,
+    BLUEPRINT_TIERS,
+    BLUEPRINT_PRESENTATION,
+    CRAFTING_GLOBAL,
+    SUIT_ARMOR,
+    VEHICLE_ARMOR,
+    RESOURCE_GROUPS,
+    RESOURCE_GROUP_MEMBERS,
+    RESOURCE_GROUP_PARENTS,
+    RESOURCE_TYPES,
+    RESOURCE_COMPONENTS,
+    RESOURCE_CONNECTIONS,
+    FUEL_TANKS,
+    FUEL_INTAKES,
+    RESOURCE_CONTAINERS,
+    CARGO_LOADING_GLOBALS,
+    SHOP_COMMODITY_GLOBALS,
+    SHIELD_GENERATORS,
+    QUANTUM_DRIVES,
+    CLOTHING,
+    ITEM_RADARS,
+    MINEABLE_ENTITIES,
+    MINING_LASERS,
+    ATTACHABLE_MODIFIERS,
+    CONSUMABLE_CONFIGURATIONS,
+    SHOP_INVENTORIES,
+    FLARE_LIBRARIES,
+    SUBSUMPTION_EVENTS,
+    RADAR_AUDIO,
+    AMMUNITION,
+    PROJECTILE_AMMUNITION,
+    MAGAZINE_RESOLUTION,
+    WEAPON_COMBAT,
+    WEAPON_RECOIL,
+    WEAPON_ANIMATION,
+    CONTAINERS,
+    UNRESOLVED,
+];
+
 #[test]
 fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
     let schema = p4kx_export::catalog_schema();
     let registered = dataset_owners::entries();
     let witnesses = routes::read()?;
     let gaps = audit(&schema, &registered, &witnesses)?;
-    for path in [
-        LANGUAGE_SOURCES,
-        ITEM_DEFINITIONS,
-        MANUFACTURERS,
-        COMMODITY_DEFINITIONS,
-        COMMODITY_PRESENTATIONS,
-        LOCATION_ENTITIES,
-        BLUEPRINT_POOLS,
-        BLUEPRINT_POOL_WEIGHTS,
-        BLUEPRINT_REWARDS,
-        BLUEPRINT_DEFINITIONS,
-        BLUEPRINT_TIERS,
-        BLUEPRINT_PRESENTATION,
-        CRAFTING_GLOBAL,
-        SUIT_ARMOR,
-        VEHICLE_ARMOR,
-        RESOURCE_GROUPS,
-        RESOURCE_GROUP_MEMBERS,
-        RESOURCE_GROUP_PARENTS,
-        RESOURCE_TYPES,
-        RESOURCE_COMPONENTS,
-        RESOURCE_CONNECTIONS,
-        FUEL_TANKS,
-        FUEL_INTAKES,
-        RESOURCE_CONTAINERS,
-        CARGO_LOADING_GLOBALS,
-        SHOP_COMMODITY_GLOBALS,
-        SHIELD_GENERATORS,
-        QUANTUM_DRIVES,
-        CLOTHING,
-        ITEM_RADARS,
-        MINEABLE_ENTITIES,
-        MINING_LASERS,
-        ATTACHABLE_MODIFIERS,
-        CONSUMABLE_CONFIGURATIONS,
-        SHOP_INVENTORIES,
-        FLARE_LIBRARIES,
-        SUBSUMPTION_EVENTS,
-        RADAR_AUDIO,
-        AMMUNITION,
-        PROJECTILE_AMMUNITION,
-        MAGAZINE_RESOLUTION,
-        WEAPON_COMBAT,
-        WEAPON_RECOIL,
-        WEAPON_ANIMATION,
-        CONTAINERS,
-        UNRESOLVED,
-    ] {
+    for path in REQUIRED_WITNESSES
+        .iter()
+        .copied()
+        .chain(routes::loot_datasets())
+    {
         assert_ne!(
             gaps.get(path),
             Some(&NO_WITNESS),
-            "the public query supplies a typed row for {path}"
+            "missing typed SDK row for {path}"
         );
     }
     Ok(())

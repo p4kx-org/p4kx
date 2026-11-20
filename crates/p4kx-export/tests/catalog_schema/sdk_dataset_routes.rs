@@ -48,6 +48,8 @@ mod component_tools;
 mod flight_configurations;
 #[path = "sdk_fuel_routes.rs"]
 mod fuel;
+#[path = "sdk_loot_routes.rs"]
+mod loot;
 #[path = "sdk_mineable_entity_route.rs"]
 mod mineable_entity;
 #[path = "sdk_planet_resource_route.rs"]
@@ -76,6 +78,10 @@ const ROOT_XML: &[u8] = br#"<ObjectContainer version="14"><ChildObjectContainers
     <Child external="true" name="Data\ObjectContainers\PU\fixture\tile.socpak" pos="0,0,0" rot="1,0,0,0"/>
     <Child external="true" name="Data\ObjectContainers\PU\fixture\missing.socpak" pos="1,0,0" rot="1,0,0,0"/>
 </ChildObjectContainers></ObjectContainer>"#;
+
+pub(super) fn loot_datasets() -> impl Iterator<Item = &'static str> {
+    loot::datasets()
+}
 
 pub(super) fn read() -> TestResult<Vec<Route>> {
     let (_directory, archive) = fixture()?;
@@ -132,6 +138,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     routes.extend(read_cargo_globals(&archive)?);
     routes.extend(read_entity_definitions(&archive)?);
     routes.extend(commodities::read(&archive)?);
+    routes.extend(loot::read()?);
     routes.push(mineable_entity::read()?);
     routes.push(planet_resource::read()?);
     routes.extend(component_tools::read()?);

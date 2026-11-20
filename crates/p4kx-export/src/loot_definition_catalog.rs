@@ -13,7 +13,7 @@ mod kind;
 #[path = "loot_definition_tables.rs"]
 mod tables;
 
-pub(crate) use definition::LootDefinition;
-pub(crate) use kind::LootDefinitionKind;
-pub(crate) use read::read;
+pub use definition::LootDefinition;
+pub use kind::LootDefinitionKind;
+pub(crate) use read::{read, read_archetype, read_table};
 pub(crate) use tables::{LootDefinitionTables, LootDefinitions};

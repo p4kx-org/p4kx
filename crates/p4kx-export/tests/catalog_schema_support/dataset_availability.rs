@@ -29,6 +29,8 @@ fn add_empty_definitions(catalog: &mut Value) {
         "shadingClasses",
         "proceduralPlanetAudio",
         "resourceNetworkGlobals",
+        "lootTables",
+        "lootArchetypes",
     ] {
         for (section, value) in [
             ("completeness", json!({"status": "complete"})),

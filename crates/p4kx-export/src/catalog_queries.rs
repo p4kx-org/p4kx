@@ -17,6 +17,8 @@ pub use record_selection::CatalogRecordSelection;
 
 #[path = "commodity_query.rs"]
 pub mod commodities;
+#[path = "loot_query.rs"]
+pub mod loot;
 
 #[path = "contract_query.rs"]
 mod contracts;

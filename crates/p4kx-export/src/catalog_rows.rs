@@ -33,6 +33,7 @@ pub(crate) fn snapshot(collected: &mut Collected<'_>, filter: Option<&Filter>) -
         template_numbers.push(receipt.numbers);
     }
     append_gameplay_definitions(&mut emitted, collected);
+    emitted.extend(collected.loot_kinds.definitions.emitted());
     CatalogRows {
         emitted,
         filter: filter.cloned(),
@@ -135,7 +136,6 @@ fn append_gameplay_definitions(emitted: &mut Vec<CatalogRow>, collected: &Collec
                 &collected.refining_processes,
                 &collected.mining_global_params,
             ))
-            .chain(collected.loot_kinds.definitions.sources())
             .map(|(kind, guid, path, _)| CatalogRow {
                 kind,
                 guid,

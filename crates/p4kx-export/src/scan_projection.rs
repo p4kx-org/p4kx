@@ -306,10 +306,19 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
         ledger: &mut ExportLedger,
     ) -> Result<Option<Picked<'f>>, ScanError> {
         if let Some(loot) = LootDefinitionKind::of(kind) {
-            let value = loot_definition_catalog::read(
+            if let Some(weighted) = LootPick::read_weighted(
+                loot,
                 admission.record(),
                 tree,
                 &self.projection,
+                self.scan.options.cancel,
+            )? {
+                return Ok(Some(Picked::Loot(weighted)));
+            }
+            let value = loot_definition_catalog::read(
+                admission.record(),
+                tree,
+                self.projection.original(),
                 self.scan.options.cancel,
             )?;
             let definition = Box::new(value);
