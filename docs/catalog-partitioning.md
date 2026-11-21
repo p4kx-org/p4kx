@@ -604,6 +604,18 @@ counts. Row counts cover `/items`, `/definitions/items/rows`, `/definitions/blue
 `/placements/containerInstances/rows`. Replay opens no installed Archive and creates no raw file.
 Cross-domain link validation and consumer import measurements remain separate release evidence.
 
+The installed SDK parity check for law, resource-quality quantization, cargo,
+turret and radar configuration, resource networks and room associations shares
+one streaming read per Build. Use the same measurement directory, set
+`P4KX_DATA_P4K` to its Archive and `P4KX_LAW_SDK_BUILD` to its changelist.
+
+```text
+cargo test --release --locked -p p4kx-export --test real_archive -- --ignored --exact --nocapture real_archive_batched_catalog_sdk::installed_law_quality_cargo_and_resource_sdk_match_one_complete_catalog
+```
+
+It checks availability, ordered physical rows and their exact source references
+across the 14 selected tables. Record peak memory for individual SDK queries
+separately.
 To produce the raw artifact from the same completed measurement, run the reconciliation test.
 
 ```text

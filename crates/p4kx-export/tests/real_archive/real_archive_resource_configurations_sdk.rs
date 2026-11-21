@@ -14,7 +14,7 @@ use crate::real_archive_catalog_table_parity::{
 };
 use crate::real_archive_verification::print_line;
 
-const TABLES: [&str; 7] = [
+pub(super) const TABLES: [&str; 7] = [
     "/configurations/turretHealth",
     "/configurations/radarOptions",
     "/definitions/resourceNetworkGlobals",
@@ -44,7 +44,7 @@ fn installed_resource_configuration_sdk_matches_one_complete_catalog() -> TestRe
     Ok(())
 }
 
-fn read_sdk(archive: &Archive, origins: &mut Origins) -> TestResult<[Table; 7]> {
+pub(super) fn read_sdk(archive: &Archive, origins: &mut Origins) -> TestResult<[Table; 7]> {
     let session =
         CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
     let parsed = session.parsed(None)?;
