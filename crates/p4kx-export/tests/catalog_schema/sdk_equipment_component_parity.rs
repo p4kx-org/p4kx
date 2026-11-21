@@ -7,9 +7,9 @@ use serde_json::Value;
 
 use super::TestResult;
 
-pub(super) fn parity<Row: Serialize>(
+pub(super) fn parity<Row: Serialize, Dependencies>(
     dataset: &str,
-    snapshot: &EquipmentSnapshot<'_, Row>,
+    snapshot: &EquipmentSnapshot<'_, Row, Dependencies>,
     catalog: &Value,
 ) -> TestResult<()> {
     let expected = catalog

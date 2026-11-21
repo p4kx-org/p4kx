@@ -17,11 +17,13 @@ use super::{Route, TestResult};
 
 #[path = "sdk_worn_gear_fixture.rs"]
 mod fixture;
+#[path = "sdk_shared_radar_definition_route.rs"]
+mod shared_radar;
 
 const ALL: CatalogRecordSelection = CatalogRecordSelection::All;
 const REMAINING: &str = "typed physical owner query and synthetic producer parity witnessed; complete installed producer parity open";
 
-pub(super) fn read() -> TestResult<[Route; 3]> {
+pub(super) fn read() -> TestResult<[Route; 4]> {
     let (_directory, archive) = fixture::archive()?;
     let session =
         CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
@@ -36,6 +38,7 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
         parsed.with_item_radars(ALL, None, |snapshot| {
             Route::queried_rows(ITEM_RADARS, snapshot.rows(), REMAINING)
         })??,
+        shared_radar::read(&archive, &parsed)?,
     ])
 }
 

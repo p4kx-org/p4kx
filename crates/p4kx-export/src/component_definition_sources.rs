@@ -6,11 +6,12 @@ use p4kx_extraction::{CancelToken, DataForge, RecordTree};
 use super::catalog_independent_configurations::electrical_behavior::{
     ElectricalBehavior, SOURCE_TYPE as ELECTRICAL_BEHAVIOR,
 };
+use super::catalog_independent_configurations::item_radar::SHARED_RADAR_PARAMS;
 use super::catalog_independent_configurations::{
     CONSUMABLE_SUBTYPE, CONSUMABLE_TYPE, ConsumableSubtype, ConsumableType,
     DAMAGE_RESISTANCE_MACRO, DamageResistanceMacro, GLOBAL_JUMP_TYPES, GlobalJumpConfiguration,
-    HEALTH_MODIFIER, MINING_LASER_GLOBAL, MiningLaserGlobalDefinition, TurretHealthModifier,
-    observe_modifier_types,
+    HEALTH_MODIFIER, MINING_LASER_GLOBAL, MiningLaserGlobalDefinition, RadarSystemSharedParams,
+    TurretHealthModifier, observe_modifier_types,
 };
 use super::catalog_jump_drive::{FLIGHT_PARAMS, TUNNEL_FORCES};
 pub use super::jump_drive_definitions::JumpDriveDefinition;
@@ -89,6 +90,12 @@ direct_definition!(
     DamageResistanceMacro,
     &[DAMAGE_RESISTANCE_MACRO],
     DamageResistanceMacro
+);
+direct_definition!(
+    SharedRadarParams,
+    RadarSystemSharedParams,
+    &[SHARED_RADAR_PARAMS],
+    RadarSystemSharedParams
 );
 direct_definition!(
     MiningLaserGlobals,

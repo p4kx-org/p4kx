@@ -9,13 +9,16 @@ use crate::CatalogError;
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ParsedCatalogQueries,
 };
+use crate::catalog_v3::catalog_independent_configurations::item_radar::ItemRadarComponents;
 use crate::catalog_v3::catalog_independent_configurations::worn_gear::{
-    ClothingComponents, ItemRadarComponents, SuitArmorComponents,
+    ClothingComponents, SuitArmorComponents,
 };
 
+pub use crate::catalog_v3::catalog_independent_configurations::item_radar::{
+    AimAssist as ItemRadarAimAssist, ItemRadar, PingProperties as ItemRadarPingProperties,
+};
 pub use crate::catalog_v3::catalog_independent_configurations::worn_gear::{
-    Clothing, ClothingFlight, ItemRadar, ItemRadarAimAssist, ItemRadarPingProperties,
-    RadiationResistance, SuitArmor, TemperatureResistance,
+    Clothing, ClothingFlight, RadiationResistance, SuitArmor, TemperatureResistance,
 };
 
 equipment_component_query!(

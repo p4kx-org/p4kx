@@ -12,7 +12,7 @@ use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::ammo_definition::AmmoDefinition;
 use crate::catalog_v3::cargo_manifest::CargoManifestDefinition;
 use crate::catalog_v3::catalog_independent_configurations::{
-    ConsumableDefinitions, DamageResistanceMacro, MiningLaserGlobalDefinition, TurretHealthModifier,
+    ConsumableDefinitions, ItemLinkedDefinitions, MiningLaserGlobalDefinition, TurretHealthModifier,
 };
 use crate::catalog_v3::catalog_resource_network_read::resource_network_global::ResourceNetworkGlobal;
 use crate::catalog_v3::explosion_definition::ExplosionDefinition;
@@ -169,7 +169,8 @@ pub(crate) struct CatalogDefinitions<'source> {
         CatalogTable<WeaponActionRecoilDefinition<'source>>,
     #[serde(flatten)]
     pub(crate) weapon_procedural: WeaponProceduralTables<'source>,
-    pub(crate) damage_resistance_macros: CatalogTable<DamageResistanceMacro<'source>>,
+    #[serde(flatten)]
+    pub(crate) item_linked: ItemLinkedDefinitions<'source>,
     pub(crate) turret_health_modifiers: CatalogTable<TurretHealthModifier<'source>>,
     #[serde(flatten)]
     pub(crate) consumables: ConsumableDefinitions<'source>,

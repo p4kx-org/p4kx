@@ -9,22 +9,16 @@ use crate::CatalogError;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::component_sources::physical_component;
-use crate::catalog_v3::referenced_definition_read::{self, Selection};
 use crate::export_field_inspection::ConfigurationInspection;
 use crate::schema_fields::every_field_required;
 
 #[path = "catalog_clothing.rs"]
 mod clothing;
-#[path = "catalog_item_radar.rs"]
-mod radar;
 #[path = "catalog_suit_armor.rs"]
 mod suit_armor;
 
 pub use clothing::{
     Clothing, Flight as ClothingFlight, RadiationResistance, TemperatureResistance,
-};
-pub use radar::{
-    AimAssist as ItemRadarAimAssist, ItemRadar, PingProperties as ItemRadarPingProperties,
 };
 pub(crate) use suit_armor::MACRO;
 pub use suit_armor::{DamageResistanceMacro, MacroBody, SuitArmor};
@@ -37,14 +31,9 @@ const CLOTHING: ComponentKind = ComponentKind {
     source_type: clothing::COMPONENT,
     inspection: ConfigurationInspection::Clothing,
 };
-const ITEM_RADAR: ComponentKind = ComponentKind {
-    source_type: radar::COMPONENT,
-    inspection: ConfigurationInspection::ItemRadar,
-};
 
 physical_component!(SuitArmorComponents, SuitArmor, SUIT_ARMOR);
 physical_component!(ClothingComponents, Clothing, CLOTHING);
-physical_component!(ItemRadarComponents, ItemRadar, ITEM_RADAR);
 
 /// Gear and device records scoped by their physical component owners.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -53,7 +42,6 @@ physical_component!(ItemRadarComponents, ItemRadar, ITEM_RADAR);
 pub(super) struct WornGearTables<'source> {
     suit_armor: CatalogTable<SuitArmor<'source>>,
     clothing: CatalogTable<Clothing<'source>>,
-    item_radars: CatalogTable<ItemRadar<'source>>,
 }
 
 impl<'source> WornGearTables<'source> {
@@ -63,39 +51,13 @@ impl<'source> WornGearTables<'source> {
         Ok(Self {
             suit_armor: components.table(SUIT_ARMOR, SuitArmor::read)?,
             clothing: components.table(CLOTHING, Clothing::read)?,
-            item_radars: components.table(ITEM_RADAR, ItemRadar::read)?,
         })
     }
 
-    pub(super) fn resistance_macros(
-        &self,
-        components: &mut PhysicalComponents<'_, '_, 'source>,
-    ) -> Result<CatalogTable<DamageResistanceMacro<'source>>, CatalogError> {
-        let linked = self
-            .suit_armor
+    pub(super) fn resistance_indices(&self) -> impl Iterator<Item = u32> + '_ {
+        self.suit_armor
             .rows
             .iter()
             .filter_map(SuitArmor::macro_index)
-            .collect();
-        let definitions = referenced_definition_read::read(
-            components.forge,
-            components.projection.original(),
-            &Selection {
-                source_types: &[MACRO],
-                linked: &linked,
-                filter: components.options.filter,
-                inspection: ConfigurationInspection::DamageResistanceMacro,
-            },
-            components.options.cancel,
-            DamageResistanceMacro::read,
-        )?;
-        components.numbers.extend(definitions.numbers);
-        components.collected.ledger.merge(definitions.ledger);
-        components.collected.add_failures(definitions.failures);
-        Ok(CatalogTable::new(
-            components.forge,
-            &[MACRO],
-            definitions.rows.into_iter().map(|(_, row)| row).collect(),
-        ))
     }
 }

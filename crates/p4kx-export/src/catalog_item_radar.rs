@@ -5,15 +5,29 @@ use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::Observed;
+use super::ComponentKind;
 use crate::CatalogError;
+use crate::canonical_record_header::CanonicalRecordHeader;
+use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::catalog_unit_source::UnitSource;
+use crate::catalog_v3::component_sources::physical_component;
 use crate::catalog_v3::item_component_owner::ComponentOwner;
+use crate::export_field_inspection::ConfigurationInspection;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
+use crate::source_value_catalog::{
+    SourceArenaOutput, SourceDataType, SourcePayload, SourceRecordReference,
+};
 
-pub(super) const COMPONENT: &str = "SCItemRadarComponentParams";
+const COMPONENT: &str = "SCItemRadarComponentParams";
+pub(crate) const SHARED_RADAR_PARAMS: &str = "RadarSystemSharedParams";
+pub(super) const KIND: ComponentKind = ComponentKind {
+    source_type: COMPONENT,
+    inspection: ConfigurationInspection::ItemRadar,
+};
+
+physical_component!(ItemRadarComponents, ItemRadar, KIND);
 
 /// One original radar component installed on a physical entity record.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -45,6 +59,38 @@ impl<'source> ItemRadar<'source> {
     #[must_use]
     pub const fn ping_properties(&self) -> &SourcedValue<PingProperties<'source>> {
         &self.ping_properties
+    }
+
+    /// Borrows the original resolved shared-parameters Reference when its target is compatible.
+    #[must_use]
+    pub fn shared_params(&self) -> Option<&SourceRecordReference<'source>> {
+        let arena = self.original.additional_fields();
+        let field = arena
+            .roots()
+            .iter()
+            .find(|field| field.name().value() == Some(&"sharedParams"))?;
+        let declaration = field.declaration();
+        if !matches!(
+            declaration.data_type().value(),
+            Some(SourceDataType::Reference)
+        ) || declaration.is_array().value() != Some(&false)
+        {
+            return None;
+        }
+        let SourcePayload::RecordReference { value } =
+            arena.value(field.value())?.value().value()?
+        else {
+            return None;
+        };
+        if value.target_type().value() != Some(&SHARED_RADAR_PARAMS) {
+            return None;
+        }
+        value.resolved_index()?;
+        Some(value)
+    }
+
+    pub(super) fn shared_params_index(&self) -> Option<u32> {
+        self.shared_params()?.resolved_index()
     }
 
     /// Borrows original type and remaining fields.
@@ -178,6 +224,41 @@ impl<'source> PingProperties<'source> {
         Ok(Self {
             cooldown_time,
             original,
+        })
+    }
+}
+
+/// One physical Record defining original shared radar configuration parameters.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
+pub struct RadarSystemSharedParams<'source> {
+    source: CanonicalRecordHeader<'source>,
+    authored_fields: SourceArenaOutput<'source>,
+}
+
+impl<'source> RadarSystemSharedParams<'source> {
+    /// Borrows the original physical definition header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows the complete original owned parameter tree and its field provenance.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
+    pub(in crate::catalog_v3) fn read(
+        _source_type: &'source str,
+        source: CanonicalRecordHeader<'source>,
+        fields: Observed<'_, '_, '_, 'source>,
+        _notes: &mut Vec<FieldError>,
+    ) -> Result<Self, CatalogError> {
+        Ok(Self {
+            source,
+            authored_fields: fields.authored_members()?,
         })
     }
 }

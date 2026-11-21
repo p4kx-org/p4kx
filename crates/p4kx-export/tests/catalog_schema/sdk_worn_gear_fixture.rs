@@ -11,6 +11,8 @@ use super::TestResult;
 
 pub(super) const FIRST: u32 = 1;
 pub(super) const ALIAS: u32 = 2;
+pub(super) const RADAR_TARGET: u32 = 3;
+pub(super) const RADAR_TARGET_ALIAS: u32 = 4;
 const ENTITY: &str = "EntityClassDefinition";
 const BASE: &str = "FixtureComponent";
 const SUIT: &str = "SCItemSuitArmorParams";
@@ -19,9 +21,12 @@ const CLOTHING: &str = "SCItemClothingParams";
 const TEMPERATURE: &str = "SCItemClothingTemperatureResistanceParams";
 const RADAR: &str = "SCItemRadarComponentParams";
 const PING: &str = "SCItemRadarPingProperties";
+const SHARED_RADAR: &str = "RadarSystemSharedParams";
+const RADAR_SETTINGS: &str = "FixtureRadarSettings";
 const OWNER_GUID: u128 = 1;
 const MACRO_GUID: u128 = 2;
 const DANGLING_GUID: u128 = 3;
+const RADAR_TARGET_GUID: u128 = 4;
 
 pub(super) fn archive() -> TestResult<(tempfile::TempDir, Archive)> {
     let directory = tempfile::tempdir()?;
@@ -39,6 +44,8 @@ pub(super) fn archive() -> TestResult<(tempfile::TempDir, Archive)> {
             "alias",
             vec![TestValue::Null, suit(-0.0, DANGLING_GUID)],
         ))
+        .record(shared_radar("shared", true))
+        .record(shared_radar("shared_alias", false))
         .build();
     ArchiveBuilder::new()
         .entry(TestEntry::stored(r"Data\Game2.dcb", database).encrypted())
@@ -70,9 +77,18 @@ fn schema() -> DataForgeBuilder {
         .structure(
             TestStruct::new(RADAR)
                 .parent(BASE)
-                .field("pingProperties", TestType::Class(PING.into())),
+                .field("pingProperties", TestType::Class(PING.into()))
+                .field("sharedParams", TestType::ReferenceTo(SHARED_RADAR.into()))
+                .field(
+                    "sharedExperimentalParams",
+                    TestType::ReferenceTo(SHARED_RADAR.into()),
+                ),
         )
         .structure(TestStruct::new(PING).field("cooldownTime", TestType::Single))
+        .structure(
+            TestStruct::new(SHARED_RADAR).field("settings", TestType::Class(RADAR_SETTINGS.into())),
+        )
+        .structure(TestStruct::new(RADAR_SETTINGS).field("flag", TestType::Bool))
 }
 
 fn entity(name: &str, components: Vec<TestValue>) -> TestRecord {
@@ -103,8 +119,31 @@ fn clothing() -> TestValue {
 }
 
 fn radar() -> TestValue {
-    TestValue::Struct(TestInstance::new(RADAR).value(
-        "pingProperties",
-        TestValue::Struct(TestInstance::new(PING).value("cooldownTime", TestValue::Single(8.0))),
-    ))
+    TestValue::Struct(
+        TestInstance::new(RADAR)
+            .value(
+                "pingProperties",
+                TestValue::Struct(
+                    TestInstance::new(PING).value("cooldownTime", TestValue::Single(8.0)),
+                ),
+            )
+            .value("sharedParams", TestValue::Reference(RADAR_TARGET_GUID))
+            .value(
+                "sharedExperimentalParams",
+                TestValue::Reference(DANGLING_GUID),
+            ),
+    )
+}
+
+fn shared_radar(name: &str, flag: bool) -> TestRecord {
+    TestRecord::new(
+        RADAR_TARGET_GUID,
+        SHARED_RADAR,
+        name,
+        format!("fixtures/worn/{name}.xml"),
+    )
+    .value(
+        "settings",
+        TestValue::Struct(TestInstance::new(RADAR_SETTINGS).value("flag", TestValue::Bool(flag))),
+    )
 }

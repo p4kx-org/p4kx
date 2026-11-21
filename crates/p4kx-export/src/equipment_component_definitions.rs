@@ -10,7 +10,8 @@ use crate::catalog_queries::{
 };
 use crate::catalog_v3::component_definition_sources::{
     ArmorMacros, ConsumableSubtypes, ConsumableTypes, GlobalJumpConfigurations,
-    JumpDriveFlightTuning, JumpTunnelForces, MiningLaserGlobals, TurretModifiers,
+    JumpDriveFlightTuning, JumpTunnelForces, MiningLaserGlobals, SharedRadarParams,
+    TurretModifiers,
 };
 
 pub use crate::catalog_v3::catalog_independent_configurations::{
@@ -18,7 +19,8 @@ pub use crate::catalog_v3::catalog_independent_configurations::{
     DamageResistanceMacro, DurabilityResistanceEntry,
     EffectParameters as ConsumableEffectParameters, GasMass as ConsumableGasMass,
     GlobalJumpConfiguration, MacroBody as DamageResistanceMacroBody, MiningLaserGlobalDefinition,
-    OrderedCurve, Override as ConsumableBuffOverride, ResistanceSet, Rtpc, TurretHealthModifier,
+    OrderedCurve, Override as ConsumableBuffOverride, RadarSystemSharedParams, ResistanceSet, Rtpc,
+    TurretHealthModifier,
 };
 
 pub use crate::catalog_v3::component_definition_sources::JumpDriveDefinition;
@@ -127,6 +129,11 @@ definition_query!(
 definition_query!(
     ArmorMacros, DamageResistanceMacro, DamageResistanceMacroSnapshot, with_damage_resistance_macros,
     with_damage_resistance_macros_from, CatalogLanguageSelection::Selected(&[]);
+);
+definition_query!(
+    SharedRadarParams, RadarSystemSharedParams, RadarSystemSharedParamsSnapshot,
+    with_radar_system_shared_params, with_radar_system_shared_params_from,
+    CatalogLanguageSelection::Selected(&[]);
 );
 definition_query!(
     MiningLaserGlobals, MiningLaserGlobalDefinition, MiningLaserGlobalSnapshot, with_mining_laser_globals,

@@ -116,6 +116,7 @@ const GROUPS: &[Group] = &[
             "refiningProcesses",
             "qualityDistributions",
             "qualityQuantizations",
+            "radarSystemSharedParams",
             "reputationContexts",
             "reputationPerks",
             "reputationRewardAmounts",

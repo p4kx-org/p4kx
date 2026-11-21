@@ -228,7 +228,7 @@ pub(super) fn assemble<R>(
             weapon_action_recoil_definitions: independent.weapon_action_recoil_definitions,
             weapon_animation_sources: weapon_animation.sources,
             weapon_procedural: independent.weapon_procedural,
-            damage_resistance_macros: independent.damage_resistance_macros,
+            item_linked: independent.item_linked_definitions,
             turret_health_modifiers: independent.turret_health_modifiers,
             consumables: independent.consumable_definitions,
             mining_laser_globals: independent.mining_laser_globals,

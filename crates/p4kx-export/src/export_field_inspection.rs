@@ -51,6 +51,7 @@ pub(crate) enum ConfigurationInspection {
     Clothing,
     ItemRadar,
     DamageResistanceMacro,
+    RadarSystemSharedParams,
     TurretHealth,
     TurretHealthModifier,
     ConsumableComponent,

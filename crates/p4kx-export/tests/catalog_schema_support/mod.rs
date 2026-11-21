@@ -100,7 +100,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "refiningProcesses": mining::refining(),
             "mineableEntities": harvest::mineable_entities(),
             "tags": tags::definitions(),
-            "explosionDefinitions": absent_table(), "damageResistanceMacros": absent_table(), "turretHealthModifiers": absent_table(), "miningLaserGlobals": absent_table(), "consumableTypes": absent_table(), "consumableSubtypes": absent_table(),
+            "explosionDefinitions": absent_table(), "damageResistanceMacros": absent_table(), "radarSystemSharedParams": absent_table(), "turretHealthModifiers": absent_table(), "miningLaserGlobals": absent_table(), "consumableTypes": absent_table(), "consumableSubtypes": absent_table(),
             "inventoryContainers": absent_table(),
             "medicalItemTierConfigs": absent_table(),
             "factions": absent_table(),

@@ -5829,6 +5829,9 @@
         "qualityQuantizations": {
           "$ref": "#/$defs/CatalogTableOfQualityQuantizationDefinition"
         },
+        "radarSystemSharedParams": {
+          "$ref": "#/$defs/CatalogTableOfRadarSystemSharedParams"
+        },
         "refiningProcesses": {
           "$ref": "#/$defs/CatalogTableOfRefiningProcessDefinition"
         },
@@ -5981,6 +5984,7 @@
         "proceduralPlanetAudio",
         "qualityDistributions",
         "qualityQuantizations",
+        "radarSystemSharedParams",
         "refiningProcesses",
         "reputationContexts",
         "reputationPerks",
@@ -8621,6 +8625,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/RadarOptionsConfiguration"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfRadarSystemSharedParams": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/RadarSystemSharedParams"
           },
           "type": "array"
         }
@@ -40533,6 +40556,22 @@
         "isScannable",
         "radarProperties",
         "sourceType"
+      ],
+      "type": "object"
+    },
+    "RadarSystemSharedParams": {
+      "description": "One physical Record defining original shared radar configuration parameters.",
+      "properties": {
+        "authoredFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "source": {
+          "$ref": "#/$defs/CanonicalRecordHeader"
+        }
+      },
+      "required": [
+        "authoredFields",
+        "source"
       ],
       "type": "object"
     },

@@ -41,6 +41,10 @@ pub(crate) mod entity_animation_controller;
 pub(in crate::catalog_v3) mod flight_configuration_tables;
 #[path = "hackable_configuration.rs"]
 pub(crate) mod hackable_configuration;
+#[path = "item_linked_definitions.rs"]
+mod item_linked_definitions;
+#[path = "catalog_item_radar.rs"]
+pub(crate) mod item_radar;
 #[path = "catalog_jump_point.rs"]
 mod jump_point;
 #[path = "jump_point_globals.rs"]
@@ -67,6 +71,8 @@ pub use consumables::{AuthoredList, ConsumableEffect, EffectParameters, GasMass,
 use electrical_behavior::ElectricalBehavior;
 use flight_configuration_tables::FlightConfigurationTables;
 use hackable_configuration::{HackableConfiguration, KIND as HACKABLE_DEVICES};
+pub(crate) use item_linked_definitions::ItemLinkedDefinitions;
+pub use item_radar::RadarSystemSharedParams;
 pub use jump_point::JumpPointConfiguration;
 pub use jump_point_globals::GlobalJumpConfiguration;
 pub(crate) use jump_point_globals::SOURCE_TYPES as GLOBAL_JUMP_TYPES;
@@ -105,6 +111,7 @@ pub(crate) struct IndependentConfigurationTables<'source> {
     global_jump_point_configurations: CatalogTable<GlobalJumpConfiguration<'source>>,
     #[serde(flatten)]
     worn_gear: WornGearTables<'source>,
+    item_radars: CatalogTable<item_radar::ItemRadar<'source>>,
     #[serde(flatten)]
     consumables: ConsumableConfigurations<'source>,
     #[serde(flatten)]
@@ -116,7 +123,7 @@ pub(crate) struct IndependentConfigurations<'source> {
     pub(crate) weapon_action_recoil_definitions:
         CatalogTable<WeaponActionRecoilDefinition<'source>>,
     pub(crate) weapon_procedural: WeaponProceduralTables<'source>,
-    pub(crate) damage_resistance_macros: CatalogTable<DamageResistanceMacro<'source>>,
+    pub(crate) item_linked_definitions: ItemLinkedDefinitions<'source>,
     pub(crate) turret_health_modifiers: CatalogTable<TurretHealthModifier<'source>>,
     pub(crate) consumable_definitions: ConsumableDefinitions<'source>,
     pub(crate) mining_laser_globals: CatalogTable<MiningLaserGlobalDefinition<'source>>,
@@ -155,7 +162,8 @@ pub(crate) fn read<'source>(
     let jump_points = components.jump_points(jump_owners)?;
     let turret = TurretTables::read(&mut components)?;
     let worn_gear = WornGearTables::read(&mut components)?;
-    let damage_resistance_macros = worn_gear.resistance_macros(&mut components)?;
+    let (item_radars, item_linked_definitions) =
+        item_linked_definitions::read_for_items(&mut components, &worn_gear)?;
     let consumables = ConsumableTables::read(&mut components)?;
     let mining_configurations = MiningConfigurationTables::read(&mut components)?;
     let mining_laser_globals = mining_configurations.globals(&mut components)?;
@@ -177,11 +185,12 @@ pub(crate) fn read<'source>(
             jump_point_configurations: jump_points.local,
             global_jump_point_configurations: jump_points.global,
             worn_gear,
+            item_radars,
             consumables: consumables.configurations,
             mining_configurations,
         },
         weapon_action_recoil_definitions,
-        damage_resistance_macros,
+        item_linked_definitions,
         turret_health_modifiers: turret.modifiers,
         consumable_definitions: consumables.definitions,
         mining_laser_globals,
