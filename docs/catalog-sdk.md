@@ -1867,6 +1867,24 @@ complete. An absent host state means the physical selection has no admitted ship
 host state distinguishes an unreadable header or a selected ship whose Loadout could not be
 produced.
 
+For an installed Crafter witness, configure `P4KX_DATA_P4K` and
+`P4KX_CRAFTER_WITNESS_BUILD` with the matching archive and expected changelist. The
+station test selects one original component using metadata and a component probe.
+Use the configured Archive key or set `P4KX_KEY_FILE` or `P4KX_ARCHIVE_KEY`.
+Optionally set `P4KX_CRAFTER_WITNESS_STATION_INDEX` to a private exact physical index.
+
+The positive host witness also requires `P4KX_CRAFTER_WITNESS_SHIP_INDEX` and
+`P4KX_CRAFTER_WITNESS_FILTER`. It resolves the selected original Loadout and proves
+the single filter selects exactly that ship and all independently reached crafter Records
+before generating the filtered Catalog. If the scope cannot be expressed by a single
+filter, use a current complete producer artifact for a same-Build scoped comparison.
+These tests emit aggregate counts and retain no exported files.
+
+```powershell
+cargo test --locked -p p4kx-export --test real_archive real_archive_crafter_sdk::installed_crafter_station_matches_original_sdk_and_literal_producer -- --ignored --exact --nocapture --test-threads=1
+cargo test --locked -p p4kx-export --test real_archive real_archive_crafter_sdk::installed_crafter_hosts_match_original_sdk_and_exact_filtered_producer -- --ignored --exact --nocapture --test-threads=1
+```
+
 ## Cargo loading and shop fees
 
 Use `equipment::cargo_globals::with_cargo_loading_globals` and
