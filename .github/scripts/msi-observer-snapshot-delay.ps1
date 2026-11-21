@@ -1,9 +1,11 @@
 $ErrorActionPreference = 'Stop'
 
 function Get-P4kxMsiCheckpoint2Binding {
-    param([string]$Directory)
+    param([string]$Directory, [switch]$ObserveRead)
     $requestPath = Join-Path $Directory 'request.json'
+    if ($ObserveRead) { Write-P4kxMsiObserverProgress delayReadRequest begin }
     $request = Read-P4kxDetachedReceipt $requestPath
+    if ($ObserveRead) { Write-P4kxMsiObserverProgress delayReadRequest end }
     if ($request.schema -ne 1 -or $request.role -cne 'native-msi-observer-request' -or $request.mode -cne 'Lifecycle' -or
         $request.directory -cne $Directory -or $request.revision -cne $env:GITHUB_SHA -or $request.run -cne $env:GITHUB_RUN_ID -or
         $request.attempt -cne $env:GITHUB_RUN_ATTEMPT -or $request.target -cne $env:P4KX_TARGET -or
@@ -33,7 +35,9 @@ function Wait-P4kxMsiCheckpoint2Delay {
     param([string]$Directory)
     $started = [DateTimeOffset]::UtcNow
     $root = [IO.Path]::GetFullPath($Directory)
-    $binding = Get-P4kxMsiCheckpoint2Binding $root
+    Write-P4kxMsiObserverProgress delayBinding begin
+    $binding = Get-P4kxMsiCheckpoint2Binding $root -ObserveRead
+    Write-P4kxMsiObserverProgress delayBinding end
     $window = New-P4kxMsiCheckpoint2Window $binding $started
     $path = Join-Path $root 'delays/02'
     if ([IO.Path]::Exists($path)) { throw 'Checkpoint 2 needs a fresh delay receipt directory.' }
@@ -45,14 +49,18 @@ function Wait-P4kxMsiCheckpoint2Delay {
         requested_wait_ms=75000;delay_complete=$false
         completed_success=$false;native_completion_unproven=$true;mutation_authority=$false
     }
+    Write-P4kxMsiObserverProgress delayStartReceipt begin
     Write-P4kxDetachedReceipt (Join-Path $path 'delay-start.json') $record
+    Write-P4kxMsiObserverProgress delayStartReceipt end
     $failure = $null
     $timer = [Diagnostics.Stopwatch]::StartNew()
     try {
         if ((Get-P4kxMsiRemainingBudget $window.capture_deadline_utc) -le $record.requested_wait_ms) {
             throw 'Checkpoint 2 delay leaves no capture budget inside the original allowance.'
         }
+        Write-P4kxMsiObserverProgress delayWait begin
         Start-Sleep -Milliseconds $record.requested_wait_ms
+        Write-P4kxMsiObserverProgress delayWait end
         [void](Get-P4kxMsiRemainingBudget $window.capture_deadline_utc)
         if ($timer.ElapsedMilliseconds -lt $record.requested_wait_ms) { throw 'Checkpoint 2 delay ended early.' }
         $record.delay_complete = $true
@@ -61,7 +69,9 @@ function Wait-P4kxMsiCheckpoint2Delay {
     $record.finished_utc = [DateTimeOffset]::UtcNow.ToString('o')
     $record.elapsed_ms = $timer.ElapsedMilliseconds
     $record.failure_type = $(if ($null -ne $failure) { $failure.GetType().FullName } else { $null })
+    Write-P4kxMsiObserverProgress delayResultReceipt begin
     Write-P4kxDetachedReceipt (Join-Path $path 'delay-result.json') $record
+    Write-P4kxMsiObserverProgress delayResultReceipt end
     if ($null -ne $failure) { throw $failure }
 }
 

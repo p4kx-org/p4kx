@@ -6,6 +6,46 @@ function Assert-Delay([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
 }
 
+function Test-DelayExecutionMarkers {
+    param([string]$Root, [hashtable]$Prototype)
+    $directory = Join-Path $Root 'executed'
+    [void][IO.Directory]::CreateDirectory($directory)
+    $now = [DateTimeOffset]::UtcNow
+    $request = $Prototype.Clone()
+    $request.directory = $directory
+    $request.deadline_utc = $now.AddSeconds(180).ToString('o')
+    $request.observer_deadline_utc = $now.AddSeconds(130).ToString('o')
+    $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC = $request.deadline_utc
+    Write-P4kxDetachedReceipt (Join-Path $directory 'request.json') $request
+
+    function Start-Sleep {
+        param([int]$Milliseconds)
+        Assert-Delay ($Milliseconds -eq 75000) 'The executed observation requests the original 75 seconds.'
+    }
+    $prefix = '[P4KX-MSI-OBSERVER]'
+    $observed = [Collections.Generic.List[string]]::new()
+    $failure = $null
+    try {
+        & (Join-Path $PSScriptRoot 'invoke-msi-observer.ps1') -Stage Delay -Directory $directory -Sequence 2 -WaitMilliseconds 75000 6>&1 |
+            ForEach-Object {
+                $message = $_.ToString()
+                if ($message.StartsWith($prefix, [StringComparison]::Ordinal)) {
+                    $event = $message.Substring($prefix.Length) | ConvertFrom-Json -AsHashtable -DateKind String
+                    $observed.Add($event.stage + ':' + $event.status)
+                }
+            }
+    } catch { $failure = $_.Exception.Message }
+    $expected = @(
+        'delayCaller:begin','delayBinding:begin','delayReadRequest:begin','delayReadRequest:end','delayBinding:end',
+        'delayStartReceipt:begin','delayStartReceipt:end','delayWait:begin','delayWait:end',
+        'delayResultReceipt:begin','delayResultReceipt:end','delayCaller:end'
+    )
+    Assert-Delay (($observed -join ',') -ceq ($expected -join ',')) 'Delay markers bracket each operation through failure and return.'
+    Assert-Delay ($failure -ceq 'Checkpoint 2 delay ended early.') 'Markers cannot accept an early wait.'
+    $result = Read-P4kxDetachedReceipt (Join-Path $directory 'delays/02/delay-result.json')
+    Assert-Delay ($result.delay_complete -eq $false -and $result.native_completion_unproven -eq $true) 'The exercised early delay remains unproven.'
+}
+
 $root = [IO.Path]::GetFullPath($Directory)
 $path = Join-Path $root 'delays/02'
 if ([IO.Path]::Exists($root)) { throw 'Delay budget fixture directory must be new.' }
@@ -58,6 +98,7 @@ try {
     $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC=$started.AddSeconds(179).ToString('o')
     try { Read-P4kxMsiCheckpoint2Delay $root $started.AddSeconds(80) | Out-Null } catch { $mismatched=$true }
     Assert-Delay $mismatched 'A different deadline must refuse the original delay receipt.'
+    Test-DelayExecutionMarkers $root $request
 } finally {
     $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC = $saved
 }

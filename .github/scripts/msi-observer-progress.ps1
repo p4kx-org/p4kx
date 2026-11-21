@@ -2,7 +2,10 @@ $ErrorActionPreference = 'Stop'
 
 function Write-P4kxMsiObserverProgress {
     param(
-        [Parameter(Mandatory)][ValidateSet('readRequest','binding','readHandle','parentState','wait','stopExpiredParent','saveCheckpoint','workflowOutput')][string]$Stage,
+        [Parameter(Mandatory)][ValidateSet(
+            'readRequest','binding','readHandle','parentState','wait','stopExpiredParent','saveCheckpoint','workflowOutput',
+            'delayCaller','delayBinding','delayReadRequest','delayStartReceipt','delayWait','delayResultReceipt'
+        )][string]$Stage,
         [Parameter(Mandatory)][ValidateSet('begin','end')][string]$Status,
         [string]$Directory,
         [string]$RequestDigest

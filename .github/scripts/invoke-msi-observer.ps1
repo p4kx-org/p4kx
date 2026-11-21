@@ -16,9 +16,13 @@ if ($Stage -ceq 'Delay') {
     if ($Mode -cne 'Lifecycle' -or $Sequence -ne 2 -or $WaitMilliseconds -ne 75000) {
         throw 'The split wait applies only to the original 75-second lifecycle checkpoint 2.'
     }
-    . (Join-Path $PSScriptRoot 'msi-detached-control.ps1')
-    . (Join-Path $PSScriptRoot 'msi-observer-snapshot-delay.ps1')
-    Wait-P4kxMsiCheckpoint2Delay $Directory
+    . (Join-Path $PSScriptRoot 'msi-observer-progress.ps1')
+    Write-P4kxMsiObserverProgress delayCaller begin
+    try {
+        . (Join-Path $PSScriptRoot 'msi-detached-control.ps1')
+        . (Join-Path $PSScriptRoot 'msi-observer-snapshot-delay.ps1')
+        Wait-P4kxMsiCheckpoint2Delay $Directory
+    } finally { Write-P4kxMsiObserverProgress delayCaller end }
     return
 }
 if ($Stage -ceq 'Snapshot') {
