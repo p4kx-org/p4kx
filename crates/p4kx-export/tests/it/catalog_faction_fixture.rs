@@ -197,3 +197,35 @@ fn override_for(label: &str, allow: bool) -> TestValue {
             .value("shouldAllowFriendlyFire", TestValue::Bool(allow)),
     )
 }
+
+pub(super) fn sdk_neighbors() -> DataForgeBuilder {
+    const NEIGHBOR: &str = "SyntheticFactionNeighbor";
+    complete()
+        .structure(TestStruct::new(NEIGHBOR).field("name", TestType::String))
+        .record(
+            TestRecord::new(
+                0x0010_6607,
+                NEIGHBOR,
+                "SyntheticFactionNeighbor.Test",
+                "libs/foundry/records/factions/fixture_neighbor.xml",
+            )
+            .value("name", invalid_string()),
+        )
+}
+
+pub(super) fn unreadable_faction() -> DataForgeBuilder {
+    base(
+        TestStruct::new(FACTION)
+            .field("name", TestType::String)
+            .field("fixtureUnreadable", TestType::String),
+    )
+    .record(
+        faction_record(SECURITY, "unreadable")
+            .value("name", TestValue::text("Fixture Faction"))
+            .value("fixtureUnreadable", invalid_string()),
+    )
+}
+
+fn invalid_string() -> TestValue {
+    TestValue::Raw((u32::MAX - 1).to_le_bytes().to_vec())
+}

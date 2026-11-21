@@ -8,19 +8,23 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
+use super::catalog_item_components::source_getters;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::{OriginalFlowFields, OriginalValueFact};
+use crate::catalog_read::scoped_source_read::ScopedSourceRead;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
+use crate::export_diagnostic::ExportSourceRole;
+use crate::export_field_walk;
 use crate::record_observation::RecordObservation;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
 use crate::template_field_capture::TemplateFieldCapture;
-use crate::{CatalogError, ExportAccountingError};
+use crate::{CatalogError, ExportAccountingError, Kind};
 
 pub(crate) const SOURCE_TYPE: &str = "Faction";
 const REPUTATION: &str = "FactionReputation";
@@ -34,7 +38,7 @@ type Link<'source> = SourcedValue<Box<SourceRecordReference<'source>>>;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct FactionDefinition<'source> {
+pub struct FactionDefinition<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     name: SourcedValue<FactionText<'source, PublicNameRef>>,
@@ -97,7 +101,7 @@ impl<'source, Reference> FactionText<'source, Reference> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct FriendlyFireOverride<'source> {
+pub struct FriendlyFireOverride<'source> {
     source_type: SourcedValue<&'source str>,
     reaction_type: SourcedValue<&'source str>,
     should_allow_friendly_fire: SourcedValue<bool>,
@@ -105,6 +109,17 @@ struct FriendlyFireOverride<'source> {
 }
 
 impl<'source> FriendlyFireOverride<'source> {
+    source_getters! {
+        /// Borrows the original concrete override class.
+        source_type: SourcedValue<&'source str>,
+        /// Borrows the authored reaction label.
+        reaction_type: SourcedValue<&'source str>,
+        /// Borrows the original friendly-fire flag.
+        should_allow_friendly_fire: SourcedValue<bool>,
+        /// Borrows other members of the original override.
+        authored_fields: SourceArenaOutput<'source>,
+    }
+
     fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -176,7 +191,60 @@ pub(crate) fn read<'source>(
     })
 }
 
+pub(crate) fn read_selected<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<FactionDefinition<'source>>, CatalogError> {
+    let FactionRead { value, notes } = read(tree, projection, admission, cancel)?;
+    let inspection = export_field_walk::inspect_observed(
+        Some(projection.original()),
+        tree,
+        admission,
+        Some(Kind::Factions),
+        ExportSourceRole::Selected,
+        cancel,
+    )?;
+    Ok(ScopedSourceRead::new(
+        value.definition,
+        notes,
+        inspection.field_projection_complete(0, 0),
+    ))
+}
+
 impl<'source> FactionDefinition<'source> {
+    source_getters! {
+        /// Borrows the original physical faction Record header.
+        source: CanonicalRecordHeader<'source>,
+        /// Borrows the authored name in the public name domain or as a literal.
+        name: SourcedValue<FactionText<'source, PublicNameRef>>,
+        /// Borrows the authored description in the protected text domain or as a literal.
+        description: SourcedValue<FactionText<'source, GameTextRef>>,
+        /// Borrows the authored default reaction label.
+        default_reaction: SourcedValue<&'source str>,
+        /// Borrows the original ordered ally links.
+        allied_factions: SourcedValue<Vec<Link<'source>>>,
+        /// Borrows the original ordered enemy links.
+        enemy_factions: SourcedValue<Vec<Link<'source>>>,
+        /// Borrows the original ordered friendly-fire overrides.
+        friendly_fire_behavior_overrides: SourcedValue<Vec<SourcedValue<FriendlyFireOverride<'source>>>>,
+        /// Borrows the authored faction type label.
+        faction_type: SourcedValue<&'source str>,
+        /// Borrows the authored permission to arrest.
+        able_to_arrest: SourcedValue<bool>,
+        /// Borrows the authored lawful-trespass policing flag.
+        polices_lawful_trespass: SourcedValue<bool>,
+        /// Borrows the authored criminality policing flag.
+        polices_criminality: SourcedValue<bool>,
+        /// Borrows the authored legal-rights exception flag.
+        no_legal_rights: SourcedValue<bool>,
+        /// Borrows the independently authored reputation Record link.
+        faction_reputation_ref: Link<'source>,
+        /// Borrows other members of the original faction.
+        authored_fields: SourceArenaOutput<'source>,
+    }
+
     fn read(
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,

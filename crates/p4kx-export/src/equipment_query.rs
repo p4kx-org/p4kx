@@ -110,6 +110,8 @@ mod cargo_read;
 mod definitions;
 #[path = "equipment_facility_query.rs"]
 mod facilities;
+#[path = "equipment_faction_query.rs"]
+pub mod factions;
 #[path = "equipment_inventory_query.rs"]
 mod inventory;
 #[path = "equipment_item_source_query.rs"]

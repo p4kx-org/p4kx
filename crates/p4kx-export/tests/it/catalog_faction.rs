@@ -9,6 +9,8 @@ use crate::commodity_v3_fixture::{self as archive, DcbOrigin, TestResult, at, gu
 
 #[path = "catalog_faction_fixture.rs"]
 mod fixture;
+#[path = "catalog_faction_sdk.rs"]
+mod sdk;
 
 const ROWS: &str = "/definitions/factions/rows";
 

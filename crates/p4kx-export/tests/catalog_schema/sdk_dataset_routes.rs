@@ -54,6 +54,8 @@ pub(super) mod entity_animation;
 mod facilities;
 #[path = "../it/catalog_facility_medbed_fixture.rs"]
 mod facility_medbed_fixture;
+#[path = "sdk_faction_definition_route.rs"]
+mod faction_definitions;
 #[path = "sdk_faction_trigger_configuration_route.rs"]
 mod faction_trigger_configuration;
 #[path = "sdk_dataset_fixtures.rs"]
@@ -223,6 +225,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         archive_entries::read_shop_inventory(&archive)?,
         archive_entries::read_flare_library(&archive)?,
         read_faction_identities(&archive)?,
+        faction_definitions::read()?,
         faction_trigger_configuration::read()?,
         archive_entries::read_subsumption_event(&archive)?,
         archive_entries::read_radar_configuration(&archive)?,

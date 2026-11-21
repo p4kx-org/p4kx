@@ -21,3 +21,18 @@ A GUID selection retains every physical match. An index selection selects that o
 Record and still applies the family admission rule. The result provides the canonical rows,
 their protected text definitions for the requested languages, original provenance and coverage.
 Use `CatalogQuerySession` to share a parsed DataForge across scoped queries.
+
+## Faction rules and references
+
+Use `catalog_queries::factions::with_factions` and its decoded-Entry or parsed-session
+forms to read `definitions.factions` by GUID, physical Record index or all original Faction
+Records. Rows keep the order of the Catalog. They expose original legal flags, ordered ally,
+enemy and friendly-fire slots, a separate reputation link and the remaining authored fields.
+Referenced targets retain their physical identity when resolved and their authored GUID when
+dangling.
+
+The query resolves `name` through the public-name domain and `description` through the
+protected game-text domain. The original value can also be a literal. A caller chooses
+which locale payloads to read, or an empty list to retrieve keys without translations.
+The snapshot returns these text rows, original per-value provenance and physical read coverage.
+An unreadable owned field leaves the other fields of its Faction available.

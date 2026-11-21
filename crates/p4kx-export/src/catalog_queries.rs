@@ -27,6 +27,7 @@ pub mod loot;
 
 #[path = "faction_identity_query.rs"]
 pub mod faction_identities;
+pub use self::equipment::factions;
 
 #[path = "item_recovery_query.rs"]
 pub mod item_recovery;
