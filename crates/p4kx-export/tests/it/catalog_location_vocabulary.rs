@@ -8,6 +8,8 @@ use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult, at, gui
 
 #[path = "location_vocabulary_fixture.rs"]
 pub(crate) mod fixture;
+#[path = "catalog_contract_scope_sdk.rs"]
+mod scope_sdk;
 
 const CLASS_ROWS: &str = "/definitions/locationClasses/rows";
 const CLASS_REGISTRY: &str = "/definitions/locationRegistries/classes/rows/0";

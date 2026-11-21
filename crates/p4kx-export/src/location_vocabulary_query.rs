@@ -20,6 +20,10 @@ use crate::catalog_v3::location_vocabulary::{
 use crate::record_observation::RecordObservation;
 use crate::{CatalogError, Kind};
 
+pub use super::equipment::contract_scopes::{
+    ContractScopeGlobalParams, ContractScopeItem, ContractScopeSnapshot, with_contract_scopes,
+    with_contract_scopes_from,
+};
 pub use crate::catalog_v3::location_vocabulary::LocationResourceSlot;
 pub use crate::catalog_v3::location_vocabulary_definition::{
     LocationClassDefinition, LocationDictionaryEntry, LocationRegistry,

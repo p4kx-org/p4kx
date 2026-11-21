@@ -9,7 +9,8 @@ mod contract_scope_global_params;
 #[path = "location_resource_slot.rs"]
 mod location_resource_slot;
 
-use contract_scope_global_params::{ContractScopeGlobalParams, SOURCE_TYPE as SCOPE_SOURCE_TYPE};
+pub(crate) use contract_scope_global_params::read_selected as read_contract_scope_selected;
+pub use contract_scope_global_params::{ContractScopeGlobalParams, ContractScopeItem};
 pub use location_resource_slot::LocationResourceSlot;
 
 use super::location_entity_declaration::{self, LocationEntityDeclaration};
@@ -34,7 +35,7 @@ pub(crate) const RESOURCE_SLOT: &str = location_resource_slot::SOURCE_TYPE;
 pub(crate) const CLASS_REGISTRY: &str = "MissionLocationClasses";
 pub(crate) const FUNCTION_REGISTRY: &str = "MissionLocationFunctions";
 pub(crate) const SIZE_REGISTRY: &str = "MissionLocationSizes";
-pub(crate) const CONTRACT_SCOPE: &str = SCOPE_SOURCE_TYPE;
+pub(crate) const CONTRACT_SCOPE: &str = contract_scope_global_params::SOURCE_TYPE;
 
 pub(crate) fn kind_for_type(source_type: &str) -> Option<Kind> {
     Some(match source_type {
@@ -183,13 +184,8 @@ impl<'source> LocationVocabularyPick<'source> {
         admission: &RecordObservation<'_, 'source>,
         cancel: Option<&CancelToken>,
     ) -> Result<(Self, Vec<FieldError>), CatalogError> {
-        let (row, notes) = PreparedDefinition::read(
-            tree,
-            projection,
-            admission,
-            cancel,
-            ContractScopeGlobalParams::read,
-        )?;
+        let (row, notes) =
+            contract_scope_global_params::prepare(tree, projection, admission, cancel)?;
         Ok((Self::ContractScope(Box::new(row)), notes))
     }
 }

@@ -193,6 +193,7 @@ impl<'query> Query<'query> {
             | Family::ResourceNetworkGlobals
             | Family::ProceduralPlanetAudio
             | Family::Factions
+            | Family::ContractScopes
             | Family::WeaponSources
             | Family::ProjectileAmmo
             | Family::MagazineResolutions => Plan::read(
@@ -242,6 +243,7 @@ fn order(family: Family, owners: &mut [Owner<'_>]) {
         | Family::ResourceNetworkGlobals
         | Family::ProceduralPlanetAudio
         | Family::Factions
+        | Family::ContractScopes
         | Family::InventoryContainers
         | Family::CargoLoadingGlobals
         | Family::ShopCommodityGlobals => owners.sort_by_cached_key(|owner| {

@@ -48,6 +48,12 @@ Locale key and resolved translations. This vocabulary describes authored labels 
 The source `ContractScope` Enum on location and contract configuration retains its own
 authored label. Availability is explicit for Builds where the global Record type is absent.
 
+Use `catalog_queries::location_vocabulary::with_contract_scopes`, its decoded-Entry variant
+or a parsed session to read those rows by GUID, physical Record index or all original owners.
+The snapshot exposes the seven typed slots, their public-name definitions in the requested
+languages, per-value source evidence and read coverage. An unreadable original icon does
+not prevent the query from returning the other authored values.
+
 ## Mission board providers
 
 `configurations.missionBoards` contains each selected

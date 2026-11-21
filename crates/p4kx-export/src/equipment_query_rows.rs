@@ -65,6 +65,7 @@ pub(super) enum Family {
     ResourceNetworkGlobals,
     ProceduralPlanetAudio,
     Factions,
+    ContractScopes,
     WeaponSources,
     ProjectileAmmo,
     MagazineResolutions,
@@ -74,7 +75,7 @@ impl Family {
     pub(super) const fn localized(self) -> bool {
         matches!(
             self,
-            Self::Definitions | Self::AmmoDefinitions | Self::Factions
+            Self::Definitions | Self::AmmoDefinitions | Self::Factions | Self::ContractScopes
         )
     }
 
@@ -85,6 +86,7 @@ impl Family {
             Self::ResourceNetworkGlobals => Kind::ResourceNetworkGlobals,
             Self::ProceduralPlanetAudio => Kind::ProceduralPlanetAudio,
             Self::Factions => Kind::Factions,
+            Self::ContractScopes => Kind::ContractScopes,
             Self::InventoryContainers => Kind::InventoryContainers,
             Self::CargoLoadingGlobals => Kind::CargoLoadingGlobals,
             Self::ShopCommodityGlobals => Kind::ShopCommodityGlobals,
@@ -120,7 +122,8 @@ impl Family {
             | Self::ExplosionDefinitions
             | Self::ResourceNetworkGlobals
             | Self::ProceduralPlanetAudio
-            | Self::Factions => {
+            | Self::Factions
+            | Self::ContractScopes => {
                 return DatasetAvailability::from_source_declarations(forge, |name| {
                     name == self.kind().records().type_name
                 });

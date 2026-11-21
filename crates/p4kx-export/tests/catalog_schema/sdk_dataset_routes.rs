@@ -42,6 +42,8 @@ mod component_parity;
 mod component_tools;
 #[path = "sdk_container_placement_routes.rs"]
 mod container_placements;
+#[path = "sdk_contract_scope_route.rs"]
+mod contract_scopes;
 #[path = "sdk_contract_routes.rs"]
 mod contracts;
 #[path = "sdk_countermeasure_emitter_route.rs"]
@@ -226,6 +228,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         archive_entries::read_flare_library(&archive)?,
         read_faction_identities(&archive)?,
         faction_definitions::read()?,
+        contract_scopes::read()?,
         faction_trigger_configuration::read()?,
         archive_entries::read_subsumption_event(&archive)?,
         archive_entries::read_radar_configuration(&archive)?,

@@ -1,19 +1,25 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::SourcedValue;
+use p4kx_extraction::{CancelToken, RecordTree, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::CatalogError;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_projection::CatalogProjection;
+use crate::catalog_read::scoped_source_read::ScopedSourceRead;
 use crate::catalog_text_contract::PublicNameRef;
 use crate::catalog_v3::authored_fields::Observed;
+use crate::catalog_v3::catalog_item_components::source_getters;
 use crate::catalog_v3::catalog_unit_source::UnitSource;
+use crate::catalog_v3::prepared_definition::PreparedDefinition;
+use crate::export_diagnostic::ExportSourceRole;
+use crate::export_field_walk;
+use crate::record_observation::RecordObservation;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::source_value_catalog::SourceArenaOutput;
+use crate::{CatalogError, ExportAccountingError, Kind};
 
 pub(crate) const SOURCE_TYPE: &str = "ContractScopeGlobalParams";
 const ITEM_TYPE: &str = "ContractScope_Item";
@@ -22,7 +28,7 @@ const ITEM_TYPE: &str = "ContractScope_Item";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ContractScopeGlobalParams<'source> {
+pub struct ContractScopeGlobalParams<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     location: SourcedValue<ContractScopeItem<'source>>,
@@ -35,8 +41,75 @@ pub(crate) struct ContractScopeGlobalParams<'source> {
     additional_fields: SourceArenaOutput<'source>,
 }
 
+pub(super) fn prepare<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<
+    (
+        PreparedDefinition<'source, ContractScopeGlobalParams<'source>>,
+        Vec<FieldError>,
+    ),
+    CatalogError,
+> {
+    if tree.type_name() != SOURCE_TYPE {
+        return Err(ExportAccountingError::ConflictingSourceDatum.into());
+    }
+    PreparedDefinition::read(
+        tree,
+        projection,
+        admission,
+        cancel,
+        ContractScopeGlobalParams::read,
+    )
+}
+
+pub(crate) fn read_selected<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<ContractScopeGlobalParams<'source>>, CatalogError> {
+    let (row, notes) = prepare(tree, projection, admission, cancel)?;
+    let inspection = export_field_walk::inspect_observed(
+        Some(projection.original()),
+        tree,
+        admission,
+        Some(Kind::ContractScopes),
+        ExportSourceRole::Selected,
+        cancel,
+    )?;
+    Ok(ScopedSourceRead::new(
+        row.into_definition(),
+        notes,
+        inspection.field_projection_complete(0, 0),
+    ))
+}
+
 impl<'source> ContractScopeGlobalParams<'source> {
-    pub(in crate::catalog_v3) fn read(
+    source_getters! {
+        /// Borrows the original physical scope Record header.
+        source: CanonicalRecordHeader<'source>,
+        /// Borrows the original location scope slot.
+        location: SourcedValue<ContractScopeItem<'source>>,
+        /// Borrows the original cluster scope slot.
+        cluster: SourcedValue<ContractScopeItem<'source>>,
+        /// Borrows the original sector scope slot.
+        sector: SourcedValue<ContractScopeItem<'source>>,
+        /// Borrows the original planetary body scope slot.
+        planetary_body: SourcedValue<ContractScopeItem<'source>>,
+        /// Borrows the original planetary system scope slot.
+        planetary_system: SourcedValue<ContractScopeItem<'source>>,
+        /// Borrows the original solar system scope slot.
+        solar_system: SourcedValue<ContractScopeItem<'source>>,
+        /// Borrows the original universe scope slot.
+        universe: SourcedValue<ContractScopeItem<'source>>,
+        /// Borrows other members of the original scope definition.
+        additional_fields: SourceArenaOutput<'source>,
+    }
+
+    fn read(
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,
         projection: &CatalogProjection<'_, 'source>,
@@ -77,10 +150,11 @@ impl<'source> ContractScopeGlobalParams<'source> {
     }
 }
 
+/// The label and icon of one original contract scope declaration.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ContractScopeItem<'source> {
+pub struct ContractScopeItem<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     display_name: SourcedValue<PublicNameRef>,
@@ -88,6 +162,15 @@ struct ContractScopeItem<'source> {
 }
 
 impl<'source> ContractScopeItem<'source> {
+    source_getters! {
+        /// Borrows the original concrete source type and remaining members.
+        source: UnitSource<'source>,
+        /// Borrows the original public name reference.
+        display_name: SourcedValue<PublicNameRef>,
+        /// Borrows the original icon locator.
+        icon: SourcedValue<&'source str>,
+    }
+
     fn read(
         fields: Observed<'_, '_, '_, 'source>,
         projection: &CatalogProjection<'_, 'source>,

@@ -23,6 +23,10 @@ pub mod durability;
 /// Selective reads of authored consumable components and contents slots.
 #[path = "equipment_consumable_query.rs"]
 pub mod consumables;
+
+/// Selective reads of declared contract scope labels and icons.
+#[path = "equipment_contract_scope_query.rs"]
+pub mod contract_scopes;
 /// Selective reads of authored Mannequin controller and animation database locators.
 #[path = "equipment_entity_animation_query.rs"]
 pub mod entity_animation;

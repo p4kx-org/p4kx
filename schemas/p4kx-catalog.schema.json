@@ -13167,7 +13167,7 @@
       "type": "object"
     },
     "ContractScopeItem": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "The label and icon of one original contract scope declaration.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
