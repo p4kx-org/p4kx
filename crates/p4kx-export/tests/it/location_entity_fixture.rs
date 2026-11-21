@@ -1,7 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_export::catalog_queries::{LocationEntityDeclaration, SourcePayload};
+use p4kx_extraction::{InputScope, SourceInventory, SourceLocation, SourceUseRole};
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
+
+use crate::commodity_v3_fixture::TestResult;
 
 const SOURCE: &str = "LocationEntityDeclaration";
 const BASE: &str = "LocationEntityType_Base";
@@ -22,7 +26,7 @@ pub(super) fn database() -> DataForgeBuilder {
         .version(8)
         .enumeration(DELIVERY_ENUM, ["FixtureDelivery"])
         .structure(TestStruct::new("Tag"))
-        .structure(TestStruct::new("TagList").array("tags", reference("Tag")))
+        .structure(tag_list())
         .structure(TestStruct::new(SLOT))
         .structure(TestStruct::new(BASE))
         .structure(TestStruct::new(STATIC).parent(BASE))
@@ -77,14 +81,75 @@ pub(super) fn database() -> DataForgeBuilder {
         ))
 }
 
+fn tag_list() -> TestStruct {
+    TestStruct::new("TagList")
+        .array("tags", reference("Tag"))
+        .field("fixtureFlag", TestType::Bool)
+}
+
 fn declaration(guid: u128, name: &str, ty: TestInstance, tags: Vec<TestValue>) -> TestRecord {
     TestRecord::new(guid, SOURCE, name, format!("fixture/{name}.xml"))
         .value(
             "entityTags",
-            TestValue::Struct(TestInstance::new("TagList").value("tags", TestValue::Array(tags))),
+            TestValue::Struct(
+                TestInstance::new("TagList")
+                    .value("tags", TestValue::Array(tags))
+                    .value("fixtureFlag", TestValue::Bool(true)),
+            ),
         )
         .value("type", TestValue::Struct(ty))
         .value("resourceSlot", TestValue::Reference(SLOT_RECORD))
+}
+
+pub(super) fn verify_authored_tag_field(
+    row: &LocationEntityDeclaration<'_>,
+    inventory: &SourceInventory,
+) -> TestResult {
+    let tags = row.entity_tags().value().ok_or("the original TagList")?;
+    let arena = tags.authored_fields();
+    let [field] = arena.roots() else {
+        return Err("one original member outside the typed tags array".into());
+    };
+    assert_eq!(
+        field.name().value(),
+        Some(&"fixtureFlag"),
+        "the SDK keeps the original field name"
+    );
+    let cell = arena.value(field.value()).ok_or("the flag value")?.value();
+    assert!(
+        matches!(cell.value(), Some(SourcePayload::Boolean { value: true })),
+        "the SDK resolves the original Boolean without serializing the row"
+    );
+    let origin = cell.origin();
+    assert_eq!(
+        origin.contains_encrypted_source(),
+        Some(false),
+        "the flag has its own complete plain DataForge origin"
+    );
+    let [use_id] = origin.source_uses_refs() else {
+        return Err("one original flag payload use".into());
+    };
+    let source_use = inventory
+        .iter_uses()
+        .find(|source_use| source_use.id() == use_id)
+        .ok_or("the SDK inventory retains the original flag source use")?;
+    let record_index = row
+        .source()
+        .record_index()
+        .value()
+        .copied()
+        .ok_or("the original physical Record index")?;
+    assert!(
+        source_use.scope() == InputScope::Payload
+            && source_use.role() == SourceUseRole::Payload
+            && matches!(source_use.location(),
+                SourceLocation::Subresource { namespace, indices, field }
+                if namespace == "dataforgeValue"
+                    && indices.first() == Some(&u64::from(record_index))
+                    && field == "$value"),
+        "the use addresses the original value on the selected physical Record"
+    );
+    Ok(())
 }
 
 fn reference(target: &str) -> TestType {

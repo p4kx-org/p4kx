@@ -51,6 +51,7 @@ fn location_entity_declarations_match_catalog_and_preserve_source_slots() -> Tes
             };
             verify_duplicate_owners(static_row, unknown)?;
             verify_tags(delivery)?;
+            fixture::verify_authored_tag_field(delivery, &snapshot.source_inventory)?;
             verify_delivery(delivery, &snapshot)
         },
     )??;

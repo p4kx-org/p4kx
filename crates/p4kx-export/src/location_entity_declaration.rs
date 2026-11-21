@@ -119,6 +119,12 @@ impl<'source> LocationEntityTags<'source> {
         &self.tags
     }
 
+    /// Returns the original tag block members outside the typed tag array.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
