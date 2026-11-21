@@ -15,44 +15,70 @@ use crate::schema_fields::every_field_required;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct Database {
-    pub(super) source: PhysicalEntryIdentity,
-    pub(super) position: SourcedValue<SourceLocation>,
-    pub(super) attributes: Vec<SourceXmlAttribute>,
-    pub(super) branches: Vec<Branch>,
-    pub(super) options: Vec<OptionRow>,
+#[non_exhaustive]
+pub struct Database {
+    /// Original physical database Entry.
+    pub source: PhysicalEntryIdentity,
+    /// Original root element coordinate.
+    pub position: SourcedValue<SourceLocation>,
+    /// Original root attributes in source order.
+    pub attributes: Vec<SourceXmlAttribute>,
+    /// Original `SubADB` declarations in source order.
+    pub branches: Vec<Branch>,
+    /// Original fragment options in source order.
+    pub options: Vec<OptionRow>,
 }
 
+/// One original `SubADB` node and its nested fragment selectors.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct Branch {
-    pub(super) position: SourcedValue<SourceLocation>,
-    ordinals: SourcedValue<[usize; 2]>,
-    pub(super) attributes: Vec<SourceXmlAttribute>,
-    pub(super) fragments: Vec<Node>,
+#[non_exhaustive]
+pub struct Branch {
+    /// Original element coordinate.
+    pub position: SourcedValue<SourceLocation>,
+    /// Original collection and branch positions.
+    pub ordinals: SourcedValue<[usize; 2]>,
+    /// Original attributes in source order.
+    pub attributes: Vec<SourceXmlAttribute>,
+    /// Original fragment selectors in source order.
+    pub fragments: Vec<Node>,
 }
 
+/// One original option in a Mannequin fragment group.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct OptionRow {
-    pub(super) position: SourcedValue<SourceLocation>,
-    ordinals: SourcedValue<[usize; 3]>,
-    pub(super) fragment: SourcedValue<String>,
-    pub(super) attributes: Vec<SourceXmlAttribute>,
-    elements: Vec<Node>,
+#[non_exhaustive]
+pub struct OptionRow {
+    /// Original option element coordinate.
+    pub position: SourcedValue<SourceLocation>,
+    /// Original collection, group and option positions.
+    pub ordinals: SourcedValue<[usize; 3]>,
+    /// Original owning fragment group name.
+    pub fragment: SourcedValue<String>,
+    /// Original option attributes in source order.
+    pub attributes: Vec<SourceXmlAttribute>,
+    /// Original nested elements in depth-first authored order.
+    pub elements: Vec<Node>,
 }
 
+/// An original nested Mannequin option or selector element.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct Node {
-    pub(super) position: SourcedValue<SourceLocation>,
-    ordinal: SourcedValue<usize>,
-    parent: SourcedValue<Option<usize>>,
-    name: SourcedValue<String>,
-    pub(super) attributes: Vec<SourceXmlAttribute>,
+#[non_exhaustive]
+pub struct Node {
+    /// Original element coordinate.
+    pub position: SourcedValue<SourceLocation>,
+    /// Original sibling ordinal.
+    pub ordinal: SourcedValue<usize>,
+    /// Parent position in the flattened element list when nested.
+    pub parent: SourcedValue<Option<usize>>,
+    /// Original element name.
+    pub name: SourcedValue<String>,
+    /// Original attributes in source order.
+    pub attributes: Vec<SourceXmlAttribute>,
 }
 
 impl Database {

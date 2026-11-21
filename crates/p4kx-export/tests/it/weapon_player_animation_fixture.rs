@@ -44,24 +44,31 @@ pub(super) fn database() -> Vec<u8> {
     database_with_player_assets("Animations/TestController.xml", "Animations/TestRoot.adb")
 }
 
-pub(super) fn database_with_player_assets(controller: &str, database: &str) -> Vec<u8> {
-    database_schema()
-        .record(
-            TestRecord::new(
-                0x1053,
-                ENTITY,
-                "EntityClassDefinition.Player",
-                "synthetic/player.xml",
-            )
-            .value(
-                "Components",
-                TestValue::Array(vec![TestValue::Struct(
-                    TestInstance::new(MOTION)
-                        .value("actionController", TestValue::text(controller))
-                        .value("animDatabase3P", TestValue::text(database)),
-                )]),
-            ),
+fn player_database(controller: &str, database: &str) -> DataForgeBuilder {
+    database_schema().record(
+        TestRecord::new(
+            0x1053,
+            ENTITY,
+            "EntityClassDefinition.Player",
+            "synthetic/player.xml",
         )
+        .value(
+            "Components",
+            TestValue::Array(vec![TestValue::Struct(
+                TestInstance::new(MOTION)
+                    .value("actionController", TestValue::text(controller))
+                    .value("animDatabase3P", TestValue::text(database)),
+            )]),
+        ),
+    )
+}
+
+pub(super) fn database_without_weapon() -> Vec<u8> {
+    player_database("Animations/TestController.xml", "Animations/TestRoot.adb").build()
+}
+
+pub(super) fn database_with_player_assets(controller: &str, database: &str) -> Vec<u8> {
+    player_database(controller, database)
         .record(
             TestRecord::new(
                 0x1054,

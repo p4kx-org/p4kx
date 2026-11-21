@@ -5,8 +5,6 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use p4kx_assembly::Entities;
 use p4kx_extraction::{Archive, CancelToken, Record, SourceUses, SourcedValue};
-use schemars::JsonSchema;
-use serde::Serialize;
 
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
@@ -15,7 +13,6 @@ use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogTable};
 use crate::catalog_table::DatasetAvailability;
 use crate::catalog_v3::catalog_item_components::item_definition::WeaponAttachment;
 use crate::export_ledger::ExportLedger;
-use crate::schema_fields::every_field_required;
 
 #[path = "weapon_reload_actor.rs"]
 mod actor;
@@ -29,44 +26,40 @@ mod graph;
 mod relation;
 #[path = "weapon_reload_scope.rs"]
 mod scope;
+#[path = "weapon_reload_sources.rs"]
+mod sources;
 
-use actor::PlayerMotion;
-use assets::{AssetLink, Assets, Controller, Definition, FileSelector};
-use document::{Database, check_cancel};
+use assets::{Assets, FileSelector};
+use document::check_cancel;
 use graph::BranchLink;
 use relation::{CandidateInput, FragmentMatch};
 use scope::DatabaseScopes;
+use sources::ActorBinding;
 
 #[path = "weapon_reload_coverage.rs"]
 mod coverage;
 
+pub use actor::{MotionComponent as PlayerMotionComponent, PlayerMotion};
+pub use assets::{
+    AssetLink as MannequinAssetLink, AssetState as MannequinAssetState,
+    Controller as MannequinController, Definition as MannequinTagDefinition,
+    SelectorNode as MannequinSelectorNode,
+};
 pub use coverage::WeaponAnimationGraphCoverage;
+pub use document::{
+    Branch as MannequinSubDatabase, Database as MannequinDatabase, Node as MannequinNode,
+    OptionRow as MannequinFragmentOption,
+};
+pub use graph::{BranchLink as MannequinBranch, BranchVisit as MannequinBranchVisit};
+pub use relation::{
+    FragmentMatch as MannequinFragmentSelector, FragmentStatus as MannequinFragmentStatus,
+};
 pub use relation::{Playback, TagEvidence, TagMatch, WeaponPlayerAnimationCandidate};
-
-/// Authored Player context, Mannequin documents and their physical declarations.
-#[derive(Debug, Default, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct WeaponAnimationSources<'source> {
-    player: Option<SourcedValue<Vec<PlayerMotion<'source>>>>,
-    actor_bindings: Vec<ActorBinding>,
-    controllers: Vec<Controller>,
-    databases: Vec<Database>,
-    tag_definitions: Vec<Definition>,
-    scopes: Vec<DatabaseScopes>,
-    branches: Vec<BranchLink>,
-    fragment_selectors: Vec<FragmentMatch>,
-}
-
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-struct ActorBinding {
-    record: SourcedValue<u32>,
-    component: SourcedValue<u32>,
-    controller: AssetLink,
-    database: AssetLink,
-}
+pub use scope::{
+    DatabaseScopes as MannequinDatabaseScopes, Declaration as MannequinDeclaration,
+    Scope as MannequinScope, ScopeImport as MannequinScopeImport,
+};
+pub use sources::{ActorBinding as MannequinActorBinding, WeaponAnimationSources};
 
 pub(crate) struct WeaponAnimation<'source> {
     pub(crate) sources: WeaponAnimationSources<'source>,
@@ -107,7 +100,7 @@ pub(crate) fn project<'source>(
     input: &OriginalCatalogInput<'_, 'source>,
     weapons: &[WeaponAttachment<'source>],
     cancel: Option<&CancelToken>,
-    mut emit: impl FnMut(WeaponPlayerAnimationCandidate) -> Result<(), CatalogError>,
+    emit: impl FnMut(WeaponPlayerAnimationCandidate) -> Result<(), CatalogError>,
 ) -> Result<WeaponAnimationProjection<'source>, CatalogError> {
     if weapons.is_empty() {
         return Ok(WeaponAnimationProjection {
@@ -116,6 +109,26 @@ pub(crate) fn project<'source>(
             ledger: ExportLedger::default(),
         });
     }
+    project_graph(archive, players, input, weapons, cancel, emit)
+}
+
+pub(crate) fn project_sources<'source>(
+    archive: &Archive,
+    players: &[Record<'source>],
+    input: &OriginalCatalogInput<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<WeaponAnimationProjection<'source>, CatalogError> {
+    project_graph(archive, players, input, &[], cancel, |_| Ok(()))
+}
+
+fn project_graph<'source>(
+    archive: &Archive,
+    players: &[Record<'source>],
+    input: &OriginalCatalogInput<'_, 'source>,
+    weapons: &[WeaponAttachment<'source>],
+    cancel: Option<&CancelToken>,
+    mut emit: impl FnMut(WeaponPlayerAnimationCandidate) -> Result<(), CatalogError>,
+) -> Result<WeaponAnimationProjection<'source>, CatalogError> {
     let entry = EntryCapture::for_input(input);
     let mut assets = Assets::new(archive, &entry, cancel);
     let sources = entry.source_uses();
@@ -157,12 +170,6 @@ pub(crate) fn project<'source>(
     })
 }
 
-impl WeaponAnimationSources<'_> {
-    pub(crate) fn graph_coverage(&self, player_candidates: usize) -> WeaponAnimationGraphCoverage {
-        WeaponAnimationGraphCoverage::read(self, player_candidates)
-    }
-}
-
 fn bindings(
     player: &SourcedValue<Vec<PlayerMotion<'_>>>,
     assets: &mut Assets<'_, '_, '_>,
@@ -200,7 +207,7 @@ fn build_rows(
         .iter()
         .map(|scope| (&scope.database, scope))
         .collect::<BTreeMap<_, _>>();
-    let branches_by_entry = graph::by_database(branches);
+    let branches_by_entry = (!weapons.is_empty()).then(|| graph::by_database(branches));
     let mut fragment_selectors = Vec::new();
     let indices = weapons_by_tag(weapons);
     for edge in branches {
@@ -218,11 +225,12 @@ fn build_rows(
             sources,
         )?;
         if edge.is_resolved()
-            && let (Some(database), Some(scope), Some(target)) = (database, scope, target)
+            && let (Some(database), Some(scope), Some(target), Some(by_entry)) =
+                (database, scope, target, branches_by_entry.as_ref())
         {
             for actor in actors
                 .iter()
-                .filter(|actor| reachable(actor, &edge.source, &branches_by_entry))
+                .filter(|actor| reachable(actor, &edge.source, by_entry))
             {
                 for option in &database.options {
                     check_cancel(cancel)?;

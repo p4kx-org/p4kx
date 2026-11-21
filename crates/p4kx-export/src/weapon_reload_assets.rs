@@ -18,29 +18,42 @@ use crate::catalog_read::original::{
 use crate::entry_source::EntrySource;
 use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
-use crate::schema_fields::every_field_required;
+use crate::schema_fields::{compact_string_enum, every_field_required};
 use crate::{CatalogError, ExportAccountingError, Kind};
 
 use super::document::Database;
 
+/// Status of a reached original Mannequin document.
 #[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(transform = compact_string_enum)]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(super) enum AssetState {
+#[non_exhaustive]
+pub enum AssetState {
+    /// The locator supplied no unique physical target.
     Unresolved,
+    /// The selected Entry could not be read.
     Unreadable,
+    /// The selected bytes did not parse as a source document.
     MalformedXml,
+    /// The decoded root has no admitted Mannequin document type.
     UnsupportedRoot,
+    /// The selected document was read and projected.
     Read,
 }
 
+/// An authored locator, its target candidates and the actual read status.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct AssetLink {
-    path: LooseArchivePath,
-    state: SourcedValue<AssetState>,
-    pub(super) source: Option<PhysicalEntryRef>,
+#[non_exhaustive]
+pub struct AssetLink {
+    /// Original path and physical directory candidates.
+    pub path: LooseArchivePath,
+    /// Outcome of selecting and reading the source document.
+    pub state: SourcedValue<AssetState>,
+    /// Unique physical Entry selected by the locator, when one was found.
+    pub source: Option<PhysicalEntryRef>,
 }
 
 #[derive(Clone, Copy)]
@@ -234,13 +247,18 @@ fn sub_database_path(path: &str) -> Option<String> {
     }
 }
 
+/// One original `ControllerDef` document and its authored selectors.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct Controller {
-    pub(super) source: PhysicalEntryIdentity,
-    pub(super) tags: Vec<SelectorNode>,
-    pub(super) fragments: Vec<SelectorNode>,
+#[non_exhaustive]
+pub struct Controller {
+    /// Original physical controller Entry.
+    pub source: PhysicalEntryIdentity,
+    /// Original tag locators in authored order.
+    pub tags: Vec<SelectorNode>,
+    /// Original fragment locators in authored order.
+    pub fragments: Vec<SelectorNode>,
 }
 
 impl Controller {
@@ -266,14 +284,20 @@ impl Controller {
     }
 }
 
+/// One original `TagDef` or `FragDef` source definition.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct Definition {
-    source: PhysicalEntryIdentity,
-    pub(super) version: SourcedValue<String>,
-    pub(super) imports: Vec<SelectorNode>,
-    pub(super) tags: Vec<SelectorNode>,
+#[non_exhaustive]
+pub struct Definition {
+    /// Original physical definition Entry.
+    pub source: PhysicalEntryIdentity,
+    /// Original definition version.
+    pub version: SourcedValue<String>,
+    /// Original import declarations in authored order.
+    pub imports: Vec<SelectorNode>,
+    /// Original tag declarations in authored order.
+    pub tags: Vec<SelectorNode>,
 }
 
 impl Definition {
@@ -327,12 +351,16 @@ impl Definition {
     }
 }
 
+/// An authored XML selector and its attributes.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct SelectorNode {
-    pub(super) position: SourcedValue<SourceLocation>,
-    pub(super) attributes: Vec<SourceXmlAttribute>,
+#[non_exhaustive]
+pub struct SelectorNode {
+    /// Original byte-span or CryXml coordinate.
+    pub position: SourcedValue<SourceLocation>,
+    /// Original attributes in source order.
+    pub attributes: Vec<SourceXmlAttribute>,
 }
 
 impl SelectorNode {

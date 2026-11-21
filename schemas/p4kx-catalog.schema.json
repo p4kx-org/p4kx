@@ -347,18 +347,23 @@
       "type": "object"
     },
     "ActorBinding": {
+      "description": "One Player animation component's controller and database locators.",
       "properties": {
         "component": {
-          "$ref": "#/$defs/SourcedValueOfuint32"
+          "$ref": "#/$defs/SourcedValueOfuint32",
+          "description": "Original component ordinal within the Player Record."
         },
         "controller": {
-          "$ref": "#/$defs/AssetLink"
+          "$ref": "#/$defs/AssetLink",
+          "description": "Original controller selector and its Entry read status."
         },
         "database": {
-          "$ref": "#/$defs/AssetLink"
+          "$ref": "#/$defs/AssetLink",
+          "description": "Original third-person database selector and its Entry read status."
         },
         "record": {
-          "$ref": "#/$defs/SourcedValueOfuint32"
+          "$ref": "#/$defs/SourcedValueOfuint32",
+          "description": "Physical Player Record index."
         }
       },
       "required": [
@@ -1748,9 +1753,11 @@
       "type": "object"
     },
     "AssetLink": {
+      "description": "An authored locator, its target candidates and the actual read status.",
       "properties": {
         "path": {
-          "$ref": "#/$defs/LooseArchivePath"
+          "$ref": "#/$defs/LooseArchivePath",
+          "description": "Original path and physical directory candidates."
         },
         "source": {
           "anyOf": [
@@ -1760,10 +1767,12 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Unique physical Entry selected by the locator, when one was found."
         },
         "state": {
-          "$ref": "#/$defs/SourcedValueOfAssetState"
+          "$ref": "#/$defs/SourcedValueOfAssetState",
+          "description": "Outcome of selecting and reading the source document."
         }
       },
       "required": [
@@ -1774,6 +1783,7 @@
       "type": "object"
     },
     "AssetState": {
+      "description": "Status of a reached original Mannequin document.",
       "enum": [
         "unresolved",
         "unreadable",
@@ -4128,24 +4138,29 @@
       "type": "object"
     },
     "Branch": {
+      "description": "One original `SubADB` node and its nested fragment selectors.",
       "properties": {
         "attributes": {
+          "description": "Original attributes in source order.",
           "items": {
             "$ref": "#/$defs/SourceXmlAttribute"
           },
           "type": "array"
         },
         "fragments": {
+          "description": "Original fragment selectors in source order.",
           "items": {
             "$ref": "#/$defs/Node"
           },
           "type": "array"
         },
         "ordinals": {
-          "$ref": "#/$defs/SourcedValueOfArray_size_2_of_uint"
+          "$ref": "#/$defs/SourcedValueOfArray_size_2_of_uint",
+          "description": "Original collection and branch positions."
         },
         "position": {
-          "$ref": "#/$defs/SourcedValueOfSourceLocation"
+          "$ref": "#/$defs/SourcedValueOfSourceLocation",
+          "description": "Original element coordinate."
         }
       },
       "required": [
@@ -4157,27 +4172,34 @@
       "type": "object"
     },
     "BranchLink": {
+      "description": "One authored `SubADB` edge and the outcome of following it.",
       "properties": {
         "fragmentSelectors": {
+          "description": "Original fragment names selected by the branch.",
           "items": {
             "$ref": "#/$defs/SourcedValueOfstring"
           },
           "type": "array"
         },
         "position": {
-          "$ref": "#/$defs/SourcedValueOfSourceLocation"
+          "$ref": "#/$defs/SourcedValueOfSourceLocation",
+          "description": "Original branch element coordinate."
         },
         "source": {
-          "$ref": "#/$defs/PhysicalEntryRef"
+          "$ref": "#/$defs/PhysicalEntryRef",
+          "description": "Physical database containing this selector."
         },
         "tags": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original branch tags."
         },
         "target": {
-          "$ref": "#/$defs/AssetLink"
+          "$ref": "#/$defs/AssetLink",
+          "description": "Authored target locator and its physical resolution."
         },
         "traversal": {
-          "$ref": "#/$defs/SourcedValueOfBranchVisit"
+          "$ref": "#/$defs/SourcedValueOfBranchVisit",
+          "description": "Source-backed traversal outcome."
         }
       },
       "required": [
@@ -4191,6 +4213,7 @@
       "type": "object"
     },
     "BranchVisit": {
+      "description": "Traversal result for an original `SubADB` selector.",
       "enum": [
         "resolved",
         "unresolved",
@@ -13224,17 +13247,21 @@
       "type": "object"
     },
     "Controller": {
+      "description": "One original `ControllerDef` document and its authored selectors.",
       "properties": {
         "fragments": {
+          "description": "Original fragment locators in authored order.",
           "items": {
             "$ref": "#/$defs/SelectorNode"
           },
           "type": "array"
         },
         "source": {
-          "$ref": "#/$defs/PhysicalEntryIdentity"
+          "$ref": "#/$defs/PhysicalEntryIdentity",
+          "description": "Original physical controller Entry."
         },
         "tags": {
+          "description": "Original tag locators in authored order.",
           "items": {
             "$ref": "#/$defs/SelectorNode"
           },
@@ -14077,28 +14104,33 @@
       "description": "An original Player-reachable `AnimDB` and its physical child occurrences.",
       "properties": {
         "attributes": {
+          "description": "Original root attributes in source order.",
           "items": {
             "$ref": "#/$defs/SourceXmlAttribute"
           },
           "type": "array"
         },
         "branches": {
+          "description": "Original `SubADB` declarations in source order.",
           "items": {
             "$ref": "#/$defs/Branch"
           },
           "type": "array"
         },
         "options": {
+          "description": "Original fragment options in source order.",
           "items": {
             "$ref": "#/$defs/OptionRow"
           },
           "type": "array"
         },
         "position": {
-          "$ref": "#/$defs/SourcedValueOfSourceLocation"
+          "$ref": "#/$defs/SourcedValueOfSourceLocation",
+          "description": "Original root element coordinate."
         },
         "source": {
-          "$ref": "#/$defs/PhysicalEntryIdentity"
+          "$ref": "#/$defs/PhysicalEntryIdentity",
+          "description": "Original physical database Entry."
         }
       },
       "required": [
@@ -14111,15 +14143,19 @@
       "type": "object"
     },
     "DatabaseScopes": {
+      "description": "Tag and fragment definition scopes reached by one physical database.",
       "properties": {
         "database": {
-          "$ref": "#/$defs/PhysicalEntryRef"
+          "$ref": "#/$defs/PhysicalEntryRef",
+          "description": "Physical database that supplied both root selectors."
         },
         "fragments": {
-          "$ref": "#/$defs/Scope"
+          "$ref": "#/$defs/Scope",
+          "description": "Authored fragment scope and coverage."
         },
         "tags": {
-          "$ref": "#/$defs/Scope"
+          "$ref": "#/$defs/Scope",
+          "description": "Authored tag scope and coverage."
         }
       },
       "required": [
@@ -14160,18 +14196,23 @@
       "type": "string"
     },
     "Declaration": {
+      "description": "Original declaration reached in a tag or fragment scope.",
       "properties": {
         "name": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original authored name."
         },
         "position": {
-          "$ref": "#/$defs/SourcedValueOfSourceLocation"
+          "$ref": "#/$defs/SourcedValueOfSourceLocation",
+          "description": "Original declaration coordinate."
         },
         "source": {
-          "$ref": "#/$defs/PhysicalEntryRef"
+          "$ref": "#/$defs/PhysicalEntryRef",
+          "description": "Physical definition Entry that owns the declaration."
         },
         "subTagDefinition": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original nested tag-definition locator."
         }
       },
       "required": [
@@ -14346,24 +14387,29 @@
       "type": "object"
     },
     "Definition": {
+      "description": "One original `TagDef` or `FragDef` source definition.",
       "properties": {
         "imports": {
+          "description": "Original import declarations in authored order.",
           "items": {
             "$ref": "#/$defs/SelectorNode"
           },
           "type": "array"
         },
         "source": {
-          "$ref": "#/$defs/PhysicalEntryIdentity"
+          "$ref": "#/$defs/PhysicalEntryIdentity",
+          "description": "Original physical definition Entry."
         },
         "tags": {
+          "description": "Original tag declarations in authored order.",
           "items": {
             "$ref": "#/$defs/SelectorNode"
           },
           "type": "array"
         },
         "version": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original definition version."
         }
       },
       "required": [
@@ -19040,24 +19086,30 @@
       "type": "object"
     },
     "FragmentMatch": {
+      "description": "An authored fragment selector and its physically reached options.",
       "properties": {
         "branch": {
-          "$ref": "#/$defs/SourcedValueOfSourceLocation"
+          "$ref": "#/$defs/SourcedValueOfSourceLocation",
+          "description": "Original branch coordinate within that database."
         },
         "options": {
+          "description": "Coordinates of matching options in original order.",
           "items": {
             "$ref": "#/$defs/SourcedValueOfSourceLocation"
           },
           "type": "array"
         },
         "selector": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original fragment selector spelling."
         },
         "source": {
-          "$ref": "#/$defs/PhysicalEntryRef"
+          "$ref": "#/$defs/PhysicalEntryRef",
+          "description": "Original database containing the branch selector."
         },
         "status": {
-          "$ref": "#/$defs/SourcedValueOfFragmentStatus"
+          "$ref": "#/$defs/SourcedValueOfFragmentStatus",
+          "description": "Match outcome and the original used evidence."
         }
       },
       "required": [
@@ -19070,6 +19122,7 @@
       "type": "object"
     },
     "FragmentStatus": {
+      "description": "How the original fragment selector and target option declarations relate.",
       "enum": [
         "unresolvedTarget",
         "unreadableSelector",
@@ -34033,15 +34086,19 @@
       ]
     },
     "MotionComponent": {
+      "description": "Original Mannequin locators on an animated Player component.",
       "properties": {
         "actionController": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original action-controller locator."
         },
         "animDatabase3P": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original third-person animation database locator."
         },
         "ordinal": {
-          "$ref": "#/$defs/SourcedValueOfuint32"
+          "$ref": "#/$defs/SourcedValueOfuint32",
+          "description": "Source component position in the Player Record."
         }
       },
       "required": [
@@ -34163,24 +34220,30 @@
       "required": []
     },
     "Node": {
+      "description": "An original nested Mannequin option or selector element.",
       "properties": {
         "attributes": {
+          "description": "Original attributes in source order.",
           "items": {
             "$ref": "#/$defs/SourceXmlAttribute"
           },
           "type": "array"
         },
         "name": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original element name."
         },
         "ordinal": {
-          "$ref": "#/$defs/SourcedValueOfuint"
+          "$ref": "#/$defs/SourcedValueOfuint",
+          "description": "Original sibling ordinal."
         },
         "parent": {
-          "$ref": "#/$defs/SourcedValueOfNullable_uint"
+          "$ref": "#/$defs/SourcedValueOfNullable_uint",
+          "description": "Parent position in the flattened element list when nested."
         },
         "position": {
-          "$ref": "#/$defs/SourcedValueOfSourceLocation"
+          "$ref": "#/$defs/SourcedValueOfSourceLocation",
+          "description": "Original element coordinate."
         }
       },
       "required": [
@@ -34841,27 +34904,33 @@
       "type": "object"
     },
     "OptionRow": {
+      "description": "One original option in a Mannequin fragment group.",
       "properties": {
         "attributes": {
+          "description": "Original option attributes in source order.",
           "items": {
             "$ref": "#/$defs/SourceXmlAttribute"
           },
           "type": "array"
         },
         "elements": {
+          "description": "Original nested elements in depth-first authored order.",
           "items": {
             "$ref": "#/$defs/Node"
           },
           "type": "array"
         },
         "fragment": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original owning fragment group name."
         },
         "ordinals": {
-          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_uint"
+          "$ref": "#/$defs/SourcedValueOfArray_size_3_of_uint",
+          "description": "Original collection, group and option positions."
         },
         "position": {
-          "$ref": "#/$defs/SourcedValueOfSourceLocation"
+          "$ref": "#/$defs/SourcedValueOfSourceLocation",
+          "description": "Original option element coordinate."
         }
       },
       "required": [
@@ -36645,13 +36714,14 @@
       "x-p4kx-vocabularyClass": "control"
     },
     "PlayerMotion": {
-      "description": "Independently sourced original metadata and stable convenience values of one physical Record.",
+      "description": "One physical Player Record and its ordered animation component slots.",
       "properties": {
         "className": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "components": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfNullable_MotionComponent"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfNullable_MotionComponent",
+          "description": "Original component slots with animation values where present."
         },
         "fileName": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -44689,6 +44759,7 @@
       "type": "object"
     },
     "Scope": {
+      "description": "A tag or fragment scope formed by an original database selector.",
       "properties": {
         "coverage": {
           "$ref": "#/$defs/SourcedValueOfboolean"
@@ -44807,15 +44878,19 @@
       "type": "object"
     },
     "ScopeImport": {
+      "description": "Original import within a tag or fragment definition scope.",
       "properties": {
         "position": {
-          "$ref": "#/$defs/SourcedValueOfSourceLocation"
+          "$ref": "#/$defs/SourcedValueOfSourceLocation",
+          "description": "Original import coordinate."
         },
         "source": {
-          "$ref": "#/$defs/PhysicalEntryRef"
+          "$ref": "#/$defs/PhysicalEntryRef",
+          "description": "Original definition Entry containing the import."
         },
         "target": {
-          "$ref": "#/$defs/AssetLink"
+          "$ref": "#/$defs/AssetLink",
+          "description": "Authored target locator and resolution."
         }
       },
       "required": [
@@ -45858,15 +45933,18 @@
       "required": []
     },
     "SelectorNode": {
+      "description": "An authored XML selector and its attributes.",
       "properties": {
         "attributes": {
+          "description": "Original attributes in source order.",
           "items": {
             "$ref": "#/$defs/SourceXmlAttribute"
           },
           "type": "array"
         },
         "position": {
-          "$ref": "#/$defs/SourcedValueOfSourceLocation"
+          "$ref": "#/$defs/SourcedValueOfSourceLocation",
+          "description": "Original byte-span or CryXml coordinate."
         }
       },
       "required": [
@@ -142605,33 +142683,38 @@
       "type": "object"
     },
     "WeaponAnimationSources": {
-      "description": "Authored Player context, Mannequin documents and their physical declarations.",
+      "description": "Physical Player context and Mannequin declarations reached from it.",
       "properties": {
         "actorBindings": {
+          "description": "Physical Player component bindings.",
           "items": {
             "$ref": "#/$defs/ActorBinding"
           },
           "type": "array"
         },
         "branches": {
+          "description": "Original `SubADB` selectors and traversal outcomes.",
           "items": {
             "$ref": "#/$defs/BranchLink"
           },
           "type": "array"
         },
         "controllers": {
+          "description": "Reached original controller documents.",
           "items": {
             "$ref": "#/$defs/Controller"
           },
           "type": "array"
         },
         "databases": {
+          "description": "Reached original `AnimDB` documents.",
           "items": {
             "$ref": "#/$defs/Database"
           },
           "type": "array"
         },
         "fragmentSelectors": {
+          "description": "Authored fragment selectors and matches within the reached scopes.",
           "items": {
             "$ref": "#/$defs/FragmentMatch"
           },
@@ -142645,15 +142728,18 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Player Record candidates and original component slots."
         },
         "scopes": {
+          "description": "Tag and fragment scopes for each reached database.",
           "items": {
             "$ref": "#/$defs/DatabaseScopes"
           },
           "type": "array"
         },
         "tagDefinitions": {
+          "description": "Reached original `TagDef` and `FragDef` documents.",
           "items": {
             "$ref": "#/$defs/Definition"
           },

@@ -12,6 +12,8 @@ use crate::health_origin_fixture::{Fixture, Input, TestResult};
 mod fixture;
 #[path = "weapon_player_animation_sdk.rs"]
 mod sdk;
+#[path = "weapon_player_animation_sources_sdk.rs"]
+mod sources_sdk;
 
 use fixture::{CANDIDATE, database, documents};
 

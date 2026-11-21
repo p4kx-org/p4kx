@@ -136,6 +136,9 @@ mod ship_sources;
 mod snapshot;
 #[path = "equipment_weapon_query.rs"]
 mod weapon;
+#[path = "equipment_weapon_animation_sources_query.rs"]
+pub mod weapon_animation_sources;
+
 #[path = "equipment_weapon_animation_query.rs"]
 mod weapon_animation;
 #[path = "equipment_weapon_combat_query.rs"]

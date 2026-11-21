@@ -20,3 +20,42 @@ pub(crate) fn every_field_required(schema: &mut Schema) {
         });
     object.insert("required".to_owned(), serde_json::Value::Array(names));
 }
+
+/// Keeps string-only variants with documentation in the compact enum schema.
+pub(crate) fn compact_string_enum(schema: &mut Schema) {
+    use std::collections::BTreeSet;
+
+    use serde_json::Value;
+
+    let Some(object) = schema.as_object_mut() else {
+        return;
+    };
+    let Some(variants) = object.get("oneOf").and_then(Value::as_array) else {
+        return;
+    };
+    let mut seen = BTreeSet::new();
+    let Some(values): Option<Vec<_>> = variants
+        .iter()
+        .map(|variant| {
+            let fields = variant.as_object()?;
+            if fields
+                .keys()
+                .any(|key| !matches!(key.as_str(), "type" | "const" | "description"))
+                || fields.get("type")?.as_str()? != "string"
+            {
+                return None;
+            }
+            let value = fields.get("const")?.as_str()?;
+            seen.insert(value).then(|| Value::String(value.to_owned()))
+        })
+        .collect()
+    else {
+        return;
+    };
+    if values.is_empty() {
+        return;
+    }
+    object.remove("oneOf");
+    object.insert("type".to_owned(), Value::String("string".to_owned()));
+    object.insert("enum".to_owned(), Value::Array(values));
+}

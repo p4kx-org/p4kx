@@ -325,6 +325,10 @@ attachment, Player component, branch and option. `playback` is `unverified`.
 Runtime fragment or animation selection, and elapsed reload time, require
 separate evidence.
 
+The typed Player graph SDK follows these same physical source relationships directly.
+It reads the reached graph even when a filtered Catalog admits no personal-weapon
+attachments. [Player animation SDK](catalog-sdk.md#player-weapon-animation-candidates)
+
 Each source field and candidate state carries per-value provenance. A
 candidate state's provenance includes the weapon attachment and the scoped
 option selection.

@@ -19,11 +19,31 @@ mod physics;
 /// One original XML attribute and its spelling, namespace and value.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[schemars(transform = crate::schema_fields::every_field_required)]
-pub(crate) struct SourceXmlAttribute {
+pub struct SourceXmlAttribute {
     pub(crate) name: SourcedValue<String>,
     pub(crate) namespace: SourcedValue<Option<String>>,
     #[schemars(extend("x-gameText" = true))]
     pub(crate) value: SourcedValue<String>,
+}
+
+impl SourceXmlAttribute {
+    /// Borrows the original attribute name.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<String> {
+        &self.name
+    }
+
+    /// Borrows the original attribute namespace, when declared.
+    #[must_use]
+    pub const fn namespace(&self) -> &SourcedValue<Option<String>> {
+        &self.namespace
+    }
+
+    /// Borrows the original attribute text.
+    #[must_use]
+    pub const fn value(&self) -> &SourcedValue<String> {
+        &self.value
+    }
 }
 
 /// One complete XML read and its actual Archive Entry evidence.

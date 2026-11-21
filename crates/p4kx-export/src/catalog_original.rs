@@ -185,7 +185,8 @@ mod health_entry_soc;
 mod health_entry_source_xml;
 #[path = "health_entry_xml.rs"]
 mod health_entry_xml;
-pub(crate) use health_entry_source_xml::{EntrySourceXml, SourceXmlAttribute};
+pub(crate) use health_entry_source_xml::EntrySourceXml;
+pub use health_entry_source_xml::SourceXmlAttribute;
 #[path = "health_failed_entry.rs"]
 mod health_failed_entry;
 

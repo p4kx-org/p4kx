@@ -1602,6 +1602,19 @@ Entry operations. An empty result can be interpreted using those observations.
 The query creates no Catalog or temporary row spool and opens no localization
 payloads.
 
+Use `equipment::weapon_animation_sources::with_player_weapon_animation_sources` for
+the authored graph at `definitions.weaponAnimationSources`. The direct, decoded-Entry
+and session forms expose the Player context, actor bindings, controllers, databases,
+tag definitions, scopes, branches and fragment selectors as typed values. They read
+the exact Player Record scope and follow its selected verified Mannequin documents.
+The query does not read Item bodies, localized strings or animation clips. Inspect
+the Player and graph coverage and the failed dependency operations before inferring
+absence. The source inventory belongs to this graph read.
+
+The graph query can read Player sources when the selected Catalog would omit the
+graph because no personal-weapon attachment was admitted. Candidate playback and
+weapon matching belong to the separate Item-scoped query.
+
 ## Weapon recoil definitions
 
 Read the sourced recoil links and interval from `WeaponAction::recoil()` on a

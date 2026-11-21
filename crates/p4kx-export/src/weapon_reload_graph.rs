@@ -9,30 +9,44 @@ use serde::Serialize;
 
 use crate::CatalogError;
 use crate::catalog_read::original::{PhysicalEntryRef, SourceXmlAttribute};
-use crate::schema_fields::every_field_required;
+use crate::schema_fields::{compact_string_enum, every_field_required};
 
 use super::assets::{AssetLink, Assets, FileSelector};
 use super::document::{Branch, check_cancel};
 
+/// Traversal result for an original `SubADB` selector.
 #[derive(Debug, Copy, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(transform = compact_string_enum)]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(super) enum BranchVisit {
+#[non_exhaustive]
+pub enum BranchVisit {
+    /// The target is a reached `AnimDB`.
     Resolved,
+    /// The selector has no readable compatible target.
     Unresolved,
+    /// The target is already on the active traversal path.
     Cycle,
 }
 
+/// One authored `SubADB` edge and the outcome of following it.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct BranchLink {
-    pub(super) source: PhysicalEntryRef,
-    pub(super) position: SourcedValue<SourceLocation>,
-    pub(super) target: AssetLink,
-    traversal: SourcedValue<BranchVisit>,
-    pub(super) fragment_selectors: Vec<SourcedValue<String>>,
-    pub(super) tags: SourcedValue<String>,
+#[non_exhaustive]
+pub struct BranchLink {
+    /// Physical database containing this selector.
+    pub source: PhysicalEntryRef,
+    /// Original branch element coordinate.
+    pub position: SourcedValue<SourceLocation>,
+    /// Authored target locator and its physical resolution.
+    pub target: AssetLink,
+    /// Source-backed traversal outcome.
+    pub traversal: SourcedValue<BranchVisit>,
+    /// Original fragment names selected by the branch.
+    pub fragment_selectors: Vec<SourcedValue<String>>,
+    /// Original branch tags.
+    pub tags: SourcedValue<String>,
 }
 
 impl BranchLink {

@@ -8,33 +8,49 @@ use serde::Serialize;
 use crate::CatalogError;
 use crate::catalog_read::original::PhysicalEntryRef;
 use crate::catalog_v3::catalog_item_components::item_definition::WeaponAttachment;
-use crate::schema_fields::every_field_required;
+use crate::schema_fields::{compact_string_enum, every_field_required};
 
 use super::document::OptionRow;
 use super::graph::{BranchLink, attribute};
 use super::scope::{DatabaseScopes, Declaration};
 
+/// How the original fragment selector and target option declarations relate.
 #[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
+#[schemars(transform = compact_string_enum)]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-enum FragmentStatus {
+#[non_exhaustive]
+pub enum FragmentStatus {
+    /// No readable target database supplied fragment options.
     UnresolvedTarget,
+    /// The authored selector was unavailable or invalid.
     UnreadableSelector,
+    /// The target had no option group matching the original selector.
     NoMatchingGroup,
+    /// The source and target declarations could not both be resolved uniquely.
     IncompleteScope,
+    /// Equal names referred to different physical fragment definitions.
     DifferentScope,
+    /// Both scopes resolve the selector to the same original declaration.
     Matched,
 }
 
+/// An authored fragment selector and its physically reached options.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct FragmentMatch {
-    source: PhysicalEntryRef,
-    branch: SourcedValue<SourceLocation>,
-    selector: SourcedValue<String>,
-    status: SourcedValue<FragmentStatus>,
-    options: Vec<SourcedValue<SourceLocation>>,
+#[non_exhaustive]
+pub struct FragmentMatch {
+    /// Original database containing the branch selector.
+    pub source: PhysicalEntryRef,
+    /// Original branch coordinate within that database.
+    pub branch: SourcedValue<SourceLocation>,
+    /// Original fragment selector spelling.
+    pub selector: SourcedValue<String>,
+    /// Match outcome and the original used evidence.
+    pub status: SourcedValue<FragmentStatus>,
+    /// Coordinates of matching options in original order.
+    pub options: Vec<SourcedValue<SourceLocation>>,
 }
 
 /// One original weapon and Player option relationship with its authored evidence.

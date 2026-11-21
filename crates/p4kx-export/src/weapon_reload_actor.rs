@@ -20,23 +20,32 @@ use crate::template_field_capture::TemplateFieldCapture;
 
 pub(super) const COMPONENT: &str = "SAnimatedCharacterComponentParams";
 
+/// One physical Player Record and its ordered animation component slots.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct PlayerMotion<'source> {
+#[non_exhaustive]
+pub struct PlayerMotion<'source> {
+    /// Physical Player Record identity and authored header fields.
     #[serde(flatten)]
-    pub(super) source: CanonicalRecordHeader<'source>,
-    pub(super) components: SourcedValue<Vec<SourcedValue<Option<MotionComponent>>>>,
+    pub source: CanonicalRecordHeader<'source>,
+    /// Original component slots with animation values where present.
+    pub components: SourcedValue<Vec<SourcedValue<Option<MotionComponent>>>>,
 }
 
+/// Original Mannequin locators on an animated Player component.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct MotionComponent {
-    pub(super) ordinal: SourcedValue<u32>,
-    pub(super) action_controller: SourcedValue<String>,
+#[non_exhaustive]
+pub struct MotionComponent {
+    /// Source component position in the Player Record.
+    pub ordinal: SourcedValue<u32>,
+    /// Original action-controller locator.
+    pub action_controller: SourcedValue<String>,
+    /// Original third-person animation database locator.
     #[serde(rename = "animDatabase3P")]
-    pub(super) anim_database_3p: SourcedValue<String>,
+    pub anim_database_3p: SourcedValue<String>,
 }
 
 pub(super) fn read<'source>(

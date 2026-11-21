@@ -18,20 +18,28 @@ use super::assets::{AssetLink, Assets, Definition, FileSelector};
 use super::document::check_cancel;
 use super::graph::attribute;
 
+/// Original declaration reached in a tag or fragment scope.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct Declaration {
-    pub(super) source: PhysicalEntryRef,
-    pub(super) position: SourcedValue<SourceLocation>,
-    pub(super) name: SourcedValue<String>,
-    pub(super) sub_tag_definition: SourcedValue<String>,
+#[non_exhaustive]
+pub struct Declaration {
+    /// Physical definition Entry that owns the declaration.
+    pub source: PhysicalEntryRef,
+    /// Original declaration coordinate.
+    pub position: SourcedValue<SourceLocation>,
+    /// Original authored name.
+    pub name: SourcedValue<String>,
+    /// Original nested tag-definition locator.
+    pub sub_tag_definition: SourcedValue<String>,
 }
 
+/// A tag or fragment scope formed by an original database selector.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct Scope {
+#[non_exhaustive]
+pub struct Scope {
     pub(super) selector: AssetLink,
     #[serde(serialize_with = "serialize_declarations")]
     #[schemars(with = "Vec<Declaration>")]
@@ -40,13 +48,18 @@ pub(super) struct Scope {
     coverage: SourcedValue<bool>,
 }
 
+/// Original import within a tag or fragment definition scope.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ScopeImport {
-    source: PhysicalEntryRef,
-    position: SourcedValue<SourceLocation>,
-    target: AssetLink,
+#[non_exhaustive]
+pub struct ScopeImport {
+    /// Original definition Entry containing the import.
+    pub source: PhysicalEntryRef,
+    /// Original import coordinate.
+    pub position: SourcedValue<SourceLocation>,
+    /// Authored target locator and resolution.
+    pub target: AssetLink,
 }
 
 #[derive(Debug)]
@@ -99,13 +112,34 @@ fn serialize_declarations<S: Serializer>(
 ) -> Result<S::Ok, S::Error> {
     let count = declarations.iter().map(|tags| tags.rows.len()).sum();
     let mut sequence = serializer.serialize_seq(Some(count))?;
-    for row in declarations.iter().flat_map(|tags| &tags.rows) {
+    for row in declaration_rows(declarations) {
         sequence.serialize_element(row)?;
     }
     sequence.end()
 }
 
+fn declaration_rows(declarations: &[Arc<DeclaredTags>]) -> impl Iterator<Item = &Declaration> {
+    declarations.iter().flat_map(|tags| &tags.rows)
+}
+
 impl Scope {
+    /// Borrows the original root selector.
+    #[must_use]
+    pub const fn selector(&self) -> &AssetLink {
+        &self.selector
+    }
+
+    /// Iterates original declarations in the same order as the Catalog.
+    pub fn declarations(&self) -> impl Iterator<Item = &Declaration> {
+        declaration_rows(&self.declarations)
+    }
+
+    /// Borrows the followed import declarations in source order.
+    #[must_use]
+    pub fn imports(&self) -> &[ScopeImport] {
+        &self.imports
+    }
+
     fn read(
         selector: &SourcedValue<String>,
         assets: &mut Assets<'_, '_, '_>,
@@ -157,7 +191,9 @@ impl Scope {
         Ok(scope)
     }
 
-    pub(super) const fn coverage(&self) -> &SourcedValue<bool> {
+    /// Borrows the observed scope-coverage state.
+    #[must_use]
+    pub const fn coverage(&self) -> &SourcedValue<bool> {
         &self.coverage
     }
 
@@ -223,13 +259,18 @@ impl Scope {
     }
 }
 
+/// Tag and fragment definition scopes reached by one physical database.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct DatabaseScopes {
-    pub(super) database: PhysicalEntryRef,
-    pub(super) tags: Scope,
-    pub(super) fragments: Scope,
+#[non_exhaustive]
+pub struct DatabaseScopes {
+    /// Physical database that supplied both root selectors.
+    pub database: PhysicalEntryRef,
+    /// Authored tag scope and coverage.
+    pub tags: Scope,
+    /// Authored fragment scope and coverage.
+    pub fragments: Scope,
 }
 
 pub(super) fn databases(

@@ -218,7 +218,6 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         read_weapon_recoil(&archive)?,
         countermeasure_emitters::read()?,
         dismantle::read()?,
-        weapon_animation::read()?,
         archive_entries::read_language_sources(&archive)?,
         location_vocabulary::read_entities(&archive)?,
         mission_location::read()?,
@@ -269,6 +268,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(radar_options::read()?);
     routes.push(planet_audio::read()?);
     routes.push(archive_entries::read_particle_library(archive)?);
+    routes.extend(weapon_animation::read()?);
     routes.extend(fuel::read()?);
     routes.extend(hacking::read()?);
     routes.push(inventory_containers::read()?);
@@ -376,6 +376,10 @@ fn read_weather(archive: &Archive) -> TestResult<Route> {
             "synthetic canonical parity available; complete installed producer parity open",
         )
     })?
+}
+
+pub(super) const fn weapon_animation_datasets() -> [&'static str; 8] {
+    weapon_animation::GRAPH_DATASETS
 }
 
 pub(super) const fn durability_datasets() -> [&'static str; 3] {
