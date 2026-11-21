@@ -607,6 +607,18 @@ counts. Row counts cover `/items`, `/definitions/items/rows`, `/definitions/blue
 `/placements/containerInstances/rows`. Replay opens no installed Archive and creates no raw file.
 Cross-domain link validation and consumer import measurements remain separate release evidence.
 
+The verifier at `01ae3cb78` completed both passes on the installed outputs from
+producer `25287d184`. It checked the immediate origin of every sourced cell
+present in each artifact and reconciled the decoded bytes with the writer receipts.
+
+| Build | Decoded bytes | Sourced cells checked | Source uses | Peak private bytes | Process write bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 71,467,922,615 | 85,520,379 | 88,973,850 | 8,884,805,632 | 23,057 |
+| PTU `13248297` | 74,427,393,008 | 89,964,616 | 94,272,938 | 9,227,853,824 | 23,260 |
+
+Each readback took about 87 minutes. The results identify those two artifacts
+and that verifier. The release candidate needs its own producer and replay receipts.
+
 The installed SDK parity check for law, resource-quality quantization, cargo,
 turret and radar configuration, resource networks and room associations shares
 one streaming read per Build. Use the same measurement directory, set
