@@ -4,12 +4,19 @@
 use std::error::Error;
 use std::time::UNIX_EPOCH;
 
+use p4kx_export::catalog_queries::mission_definitions::{
+    MissionDefinitionFamily, MissionDefinitionRows, MissionDefinitionSelection,
+    with_mission_definitions_from,
+};
+use p4kx_export::catalog_queries::{
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability,
+};
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, Filter, Kind, build_catalog_from};
 use p4kx_extraction::{
     Archive, ArchiveWatch, DataForge, DataForgeEntry, RecordTree, Value as Original,
 };
 use p4kx_testkit::{real_archive_key, real_archive_path};
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use crate::authored_definition_witness::{field, verify_array, verify_link, verify_state};
 use crate::catalog_v3_consumer as consumer;
@@ -59,11 +66,57 @@ fn mission_item_definition_matches_original_variants_and_targets() -> TestResult
         owner: tree.record_index(),
     };
     witness.compare(&tree, row)?;
+    verify_sdk(&archive, &entry, row, &witness.origins, tree.record_index())?;
     watch.check().map_err(|_| "Archive changed")?;
     crate::real_archive_verification::print_line(
         "Verified one physical MissionItem with its ordered variants and original field sources",
     );
     Ok(())
+}
+
+fn verify_sdk(
+    archive: &Archive,
+    entry: &DataForgeEntry,
+    catalog_row: &Value,
+    catalog_origins: &Origins<'_>,
+    owner: u32,
+) -> TestResult {
+    let selection = MissionDefinitionSelection::new(
+        MissionDefinitionFamily::Items,
+        CatalogRecordSelection::RecordIndex(owner),
+    );
+    with_mission_definitions_from(
+        archive,
+        entry,
+        selection,
+        CatalogLanguageSelection::AllAvailable,
+        None,
+        |snapshot| {
+            let MissionDefinitionRows::Items(rows) = &snapshot.rows else {
+                return Err("the selected family is MissionItem".into());
+            };
+            let [row] = rows.as_slice() else {
+                return Err("one selective physical MissionItem".into());
+            };
+            if snapshot.build.as_ref() != archive.build()
+                || !matches!(snapshot.availability, DatasetAvailability::Available)
+                || !snapshot.coverage.unreadable_headers.is_empty()
+                || !snapshot.coverage.unreadable_bodies.is_empty()
+            {
+                return Err("installed MissionItem SDK Build or selected scope differs".into());
+            }
+            let serialized = serde_json::to_vec(row)?;
+            let actual = serde_json::from_slice(&serialized)?;
+            let document = json!({"provenance": snapshot.source_inventory});
+            let sdk_origins = Origins::read(&document, entry.origin())?;
+            if sdk_origins.with_resolved_contributors(&actual)?
+                != catalog_origins.with_resolved_contributors(catalog_row)?
+            {
+                return Err("installed MissionItem SDK row or original contributors differ".into());
+            }
+            Ok(())
+        },
+    )?
 }
 
 fn select<'source>(

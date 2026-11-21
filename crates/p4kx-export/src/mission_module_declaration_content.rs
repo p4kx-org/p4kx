@@ -16,10 +16,11 @@ use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference, Sour
 type RecordLink<'source> = SourcedValue<Box<SourceRecordReference<'source>>>;
 type WeakLink<'source> = Box<SourceWeakReference<'source>>;
 
+/// The concrete authored configuration of a mission module.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ModuleType<'source> {
+pub struct ModuleType<'source> {
     source_type: SourcedValue<&'source str>,
     #[serde(flatten)]
     data: ModuleTypeData<'source>,
@@ -49,6 +50,67 @@ enum ModuleTypeData<'source> {
 }
 
 impl<'source> ModuleType<'source> {
+    /// Borrows the original concrete module type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows the mission variant's required location module slots.
+    #[must_use]
+    pub const fn required_location_modules(
+        &self,
+    ) -> Option<&SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>> {
+        match &self.data {
+            ModuleTypeData::Mission {
+                required_location_modules,
+                ..
+            } => Some(required_location_modules),
+            _ => None,
+        }
+    }
+
+    /// Borrows the mission variant's required resource slot.
+    #[must_use]
+    pub const fn required_resource_slot(
+        &self,
+    ) -> Option<&SourcedValue<Box<SourceRecordReference<'source>>>> {
+        match &self.data {
+            ModuleTypeData::Mission {
+                required_resource_slot,
+                ..
+            } => Some(required_resource_slot),
+            _ => None,
+        }
+    }
+
+    /// Borrows the authored mission variant autospawn flag.
+    #[must_use]
+    pub const fn pauses_location_npc_autospawns(&self) -> Option<&SourcedValue<bool>> {
+        match &self.data {
+            ModuleTypeData::Mission {
+                pauses_location_npc_autospawns,
+                ..
+            } => Some(pauses_location_npc_autospawns),
+            _ => None,
+        }
+    }
+
+    /// Borrows the authored location variant persistence flag.
+    #[must_use]
+    pub const fn is_persistent(&self) -> Option<&SourcedValue<bool>> {
+        match &self.data {
+            ModuleTypeData::Location { is_persistent, .. } => Some(is_persistent),
+            _ => None,
+        }
+    }
+
+    /// Borrows additional authored fields in source order.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     pub(super) fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -109,10 +171,11 @@ impl ModuleTypeData<'_> {
     }
 }
 
+/// An authored module spawn declaration.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ModuleSpawnedEntities<'source> {
+pub struct ModuleSpawnedEntities<'source> {
     source_type: SourcedValue<&'source str>,
     debug_name: SourcedValue<&'source str>,
     spawn_immediately: SourcedValue<bool>,
@@ -136,6 +199,42 @@ enum ModuleSpawnData<'source> {
 }
 
 impl<'source> ModuleSpawnedEntities<'source> {
+    /// Borrows the original concrete spawn type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows the authored debug name.
+    #[must_use]
+    pub const fn debug_name(&self) -> &SourcedValue<&'source str> {
+        &self.debug_name
+    }
+
+    /// Borrows the authored immediate-spawn flag.
+    #[must_use]
+    pub const fn spawn_immediately(&self) -> &SourcedValue<bool> {
+        &self.spawn_immediately
+    }
+
+    /// Borrows the NPC spawn property selector.
+    #[must_use]
+    pub const fn spawn_description_property_name(&self) -> Option<&SourcedValue<&'source str>> {
+        match &self.data {
+            ModuleSpawnData::Npc {
+                spawn_description_property_name,
+                ..
+            } => Some(spawn_description_property_name),
+            ModuleSpawnData::Authored => None,
+        }
+    }
+
+    /// Borrows additional authored fields in source order.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     pub(super) fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -169,10 +268,11 @@ impl<'source> ModuleSpawnedEntities<'source> {
     }
 }
 
+/// An authored module variable and its original binding.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ModuleVariable<'source> {
+pub struct ModuleVariable<'source> {
     source_type: SourcedValue<&'source str>,
     subsumption_variable_name: SourcedValue<&'source str>,
     #[serde(flatten)]
@@ -198,6 +298,50 @@ enum ModuleVariableData<'source> {
 }
 
 impl<'source> ModuleVariable<'source> {
+    /// Borrows the original concrete variable type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows the authored variable name.
+    #[must_use]
+    pub const fn subsumption_variable_name(&self) -> &SourcedValue<&'source str> {
+        &self.subsumption_variable_name
+    }
+
+    /// Borrows the ordered weak location-entity slots.
+    #[must_use]
+    pub const fn location_entities(
+        &self,
+    ) -> Option<&SourcedValue<Vec<SourcedValue<Box<SourceWeakReference<'source>>>>>> {
+        match &self.data {
+            ModuleVariableData::LocationEntities {
+                location_entities, ..
+            } => Some(location_entities),
+            _ => None,
+        }
+    }
+
+    /// Borrows the ordered weak spawned-entity slots.
+    #[must_use]
+    pub const fn spawned_entities(
+        &self,
+    ) -> Option<&SourcedValue<Vec<SourcedValue<Box<SourceWeakReference<'source>>>>>> {
+        match &self.data {
+            ModuleVariableData::SpawnedEntities {
+                spawned_entities, ..
+            } => Some(spawned_entities),
+            _ => None,
+        }
+    }
+
+    /// Borrows additional authored fields in source order.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     pub(super) fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

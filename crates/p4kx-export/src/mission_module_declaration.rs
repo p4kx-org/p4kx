@@ -23,8 +23,8 @@ mod content;
 #[path = "mission_module_declaration_locations.rs"]
 mod locations;
 
-use content::{ModuleSpawnedEntities, ModuleType, ModuleVariable};
-use locations::ModuleLocationEntities;
+pub use content::{ModuleSpawnedEntities, ModuleType, ModuleVariable};
+pub use locations::{AcquiringStrategy, ModuleLocationEntities};
 
 pub(crate) const SOURCE_TYPE: &str = "ModuleDeclaration";
 const MISSION_PROPERTY: &str = "MissionProperty";
@@ -37,11 +37,69 @@ pub(crate) type PreparedModuleDeclaration<'source> =
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct MissionModuleDeclaration<'source> {
+pub struct MissionModuleDeclaration<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     #[serde(flatten)]
     configuration: ModuleConfiguration<'source>,
+}
+
+impl<'source> MissionModuleDeclaration<'source> {
+    /// Borrows the physical Record header.
+    #[must_use]
+    pub const fn header(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows the authored module name.
+    #[must_use]
+    pub const fn module(&self) -> &SourcedValue<&'source str> {
+        &self.configuration.module
+    }
+
+    /// Borrows the authored module type.
+    #[must_use]
+    pub const fn module_type(&self) -> &SourcedValue<ModuleType<'source>> {
+        &self.configuration.module_type
+    }
+
+    /// Borrows the ordered location entity declarations.
+    #[must_use]
+    pub const fn location_entities(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<ModuleLocationEntities<'source>>>> {
+        &self.configuration.location_entities
+    }
+
+    /// Borrows the ordered module property declarations.
+    #[must_use]
+    pub const fn properties(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<ModuleMissionProperty<'source>>>> {
+        &self.configuration.properties
+    }
+
+    /// Borrows the ordered spawned entity declarations.
+    #[must_use]
+    pub const fn spawned_entities(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<ModuleSpawnedEntities<'source>>>> {
+        &self.configuration.spawned_entities
+    }
+
+    /// Borrows the ordered variable bindings.
+    #[must_use]
+    pub const fn declared_variables(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<ModuleVariable<'source>>>> {
+        &self.configuration.declared_variables
+    }
+
+    /// Borrows additional authored fields in source order.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.configuration.authored_fields
+    }
 }
 
 #[derive(Debug, Serialize, JsonSchema)]

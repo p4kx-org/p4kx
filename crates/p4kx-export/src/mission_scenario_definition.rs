@@ -22,10 +22,24 @@ pub(crate) const SOURCE_TYPE: &str = "MissionScenario";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct MissionScenarioDefinition<'source> {
+pub struct MissionScenarioDefinition<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     authored_fields: SourceArenaOutput<'source>,
+}
+
+impl<'source> MissionScenarioDefinition<'source> {
+    /// Borrows the physical Record header.
+    #[must_use]
+    pub const fn header(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows the original scenario members in source order.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
 }
 
 pub(crate) type PreparedMissionScenario<'source> =

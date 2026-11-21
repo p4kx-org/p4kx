@@ -533,6 +533,35 @@ occurrences, nulls and unresolved GUIDs. A resolved reference carries separate
 source evidence for the array slot and its target header. The query reads no
 localization or contract pickup projections.
 
+## Authored mission definitions
+
+Use `mission_definitions::with_mission_definitions` or its decoded-Entry and session forms
+to read `definitions.missionScenarios`, `definitions.missionModuleDeclarations` or
+`definitions.missionItems`. Choose a `MissionDefinitionFamily` and a physical Record selection
+in `MissionDefinitionSelection`. The result preserves canonical row order, original source
+coordinates and the field and coverage states of the selected family.
+
+Scenario rows expose the original field arena. Module rows expose exact module type, property,
+location acquisition, spawn and variable declarations. The typed views preserve original slot
+order and reference states. References use target header evidence and leave target bodies
+for independent selection.
+
+Mission items expose their original tags, entity reference, weighting and localized alternatives.
+The query reads the requested available locales for an admitted mission-item selection. Use
+`game_text` to resolve the protected references in that result. Scenario and module queries
+read the selected DataForge Records and leave unrelated Archive payloads unopened.
+
+To verify a physical mission-item query on an installed Archive, set `P4KX_DATA_P4K`
+and use the configured Archive key. The test compares one selected original Record with
+the filtered Catalog producer and the SDK, including the row's resolved source contributors.
+It keeps the filtered output in memory.
+
+```powershell
+cargo test --locked -p p4kx-export --test real_archive -- `
+    real_archive_mission_items::mission_item_definition_matches_original_variants_and_targets `
+    --ignored --exact --test-threads=1
+```
+
 ## Authored NPC spawn definitions
 
 Use `npc_spawns::with_npc_spawn_definitions`, its decoded-Entry form, or a

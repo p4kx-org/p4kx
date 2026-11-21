@@ -88,6 +88,8 @@ pub use mining_definitions::process_api as mining;
 mod location_entity_declarations;
 #[path = "location_vocabulary_query.rs"]
 pub mod location_vocabulary;
+#[path = "mission_definition_query.rs"]
+pub mod mission_definitions;
 #[path = "mission_locality_query.rs"]
 mod mission_localities;
 #[path = "mission_location_query.rs"]

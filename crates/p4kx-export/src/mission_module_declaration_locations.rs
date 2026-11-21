@@ -15,10 +15,11 @@ use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
 const STRATEGY: &str = "ModuleLocationEntitiesAcquiringStrategy_Base";
 type EntityLinks<'source> = SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>;
 
+/// One authored location-entity declaration owned by a mission module.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ModuleLocationEntities<'source> {
+pub struct ModuleLocationEntities<'source> {
     source_type: SourcedValue<&'source str>,
     debug_name: SourcedValue<&'source str>,
     required_for_init: SourcedValue<bool>,
@@ -45,6 +46,56 @@ enum LocationEntityData<'source> {
 }
 
 impl<'source> ModuleLocationEntities<'source> {
+    /// Borrows the original concrete location-entity type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows the authored debug name.
+    #[must_use]
+    pub const fn debug_name(&self) -> &SourcedValue<&'source str> {
+        &self.debug_name
+    }
+
+    /// Borrows the initialization requirement.
+    #[must_use]
+    pub const fn required_for_init(&self) -> &SourcedValue<bool> {
+        &self.required_for_init
+    }
+
+    /// Borrows the authored optional flag.
+    #[must_use]
+    pub const fn optional(&self) -> &SourcedValue<bool> {
+        &self.optional
+    }
+
+    /// Borrows the authored acquiring strategy.
+    #[must_use]
+    pub const fn acquiring_strategy(&self) -> &SourcedValue<AcquiringStrategy<'source>> {
+        &self.acquiring_strategy
+    }
+
+    /// Borrows the ordered original static entity references.
+    #[must_use]
+    pub const fn entity_declarations(
+        &self,
+    ) -> Option<&SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>>> {
+        match &self.data {
+            LocationEntityData::Static {
+                entity_declarations,
+                ..
+            } => Some(entity_declarations),
+            LocationEntityData::Authored => None,
+        }
+    }
+
+    /// Borrows additional authored fields in source order.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     pub(super) fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -93,10 +144,11 @@ impl<'source> ModuleLocationEntities<'source> {
     }
 }
 
+/// The authored strategy for acquiring location entities.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct AcquiringStrategy<'source> {
+pub struct AcquiringStrategy<'source> {
     source_type: SourcedValue<&'source str>,
     #[serde(flatten)]
     data: StrategyData,
@@ -122,6 +174,45 @@ enum StrategyData {
 }
 
 impl<'source> AcquiringStrategy<'source> {
+    /// Borrows the original concrete acquiring strategy type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows the authored exact count.
+    #[must_use]
+    pub const fn count(&self) -> Option<&SourcedValue<i32>> {
+        match &self.data {
+            StrategyData::ExactCount { count, .. } => Some(count),
+            _ => None,
+        }
+    }
+
+    /// Borrows the authored minimum suitable count.
+    #[must_use]
+    pub const fn min_count(&self) -> Option<&SourcedValue<i32>> {
+        match &self.data {
+            StrategyData::AllSuitable { min_count, .. } => Some(min_count),
+            _ => None,
+        }
+    }
+
+    /// Borrows the authored maximum suitable count.
+    #[must_use]
+    pub const fn max_count(&self) -> Option<&SourcedValue<i32>> {
+        match &self.data {
+            StrategyData::AllSuitable { max_count, .. } => Some(max_count),
+            _ => None,
+        }
+    }
+
+    /// Borrows additional authored fields in source order.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

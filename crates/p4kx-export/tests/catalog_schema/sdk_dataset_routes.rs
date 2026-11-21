@@ -88,6 +88,8 @@ mod mineable_entity;
 mod mining_families;
 #[path = "sdk_mission_board_route.rs"]
 mod mission_board;
+#[path = "sdk_mission_definition_routes.rs"]
+mod mission_definitions;
 #[path = "sdk_mission_locality_route.rs"]
 mod mission_locality;
 #[path = "sdk_mission_location_route.rs"]
@@ -164,6 +166,7 @@ pub(super) fn mission_datasets() -> impl Iterator<Item = &'static str> {
     .into_iter()
     .chain(location_vocabulary::datasets())
     .chain(npc_spawns::datasets())
+    .chain(mission_definitions::DATASETS)
 }
 
 pub(super) fn world_datasets() -> impl Iterator<Item = &'static str> {
@@ -235,6 +238,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.push(loot_generation::read()?);
     routes.push(entity_animation::read()?);
     routes.push(mission_board::read()?);
+    routes.extend(mission_definitions::read()?);
     routes.extend(resource_groups::read()?);
     routes.extend(reputation::read()?);
     routes.push(reputation_rewards::read()?);

@@ -32,7 +32,7 @@ pub(crate) type PreparedMissionItem<'source> =
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct MissionItemDefinition<'source> {
+pub struct MissionItemDefinition<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
@@ -44,18 +44,20 @@ pub(crate) struct MissionItemDefinition<'source> {
     authored_fields: SourceArenaOutput<'source>,
 }
 
+/// The authored ordered mission item string alternatives.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct MissionStringVariants<'source> {
+pub struct MissionStringVariants<'source> {
     variants: SourcedValue<Vec<SourcedValue<MissionStringVariant<'source>>>>,
     authored_fields: SourceArenaOutput<'source>,
 }
 
+/// One original mission item string alternative.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct MissionStringVariant<'source> {
+pub struct MissionStringVariant<'source> {
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     tag: RecordLink<'source>,
     #[schemars(extend("x-gameText" = true))]
@@ -64,6 +66,44 @@ struct MissionStringVariant<'source> {
 }
 
 impl<'source> MissionItemDefinition<'source> {
+    /// Borrows the physical Record header.
+    #[must_use]
+    pub const fn header(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows the ordered original tag references.
+    #[must_use]
+    pub const fn tags(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>> {
+        &self.tags
+    }
+
+    /// Borrows the authored entity class reference.
+    #[must_use]
+    pub const fn entity_class(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.entity_class
+    }
+
+    /// Borrows the stored mission-item weighting.
+    #[must_use]
+    pub const fn weighting(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.weighting
+    }
+
+    /// Borrows the authored string variants.
+    #[must_use]
+    pub const fn string_variants(&self) -> &SourcedValue<MissionStringVariants<'source>> {
+        &self.string_variants
+    }
+
+    /// Borrows additional authored fields in source order.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     fn read(
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,
@@ -95,6 +135,20 @@ impl<'source> MissionItemDefinition<'source> {
 }
 
 impl<'source> MissionStringVariants<'source> {
+    /// Borrows all original alternative slots.
+    #[must_use]
+    pub const fn variants(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<MissionStringVariant<'source>>>> {
+        &self.variants
+    }
+
+    /// Borrows additional authored fields in source order.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     fn read(
         fields: Observed<'_, '_, '_, 'source>,
         projection: &CatalogProjection<'_, 'source>,
@@ -112,6 +166,24 @@ impl<'source> MissionStringVariants<'source> {
 }
 
 impl<'source> MissionStringVariant<'source> {
+    /// Borrows the authored tag selector.
+    #[must_use]
+    pub const fn tag(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.tag
+    }
+
+    /// Borrows the protected text reference.
+    #[must_use]
+    pub const fn string(&self) -> &SourcedValue<GameTextRef> {
+        &self.string
+    }
+
+    /// Borrows additional authored fields in source order.
+    #[must_use]
+    pub const fn authored_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.authored_fields
+    }
+
     fn read(
         fields: Observed<'_, '_, '_, 'source>,
         projection: &CatalogProjection<'_, 'source>,

@@ -118,6 +118,7 @@
       ]
     },
     "AcquiringStrategy": {
+      "description": "The authored strategy for acquiring location entities.",
       "oneOf": [
         {
           "properties": {
@@ -33375,6 +33376,7 @@
       "type": "object"
     },
     "MissionStringVariant": {
+      "description": "One original mission item string alternative.",
       "properties": {
         "authoredFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -33395,6 +33397,7 @@
       "type": "object"
     },
     "MissionStringVariants": {
+      "description": "The authored ordered mission item string alternatives.",
       "properties": {
         "authoredFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -33627,6 +33630,7 @@
       "required": []
     },
     "ModuleLocationEntities": {
+      "description": "One authored location-entity declaration owned by a mission module.",
       "oneOf": [
         {
           "properties": {
@@ -33728,6 +33732,7 @@
       "type": "object"
     },
     "ModuleSpawnedEntities": {
+      "description": "An authored module spawn declaration.",
       "oneOf": [
         {
           "properties": {
@@ -33781,6 +33786,7 @@
       "type": "object"
     },
     "ModuleType": {
+      "description": "The concrete authored configuration of a mission module.",
       "oneOf": [
         {
           "properties": {
@@ -33862,6 +33868,7 @@
       "type": "object"
     },
     "ModuleVariable": {
+      "description": "An authored module variable and its original binding.",
       "oneOf": [
         {
           "properties": {
