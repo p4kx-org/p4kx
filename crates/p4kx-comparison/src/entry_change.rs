@@ -15,7 +15,7 @@ pub enum ChangeKind {
     Added,
     /// An unpaired occurrence on the old side.
     Removed,
-    /// A matched occurrence with a different uncompressed size or declared checksum.
+    /// A matched occurrence with a different uncompressed size or comparable declared checksum.
     Changed,
 }
 
@@ -23,9 +23,16 @@ pub enum ChangeKind {
 pub(crate) enum EntryDecision {
     SizeDiffers,
     ChecksumDiffers,
+    Incomparable {
+        collision: Option<usize>,
+        ambiguous: bool,
+    },
     OrderedAgainst(usize),
     OppositeExhausted,
-    Collision { evidence: usize, ambiguous: bool },
+    Collision {
+        evidence: usize,
+        ambiguous: bool,
+    },
 }
 
 /// One Entry that was added, removed or changed.
@@ -124,7 +131,7 @@ pub struct EntryCounts {
     pub added: usize,
     /// Entries only the old side has.
     pub removed: usize,
-    /// Entries with a different uncompressed size or CRC-32C.
+    /// Entries with a different uncompressed size or comparable declared checksum.
     pub changed: usize,
 }
 

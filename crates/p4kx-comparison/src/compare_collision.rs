@@ -51,7 +51,7 @@ pub(super) fn join_if_needed(
             old: old.iter().map(|(position, _)| *position).collect(),
             new: new.iter().map(|(position, _)| *position).collect(),
         });
-        result.changes.extend(changes);
+        result.extend(changes);
     }
     Ok(Some((old_count, new_count)))
 }
@@ -162,10 +162,18 @@ fn pair(
 ) {
     old.taken = true;
     new.taken = true;
-    if difference(old.entry, new.entry).is_some() {
-        let decision = EntryDecision::Collision {
-            evidence,
-            ambiguous: old.ambiguous || new.ambiguous,
+    if let Some(decision) = difference(old.entry, new.entry) {
+        let ambiguous = old.ambiguous || new.ambiguous;
+        let decision = if matches!(decision, EntryDecision::Incomparable { .. }) {
+            EntryDecision::Incomparable {
+                collision: Some(evidence),
+                ambiguous,
+            }
+        } else {
+            EntryDecision::Collision {
+                evidence,
+                ambiguous,
+            }
         };
         changes.push(changed(old.position, new.position, decision));
     }

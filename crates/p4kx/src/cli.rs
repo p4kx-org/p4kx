@@ -299,8 +299,9 @@ pub(crate) struct CompareArgs {
     pub(crate) old: PathBuf,
     /// Path of the new Data.p4k Archive, the side the changes lead to.
     pub(crate) new: PathBuf,
-    /// Compares the Entries from both central directories, without decompressing: added, removed,
-    /// or changed in size or CRC-32C. Every level is compared when none is given.
+    /// Compares the Entries from both central directories by size and comparable checksums.
+    /// Same-size pairs using different algorithms are reported as incomparable. Every level is
+    /// compared when none is given.
     #[arg(long)]
     pub(crate) entries: bool,
     /// Compares the Records of both DataForges, joined by GUID: added, removed, moved to another

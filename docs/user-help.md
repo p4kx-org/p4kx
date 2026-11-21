@@ -175,8 +175,10 @@ The **Comparison** tab next to **Browse** compares two Archives, for example an 
 
 The result shows both sides with Channel and Build, old first, so the direction of every change
 is clear. An Entry is added when only the new Archive has it, removed when only the old one has
-it, and changed when its size or CRC-32C differs; paths match ignoring case and separator kind.
-The tiles count each kind, and **By directory** counts them per top-level directory.
+it, and changed when its size or comparable declared checksum differs. Paths match ignoring case
+and separator kind. Equal-size pairs with different checksum algorithms appear as a separate
+summary count. They remain available in the JSON report. The change list and directory totals
+show the added, removed and changed rows.
 
 The list below can be filtered with the rules of the search (a glob with `*` or `?`, otherwise
 any part of the path) and sorted by any column; the counts follow the Filter. **Save report…**

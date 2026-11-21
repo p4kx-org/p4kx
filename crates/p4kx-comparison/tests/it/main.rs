@@ -10,6 +10,7 @@ mod entries;
 mod entry_aggregate_origins;
 mod entry_collisions;
 mod entry_decision_origins;
+mod entry_incomparables;
 mod forge_pair;
 mod line_diff;
 mod line_diff_content;

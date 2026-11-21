@@ -21,7 +21,12 @@ pub(super) fn capture(
     uses: &SourceUses,
     collisions: &mut CollisionOrigins,
 ) -> Result<FieldOrigin, EntryDirectoryOriginsError> {
-    if let EntryDecision::Collision { evidence, .. } = decision {
+    let evidence = match decision {
+        EntryDecision::Collision { evidence, .. } => Some(evidence),
+        EntryDecision::Incomparable { collision, .. } => collision,
+        _ => None,
+    };
+    if let Some(evidence) = evidence {
         let origin = collisions.get(evidence, comparison, uses)?;
         return if old.is_some() && new.is_some() {
             Ok(origin.matched.clone())
@@ -44,7 +49,7 @@ fn matched(
 ) -> Result<FieldOrigin, EntryDirectoryOriginsError> {
     let compare_checksums = match decision {
         EntryDecision::SizeDiffers => false,
-        EntryDecision::ChecksumDiffers => true,
+        EntryDecision::ChecksumDiffers | EntryDecision::Incomparable { .. } => true,
         _ => return Err(SourceEvidenceError::ForeignEvidence.into()),
     };
     let mut observed = Vec::new();

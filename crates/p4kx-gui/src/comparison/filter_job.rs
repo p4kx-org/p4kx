@@ -113,7 +113,15 @@ fn matching(
     if cancelled.load(Ordering::Relaxed) {
         return None;
     }
-    let summary = Summary::of(&comparison.comparison_of(&mask));
+    let incomparables = comparison
+        .incomparable_entries()
+        .take_while(|_| !cancelled.load(Ordering::Relaxed))
+        .filter(|entry| filter.matches(entry.path()))
+        .count();
+    let summary = Summary {
+        incomparables,
+        ..Summary::of(&comparison.comparison_of(&mask))
+    };
     (!cancelled.load(Ordering::Relaxed)).then(|| Matched {
         mask: mask.into(),
         summary,

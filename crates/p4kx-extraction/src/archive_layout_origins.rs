@@ -24,6 +24,26 @@ pub struct ArchiveLayoutOrigins {
     pub provenance: SourceInventory,
 }
 
+impl ArchiveLayoutOrigins {
+    /// Observes the format selection that determines the directory's checksum algorithm.
+    ///
+    /// # Errors
+    /// Returns an error when the original metadata cannot be bound to the source inventory.
+    pub fn layout_origin(
+        archive: &Archive,
+        uses: &SourceUses,
+    ) -> Result<FieldOrigin, SourceEvidenceError> {
+        let (scope, complete) = owner(archive, uses)?;
+        let capture = LayoutCapture {
+            uses,
+            scope: scope.as_ref(),
+            complete,
+            view: archive.metadata_view(),
+        };
+        Ok(capture.field("layout")?.origin(uses))
+    }
+}
+
 /// A cached Archive layout could not be addressed or bound to its observed input.
 #[derive(Debug, Error)]
 #[non_exhaustive]

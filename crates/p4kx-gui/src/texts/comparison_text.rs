@@ -58,6 +58,10 @@ pub enum ComparisonText {
     Removed,
     /// The changed Entries.
     Changed,
+    /// Incomparable matched Entry pairs; takes `number`.
+    Incomparable,
+    /// Shown when the list is empty and some Entry pairs are incomparable.
+    NoConfirmedDifferences,
     /// The section of the counts per top-level directory; takes `number`.
     Directories,
     /// The Entries at the root of the Archive.
@@ -96,7 +100,7 @@ pub enum ComparisonText {
 
 impl ComparisonText {
     /// Every text of the Comparison tab.
-    pub const ALL: [Self; 44] = [
+    pub const ALL: [Self; 46] = [
         Self::TabArchive,
         Self::TabComparison,
         Self::OldArchive,
@@ -124,6 +128,8 @@ impl ComparisonText {
         Self::Added,
         Self::Removed,
         Self::Changed,
+        Self::Incomparable,
+        Self::NoConfirmedDifferences,
         Self::Directories,
         Self::Root,
         Self::ColumnDirectory,
@@ -174,6 +180,8 @@ impl ComparisonText {
             Self::Added => "comparison-added",
             Self::Removed => "comparison-removed",
             Self::Changed => "comparison-changed",
+            Self::Incomparable => "comparison-incomparable",
+            Self::NoConfirmedDifferences => "comparison-no-confirmed-differences",
             Self::Directories => "comparison-directories",
             Self::Root => "comparison-root",
             Self::ColumnDirectory => "comparison-column-directory",

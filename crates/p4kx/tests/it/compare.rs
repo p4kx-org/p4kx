@@ -8,7 +8,7 @@ use std::path::Path;
 
 use assert_cmd::Command;
 use p4kx_testkit::{
-    ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, TestStruct, TestType,
+    ArchiveBuilder, DataForgeBuilder, TestContainer, TestEntry, TestRecord, TestStruct, TestType,
     write_build_manifest,
 };
 use serde_json::{Value, json};
@@ -88,6 +88,40 @@ fn differing_archives_print_a_summary_and_exit_with_code_1() -> TestResult {
     let summary = stdout(p4kx(dir.path())?.args([OLD, NEW, "--entries"]), 1)?;
 
     insta::assert_snapshot!(summary);
+    Ok(())
+}
+
+#[test]
+fn differing_checksum_algorithms_report_an_incomparable_entry_and_exit_with_code_1() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = "Data/same.txt";
+    let body = b"123456789";
+    std::fs::write(
+        dir.path().join("before.zip"),
+        TestContainer::new()
+            .entry(TestEntry::stored(path, body))
+            .build(),
+    )?;
+    write(
+        dir.path(),
+        NEW,
+        &ArchiveBuilder::new().entry(TestEntry::stored(path, body)),
+    )?;
+    let stdout = stdout(
+        p4kx(dir.path())?.args(["before.zip", NEW, "--entries", "--json"]),
+        1,
+    )?;
+    let report: Value = serde_json::from_str(&stdout)?;
+    assert_eq!(
+        report.pointer("/entries/counts/changed"),
+        Some(&json!(0)),
+        "confirmed changes"
+    );
+    assert_eq!(
+        report.pointer("/entries/incomparable/0/reason"),
+        Some(&json!("checksum_algorithms_differ")),
+        "incomplete comparison result"
+    );
     Ok(())
 }
 

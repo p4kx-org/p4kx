@@ -12,8 +12,9 @@ use crate::comparison::RecordSources;
 use crate::record_compare::{compare_record, compare_records};
 use crate::{
     Archive, CancelToken, CompareOptions, Comparison, ComparisonError, ComparisonProgress,
-    DataForgeEntry, DataForgeError, DataForges, EntryChange, Filter, Levels, RecordChange,
-    RecordKey, SchemaDiff, Side, compare, compare_schema, compare_with_dataforge_entries,
+    DataForgeEntry, DataForgeError, DataForges, EntryChange, Filter, IncomparableEntry, Levels,
+    RecordChange, RecordKey, SchemaDiff, Side, compare, compare_schema,
+    compare_with_dataforge_entries,
 };
 
 /// The DataForge Entries of the old and the new Archive, owned.
@@ -146,6 +147,14 @@ impl OwnedComparison {
             .resolve(&self.old, &self.new)
     }
 
+    /// Returns matched Entries with different checksum algorithms, in normalised path order.
+    pub fn incomparable_entries(&self) -> impl Iterator<Item = IncomparableEntry<'_>> {
+        self.joined
+            .incomparables
+            .iter()
+            .filter_map(|joined| joined.resolve_incomparable(&self.old, &self.new))
+    }
+
     /// Returns the Entry level as a Comparison, for its counts; it holds no Record changes.
     #[must_use]
     pub fn comparison(&self) -> Comparison<'_> {
@@ -156,6 +165,7 @@ impl OwnedComparison {
                 .iter()
                 .filter_map(|joined| joined.resolve(&self.old, &self.new))
                 .collect(),
+            incomparables: self.incomparable_entries().collect(),
             ..self.without_changes()
         }
     }
@@ -304,6 +314,7 @@ impl OwnedComparison {
             levels: self.levels,
             filter: self.filter.clone(),
             entries: Vec::new(),
+            incomparables: Vec::new(),
             entry_collisions: Cow::Borrowed(&self.joined.collisions),
             records: Vec::new(),
             record_sources: RecordSources::default(),

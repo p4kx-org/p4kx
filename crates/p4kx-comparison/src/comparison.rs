@@ -16,6 +16,7 @@ use serde::{Serialize, Serializer};
 
 use crate::compare::CollisionEvidence;
 use crate::entry_change::{count, count_by_directory};
+use crate::entry_incomparable::IncomparableEntry;
 use crate::{
     Archive, Build, DirectoryCounts, EntryChange, EntryCounts, Levels, RecordChange, RecordCounts,
     Report, report::to_report,
@@ -129,6 +130,7 @@ pub struct Comparison<'a> {
     pub(crate) levels: Levels,
     pub(crate) filter: Option<String>,
     pub(crate) entries: Vec<EntryChange<'a>>,
+    pub(crate) incomparables: Vec<IncomparableEntry<'a>>,
     pub(crate) entry_collisions: Cow<'a, [CollisionEvidence]>,
     pub(crate) records: Vec<RecordChange<'a>>,
     pub(crate) record_sources: RecordSources,
@@ -141,6 +143,7 @@ impl PartialEq for Comparison<'_> {
             && self.levels == other.levels
             && self.filter == other.filter
             && self.entries == other.entries
+            && self.incomparables == other.incomparables
             && self.records == other.records
     }
 }
@@ -177,6 +180,12 @@ impl<'a> Comparison<'a> {
         &self.entries
     }
 
+    /// Returns matched Entry pairs with different checksum algorithms, in normalised path order.
+    #[must_use]
+    pub fn incomparable_entries(&self) -> &[IncomparableEntry<'a>] {
+        &self.incomparables
+    }
+
     /// Returns the number of changed Entries per change kind.
     #[must_use]
     pub fn entry_counts(&self) -> EntryCounts {
@@ -191,6 +200,7 @@ impl<'a> Comparison<'a> {
     }
 
     /// Returns whether any compared level found a difference.
+    /// The incomparable Entry pairs have their own result list.
     #[must_use]
     pub const fn has_differences(&self) -> bool {
         !self.entries.is_empty() || !self.records.is_empty()

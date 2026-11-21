@@ -3,6 +3,7 @@
 
 use std::borrow::Cow;
 use std::cmp::Ordering;
+use std::mem;
 
 use rayon::prelude::*;
 
@@ -12,7 +13,7 @@ use crate::path_key::cmp_normalised;
 use crate::record_compare::compare_records;
 use crate::{
     Archive, CancelToken, CompareOptions, Comparison, ComparisonError, ComparisonProgress,
-    DataForgeEntry, DataForges, Entry, EntryChange, Side,
+    DataForgeEntry, DataForges, Entry, EntryChange, IncomparableEntry, Side,
 };
 
 #[path = "compare_collision.rs"]
@@ -25,11 +26,24 @@ const PROGRESS_STEP: usize = 1 << 16;
 #[derive(Debug, Clone, Default)]
 pub(crate) struct JoinResult {
     pub(crate) changes: Vec<Joined>,
+    pub(crate) incomparables: Vec<Joined>,
     pub(crate) collisions: Vec<CollisionEvidence>,
     total: usize,
 }
 
-/// One changed Entry as positions in the Entry lists of both Archives.
+impl JoinResult {
+    pub(crate) fn extend(&mut self, outcomes: impl IntoIterator<Item = Joined>) {
+        for outcome in outcomes {
+            if matches!(outcome.decision, EntryDecision::Incomparable { .. }) {
+                self.incomparables.push(outcome);
+            } else {
+                self.changes.push(outcome);
+            }
+        }
+    }
+}
+
+/// One directory comparison outcome as positions in the two Archive entry lists.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct Joined {
     pub(crate) old: Option<usize>,
@@ -56,13 +70,24 @@ impl Joined {
             (None, None) => None,
         }
     }
+
+    pub(crate) fn resolve_incomparable<'archive>(
+        self,
+        old: &'archive Archive,
+        new: &'archive Archive,
+    ) -> Option<IncomparableEntry<'archive>> {
+        let before = old.entries().get(self.old?)?;
+        let after = new.entries().get(self.new?)?;
+        Some(IncomparableEntry::new(before, after, self.decision))
+    }
 }
 
 /// Compares the `old` with the `new` Archive on the selected levels.
 ///
 /// Entries are joined by their path with ASCII case folded and `/` read as `\`; an Entry is
-/// changed when its uncompressed size or declared checksum differs. Duplicate occurrences are
-/// reconciled using original spellings and declared content. Nothing is decompressed.
+/// changed when its uncompressed size or a comparable declared checksum differs. Equal-size
+/// pairs with different checksum algorithms are incomparable. Duplicate occurrences are reconciled
+/// using original spellings and declared content. Nothing is decompressed.
 ///
 /// Records of the `dataforges` are joined by GUID: a Record is moved when its record path
 /// differs, ignoring case and separator kind, and changed when its name, its type or the value
@@ -111,6 +136,11 @@ fn compare_inner<'a>(
             .changes
             .iter()
             .filter_map(|joined| joined.resolve(old, new))
+            .collect(),
+        incomparables: joined
+            .incomparables
+            .iter()
+            .filter_map(|joined| joined.resolve_incomparable(old, new))
             .collect(),
         entry_collisions: Cow::Owned(joined.collisions),
         records,
@@ -269,7 +299,7 @@ fn merge_sorted_entries(
                 }
             }
         };
-        result.changes.extend(change);
+        result.extend(change);
         if i + j >= next_report {
             check_cancel(options)?;
             report_entry_progress(options, i + j, total);
@@ -313,11 +343,17 @@ fn sorted_selection<'a>(
 
 fn difference(old: &Entry, new: &Entry) -> Option<EntryDecision> {
     if old.uncompressed_size() != new.uncompressed_size() {
-        Some(EntryDecision::SizeDiffers)
-    } else if old.checksum() != new.checksum() {
-        Some(EntryDecision::ChecksumDiffers)
+        return Some(EntryDecision::SizeDiffers);
+    }
+    let before = old.checksum();
+    let after = new.checksum();
+    if mem::discriminant(&before) == mem::discriminant(&after) {
+        (before != after).then_some(EntryDecision::ChecksumDiffers)
     } else {
-        None
+        Some(EntryDecision::Incomparable {
+            collision: None,
+            ambiguous: false,
+        })
     }
 }
 

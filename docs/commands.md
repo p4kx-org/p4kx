@@ -600,7 +600,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
 - `p4kx compare <old> <new> [--entries] [--records] [--filter <filter>] [--report <file>]`
   compares two Archives, e.g. an older against a newer Build. The Entry level joins both central directories
   by path (ignoring case and separator kind) and lists Entries as added, removed, or changed when
-  their size or CRC-32C differs; nothing is decompressed, so it finishes in seconds. The Record
+  their size or comparable declared checksum differs. Equal-size pairs with different checksum
+  algorithms are listed separately as incomparable. The Entry level reads directory metadata.
+  The Record
   level joins the Records of both DataForges by GUID and lists them as added, removed, moved (same
   GUID at another record path) or changed, with every changed scalar field and its old and new
   value; enum fields show the option names, and a value that cannot be read is a change with the
@@ -610,7 +612,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   with the rules of `search`; `--report` writes the full Comparison as JSON (see
   [docs/cli-json.md](cli-json.md#p4kx-compare-old-new---json)). Every level is compared when
   none is given; the Record level needs a DataForge in both Archives (exit code 5 otherwise). The
-  exit code is 0 without and 1 with differences.
+  exit code is 1 for differences or incomparable Entry pairs and 0 when neither occurs.
 - `p4kx compare <old> <new> --schema` compares the schema of both DataForges instead of their
   contents: the structs, properties (data type, conversion type, target), enums and enum options
   added, removed or changed, each struct and enum with the number of Records it concerns on both

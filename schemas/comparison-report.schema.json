@@ -105,7 +105,7 @@
         },
         {
           "const": "changed",
-          "description": "A matched occurrence with a different uncompressed size or declared checksum.",
+          "description": "A matched occurrence with a different uncompressed size or comparable declared checksum.",
           "type": "string"
         }
       ]
@@ -129,7 +129,7 @@
           "type": "integer"
         },
         "changed": {
-          "description": "Entries with a different uncompressed size or CRC-32C.",
+          "description": "Entries with a different uncompressed size or comparable declared checksum.",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
@@ -207,7 +207,7 @@
           "type": "integer"
         },
         "changed": {
-          "description": "Entries with a different uncompressed size or CRC-32C.",
+          "description": "Entries with a different uncompressed size or comparable declared checksum.",
           "format": "uint",
           "minimum": 0,
           "type": "integer"
@@ -227,7 +227,7 @@
       "type": "object"
     },
     "EntryLevel": {
-      "description": "The Entries added, removed and changed.",
+      "description": "The Entry comparison outcomes.",
       "properties": {
         "changes": {
           "description": "Every added, removed or changed Entry, ordered by path ignoring case and separator kind.",
@@ -249,6 +249,13 @@
         },
         "fieldOrigins": {
           "$ref": "#/$defs/FieldOrigins"
+        },
+        "incomparable": {
+          "description": "Matched pairs that the declared checksum algorithms cannot compare.",
+          "items": {
+            "$ref": "#/$defs/IncomparableEntryReport"
+          },
+          "type": "array"
         },
         "provenance": {
           "$ref": "#/$defs/SourceInventory"
@@ -501,6 +508,47 @@
       "description": "A GUID of the form xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx.",
       "pattern": "^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$",
       "type": "string"
+    },
+    "IncomparableEntryReport": {
+      "properties": {
+        "new": {
+          "$ref": "#/$defs/EntryState",
+          "description": "Original directory values on the new side."
+        },
+        "old": {
+          "$ref": "#/$defs/EntryState",
+          "description": "Original directory values on the old side."
+        },
+        "pairing_ambiguous": {
+          "description": "Whether more than one physical pairing remains possible.",
+          "type": "boolean"
+        },
+        "path": {
+          "description": "The Entry path as the new side stores it.",
+          "type": "string"
+        },
+        "reason": {
+          "$ref": "#/$defs/IncomparableReason",
+          "description": "Why the directory comparison could not decide the pair."
+        }
+      },
+      "required": [
+        "path",
+        "reason",
+        "old",
+        "new"
+      ],
+      "type": "object"
+    },
+    "IncomparableReason": {
+      "description": "Why a matched Entry pair lacks comparable directory checksums.",
+      "oneOf": [
+        {
+          "const": "checksum_algorithms_differ",
+          "description": "The declared checksums use different algorithms.",
+          "type": "string"
+        }
+      ]
     },
     "InputScope": {
       "description": "The source byte domain interpreted by one use.",
