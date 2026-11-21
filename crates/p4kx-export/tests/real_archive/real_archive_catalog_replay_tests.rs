@@ -9,6 +9,9 @@ use serde_json::{Value, json};
 
 use super::{Receipt, TestResult, artifact, index, verify};
 
+#[path = "real_archive_catalog_replay_health_tests.rs"]
+mod health_tests;
+
 const FRAME: &str = "p4kx-catalog.json.zst";
 
 #[test]
@@ -189,6 +192,39 @@ fn truncated_checksum_and_json_cannot_pass_replay() -> TestResult {
     Ok(())
 }
 
+fn health() -> Value {
+    let kinds: Vec<_> = Kind::ALL
+        .into_iter()
+        .map(|kind| {
+            let item = u64::from(kind == Kind::Items);
+            let blueprint = u64::from(kind == Kind::Blueprints);
+            let radar = u64::from(kind == Kind::RadarAudio);
+            json!({
+                "kind": kind,
+                "sourceRecords": {
+                    "selected": 2 * item + blueprint,
+                    "projected": item + blueprint,
+                    "intentionallySkipped": item,
+                    "omittedAfterReadFailure": 0,
+                    "omittedAfterProjectionFailure": 0
+                },
+                "sourceEntries": {
+                    "selected": radar,
+                    "projected": radar,
+                    "intentionallySkipped": 0,
+                    "failedRequiredReads": 0,
+                    "failedProjections": 0
+                },
+                "writtenRows": item + blueprint
+            })
+        })
+        .collect();
+    json!({
+        "status": "complete", "read": "complete", "projection": "complete", "publicationMode": "normal",
+        "kinds": kinds, "selectedKindRecords": 3, "writtenRows": 2
+    })
+}
+
 fn catalog() -> Value {
     let complete: serde_json::Map<String, Value> = Kind::ALL
         .into_iter()
@@ -200,9 +236,7 @@ fn catalog() -> Value {
             "channel": "LIVE", "build": build(),
             "archiveSize": 47, "archiveModified": "2026-11-12T07:12:02Z"
         },
-        "exportHealth": {
-            "status": "complete", "read": "complete", "projection": "complete", "publicationMode": "normal"
-        },
+        "exportHealth": health(),
         "completeness": complete,
         "items": [{"guid": "equipment"}],
         "definitions": {

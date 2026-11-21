@@ -133,8 +133,8 @@ pub(crate) struct Table {
     rows: Vec<Value>,
 }
 
-pub(crate) fn capture_table<Row: Serialize, Id: Eq + Hash>(
-    sdk: &EquipmentSnapshot<'_, Row>,
+pub(crate) fn capture_table<Row: Serialize, Id: Eq + Hash, Dependencies>(
+    sdk: &EquipmentSnapshot<'_, Row, Dependencies>,
     archive: &Archive,
     origins: &mut Origins,
     identity: impl Fn(&Value) -> TestResult<Id>,

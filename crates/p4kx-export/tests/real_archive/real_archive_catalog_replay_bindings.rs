@@ -2,19 +2,23 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::BTreeMap;
-use std::fmt::Write as _;
+use std::fmt::{self, Write as _};
 use std::fs::{self, File};
 use std::io::{BufReader, Read};
 use std::path::Path;
 
 use p4kx_export::{Kind, SCHEMA_VERSION};
 use p4kx_extraction::{Archive, utc_rfc3339};
-use serde::Deserialize;
+use serde::de::{self, MapAccess, Visitor};
+use serde::{Deserialize, Deserializer};
 use serde_json::Value;
 use sha2::{Digest as _, Sha256};
 
 use super::TestResult;
 use super::inventory::Inventory;
+
+#[path = "real_archive_catalog_replay_health.rs"]
+mod health;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -87,6 +91,7 @@ impl Receipt {
 pub(super) struct IndexedPass {
     schema_version: u32,
     source: CatalogSource,
+    #[serde(deserialize_with = "read_kind_selection")]
     completeness: BTreeMap<String, Selection>,
     export_health: Publication,
     #[serde(rename = "provenance")]
@@ -124,6 +129,20 @@ struct Publication {
     status: String,
     read: String,
     projection: String,
+    kinds: Option<Vec<health::KindReport>>,
+    selected_kind_records: Option<u64>,
+    written_rows: Option<u64>,
+}
+
+impl Publication {
+    fn check_accounting(&self) -> TestResult {
+        health::check(
+            self.kinds.as_deref().ok_or("missing catalog kind health")?,
+            self.selected_kind_records
+                .ok_or("missing selectedKindRecords total")?,
+            self.written_rows.ok_or("missing writtenRows total")?,
+        )
+    }
 }
 
 impl IndexedPass {
@@ -139,7 +158,8 @@ impl Binding {
             &pass.source,
             &pass.completeness,
             &pass.export_health,
-        )
+        )?;
+        pass.export_health.check_accounting()
     }
 
     pub(crate) fn check_catalog(&self, selected: &Value) -> TestResult {
@@ -232,6 +252,9 @@ fn check_complete_selection(completeness: &BTreeMap<String, Selection>) -> TestR
         )
         .into());
     }
+    if completeness.len() != Kind::ALL.len() {
+        return Err("replay found an unexpected Catalog Kind selection".into());
+    }
     if completeness
         .values()
         .any(|selection| selection.status != "complete")
@@ -239,6 +262,32 @@ fn check_complete_selection(completeness: &BTreeMap<String, Selection>) -> TestR
         return Err("replay requires a complete unfiltered selection (incomplete coverage)".into());
     }
     Ok(())
+}
+
+fn read_kind_selection<'de, D: Deserializer<'de>>(
+    deserializer: D,
+) -> Result<BTreeMap<String, Selection>, D::Error> {
+    deserializer.deserialize_map(UniqueKindSelection)
+}
+
+struct UniqueKindSelection;
+
+impl<'de> Visitor<'de> for UniqueKindSelection {
+    type Value = BTreeMap<String, Selection>;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("a map of unique Catalog Kind selections")
+    }
+
+    fn visit_map<A: MapAccess<'de>>(self, mut input: A) -> Result<Self::Value, A::Error> {
+        let mut selection = BTreeMap::new();
+        while let Some((name, value)) = input.next_entry()? {
+            if selection.insert(name, value).is_some() {
+                return Err(de::Error::custom("duplicate Catalog Kind selection"));
+            }
+        }
+        Ok(selection)
+    }
 }
 
 fn stamp_seconds(stamp: &str) -> TestResult<String> {
