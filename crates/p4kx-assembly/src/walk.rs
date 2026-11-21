@@ -5,14 +5,12 @@ use crate::LoadoutTargetGuid;
 use p4kx_dataforge::Guid;
 
 use crate::plan::Plan;
-use crate::{LoadoutError, MAX_LOADOUT_DEPTH, MAX_LOADOUT_PORTS};
+use crate::{LoadoutError, MAX_LOADOUT_DEPTH};
 
-/// The state of one resolution: the Entities on the current branch, the ports so far and the
-/// changes being applied.
+/// The Entities on the current branch, nested Loadout levels and changes being applied.
 pub(crate) struct Walk {
     pub(crate) ancestors: Vec<Guid>,
     pub(crate) nesting: usize,
-    ports: usize,
     pub(crate) plan: Option<Plan>,
     pub(crate) cancellable: bool,
 }
@@ -22,7 +20,6 @@ impl Walk {
         Self {
             ancestors: vec![root],
             nesting: 0,
-            ports: 0,
             plan,
             cancellable: false,
         }
@@ -57,16 +54,6 @@ impl Walk {
     /// Returns the depth of the current branch: attached Entities plus nested Loadout levels.
     pub(crate) const fn depth(&self) -> usize {
         self.ancestors.len().saturating_add(self.nesting)
-    }
-
-    /// Counts one more port, or returns `false` when the tree already holds
-    /// [`MAX_LOADOUT_PORTS`].
-    pub(crate) const fn reserve(&mut self) -> bool {
-        if self.ports >= MAX_LOADOUT_PORTS {
-            return false;
-        }
-        self.ports = self.ports.saturating_add(1);
-        true
     }
 
     /// Returns why the Entity `guid` may not be attached below the current branch, if it may not.

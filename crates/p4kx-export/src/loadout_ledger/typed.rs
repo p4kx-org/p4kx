@@ -145,9 +145,7 @@ const fn category(error: &LoadoutError) -> (Code, Severity) {
         | LoadoutError::AssortmentRequirement { .. } => {
             (Code::SourceWarning, Severity::Information)
         }
-        LoadoutError::TooDeep | LoadoutError::TooManyPorts => {
-            (Code::FieldWalkLimit, Severity::Warning)
-        }
+        LoadoutError::TooDeep => (Code::FieldWalkLimit, Severity::Warning),
         LoadoutError::UnreadableRecord { .. } | LoadoutError::InvalidReference { .. } => {
             (Code::UnreadableSource, Severity::Error)
         }

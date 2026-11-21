@@ -56,9 +56,8 @@ impl Entries {
 ///
 /// Records are read once per resolver and kept, so resolving several Entities with one resolver
 /// reads each Record once; the Records an Entity reaches are read in parallel. Resolution is
-/// cycle-safe and bounded by [`MAX_LOADOUT_DEPTH`](crate::MAX_LOADOUT_DEPTH) and
-/// [`MAX_LOADOUT_PORTS`](crate::MAX_LOADOUT_PORTS); a port that cannot be resolved is kept in the
-/// tree with the reason.
+/// cycle-safe and bounded by [`MAX_LOADOUT_DEPTH`](crate::MAX_LOADOUT_DEPTH). A port that
+/// cannot be resolved is kept in the tree with the reason.
 pub struct LoadoutResolver<'f> {
     pub(crate) entities: Arc<Entities<'f>>,
     pub(crate) forge_origin: Option<Arc<DataForgeOrigin>>,

@@ -8,7 +8,7 @@ use std::sync::Arc;
 
 use crate::{
     LoadoutFailurePath, LoadoutReference, LoadoutRequest, LoadoutTargetGuid, LoadoutXmlClassUse,
-    MAX_LOADOUT_DEPTH, MAX_LOADOUT_PORTS,
+    MAX_LOADOUT_DEPTH,
 };
 
 /// Why a port of a Loadout, or the Loadout of an Entity, cannot be resolved.
@@ -77,9 +77,6 @@ pub enum LoadoutError {
     /// The branch is deeper than [`MAX_LOADOUT_DEPTH`].
     #[error("the Loadout is nested deeper than {MAX_LOADOUT_DEPTH} Entities")]
     TooDeep,
-    /// The tree reached [`MAX_LOADOUT_PORTS`] ports, so the Entity's further ports are left out.
-    #[error("the Loadout tree reached {MAX_LOADOUT_PORTS} ports; further ports are left out")]
-    TooManyPorts,
     /// An XML Loadout is named, but no Archive to read it from was given.
     #[error("the XML Loadout {path} is not read without its Archive")]
     NoLoadoutFiles {
@@ -225,7 +222,6 @@ impl LoadoutError {
             Self::UnreadableRecord { .. } => "unreadable_record",
             Self::Cycle { .. } => "cycle",
             Self::TooDeep => "too_deep",
-            Self::TooManyPorts => "too_many_ports",
             Self::NoLoadoutFiles { .. } => "no_loadout_files",
             Self::XmlLoadout { .. } | Self::MissingXmlLoadout { .. } => "xml_loadout",
             Self::XmlIncludeReadBudgetExceeded { .. } => "xml_include_read_budget_exceeded",

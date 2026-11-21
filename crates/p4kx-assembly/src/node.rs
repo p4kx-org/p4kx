@@ -77,19 +77,6 @@ impl LoadoutResolver<'_> {
             if self.observation_stopped() || (walk.cancellable && self.stopped()) {
                 break;
             }
-            if !walk.reserve() {
-                if resolver_observation::notify(
-                    self.observation.as_deref(),
-                    LoadoutReadEvent::InventoryIncomplete,
-                )
-                .is_err()
-                {
-                    issues.push(LoadoutError::ObservationStopped);
-                    break;
-                }
-                issues.push(LoadoutError::TooManyPorts);
-                break;
-            }
             walk.enter(pending.name);
             let mut port = self.port_node(pending, walk, &mut issues, vehicle.as_deref(), shared);
             walk.leave();

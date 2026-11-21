@@ -77,10 +77,6 @@ impl LoadoutResolver<'_> {
             if self.observation_stopped() {
                 break;
             }
-            if !walk.reserve() {
-                issues.push(LoadoutError::TooManyPorts);
-                break;
-            }
             walk.enter(&entry.port);
             let mut node = PortNode {
                 name: entry.port.clone(),

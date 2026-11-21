@@ -340,8 +340,7 @@ target: `reference` (the GUID) or `class_name`, the other `null`. The kinds are:
 - at a port: `dangling_reference`, `invalid_reference`, `unknown_class`, `not_an_entity`,
   `unreadable_record`, `cycle` (the Entity is already attached further up the branch) and
   `too_deep` (more than 32 attached Entities below the root);
-- among the `issues` of an Entity: `too_many_ports` (the tree reached 65,536 ports, so this
-  Entity's further ports are left out; the tree never holds more), `ambiguous_class` (several
+- among the `issues` of an Entity: `ambiguous_class` (several
   Entities have the class name the entry names; the first in definition order is attached and
   the reason lists every candidate), `no_loadout_files` and `xml_loadout` (an XML Loadout or one
   it includes that is missing, corrupt, includes itself or nests deeper than 8 includes; what

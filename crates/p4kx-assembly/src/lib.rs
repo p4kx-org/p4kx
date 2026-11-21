@@ -348,10 +348,6 @@ pub const MAX_XML_ELEMENT_DEPTH: usize = markup::MAX_ELEMENT_DEPTH;
 /// are [`LoadoutError::TooDeep`].
 pub const MAX_LOADOUT_DEPTH: usize = 32;
 
-/// The most ports one Loadout tree holds; an Entity whose ports would pass it keeps the ports so
-/// far and has [`LoadoutError::TooManyPorts`] among its issues.
-pub const MAX_LOADOUT_PORTS: usize = 1 << 16;
-
 mod loadout_reference;
 mod target_spec;
 pub use loadout_reference::{LoadoutReference, LoadoutReferenceSelection};

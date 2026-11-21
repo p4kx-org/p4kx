@@ -8,8 +8,8 @@ use std::error::Error;
 use std::fmt::Write as _;
 
 use p4kx_assembly::{
-    Attachment, EntityNode, LoadoutError, LoadoutFileError, LoadoutFiles, LoadoutResolver,
-    PortNode, PortSource,
+    Attachment, EntityNode, LoadoutError, LoadoutFileError, LoadoutFiles, LoadoutOrigin,
+    LoadoutResolver, PortNode, PortSource,
 };
 use p4kx_dataforge::DataForge;
 use p4kx_testkit::{
@@ -314,10 +314,13 @@ fn a_huge_xml_loadout_merges_its_includes_in_linear_time() -> TestResult {
     let started = std::time::Instant::now();
     let tree = resolve(&builder, Some(&files))?;
     let elapsed = started.elapsed();
-    assert_eq!(
-        tree.ports().len(),
-        p4kx_assembly::MAX_LOADOUT_PORTS,
-        "capped after the merge"
+    assert_eq!(tree.ports().len(), count, "every merged port");
+    assert!(tree.issues().is_empty(), "the merged Loadout is complete");
+    let last = tree.ports().last().ok_or("the final merged port")?;
+    assert_eq!(last.name(), "port_199999", "original merged order");
+    assert!(
+        matches!(last.origin(), Some(LoadoutOrigin::File(path)) if path.as_ref() == "Loadouts/Door.xml"),
+        "the final override retains its original XML Loadout",
     );
     assert!(
         tree.ports()
