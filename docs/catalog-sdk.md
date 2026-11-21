@@ -1709,6 +1709,24 @@ resolve source references against the snapshot's own inventory.
 For the consumer convention on quantum acceleration, see the
 [quantum drive contract](catalog-quantum-drives.md).
 
+## Jump drives and quantum interdiction
+
+Use `equipment::ship_systems::with_jump_drives` and
+`with_quantum_interdiction_generators` for `configurations.jumpDrives` and
+`configurations.quantumInterdiction`. Select an Item Record by GUID or physical index,
+or read the complete component family. Results preserve the physical owner and original
+Components ordinal. Device settings, weak interaction links, and ordered visual states
+use the same sourced fields as the Catalog.
+
+Use `equipment::component_definitions::with_jump_drive_flight_tuning` for
+`configurations.jumpDriveFlightTuning`. Its selection addresses the definition's own
+Record. A device's `flightTuning` reference provides the target Record index, which can
+be passed as `CatalogRecordSelection::RecordIndex`. The definition returns its original
+ordered field arena. All three queries accept the original decoded Entry through `_from`
+and are also available on the query session and parsed view. Each result has its own
+source inventory and coverage. [Jump-drive definitions](catalog-jump-drives.md).
+[Quantum interdiction](catalog-quantum-interdiction.md).
+
 ## Verify dataset coverage
 
 The SDK coverage audit checks canonical dataset boundaries against calls to the public typed

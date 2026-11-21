@@ -90,6 +90,9 @@ const CARGO_LOADING_GLOBALS: &str = "/configurations/cargoLoadingGlobals";
 const SHOP_COMMODITY_GLOBALS: &str = "/configurations/shopCommodityGlobals";
 const SHIELD_GENERATORS: &str = "/configurations/shieldGenerators";
 const QUANTUM_DRIVES: &str = "/configurations/quantumDrives";
+const QUANTUM_INTERDICTION: &str = "/configurations/quantumInterdiction";
+const JUMP_DRIVES: &str = "/configurations/jumpDrives";
+const JUMP_DRIVE_FLIGHT_TUNING: &str = "/configurations/jumpDriveFlightTuning";
 const CLOTHING: &str = "/configurations/clothing";
 const ITEM_RADARS: &str = "/configurations/itemRadars";
 const REPUTATION_CONTEXTS: &str = "/definitions/reputationContexts";
@@ -211,6 +214,9 @@ const REQUIRED_WITNESSES: &[&str] = &[
     SHOP_COMMODITY_GLOBALS,
     SHIELD_GENERATORS,
     QUANTUM_DRIVES,
+    QUANTUM_INTERDICTION,
+    JUMP_DRIVES,
+    JUMP_DRIVE_FLIGHT_TUNING,
     CLOTHING,
     ITEM_RADARS,
     MINEABLE_ENTITIES,

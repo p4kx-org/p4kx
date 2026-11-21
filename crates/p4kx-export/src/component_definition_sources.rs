@@ -11,6 +11,8 @@ use super::catalog_independent_configurations::{
     DAMAGE_RESISTANCE_MACRO, DamageResistanceMacro, HEALTH_MODIFIER, MINING_LASER_GLOBAL,
     MiningLaserGlobalDefinition, TurretHealthModifier, observe_modifier_types,
 };
+use super::catalog_jump_drive::FLIGHT_PARAMS;
+pub use super::jump_drive_definitions::JumpDriveDefinition;
 use super::referenced_definition_read;
 use crate::CatalogError;
 use crate::catalog_projection::{CatalogProjection, TextOwner};
@@ -74,6 +76,12 @@ direct_definition!(
     ElectricalBehavior,
     ELECTRICAL_BEHAVIOR,
     ElectricalBehavior
+);
+direct_definition!(
+    JumpDriveFlightTuning,
+    JumpDriveDefinition,
+    FLIGHT_PARAMS,
+    JumpDriveDefinition
 );
 direct_definition!(
     ArmorMacros,

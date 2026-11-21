@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
+use super::catalog_item_components::source_getters;
 use super::item_component_owner::ComponentOwner;
 use super::quantum_fields::QuantumFields;
 use crate::CatalogError;
@@ -19,7 +20,10 @@ use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference, Sour
 #[path = "jump_drive_effects.rs"]
 mod effects;
 
-use effects::JumpDriveEffects;
+pub use effects::{
+    JumpDriveEffectRange, JumpDriveEffects, JumpDriveExit, JumpDriveOpening, JumpDriveTravel,
+    JumpDriveWake,
+};
 
 pub(super) const SOURCE_TYPE: &str = "SCItemJumpDriveParams";
 pub(super) const FLIGHT_PARAMS: &str = "JumpDriveFlightParams";
@@ -30,7 +34,7 @@ const DEVICE_STATE: &str = "ItemResourceState";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct JumpDrive<'source> {
+pub struct JumpDrive<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     source_type: SourcedValue<&'source str>,
@@ -87,6 +91,37 @@ impl<'source> JumpDrive<'source> {
             effects: fields.class("jumpDriveEffectParams", JumpDriveEffects::read)?,
             additional_fields: fields.additional_fields()?,
         })
+    }
+}
+
+impl<'source> JumpDrive<'source> {
+    source_getters! {
+        /// The physical Item Record and original Components slot.
+        owner: ComponentOwner,
+        /// The original concrete source type.
+        source_type: SourcedValue<&'source str>,
+        /// The authored alignment decay rate.
+        alignment_decay_rate: SourcedValue<ResourceNumber>,
+        /// The authored alignment rate.
+        alignment_rate: SourcedValue<ResourceNumber>,
+        /// The original fuel efficiency multiplier.
+        fuel_usage_efficiency_multiplier: SourcedValue<ResourceNumber>,
+        /// The authored tuning decay rate.
+        tuning_decay_rate: SourcedValue<ResourceNumber>,
+        /// The authored tuning rate.
+        tuning_rate: SourcedValue<ResourceNumber>,
+        /// The original flight-tuning Record reference.
+        flight_tuning: SourcedValue<Box<SourceRecordReference<'source>>>,
+        /// The original tunnel-force Record reference.
+        tunnel_forces: SourcedValue<Box<SourceRecordReference<'source>>>,
+        /// The original weak idle-state reference.
+        idle_state: SourcedValue<Box<SourceWeakReference<'source>>>,
+        /// The original weak transiting-state reference.
+        transiting_state: SourcedValue<Box<SourceWeakReference<'source>>>,
+        /// The original travel-phase presentation settings.
+        effects: SourcedValue<JumpDriveEffects<'source>>,
+        /// Original members outside the typed fields.
+        additional_fields: SourceArenaOutput<'source>,
     }
 }
 

@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
+use super::catalog_item_components::source_getters;
 use super::item_component_owner::ComponentOwner;
 use super::quantum_fields::QuantumFields;
 use crate::CatalogError;
@@ -18,7 +19,12 @@ use crate::source_value_catalog::{SourceArenaOutput, SourceWeakReference};
 #[path = "quantum_interdiction_visual_graph.rs"]
 mod visual_graph;
 
-use visual_graph::QuantumInterdictionVisualGraph;
+pub use visual_graph::{
+    QuantumInterdictionTransitionParameters, QuantumInterdictionTransitionSelector,
+    QuantumInterdictionVisualAnimation, QuantumInterdictionVisualEffect,
+    QuantumInterdictionVisualGraph, QuantumInterdictionVisualState,
+    QuantumInterdictionVisualTransition,
+};
 
 pub(super) const SOURCE_TYPE: &str = "SCItemQuantumInterdictionGeneratorParams";
 const JAMMER: &str = "SCItemQuantumJammerParams";
@@ -31,7 +37,7 @@ type InteractionLink<'source> = SourcedValue<Box<SourceWeakReference<'source>>>;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct QuantumInterdictionGenerator<'source> {
+pub struct QuantumInterdictionGenerator<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     source_type: SourcedValue<&'source str>,
@@ -104,10 +110,11 @@ pub(crate) fn table<'source>(
     CatalogTable::new(forge, &[SOURCE_TYPE], rows)
 }
 
+/// Authored quantum jammer settings and interaction links.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct QuantumJammerSettings<'source> {
+pub struct QuantumJammerSettings<'source> {
     source_type: SourcedValue<&'source str>,
     jammer_range: SourcedValue<ResourceNumber>,
     max_power_draw: SourcedValue<ResourceNumber>,
@@ -135,10 +142,11 @@ impl<'source> QuantumJammerSettings<'source> {
     }
 }
 
+/// Authored quantum interdiction pulse settings and interaction links.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct QuantumInterdictionPulseSettings<'source> {
+pub struct QuantumInterdictionPulseSettings<'source> {
     source_type: SourcedValue<&'source str>,
     charge_time_seconds: SourcedValue<ResourceNumber>,
     discharge_time_seconds: SourcedValue<ResourceNumber>,
@@ -187,5 +195,94 @@ impl<'source> QuantumInterdictionPulseSettings<'source> {
             disperse_charge_interaction: fields.weak_link_to("disperseChargeIP", INTERACTION)?,
             additional_fields: fields.additional_fields()?,
         })
+    }
+}
+
+impl<'source> QuantumInterdictionGenerator<'source> {
+    source_getters! {
+        /// The physical Item Record and original Components slot.
+        owner: ComponentOwner,
+        /// The original concrete source type.
+        source_type: SourcedValue<&'source str>,
+        /// The authored base power-draw fraction.
+        base_power_draw_fraction: SourcedValue<ResourceNumber>,
+        /// The authored pulse power fraction.
+        pulse_power_fraction: SourcedValue<ResourceNumber>,
+        /// The authored jammer power fraction.
+        jammer_power_fraction: SourcedValue<ResourceNumber>,
+        /// The authored jammer settings.
+        jammer_settings: SourcedValue<QuantumJammerSettings<'source>>,
+        /// The authored pulse settings.
+        pulse_settings: SourcedValue<QuantumInterdictionPulseSettings<'source>>,
+        /// The authored visual state graph.
+        visual_graph: SourcedValue<QuantumInterdictionVisualGraph<'source>>,
+        /// The weak reference for switching the device on.
+        main_device_switch_on: SourcedValue<Box<SourceWeakReference<'source>>>,
+        /// The weak reference for switching the device off.
+        main_device_switch_off: SourcedValue<Box<SourceWeakReference<'source>>>,
+        /// Original members outside the typed fields.
+        additional_fields: SourceArenaOutput<'source>,
+    }
+}
+
+impl<'source> QuantumJammerSettings<'source> {
+    source_getters! {
+        /// The original concrete source type.
+        source_type: SourcedValue<&'source str>,
+        /// The authored jammer range.
+        jammer_range: SourcedValue<ResourceNumber>,
+        /// The authored maximum power draw.
+        max_power_draw: SourcedValue<ResourceNumber>,
+        /// The authored green-zone check range.
+        green_zone_check_range: SourcedValue<ResourceNumber>,
+        /// The weak reference for switching the jammer on.
+        set_jammer_switch_on: SourcedValue<Box<SourceWeakReference<'source>>>,
+        /// The weak reference for switching the jammer off.
+        set_jammer_switch_off: SourcedValue<Box<SourceWeakReference<'source>>>,
+        /// Original members outside the typed fields.
+        additional_fields: SourceArenaOutput<'source>,
+    }
+}
+
+impl<'source> QuantumInterdictionPulseSettings<'source> {
+    source_getters! {
+        /// The original concrete source type.
+        source_type: SourcedValue<&'source str>,
+        /// The authored charge time in seconds.
+        charge_time_seconds: SourcedValue<ResourceNumber>,
+        /// The authored discharge time in seconds.
+        discharge_time_seconds: SourcedValue<ResourceNumber>,
+        /// The authored cooldown time in seconds.
+        cooldown_time_seconds: SourcedValue<ResourceNumber>,
+        /// The authored radius in metres.
+        radius_meters: SourcedValue<ResourceNumber>,
+        /// The authored time for decreasing the charge rate.
+        decrease_charge_rate_time_seconds: SourcedValue<ResourceNumber>,
+        /// The authored time for increasing the charge rate.
+        increase_charge_rate_time_seconds: SourcedValue<ResourceNumber>,
+        /// The authored activation phase duration in seconds.
+        activation_phase_duration_seconds: SourcedValue<ResourceNumber>,
+        /// The authored charge dispersal time in seconds.
+        disperse_charge_time_seconds: SourcedValue<ResourceNumber>,
+        /// The authored maximum power draw.
+        max_power_draw: SourcedValue<ResourceNumber>,
+        /// The authored power fraction when charging stops.
+        stop_charging_power_draw_fraction: SourcedValue<ResourceNumber>,
+        /// The authored power fraction at maximum charge rate.
+        max_charge_rate_power_draw_fraction: SourcedValue<ResourceNumber>,
+        /// The authored active power-draw fraction.
+        active_power_draw_fraction: SourcedValue<ResourceNumber>,
+        /// The authored tethering power-draw fraction.
+        tethering_power_draw_fraction: SourcedValue<ResourceNumber>,
+        /// The authored green-zone check range.
+        green_zone_check_range: SourcedValue<ResourceNumber>,
+        /// The weak reference for starting to charge.
+        start_charging_interaction: SourcedValue<Box<SourceWeakReference<'source>>>,
+        /// The weak reference for cancelling the charge.
+        cancel_charging_interaction: SourcedValue<Box<SourceWeakReference<'source>>>,
+        /// The weak reference for dispersing the charge.
+        disperse_charge_interaction: SourcedValue<Box<SourceWeakReference<'source>>>,
+        /// Original members outside the typed fields.
+        additional_fields: SourceArenaOutput<'source>,
     }
 }

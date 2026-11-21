@@ -9,6 +9,8 @@ use crate::health_origin_assertions as proof;
 
 #[path = "catalog_quantum_interdiction_fixture.rs"]
 mod fixture;
+#[path = "catalog_quantum_interdiction_sdk.rs"]
+mod sdk;
 
 const ROWS: &str = "/configurations/quantumInterdiction/rows";
 

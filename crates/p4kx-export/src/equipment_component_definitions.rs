@@ -9,7 +9,8 @@ use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ParsedCatalogQueries,
 };
 use crate::catalog_v3::component_definition_sources::{
-    ArmorMacros, ConsumableSubtypes, ConsumableTypes, MiningLaserGlobals, TurretModifiers,
+    ArmorMacros, ConsumableSubtypes, ConsumableTypes, JumpDriveFlightTuning, MiningLaserGlobals,
+    TurretModifiers,
 };
 
 pub use crate::catalog_v3::catalog_independent_configurations::{
@@ -19,6 +20,8 @@ pub use crate::catalog_v3::catalog_independent_configurations::{
     MacroBody as DamageResistanceMacroBody, MiningLaserGlobalDefinition, OrderedCurve,
     Override as ConsumableBuffOverride, ResistanceSet, Rtpc, TurretHealthModifier,
 };
+
+pub use crate::catalog_v3::component_definition_sources::JumpDriveDefinition;
 
 #[path = "equipment_component_definition_read.rs"]
 mod read;
@@ -106,6 +109,11 @@ macro_rules! definition_query {
     };
 }
 
+definition_query!(
+    JumpDriveFlightTuning, JumpDriveDefinition, JumpDriveFlightTuningSnapshot,
+    with_jump_drive_flight_tuning, with_jump_drive_flight_tuning_from,
+    CatalogLanguageSelection::Selected(&[]);
+);
 definition_query!(
     ArmorMacros, DamageResistanceMacro, DamageResistanceMacroSnapshot, with_damage_resistance_macros,
     with_damage_resistance_macros_from, CatalogLanguageSelection::Selected(&[]);

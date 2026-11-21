@@ -14,6 +14,9 @@ use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
 
+#[path = "quantum_interdiction_visual_accessors.rs"]
+mod accessors;
+
 pub(super) const SOURCE_TYPE: &str = "SQedVisualGraphParams";
 const STATE_PARAMS: &str = "SQedVisualGraphStateParams";
 const ANIMATION_PARAMS: &str = "SQedVisualGraphAnimationParams";
@@ -34,7 +37,7 @@ type OrderedCells<T> = SourcedValue<Vec<SourcedValue<T>>>;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct QuantumInterdictionVisualGraph<'source> {
+pub struct QuantumInterdictionVisualGraph<'source> {
     source_type: SourcedValue<&'source str>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     effect_strength_link: RecordLink<'source>,
@@ -64,10 +67,11 @@ impl<'source> QuantumInterdictionVisualGraph<'source> {
     }
 }
 
+/// Authored quantum interdiction visual state and its transition slots.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct QuantumInterdictionVisualState<'source> {
+pub struct QuantumInterdictionVisualState<'source> {
     source_type: SourcedValue<&'source str>,
     animation_params: SourcedValue<QuantumInterdictionVisualAnimation<'source>>,
     effect_params: SourcedValue<QuantumInterdictionVisualEffect<'source>>,
@@ -112,10 +116,11 @@ impl<'source> QuantumInterdictionVisualState<'source> {
     }
 }
 
+/// Authored animation references and playback settings of one visual state.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct QuantumInterdictionVisualAnimation<'source> {
+pub struct QuantumInterdictionVisualAnimation<'source> {
     source_type: SourcedValue<&'source str>,
     fragment_name: SourcedValue<&'source str>,
     fragment_tag: SourcedValue<&'source str>,
@@ -147,10 +152,11 @@ impl<'source> QuantumInterdictionVisualAnimation<'source> {
     }
 }
 
+/// Authored effect references and strength of one visual state.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct QuantumInterdictionVisualEffect<'source> {
+pub struct QuantumInterdictionVisualEffect<'source> {
     source_type: SourcedValue<&'source str>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     entity_effect_tag: RecordLink<'source>,
@@ -176,10 +182,11 @@ impl<'source> QuantumInterdictionVisualEffect<'source> {
     }
 }
 
+/// Authored transition target and its selector declarations.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct QuantumInterdictionVisualTransition<'source> {
+pub struct QuantumInterdictionVisualTransition<'source> {
     source_type: SourcedValue<&'source str>,
     state: SourcedValue<&'source str>,
     animation_transition_type: SourcedValue<QuantumInterdictionTransitionSelector<'source>>,
@@ -218,10 +225,11 @@ fn read_selector<'source>(
     )
 }
 
+/// The exact concrete source type and parameters of one transition selector.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct QuantumInterdictionTransitionSelector<'source> {
+pub struct QuantumInterdictionTransitionSelector<'source> {
     source_type: SourcedValue<&'source str>,
     #[serde(flatten)]
     parameters: QuantumInterdictionTransitionParameters<'source>,
@@ -260,6 +268,7 @@ impl<'source> QuantumInterdictionTransitionSelector<'source> {
     }
 }
 
+/// The authored variant of a quantum interdiction transition selector.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(
     tag = "kind",
@@ -267,13 +276,20 @@ impl<'source> QuantumInterdictionTransitionSelector<'source> {
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-enum QuantumInterdictionTransitionParameters<'source> {
+#[non_exhaustive]
+pub enum QuantumInterdictionTransitionParameters<'source> {
+    /// An authored time-based transition.
     TimeBased {
+        /// The original duration in seconds.
         seconds: SourcedValue<ResourceNumber>,
     },
+    /// An authored value-based transition.
     ValueBased {
+        /// The original context token.
         context: SourcedValue<&'source str>,
+        /// The original variable token.
         variable: SourcedValue<&'source str>,
     },
+    /// Another source type with its original fields retained on the selector.
     Authored,
 }

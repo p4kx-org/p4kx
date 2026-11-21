@@ -9,6 +9,9 @@ use serde_json::{Value, json};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
 
+#[path = "catalog_jump_drive_sdk.rs"]
+mod sdk;
+
 const DEVICE: &str = "SCItemJumpDriveParams";
 const EFFECT: &str = "FixtureJumpEffects";
 const TRAVEL: &str = "FixtureJumpTravel";

@@ -7,6 +7,7 @@ use serde::Serialize;
 
 use super::super::authored_fields::Observed;
 use super::super::quantum_fields::QuantumFields;
+use super::source_getters;
 use crate::CatalogError;
 use crate::resource_number::ResourceNumber;
 use crate::schema_fields::every_field_required;
@@ -17,7 +18,7 @@ use crate::source_value_catalog::SourceArenaOutput;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct JumpDriveEffects<'source> {
+pub struct JumpDriveEffects<'source> {
     source_type: SourcedValue<&'source str>,
     exit: SourcedValue<JumpDriveExit<'source>>,
     opening: SourcedValue<JumpDriveOpening<'source>>,
@@ -49,10 +50,11 @@ impl<'source> JumpDriveEffects<'source> {
     }
 }
 
+/// Authored jump-drive exit settings.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct JumpDriveExit<'source> {
+pub struct JumpDriveExit<'source> {
     exit_speed_range: SourcedValue<JumpDriveEffectRange<'source>>,
     exit_trail_time: SourcedValue<ResourceNumber>,
     additional_fields: SourceArenaOutput<'source>,
@@ -72,10 +74,11 @@ impl<'source> JumpDriveExit<'source> {
     }
 }
 
+/// Authored jump-drive opening settings.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct JumpDriveOpening<'source> {
+pub struct JumpDriveOpening<'source> {
     shield_pulse_max_time: SourcedValue<ResourceNumber>,
     additional_fields: SourceArenaOutput<'source>,
 }
@@ -93,10 +96,11 @@ impl<'source> JumpDriveOpening<'source> {
     }
 }
 
+/// Authored jump-drive travel settings.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct JumpDriveTravel<'source> {
+pub struct JumpDriveTravel<'source> {
     interaction_start_distance: SourcedValue<ResourceNumber>,
     reaction_burst_trigger_distance: SourcedValue<ResourceNumber>,
     tunnel_response_distance_ahead_range: SourcedValue<JumpDriveEffectRange<'source>>,
@@ -121,10 +125,11 @@ impl<'source> JumpDriveTravel<'source> {
     }
 }
 
+/// Authored jump-drive wake settings.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct JumpDriveWake<'source> {
+pub struct JumpDriveWake<'source> {
     max_penetration: SourcedValue<ResourceNumber>,
     additional_fields: SourceArenaOutput<'source>,
 }
@@ -142,10 +147,11 @@ impl<'source> JumpDriveWake<'source> {
     }
 }
 
+/// The original endpoints of a jump-drive effect range.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct JumpDriveEffectRange<'source> {
+pub struct JumpDriveEffectRange<'source> {
     minimum: SourcedValue<ResourceNumber>,
     maximum: SourcedValue<ResourceNumber>,
     additional_fields: SourceArenaOutput<'source>,
@@ -162,5 +168,81 @@ impl<'source> JumpDriveEffectRange<'source> {
             maximum: fields.number("maximum")?,
             additional_fields: fields.additional_fields()?,
         })
+    }
+}
+
+impl<'source> JumpDriveEffects<'source> {
+    source_getters! {
+        /// The original concrete source type.
+        source_type: SourcedValue<&'source str>,
+        /// The authored exit parameters.
+        exit: SourcedValue<JumpDriveExit<'source>>,
+        /// The authored opening parameters.
+        opening: SourcedValue<JumpDriveOpening<'source>>,
+        /// The authored travel parameters.
+        travel: SourcedValue<JumpDriveTravel<'source>>,
+        /// The authored wake parameters.
+        wake: SourcedValue<JumpDriveWake<'source>>,
+        /// The original projectile effect declaration.
+        projectile_effect: SourcedValue<SourceArenaOutput<'source>>,
+        /// The original tunnel response effect declaration.
+        tunnel_response_effect: SourcedValue<SourceArenaOutput<'source>>,
+        /// The original particle declarations.
+        jump_drive_particles: SourcedValue<SourceArenaOutput<'source>>,
+        /// Original members outside the typed fields.
+        additional_fields: SourceArenaOutput<'source>,
+    }
+}
+
+impl<'source> JumpDriveExit<'source> {
+    source_getters! {
+        /// The authored range of exit speeds.
+        exit_speed_range: SourcedValue<JumpDriveEffectRange<'source>>,
+        /// The authored exit trail time.
+        exit_trail_time: SourcedValue<ResourceNumber>,
+        /// Original members outside the typed fields.
+        additional_fields: SourceArenaOutput<'source>,
+    }
+}
+
+impl<'source> JumpDriveOpening<'source> {
+    source_getters! {
+        /// The authored shield pulse maximum time.
+        shield_pulse_max_time: SourcedValue<ResourceNumber>,
+        /// Original members outside the typed fields.
+        additional_fields: SourceArenaOutput<'source>,
+    }
+}
+
+impl<'source> JumpDriveTravel<'source> {
+    source_getters! {
+        /// The authored interaction start distance.
+        interaction_start_distance: SourcedValue<ResourceNumber>,
+        /// The authored reaction burst trigger distance.
+        reaction_burst_trigger_distance: SourcedValue<ResourceNumber>,
+        /// The authored tunnel response ahead range.
+        tunnel_response_distance_ahead_range: SourcedValue<JumpDriveEffectRange<'source>>,
+        /// Original members outside the typed fields.
+        additional_fields: SourceArenaOutput<'source>,
+    }
+}
+
+impl<'source> JumpDriveWake<'source> {
+    source_getters! {
+        /// The authored maximum penetration.
+        max_penetration: SourcedValue<ResourceNumber>,
+        /// Original members outside the typed fields.
+        additional_fields: SourceArenaOutput<'source>,
+    }
+}
+
+impl<'source> JumpDriveEffectRange<'source> {
+    source_getters! {
+        /// The original minimum endpoint.
+        minimum: SourcedValue<ResourceNumber>,
+        /// The original maximum endpoint.
+        maximum: SourcedValue<ResourceNumber>,
+        /// Original members outside the typed fields.
+        additional_fields: SourceArenaOutput<'source>,
     }
 }

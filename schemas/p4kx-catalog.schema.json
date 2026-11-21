@@ -26530,6 +26530,7 @@
       "type": "object"
     },
     "JumpDriveDefinition": {
+      "description": "A physical jump-drive tuning or tunnel-force Record with ordered original members.",
       "properties": {
         "fields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -26545,6 +26546,7 @@
       "type": "object"
     },
     "JumpDriveEffectRange": {
+      "description": "The original endpoints of a jump-drive effect range.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -26608,6 +26610,7 @@
       "type": "object"
     },
     "JumpDriveExit": {
+      "description": "Authored jump-drive exit settings.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -26627,6 +26630,7 @@
       "type": "object"
     },
     "JumpDriveOpening": {
+      "description": "Authored jump-drive opening settings.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -26642,6 +26646,7 @@
       "type": "object"
     },
     "JumpDriveTravel": {
+      "description": "Authored jump-drive travel settings.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -26665,6 +26670,7 @@
       "type": "object"
     },
     "JumpDriveWake": {
+      "description": "Authored jump-drive wake settings.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -39437,6 +39443,7 @@
       "type": "object"
     },
     "QuantumInterdictionPulseSettings": {
+      "description": "Authored quantum interdiction pulse settings and interaction links.",
       "properties": {
         "activationPhaseDurationSeconds": {
           "$ref": "#/$defs/SourcedValueOfResourceNumber"
@@ -39520,15 +39527,18 @@
       "type": "object"
     },
     "QuantumInterdictionTransitionSelector": {
+      "description": "The exact concrete source type and parameters of one transition selector.",
       "oneOf": [
         {
+          "description": "An authored time-based transition.",
           "properties": {
             "kind": {
               "const": "timeBased",
               "type": "string"
             },
             "seconds": {
-              "$ref": "#/$defs/SourcedValueOfResourceNumber"
+              "$ref": "#/$defs/SourcedValueOfResourceNumber",
+              "description": "The original duration in seconds."
             }
           },
           "required": [
@@ -39538,16 +39548,19 @@
           "type": "object"
         },
         {
+          "description": "An authored value-based transition.",
           "properties": {
             "context": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "The original context token."
             },
             "kind": {
               "const": "valueBased",
               "type": "string"
             },
             "variable": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "The original variable token."
             }
           },
           "required": [
@@ -39558,6 +39571,7 @@
           "type": "object"
         },
         {
+          "description": "Another source type with its original fields retained on the selector.",
           "properties": {
             "kind": {
               "const": "authored",
@@ -39585,6 +39599,7 @@
       "type": "object"
     },
     "QuantumInterdictionVisualAnimation": {
+      "description": "Authored animation references and playback settings of one visual state.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -39616,6 +39631,7 @@
       "type": "object"
     },
     "QuantumInterdictionVisualEffect": {
+      "description": "Authored effect references and strength of one visual state.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -39667,6 +39683,7 @@
       "type": "object"
     },
     "QuantumInterdictionVisualState": {
+      "description": "Authored quantum interdiction visual state and its transition slots.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -39694,6 +39711,7 @@
       "type": "object"
     },
     "QuantumInterdictionVisualTransition": {
+      "description": "Authored transition target and its selector declarations.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -39721,6 +39739,7 @@
       "type": "object"
     },
     "QuantumJammerSettings": {
+      "description": "Authored quantum jammer settings and interaction links.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"

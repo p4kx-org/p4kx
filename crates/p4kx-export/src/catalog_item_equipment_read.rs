@@ -11,7 +11,9 @@ use super::{
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_read::scoped_source_read::ScopedSourceRead;
+use crate::catalog_v3::catalog_jump_drive::JumpDrive;
 use crate::catalog_v3::catalog_quantum_drive::QuantumDrive;
+use crate::catalog_v3::catalog_quantum_interdiction::QuantumInterdictionGenerator;
 use crate::catalog_v3::catalog_shield_generator::ShieldGenerator;
 use crate::record_observation::RecordObservation;
 use crate::source_value_catalog;
@@ -46,6 +48,38 @@ pub(crate) fn read_quantum_drives<'source>(
         cancel,
         ItemEquipmentFamily::QuantumDrives,
         |rows| rows.quantum_drives,
+    )
+}
+
+pub(crate) fn read_jump_drives<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<Vec<JumpDrive<'source>>>, CatalogError> {
+    read(
+        tree,
+        projection,
+        admission,
+        cancel,
+        ItemEquipmentFamily::JumpDrives,
+        |rows| rows.jump_drives,
+    )
+}
+
+pub(crate) fn read_quantum_interdiction_generators<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<Vec<QuantumInterdictionGenerator<'source>>>, CatalogError> {
+    read(
+        tree,
+        projection,
+        admission,
+        cancel,
+        ItemEquipmentFamily::QuantumInterdictionGenerators,
+        |rows| rows.quantum_interdiction,
     )
 }
 

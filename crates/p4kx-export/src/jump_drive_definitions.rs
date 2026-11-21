@@ -19,10 +19,11 @@ use crate::source_fields::FieldError;
 use crate::source_value_catalog::SourceArenaOutput;
 use crate::{CatalogError, CatalogReadFailure};
 
+/// A physical jump-drive tuning or tunnel-force Record with ordered original members.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct JumpDriveDefinition<'source> {
+pub struct JumpDriveDefinition<'source> {
     source: CanonicalRecordHeader<'source>,
     fields: SourceArenaOutput<'source>,
 }
@@ -63,7 +64,7 @@ pub(super) fn read<'source>(
             inspection: ConfigurationInspection::JumpDriveDefinition,
         },
         cancel,
-        project,
+        JumpDriveDefinition::read,
     )?;
     let (flight, tunnel) = read
         .rows
@@ -81,14 +82,28 @@ pub(super) fn read<'source>(
     })
 }
 
-fn project<'source>(
-    _source_type: &'source str,
-    source: CanonicalRecordHeader<'source>,
-    observed: Observed<'_, '_, '_, 'source>,
-    _notes: &mut Vec<FieldError>,
-) -> Result<JumpDriveDefinition<'source>, CatalogError> {
-    Ok(JumpDriveDefinition {
-        source,
-        fields: observed.authored_members()?,
-    })
+impl<'source> JumpDriveDefinition<'source> {
+    /// Borrows the exact physical definition identity.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows ordered authored fields and their original value arena.
+    #[must_use]
+    pub const fn fields(&self) -> &SourceArenaOutput<'source> {
+        &self.fields
+    }
+
+    pub(super) fn read(
+        _: &'source str,
+        source: CanonicalRecordHeader<'source>,
+        observed: Observed<'_, '_, '_, 'source>,
+        _: &mut Vec<FieldError>,
+    ) -> Result<Self, CatalogError> {
+        Ok(Self {
+            source,
+            fields: observed.authored_members()?,
+        })
+    }
 }

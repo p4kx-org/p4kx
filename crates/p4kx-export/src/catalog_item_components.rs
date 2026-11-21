@@ -28,8 +28,8 @@ use crate::source_fields::FieldError;
 mod component_read;
 pub use component_read::WeaponSource;
 pub(crate) use component_read::{
-    read, read_magazine_resolution, read_projectile_ammo, read_quantum_drives,
-    read_shield_generators, read_weapon_source,
+    read, read_jump_drives, read_magazine_resolution, read_projectile_ammo, read_quantum_drives,
+    read_quantum_interdiction_generators, read_shield_generators, read_weapon_source,
 };
 
 #[path = "equipment_item_definition_read.rs"]
@@ -269,6 +269,8 @@ enum Component {
 pub(crate) enum ItemEquipmentFamily {
     ShieldGenerators,
     QuantumDrives,
+    JumpDrives,
+    QuantumInterdictionGenerators,
 }
 
 impl ItemEquipmentFamily {
@@ -276,6 +278,8 @@ impl ItemEquipmentFamily {
         match self {
             Self::ShieldGenerators => &[catalog_shield_generator::SOURCE_TYPE],
             Self::QuantumDrives => &[catalog_quantum_drive::SOURCE_TYPE],
+            Self::JumpDrives => &[catalog_jump_drive::SOURCE_TYPE],
+            Self::QuantumInterdictionGenerators => &[catalog_quantum_interdiction::SOURCE_TYPE],
         }
     }
 
@@ -284,6 +288,11 @@ impl ItemEquipmentFamily {
             (self, component),
             (Self::ShieldGenerators, Component::ShieldGenerator)
                 | (Self::QuantumDrives, Component::QuantumDrive)
+                | (Self::JumpDrives, Component::JumpDrive)
+                | (
+                    Self::QuantumInterdictionGenerators,
+                    Component::QuantumInterdictionGenerator
+                )
         )
     }
 }
