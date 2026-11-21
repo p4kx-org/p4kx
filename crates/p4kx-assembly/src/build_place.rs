@@ -124,29 +124,17 @@ pub(crate) fn place(
     let Some(port) = draft.port else {
         return PlacedPart::unanchored(Placement::Origin, None);
     };
-    let port_definition = port.definition();
+    let is_skin = port.definition().is_some_and(PortDefinition::is_skin);
     let resolved = port.placement_helper();
-    if let Some(diagnostic) = resolved.diagnostic {
-        issues.push(issue(
-            draft,
-            IssueKind::PortHelperUnresolved(Box::new(diagnostic)),
-        ));
-    }
     let definition = resolved.transform;
     let helper = definition
         .map(PortTransform::helper)
         .filter(|helper| !helper.is_empty());
     let on_rig = || {
-        rig.zip(helper).and_then(|(rig, helper)| {
-            let found = creature_rig::skin_port_anchor(rig, parent, helper)?;
-            Some(Anchor::bone(
-                Placement::Helper(helper.to_owned()),
-                found,
-                BoneOwner::Root,
-            ))
-        })
+        rig.zip(helper)
+            .and_then(|(rig, helper)| skin_anchor(rig, parent, helper))
     };
-    let anchored = if port_definition.is_some_and(PortDefinition::is_skin) {
+    let anchored = if is_skin {
         match prop.then(on_rig).flatten() {
             Some(found) => found,
             None => {
@@ -161,6 +149,17 @@ pub(crate) fn place(
             on_rig().unwrap_or(model_anchor)
         }
     };
+    let diagnostic = if is_skin {
+        port.rigid_helper_diagnostic()
+    } else {
+        resolved.diagnostic
+    };
+    if let Some(diagnostic) = diagnostic {
+        issues.push(issue(
+            draft,
+            IssueKind::PortHelperUnresolved(Box::new(diagnostic)),
+        ));
+    }
     if let Some(helper) = helper
         && anchored.kind == Placement::Origin
         && parent.model().is_some()
@@ -169,6 +168,15 @@ pub(crate) fn place(
         issues.push(issue(draft, IssueKind::HelperNotFound { helper }));
     }
     anchored.with_port_offset(port, definition, model)
+}
+
+fn skin_anchor(rig: PlacementSkeleton<'_>, parent: &Part, helper: &str) -> Option<Anchor> {
+    let found = creature_rig::skin_port_anchor(rig, parent, helper)?;
+    Some(Anchor::bone(
+        Placement::Helper(helper.to_owned()),
+        found,
+        BoneOwner::Root,
+    ))
 }
 
 fn with_offset(

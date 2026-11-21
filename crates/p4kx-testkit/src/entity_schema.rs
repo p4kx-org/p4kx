@@ -24,6 +24,24 @@ pub fn entity_schema(builder: DataForgeBuilder) -> DataForgeBuilder {
         .fold(builder, DataForgeBuilder::structure)
 }
 
+pub(crate) fn add_port_subhelper_fields(mut builder: DataForgeBuilder) -> DataForgeBuilder {
+    const NODE_TYPE: &str = "SItemPortDefHelperNode";
+    builder.structs = builder
+        .structs
+        .into_iter()
+        .map(|structure| {
+            if structure.name == NODE_TYPE {
+                structure
+                    .field("Tags", TestType::String)
+                    .array("SubHelpers", TestType::StrongPointer(NODE_TYPE.to_owned()))
+            } else {
+                structure
+            }
+        })
+        .collect();
+    builder
+}
+
 fn attachable_structs() -> Vec<TestStruct> {
     vec![
         TestStruct::new("SAttachableComponentParams")

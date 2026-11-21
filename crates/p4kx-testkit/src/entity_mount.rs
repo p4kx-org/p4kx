@@ -3,9 +3,10 @@
 
 use crate::entity_armour::{MALE_ARMOUR, armour_database, armour_files};
 use crate::entity_port::helper_node;
+use crate::entity_schema::add_port_subhelper_fields;
 use crate::{
     DataForgeBuilder, TestEntity, TestEntry, TestInstance, TestLoadout, TestLoadoutEntry,
-    TestModel, TestNode, TestPort, TestType, TestValue,
+    TestModel, TestNode, TestPort, TestValue,
 };
 
 /// The class name of the character whose backpack hangs on a bone its armour has.
@@ -133,21 +134,7 @@ fn mounted_unresolved_helper_fixture(port: TestPort) -> Vec<TestEntry> {
             TestValue::Array(vec![TestValue::Struct(alternative)]),
         );
     let port = port.sub_helpers(vec![TestValue::Null, TestValue::Struct(group)]);
-    let mut database = database_with_carrier(port);
-    database.structs = database
-        .structs
-        .into_iter()
-        .map(|structure| {
-            if structure.name == node_type {
-                structure
-                    .field("Tags", TestType::String)
-                    .array("SubHelpers", TestType::StrongPointer(node_type.to_owned()))
-            } else {
-                structure
-            }
-        })
-        .collect();
-    mounted_entries(&database)
+    mounted_entries(&add_port_subhelper_fields(database_with_carrier(port)))
 }
 
 fn mounted_entries(database: &DataForgeBuilder) -> Vec<TestEntry> {

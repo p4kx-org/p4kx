@@ -224,9 +224,7 @@ fn attachment(
             |(name, position, rotation)| helper_node(name, item_helper, *position, *rotation),
         );
         if !children.is_empty() {
-            root = root
-                .value("Tags", TestValue::text(""))
-                .value("SubHelpers", TestValue::Array(children.to_vec()));
+            root = root.value("SubHelpers", TestValue::Array(children.to_vec()));
         }
         instance = instance.value("Helper", TestValue::Struct(root));
     }
@@ -254,5 +252,7 @@ pub(crate) fn helper_node(
         .value("Name", TestValue::text(name))
         .value("ItemOffsetHelperName", TestValue::text(item_helper))
         .value("Offset", TestValue::Struct(offset));
-    TestInstance::new("SItemPortDefHelperNode").value("Helper", TestValue::Struct(helper))
+    TestInstance::new("SItemPortDefHelperNode")
+        .value("Tags", TestValue::text(""))
+        .value("Helper", TestValue::Struct(helper))
 }

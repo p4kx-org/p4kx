@@ -98,6 +98,14 @@ impl PortNode {
             },
         }
     }
+
+    /// Reports unresolved helper selection for a rigid anchor that used this port.
+    pub(crate) fn rigid_helper_diagnostic(&self) -> Option<PortHelperDiagnostic> {
+        let Attachment::Entity(item) = self.attachment() else {
+            return None;
+        };
+        unresolved_helper(self.definition()?, item.record_index())
+    }
 }
 
 pub(crate) fn resolve(
