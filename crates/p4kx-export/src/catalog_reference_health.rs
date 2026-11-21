@@ -190,7 +190,11 @@ fn ambiguous_rows(
             kind: Some(*kind),
             stage: ExportDiagnosticStage::Projection,
             code: ExportDiagnosticCode::AmbiguousIdentity,
-            severity: ExportDiagnosticSeverity::Error,
+            severity: if targets.ambiguous.contains(&(*kind, proof.guid)) {
+                ExportDiagnosticSeverity::Error
+            } else {
+                ExportDiagnosticSeverity::Information
+            },
             source_role: Some(ExportSourceRole::Selected),
             warning_code: None,
             count: 1,

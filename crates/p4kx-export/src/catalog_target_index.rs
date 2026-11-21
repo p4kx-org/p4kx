@@ -7,6 +7,7 @@ use p4kx_extraction::Guid;
 
 use crate::catalog_row::{CatalogRow, CatalogRowExclusion, ExcludedCatalogRow};
 use crate::catalog_v3::loot_definition_catalog::LootDefinitionKind;
+use crate::catalog_v3::{location_vocabulary, npc_spawn_definitions, starmap_definition_kinds};
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_field_inspection::FieldInspection;
 use crate::export_ledger::{ExportAccountingError, SourceDisposition, SourceObservation};
@@ -84,6 +85,7 @@ impl TargetIndex {
         selected: &Origins<'_>,
     ) -> Result<(), ExportAccountingError> {
         let mut identities = HashMap::<(Kind, Guid), usize>::new();
+        let mut indexed_owners = HashMap::new();
         for row in rows {
             let origins = selected
                 .get(&Identity::row(row))
@@ -94,6 +96,12 @@ impl TargetIndex {
                 }
                 if !self.emitted.insert((row.kind, physical)) {
                     return Err(ExportAccountingError::ConflictingCatalogRows);
+                }
+                if diagnoses_indexed_owner_aliases(row.kind)
+                    && let Some(previous) = indexed_owners.insert((row.kind, row.guid), physical)
+                {
+                    self.ambiguous_sources
+                        .extend([(row.kind, previous), (row.kind, physical)]);
                 }
                 continue;
             }
@@ -131,6 +139,14 @@ impl TargetIndex {
         }
         Ok(())
     }
+}
+
+fn diagnoses_indexed_owner_aliases(kind: Kind) -> bool {
+    let source_type = kind.records().type_name;
+    kind == Kind::StarmapObjects
+        || location_vocabulary::kind_for_type(source_type) == Some(kind)
+        || npc_spawn_definitions::kind_for_type(source_type) == Some(kind)
+        || starmap_definition_kinds::kind_for_type(source_type) == Some(kind)
 }
 
 fn origins<'source>(

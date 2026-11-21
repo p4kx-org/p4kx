@@ -150,13 +150,66 @@ fn duplicate_slot_guids_keep_distinct_physical_headers() -> TestResult {
         at(rows, "/1/recordIndex/value")?,
         "the physical occurrences remain distinct"
     );
-    let diagnostics = at(&diagnostic, "/exportHealth/diagnostics")?
+    let collision = slot_alias_diagnostic(&diagnostic)?
+        .ok_or("the canonical slot Kind diagnoses duplicate physical identities")?;
+    assert_eq!(at(collision, "/severity")?, "information");
+    assert_eq!(at(&diagnostic, "/exportHealth/status")?, "complete");
+    assert_eq!(at(&diagnostic, "/exportHealth/publicationMode")?, "normal");
+    let examples = at(collision, "/examples")?
+        .as_array()
+        .ok_or("two diagnostic examples")?;
+    let positions: Vec<_> = examples
+        .iter()
+        .map(|example| at(example, "/recordIndex/value"))
+        .collect::<TestResult<_>>()?;
+    assert_eq!(
+        positions,
+        [&json!(1), &json!(2)],
+        "both physical alias owners"
+    );
+    assert_eq!(at(collision, "/count")?, 2, "one diagnostic unit per owner");
+    assert_slot_links_remain_bound(&diagnostic)
+}
+
+fn slot_alias_diagnostic(catalog: &Value) -> TestResult<Option<&Value>> {
+    let diagnostics = at(catalog, "/exportHealth/diagnostics")?
         .as_array()
         .ok_or("diagnostics array")?;
+    Ok(diagnostics.iter().find(|row| {
+        row["kind"] == "locationResourceSlots"
+            && row["stage"] == "projection"
+            && row["code"] == "ambiguousIdentity"
+    }))
+}
+
+fn assert_slot_links_remain_bound(catalog: &Value) -> TestResult {
+    let references = at(catalog, "/exportHealth/unresolvedReferences")?
+        .as_array()
+        .ok_or("unresolved References array")?;
     assert!(
-        diagnostics.iter().any(|row| row["kind"] == "locationResourceSlots"
-            && row["code"] == "ambiguousIdentity"),
-        "the canonical slot Kind diagnoses duplicate physical identities"
+        references.iter().all(|entry| {
+            entry["status"] != "ambiguousIdentity"
+                || entry.pointer("/targetGuid/value") != Some(&json!(guid(SLOT)))
+        }),
+        "a physical module target is independent of GUID-only alias diagnostics"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_single_selected_slot_has_no_duplicate_owner_diagnostic() -> TestResult {
+    let isolated = export(
+        Layout::DuplicateGuid,
+        Some(&Filter::new("fixture/slots/first")),
+    )?;
+    assert_eq!(
+        at(&isolated, SLOTS)?.as_array().map(Vec::len),
+        Some(1),
+        "the filter selects exactly one physical slot owner"
+    );
+    assert!(
+        slot_alias_diagnostic(&isolated)?.is_none(),
+        "an excluded alias does not create an owner collision"
     );
     Ok(())
 }
@@ -165,9 +218,6 @@ fn export(layout: Layout, filter: Option<&Filter>) -> TestResult<Value> {
     let (_directory, archive) = common::open(&database(layout), DcbOrigin::Encrypted)?;
     let mut options = common::options();
     options.filter = filter;
-    if matches!(layout, Layout::DuplicateGuid) {
-        options.publication_mode = p4kx_export::CatalogPublicationMode::DiagnosticPartial;
-    }
     let built = build_catalog(&archive, &options)?;
     Ok(serde_json::from_slice(built.json())?)
 }

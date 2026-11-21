@@ -11,33 +11,47 @@ use crate::mission_index::MissionIndex;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 const SOURCE: u128 = 0x6a00_0000_0000_4000_8000_0000_0000_0001;
+const WRONG_LOCALITY: &str = "libs/foundry/records/missiondata/pu_missionlocality/unrelated.xml";
 
 fn unreadable_dependencies() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let mut spec = DataForgeBuilder::new().structure(
-        TestStruct::new("Broken")
-            .field("value", TestType::Int32)
-            .declared_size(6),
-    );
-    for (index, prefix) in [
-        "contracts/contracttemplates",
-        "missiontype",
-        "missiondata/pu_organizations",
-        "reputation/rewards/missionrewards_reputation",
-        "missiondata/pu_missionlocality",
-        "missionbroker",
-        "factions/factionreputation",
-    ]
-    .into_iter()
-    .enumerate()
-    {
+    let generic = "Broken";
+    let locality = Kind::MissionLocalities.records().type_name;
+    let mut spec =
+        [generic, locality]
+            .into_iter()
+            .fold(DataForgeBuilder::new(), |spec, type_name| {
+                spec.structure(
+                    TestStruct::new(type_name)
+                        .field("value", TestType::Int32)
+                        .declared_size(6),
+                )
+            });
+    let families = [
+        ("contracts/contracttemplates", generic),
+        ("missiontype", generic),
+        ("missiondata/pu_organizations", generic),
+        ("reputation/rewards/missionrewards_reputation", generic),
+        ("missiondata/pu_missionlocality", locality),
+        ("missionbroker", generic),
+        ("factions/factionreputation", generic),
+    ];
+    let unrelated = SOURCE + u128::try_from(families.len())?;
+    for (index, (prefix, type_name)) in families.into_iter().enumerate() {
         spec = spec.record(TestRecord::new(
             SOURCE + u128::try_from(index)?,
-            "Broken",
-            format!("Broken.Synthetic{index}"),
+            type_name,
+            format!("{type_name}.Synthetic{index}"),
             format!("libs/foundry/records/{prefix}/synthetic.xml"),
         ));
     }
-    Ok(spec.build())
+    Ok(spec
+        .record(TestRecord::new(
+            unrelated,
+            generic,
+            "Broken.Unrelated",
+            WRONG_LOCALITY,
+        ))
+        .build())
 }
 
 #[test]
@@ -50,6 +64,21 @@ fn all_seven_unreadable_dependency_families_are_retained() -> TestResult {
         failures.len(),
         7,
         "no dependency read error is discarded by Result::ok"
+    );
+    let locality = Kind::MissionLocalities.records();
+    assert!(
+        failures.iter().any(|failure| failure
+            .record()
+            .type_name()
+            .is_ok_and(|name| name == locality.type_name)),
+        "the malformed canonical locality is a retained Contracts dependency"
+    );
+    assert!(
+        failures.iter().all(|failure| failure
+            .record()
+            .record_path()
+            .is_ok_and(|path| path != WRONG_LOCALITY)),
+        "a different type in the locality folder is outside the dependency scope"
     );
     assert_eq!(
         ledger
