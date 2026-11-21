@@ -8,7 +8,7 @@ use crate::loadout_file_trace::FileTrace;
 use crate::loadout_xml::{Node, Scope};
 use crate::loadout_xml_use::{XmlInclude, XmlRoute};
 use crate::manual_loadout::ManualLoadout;
-use crate::merge::merge_by_port;
+use crate::merge::PortMergeIndex;
 use crate::resolver_observation::{self, LoadoutReadEvent, Observation};
 use crate::spec::{EntrySpec, LoadoutOrigin, LoadoutSpec, TargetSpec};
 use crate::{
@@ -18,9 +18,6 @@ use crate::{
 
 /// The most XML Loadouts one XML Loadout includes through nested `<Loadouts>`.
 pub const MAX_XML_INCLUDE_DEPTH: usize = 8;
-
-/// The most XML files one resolution reads, including its root and nested includes.
-pub const MAX_XML_INCLUDES: usize = 256;
 
 struct XmlLoadout {
     includes: Vec<LoadoutPath>,
@@ -37,6 +34,7 @@ pub(crate) fn load_observed(
     path: &LoadoutPath,
     caller: &LoadoutRequest,
     observation: Option<&Observation<'_>>,
+    include_read_budget: Option<usize>,
     trace: &mut FileTrace,
 ) -> Result<XmlEntries, LoadoutError> {
     let mut loader = Loader {
@@ -46,7 +44,8 @@ pub(crate) fn load_observed(
         stack: Vec::new(),
         include_paths: Vec::new(),
         done: HashMap::new(),
-        loads: 0,
+        include_read_budget,
+        include_reads: 0,
         issues: Vec::new(),
     };
     let entries = loader.load(path, caller);
@@ -73,7 +72,8 @@ struct Loader<'l> {
     stack: Vec<String>,
     include_paths: Vec<LoadoutPath>,
     done: HashMap<String, CachedLoadout>,
-    loads: usize,
+    include_read_budget: Option<usize>,
+    include_reads: usize,
     issues: Vec<LoadoutError>,
 }
 
@@ -106,33 +106,42 @@ impl Loader<'_> {
                 "it is included deeper than {MAX_XML_INCLUDE_DEPTH} Loadouts"
             )));
         }
-        self.loads = self.loads.saturating_add(1);
+        self.admit_include(path)?;
         let first = self.trace.position();
-        let loadout = match load_file(self.files, path, caller, self.observation, self.trace) {
-            Ok(loadout) => loadout,
-            Err(error) => {
-                self.done.insert(
-                    path.to_ascii_lowercase(),
-                    CachedLoadout {
-                        result: Err(error.clone()),
-                        operation: self.trace.captured(first),
-                    },
-                );
-                return Err(error);
-            }
-        };
-        self.stack.push(path.to_string());
-        let mut entries = self.load_includes(&loadout.includes, self.trace.captured(first))?;
-        self.stack.pop();
-        merge_into(&mut entries, loadout.entries);
+        let result =
+            load_file(self.files, path, caller, self.observation, self.trace).and_then(|loadout| {
+                self.stack.push(path.to_string());
+                let result = self.load_includes(loadout, self.trace.captured(first));
+                self.stack.pop();
+                result
+            });
         self.done.insert(
             path.to_ascii_lowercase(),
             CachedLoadout {
-                result: Ok(entries.clone()),
+                result: result.clone(),
                 operation: self.trace.captured(first),
             },
         );
-        Ok(entries)
+        result
+    }
+
+    fn admit_include(&mut self, path: &LoadoutPath) -> Result<(), LoadoutError> {
+        if let Some(limit) = self.include_read_budget
+            && !self.stack.is_empty()
+        {
+            if self.include_reads >= limit {
+                resolver_observation::notify(
+                    self.observation,
+                    LoadoutReadEvent::InventoryIncomplete,
+                )?;
+                return Err(LoadoutError::XmlIncludeReadBudgetExceeded {
+                    path: path.to_string(),
+                    limit,
+                });
+            }
+            self.include_reads += 1;
+        }
+        Ok(())
     }
 
     fn load_include(
@@ -154,12 +163,13 @@ impl Loader<'_> {
 
     fn load_includes(
         &mut self,
-        paths: &[LoadoutPath],
+        loadout: XmlLoadout,
         parent: Option<usize>,
     ) -> Result<Vec<EntrySpec>, LoadoutError> {
         let mut entries = Vec::new();
+        let mut ports = PortMergeIndex::default();
         let mut named = HashSet::new();
-        for include in paths {
+        for include in &loadout.includes {
             if self.observation.is_some_and(Observation::stopped) {
                 return Err(LoadoutError::ObservationStopped);
             }
@@ -170,24 +180,10 @@ impl Loader<'_> {
             let caller = LoadoutRequest::Xml {
                 path: include.clone(),
             };
-            if self.loads >= MAX_XML_INCLUDES && !self.done.contains_key(&key) {
-                resolver_observation::notify(
-                    self.observation,
-                    LoadoutReadEvent::InventoryIncomplete,
-                )?;
-                let error = LoadoutError::XmlLoadout {
-                    path: include.to_string(),
-                    reason: format!(
-                        "more than {MAX_XML_INCLUDES} Loadouts are read; the rest are left out"
-                    ),
-                };
-                self.trace
-                    .refused(parent, &caller, &error, self.observation)?;
-                self.issues.push(error);
-                break;
-            }
-
             let result = self.load_include(include, &caller);
+            if self.observation.is_some_and(Observation::stopped) {
+                return Err(LoadoutError::ObservationStopped);
+            }
             let edge = if let Some(done) = self.done.get(&key) {
                 self.trace
                     .dependency(parent, done.operation, &caller, self.observation)?
@@ -201,13 +197,18 @@ impl Loader<'_> {
                 None
             };
             match result {
-                Ok(included) => merge_into(&mut entries, through_include(included, edge)),
-                Err(error) if self.observation.is_some_and(Observation::stopped) => {
+                Ok(included) => {
+                    ports.merge(&mut entries, through_include(included, edge), |entry| {
+                        &entry.port
+                    });
+                }
+                Err(error @ LoadoutError::XmlIncludeReadBudgetExceeded { .. }) => {
                     return Err(error);
                 }
                 Err(error) => self.issues.push(error),
             }
         }
+        ports.merge(&mut entries, loadout.entries, |entry| &entry.port);
         Ok(entries)
     }
 }
@@ -265,10 +266,6 @@ fn through_include(mut entries: Vec<EntrySpec>, edge: Option<XmlInclude>) -> Vec
         ));
     }
     entries
-}
-
-fn merge_into(entries: &mut Vec<EntrySpec>, overrides: Vec<EntrySpec>) {
-    merge_by_port(entries, overrides, |entry| &entry.port);
 }
 
 fn read_root(

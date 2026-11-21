@@ -5,7 +5,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use p4kx_assembly::{Entities, LoadoutResolver};
+use p4kx_assembly::{Entities, LoadoutError, LoadoutResolver};
 use p4kx_dataforge::DataForge;
 
 use crate::loadout_cache_shared_support as fixture;
@@ -66,7 +66,7 @@ fn verify_stop(
     assert!(
         matches!(
             resolver.resolve(&root),
-            Err(p4kx_assembly::LoadoutError::ObservationStopped)
+            Err(LoadoutError::ObservationStopped)
         ),
         "an edge or refusal observer can stop before subsequent dependency work"
     );
@@ -104,23 +104,56 @@ fn verify_stop(
 }
 
 #[test]
-fn a_before_read_capacity_refusal_has_no_invented_child_operation() -> TestResult {
+fn an_explicit_include_budget_refuses_the_xml_result_before_the_next_read() -> TestResult {
+    const INCLUDES: usize = 257;
     let mut documents = HashMap::new();
-    let total = p4kx_assembly::MAX_XML_INCLUDES;
+    let budget = INCLUDES - 1;
     documents.insert(
         fixture::ROOT.to_owned(),
-        fixture::document((0..total).map(fixture::path)),
+        fixture::document((0..INCLUDES).map(fixture::path)),
     );
-    for index in 0..total {
+    for index in 0..INCLUDES {
         documents.insert(fixture::path(index), fixture::document([]));
     }
+    documents.insert(
+        fixture::path(0),
+        br#"<Loadout><Items><Item portName="admitted"/></Items></Loadout>"#.to_vec(),
+    );
     verify_refusal(
         &Files {
             documents,
             reads: AtomicUsize::new(0),
         },
-        total,
-        &fixture::path(total - 1),
+        Some(budget),
+        budget + 1,
+        &fixture::path(budget),
+    )
+}
+
+#[test]
+fn a_nested_budget_refusal_records_only_the_unread_dependency() -> TestResult {
+    let branch = fixture::path(0);
+    let completed = fixture::path(1);
+    let refused = fixture::path(2);
+    let documents = HashMap::from([
+        (
+            fixture::ROOT.to_owned(),
+            fixture::document([branch.clone()]),
+        ),
+        (
+            branch,
+            fixture::document([completed.clone(), refused.clone()]),
+        ),
+        (completed, fixture::document([])),
+    ]);
+    verify_refusal(
+        &Files {
+            documents,
+            reads: AtomicUsize::new(0),
+        },
+        Some(2),
+        3,
+        &refused,
     )
 }
 
@@ -143,18 +176,20 @@ fn a_before_read_depth_refusal_has_no_invented_child_operation() -> TestResult {
             documents,
             reads: AtomicUsize::new(0),
         },
+        None,
         total,
         &fixture::path(total - 1),
     )
 }
 
-fn verify_refusal(files: &Files, reads: usize, skipped: &str) -> TestResult {
+fn verify_refusal(files: &Files, budget: Option<usize>, reads: usize, skipped: &str) -> TestResult {
     let database = fixture::database();
     let forge = DataForge::open(&database)?;
     let probe = Arc::new(Probe::default());
     let mut resolver =
         LoadoutResolver::with_observed_entities(Arc::new(Entities::new(&forge)), probe.clone())
-            .with_files(files);
+            .with_files(files)
+            .with_xml_include_read_budget(budget);
     let root = forge.record(0).ok_or("the synthetic Entity is absent")?;
     let node = resolver.resolve(&root)?;
     assert_eq!(
@@ -162,11 +197,25 @@ fn verify_refusal(files: &Files, reads: usize, skipped: &str) -> TestResult {
         1,
         "the actual first omitted Include keeps its precise issue"
     );
+    if let Some(limit) = budget {
+        assert!(
+            matches!(node.issues(), [LoadoutError::XmlIncludeReadBudgetExceeded { path, limit: actual }] if path == skipped && *actual == limit),
+            "the caller sees the precise budget error"
+        );
+        assert!(
+            node.ports().is_empty(),
+            "the refused XML contributes no partial ports"
+        );
+    }
     assert_eq!(
         files.reads.load(Ordering::Relaxed),
         reads,
         "a readless refusal adds no provider read"
     );
+    verify_source_refusal(&probe, skipped)
+}
+
+fn verify_source_refusal(probe: &Probe, skipped: &str) -> TestResult {
     let state = probe
         .0
         .lock()

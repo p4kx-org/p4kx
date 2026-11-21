@@ -106,6 +106,14 @@ pub enum LoadoutError {
         /// Why it cannot be read.
         reason: String,
     },
+    /// The caller's XML Include read budget was exhausted before a new provider read.
+    #[error("the XML Include {path} exceeds the budget of {limit} Include read attempts")]
+    XmlIncludeReadBudgetExceeded {
+        /// The requested Include that needs another provider read.
+        path: String,
+        /// The caller's allowance, excluding the root.
+        limit: usize,
+    },
     /// A loadout assortment cannot be used: it names itself, is no assortment, has a chosen
     /// alternative that is no Loadout or is picked beyond its group. The other assortments still
     /// apply.
@@ -220,6 +228,7 @@ impl LoadoutError {
             Self::TooManyPorts => "too_many_ports",
             Self::NoLoadoutFiles { .. } => "no_loadout_files",
             Self::XmlLoadout { .. } | Self::MissingXmlLoadout { .. } => "xml_loadout",
+            Self::XmlIncludeReadBudgetExceeded { .. } => "xml_include_read_budget_exceeded",
             Self::Assortment { .. } | Self::UnknownPick { .. } => "assortment",
             Self::AssortmentRequirement { .. } => "assortment_requirement",
             Self::VehicleImplementation { .. } | Self::MissingVehicleImplementation { .. } => {

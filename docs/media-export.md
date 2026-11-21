@@ -773,9 +773,13 @@ link status. Unreadable tag or fragment definitions have a selector scope
 diagnostic. A failed verification of a required ADB payload prevents complete
 publication. The Animation provider is optional for the source graph export.
 
-The Assembly Loadout parser applies a 16 MiB limit per XML document, a maximum
-of eight documents on the active Include chain, and a maximum of 256 files per
-Loadout resolution. Media input limits also apply.
+The Assembly Loadout reader applies a 16 MiB limit per XML document and allows up to
+eight documents on an active Include chain, counting the root. Include breadth uses
+the full reachable set by default. A library caller can choose a read-attempt budget
+per XML resolution with `LoadoutResolver::with_xml_include_read_budget`. The root and
+cached Includes consume no attempts. A failed provider read consumes one attempt.
+Exhaustion refuses the XML result with a typed error for the first omitted Include.
+Media input limits also apply.
 
 Scoped exports write one directory `scope-receipt` record per resolved rig
 occurrence using its ordinal in loadout traversal order. The receipt identifies

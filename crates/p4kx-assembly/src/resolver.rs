@@ -16,7 +16,7 @@ use crate::pick::LoadoutPicks;
 use crate::plan::Plan;
 use crate::resolver_observation::{self, Cache, LoadoutReadEvent, Observation};
 use crate::resolver_vehicle::VehicleCacheKey;
-use crate::resolver_xml::XmlCacheKey;
+use crate::resolver_xml::XmlCache;
 use crate::spec::{EntitySpec, EntrySpec, LoadoutSpec, TargetSpec};
 use crate::walk::Walk;
 use crate::{
@@ -64,7 +64,7 @@ pub struct LoadoutResolver<'f> {
     pub(crate) forge_origin: Option<Arc<DataForgeOrigin>>,
     pub(crate) files: Option<&'f dyn LoadoutFiles>,
     pub(crate) specs: HashMap<u32, SpecResult>,
-    pub(crate) xml: HashMap<XmlCacheKey, CachedDocument<EntriesResult>>,
+    pub(crate) xml: XmlCache,
     pub(crate) vehicles: HashMap<VehicleCacheKey, CachedDocument<VehicleResult>>,
     pub(crate) landing: HashMap<Guid, Result<Arc<[LandingGear]>, LoadoutError>>,
     pub(crate) builder: TreeBuilder<'f>,
@@ -108,7 +108,7 @@ impl<'f> LoadoutResolver<'f> {
             forge_origin: None,
             files: None,
             specs: HashMap::new(),
-            xml: HashMap::new(),
+            xml: XmlCache::default(),
             vehicles: HashMap::new(),
             landing: HashMap::new(),
             builder: TreeBuilder::new(),

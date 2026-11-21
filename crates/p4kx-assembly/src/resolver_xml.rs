@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
@@ -14,13 +15,36 @@ use crate::{
     xml,
 };
 
+#[derive(Default)]
+pub(crate) struct XmlCache {
+    entries: HashMap<XmlCacheKey, CachedDocument<EntriesResult>>,
+    include_read_budget: Option<usize>,
+}
+
+impl XmlCache {
+    pub(crate) fn clear(&mut self) {
+        self.entries.clear();
+    }
+}
+
 #[derive(PartialEq, Eq, Hash)]
-pub(crate) struct XmlCacheKey {
+struct XmlCacheKey {
     path: String,
     capture_paint: bool,
 }
 
 impl LoadoutResolver<'_> {
+    /// Selects a maximum of new provider read attempts per XML Include resolution.
+    ///
+    /// The root and reused Includes cost no attempts. A failed provider read costs one attempt.
+    /// `None` permits all Includes. An exhausted budget refuses the XML result.
+    #[must_use]
+    pub fn with_xml_include_read_budget(mut self, budget: Option<usize>) -> Self {
+        self.xml.include_read_budget = budget;
+        self.xml.clear();
+        self
+    }
+
     pub(crate) fn xml_entries(&mut self, path: &LoadoutPath) -> EntriesResult {
         let Some(files) = self.files else {
             return Err(LoadoutError::NoLoadoutFiles {
@@ -34,7 +58,8 @@ impl LoadoutResolver<'_> {
             path: path.to_ascii_lowercase(),
             capture_paint,
         };
-        let (mut result, original) = match self.xml.entry(key) {
+        let include_read_budget = self.xml.include_read_budget;
+        let (mut result, original) = match self.xml.entries.entry(key) {
             Entry::Occupied(entry) => {
                 let cached = entry.get();
                 (
@@ -44,7 +69,15 @@ impl LoadoutResolver<'_> {
             }
             Entry::Vacant(entry) => {
                 let cached = entry.insert(CachedDocument::read(|trace| {
-                    read_entries(files, path, &caller, observation, capture_paint, trace)
+                    read_entries(
+                        files,
+                        path,
+                        &caller,
+                        observation,
+                        capture_paint,
+                        include_read_budget,
+                        trace,
+                    )
                 }));
                 (cached.value().clone(), cached.xml_root().cloned())
             }
@@ -77,13 +110,21 @@ fn read_entries(
     caller: &LoadoutRequest,
     observation: Option<&Observation<'_>>,
     capture_paint: bool,
+    include_read_budget: Option<usize>,
     trace: &mut FileTrace,
 ) -> EntriesResult {
     let attributes = capture_paint.then(|| Arc::new(XmlLoadoutAttributes::default()));
     let capture = attributes
         .as_ref()
         .map(|sites| Observation::new(sites.clone()));
-    let loaded = xml::load_observed(files, path, caller, observation.or(capture.as_ref()), trace)?;
+    let loaded = xml::load_observed(
+        files,
+        path,
+        caller,
+        observation.or(capture.as_ref()),
+        include_read_budget,
+        trace,
+    )?;
     let xml_use = attributes.and_then(|sites| {
         let original = trace.xml_root()?.clone();
         Some(LoadoutXmlClassUse::root(original, path, Some(sites)))

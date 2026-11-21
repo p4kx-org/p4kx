@@ -46,9 +46,16 @@ fn a_missing_xml_error_retains_the_actual_getter_selection() -> TestResult {
     let archive = p4kx_archive::Archive::open(file)?;
     let files = ArchiveFiles::new(&archive);
     let caller = LoadoutRequest::Xml { path: path.clone() };
-    let error = crate::xml::load_observed(&files, &path, &caller, None, &mut FileTrace::default())
-        .err()
-        .ok_or("the actual absent file was accepted")?;
+    let error = crate::xml::load_observed(
+        &files,
+        &path,
+        &caller,
+        None,
+        None,
+        &mut FileTrace::default(),
+    )
+    .err()
+    .ok_or("the actual absent file was accepted")?;
     assert_missing_error(&error, &expected)
 }
 

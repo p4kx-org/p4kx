@@ -56,17 +56,36 @@ pub(crate) fn merge_by_port<T>(
     overrides: impl IntoIterator<Item = T>,
     port: impl Fn(&T) -> &str,
 ) {
-    let mut index: HashMap<String, usize> = HashMap::with_capacity(items.len());
-    for (at, item) in items.iter().enumerate() {
-        index.entry(port_key(port(item))).or_insert(at);
+    PortMergeIndex::of(items, &port).merge(items, overrides, port);
+}
+
+/// Tracks the first occurrence of each normalized port across ordered merges.
+#[derive(Default)]
+pub(crate) struct PortMergeIndex(HashMap<String, usize>);
+
+impl PortMergeIndex {
+    fn of<T>(items: &[T], port: impl Fn(&T) -> &str) -> Self {
+        let mut index = HashMap::with_capacity(items.len());
+        for (at, item) in items.iter().enumerate() {
+            index.entry(port_key(port(item))).or_insert(at);
+        }
+        Self(index)
     }
-    for item in overrides {
-        let key = port_key(port(&item));
-        if let Some(old) = index.get(&key).and_then(|at| items.get_mut(*at)) {
-            *old = item;
-        } else {
-            index.insert(key, items.len());
-            items.push(item);
+
+    pub(crate) fn merge<T>(
+        &mut self,
+        items: &mut Vec<T>,
+        overrides: impl IntoIterator<Item = T>,
+        port: impl Fn(&T) -> &str,
+    ) {
+        for item in overrides {
+            let key = port_key(port(&item));
+            if let Some(old) = self.0.get(&key).and_then(|at| items.get_mut(*at)) {
+                *old = item;
+            } else {
+                self.0.insert(key, items.len());
+                items.push(item);
+            }
         }
     }
 }
