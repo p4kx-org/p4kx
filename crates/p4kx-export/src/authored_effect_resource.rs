@@ -7,16 +7,23 @@ use serde::Serialize;
 
 use super::authored_fields::Observed;
 use crate::CatalogError;
+use crate::catalog_v3::catalog_item_components::source_getters;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 
+/// A configured particle resource path.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-pub(super) struct ParticleResource {
+pub struct ParticleResource {
     path: SourcedValue<String>,
 }
 
 impl ParticleResource {
+    source_getters! {
+        /// Borrows the authored resource path.
+        path: SourcedValue<String>,
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,
@@ -27,14 +34,20 @@ impl ParticleResource {
     }
 }
 
+/// A configured audio trigger identifier.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct AudioResource {
+pub struct AudioResource {
     audio_trigger: SourcedValue<String>,
 }
 
 impl AudioResource {
+    source_getters! {
+        /// Borrows the authored audio trigger.
+        audio_trigger: SourcedValue<String>,
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,

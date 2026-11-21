@@ -18,11 +18,12 @@ mod missile_targeting;
 use super::super::ordnance_fields::OrdnanceFields;
 use crate::CatalogError;
 use crate::catalog_table::CatalogTable;
+use crate::catalog_v3::catalog_item_components::source_getters;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
-use missile_guidance::MissileGuidance;
-use missile_shake::MissileShake;
-use missile_targeting::MissileTargeting;
+pub use missile_guidance::{MissileGuidance, MissileGuidancePhase};
+pub use missile_shake::{MissileAxes, MissileShake};
+pub use missile_targeting::MissileTargeting;
 
 pub(in crate::catalog_v3) const SOURCE_TYPE: &str = "SCItemMissileParams";
 
@@ -41,6 +42,17 @@ pub struct MissileConfiguration<'source> {
 }
 
 impl<'source> MissileConfiguration<'source> {
+    source_getters! {
+        /// Borrows the original declaration and additional fields.
+        source: UnitSource<'source>,
+        /// Borrows the authored guidance.
+        guidance: SourcedValue<MissileGuidance<'source>>,
+        /// Borrows the authored targeting.
+        targeting: SourcedValue<MissileTargeting<'source>>,
+        /// Borrows the authored shake.
+        shake: SourcedValue<MissileShake<'source>>,
+    }
+
     /// Borrows the original Item Record and physical Components slot.
     #[must_use]
     pub const fn owner(&self) -> &ComponentOwner {

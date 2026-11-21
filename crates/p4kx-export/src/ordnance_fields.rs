@@ -9,6 +9,7 @@ use super::authored_effect_resource::{AudioResource, Rtpc};
 use super::authored_explosion::ExplosionParameters;
 use super::authored_fields::Observed;
 use crate::CatalogError;
+use crate::catalog_v3::catalog_item_components::source_getters;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
@@ -19,7 +20,7 @@ const AUDIO_TYPE: &[&str] = &["GlobalResourceAudio"];
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct OrdnanceFields<'source> {
+pub struct OrdnanceFields<'source> {
     audio_params: SourcedValue<OrdnanceAudio>,
     requires_launcher: SourcedValue<bool>,
     enable_lifetime: SourcedValue<bool>,
@@ -36,6 +37,35 @@ pub(crate) struct OrdnanceFields<'source> {
 }
 
 impl<'source> OrdnanceFields<'source> {
+    source_getters! {
+        /// Borrows the authored audio params.
+        audio_params: SourcedValue<OrdnanceAudio>,
+        /// Borrows the authored requires launcher.
+        requires_launcher: SourcedValue<bool>,
+        /// Borrows the authored enable lifetime.
+        enable_lifetime: SourcedValue<bool>,
+        /// Borrows the authored max lifetime.
+        max_lifetime: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored arm time.
+        arm_time: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored max armable override.
+        max_armable_override: SourcedValue<i32>,
+        /// Borrows the authored ignite time.
+        ignite_time: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored collision delay time.
+        collision_delay_time: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored explosion safety distance.
+        explosion_safety_distance: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored projectile proximity.
+        projectile_proximity: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored explosion settings and their source evidence.
+        explosion_params: SourcedValue<ExplosionParameters<'source>>,
+        /// Borrows the authored cluster params.
+        cluster_params: SourcedValue<OrdnanceCluster>,
+        /// Borrows the authored emissions params.
+        emissions_params: SourcedValue<Vec<SourcedValue<OrdnanceEmission>>>,
+    }
+
     pub(super) const fn projected(
         &self,
     ) -> [(&'static str, p4kx_extraction::SourceValueState); 13] {
@@ -105,7 +135,7 @@ impl<'source> OrdnanceFields<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct BombFields<'source> {
+pub struct BombFields<'source> {
     #[serde(flatten)]
     ordnance: OrdnanceFields<'source>,
     drag_area_radius: SourcedValue<ResourceFloat32>,
@@ -116,6 +146,21 @@ pub(crate) struct BombFields<'source> {
 }
 
 impl<'source> BombFields<'source> {
+    source_getters! {
+        /// Borrows the inherited ordnance settings.
+        ordnance: OrdnanceFields<'source>,
+        /// Borrows the authored drag area radius.
+        drag_area_radius: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored centre of pressure offset Y.
+        centre_of_pressure_offset_y: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored maximum drop angle from flat flight.
+        maximum_drop_angle_from_flat_flight: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored altitude RTPC.
+        altitude_rtpc: SourcedValue<Rtpc>,
+        /// Borrows the authored max altitude for audio RTPC.
+        max_altitude_for_audio_rtpc: SourcedValue<ResourceFloat32>,
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -137,10 +182,11 @@ impl<'source> BombFields<'source> {
     }
 }
 
+/// Original ordnance audio triggers.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct OrdnanceAudio {
+pub struct OrdnanceAudio {
     #[serde(rename = "releaseAudioTrigger")]
     release: SourcedValue<AudioResource>,
     #[serde(rename = "engineIgniteAudioTrigger")]
@@ -152,6 +198,17 @@ struct OrdnanceAudio {
 }
 
 impl OrdnanceAudio {
+    source_getters! {
+        /// Borrows the authored release.
+        release: SourcedValue<AudioResource>,
+        /// Borrows the authored engine ignite.
+        engine_ignite: SourcedValue<AudioResource>,
+        /// Borrows the authored trail.
+        trail: SourcedValue<AudioResource>,
+        /// Borrows the authored trail stop.
+        trail_stop: SourcedValue<AudioResource>,
+    }
+
     fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,
@@ -185,10 +242,11 @@ impl OrdnanceAudio {
     }
 }
 
+/// Authored cluster munition separation settings.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct OrdnanceCluster {
+pub struct OrdnanceCluster {
     launch_detach_time: SourcedValue<ResourceFloat32>,
     impact_detach_time: SourcedValue<ResourceFloat32>,
     detach_angle_relative_to_gravity: SourcedValue<bool>,
@@ -200,6 +258,25 @@ struct OrdnanceCluster {
 }
 
 impl OrdnanceCluster {
+    source_getters! {
+        /// Borrows the authored launch detach time.
+        launch_detach_time: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored impact detach time.
+        impact_detach_time: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored detach angle relative to gravity.
+        detach_angle_relative_to_gravity: SourcedValue<bool>,
+        /// Borrows the authored detach angle initial.
+        detach_angle_initial: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored detach angle increment.
+        detach_angle_increment: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored detach angle reset count.
+        detach_angle_reset_count: SourcedValue<i32>,
+        /// Borrows the authored detach delay.
+        detach_delay: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored detach speed.
+        detach_speed: SourcedValue<ResourceFloat32>,
+    }
+
     fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,
@@ -218,10 +295,11 @@ impl OrdnanceCluster {
     }
 }
 
+/// One authored ordnance emission envelope.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct OrdnanceEmission {
+pub struct OrdnanceEmission {
     active: SourcedValue<bool>,
     min_value: SourcedValue<ResourceFloat32>,
     max_value: SourcedValue<ResourceFloat32>,
@@ -230,6 +308,19 @@ struct OrdnanceEmission {
 }
 
 impl OrdnanceEmission {
+    source_getters! {
+        /// Borrows the authored active.
+        active: SourcedValue<bool>,
+        /// Borrows the authored min value.
+        min_value: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored max value.
+        max_value: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored rise rate.
+        rise_rate: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored decay rate.
+        decay_rate: SourcedValue<ResourceFloat32>,
+    }
+
     fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,

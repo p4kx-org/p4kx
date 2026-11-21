@@ -8,6 +8,7 @@ use serde::Serialize;
 use crate::CatalogError;
 use crate::catalog_v3::authored_damage::DamageVector;
 use crate::catalog_v3::authored_fields::Observed;
+use crate::catalog_v3::catalog_item_components::source_getters;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
@@ -16,7 +17,7 @@ use crate::source_fields::FieldError;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ExplosionGeometry {
+pub struct ExplosionGeometry {
     min_radius: SourcedValue<ResourceFloat32>,
     max_radius: SourcedValue<ResourceFloat32>,
     sound_radius: SourcedValue<ResourceFloat32>,
@@ -33,6 +34,35 @@ pub(super) struct ExplosionGeometry {
 }
 
 impl ExplosionGeometry {
+    source_getters! {
+        /// Borrows the authored min radius.
+        min_radius: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored max radius.
+        max_radius: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored sound radius.
+        sound_radius: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored min phys radius.
+        min_phys_radius: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored max phys radius.
+        max_phys_radius: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored angle.
+        angle: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored angle vertical.
+        angle_vertical: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored explosion front.
+        explosion_front: SourcedValue<DamageVector>,
+        /// Borrows the authored explosion up.
+        explosion_up: SourcedValue<DamageVector>,
+        /// Borrows the authored explosion zone.
+        explosion_zone: SourcedValue<String>,
+        /// Borrows the authored pressure.
+        pressure: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored hole size.
+        hole_size: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored terrain hole size.
+        terrain_hole_size: SourcedValue<ResourceFloat32>,
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,

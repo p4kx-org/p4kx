@@ -8,6 +8,7 @@ use serde::Serialize;
 use super::authored_fields::Observed;
 use super::authored_link::HealthLink;
 use crate::CatalogError;
+use crate::catalog_v3::catalog_item_components::source_getters;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
@@ -22,12 +23,18 @@ pub(super) const DAMAGE_TYPES: &[&str] = &["DamageBase", "DamageInfo", "DamagePa
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-pub(crate) enum AuthoredDamage<'source> {
+#[non_exhaustive]
+pub enum AuthoredDamage<'source> {
+    /// The base damage declaration.
     Base,
+    /// An explicit set of damage channels.
     Info {
+        /// The original per-channel damage values.
         value: Box<DamageInfo>,
     },
+    /// A damage macro and declared total.
     Parameters {
+        /// The original macro link and total.
         value: Box<DamageParameters<'source>>,
     },
 }
@@ -54,7 +61,7 @@ impl<'source> AuthoredDamage<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct DamageInfo {
+pub struct DamageInfo {
     physical: SourcedValue<ResourceFloat32>,
     energy: SourcedValue<ResourceFloat32>,
     distortion: SourcedValue<ResourceFloat32>,
@@ -73,7 +80,9 @@ impl DamageInfo {
         }
     }
 
-    pub(super) const fn channels(&self) -> DamageChannels<&SourcedValue<ResourceFloat32>> {
+    /// Borrows each of the six authored damage channels.
+    #[must_use]
+    pub const fn channels(&self) -> DamageChannels<&SourcedValue<ResourceFloat32>> {
         DamageChannels {
             physical: &self.physical,
             energy: &self.energy,
@@ -229,13 +238,22 @@ impl<'source> DamageParameters<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct DamageVector {
+pub struct DamageVector {
     x: SourcedValue<ResourceFloat32>,
     y: SourcedValue<ResourceFloat32>,
     z: SourcedValue<ResourceFloat32>,
 }
 
 impl DamageVector {
+    source_getters! {
+        /// Borrows the authored X coordinate.
+        x: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored Y coordinate.
+        y: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored Z coordinate.
+        z: SourcedValue<ResourceFloat32>,
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,

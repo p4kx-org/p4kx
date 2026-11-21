@@ -12,9 +12,19 @@ use crate::catalog_v3::catalog_item_components::ItemEquipmentFamily;
 use crate::catalog_v3::explosion_definition;
 use crate::record_observation::RecordObservation;
 
-pub use crate::catalog_v3::catalog_emp::Emp;
-pub use crate::catalog_v3::catalog_explosives::Explosive;
-pub use crate::catalog_v3::catalog_explosives::catalog_missile_configuration::MissileConfiguration;
+pub use crate::catalog_v3::catalog_emp::{Emp, EmpParameters, EmpParticle, EmpStages, EmpTriggers};
+pub use crate::catalog_v3::catalog_explosives::catalog_missile_configuration::{
+    MissileAxes, MissileConfiguration, MissileGuidance, MissileGuidancePhase, MissileShake,
+    MissileTargeting,
+};
+pub use crate::catalog_v3::catalog_explosives::{
+    AnimatedPrimeState, AudioResource, AuthoredDamage, BehaviorEffect, BombFields, DamageInfo,
+    DamageVector, DeviceBehavior, DeviceTrigger, ExplosionEffects, ExplosionGeometry,
+    ExplosionParameters, Explosive, ExplosiveConfiguration, Flashbang, Fragments, LaserTrigger,
+    LaserTrip, MaterialEffect, OrdnanceAudio, OrdnanceCluster, OrdnanceEmission, OrdnanceFields,
+    ParticleResource, PrimeFlags, PrimeStates, Primeable, ProximityTrigger, SensorMine,
+    SensorMineTrigger, Shockwave, TriggerDetails, TriggerSource, TriggerableDevice,
+};
 pub use crate::catalog_v3::explosion_definition::ExplosionDefinition;
 
 record_query::item_component!(EmpRows, 'source, Emp<'source>, ItemEquipmentFamily::Emp, read_emp);

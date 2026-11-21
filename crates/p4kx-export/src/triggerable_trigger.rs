@@ -9,6 +9,7 @@ use super::behavior::DeviceBehavior;
 use crate::CatalogError;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_v3::authored_fields::Observed;
+use crate::catalog_v3::catalog_item_components::source_getters;
 use crate::catalog_v3::catalog_unit_source::UnitSource;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
@@ -24,7 +25,7 @@ const LASER_TRIP: &str = "STriggerableDevicesTriggerLaserTripParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct DeviceTrigger<'source> {
+pub struct DeviceTrigger<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     #[serde(flatten)]
@@ -34,6 +35,15 @@ pub(super) struct DeviceTrigger<'source> {
 }
 
 impl<'source> DeviceTrigger<'source> {
+    source_getters! {
+        /// Borrows the original declaration and additional fields.
+        source: UnitSource<'source>,
+        /// Borrows the shared authored trigger settings.
+        common: TriggerSource<'source>,
+        /// Borrows the concrete trigger variant.
+        details: TriggerDetails<'source>,
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -50,10 +60,11 @@ impl<'source> DeviceTrigger<'source> {
     }
 }
 
+/// The common authored fields of a device trigger.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct TriggerSource<'source> {
+pub struct TriggerSource<'source> {
     behavior: SourcedValue<DeviceBehavior<'source>>,
     blinking_params: SourcedValue<SourceArenaOutput<'source>>,
     effect_tags: SourcedValue<SourceArenaOutput<'source>>,
@@ -64,6 +75,23 @@ struct TriggerSource<'source> {
 }
 
 impl<'source> TriggerSource<'source> {
+    source_getters! {
+        /// Borrows the authored behavior.
+        behavior: SourcedValue<DeviceBehavior<'source>>,
+        /// Borrows the authored blinking params.
+        blinking_params: SourcedValue<SourceArenaOutput<'source>>,
+        /// Borrows the authored effect tag declarations.
+        effect_tags: SourcedValue<SourceArenaOutput<'source>>,
+        /// Borrows the authored is authoritative.
+        is_authoritative: SourcedValue<bool>,
+        /// Borrows the authored marker model path.
+        marker_model_path: SourcedValue<SourceText<'source>>,
+        /// Borrows the authored marker shape path.
+        marker_shape_path: SourcedValue<SourceText<'source>>,
+        /// Borrows the authored name.
+        name: SourcedValue<SourceText<'source>>,
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -99,6 +127,7 @@ impl<'source> TriggerSource<'source> {
     }
 }
 
+/// The concrete settings selected by an authored device trigger.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(
     tag = "type",
@@ -106,16 +135,24 @@ impl<'source> TriggerSource<'source> {
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-enum TriggerDetails<'source> {
+#[non_exhaustive]
+pub enum TriggerDetails<'source> {
+    /// An elapsed-time trigger.
     Timer {
+        /// The authored timer duration.
         duration: SourcedValue<ResourceFloat32>,
     },
+    /// An impact trigger.
     Impact {
+        /// Whether water collisions are ignored.
         ignore_water_collision: SourcedValue<bool>,
     },
+    /// A laser trip trigger.
     LaserTrip {
+        /// The authored laser trip settings.
         value: Box<LaserTrip<'source>>,
     },
+    /// A trigger with its fields retained in the source arena.
     Other,
 }
 
@@ -154,10 +191,11 @@ impl<'source> TriggerDetails<'source> {
     }
 }
 
+/// The authored geometry and effects of a laser trip trigger.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct LaserTrip<'source> {
+pub struct LaserTrip<'source> {
     helper_name: SourcedValue<SourceText<'source>>,
     laser_corner_duration: SourcedValue<ResourceFloat32>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
@@ -173,6 +211,27 @@ struct LaserTrip<'source> {
 }
 
 impl<'source> LaserTrip<'source> {
+    source_getters! {
+        /// Borrows the authored helper name.
+        helper_name: SourcedValue<SourceText<'source>>,
+        /// Borrows the authored laser corner duration.
+        laser_corner_duration: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored laser effect tag.
+        laser_effect_tag: SourcedValue<Box<SourceRecordReference<'source>>>,
+        /// Borrows the authored laser impact effect tag.
+        laser_impact_effect_tag: SourcedValue<Box<SourceRecordReference<'source>>>,
+        /// Borrows the authored laser impact offset parameter.
+        laser_impact_offset_parameter: SourcedValue<Box<SourceRecordReference<'source>>>,
+        /// Borrows the authored laser length.
+        laser_length: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored laser radius.
+        laser_radius: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored laser sweep angle.
+        laser_sweep_angle: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored laser sweep duration.
+        laser_sweep_duration: SourcedValue<ResourceFloat32>,
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

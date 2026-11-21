@@ -9,6 +9,7 @@ use crate::CatalogError;
 use crate::catalog_v3::authored_damage::DamageVector;
 use crate::catalog_v3::authored_effect_resource::{AudioResource, ParticleResource};
 use crate::catalog_v3::authored_fields::Observed;
+use crate::catalog_v3::catalog_item_components::source_getters;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
@@ -17,7 +18,7 @@ use crate::source_fields::FieldError;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ExplosionEffects {
+pub struct ExplosionEffects {
     max_blur_dist: SourcedValue<ResourceFloat32>,
     effect_scale: SourcedValue<ResourceFloat32>,
     use_random_scale: SourcedValue<bool>,
@@ -33,6 +34,33 @@ pub(super) struct ExplosionEffects {
 }
 
 impl ExplosionEffects {
+    source_getters! {
+        /// Borrows the maximum blur distance.
+        max_blur_dist: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored effect scale.
+        effect_scale: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored use random scale.
+        use_random_scale: SourcedValue<bool>,
+        /// Borrows the authored effect scale min.
+        effect_scale_min: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored effect scale max.
+        effect_scale_max: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored effect.
+        effect: SourcedValue<ParticleResource>,
+        /// Borrows the authored failed effect.
+        failed_effect: SourcedValue<ParticleResource>,
+        /// Borrows the authored custom material effect.
+        custom_material_effect: SourcedValue<String>,
+        /// Borrows the authored sound.
+        sound: SourcedValue<AudioResource>,
+        /// Borrows the authored failed sound.
+        failed_sound: SourcedValue<AudioResource>,
+        /// Borrows the authored material effect entry.
+        material_effect_entry: SourcedValue<MaterialEffect>,
+        /// Borrows the authored particle strength.
+        particle_strength: SourcedValue<ResourceFloat32>,
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,
@@ -79,15 +107,23 @@ impl ExplosionEffects {
     }
 }
 
+/// The authored material-effect library and entry.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct MaterialEffect {
+pub struct MaterialEffect {
     library_name: SourcedValue<String>,
     effect_name: SourcedValue<String>,
 }
 
 impl MaterialEffect {
+    source_getters! {
+        /// Borrows the authored library name.
+        library_name: SourcedValue<String>,
+        /// Borrows the authored effect name.
+        effect_name: SourcedValue<String>,
+    }
+
     fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,
@@ -103,12 +139,19 @@ impl MaterialEffect {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct Flashbang {
+pub struct Flashbang {
     blind_amount: SourcedValue<ResourceFloat32>,
     flashbang_base_time: SourcedValue<ResourceFloat32>,
 }
 
 impl Flashbang {
+    source_getters! {
+        /// Borrows the authored blind amount.
+        blind_amount: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored flashbang base time.
+        flashbang_base_time: SourcedValue<ResourceFloat32>,
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,
@@ -124,7 +167,7 @@ impl Flashbang {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct Shockwave {
+pub struct Shockwave {
     primitive_type: SourcedValue<String>,
     axis: SourcedValue<DamageVector>,
     half_height: SourcedValue<ResourceFloat32>,
@@ -137,6 +180,27 @@ pub(super) struct Shockwave {
 }
 
 impl Shockwave {
+    source_getters! {
+        /// Borrows the authored primitive type.
+        primitive_type: SourcedValue<String>,
+        /// Borrows the authored axis.
+        axis: SourcedValue<DamageVector>,
+        /// Borrows the authored half height.
+        half_height: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored detonation speed.
+        detonation_speed: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored peak pressure.
+        peak_pressure: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored duration.
+        duration: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored duration scale.
+        duration_scale: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored density.
+        density: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored resistance.
+        resistance: SourcedValue<ResourceFloat32>,
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,
@@ -159,7 +223,7 @@ impl Shockwave {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct Fragments {
+pub struct Fragments {
     mass: SourcedValue<ResourceFloat32>,
     radius: SourcedValue<ResourceFloat32>,
     drag: SourcedValue<ResourceFloat32>,
@@ -168,6 +232,19 @@ pub(super) struct Fragments {
 }
 
 impl Fragments {
+    source_getters! {
+        /// Borrows the authored mass.
+        mass: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored radius.
+        radius: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored drag.
+        drag: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored amount.
+        amount: SourcedValue<i32>,
+        /// Borrows the authored surface type override.
+        surface_type_override: SourcedValue<String>,
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,

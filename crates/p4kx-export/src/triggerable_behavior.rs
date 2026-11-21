@@ -10,6 +10,7 @@ use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_v3::authored_explosion::ExplosionParameters;
 use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::authored_link::HealthLink;
+use crate::catalog_v3::catalog_item_components::source_getters;
 use crate::catalog_v3::catalog_unit_source::UnitSource;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
@@ -22,7 +23,7 @@ const SPAWN_ENTITY: &str = "STriggerableDevicesBehaviorSpawnEntityParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct DeviceBehavior<'source> {
+pub struct DeviceBehavior<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     name: SourcedValue<SourceText<'source>>,
@@ -33,6 +34,7 @@ pub(super) struct DeviceBehavior<'source> {
     effect: BehaviorEffect<'source>,
 }
 
+/// The concrete effect selected by an authored device behavior.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(
     tag = "type",
@@ -40,18 +42,39 @@ pub(super) struct DeviceBehavior<'source> {
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-enum BehaviorEffect<'source> {
+#[non_exhaustive]
+pub enum BehaviorEffect<'source> {
+    /// An explosion effect.
     Explosion {
+        /// The authored explosion settings.
         explosion_params: Box<SourcedValue<ExplosionParameters<'source>>>,
     },
+    /// An entity-spawn effect.
     SpawnEntity {
         #[schemars(with = "SourcedValue<CatalogRecordReference>")]
+        /// The authored entity reference.
         entity_to_spawn: SourcedValue<Box<SourceRecordReference<'source>>>,
     },
+    /// A behavior with its fields retained in the source arena.
     Other,
 }
 
 impl<'source> DeviceBehavior<'source> {
+    source_getters! {
+        /// Borrows the original declaration and additional fields.
+        source: UnitSource<'source>,
+        /// Borrows the authored name.
+        name: SourcedValue<SourceText<'source>>,
+        /// Borrows the authored should be destroyed.
+        should_be_destroyed: SourcedValue<bool>,
+        /// Borrows the authored start sequence.
+        start_sequence: SourcedValue<HealthLink<'source>>,
+        /// Borrows the authored end sequence.
+        end_sequence: SourcedValue<HealthLink<'source>>,
+        /// Borrows the authored effect.
+        effect: BehaviorEffect<'source>,
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

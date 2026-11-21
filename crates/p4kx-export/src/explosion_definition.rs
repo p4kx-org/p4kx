@@ -15,6 +15,7 @@ use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::CatalogFields;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_table::CatalogTable;
+use crate::catalog_v3::catalog_item_components::source_getters;
 use crate::record_observation::RecordObservation;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
@@ -35,6 +36,11 @@ pub struct ExplosionDefinition<'source> {
 }
 
 impl<'source> ExplosionDefinition<'source> {
+    source_getters! {
+        /// Borrows the authored explosion settings and their source evidence.
+        explosion_params: SourcedValue<ExplosionParameters<'source>>,
+    }
+
     /// Borrows the original physical Record identity.
     #[must_use]
     pub const fn source(&self) -> &CanonicalRecordHeader<'source> {

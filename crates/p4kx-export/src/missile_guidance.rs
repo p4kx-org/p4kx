@@ -13,6 +13,7 @@ use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 
 use super::missile_shake::MissileAxes;
+use crate::catalog_v3::catalog_item_components::source_getters;
 
 const PHASE: &str = "SGuidanceAndControlPhaseParams";
 
@@ -20,7 +21,7 @@ const PHASE: &str = "SGuidanceAndControlPhaseParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct MissileGuidance<'source> {
+pub struct MissileGuidance<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     is_dumb_missile: SourcedValue<bool>,
@@ -39,6 +40,37 @@ pub(super) struct MissileGuidance<'source> {
 }
 
 impl<'source> MissileGuidance<'source> {
+    source_getters! {
+        /// Borrows the original declaration and additional fields.
+        source: UnitSource<'source>,
+        /// Borrows the unguided missile flag.
+        is_dumb_missile: SourcedValue<bool>,
+        /// Borrows the authored dumbfire rotation scale.
+        dumbfire_rotation_scale: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored linear speed.
+        linear_speed: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored boost phase duration.
+        boost_phase_duration: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored terminal phase engagement time.
+        terminal_phase_engagement_time: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored terminal phase engagement angle.
+        terminal_phase_engagement_angle: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored fuel tank size.
+        fuel_tank_size: SourcedValue<ResourceFloat32>,
+        /// Borrows the PID integral term.
+        pid_integral_term: SourcedValue<ResourceFloat32>,
+        /// Borrows the PID derivative term.
+        pid_derivative_term: SourcedValue<ResourceFloat32>,
+        /// Borrows the PID proportional term.
+        pid_proportional_term: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored boost phase.
+        boost_phase: SourcedValue<MissileGuidancePhase<'source>>,
+        /// Borrows the authored intercept phase.
+        intercept_phase: SourcedValue<MissileGuidancePhase<'source>>,
+        /// Borrows the authored terminal phase.
+        terminal_phase: SourcedValue<MissileGuidancePhase<'source>>,
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -107,7 +139,7 @@ impl<'source> MissileGuidance<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct MissileGuidancePhase<'source> {
+pub struct MissileGuidancePhase<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     angular_speed: SourcedValue<ResourceFloat32>,
@@ -118,6 +150,21 @@ struct MissileGuidancePhase<'source> {
 }
 
 impl<'source> MissileGuidancePhase<'source> {
+    source_getters! {
+        /// Borrows the original declaration and additional fields.
+        source: UnitSource<'source>,
+        /// Borrows the authored angular speed.
+        angular_speed: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored max rotation accel.
+        max_rotation_accel: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored PID aggression.
+        pid_aggression: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored max linear acceleration positive.
+        max_linear_acceleration_positive: SourcedValue<MissileAxes<'source>>,
+        /// Borrows the authored max linear acceleration negative.
+        max_linear_acceleration_negative: SourcedValue<MissileAxes<'source>>,
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

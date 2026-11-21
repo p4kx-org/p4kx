@@ -7,6 +7,7 @@ use serde::Serialize;
 
 use crate::CatalogError;
 use crate::catalog_v3::authored_fields::Observed;
+use crate::catalog_v3::catalog_item_components::source_getters;
 use crate::catalog_v3::catalog_unit_source::UnitSource;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
@@ -16,7 +17,7 @@ use crate::source_fields::FieldError;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct MissileShake<'source> {
+pub struct MissileShake<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     offset_angle: SourcedValue<MissileAxes<'source>>,
@@ -28,6 +29,23 @@ pub(super) struct MissileShake<'source> {
 }
 
 impl<'source> MissileShake<'source> {
+    source_getters! {
+        /// Borrows the original declaration and additional fields.
+        source: UnitSource<'source>,
+        /// Borrows the angular offset.
+        offset_angle: SourcedValue<MissileAxes<'source>>,
+        /// Borrows the positional offset.
+        offset_position: SourcedValue<MissileAxes<'source>>,
+        /// Borrows the authored randomness.
+        randomness: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored range.
+        range: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored duration.
+        duration: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored frequency.
+        frequency: SourcedValue<ResourceFloat32>,
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -67,7 +85,7 @@ impl<'source> MissileShake<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct MissileAxes<'source> {
+pub struct MissileAxes<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     x: SourcedValue<ResourceFloat32>,
@@ -76,6 +94,17 @@ pub(super) struct MissileAxes<'source> {
 }
 
 impl<'source> MissileAxes<'source> {
+    source_getters! {
+        /// Borrows the original declaration and additional fields.
+        source: UnitSource<'source>,
+        /// Borrows the authored X coordinate.
+        x: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored Y coordinate.
+        y: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored Z coordinate.
+        z: SourcedValue<ResourceFloat32>,
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

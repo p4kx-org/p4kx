@@ -13,16 +13,28 @@ mod primeable;
 #[path = "triggerable_device.rs"]
 mod triggerable_device;
 
+pub use super::authored_damage::{AuthoredDamage, DamageInfo, DamageVector};
+pub use super::authored_effect_resource::{AudioResource, ParticleResource};
+pub use super::authored_explosion::{
+    ExplosionEffects, ExplosionGeometry, ExplosionParameters, Flashbang, Fragments, MaterialEffect,
+    Shockwave,
+};
 use super::item_component_owner::ComponentOwner;
-use super::ordnance_fields::{BombFields, OrdnanceFields};
-use super::sensor_mine::SensorMine;
+pub use super::ordnance_fields::{
+    BombFields, OrdnanceAudio, OrdnanceCluster, OrdnanceEmission, OrdnanceFields,
+};
+pub use super::sensor_mine::{LaserTrigger, ProximityTrigger, SensorMine, SensorMineTrigger};
 use crate::CatalogError;
 use crate::catalog_table::CatalogTable;
+use crate::catalog_v3::catalog_item_components::source_getters;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use catalog_missile_configuration as missile;
-use primeable::Primeable;
-use triggerable_device::TriggerableDevice;
+pub use primeable::{AnimatedPrimeState, PrimeFlags, PrimeStates, Primeable};
+pub use triggerable_device::{
+    BehaviorEffect, DeviceBehavior, DeviceTrigger, LaserTrip, TriggerDetails, TriggerSource,
+    TriggerableDevice,
+};
 
 const SENSOR_MINE: &str = "SSensorMineComponentParams";
 const ORDNANCE: &str = "SExplosiveOrdnanceParams";
@@ -77,6 +89,11 @@ pub struct Explosive<'source> {
 }
 
 impl<'source> Explosive<'source> {
+    source_getters! {
+        /// Borrows the authored explosive variant and its source evidence.
+        configuration: SourcedValue<ExplosiveConfiguration<'source>>,
+    }
+
     /// Borrows the original Item Record and physical Components slot.
     #[must_use]
     pub const fn owner(&self) -> &ComponentOwner {
@@ -121,26 +138,41 @@ impl<'source> Explosive<'source> {
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-enum ExplosiveConfiguration<'source> {
+#[non_exhaustive]
+pub enum ExplosiveConfiguration<'source> {
+    /// A sensor mine with an authored trigger.
     SensorMine {
+        /// The original sensor mine settings.
         value: Box<SensorMine>,
     },
+    /// A generic ordnance component.
     Ordnance {
+        /// The original ordnance settings.
         value: Box<OrdnanceFields<'source>>,
     },
+    /// A bomb with explicit aerodynamic settings.
     Bomb {
+        /// The original bomb settings.
         value: Box<BombFields<'source>>,
     },
+    /// A space mine.
     SpaceMine {
+        /// The original inherited ordnance settings.
         value: Box<OrdnanceFields<'source>>,
     },
+    /// A missile with inherited ordnance settings.
     Missile {
+        /// The original inherited ordnance settings.
         value: Box<OrdnanceFields<'source>>,
     },
+    /// A device with authored triggers and behavior.
     TriggerableDevice {
+        /// The original triggerable-device settings.
         value: Box<TriggerableDevice<'source>>,
     },
+    /// A device with authored priming behavior.
     Primeable {
+        /// The original primeable settings.
         value: Box<Primeable<'source>>,
     },
 }

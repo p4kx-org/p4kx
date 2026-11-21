@@ -4,14 +4,14 @@
 use p4kx_export::build_catalog;
 use p4kx_export::catalog_queries::equipment::EquipmentSnapshot;
 use p4kx_export::catalog_queries::equipment::ordnance::{
-    EmpSnapshot, ExplosionDefinitionSnapshot, ExplosiveSnapshot, MissileConfigurationSnapshot,
-    with_missile_configurations_from,
+    EmpSnapshot, ExplosionDefinitionSnapshot, ExplosiveConfiguration, ExplosiveSnapshot,
+    MissileConfigurationSnapshot, with_missile_configurations_from,
 };
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    ResourceFloat32,
+    DefinitionStatus, ResourceFloat32,
 };
-use p4kx_extraction::DataForgeEntry;
+use p4kx_extraction::{DataForgeEntry, SourceValueState};
 use serde::Serialize;
 use serde_json::{Value, json};
 
@@ -83,20 +83,26 @@ fn check_emp(snapshot: &EmpSnapshot<'_>, catalog: &Value) -> TestResult {
         Some(true),
         "the field is bound to the encrypted DataForge Entry"
     );
-    let actual = wire(row)?;
-    proof::cell(&actual, "chargedTag", "null")?;
-    let dangling = proof::at(&actual, "/chargingTag/value")?;
     assert_eq!(
-        proof::at(dangling, "/status")?,
-        "dangling",
+        row.stages().charged_tag().state(),
+        SourceValueState::Null,
+        "the original charged tag is explicitly null"
+    );
+    let dangling = row.stages().charging_tag().value().ok_or("charging tag")?;
+    assert!(
+        matches!(dangling.status(), DefinitionStatus::Dangling),
         "the absent target stays unresolved"
     );
-    proof::present(
-        dangling,
-        "guid",
-        &json!(common::guid(fixture::MISSING_TAG)),
+    assert_eq!(
+        dangling.guid().value().map(ToString::to_string),
+        Some(common::guid(fixture::MISSING_TAG)),
+        "the original target GUID remains available"
+    );
+    assert_eq!(
+        dangling.guid().origin().contains_encrypted_source(),
         Some(true),
-    )?;
+        "the original unresolved GUID is encrypted"
+    );
     parity("/configurations/emp", snapshot, catalog)
 }
 
@@ -114,6 +120,22 @@ fn check_explosives(snapshot: &ExplosiveSnapshot<'_>, catalog: &Value) -> TestRe
         Some(&3),
         "ordinary explosive slot"
     );
+    let Some(ExplosiveConfiguration::Missile { value, .. }) = missile.configuration().value()
+    else {
+        return Err("typed missile ordnance payload".into());
+    };
+    assert_eq!(
+        value.requires_launcher().value(),
+        Some(&true),
+        "the inherited ordnance field is reachable through the missile variant"
+    );
+    assert!(
+        matches!(
+            ordnance.configuration().value(),
+            Some(ExplosiveConfiguration::Ordnance { .. })
+        ),
+        "the generic ordnance variant stays distinct"
+    );
     parity("/configurations/explosives", snapshot, catalog)
 }
 
@@ -126,9 +148,16 @@ fn check_missile(snapshot: &MissileConfigurationSnapshot<'_>, catalog: &Value) -
         Some(&2),
         "same physical slot as the ordnance row"
     );
-    let observed = wire(row)?;
-    proof::cell(&observed, "guidance", "absent")?;
-    proof::cell(&observed, "shake", "null")?;
+    assert_eq!(
+        row.guidance().state(),
+        SourceValueState::Absent,
+        "the guidance slot is absent"
+    );
+    assert_eq!(
+        row.shake().state(),
+        SourceValueState::Null,
+        "the authored shake slot is explicitly null"
+    );
     parity("/configurations/missileConfigurations", snapshot, catalog)
 }
 
@@ -145,6 +174,21 @@ fn check_definitions(snapshot: &ExplosionDefinitionSnapshot<'_>, catalog: &Value
         second.source().record_index().value(),
         Some(&2),
         "second original GUID in canonical order"
+    );
+    let parameters = first
+        .explosion_params()
+        .value()
+        .ok_or("explosion parameters")?;
+    let pressure = parameters.geometry().pressure();
+    assert_eq!(
+        pressure.value().map(ResourceFloat32::raw_bits),
+        Some((-0.0_f32).to_bits()),
+        "source pressure retains signed-zero bits"
+    );
+    assert_eq!(
+        pressure.origin().contains_encrypted_source(),
+        Some(true),
+        "the exact explosion datum retains its encrypted source"
     );
     parity("/definitions/explosionDefinitions", snapshot, catalog)
 }

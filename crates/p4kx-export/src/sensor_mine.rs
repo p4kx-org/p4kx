@@ -8,6 +8,7 @@ use serde::Serialize;
 use super::authored_damage::DamageVector;
 use super::authored_effect_resource::ParticleResource;
 use super::authored_fields::Observed;
+use crate::catalog_v3::catalog_item_components::source_getters;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
@@ -23,13 +24,22 @@ const TRIGGER_TYPES: &[&str] = &[
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct SensorMine {
+pub struct SensorMine {
     friendly_fire: SourcedValue<bool>,
     laser_vfx: SourcedValue<ParticleResource>,
     trigger_type: SourcedValue<SensorMineTrigger>,
 }
 
 impl SensorMine {
+    source_getters! {
+        /// Borrows the authored friendly fire.
+        friendly_fire: SourcedValue<bool>,
+        /// Borrows the laser particle effect.
+        laser_vfx: SourcedValue<ParticleResource>,
+        /// Borrows the authored trigger type.
+        trigger_type: SourcedValue<SensorMineTrigger>,
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,
@@ -60,10 +70,20 @@ impl SensorMine {
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-enum SensorMineTrigger {
+#[non_exhaustive]
+pub enum SensorMineTrigger {
+    /// A base trigger declaration.
     Base,
-    Laser { value: Box<LaserTrigger> },
-    Proximity { value: Box<ProximityTrigger> },
+    /// A laser-based trigger.
+    Laser {
+        /// The original laser trigger settings.
+        value: Box<LaserTrigger>,
+    },
+    /// A proximity-based trigger.
+    Proximity {
+        /// The original proximity trigger settings.
+        value: Box<ProximityTrigger>,
+    },
 }
 
 impl SensorMineTrigger {
@@ -84,10 +104,11 @@ impl SensorMineTrigger {
     }
 }
 
+/// Authored settings for a laser-triggered sensor mine.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct LaserTrigger {
+pub struct LaserTrigger {
     laser_length: SourcedValue<ResourceFloat32>,
     laser_hit_offset: SourcedValue<ResourceFloat32>,
     mine_front: SourcedValue<DamageVector>,
@@ -95,6 +116,17 @@ struct LaserTrigger {
 }
 
 impl LaserTrigger {
+    source_getters! {
+        /// Borrows the authored laser length.
+        laser_length: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored laser hit offset.
+        laser_hit_offset: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored mine front.
+        mine_front: SourcedValue<DamageVector>,
+        /// Borrows the authored laser offset.
+        laser_offset: SourcedValue<DamageVector>,
+    }
+
     fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,
@@ -113,10 +145,11 @@ impl LaserTrigger {
     }
 }
 
+/// Authored settings for a proximity-triggered sensor mine.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ProximityTrigger {
+pub struct ProximityTrigger {
     max_rays_per_mine: SourcedValue<i32>,
     radius: SourcedValue<ResourceFloat32>,
     warning_radius: SourcedValue<ResourceFloat32>,
@@ -129,6 +162,27 @@ struct ProximityTrigger {
 }
 
 impl ProximityTrigger {
+    source_getters! {
+        /// Borrows the authored max rays per mine.
+        max_rays_per_mine: SourcedValue<i32>,
+        /// Borrows the authored radius.
+        radius: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored warning radius.
+        warning_radius: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored angle vertical.
+        angle_vertical: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored angle horizontal.
+        angle_horizontal: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored guide laser length.
+        guide_laser_length: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored front.
+        front: SourcedValue<DamageVector>,
+        /// Borrows the authored up.
+        up: SourcedValue<DamageVector>,
+        /// Borrows the authored center.
+        center: SourcedValue<DamageVector>,
+    }
+
     fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,

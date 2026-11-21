@@ -1438,7 +1438,7 @@
       "x-p4kx-vocabularyClass": "control"
     },
     "AnimatedPrimeState": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "One original animated-state binding for a primeable component.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -2077,6 +2077,7 @@
       "type": "object"
     },
     "AudioResource": {
+      "description": "A configured audio trigger identifier.",
       "properties": {
         "audioTrigger": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -2091,6 +2092,7 @@
       "description": "The authored damage alternatives of one `DamageBase` declaration.",
       "oneOf": [
         {
+          "description": "The base damage declaration.",
           "properties": {
             "type": {
               "const": "base",
@@ -2103,13 +2105,15 @@
           "type": "object"
         },
         {
+          "description": "An explicit set of damage channels.",
           "properties": {
             "type": {
               "const": "info",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/DamageInfo"
+              "$ref": "#/$defs/DamageInfo",
+              "description": "The original per-channel damage values."
             }
           },
           "required": [
@@ -2119,13 +2123,15 @@
           "type": "object"
         },
         {
+          "description": "A damage macro and declared total.",
           "properties": {
             "type": {
               "const": "parameters",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/DamageParameters"
+              "$ref": "#/$defs/DamageParameters",
+              "description": "The original macro link and total."
             }
           },
           "required": [
@@ -14560,9 +14566,11 @@
       "description": "The concrete authored behavior and its shared lifecycle declarations.",
       "oneOf": [
         {
+          "description": "An explosion effect.",
           "properties": {
             "explosionParams": {
-              "$ref": "#/$defs/SourcedValueOfExplosionParameters"
+              "$ref": "#/$defs/SourcedValueOfExplosionParameters",
+              "description": "The authored explosion settings."
             },
             "type": {
               "const": "explosion",
@@ -14576,9 +14584,11 @@
           "type": "object"
         },
         {
+          "description": "An entity-spawn effect.",
           "properties": {
             "entityToSpawn": {
-              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+              "description": "The authored entity reference."
             },
             "type": {
               "const": "spawnEntity",
@@ -14592,6 +14602,7 @@
           "type": "object"
         },
         {
+          "description": "A behavior with its fields retained in the source arena.",
           "properties": {
             "type": {
               "const": "other",
@@ -14638,9 +14649,11 @@
       "description": "Concrete trigger selection with the original common settings and owned behavior.",
       "oneOf": [
         {
+          "description": "An elapsed-time trigger.",
           "properties": {
             "duration": {
-              "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+              "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+              "description": "The authored timer duration."
             },
             "type": {
               "const": "timer",
@@ -14654,9 +14667,11 @@
           "type": "object"
         },
         {
+          "description": "An impact trigger.",
           "properties": {
             "ignoreWaterCollision": {
-              "$ref": "#/$defs/SourcedValueOfboolean"
+              "$ref": "#/$defs/SourcedValueOfboolean",
+              "description": "Whether water collisions are ignored."
             },
             "type": {
               "const": "impact",
@@ -14670,13 +14685,15 @@
           "type": "object"
         },
         {
+          "description": "A laser trip trigger.",
           "properties": {
             "type": {
               "const": "laserTrip",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/LaserTrip"
+              "$ref": "#/$defs/LaserTrip",
+              "description": "The authored laser trip settings."
             }
           },
           "required": [
@@ -14686,6 +14703,7 @@
           "type": "object"
         },
         {
+          "description": "A trigger with its fields retained in the source arena.",
           "properties": {
             "type": {
               "const": "other",
@@ -15787,7 +15805,7 @@
       "type": "object"
     },
     "EmpParticle": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "The source class and path of an EMP particle.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -16568,13 +16586,15 @@
       "description": "The device-specific shape selected by the actual component type.",
       "oneOf": [
         {
+          "description": "A sensor mine with an authored trigger.",
           "properties": {
             "type": {
               "const": "sensorMine",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/SensorMine"
+              "$ref": "#/$defs/SensorMine",
+              "description": "The original sensor mine settings."
             }
           },
           "required": [
@@ -16584,13 +16604,15 @@
           "type": "object"
         },
         {
+          "description": "A generic ordnance component.",
           "properties": {
             "type": {
               "const": "ordnance",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/OrdnanceFields"
+              "$ref": "#/$defs/OrdnanceFields",
+              "description": "The original ordnance settings."
             }
           },
           "required": [
@@ -16600,13 +16622,15 @@
           "type": "object"
         },
         {
+          "description": "A bomb with explicit aerodynamic settings.",
           "properties": {
             "type": {
               "const": "bomb",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/BombFields"
+              "$ref": "#/$defs/BombFields",
+              "description": "The original bomb settings."
             }
           },
           "required": [
@@ -16616,13 +16640,15 @@
           "type": "object"
         },
         {
+          "description": "A space mine.",
           "properties": {
             "type": {
               "const": "spaceMine",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/OrdnanceFields"
+              "$ref": "#/$defs/OrdnanceFields",
+              "description": "The original inherited ordnance settings."
             }
           },
           "required": [
@@ -16632,13 +16658,15 @@
           "type": "object"
         },
         {
+          "description": "A missile with inherited ordnance settings.",
           "properties": {
             "type": {
               "const": "missile",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/OrdnanceFields"
+              "$ref": "#/$defs/OrdnanceFields",
+              "description": "The original inherited ordnance settings."
             }
           },
           "required": [
@@ -16648,13 +16676,15 @@
           "type": "object"
         },
         {
+          "description": "A device with authored triggers and behavior.",
           "properties": {
             "type": {
               "const": "triggerableDevice",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/TriggerableDevice"
+              "$ref": "#/$defs/TriggerableDevice",
+              "description": "The original triggerable-device settings."
             }
           },
           "required": [
@@ -16664,13 +16694,15 @@
           "type": "object"
         },
         {
+          "description": "A device with authored priming behavior.",
           "properties": {
             "type": {
               "const": "primeable",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/Primeable"
+              "$ref": "#/$defs/Primeable",
+              "description": "The original primeable settings."
             }
           },
           "required": [
@@ -27644,6 +27676,7 @@
       "x-p4kx-vocabularyClass": "control"
     },
     "LaserTrigger": {
+      "description": "Authored settings for a laser-triggered sensor mine.",
       "properties": {
         "laserHitOffset": {
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
@@ -27667,6 +27700,7 @@
       "type": "object"
     },
     "LaserTrip": {
+      "description": "The authored geometry and effects of a laser trip trigger.",
       "properties": {
         "helperName": {
           "$ref": "#/$defs/SourcedValueOfSourceText"
@@ -31038,6 +31072,7 @@
       "required": []
     },
     "MaterialEffect": {
+      "description": "The authored material-effect library and entry.",
       "properties": {
         "effectName": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -34854,6 +34889,7 @@
       "type": "object"
     },
     "OrdnanceAudio": {
+      "description": "Original ordnance audio triggers.",
       "properties": {
         "engineIgniteAudioTrigger": {
           "$ref": "#/$defs/SourcedValueOfAudioResource"
@@ -34877,6 +34913,7 @@
       "type": "object"
     },
     "OrdnanceCluster": {
+      "description": "Authored cluster munition separation settings.",
       "properties": {
         "detachAngleIncrement": {
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
@@ -34916,6 +34953,7 @@
       "type": "object"
     },
     "OrdnanceEmission": {
+      "description": "One authored ordnance emission envelope.",
       "properties": {
         "active": {
           "$ref": "#/$defs/SourcedValueOfboolean"
@@ -35807,6 +35845,7 @@
       "type": "object"
     },
     "ParticleResource": {
+      "description": "A configured particle resource path.",
       "properties": {
         "path": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -38666,6 +38705,7 @@
       "type": "object"
     },
     "ProximityTrigger": {
+      "description": "Authored settings for a proximity-triggered sensor mine.",
       "properties": {
         "angleHorizontal": {
           "$ref": "#/$defs/SourcedValueOfResourceFloat32"
@@ -45876,6 +45916,7 @@
       "description": "The actual owned trigger type admitted at the mine's `TriggerType` slot.",
       "oneOf": [
         {
+          "description": "A base trigger declaration.",
           "properties": {
             "type": {
               "const": "base",
@@ -45888,13 +45929,15 @@
           "type": "object"
         },
         {
+          "description": "A laser-based trigger.",
           "properties": {
             "type": {
               "const": "laser",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/LaserTrigger"
+              "$ref": "#/$defs/LaserTrigger",
+              "description": "The original laser trigger settings."
             }
           },
           "required": [
@@ -45904,13 +45947,15 @@
           "type": "object"
         },
         {
+          "description": "A proximity-based trigger.",
           "properties": {
             "type": {
               "const": "proximity",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/ProximityTrigger"
+              "$ref": "#/$defs/ProximityTrigger",
+              "description": "The original proximity trigger settings."
             }
           },
           "required": [

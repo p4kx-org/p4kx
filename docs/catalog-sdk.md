@@ -1767,6 +1767,12 @@ physical Record index. The query preserves original null, unresolved and
 unreadable reference states without materializing foreign definition bodies or
 media. Every route has a decoded-Entry form and can reuse a parsed session.
 
+Rust callers can inspect the canonical payloads directly. Match
+`ExplosiveConfiguration` for the authored component variant, and read
+`ExplosionDefinition::explosion_params` for an independent explosion Record.
+EMP settings and missile guidance, targeting and shake expose the original
+`SourcedValue` fields, including absence, null and per-datum provenance.
+
 ## Jump drives and quantum interdiction
 
 Use `equipment::ship_systems::with_jump_drives` and

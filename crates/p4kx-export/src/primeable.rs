@@ -8,6 +8,7 @@ use serde::Serialize;
 use crate::CatalogError;
 use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::authored_link::HealthLink;
+use crate::catalog_v3::catalog_item_components::source_getters;
 use crate::catalog_v3::catalog_unit_source::UnitSource;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
@@ -19,7 +20,7 @@ pub(super) const SOURCE_TYPE: &str = "SPrimeableComponentParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct Primeable<'source> {
+pub struct Primeable<'source> {
     additional_fields: SourceArenaOutput<'source>,
     #[serde(flatten)]
     flags: PrimeFlags,
@@ -30,6 +31,17 @@ pub(super) struct Primeable<'source> {
 }
 
 impl<'source> Primeable<'source> {
+    source_getters! {
+        /// Borrows additional authored fields.
+        additional_fields: SourceArenaOutput<'source>,
+        /// Borrows the authored priming interaction flags.
+        flags: PrimeFlags,
+        /// Borrows the authored states.
+        states: PrimeStates<'source>,
+        /// Borrows the authored animated state sequence.
+        animated_states: SourcedValue<Vec<SourcedValue<AnimatedPrimeState<'source>>>>,
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -57,10 +69,11 @@ impl<'source> Primeable<'source> {
     }
 }
 
+/// Authored interaction flags controlling priming.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct PrimeFlags {
+pub struct PrimeFlags {
     prime_on_attach: SourcedValue<bool>,
     prime_on_place: SourcedValue<bool>,
     prime_on_place_attach: SourcedValue<bool>,
@@ -70,6 +83,21 @@ struct PrimeFlags {
 }
 
 impl PrimeFlags {
+    source_getters! {
+        /// Borrows the authored prime on attach.
+        prime_on_attach: SourcedValue<bool>,
+        /// Borrows the authored prime on place.
+        prime_on_place: SourcedValue<bool>,
+        /// Borrows the authored prime on place attach.
+        prime_on_place_attach: SourcedValue<bool>,
+        /// Borrows the authored prime on take.
+        prime_on_take: SourcedValue<bool>,
+        /// Borrows the authored prime on throw.
+        prime_on_throw: SourcedValue<bool>,
+        /// Borrows the authored unprime on take.
+        unprime_on_take: SourcedValue<bool>,
+    }
+
     fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,
@@ -96,10 +124,11 @@ impl PrimeFlags {
     }
 }
 
+/// Authored primed states and interaction links.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct PrimeStates<'source> {
+pub struct PrimeStates<'source> {
     on_prime_interaction: SourcedValue<HealthLink<'source>>,
     on_unprime_interaction: SourcedValue<HealthLink<'source>>,
     picked_up_state: SourcedValue<HealthLink<'source>>,
@@ -109,6 +138,21 @@ struct PrimeStates<'source> {
 }
 
 impl<'source> PrimeStates<'source> {
+    source_getters! {
+        /// Borrows the authored on prime interaction.
+        on_prime_interaction: SourcedValue<HealthLink<'source>>,
+        /// Borrows the authored on unprime interaction.
+        on_unprime_interaction: SourcedValue<HealthLink<'source>>,
+        /// Borrows the authored picked up state.
+        picked_up_state: SourcedValue<HealthLink<'source>>,
+        /// Borrows the authored primed state.
+        primed_state: SourcedValue<HealthLink<'source>>,
+        /// Borrows the authored settled state.
+        settled_state: SourcedValue<HealthLink<'source>>,
+        /// Borrows the authored unprimed state.
+        unprimed_state: SourcedValue<HealthLink<'source>>,
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -135,10 +179,11 @@ impl<'source> PrimeStates<'source> {
     }
 }
 
+/// One original animated-state binding for a primeable component.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct AnimatedPrimeState<'source> {
+pub struct AnimatedPrimeState<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     animated_state: SourcedValue<HealthLink<'source>>,
@@ -147,6 +192,17 @@ struct AnimatedPrimeState<'source> {
 }
 
 impl<'source> AnimatedPrimeState<'source> {
+    source_getters! {
+        /// Borrows the original declaration and additional fields.
+        source: UnitSource<'source>,
+        /// Borrows the authored animated state.
+        animated_state: SourcedValue<HealthLink<'source>>,
+        /// Borrows the authored fragment ID.
+        fragment_id: SourcedValue<SourceText<'source>>,
+        /// Borrows the authored fragment tag.
+        frag_tag: SourcedValue<SourceText<'source>>,
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

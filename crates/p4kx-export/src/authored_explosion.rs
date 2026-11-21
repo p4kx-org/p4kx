@@ -18,8 +18,9 @@ mod effects;
 #[path = "explosion_geometry.rs"]
 mod geometry;
 
-use effects::{ExplosionEffects, Flashbang, Fragments, Shockwave};
-use geometry::ExplosionGeometry;
+use crate::catalog_v3::catalog_item_components::source_getters;
+pub use effects::{ExplosionEffects, Flashbang, Fragments, MaterialEffect, Shockwave};
+pub use geometry::ExplosionGeometry;
 
 pub(super) const EXPLOSION_TYPES: &[&str] = &[
     "ExplosionBaseParams",
@@ -68,7 +69,7 @@ impl<'source> AuthoredExplosion<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ExplosionParameters<'source> {
+pub struct ExplosionParameters<'source> {
     friendly_fire: SourcedValue<String>,
     #[serde(flatten)]
     geometry: ExplosionGeometry,
@@ -86,6 +87,31 @@ pub(crate) struct ExplosionParameters<'source> {
 }
 
 impl<'source> ExplosionParameters<'source> {
+    source_getters! {
+        /// Borrows the authored friendly fire.
+        friendly_fire: SourcedValue<String>,
+        /// Borrows the authored radii, orientation and shape settings.
+        geometry: ExplosionGeometry,
+        /// Borrows the authored audiovisual and material effects.
+        effects: ExplosionEffects,
+        /// Borrows the original owned damage declaration.
+        damage: SourcedValue<AuthoredDamage<'source>>,
+        /// Borrows the authored flashbang params.
+        flashbang_params: SourcedValue<Flashbang>,
+        /// Borrows the authored shockwave params.
+        shockwave_params: SourcedValue<Shockwave>,
+        /// Borrows the authored fragment params.
+        fragment_params: SourcedValue<Fragments>,
+        /// Borrows the authored hit type.
+        hit_type: SourcedValue<String>,
+        /// Borrows the authored offset.
+        offset: SourcedValue<DamageVector>,
+        /// Borrows the authored direction.
+        direction: SourcedValue<DamageVector>,
+        /// Borrows the radar-contact-type reference.
+        radar_contact_type: SourcedValue<Box<SourceRecordReference<'source>>>,
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

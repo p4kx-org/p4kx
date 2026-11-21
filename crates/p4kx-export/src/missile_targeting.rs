@@ -7,6 +7,7 @@ use serde::Serialize;
 
 use crate::CatalogError;
 use crate::catalog_v3::authored_fields::Observed;
+use crate::catalog_v3::catalog_item_components::source_getters;
 use crate::catalog_v3::catalog_unit_source::UnitSource;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
@@ -16,7 +17,7 @@ use crate::source_fields::FieldError;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct MissileTargeting<'source> {
+pub struct MissileTargeting<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     tracking_signal_type: SourcedValue<&'source str>,
@@ -38,6 +39,43 @@ pub(super) struct MissileTargeting<'source> {
 }
 
 impl<'source> MissileTargeting<'source> {
+    source_getters! {
+        /// Borrows the original declaration and additional fields.
+        source: UnitSource<'source>,
+        /// Borrows the authored tracking signal type.
+        tracking_signal_type: SourcedValue<&'source str>,
+        /// Borrows the authored tracking signal min.
+        tracking_signal_min: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored lock signal amplifier.
+        lock_signal_amplifier: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored lock time.
+        lock_time: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored locking angle.
+        locking_angle: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored min ratio for lock.
+        min_ratio_for_lock: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored lock increase rate.
+        lock_increase_rate: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored lock decrease rate.
+        lock_decrease_rate: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored lock range min.
+        lock_range_min: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored lock range max.
+        lock_range_max: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored lock resolution radius.
+        lock_resolution_radius: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored lock resolution falloff power.
+        lock_resolution_falloff_power: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored signal resilience min.
+        signal_resilience_min: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored signal resilience max.
+        signal_resilience_max: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored allow dumb firing.
+        allow_dumb_firing: SourcedValue<bool>,
+        /// Borrows the maximum number of missed approaches.
+        max_times_can_miss: SourcedValue<i32>,
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

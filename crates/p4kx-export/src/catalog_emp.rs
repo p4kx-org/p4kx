@@ -12,9 +12,11 @@ use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_table::CatalogTable;
+use crate::catalog_v3::catalog_item_components::source_getters;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
+use crate::source_value_catalog::{SourceRecordReference, SourceWeakReference};
 
 pub(super) const SOURCE_TYPE: &str = "SCItemEMPParams";
 const STATE: &str = "ItemResourceState";
@@ -39,6 +41,17 @@ pub struct Emp<'source> {
 }
 
 impl<'source> Emp<'source> {
+    source_getters! {
+        /// Borrows the original declaration and additional fields.
+        source: UnitSource<'source>,
+        /// Borrows the authored EMP timing, radius and damage settings.
+        parameters: EmpParameters,
+        /// Borrows the authored stage states, particles and tags.
+        stages: EmpStages<'source>,
+        /// Borrows the authored trigger declarations.
+        triggers: EmpTriggers<'source>,
+    }
+
     /// Borrows the original Item Record and physical Components slot.
     #[must_use]
     pub const fn owner(&self) -> &ComponentOwner {
@@ -74,10 +87,11 @@ impl<'source> Emp<'source> {
     }
 }
 
+/// Authored EMP timing, radius and force settings.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct EmpParameters {
+pub struct EmpParameters {
     charge_time: SourcedValue<ResourceFloat32>,
     unleash_time: SourcedValue<ResourceFloat32>,
     cooldown_time: SourcedValue<ResourceFloat32>,
@@ -90,6 +104,27 @@ struct EmpParameters {
 }
 
 impl EmpParameters {
+    source_getters! {
+        /// Borrows the authored charge time.
+        charge_time: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored unleash time.
+        unleash_time: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored cooldown time.
+        cooldown_time: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored EMP radius.
+        emp_radius: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored min EMP radius.
+        min_emp_radius: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored phys radius.
+        phys_radius: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored min phys radius.
+        min_phys_radius: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored distortion damage.
+        distortion_damage: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored pressure.
+        pressure: SourcedValue<ResourceFloat32>,
+    }
+
     fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,
@@ -122,10 +157,11 @@ impl EmpParameters {
     }
 }
 
+/// Authored EMP stage states, particles and tags.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct EmpStages<'source> {
+pub struct EmpStages<'source> {
     idle_state: WeakLink<'source>,
     charging_state: WeakLink<'source>,
     charged_state: WeakLink<'source>,
@@ -139,6 +175,25 @@ struct EmpStages<'source> {
 }
 
 impl<'source> EmpStages<'source> {
+    source_getters! {
+        /// Borrows the authored idle state.
+        idle_state: SourcedValue<Box<SourceWeakReference<'source>>>,
+        /// Borrows the authored charging state.
+        charging_state: SourcedValue<Box<SourceWeakReference<'source>>>,
+        /// Borrows the authored charged state.
+        charged_state: SourcedValue<Box<SourceWeakReference<'source>>>,
+        /// Borrows the authored releasing state.
+        releasing_state: SourcedValue<Box<SourceWeakReference<'source>>>,
+        /// Borrows the authored charging particle.
+        charging_particle: SourcedValue<EmpParticle<'source>>,
+        /// Borrows the authored charged particle.
+        charged_particle: SourcedValue<EmpParticle<'source>>,
+        /// Borrows the authored charging tag.
+        charging_tag: SourcedValue<Box<SourceRecordReference<'source>>>,
+        /// Borrows the authored charged tag.
+        charged_tag: SourcedValue<Box<SourceRecordReference<'source>>>,
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -179,15 +234,23 @@ impl<'source> EmpStages<'source> {
     }
 }
 
+/// The source class and path of an EMP particle.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-struct EmpParticle<'source> {
+pub struct EmpParticle<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     path: SourcedValue<&'source str>,
 }
 
 impl<'source> EmpParticle<'source> {
+    source_getters! {
+        /// Borrows the original declaration and additional fields.
+        source: UnitSource<'source>,
+        /// Borrows the authored resource path.
+        path: SourcedValue<&'source str>,
+    }
+
     fn read(
         observed: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -200,10 +263,11 @@ impl<'source> EmpParticle<'source> {
     }
 }
 
+/// Authored audio trigger references by EMP stage.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct EmpTriggers<'source> {
+pub struct EmpTriggers<'source> {
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     #[serde(rename = "startChargingTrigger")]
     start_charging: RecordLink<'source>,
@@ -225,6 +289,21 @@ struct EmpTriggers<'source> {
 }
 
 impl<'source> EmpTriggers<'source> {
+    source_getters! {
+        /// Borrows the authored start charging.
+        start_charging: SourcedValue<Box<SourceRecordReference<'source>>>,
+        /// Borrows the authored stop charging.
+        stop_charging: SourcedValue<Box<SourceRecordReference<'source>>>,
+        /// Borrows the authored start charged.
+        start_charged: SourcedValue<Box<SourceRecordReference<'source>>>,
+        /// Borrows the authored stop charged.
+        stop_charged: SourcedValue<Box<SourceRecordReference<'source>>>,
+        /// Borrows the authored start unleash.
+        start_unleash: SourcedValue<Box<SourceRecordReference<'source>>>,
+        /// Borrows the authored stop unleash.
+        stop_unleash: SourcedValue<Box<SourceRecordReference<'source>>>,
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

@@ -16,8 +16,9 @@ mod behavior;
 #[path = "triggerable_trigger.rs"]
 mod trigger;
 
-use behavior::DeviceBehavior;
-use trigger::DeviceTrigger;
+use crate::catalog_v3::catalog_item_components::source_getters;
+pub use behavior::{BehaviorEffect, DeviceBehavior};
+pub use trigger::{DeviceTrigger, LaserTrip, TriggerDetails, TriggerSource};
 
 pub(super) const SOURCE_TYPE: &str = "EntityComponentTriggerableDevicesParams";
 
@@ -27,7 +28,7 @@ type TriggerSlots<'source> = SourcedValue<Vec<SourcedValue<DeviceTrigger<'source
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct TriggerableDevice<'source> {
+pub struct TriggerableDevice<'source> {
     additional_fields: SourceArenaOutput<'source>,
     triggers: TriggerSlots<'source>,
     ai_triggers: TriggerSlots<'source>,
@@ -35,6 +36,17 @@ pub(super) struct TriggerableDevice<'source> {
 }
 
 impl<'source> TriggerableDevice<'source> {
+    source_getters! {
+        /// Borrows additional authored fields.
+        additional_fields: SourceArenaOutput<'source>,
+        /// Borrows the authored trigger declarations.
+        triggers: SourcedValue<Vec<SourcedValue<DeviceTrigger<'source>>>>,
+        /// Borrows the authored AI trigger declarations.
+        ai_triggers: SourcedValue<Vec<SourcedValue<DeviceTrigger<'source>>>>,
+        /// Borrows the authored death behavior.
+        death_behavior: SourcedValue<DeviceBehavior<'source>>,
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
