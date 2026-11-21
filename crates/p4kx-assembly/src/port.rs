@@ -3,11 +3,11 @@
 
 use std::sync::Arc;
 
-use p4kx_dataforge::StructValue;
-use p4kx_extraction::DataForgeOrigin;
+use p4kx_dataforge::{StructValue, Value};
+use p4kx_extraction::{DataForgeOrigin, SourceValue};
 
 use crate::port_sub_helper::{self, PortSubHelper, PortSubHelpers};
-use crate::read::{flag, struct_field, struct_items, text, texts, unsigned, xyz};
+use crate::read::{as_struct, struct_field, struct_items, text, texts, unsigned, xyz};
 
 const ATTACHMENT_PREFIX: &str = "SItemPortDefAttachmentImplementation";
 const SKIN_ATTACHMENT: &str = "Skin";
@@ -29,7 +29,7 @@ pub struct PortDefinition {
     pub(crate) transform: Option<PortTransform>,
     pub(crate) helper_tree: PortSubHelpers,
     pub(crate) skin: bool,
-    pub(crate) no_rotation: bool,
+    no_rotation: SourceValue<bool>,
     pub(crate) detach_direction: [f32; 3],
 }
 
@@ -40,11 +40,16 @@ impl PortDefinition {
         self.position
     }
 
-    /// Returns the authored entity attachment flag `constraintParams.noRotation`.
-    /// Static placement applies the complete helper transform.
+    /// Returns whether the authored entity attachment flag is true.
     #[must_use]
     pub const fn no_rotation(&self) -> bool {
-        self.no_rotation
+        matches!(self.no_rotation, SourceValue::Present(true))
+    }
+
+    /// Returns the original rotation constraint and its source state.
+    #[must_use]
+    pub const fn no_rotation_source(&self) -> &SourceValue<bool> {
+        &self.no_rotation
     }
 
     /// Returns the direction in which the item leaves the port when detached, `[x, y, z]` as
@@ -239,7 +244,8 @@ pub(crate) fn read_definition(
     port: &StructValue<'_>,
     position: PortDefinitionPosition,
 ) -> PortDefinition {
-    let attachment = struct_field(port, "AttachmentImplementation");
+    let attachment_value = port.field("AttachmentImplementation");
+    let attachment = attachment_value.and_then(as_struct);
     let helper = attachment.and_then(|attachment| struct_field(attachment, "Helper"));
     let kind = attachment.map_or("", attachment_kind);
     PortDefinition {
@@ -259,12 +265,37 @@ pub(crate) fn read_definition(
         required_tags: text(port, "RequiredPortTags").to_owned(),
         requires_attachment_tags: crate::spec::has_tag_requirements(port.field("RequiredPortTags")),
         transform: helper.and_then(|helper| PortTransform::read(helper, kind)),
-        helper_tree: port_sub_helper::read(port.field("AttachmentImplementation"), kind),
+        helper_tree: port_sub_helper::read(attachment_value, kind),
         skin: kind == SKIN_ATTACHMENT,
-        no_rotation: attachment
-            .and_then(|attachment| struct_field(attachment, "constraintParams"))
-            .is_some_and(|constraints| flag(constraints, "noRotation")),
+        no_rotation: no_rotation_at_port(attachment_value),
         detach_direction: xyz(struct_field(port, "detachDirection")),
+    }
+}
+
+fn no_rotation_at_port(attachment: Option<&Value<'_>>) -> SourceValue<bool> {
+    match attachment {
+        Some(Value::Struct(implementation)) => attachment_no_rotation(implementation),
+        None | Some(Value::Null) => SourceValue::Absent,
+        Some(Value::Error(_)) => SourceValue::Unreadable,
+        _ => SourceValue::Invalid,
+    }
+}
+
+/// Reads the authored rotation constraint of an attachment implementation.
+#[must_use]
+pub fn attachment_no_rotation(implementation: &StructValue<'_>) -> SourceValue<bool> {
+    match implementation.field("constraintParams") {
+        Some(Value::Struct(constraints)) => match constraints.field("noRotation") {
+            Some(Value::Bool(value)) => SourceValue::Present(*value),
+            Some(Value::Null) => SourceValue::Null,
+            Some(Value::Error(_)) => SourceValue::Unreadable,
+            None => SourceValue::Absent,
+            _ => SourceValue::Invalid,
+        },
+        Some(Value::Null) => SourceValue::Null,
+        Some(Value::Error(_)) => SourceValue::Unreadable,
+        None => SourceValue::Absent,
+        _ => SourceValue::Invalid,
     }
 }
 

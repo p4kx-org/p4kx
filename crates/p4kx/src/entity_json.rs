@@ -5,6 +5,7 @@ use p4kx_assembly::{
     Attachment, EntityNode, LoadoutError, PortDefinition, PortNode, PortSource, PortTransform,
     Target,
 };
+use p4kx_extraction::{SourceValue, SourceValueState};
 use serde::Serialize;
 
 use crate::entity_ignored::IncompatibleJson;
@@ -193,6 +194,8 @@ struct DefinitionJson<'a> {
     max_size: Option<u32>,
     types: Vec<TypeJson<'a>>,
     transform: Option<TransformJson<'a>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rotation_constraint: Option<RotationConstraintJson>,
 }
 
 impl<'a> From<&'a PortDefinition> for DefinitionJson<'a> {
@@ -211,7 +214,43 @@ impl<'a> From<&'a PortDefinition> for DefinitionJson<'a> {
                 })
                 .collect(),
             transform: definition.transform().map(TransformJson::from),
+            rotation_constraint: RotationConstraintJson::of(definition.no_rotation_source()),
         }
+    }
+}
+
+#[derive(Serialize)]
+struct RotationConstraintJson {
+    no_rotation: AuthoredRotationFlag,
+    animation_semantics: AnimationSemantics,
+}
+
+#[derive(Serialize)]
+struct AuthoredRotationFlag {
+    state: SourceValueState,
+    value: Option<bool>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "snake_case")]
+enum AnimationSemantics {
+    Unresolved,
+}
+
+impl RotationConstraintJson {
+    const fn of(source: &SourceValue<bool>) -> Option<Self> {
+        let (state, value) = match source {
+            SourceValue::Present(value) => (SourceValueState::Present, Some(*value)),
+            SourceValue::Absent => return None,
+            SourceValue::Null => (SourceValueState::Null, None),
+            SourceValue::Unreadable => (SourceValueState::Unreadable, None),
+            SourceValue::Invalid => (SourceValueState::Invalid, None),
+            _ => (SourceValueState::Unsupported, None),
+        };
+        Some(Self {
+            no_rotation: AuthoredRotationFlag { state, value },
+            animation_semantics: AnimationSemantics::Unresolved,
+        })
     }
 }
 

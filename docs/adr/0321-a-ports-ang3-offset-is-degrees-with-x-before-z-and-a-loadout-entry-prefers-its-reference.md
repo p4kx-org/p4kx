@@ -41,7 +41,9 @@ sideways along X. A part at `[30, 0, 90]` keeps its right axis level.
 
 Static placement applies the complete helper transform. A rotated relay fixture
 distinguishes that rule from translation-only placement. The stored
-`no_rotation` flag remains available to consumers. `PortTags` and
+`no_rotation` flag remains available to consumers. The entity loadout JSON retains its
+authored value and source state alongside the unresolved animation interpretation.
+`PortTags` and
 `RequiredPortTags` were read already; the port container holds no tags of its
 own in LIVE, only `PortFlags`.
 

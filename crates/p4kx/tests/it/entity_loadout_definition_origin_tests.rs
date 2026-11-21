@@ -11,6 +11,9 @@ use serde_json::Value;
 
 use super::{TestResult, field_uses, origin, original_bytes, verify_emitted_fields};
 
+#[path = "entity_loadout_rotation_origin_tests.rs"]
+mod rotation;
+
 const PORT: &str = "/entity/ports/0";
 const VEHICLE_PATH: &str = "Scripts/Entities/Vehicles/Implementations/Xml/Probe.xml";
 const LOADOUT: &str = concat!(

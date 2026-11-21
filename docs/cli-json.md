@@ -325,6 +325,15 @@ attachment helper, otherwise `attachment` (`Bone`, `Entity`, `Skin` or `StatObj`
 helper in the parent's geometry), `offset_helper`, `position` (`[x, y, z]` in metres) and
 `rotation` (`[x, y, z]` in degrees as stored).
 
+`definition.rotation_constraint` is absent when the port declares no rotation constraint.
+Its `no_rotation` object has `state` and `value`. State `present` carries the exact
+Boolean, including `false`. A null constraint or value uses state `null`. Unreadable
+and incompatible source values have states `unreadable` and `invalid`. These states
+carry a JSON null value. An unknown source state uses `unsupported`.
+The `fieldOrigins` entry for `no_rotation` identifies the original constraint evidence.
+The separate `animation_semantics` value is `unresolved`.
+Static placement applies the full helper transform.
+
 An **Error** has `kind`, a stable code, `reason`, text for people, and for an unresolved port the
 target: `reference` (the GUID) or `class_name`, the other `null`. The kinds are:
 

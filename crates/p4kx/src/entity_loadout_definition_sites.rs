@@ -6,7 +6,7 @@ use std::ptr;
 
 use p4kx_assembly::{PortDefinition, PortDefinitionPosition};
 use p4kx_extraction::{
-    DataForge, RecordJsonLocation, SourceLocation, SourceUseRole, StructValue, Value,
+    DataForge, RecordJsonLocation, SourceLocation, SourceUseRole, SourceValue, StructValue, Value,
 };
 
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
@@ -133,6 +133,7 @@ impl PendingDefinition {
         }
         capture.types(original);
         capture.transform(original, definition);
+        capture.rotation_constraint(original, definition.no_rotation_source());
         Self {
             key,
             members: capture.members,
@@ -233,6 +234,25 @@ impl Capture<'_> {
             }
         }
         self.push(format!("{path}/sub_types"), collection);
+    }
+
+    fn rotation_constraint(&mut self, original: &StructValue<'_>, source: &SourceValue<bool>) {
+        if matches!(source, SourceValue::Absent) {
+            return;
+        }
+        let mut inputs = Vec::new();
+        let constraints = self
+            .child(original, "AttachmentImplementation", &mut inputs)
+            .and_then(|attachment| self.child(attachment, "constraintParams", &mut inputs));
+        if let Some(constraints) = constraints {
+            let role = if matches!(source, SourceValue::Present(_)) {
+                SourceUseRole::Payload
+            } else {
+                SourceUseRole::Conversion
+            };
+            inputs.extend(self.field(constraints, "noRotation", role));
+        }
+        self.push("/rotation_constraint/no_rotation", inputs);
     }
 
     fn transform(&mut self, original: &StructValue<'_>, definition: &PortDefinition) {

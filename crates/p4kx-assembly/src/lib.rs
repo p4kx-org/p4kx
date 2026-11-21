@@ -289,7 +289,9 @@ pub use palette::{
 };
 pub use pick::LoadoutPicks;
 pub use placement::offset_transform;
-pub use port::{PortDefinition, PortDefinitionPosition, PortTransform, PortType};
+pub use port::{
+    PortDefinition, PortDefinitionPosition, PortTransform, PortType, attachment_no_rotation,
+};
 pub use port_helper_selection::{
     PortHelperChoice, PortHelperObservation, PortHelperPath, PortHelperProblem,
     PortHelperSelection, PortHelperTagMatch,

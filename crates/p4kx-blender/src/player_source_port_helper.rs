@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_assembly as assembly;
 use p4kx_extraction::{SourceValue, SourcedValue, StructValue, Value};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -59,7 +60,7 @@ impl Attachment {
                     helpers: site.cell(HELPER_NODE, helpers)?,
                     no_rotation: site.cell(
                         "AttachmentImplementation.constraintParams.noRotation",
-                        no_rotation(implementation),
+                        assembly::attachment_no_rotation(implementation),
                     )?,
                 })
             }
@@ -194,22 +195,6 @@ fn number(value: Option<&Value<'_>>) -> SourceValue<f64> {
         None => SourceValue::Absent,
         Some(Value::Null) => SourceValue::Null,
         Some(Value::Error(_)) => SourceValue::Unreadable,
-        _ => SourceValue::Invalid,
-    }
-}
-
-fn no_rotation(implementation: &StructValue<'_>) -> SourceValue<bool> {
-    match implementation.field("constraintParams") {
-        Some(Value::Struct(constraints)) => match constraints.field("noRotation") {
-            Some(Value::Bool(value)) => SourceValue::Present(*value),
-            Some(Value::Null) => SourceValue::Null,
-            Some(Value::Error(_)) => SourceValue::Unreadable,
-            None => SourceValue::Absent,
-            _ => SourceValue::Invalid,
-        },
-        Some(Value::Null) => SourceValue::Null,
-        Some(Value::Error(_)) => SourceValue::Unreadable,
-        None => SourceValue::Absent,
         _ => SourceValue::Invalid,
     }
 }
