@@ -230,7 +230,7 @@ fn site_encryption(site: &VehicleXmlSite) -> Option<SourceEncryption> {
     site.file()
         .source()
         .entry_origin()
-        .map(|entry| entry.encryption())
+        .map(p4kx_extraction::EntryOrigin::encryption)
 }
 
 fn archive() -> TestResult<(tempfile::TempDir, Archive)> {

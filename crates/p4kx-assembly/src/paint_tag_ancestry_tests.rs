@@ -126,7 +126,7 @@ fn required_tags_keep_port_before_vehicle_and_preserve_requirement_order() -> Te
         matched.uses_port_tags() && !matched.uses_vehicle_tags(),
         "a matching port offer wins over an equal vehicle offer"
     );
-    let matches = matched
+    let endpoints = matched
         .ancestries()
         .iter()
         .map(|path| {
@@ -137,7 +137,7 @@ fn required_tags_keep_port_before_vehicle_and_preserve_requirement_order() -> Te
         })
         .collect::<Vec<_>>();
     assert_eq!(
-        matches,
+        endpoints,
         [(Some(5), Some(3)), (Some(5), Some(3)), (Some(2), Some(1))],
         "port requirements follow their original order and choose each matching offered occurrence"
     );
