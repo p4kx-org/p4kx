@@ -1,28 +1,33 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use p4kx_dataforge::Record;
 
 use crate::entities::describe;
+
+#[cfg(test)]
+#[path = "record_loadout_effect_tests.rs"]
+mod record_loadout_effect_tests;
 use crate::geometry_choice::GeometryChoice;
-use crate::merge::port_key;
 use crate::node_body::is_head_type;
 use crate::node_inputs::NodeInputs;
 use crate::node_notes;
-use crate::port::PortDefinition;
 use crate::resolver::LoadoutResolver;
 use crate::resolver_observation::{self, LoadoutReadEvent};
-use crate::spec::{EntitySpec, EntrySpec, LoadoutOrigin, LoadoutSpec, TargetSpec};
+use crate::spec::{EntitySpec, LoadoutSpec, TargetSpec};
 use crate::vehicle::flags_contain;
 use crate::walk::Walk;
 use crate::{
-    Attachment, EntityNode, LoadoutError, LoadoutPath, LoadoutReferenceSelection,
-    LoadoutTargetGuid, LoadoutXmlClassUse, PortConstraints, PortNode, PortSource, PortVisibility,
-    Target, Unresolved, VehicleImplementation,
+    Attachment, EntityNode, LoadoutError, LoadoutReferenceSelection, LoadoutTargetGuid,
+    LoadoutXmlClassUse, PortConstraints, PortNode, PortVisibility, Target, Unresolved,
+    VehicleImplementation,
 };
+
+#[path = "pending_ports.rs"]
+mod pending_ports;
+use pending_ports::{Pending, pending_ports};
 
 /// Returns the flags `spec`'s port container gives all its ports when they choose a sub-geometry:
 /// those of a head, which name the character the face parts belong to; none for any other Entity.
@@ -32,18 +37,6 @@ fn shared_port_flags(spec: &EntitySpec) -> &[String] {
     } else {
         &[]
     }
-}
-
-/// One port of an Entity before it is resolved.
-struct Pending<'s> {
-    name: &'s str,
-    name_proof: Option<&'s LoadoutPath>,
-    source: PortSource,
-    definition: Option<Arc<PortDefinition>>,
-    target: &'s TargetSpec,
-    loadout: Option<&'s LoadoutSpec>,
-    origin: Option<&'s LoadoutOrigin>,
-    xml_use: Option<&'s LoadoutXmlClassUse>,
 }
 
 impl LoadoutResolver<'_> {
@@ -73,7 +66,17 @@ impl LoadoutResolver<'_> {
             entries,
         } = inputs;
         let shared = shared_port_flags(spec);
-        for pending in pending_ports(spec, &entries, vehicle.as_deref()) {
+        let record_observation = self
+            .observation
+            .as_ref()
+            .filter(|observation| observation.observes_record_loadout_effects())
+            .cloned();
+        for pending in pending_ports(
+            spec,
+            &entries,
+            vehicle.as_deref(),
+            record_observation.as_deref(),
+        ) {
             if self.observation_stopped() || (walk.cancellable && self.stopped()) {
                 break;
             }
@@ -233,67 +236,6 @@ impl LoadoutResolver<'_> {
             candidates: candidates.iter().map(describe).collect(),
         })
     }
-}
-
-/// Returns the ports of an Entity in order: the merged Loadout entries, then the defined ports
-/// no entry names, then the item ports only the vehicle implementation declares, each part once
-/// even where several share a name.
-fn pending_ports<'s>(
-    spec: &'s EntitySpec,
-    entries: &'s [(EntrySpec, PortSource)],
-    vehicle: Option<&'s VehicleImplementation>,
-) -> impl Iterator<Item = Pending<'s>> {
-    let named: HashSet<String> = entries
-        .iter()
-        .map(|(entry, _)| port_key(&entry.port))
-        .collect();
-    let mut taken = named.clone();
-    taken.extend(spec.ports.iter().map(|port| port_key(&port.name)));
-    let declared = vehicle
-        .into_iter()
-        .flat_map(VehicleImplementation::item_ports)
-        .filter(move |part| !taken.contains(&port_key(part.name())))
-        .map(|part| Pending {
-            name: part.name(),
-            name_proof: part.name_proof.as_ref(),
-            source: PortSource::Empty,
-            definition: None,
-            target: &TargetSpec::None,
-            loadout: None,
-            origin: None,
-            xml_use: None,
-        });
-    let from_entries = entries.iter().map(|(entry, source)| Pending {
-        name: &entry.port,
-        name_proof: entry.port_proof.as_ref(),
-        source: *source,
-        definition: spec
-            .port(&entry.port)
-            .map(|port| Arc::clone(&port.definition)),
-        target: &entry.target,
-        loadout: entry.loadout.as_ref(),
-        origin: Some(&entry.origin),
-        xml_use: entry.xml_use.as_ref(),
-    });
-    let defined = spec
-        .ports
-        .iter()
-        .filter(move |port| !named.contains(&port_key(&port.name)))
-        .map(|port| Pending {
-            name: &port.name,
-            name_proof: Some(&port.name_proof),
-            source: if port.default_item == TargetSpec::None {
-                PortSource::Unset
-            } else {
-                PortSource::PortDefault
-            },
-            definition: Some(Arc::clone(&port.definition)),
-            target: &port.default_item,
-            loadout: None,
-            origin: (port.default_item != TargetSpec::None).then_some(&spec.origin),
-            xml_use: None,
-        });
-    from_entries.chain(defined).chain(declared)
 }
 
 /// Returns the visibility of `port`: the verdict of the vehicle implementation's part of that

@@ -5,96 +5,20 @@ use std::ops::ControlFlow;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use p4kx_dataforge::{DataForgeError, Guid, Record, RecordTree, TreeBuilder};
+use p4kx_dataforge::{Guid, Record, RecordTree, TreeBuilder};
 
 pub(crate) use crate::resolver_path_read::parse_spec;
 
 use crate::{
     Entities, LoadoutClassSelection, LoadoutError, LoadoutFileObservation, LoadoutPath,
     LoadoutPathObserver, LoadoutRequest, LoadoutResolver, LoadoutSelection, LoadoutTargetGuid,
-    LoadoutXmlRecordSelector, VehicleImplementation, XmlLoadoutClassSite, XmlLoadoutPathSite,
+    LoadoutXmlRecordSelector, RecordLoadoutEffect, VehicleImplementation, XmlLoadoutClassSite,
+    XmlLoadoutPathSite, XmlPortReplacement,
 };
 
-/// An actual source operation performed by a loadout resolver.
-#[derive(Debug)]
-pub enum LoadoutReadEvent<'r, 'f> {
-    /// A traversal limit prevents enumerating further required source inputs.
-    InventoryIncomplete,
-    /// An actual required XML file read completed.
-    FileRead {
-        /// The original document operation whose read completed.
-        observation: &'r LoadoutFileObservation,
-        /// The actual retained document candidate that supplied this operation.
-        request: &'r LoadoutPath,
-        /// The current caller supplied before document-cache lookup.
-        caller: &'r LoadoutRequest,
-    },
-    /// The actual intrinsic source document projection completed.
-    FileProjection {
-        /// The same original operation whose successful read was observed.
-        observation: &'r LoadoutFileObservation,
-        /// The actual retained document candidate that supplied this operation.
-        request: &'r LoadoutPath,
-        /// The current caller supplied before document-cache lookup.
-        caller: &'r LoadoutRequest,
-    },
-    /// Original file and projection outcomes supplied a cached document result.
-    FileReused {
-        /// Immutable first-population evidence, without another source operation.
-        observation: &'r LoadoutFileObservation,
-        /// The actual retained document candidate that supplied this operation.
-        request: &'r LoadoutPath,
-
-        /// The current caller supplied before document-cache lookup.
-        caller: &'r LoadoutRequest,
-    },
-    /// One original direct Include links two genuine file operations.
-    FileDependency {
-        /// The original including document's operation.
-        parent: &'r LoadoutFileObservation,
-        /// The original child operation, including an actual read or parse failure.
-        observation: &'r LoadoutFileObservation,
-        /// The child's original first-population candidate.
-        request: &'r LoadoutPath,
-        /// The genuine direct Include request selected by the parent parse.
-        dependency: &'r LoadoutRequest,
-    },
-    /// A genuine Include is refused before a child operation is read.
-    FileDependencyRefused {
-        /// The original including document's operation.
-        parent: &'r LoadoutFileObservation,
-        /// The genuine Include request that reached this refusal.
-        dependency: &'r LoadoutRequest,
-        /// The actual cycle or input-limit failure.
-        error: &'r LoadoutError,
-    },
-    /// A canonical dependency read completed before optional projection helpers run.
-    CanonicalRead {
-        /// The physical dependency Record.
-        record: &'r Record<'f>,
-        /// The actual canonical result.
-        outcome: Result<&'r RecordTree<'f>, &'r DataForgeError>,
-    },
-    /// A caller supplied the canonical root tree instead of decoding it again.
-    ProvidedTree {
-        /// The physical source identity supplied by the caller.
-        record: &'r Record<'f>,
-        /// The supplied immutable canonical tree.
-        tree: &'r RecordTree<'f>,
-    },
-    /// A previously read physical source supplies a cached projection.
-    Reused {
-        /// The original physical source behind the cache entry.
-        record: &'r Record<'f>,
-    },
-    /// A known dependency cannot supply the required source type before canonical reading.
-    Rejected {
-        /// The physical dependency Record.
-        record: &'r Record<'f>,
-        /// The typed source-selection error.
-        error: &'r LoadoutError,
-    },
-}
+#[path = "loadout_read_event.rs"]
+mod loadout_read_event;
+pub use loadout_read_event::LoadoutReadEvent;
 
 #[path = "loadout_read_observer.rs"]
 mod loadout_read_observer;
@@ -130,8 +54,43 @@ impl<'f> Observation<'f> {
         Self::new(Arc::new(VehiclePortAttributeCapture))
     }
 
+    pub(crate) fn observes_record_loadout_effects(&self) -> bool {
+        self.observer.observes_record_loadout_effects()
+    }
+
+    pub(crate) fn record_loadout_effect(&self, effect: &RecordLoadoutEffect<'_>) {
+        if !self.stopped() && self.observer.record_loadout_effect(effect).is_break() {
+            self.stop();
+        }
+    }
+
     pub(crate) fn observes_port_names(&self) -> bool {
         self.observer.observes_port_names()
+    }
+
+    pub(crate) fn observes_xml_port_replacements(&self) -> bool {
+        self.observer.observes_xml_port_replacements()
+    }
+
+    pub(crate) fn xml_port_replacements_used(
+        &self,
+        original: &LoadoutFileObservation,
+        request: &LoadoutPath,
+        replacements: &[XmlPortReplacement],
+    ) -> Result<(), LoadoutError> {
+        if !self.stopped()
+            && self
+                .observer
+                .xml_port_replacements_used(original, request, replacements)
+                .is_break()
+        {
+            self.stop();
+        }
+        if self.stopped() {
+            Err(LoadoutError::ObservationStopped)
+        } else {
+            Ok(())
+        }
     }
 
     pub(crate) fn observes_xml_record_selectors(&self) -> bool {

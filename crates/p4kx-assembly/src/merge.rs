@@ -59,6 +59,15 @@ pub(crate) fn merge_by_port<T>(
     PortMergeIndex::of(items, &port).merge(items, overrides, port);
 }
 
+pub(crate) fn merge_by_port_observed<T>(
+    items: &mut Vec<T>,
+    overrides: impl IntoIterator<Item = T>,
+    port: impl Fn(&T) -> &str,
+    replace: impl FnMut(usize, &T, &T),
+) {
+    PortMergeIndex::of(items, &port).merge_observed(items, overrides, port, replace);
+}
+
 /// Tracks the first occurrence of each normalized port across ordered merges.
 #[derive(Default)]
 pub(crate) struct PortMergeIndex(HashMap<String, usize>);
@@ -78,9 +87,22 @@ impl PortMergeIndex {
         overrides: impl IntoIterator<Item = T>,
         port: impl Fn(&T) -> &str,
     ) {
+        self.merge_observed(items, overrides, port, |_, _, _| {});
+    }
+
+    pub(crate) fn merge_observed<T>(
+        &mut self,
+        items: &mut Vec<T>,
+        overrides: impl IntoIterator<Item = T>,
+        port: impl Fn(&T) -> &str,
+        mut replace: impl FnMut(usize, &T, &T),
+    ) {
         for item in overrides {
             let key = port_key(port(&item));
-            if let Some(old) = self.0.get(&key).and_then(|at| items.get_mut(*at)) {
+            if let Some(&ordinal) = self.0.get(&key)
+                && let Some(old) = items.get_mut(ordinal)
+            {
+                replace(ordinal, old, &item);
                 *old = item;
             } else {
                 self.0.insert(key, items.len());

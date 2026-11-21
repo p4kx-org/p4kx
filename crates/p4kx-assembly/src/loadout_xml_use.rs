@@ -27,6 +27,19 @@ pub(crate) struct XmlRoute {
 }
 
 impl XmlRoute {
+    pub(crate) fn includes(
+        route: Option<&Self>,
+    ) -> impl Iterator<
+        Item = (
+            &LoadoutFileObservation,
+            &LoadoutFileObservation,
+            &LoadoutPath,
+        ),
+    > {
+        std::iter::successors(route, |&route| route.tail.as_deref())
+            .map(|route| (&route.edge.parent, &route.edge.child, &route.edge.path))
+    }
+
     pub(crate) fn prepend(
         tail: Option<Arc<Self>>,
         edge: &Arc<XmlInclude>,
@@ -104,8 +117,7 @@ impl LoadoutXmlClassUse {
             &LoadoutPath,
         ),
     > {
-        std::iter::successors(self.route.as_deref(), |&route| route.tail.as_deref())
-            .map(|route| (&route.edge.parent, &route.edge.child, &route.edge.path))
+        XmlRoute::includes(self.route.as_deref())
     }
 
     pub(crate) fn root(

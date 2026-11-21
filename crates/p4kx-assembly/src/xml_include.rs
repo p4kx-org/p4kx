@@ -11,7 +11,7 @@ use crate::loadout_xml_use::{XmlInclude, XmlRoute};
 use crate::merge::PortMergeIndex;
 use crate::resolver_observation::{self, LoadoutReadEvent, Observation};
 use crate::spec::EntrySpec;
-use crate::{LoadoutError, LoadoutFiles, LoadoutPath, LoadoutRequest};
+use crate::{LoadoutError, LoadoutFiles, LoadoutPath, LoadoutRequest, XmlPortReplacement};
 
 type EntriesResult = Result<Arc<[EntrySpec]>, LoadoutError>;
 
@@ -33,12 +33,16 @@ pub(crate) fn load_observed(
         include_read_budget,
         include_reads: 0,
         issues: Vec::new(),
+        replacements: observation
+            .is_some_and(Observation::observes_xml_port_replacements)
+            .then(Vec::new),
     };
     let entries = loader.load(path, caller);
     loader.trace.set_xml(loader.trace.captured(root));
     entries.map(|entries| XmlEntries {
         entries,
         issues: loader.issues,
+        replacements: loader.replacements.map(Arc::from),
     })
 }
 
@@ -92,11 +96,32 @@ impl Frame {
         Ok(None)
     }
 
-    fn finish(&mut self) -> Arc<[EntrySpec]> {
-        self.ports
-            .merge(&mut self.merged, mem::take(&mut self.own), |entry| {
-                &entry.port
-            });
+    fn merge(
+        &mut self,
+        entries: impl IntoIterator<Item = EntrySpec>,
+        replacements: Option<&mut Vec<XmlPortReplacement>>,
+    ) {
+        if let Some(replacements) = replacements {
+            let document = &self.path;
+            self.ports.merge_observed(
+                &mut self.merged,
+                entries,
+                |entry| &entry.port,
+                |ordinal, displaced, winner| {
+                    replacements.push(XmlPortReplacement::new(
+                        document, ordinal, displaced, winner,
+                    ));
+                },
+            );
+        } else {
+            self.ports
+                .merge(&mut self.merged, entries, |entry| &entry.port);
+        }
+    }
+
+    fn finish(&mut self, replacements: Option<&mut Vec<XmlPortReplacement>>) -> Arc<[EntrySpec]> {
+        let own = mem::take(&mut self.own);
+        self.merge(own, replacements);
         Arc::from(mem::take(&mut self.merged))
     }
 }
@@ -110,6 +135,7 @@ struct Loader<'load> {
     include_read_budget: Option<usize>,
     include_reads: usize,
     issues: Vec<LoadoutError>,
+    replacements: Option<Vec<XmlPortReplacement>>,
 }
 
 impl Loader<'_> {
@@ -135,7 +161,7 @@ impl Loader<'_> {
                 }
                 continue;
             }
-            let entries = current.finish();
+            let entries = current.finish(self.replacements.as_mut());
             let path = current.path.clone();
             let complete = self.finish(current, Ok(entries));
             let Some(mut parent) = parents.pop() else {
@@ -230,11 +256,9 @@ impl Loader<'_> {
             None
         };
         match completed.result {
-            Ok(entries) => parent.ports.merge(
-                &mut parent.merged,
-                through_include(&entries, edge),
-                |entry| &entry.port,
-            ),
+            Ok(entries) => {
+                parent.merge(through_include(&entries, edge), self.replacements.as_mut());
+            }
             Err(error @ LoadoutError::XmlIncludeReadBudgetExceeded { .. }) => return Err(error),
             Err(mut error) => {
                 if let LoadoutError::MissingXmlLoadout { path } = &mut error

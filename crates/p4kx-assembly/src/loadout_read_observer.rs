@@ -7,8 +7,9 @@ use p4kx_dataforge::{Record, RecordTree};
 
 use super::LoadoutReadEvent;
 use crate::{
-    LoadoutClassSelection, LoadoutPath, LoadoutPathObserver, LoadoutRequest, LoadoutSelection,
-    LoadoutXmlRecordSelector, VehicleImplementation, XmlLoadoutClassSite, XmlLoadoutPathSite,
+    LoadoutClassSelection, LoadoutFileObservation, LoadoutPath, LoadoutPathObserver,
+    LoadoutRequest, LoadoutSelection, LoadoutXmlRecordSelector, RecordLoadoutEffect,
+    VehicleImplementation, XmlLoadoutClassSite, XmlLoadoutPathSite, XmlPortReplacement,
 };
 
 /// Observes actual resolver source operations, including concurrent prefetch reads.
@@ -16,9 +17,34 @@ pub trait LoadoutReadObserver: Send + Sync {
     /// Returns `Break` to stop the observed resolution.
     fn observe(&self, event: LoadoutReadEvent<'_, '_>) -> ControlFlow<()>;
 
+    /// Enables original Record Loadout override and default suppression evidence.
+    fn observes_record_loadout_effects(&self) -> bool {
+        false
+    }
+
+    /// Receives an actual matched Record Loadout decision during resolution.
+    fn record_loadout_effect(&self, _effect: &RecordLoadoutEffect<'_>) -> ControlFlow<()> {
+        ControlFlow::Continue(())
+    }
+
     /// Enables original port-name selections in the resolver's read callbacks.
     fn observes_port_names(&self) -> bool {
         false
+    }
+
+    /// Enables evidence for original XML Loadout port replacements.
+    fn observes_xml_port_replacements(&self) -> bool {
+        false
+    }
+
+    /// Receives the replacements of the XML Loadout consumed for the current request.
+    fn xml_port_replacements_used(
+        &self,
+        _observation: &LoadoutFileObservation,
+        _request: &LoadoutPath,
+        _replacements: &[XmlPortReplacement],
+    ) -> ControlFlow<()> {
+        ControlFlow::Continue(())
     }
 
     /// Enables exact DataForge selectors that supply an XML Loadout.

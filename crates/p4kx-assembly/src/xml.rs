@@ -10,7 +10,7 @@ use crate::resolver_observation::Observation;
 use crate::spec::{EntrySpec, LoadoutOrigin, LoadoutSpec, TargetSpec};
 use crate::{
     LoadoutDocumentKind, LoadoutError, LoadoutFailurePath, LoadoutFiles, LoadoutPath,
-    LoadoutRequest, MAX_LOADOUT_DEPTH,
+    LoadoutRequest, MAX_LOADOUT_DEPTH, XmlPortReplacement,
 };
 
 #[path = "xml_include.rs"]
@@ -26,6 +26,7 @@ struct XmlLoadout {
 pub(crate) struct XmlEntries {
     pub(crate) entries: Arc<[EntrySpec]>,
     pub(crate) issues: Vec<LoadoutError>,
+    pub(crate) replacements: Option<Arc<[XmlPortReplacement]>>,
 }
 
 fn load_file(
@@ -123,7 +124,7 @@ fn read_items(
         entries.push(EntrySpec {
             origin: origin.clone(),
             port: item.attribute("portName").unwrap_or_default().to_owned(),
-            port_proof: scope.port_name(item, "portName")?,
+            port_proof: scope.loadout_port_name(item, "portName")?,
             target: class_name.map_or(TargetSpec::None, TargetSpec::ClassName),
             loadout: (!nested.is_empty())
                 .then(|| LoadoutSpec::Manual(ManualLoadout::new(Arc::from(nested)))),

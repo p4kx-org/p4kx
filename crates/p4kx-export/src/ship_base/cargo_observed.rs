@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::{EntityNode, LoadoutEntry};
-use p4kx_extraction::{Record, RecordTree, SourceUseRole, SourceValue, SourcedValue};
+use p4kx_extraction::{FieldOrigin, Record, RecordTree, SourceUseRole, SourceValue, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -184,7 +184,11 @@ impl<'read, 'source> Observation<'read, 'source> {
         }
     }
 
-    pub(crate) fn finish(self, cargo: &Cargo) -> Result<ShipCargoSource, CatalogError> {
+    pub(crate) fn finish(
+        self,
+        cargo: &Cargo,
+        membership: &FieldOrigin,
+    ) -> Result<ShipCargoSource, CatalogError> {
         if let Some(error) = self.error {
             return Err(error);
         }
@@ -193,9 +197,7 @@ impl<'read, 'source> Observation<'read, 'source> {
         }
         let (input, _) = self.capture.cargo_context()?;
         let uses = &input.origins().uses;
-        // Reached mounts do not establish why other resolver branches were excluded.
-        let unproven_membership = uses.origin(&[], false);
-        let mut origins = vec![&unproven_membership];
+        let mut origins = vec![membership];
         for mount in &self.mounts {
             origins.extend([
                 mount.attachment.target_record_index().origin(),

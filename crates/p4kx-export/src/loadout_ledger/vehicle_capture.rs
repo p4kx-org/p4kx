@@ -117,6 +117,7 @@ impl Capture<'_> {
             kind_path: VehicleKindPath::of(record_path),
             kind_path_origin,
             files: Vec::new(),
+            cargo_port_selectors: Vec::new(),
             selected: None,
             mass: MetricContributions::default(),
             hull: MetricContributions::default(),

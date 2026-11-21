@@ -12,12 +12,16 @@ use crate::resolver::{Entries, EntriesResult};
 use crate::resolver_observation::Observation;
 use crate::{
     LoadoutError, LoadoutFiles, LoadoutPath, LoadoutRequest, LoadoutResolver, LoadoutXmlClassUse,
-    xml,
+    XmlPortReplacement, xml,
 };
+
+#[cfg(test)]
+#[path = "resolver_xml_replacements_tests.rs"]
+mod replacement_tests;
 
 #[derive(Default)]
 pub(crate) struct XmlCache {
-    entries: HashMap<XmlCacheKey, CachedDocument<EntriesResult>>,
+    entries: HashMap<XmlCacheKey, CachedDocument<Result<ParsedEntries, LoadoutError>>>,
     include_read_budget: Option<usize>,
 }
 
@@ -25,6 +29,12 @@ impl XmlCache {
     pub(crate) fn clear(&mut self) {
         self.entries.clear();
     }
+}
+
+#[derive(Clone)]
+struct ParsedEntries {
+    entries: Entries,
+    replacements: Option<Arc<[XmlPortReplacement]>>,
 }
 
 #[derive(PartialEq, Eq, Hash)]
@@ -59,7 +69,7 @@ impl LoadoutResolver<'_> {
             capture_paint,
         };
         let include_read_budget = self.xml.include_read_budget;
-        let (mut result, original) = match self.xml.entries.entry(key) {
+        let (parsed, original) = match self.xml.entries.entry(key) {
             Entry::Occupied(entry) => {
                 let cached = entry.get();
                 (
@@ -82,6 +92,18 @@ impl LoadoutResolver<'_> {
                 (cached.value().clone(), cached.xml_root().cloned())
             }
         };
+        let mut result = parsed.and_then(|parsed| {
+            if let Some(replacements) = &parsed.replacements {
+                let (Some(observer), Some(root)) = (observation, original.as_ref()) else {
+                    if let Some(observer) = observation {
+                        observer.stop();
+                    }
+                    return Err(LoadoutError::ObservationStopped);
+                };
+                observer.xml_port_replacements_used(root, path, replacements)?;
+            }
+            Ok(parsed.entries)
+        });
         if let (Ok(entries), Some(original)) = (&mut result, original)
             && !entries.list.is_empty()
         {
@@ -90,17 +112,21 @@ impl LoadoutResolver<'_> {
                 |usage| usage.with_caller(path),
             ));
         }
-        match &mut result {
-            Ok(entries) if entries.issues.iter().any(LoadoutError::is_missing_file) => {
-                let caller = Arc::new(caller);
-                for issue in Arc::make_mut(&mut entries.issues) {
-                    issue.used_by(&caller);
-                }
-            }
-            Err(error) if error.is_missing_file() => error.used_by(&Arc::new(caller)),
-            _ => {}
-        }
+        attach_missing_file_caller(&mut result, caller);
         result
+    }
+}
+
+fn attach_missing_file_caller(result: &mut EntriesResult, caller: LoadoutRequest) {
+    match result {
+        Ok(entries) if entries.issues.iter().any(LoadoutError::is_missing_file) => {
+            let caller = Arc::new(caller);
+            for issue in Arc::make_mut(&mut entries.issues) {
+                issue.used_by(&caller);
+            }
+        }
+        Err(error) if error.is_missing_file() => error.used_by(&Arc::new(caller)),
+        _ => {}
     }
 }
 
@@ -112,7 +138,7 @@ fn read_entries(
     capture_paint: bool,
     include_read_budget: Option<usize>,
     trace: &mut FileTrace,
-) -> EntriesResult {
+) -> Result<ParsedEntries, LoadoutError> {
     let attributes = capture_paint.then(|| Arc::new(XmlLoadoutAttributes::default()));
     let capture = attributes
         .as_ref()
@@ -129,9 +155,12 @@ fn read_entries(
         let original = trace.xml_root()?.clone();
         Some(LoadoutXmlClassUse::root(original, path, Some(sites)))
     });
-    Ok(Entries {
-        list: loaded.entries,
-        issues: Arc::from(loaded.issues),
-        xml_use,
+    Ok(ParsedEntries {
+        entries: Entries {
+            list: loaded.entries,
+            issues: Arc::from(loaded.issues),
+            xml_use,
+        },
+        replacements: loaded.replacements,
     })
 }

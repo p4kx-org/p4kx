@@ -18,6 +18,7 @@ query to retrieve one Ship without building the catalog.
 The projection preserves the established capacity arithmetic. A subtotal of
 readable grids remains present with an explicit count of unavailable capacities.
 An unresolved Loadout can leave additional grids unaccounted for. Aggregate
-origins retain observed contributors and remain incomplete while exclusion
-decisions lack evidence. A proven encrypted input sets the encryption marker to
+origins retain observed contributors. Applied Record overrides and suppressed
+defaults contribute the original port names the resolver compared. The
+aggregate remains incomplete while other exclusion decisions lack evidence. A proven encrypted input sets the encryption marker to
 true even with incomplete coverage.

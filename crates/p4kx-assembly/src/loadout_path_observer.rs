@@ -57,6 +57,15 @@ pub trait LoadoutPathObserver {
         ControlFlow::Continue(())
     }
 
+    /// Binds a chosen empty manual entry to its actual original Record struct.
+    fn record_empty_loadout_entry(
+        &self,
+        _selection: &LoadoutSelection,
+        _entry: &StructValue<'_>,
+    ) -> ControlFlow<()> {
+        ControlFlow::Continue(())
+    }
+
     /// Captures the actual Record name before its vehicle class fallback is copied.
     fn record_name(&self, selection: &LoadoutSelection, tree: &RecordTree<'_>) -> ControlFlow<()>;
 }

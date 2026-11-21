@@ -170,6 +170,7 @@ mod positioned_loadout;
 mod prefab;
 mod provider;
 mod read;
+mod record_loadout_effect;
 mod resolved_port_helper;
 mod resolver;
 mod resolver_observation;
@@ -194,6 +195,7 @@ mod vehicle;
 mod vehicle_paint;
 mod walk;
 mod xml;
+mod xml_port_replacement;
 
 pub use animation_folders::{
     AnimationFolders, animation_choice, character_animations,
@@ -310,6 +312,7 @@ pub use provider::{
     ArchiveModels, ModelFailure, ModelProvider, ProvidedAttachment, ProvidedModel,
     archive_entry_candidates,
 };
+pub use record_loadout_effect::{RecordLoadoutEffect, RecordPortSelection, RecordPortTarget};
 pub use resolved_port_helper::PortHelperDiagnostic;
 pub use resolver::LoadoutResolver;
 pub use resolver_observation::{LoadoutReadEvent, LoadoutReadObserver};
@@ -339,6 +342,7 @@ pub use vehicle::{
     VehicleTotalFieldPresence, VehicleTotalFieldUse, VehicleTotalMetric, VehicleTotals,
     VehicleXmlSite,
 };
+pub use xml_port_replacement::{XmlPortReplacement, XmlPortSelection};
 
 /// The deepest element nesting of a vehicle implementation or patch file that is read; deeper
 /// files are refused.

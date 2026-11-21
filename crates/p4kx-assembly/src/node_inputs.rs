@@ -3,9 +3,12 @@
 
 use std::sync::Arc;
 
-use crate::merge::merge_by_port;
+use crate::merge::{merge_by_port, merge_by_port_observed};
 use crate::spec::{EntitySpec, EntrySpec, LoadoutSpec};
-use crate::{LandingGear, LoadoutError, LoadoutResolver, PortSource, VehicleImplementation};
+use crate::{
+    LandingGear, LoadoutError, LoadoutResolver, PortSource, RecordLoadoutEffect,
+    RecordPortSelection, VehicleImplementation,
+};
 
 /// Resolved vehicle, landing gear and loadout inputs for a node.
 pub(crate) struct NodeInputs {
@@ -98,7 +101,36 @@ impl LoadoutResolver<'_> {
                     let given = given
                         .specs()
                         .map(|entry| (entry.into_owned(), PortSource::Override));
-                    merge_by_port(&mut entries, given, |(entry, _)| &entry.port);
+                    let observation = self
+                        .observation
+                        .as_deref()
+                        .filter(|observation| observation.observes_record_loadout_effects());
+                    if let (Some(observation), Some(owner_record_index)) =
+                        (observation, spec.record_index)
+                    {
+                        merge_by_port_observed(
+                            &mut entries,
+                            given,
+                            |(entry, _)| &entry.port,
+                            |ordinal, (displaced, _), (winner, _)| {
+                                if let (Some(displaced), Some(winner)) = (
+                                    RecordPortSelection::entry(displaced),
+                                    RecordPortSelection::entry(winner),
+                                ) {
+                                    observation.record_loadout_effect(
+                                        &RecordLoadoutEffect::Override {
+                                            owner_record_index,
+                                            ordinal,
+                                            displaced,
+                                            winner,
+                                        },
+                                    );
+                                }
+                            },
+                        );
+                    } else {
+                        merge_by_port(&mut entries, given, |(entry, _)| &entry.port);
+                    }
                 }
                 Err(error) => issues.push(error),
             }

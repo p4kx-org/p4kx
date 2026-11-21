@@ -54,6 +54,9 @@ fn read_entry(entry: &StructValue<'_>, record: &Arc<str>, paths: &PathRead<'_>) 
         other => other,
     };
     let port_proof = paths.field(entry, "itemPortName", LoadoutPathOperation::PortName);
+    if target == TargetSpec::None {
+        paths.empty_loadout_entry(&port_proof, entry);
+    }
     EntrySpec {
         origin: LoadoutOrigin::Record(Arc::clone(record)),
         port: port_proof.value().to_owned(),

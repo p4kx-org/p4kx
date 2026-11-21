@@ -4,7 +4,7 @@
 use p4kx_extraction::{FieldOrigin, SharedFieldOrigin, SourceUse, SourceUses};
 
 use crate::catalog_read::original::{
-    OriginalDatum, RecordSubject, VehicleCaller, VehicleFileSelection,
+    AuthoredEntryPath, OriginalDatum, RecordSubject, VehicleCaller, VehicleFileSelection,
 };
 use crate::catalog_v3::authored_fields::ship_source_read::ShipAggregateOperands;
 use crate::ship_base::VehicleKindPath;
@@ -21,6 +21,7 @@ pub(super) struct PendingVehicle {
     pub(super) kind_path: VehicleKindPath,
     pub(super) kind_path_origin: FieldOrigin,
     pub(super) files: Vec<VehicleFileSelection>,
+    pub(super) cargo_port_selectors: Vec<AuthoredEntryPath>,
     pub(super) selected: Option<SelectedVehicle>,
     pub(super) mass: MetricContributions,
     pub(super) hull: MetricContributions,

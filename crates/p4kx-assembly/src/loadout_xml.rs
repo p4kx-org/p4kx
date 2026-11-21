@@ -6,6 +6,8 @@ use p4kx_cryxml::{
 };
 use p4kx_extraction::SourceLocation;
 
+#[path = "loadout_xml_effect_paths.rs"]
+mod effect_paths;
 #[path = "loadout_xml_source_positions.rs"]
 mod source_positions;
 

@@ -131,3 +131,7 @@ mod cache_tests;
 #[cfg(test)]
 #[path = "ship_aggregate_transaction_tests.rs"]
 mod aggregate_transaction_tests;
+
+#[cfg(test)]
+#[path = "ship_cargo_record_comparison_tests.rs"]
+mod cargo_record_comparison_tests;

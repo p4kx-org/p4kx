@@ -149,6 +149,16 @@ impl Capture<'_> {
 }
 
 impl LoadoutReadObserver for Capture<'_> {
+    fn observes_record_loadout_effects(&self) -> bool {
+        self.input.is_some() && self.kind == crate::Kind::Ships
+    }
+
+    fn record_loadout_effect(
+        &self,
+        effect: &p4kx_assembly::RecordLoadoutEffect<'_>,
+    ) -> ControlFlow<()> {
+        self.observe_cargo_record_effect(effect)
+    }
     fn observes_vehicle_port_attributes(&self) -> bool {
         self.input.is_some() && self.kind == crate::Kind::Loadouts
     }

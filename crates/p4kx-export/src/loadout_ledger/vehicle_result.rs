@@ -66,7 +66,10 @@ impl Capture<'_> {
             &EntryCapture::for_input(input),
             archive,
             physics_used,
-            cargo.finish(&read.base.cargo)?,
+            cargo.finish(
+                &read.base.cargo,
+                &pending.cargo_membership(input, self.cancel.as_ref())?,
+            )?,
         )?))
     }
 }

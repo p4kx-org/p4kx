@@ -246,9 +246,10 @@ impl<'scope> PathRead<'scope> {
         };
         let observer = self.observer.filter(|_| {
             operation != LoadoutPathOperation::PortName
-                || self
-                    .observation
-                    .is_some_and(Observation::observes_port_names)
+                || self.observation.is_some_and(|observation| {
+                    observation.observes_port_names()
+                        || observation.observes_record_loadout_effects()
+                })
         });
         let selection = value.and_then(|value| {
             if (observer.is_none() && xml_record_paths.is_none())
@@ -340,6 +341,20 @@ impl<'scope> PathRead<'scope> {
             && let Some(observer) = self.observer
             && observer
                 .record_inventory_container(component, value, guid)
+                .is_break()
+        {
+            self.stop();
+        }
+    }
+
+    pub(crate) fn empty_loadout_entry(&self, name: &LoadoutPath, entry: &StructValue<'_>) {
+        if !self.stopped()
+            && self
+                .observation
+                .is_some_and(Observation::observes_record_loadout_effects)
+            && let (Some(observer), Some(selection)) = (self.observer, name.selection())
+            && observer
+                .record_empty_loadout_entry(selection, entry)
                 .is_break()
         {
             self.stop();

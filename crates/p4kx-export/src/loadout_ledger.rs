@@ -3,6 +3,8 @@
 
 #[path = "loadout_ledger/alignment.rs"]
 mod alignment;
+#[path = "loadout_ledger/cargo_record_effect.rs"]
+mod cargo_record_effect;
 #[path = "loadout_ledger/cargo_storage.rs"]
 mod cargo_storage;
 #[path = "loadout_ledger/file_dependencies.rs"]
