@@ -396,6 +396,9 @@ sampled once per second with an 8 GiB reserve. System-wide page reads
 increased during both exports and page writes stayed unchanged. The archive
 stamps, Build manifests and executable digest were stable across both runs.
 
+The installed mining parity checks streamed both artifacts to completion and
+confirmed the recorded decoded lengths. The independent all-field provenance
+replay and final integrated release-candidate measurement are separate gates.
 The larger private peak leaves an estimated 37,819,613,184 bytes for the OS
 and other processes on a 64 GiB host. This measures production with the
 specified package. Replaying the raw stream and measuring the final release

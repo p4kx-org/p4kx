@@ -370,6 +370,20 @@ The private commit peak leaves an estimated 15,951,486,976 bytes for the OS
 and other processes on a 16 GiB system. This measures the mining SDK harness
 on the available host. Paging, scratch writes and the integrated application's
 total footprint need their own counters.
+Installed parity reads the same Build's measured normal Catalog directly from
+the compressed artifact. Both checks matched the mineable elements,
+compositions, provider presets, harvestable locations, reachable resources,
+Starmap links and original localization used by the mining SDK.
+
+| Build | Mining verifier revision | Matching Catalog occurrence routes | Additional SDK occurrences |
+| --- | --- | ---: | ---: |
+| LIVE `13220821` | `046aa1980` | 1,287 | 1 |
+| PTU `13248297` | `6b0d55175` | 1,305 | 1 |
+
+The two checks use the measured Windows portable producer at `25287d184`.
+Additional SDK occurrences follow the separate SDK reach described above.
+Decoded stream lengths matched the producer receipts.
+[Measured producer and streaming method](catalog-partitioning.md#system-memory-acceptance)
 The synthetic `consumer_refresh` integration cases show how one parsed view can serve several
 queries in one refresh. They resolve a reward source to its physical pool and Blueprint and
 read a mission location and Item ports. The joined mining case follows the provider,

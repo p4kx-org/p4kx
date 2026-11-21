@@ -1,24 +1,37 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::path::{Path, PathBuf};
+
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogQuerySession};
 use p4kx_export::mining_locations::{
     CompositionPart, DefinitionStatus, HarvestableElement, HarvestableOccurrenceRoute,
     MineableComposition, MineableElement, MiningLocationOptions, MiningLocationSnapshot,
     ResourceNumber,
 };
+use p4kx_export::{CatalogPublicationMode, build_catalog};
 use p4kx_extraction::{Archive, Guid, Language, SourceInventory, SourcedValue};
+use serde_json::{Value, json};
 
-use crate::commodity_v3_fixture::{TestResult, guid};
+use crate::commodity_v3_fixture::{self as common, TestResult, guid};
 use crate::harvest_fixture as fixture;
+use crate::health_origin_assertions as proof;
 
 use super::origins;
 
 #[test]
 fn consumer_mining_joins_original_rows_and_refuses_unresolved_membership() -> TestResult {
+    check_mining_refresh(fixture::write_archive, Some(true))?;
+    check_mining_refresh(fixture::write_archive_with_unknown_dcb_encryption, None)
+}
+
+fn check_mining_refresh(
+    write_archive: impl FnOnce(&Path) -> TestResult<PathBuf>,
+    expected_encryption: Option<bool>,
+) -> TestResult {
     let folder = tempfile::tempdir()?;
     let archive = Archive::open_with_key(
-        fixture::write_archive(folder.path())?,
+        write_archive(folder.path())?,
         Some(p4kx_testkit::test_key()),
     )?;
     let session = CatalogQuerySession::open(
@@ -30,7 +43,8 @@ fn consumer_mining_joins_original_rows_and_refuses_unresolved_membership() -> Te
         .parsed(None)?
         .read_mining_locations(MiningLocationOptions::new(Language::English, None))?;
     let composition = check_join(&snapshot)?;
-    let material = check_members(&snapshot, composition)?;
+    let material = check_members(&snapshot, composition, expected_encryption)?;
+    check_composition_parity(&archive, &snapshot, composition)?;
     check_locations_and_name(&snapshot, composition)?;
     assert!(
         snapshot.coverage.language_available,
@@ -42,17 +56,46 @@ fn consumer_mining_joins_original_rows_and_refuses_unresolved_membership() -> Te
     );
     let mut published = vec![material];
     let previous = published.clone();
-    let result = publish_resolved_members(&snapshot, &mut published);
+    let Err(error) = publish_resolved_members(&snapshot, &mut published) else {
+        return Err("a complete-resolved consumer must refuse".into());
+    };
     assert_eq!(
-        result
-            .expect_err("a complete-resolved consumer must refuse")
-            .to_string(),
+        error.to_string(),
         "consumer requires every composition member target",
         "the consumer policy keeps known dangling membership explicit"
     );
     assert_eq!(
         published, previous,
         "a refused refresh retains the owned cache"
+    );
+    Ok(())
+}
+
+fn check_composition_parity(
+    archive: &Archive,
+    snapshot: &MiningLocationSnapshot,
+    composition: &MineableComposition,
+) -> TestResult {
+    let mut options = common::options();
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
+    let catalog: Value = serde_json::from_slice(build_catalog(archive, &options)?.json())?;
+    let actual: Value = serde_json::from_slice(&serde_json::to_vec(composition)?)?;
+    let index = composition
+        .source
+        .record_index
+        .value()
+        .ok_or("physical index")?;
+    let expected = proof::rows(&catalog, "/mineableCompositions")?
+        .iter()
+        .find(|row| {
+            row.pointer("/recordIndex/value").and_then(Value::as_u64) == Some(u64::from(*index))
+        })
+        .ok_or("canonical physical composition")?;
+    let scoped = json!({"provenance": snapshot.source_inventory});
+    assert_eq!(
+        proof::with_origins(actual, &scoped)?,
+        proof::with_origins(expected.clone(), &catalog)?,
+        "the selected composition retains the producer's ordered values and original use facts"
     );
     Ok(())
 }
@@ -148,6 +191,7 @@ fn check_spawn(
 fn check_members(
     snapshot: &MiningLocationSnapshot,
     composition: &MineableComposition,
+    expected_encryption: Option<bool>,
 ) -> TestResult<Guid> {
     let [first, second] = composition
         .parts
@@ -177,17 +221,11 @@ fn check_members(
         "element identity agrees"
     );
     check_resource(snapshot, element)?;
-    assert!(
-        matches!(first.min_percentage.value(), Some(ResourceNumber::Single(value))
-        if value.raw_bits() == 30.0_f32.to_bits()),
-        "the original percentage is not rescaled"
-    );
-    assert_eq!(
-        first.min_percentage.origin().contains_encrypted_source(),
-        Some(true),
-        "the authored share uses the encrypted DataForge"
-    );
-    closed(&first.min_percentage, &snapshot.source_inventory)?;
+    check_share(
+        &first.min_percentage,
+        &snapshot.source_inventory,
+        expected_encryption,
+    )?;
     closed(&first.mineable_element, &snapshot.source_inventory)?;
     check_dangling(snapshot, second)?;
     valid
@@ -195,6 +233,32 @@ fn check_members(
         .value()
         .copied()
         .ok_or_else(|| "original material GUID".into())
+}
+
+fn check_share(
+    share: &SourcedValue<ResourceNumber>,
+    inventory: &SourceInventory,
+    expected_encryption: Option<bool>,
+) -> TestResult {
+    assert!(
+        matches!(share.value(), Some(ResourceNumber::Single(value)) if value.raw_bits() == 30.0_f32.to_bits()),
+        "the authored share keeps its original binary32 value"
+    );
+    assert_eq!(
+        origins::check(share, inventory)?,
+        expected_encryption,
+        "the share marker describes the actual archived declaration"
+    );
+    assert!(
+        share.origin().source_set_complete(),
+        "known input identity stays complete when its encryption is unknown"
+    );
+    assert_eq!(
+        serde_json::to_value(share)?.get("containsEncryptedSource"),
+        Some(&json!(expected_encryption)),
+        "the wire carries the immediate marker, including an explicit null"
+    );
+    Ok(())
 }
 
 fn check_resource(snapshot: &MiningLocationSnapshot, element: &MineableElement) -> TestResult {

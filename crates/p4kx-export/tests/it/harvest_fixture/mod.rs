@@ -4,6 +4,7 @@
 //! A synthetic Archive with mining and harvestable Records and the containers that name a
 //! provider preset in their `.soc`.
 
+use std::convert::identity;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
@@ -290,26 +291,36 @@ pub(crate) fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
 
 /// Writes the fixture Archive whose radar parameters are `radar` into `dir`.
 pub(crate) fn write_archive_with(dir: &Path, radar: Radar) -> Result<PathBuf, Box<dyn Error>> {
-    write_archive_layout(dir, radar, true)
+    write_archive_layout(dir, radar, true, identity)
 }
 
 /// Writes the fixture Archive whose `MiningGlobalParams` struct lacks the mass multiplier, as in
 /// an older game version, into `dir`.
 pub(crate) fn write_archive_without_mass_multiplier(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
-    write_archive_layout(dir, Radar::Named, false)
+    write_archive_layout(dir, Radar::Named, false, identity)
+}
+
+/// Writes the same fixture with a readable DataForge and unknown stored encryption.
+pub(crate) fn write_archive_with_unknown_dcb_encryption(
+    dir: &Path,
+) -> Result<PathBuf, Box<dyn Error>> {
+    const UNKNOWN_ENCRYPTION_DECLARATION: u16 = 7;
+    write_archive_layout(dir, Radar::Named, true, |entry| {
+        entry.with_encryption_field(UNKNOWN_ENCRYPTION_DECLARATION)
+    })
 }
 
 fn write_archive_layout(
     dir: &Path,
     radar: Radar,
     mass_multiplier: bool,
+    mark_dcb: impl FnOnce(TestEntry) -> TestEntry,
 ) -> Result<PathBuf, Box<dyn Error>> {
     let path = dir.join("Data.p4k");
+    let dcb =
+        TestEntry::zstd("Data\\Game2.dcb", database(radar, mass_multiplier).build()).encrypted();
     ArchiveBuilder::new()
-        .entry(
-            TestEntry::zstd("Data\\Game2.dcb", database(radar, mass_multiplier).build())
-                .encrypted(),
-        )
+        .entry(mark_dcb(dcb))
         .entry(TestEntry::zstd(
             "Data\\Localization\\english\\global.ini",
             GlobalIniBuilder::new()
