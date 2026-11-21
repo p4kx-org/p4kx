@@ -8,7 +8,7 @@ use std::path::Path;
 use p4kx_extraction::{Archive, DataForgeEntry};
 use p4kx_testkit::{
     CheckedGlb, MOUNT_COURIER, SATCHEL_HELPER_Z, check_glb, mounted_unresolved_helper_entries,
-    test_key,
+    mounted_unresolved_helper_without_root_entries, test_key,
 };
 use serde_json::Value;
 
@@ -22,9 +22,57 @@ fn unresolved_nested_worn_helper_warns_and_exports_only_the_root_transform() -> 
     let archive = mount_archive(directory.path(), mounted_unresolved_helper_entries(), true)?;
     let holder = holder_record_index(&archive)?;
     let out = directory.path().join("armour.glb");
+    let report = export(&archive, &out)?;
+    check_diagnostic(&report, holder)?;
+    let bytes = fs::read(&out)?;
+    let glb = check_glb(&bytes)?;
+    let rows = fs::read_to_string(out.with_file_name("armour.glb.p4kx-origin.jsonl"))?
+        .lines()
+        .map(serde_json::from_str::<Value>)
+        .collect::<Result<Vec<_>, _>>()?;
+    check_artifact_binding(&bytes, &rows)?;
+    check_root_mount(&glb, &rows, holder)
+}
+
+#[test]
+fn unresolved_worn_helper_without_root_keeps_its_original_diagnostic() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let archive = mount_archive(
+        directory.path(),
+        mounted_unresolved_helper_without_root_entries(),
+        true,
+    )?;
+    let holder = holder_record_index(&archive)?;
+    let out = directory.path().join("armour.glb");
+    let report = export(&archive, &out)?;
+    check_diagnostic(&report, holder)?;
+    let bytes = fs::read(&out)?;
+    let glb = check_glb(&bytes)?;
+    let satchel = glb
+        .document
+        .default_scene()
+        .and_then(|scene| scene.nodes().find(|node| node.name() == Some("satchel")))
+        .ok_or("the unmounted satchel is a scene root")?;
+    assert!(
+        satchel
+            .transform()
+            .decomposed()
+            .0
+            .into_iter()
+            .all(|coordinate| coordinate.abs() < f32::EPSILON),
+        "the scene-root piece keeps its origin"
+    );
+    assert!(
+        !out.with_file_name("armour.glb.p4kx-origin.jsonl").exists(),
+        "without a mount there is no mount provenance receipt"
+    );
+    Ok(())
+}
+
+fn export(archive: &Path, out: &Path) -> Result<Value, Box<dyn Error>> {
     let result = p4kx_testkit::p4kx()?
         .args(["--json", "armour", "glb"])
-        .arg(&archive)
+        .arg(archive)
         .args([
             "--key",
             &test_key().to_hex(),
@@ -34,22 +82,14 @@ fn unresolved_nested_worn_helper_warns_and_exports_only_the_root_transform() -> 
             MOUNT_COURIER,
             "--out",
         ])
-        .arg(&out)
+        .arg(out)
         .output()?;
     assert!(
         result.status.success(),
-        "an unresolved selector leaves a drawable fallback: {}",
+        "the original wearable is still drawable: {}",
         String::from_utf8_lossy(&result.stderr)
     );
-    check_diagnostic(&serde_json::from_slice(&result.stdout)?, holder)?;
-    let bytes = fs::read(&out)?;
-    let glb = check_glb(&bytes)?;
-    let rows = fs::read_to_string(out.with_file_name("armour.glb.p4kx-origin.jsonl"))?
-        .lines()
-        .map(serde_json::from_str::<Value>)
-        .collect::<Result<Vec<_>, _>>()?;
-    check_artifact_binding(&bytes, &rows)?;
-    check_root_mount(&glb, &rows, holder)
+    Ok(serde_json::from_slice(&result.stdout)?)
 }
 
 fn holder_record_index(path: &Path) -> Result<u32, Box<dyn Error>> {
@@ -82,7 +122,7 @@ fn check_diagnostic(report: &Value, holder: u32) -> TestResult {
     assert_eq!(
         warning.get("skipped").and_then(Value::as_bool),
         Some(false),
-        "the warning leaves the rigid piece mounted"
+        "the selector warning does not omit the rigid piece"
     );
     let reason = warning
         .get("reason")

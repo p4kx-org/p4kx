@@ -12,7 +12,7 @@ use super::piece::{Mount, Note, Source};
 use super::wearable::{Unfit, Worn};
 use super::{BodyVariant, Expressions, Look, PartOrigin, Piece, Wearable, ZoneChunk};
 use crate::bespoke::{Bespoke, exists, missing_library};
-use crate::{Issue, IssueKind, MaterialVariant, ModelProvider, PaletteRef};
+use crate::{Issue, IssueKind, MaterialVariant, ModelProvider, PaletteRef, PortHelperDiagnostic};
 
 /// One skin to read and wear.
 pub(super) struct Job {
@@ -32,6 +32,7 @@ pub(super) struct Job {
     pub(super) bespoke: bool,
     pub(super) zones: Arc<[ZoneChunk]>,
     pub(super) mount: Option<Mount>,
+    pub(super) unresolved_mount_helper: Option<Box<PortHelperDiagnostic>>,
     pub(super) overlay_mount: OverlayMount,
     pub(super) overlay_index: Option<usize>,
 }
@@ -56,6 +57,7 @@ impl Job {
             bespoke: false,
             zones: Arc::default(),
             mount: None,
+            unresolved_mount_helper: None,
             overlay_mount: OverlayMount::Original,
             overlay_index: None,
         }
@@ -178,6 +180,7 @@ pub(super) fn gather(
         follows_head: piece.follows_head,
         bespoke,
         mount: piece.mount.clone(),
+        unresolved_mount_helper: piece.unresolved_mount_helper.clone(),
         overlay_mount: piece.overlay_mount,
         overlay_index: piece.overlay_index,
     });

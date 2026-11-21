@@ -24,19 +24,30 @@ enum Holder<'a> {
 }
 
 impl Holder<'_> {
-    /// Returns where an item on `port` hangs on this holder, or `None` when the holder is not
-    /// drawn, the port is a skin or names no helper.
-    fn mount(self, port: &PortNode) -> Option<Mount> {
+    fn mount_piece(self, port: &PortNode, mut piece: Piece) -> Piece {
+        let Some(definition) = port.definition().filter(|definition| !definition.is_skin()) else {
+            return piece;
+        };
         let holder = match self {
             Self::Body => None,
             Self::Piece(index, name) => Some((index, name.to_owned())),
-            Self::Other => return None,
+            Self::Other => return piece,
         };
-        let definition = port.definition()?;
         let resolved = port.placement_helper();
-        let transform = resolved.transform?;
-        (!definition.is_skin() && !transform.helper().is_empty())
-            .then(|| Mount::new(holder, definition, transform, resolved.diagnostic))
+        if let Some(transform) = resolved
+            .transform
+            .filter(|transform| !transform.helper().is_empty())
+        {
+            piece.mounted(Mount::new(
+                holder,
+                definition,
+                transform,
+                resolved.diagnostic,
+            ))
+        } else {
+            piece.unresolved_mount_helper = resolved.diagnostic.map(Box::new);
+            piece
+        }
     }
 }
 
@@ -241,10 +252,7 @@ impl<'f> LoadoutResolver<'f> {
                         let piece = piece.at_port(port.name());
                         observe(pieces.len(), node);
                         piece_index = Some(pieces.len());
-                        pieces.push(match holder.mount(port) {
-                            Some(mount) => piece.mounted(mount),
-                            None => piece,
-                        });
+                        pieces.push(holder.mount_piece(port, piece));
                     }
                     below = Some((node, name, piece_index));
                 }

@@ -39,26 +39,33 @@ pub(super) fn place(
         {
             continue;
         }
-        let Some(mount) = &job.mount else { continue };
-        match mounted(parts, jobs, index, mount, skeleton, level) {
-            Ok(placed) => {
-                if let Some(diagnostic) = &mount.helper_diagnostic {
-                    issues.push(issue(
-                        job,
-                        IssueKind::PortHelperUnresolved(diagnostic.clone()),
-                    ));
+        let diagnostic = job.mount.as_ref().map_or(
+            job.unresolved_mount_helper.as_ref(),
+            |mount| match mounted(parts, jobs, index, mount, skeleton, level) {
+                Ok(placed) => {
+                    if let Some(part) = parts.get_mut(index) {
+                        part.mount = Some(Box::new(placed));
+                    }
+                    mount.helper_diagnostic.as_ref()
                 }
-                if let Some(part) = parts.get_mut(index) {
-                    part.mount = Some(Box::new(placed));
+                Err(helper) => {
+                    let kind = if job.overlay_mount.requires_mount() {
+                        IssueKind::WornMountUnresolved(
+                            "the current holder or its authored helper is absent from the exported model",
+                        )
+                    } else {
+                        IssueKind::HelperNotFound { helper }
+                    };
+                    issues.push(issue(job, kind));
+                    None
                 }
-            }
-            Err(_) if job.overlay_mount.requires_mount() => issues.push(issue(
+            },
+        );
+        if let Some(diagnostic) = diagnostic {
+            issues.push(issue(
                 job,
-                IssueKind::WornMountUnresolved(
-                    "the current holder or its authored helper is absent from the exported model",
-                ),
-            )),
-            Err(helper) => issues.push(issue(job, IssueKind::HelperNotFound { helper })),
+                IssueKind::PortHelperUnresolved(diagnostic.clone()),
+            ));
         }
     }
 }

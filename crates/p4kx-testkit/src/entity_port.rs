@@ -174,7 +174,7 @@ impl TestPort {
         }
         if let Some(no_rotation) = self.entity_attachment {
             instance = instance.value("AttachmentImplementation", entity_attachment(no_rotation));
-        } else if self.helper.is_some() || self.skin {
+        } else if self.helper.is_some() || self.skin || !self.sub_helpers.is_empty() {
             let kind = if self.skin { "Skin" } else { "Bone" };
             instance = instance.value(
                 "AttachmentImplementation",
@@ -218,8 +218,11 @@ fn attachment(
     children: &[TestValue],
 ) -> TestValue {
     let mut instance = TestInstance::new(format!("SItemPortDefAttachmentImplementation{kind}"));
-    if let Some((name, position, rotation)) = helper {
-        let mut root = helper_node(name, item_helper, *position, *rotation);
+    if helper.is_some() || !children.is_empty() {
+        let mut root = helper.map_or_else(
+            || helper_node("", "", [0.0; 3], [0.0; 3]),
+            |(name, position, rotation)| helper_node(name, item_helper, *position, *rotation),
+        );
         if !children.is_empty() {
             root = root
                 .value("Tags", TestValue::text(""))

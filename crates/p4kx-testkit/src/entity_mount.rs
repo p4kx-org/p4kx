@@ -47,10 +47,13 @@ fn satchel_model() -> TestModel {
 }
 
 fn satchel_port(helper: &str) -> TestPort {
-    TestPort::new("pack")
-        .item_type("Char_Armor_Backpack", Vec::<String>::new())
+    rigid_satchel_port()
         .helper(helper, [0.0, 0.1, 0.2], [0.0; 3])
         .item_helper("satchel_loc")
+}
+
+fn rigid_satchel_port() -> TestPort {
+    TestPort::new("pack").item_type("Char_Armor_Backpack", Vec::<String>::new())
 }
 
 fn carrier(guid: u128, class: &str, port: TestPort) -> TestEntity {
@@ -110,6 +113,16 @@ pub fn mounted_item_entries() -> Vec<TestEntry> {
 /// Returns the mounted-item fixture with a tagged alternative at original helper ordinals [1, 0].
 #[must_use]
 pub fn mounted_unresolved_helper_entries() -> Vec<TestEntry> {
+    mounted_unresolved_helper_fixture(satchel_port("cloth"))
+}
+
+/// Returns the tagged helper fixture with no root transform.
+#[must_use]
+pub fn mounted_unresolved_helper_without_root_entries() -> Vec<TestEntry> {
+    mounted_unresolved_helper_fixture(rigid_satchel_port())
+}
+
+fn mounted_unresolved_helper_fixture(port: TestPort) -> Vec<TestEntry> {
     let node_type = "SItemPortDefHelperNode";
     let alternative = helper_node("pelvis", "satchel", [0.0, 0.1, 0.8], [0.0; 3])
         .value("Tags", TestValue::text("FixtureUnresolvedTag"));
@@ -119,7 +132,7 @@ pub fn mounted_unresolved_helper_entries() -> Vec<TestEntry> {
             "SubHelpers",
             TestValue::Array(vec![TestValue::Struct(alternative)]),
         );
-    let port = satchel_port("cloth").sub_helpers(vec![TestValue::Null, TestValue::Struct(group)]);
+    let port = port.sub_helpers(vec![TestValue::Null, TestValue::Struct(group)]);
     let mut database = database_with_carrier(port);
     database.structs = database
         .structs

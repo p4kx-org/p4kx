@@ -811,8 +811,9 @@ head. `material` of a part is the material library it is drawn with, `null` when
 
 `worn_mount_unresolved` has `skipped: true` when an explicit loadout overlay cannot
 bind a rigid mesh to a unique compatible holder port and its helper. `port_helper_unresolved`
-has `skipped: false` when a mounted piece uses the root helper with an unresolved selector.
-The `reason` includes the original physical port and helper position for that note.
+has `skipped: false` when a worn piece uses the root helper with an unresolved selector or
+stays at the scene origin because it has no usable root helper. The `reason` includes the
+original physical port and helper position for that note.
 
 `--anim NAME` (repeatable, `all` for every one) and `--anim-from ENTRY` write the animations of
 the body variant's folders on the body skeleton, those of the character's own folder

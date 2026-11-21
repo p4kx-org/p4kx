@@ -369,7 +369,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   current holder's physical port. A new rigid piece needs one demonstrably free, visible,
   compatible port. `worn_mount_unresolved` reports competing, occupied or unproven slots and
   the affected rigid mesh is omitted. An unresolved authored `SubHelpers` selector uses the
-  root helper with `port_helper_unresolved` identifying the original port and array position.
+  root helper when available. `port_helper_unresolved` identifies the original port and array
+  position, including when a default worn piece has no usable root helper and stays at the
+  scene origin.
 - `p4kx wwise resolve <archive> <trigger>` lists the sound variants reached for an audio trigger with
   its soundbank, WEM ID, source and container path, e.g. `Play_QDrive_Spool in SSQD_QDrive.bnk:
   WEM 98393519 embedded, not located; event 2178236557 > action 98720655 > blend 228967944 > Ã¢â‚¬Â¦`;
