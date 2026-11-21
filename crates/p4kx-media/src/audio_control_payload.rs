@@ -13,6 +13,8 @@ use crate::audio_control_fields::{AtlFamily, AtlField, AtlScalar};
 use crate::audio_control_graph::rows::{AtlReferenceCandidate, AtlReferenceResolution};
 use crate::audio_control_reference::AtlReference;
 use crate::audio_control_reference::paths::AtlPathCandidate;
+use crate::audio_control_source::cig_audio_field::CigAudioFieldRecord;
+use crate::audio_control_source::cig_audio_role::CigAudioRole;
 
 pub(crate) const DOCUMENT: &str = "audio-control-document";
 pub(crate) const ELEMENT: &str = "audio-control-element";
@@ -23,6 +25,8 @@ pub(crate) const DEFINITION: &str = "audio-control-definition";
 pub(crate) const FIELD: &str = "audio-control-field";
 pub(crate) const RADAR_DEFINITION: &str = "audio-control-radar-definition";
 pub(crate) const RADAR_FIELD: &str = "audio-control-radar-field";
+pub(crate) const CIG_AUDIO_DEFINITION: &str = "audio-control-cig-audio-definition";
+pub(crate) const CIG_AUDIO_FIELD: &str = "audio-control-cig-audio-field";
 pub(crate) const REFERENCE: &str = "audio-control-reference";
 pub(crate) const FAILURE: &str = "audio-control-failure";
 
@@ -43,6 +47,8 @@ pub(crate) enum AtlPayload<'document> {
     Field(AtlFieldRecord<'document>),
     RadarDefinition(RadarAudioElement),
     RadarField(RadarAudioAttribute<'document>),
+    CigAudioDefinition(CigAudioDefinition),
+    CigAudioField(CigAudioFieldRecord<'document>),
     Reference(AtlReference<'document>),
     ReferenceResolution(AtlReferenceResolution),
     ReferenceCandidate(AtlReferenceCandidate),
@@ -191,6 +197,12 @@ pub(crate) struct AtlDefinition {
 
 #[derive(Serialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+pub(crate) struct CigAudioDefinition {
+    pub(crate) role: CigAudioRole,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub(crate) struct AtlFieldRecord<'document> {
     pub(crate) field: AtlField,
     pub(crate) typed_value: AtlScalar<'document>,
@@ -204,4 +216,5 @@ pub(crate) enum AtlFailure {
     TextEncoding,
     TextXml,
     SourceSpan,
+    UnexpectedCigAudioRoot,
 }

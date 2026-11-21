@@ -118,6 +118,7 @@ mod audio_control_projection;
 mod audio_control_provider;
 mod audio_control_reference;
 mod audio_control_schema;
+mod audio_control_source;
 mod audio_foreign;
 mod audio_loose_inventory;
 mod audio_payload;

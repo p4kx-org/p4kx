@@ -9,6 +9,7 @@ use p4kx_extraction::cryxml::{SourceDocument, SourceSpanError};
 use crate::audio_control_origin as origins;
 use crate::audio_control_payload::{self as wire, AtlPayload, AtlPosition};
 use crate::audio_control_reference::{self as references, NameDeclaration};
+use crate::audio_control_source::AudioControlSource;
 use crate::audio_record_origins as records;
 use crate::input_budget::InputBudget;
 use crate::origin_input::MediaOriginInput;
@@ -27,6 +28,7 @@ pub(crate) use self::census::census;
 use self::walk::Sink;
 
 pub(crate) struct Projection<'source, 'directory> {
+    pub(crate) kind: AudioControlSource,
     pub(crate) input: &'source MediaOriginInput,
     pub(crate) budget: &'source InputBudget,
     pub(crate) directory: &'source DirectoryLookup<'directory>,
@@ -58,13 +60,14 @@ impl Projection<'_, '_> {
         writer: &mut MediaWriter<'_>,
     ) -> Result<(), Failure> {
         let mut sink = WriterSink {
+            kind: self.kind,
             input: self.input,
             budget: self.budget,
             directory: self.directory,
             writer,
             size,
         };
-        walk::project(source, self.entry, &mut sink)
+        walk::project(source, self.kind, self.entry, &mut sink)
     }
 
     pub(crate) fn document_observed(
@@ -73,7 +76,10 @@ impl Projection<'_, '_> {
         complete: bool,
         writer: &MediaWriter<'_>,
     ) -> Result<(), MediaError> {
-        let evidence = origins::file(self.input, size, SourceUseRole::Selector, writer)?;
+        if self.kind != AudioControlSource::Atl {
+            return Ok(());
+        }
+        let evidence = origins::file(self.input, self.kind, size, SourceUseRole::Selector, writer)?;
         self.directory
             .index
             .atl_controls
@@ -82,6 +88,7 @@ impl Projection<'_, '_> {
 }
 
 struct WriterSink<'source, 'directory, 'run> {
+    kind: AudioControlSource,
     input: &'source MediaOriginInput,
     budget: &'source InputBudget,
     directory: &'source DirectoryLookup<'directory>,
@@ -106,8 +113,13 @@ impl Sink for WriterSink<'_, '_, '_> {
         } else {
             Status::Complete
         };
-        let mut prepared =
-            origins::document(self.input, self.size, SourceUseRole::Payload, writer)?;
+        let mut prepared = origins::document(
+            self.input,
+            self.kind,
+            self.size,
+            SourceUseRole::Payload,
+            writer,
+        )?;
         let mut issues = Vec::new();
         if payload.repaired_string_bytes {
             issues.push(MediaIssue::new(
@@ -119,7 +131,13 @@ impl Sink for WriterSink<'_, '_, '_> {
             records::subtree(
                 &mut prepared,
                 "/issues",
-                origins::file(self.input, self.size, SourceUseRole::Conversion, writer)?,
+                origins::file(
+                    self.input,
+                    self.kind,
+                    self.size,
+                    SourceUseRole::Conversion,
+                    writer,
+                )?,
                 writer,
             )?;
         }
@@ -140,7 +158,8 @@ impl Sink for WriterSink<'_, '_, '_> {
         subresource: &Subresource,
         payload: &AtlPayload<'_>,
     ) -> Result<(), MediaError> {
-        let prepared = origins::observation(self.input, position, field, role, self.writer)?;
+        let prepared =
+            origins::observation(self.input, self.kind, position, field, role, self.writer)?;
         prepared.write(self.writer, subresource, Status::Complete, payload, &[])
     }
 

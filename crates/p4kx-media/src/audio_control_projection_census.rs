@@ -8,6 +8,7 @@ use p4kx_extraction::cryxml::SourceDocument;
 
 use crate::audio_control_payload::{self as wire, AtlPayload, AtlPosition};
 use crate::audio_control_reference::{self as references, NameDeclaration};
+use crate::audio_control_source::AudioControlSource;
 use crate::{MediaError, Subresource, origin_error};
 
 use super::Failure;
@@ -31,7 +32,7 @@ pub(crate) fn census(
         counts: AtlCensus::default(),
         checkpoint,
     };
-    walk::project(source, entry, &mut sink)?;
+    walk::project(source, AudioControlSource::Atl, entry, &mut sink)?;
     Ok(sink.counts)
 }
 

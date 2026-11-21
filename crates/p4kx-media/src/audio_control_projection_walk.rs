@@ -14,6 +14,9 @@ use crate::audio_control_fields::{AtlFamily, AtlScalar};
 use crate::audio_control_graph::Site;
 use crate::audio_control_payload::{self as wire, AtlPayload, AtlPosition};
 use crate::audio_control_reference::NameDeclaration;
+use crate::audio_control_source::AudioControlSource;
+use crate::audio_control_source::cig_audio_field::CigAudioFieldRecord;
+use crate::audio_control_source::cig_audio_role::CigAudioRole;
 use crate::xml_source_projection::{content_position, element_position, source_content};
 use crate::{MediaError, Subresource, origin_error};
 
@@ -41,6 +44,7 @@ struct Frame<'document> {
     sibling: u64,
     preload: Option<u64>,
     radar: Option<RadarAudioElement>,
+    cig_audio: Option<CigAudioRole>,
 }
 
 struct ElementRoute {
@@ -48,6 +52,7 @@ struct ElementRoute {
     index: u64,
     preload: Option<u64>,
     radar: Option<RadarAudioElement>,
+    cig_audio: Option<CigAudioRole>,
 }
 
 #[derive(Clone, Copy)]
@@ -55,21 +60,56 @@ struct Definition {
     family: Option<AtlFamily>,
     preload: Option<u64>,
     radar: Option<RadarAudioElement>,
+    cig_audio: Option<CigAudioRole>,
+}
+
+#[derive(Clone, Copy)]
+enum Layout {
+    Xml,
+    Atl,
+    Radar(RadarAudioElement),
+    CigAudio(CigAudioRole),
+}
+
+impl Layout {
+    fn detect(kind: AudioControlSource, root: SourceElement<'_>) -> Self {
+        match kind {
+            AudioControlSource::Atl if root.name() == "ATLConfig" => Self::Atl,
+            AudioControlSource::Atl => RadarAudioElement::root(root).map_or(Self::Xml, Self::Radar),
+            AudioControlSource::CigAudio => {
+                CigAudioRole::root(root).map_or(Self::Xml, Self::CigAudio)
+            }
+        }
+    }
+
+    const fn radar(self) -> Option<RadarAudioElement> {
+        match self {
+            Self::Radar(root) => Some(root),
+            _ => None,
+        }
+    }
+
+    const fn cig_audio(self) -> Option<CigAudioRole> {
+        match self {
+            Self::CigAudio(root) => Some(root),
+            _ => None,
+        }
+    }
 }
 
 pub(super) fn project(
     source: &SourceDocument<'_>,
+    kind: AudioControlSource,
     entry: usize,
     sink: &mut impl Sink,
 ) -> Result<(), Failure> {
-    let typed = source.root().name() == "ATLConfig";
+    let layout = Layout::detect(kind, source.root());
     sink.document(wire::AtlDocument {
         format: source.format().into(),
-        root_is_atl_config: typed,
+        root_is_atl_config: matches!(layout, Layout::Atl),
         repaired_string_bytes: source.is_lossy(),
     })?;
-    let radar = RadarAudioElement::root(source.root());
-    Walk { entry, sink }.tree(source, typed, radar)
+    Walk { entry, sink }.tree(source, layout)
 }
 
 struct Walk<'sink, S> {
@@ -78,12 +118,7 @@ struct Walk<'sink, S> {
 }
 
 impl<S: Sink> Walk<'_, S> {
-    fn tree(
-        &mut self,
-        source: &SourceDocument<'_>,
-        typed: bool,
-        radar_root: Option<RadarAudioElement>,
-    ) -> Result<(), Failure> {
+    fn tree(&mut self, source: &SourceDocument<'_>, layout: Layout) -> Result<(), Failure> {
         let mut stack = Vec::new();
         reserve(&mut stack, self.sink.path())?;
         stack.push(Frame {
@@ -92,6 +127,7 @@ impl<S: Sink> Walk<'_, S> {
             sibling: 0,
             preload: None,
             radar: None,
+            cig_audio: None,
         });
         let mut next = 0_u64;
         while let Some(frame) = stack.last_mut() {
@@ -109,18 +145,22 @@ impl<S: Sink> Walk<'_, S> {
             next = advance(next)?;
             match item? {
                 SourceContent::Element(element) => {
-                    let radar = if frame.parent.is_none() {
-                        radar_root
+                    let (radar, cig_audio) = if frame.parent.is_none() {
+                        (layout.radar(), layout.cig_audio())
                     } else {
-                        frame.radar.and_then(|parent| parent.child(element))
+                        (
+                            frame.radar.and_then(|parent| parent.child(element)),
+                            frame.cig_audio.and_then(|parent| parent.child(element)),
+                        )
                     };
                     let route = ElementRoute {
                         location,
                         index,
                         preload: frame.preload,
                         radar,
+                        cig_audio,
                     };
-                    let child = self.element(element, route, typed)?;
+                    let child = self.element(element, route, matches!(layout, Layout::Atl))?;
                     reserve(&mut stack, self.sink.path())?;
                     stack.push(child);
                 }
@@ -141,6 +181,7 @@ impl<S: Sink> Walk<'_, S> {
             index,
             preload,
             radar,
+            cig_audio,
         } = route;
         let syntax = element.syntax()?;
         let position = element_position(&element.position())?;
@@ -169,6 +210,7 @@ impl<S: Sink> Walk<'_, S> {
             family,
             preload,
             radar,
+            cig_audio,
         };
         self.declarations(&syntax, definition, position, index)?;
         if let Some(text) = syntax.binary_text() {
@@ -189,6 +231,7 @@ impl<S: Sink> Walk<'_, S> {
             sibling: 0,
             preload,
             radar,
+            cig_audio,
         })
     }
 
@@ -213,6 +256,14 @@ impl<S: Sink> Walk<'_, S> {
                 "element",
                 &Subresource::new(wire::RADAR_DEFINITION, vec![index]),
                 &AtlPayload::RadarDefinition(radar),
+            )?;
+        }
+        if let Some(role) = definition.cig_audio {
+            self.payload(
+                position,
+                "element",
+                &Subresource::new(wire::CIG_AUDIO_DEFINITION, vec![index]),
+                &AtlPayload::CigAudioDefinition(wire::CigAudioDefinition { role }),
             )?;
         }
         for (ordinal, declaration) in syntax.declarations().enumerate() {
@@ -246,6 +297,18 @@ impl<S: Sink> Walk<'_, S> {
                 SourceUseRole::Conversion,
                 &Subresource::new(wire::RADAR_FIELD, indices.to_vec()),
                 &AtlPayload::RadarField(field),
+            )?;
+        }
+        if let Some(field) = definition
+            .cig_audio
+            .and_then(|role| CigAudioFieldRecord::read(role, declaration))
+        {
+            self.sink.record(
+                position,
+                "declaration",
+                SourceUseRole::Conversion,
+                &Subresource::new(wire::CIG_AUDIO_FIELD, indices.to_vec()),
+                &AtlPayload::CigAudioField(field),
             )?;
         }
         if let Some(typed) = observed.typed {

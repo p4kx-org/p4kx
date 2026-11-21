@@ -35,6 +35,18 @@ pub(crate) fn bind_record_schema(mut base: Value) -> Result<Value, MediaError> {
             &["complete"][..],
         ),
         (wire::RADAR_FIELD, "radar-field", 2, &["complete"][..]),
+        (
+            wire::CIG_AUDIO_DEFINITION,
+            "cig-audio-definition",
+            1,
+            &["complete"][..],
+        ),
+        (
+            wire::CIG_AUDIO_FIELD,
+            "cig-audio-field",
+            2,
+            &["complete"][..],
+        ),
         (wire::REFERENCE, "reference", 2, &["complete"][..]),
         (
             graph::RESOLUTION,

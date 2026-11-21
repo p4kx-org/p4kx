@@ -85,6 +85,7 @@ mod build_origin_record;
 mod build_origin_support;
 mod build_origin_tamper;
 mod capabilities;
+mod cig_audio_graph;
 mod converted_artifact_failures;
 mod converted_artifact_support;
 mod converted_artifacts;

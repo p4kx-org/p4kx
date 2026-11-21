@@ -23,6 +23,8 @@ is an independent slot alongside the child order.
 | `audio-control-field` | Element occurrence and original declaration ordinal |
 | `audio-control-radar-definition` | Element occurrence |
 | `audio-control-radar-field` | Element occurrence and original declaration ordinal |
+| `audio-control-cig-audio-definition` | CIG graph element occurrence |
+| `audio-control-cig-audio-field` | CIG graph element occurrence and original declaration ordinal |
 | `audio-control-reference` | Element occurrence and original declaration ordinal |
 | `audio-control-reference-resolution` | Owning Archive directory and query index |
 | `audio-control-reference-candidate` | Owning Archive directory, query index and candidate ordinal |
@@ -68,6 +70,29 @@ from a protected ATL source keeps that proof, and a reference to other bytes doe
 that those bytes contributed. Common generation budgets govern actual input and output work.
 Malformed XML and repaired CryXml string-table bytes produce diagnosed incomplete output when
 requested with `--diagnostic`. The original raw source remains separately recoverable.
+
+## CIG audio graph
+
+`p4kx media export ARCHIVE --out DIR --kind audio-control --filter 'Data/Libs/CIGAudio/CIGAudioData.bin'`
+selects the authored CIG audio graph. Both Archive separator spellings and ASCII case variants
+match the same fixed path. The source must have a `CIGAudioData` root. Its original bytes and
+syntax rows retain the full graph, including unrecognised elements and declarations.
+
+The role rows classify the original object, logic, reference and link hierarchy. Join
+each definition to its original element occurrence to read the exact name, parent and
+sibling ordinal. The original CryXml graph can use decimal-only element names.
+The text spelling also permits an underscore with optional digits.
+A typed field joins the original declaration by the same indices. Object
+types, classes and mixed-form IDs preserve their exact text. GUID-valued slots retain
+verbatim tokens. Numeric and flag fields expose typed values or explicit invalid states
+and keep their original spellings in declaration rows.
+
+An authored link belongs to its logic node through an inLinks or outLinks port occurrence
+and that port's links element.
+The `node`, `source-link-id` and `target-link-id` fields preserve their authored endpoint
+tokens and port values. The export keeps repeated edges and does not resolve endpoints
+or infer a Wwise binding. Every field receipt points to its original CryXml table position
+or XML byte range. The audio-control stream and Media envelope retain their format versions.
 
 ## Installed ATL checks
 

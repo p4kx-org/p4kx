@@ -3,11 +3,12 @@
 
 use p4kx_extraction::SourceUseRole;
 use p4kx_extraction::cryxml::{SourceDocument, SourceReadError, SourceReadOptions};
-use p4kx_extraction::sound::wwise_path;
 
 use crate::audio_control_origin as origins;
 use crate::audio_control_payload::{self as wire, AtlFailure, AtlPayload};
 use crate::audio_control_projection::{Failure, Projection as AtlProjection};
+use crate::audio_control_source::AudioControlSource;
+use crate::audio_control_source::cig_audio_role::CigAudioRole;
 use crate::audio_record_origins as records;
 use crate::required_reader;
 use crate::{
@@ -30,8 +31,8 @@ impl Provider for AudioControlProvider {
         let mut capability = Capability::new(
             MediaKind::AudioControl,
             "p4kx.audio-control",
-            "1.0.0",
-            "Exact selected Audio XML and CryXml bytes, source-ordered authored syntax, typed control families, and observed declarations.",
+            "1.1.0",
+            "Exact selected Audio XML and CryXml bytes, source-ordered syntax, typed control families, and authored CIG audio graphs.",
         );
         capability.field_groups = vec![
             FieldGroup::new(
@@ -45,6 +46,10 @@ impl Provider for AudioControlProvider {
             FieldGroup::new(
                 "radar-audio",
                 "Authored radar zoom, categories and sound-event declarations.",
+            ),
+            FieldGroup::new(
+                "cig-audio-graph",
+                "Authored graph objects, logic nodes, properties, and links with exact source coordinates.",
             ),
         ];
         capability
@@ -63,12 +68,13 @@ impl Provider for AudioControlProvider {
         context: &SourceContext<'_>,
         writer: &mut MediaWriter<'_>,
     ) -> Result<Projection, MediaError> {
-        if !wwise_path::is_atl_definition(context.entry.path()) {
+        let Some(kind) = AudioControlSource::from_path(context.entry.path()) else {
             return Ok(Projection::Skipped);
-        }
+        };
         let input = context.origin_input(writer)?;
         let budget = &context.directory.input_state()?.budget;
         let projection = AtlProjection {
+            kind,
             input: &input,
             budget,
             directory: context.directory,
@@ -94,6 +100,12 @@ fn project_bytes(
         }
     };
     writer.checkpoint()?;
+    if projection.kind == AudioControlSource::CigAudio
+        && CigAudioRole::root(source.root()).is_none()
+    {
+        failure(projection, size, AtlFailure::UnexpectedCigAudioRoot, writer)?;
+        return Ok(Projection::Written);
+    }
     match projection.project(&source, size, writer) {
         Ok(()) => {
             projection.document_observed(size, !source.is_lossy(), writer)?;
@@ -113,12 +125,24 @@ fn failure(
     reason: AtlFailure,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
-    let mut prepared =
-        origins::document(projection.input, size, SourceUseRole::Conversion, writer)?;
+    let kind = projection.kind;
+    let mut prepared = origins::document(
+        projection.input,
+        kind,
+        size,
+        SourceUseRole::Conversion,
+        writer,
+    )?;
     records::subtree(
         &mut prepared,
         "/issues",
-        origins::file(projection.input, size, SourceUseRole::Conversion, writer)?,
+        origins::file(
+            projection.input,
+            kind,
+            size,
+            SourceUseRole::Conversion,
+            writer,
+        )?,
         writer,
     )?;
     prepared.write(
@@ -130,7 +154,14 @@ fn failure(
             "audio-control.invalid-source",
             "document",
             Severity::Error,
-            "The retained ATL XML source cannot be projected completely.",
+            match kind {
+                AudioControlSource::Atl => {
+                    "The retained ATL XML source cannot be projected completely."
+                }
+                AudioControlSource::CigAudio => {
+                    "The retained CIG audio graph cannot be projected completely."
+                }
+            },
         )],
     )
 }

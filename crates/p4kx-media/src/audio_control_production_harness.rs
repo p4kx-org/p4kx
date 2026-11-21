@@ -26,6 +26,8 @@ use crate::{
     raw_output, source,
 };
 
+use crate::audio_control_source::AudioControlSource;
+
 use super::super::{AudioControlProvider, project_bytes};
 use super::TestResult;
 
@@ -154,6 +156,7 @@ fn observe_entry(
     writer.retained_with_input(&source, &input)?;
     writer.begin_with_input(0, source.clone(), input.clone())?;
     let projection = AtlProjection {
+        kind: AudioControlSource::Atl,
         input: &input,
         budget,
         directory: lookup,
