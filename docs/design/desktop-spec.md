@@ -1,6 +1,6 @@
 # P4KX · Desktop-Vorgaben des P4KX-Designs
 
-Grundlage: die Tokens des P4KX-Themes (gemessene Palette, `radius-sm` 4 px). Maschinenlesbar:
+Grundlage: die P4KX-Tokens für Farben, Formen und Typografie. Maschinenlesbar:
 [`p4kx-desktop-spec.json`](p4kx-desktop-spec.json). Artboards: Design-Canvas „P4KX Desktop".
 
 Alle Maße in px bei 1 rem = 16 px. Farben, Glows und Gewichte als Token-Namen aus der Token-Fixture `crates/p4kx-gui/src/theme/fixtures/tokens.json`.
@@ -34,31 +34,31 @@ sind keine neuen Farben.
 | Dropdown | `.combobox__listbox` | – | y 4 | Untermenü −4 überlappend | – | – | bg `color-gray-4` | 1 `color-primary` | `shadow-dropdown` | – |
 | Dropdown-Eintrag | `.combobox__option` | 36 | x 12 | Spalten 12 | 14,4 / 400 / 0; Kürzel 12,8 `color-gray-2-text` | nein | `color-gray-1`; Hover bg `color-gray-3` + `color-primary`; Tastatur bg `color-primary` + `color-bg-black` | Trenner 1 `color-gray-3`, y 4 | – | Tastatur = Füllung |
 | Seitenleisten-Titel | `.page-head__eyebrow` | ~32 | 14 / 12 / 6 | – | 11,2 / 700 / 0,15 em | ja | `color-gray-2-text` | – | – | – |
-| Channel-Zeile | `.master-row` | 36 | x 12 | Name↔Build 8 | Name 12,8 / 700 / 0,05 em; Build 12,8 / 400 | Namen sind Konstanten | `color-gray-1`, Build `color-gray-2-text`; Hover `rgba(255,255,255,0.03)`; aktiv bg `color-surface-input`, Text `color-white` | unten 1 `color-gray-3`; aktiv links 3 `color-primary` (innen) | – | innen −2 |
+| Channel-Zeile | `.master-row` | 36 | x 12 | Name↔Build 8 | Name 12,8 / 700 / 0,05 em; Build 12,8 / 400 | Namen sind Konstanten | `color-gray-1`, Build `color-gray-2-text`; Hover `rgba(255,255,255,0.03)`; aktiv bg `control-selected-bg`, Text `color-white` | unten 1 `color-gray-3`; aktiv links 3 `color-primary` (innen) | – | innen −2 |
 | Baumzeile | `.tree-row` / `.tree-name` | 36 | links 8 + 12 je Ebene, rechts 8 | Chevron↔Name 6 | 13,76 / 400; aktiv 700 | nein | wie Channel-Zeile, Hover `rgba(255,255,255,0.025)` (`.tree-row--mid:hover`); Chevron `color-primary` 12 px, Strich 3 | Ebenen-Schiene 1 `color-gray-3` | – | innen −2 |
-| Listen-Panel | `.list-panel` / `.master-detail` | füllt | Rand zur Tab-Leiste und zum Fenster 12 (`space-3`), Lücke zwischen den Panels 6 (Größenänderungs-Griff) | – | – | – | bg `surface-panel` | 1 `color-gray-3`, Radius `radius-sm` | – | – |
+| Listen-Panel | `.list-panel` / `.master-detail` | füllt | Rand zur Tab-Leiste und zum Fenster 12 (`space-3`), Lücke zwischen den Panels 6 (Größenänderungs-Griff) | – | – | – | bg `surface-panel` | 1 `color-gray-3`, Radius `radius-box` | – | – |
 | Toolbar | `.list-panel__toolbar` | 68 | 12 | 12, bricht um | – | – | bg `surface-panel` | unten 1 `color-gray-3` | – | – |
 | Suchfeld | `.list-panel__search input` | 44 | links 38,4, rechts 12 | Basis 260, min. 200 | 16 / 400; Platzhalter kursiv | nein | bg `control-bg`, Text `color-gray-1`, Platzhalter `color-gray-2-text` | 1 `control-border`; Fokus `color-primary` | Fokus `glow-primary` | Rahmen + Glow |
-| Schnellfilter | `.segmented--sm` / `__item[aria-pressed]` | 34 | x 12 | Label↔Gruppe 12 | 12,8 / 400 (gewählt 700) / 0 | **nein** | `control-fg` auf `control-bg`; Hover `control-bg-hover` + `color-white`; gewählt `control-selected-bg` + `control-selected-fg` | 1 `control-border`, Trenner 1; gewählt innen 1 + unten 3 `control-selected-border` | – | innen −3 |
-| Button-Grundform | `.btn` | 44 (xs 32) | x 16, y 8 (xs 8,8 / 4) | Icon↔Text 8 | 12,8 / 700 / 0,03 em (xs 10,88) | ja | siehe Leiter | Radius `radius-sm` | – | 2 / +2 |
+| Schnellfilter | `.segmented--sm` / `__item[aria-pressed]` | 34 | x 12 | Label↔Gruppe 12 | 12,8 / 400 (gewählt 700) / 0 | **nein** | `control-fg` auf `control-bg`; Hover `control-bg-hover` + `color-white`; gewählt `control-selected-bg` + `control-selected-fg` | 1 `control-border`, Trenner 1; gewählt innen 1 + unten 3 `control-selected-border` | – | innen −3, gewählt `control-selected-fg` |
+| Button-Grundform | `.btn` | 44 (xs 32) | x 16, y 8 (xs 8,8 / 4) | Icon↔Text 8 | 12,8 / 700 / 0,03 em (xs 10,88) | ja | siehe Leiter | Radius `radius-control` | – | 2 / +2 |
 | CTA | `.btn.btn--cta` | 44 | wie oben | – | wie oben | ja | bg `color-primary`, Text `color-bg-black`; Hover `color-accent-light`; gedrückt `color-accent-dark` | – | `glow-primary`, Hover `glow-primary-lg` | weiß, +2 |
 | Outline | `.btn-outline` | 44 | wie oben | – | wie oben | ja | `color-primary` auf transparent; Hover `color-accent-light` | 1 `color-primary` | – | 2 / +2 |
 | Ghost | `.btn-ghost` | 44 | wie oben | – | wie oben | ja | `control-fg` auf `control-bg`; Hover `color-accent-light` | 1 `control-border`; Hover `color-primary` | – | 2 / +2 |
 | Quiet-Danger | `.btn-quiet-danger` | 44 | wie oben | – | wie oben | ja | `color-gray-2-text` auf `control-bg`; Hover `color-danger-text` | 1 `control-border`; Hover `color-danger` | – | 2 / +2 |
 | Tabellenkopf | `th` / `.tree-head .tree-cell` | 36 | x 12,8 | – | 11,84 / 700 / 0,07 em | ja | bg `color-surface-input`, `color-gray-1`; sortiert `color-white` | unten 2 `color-primary` | – | innen −2 |
 | Sortieranzeige | Chevron (Icon-Set) | 12 | – | Label↔Icon 6 | – | – | aktiv `color-primary`; Hover-Vorschau `color-gray-2-text` | – | – | über Kopfzelle |
-| Tabellenzeile | `tbody tr` / `td` | 36 | x 12,8; Checkbox-Spalte 44 | – | 13,76 / 400; aktiv 700 | nein | `color-gray-1`; Zebra `table-stripe-bg` (`color-control` bei 50 %, auf dem Panel `#30353A`); Hover `control-bg`; ausgewählt `control-selected-bg`; aktiv bg `color-surface-input`, Text `color-white` | unten 1 `color-gray-3`; aktiv links 3 `color-primary` (innen) | – | innen −2 |
+| Tabellenzeile | `tbody tr` / `td` | 36 | x 12,8; Checkbox-Spalte 44 | – | 13,76 / 400; aktiv 700 | nein | `color-gray-1`; Zebra `table-stripe-bg`; Hover `table-row-hover`; ausgewählt `control-selected-bg`; aktiv bg `control-selected-bg`, Text `color-white` | unten 1 `color-gray-3`; aktiv links 3 `color-primary` (innen) | – | innen −2 |
 | Checkbox | `input[type=checkbox]` | 19,2 | – | Trefferfläche = Zelle | Haken | – | bg `control-bg`; an `color-primary`, Haken `color-bg-black`; gemischt: Balken 10 × 2 | 1 `control-border`, Radius 2; Hover `color-primary` | – | `glow-primary`, kein Ring (`input:focus`) |
 | Radio | `input[type=radio]` | 19,2 (Zeile 36) | – | Label 12 | Label 14,4 / 400 | nein | wie Checkbox, Punkt 8 `color-bg-black` | 1 `control-border`, rund | – | `glow-primary`, kein Ring (`input:focus`) |
 | Tab-Leiste | `.tab-nav` / `.tab` | 44 | Tab x 14, Leiste links 12 | – | 11,52 / 700 / 0,06 em | ja | `color-gray-2-text`; Hover `color-gray-1`; aktiv `color-white` | unten 1 `color-gray-3`; aktiv 3 `color-primary` | – | innen −2 |
-| Vorschau-Panel | Fläche + `.tab-nav` | Start 236, min. 120 | Pfadzeile 32, x 16; Inhalt x 16 y 8 | – | Pfad 12,8 / 400 | nein | bg `surface-panel`; Pfad `color-gray-1`, Größe `color-gray-2-text` | 1 `color-gray-3`, Radius `radius-sm` | – | – |
+| Vorschau-Panel | Fläche + `.tab-nav` | Start 236, min. 120 | Pfadzeile 32, x 16; Inhalt x 16 y 8 | – | Pfad 12,8 / 400 | nein | bg `surface-panel`; Pfad `color-gray-1`, Größe `color-gray-2-text` | 1 `color-gray-3`, Radius `radius-box` | – | – |
 | Hex-Zeile | – | 20 | – | Offset 88; Byte-Zelle 22 + 2; nach 8 Bytes 10; ASCII-Abstand 16, Zelle 10 | 12,8 / 400, Ziffern tabellarisch | Hex in Großbuchstaben | Offset und `00` `color-gray-2-text`; Bytes/ASCII `color-gray-1`; nicht druckbar „." gedämpft | – | – | – |
 | Statusleiste | `.footer` (Desktop-Dichte) | 32 | x 16; Einträge x 12 | Trenner 1 `color-gray-3` | 12,8 / 400 | nein | bg `surface-bar`, `color-gray-2-text`; Pfad `color-gray-1`; „Suche …" `color-primary` | oben 1 `color-gray-3` | – | – |
-| Leerzustand | `.empty-state` | füllt | 24 | 12 | Titel 13,6 / 700 / 0,06 em; Text 12,8 | Titel ja | bg `color-bg-dark-gray`, Titel `color-gray-1`, Text `color-gray-2-text`; Ziehen: `rgba(231,126,35,0.06)` (`.drop-zone.is-over`) | 1 gestrichelt `color-gray-3`, Radius `radius-sm`; Ziehen `color-primary` | – | Aktion |
+| Leerzustand | `.empty-state` | füllt | 24 | 12 | Titel 13,6 / 700 / 0,06 em; Text 12,8 | Titel ja | bg `color-bg-dark-gray`, Titel `color-title`, Text `color-gray-2-text`; Ziehen: `rgba(231,126,35,0.06)` (`.drop-zone.is-over`) | 1 gestrichelt `color-gray-3`, Radius `radius-box`; Ziehen `color-primary` | – | Aktion |
 | Hinweisleiste | `.alert.alert-warning` | ~44 | x 16, y 10 | 12 | 14,4 / 400 | nein | bg `rgba(255,210,63,0.15)`, Text `color-gray-1`, Icon `color-warning` | 1 `color-warning`, links 4 | – | Aktion |
-| Modal | `.modal` (`--wide` 600) | – | Kopf 16 / 12, Körper 16, Fuß 16 / 12 | Gruppen 20, Fuß 8 | Titel 13,6 / 700 / 0,06 em; Körper 14,4 / 400 | Titel ja | bg `color-bg-dark-gray`, Titel `color-white`; Scrim `rgba(0,0,0,0.8)` flach | 1 `color-gray-3`, oben 3 `color-primary`, Ecken 13 × 2 | `glow-primary-lg` | Fokusfalle, Esc |
+| Modal | `.modal` (`--wide` 600) | – | Kopf 16 / 12, Körper 16, Fuß 16 / 12 | Gruppen 20, Fuß 8 | Titel 13,6 / 700 / 0,06 em; Körper 14,4 / 400 | Titel ja | bg `color-bg-dark-gray`, Titel `color-title`; Scrim `rgba(0,0,0,0.8)` flach | 1 `color-gray-3`, oben 3 `color-primary`, Ecken 13 × 2 entlang `radius-box` | `glow-primary-lg` | Fokusfalle, Esc |
 | Modal Danger | `.modal--danger` | – | wie Modal | – | Titel `color-danger-text` | ja | – | oben 3 + Ecken `color-danger` | `glow-danger-lg` | wie Modal |
-| Aufklappbarer Abschnitt | `.panel-header` | 44 | x 16, y 12,8 | Liste max. 180 hoch | 13,6 / 700 / 1 px | ja | bg `color-surface-input`, Titel `color-white`, Chevron `color-primary`; Hover `color-gray-3` | 1 `color-gray-3`, Radius `radius-sm`, links 4 `color-primary` | – | 2 / +2 |
+| Aufklappbarer Abschnitt | `.panel-header` | 44 | x 16, y 12,8 | Liste max. 180 hoch | 13,6 / 700 / 1 px | ja | bg `color-surface-input`, Titel `color-white`, Chevron `color-primary`; Hover `color-gray-3` | 1 `color-gray-3`, Radius `radius-control`, links 4 `color-primary` | – | 2 / +2 |
 | Fortschrittsbalken | `.attendance-meter` | 8 | – | Text→Balken 12 | Text 14,4 / 400, tabellarisch | nein | Spur `color-surface-input`; Füllung `color-primary`; beim Abbrechen `color-gray-2` | 1 `color-gray-3` | – | – |
 | Spinner | `.spinner` | 20 (inline 14) | – | Text 8 | – | – | Spur `rgba(231,126,35,0.25)`, Bogen `color-primary` | Ring 2 | – | – |
 | Detailliste | `.kv-list.kv-ruled` | – | unten 8,8 | Zeilen 8,8, Spalten 20; Schlüsselspalte min. 140 | Schlüssel 14,4 / 700 / 0,04 em; Wert 16,8 / 300 | Schlüssel ja | Schlüssel `color-gray-2-text`, Wert `data-fg` | unten 1 `color-gray-3` | – | – |
@@ -91,6 +91,37 @@ sind keine neuen Farben.
 | Abfrage-Vervollständigung | `.combobox__listbox` / `__option` / `__notice` | Eintrag 36; Liste max. 288 (18 rem), dann Scrollleiste | Eintrag x 12; Hinweis 12 | an der Schreibmarke darunter, ohne Platz darüber; min. 240 breit; Name↔Typ 12 | Name 14,4 / 400, getippter Teil 700 (`<mark>`); Typ 12,8 / 400 rechtsbündig | nein | bg `color-gray-4`; Name `color-gray-1`, Typ `color-gray-2-text`; Hover bg `color-gray-3` + `color-primary`; Tastatur bg `color-primary` + `color-bg-black`; Hinweis kursiv `color-gray-2-text` | 1 `color-primary`; Trenner 1 `color-gray-3` | `shadow-dropdown` | Fokus bleibt im Editor; ↑/↓, Enter/Tab, Esc, Strg+Leertaste |
 | Gespeicherte Abfragen | `.panel-header` + Zeile + `.btn-xs` | Kopf 44, Zeile 36; Liste max. 180 | Zeile x 12; Aktionen x 8 | unter den Editor-Aktionen; Name↔Abfrage 8 | Name 12,8 / 700, max. 240 breit mit Auslassung; Abfrage 12,8 / 400, einzeilig, gekürzt | Kopf ja, Namen nein | Name `color-gray-1`, Abfrage `color-gray-2-text`; Hover `color-gray-3`; „Umbenennen" Ghost, „Löschen" Quiet-Danger | unten 1 `color-gray-3` | – | Zeile innen −2; Aktionen 2 / +2 |
 | Abfrage speichern / umbenennen / löschen | `.modal` / `.modal--danger` + `.btn-danger` | – | wie Modal | Feld→Hinweis 12; Fuß wie Modal | Feld 16 / 400, Platzhalter kursiv; Hinweis 14,4 / 400 | Titel ja | Hinweis „ersetzt" `color-gray-2-text`, Fehler `color-danger-text` | wie Modal | wie Modal | Fokus im Namensfeld; Enter führt aus, Esc schließt |
+
+## Flächen, Radien und Kontrast
+
+| Rolle | Token | Farbe |
+| --- | --- | --- |
+| Hintergrund der Arbeitsfläche | `surface-canvas` | `#0D0F12` |
+| Kopf, Fuß und Tabellenkopf | `surface-bar` | `#14171C` |
+| Listen, Vorschauen und Dialogflächen | `surface-panel` | `#1A1E24` |
+| Kacheln auf einer Arbeitsfläche | `surface-card` | `#20252C` |
+| Vertiefte Inhalte und Modellhintergrund | `surface-inset` | `#14171C` |
+| Zebra und Tabellen-Hover | `table-stripe-bg`, `table-row-hover` | `#1E2329`, `#272D35` |
+| Rahmen und Bedienelemente | `color-gray-3`, `control-border` | `#2A3038`, `#8F9399` |
+| Ruhende und berührte Bedienelemente | `control-bg`, `control-bg-hover` | `#2F3640`, `#353C48` |
+| Text, gedämpfter Text und Flächentitel | `color-gray-1`, `color-gray-2-text`, `color-title` | `#D7DADE`, `#9AA1AB`, `#C9CED5` |
+
+Arbeitsflächen, Dialoge und Leerzustände haben `radius-box` (10 px).
+Kacheln, Hinweise und Menüs verwenden `radius-tile` (8 px), Knöpfe und
+Eingaben `radius-control` (6 px), Chips und Faktenleisten `radius-sm` (4 px).
+Tabellenzellen und die Bildlaufleiste bleiben rechteckig. Arbeitsflächen haben
+innen 4 px Abstand, damit bis zum Rand reichende rechteckige Kinder die
+gerundeten Ecken frei lassen. Die Browse-Liste hält mindestens 252 px für
+Werkzeugleiste, Tabellenkopf und eine vollständige Zeile vor. Zusammen mit der
+Vorschau ergibt das 488 px Arbeitshöhe. Das Fenster kann weiterhin auf
+640 × 400 px verkleinert werden.
+
+Die sichtbaren Kontrollrahmen erreichen auf ihrem Grund mindestens 3:1.
+Kleine Beschriftungen verwenden hellen Akzent oder Weiß auf getönten
+Bedienflächen. Die aktive Zeile zeigt zusätzlich zum getönten Hintergrund
+den 3 px breiten linken Balken. Die Checkbox bleibt ein separates Klickziel.
+Klicks auf die restlichen Zellen öffnen die Zeile. Tastenfokus folgt der
+Kontur des Bedienelements. Auf der gefüllten Hauptaktion ist er weiß.
 
 ## Entscheidungen
 

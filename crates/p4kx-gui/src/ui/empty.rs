@@ -8,7 +8,7 @@ use crate::theme::desktop::{
     DROP_TARGET_FILL, EMPTY_ICON, EMPTY_PADDING, TITLE_SIZE, TITLE_TRACKING,
 };
 use crate::theme::palette;
-use crate::theme::tokens::{CORNER_SM, FS_XS, SPACE_3, Weight};
+use crate::theme::tokens::{CORNER_BOX, FS_XS, SPACE_3, Weight};
 use crate::widgets::button::{self, Kind, Size};
 use crate::widgets::frames;
 use crate::widgets::text::{caps, plain};
@@ -27,8 +27,8 @@ pub(super) fn show(ui: &mut Ui, model: &Model, dragging: bool, requests: &mut Re
         (palette::BG_DARK_GRAY, palette::GRAY_3)
     };
     ui.painter()
-        .rect_filled(rect, CORNER_SM, palette::BG_DARK_GRAY);
-    ui.painter().rect_filled(rect, CORNER_SM, fill);
+        .rect_filled(rect, CORNER_BOX, palette::BG_DARK_GRAY);
+    ui.painter().rect_filled(rect, CORNER_BOX, fill);
     frames::dashed(ui, rect.shrink(0.5), border);
     let title = if dragging {
         Text::DropRelease
@@ -45,8 +45,7 @@ pub(super) fn show(ui: &mut Ui, model: &Model, dragging: bool, requests: &mut Re
         archive_icon(ui, icon);
         ui.add_space(SPACE_3);
         ui.label(
-            caps(&texts.get(title), TITLE_SIZE, Weight::Bold, TITLE_TRACKING)
-                .color(palette::GRAY_1),
+            caps(&texts.get(title), TITLE_SIZE, Weight::Bold, TITLE_TRACKING).color(palette::TITLE),
         );
         ui.add_space(SPACE_3);
         ui.label(
@@ -83,7 +82,7 @@ fn archive_icon(ui: &Ui, rect: Rect) {
 pub(super) fn notice(ui: &mut Ui, title: &str, hint: &str) {
     let rect = ui.available_rect_before_wrap();
     ui.painter()
-        .rect_filled(rect, CORNER_SM, palette::BG_DARK_GRAY);
+        .rect_filled(rect, CORNER_BOX, palette::BG_DARK_GRAY);
     frames::dashed(ui, rect.shrink(0.5), palette::GRAY_3);
     egui::Frame::NONE
         .inner_margin(egui::Margin::same(frames::px(EMPTY_PADDING)))
@@ -92,7 +91,7 @@ pub(super) fn notice(ui: &mut Ui, title: &str, hint: &str) {
             ui.with_layout(Layout::top_down(Align::Center), |ui| {
                 ui.add_space((rect.height() / 2.0 - EMPTY_ICON).max(0.0));
                 ui.label(
-                    caps(title, TITLE_SIZE, Weight::Bold, TITLE_TRACKING).color(palette::GRAY_1),
+                    caps(title, TITLE_SIZE, Weight::Bold, TITLE_TRACKING).color(palette::TITLE),
                 )
                 .widget_info(|| egui::WidgetInfo::labeled(egui::Role::Label, true, title));
                 ui.add_space(SPACE_3);

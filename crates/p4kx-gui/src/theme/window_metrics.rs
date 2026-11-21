@@ -23,14 +23,16 @@ pub const SIDEBAR_RAIL_WIDTH: f32 = 2.0f32.mul_add(SPACE_1, BUTTON_XS_HEIGHT);
 /// on each side of the window.
 pub const WORK_MIN_WIDTH: f32 =
     2.0f32.mul_add(-SPACE_2, WINDOW_MIN_WIDTH - SIDEBAR_RAIL_WIDTH - SCROLLBAR);
+/// The inset that keeps rectangular panel children inside the curved frame.
+pub const PANEL_INSET: f32 = SPACE_1;
 /// The height the Entry list of the Browse tab keeps above the preview.
 ///
 /// Its toolbar with the search row, the actions in one row and the quick filters, the table head
-/// and one row, and the two hairlines of its frame.
+/// and one row, both frame hairlines and both panel insets.
 pub const BROWSE_LIST_MIN_HEIGHT: f32 = 2.0f32.mul_add(
-    ROW_HEIGHT,
+    ROW_HEIGHT + 1.0 + PANEL_INSET,
     2.0f32.mul_add(BUTTON_HEIGHT, 4.0 * TOOLBAR_PADDING) + SEGMENT_HEIGHT,
-) + 2.0;
+);
 /// The height a second row of actions adds to a toolbar, reserved only while the actions wrap.
 pub const WRAPPED_ACTIONS_HEIGHT: f32 = TOOLBAR_PADDING + BUTTON_HEIGHT;
 /// The height the room of a work tab below the tab bar keeps; a lower window scrolls it.

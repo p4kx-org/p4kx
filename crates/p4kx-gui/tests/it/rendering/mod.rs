@@ -25,7 +25,7 @@ use egui_kittest::wgpu::{WgpuTestRenderer, create_render_state};
 use p4kx_gui::{GpuReport, Language, Model, ViewerSupport, install_viewer};
 use viewing::{Site, TestResult, entries, opened_at};
 
-pub(crate) const BACKGROUND: [u8; 3] = [0x0F, 0x0F, 0x0F];
+pub(crate) const BACKGROUND: [u8; 3] = [0x14, 0x17, 0x1C];
 
 pub(crate) fn render_state() -> Option<RenderState> {
     render_state_with(software_wgpu_setup())

@@ -8,7 +8,7 @@ use egui::epaint::Shadow;
 use serde_json::Value;
 
 use super::categorical::{self as c, ItemClassTint, PlanetTint};
-use super::{desktop, palette as p, tokens as t, window_metrics};
+use super::{desktop, palette as p, tokens as t};
 
 const TOKENS: &str = include_str!("fixtures/tokens.json");
 const DESKTOP: &str = include_str!("../../../../docs/design/p4kx-desktop-spec.json");
@@ -19,6 +19,7 @@ fn colours() -> BTreeMap<String, Color32> {
         ("color-white", p::WHITE),
         ("color-bg-black", p::BLACK),
         ("color-canvas", p::CANVAS),
+        ("brand-tile", p::BRAND_TILE),
         ("color-accent-light", p::ACCENT_LIGHT),
         ("color-accent-dark", p::ACCENT_DARK),
         ("color-gray-1", p::GRAY_1),
@@ -48,31 +49,41 @@ fn colours() -> BTreeMap<String, Color32> {
         ("color-info-text", p::INFO_TEXT),
         ("color-success-text", p::SUCCESS_TEXT),
         ("color-gray-2-text", p::GRAY_2_TEXT),
+        ("color-title", p::TITLE),
+        ("color-danger-hover", p::DANGER_HOVER),
+        ("color-success-hover", p::SUCCESS_HOVER),
+    ]
+    .into_iter()
+    .chain(surface_and_control_colours())
+    .map(|(name, colour)| (name.to_owned(), colour))
+    .collect();
+    add_categorical(&mut map);
+    map
+}
+
+fn surface_and_control_colours() -> [(&'static str, Color32); 20] {
+    [
         ("action-primary", p::ACTION_PRIMARY),
         ("action-emphasis", p::ACTION_EMPHASIS),
         ("action-neutral", p::ACTION_NEUTRAL),
         ("data-fg", p::DATA_FG),
         ("surface-canvas", p::SURFACE_CANVAS),
         ("surface-panel", p::SURFACE_PANEL),
+        ("surface-card", p::SURFACE_CARD),
+        ("surface-card-hover", p::SURFACE_CARD_HOVER),
         ("surface-inset", p::SURFACE_INSET),
         ("surface-bar", p::SURFACE_BAR),
         ("surface-raised", p::SURFACE_RAISED),
         ("control-bg", p::CONTROL_BG),
         ("control-bg-hover", p::CONTROL_BG_HOVER),
         ("table-stripe-bg", p::TABLE_STRIPE_BG),
+        ("table-row-hover", p::TABLE_ROW_HOVER),
         ("control-border", p::CONTROL_BORDER),
         ("control-fg", p::CONTROL_FG),
         ("control-selected-bg", p::CONTROL_SELECTED_BG),
         ("control-selected-border", p::CONTROL_SELECTED_BORDER),
         ("control-selected-fg", p::CONTROL_SELECTED_FG),
-        ("color-danger-hover", p::DANGER_HOVER),
-        ("color-success-hover", p::SUCCESS_HOVER),
     ]
-    .into_iter()
-    .map(|(name, colour)| (name.to_owned(), colour))
-    .collect();
-    add_categorical(&mut map);
-    map
 }
 
 fn add_categorical(map: &mut BTreeMap<String, Color32>) {
@@ -221,6 +232,9 @@ fn type_spacing_and_radius_tokens_match_the_theme() {
         ("content-max", t::CONTENT_MAX),
         ("radius-none", t::RADIUS_NONE),
         ("radius-sm", t::RADIUS_SM),
+        ("radius-control", f32::from(t::RADIUS_CONTROL_POINTS)),
+        ("radius-tile", f32::from(t::RADIUS_TILE_POINTS)),
+        ("radius-box", f32::from(t::RADIUS_BOX_POINTS)),
         ("radius-pill", t::RADIUS_PILL),
     ]
     .into();
@@ -280,121 +294,5 @@ fn glows_and_shadows_match_the_theme() {
     }
 }
 
-const DESKTOP_METRICS: [(&str, &str, f32); 70] = [
-    ("meta", "rowDensity", desktop::ROW_HEIGHT),
-    ("header", "height", desktop::HEADER_HEIGHT),
-    ("header", "brandMarkSize", desktop::BRAND_MARK),
-    ("header", "brandGap", desktop::BRAND_GAP),
-    ("header", "wordmarkHeight", desktop::BRAND_HEIGHT),
-    ("menuLink", "paddingX", desktop::MENU_LINK_PADDING_X),
-    ("dropdown", "minWidth", desktop::DROPDOWN_MIN_WIDTH),
-    ("sidebar", "defaultWidth", desktop::SIDEBAR_WIDTH),
-    ("sidebar", "minWidth", desktop::SIDEBAR_MIN_WIDTH),
-    ("sidebar", "maxWidth", desktop::SIDEBAR_MAX_WIDTH),
-    (
-        "sidebar",
-        "collapseWidth",
-        window_metrics::SIDEBAR_COLLAPSE_WIDTH,
-    ),
-    ("sidebar", "railWidth", window_metrics::SIDEBAR_RAIL_WIDTH),
-    ("workSurface", "minWidth", window_metrics::WORK_MIN_WIDTH),
-    ("workSurface", "minHeight", window_metrics::WORK_MIN_HEIGHT),
-    (
-        "workSurface",
-        "browseListMinHeight",
-        window_metrics::BROWSE_LIST_MIN_HEIGHT,
-    ),
-    (
-        "workSurface",
-        "wrappedActionsHeight",
-        window_metrics::WRAPPED_ACTIONS_HEIGHT,
-    ),
-    (
-        "workSurface",
-        "soundsToolbarMinHeight",
-        window_metrics::SOUNDS_TOOLBAR_MIN_HEIGHT,
-    ),
-    ("treeRow", "indentPerLevel", desktop::TREE_INDENT),
-    ("treeRow", "paddingLeftBase", desktop::TREE_PADDING_LEFT),
-    ("treeRow", "fontSize", desktop::ROW_FONT),
-    ("toolbar", "padding", desktop::TOOLBAR_PADDING),
-    ("searchField", "flexBasis", desktop::SEARCH_WIDTH),
-    ("searchField", "paddingLeft", desktop::SEARCH_PADDING_LEFT),
-    ("quickFilter", "height", desktop::SEGMENT_HEIGHT),
-    ("buttonBase", "height", desktop::BUTTON_HEIGHT),
-    ("buttonBase", "paddingX", desktop::BUTTON_PADDING_X),
-    ("buttonCompact", "height", desktop::BUTTON_XS_HEIGHT),
-    ("buttonCompact", "paddingX", desktop::BUTTON_XS_PADDING_X),
-    ("buttonCompact", "fontSize", desktop::BUTTON_XS_SIZE),
-    ("tableHeader", "fontSize", desktop::TABLE_HEAD_SIZE),
-    ("tableHeader", "paddingX", desktop::CELL_PADDING_X),
-    ("checkbox", "size", desktop::TOGGLE_SIZE),
-    ("radio", "dotSize", desktop::RADIO_DOT),
-    ("tabBar", "fontSize", desktop::TAB_SIZE),
-    ("previewPanel", "defaultHeight", desktop::PREVIEW_HEIGHT),
-    ("previewPanel", "minHeight", desktop::PREVIEW_MIN_HEIGHT),
-    ("hexRow", "height", desktop::HEX_ROW_HEIGHT),
-    ("hexRow", "offsetWidth", desktop::HEX_OFFSET_WIDTH),
-    ("hexRow", "byteCellWidth", desktop::HEX_BYTE_WIDTH),
-    ("hexRow", "groupGap", desktop::HEX_GROUP_GAP),
-    ("hexRow", "asciiCellWidth", desktop::HEX_ASCII_WIDTH),
-    ("statusBar", "height", desktop::STATUS_HEIGHT),
-    ("statusBar", "pathMaxWidth", desktop::STATUS_PATH_MAX_WIDTH),
-    ("emptyState", "padding", desktop::EMPTY_PADDING),
-    ("emptyState", "titleFontSize", desktop::TITLE_SIZE),
-    ("modal", "width", desktop::MODAL_WIDTH),
-    ("modal", "wideWidth", desktop::MODAL_WIDE_WIDTH),
-    ("modal", "bodyGroupGap", desktop::MODAL_GROUP_GAP),
-    (
-        "collapsibleSection",
-        "listMaxHeight",
-        desktop::SECTION_LIST_HEIGHT,
-    ),
-    ("progressBar", "height", desktop::PROGRESS_HEIGHT),
-    ("progressBar", "sweepShare", desktop::PROGRESS_SWEEP_SHARE),
-    ("spinner", "size", desktop::SPINNER),
-    ("spinner", "sizeInline", desktop::SPINNER_INLINE),
-    ("detailList", "keyColumnMin", desktop::DETAIL_KEY_MIN_WIDTH),
-    ("detailList", "rowGap", desktop::DETAIL_ROW_GAP),
-    ("detailList", "columnGap", desktop::DETAIL_COLUMN_GAP),
-    (
-        "detailList",
-        "keyLetterSpacingEm",
-        desktop::DETAIL_KEY_TRACKING,
-    ),
-    ("detailList", "valueFontSize", desktop::DETAIL_VALUE_SIZE),
-    ("sectionTitle", "fontSize", desktop::PANEL_TITLE_SIZE),
-    ("sectionTitle", "letterSpacingEm", t::TRACKING_DISPLAY),
-    ("sectionTitle", "marginTop", desktop::PANEL_TITLE_MARGIN_TOP),
-    (
-        "sectionTitle",
-        "marginBottom",
-        desktop::PANEL_TITLE_MARGIN_BOTTOM,
-    ),
-    (
-        "sectionTitle",
-        "paddingBottom",
-        desktop::PANEL_TITLE_PADDING_BOTTOM,
-    ),
-    ("tooltip", "maxWidth", desktop::TOOLTIP_MAX_WIDTH),
-    ("tooltip", "paddingX", desktop::TOOLTIP_PADDING_X),
-    ("tooltip", "paddingY", desktop::TOOLTIP_PADDING_Y),
-    ("tooltip", "fontSize", desktop::TOOLTIP_SIZE),
-    ("tooltip", "lineHeight", desktop::TOOLTIP_LINE_HEIGHT),
-    ("scrollbar", "width", desktop::SCROLLBAR),
-    ("scrollbar", "thumbMinLength", desktop::SCROLL_THUMB_MIN),
-];
-
-#[test]
-fn the_desktop_metrics_match_the_desktop_spec() {
-    let json = fixture(DESKTOP);
-    let number = |element: &str, key: &str| json[element][key].as_f64();
-
-    for (element, key, value) in DESKTOP_METRICS {
-        let expected = number(element, key);
-        assert!(
-            expected.is_some_and(|want| (want - f64::from(value)).abs() < 0.01),
-            "{element}.{key} is {expected:?}, the theme has {value}"
-        );
-    }
-}
+#[path = "desktop_token_tests.rs"]
+mod desktop_tests;
