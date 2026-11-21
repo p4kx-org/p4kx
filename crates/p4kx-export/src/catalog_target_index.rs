@@ -6,7 +6,7 @@ use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 use p4kx_extraction::Guid;
 
 use crate::catalog_row::{CatalogRow, CatalogRowExclusion, ExcludedCatalogRow};
-use crate::catalog_v3::loot_definition_catalog::LootDefinitionKind;
+use crate::catalog_v3::loot_definition_catalog::has_authored_arena;
 use crate::catalog_v3::{location_vocabulary, npc_spawn_definitions, starmap_definition_kinds};
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_field_inspection::FieldInspection;
@@ -203,7 +203,7 @@ const fn projects_catalog_row(kind: Kind, role: ExportSourceRole) -> bool {
 
 const fn uses_physical_row_identity(kind: Kind) -> bool {
     uses_physical_reputation_identity(kind)
-        || LootDefinitionKind::of(kind).is_some()
+        || has_authored_arena(kind)
         || matches!(
             kind,
             Kind::Manufacturers

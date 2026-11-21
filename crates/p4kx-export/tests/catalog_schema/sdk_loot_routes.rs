@@ -12,6 +12,8 @@ use super::{Route, TestResult};
 
 const TABLES: &str = "/lootTables";
 const ARCHETYPES: &str = "/lootArchetypes";
+const LEGACY_TABLES: &str = "/legacyLootTables";
+const LEGACY_ARCHETYPES: &str = "/legacyLootArchetypes";
 const REMAINING: &str =
     "physical selection and synthetic catalog parity available; installed producer parity open";
 
@@ -92,10 +94,12 @@ const fn fixture(
 }
 
 pub(super) fn datasets() -> impl Iterator<Item = &'static str> {
-    FIXTURES
-        .iter()
-        .map(|fixture| fixture.path)
-        .chain([TABLES, ARCHETYPES])
+    FIXTURES.iter().map(|fixture| fixture.path).chain([
+        TABLES,
+        ARCHETYPES,
+        LEGACY_TABLES,
+        LEGACY_ARCHETYPES,
+    ])
 }
 
 pub(super) fn read() -> TestResult<Vec<Route>> {
@@ -114,6 +118,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
                 ))
         },
     );
+    let data = add_legacy_rows(data);
     ArchiveBuilder::new()
         .entry(TestEntry::stored("Data\\Game2.dcb", data.build()))
         .write_to(&path)?;
@@ -144,5 +149,31 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
             },
         )??;
     }
+    let selection = CatalogRecordSelection::All;
+    routes.push(parsed.with_legacy_loot_tables(selection, None, |snapshot| {
+        Route::queried_rows(LEGACY_TABLES, &snapshot.rows, REMAINING)
+    })??);
+    routes.push(
+        parsed.with_legacy_loot_archetypes(selection, None, |snapshot| {
+            Route::queried_rows(LEGACY_ARCHETYPES, &snapshot.rows, REMAINING)
+        })??,
+    );
     Ok(routes)
+}
+
+fn add_legacy_rows(data: DataForgeBuilder) -> DataForgeBuilder {
+    data.structure(TestStruct::new("LootTable"))
+        .structure(TestStruct::new("LootArchetype"))
+        .record(TestRecord::new(
+            100,
+            "LootTable",
+            "LootTable.Legacy",
+            "libs/foundry/records/lootgeneration/loottables/legacy.xml",
+        ))
+        .record(TestRecord::new(
+            101,
+            "LootArchetype",
+            "LootArchetype.Legacy",
+            "libs/foundry/records/lootgeneration/lootarchetypes/legacy.xml",
+        ))
 }

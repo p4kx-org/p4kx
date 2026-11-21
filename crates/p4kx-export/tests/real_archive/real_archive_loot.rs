@@ -49,7 +49,12 @@ fn list<'c>(catalog: &'c Value, kind: &str) -> Result<&'c Vec<Value>, String> {
 fn guids<'c>(catalog: &'c Value, kind: &str) -> Result<HashSet<&'c str>, Box<dyn Error>> {
     Ok(list(catalog, kind)?
         .iter()
-        .filter_map(|entry| entry["guid"].as_str())
+        .filter_map(|entry| {
+            entry
+                .pointer("/guid/value")
+                .or_else(|| entry.get("guid"))
+                .and_then(Value::as_str)
+        })
         .collect())
 }
 
@@ -239,9 +244,16 @@ fn the_older_loot_records_of_a_real_archive_resolve_and_the_scan_warns_of_nothin
     for table in list(&catalog, "legacyLootTables")? {
         assert_resolve(
             "the archetypes of an older table",
-            array(table, "entries")
+            table
+                .pointer("/entries/value")
+                .and_then(Value::as_array)
+                .ok_or("sourced legacy table entries")?
                 .iter()
-                .filter_map(|entry| entry["archetypeGuid"].as_str()),
+                .filter_map(|entry| {
+                    entry
+                        .pointer("/value/archetypeGuid/value")
+                        .and_then(Value::as_str)
+                }),
             &archetypes,
         );
     }

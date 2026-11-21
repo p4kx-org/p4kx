@@ -813,6 +813,17 @@ headers for independent lookup.
 See [Contract queries](catalog-contract-queries.md) for callback lifetimes, parsed-session reuse,
 global duplicate and intro semantics, complete original views and source-inventory ownership.
 
+## Older loot Record queries
+
+`CatalogQuerySession` and `ParsedCatalogQueries` expose `with_legacy_loot_tables` and
+`with_legacy_loot_archetypes`. A typed snapshot returns the same physical rows as
+`legacyLootTables` or `legacyLootArchetypes`, with source inventory and selection coverage.
+Pass a physical Record index for one occurrence or a GUID for all admitted occurrences
+sharing that identity. The family-specific type and Record path selection stays in effect.
+Neither query opens linked target bodies, reads placement files, nor creates a Catalog.
+Use each datum's `containsEncryptedSource` and resolve its source-use references through the
+snapshot's inventory. The row's original arena is local to that physical owner.
+
 ## Loot container-document source scope
 
 Catalog v3 `declarations.lootEntityContainerDocuments` retains original attribute sites only from

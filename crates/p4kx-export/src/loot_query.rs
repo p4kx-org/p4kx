@@ -16,6 +16,14 @@ pub use crate::contract_loot::{
     LootArchetype, LootArchetypeEntry, LootSelector, LootTable, LootTableEntry, QuantityRange,
     SpawnWith,
 };
+pub use crate::contract_loot_legacy::{
+    LegacyLootArchetype, LegacyLootEntry, LegacyLootQuantity, LegacyLootTable,
+    LegacyLootTableEntry, LegacySecondaryEntry, LegacySecondaryGroup, LegacySpawnWith,
+};
+
+#[path = "legacy_loot_query.rs"]
+mod legacy;
+pub use legacy::LegacyLootSnapshot;
 
 #[path = "loot_query_read.rs"]
 mod read;

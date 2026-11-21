@@ -136,8 +136,8 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | lootTables | D.lootTables | weighted archetype links/order |
 | lootArchetypes | D.lootArchetypes | weighted typed selectors/constraints/order |
 | lootPoolFilters | D.lootPoolFilters | complete ordered original fields/values in an owner-local flat graph; exact declarations, every slot/error parameter, per-datum origins |
-| legacyLootTables | D.legacyLootTables | actual distinct source generation, not compatibility duplicate of LootV3 |
-| legacyLootArchetypes | D.legacyLootArchetypes | source generation/secondary/spawn-with relationships |
+| legacyLootTables | legacyLootTables | actual distinct source generation, not compatibility duplicate of LootV3 |
+| legacyLootArchetypes | legacyLootArchetypes | source generation/secondary/spawn-with relationships |
 | mineableEntities | D.mineableEntities | physical entity identity, ordered mining and radar declarations, and a sourced derived scan signature |
 | crafters | D.crafters | station limits/modifiers/queues, identity |
 | cargoManifests | D.cargoManifests | physical CargoManifest definitions with ordered fill and spawn rules, exact numbers, references and authored remainder |

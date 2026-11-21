@@ -2434,7 +2434,18 @@ are distinct concepts; serialized indices never establish physical source author
 GUIDs and pointer-derived Weak GUIDs retain their different original contributors. See
 [catalog-loot-source.md](catalog-loot-source.md) for the value graph and original-source contract.
 
-**Older loot Records (`legacyLootTables`, `legacyLootArchetypes`).** The `LootTable` (161 on LIVE)
+**Older loot Records (`legacyLootTables`, `legacyLootArchetypes`).** The two arrays retain their
+existing dataset paths. Rows carry individually sourced Record header fields including
+`recordIndex`. Equal GUIDs at distinct physical indices remain distinct, ordered by GUID then
+Record index. Each row embeds its original owner-local `fields` and `values` arena. It retains
+the exact authored occurrences even when a weighted view cannot interpret them. Existing
+term keys use sourced cells. A present numeric term carries its storage width and exact IEEE
+bits when applicable. Original arrays retain their authored order and every null or unreadable
+slot. The SpawnWith and stack-size projections register their actual selection inputs.
+A dangling Reference retains its stored GUID in the typed cell. The attempted lookup is marked
+incomplete, and the matching owner-local value preserves the original error and target GUID.
+
+The `LootTable` (161 on LIVE)
 and `LootArchetype` (233) Records of the same folders, which 635 of the 1,958 slots with a
 `lootConfig` still name in `lootTableGuid`. A table has `entries`, each with `weight`,
 `archetypeGuid` (an entry of `legacyLootArchetypes`), and `minResults` and `maxResults` of

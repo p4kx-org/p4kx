@@ -6,6 +6,8 @@
 
 #[path = "loot_entity_container_publication.rs"]
 mod entity_container_publication;
+#[path = "legacy_loot_query_parity.rs"]
+mod legacy_query_parity;
 #[path = "loot_query_parity.rs"]
 mod query_parity;
 #[path = "loot_unreadable_root_publication.rs"]
@@ -50,7 +52,10 @@ pub(crate) fn entry<'a>(
         .as_array()
         .into_iter()
         .flatten()
-        .find(|entry| entry["guid"] == starmap_fixture::guid_text(record).as_str())
+        .find(|entry| {
+            let guid = entry.pointer("/guid/value").or_else(|| entry.get("guid"));
+            guid.and_then(Value::as_str) == Some(starmap_fixture::guid_text(record).as_str())
+        })
         .ok_or_else(|| format!("{kind} has no {}", starmap_fixture::guid_text(record)).into())
 }
 

@@ -4,6 +4,7 @@
 use p4kx_extraction::{CancelToken, Record, RecordTree};
 
 use crate::catalog_projection::CatalogProjection;
+use crate::catalog_row::CatalogRow;
 use crate::catalog_v3::loot_definition_catalog::{
     self, LootDefinition, LootDefinitionKind, LootDefinitions,
 };
@@ -22,9 +23,9 @@ pub(crate) enum LootPick<'f> {
     /// A physical Loot Record with an owner-local source value arena.
     Definition(LootDefinitionKind, Box<LootDefinition<'f>>),
     /// An older loot table.
-    LegacyTable(LegacyLootTable<'f>),
+    LegacyTable(Box<LegacyLootTable<'f>>),
     /// An older loot archetype.
-    LegacyArchetype(LegacyLootArchetype<'f>),
+    LegacyArchetype(Box<LegacyLootArchetype<'f>>),
 }
 
 impl<'f> LootPick<'f> {
@@ -58,14 +59,23 @@ impl<'f> LootPick<'f> {
         }))
     }
 
-    /// Returns the entity of `kind` the Record tree `tree` describes, `None` for a kind that is
-    /// not a loot kind.
-    pub(crate) fn entity(kind: Kind, tree: &RecordTree<'f>) -> Option<Self> {
-        Some(match kind {
-            Kind::LegacyLootTables => Self::LegacyTable(legacy_table(tree)),
-            Kind::LegacyLootArchetypes => Self::LegacyArchetype(legacy_archetype(tree)),
-            _ => return None,
-        })
+    pub(crate) fn read_legacy(
+        kind: Kind,
+        record: &Record<'f>,
+        tree: &RecordTree<'f>,
+        projection: &CatalogProjection<'_, 'f>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Option<Self>, CatalogError> {
+        let input = projection.original();
+        Ok(Some(match kind {
+            Kind::LegacyLootTables => {
+                Self::LegacyTable(Box::new(legacy_table(record, tree, input, cancel)?))
+            }
+            Kind::LegacyLootArchetypes => {
+                Self::LegacyArchetype(Box::new(legacy_archetype(record, tree, input, cancel)?))
+            }
+            _ => return Ok(None),
+        }))
     }
 }
 
@@ -77,6 +87,13 @@ pub(crate) struct LootKinds<'f> {
     pub(crate) definitions: LootDefinitions<'f>,
     pub(crate) legacy_tables: Vec<LegacyLootTable<'f>>,
     pub(crate) legacy_archetypes: Vec<LegacyLootArchetype<'f>>,
+}
+
+fn legacy_order(row: &LootDefinition<'_>) -> (crate::guid_text::GuidText, Option<u32>) {
+    (
+        row.physical_guid.text(),
+        row.source.record_index.value().copied(),
+    )
 }
 
 impl<'f> LootKinds<'f> {
@@ -94,8 +111,8 @@ impl<'f> LootKinds<'f> {
                     .push(LootDefinitionKind::Archetype, *definition);
             }
             LootPick::Definition(kind, entity) => self.definitions.push(kind, *entity),
-            LootPick::LegacyTable(entity) => self.legacy_tables.push(entity),
-            LootPick::LegacyArchetype(entity) => self.legacy_archetypes.push(entity),
+            LootPick::LegacyTable(entity) => self.legacy_tables.push(*entity),
+            LootPick::LegacyArchetype(entity) => self.legacy_archetypes.push(*entity),
         }
     }
 
@@ -104,8 +121,31 @@ impl<'f> LootKinds<'f> {
         sort_by_guid(&mut self.tables, |entity| entity.guid);
         sort_by_guid(&mut self.archetypes, |entity| entity.guid);
         self.definitions.order();
-        sort_by_guid(&mut self.legacy_tables, |entity| entity.guid);
-        sort_by_guid(&mut self.legacy_archetypes, |entity| entity.guid);
+        self.legacy_tables
+            .sort_by_cached_key(|entity| legacy_order(&entity.original));
+        self.legacy_archetypes
+            .sort_by_cached_key(|entity| legacy_order(&entity.original));
+    }
+
+    pub(crate) fn legacy_sources(&self) -> impl Iterator<Item = (Kind, &LootDefinition<'f>)> {
+        let tables = self
+            .legacy_tables
+            .iter()
+            .map(|row| (Kind::LegacyLootTables, &row.original));
+        let archetypes = self
+            .legacy_archetypes
+            .iter()
+            .map(|row| (Kind::LegacyLootArchetypes, &row.original));
+        tables.chain(archetypes)
+    }
+
+    pub(crate) fn legacy_emitted(&self) -> impl Iterator<Item = CatalogRow> {
+        self.legacy_sources().map(|(kind, row)| CatalogRow {
+            kind,
+            guid: row.physical_guid.0,
+            record_path: row.physical_path.to_owned(),
+            record_index: row.source.record_index.value().copied(),
+        })
     }
 
     /// Returns how many entities `kind` holds, 0 for a kind that is not a loot kind.

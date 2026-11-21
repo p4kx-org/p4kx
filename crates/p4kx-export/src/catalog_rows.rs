@@ -34,6 +34,7 @@ pub(crate) fn snapshot(collected: &mut Collected<'_>, filter: Option<&Filter>) -
     }
     append_gameplay_definitions(&mut emitted, collected);
     emitted.extend(collected.loot_kinds.definitions.emitted());
+    emitted.extend(collected.loot_kinds.legacy_emitted());
     CatalogRows {
         emitted,
         filter: filter.cloned(),

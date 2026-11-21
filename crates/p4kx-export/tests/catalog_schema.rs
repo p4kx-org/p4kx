@@ -9,6 +9,8 @@
 
 #[path = "catalog_schema/additive.rs"]
 mod additive;
+#[path = "catalog_schema/authored_markers.rs"]
+mod authored_markers;
 mod catalog_schema_support;
 #[path = "catalog_schema/dataset_ownership.rs"]
 mod dataset_ownership;

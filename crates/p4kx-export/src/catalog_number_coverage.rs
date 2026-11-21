@@ -3,12 +3,12 @@
 
 use crate::Kind;
 use crate::catalog_number_capture::{FloatToken, NumberOccurrence};
-use crate::catalog_v3::loot_definition_catalog::LootDefinitionKind;
+use crate::catalog_v3::loot_definition_catalog::has_authored_arena;
 use crate::resource_raw_policy::ResourceNumberContract;
 
 /// Whether this kind covers original numeric data by owned occurrence.
 pub(super) const fn uses_owned_number(kind: Kind) -> bool {
-    LootDefinitionKind::of(kind).is_some()
+    has_authored_arena(kind)
         || matches!(
             kind,
             Kind::Blueprints
@@ -77,7 +77,7 @@ pub(super) const fn expected_owned_number(
     use ResourceNumberContract::{Double, Number, Single};
 
     Some(match (kind, captured) {
-        (kind, _) if LootDefinitionKind::of(kind).is_some() => (LootValue { ordinal }, Number),
+        (kind, _) if has_authored_arena(kind) => (LootValue { ordinal }, Number),
         (Kind::Blueprints, _) => (BlueprintValue { ordinal }, Number),
         (Kind::Items, ItemComponentRawValue { .. }) => (ItemComponentRawValue { ordinal }, Number),
         (Kind::Items, _) => (ItemComponentValue { ordinal }, Single),

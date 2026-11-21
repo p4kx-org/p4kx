@@ -11,22 +11,22 @@ use crate::catalog_v3::catalog_item_components::{self, ItemComponentsRead, resol
 use crate::catalog_v3::catalog_weapon_projectile_ammo::{
     self, LinkedAmmunitionReader, WeaponProjectileAmmoSelection,
 };
-use crate::catalog_v3::loot_definition_catalog::{self, LootDefinitionKind};
 use crate::catalog_v3::mineable_entity_definition;
 use crate::catalog_v3::starmap_object_definition;
 use crate::contract::Item;
 use crate::contract_stats::ItemStats;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::ExportLedger;
-use crate::harvest_config::{is_slotpreset_path, multi_config};
 use crate::item_class::ClassLine;
-use crate::loot_kinds::LootPick;
 use crate::picked::{Picked, PickedItem};
 use crate::record_observation::RecordObservation;
 use crate::scan_health::ScanError;
 use crate::ship;
 use crate::starmap::starmap_object;
 use crate::{CatalogError, ExportAccountingError, Kind, item_stats, item_variant};
+
+#[path = "scan_loot_projection.rs"]
+mod loot_projection;
 
 pub(super) struct SelectedProjection<'scan, 'options, 'parameters, 'source> {
     pub(super) scan: &'scan Scan<'options, 'parameters, 'source>,
@@ -305,35 +305,7 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
         tree: &RecordTree<'f>,
         ledger: &mut ExportLedger,
     ) -> Result<Option<Picked<'f>>, ScanError> {
-        if let Some(loot) = LootDefinitionKind::of(kind) {
-            if let Some(weighted) = LootPick::read_weighted(
-                loot,
-                admission.record(),
-                tree,
-                &self.projection,
-                self.scan.options.cancel,
-            )? {
-                return Ok(Some(Picked::Loot(weighted)));
-            }
-            let value = loot_definition_catalog::read(
-                admission.record(),
-                tree,
-                self.projection.original(),
-                self.scan.options.cancel,
-            )?;
-            let definition = Box::new(value);
-            let picked = if kind == Kind::SubHarvestableMultiConfigs {
-                let path = tree.record_path();
-                let projection = (is_slotpreset_path(path)
-                    && !crate::selection::is_leftover(path, tree.name()))
-                .then(|| multi_config(trees, tree, self.scan.forge, &self.scan.links));
-                Picked::MultiConfig {
-                    definition,
-                    projection,
-                }
-            } else {
-                Picked::Loot(LootPick::Definition(loot, definition))
-            };
+        if let Some(picked) = self.loot_definition(kind, trees, admission, tree)? {
             return Ok(Some(picked));
         }
         let Some((picked, notes)) = self.read_definition(kind, admission, tree)? else {

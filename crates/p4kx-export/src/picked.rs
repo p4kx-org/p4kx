@@ -131,10 +131,9 @@ impl<'f> Picked<'f> {
         match kind {
             Kind::Crafters => crafter(tree).map(Self::Crafter),
             Kind::ContractScenarios => MissionPick::entity(kind, tree).map(Self::Mission),
-            Kind::LegacyLootTables | Kind::LegacyLootArchetypes => {
-                LootPick::entity(kind, tree).map(Self::Loot)
-            }
             Kind::Items
+            | Kind::LegacyLootTables
+            | Kind::LegacyLootArchetypes
             | Kind::LootTables
             | Kind::LootArchetypes
             | Kind::RefiningProcesses

@@ -149,52 +149,107 @@ fn filter_value(value: SourceValue<Value>) -> Value {
     json!({"value":values::source(value),"originalError":null})
 }
 
+fn legacy_header(
+    guid: &str,
+    class: &str,
+    path: &str,
+    kind: &str,
+    index: u32,
+) -> serde_json::Map<String, Value> {
+    let header = json!({
+        "guid":values::present(json!(guid)),
+        "recordName":values::present(json!(format!("{kind}.{class}"))),
+        "className":values::present(json!(class)),
+        "recordPath":values::present(json!(path)),
+        "recordIndex":values::present(json!(index)),
+        "sourceType":values::present(json!(kind)),
+        "fileName":values::present(json!(format!("{path}.xml"))),
+        "metadataTag":values::source(SourceValue::Absent),
+        "fields":[],
+        "values":[]
+    });
+    if let Value::Object(header) = header {
+        header
+    } else {
+        serde_json::Map::new()
+    }
+}
+
+fn legacy_rows(cells: impl IntoIterator<Item = Value>) -> Value {
+    let rows: Vec<_> = cells.into_iter().map(values::present).collect();
+    values::present(json!(rows))
+}
+
+fn legacy_number(number: i32) -> Value {
+    values::present(json!({"type":"int32","value":number}))
+}
+
 pub(super) fn legacy_tables() -> Value {
-    json!([{
-        "guid": "a9000000-0000-4000-8000-000000000005",
-        "className": "Ammo",
-        "recordPath": "libs/foundry/records/lootgeneration/loottables/ammo",
-        "entries": [{
-            "weight": 1.0,
-            "archetypeGuid": "a9000000-0000-4000-8000-000000000006",
-            "minResults": 0,
-            "maxResults": 2
-        }, {
-            "weight": null,
-            "archetypeGuid": null,
-            "minResults": null,
-            "maxResults": null
-        }]
-    }])
+    let mut row = legacy_header(
+        "a9000000-0000-4000-8000-000000000005",
+        "Ammo",
+        "libs/foundry/records/lootgeneration/loottables/ammo",
+        "LootTable",
+        3,
+    );
+    row.insert(
+        "entries".into(),
+        legacy_rows([
+            json!({
+                "weight":legacy_number(1),
+                "archetypeGuid":values::present(json!("a9000000-0000-4000-8000-000000000006")),
+                "minResults":legacy_number(0),
+                "maxResults":legacy_number(2)
+            }),
+            json!({
+                "weight":values::source(SourceValue::Null),
+                "archetypeGuid":values::source(SourceValue::Unreadable),
+                "minResults":values::source(SourceValue::Absent),
+                "maxResults":values::source(SourceValue::Invalid)
+            }),
+        ]),
+    );
+    json!([row])
 }
 
 pub(super) fn legacy_archetypes() -> Value {
-    json!([{
-        "guid": "a9000000-0000-4000-8000-000000000006",
-        "className": "LootArchetype_AmmoCache_Common",
-        "recordPath": "libs/foundry/records/lootgeneration/lootarchetypes/lootarchetype_ammocache_common",
-        "excludedTagGuids": ["a9000000-0000-4000-8000-000000000010"],
-        "entries": [{
-            "name": "Ammo",
-            "weight": 1.0,
-            "tagGuid": "a9000000-0000-4000-8000-000000000011",
-            "additionalPositiveTagGuids": ["a9000000-0000-4000-8000-000000000012"],
-            "additionalNegativeTagGuids": [],
-            "stackSize": {"min": 3.0, "max": 3.0},
-            "spawnWith": [{
-                "name": "Suitable ammunition",
-                "mode": "MostSimilar",
-                "min": 1.0,
-                "max": 3.0,
-                "positiveTagGuids": ["a9000000-0000-4000-8000-000000000012"],
-                "negativeTagGuids": []
-            }]
-        }],
-        "secondaryGroups": [{
-            "groupName": "Rarity",
-            "entries": [{"weight": 1.0, "tagGuid": "a9000000-0000-4000-8000-000000000011"}]
-        }]
-    }])
+    let mut row = legacy_header(
+        "a9000000-0000-4000-8000-000000000006",
+        "LootArchetype_AmmoCache_Common",
+        "libs/foundry/records/lootgeneration/lootarchetypes/lootarchetype_ammocache_common",
+        "LootArchetype",
+        4,
+    );
+    let tag = "a9000000-0000-4000-8000-000000000010";
+    row.insert("excludedTagGuids".into(), legacy_rows([json!(tag)]));
+    row.insert(
+        "entries".into(),
+        legacy_rows([json!({
+            "name":values::present(json!("Ammo")),
+            "weight":legacy_number(1),
+            "tagGuid":values::present(json!(tag)),
+            "additionalPositiveTagGuids":legacy_rows([json!(tag)]),
+            "additionalNegativeTagGuids":legacy_rows([]),
+            "stackSize":values::present(json!({"min":legacy_number(3),"max":legacy_number(3)})),
+            "spawnWith":legacy_rows([legacy_spawn(tag)])
+        })]),
+    );
+    row.insert("secondaryGroups".into(), legacy_rows([json!({
+        "groupName":values::present(json!("Rarity")),
+        "entries":legacy_rows([json!({"weight":legacy_number(1),"tagGuid":values::present(json!(tag))})])
+    })]));
+    json!([row])
+}
+
+fn legacy_spawn(tag: &str) -> Value {
+    json!({
+        "name":values::present(json!("Suitable ammunition")),
+        "mode":values::present(json!("MostSimilar")),
+        "min":legacy_number(1),
+        "max":legacy_number(3),
+        "positiveTagGuids":legacy_rows([json!(tag)]),
+        "negativeTagGuids":legacy_rows([])
+    })
 }
 
 pub(super) fn containers() -> Value {

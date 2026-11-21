@@ -8,7 +8,7 @@ use crate::catalog_number_capture::{CapturedNumber, FloatToken, NumberOccurrence
 use crate::catalog_read::original::ExampleBodyReceipt;
 use crate::catalog_row::CatalogRows;
 use crate::catalog_target_index::TargetIndex;
-use crate::catalog_v3::loot_definition_catalog::LootDefinitionKind;
+use crate::catalog_v3::loot_definition_catalog::has_authored_arena;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{SourceDisposition, SourceObservation};
 use crate::resource_raw_policy::ResourceNumberContract;
@@ -105,7 +105,7 @@ fn emitted_record_numbers<'source>(
                     .ammo_definition = true;
             }
             if matches!(actual.occurrence, NumberOccurrence::LootValue { .. })
-                && LootDefinitionKind::of(number.kind).is_none()
+                && !has_authored_arena(number.kind)
             {
                 continue;
             }

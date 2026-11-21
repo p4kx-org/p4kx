@@ -53,7 +53,7 @@ pub(crate) fn read_archetype<'source>(
     })
 }
 
-fn read_projected<'source, T>(
+pub(crate) fn read_projected<'source, T>(
     record: &Record<'source>,
     tree: &RecordTree<'source>,
     input: &OriginalCatalogInput<'_, 'source>,

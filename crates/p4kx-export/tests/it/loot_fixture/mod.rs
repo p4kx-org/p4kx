@@ -56,6 +56,28 @@ pub(crate) fn database_with_loot_aliases() -> DataForgeBuilder {
         ))
 }
 
+pub(crate) fn database_with_legacy_loot_alias() -> DataForgeBuilder {
+    let broken_link = TestInstance::new("WeightedLootArchetype")
+        .value("weight", TestValue::Single(0.5))
+        .value("archetype", TestValue::Reference(u128::MAX));
+    database()
+        .record(
+            TestRecord::new(
+                LEGACY_TABLE,
+                "LootTable",
+                "LootTable.LegacyAlias",
+                "libs/foundry/records/lootgeneration/loottables/legacy_alias.xml",
+            )
+            .value("lootArchetypes", array(vec![broken_link])),
+        )
+        .record(TestRecord::new(
+            LEGACY_TABLE,
+            "LootTable",
+            "LootTable.Outside",
+            "unselected/loottables/legacy_outside.xml",
+        ))
+}
+
 pub(crate) fn source_fixture(data: &[u8], input: Input) -> TestResult<Fixture> {
     Fixture::open(
         data,

@@ -7,6 +7,7 @@
 mod loot_generation_component_tests;
 
 use crate::catalog_loot::{build, entry};
+use crate::health_origin_assertions as proof;
 use crate::loot_fixture::{
     GHOST, LEGACY_ARCHETYPE, LEGACY_TABLE, NESTED, TABLE, TAG_COMMON, TAG_RARE,
 };
@@ -23,22 +24,37 @@ type TestResult = Result<(), Box<dyn Error>>;
 fn an_older_loot_table_keeps_its_weights_and_result_limits() -> TestResult {
     let (built, catalog) = build()?;
     let table = entry(&catalog, "legacyLootTables", LEGACY_TABLE)?;
-    assert_eq!(table["className"], "Cargo");
+    legacy_assert_fields(
+        table,
+        [
+            ("/className/value", json!("Cargo")),
+            (
+                "/recordPath/value",
+                json!("libs/foundry/records/lootgeneration/loottables/cargo"),
+            ),
+            (
+                "/entries/value/0/value/weight/value",
+                proof::single_number(2.0)?,
+            ),
+            (
+                "/entries/value/0/value/archetypeGuid/value",
+                json!(guid_text(LEGACY_ARCHETYPE)),
+            ),
+            ("/entries/value/0/value/minResults/value/value", json!(0)),
+            ("/entries/value/0/value/maxResults/value/value", json!(3)),
+            (
+                "/entries/value/1/value/weight/value",
+                proof::single_number(1.0)?,
+            ),
+            ("/entries/value/1/value/archetypeGuid/state", json!("null")),
+            ("/entries/value/1/value/minResults/value/value", json!(0)),
+            ("/entries/value/1/value/maxResults/value/value", json!(0)),
+        ],
+    )?;
     assert_eq!(
-        table["recordPath"],
-        "libs/foundry/records/lootgeneration/loottables/cargo"
-    );
-    assert_eq!(
-        table["entries"],
-        json!([
-            {
-                "weight": 2.0,
-                "archetypeGuid": guid_text(LEGACY_ARCHETYPE),
-                "minResults": 0,
-                "maxResults": 3
-            },
-            {"weight": 1.0, "archetypeGuid": null, "minResults": 0, "maxResults": 0}
-        ])
+        proof::rows(table, "/entries/value")?.len(),
+        2,
+        "both weighted slots survive"
     );
     assert_eq!(
         built
@@ -54,34 +70,79 @@ fn an_older_loot_table_keeps_its_weights_and_result_limits() -> TestResult {
 fn an_older_loot_archetype_keeps_its_tags_optional_data_and_groups() -> TestResult {
     let (_, catalog) = build()?;
     let archetype = entry(&catalog, "legacyLootArchetypes", LEGACY_ARCHETYPE)?;
-    assert_eq!(archetype["className"], "LootArchetype_Cargo");
-    assert_eq!(archetype["excludedTagGuids"], json!([guid_text(TAG_RARE)]));
-    assert_eq!(
-        archetype["entries"],
-        json!([{
-            "name": "Cargo",
-            "weight": 1.0,
-            "tagGuid": guid_text(TAG_COMMON),
-            "additionalPositiveTagGuids": [guid_text(TAG_RARE)],
-            "additionalNegativeTagGuids": [],
-            "stackSize": {"min": 3.0, "max": 5.0},
-            "spawnWith": [{
-                "name": "Suitable ammunition",
-                "mode": "MostSimilar",
-                "min": 1.0,
-                "max": 3.0,
-                "positiveTagGuids": [guid_text(TAG_COMMON)],
-                "negativeTagGuids": [guid_text(TAG_RARE)]
-            }]
-        }])
-    );
-    assert_eq!(
-        archetype["secondaryGroups"],
-        json!([{
-            "groupName": "Rarity",
-            "entries": [{"weight": 4.0, "tagGuid": guid_text(TAG_RARE)}]
-        }])
-    );
+    legacy_assert_fields(
+        archetype,
+        [
+            ("/className/value", json!("LootArchetype_Cargo")),
+            (
+                "/excludedTagGuids/value/0/value",
+                json!(guid_text(TAG_RARE)),
+            ),
+            (
+                "/secondaryGroups/value/0/value/groupName/value",
+                json!("Rarity"),
+            ),
+            (
+                "/secondaryGroups/value/0/value/entries/value/0/value/weight/value",
+                proof::single_number(4.0)?,
+            ),
+            (
+                "/secondaryGroups/value/0/value/entries/value/0/value/tagGuid/value",
+                json!(guid_text(TAG_RARE)),
+            ),
+        ],
+    )?;
+    let primary = proof::at(archetype, "/entries/value/0/value")?;
+    legacy_assert_fields(
+        primary,
+        [
+            ("/name/value", json!("Cargo")),
+            ("/weight/value", proof::single_number(1.0)?),
+            ("/tagGuid/value", json!(guid_text(TAG_COMMON))),
+            (
+                "/additionalPositiveTagGuids/value/0/value",
+                json!(guid_text(TAG_RARE)),
+            ),
+            ("/additionalNegativeTagGuids/value", json!([])),
+            ("/stackSize/value/min/value/value", json!(3)),
+            ("/stackSize/value/max/value/value", json!(5)),
+        ],
+    )?;
+    assert_legacy_spawn(proof::at(primary, "/spawnWith/value/0/value")?)?;
+    Ok(())
+}
+
+fn assert_legacy_spawn(spawn: &Value) -> TestResult {
+    legacy_assert_fields(
+        spawn,
+        [
+            ("/mode/value", json!("MostSimilar")),
+            ("/name/value", json!("Suitable ammunition")),
+            ("/min/value/value", json!(1)),
+            ("/max/value/value", json!(3)),
+            (
+                "/positiveTagGuids/value/0/value",
+                json!(guid_text(TAG_COMMON)),
+            ),
+            (
+                "/negativeTagGuids/value/0/value",
+                json!(guid_text(TAG_RARE)),
+            ),
+        ],
+    )
+}
+
+fn legacy_assert_fields(
+    row: &Value,
+    expected: impl IntoIterator<Item = (&'static str, Value)>,
+) -> TestResult {
+    for (path, expected) in expected {
+        assert_eq!(
+            proof::at(row, path)?,
+            &expected,
+            "the legacy authored fact at {path} survives"
+        );
+    }
     Ok(())
 }
 

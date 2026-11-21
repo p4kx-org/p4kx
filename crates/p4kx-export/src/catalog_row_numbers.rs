@@ -117,6 +117,12 @@ fn definition_number_groups<'rows>(
         .chain(
             collected
                 .loot_kinds
+                .legacy_sources()
+                .map(|(kind, row)| (kind, row.numbers.as_slice())),
+        )
+        .chain(
+            collected
+                .loot_kinds
                 .definitions
                 .sources()
                 .map(|(kind, _, _, numbers)| (kind, numbers)),
