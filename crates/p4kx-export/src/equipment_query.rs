@@ -19,6 +19,10 @@ pub mod component_definitions;
 /// Selective reads of authored consumable components and contents slots.
 #[path = "equipment_consumable_query.rs"]
 pub mod consumables;
+/// Selective reads of authored Mannequin controller and animation database locators.
+#[path = "equipment_entity_animation_query.rs"]
+pub mod entity_animation;
+
 #[path = "equipment_loadout_query.rs"]
 mod loadout_query;
 

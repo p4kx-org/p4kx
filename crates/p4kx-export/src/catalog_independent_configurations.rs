@@ -27,13 +27,13 @@ use crate::export_field_inspection::ConfigurationInspection;
 use crate::recovery::{self, ItemRecoveryPolicy, Recovery};
 use crate::schema_fields::every_field_required;
 use crate::{CatalogError, CatalogOptions};
-use entity_animation_controller::EntityAnimationController;
+use entity_animation_controller::{EntityAnimationController, KIND as ANIMATION_CONTROLLERS};
 use loot_generation_component::{KIND as LOOT_GENERATION, LootGenerationComponent};
 
 #[path = "consumable_tables.rs"]
 pub(crate) mod consumables;
 #[path = "catalog_entity_animation_controller.rs"]
-mod entity_animation_controller;
+pub(crate) mod entity_animation_controller;
 #[path = "flight_configuration_tables.rs"]
 pub(in crate::catalog_v3) mod flight_configuration_tables;
 #[path = "hackable_configuration.rs"]
@@ -254,10 +254,6 @@ fn read_game_mode<'source>(
     ))
 }
 
-const ANIMATION_CONTROLLERS: ComponentKind = ComponentKind {
-    source_type: entity_animation_controller::COMPONENT,
-    inspection: ConfigurationInspection::EntityAnimationController,
-};
 const JUMP_POINTS: ComponentKind = ComponentKind {
     source_type: jump_point::COMPONENT,
     inspection: ConfigurationInspection::JumpPoint,

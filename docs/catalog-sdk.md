@@ -77,6 +77,21 @@ Use `catalog_queries::flares::read_flare_libraries` to read the physical rows fr
 or an exact Archive-relative path. The query reports original parameter origins, directory-only
 texture links, and any required library reads or projections that failed. [Lens flare contract](catalog-flare-libraries.md)
 
+## Original ecosystems and terrain shading classes
+
+Use `terrain::read_ecosystems` or `terrain::read_shading_classes` for
+`definitions.ecosystems` and `definitions.shadingClasses`. The shared
+`LooseDefinitionSelection` accepts all admitted Entries, a physical Entry index,
+an Archive path, or an authored GUID. Direct selections open only their
+selected owner definitions. Duplicate-owner issues describe that scope.
+GUID selection reports unreadable possible aliases separately.
+
+The queries preserve original protected labels, sound declarations,
+texture and mask selectors, numeric tokens and additional raw fields with
+their own origins. Texture paths consult directory Entries and never open
+texture payloads. These queries require no DataForge or localization. The
+returned data describes the selected original definitions.
+
 ## Original soil definitions
 
 Use `soils::read_soils` or `soils::read_soil_texture_sets` for `definitions.soils`
@@ -1413,6 +1428,16 @@ check a second Archive in the same run. Each check reads DataForge once and crea
 ```powershell
 cargo test --locked -p p4kx-export --test real_archive real_archive_weapon_combat::projectile::projectile_ammunition_sdk_matches_original_sources -- --ignored --exact --nocapture --test-threads=1
 ```
+
+## Entity animation controllers
+
+Use `equipment::entity_animation::with_entity_animation_controllers` or its decoded-Entry
+and session forms to read `configurations.entityAnimationControllers` for the selected
+physical Entity Records. The selection accepts a Record index, all physical aliases of a GUID,
+or all admitted owners. Each row identifies the original component slot and exposes the
+authored Mannequin controller and animation database locators with their immediate source
+evidence. Additional authored component members remain accessible in the same snapshot.
+The query reads the owner bodies that contain the requested component.
 
 ## Player weapon animation candidates
 

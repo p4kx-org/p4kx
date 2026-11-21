@@ -47,13 +47,13 @@ use crate::mission_generator::GeneratorDefinition;
 use planet_tech_definitions::PlanetTechDefinitions;
 
 #[path = "ecosystem.rs"]
-mod ecosystem;
+pub(crate) mod ecosystem;
 #[path = "geology_set.rs"]
 mod geology_set;
 #[path = "geology_texture_set.rs"]
 mod geology_texture_set;
 #[path = "planet_asset_raw_fields.rs"]
-mod planet_asset_raw_fields;
+pub(crate) mod planet_asset_raw_fields;
 #[cfg(test)]
 #[path = "planet_asset_tests.rs"]
 mod planet_asset_tests;
@@ -78,7 +78,7 @@ pub(crate) mod planet_resource;
 #[path = "planet_tech_definitions.rs"]
 pub(crate) mod planet_tech_definitions;
 #[path = "shading_class.rs"]
-mod shading_class;
+pub(crate) mod shading_class;
 #[path = "soil.rs"]
 pub(crate) mod soil;
 #[path = "soil_texture_set.rs"]
@@ -92,7 +92,7 @@ mod terrain_guid_link;
 #[path = "terrain_guid_link_tests.rs"]
 mod terrain_guid_link_tests;
 #[path = "terrain_layers.rs"]
-mod terrain_layers;
+pub(crate) mod terrain_layers;
 #[cfg(test)]
 #[path = "terrain_projection_witness.rs"]
 mod terrain_projection_witness;

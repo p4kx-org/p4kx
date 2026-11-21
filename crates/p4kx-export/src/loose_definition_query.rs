@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, Build, CancelToken, FieldOrigin, SourceInventory};
+use std::time::UNIX_EPOCH;
+
+use p4kx_extraction::{Archive, ArchiveWatch, Build, CancelToken, FieldOrigin, SourceInventory};
 
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_read::loose_definition::Selection;
-use crate::catalog_read::original::{EntryCapture, EntryReceipt};
+use crate::catalog_read::original::{EntryCapture, EntryReceipt, with_entry_capture};
 use crate::catalog_table::{CatalogTable, DatasetAvailability};
+use crate::export_archive_health;
 use crate::export_entry_counts::ExportEntryCounts;
 use crate::export_ledger::ExportLedger;
-use crate::{CatalogError, Kind, export_health_entries};
+use crate::{CatalogError, CatalogOptions, Kind, export_health_entries};
 
 /// Selected loose definitions with their canonical rows and physical source evidence.
 #[derive(Debug)]
@@ -39,6 +42,35 @@ impl<Row> LooseDefinitionSnapshot<Row> {
             && self.entries.failed_projections == 0
             && self.entries.failed_selection_candidates == 0
     }
+}
+
+pub(super) fn read<Row>(
+    archive: &Archive,
+    selection: Selection<'_>,
+    cancel: Option<&CancelToken>,
+    kind: Kind,
+    read_rows: impl FnOnce(
+        &EntryCapture<'_>,
+        &mut ExportLedger,
+        &CatalogOptions<'_>,
+    ) -> Result<CatalogTable<Row>, CatalogError>,
+) -> Result<LooseDefinitionSnapshot<Row>, CatalogError> {
+    checkpoint(cancel)?;
+    let watch = ArchiveWatch::new(archive);
+    watch.check()?;
+    let snapshot = with_entry_capture(archive, |capture| {
+        let mut ledger = ExportLedger {
+            archive_inventory_problem: export_archive_health::inventory(archive),
+            ..ExportLedger::default()
+        };
+        let mut options = CatalogOptions::new(UNIX_EPOCH);
+        options.cancel = cancel;
+        let table = read_rows(capture, &mut ledger, &options)?;
+        finish(archive, capture, selection, cancel, kind, table, ledger)
+    });
+    watch.check()?;
+    checkpoint(cancel)?;
+    snapshot
 }
 
 pub(super) fn finish<Row>(

@@ -10,7 +10,7 @@ use crate::catalog_read::catalog_json_number::CatalogJsonNumber;
 use crate::catalog_read::entry_json_object::{self, EntryJsonObject};
 use crate::catalog_read::loose_archive_path::{self, LooseArchivePath};
 use crate::catalog_read::loose_definition::{
-    self, DefinitionFamily, DefinitionIssue, LooseDefinition,
+    self, DefinitionFamily, DefinitionIssue, LooseDefinition, Selection,
 };
 use crate::catalog_read::original::{EntryCapture, PhysicalEntryIdentity};
 use crate::catalog_read::parsed_entry_json;
@@ -38,51 +38,83 @@ pub(crate) type EcosystemTable = CatalogTable<Ecosystem>;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct Ecosystem {
-    identity: PhysicalEntryIdentity,
-    guid: SourcedValue<CatalogGuid>,
-    guid_raw: SourcedValue<String>,
+#[non_exhaustive]
+pub struct Ecosystem {
+    /// The physical original Entry.
+    pub identity: PhysicalEntryIdentity,
+    /// The original parsed GUID.
+    pub guid: SourcedValue<CatalogGuid>,
+    /// The authored GUID spelling.
+    pub guid_raw: SourcedValue<String>,
     #[schemars(extend("x-gameText" = true))]
-    name: SourcedValue<String>,
-    sound_effect: SourcedValue<EcosystemSoundEffect>,
-    textures: SourcedValue<EcosystemTextures>,
-    texture_links: Option<EcosystemTextureLinks>,
-    additional_fields: Vec<RawPlanetAssetMember>,
-    issues: Vec<DefinitionIssue>,
+    /// The original protected ecosystem name.
+    pub name: SourcedValue<String>,
+    /// Original sound settings and observed array counts.
+    pub sound_effect: SourcedValue<EcosystemSoundEffect>,
+    /// Original texture and mask selector fields.
+    pub textures: SourcedValue<EcosystemTextures>,
+    /// Directory lookups for the original texture selectors.
+    pub texture_links: Option<EcosystemTextureLinks>,
+    /// Additional original JSON members and their exact tokens.
+    pub additional_fields: Vec<RawPlanetAssetMember>,
+    /// Source issues observed in the selected owner scope.
+    pub issues: Vec<DefinitionIssue>,
 }
 
+/// Original settings of an ecosystem sound declaration.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct EcosystemSoundEffect {
-    audio_rtpc_array_count: SourcedValue<DecimalU64>,
-    audio_switch_array_count: SourcedValue<DecimalU64>,
-    audio_trigger: SourcedValue<String>,
-    audio_terrain_eccentricity: SourcedValue<CatalogJsonNumber>,
-    additional_fields: Vec<RawPlanetAssetMember>,
+#[non_exhaustive]
+pub struct EcosystemSoundEffect {
+    /// The original number of audio RTPC entries.
+    pub audio_rtpc_array_count: SourcedValue<DecimalU64>,
+    /// The original number of audio switch entries.
+    pub audio_switch_array_count: SourcedValue<DecimalU64>,
+    /// The original audio trigger text.
+    pub audio_trigger: SourcedValue<String>,
+    /// The exact authored terrain eccentricity.
+    pub audio_terrain_eccentricity: SourcedValue<CatalogJsonNumber>,
+    /// Additional original JSON members and their exact tokens.
+    pub additional_fields: Vec<RawPlanetAssetMember>,
 }
 
+/// Original texture and mask selectors of an ecosystem.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct EcosystemTextures {
-    climate: SourcedValue<String>,
-    data: SourcedValue<String>,
-    normal: SourcedValue<String>,
-    elevation: SourcedValue<String>,
-    object_preset_spawn_mask: SourcedValue<String>,
-    additional_fields: Vec<RawPlanetAssetMember>,
+#[non_exhaustive]
+pub struct EcosystemTextures {
+    /// The original climate texture path.
+    pub climate: SourcedValue<String>,
+    /// The original data texture path.
+    pub data: SourcedValue<String>,
+    /// The original normal texture path.
+    pub normal: SourcedValue<String>,
+    /// The original elevation texture path.
+    pub elevation: SourcedValue<String>,
+    /// The original object preset spawn mask path.
+    pub object_preset_spawn_mask: SourcedValue<String>,
+    /// Additional original JSON members and their exact tokens.
+    pub additional_fields: Vec<RawPlanetAssetMember>,
 }
 
+/// Directory evidence for the original ecosystem selectors.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct EcosystemTextureLinks {
-    climate: LooseArchivePath,
-    data: LooseArchivePath,
-    normal: LooseArchivePath,
-    elevation: LooseArchivePath,
-    object_preset_spawn_mask: LooseArchivePath,
+#[non_exhaustive]
+pub struct EcosystemTextureLinks {
+    /// The original climate texture lookup.
+    pub climate: LooseArchivePath,
+    /// The original data texture lookup.
+    pub data: LooseArchivePath,
+    /// The original normal texture lookup.
+    pub normal: LooseArchivePath,
+    /// The original elevation texture lookup.
+    pub elevation: LooseArchivePath,
+    /// The original object preset spawn mask lookup.
+    pub object_preset_spawn_mask: LooseArchivePath,
 }
 
 impl LooseDefinition for Ecosystem {
@@ -102,7 +134,20 @@ pub(crate) fn read(
     options: &CatalogOptions<'_>,
     paths: &mut loose_archive_path::Resolver<'_, '_, '_>,
 ) -> Result<EcosystemTable, CatalogError> {
-    let mut table = loose_definition::read(archive, capture, ledger, options, FAMILY, project)?;
+    read_selected(archive, capture, ledger, options, paths, Selection::All)
+}
+
+pub(crate) fn read_selected(
+    archive: &Archive,
+    capture: &EntryCapture<'_>,
+    ledger: &mut ExportLedger,
+    options: &CatalogOptions<'_>,
+    paths: &mut loose_archive_path::Resolver<'_, '_, '_>,
+    selection: Selection<'_>,
+) -> Result<EcosystemTable, CatalogError> {
+    let mut table = loose_definition::read_selected(
+        archive, capture, ledger, options, FAMILY, selection, project,
+    )?;
     let mut resolver = TextureResolver { paths, ledger };
     for row in &mut table.rows {
         parsed_entry_json::check_cancel(options.cancel)?;

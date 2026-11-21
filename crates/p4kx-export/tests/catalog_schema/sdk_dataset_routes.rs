@@ -50,6 +50,8 @@ mod contracts;
 mod countermeasure_emitters;
 #[path = "sdk_dismantle_process_route.rs"]
 pub(super) mod dismantle;
+#[path = "sdk_entity_animation_route.rs"]
+pub(super) mod entity_animation;
 #[path = "sdk_facility_route.rs"]
 mod facilities;
 #[path = "../it/catalog_facility_medbed_fixture.rs"]
@@ -126,6 +128,8 @@ mod soils;
 pub(super) mod starmap_definitions;
 #[path = "sdk_tag_routes.rs"]
 mod tag_routes;
+#[path = "sdk_terrain_routes.rs"]
+mod terrain;
 #[path = "sdk_vehicle_armor_route.rs"]
 mod vehicle_armor;
 #[path = "sdk_weapon_animation_route.rs"]
@@ -164,6 +168,7 @@ pub(super) fn world_datasets() -> impl Iterator<Item = &'static str> {
     starmap_definitions::DATASETS
         .into_iter()
         .chain(soils::DATASETS)
+        .chain(terrain::DATASETS)
 }
 
 pub(super) fn read() -> TestResult<Vec<Route>> {
@@ -217,6 +222,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(worn_gear::read()?);
     routes.push(vehicle_armor::read()?);
     routes.push(loot_generation::read()?);
+    routes.push(entity_animation::read()?);
     routes.push(mission_board::read()?);
     routes.extend(resource_groups::read()?);
     routes.extend(reputation::read()?);
@@ -249,6 +255,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(weapon_sources::read()?);
     routes.extend(starmap_definitions::read()?);
     routes.extend(soils::read()?);
+    routes.extend(terrain::read()?);
     Ok(())
 }
 

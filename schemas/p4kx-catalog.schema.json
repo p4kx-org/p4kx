@@ -15277,21 +15277,26 @@
       "description": "One physical ecosystem definition and its authored audio and texture fields.",
       "properties": {
         "additionalFields": {
+          "description": "Additional original JSON members and their exact tokens.",
           "items": {
             "$ref": "#/$defs/RawPlanetAssetMember"
           },
           "type": "array"
         },
         "guid": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The original parsed GUID."
         },
         "guidRaw": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored GUID spelling."
         },
         "identity": {
-          "$ref": "#/$defs/PhysicalEntryIdentity"
+          "$ref": "#/$defs/PhysicalEntryIdentity",
+          "description": "The physical original Entry."
         },
         "issues": {
+          "description": "Source issues observed in the selected owner scope.",
           "items": {
             "$ref": "#/$defs/DefinitionIssue"
           },
@@ -15299,10 +15304,12 @@
         },
         "name": {
           "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original protected ecosystem name.",
           "x-gameText": true
         },
         "soundEffect": {
-          "$ref": "#/$defs/SourcedValueOfEcosystemSoundEffect"
+          "$ref": "#/$defs/SourcedValueOfEcosystemSoundEffect",
+          "description": "Original sound settings and observed array counts."
         },
         "textureLinks": {
           "anyOf": [
@@ -15312,10 +15319,12 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Directory lookups for the original texture selectors."
         },
         "textures": {
-          "$ref": "#/$defs/SourcedValueOfEcosystemTextures"
+          "$ref": "#/$defs/SourcedValueOfEcosystemTextures",
+          "description": "Original texture and mask selector fields."
         }
       },
       "required": [
@@ -15332,24 +15341,30 @@
       "type": "object"
     },
     "EcosystemSoundEffect": {
+      "description": "Original settings of an ecosystem sound declaration.",
       "properties": {
         "additionalFields": {
+          "description": "Additional original JSON members and their exact tokens.",
           "items": {
             "$ref": "#/$defs/RawPlanetAssetMember"
           },
           "type": "array"
         },
         "audioRtpcArrayCount": {
-          "$ref": "#/$defs/SourcedValueOfDecimalU64"
+          "$ref": "#/$defs/SourcedValueOfDecimalU64",
+          "description": "The original number of audio RTPC entries."
         },
         "audioSwitchArrayCount": {
-          "$ref": "#/$defs/SourcedValueOfDecimalU64"
+          "$ref": "#/$defs/SourcedValueOfDecimalU64",
+          "description": "The original number of audio switch entries."
         },
         "audioTerrainEccentricity": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The exact authored terrain eccentricity."
         },
         "audioTrigger": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original audio trigger text."
         }
       },
       "required": [
@@ -15362,21 +15377,27 @@
       "type": "object"
     },
     "EcosystemTextureLinks": {
+      "description": "Directory evidence for the original ecosystem selectors.",
       "properties": {
         "climate": {
-          "$ref": "#/$defs/LooseArchivePath"
+          "$ref": "#/$defs/LooseArchivePath",
+          "description": "The original climate texture lookup."
         },
         "data": {
-          "$ref": "#/$defs/LooseArchivePath"
+          "$ref": "#/$defs/LooseArchivePath",
+          "description": "The original data texture lookup."
         },
         "elevation": {
-          "$ref": "#/$defs/LooseArchivePath"
+          "$ref": "#/$defs/LooseArchivePath",
+          "description": "The original elevation texture lookup."
         },
         "normal": {
-          "$ref": "#/$defs/LooseArchivePath"
+          "$ref": "#/$defs/LooseArchivePath",
+          "description": "The original normal texture lookup."
         },
         "objectPresetSpawnMask": {
-          "$ref": "#/$defs/LooseArchivePath"
+          "$ref": "#/$defs/LooseArchivePath",
+          "description": "The original object preset spawn mask lookup."
         }
       },
       "required": [
@@ -15389,27 +15410,34 @@
       "type": "object"
     },
     "EcosystemTextures": {
+      "description": "Original texture and mask selectors of an ecosystem.",
       "properties": {
         "additionalFields": {
+          "description": "Additional original JSON members and their exact tokens.",
           "items": {
             "$ref": "#/$defs/RawPlanetAssetMember"
           },
           "type": "array"
         },
         "climate": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original climate texture path."
         },
         "data": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original data texture path."
         },
         "elevation": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original elevation texture path."
         },
         "normal": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original normal texture path."
         },
         "objectPresetSpawnMask": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original object preset spawn mask path."
         }
       },
       "required": [
@@ -45430,21 +45458,26 @@
       "required": []
     },
     "ShadingClass": {
+      "description": "An original terrain shading class and its authored material settings.",
       "properties": {
         "additionalFields": {
+          "description": "Additional original JSON members and their exact tokens.",
           "items": {
             "$ref": "#/$defs/RawPlanetAssetMember"
           },
           "type": "array"
         },
         "ambientOcclusionAmount": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored ambient occlusion amount."
         },
         "distantVegetationUvScale": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored distant vegetation UV scale."
         },
         "groundLayer": {
-          "$ref": "#/$defs/SourcedValueOfGroundLayer"
+          "$ref": "#/$defs/SourcedValueOfGroundLayer",
+          "description": "The original ground-layer declaration."
         },
         "groundTexture": {
           "anyOf": [
@@ -45454,37 +45487,47 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "The original ground texture directory lookup."
         },
         "guid": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The original parsed GUID."
         },
         "guidRaw": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored GUID spelling."
         },
         "identity": {
-          "$ref": "#/$defs/PhysicalEntryIdentity"
+          "$ref": "#/$defs/PhysicalEntryIdentity",
+          "description": "The physical original Entry."
         },
         "issues": {
+          "description": "Source issues observed in the selected owner scope.",
           "items": {
             "$ref": "#/$defs/DefinitionIssue"
           },
           "type": "array"
         },
         "lightingModel": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The original numeric lighting model code."
         },
         "normalStrength": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored normal strength."
         },
         "parallaxOcclusionHeight": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored parallax occlusion height."
         },
         "roughness": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored surface roughness."
         },
         "viewAngleMasking": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored view-angle masking value."
         }
       },
       "required": [

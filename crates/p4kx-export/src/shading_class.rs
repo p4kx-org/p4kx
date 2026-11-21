@@ -10,7 +10,7 @@ use super::terrain_layers::{self, GroundLayer, GroundLayerFieldNames, LayerResol
 use crate::catalog_read::entry_json_object::{self, EntryJsonObject};
 use crate::catalog_read::loose_archive_path::{self, LooseArchivePath};
 use crate::catalog_read::loose_definition::{
-    self, DefinitionFamily, DefinitionIssue, LooseDefinition,
+    self, DefinitionFamily, DefinitionIssue, LooseDefinition, Selection,
 };
 use crate::catalog_read::original::{EntryCapture, PhysicalEntryIdentity};
 use crate::catalog_table::CatalogTable;
@@ -36,24 +36,40 @@ pub(super) const FAMILY: DefinitionFamily = DefinitionFamily::new(
 
 pub(crate) type ShadingClassTable = CatalogTable<ShadingClass>;
 
+/// An original terrain shading class and its authored material settings.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ShadingClass {
-    identity: PhysicalEntryIdentity,
-    guid: SourcedValue<CatalogGuid>,
-    guid_raw: SourcedValue<String>,
-    ground_layer: SourcedValue<GroundLayer>,
-    ground_texture: Option<LooseArchivePath>,
-    lighting_model: Number,
-    roughness: Number,
-    ambient_occlusion_amount: Number,
-    distant_vegetation_uv_scale: Number,
-    view_angle_masking: Number,
-    normal_strength: Number,
-    parallax_occlusion_height: Number,
-    additional_fields: Vec<RawPlanetAssetMember>,
-    issues: Vec<DefinitionIssue>,
+#[non_exhaustive]
+pub struct ShadingClass {
+    /// The physical original Entry.
+    pub identity: PhysicalEntryIdentity,
+    /// The original parsed GUID.
+    pub guid: SourcedValue<CatalogGuid>,
+    /// The authored GUID spelling.
+    pub guid_raw: SourcedValue<String>,
+    /// The original ground-layer declaration.
+    pub ground_layer: SourcedValue<GroundLayer>,
+    /// The original ground texture directory lookup.
+    pub ground_texture: Option<LooseArchivePath>,
+    /// The original numeric lighting model code.
+    pub lighting_model: Number,
+    /// The authored surface roughness.
+    pub roughness: Number,
+    /// The authored ambient occlusion amount.
+    pub ambient_occlusion_amount: Number,
+    /// The authored distant vegetation UV scale.
+    pub distant_vegetation_uv_scale: Number,
+    /// The authored view-angle masking value.
+    pub view_angle_masking: Number,
+    /// The authored normal strength.
+    pub normal_strength: Number,
+    /// The authored parallax occlusion height.
+    pub parallax_occlusion_height: Number,
+    /// Additional original JSON members and their exact tokens.
+    pub additional_fields: Vec<RawPlanetAssetMember>,
+    /// Source issues observed in the selected owner scope.
+    pub issues: Vec<DefinitionIssue>,
 }
 
 impl LooseDefinition for ShadingClass {
@@ -73,13 +89,25 @@ pub(crate) fn read(
     options: &CatalogOptions<'_>,
     paths: &mut loose_archive_path::Resolver<'_, '_, '_>,
 ) -> Result<ShadingClassTable, CatalogError> {
+    read_selected(archive, capture, ledger, options, paths, Selection::All)
+}
+
+pub(crate) fn read_selected(
+    archive: &Archive,
+    capture: &EntryCapture<'_>,
+    ledger: &mut ExportLedger,
+    options: &CatalogOptions<'_>,
+    paths: &mut loose_archive_path::Resolver<'_, '_, '_>,
+    selection: Selection<'_>,
+) -> Result<ShadingClassTable, CatalogError> {
     let mut resolver = LayerResolver::new(paths, options.cancel);
-    loose_definition::read(
+    loose_definition::read_selected(
         archive,
         capture,
         ledger,
         options,
         FAMILY,
+        selection,
         |identity, object| ShadingClass::project(identity, object, &mut resolver),
     )
 }

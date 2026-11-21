@@ -128,6 +128,9 @@ pub use loose_definitions::LooseDefinitionSnapshot;
 #[path = "soil_query.rs"]
 pub mod soils;
 
+#[path = "terrain_query.rs"]
+pub mod terrain;
+
 #[path = "planet_resource_query.rs"]
 pub mod planet_resources;
 

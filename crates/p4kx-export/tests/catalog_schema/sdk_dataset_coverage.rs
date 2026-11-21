@@ -232,6 +232,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     WEAPON_COMBAT,
     WEAPON_RECOIL,
     WEAPON_ANIMATION,
+    routes::entity_animation::DATASET,
     CONTAINERS,
     LOCATION_PHYSICS_GRIDS,
     LOOT_DOCUMENTS,

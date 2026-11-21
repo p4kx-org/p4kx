@@ -4,20 +4,15 @@
 //! Selective access to original loose soil definitions.
 
 use std::collections::HashSet;
-use std::time::UNIX_EPOCH;
 
-use p4kx_extraction::{Archive, ArchiveWatch, CancelToken};
+use p4kx_extraction::{Archive, CancelToken};
 
 use super::loose_definitions::{self, LooseDefinitionSnapshot};
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_read::loose_archive_path;
 pub use crate::catalog_read::loose_definition::{DefinitionIssue, LooseDefinitionSelection};
-use crate::catalog_read::original::{EntryCapture, with_entry_capture};
-use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::catalog_definitions::{planet_tech_definitions, soil, soil_texture_set};
-use crate::export_archive_health;
-use crate::export_ledger::ExportLedger;
-use crate::{CatalogError, CatalogOptions, Kind};
+use crate::{CatalogError, Kind};
 
 pub use crate::catalog_read::catalog_json_number::CatalogJsonNumber;
 pub use crate::catalog_read::loose_archive_path::{LooseArchivePath, LooseArchivePathState};
@@ -47,7 +42,7 @@ pub fn read_soils(
     selection: LooseDefinitionSelection<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<SoilSnapshot, CatalogError> {
-    read(
+    loose_definitions::read(
         archive,
         selection,
         cancel,
@@ -83,7 +78,7 @@ pub fn read_soil_texture_sets(
     selection: LooseDefinitionSelection<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<SoilTextureSetSnapshot, CatalogError> {
-    read(
+    loose_definitions::read(
         archive,
         selection,
         cancel,
@@ -110,33 +105,4 @@ fn wanted_texture_sets(
         wanted.insert(guid);
     }
     Ok(wanted)
-}
-
-fn read<Row>(
-    archive: &Archive,
-    selection: LooseDefinitionSelection<'_>,
-    cancel: Option<&CancelToken>,
-    kind: Kind,
-    read_rows: impl FnOnce(
-        &EntryCapture<'_>,
-        &mut ExportLedger,
-        &CatalogOptions<'_>,
-    ) -> Result<CatalogTable<Row>, CatalogError>,
-) -> Result<LooseDefinitionSnapshot<Row>, CatalogError> {
-    checkpoint(cancel)?;
-    let watch = ArchiveWatch::new(archive);
-    watch.check()?;
-    let snapshot = with_entry_capture(archive, |capture| {
-        let mut ledger = ExportLedger {
-            archive_inventory_problem: export_archive_health::inventory(archive),
-            ..ExportLedger::default()
-        };
-        let mut options = CatalogOptions::new(UNIX_EPOCH);
-        options.cancel = cancel;
-        let table = read_rows(capture, &mut ledger, &options)?;
-        loose_definitions::finish(archive, capture, selection, cancel, kind, table, ledger)
-    });
-    watch.check()?;
-    checkpoint(cancel)?;
-    snapshot
 }
