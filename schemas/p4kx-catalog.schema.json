@@ -19576,39 +19576,51 @@
       "type": "object"
     },
     "GeologyGeometry": {
+      "description": "Authored geometry, material and Entity class selectors.",
       "properties": {
         "entityClass": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The authored Entity class GUID."
         },
         "entityClassRaw": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original Entity class GUID text."
         },
         "fallbackPromotionType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored fallback promotion type."
         },
         "geometryPath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored geometry path."
         },
         "groundCover": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "The authored ground cover flag."
         },
         "lodRatio": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored level-of-detail ratio."
         },
         "materialPath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored material path."
         },
         "promotionType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored promotion type."
         },
         "size": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The authored geometry size vector."
         },
         "sunShadowMode": {
-          "$ref": "#/$defs/SourcedValueOfSunShadowMode"
+          "$ref": "#/$defs/SourcedValueOfSunShadowMode",
+          "description": "The original named or numeric sun shadow mode."
         },
         "wheeledCollisionMode": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored wheeled collision mode."
         }
       },
       "required": [
@@ -19627,42 +19639,55 @@
       "type": "object"
     },
     "GeologyPlacement": {
+      "description": "Authored placements and alignment for a geology asset.",
       "properties": {
         "alignToProjectionDirection": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "The authored projection alignment flag."
         },
         "gravityAligned": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "The authored gravity alignment flag."
         },
         "ignoresParentBlocking": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "The authored parent-blocking override."
         },
         "immuneToBurying": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "The authored burying immunity flag."
         },
         "randomRotationMax": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The authored upper random rotation."
         },
         "randomRotationMin": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The authored lower random rotation."
         },
         "randomRotationQuantization": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The authored random rotation quantization."
         },
         "randomScale": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The authored random scale."
         },
         "randomZOffsetMax": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The upper authored random Z offset."
         },
         "randomZOffsetMin": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The lower authored random Z offset."
         },
         "slopeAlignmentAmount": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored slope alignment amount."
         },
         "slopeRangeDeg": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The authored slope range in degrees."
         }
       },
       "required": [
@@ -19685,16 +19710,20 @@
       "description": "Original Archive target paths of the geometry and mineable settings.",
       "properties": {
         "geometry": {
-          "$ref": "#/$defs/LooseArchivePath"
+          "$ref": "#/$defs/LooseArchivePath",
+          "description": "The authored geometry path lookup."
         },
         "material": {
-          "$ref": "#/$defs/LooseArchivePath"
+          "$ref": "#/$defs/LooseArchivePath",
+          "description": "The authored material path lookup."
         },
         "mineableConfig": {
-          "$ref": "#/$defs/LooseArchivePath"
+          "$ref": "#/$defs/LooseArchivePath",
+          "description": "The authored mineable configuration geometry lookup."
         },
         "mineableMaterial": {
-          "$ref": "#/$defs/LooseArchivePath"
+          "$ref": "#/$defs/LooseArchivePath",
+          "description": "The authored mineable material lookup."
         }
       },
       "required": [
@@ -19837,24 +19866,31 @@
       "type": "object"
     },
     "GeologySubstrate": {
+      "description": "Authored aggregate, bedrock and soil settings for a geology asset.",
       "properties": {
         "aggregateSize": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored aggregate size."
         },
         "aggregateSizeMax": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored maximum aggregate size."
         },
         "bedrockFalldownDistance": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored bedrock fall distance."
         },
         "bedrockPointOfMaxInfluence": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored point of maximum bedrock influence."
         },
         "bedrockScaleRatio": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored bedrock scale ratio."
         },
         "maxSoilDepth": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored maximum soil depth."
         }
       },
       "required": [
@@ -36038,34 +36074,43 @@
       "description": "Original `PlanetTech` fauna configuration from a physical loose JSON Entry.",
       "properties": {
         "entity": {
-          "$ref": "#/$defs/LooseRecordLink"
+          "$ref": "#/$defs/LooseRecordLink",
+          "description": "The linked physical Record header candidates and resolution state."
         },
         "entityClass": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The authored Entity class GUID."
         },
         "entityClassRaw": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original Entity class GUID text."
         },
         "guid": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The parsed creature GUID."
         },
         "guidRaw": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original creature GUID text."
         },
         "identity": {
-          "$ref": "#/$defs/PhysicalEntryIdentity"
+          "$ref": "#/$defs/PhysicalEntryIdentity",
+          "description": "The physical Entry that owns this definition."
         },
         "issues": {
+          "description": "Source issues observed in this owner selection.",
           "items": {
             "$ref": "#/$defs/DefinitionIssue"
           },
           "type": "array"
         },
         "needVerticalOffset": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "The authored vertical offset flag."
         },
         "slopeTolerance": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored slope tolerance with its original numeric spelling."
         }
       },
       "required": [
@@ -36085,64 +36130,81 @@
       "description": "A physical loose geology definition and its authored fields.",
       "properties": {
         "additionalFields": {
+          "description": "Additional unprojected original fields.",
           "items": {
             "$ref": "#/$defs/RawPlanetAssetMember"
           },
           "type": "array"
         },
         "audioOffset": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The authored procedural audio offset."
         },
         "entity": {
-          "$ref": "#/$defs/LooseRecordLink"
+          "$ref": "#/$defs/LooseRecordLink",
+          "description": "The linked Entity class Record header candidates and resolution state."
         },
         "geometry": {
-          "$ref": "#/$defs/GeologyGeometry"
+          "$ref": "#/$defs/GeologyGeometry",
+          "description": "Authored geometry selectors and settings."
         },
         "guid": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The parsed geology asset GUID."
         },
         "guidRaw": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original geology asset GUID text."
         },
         "harvestableModelTag": {
           "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored harvestable model tag.",
           "x-gameText": true
         },
         "identity": {
-          "$ref": "#/$defs/PhysicalEntryIdentity"
+          "$ref": "#/$defs/PhysicalEntryIdentity",
+          "description": "The physical Entry that owns this definition."
         },
         "issues": {
+          "description": "Source issues observed in this owner selection.",
           "items": {
             "$ref": "#/$defs/DefinitionIssue"
           },
           "type": "array"
         },
         "mineableConfigPath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original mineable configuration geometry path."
         },
         "mineableMaterialPath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original mineable material path."
         },
         "placement": {
-          "$ref": "#/$defs/GeologyPlacement"
+          "$ref": "#/$defs/GeologyPlacement",
+          "description": "Authored placement settings."
         },
         "proceduralAudio": {
           "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored procedural audio selector.",
           "x-gameText": true
         },
         "references": {
-          "$ref": "#/$defs/GeologyReferences"
+          "$ref": "#/$defs/GeologyReferences",
+          "description": "The directory lookups for the authored geometry and material paths."
         },
         "resources": {
           "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfstring",
+          "description": "The original resource tokens in physical slot order.",
           "x-gameText": true
         },
         "resourcesCount": {
-          "$ref": "#/$defs/SourcedValueOfDecimalU64"
+          "$ref": "#/$defs/SourcedValueOfDecimalU64",
+          "description": "The count of original resource declarations."
         },
         "substrate": {
-          "$ref": "#/$defs/GeologySubstrate"
+          "$ref": "#/$defs/GeologySubstrate",
+          "description": "Authored substrate settings."
         }
       },
       "required": [
@@ -138242,8 +138304,10 @@
       "type": "object"
     },
     "SunShadowMode": {
+      "description": "The original named or numeric representation of a sun shadow mode.",
       "oneOf": [
         {
+          "description": "An authored name.",
           "properties": {
             "type": {
               "const": "named",
@@ -138260,6 +138324,7 @@
           "type": "object"
         },
         {
+          "description": "An authored numeric token.",
           "properties": {
             "type": {
               "const": "numeric",

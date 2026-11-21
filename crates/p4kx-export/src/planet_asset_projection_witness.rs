@@ -42,7 +42,7 @@ fn installed_planet_asset_projection_pairs_original_and_output() -> TestResult {
         planet_geology_asset::FAMILY.includes(geology_path),
         "geology scope"
     );
-    with_archive_input(&archive, |forge, original| {
+    with_archive_input(&archive, |_, original| {
         let capture = EntryCapture::for_input(original);
         let mut ledger = ExportLedger::default();
         let climate_filter = Filter::parse(climate_path)?;
@@ -53,7 +53,7 @@ fn installed_planet_asset_projection_pairs_original_and_output() -> TestResult {
         let geology_filter = Filter::parse(geology_path)?;
         options.filter = Some(&geology_filter);
         let geology =
-            planet_geology_asset::read(&archive, forge, original, &capture, &mut ledger, &options)?;
+            planet_geology_asset::read(&archive, original, &capture, &mut ledger, &options)?;
         assert!(
             ledger
                 .entries

@@ -18,18 +18,31 @@ type Vector = SourcedValue<Vec<Number>>;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct GeologyGeometry {
-    pub(super) geometry_path: SourcedValue<String>,
-    pub(super) material_path: SourcedValue<String>,
-    size: Vector,
-    lod_ratio: Number,
-    promotion_type: SourcedValue<String>,
-    fallback_promotion_type: SourcedValue<String>,
-    pub(super) entity_class: SourcedValue<CatalogGuid>,
-    pub(super) entity_class_raw: SourcedValue<String>,
-    sun_shadow_mode: SourcedValue<SunShadowMode>,
-    wheeled_collision_mode: SourcedValue<String>,
-    ground_cover: SourcedValue<bool>,
+/// Authored geometry, material and Entity class selectors.
+#[non_exhaustive]
+pub struct GeologyGeometry {
+    /// The authored geometry path.
+    pub geometry_path: SourcedValue<String>,
+    /// The authored material path.
+    pub material_path: SourcedValue<String>,
+    /// The authored geometry size vector.
+    pub size: Vector,
+    /// The authored level-of-detail ratio.
+    pub lod_ratio: Number,
+    /// The authored promotion type.
+    pub promotion_type: SourcedValue<String>,
+    /// The authored fallback promotion type.
+    pub fallback_promotion_type: SourcedValue<String>,
+    /// The authored Entity class GUID.
+    pub entity_class: SourcedValue<CatalogGuid>,
+    /// The original Entity class GUID text.
+    pub entity_class_raw: SourcedValue<String>,
+    /// The original named or numeric sun shadow mode.
+    pub sun_shadow_mode: SourcedValue<SunShadowMode>,
+    /// The authored wheeled collision mode.
+    pub wheeled_collision_mode: SourcedValue<String>,
+    /// The authored ground cover flag.
+    pub ground_cover: SourcedValue<bool>,
 }
 
 impl GeologyGeometry {
@@ -52,8 +65,12 @@ impl GeologyGeometry {
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", content = "value", rename_all = "camelCase")]
-enum SunShadowMode {
+/// The original named or numeric representation of a sun shadow mode.
+#[non_exhaustive]
+pub enum SunShadowMode {
+    /// An authored name.
     Named(String),
+    /// An authored numeric token.
     Numeric(CatalogJsonNumber),
 }
 
@@ -72,19 +89,33 @@ fn sun_shadow_mode(node: &SourceNode<'_>) -> SourceValue<SunShadowMode> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct GeologyPlacement {
-    align_to_projection_direction: SourcedValue<bool>,
-    gravity_aligned: SourcedValue<bool>,
-    ignores_parent_blocking: SourcedValue<bool>,
-    immune_to_burying: SourcedValue<bool>,
-    random_z_offset_min: Number,
-    random_z_offset_max: Number,
-    slope_alignment_amount: Number,
-    slope_range_deg: Vector,
-    random_rotation_min: Vector,
-    random_rotation_max: Vector,
-    random_rotation_quantization: Vector,
-    random_scale: Vector,
+/// Authored placements and alignment for a geology asset.
+#[non_exhaustive]
+pub struct GeologyPlacement {
+    /// The authored projection alignment flag.
+    pub align_to_projection_direction: SourcedValue<bool>,
+    /// The authored gravity alignment flag.
+    pub gravity_aligned: SourcedValue<bool>,
+    /// The authored parent-blocking override.
+    pub ignores_parent_blocking: SourcedValue<bool>,
+    /// The authored burying immunity flag.
+    pub immune_to_burying: SourcedValue<bool>,
+    /// The lower authored random Z offset.
+    pub random_z_offset_min: Number,
+    /// The upper authored random Z offset.
+    pub random_z_offset_max: Number,
+    /// The authored slope alignment amount.
+    pub slope_alignment_amount: Number,
+    /// The authored slope range in degrees.
+    pub slope_range_deg: Vector,
+    /// The authored lower random rotation.
+    pub random_rotation_min: Vector,
+    /// The authored upper random rotation.
+    pub random_rotation_max: Vector,
+    /// The authored random rotation quantization.
+    pub random_rotation_quantization: Vector,
+    /// The authored random scale.
+    pub random_scale: Vector,
 }
 
 impl GeologyPlacement {
@@ -112,13 +143,21 @@ impl GeologyPlacement {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct GeologySubstrate {
-    aggregate_size: Number,
-    aggregate_size_max: Number,
-    bedrock_falldown_distance: Number,
-    bedrock_point_of_max_influence: Number,
-    bedrock_scale_ratio: Number,
-    max_soil_depth: Number,
+/// Authored aggregate, bedrock and soil settings for a geology asset.
+#[non_exhaustive]
+pub struct GeologySubstrate {
+    /// The authored aggregate size.
+    pub aggregate_size: Number,
+    /// The authored maximum aggregate size.
+    pub aggregate_size_max: Number,
+    /// The authored bedrock fall distance.
+    pub bedrock_falldown_distance: Number,
+    /// The authored point of maximum bedrock influence.
+    pub bedrock_point_of_max_influence: Number,
+    /// The authored bedrock scale ratio.
+    pub bedrock_scale_ratio: Number,
+    /// The authored maximum soil depth.
+    pub max_soil_depth: Number,
 }
 
 impl GeologySubstrate {

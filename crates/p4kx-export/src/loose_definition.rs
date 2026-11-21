@@ -140,25 +140,6 @@ pub(crate) trait LooseDefinition {
     fn issues(&mut self) -> &mut Vec<DefinitionIssue>;
 }
 
-pub(crate) fn read<T: LooseDefinition>(
-    archive: &Archive,
-    capture: &EntryCapture<'_>,
-    ledger: &mut ExportLedger,
-    options: &CatalogOptions<'_>,
-    family: DefinitionFamily,
-    project: impl FnMut(PhysicalEntryIdentity, &EntryJsonObject<'_, '_>) -> Result<T, CatalogError>,
-) -> Result<CatalogTable<T>, CatalogError> {
-    read_selected(
-        archive,
-        capture,
-        ledger,
-        options,
-        family,
-        Selection::All,
-        project,
-    )
-}
-
 pub(crate) fn read_selected<T: LooseDefinition>(
     archive: &Archive,
     capture: &EntryCapture<'_>,

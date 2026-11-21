@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, DataForge, DecimalU64, SourcedValue};
+use p4kx_extraction::{Archive, DecimalU64, SourceUses, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -13,9 +13,9 @@ use crate::catalog_read::catalog_json_number::CatalogJsonNumber;
 use crate::catalog_read::entry_json_object::{self, EntryJsonObject};
 use crate::catalog_read::loose_archive_path::Resolver;
 use crate::catalog_read::loose_definition::{
-    self, DefinitionFamily, DefinitionIssue, LooseDefinition,
+    self, DefinitionFamily, DefinitionIssue, LooseDefinition, Selection,
 };
-use crate::catalog_read::loose_record_link::{self, LooseRecordLink};
+use crate::catalog_read::loose_record_link::{self, GuidRecordLookup, LooseRecordLink};
 use crate::catalog_read::original::{EntryCapture, PhysicalEntryIdentity};
 use crate::catalog_table::CatalogTable;
 use crate::export_ledger::ExportLedger;
@@ -35,27 +35,45 @@ pub(super) const FAMILY: DefinitionFamily = DefinitionFamily::new(
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct PlanetGeologyAsset {
-    identity: PhysicalEntryIdentity,
-    guid: SourcedValue<CatalogGuid>,
-    guid_raw: SourcedValue<String>,
-    geometry: GeologyGeometry,
-    placement: GeologyPlacement,
-    substrate: GeologySubstrate,
-    entity: LooseRecordLink,
-    references: GeologyReferences,
-    mineable_config_path: SourcedValue<String>,
-    mineable_material_path: SourcedValue<String>,
+#[non_exhaustive]
+pub struct PlanetGeologyAsset {
+    /// The physical Entry that owns this definition.
+    pub identity: PhysicalEntryIdentity,
+    /// The parsed geology asset GUID.
+    pub guid: SourcedValue<CatalogGuid>,
+    /// The original geology asset GUID text.
+    pub guid_raw: SourcedValue<String>,
+    /// Authored geometry selectors and settings.
+    pub geometry: GeologyGeometry,
+    /// Authored placement settings.
+    pub placement: GeologyPlacement,
+    /// Authored substrate settings.
+    pub substrate: GeologySubstrate,
+    /// The linked Entity class Record header candidates and resolution state.
+    pub entity: LooseRecordLink,
+    /// The directory lookups for the authored geometry and material paths.
+    pub references: GeologyReferences,
+    /// The original mineable configuration geometry path.
+    pub mineable_config_path: SourcedValue<String>,
+    /// The original mineable material path.
+    pub mineable_material_path: SourcedValue<String>,
     #[schemars(extend("x-gameText" = true))]
-    harvestable_model_tag: SourcedValue<String>,
-    resources_count: SourcedValue<DecimalU64>,
+    /// The authored harvestable model tag.
+    pub harvestable_model_tag: SourcedValue<String>,
+    /// The count of original resource declarations.
+    pub resources_count: SourcedValue<DecimalU64>,
     #[schemars(extend("x-gameText" = true))]
-    resources: SourcedValue<Vec<SourcedValue<String>>>,
+    /// The original resource tokens in physical slot order.
+    pub resources: SourcedValue<Vec<SourcedValue<String>>>,
     #[schemars(extend("x-gameText" = true))]
-    procedural_audio: SourcedValue<String>,
-    audio_offset: SourcedValue<Vec<SourcedValue<CatalogJsonNumber>>>,
-    additional_fields: Vec<RawPlanetAssetMember>,
-    issues: Vec<DefinitionIssue>,
+    /// The authored procedural audio selector.
+    pub procedural_audio: SourcedValue<String>,
+    /// The authored procedural audio offset.
+    pub audio_offset: SourcedValue<Vec<SourcedValue<CatalogJsonNumber>>>,
+    /// Additional unprojected original fields.
+    pub additional_fields: Vec<RawPlanetAssetMember>,
+    /// Source issues observed in this owner selection.
+    pub issues: Vec<DefinitionIssue>,
 }
 
 impl LooseDefinition for PlanetGeologyAsset {
@@ -69,26 +87,52 @@ impl LooseDefinition for PlanetGeologyAsset {
 
 pub(crate) fn read(
     archive: &Archive,
-    forge: &DataForge<'_>,
     original: &OriginalCatalogInput<'_, '_>,
     capture: &EntryCapture<'_>,
     ledger: &mut ExportLedger,
     options: &CatalogOptions<'_>,
 ) -> Result<CatalogTable<PlanetGeologyAsset>, CatalogError> {
+    read_selected(
+        archive,
+        capture,
+        ledger,
+        options,
+        Selection::All,
+        &mut |guid, selector, expected| {
+            loose_record_link::resolve_guid(
+                guid,
+                selector,
+                original,
+                expected,
+                options.filter,
+                options.cancel,
+            )
+        },
+    )
+}
+
+pub(crate) fn read_selected(
+    archive: &Archive,
+    capture: &EntryCapture<'_>,
+    ledger: &mut ExportLedger,
+    options: &CatalogOptions<'_>,
+    selection: Selection<'_>,
+    lookup: &mut GuidRecordLookup<'_>,
+) -> Result<CatalogTable<PlanetGeologyAsset>, CatalogError> {
     let mut resolver = Resolver::new(archive, capture, options.cancel);
-    loose_definition::read(
+    loose_definition::read_selected(
         archive,
         capture,
         ledger,
         options,
         FAMILY,
+        selection,
         |identity, object| {
             project(
                 identity,
                 &object.retaining_unprojected(),
-                forge,
-                original,
-                options,
+                capture.source_uses(),
+                lookup,
                 &mut resolver,
             )
         },
@@ -98,20 +142,18 @@ pub(crate) fn read(
 fn project(
     identity: PhysicalEntryIdentity,
     object: &EntryJsonObject<'_, '_>,
-    forge: &DataForge<'_>,
-    original: &OriginalCatalogInput<'_, '_>,
-    options: &CatalogOptions<'_>,
+    sources: &SourceUses,
+    lookup: &mut GuidRecordLookup<'_>,
     resolver: &mut Resolver<'_, '_, '_>,
 ) -> Result<PlanetGeologyAsset, CatalogError> {
     let guid = object.field("GUID", entry_json_object::guid)?;
     let geometry = GeologyGeometry::read(object)?;
-    let entity = loose_record_link::by_guid(
-        forge,
-        original,
-        options,
+    let entity = loose_record_link::by_guid_using(
+        sources,
         &geometry.entity_class,
         &geometry.entity_class_raw,
         "EntityClassDefinition",
+        lookup,
     )?;
     let mut issues = declaration_issues(&guid, &entity);
     let mineable_config_path = object.field("Mineable_cfg_path", entry_json_object::text)?;

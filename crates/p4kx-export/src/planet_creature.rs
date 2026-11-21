@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, DataForge, SourceValueState, SourcedValue};
+use p4kx_extraction::{Archive, SourceUses, SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -9,9 +9,9 @@ use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::catalog_json_number::CatalogJsonNumber;
 use crate::catalog_read::entry_json_object::{self, EntryJsonObject};
 use crate::catalog_read::loose_definition::{
-    self, DefinitionFamily, DefinitionIssue, LooseDefinition,
+    self, DefinitionFamily, DefinitionIssue, LooseDefinition, Selection,
 };
-use crate::catalog_read::loose_record_link::{self, LooseRecordLink};
+use crate::catalog_read::loose_record_link::{self, GuidRecordLookup, LooseRecordLink};
 use crate::catalog_read::original::{EntryCapture, PhysicalEntryIdentity};
 use crate::catalog_table::CatalogTable;
 use crate::export_diagnostic::ExportDiagnosticCode;
@@ -35,16 +35,26 @@ pub(crate) type PlanetCreatureTable = CatalogTable<PlanetCreature>;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct PlanetCreature {
-    identity: PhysicalEntryIdentity,
-    guid: SourcedValue<CatalogGuid>,
-    guid_raw: SourcedValue<String>,
-    entity_class: SourcedValue<CatalogGuid>,
-    entity_class_raw: SourcedValue<String>,
-    entity: LooseRecordLink,
-    need_vertical_offset: SourcedValue<bool>,
-    slope_tolerance: SourcedValue<CatalogJsonNumber>,
-    issues: Vec<DefinitionIssue>,
+#[non_exhaustive]
+pub struct PlanetCreature {
+    /// The physical Entry that owns this definition.
+    pub identity: PhysicalEntryIdentity,
+    /// The parsed creature GUID.
+    pub guid: SourcedValue<CatalogGuid>,
+    /// The original creature GUID text.
+    pub guid_raw: SourcedValue<String>,
+    /// The authored Entity class GUID.
+    pub entity_class: SourcedValue<CatalogGuid>,
+    /// The original Entity class GUID text.
+    pub entity_class_raw: SourcedValue<String>,
+    /// The linked physical Record header candidates and resolution state.
+    pub entity: LooseRecordLink,
+    /// The authored vertical offset flag.
+    pub need_vertical_offset: SourcedValue<bool>,
+    /// The authored slope tolerance with its original numeric spelling.
+    pub slope_tolerance: SourcedValue<CatalogJsonNumber>,
+    /// Source issues observed in this owner selection.
+    pub issues: Vec<DefinitionIssue>,
 }
 
 impl LooseDefinition for PlanetCreature {
@@ -59,28 +69,54 @@ impl LooseDefinition for PlanetCreature {
 
 pub(crate) fn read(
     archive: &Archive,
-    forge: &DataForge<'_>,
     original: &OriginalCatalogInput<'_, '_>,
     capture: &EntryCapture<'_>,
     ledger: &mut ExportLedger,
     options: &CatalogOptions<'_>,
 ) -> Result<PlanetCreatureTable, CatalogError> {
-    loose_definition::read(
+    read_selected(
+        archive,
+        capture,
+        ledger,
+        options,
+        Selection::All,
+        &mut |guid, selector, expected| {
+            loose_record_link::resolve_guid(
+                guid,
+                selector,
+                original,
+                expected,
+                options.filter,
+                options.cancel,
+            )
+        },
+    )
+}
+
+pub(crate) fn read_selected(
+    archive: &Archive,
+    capture: &EntryCapture<'_>,
+    ledger: &mut ExportLedger,
+    options: &CatalogOptions<'_>,
+    selection: Selection<'_>,
+    lookup: &mut GuidRecordLookup<'_>,
+) -> Result<PlanetCreatureTable, CatalogError> {
+    loose_definition::read_selected(
         archive,
         capture,
         ledger,
         options,
         FAMILY,
-        |identity, object| project(identity, object, forge, original, options),
+        selection,
+        |identity, object| project(identity, object, capture.source_uses(), lookup),
     )
 }
 
 fn project(
     identity: PhysicalEntryIdentity,
     object: &EntryJsonObject<'_, '_>,
-    forge: &DataForge<'_>,
-    original: &OriginalCatalogInput<'_, '_>,
-    options: &CatalogOptions<'_>,
+    sources: &SourceUses,
+    lookup: &mut GuidRecordLookup<'_>,
 ) -> Result<PlanetCreature, CatalogError> {
     let guid = object.field("guid", entry_json_object::guid)?;
     let guid_raw = object.field("guid", entry_json_object::text)?;
@@ -88,13 +124,12 @@ fn project(
     let entity_class_raw = object.field("entityClass", entry_json_object::text)?;
     let need_vertical_offset = object.field("needVerticalOffset", entry_json_object::boolean)?;
     let slope_tolerance = object.field("slopeTolerance", entry_json_object::number)?;
-    let entity = loose_record_link::by_guid(
-        forge,
-        original,
-        options,
+    let entity = loose_record_link::by_guid_using(
+        sources,
         &entity_class,
         &entity_class_raw,
         ENTITY,
+        lookup,
     )?;
     let mut issues: Vec<_> = loose_definition::identity_issue("guid", &guid)
         .into_iter()

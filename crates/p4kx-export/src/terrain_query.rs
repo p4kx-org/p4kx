@@ -5,6 +5,11 @@
 
 use p4kx_extraction::{Archive, CancelToken};
 
+pub use super::geology_asset_query::{
+    GeologyAssetSnapshot, GeologyGeometry, GeologyPlacement, GeologyReferences, GeologySubstrate,
+    LooseRecordCandidate, LooseRecordLink, PlanetGeologyAsset, SunShadowMode, read_geology_assets,
+    read_geology_assets_from,
+};
 use super::loose_definitions::{self, LooseDefinitionSnapshot};
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_read::loose_archive_path::Resolver;

@@ -2,19 +2,18 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    CancelToken, DataForge, Filter, Guid, Record, SourceUses, SourceValue, SourceValueState,
-    SourcedValue,
+    CancelToken, Filter, Guid, Record, SourceUses, SourceValue, SourceValueState, SourcedValue,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::loose_archive_path::LooseArchivePathState;
 use crate::catalog_read::parsed_entry_json;
 use crate::guid_text::CatalogGuid;
 use crate::record_header_field::RecordHeaderField;
 use crate::schema_fields::every_field_required;
-use crate::{CatalogError, CatalogOptions};
 
 /// Resolution of an authored loose JSON reference against original Record headers.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -82,32 +81,6 @@ impl LooseRecordLink {
 
 pub(crate) type GuidRecordLookup<'query> = dyn FnMut(Guid, &SourcedValue<CatalogGuid>, &str) -> Result<LooseRecordLink, CatalogError>
     + 'query;
-
-pub(crate) fn by_guid(
-    forge: &DataForge<'_>,
-    original: &OriginalCatalogInput<'_, '_>,
-    options: &CatalogOptions<'_>,
-    selector: &SourcedValue<CatalogGuid>,
-    raw: &SourcedValue<String>,
-    expected_type: &str,
-) -> Result<LooseRecordLink, CatalogError> {
-    by_guid_using(
-        &original.origins().uses,
-        selector,
-        raw,
-        expected_type,
-        &mut |guid, selector, expected_type| {
-            resolve(
-                selector,
-                original,
-                forge.records_by_guid(guid),
-                expected_type,
-                options.filter,
-                options.cancel,
-            )
-        },
-    )
-}
 
 pub(crate) fn by_guid_using(
     sources: &SourceUses,

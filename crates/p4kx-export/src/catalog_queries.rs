@@ -120,6 +120,8 @@ pub mod localization;
 #[path = "shop_inventory_query.rs"]
 pub mod shops;
 
+#[path = "guid_linked_definition_read.rs"]
+mod guid_linked_definition_read;
 #[path = "lazy_loose_records.rs"]
 mod lazy_loose_records;
 #[path = "loose_definition_query.rs"]
@@ -130,6 +132,10 @@ pub use loose_definitions::LooseDefinitionSnapshot;
 #[path = "soil_query.rs"]
 pub mod soils;
 
+#[path = "planet_creature_query.rs"]
+pub mod creatures;
+#[path = "planet_geology_asset_query.rs"]
+mod geology_asset_query;
 #[path = "terrain_query.rs"]
 pub mod terrain;
 

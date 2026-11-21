@@ -76,11 +76,9 @@ pub(crate) fn read(
         planet_resources: planet_resource::read(
             archive, forge, original, capture, ledger, options,
         )?,
-        creatures: planet_creature::read(archive, forge, original, capture, ledger, options)?,
+        creatures: planet_creature::read(archive, original, capture, ledger, options)?,
         climate_assets: planet_climate_asset::read(archive, original, capture, ledger, options)?,
-        geology_assets: planet_geology_asset::read(
-            archive, forge, original, capture, ledger, options,
-        )?,
+        geology_assets: planet_geology_asset::read(archive, original, capture, ledger, options)?,
         ecosystems: ecosystem::read(archive, capture, ledger, options, &mut paths)?,
         geology_sets: geology_set::read(archive, capture, ledger, options)?,
         geology_texture_sets: geology_texture_set::read(

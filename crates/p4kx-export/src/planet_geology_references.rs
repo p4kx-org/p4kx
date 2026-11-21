@@ -12,11 +12,16 @@ use crate::schema_fields::every_field_required;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct GeologyReferences {
-    pub(super) geometry: LooseArchivePath,
-    pub(super) material: LooseArchivePath,
-    pub(super) mineable_config: LooseArchivePath,
-    pub(super) mineable_material: LooseArchivePath,
+#[non_exhaustive]
+pub struct GeologyReferences {
+    /// The authored geometry path lookup.
+    pub geometry: LooseArchivePath,
+    /// The authored material path lookup.
+    pub material: LooseArchivePath,
+    /// The authored mineable configuration geometry lookup.
+    pub mineable_config: LooseArchivePath,
+    /// The authored mineable material lookup.
+    pub mineable_material: LooseArchivePath,
 }
 
 pub(super) fn geometry(entry: &Entry) -> bool {

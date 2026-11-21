@@ -98,6 +98,8 @@ mod mission_location;
 mod mission_type;
 #[path = "sdk_npc_spawn_definition_routes.rs"]
 mod npc_spawns;
+#[path = "sdk_planet_asset_routes.rs"]
+mod planet_assets;
 #[path = "sdk_planet_resource_route.rs"]
 mod planet_resource;
 #[path = "sdk_projectile_ammo_route.rs"]
@@ -172,6 +174,7 @@ pub(super) fn world_datasets() -> impl Iterator<Item = &'static str> {
         .chain(soils::DATASETS)
         .chain(terrain::DATASETS)
         .chain([climate_assets::DATASET])
+        .chain(planet_assets::DATASETS)
 }
 
 pub(super) fn read() -> TestResult<Vec<Route>> {
@@ -253,6 +256,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.push(mineable_entity::read()?);
     routes.extend(mining_families::read()?);
     routes.push(planet_resource::read()?);
+    routes.extend(planet_assets::read()?);
     routes.push(climate_assets::read()?);
     routes.extend(component_tools::read()?);
     routes.extend(authored_reputation::read()?);

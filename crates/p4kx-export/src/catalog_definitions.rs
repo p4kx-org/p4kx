@@ -66,11 +66,11 @@ pub(crate) mod planet_climate_subasset;
 #[path = "planet_creature.rs"]
 pub(crate) mod planet_creature;
 #[path = "planet_geology_asset.rs"]
-mod planet_geology_asset;
+pub(crate) mod planet_geology_asset;
 #[path = "planet_geology_properties.rs"]
-mod planet_geology_properties;
+pub(crate) mod planet_geology_properties;
 #[path = "planet_geology_references.rs"]
-mod planet_geology_references;
+pub(crate) mod planet_geology_references;
 #[path = "planet_palette_reference.rs"]
 mod planet_palette_reference;
 #[path = "planet_resource.rs"]

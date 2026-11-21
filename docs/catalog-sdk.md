@@ -168,6 +168,20 @@ Applications that already have a query session can reuse its parsed DataForge.
 Geometry, material and audio fields retain their authored values. Media payloads
 stay unopened.
 
+## Original geology assets and creatures
+
+`catalog_queries::terrain::read_geology_assets` and
+`catalog_queries::creatures::read_creatures` expose
+`/definitions/geologyAssets` and `/definitions/creatures` by GUID, Archive path,
+physical Entry index or all owners. Both share the canonical Catalog projection
+and return the original per-field evidence for the selected rows.
+
+Entity class references use original DataForge Record headers. The standalone
+queries open DataForge when a selected owner declares a valid nonzero Entity
+class GUID. Query sessions can reuse a parsed DataForge. Geology asset references
+use Archive directory lookups for geometry, material and mineable paths. The
+queries leave models, materials, textures and audio payloads unopened.
+
 ## Radar audio configuration
 
 Use `catalog_queries::radar_audio::read_radar_audio` to read original rows from
