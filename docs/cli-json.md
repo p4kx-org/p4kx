@@ -748,6 +748,15 @@ library holds that one), `objects_left_out`, `attached`, `too_many_issues` (more
 objects) and `too_many_visits` (more than 4194304 objects looked at). A library or prefab the
 Archive lacks is exit code 2, a library that cannot be read 3; issues leave the exit code 0.
 
+When an instance authors `GUIDRemapping` blocks, `guid_remappings` lists those occurrences
+in visit order, including instances that could not be expanded. `instance_path` holds the
+zero-based flattened object ordinal in each successive Prefab from the root. Two placements
+with the same name have different paths. `target`, when present, gives the entered library
+file and zero-based Prefab index. `blocks` holds the ordered lists of authored pairs. Each pair
+contains the original `default_guid` and `instance_guid` text, or null when the corresponding
+attribute is absent. Empty blocks, duplicate pairs, and invalid GUID text remain visible.
+The regular object list continues to report original IDs.
+
 The dump includes `fieldOrigins` and `provenance`. Origin keys are JSON Pointers from the
 document root. They cover the selected library, prefab, collections, object fields and
 resolution issues. Source uses retain the original XML or CryXml positions and the physical

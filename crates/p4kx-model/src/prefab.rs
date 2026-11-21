@@ -9,6 +9,7 @@ use thiserror::Error;
 use crate::Transform;
 use crate::mtl_xml::XmlElement;
 use crate::prefab_diagnostic::PrefabParseFailure;
+use crate::prefab_guid_remapping::PrefabGuidRemapping;
 use crate::prefab_objects;
 use crate::prefab_source::{PositionedPrefabLibrary, PrefabLibrarySource, PrefabSource};
 
@@ -59,6 +60,8 @@ pub struct PrefabRef {
     /// The `PrefabName`: the library name and the prefab name joined by `.`, e.g.
     /// `pu/derelict/components.visual.flare`; empty when it names none.
     pub name: String,
+    /// Authored `GUIDRemapping` blocks and their pairs in file order.
+    pub guid_remapping_blocks: Vec<Vec<PrefabGuidRemapping>>,
 }
 
 /// An object of a prefab, placed in the prefab's space.

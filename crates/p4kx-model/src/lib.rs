@@ -129,6 +129,7 @@ mod physics_trimesh;
 mod positioned_animation;
 mod prefab;
 mod prefab_diagnostic;
+mod prefab_guid_remapping;
 mod prefab_object_source;
 mod prefab_objects;
 mod prefab_source;
@@ -263,6 +264,9 @@ pub use prefab::{
     PrefabObject, PrefabParseMode, PrefabRef,
 };
 pub use prefab_diagnostic::{PrefabDiagnostic, PrefabParseFailure};
+pub use prefab_guid_remapping::{
+    PrefabGuidRemapping, PrefabGuidRemappingBlockSource, PrefabGuidRemappingSource,
+};
 pub use prefab_object_source::{
     PrefabAttachmentSource, PrefabAttributeObservation, PrefabModelSource, PrefabObjectSource,
     PrefabReferenceSource, PrefabResourceChild, PrefabResourceEnd, PrefabTransformAncestor,

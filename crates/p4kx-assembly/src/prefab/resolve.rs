@@ -1,18 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::hash_map::Entry;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use p4kx_model::{PrefabRef, Transform};
 
+use super::capture::{Capture, ObjectKey};
 use super::resolution_source::OwnedPrefabLocation;
 use super::set::Lookup;
 use super::{
     MAX_PREFAB_DEPTH, MAX_PREFAB_ISSUES, MAX_PREFAB_OBJECTS, MAX_PREFAB_VISITS, PrefabError,
-    PrefabFile, PrefabInstanceSource, PrefabIssue, PrefabIssueKind, PrefabIssueSource,
-    PrefabLinkSource, PrefabResolutionSource, PrefabSelectionSource, PrefabSet, ResolvedObject,
+    PrefabFile, PrefabGuidRemappingInstance, PrefabInstanceSource, PrefabIssue, PrefabIssueKind,
+    PrefabIssueSource, PrefabLinkSource, PrefabSelectionSource, PrefabSet, ResolvedObject,
     ResolvedPrefab,
 };
 
@@ -42,6 +42,8 @@ impl PrefabSet<'_> {
             capture,
             objects: Vec::new(),
             issues: Vec::new(),
+            instance_path: Vec::new(),
+            guid_remapping_instances: Vec::new(),
             visits: 0,
             prefabs: 0,
             stack: Vec::new(),
@@ -70,43 +72,8 @@ impl PrefabSet<'_> {
             prefabs: walk.prefabs,
             issues: walk.issues,
             source: walk.capture.map(|capture| capture.source),
+            guid_remapping_instances: walk.guid_remapping_instances,
         })
-    }
-}
-
-type ObjectKey = (usize, usize, usize);
-
-struct Capture {
-    source: PrefabResolutionSource,
-    selections: HashMap<ObjectKey, Arc<PrefabSelectionSource>>,
-}
-
-impl Capture {
-    fn new(file: &Arc<PrefabFile>, prefab_index: usize) -> Self {
-        Self {
-            source: PrefabResolutionSource {
-                root: OwnedPrefabLocation {
-                    file: Arc::clone(file),
-                    prefab_index,
-                },
-                entered: Vec::new(),
-                issues: Vec::new(),
-            },
-            selections: HashMap::new(),
-        }
-    }
-
-    fn record_entered(&mut self, route: &PrefabInstanceSource) {
-        let selection = &route.selection;
-        let key = (
-            selection.owner.file.slot(),
-            selection.owner.prefab_index,
-            selection.object_index,
-        );
-        if let Entry::Vacant(entry) = self.selections.entry(key) {
-            entry.insert(Arc::clone(selection));
-            self.source.entered.push(Arc::clone(selection));
-        }
     }
 }
 
@@ -141,6 +108,8 @@ struct Walk<'s, 'a> {
     capture: Option<Capture>,
     objects: Vec<ResolvedObject>,
     issues: Vec<PrefabIssue>,
+    instance_path: Vec<usize>,
+    guid_remapping_instances: Vec<PrefabGuidRemappingInstance>,
     visits: usize,
     prefabs: usize,
     stack: Vec<(usize, usize)>,
@@ -239,6 +208,7 @@ impl Walk<'_, '_> {
                 Some(reference) => self.nested(visit, at, &object.name, reference)?,
                 None => NestedDecision::default(),
             };
+            self.record_remapping(visit, at, object.nested.as_ref(), &nested);
             match nested.target {
                 Some((inner, target)) => {
                     let path: Arc<str> = if visit.container.is_empty() {
@@ -253,13 +223,42 @@ impl Walk<'_, '_> {
                         container: &path,
                         route: route.as_ref(),
                     };
+                    self.instance_path.push(at);
                     self.expand(&child, placed)?;
+                    self.instance_path.pop();
                 }
                 None => self.push(visit, at, placed, nested.source),
             }
         }
         self.stack.pop();
         Ok(())
+    }
+
+    fn record_remapping(
+        &mut self,
+        visit: &Visit<'_>,
+        at: usize,
+        reference: Option<&PrefabRef>,
+        nested: &NestedDecision,
+    ) {
+        if reference.is_some_and(|reference| !reference.guid_remapping_blocks.is_empty()) {
+            let mut path = self.instance_path.clone();
+            path.push(at);
+            self.guid_remapping_instances
+                .push(PrefabGuidRemappingInstance {
+                    path,
+                    owner: visit.owner(),
+                    object_index: at,
+                    entered_target: nested.target.as_ref().map(|(file, index)| {
+                        OwnedPrefabLocation {
+                            file: Arc::clone(file),
+                            prefab_index: *index,
+                        }
+                    }),
+                    route: visit.route.cloned(),
+                    lookup: nested.source.clone(),
+                });
+        }
     }
 
     fn instance(

@@ -6,8 +6,8 @@ use std::sync::Arc;
 use p4kx_model::{PrefabObject, PrefabRef, Transform};
 
 use super::{
-    PrefabFile, PrefabInstanceSource, PrefabIssue, PrefabLinkSource, PrefabLocation,
-    PrefabObjectLocation, PrefabResolutionSource,
+    PrefabFile, PrefabGuidRemappingInstance, PrefabInstanceSource, PrefabIssue, PrefabLinkSource,
+    PrefabLocation, PrefabObjectLocation, PrefabResolutionSource,
 };
 
 /// An object of a resolved prefab with its transform to the resolved prefab's space.
@@ -164,9 +164,16 @@ pub struct ResolvedPrefab {
     /// What could not be resolved.
     pub issues: Vec<PrefabIssue>,
     pub(super) source: Option<PrefabResolutionSource>,
+    pub(super) guid_remapping_instances: Vec<PrefabGuidRemappingInstance>,
 }
 
 impl ResolvedPrefab {
+    /// Returns the distinct occurrences that author GUID remapping blocks.
+    #[must_use]
+    pub fn guid_remapping_instances(&self) -> &[PrefabGuidRemappingInstance] {
+        &self.guid_remapping_instances
+    }
+
     /// Returns original resolution evidence when the set was created with object sources.
     #[must_use]
     pub const fn source(&self) -> Option<&PrefabResolutionSource> {

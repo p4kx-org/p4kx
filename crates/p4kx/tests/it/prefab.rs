@@ -11,6 +11,8 @@ use serde_json::Value;
 
 #[path = "prefab_dump_origins.rs"]
 mod dump_origins;
+#[path = "prefab_guid_remapping.rs"]
+mod guid_remapping;
 
 type TestResult = Result<(), Box<dyn Error>>;
 

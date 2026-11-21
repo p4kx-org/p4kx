@@ -6,6 +6,7 @@ use std::sync::Arc;
 use p4kx_cryxml::{SourceAttributePosition, SourceElementPosition};
 
 use crate::mtl_xml::XmlElement;
+use crate::prefab_guid_remapping::PrefabGuidRemappingBlockSource;
 
 /// Original transform operands of one Prefab object or its parent.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -113,6 +114,8 @@ pub struct PrefabReferenceSource {
     pub name: Option<SourceAttributePosition>,
     /// The object's `PrefabGUID` when authored.
     pub guid: Option<SourceAttributePosition>,
+    /// Original blocks and pair positions matching the parsed remapping values.
+    pub guid_remapping_blocks: Vec<PrefabGuidRemappingBlockSource>,
 }
 
 /// An attribute observed while evaluating a selector.

@@ -4,6 +4,7 @@
 use std::sync::Arc;
 
 use crate::mtl_xml::XmlElement;
+use crate::prefab_guid_remapping;
 use crate::soc_entities::entity_transform;
 use crate::{
     MAX_GROUP_DEPTH, MAX_LIBRARY_OBJECTS, Prefab, PrefabAttachmentSource,
@@ -165,9 +166,14 @@ fn read_object<'a, E: XmlElement<'a>>(
     sources: Option<&mut Vec<PrefabObjectSource>>,
 ) -> PrefabObject {
     let element = pending.element;
+    let mut remapping_sources = Vec::new();
     let nested = kind.eq_ignore_ascii_case("Prefab").then(|| PrefabRef {
         guid: attribute(element, "PrefabGUID"),
         name: attribute(element, "PrefabName"),
+        guid_remapping_blocks: prefab_guid_remapping::read(
+            element,
+            sources.is_some().then_some(&mut remapping_sources),
+        ),
     });
     let parent = attribute_text(element, "Parent");
     let outside_group = !parent.is_empty() && !parent.eq_ignore_ascii_case(&pending.group_id);
@@ -183,6 +189,7 @@ fn read_object<'a, E: XmlElement<'a>>(
             reference: nested.as_ref().map(|_| PrefabReferenceSource {
                 name: element.attribute_position("PrefabName"),
                 guid: element.attribute_position("PrefabGUID"),
+                guid_remapping_blocks: remapping_sources,
             }),
             attachment: PrefabAttachmentSource {
                 parent: element.attribute_position("Parent"),

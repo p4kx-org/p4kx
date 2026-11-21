@@ -299,10 +299,10 @@ pub use port_sub_helper::PortSubHelper;
 pub use positioned_loadout::{PositionedLoadout, PositionedLoadoutNode};
 pub use prefab::{
     MAX_PREFAB_DEPTH, MAX_PREFAB_ISSUES, MAX_PREFAB_LIBRARY_LEN, MAX_PREFAB_OBJECTS,
-    MAX_PREFAB_VISITS, PrefabError, PrefabFile, PrefabInstanceSource, PrefabIssue, PrefabIssueKind,
-    PrefabIssueSource, PrefabLinkSource, PrefabLocation, PrefabLookupRoute, PrefabObjectLocation,
-    PrefabResolutionSource, PrefabSelectionSource, PrefabSet, PrefabUnreadableEvidence,
-    PrefabUnreadableSource, ResolvedObject, ResolvedPrefab,
+    MAX_PREFAB_VISITS, PrefabError, PrefabFile, PrefabGuidRemappingInstance, PrefabInstanceSource,
+    PrefabIssue, PrefabIssueKind, PrefabIssueSource, PrefabLinkSource, PrefabLocation,
+    PrefabLookupRoute, PrefabObjectLocation, PrefabResolutionSource, PrefabSelectionSource,
+    PrefabSet, PrefabUnreadableEvidence, PrefabUnreadableSource, ResolvedObject, ResolvedPrefab,
 };
 pub use provider::{
     ArchiveModels, ModelFailure, ModelProvider, ProvidedAttachment, ProvidedModel,

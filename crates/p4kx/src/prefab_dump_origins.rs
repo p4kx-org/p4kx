@@ -5,6 +5,8 @@
 mod issue;
 #[path = "prefab_dump_origins/object.rs"]
 mod object;
+#[path = "prefab_dump_origins/remapping.rs"]
+mod remapping;
 #[path = "prefab_dump_origins/route.rs"]
 mod route;
 #[path = "prefab_dump_origins/sites.rs"]
@@ -56,6 +58,7 @@ pub(super) fn collect<'archive>(
     )?;
     sites.put(&mut fields, "/name", &name)?;
     let mut diagnostics = collections(&mut sites, &mut fields, source, resolved)?;
+    remapping::collect(&mut sites, &mut fields, resolved)?;
     for (index, resolved) in resolved.objects.iter().enumerate() {
         object::collect(&mut sites, &mut fields, index, resolved)?;
     }

@@ -16,6 +16,8 @@ use crate::query_table::one_line;
 mod dump_origins;
 #[path = "prefab_origins.rs"]
 mod origins;
+#[path = "prefab_remapping_json.rs"]
+mod remapping_json;
 
 #[derive(Serialize)]
 struct LibrariesJson<'a> {
@@ -108,6 +110,8 @@ struct DumpJson<'a> {
     name: &'a str,
     prefabs_entered: usize,
     objects: Vec<ObjectJson<'a>>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    guid_remappings: Vec<remapping_json::InstanceJson<'a>>,
     issues: Vec<IssueJson<'a>>,
     #[serde(flatten)]
     origins: origins::Origins,
@@ -243,6 +247,7 @@ fn dump_command(args: &PrefabDumpArgs, as_json: bool) -> Result<()> {
             name: &resolved.name,
             prefabs_entered: resolved.prefabs,
             objects: resolved.objects.iter().map(ObjectJson::from).collect(),
+            guid_remappings: remapping_json::rows(&resolved),
             issues: resolved.issues.iter().map(IssueJson::from).collect(),
             origins: dump_origins::collect(&archive, &set, &resolved)?,
         })?;
