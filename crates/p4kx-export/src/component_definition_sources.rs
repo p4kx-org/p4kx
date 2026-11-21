@@ -3,6 +3,9 @@
 
 use p4kx_extraction::{CancelToken, DataForge, RecordTree};
 
+use super::catalog_independent_configurations::electrical_behavior::{
+    ElectricalBehavior, SOURCE_TYPE as ELECTRICAL_BEHAVIOR,
+};
 use super::catalog_independent_configurations::{
     CONSUMABLE_SUBTYPE, CONSUMABLE_TYPE, ConsumableSubtype, ConsumableType,
     DAMAGE_RESISTANCE_MACRO, DamageResistanceMacro, HEALTH_MODIFIER, MINING_LASER_GLOBAL,
@@ -66,6 +69,12 @@ macro_rules! direct_definition {
     };
 }
 
+direct_definition!(
+    ElectricalBehaviors,
+    ElectricalBehavior,
+    ELECTRICAL_BEHAVIOR,
+    ElectricalBehavior
+);
 direct_definition!(
     ArmorMacros,
     DamageResistanceMacro,

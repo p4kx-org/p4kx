@@ -31,6 +31,7 @@ pub(crate) enum ConfigurationInspection {
     FuelIntake,
     ResourceContainer,
     RadarOptions,
+    ElectricalBehavior,
     LootGeneration,
     JumpDriveDefinition,
     JumpPoint,

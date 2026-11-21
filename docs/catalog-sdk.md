@@ -182,6 +182,14 @@ class GUID. Query sessions can reuse a parsed DataForge. Geology asset reference
 use Archive directory lookups for geometry, material and mineable paths. The
 queries leave models, materials, textures and audio payloads unopened.
 
+## Weather configurations
+
+Use `catalog_queries::weather::with_electrical_behaviors` for the canonical
+`configurations.electricalBehaviors` rows. Select all owners, an original GUID or a physical
+Record index. The query shares the catalog's source projection for lightning effects and
+their ordered target modes. Reuse a parsed session or an already decoded DataForge Entry
+for repeated lookups. [Weather configurations](catalog-weather.md)
+
 ## Radar audio configuration
 
 Use `catalog_queries::radar_audio::read_radar_audio` to read original rows from

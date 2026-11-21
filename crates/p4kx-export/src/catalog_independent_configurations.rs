@@ -32,6 +32,8 @@ use loot_generation_component::{KIND as LOOT_GENERATION, LootGenerationComponent
 
 #[path = "consumable_tables.rs"]
 pub(crate) mod consumables;
+#[path = "electrical_behavior.rs"]
+pub(crate) mod electrical_behavior;
 #[path = "catalog_entity_animation_controller.rs"]
 pub(crate) mod entity_animation_controller;
 #[path = "flight_configuration_tables.rs"]
@@ -61,6 +63,7 @@ pub use consumables::{ConsumableSubtype, ConsumableType};
 pub use super::authored_effect_resource::Rtpc;
 pub use super::catalog_durability::resistance::{DurabilityResistanceEntry, ResistanceSet};
 pub use consumables::{AuthoredList, ConsumableEffect, EffectParameters, GasMass, Override};
+use electrical_behavior::ElectricalBehavior;
 use flight_configuration_tables::FlightConfigurationTables;
 use hackable_configuration::HackableConfiguration;
 use jump_point::JumpPointConfiguration;
@@ -86,6 +89,7 @@ pub(crate) struct IndependentConfigurationTables<'source> {
     item_recovery_policy: CatalogTable<ItemRecoveryPolicy<'source>>,
     resource_network_parameters: CatalogTable<ResourceNetworkConfiguration<'source>>,
     radar_options: CatalogTable<RadarOptionsConfiguration<'source>>,
+    electrical_behaviors: CatalogTable<ElectricalBehavior<'source>>,
     mission_boards: CatalogTable<MissionBoard<'source>>,
     entity_animation_controllers: CatalogTable<EntityAnimationController<'source>>,
     loot_generation: CatalogTable<LootGenerationComponent<'source>>,
@@ -136,6 +140,7 @@ pub(crate) fn read<'source>(
         collected,
         numbers: &mut configuration_numbers,
     };
+    let electrical_behaviors = components.electrical_behaviors()?;
     let jump_drive_definitions = components.jump_definitions()?;
     let flight = FlightConfigurationTables::read(&mut components)?;
     let weapon_action_recoil_definitions = components.weapon_recoil()?;
@@ -159,6 +164,7 @@ pub(crate) fn read<'source>(
             item_recovery_policy: recovery.policy,
             resource_network_parameters: game_mode.resource_network_parameters,
             radar_options: game_mode.radar_options,
+            electrical_behaviors,
             mission_boards,
             entity_animation_controllers,
             loot_generation,
@@ -278,6 +284,7 @@ impl<'source> PhysicalComponents<'_, '_, 'source> {
         self.collected.add_failures(definitions.failures);
         definitions.rows.into_iter().map(|(_, row)| row).collect()
     }
+
     fn jump_points(
         &mut self,
         owners: &HashSet<u32>,

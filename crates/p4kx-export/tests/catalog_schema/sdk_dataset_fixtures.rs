@@ -115,7 +115,9 @@ fn fixture_database() -> DataForgeBuilder {
             .record(),
         )
         .record(commodities::fixture_record());
-    with_tag_declarations(with_starmap(with_faction_identity(database)))
+    with_electrical_behavior(with_tag_declarations(with_starmap(with_faction_identity(
+        database,
+    ))))
 }
 
 fn with_tag_declarations(database: DataForgeBuilder) -> DataForgeBuilder {
@@ -182,4 +184,15 @@ fn packed(
             .fold(container, TestContainer::entry)
             .build(),
     )
+}
+
+fn with_electrical_behavior(database: DataForgeBuilder) -> DataForgeBuilder {
+    database
+        .structure(TestStruct::new("ElectricalBehavior"))
+        .record(TestRecord::new(
+            13,
+            "ElectricalBehavior",
+            "ElectricalBehavior.Fixture",
+            "fixtures/electrical_behavior.xml",
+        ))
 }

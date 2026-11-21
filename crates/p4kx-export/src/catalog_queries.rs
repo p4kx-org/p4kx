@@ -144,6 +144,15 @@ pub mod terrain;
 #[path = "climate_asset_query.rs"]
 pub mod climate;
 
+/// Selective access to original weather-related configuration Records.
+pub mod weather {
+    pub use super::equipment::component_definitions::weather::{
+        ElectricalBehavior, ElectricalBehaviorSnapshot, InternalPlanetLightning, LightningBehavior,
+        LightningEffect, LightningRange, LightningTargetMode, LightningTargetPayload,
+        with_electrical_behaviors, with_electrical_behaviors_from,
+    };
+}
+
 #[path = "planet_resource_query.rs"]
 pub mod planet_resources;
 

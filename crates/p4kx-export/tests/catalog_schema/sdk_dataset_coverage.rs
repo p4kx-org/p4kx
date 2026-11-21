@@ -48,6 +48,7 @@ const FLARE_LIBRARIES: &str = "/definitions/flareLibraries";
 const SUBSUMPTION_EVENTS: &str = "/definitions/subsumptionEvents";
 const CLIENT_PROFILE_DOCUMENTS: &str = "/configurations/clientProfileSettings/documents";
 const RADAR_AUDIO: &str = "/configurations/radarAudio";
+const ELECTRICAL_BEHAVIORS: &str = "/configurations/electricalBehaviors";
 const AMMUNITION: &str = "/definitions/ammoDefinitions";
 const AMMO_BINDINGS: &str = "/declarations/ammoBindings";
 const AMMO_CONTAINERS: &str = "/configurations/ammoContainers";

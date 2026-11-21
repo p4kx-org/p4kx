@@ -126,3 +126,6 @@ definition_query!(
     ConsumableSubtypes, ConsumableSubtype, ConsumableSubtypeSnapshot, with_consumable_subtypes,
     with_consumable_subtypes_from, languages; languages
 );
+
+#[path = "weather_query.rs"]
+pub(in crate::build::catalog_queries) mod weather;

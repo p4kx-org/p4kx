@@ -5,14 +5,15 @@ use p4kx_export::catalog_queries::equipment::{
     with_ammo_definitions, with_weapon_recoil_definitions,
 };
 use p4kx_export::catalog_queries::faction_identities::with_faction_identities;
+use p4kx_export::catalog_queries::weather::with_electrical_behaviors;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
 };
 use p4kx_extraction::Archive;
 
 use super::{
-    AMMUNITION, FACTION_IDENTITIES, ITEM_DEFINITIONS, MANUFACTURERS, Route, TestResult,
-    WEAPON_RECOIL,
+    AMMUNITION, ELECTRICAL_BEHAVIORS, FACTION_IDENTITIES, ITEM_DEFINITIONS, MANUFACTURERS, Route,
+    TestResult, WEAPON_RECOIL,
 };
 
 #[path = "sdk_archive_entry_routes.rs"]
@@ -170,7 +171,7 @@ pub(super) fn world_datasets() -> impl Iterator<Item = &'static str> {
         .into_iter()
         .chain(soils::DATASETS)
         .chain(terrain::DATASETS)
-        .chain([climate_assets::DATASET])
+        .chain([climate_assets::DATASET, ELECTRICAL_BEHAVIORS])
         .chain(planet_assets::DATASETS)
 }
 
@@ -208,6 +209,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         faction_trigger_configuration::read()?,
         archive_entries::read_subsumption_event(&archive)?,
         archive_entries::read_radar_configuration(&archive)?,
+        read_weather(&archive)?,
         containers,
         location_instances,
         location_physics,
@@ -330,6 +332,16 @@ fn read_weapon_recoil(archive: &Archive) -> TestResult<Route> {
             WEAPON_RECOIL,
             snapshot.rows(),
             "physical definition selection available; installed and complete producer parity open",
+        )
+    })?
+}
+
+fn read_weather(archive: &Archive) -> TestResult<Route> {
+    with_electrical_behaviors(archive, CatalogRecordSelection::All, None, |snapshot| {
+        Route::queried_rows(
+            ELECTRICAL_BEHAVIORS,
+            snapshot.rows(),
+            "synthetic canonical parity available; complete installed producer parity open",
         )
     })?
 }

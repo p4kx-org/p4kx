@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::SourcedValue;
+use p4kx_extraction::{SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -11,7 +11,10 @@ use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 
-/// The two authored endpoints of a projectile range.
+const MINIMUM: &str = "minimum";
+const MAXIMUM: &str = "maximum";
+
+/// The two authored Single endpoints of a Range.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
@@ -26,8 +29,23 @@ impl ProjectileRange {
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
         Ok(Self {
-            minimum: source.single("minimum", notes)?,
-            maximum: source.single("maximum", notes)?,
+            minimum: source.single(MINIMUM, notes)?,
+            maximum: source.single(MAXIMUM, notes)?,
         })
+    }
+
+    pub(super) const fn minimum(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.minimum
+    }
+
+    pub(super) const fn maximum(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.maximum
+    }
+
+    pub(super) const fn projected(&self) -> [(&'static str, SourceValueState); 2] {
+        [
+            (MINIMUM, self.minimum.state()),
+            (MAXIMUM, self.maximum.state()),
+        ]
     }
 }

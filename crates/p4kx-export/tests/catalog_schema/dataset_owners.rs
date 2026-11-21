@@ -181,6 +181,7 @@ const GROUPS: &[Group] = &[
             "degradation",
             "distortion",
             "durability",
+            "electricalBehaviors",
             "emp",
             "entityAnimationControllers",
             "explosives",

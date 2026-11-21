@@ -215,6 +215,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.particleLibraries` | Original particle-library XML Entries, ordered elements and attributes, and typed `RainOcclusion` ([contract](catalog-particle-libraries.md)) |
 | `definitions.flareLibraries` | Physical lens flare libraries, ordered effect elements, typed parameters and directory-only texture links with per-value provenance ([contract](catalog-flare-libraries.md)) |
 | `configurations.radarAudio` | Authored radar audio XML with physical identity, typed fields and original sound event tokens. [Radar audio](catalog-radar-audio.md) |
+| `configurations.electricalBehaviors` | Original electrical behaviour Records with ordered lightning effects and target modes. [Weather configurations](catalog-weather.md) |
 | `definitions.manufacturers` | Source-family availability and directly sourced Manufacturer rows in GUID order, including typed Localization and canonical text references ([contract](catalog-manufacturer-types.md)) |
 | `items` | The items, ordered by GUID |
 | `ships` | The ships and ground vehicles, ordered by GUID |

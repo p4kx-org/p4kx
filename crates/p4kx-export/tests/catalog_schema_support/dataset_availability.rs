@@ -60,6 +60,7 @@ pub(super) fn add_defaults(catalog: &mut Value) {
         for name in [
             "radarAudio",
             "radarOptions",
+            "electricalBehaviors",
             "flightControllers",
             "ifcs",
             "thrusters",
