@@ -171,7 +171,9 @@ never held in memory; it is serialised twice, the first time only to count its l
 uses long-distance matching, carries a content checksum and declares its exact decoded size
 (`Frame_Content_Size`). The default compression level is 19. Use `--zstd-level <level>` with a
 `.zst` filename to select a level from 1 to 22. Lower levels can encode faster and produce larger
-files. An explicit level with plain JSON output is invalid. The encoding caps the compression
+files. Use `--zstd-level 3` to reproduce the full export profiles in the
+[catalog size investigation](catalog-partitioning.md#complete-live-and-ptu-measurements).
+An explicit level with plain JSON output is invalid. The encoding caps the compression
 window at 2^27 bytes. Plain
 `zstd -d p4kx-catalog.json.zst` decodes the frame. The decoded
 bytes are exactly the plain catalog for the same Archive and export time (tests check this with the
@@ -3153,7 +3155,9 @@ plain build then took 2.1 s):
 | 17 | 1,807,476 | 14.7 | about 7.0 s |
 | 19 | 1,700,181 | 15.6 | about 12.7 s |
 
-Level 19 stays: 12.7 s is acceptable and it saves 15 % over level 15.
+On that historical sample, level 19 took about 12.7 seconds and used 15 % fewer bytes than
+level 15. See the [full export measurements](catalog-partitioning.md#complete-live-and-ptu-measurements)
+for current runtime and storage costs.
 
 Of the 26.5 MB of LIVE, the paints take 0.5 MB (the ship lists), the blueprints take 5.5 MB (4.4 MB more than before: the `tiers` repeat
 the cost tree, every line with its null fields), the pools 0.43 MB (824 entries, 1,039 reward
