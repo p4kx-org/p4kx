@@ -135,12 +135,11 @@ impl Branch<'_, '_> {
     fn check_status(&self, row: &Value, option: &OptionRow<'_, '_>) -> TestResult {
         assert!(
             text(row, "/tagEvidence/value")? == "sharedDeclaration"
-                && text(row, "/playback/value")? == "unverified"
+                && text(row, "/playback")? == "unverified"
                 && row.get("reloadDuration").is_none(),
             "scope evidence keeps playback explicitly unverified",
         );
         self.inventory.closure(&row["tagEvidence"])?;
-        self.inventory.closure(&row["playback"])?;
         let original_tags = unique(
             rows(option.row, "/attributes")?.iter().filter(|attr| {
                 attr.pointer("/name/value").and_then(Value::as_str) == Some("Tags")

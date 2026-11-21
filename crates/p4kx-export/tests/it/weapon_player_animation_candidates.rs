@@ -8,6 +8,8 @@ use serde_json::Value;
 use crate::health_origin_assertions as origin;
 use crate::health_origin_fixture::{Fixture, Input, TestResult};
 
+#[path = "weapon_player_animation_evidence.rs"]
+mod evidence;
 #[path = "weapon_player_animation_fixture.rs"]
 mod fixture;
 #[path = "weapon_player_animation_sdk.rs"]
@@ -58,22 +60,7 @@ fn original_reload_options_join_only_through_their_physical_scopes() -> TestResu
         "the join identifies the physical AttachDef component",
     );
     check_candidate_order(candidates)?;
-    for row in candidates {
-        let tag_evidence = origin::cell(row, "tagEvidence", "present")?;
-        assert_eq!(
-            tag_evidence["value"], "sharedDeclaration",
-            "only a scoped tag is established"
-        );
-        let playback = origin::cell(row, "playback", "present")?;
-        assert_eq!(
-            playback["value"], "unverified",
-            "the source does not select a runtime animation"
-        );
-        assert_eq!(
-            playback["containsEncryptedSource"], true,
-            "the derived row includes the encrypted weapon tag source"
-        );
-    }
+    evidence::check(&catalog, candidates)?;
     check_sources(&catalog)?;
     origin::closure(&catalog)
 }

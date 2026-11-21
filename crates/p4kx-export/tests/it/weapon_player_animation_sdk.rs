@@ -94,14 +94,11 @@ fn check_candidate(row: &WeaponPlayerAnimationCandidate, input: Input) {
         "both token positions resolve to the same declaration"
     );
     assert!(
-        matches!(
-            row.playback().value(),
-            Some(WeaponAnimationPlayback::Unverified)
-        ),
+        matches!(row.playback(), WeaponAnimationPlayback::Unverified),
         "a source candidate cannot establish runtime playback"
     );
     assert_eq!(
-        row.playback().origin().contains_encrypted_source(),
+        row.tag_evidence().origin().contains_encrypted_source(),
         input.marker(),
         "the candidate inherits its actual DataForge origin"
     );

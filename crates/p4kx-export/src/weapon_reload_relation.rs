@@ -68,7 +68,7 @@ pub struct WeaponPlayerAnimationCandidate {
     option_position: SourcedValue<SourceLocation>,
     matches: Vec<TagMatch>,
     tag_evidence: SourcedValue<TagEvidence>,
-    playback: SourcedValue<Playback>,
+    playback: Playback,
 }
 
 /// One shared original tag declaration and both token positions.
@@ -92,13 +92,13 @@ pub enum TagEvidence {
     SharedDeclaration,
 }
 
-/// Evidence for selection of the animation during gameplay.
+/// Tool-owned verification status for playback of a projected candidate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
 #[non_exhaustive]
 pub enum Playback {
-    /// The original declarations establish a candidate.
+    /// The tool provides no verification of runtime playback.
     Unverified,
 }
 
@@ -259,7 +259,6 @@ impl CandidateInput<'_, '_> {
             SourceValue::Present(TagEvidence::SharedDeclaration),
             &inputs,
         )?;
-        let playback = tag_evidence.map_ref(|_| Playback::Unverified);
         Ok(Some(WeaponPlayerAnimationCandidate {
             weapon_record_index: self.weapon.record.clone(),
             attachment_component_ordinal: self.weapon.slot.clone(),
@@ -271,7 +270,7 @@ impl CandidateInput<'_, '_> {
             option_position: self.option.position.clone(),
             matches: evidence,
             tag_evidence,
-            playback,
+            playback: Playback::Unverified,
         }))
     }
 

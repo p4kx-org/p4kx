@@ -321,7 +321,10 @@ A weapon tag candidate requires at least one common authored attachment
 and option tag with a unique declaration in the target's `TagDef`. Each
 match gives the two zero-based token indices and the original declaration.
 The `weaponPlayerAnimationCandidates` projection links the weapon
-attachment, Player component, branch and option. `playback` is `unverified`.
+attachment, Player component, branch and option. The tool emits the
+literal control value `playback` as `unverified`. It describes verification status
+and carries no source origin. The complete sourced candidate proof is in
+`tagEvidence` and in the individual original fields and token matches.
 Runtime fragment or animation selection, and elapsed reload time, require
 separate evidence.
 

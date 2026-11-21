@@ -61,10 +61,10 @@ impl WeaponPlayerAnimationCandidate {
         &self.tag_evidence
     }
 
-    /// Borrows the observed playback evidence.
+    /// Returns the tool-owned playback verification status.
     #[must_use]
-    pub const fn playback(&self) -> &SourcedValue<Playback> {
-        &self.playback
+    pub const fn playback(&self) -> Playback {
+        self.playback
     }
 
     /// Borrows the original token and declaration matches in order.

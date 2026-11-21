@@ -1655,7 +1655,10 @@ Use `equipment::with_weapon_animation_candidates` to read the canonical
 The decoded-Entry, session and parsed forms share the Catalog's AttachDef,
 Player database, scoped tag and option projection. Rows retain both Entry
 identities, original branch and option coordinates, ordered tag matches,
-playback evidence and their own source inventory.
+the tool-owned `playback` status, and their own source inventory. `tagEvidence`
+carries the complete per-candidate source proof and immediate encryption marker.
+`playback` is the literal `unverified` status and has no input origin.
+The SDK accessor `playback()` returns the typed status by value.
 
 The query reads the selected Item and the Player context and reachable
 Mannequin dependencies required by its personal-weapon attachments. It
