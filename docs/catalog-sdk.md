@@ -348,13 +348,19 @@ desktop workflow and record its total footprint separately.
 [Local consumer RAM acceptance](catalog-partitioning.md#system-memory-acceptance)
 
 A Windows AMD64 harness built at `b8ad606ce` read LIVE `13220821` and
-PTU `13248297` with English selected and one Rayon worker. Windows reported
-1,226,883,072 bytes peak working set and 1,228,382,208 bytes peak private
-commit. The initial refresh took 139 seconds and the changed-Build refresh
-took 144 seconds. The warm query reused the cache. Cancellation and an
-unavailable input both retained that cache. This harness run stays within
-the 2 GB budget and covers the mining refresh workflow.
+PTU `13248297` with English selected and one Rayon worker. The executable
+SHA-256 was
+`fb31c11dade76eadaa4a484842737d4dffbadf892f36eecaa4d165c75b4094e5`.
+Windows reported 1,226,883,072 bytes peak working set and 1,228,382,208 bytes
+peak private commit. The capture sampled a minimum of 56,292,515,840 bytes
+available on the host. The initial refresh took 138.775 seconds and the
+changed-Build refresh took 143.946 seconds. The warm query reused the cache.
+Cancellation and an unavailable input both retained that cache.
 
+The private commit peak leaves an estimated 15,951,486,976 bytes for the OS
+and other processes on a 16 GiB system. This measures the mining SDK harness
+on the available host. Paging, scratch writes and the integrated application's
+total footprint need their own counters.
 The synthetic `consumer_refresh` integration cases show how one parsed view can serve several
 queries in one refresh. They resolve a reward source to its physical pool and Blueprint and
 read a mission location and Item ports. The joined mining case follows the provider,
