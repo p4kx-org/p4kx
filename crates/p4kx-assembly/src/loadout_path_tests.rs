@@ -179,11 +179,11 @@ fn vehicle_value_equality_does_not_depend_on_record_name_authorship() -> TestRes
     let plain = plain.vehicle.ok_or("the unobserved vehicle is absent")?;
     let observed = observed.vehicle.ok_or("the observed vehicle is absent")?;
     assert!(
-        plain.class_name.is_none(),
+        plain.source.class_name.is_none(),
         "the ordinary read has no class selection token"
     );
     assert!(
-        observed.class_name.is_some(),
+        observed.source.class_name.is_some(),
         "the observed read retains its actual class-name selection"
     );
     assert_eq!(

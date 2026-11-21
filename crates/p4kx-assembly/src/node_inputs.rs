@@ -47,11 +47,9 @@ impl LoadoutResolver<'_> {
         spec: &EntitySpec,
         issues: &mut Vec<LoadoutError>,
     ) -> Option<Arc<VehicleImplementation>> {
-        match self.vehicle_of(spec) {
+        let source = &spec.vehicle.as_ref()?.source;
+        match self.vehicle_of(source, &spec.name, spec.record_index) {
             Some((Ok(vehicle), caller)) => {
-                if let (Some(observer), Some(record)) = (&self.observation, spec.record_index) {
-                    observer.vehicle_used(record, &vehicle, &caller);
-                }
                 if vehicle.issues.iter().any(LoadoutError::is_missing_file) {
                     let caller = Arc::new(caller);
                     issues.extend(vehicle.issues.iter().cloned().map(|mut issue| {
@@ -63,10 +61,7 @@ impl LoadoutResolver<'_> {
                 }
                 Some(vehicle)
             }
-            Some((Err(mut error), caller)) => {
-                if error.is_missing_file() {
-                    error.used_by(&Arc::new(caller));
-                }
+            Some((Err(error), _)) => {
                 issues.push(error);
                 None
             }

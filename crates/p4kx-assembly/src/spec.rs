@@ -13,8 +13,10 @@ use crate::LoadoutXmlClassUse;
 #[path = "vehicle_spec.rs"]
 mod vehicle_spec;
 
-pub(crate) use self::vehicle_spec::VehicleSpec;
 use self::vehicle_spec::read_vehicle;
+pub(crate) use self::vehicle_spec::{
+    VehicleSource, VehicleSpec, read_vehicle_source, vehicle_component,
+};
 use crate::armour::{ZoneList, read_zones};
 use crate::geometry::GeometryComponent;
 use crate::loadout_path::PathRead;
@@ -37,7 +39,6 @@ pub(crate) const GEOMETRY_RESOURCE: &str = "SGeometryResourceParams";
 const DEFAULT_LOADOUT: &str = "SEntityComponentDefaultLoadoutParams";
 const PORT_CONTAINER: &str = "SItemPortContainerComponentParams";
 const OUTFIT_LOADOUT: &str = "SItemPortLoadoutOutfitParams";
-const VEHICLE_PARAMS: &str = "VehicleComponentParams";
 const ATTACHABLE: &str = "SAttachableComponentParams";
 const INVENTORY_CONTAINER: &str = "SCItemInventoryContainerComponentParams";
 const DOCKED_VEHICLE_TYPE: &str = "NOITEM_Vehicle";
@@ -156,8 +157,7 @@ impl EntitySpec {
         let attachable = attachable_component(tree);
         let definition = attachable.and_then(|(_, component)| struct_field(component, "AttachDef"));
         let attach_tags = definition.map_or_default(|definition| text(definition, "Tags"));
-        let mut vehicle = component_slots(tree)
-            .find(|(_, component)| component.type_name() == VEHICLE_PARAMS)
+        let mut vehicle = vehicle_component(tree)
             .map(|(ordinal, component)| read_vehicle(component, ordinal, tree, paths, attach_tags));
         let variants = geometry_component.map_or_default(|(ordinal, component)| {
             let hull_base = geometry.as_ref().filter(|_| vehicle.is_some());

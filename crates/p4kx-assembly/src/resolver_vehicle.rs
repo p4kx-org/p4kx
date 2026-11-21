@@ -4,12 +4,17 @@
 use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
+use p4kx_dataforge::{Record, RecordTree};
+
+use crate::entities::is_entity;
 use crate::loadout_file_cache::CachedDocument;
 use crate::resolver::VehicleResult;
-use crate::resolver_observation::Observation;
-use crate::spec::EntitySpec;
+use crate::resolver_observation::{self, LoadoutReadEvent, Observation};
+use crate::resolver_path_read;
+use crate::spec::{EntitySpec, VehicleSource, read_vehicle_source, vehicle_component};
 use crate::{
-    LandingGear, LoadoutError, LoadoutRequest, LoadoutResolver, LoadoutTargetGuid, vehicle,
+    LandingGear, LoadoutError, LoadoutRequest, LoadoutResolver, LoadoutTargetGuid,
+    VehicleImplementation, vehicle,
 };
 
 #[derive(PartialEq, Eq, Hash)]
@@ -20,34 +25,74 @@ pub(crate) struct VehicleCacheKey {
     capture_paint: bool,
 }
 
-impl LoadoutResolver<'_> {
-    /// Returns the vehicle implementation `spec` names with its Modification, read once per
-    /// resolver, or `None` when the Entity names none, its `vehicleDefinition` is empty, or no
-    /// files were given. The class-name fallback applies to a definition the Archive lacks, not
-    /// to an empty one.
+impl<'f> LoadoutResolver<'f> {
+    /// Reads only the vehicle implementation selected by the exact original Entity tree.
+    ///
+    /// Includes the selected Modification and its patch. Returns no implementation when the
+    /// Entity provides no definition or the resolver has no vehicle file provider.
+    ///
+    /// # Errors
+    /// Returns a Record ownership or type error, a vehicle read error, or an observer stop.
+    pub fn read_vehicle_tree(
+        &mut self,
+        record: &Record<'f>,
+        tree: &RecordTree<'f>,
+    ) -> Result<Option<Arc<VehicleImplementation>>, LoadoutError> {
+        if self.stopped() {
+            return Err(LoadoutError::ObservationStopped);
+        }
+        if !record.is_from(self.entities.forge()) || !tree.is_from(record) {
+            return Err(LoadoutError::UnreadableRecord {
+                guid: LoadoutTargetGuid::unbound(record.guid()),
+                reason: "the vehicle tree does not belong to the selected Record".to_owned(),
+            });
+        }
+        if !is_entity(record) {
+            return Err(LoadoutError::NotAnEntity {
+                guid: LoadoutTargetGuid::unbound(record.guid()),
+                type_name: tree.type_name().to_owned(),
+            });
+        }
+        let Some((_, component)) = vehicle_component(tree) else {
+            return Ok(None);
+        };
+        let observer = self.observation.as_deref();
+        resolver_observation::notify(observer, LoadoutReadEvent::ProvidedTree { record, tree })?;
+        let source = resolver_path_read::with_record_paths(record, tree, observer, |paths| {
+            read_vehicle_source(component, tree, paths)
+        })?;
+        let result = self.vehicle_of(&source, tree.name(), Some(record.index()));
+        if self.stopped() {
+            return Err(LoadoutError::ObservationStopped);
+        }
+        result.map(|(read, _)| read).transpose()
+    }
+
+    /// Loads the selected implementation and reports its actual caller, including cache reuse.
     pub(crate) fn vehicle_of(
         &mut self,
-        spec: &EntitySpec,
+        source: &VehicleSource,
+        record_name: &str,
+        record_index: Option<u32>,
     ) -> Option<(VehicleResult, LoadoutRequest)> {
-        let vehicle_spec = spec.vehicle.as_ref()?;
         let files = self
             .files
             .filter(|files| files.reads_vehicle_implementations())?;
-        let class_name = crate::entities::class_name_of(&spec.name).unwrap_or(&spec.name);
-        if vehicle_spec.definition.is_empty() {
+        let class_name = crate::entities::class_name_of(record_name).unwrap_or(record_name);
+        if source.definition.is_empty() {
             return None;
         }
         let capture_paint = self.captures_vehicle_appearance();
         let key = VehicleCacheKey {
-            definition: vehicle_spec.definition.to_ascii_lowercase(),
-            modification: Arc::clone(vehicle_spec.modification.text()),
+            definition: source.definition.to_ascii_lowercase(),
+            modification: Arc::clone(source.modification.text()),
             class_name: class_name.to_ascii_lowercase(),
             capture_paint,
         };
         let caller = LoadoutRequest::Vehicle {
-            definition: vehicle_spec.definition.clone(),
-            modification: vehicle_spec.modification.clone(),
-            class_name: vehicle_spec.class_name.clone(),
+            definition: source.definition.clone(),
+            modification: source.modification.clone(),
+            class_name: source.class_name.clone(),
         };
         let observation = self.observation.as_deref();
         let loaded = match self.vehicles.entry(key) {
@@ -61,7 +106,16 @@ impl LoadoutResolver<'_> {
                 }))
                 .value()),
         };
-        Some((loaded.map_or_else(Err, Clone::clone), caller))
+        let result = loaded.map_or_else(Err, Clone::clone).map_err(|mut error| {
+            if error.is_missing_file() {
+                error.used_by(&Arc::new(caller.clone()));
+            }
+            error
+        });
+        if let (Ok(vehicle), Some(observer), Some(record)) = (&result, observation, record_index) {
+            observer.vehicle_used(record, vehicle, &caller);
+        }
+        Some((result, caller))
     }
 
     /// Returns the gears of the landing gear Record the vehicle component of `spec` names, read
@@ -86,8 +140,8 @@ impl LoadoutResolver<'_> {
                     guid: LoadoutTargetGuid::unbound(guid),
                 }),
                 Some(record) => {
-                    self.remember_read(crate::resolver_observation::Cache::LandingGear, record);
-                    crate::resolver_observation::canonical(
+                    self.remember_read(resolver_observation::Cache::LandingGear, record);
+                    resolver_observation::canonical(
                         &mut self.builder,
                         &record,
                         self.observation.as_deref(),
@@ -96,9 +150,7 @@ impl LoadoutResolver<'_> {
                 }
             };
             self.landing.insert(guid, read);
-        } else if let Err(error) =
-            self.reuse_read(crate::resolver_observation::Cache::LandingGear, guid)
-        {
+        } else if let Err(error) = self.reuse_read(resolver_observation::Cache::LandingGear, guid) {
             issues.push(error);
             return Arc::from([]);
         }
@@ -112,3 +164,7 @@ impl LoadoutResolver<'_> {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "resolver_vehicle_read_tests.rs"]
+mod tests;
