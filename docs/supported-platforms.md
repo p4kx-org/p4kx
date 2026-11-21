@@ -117,10 +117,12 @@ before the first snapshot. It includes the parent-start receipt when that file i
 available. Upload errors are recorded as diagnostics.
 An immediate checkpoint uploads a bounded copy of the original file journal and source metadata
 before the completion step. It carries an unproven verdict. The completion step observes the
-same process until it returns or its original allowance expires. Acceptance requires the
-original successful result, its closed journal, final cleanup, matching input and source
-receipts, and the installed runtime checks. A compact final artifact contains the original
-checkpoint and observer verdict. The ten-minute worker cap, thirty-five-minute absolute deadline
+same process until it returns or its original allowance expires. Its runner step reserves one
+additional minute for owned-process cleanup and the completion receipt. The original process
+deadlines remain in force. Acceptance requires the original successful result, its closed
+journal, final cleanup, matching input and source receipts, and the installed runtime checks.
+A compact final artifact contains the original checkpoint and observer verdict. The ten-minute
+worker cap, thirty-five-minute absolute deadline
 and forty-five-minute job limit remain in force. Expiry can stop only the bound parent.
 Evidence of that stop leaves the installer and descendant cleanup unproven.
 

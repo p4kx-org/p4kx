@@ -40,7 +40,7 @@ function New-P4kxMsiStepBudget {
     $remaining=Get-P4kxMsiRemainingBudget $Deadline $Now
     $minutes=[int][Math]::Min(12,[Math]::Floor($remaining/60000))
     if($minutes -le 0){throw 'Native MSI installer step has less than one whole minute remaining.'}
-    return @{deadline_utc=$Deadline;computed_at_utc=$Now.ToString('o');minutes=$minutes}
+    return @{deadline_utc=$Deadline;computed_at_utc=$Now.ToString('o');minutes=$minutes;observer_finish_minutes=($minutes+1)}
 }
 function Assert-P4kxMsiStepAdmission {
     param([string]$Deadline,[string]$Minutes,[string]$ComputedAt,[DateTimeOffset]$Now=[DateTimeOffset]::UtcNow)

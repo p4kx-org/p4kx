@@ -45,9 +45,16 @@ Assert-FeedbackWorkflow ($admissionUpload.Contains('always() && !cancelled()') -
 Assert-FeedbackWorkflow ($installer -cmatch '(?m)^        timeout-minutes: \$\{\{ fromJSON\(steps\.msi-budget\.outputs\.minutes\) \}\}\r?$') 'Installer workflow step lacks an independent deadline-derived runner timeout.'
 Assert-FeedbackWorkflow (-not ($installer -match '(?m)^        (continue-on-error|if):')) 'Installer failure must retain ordinary failure gating.'
 $observerFinish=Get-FeedbackWorkflowStep $verify 'Finish the original native MSI lifecycle'
+$prepare=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/scripts/prepare-msi-feedback.ps1')
+$observerRequest=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/scripts/msi-observer-request.ps1')
+Assert-FeedbackWorkflow ($prepare.Contains('"observer_finish_minutes=$($budget.observer_finish_minutes)" >> $env:GITHUB_OUTPUT') -and
+    $prepare.Contains('"P4KX_MSI_STEP_MINUTES=$($budget.minutes)" >> $env:GITHUB_ENV') -and
+    $observerRequest.Contains('$milliseconds = [int]$env:P4KX_MSI_STEP_MINUTES*60000') -and
+    $observerRequest.Contains('observer_deadline_utc=$prepared.AddMilliseconds($milliseconds).ToString(''o'')') -and
+    -not $observerRequest.Contains('observer_finish_minutes')) 'The cleanup reserve must affect only the hosted Finish timeout and preserve the original observer deadline.'
 Assert-FeedbackWorkflow ($installer.Contains('id: msi-launch') -and $installer.Contains('invoke-msi-observer.ps1 -Stage Start') -and
     $observerFinish.Contains('invoke-msi-observer.ps1 -Stage Finish') -and $observerFinish.Contains('-WaitMilliseconds 0') -and
-    $observerFinish -cmatch '(?m)^        timeout-minutes: \$\{\{ fromJSON\(steps\.msi-budget\.outputs\.minutes\) \}\}\r?$' -and
+    $observerFinish -cmatch '(?m)^        timeout-minutes: \$\{\{ fromJSON\(steps\.msi-budget\.outputs\.observer_finish_minutes\) \}\}\r?$' -and
     $observerFinish.Contains("always() && !cancelled() && steps.msi-launch.outcome == 'success'") -and
     -not $observerFinish.Contains('continue-on-error')) 'Original lifecycle completion lost its source-bound deadline or failure gate.'
 $observerStart=Get-FeedbackWorkflowStep $verify 'Preserve original MSI observer start'

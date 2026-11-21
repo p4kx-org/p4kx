@@ -11,5 +11,6 @@ New-Item -ItemType Directory -Path $Directory -Force | Out-Null
     revision=$env:GITHUB_SHA;run=$env:GITHUB_RUN_ID;attempt=$env:GITHUB_RUN_ATTEMPT;target=$env:P4KX_TARGET} |
     ConvertTo-Json -Compress | Set-Content -LiteralPath (Join-Path $Directory 'step-feedback.json') -Encoding utf8NoBOM
 "minutes=$($budget.minutes)" >> $env:GITHUB_OUTPUT
+"observer_finish_minutes=$($budget.observer_finish_minutes)" >> $env:GITHUB_OUTPUT
 "P4KX_MSI_STEP_MINUTES=$($budget.minutes)" >> $env:GITHUB_ENV
 "P4KX_MSI_STEP_COMPUTED_AT_UTC=$($budget.computed_at_utc)" >> $env:GITHUB_ENV

@@ -205,7 +205,7 @@ jobs:
       - name: Finish the original native MSI lifecycle
         id: msi-finish
         if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' }}
-        timeout-minutes: ${{ fromJSON(steps.msi-budget.outputs.minutes) }}
+        timeout-minutes: ${{ fromJSON(steps.msi-budget.outputs.observer_finish_minutes) }}
         run: .github/scripts/invoke-msi-observer.ps1 -Stage Finish -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -WaitMilliseconds 0
       - name: Upload final original MSI lifecycle evidence
         if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && steps.msi-finish.outcome != 'skipped' }}

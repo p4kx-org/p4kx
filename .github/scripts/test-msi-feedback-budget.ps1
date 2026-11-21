@@ -10,11 +10,13 @@ function Assert-FeedbackBudgetFailure([scriptblock]$Action,[string]$Message) {
     Assert-FeedbackBudget $failed $Message
 }
 $now=[DateTimeOffset]::ParseExact('2026-11-09T12:00:00.0000000+00:00','o',[Globalization.CultureInfo]::InvariantCulture)
-foreach($case in @(@{seconds=2100;minutes=12},@{seconds=719;minutes=11},@{seconds=61;minutes=1})){
+foreach($case in @(@{seconds=2100;minutes=12;finishMinutes=13},@{seconds=719;minutes=11;finishMinutes=12},@{seconds=61;minutes=1;finishMinutes=2})){
     $deadline=$now.AddSeconds($case.seconds).ToString('o')
     $budget=New-P4kxMsiStepBudget $deadline $now
     Assert-FeedbackBudget ($budget.minutes -eq $case.minutes -and $budget.computed_at_utc -ceq $now.ToString('o') -and $budget.deadline_utc -ceq $deadline) 'Pinned preparation changed its original deadline, integer cap or floor.'
+    Assert-FeedbackBudget ($budget.observer_finish_minutes -eq $case.finishMinutes) 'The hosted observer must reserve one whole minute for cleanup and evidence.'
     Assert-P4kxMsiStepAdmission $deadline ([string]$budget.minutes) $budget.computed_at_utc $now
+    Assert-FeedbackBudgetFailure {Assert-P4kxMsiStepAdmission $deadline ([string]$budget.observer_finish_minutes) $budget.computed_at_utc $now} 'The hosted cleanup reserve extended installer admission.'
 }
 foreach($deadline in @('','invalid',$now.ToString('o'),$now.AddMinutes(-1).ToString('o'),$now.AddMinutes(36).ToString('o'),$now.AddSeconds(59).ToString('o'))){
     Assert-FeedbackBudgetFailure {New-P4kxMsiStepBudget $deadline $now} 'Malformed, expired, inflated or sub-minute allowance was admitted.'
