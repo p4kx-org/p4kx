@@ -64,7 +64,7 @@ fn compare(snapshot: &ShipSourceSnapshot<'_>, catalog: &Value) -> TestResult<Rou
     Route::queried_value(
         SHIP_BASE_FACTS,
         facts,
-        "exact synthetic single-Ship producer and original cargo-use parity available; installed producer parity open",
+        "synthetic and installed selected Ship parity witnessed; full installed producer parity open",
     )
 }
 

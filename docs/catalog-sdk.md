@@ -1471,6 +1471,46 @@ cargo test --locked -p p4kx-export --lib -- `
   --ignored --exact
 ```
 
+### Installed cargo projection
+
+The physical Ship cargo witness compares the selected SDK row with the normal
+scoped Catalog, original Loadout and original capacity operands. Its original
+path filter is checked against the entire physical path cohort before producing
+the file shape. The comparison then selects the nominated physical Record.
+Aliases at the same path retain their distinct identities.
+
+Set `P4KX_DATA_P4K` and `P4KX_CARGO_SDK_BUILD` for the installed
+Archive and its change number. Set `P4KX_CARGO_SDK_RECORD` to a physical
+Record index or unique literal `class:<name>`. Set `P4KX_CARGO_SDK_RECEIPT`
+to a new absolute path within the configured temporary directory.
+
+```powershell
+cargo test --locked -p p4kx-export --test real_archive -- `
+  real_archive_cargo_grid_capacity::sdk::installed_ship_cargo_matches_scoped_producer_and_original_loadout `
+  --ignored --exact
+```
+
+Run `installed_ship_cargo_sdk_cold_query_replays_one_verified_root` in the same
+test module in a separate process with that verified receipt. This path
+opens the same Archive and reads one physical Ship through the SDK. It does
+not generate a Catalog.
+
+On Windows AMD64, the native Debug test against production code `bfa0d9740`
+confirmed the scoped producer and original Loadout comparison in LIVE
+`13220821` and PTU `13248297`. A new process with no SDK cache measured
+these peaks for the same selected rows.
+
+| Build | Peak private bytes | Peak working set bytes | Elapsed |
+| --- | ---: | ---: | ---: |
+| LIVE `13220821` | 1,091,887,104 | 1,024,430,080 | 9.915 s |
+| PTU `13248297` | 1,116,168,192 | 1,034,645,504 | 10.974 s |
+
+The observed page-file counters were stable across both SDK processes.
+On a 16 GiB machine the higher process peak leaves an estimated 16.06 GB
+for the OS and other applications. The test covers one selected Ship per
+Build. Full-catalog parity and the integrated consumer's memory remain
+separate acceptance checks.
+
 ## Resource topology placements
 
 Use `equipment::resource_topology::read_resource_topology_placements` or its

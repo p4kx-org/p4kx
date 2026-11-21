@@ -28,6 +28,8 @@ use crate::real_archive_verification::print_line;
 mod census;
 #[path = "cargo_grid_capacity_original.rs"]
 mod original;
+#[path = "real_archive_ship_cargo_sdk.rs"]
+mod sdk;
 #[path = "cargo_grid_capacity_ships.rs"]
 mod ships;
 
