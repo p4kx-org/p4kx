@@ -17,6 +17,7 @@ use crate::catalog_v3::catalog_durability::{
 use crate::catalog_v3::catalog_emp::Emp;
 use crate::catalog_v3::catalog_explosives::Explosive;
 use crate::catalog_v3::catalog_explosives::catalog_missile_configuration::MissileConfiguration;
+use crate::catalog_v3::catalog_hacking_chips::HackingChip;
 use crate::catalog_v3::catalog_jump_drive::JumpDrive;
 use crate::catalog_v3::catalog_quantum_drive::QuantumDrive;
 use crate::catalog_v3::catalog_quantum_interdiction::QuantumInterdictionGenerator;
@@ -70,6 +71,22 @@ pub(crate) fn read_missile_configurations<'source>(
         cancel,
         ItemEquipmentFamily::MissileConfigurations,
         |rows| rows.missile_configurations,
+    )
+}
+
+pub(crate) fn read_hacking_chips<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<Vec<HackingChip<'source>>>, CatalogError> {
+    read(
+        tree,
+        projection,
+        admission,
+        cancel,
+        ItemEquipmentFamily::HackingChips,
+        |rows| rows.hacking_chips,
     )
 }
 

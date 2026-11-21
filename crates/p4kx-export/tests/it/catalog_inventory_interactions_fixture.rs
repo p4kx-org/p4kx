@@ -5,8 +5,7 @@ use p4kx_testkit::{
     DataForgeBuilder, TestEntity, TestInstance, TestRecord, TestStruct, TestType, TestValue,
 };
 
-#[path = "hackable_device_fixture.rs"]
-mod hackable_device;
+use crate::hackable_device_fixture as hackable_device;
 
 pub(super) const OWNER: u128 = 0x1057_0400;
 pub(super) const PRESET: u128 = 0x1057_0401;

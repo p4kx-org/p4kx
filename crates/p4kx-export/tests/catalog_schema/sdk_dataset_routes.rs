@@ -64,6 +64,8 @@ mod flight_configurations;
 mod fuel;
 #[path = "sdk_generator_facet_routes.rs"]
 mod generator_facets;
+#[path = "sdk_hacking_routes.rs"]
+mod hacking;
 #[path = "sdk_inventory_container_route.rs"]
 mod inventory_containers;
 #[path = "sdk_item_configuration_routes.rs"]
@@ -252,6 +254,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.push(reputation_rewards::read()?);
     routes.extend(resource_network::read()?);
     routes.extend(fuel::read()?);
+    routes.extend(hacking::read()?);
     routes.push(inventory_containers::read()?);
     routes.push(inventory_containers::read_configurations()?);
     routes.push(facilities::read()?);

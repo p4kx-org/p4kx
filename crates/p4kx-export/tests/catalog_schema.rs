@@ -14,6 +14,8 @@ mod catalog_schema_support;
 mod dataset_ownership;
 #[path = "catalog_schema/gameplay_properties.rs"]
 mod gameplay_properties;
+#[path = "it/hackable_device_fixture.rs"]
+mod hackable_device_fixture;
 #[path = "catalog_schema/health.rs"]
 mod health;
 #[path = "catalog_schema/legacy_v2_inventory.rs"]

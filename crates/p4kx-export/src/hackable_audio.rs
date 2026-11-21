@@ -6,8 +6,9 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::CatalogError;
-use crate::catalog_v3::authored_effect_resource::{AudioResource, Rtpc};
+pub use crate::catalog_v3::authored_effect_resource::{AudioResource, Rtpc};
 use crate::catalog_v3::authored_fields::Observed;
+use crate::catalog_v3::catalog_item_components::source_getters;
 use crate::catalog_v3::catalog_unit_source::UnitSource;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
@@ -34,7 +35,7 @@ const SUCCESS: &str = "audioTriggerSuccess";
     clippy::struct_field_names,
     reason = "field names match the authored audio declarations"
 )]
-pub(super) struct HackableAudio<'source> {
+pub struct HackableAudio<'source> {
     audio_rtpc_overall_progress: SourcedValue<HackableSound<'source, Rtpc>>,
     audio_rtpc_part_progress: SourcedValue<HackableSound<'source, Rtpc>>,
     audio_rtpc_remaining_duration: SourcedValue<HackableSound<'source, Rtpc>>,
@@ -51,6 +52,34 @@ pub(super) struct HackableAudio<'source> {
 }
 
 impl<'source> HackableAudio<'source> {
+    source_getters! {
+        /// Borrows the authored overall progress audio parameter.
+        audio_rtpc_overall_progress: SourcedValue<HackableSound<'source, Rtpc>>,
+        /// Borrows the authored part progress audio parameter.
+        audio_rtpc_part_progress: SourcedValue<HackableSound<'source, Rtpc>>,
+        /// Borrows the authored remaining duration audio parameter.
+        audio_rtpc_remaining_duration: SourcedValue<HackableSound<'source, Rtpc>>,
+        /// Borrows the authored total duration audio parameter.
+        audio_rtpc_total_duration: SourcedValue<HackableSound<'source, Rtpc>>,
+        /// Borrows the authored error audio trigger.
+        audio_trigger_error: SourcedValue<HackableSound<'source, AudioResource>>,
+        /// Borrows the authored part success audio trigger.
+        audio_trigger_part_success: SourcedValue<HackableSound<'source, AudioResource>>,
+        /// Borrows the authored pause audio trigger.
+        audio_trigger_pause: SourcedValue<HackableSound<'source, AudioResource>>,
+        /// Borrows the authored progress loop start audio trigger.
+        audio_trigger_progress_loop_start: SourcedValue<HackableSound<'source, AudioResource>>,
+        /// Borrows the authored progress loop stop audio trigger.
+        audio_trigger_progress_loop_stop: SourcedValue<HackableSound<'source, AudioResource>>,
+        /// Borrows the authored reset audio trigger.
+        audio_trigger_reset: SourcedValue<HackableSound<'source, AudioResource>>,
+        /// Borrows the authored resume audio trigger.
+        audio_trigger_resume: SourcedValue<HackableSound<'source, AudioResource>>,
+        /// Borrows the authored start audio trigger.
+        audio_trigger_start: SourcedValue<HackableSound<'source, AudioResource>>,
+        /// Borrows the authored success audio trigger.
+        audio_trigger_success: SourcedValue<HackableSound<'source, AudioResource>>,
+    }
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -100,13 +129,23 @@ impl<'source> HackableAudio<'source> {
     }
 }
 
+/// One authored audio setting with its original source class and additional fields.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-struct HackableSound<'source, Setting> {
+pub struct HackableSound<'source, Setting> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     #[serde(flatten)]
     setting: Setting,
+}
+
+impl<'source, Setting> HackableSound<'source, Setting> {
+    source_getters! {
+        /// Borrows the original source class and additional fields.
+        source: UnitSource<'source>,
+        /// Borrows the authored audio trigger or parameter.
+        setting: Setting,
+    }
 }
 
 impl<'source> HackableSound<'source, Rtpc> {

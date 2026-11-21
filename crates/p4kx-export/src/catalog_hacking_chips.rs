@@ -9,6 +9,7 @@ use super::authored_fields::Observed;
 use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
 use crate::catalog_table::CatalogTable;
+use crate::catalog_v3::catalog_item_components::source_getters;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
@@ -16,6 +17,7 @@ use crate::source_value_catalog::SourceText;
 
 const HACKING_CHIP: &str = "HackingChipParams";
 const REMOVABLE_CHIP: &str = "RemovableChipParams";
+pub(super) const SOURCE_TYPES: &[&str] = &[HACKING_CHIP, REMOVABLE_CHIP];
 const MODIFIER: &str = "RemovableChipValue";
 
 #[derive(Clone, Copy)]
@@ -38,7 +40,7 @@ impl HackingComponent {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct HackingChip<'source> {
+pub struct HackingChip<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     source_type: SourcedValue<&'source str>,
@@ -46,6 +48,14 @@ pub(crate) struct HackingChip<'source> {
 }
 
 impl<'source> HackingChip<'source> {
+    source_getters! {
+        /// Borrows the physical owner and original Components ordinal.
+        owner: ComponentOwner,
+        /// Borrows the original component class.
+        source_type: SourcedValue<&'source str>,
+        /// Borrows the original charge or modifier variant.
+        configuration: SourcedValue<HackingConfiguration<'source>>,
+    }
     pub(super) fn read(
         kind: HackingComponent,
         owner: ComponentOwner,
@@ -74,6 +84,7 @@ impl<'source> HackingChip<'source> {
     }
 }
 
+/// The authored alternatives of a hacking chip configuration.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(
     tag = "type",
@@ -81,32 +92,64 @@ impl<'source> HackingChip<'source> {
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-enum HackingConfiguration<'source> {
-    HackingChip { value: ChargeCount },
-    RemovableChip { value: RemovableValues<'source> },
+#[non_exhaustive]
+pub enum HackingConfiguration<'source> {
+    /// A chip carrying a maximum charge count.
+    HackingChip {
+        /// The original charge settings.
+        value: ChargeCount,
+    },
+    /// A removable chip carrying an ordered array of modifiers.
+    RemovableChip {
+        /// The original modifier values.
+        value: RemovableValues<'source>,
+    },
 }
 
+/// The original charge limit of a hacking chip.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ChargeCount {
+pub struct ChargeCount {
     max_charges: SourcedValue<i32>,
 }
 
+impl ChargeCount {
+    source_getters! {
+        /// Borrows the authored maximum charge count.
+        max_charges: SourcedValue<i32>,
+    }
+}
+
+/// The ordered modifiers of a removable chip.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-struct RemovableValues<'source> {
+pub struct RemovableValues<'source> {
     values: SourcedValue<Vec<SourcedValue<Modifier<'source>>>>,
 }
 
+impl<'source> RemovableValues<'source> {
+    source_getters! {
+        /// Borrows the authored array in physical source order.
+        values: SourcedValue<Vec<SourcedValue<Modifier<'source>>>>,
+    }
+}
+
+/// One original removable-chip modifier.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-struct Modifier<'source> {
+pub struct Modifier<'source> {
     name: SourcedValue<SourceText<'source>>,
     value: SourcedValue<ResourceFloat32>,
 }
 
 impl<'source> Modifier<'source> {
+    source_getters! {
+        /// Borrows the original unnormalized modifier name.
+        name: SourcedValue<SourceText<'source>>,
+        /// Borrows the original modifier value.
+        value: SourcedValue<ResourceFloat32>,
+    }
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -125,5 +168,5 @@ pub(crate) fn table<'source>(
     mut rows: Vec<HackingChip<'source>>,
 ) -> CatalogTable<HackingChip<'source>> {
     rows.sort_by_key(|row| row.owner.key());
-    CatalogTable::new(forge, &[HACKING_CHIP, REMOVABLE_CHIP], rows)
+    CatalogTable::new(forge, SOURCE_TYPES, rows)
 }

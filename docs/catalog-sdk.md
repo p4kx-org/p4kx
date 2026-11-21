@@ -1040,6 +1040,20 @@ bodies and requested locales and reports unreadable candidates through
 `coverage`. Copy any values needed beyond the callback, and publish changes
 after the query succeeds.
 
+## Authored hacking chips and devices
+
+Use `equipment::hacking::with_hacking_chips` for chip components on admitted
+Item Records. Match the typed `HackingConfiguration` to inspect its charge
+count or original ordered removable-chip modifiers.
+
+Use `equipment::hacking::with_hackable_devices` for hackable components on
+physical Entity Records. A device row retains its timing and error-check
+settings, audio triggers and parameters, and additional authored members.
+Both queries accept a physical Record index or GUID and preserve the original
+Components ordinal and per-value provenance. Use an existing decoded Entry
+or parsed query session to avoid reopening the DataForge Entry. These routes
+require no locale inputs.
+
 ## Authored item durability
 
 Use `equipment::durability::with_durability`, `with_degradation` or

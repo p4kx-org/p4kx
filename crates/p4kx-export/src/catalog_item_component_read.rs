@@ -28,9 +28,9 @@ use crate::template_field_capture::TemplateFieldCapture;
 #[path = "catalog_item_equipment_read.rs"]
 mod equipment;
 pub(crate) use equipment::{
-    read_degradation, read_distortion, read_emp, read_explosives, read_health, read_jump_drives,
-    read_missile_configurations, read_quantum_drives, read_quantum_interdiction_generators,
-    read_shield_generators,
+    read_degradation, read_distortion, read_emp, read_explosives, read_hacking_chips, read_health,
+    read_jump_drives, read_missile_configurations, read_quantum_drives,
+    read_quantum_interdiction_generators, read_shield_generators,
 };
 
 /// Canonical authored weapon and ammunition components of one physical Item.

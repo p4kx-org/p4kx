@@ -28,10 +28,10 @@ use crate::source_fields::FieldError;
 mod component_read;
 pub use component_read::WeaponSource;
 pub(crate) use component_read::{
-    read, read_degradation, read_distortion, read_emp, read_explosives, read_health,
-    read_jump_drives, read_magazine_resolution, read_missile_configurations, read_projectile_ammo,
-    read_quantum_drives, read_quantum_interdiction_generators, read_shield_generators,
-    read_weapon_source,
+    read, read_degradation, read_distortion, read_emp, read_explosives, read_hacking_chips,
+    read_health, read_jump_drives, read_magazine_resolution, read_missile_configurations,
+    read_projectile_ammo, read_quantum_drives, read_quantum_interdiction_generators,
+    read_shield_generators, read_weapon_source,
 };
 
 #[path = "equipment_item_definition_read.rs"]
@@ -285,6 +285,7 @@ pub(crate) enum ItemEquipmentFamily {
     Emp,
     Explosives,
     MissileConfigurations,
+    HackingChips,
     Durability(DurabilityComponent),
     ShieldGenerators,
     QuantumDrives,
@@ -298,6 +299,7 @@ impl ItemEquipmentFamily {
             Self::Emp => &[catalog_emp::SOURCE_TYPE],
             Self::Explosives => catalog_explosives::SOURCE_TYPES,
             Self::MissileConfigurations => &[catalog_missile_configuration::SOURCE_TYPE],
+            Self::HackingChips => catalog_hacking_chips::SOURCE_TYPES,
             Self::Durability(component) => component.source_types(),
             Self::ShieldGenerators => &[catalog_shield_generator::SOURCE_TYPE],
             Self::QuantumDrives => &[catalog_quantum_drive::SOURCE_TYPE],
@@ -318,6 +320,7 @@ impl ItemEquipmentFamily {
                     Self::MissileConfigurations,
                     Component::Explosive(ExplosiveComponent::Missile)
                 )
+                | (Self::HackingChips, Component::Hacking(_))
                 | (Self::ShieldGenerators, Component::ShieldGenerator)
                 | (Self::QuantumDrives, Component::QuantumDrive)
                 | (Self::JumpDrives, Component::JumpDrive)

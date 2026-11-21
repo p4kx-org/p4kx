@@ -212,6 +212,7 @@ mod gameplay_v3_transforms;
 mod gameplay_v3_unknown_origin;
 mod gameplay_v3_values;
 mod gear_fixture;
+mod hackable_device_fixture;
 mod harvest_fixture;
 mod hauling_fixture;
 mod health_origin_assertions;

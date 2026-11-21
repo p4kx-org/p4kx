@@ -42,6 +42,10 @@ pub mod ordnance;
 #[path = "equipment_fuel_query.rs"]
 pub mod fuel;
 
+/// Selective reads of physical hacking chips and hackable devices.
+#[path = "equipment_hacking_query.rs"]
+pub mod hacking;
+
 /// Selective reads of authored loot-generation components and their original values.
 #[path = "equipment_loot_generation_query.rs"]
 pub mod loot_generation;

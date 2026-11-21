@@ -9665,6 +9665,7 @@
       "type": "object"
     },
     "ChargeCount": {
+      "description": "The original charge limit of a hacking chip.",
       "properties": {
         "maxCharges": {
           "$ref": "#/$defs/SourcedValueOfint32"
@@ -20948,7 +20949,7 @@
       "type": "object"
     },
     "HackableSound": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "One authored audio setting with its original source class and additional fields.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -20968,7 +20969,7 @@
       "type": "object"
     },
     "HackableSound2": {
-      "description": "Concrete source type and the original members outside its typed fields.",
+      "description": "One authored audio setting with its original source class and additional fields.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -21016,15 +21017,18 @@
       "type": "object"
     },
     "HackingConfiguration": {
+      "description": "The authored alternatives of a hacking chip configuration.",
       "oneOf": [
         {
+          "description": "A chip carrying a maximum charge count.",
           "properties": {
             "type": {
               "const": "hackingChip",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/ChargeCount"
+              "$ref": "#/$defs/ChargeCount",
+              "description": "The original charge settings."
             }
           },
           "required": [
@@ -21034,13 +21038,15 @@
           "type": "object"
         },
         {
+          "description": "A removable chip carrying an ordered array of modifiers.",
           "properties": {
             "type": {
               "const": "removableChip",
               "type": "string"
             },
             "value": {
-              "$ref": "#/$defs/RemovableValues"
+              "$ref": "#/$defs/RemovableValues",
+              "description": "The original modifier values."
             }
           },
           "required": [
@@ -33534,6 +33540,7 @@
       "type": "object"
     },
     "Modifier": {
+      "description": "One original removable-chip modifier.",
       "properties": {
         "name": {
           "$ref": "#/$defs/SourcedValueOfSourceText"
@@ -41315,6 +41322,7 @@
       "type": "object"
     },
     "RemovableValues": {
+      "description": "The ordered modifiers of a removable chip.",
       "properties": {
         "values": {
           "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfModifier"

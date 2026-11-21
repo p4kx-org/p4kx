@@ -40,7 +40,7 @@ pub(crate) mod entity_animation_controller;
 #[path = "flight_configuration_tables.rs"]
 pub(in crate::catalog_v3) mod flight_configuration_tables;
 #[path = "hackable_configuration.rs"]
-mod hackable_configuration;
+pub(crate) mod hackable_configuration;
 #[path = "catalog_jump_point.rs"]
 mod jump_point;
 #[path = "jump_point_globals.rs"]
@@ -66,7 +66,7 @@ pub use super::catalog_durability::resistance::{DurabilityResistanceEntry, Resis
 pub use consumables::{AuthoredList, ConsumableEffect, EffectParameters, GasMass, Override};
 use electrical_behavior::ElectricalBehavior;
 use flight_configuration_tables::FlightConfigurationTables;
-use hackable_configuration::HackableConfiguration;
+use hackable_configuration::{HackableConfiguration, KIND as HACKABLE_DEVICES};
 pub use jump_point::JumpPointConfiguration;
 pub use jump_point_globals::GlobalJumpConfiguration;
 pub(crate) use jump_point_globals::SOURCE_TYPES as GLOBAL_JUMP_TYPES;
@@ -267,11 +267,6 @@ const JUMP_POINTS: ComponentKind = ComponentKind {
     inspection: ConfigurationInspection::JumpPoint,
 };
 physical_component!(JumpPointComponents, JumpPointConfiguration, JUMP_POINTS);
-
-const HACKABLE_DEVICES: ComponentKind = ComponentKind {
-    source_type: hackable_configuration::COMPONENT,
-    inspection: ConfigurationInspection::HackableDevice,
-};
 
 struct PhysicalComponents<'options, 'input, 'source> {
     forge: &'source DataForge<'source>,

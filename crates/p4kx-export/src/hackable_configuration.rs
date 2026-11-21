@@ -9,6 +9,9 @@ use super::super::authored_fields::Observed;
 use super::super::catalog_unit_source::UnitSource;
 use super::super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
+use crate::catalog_v3::catalog_item_components::source_getters;
+use crate::catalog_v3::component_sources::physical_component;
+use crate::export_field_inspection::ConfigurationInspection;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
@@ -16,15 +19,21 @@ use crate::source_fields::FieldError;
 #[path = "hackable_audio.rs"]
 mod hackable_audio;
 
-use hackable_audio::HackableAudio;
+use super::ComponentKind;
+pub use hackable_audio::{AudioResource, HackableAudio, HackableSound, Rtpc};
 
-pub(super) const COMPONENT: &str = "HackableParams";
+pub(super) const KIND: ComponentKind = ComponentKind {
+    source_type: "HackableParams",
+    inspection: ConfigurationInspection::HackableDevice,
+};
+
+physical_component!(HackableDevices, HackableConfiguration, KIND);
 
 /// The original timing, error and audio configuration of one hackable Entity component.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct HackableConfiguration<'source> {
+pub struct HackableConfiguration<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     #[serde(flatten)]
@@ -40,6 +49,26 @@ pub(super) struct HackableConfiguration<'source> {
 }
 
 impl<'source> HackableConfiguration<'source> {
+    source_getters! {
+        /// Borrows the physical owner and original Components ordinal.
+        owner: ComponentOwner,
+        /// Borrows the original source class and additional fields.
+        source: UnitSource<'source>,
+        /// Borrows the authored duration.
+        base_duration: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored base error chance.
+        base_error_chance: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored maximum pause duration.
+        max_pause_duration: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored count of error checks.
+        num_error_checks: SourcedValue<u32>,
+        /// Borrows the authored reset flag.
+        reset_after_hack_success: SourcedValue<bool>,
+        /// Borrows the authored progress update interval.
+        update_progress_delta_time: SourcedValue<ResourceFloat32>,
+        /// Borrows the original audio triggers and parameters.
+        audio: HackableAudio<'source>,
+    }
     pub(super) fn read(
         owner: ComponentOwner,
         source: Observed<'_, '_, '_, 'source>,
