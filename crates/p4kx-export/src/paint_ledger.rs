@@ -4,7 +4,6 @@
 use std::collections::BTreeSet;
 
 use crate::Kind;
-use crate::contract::Item;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::{DerivedFailure, ExportLedger, SourceDiagnosis, SourceDisposition};
 use crate::paint_port::VehicleFacts;
@@ -15,20 +14,10 @@ mod tests;
 /// Captures actual paint inputs from the original selected physical sources and their read proofs.
 pub(crate) fn inputs(
     source: &ExportLedger,
-    candidates: &[&Item<'_>],
+    candidates: impl IntoIterator<Item = u32>,
     vehicles: &[VehicleFacts],
 ) -> Result<ExportLedger, crate::CatalogError> {
-    let paints: BTreeSet<_> = candidates
-        .iter()
-        .map(|item| {
-            item.source
-                .source()
-                .record_index()
-                .value()
-                .copied()
-                .ok_or(crate::ExportAccountingError::MissingFieldInspection)
-        })
-        .collect::<Result<_, _>>()?;
+    let paints: BTreeSet<_> = candidates.into_iter().collect();
     let ships: BTreeSet<_> = vehicles
         .iter()
         .map(|vehicle| {

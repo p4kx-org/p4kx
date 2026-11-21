@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
 use p4kx_assembly::PaintTagIndex;
 use p4kx_extraction::CancelToken;
@@ -9,9 +9,13 @@ use rayon::prelude::*;
 
 use crate::catalog_v3::tag_catalog::TagDependencies;
 use crate::contract::{Item, Paint};
-use crate::guid_text::CatalogGuid;
-use crate::paint_port::{PaintPort, VehicleFacts};
+use crate::paint_port::VehicleFacts;
 use crate::{CatalogError, ExportAccountingError, PaintSummary};
+
+#[path = "paint_matching.rs"]
+mod matching;
+
+use matching::{PaintOwner, ShipPaintMatches};
 
 const PAINT_TYPE: &str = "Paints";
 
@@ -53,8 +57,18 @@ pub(crate) fn paints<'f>(
     sources: &crate::export_ledger::ExportLedger,
     cancel: Option<&CancelToken>,
 ) -> Result<Paints<'f>, CatalogError> {
-    let candidates: Vec<&Item<'_>> = items.iter().filter(|item| is_paint(item)).collect();
-    let mut ledger = crate::paint_ledger::inputs(sources, &candidates, vehicles)?;
+    let candidates: Vec<_> = items
+        .iter()
+        .filter(|item| is_paint(item))
+        .map(PaintCandidate::read)
+        .collect::<Result<_, _>>()?;
+    let mut ledger = crate::paint_ledger::inputs(
+        sources,
+        candidates
+            .iter()
+            .map(|candidate| candidate.owner.record_index),
+        vehicles,
+    )?;
     if candidates.is_empty() != tags.is_none() {
         return Err(ExportAccountingError::ConflictingTagTrace.into());
     }
@@ -67,7 +81,11 @@ pub(crate) fn paints<'f>(
             unreadable_files: Vec::new(),
         });
     };
-    let (groups, mut unreadable_files) = group_ships(vehicles);
+    let matches = ShipPaintMatches::read(vehicles)?;
+    let mut unreadable_files: Vec<_> = vehicles
+        .iter()
+        .filter_map(|vehicle| vehicle.implementation.unreadable.clone())
+        .collect();
     let unreadable = unreadable_files.len();
     unreadable_files.sort_unstable();
     unreadable_files.dedup();
@@ -75,23 +93,7 @@ pub(crate) fn paints<'f>(
     let index = PaintTagIndex::new(tags.tree.tree());
     let mut paints: Vec<Paint> = candidates
         .par_iter()
-        .map(|item| {
-            if cancel.is_some_and(CancelToken::is_cancelled) {
-                return Err(CatalogError::Cancelled);
-            }
-            let have = lowered(&item.paint.tags);
-            let required = lowered(&item.paint.required_tags);
-            let mut ship_guids: Vec<CatalogGuid> = groups
-                .iter()
-                .filter(|(group, _)| group.accepts(&have, &required, &index))
-                .flat_map(|(_, guids)| guids.iter().copied())
-                .collect();
-            ship_guids.sort_by_cached_key(|guid| guid.text());
-            Ok(Paint {
-                item_guid: item.identity.guid,
-                ship_guids,
-            })
-        })
+        .map(|candidate| candidate.project(&matches, &index, cancel))
         .collect::<Result<_, _>>()?;
     paints.sort_by_cached_key(|paint| paint.item_guid.text());
     let summary = summarise(&paints, unreadable);
@@ -104,47 +106,49 @@ pub(crate) fn paints<'f>(
     })
 }
 
-/// What ships share when it comes to the paints they accept: their paint ports and the tags of
-/// their Record.
-#[derive(Debug, PartialEq, Eq, Hash)]
-struct ShipPorts {
-    ports: Vec<PaintPort>,
-    tags: Vec<String>,
+struct PaintCandidate<'item, 'source> {
+    owner: PaintOwner,
+    item: &'item Item<'source>,
 }
 
-impl ShipPorts {
-    fn accepts(&self, have: &[String], required: &[String], index: &PaintTagIndex<'_>) -> bool {
-        self.ports
-            .iter()
-            .any(|port| port.accepts(have, required, &self.tags, index))
+impl<'item, 'source> PaintCandidate<'item, 'source> {
+    fn read(item: &'item Item<'source>) -> Result<Self, ExportAccountingError> {
+        let record_index = item
+            .source
+            .source()
+            .record_index()
+            .value()
+            .copied()
+            .ok_or(ExportAccountingError::MissingFieldInspection)?;
+        Ok(Self {
+            owner: PaintOwner {
+                record_index,
+                guid: item.identity.guid,
+            },
+            item,
+        })
     }
-}
 
-type ShipsByPorts = HashMap<ShipPorts, Vec<CatalogGuid>>;
-
-/// Groups the ships by their paint ports, those of their Record and those of their vehicle
-/// implementation, and the tags of their Record, and returns why the files of the ships that could
-/// not be used cannot be read, one entry per ship.
-fn group_ships(vehicles: &[VehicleFacts]) -> (ShipsByPorts, Vec<String>) {
-    let mut by_ports = ShipsByPorts::new();
-    let mut unreadable = Vec::new();
-    for vehicle in vehicles {
-        let mut ports = vehicle.paint_ports.clone();
-        unreadable.extend(vehicle.implementation.unreadable.iter().cloned());
-        ports.extend(vehicle.implementation.ports.iter().cloned());
-        ports.sort_unstable();
-        ports.dedup();
-        if !ports.is_empty() {
-            let mut tags = vehicle.tags.clone();
-            tags.sort_unstable();
-            tags.dedup();
-            by_ports
-                .entry(ShipPorts { ports, tags })
-                .or_default()
-                .push(vehicle.ship);
+    fn project(
+        &self,
+        matches: &ShipPaintMatches,
+        index: &PaintTagIndex<'_>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Paint, CatalogError> {
+        if cancel.is_some_and(CancelToken::is_cancelled) {
+            return Err(CatalogError::Cancelled);
         }
+        let paint = &self.item.paint;
+        let mut ship_guids: Vec<_> = matches
+            .fit(&paint.tags, &paint.required_tags, index)
+            .map(|ship| ship.guid)
+            .collect();
+        ship_guids.sort_by_cached_key(|guid| guid.text());
+        Ok(Paint {
+            item_guid: self.owner.guid,
+            ship_guids,
+        })
     }
-    (by_ports, unreadable)
 }
 
 fn summarise(paints: &[Paint], unreadable_vehicles: usize) -> PaintSummary {
@@ -163,8 +167,4 @@ fn summarise(paints: &[Paint], unreadable_vehicles: usize) -> PaintSummary {
         ships: with_paints.len(),
         unreadable_vehicles,
     }
-}
-
-fn lowered(tags: &[&str]) -> Vec<String> {
-    tags.iter().map(|tag| tag.to_ascii_lowercase()).collect()
 }
