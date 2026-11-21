@@ -11,9 +11,7 @@ use crate::catalog_read::original::{
     EntryCapture, EntryDiagnosis, EntryRead, EntryXml, PhysicalEntryIdentity,
 };
 use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogTable};
-#[cfg(test)]
-use crate::catalog_table::CatalogTable;
-use crate::catalog_table::DatasetAvailability;
+use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::collected::Collected;
 use crate::entry_source::EntrySource;
 use crate::export_diagnostic::ExportDiagnosticCode;
@@ -28,6 +26,8 @@ use crate::{CatalogError, CatalogOptions, Kind};
 #[path = "particle_library_nodes.rs"]
 mod nodes;
 
+pub use self::nodes::ParticleLibraryElement;
+
 const FOLDER: &str = "data/libs/particles/";
 const ROOT: &str = "ParticleLibrary";
 const KIND: Kind = Kind::ParticleLibraries;
@@ -36,9 +36,23 @@ const KIND: Kind = Kind::ParticleLibraries;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ParticleLibrary {
+pub struct ParticleLibrary {
     identity: PhysicalEntryIdentity,
-    nodes: Vec<nodes::ParticleLibraryElement>,
+    nodes: Vec<ParticleLibraryElement>,
+}
+
+impl ParticleLibrary {
+    /// Borrows the original physical Entry identity.
+    #[must_use]
+    pub const fn identity(&self) -> &PhysicalEntryIdentity {
+        &self.identity
+    }
+
+    /// Borrows the elements in authored depth-first order.
+    #[must_use]
+    pub fn nodes(&self) -> &[ParticleLibraryElement] {
+        &self.nodes
+    }
 }
 
 pub(crate) fn collect(
@@ -67,10 +81,32 @@ fn stage(
     directory: &Path,
 ) -> Result<StagedCatalogTable, CatalogError> {
     let mut rows = StagedCatalogRows::new(directory, cancel);
-    let availability = visit(archive, capture, ledger, filter, cancel, |row| {
-        rows.append(&row).map_err(Into::into)
-    })?;
+    let availability = visit(
+        archive,
+        archive.entries(),
+        capture,
+        ledger,
+        filter,
+        cancel,
+        |row| rows.append(&row).map_err(Into::into),
+    )?;
     rows.finish(availability).map_err(Into::into)
+}
+
+pub(crate) fn read_selected(
+    archive: &Archive,
+    entries: &[Entry],
+    capture: &EntryCapture<'_>,
+    ledger: &mut ExportLedger,
+    filter: Option<&Filter>,
+    cancel: Option<&CancelToken>,
+) -> Result<CatalogTable<ParticleLibrary>, CatalogError> {
+    let mut rows = Vec::new();
+    let availability = visit(archive, entries, capture, ledger, filter, cancel, |row| {
+        rows.push(row);
+        Ok(())
+    })?;
+    Ok(CatalogTable { availability, rows })
 }
 
 #[cfg(test)]
@@ -81,16 +117,12 @@ fn read(
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
 ) -> Result<CatalogTable<ParticleLibrary>, CatalogError> {
-    let mut rows = Vec::new();
-    let availability = visit(archive, capture, ledger, filter, cancel, |row| {
-        rows.push(row);
-        Ok(())
-    })?;
-    Ok(CatalogTable { availability, rows })
+    read_selected(archive, archive.entries(), capture, ledger, filter, cancel)
 }
 
 fn visit(
     archive: &Archive,
+    entries: &[Entry],
     capture: &EntryCapture<'_>,
     ledger: &mut ExportLedger,
     filter: Option<&Filter>,
@@ -100,10 +132,7 @@ fn visit(
     let mut available = false;
     let mut unknown = ledger.archive_inventory_problem.is_some();
     ledger.inventory(KIND);
-    let candidates = archive
-        .entries()
-        .iter()
-        .filter(|entry| in_scope(entry.path()));
+    let candidates = entries.iter().filter(|entry| in_scope(entry.path()));
     for entry in candidates {
         check_cancel(cancel)?;
         if filter.is_some_and(|filter| !filter.matches(entry.path())) {

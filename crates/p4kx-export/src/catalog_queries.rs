@@ -173,6 +173,9 @@ pub use self::equipment::planet_audio;
 #[path = "planet_resource_query.rs"]
 pub mod planet_resources;
 
+#[path = "particle_library_query.rs"]
+pub mod particle_libraries;
+
 #[path = "flare_library_query.rs"]
 pub mod flares;
 #[path = "radar_audio_query.rs"]

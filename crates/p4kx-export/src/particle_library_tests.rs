@@ -15,6 +15,8 @@ use crate::catalog_read::original::with_entry_capture;
 use crate::export_health_entries;
 use crate::{CatalogOptions, CatalogPublicationMode, build_catalog};
 
+#[path = "particle_library_query_tests.rs"]
+mod query;
 #[path = "particle_library_witness.rs"]
 mod witness;
 
@@ -383,7 +385,7 @@ fn rain_slots(
     library: &ParticleLibrary,
 ) -> impl Iterator<
     Item = (
-        &nodes::ParticleLibraryElement,
+        &ParticleLibraryElement,
         &p4kx_extraction::SourcedValue<bool>,
     ),
 > {

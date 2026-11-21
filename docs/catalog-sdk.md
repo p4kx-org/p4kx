@@ -190,6 +190,15 @@ Record index. The query shares the catalog's source projection for lightning eff
 their ordered target modes. Reuse a parsed session or an already decoded DataForge Entry
 for repeated lookups. [Weather configurations](catalog-weather.md)
 
+## Particle libraries
+
+Use `catalog_queries::particle_libraries::read_particle_libraries` to select the
+canonical `definitions.particleLibraries` rows by physical Entry index or across
+the family. Exact Entry selection opens only the selected eligible XML or CryXml
+payload. The typed rows retain ordered markup, typed rain occlusion and original
+field origins. Use the returned Entry counts and source inventory to check
+read and selection coverage. [Particle library sources](catalog-particle-libraries.md)
+
 ## Radar audio configuration
 
 Use `catalog_queries::radar_audio::read_radar_audio` to read original rows from

@@ -31,6 +31,14 @@ false, ignoring surrounding whitespace. An invalid value retains its original
 decoded token in `attributes`. Light tokens such as `SharedLight`, `StartLight`
 and `TargetLight` are stored as authored attributes with their direct field origin.
 
+The Rust SDK exposes these rows through
+`catalog_queries::particle_libraries::read_particle_libraries`. Supply
+`ParticleLibrarySelection::EntryIndex` for the original root directory index or
+`ParticleLibrarySelection::All` for the family. Neither selection opens DataForge
+or referenced media. The result includes the directory proof, read outcomes and
+the source inventory used by the returned cells. Check `is_selection_complete()`
+before interpreting empty data as absence or replacing an existing cache.
+
 These declarations describe particle-library authoring data. Runtime assignment,
 probabilities, propagation, and audio links require separate source declarations.
 Existing authored particle resource references remain paths.

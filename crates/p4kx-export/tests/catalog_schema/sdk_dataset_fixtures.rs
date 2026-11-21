@@ -51,6 +51,10 @@ pub(super) fn open() -> TestResult<(tempfile::TempDir, Archive)> {
             b"<LensFlareLibrary><FlareItem Name='fixture'/></LensFlareLibrary>",
         ))
         .entry(TestEntry::stored(
+            "Data/Libs/Particles/fixture.xml",
+            b"<ParticleLibrary><Particles><Params RainOcclusion='true'/></Particles></ParticleLibrary>",
+        ))
+        .entry(TestEntry::stored(
             SUBSUMPTION_FIXTURE,
             b"<Subsumption><Event ID='00000000-0000-0000-0000-000000000001'/></Subsumption>",
         ))

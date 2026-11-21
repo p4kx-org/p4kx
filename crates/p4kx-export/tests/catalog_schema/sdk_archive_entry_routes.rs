@@ -4,6 +4,9 @@
 use p4kx_export::catalog_queries::CatalogLanguageSelection;
 use p4kx_export::catalog_queries::flares::{FlareLibrarySelection, read_flare_libraries};
 use p4kx_export::catalog_queries::localization::with_language_sources;
+use p4kx_export::catalog_queries::particle_libraries::{
+    ParticleLibrarySelection, read_particle_libraries,
+};
 use p4kx_export::catalog_queries::radar_audio::{RadarAudioSelection, read_radar_audio};
 use p4kx_export::catalog_queries::shops::{ShopInventorySelection, read_shop_inventories};
 use p4kx_export::catalog_queries::subsumption_events::{
@@ -12,7 +15,8 @@ use p4kx_export::catalog_queries::subsumption_events::{
 use p4kx_extraction::Archive;
 
 use super::super::{
-    FLARE_LIBRARIES, LANGUAGE_SOURCES, RADAR_AUDIO, SHOP_INVENTORIES, SUBSUMPTION_EVENTS,
+    FLARE_LIBRARIES, LANGUAGE_SOURCES, PARTICLE_LIBRARIES, RADAR_AUDIO, SHOP_INVENTORIES,
+    SUBSUMPTION_EVENTS,
 };
 use super::{Route, TestResult, fixtures};
 
@@ -55,6 +59,15 @@ pub(super) fn read_flare_library(archive: &Archive) -> TestResult<Route> {
         FLARE_LIBRARIES,
         &snapshot.rows,
         "synthetic canonical parity and installed source witness available; installed producer parity open",
+    )
+}
+
+pub(super) fn read_particle_library(archive: &Archive) -> TestResult<Route> {
+    let snapshot = read_particle_libraries(archive, ParticleLibrarySelection::All, None)?;
+    Route::queried_rows(
+        PARTICLE_LIBRARIES,
+        &snapshot.rows,
+        "synthetic producer parity available; installed producer parity and memory evidence open",
     )
 }
 

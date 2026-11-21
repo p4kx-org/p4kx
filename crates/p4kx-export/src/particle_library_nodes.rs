@@ -19,7 +19,7 @@ const RAIN_OCCLUSION: &str = "RainOcclusion";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ParticleLibraryElement {
+pub struct ParticleLibraryElement {
     pub(super) node_index: SourcedValue<u32>,
     pub(super) parent_node_index: SourcedValue<u32>,
     pub(super) name: SourcedValue<String>,
@@ -27,6 +27,44 @@ pub(super) struct ParticleLibraryElement {
     #[schemars(extend("x-gameText" = true))]
     pub(super) text: Vec<SourcedValue<String>>,
     pub(super) rain_occlusion: Option<SourcedValue<bool>>,
+}
+
+impl ParticleLibraryElement {
+    /// Borrows the original element index.
+    #[must_use]
+    pub const fn node_index(&self) -> &SourcedValue<u32> {
+        &self.node_index
+    }
+
+    /// Borrows the original parent index, absent at the root.
+    #[must_use]
+    pub const fn parent_node_index(&self) -> &SourcedValue<u32> {
+        &self.parent_node_index
+    }
+
+    /// Borrows the original element name.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<String> {
+        &self.name
+    }
+
+    /// Borrows the original attributes in source order.
+    #[must_use]
+    pub fn attributes(&self) -> &[SourcedXmlAttribute] {
+        &self.attributes
+    }
+
+    /// Borrows the direct text occurrences in source order.
+    #[must_use]
+    pub fn text(&self) -> &[SourcedValue<String>] {
+        &self.text
+    }
+
+    /// Borrows the typed rain occlusion cell for an applicable Params element.
+    #[must_use]
+    pub const fn rain_occlusion(&self) -> Option<&SourcedValue<bool>> {
+        self.rain_occlusion.as_ref()
+    }
 }
 
 struct Parent {

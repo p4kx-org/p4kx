@@ -268,6 +268,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(resource_network::read()?);
     routes.extend(radar_options::read()?);
     routes.push(planet_audio::read()?);
+    routes.push(archive_entries::read_particle_library(archive)?);
     routes.extend(fuel::read()?);
     routes.extend(hacking::read()?);
     routes.push(inventory_containers::read()?);
