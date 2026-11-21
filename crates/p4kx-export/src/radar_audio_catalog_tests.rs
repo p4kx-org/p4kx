@@ -34,6 +34,7 @@ const SYNTHETIC: &[u8] = br#"<RadarAudioData>
         <SoundEvent name="empty" value=""/>
         <SoundEvent name="authored" value="FixtureToken"/>
         <SoundEvent name="state-token" value="FixtureState"/>
+        <SoundEvent name="no-control" value="FixtureNoControl"/>
         <Unknown><SoundEvent name="future" value="other"/></Unknown>
     </SoundEvents>
 </RadarAudioData>"#;
@@ -77,7 +78,11 @@ fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
         .entry(TestEntry::stored(
             "Data/Libs/GameAudio/fixture-atl.xml",
             br#"<ATLConfig>
-                <AudioTriggers><ATLTrigger atl_name="FixtureToken"/></AudioTriggers>
+                <AudioTriggers>
+                    <ATLTrigger atl_name="FixtureToken">
+                        <WwiseEvent wwise_name="FixtureToken"/>
+                    </ATLTrigger>
+                </AudioTriggers>
                 <AudioSwitches>
                     <ATLSwitch atl_name="FixtureSwitch">
                         <ATLSwitchState atl_name="FixtureState">
@@ -130,8 +135,9 @@ fn check_text(row: &RadarAudioConfiguration) -> TestResult {
             RadarAudioBindingStatus::EmptyValue,
             RadarAudioBindingStatus::UnprovenSelector,
             RadarAudioBindingStatus::UnprovenSelector,
+            RadarAudioBindingStatus::UnprovenSelector,
         ],
-        "neither an adjacent trigger nor a switch-state name supplies an authored selector"
+        "a matching trigger, a matching switch state and an absent control all lack a selector"
     );
     Ok(())
 }

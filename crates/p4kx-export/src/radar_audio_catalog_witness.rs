@@ -67,9 +67,9 @@ fn installed_radar_audio_reconciles_ordered_sound_slots_and_selector_coverage() 
     };
 
     check_tree(row.elements(), original.root(), &snapshot.source_inventory)?;
-    check_slots(row.elements(), original.root())?;
+    let census = check_slots(row.elements(), original.root())?;
     watch.check()?;
-    report(build.change_number());
+    report(build.change_number(), &census);
     Ok(())
 }
 
@@ -139,10 +139,13 @@ pub(super) fn check_payload_scope(
 
 #[expect(
     clippy::print_stdout,
-    reason = "installed witness prints only the verified Build and Entry count"
+    reason = "installed witness prints only the verified Build and aggregate source structure"
 )]
-fn report(change: &str) {
-    println!("radar audio source witness: change={change}, entries=1");
+fn report(change: &str, census: &SlotCensus) {
+    println!(
+        "radar audio source witness: change={change}, entries=1, slots={}, nonempty={}, extraAttributes={}, childElements={}",
+        census.slots, census.nonempty, census.extra_attributes, census.child_elements
+    );
 }
 fn check_tree(
     actual: &[RadarAudioNode],
@@ -325,22 +328,38 @@ fn check_use(
     Ok(())
 }
 
-fn check_slots(actual: &[RadarAudioNode], root: SourceElement<'_>) -> TestResult {
+#[derive(Default)]
+struct SlotCensus {
+    slots: usize,
+    nonempty: usize,
+    extra_attributes: usize,
+    child_elements: usize,
+}
+
+fn check_slots(actual: &[RadarAudioNode], root: SourceElement<'_>) -> TestResult<SlotCensus> {
+    let mut census = SlotCensus::default();
     let slots = root
         .elements()
         .filter(|node| node.namespace().is_none() && node.name() == "SoundEvents")
         .flat_map(SourceElement::elements)
         .filter(|node| node.namespace().is_none() && node.name() == "SoundEvent")
         .map(|node| {
-            node.attributes()
-                .find(|attr| attr.namespace().is_none() && attr.name() == "value")
-                .map(|attr| attr.value())
+            census.slots += 1;
+            census.child_elements += node.elements().count();
+            let mut raw = None;
+            for attr in node.attributes() {
+                match (attr.namespace(), attr.name()) {
+                    (None, "name") => {}
+                    (None, "value") => raw = Some(attr.value()),
+                    _ => census.extra_attributes += 1,
+                }
+            }
+            census.nonempty += usize::from(raw.is_some_and(|value| !value.is_empty()));
+            raw
         })
         .collect::<Vec<_>>();
-    assert!(
-        slots
-            .iter()
-            .any(|state| state.is_some_and(|value| !value.is_empty())),
+    assert_ne!(
+        census.nonempty, 0,
         "installed witness includes a nonempty authored token",
     );
     let projected: Vec<_> = actual
@@ -367,5 +386,5 @@ fn check_slots(actual: &[RadarAudioNode], root: SourceElement<'_>) -> TestResult
         };
         assert_eq!(binding.value(), Some(&expected));
     }
-    Ok(())
+    Ok(census)
 }
