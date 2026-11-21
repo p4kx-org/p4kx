@@ -84,7 +84,7 @@ The session still owns or borrows the decoded DataForge and its lazy metadata in
 point query avoids sibling group bodies. The explicit parent projection retains its necessary
 family selector observations and releases unrelated group trees as they are consumed. Existing
 sequential original-field preparations are reused; a single body read does not imply constant
-memory. No fixed family-size or membership quota is introduced, and these APIs alone do not
-establish a measured 16 GiB desktop acceptance result.
+memory. Measure the application peak for the requested projection against
+the SDK memory budget.
 
 Decision: [ADR0409](adr/0409-resource-group-queries-separate-authored-memberships-from-parent-surveys.md).

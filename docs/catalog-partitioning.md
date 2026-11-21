@@ -13,9 +13,9 @@ The producer ran for 19 minutes 27 seconds on a Windows host with 93.67 GiB of s
 Windows recorded a 26.28 GiB process working-set peak. Sampled available system RAM stayed at
 or above 25.99 GiB, with at least 69.52 GiB of commit headroom. The sealed row spools held
 472,249,284 bytes. Windows reported 1,678,571,916 logical process write bytes, including the
-compressed publication. These figures profile the producer on that host. Acceptance requires a 64 GiB system
-for the complete catalog and a 16 GiB system for individual SDK queries and the reduced
-Basetool catalog.
+compressed publication. The two historical working-set peaks are below the
+current 40 GB limit. Use the candidate Build and binary with all required
+memory counters for release acceptance.
 
 | Decoded section | LIVE bytes | PTU bytes |
 | --- | ---: | ---: |
@@ -340,34 +340,49 @@ work. Keep those measurements distinct from the package reader and the transfer 
 
 ## System memory acceptance
 
-Verify individual SDK queries and the reduced Basetool catalog on a system
-with 16 GiB total physical or assigned RAM. Verify generation and import of
-the agreed reduced export. For SDK queries used in a cached consumer workflow,
-measure cold-cache, changed-Build and warm-cache runs. Verify that each query
-reads the requested data and its dependencies, keeps the previous cache on
-failure and leaves the desktop usable during refresh.
+Measure the peak P4KX application footprint on an available test host. The
+budgets are strict upper bounds in decimal bytes.
 
-Run the complete unfiltered LIVE and current PTU Catalog exports with the
-normal packaged command on a system with 64 GiB total physical or assigned RAM.
-Each result retains every field, language, cross-domain reference and per-value
-origin of the complete schema-v3 document. The operating system, desktop,
-background services and running processes share the available RAM in both test
-environments. Use ordinary OS paging and record the baseline and background
-workload for each run. Measurements on larger systems are producer profiles.
+| Operation | Peak P4KX memory below | Target system capacity |
+| --- | ---: | ---: |
+| Individual SDK queries | 2,000,000,000 bytes (2 GB) | 16 GiB total |
+| Reduced Basetool catalog generation | 2,000,000,000 bytes (2 GB) | 16 GiB total |
+| Complete unfiltered Catalog v3 export | 40,000,000,000 bytes (40 GB) | 64 GiB total |
 
-Record total system RAM, OS, CPU and the running system's baseline memory
-before launch. Measure the producer's peak working set and private bytes,
-the lowest available physical memory, system commit and paging, elapsed
-time, process bytes written and peak temporary storage.
-Check that the desktop remains usable for the usual light work throughout
-the export. Record any stalls alongside the system paging measurements.
-For a virtual machine, record the fixed guest RAM allocation and the RAM
-visible to the guest. Keep that allocation fixed throughout the run and
-check host memory pressure and paging separately.
+Subtract the measured peak from the target capacity to estimate the headroom
+for the operating system, desktop and other processes. This measurement is
+the release criterion and can run on a host with more installed memory.
 
-Run the artifact replay separately. Derive the raw verification artifact from
-the same compressed output so the test prepares the Catalog only once. A
-process quota or reserve on a larger machine measures a different condition.
+Measure P4KX and any helpers that run with it. Record peak resident memory
+and peak private committed bytes where available. Use the higher observed
+value for the budget and identify the counters and sampling method. Also
+record the exact Build and binary, host RAM, OS, CPU, baseline workload,
+minimum available RAM, paging, elapsed time, process writes and scratch peak.
+
+For cached SDK workflows, exercise cold, changed-Build and warm cases.
+Verify the selected data and dependency coverage and confirm that cancellation
+or failure retains the previous cache. Measure the SDK harness and record
+whole-application memory separately when measuring an embedded integration.
+Verify generation and import of the agreed reduced export.
+
+Run the complete normal packaged exporter for installed LIVE and current PTU.
+Each complete v3 export preserves all fields, languages, cross-domain links
+and per-value origins. Use a single compressed output and verify the decoded
+stream from that artifact in a separate replay, so the measured producer runs
+once per Build.
+
+Two previously completed normal producer runs also recorded both counters.
+The working-set peaks came from Windows and the private-byte peaks were
+sampled once per second.
+
+| Build | Producer revision | Peak working set | Peak sampled private bytes |
+| --- | --- | ---: | ---: |
+| LIVE `13165946` | `e914e57071` | 28,307,202,048 | 29,370,675,200 |
+| PTU `13238477` | `95bb2fc264` | 29,564,633,088 | 30,664,122,368 |
+
+Both used two Rayon workers and Zstandard level 3. These runs support the
+40 GB budget estimate. Apply the same measurements to the release candidate
+with installed LIVE and current PTU.
 [Catalog work](https://github.com/p4kx-org/p4kx/issues/1151) ·
 [Release acceptance](https://github.com/p4kx-org/p4kx/issues/1116)
 

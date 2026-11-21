@@ -339,12 +339,13 @@ aggregate row and source counts and coverage on successful requests. It writes n
 or persistent cache files. A successful read includes its observed coverage. Inspect that
 coverage when deciding which snapshots your application can use.
 
-Measure individual SDK queries on a system with 16 GiB total RAM, including the operating
-system and representative desktop activity. Run the built executable directly on that system.
-Record the exact SDK revision and executable digest, process and helper peaks, minimum
-available system RAM, paging and temporary disk usage. A harness run measures the local
-SDK and this cache policy. The integrated application also needs its normal desktop workflow
-checked. [Local consumer RAM acceptance](catalog-partitioning.md#system-memory-acceptance)
+Run the built executable directly on an available host and verify that the
+peak footprint of each SDK workflow stays below 2 GB. Record the exact SDK
+revision and executable digest, process and helper peaks, minimum available
+system RAM, paging and temporary disk usage. The measured SDK budget informs
+the headroom estimate for a desktop with 16 GiB total RAM. Check the integrated
+desktop workflow and record its total footprint separately.
+[Local consumer RAM acceptance](catalog-partitioning.md#system-memory-acceptance)
 
 The synthetic `consumer_refresh` integration cases show how one parsed view can serve several
 queries in one refresh. They resolve a reward source to its physical pool and Blueprint and

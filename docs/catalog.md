@@ -15,9 +15,10 @@ output creation. The CLI and GUI select no Child-count allowance.
 
 ## System memory
 
-Verify the complete unfiltered Catalog with 64 GiB total system RAM. Verify individual SDK
-queries and generation and import of the reduced Basetool catalog with 16 GiB total system RAM.
-The operating system, desktop and other processes share each capacity.
+The complete unfiltered Catalog must use less than 40 GB of P4KX memory.
+Individual SDK queries and generation of the reduced Basetool catalog must
+use less than 2 GB. Use measured application peaks to estimate the headroom
+for the operating system and desktop on 64 GiB and 16 GiB systems.
 [System memory acceptance](catalog-partitioning.md#system-memory-acceptance) specifies the tests.
 
 ## Media files
