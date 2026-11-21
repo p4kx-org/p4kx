@@ -221,9 +221,12 @@ retains the observed candidate prefix. The linked DIDX row describes DATA availa
 prefetch extent. A resolved DIDX identity alone makes no claim about media readability.
 
 Decoded Sound sources with streamed or prefetch-streamed storage link to each numeric loose WEM
-with the authored media ID in the same opened Archive. Prefetch-streamed Sound also keeps its
-independent DIDX reference to the embedded prefix. The loose summary reports `resolved` for one
-physical match, `missing` for none and `ambiguous` for multiple matches in a complete inventory.
+with the authored media ID in the same opened Archive. An embedded Sound also gets a loose lookup
+when the complete DIDX inventory contains no matching media ID. Its Sound row preserves the
+authored storage, and the independent DIDX lookup reports the missing embedded media.
+Prefetch-streamed Sound keeps its DIDX reference to the embedded prefix. The loose summary reports
+`resolved` for one physical match, `missing` for none and `ambiguous` for multiple matches in a
+complete inventory.
 A recovered directory reports `unavailable` with the observed candidates and an
 `incomplete-inventory` reason.
 

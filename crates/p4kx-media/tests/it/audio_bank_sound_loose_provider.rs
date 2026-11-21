@@ -23,7 +23,7 @@ const INVENTORY: &str = "audio-loose-wem-candidate";
 const ZIP_END_BYTES: usize = 22;
 
 #[test]
-fn authored_streamed_sound_links_all_physical_candidates_inside_its_own_archive() -> TestResult {
+fn sound_links_all_physical_loose_candidates_inside_its_own_archive() -> TestResult {
     let folder = tempfile::tempdir()?;
     let archive = fixture(folder.path())?;
     let output = folder.path().join("media");
@@ -42,13 +42,14 @@ fn authored_streamed_sound_links_all_physical_candidates_inside_its_own_archive(
     check_summary(&rows, root, &[1, 0], 42, "ambiguous", 3)?;
     check_summary(&rows, root, &[1, 1], 42, "ambiguous", 3)?;
     check_summary(&rows, root, &[1, 2], 92, "missing", 0)?;
+    check_embedded_fallback(&rows, root)?;
     check_summary(&rows, nested, &[1, 0], 42, "resolved", 1)?;
     assert!(
         rows.iter()
             .all(|row| row.subresource.namespace != RESOLUTION
                 || !root.owns(row)
-                || matches!(row.subresource.indices.as_slice(), [1, 0..=2])),
-        "embedded-only and external sources do not receive authored loose references"
+                || matches!(row.subresource.indices.as_slice(), [1, 0..=3])),
+        "external sources do not receive loose references"
     );
     let origins = Origins::read(&output.join(&index.artifact_base))?;
     check_root_candidates(&rows, root, &origins)?;
@@ -242,11 +243,39 @@ fn bank_row<'rows>(
         .ok_or_else(|| format!("missing {namespace} at {indices:?} in {}", owner.path).into())
 }
 
+fn check_embedded_fallback(rows: &[MediaRecord], owner: BankScope) -> TestResult {
+    let indices = [1, 3];
+    let (_, sound) = bank_row(rows, owner, "audio-bank-hirc-sound", &indices)?;
+    assert_eq!(
+        sound.data.pointer("/payload/source/storage"),
+        Some(&json!("embedded")),
+        "the authored storage is preserved"
+    );
+    let (_, didx) = bank_row(
+        rows,
+        owner,
+        "audio-bank-hirc-sound-media-resolution",
+        &indices,
+    )?;
+    assert_eq!(
+        didx.data,
+        json!({
+            "record_type":"bank-hirc-sound-media-resolution",
+            "payload":{
+                "resolution":"missing", "observed_candidates":"0", "candidates_complete":true
+            }
+        }),
+        "the independent DIDX lookup accounts for the absent embedded media"
+    );
+    check_summary(rows, owner, &indices, 42, "ambiguous", 3)
+}
+
 fn check_root_candidates(rows: &[MediaRecord], owner: BankScope, origins: &Origins) -> TestResult {
     for (candidate, entry) in [1, 2, 3].into_iter().enumerate() {
         let candidate = u64::try_from(candidate)?;
         let (ordinal, target) = linked(rows, owner, &[1, 0, candidate], entry)?;
         linked(rows, owner, &[1, 1, candidate], entry)?;
+        let (fallback_ordinal, _) = linked(rows, owner, &[1, 3, candidate], entry)?;
         assert_eq!(
             target.data.pointer("/payload/selection/status"),
             Some(&json!("not-selected")),
@@ -254,6 +283,7 @@ fn check_root_candidates(rows: &[MediaRecord], owner: BankScope, origins: &Origi
         );
         if entry == 2 {
             check_locked_candidate(origins, ordinal, target)?;
+            check_locked_candidate(origins, fallback_ordinal, target)?;
         }
     }
     Ok(())

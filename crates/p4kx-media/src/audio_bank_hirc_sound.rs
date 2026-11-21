@@ -69,5 +69,5 @@ pub(crate) fn project(
         issue.as_slice(),
     )?;
     audio_bank_sound_reference::project(projection, version, sound, didx, writer)?;
-    loose::project(projection, version, sound, writer)
+    loose::project(projection, version, sound, didx, writer)
 }

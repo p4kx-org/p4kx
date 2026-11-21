@@ -6,6 +6,7 @@ use p4kx_extraction::bank::{BankHircSound, BankSoundRead, MediaStorage};
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::audio_bank_didx_index::DidxIndex;
 use crate::audio_bank_inventory::VersionSite;
 use crate::audio_bank_projection::BankProjection;
 use crate::audio_bank_sound_origins::SoundSites;
@@ -41,17 +42,23 @@ pub(super) fn project(
     projection: &BankProjection<'_>,
     version: VersionSite,
     sound: &BankHircSound,
+    didx: &DidxIndex,
     writer: &mut MediaWriter<'_>,
 ) -> Result<(), MediaError> {
     let BankSoundRead::Decoded(source) = sound.status else {
         return Ok(());
     };
-    if !source.has_media_file()
-        || !matches!(
-            source.storage,
-            MediaStorage::Streamed | MediaStorage::PrefetchStreamed
-        )
-    {
+    if !source.has_media_file() {
+        return Ok(());
+    }
+    let search_loose = match source.storage {
+        MediaStorage::Streamed | MediaStorage::PrefetchStreamed => true,
+        MediaStorage::Embedded => {
+            didx.is_complete() && didx.candidates(source.source_id).is_empty()
+        }
+        MediaStorage::Other(_) => false,
+    };
+    if !search_loose {
         return Ok(());
     }
     writer.start_reference()?;
