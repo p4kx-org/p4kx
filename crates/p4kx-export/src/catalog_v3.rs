@@ -193,7 +193,7 @@ pub(crate) mod catalog_quantum_drive;
 #[path = "catalog_quantum_interdiction.rs"]
 pub(crate) mod catalog_quantum_interdiction;
 #[path = "catalog_radar_options.rs"]
-mod catalog_radar_options;
+pub(crate) mod catalog_radar_options;
 #[path = "catalog_resource_component.rs"]
 mod catalog_resource_component;
 #[path = "catalog_resource_connection.rs"]

@@ -146,6 +146,14 @@ pub mod terrain;
 #[path = "climate_asset_query.rs"]
 pub mod climate;
 
+/// Selective access to original game-mode configurations.
+pub mod game_modes {
+    pub use super::equipment::component_definitions::game_modes::{
+        RadarModeParameters, RadarOptionParameters, RadarOptionsConfiguration,
+        RadarOptionsSnapshot, with_radar_options, with_radar_options_from,
+    };
+}
+
 /// Selective access to original weather-related configuration Records.
 pub mod weather {
     pub use super::equipment::component_definitions::weather::{

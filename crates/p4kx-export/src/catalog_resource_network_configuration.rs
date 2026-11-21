@@ -40,16 +40,16 @@ impl<'source> GameModeConfigurations<'source> {
         mode: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
-        let game_mode_id = mode.borrowed_enum_to("id", "EGameModeId", notes)?;
-        let (network, radar) = mode
-            .strong_pointer_family_to(PARAMS, "SIParamsModule", notes, |params, notes| {
-                let source_type = params.source_type_value()?;
-                Ok((
-                    ModeParameters::read(params, source_type.clone(), notes)?,
-                    RadarModeParameters::read(params, source_type, notes)?,
-                ))
-            })?
-            .unzip();
+        let GameModeFields {
+            game_mode_id,
+            params,
+        } = read_mode(mode, notes, |params, source_type, notes| {
+            Ok((
+                ModeParameters::read(params, source_type.clone(), notes)?,
+                RadarModeParameters::read(params, source_type, notes)?,
+            ))
+        })?;
+        let (network, radar) = params.unzip();
         Ok(Self {
             network: ResourceNetworkConfiguration {
                 source: source.clone(),
@@ -59,6 +59,44 @@ impl<'source> GameModeConfigurations<'source> {
             radar: RadarOptionsConfiguration::new(source, game_mode_id, radar),
         })
     }
+}
+
+pub(super) fn read_radar<'source>(
+    source: CanonicalRecordHeader<'source>,
+    mode: Observed<'_, '_, '_, 'source>,
+    notes: &mut Vec<FieldError>,
+) -> Result<RadarOptionsConfiguration<'source>, CatalogError> {
+    let GameModeFields {
+        game_mode_id,
+        params,
+    } = read_mode(mode, notes, RadarModeParameters::read)?;
+    Ok(RadarOptionsConfiguration::new(source, game_mode_id, params))
+}
+
+struct GameModeFields<'source, Row> {
+    game_mode_id: SourcedValue<&'source str>,
+    params: SourcedValue<Row>,
+}
+
+fn read_mode<'source, Row>(
+    mode: Observed<'_, '_, '_, 'source>,
+    notes: &mut Vec<FieldError>,
+    read: impl FnOnce(
+        Observed<'_, '_, '_, 'source>,
+        SourcedValue<&'source str>,
+        &mut Vec<FieldError>,
+    ) -> Result<Row, CatalogError>,
+) -> Result<GameModeFields<'source, Row>, CatalogError> {
+    let game_mode_id = mode.borrowed_enum_to("id", "EGameModeId", notes)?;
+    let params =
+        mode.strong_pointer_family_to(PARAMS, "SIParamsModule", notes, |params, notes| {
+            let source_type = params.source_type_value()?;
+            read(params, source_type, notes)
+        })?;
+    Ok(GameModeFields {
+        game_mode_id,
+        params,
+    })
 }
 
 #[derive(Debug, Serialize, JsonSchema)]

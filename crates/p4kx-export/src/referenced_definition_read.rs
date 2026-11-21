@@ -14,7 +14,7 @@ use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_read::scoped_source_read::ScopedSourceRead;
-use crate::export_diagnostic::{ExportDiagnosticSeverity, ExportSourceRole};
+use crate::export_diagnostic::ExportSourceRole;
 use crate::export_field_inspection::ConfigurationInspection;
 use crate::export_field_walk;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
@@ -164,12 +164,7 @@ pub(super) fn read_selected<'source, Row>(
     ) -> Result<Row, CatalogError>,
 ) -> Result<ScopedSourceRead<Row>, CatalogError> {
     let read = read_row(tree, input, admission, inspection, cancel, project)?;
-    let complete = read.ledger.field_inspections.iter().all(|row| row.complete)
-        && read
-            .ledger
-            .field_diagnostics
-            .iter()
-            .all(|diagnostic| diagnostic.severity == ExportDiagnosticSeverity::Information);
+    let complete = read.ledger.field_projection_complete(0, 0);
     Ok(ScopedSourceRead::new(read.row, Vec::new(), complete))
 }
 

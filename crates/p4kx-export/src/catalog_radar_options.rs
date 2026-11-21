@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
+use super::catalog_item_components::source_getters;
 use crate::CatalogError;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::schema_fields::every_field_required;
@@ -19,13 +20,22 @@ const RADAR_TYPE: &str = "RadarOptionParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct RadarOptionsConfiguration<'source> {
+pub struct RadarOptionsConfiguration<'source> {
     source: CanonicalRecordHeader<'source>,
     game_mode_id: SourcedValue<&'source str>,
     params: SourcedValue<RadarModeParameters<'source>>,
 }
 
 impl<'source> RadarOptionsConfiguration<'source> {
+    source_getters! {
+        /// Borrows the original physical game-mode Record header.
+        source: CanonicalRecordHeader<'source>,
+        /// Borrows the authored game-mode identifier.
+        game_mode_id: SourcedValue<&'source str>,
+        /// Borrows the original parameter pointer state and radar branch.
+        params: SourcedValue<RadarModeParameters<'source>>,
+    }
+
     pub(super) const fn new(
         source: CanonicalRecordHeader<'source>,
         game_mode_id: SourcedValue<&'source str>,
@@ -39,16 +49,32 @@ impl<'source> RadarOptionsConfiguration<'source> {
     }
 }
 
+/// Radar settings of the original owned game-mode parameters.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct RadarModeParameters<'source> {
+pub struct RadarModeParameters<'source> {
     source_type: SourcedValue<&'source str>,
     radar_option_params: SourcedValue<RadarOptionParameters<'source>>,
     raw_radar_option_params: Option<SourcedValue<SourceArenaOutput<'source>>>,
 }
 
 impl<'source> RadarModeParameters<'source> {
+    source_getters! {
+        /// Borrows the original concrete game-mode parameter class.
+        source_type: SourcedValue<&'source str>,
+        /// Borrows the typed radar declaration and its source state.
+        radar_option_params: SourcedValue<RadarOptionParameters<'source>>,
+    }
+
+    /// Borrows the retained original radar branch when its nominal shape is unsupported or invalid.
+    #[must_use]
+    pub const fn raw_radar_option_params(
+        &self,
+    ) -> Option<&SourcedValue<SourceArenaOutput<'source>>> {
+        self.raw_radar_option_params.as_ref()
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         source_type: SourcedValue<&'source str>,
@@ -70,10 +96,11 @@ impl<'source> RadarModeParameters<'source> {
     }
 }
 
+/// Original radar flags and remaining authored members.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct RadarOptionParameters<'source> {
+pub struct RadarOptionParameters<'source> {
     source_type: SourcedValue<&'source str>,
     #[serde(rename = "useFPSTagging")]
     use_fps_tagging: SourcedValue<bool>,
@@ -90,6 +117,27 @@ struct RadarOptionParameters<'source> {
 }
 
 impl<'source> RadarOptionParameters<'source> {
+    source_getters! {
+        /// Borrows the original radar option class.
+        source_type: SourcedValue<&'source str>,
+        /// Borrows the authored FPS tagging flag.
+        use_fps_tagging: SourcedValue<bool>,
+        /// Borrows the authored FPS scan-mode flag.
+        use_fps_scan_mode: SourcedValue<bool>,
+        /// Borrows the authored scan-mode flag.
+        enable_scan_mode: SourcedValue<bool>,
+        /// Borrows the authored experimental-features flag.
+        use_experimental_features: SourcedValue<bool>,
+        /// Borrows the authored delta-signature flag.
+        allow_delta_signature: SourcedValue<bool>,
+        /// Borrows the authored emissions HUD flag.
+        allow_emissions_hud: SourcedValue<bool>,
+        /// Borrows the authored FPS ping-wave flag.
+        allow_fps_ping_wave: SourcedValue<bool>,
+        /// Borrows original members outside the typed flags.
+        additional_fields: SourceArenaOutput<'source>,
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

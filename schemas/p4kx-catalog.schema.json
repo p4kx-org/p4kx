@@ -40253,6 +40253,7 @@
       "type": "object"
     },
     "RadarModeParameters": {
+      "description": "Radar settings of the original owned game-mode parameters.",
       "properties": {
         "radarOptionParams": {
           "$ref": "#/$defs/SourcedValueOfRadarOptionParameters"
@@ -40279,6 +40280,7 @@
       "type": "object"
     },
     "RadarOptionParameters": {
+      "description": "Original radar flags and remaining authored members.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"

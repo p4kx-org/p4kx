@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::catalog_row::{CatalogRows, ExcludedCatalogRow};
-use crate::export_diagnostic::ExportSourceRole;
+use crate::export_diagnostic::{ExportDiagnosticSeverity, ExportSourceRole};
 use crate::export_field_inspection::FieldInspection;
 use crate::health_diagnostic_observation::DiagnosticObservation as ExportDiagnostic;
 pub(crate) use crate::record_derived_observation::DerivedFailure;
@@ -73,6 +73,19 @@ impl ExportLedger {
     /// Records a retained-row derived failure separately from source omission.
     pub(crate) fn derived_failure(&mut self, failure: DerivedFailure) {
         self.derived_failures.push(failure);
+    }
+
+    /// Reports whether the fields inspected since the given offsets are complete.
+    pub(crate) fn field_projection_complete(&self, inspections: usize, diagnostics: usize) -> bool {
+        self.field_inspections
+            .iter()
+            .skip(inspections)
+            .all(|row| row.complete)
+            && self
+                .field_diagnostics
+                .iter()
+                .skip(diagnostics)
+                .all(|row| row.severity == ExportDiagnosticSeverity::Information)
     }
 
     /// Adds represented field states without inventing source-Record outcomes.

@@ -145,5 +145,7 @@ definition_query!(
     with_consumable_subtypes_from, languages; languages
 );
 
+#[path = "equipment_game_mode_query.rs"]
+pub(in crate::build::catalog_queries) mod game_modes;
 #[path = "weather_query.rs"]
 pub(in crate::build::catalog_queries) mod weather;

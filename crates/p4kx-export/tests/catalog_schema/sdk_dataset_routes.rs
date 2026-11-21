@@ -120,6 +120,8 @@ mod projectile_ammo;
 mod projectile_ammo_fixture;
 #[path = "sdk_quality_routes.rs"]
 mod quality;
+#[path = "sdk_radar_options_route.rs"]
+mod radar_options;
 #[path = "sdk_reputation_routes.rs"]
 mod reputation;
 #[path = "../it/reputation_fixture/mod.rs"]
@@ -253,6 +255,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(reputation::read()?);
     routes.push(reputation_rewards::read()?);
     routes.extend(resource_network::read()?);
+    routes.push(radar_options::read()?);
     routes.extend(fuel::read()?);
     routes.extend(hacking::read()?);
     routes.push(inventory_containers::read()?);

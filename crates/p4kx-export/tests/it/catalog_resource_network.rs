@@ -11,6 +11,8 @@ use crate::health_origin_assertions as proof;
 mod fixture;
 #[path = "catalog_radar_options_tests.rs"]
 mod radar;
+#[path = "catalog_radar_options_sdk.rs"]
+mod radar_sdk;
 
 const ROWS: &str = "/configurations/resourceNetworkParameters/rows";
 

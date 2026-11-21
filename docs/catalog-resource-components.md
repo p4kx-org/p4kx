@@ -176,3 +176,10 @@ unsupported, `params.value.rawRadarOptionParams` retains its readable
 original data for diagnostic exports. The regular Catalog Record filter
 selects the physical mode, and the health report covers the radar
 subtree and the required selectors. These flags have no units.
+
+Use `catalog_queries::game_modes::with_radar_options` for these rows by
+physical Record index or GUID. The `_from` form accepts an already decoded
+DataForge Entry, and a parsed query session can retain the input across
+calls. The query reads the original GameMode selectors and radar branch with
+per-field provenance. Its coverage tracks the radar branch independently of
+the sibling resource-network projection. No localization inputs are required.

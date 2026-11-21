@@ -16,7 +16,7 @@ use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection};
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_read::original::OriginalFlowFields;
-use crate::export_diagnostic::{ExportDiagnosticSeverity, ExportSourceRole};
+use crate::export_diagnostic::ExportSourceRole;
 use crate::export_field_inspection::ConfigurationInspection;
 use crate::export_field_walk;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
@@ -165,7 +165,9 @@ fn read_in<'source, Row>(
                 let diagnostics = read.ledger.field_diagnostics.len();
                 read.project(&tree, input, &admission, cancel, kind, project)?;
                 if let Some(coverage) = coverage.as_deref_mut()
-                    && !projection_complete(&read.ledger, inspections, diagnostics)
+                    && !read
+                        .ledger
+                        .field_projection_complete(inspections, diagnostics)
                 {
                     coverage.incomplete_fields.push(record.index());
                 }
@@ -228,19 +230,6 @@ fn candidate<'source>(
         return Ok(false);
     }
     select(trees, probe, record, selection)
-}
-
-fn projection_complete(ledger: &ExportLedger, inspections: usize, diagnostics: usize) -> bool {
-    ledger
-        .field_inspections
-        .iter()
-        .skip(inspections)
-        .all(|row| row.complete)
-        && ledger
-            .field_diagnostics
-            .iter()
-            .skip(diagnostics)
-            .all(|row| row.severity == ExportDiagnosticSeverity::Information)
 }
 
 fn select<'source>(
