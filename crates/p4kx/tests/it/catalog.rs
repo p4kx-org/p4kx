@@ -56,6 +56,16 @@ fn printed_schema() -> Result<String, Box<dyn Error>> {
     Ok(String::from_utf8(output.stdout)?)
 }
 
+fn redact_written_size(summary: &str, file: &Path) -> Result<String, Box<dyn Error>> {
+    let bytes = fs::metadata(file)?.len();
+    let checked = summary.replacen(&format!(": {bytes} bytes,"), ": [BYTES] bytes,", 1);
+    assert_ne!(
+        checked, summary,
+        "the summary reports the written file size"
+    );
+    Ok(checked)
+}
+
 fn redact_version(text: &str) -> String {
     text.replace(
         &format!("\"toolVersion\":\"{}\"", env!("CARGO_PKG_VERSION")),
@@ -154,6 +164,7 @@ fn catalog_writes_a_catalog_that_the_schema_accepts() -> TestResult {
         "@manufacturer_NameACAS"
     );
     insta::assert_snapshot!("catalog_file", redact_version(&text));
+    let summary = redact_written_size(&summary, &out)?;
     insta::assert_snapshot!("catalog_summary", summary);
     Ok(())
 }
@@ -225,6 +236,18 @@ fn catalog_with_a_filter_marks_the_kind_partial_and_prints_json() -> TestResult 
         Some(&serde_json::json!({"availability": "unavailable", "rows": []})),
         "the Record filter omits the shop registry scan",
     );
+    let output_size = fs::metadata(&out)?.len();
+    let result: serde_json::Value = serde_json::from_str(&summary)?;
+    assert_eq!(
+        result.get("size").and_then(serde_json::Value::as_u64),
+        Some(output_size),
+        "the JSON summary reports the written file size"
+    );
+    let summary = summary.replacen(
+        &format!(r#""size":{output_size}"#),
+        r#""size":"[BYTES]""#,
+        1,
+    );
     insta::assert_snapshot!("catalog_filter_json", summary);
     Ok(())
 }
@@ -285,8 +308,7 @@ fn catalog_without_a_german_global_ini_leaves_german_null_and_counts_it() -> Tes
         name["translations"]["value"].get("de").is_none(),
         "no German input"
     );
-    let bytes = fs::metadata(&out)?.len();
-    let summary = summary.replace(&format!(": {bytes} bytes,"), ": [BYTES] bytes,");
+    let summary = redact_written_size(&summary, &out)?;
     insta::assert_snapshot!("catalog_summary_without_german", summary);
     Ok(())
 }
