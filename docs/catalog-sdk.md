@@ -977,6 +977,23 @@ their physical selectors for a separate definition query. The query projects the
 owner's configuration without reading world containers or computing runtime loot outcomes.
 See [Loot source definitions](catalog-loot-source.md).
 
+## Item recovery
+
+`catalog_queries::item_recovery::with_item_recovery` supplies the canonical
+economy, override and policy projections from one physical
+`ItemRecoveryConfigurationParams` Record. Selection admits records by the same
+type and entitlement-policy path rules as the catalog. The original path and
+then physical index order admitted readable candidates. The first candidate
+supplies all three projections. Use an exact Record index to inspect that
+policy independently of other candidates.
+
+A snapshot includes the selected original fields, ordered condition and
+override slots, protected notification text and a common source inventory.
+Record links retain header evidence. The query reads the admitted policy
+bodies and requested locales and reports unreadable candidates through
+`coverage`. Copy any values needed beyond the callback, and publish changes
+after the query succeeds.
+
 ## Vehicle armor
 
 Use `catalog_queries::equipment::vehicle_armor::with_vehicle_armor` for

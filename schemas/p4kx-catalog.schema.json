@@ -25895,10 +25895,12 @@
       "description": "The selected physical item-recovery policy and its authored economy.",
       "properties": {
         "economyParams": {
-          "$ref": "#/$defs/SourcedValueOfRecoveryEconomy"
+          "$ref": "#/$defs/SourcedValueOfRecoveryEconomy",
+          "description": "The authored economy settings."
         },
         "source": {
-          "$ref": "#/$defs/CanonicalRecordHeader"
+          "$ref": "#/$defs/CanonicalRecordHeader",
+          "description": "The original physical owner and its Record header fields."
         }
       },
       "required": [
@@ -25911,13 +25913,16 @@
       "description": "The selected physical policy's original override array, in source order.",
       "properties": {
         "overrides": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryOverride"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryOverride",
+          "description": "Authored classes and modifiers in original array order."
         },
         "ownerGuid": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The original owner's GUID."
         },
         "ownerRecordIndex": {
-          "$ref": "#/$defs/SourcedValueOfuint32"
+          "$ref": "#/$defs/SourcedValueOfuint32",
+          "description": "The original owner's physical Record index."
         }
       },
       "required": [
@@ -25931,34 +25936,44 @@
       "description": "Authored set conditions and notification settings of the selected physical policy.",
       "properties": {
         "DontEquipWhenBricked": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryCondition"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryCondition",
+          "description": "Original conditions excluding bricked items from equipment."
         },
         "ForceLTP": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryCondition"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryCondition",
+          "description": "Original required persistence conditions."
         },
         "Insurable": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryCondition"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryCondition",
+          "description": "Original insurability conditions."
         },
         "NeverLTP": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryCondition"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryCondition",
+          "description": "Original persistence exclusion conditions."
         },
         "NeverRepair": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryCondition"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryCondition",
+          "description": "Original repair exclusion conditions."
         },
         "ReplenishOnClaimAndRepair": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryCondition"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryCondition",
+          "description": "Original claim and repair replenishment conditions."
         },
         "ReplenishOnRearm": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryCondition"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfRecoveryCondition",
+          "description": "Original rearm replenishment conditions."
         },
         "notificationParams": {
-          "$ref": "#/$defs/SourcedValueOfRecoveryNotifications"
+          "$ref": "#/$defs/SourcedValueOfRecoveryNotifications",
+          "description": "The authored notification references and buffer."
         },
         "ownerGuid": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The original owner's GUID."
         },
         "ownerRecordIndex": {
-          "$ref": "#/$defs/SourcedValueOfuint32"
+          "$ref": "#/$defs/SourcedValueOfuint32",
+          "description": "The original owner's physical Record index."
         }
       },
       "required": [
@@ -40391,10 +40406,12 @@
       "description": "One condition occurrence and its selected concrete payload.",
       "properties": {
         "payload": {
-          "$ref": "#/$defs/RecoveryConditionPayload"
+          "$ref": "#/$defs/RecoveryConditionPayload",
+          "description": "The typed payload of the original condition."
         },
         "sourceType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original concrete condition type."
         }
       },
       "required": [
@@ -40407,6 +40424,7 @@
       "description": "Known concrete recovery conditions with their original enum or link values.",
       "oneOf": [
         {
+          "description": "The base condition has no additional fields.",
           "properties": {
             "kind": {
               "const": "base",
@@ -40419,9 +40437,11 @@
           "type": "object"
         },
         {
+          "description": "A condition using an authored Entity class reference.",
           "properties": {
             "classDef": {
-              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference"
+              "$ref": "#/$defs/SourcedValueOfCatalogRecordReference",
+              "description": "The original class reference and target header evidence."
             },
             "kind": {
               "const": "entityClass",
@@ -40435,13 +40455,15 @@
           "type": "object"
         },
         {
+          "description": "A condition using a list of Entity tags.",
           "properties": {
             "kind": {
               "const": "entityTag",
               "type": "string"
             },
             "tags": {
-              "$ref": "#/$defs/SourcedValueOfRecoveryConditionTags"
+              "$ref": "#/$defs/SourcedValueOfRecoveryConditionTags",
+              "description": "The original tag list."
             }
           },
           "required": [
@@ -40451,16 +40473,19 @@
           "type": "object"
         },
         {
+          "description": "A condition matching the authored item type and subtype.",
           "properties": {
             "kind": {
               "const": "itemType",
               "type": "string"
             },
             "subType": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "The original subtype Enum value."
             },
             "type": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "The original item-type Enum value."
             }
           },
           "required": [
@@ -40477,7 +40502,8 @@
       "description": "An original `TagList` with all ordered reference slots.",
       "properties": {
         "tags": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference",
+          "description": "The original tag References in source order."
         }
       },
       "required": [
@@ -40486,18 +40512,23 @@
       "type": "object"
     },
     "RecoveryCooldown": {
+      "description": "Authored claim cooldown settings.",
       "properties": {
         "aUECperSecond": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored currency rate in aUEC per second."
         },
         "baseTime": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored base time."
         },
         "defaultLoadoutMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored default loadout multiplier."
         },
         "scalingPriceFloor": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored scaling price floor."
         }
       },
       "required": [
@@ -40509,24 +40540,31 @@
       "type": "object"
     },
     "RecoveryDelivery": {
+      "description": "Authored standard and expedited delivery settings.",
       "properties": {
         "aUECperSecond": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored currency rate in aUEC per second."
         },
         "baseTime": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored base time."
         },
         "defaultLoadoutMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored default loadout multiplier."
         },
         "expeditedDefaultTimeMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored expedited default time multiplier."
         },
         "expeditedTimeMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored expedited time multiplier."
         },
         "scalingPriceFloor": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored scaling price floor."
         }
       },
       "required": [
@@ -40543,19 +40581,24 @@
       "description": "Distinct source layouts and independent global economy settings.",
       "properties": {
         "cooldownParams": {
-          "$ref": "#/$defs/SourcedValueOfRecoveryCooldown"
+          "$ref": "#/$defs/SourcedValueOfRecoveryCooldown",
+          "description": "The authored claim cooldown settings."
         },
         "deliveryParams": {
-          "$ref": "#/$defs/SourcedValueOfRecoveryDelivery"
+          "$ref": "#/$defs/SourcedValueOfRecoveryDelivery",
+          "description": "The authored delivery-time settings."
         },
         "escalatingClaimsParams": {
-          "$ref": "#/$defs/SourcedValueOfRecoveryEscalating"
+          "$ref": "#/$defs/SourcedValueOfRecoveryEscalating",
+          "description": "The authored escalating-claim settings."
         },
         "legacy": {
-          "$ref": "#/$defs/RecoveryLegacy"
+          "$ref": "#/$defs/RecoveryLegacy",
+          "description": "Authored settings stored directly on the economy block."
         },
         "repairParams": {
-          "$ref": "#/$defs/SourcedValueOfRecoveryRepair"
+          "$ref": "#/$defs/SourcedValueOfRecoveryRepair",
+          "description": "The authored repair settings."
         }
       },
       "required": [
@@ -40568,18 +40611,23 @@
       "type": "object"
     },
     "RecoveryEscalating": {
+      "description": "Authored limit and multipliers for escalating claims.",
       "properties": {
         "escalatingClaimChainLimit": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored escalating claim chain limit."
         },
         "escalatingClaimCostMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored escalating claim cost multiplier."
         },
         "escalatingDeliveryTimerMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored escalating delivery timer multiplier."
         },
         "escalationTimerMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored escalation timer multiplier."
         }
       },
       "required": [
@@ -40591,54 +40639,71 @@
       "type": "object"
     },
     "RecoveryLegacy": {
+      "description": "Legacy item recovery economy values stored directly on the source block.",
       "properties": {
         "aUECperSecond": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored currency rate in aUEC per second."
         },
         "baseDeliveryTime": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored base delivery time."
         },
         "baseReclaimTime": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored base reclaim time."
         },
         "claimCostMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored claim cost multiplier."
         },
         "defaultLoadoutCooldownMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored default loadout cooldown multiplier."
         },
         "defaultLoadoutDeliveryTimeMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored default loadout delivery time multiplier."
         },
         "defaultLoadoutExpeditedDeliveryTimeMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored default loadout expedited delivery time multiplier."
         },
         "deliverySecondsPerAUEC": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored delivery time in seconds per aUEC."
         },
         "expeditedDeliverySecondsPerAUEC": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored expedited delivery time in seconds per aUEC."
         },
         "flatMinimumDeliveryTimerSeconds": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored flat minimum delivery timer seconds."
         },
         "globalBrickTimer": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored global brick timer."
         },
         "maxExpeditedClaimCostMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored max expedited claim cost multiplier."
         },
         "scalingPriceFloor": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored scaling price floor."
         },
         "vehicleChassisRepairCostMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored vehicle chassis repair cost multiplier."
         },
         "vehicleComponentRepairCostMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored vehicle component repair cost multiplier."
         },
         "vehicleRepairMissingItemCostMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored vehicle repair missing item cost multiplier."
         }
       },
       "required": [
@@ -40666,45 +40731,56 @@
       "properties": {
         "itemBricked_Body": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The authored body for a bricked-item notification.",
           "x-gameText": true
         },
         "itemBricked_Title": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The authored title for a bricked-item notification.",
           "x-gameText": true
         },
         "itemBricking_Body": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The authored body for an item-bricking notification.",
           "x-gameText": true
         },
         "itemBricking_Title": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The authored title for an item-bricking notification.",
           "x-gameText": true
         },
         "onBrickedItemUseNotificationBuffer": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored notification buffer for attempted bricked-item use."
         },
         "onBrickedItemUsed_CannotEquip": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The authored message for a bricked item that cannot be equipped.",
           "x-gameText": true
         },
         "onBrickedItemUsed_CannotFire": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The authored message for a bricked item that cannot fire.",
           "x-gameText": true
         },
         "onBrickedItemUsed_CannotUse": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The authored message for a bricked item that cannot be used.",
           "x-gameText": true
         },
         "onBrickedItemUsed_Title": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The authored title for a bricked-item use notification.",
           "x-gameText": true
         },
         "vehicleBrickedWithItems_Body": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The authored body for a bricked vehicle still holding items.",
           "x-gameText": true
         },
         "vehicleBrickingWithItems_Body": {
           "$ref": "#/$defs/SourcedValueOfGameTextRef",
+          "description": "The authored body for a bricking vehicle still holding items.",
           "x-gameText": true
         }
       },
@@ -40724,36 +40800,47 @@
       "type": "object"
     },
     "RecoveryOverride": {
+      "description": "The original class filter and cost or time multipliers of an override group.",
       "properties": {
         "claimCooldownMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored claim cooldown multiplier."
         },
         "claimCostMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored claim cost multiplier."
         },
         "classes": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference",
+          "description": "The original class references in source order."
         },
         "deliveryTimeMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored delivery time multiplier."
         },
         "escalatingClaimCostMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored escalating claim cost multiplier."
         },
         "escalatingDeliveryTimerMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored escalating delivery timer multiplier."
         },
         "escalationTimerMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored escalation timer multiplier."
         },
         "expeditedDeliveryTimeMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored expedited delivery time multiplier."
         },
         "flatMinimumDeliveryTimerSecondsMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored flat minimum delivery timer seconds multiplier."
         },
         "maxExpediteCostMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+          "$ref": "#/$defs/SourcedValueOfResourceNumber",
+          "description": "The authored max expedite cost multiplier."
         }
       },
       "required": [
@@ -40771,15 +40858,19 @@
       "type": "object"
     },
     "RecoveryRepair": {
+      "description": "Authored repair cost multipliers.",
       "properties": {
         "vehicleChassisRepairCostMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored chassis repair cost multiplier."
         },
         "vehicleComponentRepairCostMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored component repair cost multiplier."
         },
         "vehicleRepairMissingItemCostMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfResourceFloat32"
+          "$ref": "#/$defs/SourcedValueOfResourceFloat32",
+          "description": "The authored missing-item repair cost multiplier."
         }
       },
       "required": [

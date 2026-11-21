@@ -18,7 +18,7 @@ use crate::source_projection_notes;
 use crate::{CatalogError, CatalogReadFailure};
 
 /// Selects the Records that hold the item recovery rules.
-const RECOVERY: KindRule = KindRule {
+pub(crate) const RECOVERY: KindRule = KindRule {
     prefixes: &["libs/foundry/records/entitlementpolicies/"],
     type_name: "ItemRecoveryConfigurationParams",
 };
@@ -30,13 +30,14 @@ mod notification_read;
 #[path = "recovery_overrides.rs"]
 mod overrides;
 #[path = "recovery_policy_contract.rs"]
-mod policy_contract;
+pub(crate) mod policy_contract;
 #[path = "recovery_policy_read.rs"]
 mod policy_read;
 #[path = "recovery_projection.rs"]
 mod projection;
 
 pub(crate) use policy_contract::ItemRecoveryPolicy;
+pub(crate) use projection::RecoveryProjection;
 
 /// The item recovery rules of a DataForge and the Records that could not be read.
 pub(crate) struct Recovery<'f> {
@@ -88,7 +89,7 @@ pub(crate) fn read_recovery<'f>(
                 )?);
                 if best
                     .as_ref()
-                    .is_none_or(|(_, have)| tree.record_path() < have.record_path())
+                    .is_none_or(|(_, have)| precedence(&tree) < precedence(have))
                 {
                     best = Some((record, tree));
                 }
@@ -125,12 +126,7 @@ fn finish<'f>(
         });
     };
     let admission = RecordObservation::capture(projection.original(), &record)?;
-    let selected = projection::read(
-        &tree,
-        &projection.for_text_owner(TextOwner::ItemRecoveryPolicy),
-        &admission,
-        cancel,
-    )?;
+    let selected = project_policy(&tree, projection, &admission, cancel)?;
     source_projection_notes::record_dependency(&admission, &tree, selected.notes, &mut ledger)?;
     for source in &mut ledger.sources {
         if source.record_index == record.index() {
@@ -145,6 +141,24 @@ fn finish<'f>(
         ledger,
         failures,
     })
+}
+
+pub(crate) const fn precedence<'source>(tree: &RecordTree<'source>) -> (&'source str, u32) {
+    (tree.record_path(), tree.record_index())
+}
+
+pub(crate) fn project_policy<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<RecoveryProjection<'source>, CatalogError> {
+    projection::read(
+        tree,
+        &projection.for_text_owner(TextOwner::ItemRecoveryPolicy),
+        admission,
+        cancel,
+    )
 }
 
 fn selected<'f>(

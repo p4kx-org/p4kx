@@ -25,6 +25,9 @@ const ENTITY_TAGS: &str = "/declarations/entityTags";
 const TAG_DEFINITIONS: &str = "/definitions/tags";
 const TAG_ROOTS: &str = "/declarations/tagRoots";
 const TAG_PATHS: &str = "/projections/tagPaths";
+const ITEM_RECOVERY_ECONOMY: &str = "/configurations/itemRecoveryEconomy";
+const ITEM_RECOVERY_OVERRIDES: &str = "/configurations/itemRecoveryOverrides";
+const ITEM_RECOVERY_POLICY: &str = "/configurations/itemRecoveryPolicy";
 const INVENTORY_CONTAINERS: &str = "/definitions/inventoryContainers";
 const INVENTORY_CONFIGURATIONS: &str = "/configurations/inventoryConfigurations";
 const FACILITIES: &str = "/configurations/facilities";
@@ -157,6 +160,9 @@ const REQUIRED_WITNESSES: &[&str] = &[
     TAG_ROOTS,
     TAG_PATHS,
     INVENTORY_CONTAINERS,
+    ITEM_RECOVERY_ECONOMY,
+    ITEM_RECOVERY_OVERRIDES,
+    ITEM_RECOVERY_POLICY,
     INVENTORY_CONFIGURATIONS,
     FACILITIES,
     MEDICAL_ITEM_TIER_CONFIGS,

@@ -28,6 +28,8 @@ pub mod loot;
 #[path = "faction_identity_query.rs"]
 pub mod faction_identities;
 
+#[path = "item_recovery_query.rs"]
+pub mod item_recovery;
 #[path = "law_query.rs"]
 pub mod law;
 
