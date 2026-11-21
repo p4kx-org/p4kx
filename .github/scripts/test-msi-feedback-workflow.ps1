@@ -69,38 +69,44 @@ $expectedStartPaths=@(
 Assert-FeedbackWorkflow ([string]::Join([char]10,$startPaths) -ceq [string]::Join([char]10,$expectedStartPaths)) 'Original start upload must contain only the four explicit synthetic launch-evidence paths.'
 Assert-FeedbackWorkflow ($verify.IndexOf($installer,[StringComparison]::Ordinal) -lt $verify.IndexOf($observerStart,[StringComparison]::Ordinal) -and
     $verify.IndexOf($observerStart,[StringComparison]::Ordinal) -lt $verify.IndexOf($firstCheckpoint,[StringComparison]::Ordinal)) 'Original launch receipts must upload before the first snapshot.'
-$delay=Get-FeedbackWorkflowStep $verify 'Wait separately for original MSI phase checkpoint 2'
-$delayUpload=Get-FeedbackWorkflowStep $verify 'Upload original MSI phase checkpoint 2 delay'
-Assert-FeedbackWorkflow ($delay.Contains('id: msi-checkpoint-2-delay') -and
-    $delay.Contains('invoke-msi-observer.ps1 -Stage Delay') -and $delay.Contains('-Sequence 2 -WaitMilliseconds 75000') -and
-    $delay -cmatch '(?m)^        timeout-minutes: 2\r?$' -and
-    $delayUpload.Contains("always() && steps.msi-launch.outcome == 'success' && steps.msi-checkpoint-2-delay.outcome != 'skipped'") -and
-    $delayUpload.Contains('/installer-check/observer/delays/02/*.json') -and
-    $delayUpload -cmatch '(?m)^        timeout-minutes: 1\r?$' -and $delayUpload.Contains('if-no-files-found: error') -and
-    $verify.IndexOf($delay,[StringComparison]::Ordinal) -lt $verify.IndexOf($delayUpload,[StringComparison]::Ordinal)) 'Checkpoint 2 delay and its evidence must be bounded and independently observable.'
-$checkpoints=@([regex]::Matches($verify,'(?ms)^      - name: Preserve original MSI phase checkpoint [1-8]\r?\n.*?(?=^      - |\z)'))
-Assert-FeedbackWorkflow ($checkpoints.Count -eq 8) 'Expected eight bounded pre-terminal file checkpoints.'
-for($index=0;$index -lt $checkpoints.Count;$index++){
-    $checkpoint=$checkpoints[$index].Value
-    $ordinal=$index+1
-    $waitMilliseconds=if($ordinal -le 2){0}else{75000}
-    $runnerMinutes=if($ordinal -eq 2){1}else{2}
-    $uploaded=Get-FeedbackWorkflowStep $verify "Upload original MSI phase checkpoint $ordinal"
-    Assert-FeedbackWorkflow ($checkpoint.Contains('always() && !cancelled()') -and $checkpoint.Contains("steps.msi-launch.outcome == 'success'") -and
-        $checkpoint.Contains("env.P4KX_MSI_OBSERVER_FINISHED != 'true'") -and $checkpoint.Contains('invoke-msi-observer.ps1 -Stage Snapshot') -and
-        $checkpoint.Contains("-Sequence $ordinal -WaitMilliseconds $waitMilliseconds") -and
-        $checkpoint -cmatch ('(?m)^        timeout-minutes: {0}\r?$' -f $runnerMinutes) -and
-        -not ($checkpoint -match '(?m)^        (continue-on-error|uses):')) 'Direct checkpoint can restart work, mask failure or bypass its bounded original observation.'
-    if ($ordinal -eq 2) {
-        Assert-FeedbackWorkflow ($checkpoint.Contains('-ScheduledDelay') -and
-            $checkpoint.Contains("steps.msi-checkpoint-2-delay.outcome == 'success'") -and
-            $verify.IndexOf($delayUpload,[StringComparison]::Ordinal) -lt $verify.IndexOf($checkpoint,[StringComparison]::Ordinal)) 'Checkpoint 2 must consume a recorded delay without resetting its budget.'
-    }
-    Assert-FeedbackWorkflow ($uploaded.Contains('always() && !cancelled()') -and $uploaded.Contains("steps.msi-checkpoint-$ordinal.outcome != 'skipped'") -and
-        $uploaded.Contains('actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9') -and
-        $uploaded.Contains(('/observer/*/{0:d2}/*' -f $ordinal)) -and $uploaded -cmatch '(?m)^        timeout-minutes: 1\r?$' -and -not $uploaded.Contains('continue-on-error')) 'Checkpoint upload lost its separate existing transport budget or failure gate.'
-    Assert-FeedbackWorkflow ($verify.IndexOf($checkpoint,[StringComparison]::Ordinal) -lt $verify.IndexOf($uploaded,[StringComparison]::Ordinal)) 'Checkpoint must be frozen before its independent upload.'
+$firstUpload=Get-FeedbackWorkflowStep $verify 'Upload original MSI phase checkpoint 1'
+$finalUpload=Get-FeedbackWorkflowStep $verify 'Upload final original MSI lifecycle evidence'
+Assert-FeedbackWorkflow ($firstCheckpoint.Contains('id: msi-checkpoint-1') -and
+    $firstCheckpoint.Contains("always() && !cancelled() && steps.msi-launch.outcome == 'success'") -and
+    $firstCheckpoint.Contains("env.P4KX_MSI_OBSERVER_FINISHED != 'true'") -and
+    $firstCheckpoint.Contains('invoke-msi-observer.ps1 -Stage Snapshot') -and $firstCheckpoint.Contains('-Sequence 1 -WaitMilliseconds 0') -and
+    $firstCheckpoint -cmatch '(?m)^        timeout-minutes: 2\r?$' -and
+    -not ($firstCheckpoint -match '(?m)^        continue-on-error:')) 'The original lifecycle requires its bounded immediate checkpoint.'
+Assert-FeedbackWorkflow ($firstUpload.Contains("always() && !cancelled() && steps.msi-launch.outcome == 'success' && steps.msi-checkpoint-1.outcome != 'skipped'") -and
+    $firstUpload.Contains('name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-1') -and
+    $firstUpload.Contains('/observer/*/01/*') -and $firstUpload.Contains('if-no-files-found: error') -and
+    $firstUpload -cmatch '(?m)^        timeout-minutes: 1\r?$' -and -not $firstUpload.Contains('continue-on-error')) 'The immediate snapshot requires its own bounded durable upload.'
+Assert-FeedbackWorkflow ($observerFinish.Contains('id: msi-finish') -and
+    $finalUpload.Contains("always() && !cancelled() && steps.msi-launch.outcome == 'success' && steps.msi-finish.outcome != 'skipped'") -and
+    $finalUpload.Contains('name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-final') -and
+    $finalUpload.Contains('if-no-files-found: error') -and $finalUpload -cmatch '(?m)^        timeout-minutes: 1\r?$' -and
+    -not $finalUpload.Contains('continue-on-error')) 'Final original lifecycle evidence requires a bounded upload after the original Finish.'
+foreach ($evidenceUpload in @($firstUpload,$finalUpload)) {
+    Assert-FeedbackWorkflow ($evidenceUpload.Contains('actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9') -and
+        -not ($evidenceUpload -match '(?m)^        (run|env):')) 'Observer evidence must use the pinned upload action.'
 }
+$finalPaths=@([regex]::Matches($finalUpload,'(?m)^            ([^\r\n]+)\r?$') | ForEach-Object { $_.Groups[1].Value })
+$expectedFinalPaths=@(
+    '${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/09/*',
+    '${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/observer-result.json'
+)
+Assert-FeedbackWorkflow ([string]::Join([char]10,$finalPaths) -ceq [string]::Join([char]10,$expectedFinalPaths)) 'Final compact proof must contain the original checkpoint and observer verdict.'
+Assert-FeedbackWorkflow ($verify.IndexOf($firstCheckpoint,[StringComparison]::Ordinal) -lt $verify.IndexOf($firstUpload,[StringComparison]::Ordinal) -and
+    $verify.IndexOf($firstUpload,[StringComparison]::Ordinal) -lt $verify.IndexOf($observerFinish,[StringComparison]::Ordinal) -and
+    $verify.IndexOf($observerFinish,[StringComparison]::Ordinal) -lt $verify.IndexOf($finalUpload,[StringComparison]::Ordinal) -and
+    $verify.IndexOf($finalUpload,[StringComparison]::Ordinal) -lt $verify.IndexOf('      - name: Record executed release payload evidence',[StringComparison]::Ordinal)) 'Original lifecycle acceptance must follow the immediate observation and precede final runtime publication.'
+Assert-FeedbackWorkflow (([regex]::Matches($verify,'invoke-msi-observer\.ps1 -Stage Snapshot').Count -eq 1) -and
+    -not ($verify -match 'invoke-msi-observer\.ps1 -Stage Delay|\s-WaitMilliseconds [1-9]|-ScheduledDelay')) 'The installer must not depend on a fixed observation wait.'
+$harmless=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/workflows/windows-msi-detached-control.yml')
+$harmlessDelay=Get-FeedbackWorkflowStep $harmless 'Wait separately for harmless MSI split-delay control'
+$harmlessVerify=Get-FeedbackWorkflowStep $harmless 'Verify harmless MSI split-delay control'
+Assert-FeedbackWorkflow ($harmlessDelay.Contains('invoke-msi-observer.ps1 -Stage Delay') -and $harmlessDelay.Contains('-Sequence 2 -WaitMilliseconds 75000') -and
+    $harmlessVerify.Contains('invoke-msi-split-delay-control.ps1 -Stage Verify')) 'The independent harmless split-delay diagnostic must remain executable.'
 $entryWorkflow=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/workflows/release-windows.yml')
 $delegation=[regex]::Match($entryWorkflow,'(?ms)^  verify:\r?\n.*\z').Value
 Assert-FeedbackWorkflow ($delegation.Contains('needs: build') -and $delegation.Contains("needs.build.result == 'success'") -and

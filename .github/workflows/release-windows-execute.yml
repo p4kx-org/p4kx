@@ -202,114 +202,21 @@ jobs:
           name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-1
           path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/*/01/*
           if-no-files-found: error
-      - name: Wait separately for original MSI phase checkpoint 2
-        id: msi-checkpoint-2-delay
-        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && env.P4KX_MSI_OBSERVER_FINISHED != 'true' }}
-        timeout-minutes: 2
-        run: .github/scripts/invoke-msi-observer.ps1 -Stage Delay -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -Sequence 2 -WaitMilliseconds 75000
-      - name: Upload original MSI phase checkpoint 2 delay
-        if: ${{ always() && steps.msi-launch.outcome == 'success' && steps.msi-checkpoint-2-delay.outcome != 'skipped' }}
-        timeout-minutes: 1
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-2-delay
-          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/delays/02/*.json
-          if-no-files-found: error
-      - name: Preserve original MSI phase checkpoint 2
-        id: msi-checkpoint-2
-        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && steps.msi-checkpoint-2-delay.outcome == 'success' && env.P4KX_MSI_OBSERVER_FINISHED != 'true' }}
-        timeout-minutes: 1
-        run: .github/scripts/invoke-msi-observer.ps1 -Stage Snapshot -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -Sequence 2 -WaitMilliseconds 0 -ScheduledDelay
-      - name: Upload original MSI phase checkpoint 2
-        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && steps.msi-checkpoint-2.outcome != 'skipped' }}
-        timeout-minutes: 1
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-2
-          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/*/02/*
-          if-no-files-found: error
-      - name: Preserve original MSI phase checkpoint 3
-        id: msi-checkpoint-3
-        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && env.P4KX_MSI_OBSERVER_FINISHED != 'true' }}
-        timeout-minutes: 2
-        run: .github/scripts/invoke-msi-observer.ps1 -Stage Snapshot -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -Sequence 3 -WaitMilliseconds 75000
-      - name: Upload original MSI phase checkpoint 3
-        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && steps.msi-checkpoint-3.outcome != 'skipped' }}
-        timeout-minutes: 1
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-3
-          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/*/03/*
-          if-no-files-found: error
-      - name: Preserve original MSI phase checkpoint 4
-        id: msi-checkpoint-4
-        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && env.P4KX_MSI_OBSERVER_FINISHED != 'true' }}
-        timeout-minutes: 2
-        run: .github/scripts/invoke-msi-observer.ps1 -Stage Snapshot -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -Sequence 4 -WaitMilliseconds 75000
-      - name: Upload original MSI phase checkpoint 4
-        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && steps.msi-checkpoint-4.outcome != 'skipped' }}
-        timeout-minutes: 1
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-4
-          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/*/04/*
-          if-no-files-found: error
-      - name: Preserve original MSI phase checkpoint 5
-        id: msi-checkpoint-5
-        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && env.P4KX_MSI_OBSERVER_FINISHED != 'true' }}
-        timeout-minutes: 2
-        run: .github/scripts/invoke-msi-observer.ps1 -Stage Snapshot -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -Sequence 5 -WaitMilliseconds 75000
-      - name: Upload original MSI phase checkpoint 5
-        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && steps.msi-checkpoint-5.outcome != 'skipped' }}
-        timeout-minutes: 1
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-5
-          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/*/05/*
-          if-no-files-found: error
-      - name: Preserve original MSI phase checkpoint 6
-        id: msi-checkpoint-6
-        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && env.P4KX_MSI_OBSERVER_FINISHED != 'true' }}
-        timeout-minutes: 2
-        run: .github/scripts/invoke-msi-observer.ps1 -Stage Snapshot -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -Sequence 6 -WaitMilliseconds 75000
-      - name: Upload original MSI phase checkpoint 6
-        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && steps.msi-checkpoint-6.outcome != 'skipped' }}
-        timeout-minutes: 1
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-6
-          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/*/06/*
-          if-no-files-found: error
-      - name: Preserve original MSI phase checkpoint 7
-        id: msi-checkpoint-7
-        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && env.P4KX_MSI_OBSERVER_FINISHED != 'true' }}
-        timeout-minutes: 2
-        run: .github/scripts/invoke-msi-observer.ps1 -Stage Snapshot -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -Sequence 7 -WaitMilliseconds 75000
-      - name: Upload original MSI phase checkpoint 7
-        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && steps.msi-checkpoint-7.outcome != 'skipped' }}
-        timeout-minutes: 1
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-7
-          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/*/07/*
-          if-no-files-found: error
-      - name: Preserve original MSI phase checkpoint 8
-        id: msi-checkpoint-8
-        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && env.P4KX_MSI_OBSERVER_FINISHED != 'true' }}
-        timeout-minutes: 2
-        run: .github/scripts/invoke-msi-observer.ps1 -Stage Snapshot -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -Sequence 8 -WaitMilliseconds 75000
-      - name: Upload original MSI phase checkpoint 8
-        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && steps.msi-checkpoint-8.outcome != 'skipped' }}
-        timeout-minutes: 1
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-8
-          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/*/08/*
-          if-no-files-found: error
       - name: Finish the original native MSI lifecycle
+        id: msi-finish
         if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' }}
         timeout-minutes: ${{ fromJSON(steps.msi-budget.outputs.minutes) }}
         run: .github/scripts/invoke-msi-observer.ps1 -Stage Finish -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -WaitMilliseconds 0
+      - name: Upload final original MSI lifecycle evidence
+        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && steps.msi-finish.outcome != 'skipped' }}
+        timeout-minutes: 1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-final
+          path: |
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/09/*
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/observer-result.json
+          if-no-files-found: error
       - name: Record executed release payload evidence
         run: |
           $base = "artifacts/windows-build-$env:P4KX_TARGET"

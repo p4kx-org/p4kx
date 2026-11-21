@@ -115,22 +115,20 @@ The Windows MSI lifecycle runs its original diagnostic parent in a tracked hidde
 A separate diagnostic upload captures its original request, launch handle and script inventory
 before the first snapshot. It includes the parent-start receipt when that file is already
 available. Upload errors are recorded as diagnostics.
-Eight checkpoints upload bounded copies of its file journal and source metadata before the
-final wait. Checkpoints carry an unproven verdict. Acceptance still requires the original
-successful result, its closed journal, `final-cleanup/end`, matching input/source receipts
-and the existing installed runtime checks. The ten-minute worker cap, thirty-five-minute
-absolute deadline and forty-five-minute job limit remain unchanged. Checkpoint uploads consume
-the original observer allowance; a delayed upload can delay the next parent observation.
-Expiry can stop only the bound parent and cannot prove installer or descendant cleanup.
-Each checkpoint captures and uploads in separate runner steps within a combined three-minute
-allowance. Fixed unproven progress files identify request validation, process observation and file
-preservation. Each Snapshot runs all synchronous validation, process reads, waits and file
-preservation in its own captured child. Its caller reserves bounded cleanup within the original
-absolute deadline and caps capture at 100 seconds, leaving the existing two-minute capture and
-one-minute upload steps unchanged. Caller timeout stops only that owned Snapshot child; its
-receipts retain an unproven verdict and cannot attest original-worker or installer cleanup.
-Checkpoint artifacts retain original copies under `checkpoints/NN` and caller progress and logs
-under `snapshots/NN`. The original result remains the acceptance authority.
+An immediate checkpoint uploads a bounded copy of the original file journal and source metadata
+before the completion step. It carries an unproven verdict. The completion step observes the
+same process until it returns or its original allowance expires. Acceptance requires the
+original successful result, its closed journal, final cleanup, matching input and source
+receipts, and the installed runtime checks. A compact final artifact contains the original
+checkpoint and observer verdict. The ten-minute worker cap, thirty-five-minute absolute deadline
+and forty-five-minute job limit remain in force. Expiry can stop only the bound parent.
+Evidence of that stop leaves the installer and descendant cleanup unproven.
+
+The immediate snapshot uses a separate captured child with up to 100 seconds for capture and
+bounded cleanup within the original absolute deadline. Its runner step has two minutes and its
+upload step has one. The snapshot stores the original copies in the checkpoint directory and the
+caller progress and logs in the snapshot directory. The independent harmless controls retain
+their timed observations of runner step behavior.
 
 Before checksums and release notes are assembled, `check-release-matrix.ps1` requires:
 
