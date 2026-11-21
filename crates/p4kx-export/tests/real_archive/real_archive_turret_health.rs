@@ -4,6 +4,8 @@
 use std::error::Error;
 use std::time::UNIX_EPOCH;
 
+use p4kx_export::catalog_queries::CatalogRecordSelection;
+use p4kx_export::catalog_queries::equipment::durability::with_turret_health_from;
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog_from};
 use p4kx_extraction::{
     Archive, ArchiveWatch, DataForge, DataForgeEntry, DataForgeOrigin, Filter, InputScope,
@@ -13,6 +15,7 @@ use p4kx_extraction::{
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
 
+use crate::component_sdk_parity::ComponentSdkParity;
 use crate::real_archive_item_durability::{self as proof, Trace};
 use crate::real_archive_verification::print_line;
 
@@ -20,6 +23,7 @@ type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const TURRET: &str = "SCItemTurretParams";
 const MODIFIER: &str = "STurretHealthModifierDef";
+const COMPONENT_ROWS: &str = "/configurations/turretHealth/rows";
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
@@ -58,6 +62,7 @@ fn turret_health_matches_original_components_and_points() -> TestResult {
     };
     let owner_catalog = selected(&archive, &entry, &forge, &owner)?;
     let components = compare_components(&owner_catalog, &owner, &scope, encrypted)?;
+    compare_sdk(&archive, &entry, &owner_catalog, owner.record_index())?;
     drop(owner_catalog);
     let definition_catalog = selected(&archive, &entry, &forge, &definition)?;
     let points = compare_curve(&definition_catalog, &definition, &scope, encrypted)?;
@@ -65,6 +70,24 @@ fn turret_health_matches_original_components_and_points() -> TestResult {
     print_line(&format!(
         "turret health: {components} physical components and {points} ordered points checked"
     ));
+    Ok(())
+}
+
+fn compare_sdk(
+    archive: &Archive,
+    entry: &DataForgeEntry,
+    catalog: &Value,
+    owner: u32,
+) -> TestResult {
+    let comparison = ComponentSdkParity::new(archive, entry, catalog)?;
+    with_turret_health_from(
+        archive,
+        entry,
+        CatalogRecordSelection::RecordIndex(owner),
+        None,
+        |snapshot| comparison.compare(COMPONENT_ROWS, owner, &snapshot),
+    )
+    .map_err(|_| "query turret health for the installed owner")??;
     Ok(())
 }
 
@@ -105,7 +128,7 @@ fn compare_components(
     let Some(Original::Array(components)) = tree.field("Components") else {
         return Err("original component array".into());
     };
-    let rows = proof::rows(catalog, "/configurations/turretHealth/rows")?;
+    let rows = proof::rows(catalog, COMPONENT_ROWS)?;
     let expected = components
         .iter()
         .enumerate()

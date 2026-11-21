@@ -30,3 +30,8 @@ cells. Each coordinate keeps the original Single's `rawBits` and nullable
 movement, aiming or damage value. `additionalFields` carries other authored
 values at each level. Each sourced cell and source-arena value has its own
 provenance and `containsEncryptedSource` marker.
+
+The installed-Archive witness compares a selected component's complete SDK
+and filtered Catalog rows after resolving every contributor to its physical
+source. It also compares the independently selected definition's raw curve
+points with the original DataForge values.

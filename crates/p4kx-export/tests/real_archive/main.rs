@@ -11,6 +11,7 @@ mod catalog_v3_blueprint_category_tests;
 mod catalog_v3_consumer;
 mod catalog_v3_loot_consumer_tests;
 mod catalog_v3_mission_definition_tests;
+mod component_sdk_parity;
 mod fuel_capacity;
 #[path = "shield_generators/arena.rs"]
 mod original_item_arena;
