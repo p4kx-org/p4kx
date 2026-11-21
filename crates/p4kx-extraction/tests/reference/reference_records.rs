@@ -38,7 +38,7 @@ pub(crate) fn measure(archive: &Archive) -> Result<Records> {
     let reader = archive
         .open_entry(entry)
         .map_err(|error| ReferenceError::new(Code::Provenance, error.to_string()))?;
-    let fingerprint = reference_digest::reader(reader, p4kx_extraction::MAX_DATAFORGE_SIZE)?;
+    let fingerprint = reference_digest::reader(reader, entry.uncompressed_size())?;
     let guids = guids(archive)?;
     Ok(Records {
         dcb: DcbIdentity {

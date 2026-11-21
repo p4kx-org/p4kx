@@ -9,7 +9,7 @@ use p4kx_archive::{Archive, Checksum, Entry, EntryReader, ObservedEntry, Observe
 
 use crate::ExtractionError;
 use crate::origin_artifact::{OriginArtifactDigest, OriginDigestWriter};
-use crate::source::{EntrySource, SourceEntry, SourceReader};
+use crate::source::{EntrySource, OpenOptions, SourceEntry, SourceReader};
 
 /// The exact decoded bytes of a physically selected Entry written by verified Extraction.
 #[derive(Debug, Clone)]
@@ -85,13 +85,17 @@ impl EntrySource for VerifiedPayloadSource<'_> {
         self.matches(index).then_some(self.observed)
     }
 
-    fn open(&self, index: usize, verify: bool) -> Result<SourceReader<'_>, ExtractionError> {
-        if !verify || !self.matches(index) || self.started.set(()).is_err() {
+    fn open(
+        &self,
+        index: usize,
+        options: OpenOptions,
+    ) -> Result<SourceReader<'_>, ExtractionError> {
+        if !options.verify || !self.matches(index) || self.started.set(()).is_err() {
             return Err(ExtractionError::Read(io::Error::other(
                 "a verified payload requires one original Entry read",
             )));
         }
-        let reader = self.archive.open_entry_verified(self.observed.entry())?;
+        let reader = options.archive_reader(self.archive, self.observed.entry())?;
         Ok(SourceReader::Archive(Box::new(VerifiedPayloadReader {
             reader,
             measure: Some(OriginDigestWriter::new(io::sink())),

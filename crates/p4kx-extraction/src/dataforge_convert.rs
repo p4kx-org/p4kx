@@ -1,20 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io::{self, Read};
+use std::io::Read;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use p4kx_dataforge::{Annotations, DataForge, Record, RecordXml};
 
 use crate::buffers::Buffers;
+use crate::decoded_buffer::{AppendError, DecodedBuffer, MAX_ADDRESSABLE_BYTES};
 use crate::record_export::{RecordRun, write_records};
 use crate::record_files::RecordFiles;
 use crate::record_format::RecordFileFormat;
 use crate::source::SourceEntry;
 use crate::write::{Chunk, EntryWriter, Outcome};
-use crate::{ExtractionError, MAX_DATAFORGE_SIZE, RecordExportReport};
-
-const INITIAL_RESERVE: u64 = 64 << 20;
+use crate::{ExtractionError, RecordExportReport};
 
 impl EntryWriter<'_> {
     /// Converts the DataForge Entry `entry` into one Record XML file per Record below the folder
@@ -54,20 +53,14 @@ impl EntryWriter<'_> {
         }
         let relative = self.relative_path(entry)?;
         let size = entry.uncompressed_size();
-        let too_large = || ExtractionError::TooLargeToConvert {
+        let expected = DecodedBuffer::new(size).ok_or(ExtractionError::TooLargeToConvert {
             size,
-            limit: MAX_DATAFORGE_SIZE,
-        };
-        let len = usize::try_from(size)
-            .ok()
-            .filter(|_| size <= MAX_DATAFORGE_SIZE)
-            .ok_or_else(too_large)?;
+            limit: MAX_ADDRESSABLE_BYTES,
+        })?;
         let bytes = &mut buffers.data;
         bytes.clear();
-        let reserve = usize::try_from(size.min(INITIAL_RESERVE)).unwrap_or_default();
-        bytes.try_reserve_exact(reserve).map_err(|_| too_large())?;
-        let mut reader = self.open_entry(entry)?;
-        if !self.read_all(&mut reader, bytes, len, &mut buffers.chunk, credited)? {
+        let mut reader = entry.open_exact(self.verify)?;
+        if !self.read_all(&mut reader, bytes, expected, &mut buffers.chunk, credited)? {
             return Ok((Outcome::Cancelled, None));
         }
         let forge = DataForge::open(bytes).map_err(ExtractionError::DataForge)?;
@@ -96,13 +89,12 @@ impl EntryWriter<'_> {
         Ok((outcome, Some(report)))
     }
 
-    /// Reads the Entry into `bytes` through `chunk`, up to `len` bytes, counting half of each chunk
-    /// as progress in `credited`; returns `false` once the run is to stop.
+    /// Reads the declared Entry length, crediting half of each received chunk until cancellation.
     pub(crate) fn read_all(
         &self,
         reader: &mut impl Read,
         bytes: &mut Vec<u8>,
-        len: usize,
+        expected: DecodedBuffer,
         chunk: &mut [u8],
         credited: &AtomicU64,
     ) -> Result<bool, ExtractionError> {
@@ -113,18 +105,20 @@ impl EntryWriter<'_> {
             {
                 Chunk::Data(count) => {
                     let data = chunk.get(..count).unwrap_or_default();
-                    if bytes.len().saturating_add(count) > len {
-                        return Err(ExtractionError::Read(io::Error::new(
-                            io::ErrorKind::InvalidData,
-                            "the Entry holds more data than its size",
-                        )));
-                    }
-                    bytes.extend_from_slice(data);
+                    expected.append(bytes, data).map_err(|error| match error {
+                        AppendError::Overlong(source) => ExtractionError::read(source),
+                        AppendError::Allocation { requested, source } => {
+                            ExtractionError::ConversionAllocation { requested, source }
+                        }
+                    })?;
                     let half = count as u64 / 2;
                     credited.fetch_add(half, Ordering::Relaxed);
                     self.tracker.wrote(half);
                 }
-                Chunk::End => return Ok(true),
+                Chunk::End => {
+                    expected.finish(bytes).map_err(ExtractionError::read)?;
+                    return Ok(true);
+                }
                 Chunk::Cancelled => return Ok(false),
             }
         }

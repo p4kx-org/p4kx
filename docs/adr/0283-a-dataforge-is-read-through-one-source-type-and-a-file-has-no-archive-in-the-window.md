@@ -26,9 +26,18 @@ and ADR-0249 (a DataForge file is recognised by its content).
   shown; the DataForge node is selected, its DataForge starts to read and the DataForge tab is
   shown. The status bar shows the path and nothing that counts Entries. The tabs that read
   Entries are hidden, now Search too, whose Record search is the one of the Browse tab.
-- **The size limit is testable without a 2 GiB file.** `DataForgeEntry::read_file_within` takes
-  the limit; the unit tests use a few bytes, and the `p4kx dcb` test uses an Archive whose Entry
-  claims more than the limit.
+- **Complete decoded input by default.** Entry and file reads grow a single byte buffer from data
+  received from the input. A declaration cannot force the whole reservation before reading. The
+  platform's byte-vector capacity is checked before decoding. The reader polls for cancellation
+  between chunks, requires the declared length and an end of input, and retains the physical
+  source only when the read succeeds. Extraction conversion uses the same buffer growth and
+  retains its reader's verification and progress policy.
+- **Optional decoded-byte admission.** `DataForgeReadOptions::with_max_decoded_bytes` applies to one
+  library read. A budget refusal, unaddressable declared size, allocator refusal, source read error
+  and cancellation are distinct. Allocator refusal is retryable. The decoded-byte allowance,
+  [Record Value allowance](0368-dataforge-materialization-budgets.md) and
+  [measured process memory](../catalog-partitioning.md#system-memory-acceptance) measure different
+  quantities.
 
 ## Reasons
 

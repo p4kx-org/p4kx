@@ -18,9 +18,6 @@ type TestResult = Result<(), Box<dyn Error>>;
 const CART: u128 = 0xcbee_34fd_6441_4000_b99f_924f_7f26_e19f;
 const TRUCK: u128 = 0x50e8_a9f6_f956_4000_8ace_7c0c_a9a9_1f5d;
 
-/// The size limit of a DataForge file, 2 GiB.
-const LIMIT: u64 = 2 << 30;
-
 fn database() -> DataForgeBuilder {
     DataForgeBuilder::new()
         .structure(TestStruct::new("Vehicle").field("name", TestType::Locale))
@@ -328,20 +325,24 @@ fn a_file_of_an_unsupported_version_exits_with_code_5() -> TestResult {
     Ok(())
 }
 
+#[cfg(target_pointer_width = "64")]
 #[test]
-fn a_dataforge_over_the_size_limit_exits_with_code_5() -> TestResult {
+fn a_large_declaration_with_short_data_exits_as_a_read_error() -> TestResult {
     let fixture = fixture()?;
     let oversize = fixture.root.join("Oversize.p4k");
     ArchiveBuilder::new()
         .entry(
             TestEntry::stored("Data\\Game2.dcb", database().build())
-                .with_uncompressed_size(LIMIT + 1),
+                .with_uncompressed_size((2 << 30) + 1),
         )
         .write_to(&oversize)?;
 
-    let message = run(&["info"], &oversize, &[], 5)?;
+    let message = run(&["info"], &oversize, &[], 3)?;
 
-    assert!(message.contains("more than the limit"), "{message}");
+    assert!(
+        message.contains("cannot read the DataForge Entry"),
+        "{message}"
+    );
     Ok(())
 }
 

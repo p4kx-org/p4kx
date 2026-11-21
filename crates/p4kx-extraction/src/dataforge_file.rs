@@ -7,10 +7,9 @@ use std::path::Path;
 
 use p4kx_dataforge::{SNIFF_LEN, looks_like_dataforge};
 
-use crate::dataforge::check_size_within;
 use crate::{
     ArchiveChanged, DataForgeEntry, DataForgeFileOrigin, DataForgeLoadError, DataForgeOrigin,
-    FileStamp, MAX_DATAFORGE_SIZE,
+    DataForgeReadOptions, FileStamp,
 };
 
 /// Returns whether the file at `path` starts like a DataForge database, whatever its name.
@@ -34,9 +33,7 @@ impl DataForgeEntry {
     ///
     /// # Errors
     ///
-    /// Returns [`DataForgeLoadError::TooLarge`] when the file is larger than
-    /// [`MAX_DATAFORGE_SIZE`](crate::MAX_DATAFORGE_SIZE), and [`DataForgeLoadError::Read`] when
-    /// it cannot be opened or read.
+    /// Returns the same errors as [`Self::read_file_until_with_options`].
     pub fn read_file(file: &Path) -> Result<Self, DataForgeLoadError> {
         Self::read_file_until(file, &|| false)
     }
@@ -52,14 +49,17 @@ impl DataForgeEntry {
         file: &Path,
         stop: &dyn Fn() -> bool,
     ) -> Result<Self, DataForgeLoadError> {
-        Self::read_file_within(file, MAX_DATAFORGE_SIZE, stop)
+        Self::read_file_until_with_options(file, DataForgeReadOptions::default(), stop)
     }
 
-    /// Reads the DataForge file like [`DataForgeEntry::read_file_until`], refusing a file larger
-    /// than `limit` bytes.
-    pub(crate) fn read_file_within(
+    /// Reads a standalone DataForge with caller-selected decoded input admission.
+    ///
+    /// # Errors
+    ///
+    /// Returns an admission, allocation, read, cancellation or file change error.
+    pub fn read_file_until_with_options(
         file: &Path,
-        limit: u64,
+        options: DataForgeReadOptions,
         stop: &dyn Fn() -> bool,
     ) -> Result<Self, DataForgeLoadError> {
         let name = file
@@ -74,14 +74,17 @@ impl DataForgeEntry {
         let source_path = std::path::absolute(file).map_err(read)?;
         let handle = File::open(&source_path).map_err(read)?;
         let opened = handle.metadata().map_err(read)?;
-        let size = opened.len();
-        check_size_within(&name, size, limit)?;
-        let mut entry = Self::read_stream(name.clone(), size, handle, stop)?;
+        let input = options.admit(&name, opened.len())?;
+        let entry = Self::read_stream(name.clone(), input, handle, stop);
+        if matches!(entry, Err(DataForgeLoadError::Cancelled)) {
+            return entry;
+        }
         let now = std::fs::metadata(&source_path).map_err(read)?;
         let stamp = FileStamp::from_metadata(&opened);
         if FileStamp::from_metadata(&now) != stamp {
             return Err(DataForgeLoadError::ArchiveChanged(ArchiveChanged::of(file)));
         }
+        let mut entry = entry?;
         entry.set_origin(DataForgeOrigin::File(DataForgeFileOrigin::new(
             source_path,
             stamp,
@@ -102,12 +105,16 @@ mod tests {
         let file = dir.path().join("big.dcb");
         std::fs::write(&file, [0_u8; 17])?;
 
-        let result = DataForgeEntry::read_file_within(&file, 16, &|| false);
+        let options = DataForgeReadOptions::default().with_max_decoded_bytes(16);
+        let result = DataForgeEntry::read_file_until_with_options(&file, options, &|| false);
 
-        assert!(matches!(
-            result,
-            Err(DataForgeLoadError::TooLarge { size: 17, limit: 16, ref path }) if path == "big.dcb"
-        ));
+        assert!(
+            matches!(
+                result,
+                Err(DataForgeLoadError::BudgetExceeded { size: 17, limit: 16, ref path }) if path == "big.dcb"
+            ),
+            "the caller's byte budget is the refusal: {result:?}"
+        );
         Ok(())
     }
 
@@ -117,9 +124,15 @@ mod tests {
         let file = dir.path().join("exact.dcb");
         std::fs::write(&file, [0_u8; 16])?;
 
-        let entry = DataForgeEntry::read_file_within(&file, 16, &|| false)?;
+        let options = DataForgeReadOptions::default().with_max_decoded_bytes(16);
+        let entry = DataForgeEntry::read_file_until_with_options(&file, options, &|| false)?;
 
-        assert_eq!(entry.path(), "exact.dcb");
+        assert_eq!(entry.path(), "exact.dcb", "the origin still names the file");
+        assert_eq!(
+            entry.byte_len(),
+            16,
+            "equality to the caller limit is allowed"
+        );
         Ok(())
     }
 }

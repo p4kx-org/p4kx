@@ -42,10 +42,12 @@ mod dataforge_file;
 mod dataforge_file_origin;
 mod dataforge_origin;
 mod dataforge_pick;
+mod dataforge_read_options;
 mod dataforge_source;
 mod dds_raw_info;
 mod dds_source_info;
 mod decimal_u64;
+mod decoded_buffer;
 mod dependent;
 mod disk_case;
 mod disk_parts;
@@ -211,10 +213,11 @@ pub use coverage::{
     ReferenceItem, ReferenceKind, ReferenceList, SampleExport, TypeCoverage,
 };
 pub use cryxml_field_uses::CryXmlFieldUses;
-pub use dataforge::{DATAFORGE_ENTRIES, DataForgeEntry, DataForgeLoadError, MAX_DATAFORGE_SIZE};
+pub use dataforge::{DATAFORGE_ENTRIES, DataForgeEntry, DataForgeLoadError};
 pub use dataforge_file::is_dataforge_file;
 pub use dataforge_file_origin::DataForgeFileOrigin;
 pub use dataforge_origin::DataForgeOrigin;
+pub use dataforge_read_options::DataForgeReadOptions;
 pub use dataforge_source::DataForgeSource;
 pub use dds_raw_info::{DdsDx10Info, DdsLegacyInfo, DdsPixelFormatInfo};
 pub use dds_source_info::{

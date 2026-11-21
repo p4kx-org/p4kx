@@ -348,6 +348,11 @@ aggregate row and source counts and coverage on successful requests. It writes n
 or persistent cache files. A successful read includes its observed coverage. Inspect that
 coverage when deciding which snapshots your application can use.
 
+An application that needs to admit the decoded DataForge input by size can pass
+`DataForgeReadOptions` to an Archive DataForge read and bind the result through
+`CatalogQuerySession::from_entry`. The allowance covers decoded input bytes for that read.
+Measure the query process separately, including indexes, selected data and any helpers.
+
 Run the built executable directly on an available host and verify that the
 peak footprint of each SDK workflow stays below 2 GB. Record the exact SDK
 revision and executable digest, process and helper peaks, minimum available

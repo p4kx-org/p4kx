@@ -205,7 +205,7 @@ Record paths and names that could leave the target folder are rejected.
 Entry the same way, one file per Record, below the folder of that Entry instead of the `.dcb`:
 the Records of `Data\Game2.dcb` go below `Data/`. Only the Entry the DataForge is read from is
 converted, `Game2.dcb` before `Game.dcb`; another `.dcb` is written unchanged. A DataForge that
-cannot be read or opened, or is larger than 2 GiB, fails the Entry; no raw `.dcb` is written in
+cannot be read or opened, or exceeds platform capacity, fails the Entry; no raw `.dcb` is written in
 its place.
 
 ## Combined document

@@ -8,6 +8,7 @@ use std::sync::atomic::AtomicU64;
 use p4kx_audio::{AudioError, Codec, MediaClass, Wem};
 
 use crate::buffers::Buffers;
+use crate::decoded_buffer::{DecodedBuffer, MAX_ADDRESSABLE_BYTES};
 use crate::entry_path::relative_path;
 use crate::extract::Ended;
 use crate::sound_job::sound_role;
@@ -144,11 +145,15 @@ impl EntryWriter<'_> {
         buffers: &mut Buffers,
         credited: &AtomicU64,
     ) -> Result<bool, ExtractionError> {
-        let len = usize::try_from(entry.uncompressed_size()).unwrap_or(usize::MAX);
+        let size = entry.uncompressed_size();
+        let expected = DecodedBuffer::new(size).ok_or(ExtractionError::TooLargeToConvert {
+            size,
+            limit: MAX_ADDRESSABLE_BYTES,
+        })?;
         let mut reader = self.open_entry(entry)?;
         let Buffers { chunk, data, .. } = buffers;
         data.clear();
-        self.read_all(&mut reader, data, len, chunk, credited)
+        self.read_all(&mut reader, data, expected, chunk, credited)
     }
 
     /// Converts the WEM sound `entry` as the run's audio option says; a sound that cannot be

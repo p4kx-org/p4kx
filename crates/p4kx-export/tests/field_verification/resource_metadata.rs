@@ -4,7 +4,7 @@
 use std::io::Read as _;
 use std::path::Path;
 
-use p4kx_extraction::{Archive, ArchiveWatch, DataForge, DataForgeEntry, MAX_DATAFORGE_SIZE};
+use p4kx_extraction::{Archive, ArchiveWatch, DataForge, DataForgeEntry};
 use serde::Serialize;
 
 use super::inventory::BuildIdentity;
@@ -97,9 +97,6 @@ pub(crate) fn read_and_publish(
     let build = source_build(archive, scope)?;
     let original = DataForgeEntry::locate(archive).ok_or("original DataForge Entry absent")?;
     let size = original.uncompressed_size();
-    if size > MAX_DATAFORGE_SIZE {
-        return Err("DataForge Entry exceeds the supported size".into());
-    }
     let mut bytes = Vec::new();
     bytes.try_reserve_exact(usize::try_from(size)?)?;
     archive

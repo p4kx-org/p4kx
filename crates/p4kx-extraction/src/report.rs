@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::TryReserveError;
 use std::io;
 use std::path::PathBuf;
 
@@ -80,13 +81,22 @@ pub enum ExtractionError {
     /// The Entry is `CryXml` that could not be converted.
     #[error("cannot convert the CryXml")]
     Convert(#[source] CryXmlError),
-    /// The Entry is `CryXml` or DataForge larger than a Conversion reads into memory.
+    /// The Entry exceeds the conversion limit or the platform's byte-vector capacity.
     #[error("cannot convert the Entry: {size} bytes are more than the limit of {limit}")]
     TooLargeToConvert {
         /// The size of the Entry.
         size: u64,
         /// The largest size converted.
         limit: u64,
+    },
+    /// The allocator refused the decoded conversion buffer.
+    #[error("cannot reserve {requested} bytes for the decoded Entry")]
+    ConversionAllocation {
+        /// The requested buffer capacity.
+        requested: usize,
+        /// The allocator error.
+        #[source]
+        source: TryReserveError,
     },
     /// The texture could not be converted.
     #[error("cannot convert the texture")]

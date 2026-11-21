@@ -11,7 +11,7 @@ use rayon::prelude::*;
 use thiserror::Error;
 
 use crate::observed_file_origin::ObservedFileStream;
-use crate::source::{EntrySource, SourceEntry, SourceReader};
+use crate::source::{EntrySource, OpenOptions, SourceEntry, SourceReader};
 use crate::{CancelToken, EntryFailure, Exclusion, ExtractionError, FileStamp, Filter};
 
 /// The most files, folders and rejected names [`FolderSource::scan`] visits; it bounds the memory
@@ -346,7 +346,7 @@ impl FolderSource {
 }
 
 impl EntrySource for FolderSource {
-    fn open(&self, index: usize, _verify: bool) -> Result<SourceReader<'_>, ExtractionError> {
+    fn open(&self, index: usize, _: OpenOptions) -> Result<SourceReader<'_>, ExtractionError> {
         let file = self.files.get(index).ok_or_else(|| {
             ExtractionError::Read(io::Error::new(
                 io::ErrorKind::NotFound,

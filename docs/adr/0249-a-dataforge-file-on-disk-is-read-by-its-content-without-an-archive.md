@@ -1,7 +1,7 @@
 # A DataForge file on disk is read by its content, without an Archive
 
-Decided for issue #862. Builds on ADR-0136 (versions 6 and 8 only) and the size limit of the
-DataForge Entry.
+Decided for issue #862. Builds on ADR-0136 (versions 6 and 8 only) and the shared DataForge
+input policy of ADR-0283.
 
 ## Decision
 
@@ -18,9 +18,10 @@ DataForge Entry.
   under 8 bytes too) is none either. A file that is neither an Archive nor a DataForge is an
   Archive error, exit code 3; an I/O error while looking at the file is a read error, exit code 3.
 - **A file replaced while it is read** is reported as changed, like an Archive.
-- **The limits are those of the Entry.** Versions 6 and 8, and `MAX_DATAFORGE_SIZE` (2 GiB), which
-  is checked against the file length before a byte is read. The file is opened read-only and read
-  in mebibytes, polling for a stop like the Entry.
+- **File and Entry use the same input policy.** Both support DataForge versions 6 and 8.
+  [ADR-0283](0283-a-dataforge-is-read-through-one-source-type-and-a-file-has-no-archive-in-the-window.md)
+  defines platform capacity, optional caller admission and cancellable input buffering. The file
+  is opened read-only.
 - **Texts and tags.** A DataForge holds no localisation texts. `dcb export --lang` on a file needs
   `--archive <Data.p4k>` for them and exits with code 2 without it; an Archive as input supplies
   its own and refuses `--archive`. Tag paths resolve from the DataForge alone.

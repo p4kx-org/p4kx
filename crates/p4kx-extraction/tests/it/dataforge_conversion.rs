@@ -224,6 +224,11 @@ fn a_dataforge_that_cannot_be_opened_fails_the_entry() -> TestResult {
     Ok(())
 }
 
+#[path = "dataforge_conversion_checksum.rs"]
+mod checksum;
+#[path = "dataforge_conversion_extent.rs"]
+mod extent;
+
 #[test]
 fn the_conflict_policy_applies_to_each_record_file() -> TestResult {
     let fixture = standard(2)?;

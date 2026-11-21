@@ -11,9 +11,7 @@ use p4kx_assembly::{
     ArchiveFiles, ArchiveModels, Attachment, EntityNode, ForgePalettes, Geometry, LoadoutResolver,
     archive_entry_candidates,
 };
-use p4kx_extraction::{
-    Archive, ArchiveWatch, Build, DataForge, DataForgeEntry, Entry, MAX_DATAFORGE_SIZE,
-};
+use p4kx_extraction::{Archive, ArchiveWatch, Build, DataForge, DataForgeEntry, Entry};
 use p4kx_testkit::{real_archive_key, real_archive_path};
 
 use super::observe;
@@ -162,9 +160,6 @@ fn dataforge_bytes(archive: &Archive, watch: &ArchiveWatch) -> WitnessResult<Vec
     let entry =
         unique_entry(archive, entry.path(), watch)?.ok_or("one original DataForge Entry")?;
     let size = entry.uncompressed_size();
-    if size > MAX_DATAFORGE_SIZE {
-        return Err("DataForge input exceeds its existing read allowance".into());
-    }
     let mut bytes = Vec::new();
     bytes.try_reserve_exact(usize::try_from(size)?)?;
     copy_verified(archive, entry, watch, &mut bytes)?;

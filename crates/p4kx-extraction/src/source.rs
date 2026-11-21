@@ -7,7 +7,7 @@ use std::fmt::Debug;
 use std::io::{self, Read, Take};
 use std::path::Path;
 
-use p4kx_archive::{Archive, Checksum, Entry, ObservedEntry};
+use p4kx_archive::{Archive, Checksum, Entry, EntryReader, ObservedEntry};
 use rayon::prelude::*;
 
 use crate::observed_file_origin::ObservedFileStream;
@@ -81,7 +81,56 @@ impl<'a> SourceEntry<'a> {
     /// Opens the data of the file, checked against its stated checksum when `verify` is set and
     /// the source states one.
     pub(crate) fn open(&self, verify: bool) -> Result<SourceReader<'a>, ExtractionError> {
-        self.source.open(self.index, verify)
+        self.source.open(
+            self.index,
+            OpenOptions {
+                verify,
+                ..OpenOptions::default()
+            },
+        )
+    }
+
+    /// Opens the file and rejects extra decoded bytes beyond its stated length.
+    pub(crate) fn open_exact(&self, verify: bool) -> Result<SourceReader<'a>, ExtractionError> {
+        self.source.open(
+            self.index,
+            OpenOptions {
+                verify,
+                extent: SourceExtent::Exact,
+            },
+        )
+    }
+}
+
+#[derive(Clone, Copy, Default)]
+enum SourceExtent {
+    #[default]
+    Declared,
+    Exact,
+}
+
+/// Verification and decoded-length policy for one source read.
+#[derive(Clone, Copy, Default)]
+pub(crate) struct OpenOptions {
+    pub(crate) verify: bool,
+    extent: SourceExtent,
+}
+
+impl OpenOptions {
+    pub(crate) fn archive_reader<'a>(
+        self,
+        archive: &'a Archive,
+        entry: &Entry,
+    ) -> Result<EntryReader<'a>, ExtractionError> {
+        let reader = if self.verify {
+            archive.open_entry_verified(entry)?
+        } else {
+            archive.open_entry(entry)?
+        };
+        Ok(match self.extent {
+            SourceExtent::Declared => reader,
+            SourceExtent::Exact => reader.reject_overlong(),
+        })
     }
 }
 
@@ -120,7 +169,8 @@ pub(crate) trait EntrySource: Debug + Sync {
     }
 
     /// Opens the data of the file at `index`.
-    fn open(&self, index: usize, verify: bool) -> Result<SourceReader<'_>, ExtractionError>;
+    fn open(&self, index: usize, options: OpenOptions)
+    -> Result<SourceReader<'_>, ExtractionError>;
 
     /// Returns the checksum the source states for the file at `index`.
     fn checksum(&self, index: usize) -> Option<Checksum>;
@@ -146,19 +196,20 @@ impl EntrySource for Archive {
             .and_then(|entry| self.observed_entry(entry))
     }
 
-    fn open(&self, index: usize, verify: bool) -> Result<SourceReader<'_>, ExtractionError> {
+    fn open(
+        &self,
+        index: usize,
+        options: OpenOptions,
+    ) -> Result<SourceReader<'_>, ExtractionError> {
         let entry = self.entries().get(index).ok_or_else(|| {
             ExtractionError::Read(io::Error::new(
                 io::ErrorKind::NotFound,
                 "the Archive has no Entry at that position",
             ))
         })?;
-        let reader = if verify {
-            self.open_entry_verified(entry)?
-        } else {
-            self.open_entry(entry)?
-        };
-        Ok(SourceReader::Archive(Box::new(reader)))
+        Ok(SourceReader::Archive(Box::new(
+            options.archive_reader(self, entry)?,
+        )))
     }
 
     fn checksum(&self, index: usize) -> Option<Checksum> {

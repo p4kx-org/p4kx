@@ -6,7 +6,9 @@
 use std::error::Error;
 use std::path::Path;
 
-use p4kx_extraction::{Archive, DataForgeEntry, DataForgeLoadError, MAX_DATAFORGE_SIZE};
+use p4kx_extraction::{
+    Archive, DataForgeEntry, DataForgeLoadError, DataForgeReadOptions, DataForgeSource,
+};
 use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, TestStruct};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -156,35 +158,84 @@ fn corrupt_entry_data_is_a_read_error() -> TestResult {
 }
 
 #[test]
-fn a_size_above_the_limit_is_rejected_before_reading() -> TestResult {
+fn an_explicit_byte_budget_refuses_the_archive_before_decoding() -> TestResult {
     let dir = tempfile::tempdir()?;
     let archive = archive(
         dir.path(),
         vec![
-            TestEntry::stored("Data\\Game2.dcb", database(1))
-                .with_uncompressed_size(MAX_DATAFORGE_SIZE + 1),
+            TestEntry::deflated("Data\\Game2.dcb", database(1))
+                .with_payload(vec![0xFF; 8])
+                .with_uncompressed_size(17),
+        ],
+    )?;
+    let options = DataForgeReadOptions::default().with_max_decoded_bytes(16);
+
+    let result = DataForgeSource::Archive(&archive).read_with_options(options, &|| false);
+
+    assert!(
+        matches!(
+            result,
+            Err(DataForgeLoadError::BudgetExceeded {
+                size: 17,
+                limit: 16,
+                ..
+            })
+        ),
+        "the caller's budget precedes reading the damaged payload: {result:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_platform_unaddressable_declaration_is_a_capacity_error() -> TestResult {
+    let limit = isize::MAX as u64;
+    let dir = tempfile::tempdir()?;
+    let archive = archive(
+        dir.path(),
+        vec![TestEntry::stored("Data\\Game2.dcb", database(1)).with_uncompressed_size(limit + 1)],
+    )?;
+
+    let result = DataForgeEntry::read(&archive);
+
+    assert!(
+        matches!(result, Err(DataForgeLoadError::TooLarge { size, limit: actual, .. })
+            if size == limit + 1 && actual == limit),
+        "representability is checked without allocating: {result:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_decoded_tail_beyond_the_declared_dataforge_is_a_read_error() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let original = database(1);
+    let short_declaration = u64::try_from(original.len())? - 1;
+    let archive = archive(
+        dir.path(),
+        vec![
+            TestEntry::stored("Data\\Game2.dcb", original)
+                .with_uncompressed_size(short_declaration),
         ],
     )?;
 
     let result = DataForgeEntry::read(&archive);
 
     assert!(
-        matches!(
-            result,
-            Err(DataForgeLoadError::TooLarge { size, limit, .. })
-                if size == MAX_DATAFORGE_SIZE + 1 && limit == MAX_DATAFORGE_SIZE
-        ),
-        "the forged size is rejected: {result:?}"
+        matches!(result, Err(DataForgeLoadError::Read { .. })),
+        "the decoder must prove EOF at the declared length: {result:?}"
     );
     Ok(())
 }
 
+#[cfg(target_pointer_width = "64")]
 #[test]
-fn a_forged_size_below_the_limit_fails_on_the_missing_data() -> TestResult {
+fn a_declaration_above_two_gibibytes_checks_the_actual_end_of_input() -> TestResult {
     let dir = tempfile::tempdir()?;
     let archive = archive(
         dir.path(),
-        vec![TestEntry::stored("Data\\Game2.dcb", database(1)).with_uncompressed_size(1 << 30)],
+        vec![
+            TestEntry::stored("Data\\Game2.dcb", database(1)).with_uncompressed_size((2 << 30) + 1),
+        ],
     )?;
 
     let result = DataForgeEntry::read(&archive);
