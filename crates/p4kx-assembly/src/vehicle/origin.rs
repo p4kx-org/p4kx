@@ -37,6 +37,7 @@ pub(super) struct DeclarationOrigins {
     pub(super) totals_observed: bool,
     pub(super) port_documents: Option<Checkpoint>,
     pub(super) port_parts: Option<VehicleAggregateEvidence>,
+    pub(super) port_occurrences: Vec<Checkpoint>,
     pub(super) rolling_documents: Option<Checkpoint>,
     pub(super) rolling_parts: Option<VehicleAggregateEvidence>,
     pub(super) base: Option<EntryOrigin>,

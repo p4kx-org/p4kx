@@ -40,6 +40,10 @@ impl AttributeOrigins {
         self.element.as_deref()
     }
 
+    pub(crate) fn shared_element(&self) -> Option<Arc<VehicleXmlSite>> {
+        self.element.clone()
+    }
+
     fn classification(&self) -> impl Iterator<Item = (&str, ValueOrigin)> {
         self.entries
             .iter()

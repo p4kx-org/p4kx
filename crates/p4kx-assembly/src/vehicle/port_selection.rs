@@ -2,7 +2,9 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use super::aggregate_evidence::Checkpoint;
-use super::{VehicleAggregateEvidence, VehicleImplementation, VehicleItemPort, VehicleXmlSite};
+use super::{
+    VehicleAggregateEvidence, VehicleImplementation, VehicleItemPort, VehiclePart, VehicleXmlSite,
+};
 use crate::merge::port_key;
 
 #[derive(Debug)]
@@ -24,7 +26,9 @@ impl<'vehicle> Prefix<'vehicle> {
 /// The effective item port and retained source observations for its selection.
 #[derive(Debug)]
 pub struct VehiclePortSelection<'vehicle> {
+    part: &'vehicle VehiclePart,
     port: &'vehicle VehicleItemPort,
+    ordinal: usize,
     documents: Option<Prefix<'vehicle>>,
     parts: Option<Prefix<'vehicle>>,
 }
@@ -34,6 +38,24 @@ impl<'vehicle> VehiclePortSelection<'vehicle> {
     #[must_use]
     pub const fn port(&self) -> &'vehicle VehicleItemPort {
         self.port
+    }
+
+    /// Borrows the physical Part that supplies this port.
+    #[must_use]
+    pub const fn part(&self) -> &'vehicle VehiclePart {
+        self.part
+    }
+
+    /// Returns the port's position in the effective depth-first item port traversal.
+    #[must_use]
+    pub const fn ordinal(&self) -> usize {
+        self.ordinal
+    }
+
+    /// Borrows the original effective `ItemPort` element site, when observed.
+    #[must_use]
+    pub fn position(&self) -> Option<&'vehicle VehicleXmlSite> {
+        self.port.origins.element()
     }
 
     /// Iterates the consulted document and Part selectors.
@@ -57,7 +79,24 @@ impl VehicleImplementation {
     #[must_use]
     pub fn item_port_with_selection(&self, name: &str) -> Option<VehiclePortSelection<'_>> {
         let indexed = self.port_paths.get(&port_key(name))?;
-        let port = self.part_at(&indexed.path)?.item_port()?;
+        let part = self.part_at(&indexed.path)?;
+        self.port_selection(part, indexed.ordinal)
+    }
+
+    /// Iterates every effective item port and its available original XML observations.
+    /// Retains separate physical occurrences in depth-first order, including equal names.
+    pub fn item_ports_with_selection(&self) -> impl Iterator<Item = VehiclePortSelection<'_>> {
+        self.item_ports()
+            .enumerate()
+            .filter_map(move |(ordinal, part)| self.port_selection(part, ordinal))
+    }
+
+    fn port_selection<'vehicle>(
+        &'vehicle self,
+        part: &'vehicle VehiclePart,
+        ordinal: usize,
+    ) -> Option<VehiclePortSelection<'vehicle>> {
+        let item_port = part.item_port()?;
         let origins = &self.declarations;
         let documents = origins
             .aggregate
@@ -67,12 +106,18 @@ impl VehicleImplementation {
         let parts = origins
             .port_parts
             .as_ref()
-            .zip(indexed.prefix)
+            .zip(origins.port_occurrences.get(ordinal).copied())
             .map(|(evidence, end)| Prefix { evidence, end });
         Some(VehiclePortSelection {
-            port,
+            part,
+            port: item_port,
+            ordinal,
             documents,
             parts,
         })
     }
 }
+
+#[cfg(test)]
+#[path = "port_selection_tests.rs"]
+mod tests;

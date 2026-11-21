@@ -7,26 +7,24 @@ use p4kx_extraction::SourceValue;
 use p4kx_foundation::read_text_number;
 
 use super::aggregate_evidence::Checkpoint;
-use super::{PartKind, VehicleAggregateEvidence, VehicleItemPort, VehicleItemType, VehiclePart};
+use super::{
+    ITEM_TYPE_ATTRIBUTE, PartKind, VehicleAggregateEvidence, VehicleItemPort, VehicleItemType,
+    VehiclePart,
+};
 use crate::markup::Element;
 use crate::merge::port_key;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq)]
 pub(super) struct IndexedPort {
     pub(super) path: Box<[usize]>,
-    pub(super) prefix: Option<Checkpoint>,
-}
-
-impl PartialEq for IndexedPort {
-    fn eq(&self, other: &Self) -> bool {
-        self.path == other.path
-    }
+    pub(super) ordinal: usize,
 }
 
 pub(super) struct PartTree {
     pub(super) parts: Vec<VehiclePart>,
     pub(super) paths: HashMap<String, IndexedPort>,
     pub(super) selectors: Option<VehicleAggregateEvidence>,
+    pub(super) port_occurrences: Vec<Checkpoint>,
     pub(super) rolling_parts: bool,
     pub(super) rolling_selectors: Option<VehicleAggregateEvidence>,
 }
@@ -45,6 +43,8 @@ pub(super) fn parts(
         found_wheel: false,
         paths: HashMap::new(),
         path: Vec::new(),
+        port_count: 0,
+        port_occurrences: Vec::new(),
     };
     reader.element(vehicle, "$children");
     let mut parts = Vec::new();
@@ -58,6 +58,7 @@ pub(super) fn parts(
         parts,
         paths: reader.paths,
         selectors: reader.selectors,
+        port_occurrences: reader.port_occurrences,
         rolling_parts: reader.rolling_parts,
         rolling_selectors: reader.rolling_observation,
     }
@@ -71,6 +72,8 @@ struct PartReader<'scope> {
     found_wheel: bool,
     paths: HashMap<String, IndexedPort>,
     path: Vec<usize>,
+    port_count: usize,
+    port_occurrences: Vec<Checkpoint>,
 }
 
 impl PartReader<'_> {
@@ -170,14 +173,16 @@ impl PartReader<'_> {
         } else {
             part.child("ItemPort")?
         };
+        let ordinal = self.port_count;
+        self.port_count += 1;
+        if let Some(selectors) = &self.selectors {
+            self.port_occurrences.push(selectors.checkpoint());
+        }
         self.paths
             .entry(port_key(name))
             .or_insert_with(|| IndexedPort {
                 path: self.path.as_slice().into(),
-                prefix: self
-                    .selectors
-                    .as_ref()
-                    .map(VehicleAggregateEvidence::checkpoint),
+                ordinal,
             });
         Some(item_port(source))
     }
@@ -196,6 +201,7 @@ const fn kind_of(class: &str) -> PartKind {
 }
 
 fn item_port(element: &Element) -> VehicleItemPort {
+    let item_types = read_types(element);
     VehicleItemPort {
         min_size: size(element.attribute("minSize")),
         max_size: size(element.attribute("maxSize")),
@@ -204,34 +210,40 @@ fn item_port(element: &Element) -> VehicleItemPort {
         display_name: element.attribute("display_name").map(str::to_owned),
         port_tags: element.attribute("portTags").map(str::to_owned),
         required_tags: element.attribute("requiredTags").map(str::to_owned),
-        types: type_elements(element)
-            .filter_map(|kind| kind.attribute("type"))
-            .map(str::to_owned)
+        types: item_types
+            .iter()
+            .map(|kind| kind.item_type.clone())
             .collect(),
-        item_types: type_elements(element)
-            .filter_map(|kind| {
-                Some(VehicleItemType {
-                    item_type: kind.attribute("type")?.to_owned(),
-                    subtypes: kind
-                        .attribute("subtypes")
-                        .unwrap_or_default()
-                        .split(',')
-                        .map(str::trim)
-                        .filter(|subtype| !subtype.is_empty())
-                        .map(str::to_owned)
-                        .collect(),
-                })
-            })
-            .collect(),
+        item_types,
         origins: element.origins.clone(),
         light_attachments: super::light_ports::attachments(element),
     }
 }
 
-fn type_elements(port: &Element) -> impl Iterator<Item = &Element> {
-    port.child("Types")
-        .into_iter()
-        .flat_map(|types| types.children_named("Type"))
+fn read_types(port: &Element) -> Vec<VehicleItemType> {
+    let Some(collection) = port.child("Types") else {
+        return Vec::new();
+    };
+    let collection_site = collection.origins.shared_element();
+    collection
+        .children_named("Type")
+        .filter_map(|element| {
+            Some(VehicleItemType {
+                item_type: element.attribute(ITEM_TYPE_ATTRIBUTE)?.to_owned(),
+                subtypes: element
+                    .attribute("subtypes")
+                    .unwrap_or_default()
+                    .split(',')
+                    .map(str::trim)
+                    .filter(|subtype| !subtype.is_empty())
+                    .map(str::to_owned)
+                    .collect(),
+                assignment: element.origins.evidence(ITEM_TYPE_ATTRIBUTE).cloned(),
+                collection: collection_site.clone(),
+                declaration: element.origins.shared_element(),
+            })
+        })
+        .collect()
 }
 
 fn tread_wheels(part: &Element) -> Vec<String> {

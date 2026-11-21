@@ -30,7 +30,7 @@ use crate::{LoadoutError, LoadoutFiles};
 pub use aggregate_evidence::{VehicleAggregateEvidence, VehicleAggregateIssue};
 pub use elem::ElemOverride;
 pub(crate) use gear::gears;
-pub(crate) use item_port::{PORT_OBSERVED_ATTRIBUTES, flags_contain};
+pub(crate) use item_port::{ITEM_TYPE_ATTRIBUTE, PORT_OBSERVED_ATTRIBUTES, flags_contain};
 pub use item_port::{VehicleItemPort, VehicleItemType};
 pub use light_ports::{VehicleLightAttachment, VehicleLightPort};
 pub(crate) use locate::{load, load_observed};

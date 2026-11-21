@@ -163,6 +163,7 @@ fn project(
             totals_observed,
             port_documents,
             port_parts: parts.selectors,
+            port_occurrences: parts.port_occurrences,
             rolling_documents,
             rolling_parts: parts.rolling_selectors,
             base: physical,

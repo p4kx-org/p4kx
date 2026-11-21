@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use crate::loadout_xml::{MissingAttribute, Node, Scope};
-use crate::vehicle::PORT_OBSERVED_ATTRIBUTES;
+use crate::vehicle::{ITEM_TYPE_ATTRIBUTE, PORT_OBSERVED_ATTRIBUTES};
 use crate::{ValueOrigin, VehicleAttributeEvidence};
 
 use super::AttributeOrigins;
@@ -84,6 +84,17 @@ fn retain_port_attributes(
         && attributes
             .iter()
             .any(|(name, value)| name.eq_ignore_ascii_case("id") && !value.is_empty());
+    let item_type = node.name().eq_ignore_ascii_case("Type");
+    if item_type || patch_donor {
+        retain(
+            origins,
+            node,
+            scope,
+            attributes,
+            ITEM_TYPE_ATTRIBUTE,
+            absence_scope(item_type),
+        );
+    }
     if port || patch_donor {
         for name in PORT_OBSERVED_ATTRIBUTES {
             retain(origins, node, scope, attributes, name, absence_scope(port));

@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_extraction::SourceValue;
 
-use super::{PortVisibility, ValueOrigin, VehicleAttributeEvidence};
+use super::{PortVisibility, ValueOrigin, VehicleAttributeEvidence, VehicleXmlSite};
 use crate::markup::AttributeOrigins;
 
+pub(crate) const ITEM_TYPE_ATTRIBUTE: &str = "type";
 pub(crate) const PORT_OBSERVED_ATTRIBUTES: [&str; 5] = [
     "minSize",
     "maxSize",
@@ -23,17 +26,43 @@ pub(crate) fn flags_contain(flags: &str, flag: &str) -> bool {
 }
 
 /// One `Types/Type` element of an item port: an item type and the sub-types of it the port takes.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct VehicleItemType {
     pub(crate) item_type: String,
     pub(crate) subtypes: Vec<String>,
+    pub(super) assignment: Option<Arc<VehicleAttributeEvidence>>,
+    pub(super) collection: Option<Arc<VehicleXmlSite>>,
+    pub(super) declaration: Option<Arc<VehicleXmlSite>>,
 }
+
+impl PartialEq for VehicleItemType {
+    fn eq(&self, other: &Self) -> bool {
+        self.item_type == other.item_type && self.subtypes == other.subtypes
+    }
+}
+
+impl Eq for VehicleItemType {}
 
 impl VehicleItemType {
     /// Returns the item type, e.g. `WeaponGun`.
     #[must_use]
     pub fn item_type(&self) -> &str {
         &self.item_type
+    }
+
+    /// Borrows the effective type label and its winning original attribute evidence.
+    /// An applied Elem supplies its original value rather than the overwritten Type attribute.
+    #[must_use]
+    pub fn item_type_source(&self) -> (&str, Option<&VehicleAttributeEvidence>) {
+        (&self.item_type, self.assignment.as_deref())
+    }
+
+    /// Iterates the original effective Types container and Type declaration sites.
+    pub fn selection_sites(&self) -> impl Iterator<Item = &VehicleXmlSite> {
+        self.collection
+            .iter()
+            .chain(self.declaration.iter())
+            .map(Arc::as_ref)
     }
 
     /// Returns the sub-types the port takes of the item type, in file order; empty when the
@@ -79,9 +108,7 @@ impl VehicleItemPort {
     pub fn port_tags_source(&self) -> (Option<&str>, Option<&VehicleAttributeEvidence>) {
         (
             self.port_tags.as_deref(),
-            self.origins
-                .evidence("portTags")
-                .map(std::sync::Arc::as_ref),
+            self.origins.evidence("portTags").map(Arc::as_ref),
         )
     }
 
@@ -90,9 +117,7 @@ impl VehicleItemPort {
     pub fn required_tags_source(&self) -> (Option<&str>, Option<&VehicleAttributeEvidence>) {
         (
             self.required_tags.as_deref(),
-            self.origins
-                .evidence("requiredTags")
-                .map(std::sync::Arc::as_ref),
+            self.origins.evidence("requiredTags").map(Arc::as_ref),
         )
     }
 
@@ -118,10 +143,7 @@ impl VehicleItemPort {
     /// Borrows the original display name, including empty text, and its effective attribute evidence.
     #[must_use]
     pub fn display_name_source(&self) -> (Option<&str>, Option<&VehicleAttributeEvidence>) {
-        let evidence = self
-            .origins
-            .evidence("display_name")
-            .map(std::sync::Arc::as_ref);
+        let evidence = self.origins.evidence("display_name").map(Arc::as_ref);
         let authored = self
             .display_name
             .as_deref()
@@ -152,7 +174,7 @@ impl VehicleItemPort {
     pub fn min_size_source(&self) -> (&SourceValue<u32>, Option<&VehicleAttributeEvidence>) {
         (
             &self.min_size,
-            self.origins.evidence("minSize").map(std::sync::Arc::as_ref),
+            self.origins.evidence("minSize").map(Arc::as_ref),
         )
     }
 
@@ -161,7 +183,7 @@ impl VehicleItemPort {
     pub fn max_size_source(&self) -> (&SourceValue<u32>, Option<&VehicleAttributeEvidence>) {
         (
             &self.max_size,
-            self.origins.evidence("maxSize").map(std::sync::Arc::as_ref),
+            self.origins.evidence("maxSize").map(Arc::as_ref),
         )
     }
 
@@ -202,7 +224,7 @@ impl VehicleItemPort {
     /// Returns the original attribute evidence supplying the effective flags.
     #[must_use]
     pub fn flags_evidence(&self) -> Option<&VehicleAttributeEvidence> {
-        self.origins.evidence("flags").map(std::sync::Arc::as_ref)
+        self.origins.evidence("flags").map(Arc::as_ref)
     }
 
     /// Borrows the applied flags and their original attribute evidence.
