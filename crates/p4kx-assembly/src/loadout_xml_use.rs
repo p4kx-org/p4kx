@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::HashMap;
+use std::fmt;
 use std::sync::Arc;
 
 use p4kx_extraction::{EntryOrigin, SourceLocation};
@@ -20,7 +21,6 @@ pub(crate) struct XmlInclude {
     pub(crate) path: LoadoutPath,
 }
 
-#[derive(Debug)]
 pub(crate) struct XmlRoute {
     edge: Arc<XmlInclude>,
     tail: Option<Arc<Self>>,
@@ -41,6 +41,31 @@ impl XmlRoute {
         }))
     }
 }
+
+impl Drop for XmlRoute {
+    fn drop(&mut self) {
+        let mut tail = self.tail.take();
+        while let Some(mut next) = tail.take().and_then(Arc::into_inner) {
+            tail = next.tail.take();
+        }
+    }
+}
+
+impl fmt::Debug for XmlRoute {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_list()
+            .entries(
+                std::iter::successors(Some(self), |&route| route.tail.as_deref())
+                    .map(|route| &route.edge),
+            )
+            .finish()
+    }
+}
+
+#[cfg(test)]
+#[path = "loadout_xml_route_tests.rs"]
+mod route_tests;
 
 #[derive(Debug)]
 struct XmlRoot {

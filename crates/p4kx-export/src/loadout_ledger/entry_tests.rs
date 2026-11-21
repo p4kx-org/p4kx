@@ -270,17 +270,21 @@ fn vehicle_base_and_patch_parse_are_distinct_actual_document_operations() -> Tes
 }
 
 #[test]
-fn xml_include_depth_marks_unknown_remaining_inputs_without_fictitious_reads() -> TestResult {
+fn xml_include_depth_preserves_every_original_file_operation() -> TestResult {
+    const DOCUMENTS: usize = 257;
     let mut entries = Vec::new();
-    for depth in 0..=p4kx_assembly::MAX_XML_INCLUDE_DEPTH {
+    for depth in 0..DOCUMENTS {
         let configured = if depth == 0 {
             CONFIGURED.to_owned()
         } else {
             format!("Scripts/Loadouts/Synthetic/{depth}.xml")
         };
         let next = format!("Scripts/Loadouts/Synthetic/{}.xml", depth + 1);
-        let contents =
-            format!("<Loadout><Loadouts><Loadout loadout=\"{next}\"/></Loadouts></Loadout>");
+        let contents = if depth + 1 == DOCUMENTS {
+            "<Loadout/>".to_owned()
+        } else {
+            format!("<Loadout><Loadouts><Loadout loadout=\"{next}\"/></Loadouts></Loadout>")
+        };
         entries.push(TestEntry::stored(
             format!("Data/{configured}"),
             contents.into_bytes(),
@@ -288,8 +292,8 @@ fn xml_include_depth_marks_unknown_remaining_inputs_without_fictitious_reads() -
     }
     let ledger = run(entries, None, false)?;
     assert!(
-        ledger.incomplete_inventories.contains(&Kind::Loadouts),
-        "the actual include traversal limit remains explicit"
+        !ledger.incomplete_inventories.contains(&Kind::Loadouts),
+        "the finite Include chain has complete original input coverage"
     );
     assert_eq!(
         ledger
@@ -297,15 +301,15 @@ fn xml_include_depth_marks_unknown_remaining_inputs_without_fictitious_reads() -
             .iter()
             .filter(|entry| entry.operation == EntryOperation::XmlLoadoutBytes)
             .count(),
-        p4kx_assembly::MAX_XML_INCLUDE_DEPTH,
-        "files beyond the stopped traversal are not reported as read"
+        DOCUMENTS,
+        "each source document is read exactly once"
     );
     assert!(
         ledger
             .entries
             .iter()
             .all(|entry| entry.disposition == SourceDisposition::Projected),
-        "successfully read and parsed ancestors are retained independently of the traversal limit"
+        "every original document was successfully projected"
     );
     Ok(())
 }

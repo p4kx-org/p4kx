@@ -130,7 +130,7 @@ fn read_entries(
         Some(LoadoutXmlClassUse::root(original, path, Some(sites)))
     });
     Ok(Entries {
-        list: Arc::from(loaded.entries),
+        list: loaded.entries,
         issues: Arc::from(loaded.issues),
         xml_use,
     })

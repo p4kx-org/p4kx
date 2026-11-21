@@ -1,4 +1,4 @@
 ### Fixed
 
-- Loadouts resolve all reachable Includes by default within the existing active-chain and source
-  limits. An optional SDK read budget reports the exact first Include it cannot admit.
+- Loadouts resolve the complete reachable Include graph by default. An optional SDK read budget
+  reports the exact first Include it cannot admit.

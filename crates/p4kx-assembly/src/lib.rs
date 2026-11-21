@@ -339,7 +339,6 @@ pub use vehicle::{
     VehicleTotalFieldPresence, VehicleTotalFieldUse, VehicleTotalMetric, VehicleTotals,
     VehicleXmlSite,
 };
-pub use xml::MAX_XML_INCLUDE_DEPTH;
 
 /// The deepest element nesting of a vehicle implementation or patch file that is read; deeper
 /// files are refused.

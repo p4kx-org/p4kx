@@ -5,8 +5,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use p4kx_assembly::{Entities, LoadoutError, LoadoutResolver};
+use p4kx_assembly::{Attachment, Entities, LoadoutError, LoadoutResolver, LoadoutXmlClassUse};
 use p4kx_dataforge::DataForge;
+use p4kx_testkit::{DataForgeBuilder, TestEntity, TestLoadout};
 
 use crate::loadout_cache_shared_support as fixture;
 use crate::loadout_cache_shared_support::{Counts, Files, TestResult};
@@ -157,28 +158,164 @@ fn a_nested_budget_refusal_records_only_the_unread_dependency() -> TestResult {
     )
 }
 
+const DEEP_DOCUMENTS: usize = 257;
+
 #[test]
-fn a_before_read_depth_refusal_has_no_invented_child_operation() -> TestResult {
-    let mut documents = HashMap::new();
-    let total = p4kx_assembly::MAX_XML_INCLUDE_DEPTH;
-    documents.insert(
-        fixture::ROOT.to_owned(),
-        fixture::document([fixture::path(0)]),
+fn deep_includes_preserve_authored_edges_and_the_leaf_route_on_a_small_stack() -> TestResult {
+    let worker = std::thread::Builder::new()
+        .stack_size(128 << 10)
+        .spawn(|| prove_deep_includes().map_err(|error| error.to_string()))?;
+    worker
+        .join()
+        .map_err(|_| "deep Include worker panicked")??;
+    Ok(())
+}
+
+fn prove_deep_includes() -> TestResult {
+    let (files, paths) = deep_files();
+    let builder = p4kx_testkit::entity_schema(DataForgeBuilder::new());
+    let database = builder
+        .record(
+            TestEntity::new(1, "Root", "synthetic/entity.xml")
+                .loadout(TestLoadout::Xml(fixture::ROOT.to_owned()))
+                .record(),
+        )
+        .record(TestEntity::new(2, "Leaf", "synthetic/leaf.xml").record())
+        .build();
+    let forge = DataForge::open(&database)?;
+    let probe = Arc::new(Probe::default());
+    let mut resolver =
+        LoadoutResolver::with_observed_entities(Arc::new(Entities::new(&forge)), probe.clone())
+            .with_files(&files);
+    let root = forge.record(0).ok_or("the synthetic Entity is absent")?;
+    let node = resolver.resolve(&root)?;
+    assert!(node.issues().is_empty(), "every deep document was resolved");
+    assert_eq!(
+        files.reads.load(Ordering::Relaxed),
+        DEEP_DOCUMENTS,
+        "each document is read once despite repeated Includes"
     );
-    for index in 0..total {
-        documents.insert(
-            fixture::path(index),
-            fixture::document([fixture::path(index + 1)]),
+    let [port] = node.ports() else {
+        return Err("only the leaf contributed one port".into());
+    };
+    let Attachment::Entity(leaf) = port.attachment() else {
+        return Err("the deep port did not attach the selected Entity".into());
+    };
+    let usage = leaf
+        .attachment_target()
+        .and_then(p4kx_assembly::LoadoutTargetGuid::class_xml_use)
+        .ok_or("the selected leaf origin is absent")?;
+    let actual: Vec<_> = usage.includes().map(|(_, _, path)| path.value()).collect();
+    assert_eq!(
+        actual,
+        paths.iter().skip(1).map(String::as_str).collect::<Vec<_>>(),
+        "the full selected original Include path"
+    );
+
+    verify_deep_receipts(&probe, usage, &paths)?;
+    drop(resolver);
+    drop(node);
+    Ok(())
+}
+
+fn verify_deep_receipts(probe: &Probe, usage: &LoadoutXmlClassUse, paths: &[String]) -> TestResult {
+    let observed = probe
+        .0
+        .lock()
+        .map_err(|_| "the deep receipt lock is poisoned")?;
+    let reads = observed
+        .events
+        .iter()
+        .filter(|event| event.kind == EventKind::Read)
+        .map(|event| event.request.value());
+    assert!(
+        reads.eq(paths.iter().map(String::as_str)),
+        "provider read order"
+    );
+    let dependencies: Vec<_> = observed
+        .events
+        .iter()
+        .filter(|event| event.kind == EventKind::Dependency)
+        .collect();
+    assert_eq!(
+        dependencies.len(),
+        DEEP_DOCUMENTS - 1,
+        "every distinct Include produced its edge"
+    );
+    for (dependency, ((parent, _, requested), expected)) in dependencies
+        .iter()
+        .rev()
+        .zip(usage.includes().zip(paths.iter().skip(1)))
+    {
+        assert_eq!(requested.value(), expected, "leaf route is in source order");
+        assert!(
+            dependency
+                .parent
+                .as_ref()
+                .is_some_and(|seen| seen.is_same_operation(parent)),
+            "route and dependency retain the actual original parent read"
+        );
+        let position = dependency
+            .dependency
+            .as_ref()
+            .and_then(source::caller_path)
+            .ok_or("the dependency occurrence is absent")?;
+        assert_eq!(
+            position.selection(),
+            requested.selection(),
+            "the route preserves the exact original Include occurrence"
         );
     }
-    verify_refusal(
-        &Files {
+    assert!(
+        observed.refusals.is_empty(),
+        "the valid chain has no refusal"
+    );
+    drop(observed);
+    Ok(())
+}
+
+#[test]
+fn stopping_on_the_first_deep_dependency_prevents_later_receipts() -> TestResult {
+    let (files, _) = deep_files();
+    verify_stop(
+        &files,
+        Counts {
+            stop_on_dependency: true,
+            ..Counts::default()
+        },
+        DEEP_DOCUMENTS,
+        1,
+        0,
+    )
+}
+
+fn deep_files() -> (Files, Vec<String>) {
+    let paths: Vec<_> = std::iter::once(fixture::ROOT.to_owned())
+        .chain((1..DEEP_DOCUMENTS).map(fixture::path))
+        .collect();
+    let mut documents: HashMap<_, _> = paths
+        .iter()
+        .zip(paths.iter().skip(1))
+        .map(|(path, next)| {
+            (
+                path.clone(),
+                fixture::document([next.clone(), next.to_ascii_uppercase()]),
+            )
+        })
+        .collect();
+    if let Some(leaf) = paths.last() {
+        documents.insert(
+            leaf.clone(),
+            br#"<Loadout><Items><Item portName="terminal" itemName="Leaf"/></Items></Loadout>"#
+                .to_vec(),
+        );
+    }
+    (
+        Files {
             documents,
             reads: AtomicUsize::new(0),
         },
-        None,
-        total,
-        &fixture::path(total - 1),
+        paths,
     )
 }
 
