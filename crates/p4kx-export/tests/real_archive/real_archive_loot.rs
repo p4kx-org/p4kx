@@ -13,6 +13,9 @@ use p4kx_extraction::{Archive, Guid};
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
 
+#[path = "real_archive_legacy_loot_sdk.rs"]
+mod legacy_sdk;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 #[expect(
