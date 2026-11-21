@@ -9,9 +9,7 @@ use p4kx_assembly::{Assembly, EntityNode, LoadoutResolver, Placement, PortDefini
 use p4kx_dataforge::DataForge;
 use p4kx_extraction::Archive;
 use p4kx_gltf::GlbOptions;
-use p4kx_testkit::{
-    DataForgeBuilder, TestEntity, TestEntry, TestModel, TestNode, TestPort, entity_schema,
-};
+use p4kx_testkit::{DataForgeBuilder, TestEntity, TestPort, entity_schema};
 
 use crate::assembly_support::{assemble, fixture};
 
@@ -81,27 +79,7 @@ fn the_tags_of_a_port_are_read_as_stored() -> TestResult {
 
 #[test]
 fn a_static_attachment_with_no_rotation_takes_the_rotated_port_node() -> TestResult {
-    let fuse_guid = 2;
-    let relay = TestEntity::new(1, "TEST_Relay", "entities/test_relay.xml")
-        .geometry("objects/test/relay.cgf", None)
-        .port(
-            TestPort::new("slot")
-                .entity_attachment(true)
-                .default_item(fuse_guid),
-        );
-    let fuse = TestEntity::new(fuse_guid, "TEST_Fuse", "entities/test_fuse.xml")
-        .geometry("objects/test/fuse.cgf", None);
-    let forge = entity_schema(DataForgeBuilder::new())
-        .record(relay.record())
-        .record(fuse.record())
-        .build();
-    let relay_model = relay_with_rotated_socket();
-    let fixture = fixture(vec![
-        TestEntry::stored("Data/Game2.dcb", forge),
-        TestEntry::stored("Data/objects/test/relay.cgf", relay_model.cgf()),
-        TestEntry::stored("Data/objects/test/fuse.cgf", TestModel::cube().cgf()),
-        TestEntry::stored("Data/objects/test/fuse.cgfm", TestModel::cube().cgfm()),
-    ])?;
+    let fixture = fixture(p4kx_testkit::static_relay_entries())?;
     let archive = Archive::open(&fixture.path)?;
     let assembly = assemble(&archive, "TEST_Relay", 0)?;
     let attached = assembly
@@ -122,33 +100,6 @@ fn a_static_attachment_with_no_rotation_takes_the_rotated_port_node() -> TestRes
         "the static fuse composes the frame's X rotation with the socket's Z rotation and offset"
     );
     verify_glb_socket(&assembly)
-}
-
-fn relay_with_rotated_socket() -> TestModel {
-    TestModel::cube()
-        .with_nodes(vec![
-            TestNode {
-                name: "socket frame".into(),
-                parent: None,
-                local: [
-                    [1.0, 0.0, 0.0, 7.0],
-                    [0.0, 0.0, -1.0, 11.0],
-                    [0.0, 1.0, 0.0, 13.0],
-                ],
-                kind: 2,
-            },
-            TestNode {
-                name: "slot".into(),
-                parent: Some(0),
-                local: [
-                    [0.0, -1.0, 0.0, 2.0],
-                    [1.0, 0.0, 0.0, 3.0],
-                    [0.0, 0.0, 1.0, 4.0],
-                ],
-                kind: 2,
-            },
-        ])
-        .helpers_only()
 }
 
 fn verify_glb_socket(assembly: &Assembly) -> TestResult {

@@ -63,6 +63,7 @@ mod entity_requirement;
 mod entity_sample;
 mod entity_schema;
 mod entity_skin;
+mod entity_static_relay;
 mod entity_vehicle;
 mod entity_vehicle_paint;
 mod entity_zones;
@@ -242,6 +243,7 @@ pub use entity_schema::{
     tint_palette_record_with_specular,
 };
 pub use entity_skin::{SKIN_BODY, skin_attachment_entries};
+pub use entity_static_relay::static_relay_entries;
 pub use entity_vehicle::landing_system_record;
 pub use entity_vehicle_paint::{
     FITTED_CDF_DOCUMENT, FITTED_CDF_MATERIAL, fitted_cdf_paint_vehicle_entries,

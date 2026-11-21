@@ -7,7 +7,8 @@ use std::error::Error;
 use std::path::PathBuf;
 
 use p4kx_testkit::{
-    ArchiveBuilder, TestEntry, assembly_entries, livery_entries, mounted_overlay_entries, test_key,
+    ArchiveBuilder, TestEntry, assembly_entries, livery_entries, mounted_overlay_entries,
+    static_relay_entries, test_key,
 };
 
 #[path = "blender_consumer_fixture/character.rs"]
@@ -39,6 +40,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         Case {
             name: "character",
             entries: character::entries,
+        },
+        Case {
+            name: "relay",
+            entries: static_relay_entries,
         },
     ];
     let worn_helper = std::env::var_os("P4KX_TEST_WORN_HELPER_FIXTURE").map(|_| Case {

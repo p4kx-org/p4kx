@@ -75,7 +75,7 @@ Blender session remains unchanged.
 
 ## Rust-exported synthetic packages in Blender
 
-`p4kx-testkit` can write three synthetic source Archives for an end-to-end exporter/importer check.
+`p4kx-testkit` writes synthetic source Archives for end-to-end exporter/importer checks.
 Build the CLI from the same checkout as the importer. In a dedicated PowerShell session, choose
 an absolute scratch root outside the repository and the game installation:
 
@@ -317,6 +317,9 @@ $addon = (Resolve-Path -LiteralPath 'blender_addon').ProviderPath
 Blender 5.3 checks the expected positions of both rigid pieces and their locators,
 their spine parent and one drawn vertex following a pose while the pelvis stays fixed.
 The original fixture uses a 0.2 m port offset. The replacement uses its own 0.8 m offset.
+
+The [static relay fixture](static-relay-blender-verification.md) checks full helper rotation
+in an ordinary entity package imported by native Blender.
 
 ## Native package exchange in CI
 
