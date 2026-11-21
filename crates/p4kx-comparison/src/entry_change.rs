@@ -11,11 +11,11 @@ use crate::path_key::{eq_normalised, top_level};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ChangeKind {
-    /// Only the new side has the Entry.
+    /// An unpaired occurrence on the new side.
     Added,
-    /// Only the old side has the Entry.
+    /// An unpaired occurrence on the old side.
     Removed,
-    /// Both sides have the Entry, with a different uncompressed size or CRC-32C.
+    /// A matched occurrence with a different uncompressed size or declared checksum.
     Changed,
 }
 
@@ -25,6 +25,7 @@ pub(crate) enum EntryDecision {
     ChecksumDiffers,
     OrderedAgainst(usize),
     OppositeExhausted,
+    Collision { evidence: usize, ambiguous: bool },
 }
 
 /// One Entry that was added, removed or changed.
@@ -37,7 +38,9 @@ pub struct EntryChange<'a> {
 
 impl PartialEq for EntryChange<'_> {
     fn eq(&self, other: &Self) -> bool {
-        self.old == other.old && self.new == other.new
+        self.old == other.old
+            && self.new == other.new
+            && self.pairing_is_ambiguous() == other.pairing_is_ambiguous()
     }
 }
 
@@ -80,6 +83,18 @@ impl<'a> EntryChange<'a> {
             (Some(_), None) => ChangeKind::Removed,
             (None, _) => ChangeKind::Added,
         }
+    }
+
+    /// Returns whether indistinguishable physical occurrences make this pairing ambiguous.
+    #[must_use]
+    pub const fn pairing_is_ambiguous(&self) -> bool {
+        matches!(
+            self.decision,
+            EntryDecision::Collision {
+                ambiguous: true,
+                ..
+            }
+        )
     }
 
     /// Returns the Entry path as the new side stores it, or as the old side does for a removed

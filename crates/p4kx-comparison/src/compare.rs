@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::borrow::Cow;
 use std::cmp::Ordering;
 
 use rayon::prelude::*;
@@ -14,7 +15,19 @@ use crate::{
     DataForgeEntry, DataForges, Entry, EntryChange, Side,
 };
 
+#[path = "compare_collision.rs"]
+mod collision;
+
+pub(crate) use collision::CollisionEvidence;
+
 const PROGRESS_STEP: usize = 1 << 16;
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct JoinResult {
+    pub(crate) changes: Vec<Joined>,
+    pub(crate) collisions: Vec<CollisionEvidence>,
+    total: usize,
+}
 
 /// One changed Entry as positions in the Entry lists of both Archives.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -48,7 +61,8 @@ impl Joined {
 /// Compares the `old` with the `new` Archive on the selected levels.
 ///
 /// Entries are joined by their path with ASCII case folded and `/` read as `\`; an Entry is
-/// changed when its uncompressed size or CRC-32C differs. Nothing is decompressed.
+/// changed when its uncompressed size or declared checksum differs. Duplicate occurrences are
+/// reconciled using original spellings and declared content. Nothing is decompressed.
 ///
 /// Records of the `dataforges` are joined by GUID: a Record is moved when its record path
 /// differs, ignoring case and separator kind, and changed when its name, its type or the value
@@ -77,7 +91,8 @@ fn compare_inner<'a>(
     record_sources: RecordSources,
 ) -> Result<Comparison<'a>, ComparisonError> {
     check_levels(options, dataforges.is_some())?;
-    let (joined, entries_total) = join(old, new, options)?;
+    let joined = join(old, new, options)?;
+    let entries_total = joined.total;
     let progress = ComparisonProgress {
         entries_done: entries_total,
         entries_total,
@@ -93,9 +108,11 @@ fn compare_inner<'a>(
         levels: options.levels,
         filter: options.filter.map(|filter| filter.as_str().to_owned()),
         entries: joined
+            .changes
             .iter()
             .filter_map(|joined| joined.resolve(old, new))
             .collect(),
+        entry_collisions: Cow::Owned(joined.collisions),
         records,
         record_sources,
     })
@@ -147,17 +164,16 @@ pub(crate) fn check_levels(
 }
 
 /// Joins the Entries of both Archives into the positions of the changed ones, ordered by
-/// normalised path, when the Entry level is selected; returns them with the number of Entries
-/// joined.
+/// normalised path, and retains physical evidence for collisions.
 pub(crate) fn join(
     old: &Archive,
     new: &Archive,
     options: &CompareOptions<'_>,
-) -> Result<(Vec<Joined>, usize), ComparisonError> {
+) -> Result<JoinResult, ComparisonError> {
     if options.levels.entries {
         join_entries(old, new, options)
     } else {
-        Ok((Vec::new(), 0))
+        Ok(JoinResult::default())
     }
 }
 
@@ -189,24 +205,26 @@ fn join_entries(
     old: &Archive,
     new: &Archive,
     options: &CompareOptions<'_>,
-) -> Result<(Vec<Joined>, usize), ComparisonError> {
+) -> Result<JoinResult, ComparisonError> {
     let (old, new) = rayon::join(
         || sorted_selection(old, options),
         || sorted_selection(new, options),
     );
     check_cancel(options)?;
+    merge_sorted_entries(&old, &new, options)
+}
+
+fn merge_sorted_entries(
+    old: &[(usize, &Entry)],
+    new: &[(usize, &Entry)],
+    options: &CompareOptions<'_>,
+) -> Result<JoinResult, ComparisonError> {
     let total = old.len() + new.len();
-    let report = |done| {
-        if let Some(progress) = options.progress {
-            progress(ComparisonProgress {
-                entries_done: done,
-                entries_total: total,
-                ..ComparisonProgress::default()
-            });
-        }
+    report_entry_progress(options, 0, total);
+    let mut result = JoinResult {
+        total,
+        ..JoinResult::default()
     };
-    report(0);
-    let mut changes = Vec::new();
     let (mut i, mut j) = (0, 0);
     let mut next_report = PROGRESS_STEP;
     loop {
@@ -231,23 +249,45 @@ fn join_entries(
                         Some(added(after, EntryDecision::OrderedAgainst(before)))
                     }
                     Ordering::Equal => {
-                        i += 1;
-                        j += 1;
-                        difference(old_entry, new_entry)
-                            .map(|decision| changed(before, after, decision))
+                        if let Some((old_count, new_count)) = collision::join_if_needed(
+                            old.split_at(i).1,
+                            new.split_at(j).1,
+                            old_entry.path(),
+                            &mut result,
+                            options,
+                        )? {
+                            i += old_count;
+                            j += new_count;
+                            None
+                        } else {
+                            i += 1;
+                            j += 1;
+                            difference(old_entry, new_entry)
+                                .map(|decision| changed(before, after, decision))
+                        }
                     }
                 }
             }
         };
-        changes.extend(change);
+        result.changes.extend(change);
         if i + j >= next_report {
             check_cancel(options)?;
-            report(i + j);
+            report_entry_progress(options, i + j, total);
             next_report = i + j + PROGRESS_STEP;
         }
     }
-    report(total);
-    Ok((changes, total))
+    report_entry_progress(options, total, total);
+    Ok(result)
+}
+
+fn report_entry_progress(options: &CompareOptions<'_>, done: usize, total: usize) {
+    if let Some(progress) = options.progress {
+        progress(ComparisonProgress {
+            entries_done: done,
+            entries_total: total,
+            ..ComparisonProgress::default()
+        });
+    }
 }
 
 fn sorted_selection<'a>(

@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use p4kx_channels::PublicPatches;
 use thiserror::Error;
 
-use crate::compare::{Joined, check_levels, join};
+use crate::compare::{JoinResult, check_levels, join};
 use crate::comparison::RecordSources;
 use crate::record_compare::{compare_record, compare_records};
 use crate::{
@@ -62,7 +63,7 @@ pub struct OwnedComparison {
     dataforges: Option<OwnedDataForges>,
     levels: Levels,
     filter: Option<String>,
-    changes: Vec<Joined>,
+    joined: JoinResult,
     public_patches: Option<PublicPatches>,
 }
 
@@ -82,14 +83,14 @@ impl OwnedComparison {
         options: &CompareOptions<'_>,
     ) -> Result<Self, ComparisonError> {
         check_levels(options, dataforges.is_some())?;
-        let (changes, _) = join(&old, &new, options)?;
+        let joined = join(&old, &new, options)?;
         Ok(Self {
             old,
             new,
             dataforges: dataforges.filter(|_| options.levels.records),
             levels: options.levels,
             filter: options.filter.map(|filter| filter.as_str().to_owned()),
-            changes,
+            joined,
             public_patches: options.public_patches.cloned(),
         })
     }
@@ -127,19 +128,22 @@ impl OwnedComparison {
     /// Returns the number of added, removed and changed Entries.
     #[must_use]
     pub const fn len(&self) -> usize {
-        self.changes.len()
+        self.joined.changes.len()
     }
 
     /// Returns whether no Entry was added, removed or changed.
     #[must_use]
     pub const fn is_empty(&self) -> bool {
-        self.changes.is_empty()
+        self.joined.changes.is_empty()
     }
 
     /// Returns the Entry change at `index` in normalised path order, `None` past the end.
     #[must_use]
     pub fn entry_change(&self, index: usize) -> Option<EntryChange<'_>> {
-        self.changes.get(index)?.resolve(&self.old, &self.new)
+        self.joined
+            .changes
+            .get(index)?
+            .resolve(&self.old, &self.new)
     }
 
     /// Returns the Entry level as a Comparison, for its counts; it holds no Record changes.
@@ -147,6 +151,7 @@ impl OwnedComparison {
     pub fn comparison(&self) -> Comparison<'_> {
         Comparison {
             entries: self
+                .joined
                 .changes
                 .iter()
                 .filter_map(|joined| joined.resolve(&self.old, &self.new))
@@ -161,6 +166,7 @@ impl OwnedComparison {
     pub fn comparison_of(&self, selected: &[bool]) -> Comparison<'_> {
         Comparison {
             entries: self
+                .joined
                 .changes
                 .iter()
                 .zip(selected)
@@ -298,6 +304,7 @@ impl OwnedComparison {
             levels: self.levels,
             filter: self.filter.clone(),
             entries: Vec::new(),
+            entry_collisions: Cow::Borrowed(&self.joined.collisions),
             records: Vec::new(),
             record_sources: RecordSources::default(),
         }

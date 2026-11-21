@@ -95,17 +95,17 @@
       "oneOf": [
         {
           "const": "added",
-          "description": "Only the new side has the Entry.",
+          "description": "An unpaired occurrence on the new side.",
           "type": "string"
         },
         {
           "const": "removed",
-          "description": "Only the old side has the Entry.",
+          "description": "An unpaired occurrence on the old side.",
           "type": "string"
         },
         {
           "const": "changed",
-          "description": "Both sides have the Entry, with a different uncompressed size or CRC-32C.",
+          "description": "A matched occurrence with a different uncompressed size or declared checksum.",
           "type": "string"
         }
       ]
@@ -181,6 +181,10 @@
             }
           ],
           "description": "The Entry on the old side, absent when it was added."
+        },
+        "pairing_ambiguous": {
+          "description": "Whether more than one physical pairing remains possible.",
+          "type": "boolean"
         },
         "path": {
           "description": "The Entry path as the new side stores it, or the old side for a removed Entry.",

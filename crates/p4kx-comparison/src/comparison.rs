@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::borrow::Cow;
 use std::fmt;
 use std::io::{self, Write};
 use std::path::Path;
@@ -13,6 +14,7 @@ use p4kx_extraction::{
 };
 use serde::{Serialize, Serializer};
 
+use crate::compare::CollisionEvidence;
 use crate::entry_change::{count, count_by_directory};
 use crate::{
     Archive, Build, DirectoryCounts, EntryChange, EntryCounts, Levels, RecordChange, RecordCounts,
@@ -127,6 +129,7 @@ pub struct Comparison<'a> {
     pub(crate) levels: Levels,
     pub(crate) filter: Option<String>,
     pub(crate) entries: Vec<EntryChange<'a>>,
+    pub(crate) entry_collisions: Cow<'a, [CollisionEvidence]>,
     pub(crate) records: Vec<RecordChange<'a>>,
     pub(crate) record_sources: RecordSources,
 }

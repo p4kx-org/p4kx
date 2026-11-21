@@ -101,6 +101,9 @@ struct EntryChangeReport<'a> {
     path: &'a str,
     /// How the Entry differs.
     change: ChangeKind,
+    /// Whether more than one physical pairing remains possible.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pairing_ambiguous: bool,
     /// The Entry on the old side, absent when it was added.
     #[serde(skip_serializing_if = "Option::is_none")]
     old: Option<EntryState>,
@@ -194,6 +197,7 @@ impl<'a> From<&EntryChange<'a>> for EntryChangeReport<'a> {
         Self {
             path: change.path(),
             change: change.kind(),
+            pairing_ambiguous: change.pairing_is_ambiguous(),
             old: change.old_entry().map(EntryState::from),
             new: change.new_entry().map(EntryState::from),
         }

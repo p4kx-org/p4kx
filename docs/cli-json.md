@@ -2963,7 +2963,7 @@ code is 0 without and 1 with differences on any compared level.
 | `filter` | string or `null` | The Filter that selected the Entries by path and the Records by the record path of either side |
 | `entries.counts` | object | `added`, `removed` and `changed` Entry counts |
 | `entries.directories` | array | The same counts per top-level directory (`directory`, empty for the root), ordered ignoring case |
-| `entries.fieldOrigins`, `entries.provenance` | objects | Immediate origins for the emitted Entry path, change decision and each physical old or new side's size and checksum, with a shared source and use inventory. Paths are JSON Pointers from the report root. Historical v1 reports may omit these members. |
+| `entries.fieldOrigins`, `entries.provenance` | objects | Immediate origins for the emitted Entry path, change decision, pairing ambiguity and each physical old or new side's size and checksum, with a shared source and use inventory. Paths are JSON Pointers from the report root. Historical v1 reports may omit these members. |
 | `entries.changes` | array | One object per Entry: `path` (as the new side stores it, the old side for a removed Entry), `change` (`added`, `removed` or `changed`), and `old` and `new` with `size` and the checksum for the sides that have it: `crc32c` for an Archive Entry, `crc32` for an Entry of a plain ZIP archive (a SHA-256 would be `sha256` as 64 hex digits; no Entry states one) |
 | `records.fieldOrigins`, `records.provenance` | objects | Immediate origins for the reported Record GUID and present old/new header members. Paths are JSON Pointers from the report root. Historical v1 reports may omit these members. |
 | `records.counts` | object | `added`, `removed`, `moved`, `changed` and `unreadable` Record counts |
@@ -2979,6 +2979,15 @@ that identifies that group. The `directory` label comes from that first path, in
 the empty label for root files. Zero counts remain unknown without a retained absence survey.
 A nonzero count inherits any incomplete one-sided decision evidence. A filter scopes these
 observations to the selected rows.
+
+When several physical Entries have the same normalised path, comparison first removes unchanged
+occurrences with equal path spelling, size and declared checksum. It then pairs unique
+equal spellings, removes unchanged equivalent aliases and pairs a single remaining occurrence
+on each side. Remaining ambiguous occurrences are reported individually with
+`pairing_ambiguous: true`. This marker also applies when original directory facts cannot
+distinguish a surplus duplicate from an unchanged occurrence. Counts refer to the emitted
+changes. Each collision decision retains the physical positions, path spellings, sizes and
+declared checksums that contributed to the match.
 
 The Entry field markers describe the directory metadata used by the report. The source inventory
 records the Entry's payload encryption and its container ancestry separately. A missing comparison
