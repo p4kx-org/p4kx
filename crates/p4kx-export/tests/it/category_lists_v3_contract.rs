@@ -263,6 +263,7 @@ const EXPECTED_KINDS: &[&str] = &[
     "mineableEntities",
     "legacyLootTables",
     "legacyLootArchetypes",
+    "crafters",
     "cargoManifests",
     "missionLocationTemplates",
     "contractShipSpawns",

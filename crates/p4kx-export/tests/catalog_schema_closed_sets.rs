@@ -25,6 +25,7 @@ const CONTROL_TYPES: &[&str] = &[
     "CommoditySelection",
     "ContainerTargetReadStatus",
     "ContainerTargetStatus",
+    "CrafterCategoryRuleKind",
     "DatasetAvailability",
     "DefinitionStatus",
     "DistanceUnit",
