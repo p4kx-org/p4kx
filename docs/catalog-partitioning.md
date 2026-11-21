@@ -371,18 +371,35 @@ and per-value origins. Use a single compressed output and verify the decoded
 stream from that artifact in a separate replay, so the measured producer runs
 once per Build.
 
-Two previously completed normal producer runs also recorded both counters.
-The working-set peaks came from Windows and the private-byte peaks were
-sampled once per second.
+The Windows AMD64 portable package at integration revision `25287d184`
+completed the normal export for both installed Builds. The package was built
+from merge revision `300226ceeeaf522b7d9af790e8fa3698752cf575` with Rust 1.100.0.
+Its executable SHA-256 was
+`b65c751e4e35e7e9fa9dedc91419af39a67dae4715f3087ea1a7b0438687db70`.
+Both runs used one Rayon worker at below-normal priority, Zstandard level 3
+and a fixed Unix-epoch export time.
 
-| Build | Producer revision | Peak working set | Peak sampled private bytes |
-| --- | --- | ---: | ---: |
-| LIVE `13165946` | `e914e57071` | 28,307,202,048 | 29,370,675,200 |
-| PTU `13238477` | `95bb2fc264` | 29,564,633,088 | 30,664,122,368 |
+| Build | Wall time (s) | Peak working set (B) | Peak private commit (B) | Minimum available host RAM (B) |
+| --- | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 1,236.869 | 28,416,077,824 | 29,528,719,360 | 25,586,094,080 |
+| PTU `13248297` | 1,389.108 | 29,741,670,400 | 30,899,863,552 | 25,083,817,984 |
 
-Both used two Rayon workers and Zstandard level 3. These runs support the
-40 GB budget estimate. Apply the same measurements to the release candidate
-with installed LIVE and current PTU.
+| Build | Compressed file (B) | Declared decoded size (B) | Peak temporary bytes (writer) | Process writes (B) |
+| --- | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 1,197,813,494 | 71,467,922,615 | 1,671,675,932 | 1,671,685,712 |
+| PTU `13248297` | 1,245,958,540 | 74,427,393,008 | 1,772,329,634 | 1,772,339,724 |
+
+The host ran Windows build 26300.9974 on a Ryzen 9 9950X3D with
+100,573,523,968 bytes of physical memory. Windows reported the two process
+lifetime peaks after exit. Host headroom and background activity were
+sampled once per second with an 8 GiB reserve. System-wide page reads
+increased during both exports and page writes stayed unchanged. The archive
+stamps, Build manifests and executable digest were stable across both runs.
+
+The larger private peak leaves an estimated 37,819,613,184 bytes for the OS
+and other processes on a 64 GiB host. This measures production with the
+specified package. Replaying the raw stream and measuring the final release
+candidate are separate acceptance checks.
 [Catalog work](https://github.com/p4kx-org/p4kx/issues/1151) ·
 [Release acceptance](https://github.com/p4kx-org/p4kx/issues/1116)
 
