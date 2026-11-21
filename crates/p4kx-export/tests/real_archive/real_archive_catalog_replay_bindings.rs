@@ -239,10 +239,18 @@ pub(crate) fn check_catalog_selection(value: &Value) -> TestResult {
     check_complete_selection(&BTreeMap::deserialize(value)?)
 }
 
+pub(crate) fn catalog_selection_names() -> impl Iterator<Item = &'static str> {
+    Kind::ALL
+        .into_iter()
+        .map(Kind::name)
+        .chain(["shipStoreSlugs"])
+}
+
 fn check_complete_selection(completeness: &BTreeMap<String, Selection>) -> TestResult {
-    let missing: Vec<_> = Kind::ALL
+    let expected = catalog_selection_names().collect::<Vec<_>>();
+    let missing: Vec<_> = expected
         .iter()
-        .map(|kind| kind.name())
+        .copied()
         .filter(|name| !completeness.contains_key(*name))
         .collect();
     if !missing.is_empty() {
@@ -252,7 +260,7 @@ fn check_complete_selection(completeness: &BTreeMap<String, Selection>) -> TestR
         )
         .into());
     }
-    if completeness.len() != Kind::ALL.len() {
+    if completeness.len() != expected.len() {
         return Err("replay found an unexpected Catalog Kind selection".into());
     }
     if completeness

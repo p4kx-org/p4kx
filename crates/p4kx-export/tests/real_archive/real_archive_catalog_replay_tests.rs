@@ -228,7 +228,9 @@ fn health() -> Value {
 fn catalog() -> Value {
     let complete: serde_json::Map<String, Value> = Kind::ALL
         .into_iter()
-        .map(|kind| (kind.name().to_owned(), json!({"status": "complete"})))
+        .map(Kind::name)
+        .chain(["shipStoreSlugs"])
+        .map(|name| (name.to_owned(), json!({"status": "complete"})))
         .collect();
     json!({
         "schemaVersion": 3,

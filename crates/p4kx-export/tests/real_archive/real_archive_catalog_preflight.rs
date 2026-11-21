@@ -74,12 +74,13 @@ fn missing_required_kind_is_reported_from_the_prefix() -> TestResult {
     use p4kx_export::Kind;
     use serde_json::json;
 
+    use crate::real_archive_catalog_size::replay::bindings::catalog_selection_names;
+
     let required = Kind::SubsumptionEvents.name();
     let selection = Value::Object(
-        Kind::ALL
-            .into_iter()
-            .filter(|kind| kind.name() != required)
-            .map(|kind| (kind.name().to_owned(), json!({"status": "complete"})))
+        catalog_selection_names()
+            .filter(|name| *name != required)
+            .map(|name| (name.to_owned(), json!({"status": "complete"})))
             .collect(),
     );
     let prefix = format!(
