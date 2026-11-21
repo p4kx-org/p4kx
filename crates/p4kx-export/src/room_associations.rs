@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::{Observed, RoomOffset};
+use super::catalog_item_components::source_getters;
 use super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
 use crate::schema_fields::every_field_required;
@@ -14,18 +15,24 @@ use crate::source_value_catalog::SourceArenaOutput;
 
 pub(super) const VEHICLE: &str = "VehicleComponentParams";
 const OBJECT_CONTAINER: &str = "SVehicleObjectContainerParams";
+pub(super) const OBJECT_CONTAINERS: &str = "objectContainers";
 
 /// Original room attachment declarations for a physical vehicle component.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct RoomAssociations<'source> {
+pub struct RoomAssociations<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     object_containers: SourcedValue<Vec<SourcedValue<RoomAssociation<'source>>>>,
 }
 
 impl<'source> RoomAssociations<'source> {
+    source_getters! {
+        /// Borrows the original object-container slots.
+        object_containers: SourcedValue<Vec<SourcedValue<RoomAssociation<'source>>>>,
+    }
+
     pub(super) fn read(
         owner: ComponentOwner,
         source: Observed<'_, '_, '_, 'source>,
@@ -34,7 +41,7 @@ impl<'source> RoomAssociations<'source> {
         Ok(Self {
             owner,
             object_containers: source.class_array_to(
-                "objectContainers",
+                OBJECT_CONTAINERS,
                 OBJECT_CONTAINER,
                 notes,
                 RoomAssociation::read,
@@ -50,15 +57,18 @@ impl<'source> RoomAssociations<'source> {
             .filter_map(SourcedValue::value)
     }
 
-    pub(super) const fn owner(&self) -> &ComponentOwner {
+    /// Borrows the original vehicle component owner.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
         &self.owner
     }
 }
 
+/// One authored object-container slot and its original mounting fields.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct RoomAssociation<'source> {
+pub struct RoomAssociation<'source> {
     pub(super) container_ordinal: SourcedValue<u32>,
     #[serde(skip)]
     pub(super) port_use: Option<SourceUse>,
@@ -77,8 +87,21 @@ pub(super) struct RoomAssociation<'source> {
 }
 
 impl<'source> RoomAssociation<'source> {
-    pub(super) const fn file_name(&self) -> Option<&'source str> {
-        self.file_name.value().copied()
+    source_getters! {
+        /// Borrows the original array position.
+        container_ordinal: SourcedValue<u32>,
+        /// Borrows the original item port name.
+        resource_network_itemport_name: SourcedValue<&'source str>,
+        /// Borrows the original bone name.
+        bone_name: SourcedValue<&'source str>,
+        /// Borrows the original container file name.
+        file_name: SourcedValue<&'source str>,
+        /// Borrows the original identifier text.
+        guid: SourcedValue<&'source str>,
+        /// Borrows the original navigation-mesh regeneration flag.
+        should_request_nav_mesh_regeneration_on_load: SourcedValue<bool>,
+        /// Borrows the remaining original members.
+        additional_fields: SourceArenaOutput<'source>,
     }
 
     fn read(

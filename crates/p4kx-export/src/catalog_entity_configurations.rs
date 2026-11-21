@@ -19,11 +19,8 @@ use super::inventory_entity_configurations::{InventoryEntityRows, InventoryEntit
 use super::inventory_item_occupancy::InventoryItemOccupancy;
 use super::item_alignment_options::AlignmentOptions;
 use super::item_component_owner::ComponentOwner;
-use super::resource_network_links::ResourceNetworkLinks;
-use super::resource_topology_declarations::{
-    self as topology, ItemRoomAssociation, ResourceTopologyDeclarations,
-};
-use super::room_associations::{self, RoomAssociations};
+use super::resource_topology_declarations as topology;
+use super::room_associations;
 use super::{inventory_owner_bounds, inventory_owner_storage};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_number_capture::CapturedNumber;
@@ -40,7 +37,7 @@ pub(crate) use record_read::{
     FacilitySelection, read, read_attachment_constraints, read_facility_configurations,
     read_fuel_intakes, read_fuel_tanks, read_inventory_configurations, read_item_bounds,
     read_item_ports, read_item_ports_scoped, read_resource_components, read_resource_connections,
-    read_resource_containers, read_vehicle_armor,
+    read_resource_containers, read_resource_topology, read_vehicle_armor,
 };
 
 pub use super::authored_damage::{DamageChannels, DamageParameters};
@@ -70,6 +67,12 @@ pub use super::catalog_resource_signature::{ResourceSignatureParams, SignatureEn
 pub use super::catalog_resource_state::{LinkedInteraction, ResourceState};
 pub use super::catalog_vehicle_armor::VehicleArmor;
 pub use super::degradation_curve::{CurvePoint, DegradationCurve};
+pub use super::resource_network_links::{HardpointLink, ResourceNetworkLinks, ResourcePortLink};
+pub use super::resource_topology_declarations::ItemRoomAssociation;
+pub(crate) use super::resource_topology_declarations::{
+    ResourceTopologyDeclarations, ResourceTopologyKind,
+};
+pub use super::room_associations::{RoomAssociation, RoomAssociations};
 pub use super::vehicle_armor_damage::{ArmorDamageInfo, ArmorDamageSource, VehicleArmorDamage};
 pub use super::vehicle_armor_resistance::{
     ArmorDeflection, ArmorHealthCurve, ArmorPenetrationResistance,
@@ -125,10 +128,13 @@ impl<'source> EntityConfigurationRows<'source> {
                 if occupancy {
                     self.inventory.occupancy(owner.clone(), source, notes)?;
                 }
-                if matches!(alignment, ItemAlignmentKind::Port)
-                    && let Some(links) = ResourceNetworkLinks::read(owner.clone(), source, notes)?
-                {
-                    self.topology.links.push(links);
+                if matches!(alignment, ItemAlignmentKind::Port) {
+                    self.topology.project(
+                        ResourceTopologyKind::Links,
+                        owner.clone(),
+                        source,
+                        notes,
+                    )?;
                 }
                 self.alignment
                     .push(alignment, owner, source, options, projection, notes)?;
@@ -136,13 +142,12 @@ impl<'source> EntityConfigurationRows<'source> {
             ConfigurationKind::RoomAssociations => {
                 self.inventory.vehicle(&owner, source, notes)?;
                 self.topology
-                    .rooms
-                    .push(RoomAssociations::read(owner, source, notes)?);
+                    .project(ResourceTopologyKind::VehicleRooms, owner, source, notes)?;
             }
-            ConfigurationKind::ItemRoomAssociation => self
-                .topology
-                .item_rooms
-                .push(ItemRoomAssociation::read(owner, source, notes)?),
+            ConfigurationKind::ItemRoomAssociation => {
+                self.topology
+                    .project(ResourceTopologyKind::ItemRooms, owner, source, notes)?;
+            }
             ConfigurationKind::InventoryStorage => self.inventory.storage(owner, source, notes)?,
             ConfigurationKind::ObjectMetadataBounds => {
                 self.inventory.metadata(owner, source, notes)?;

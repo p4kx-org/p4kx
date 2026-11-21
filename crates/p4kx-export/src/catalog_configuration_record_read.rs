@@ -8,7 +8,7 @@ use p4kx_extraction::{CancelToken, RecordTree, Value};
 
 use super::{
     ConfigurationKind, EntityConfigurationRows, FuelConfigurationKind, FuelIntake, FuelTank,
-    ResourceComponent, ResourceConnection, ResourceContainer, VehicleArmor,
+    ResourceComponent, ResourceConnection, ResourceContainer, ResourceTopologyKind, VehicleArmor,
 };
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
@@ -22,7 +22,7 @@ use crate::catalog_v3::inventory_owner_bounds::InventoryOwnerBounds;
 use crate::catalog_v3::inventory_owner_storage::InventoryOwnerStorage;
 use crate::catalog_v3::item_alignment_options::AlignmentOptions;
 use crate::catalog_v3::item_component_owner::ComponentOwner;
-use crate::export_diagnostic::ExportDiagnosticSeverity;
+use crate::catalog_v3::resource_topology_declarations::ResourceTopologyDeclarations;
 use crate::export_field_inspection::ConfigurationInspection;
 use crate::export_field_walk;
 use crate::record_observation::RecordObservation;
@@ -242,6 +242,24 @@ pub(crate) fn read_fuel_tanks<'source>(
     Ok(read.map(|rows| rows.fuel.tanks))
 }
 
+pub(crate) fn read_resource_topology<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    declaration: ResourceTopologyKind,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<ResourceTopologyDeclarations<'source>>, CatalogError> {
+    let read = read_scope(
+        tree,
+        projection,
+        admission,
+        &AlignmentOptions::default(),
+        cancel,
+        Scope::ResourceTopology(declaration),
+    )?;
+    Ok(read.map(|rows| rows.topology))
+}
+
 fn read_scope<'source>(
     tree: &RecordTree<'source>,
     projection: &CatalogProjection<'_, 'source>,
@@ -283,10 +301,13 @@ fn read_scope<'source>(
         };
         requested.project(&mut rows, selected, source, options, projection, &mut notes)?;
         if inspection.is_some() {
-            spans.push(originals.span(component)?);
+            requested.append_inspection_spans(&originals, component, &mut spans)?;
         }
     }
     if let Some(inspection) = inspection {
+        if requested.inspected_members().is_some() {
+            spans.sort_unstable_by_key(|span| span.start);
+        }
         selection_complete &=
             inspected_scope_complete(input, tree, admission, &spans, inspection, cancel)?;
     }
@@ -311,11 +332,7 @@ fn inspected_scope_complete<'source>(
     let evidence = export_field_walk::inspect_configuration(
         input, tree, admission, spans, inspection, cancel,
     )?;
-    Ok(evidence.field_inspections.iter().all(|row| row.complete)
-        && evidence
-            .field_diagnostics
-            .iter()
-            .all(|row| row.severity == ExportDiagnosticSeverity::Information))
+    Ok(evidence.field_projection_complete(0, 0))
 }
 
 fn retain_cargo_owner(

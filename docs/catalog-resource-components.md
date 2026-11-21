@@ -99,6 +99,21 @@ stored Double values. Current typed cells preserve the original amount
 instead of narrowing it. Variant identity continues to use the exact
 private compact bytes.
 
+## Original resource topology declarations
+
+Use `equipment::resource_topology::{with_resource_network_links, with_room_associations,
+with_item_room_associations}` or their decoded-Entry and parsed-session forms to read the three
+`declarations` tables. Select all physical owners, a GUID including all its physical occurrences,
+or a Record index. Rows keep physical Record and component order. Array slots retain original
+positions and the source evidence for each field, named endpoint, weak port target and room
+locator. Additional authored fields are accessible through their original typed arenas.
+
+The link scope reads the original hardpoint links, weak resource links, link-all flag and
+power-pool declaration. The vehicle room scope reads the `objectContainers` branch. The item
+scope reads the original object-container component and its extensions. An unreadable field in
+one scope is reported in that query's coverage. The authored declaration queries use DataForge
+only. Placed rooms and resolved equipment associations have their own Catalog tables.
+
 ## Global resource-network rules
 
 `configurations.resourceNetworkParameters` owns a separate row for each
@@ -121,6 +136,14 @@ of the rule Class retain their original storage and source coordinates.
 Health inspection covers the original rule subtree and the required
 selectors. Component and loadout rows retain their independent source
 scope.
+
+Use `catalog_queries::game_modes::with_resource_network_parameters` and its decoded-Entry,
+session or parsed-session variants to read the same rows by original GUID, physical Record index
+or all game modes. The snapshot includes availability, scoped coverage and original source
+inventory. The query inspects the shared mode identifier and parameter pointer, plus the selected
+`resourceNetworkParams` branch. Unreadable members in that branch mark the owner incomplete
+while readable fields remain available. Other concrete GameMode parameter fields have their own
+coverage.
 
 ## Original global resource-network definitions
 

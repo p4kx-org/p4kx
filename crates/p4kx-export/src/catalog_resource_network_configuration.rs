@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::authored_fields::Observed;
+use super::catalog_item_components::source_getters;
 use super::catalog_radar_options::{RadarModeParameters, RadarOptionsConfiguration};
 use crate::CatalogError;
 use crate::canonical_record_header::CanonicalRecordHeader;
@@ -23,10 +24,33 @@ const NETWORK_TYPE: &str = "ResourceNetworkParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ResourceNetworkConfiguration<'source> {
+pub struct ResourceNetworkConfiguration<'source> {
     source: CanonicalRecordHeader<'source>,
     game_mode_id: SourcedValue<&'source str>,
     params: SourcedValue<ModeParameters<'source>>,
+}
+
+impl<'source> ResourceNetworkConfiguration<'source> {
+    source_getters! {
+        /// Borrows the original physical game-mode Record header.
+        source: CanonicalRecordHeader<'source>,
+        /// Borrows the authored game-mode identifier.
+        game_mode_id: SourcedValue<&'source str>,
+        /// Borrows the original parameter pointer state and resource-network branch.
+        params: SourcedValue<ModeParameters<'source>>,
+    }
+
+    const fn new(
+        source: CanonicalRecordHeader<'source>,
+        game_mode_id: SourcedValue<&'source str>,
+        params: SourcedValue<ModeParameters<'source>>,
+    ) -> Self {
+        Self {
+            source,
+            game_mode_id,
+            params,
+        }
+    }
 }
 
 pub(super) struct GameModeConfigurations<'source> {
@@ -51,14 +75,30 @@ impl<'source> GameModeConfigurations<'source> {
         })?;
         let (network, radar) = params.unzip();
         Ok(Self {
-            network: ResourceNetworkConfiguration {
-                source: source.clone(),
-                game_mode_id: game_mode_id.clone(),
-                params: network,
-            },
+            network: ResourceNetworkConfiguration::new(
+                source.clone(),
+                game_mode_id.clone(),
+                network,
+            ),
             radar: RadarOptionsConfiguration::new(source, game_mode_id, radar),
         })
     }
+}
+
+pub(super) fn read_network<'source>(
+    source: CanonicalRecordHeader<'source>,
+    mode: Observed<'_, '_, '_, 'source>,
+    notes: &mut Vec<FieldError>,
+) -> Result<ResourceNetworkConfiguration<'source>, CatalogError> {
+    let GameModeFields {
+        game_mode_id,
+        params,
+    } = read_mode(mode, notes, ModeParameters::read)?;
+    Ok(ResourceNetworkConfiguration::new(
+        source,
+        game_mode_id,
+        params,
+    ))
 }
 
 pub(super) fn read_radar<'source>(
@@ -99,15 +139,23 @@ fn read_mode<'source, Row>(
     })
 }
 
+/// Resource-network branch of the original owned game-mode parameters.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ModeParameters<'source> {
+pub struct ModeParameters<'source> {
     source_type: SourcedValue<&'source str>,
     resource_network_params: SourcedValue<ResourceNetworkParameters<'source>>,
 }
 
 impl<'source> ModeParameters<'source> {
+    source_getters! {
+        /// Borrows the original concrete game-mode parameter class.
+        source_type: SourcedValue<&'source str>,
+        /// Borrows the typed resource-network declaration and its source state.
+        resource_network_params: SourcedValue<ResourceNetworkParameters<'source>>,
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         source_type: SourcedValue<&'source str>,
@@ -125,10 +173,11 @@ impl<'source> ModeParameters<'source> {
     }
 }
 
+/// Original network flags, ship destruction rules and authored extensions.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ResourceNetworkParameters<'source> {
+pub struct ResourceNetworkParameters<'source> {
     source_type: SourcedValue<&'source str>,
     #[serde(flatten)]
     mode: ResourceModeFlags,
@@ -138,6 +187,17 @@ struct ResourceNetworkParameters<'source> {
 }
 
 impl<'source> ResourceNetworkParameters<'source> {
+    source_getters! {
+        /// Borrows the original resource-network parameter class.
+        source_type: SourcedValue<&'source str>,
+        /// Borrows the original resource-network flags.
+        mode: ResourceModeFlags,
+        /// Borrows the authored ship destruction rules.
+        destruction: ShipDestructionRules,
+        /// Borrows the remaining authored fields.
+        additional_fields: SourceArenaOutput<'source>,
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -155,10 +215,11 @@ impl<'source> ResourceNetworkParameters<'source> {
     }
 }
 
+/// Original resource-network flags for a game mode.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ResourceModeFlags {
+pub struct ResourceModeFlags {
     enable_item_resource_network: SourcedValue<bool>,
     enable_salvage_item_repair: SourcedValue<bool>,
     enable_misfires: SourcedValue<bool>,
@@ -169,6 +230,21 @@ struct ResourceModeFlags {
 }
 
 impl ResourceModeFlags {
+    source_getters! {
+        /// Borrows the authored item network flag.
+        enable_item_resource_network: SourcedValue<bool>,
+        /// Borrows the authored salvage and repair flag.
+        enable_salvage_item_repair: SourcedValue<bool>,
+        /// Borrows the authored misfire flag.
+        enable_misfires: SourcedValue<bool>,
+        /// Borrows the authored critical misfire flag.
+        enable_critical_misfires: SourcedValue<bool>,
+        /// Borrows the authored door exclusion flag.
+        doors_ignore_resource_network: SourcedValue<bool>,
+        /// Borrows the authored experimental armor penetration flag.
+        enable_experimental_armor_penetration: SourcedValue<bool>,
+    }
+
     fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,
@@ -208,10 +284,11 @@ impl ResourceModeFlags {
     }
 }
 
+/// Original damage propagation and destruction thresholds for ships.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ShipDestructionRules {
+pub struct ShipDestructionRules {
     #[serde(rename = "shipPassDestroyedPartDamageToComponent")]
     pass_part_damage_to_component: SourcedValue<bool>,
     #[serde(rename = "shipPassDestroyedPartDamageToChild")]
@@ -223,6 +300,17 @@ struct ShipDestructionRules {
 }
 
 impl ShipDestructionRules {
+    source_getters! {
+        /// Borrows the authored component damage propagation flag.
+        pass_part_damage_to_component: SourcedValue<bool>,
+        /// Borrows the authored child damage propagation flag.
+        pass_part_damage_to_child: SourcedValue<bool>,
+        /// Borrows the original destruction buffer multiplier.
+        buffer_multiplier: SourcedValue<ResourceFloat32>,
+        /// Borrows the original destruction health threshold.
+        health_threshold: SourcedValue<ResourceFloat32>,
+    }
+
     fn read(
         source: Observed<'_, '_, '_, '_>,
         notes: &mut Vec<FieldError>,

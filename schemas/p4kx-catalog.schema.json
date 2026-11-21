@@ -21087,6 +21087,7 @@
       "type": "object"
     },
     "HardpointLink": {
+      "description": "Two authored named hardpoints in one original link slot.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -33525,6 +33526,7 @@
       "type": "object"
     },
     "ModeParameters": {
+      "description": "Resource-network branch of the original owned game-mode parameters.",
       "properties": {
         "resourceNetworkParams": {
           "$ref": "#/$defs/SourcedValueOfResourceNetworkParameters"
@@ -43334,6 +43336,7 @@
       "type": "object"
     },
     "ResourceNetworkParameters": {
+      "description": "Original network flags, ship destruction rules and authored extensions.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -43584,6 +43587,7 @@
       ]
     },
     "ResourcePortLink": {
+      "description": "Two authored weak port references in one original link slot.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"
@@ -44051,6 +44055,7 @@
       "type": "object"
     },
     "RoomAssociation": {
+      "description": "One authored object-container slot and its original mounting fields.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"

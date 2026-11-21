@@ -134,6 +134,8 @@ mod reputation_sandbox_fixture;
 mod resource_groups;
 #[path = "sdk_resource_network_routes.rs"]
 mod resource_network;
+#[path = "sdk_resource_topology_routes.rs"]
+mod resource_topology;
 #[path = "sdk_ship_system_routes.rs"]
 mod ship_systems;
 #[path = "sdk_soil_routes.rs"]
@@ -252,10 +254,11 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.push(mission_board::read()?);
     routes.extend(mission_definitions::read()?);
     routes.extend(resource_groups::read()?);
+    routes.extend(resource_topology::read()?);
     routes.extend(reputation::read()?);
     routes.push(reputation_rewards::read()?);
     routes.extend(resource_network::read()?);
-    routes.push(radar_options::read()?);
+    routes.extend(radar_options::read()?);
     routes.extend(fuel::read()?);
     routes.extend(hacking::read()?);
     routes.push(inventory_containers::read()?);

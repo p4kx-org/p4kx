@@ -14,6 +14,11 @@ use crate::catalog_v3::catalog_resource_network_read::{self, GAME_MODE_TYPES};
 use crate::catalog_v3::component_definition_sources::Definition;
 use crate::record_observation::RecordObservation;
 
+pub use crate::catalog_v3::catalog_resource_network_configuration::{
+    ModeParameters as ResourceNetworkModeParameters, ResourceModeFlags,
+    ResourceNetworkConfiguration, ResourceNetworkParameters, ShipDestructionRules,
+};
+
 pub use crate::catalog_v3::catalog_radar_options::{
     RadarModeParameters, RadarOptionParameters, RadarOptionsConfiguration,
 };
@@ -42,4 +47,31 @@ impl Definition for RadarOptions {
 definition_query!(
     RadarOptions, RadarOptionsConfiguration, RadarOptionsSnapshot, with_radar_options,
     with_radar_options_from, CatalogLanguageSelection::Selected(&[]);
+);
+
+struct ResourceNetwork;
+
+impl Definition for ResourceNetwork {
+    type Row<'source> = ResourceNetworkConfiguration<'source>;
+    const SOURCE_TYPES: &'static [&'static str] = GAME_MODE_TYPES;
+
+    fn project<'source>(
+        tree: &RecordTree<'source>,
+        projection: &CatalogProjection<'_, 'source>,
+        admission: &RecordObservation<'_, 'source>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<ScopedSourceRead<Self::Row<'source>>, CatalogError> {
+        catalog_resource_network_read::read_network_selected(
+            tree,
+            projection.original(),
+            admission,
+            cancel,
+        )
+    }
+}
+
+definition_query!(
+    ResourceNetwork, ResourceNetworkConfiguration, ResourceNetworkParametersSnapshot,
+    with_resource_network_parameters, with_resource_network_parameters_from,
+    CatalogLanguageSelection::Selected(&[]);
 );

@@ -6,6 +6,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::super::authored_fields::Observed;
+use super::super::catalog_item_components::source_getters;
 use super::super::item_component_owner::ComponentOwner;
 use crate::CatalogError;
 use crate::schema_fields::every_field_required;
@@ -18,7 +19,7 @@ pub(in crate::catalog_v3) const COMPONENT: &str = "SObjectContainerComponentPara
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ItemRoomAssociation<'source> {
+pub struct ItemRoomAssociation<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     object_container: SourcedValue<&'source str>,
@@ -28,6 +29,13 @@ pub(crate) struct ItemRoomAssociation<'source> {
 }
 
 impl<'source> ItemRoomAssociation<'source> {
+    source_getters! {
+        /// Borrows the authored container locator.
+        object_container: SourcedValue<&'source str>,
+        /// Borrows the remaining original members.
+        additional_fields: SourceArenaOutput<'source>,
+    }
+
     pub(in crate::catalog_v3) fn read(
         owner: ComponentOwner,
         source: Observed<'_, '_, '_, 'source>,
@@ -44,7 +52,9 @@ impl<'source> ItemRoomAssociation<'source> {
         })
     }
 
-    pub(in crate::catalog_v3) const fn owner(&self) -> &ComponentOwner {
+    /// Borrows the original item component owner.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
         &self.owner
     }
 

@@ -77,7 +77,7 @@ fn global_route() -> TestResult<Route> {
         Route::queried_rows(
             "/definitions/resourceNetworkGlobals",
             snapshot.rows(),
-            "synthetic producer parity witnessed; same-build installed producer parity open",
+            "scoped installed producer parity witnessed; complete Catalog parity remains open",
         )
     })?
 }

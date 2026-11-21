@@ -136,22 +136,45 @@ pub(crate) fn read_radar_selected<'source>(
     admission: &RecordObservation<'_, 'source>,
     cancel: Option<&CancelToken>,
 ) -> Result<ScopedSourceRead<RadarOptionsConfiguration<'source>>, CatalogError> {
-    let projected = project(
+    Ok(project(
         tree,
         input,
         admission,
         cancel,
         &[RADAR_RULE],
         catalog_resource_network_configuration::read_radar,
-    )?;
-    let complete = projected.ledger.field_projection_complete(0, 0);
-    Ok(ScopedSourceRead::new(projected.rows, Vec::new(), complete))
+    )?
+    .into_scoped_read())
+}
+
+pub(crate) fn read_network_selected<'source>(
+    tree: &RecordTree<'source>,
+    input: &OriginalCatalogInput<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<ResourceNetworkConfiguration<'source>>, CatalogError> {
+    Ok(project(
+        tree,
+        input,
+        admission,
+        cancel,
+        &[NETWORK_RULE],
+        catalog_resource_network_configuration::read_network,
+    )?
+    .into_scoped_read())
 }
 
 struct ModeProjection<Row> {
     rows: Row,
     numbers: Vec<CapturedNumber>,
     ledger: ExportLedger,
+}
+
+impl<Row> ModeProjection<Row> {
+    fn into_scoped_read(self) -> ScopedSourceRead<Row> {
+        let complete = self.ledger.field_projection_complete(0, 0);
+        ScopedSourceRead::new(self.rows, Vec::new(), complete)
+    }
 }
 
 fn project<'source, Row>(

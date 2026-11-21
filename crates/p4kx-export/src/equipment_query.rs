@@ -71,6 +71,10 @@ mod record_query;
 /// Direct queries for original resource components and their power and heat connections.
 #[path = "equipment_resource_network_query.rs"]
 pub mod resource_network;
+/// Selective reads of original resource links and room declarations.
+#[path = "equipment_resource_topology_query.rs"]
+pub mod resource_topology;
+
 /// Selective reads of authored vehicle armor and its original components.
 #[path = "equipment_vehicle_armor_query.rs"]
 pub mod vehicle_armor;

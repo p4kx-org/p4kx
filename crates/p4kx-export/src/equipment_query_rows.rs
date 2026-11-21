@@ -14,7 +14,7 @@ use crate::catalog_v3::ammo_definition;
 use crate::catalog_v3::catalog_entity_configurations::{
     self, FacilitySelection, FuelConfigurationKind, FuelIntake, FuelTank, RESOURCE_COMPONENT_TYPES,
     RESOURCE_CONNECTION_TYPES, ResourceComponent, ResourceConnection, ResourceContainer,
-    VEHICLE_ARMOR_TYPES, VehicleArmor,
+    ResourceTopologyKind, VEHICLE_ARMOR_TYPES, VehicleArmor,
 };
 use crate::catalog_v3::catalog_item_alignment::{ATTACHABLE, AlignmentOptions};
 use crate::catalog_v3::catalog_item_components::{ItemEquipmentFamily, definition_read};
@@ -30,6 +30,7 @@ pub(super) enum ConfigurationFamily {
     VehicleArmor,
     ResourceComponents,
     ResourceConnections,
+    ResourceTopology(ResourceTopologyKind),
     Fuel(FuelConfigurationKind),
 }
 
@@ -40,6 +41,7 @@ impl ConfigurationFamily {
             Self::VehicleArmor => VEHICLE_ARMOR_TYPES,
             Self::ResourceComponents => RESOURCE_COMPONENT_TYPES,
             Self::ResourceConnections => RESOURCE_CONNECTION_TYPES,
+            Self::ResourceTopology(declaration) => declaration.source_types(),
             Self::Fuel(configuration) => configuration.source_types(),
         }
     }

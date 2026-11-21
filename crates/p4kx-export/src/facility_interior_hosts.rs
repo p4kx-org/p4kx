@@ -144,7 +144,7 @@ impl RoomReader<'_> {
                             declaration: InteriorRoomDeclaration::Vehicle {
                                 object_container_ordinal: room.container_ordinal.clone(),
                             },
-                            file: room.file_name(),
+                            file: room.file_name().value().copied(),
                             selector: room.file_use.as_ref(),
                             vehicle: Some(room),
                         };

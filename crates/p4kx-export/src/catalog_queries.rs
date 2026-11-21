@@ -150,7 +150,11 @@ pub mod climate;
 pub mod game_modes {
     pub use super::equipment::component_definitions::game_modes::{
         RadarModeParameters, RadarOptionParameters, RadarOptionsConfiguration,
-        RadarOptionsSnapshot, with_radar_options, with_radar_options_from,
+        RadarOptionsSnapshot, ResourceModeFlags, ResourceNetworkConfiguration,
+        ResourceNetworkModeParameters, ResourceNetworkParameters,
+        ResourceNetworkParametersSnapshot, ShipDestructionRules, with_radar_options,
+        with_radar_options_from, with_resource_network_parameters,
+        with_resource_network_parameters_from,
     };
 }
 

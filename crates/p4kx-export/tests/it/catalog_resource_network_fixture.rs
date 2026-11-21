@@ -28,6 +28,7 @@ pub(super) enum Layout {
     WrongRadarType,
     WrongRadarStorage,
     WrongPingStorage,
+    UnreadableNetworkExtension,
 }
 
 pub(super) fn database(layout: Layout) -> DataForgeBuilder {
@@ -36,7 +37,8 @@ pub(super) fn database(layout: Layout) -> DataForgeBuilder {
         | Layout::HistoricalRadar
         | Layout::WrongRadarType
         | Layout::WrongRadarStorage
-        | Layout::WrongPingStorage => TestType::Class(RULES.to_owned()),
+        | Layout::WrongPingStorage
+        | Layout::UnreadableNetworkExtension => TestType::Class(RULES.to_owned()),
         Layout::Invalid => TestType::String,
     };
     DataForgeBuilder::new()
@@ -65,7 +67,7 @@ pub(super) fn database(layout: Layout) -> DataForgeBuilder {
                 .field("radarOptionParams", radar_field(layout)),
         )
         .structure(TestStruct::new(OTHER_PARAMS).parent(PARAMS))
-        .structure(rules_schema())
+        .structure(rules_schema(layout))
         .structure(radar_schema(layout))
         .structure(TestStruct::new(INVALID_RADAR).field("unknownFlag", TestType::Bool))
         .record(mode(FIRST, "FixtureFirst", standard(layout, true)))
@@ -78,7 +80,7 @@ pub(super) fn database(layout: Layout) -> DataForgeBuilder {
         .record(mode(NULL, "FixtureNull", TestValue::Null))
 }
 
-fn rules_schema() -> TestStruct {
+fn rules_schema(layout: Layout) -> TestStruct {
     [
         "enableItemResourceNetwork",
         "enableSalvageItemRepair",
@@ -95,7 +97,13 @@ fn rules_schema() -> TestStruct {
     })
     .field("shipDestructionBufferMultiplier", TestType::Single)
     .field("shipDestructionHealthThreshold", TestType::Single)
-    .field("fixtureRawRule", TestType::Double)
+    .field(
+        "fixtureRawRule",
+        match layout {
+            Layout::UnreadableNetworkExtension => TestType::String,
+            _ => TestType::Double,
+        },
+    )
 }
 
 fn mode(guid: u128, name: &str, params: TestValue) -> TestRecord {
@@ -119,7 +127,8 @@ fn standard(layout: Layout, enabled: bool) -> TestValue {
         | Layout::HistoricalRadar
         | Layout::WrongRadarType
         | Layout::WrongRadarStorage
-        | Layout::WrongPingStorage => TestValue::Struct(rules(enabled)),
+        | Layout::WrongPingStorage
+        | Layout::UnreadableNetworkExtension => TestValue::Struct(rules(layout, enabled)),
         Layout::Invalid => TestValue::text("fixture invalid resource rule"),
     };
     TestValue::Struct(
@@ -133,7 +142,7 @@ fn standard(layout: Layout, enabled: bool) -> TestValue {
     )
 }
 
-fn rules(enabled: bool) -> TestInstance {
+fn rules(layout: Layout, enabled: bool) -> TestInstance {
     TestInstance::new(RULES)
         .value("enableItemResourceNetwork", TestValue::Bool(enabled))
         .value("enableSalvageItemRepair", TestValue::Bool(false))
@@ -156,7 +165,12 @@ fn rules(enabled: bool) -> TestInstance {
         )
         .value(
             "fixtureRawRule",
-            TestValue::Double(f64::from_bits(RAW_BITS)),
+            match layout {
+                Layout::UnreadableNetworkExtension => {
+                    TestValue::Raw((u32::MAX - 1).to_le_bytes().to_vec())
+                }
+                _ => TestValue::Double(f64::from_bits(RAW_BITS)),
+            },
         )
 }
 
