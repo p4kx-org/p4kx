@@ -5,8 +5,8 @@ use std::path::Path;
 use std::sync::OnceLock;
 
 use p4kx_extraction::{
-    DataForge, Record, RecordExportOptions, RecordFilePlan, RecordJson, RecordXml,
-    export_planned_record_files,
+    DataForge, Record, RecordExportOptions, RecordFileFormat, RecordFilePlan, RecordJson,
+    RecordXml, export_planned_record_files, export_planned_record_files_with_receipt,
 };
 
 use crate::{RecordExportSummary, RecordForm, ndjson};
@@ -58,26 +58,64 @@ pub fn write_planned_record_export(
     target: &Path,
     options: &RecordExportOptions<'_>,
 ) -> RecordExportSummary {
+    write_planned(forge, plans, records, form, target, options, false)
+}
+
+/// Writes Records like [`write_planned_record_export`] and retains the committed definition indices.
+#[must_use]
+pub fn write_planned_record_export_with_receipt(
+    forge: &DataForge<'_>,
+    plans: &RecordFilePlans,
+    records: &[Record<'_>],
+    form: RecordForm,
+    target: &Path,
+    options: &RecordExportOptions<'_>,
+) -> RecordExportSummary {
+    write_planned(forge, plans, records, form, target, options, true)
+}
+
+fn write_planned(
+    forge: &DataForge<'_>,
+    plans: &RecordFilePlans,
+    records: &[Record<'_>],
+    form: RecordForm,
+    target: &Path,
+    options: &RecordExportOptions<'_>,
+    retain_receipt: bool,
+) -> RecordExportSummary {
     match form {
         RecordForm::Xml => {
             let plan = plans.xml.get_or_init(|| RecordFilePlan::new(forge));
-            RecordExportSummary::from_report(
-                form,
-                export_planned_record_files(forge, plan, records, target, options),
-            )
+            write_files(forge, plan, records, form, target, options, retain_receipt)
         }
         RecordForm::Json => {
             let plan = plans.json.get_or_init(|| RecordFilePlan::new(forge));
-            RecordExportSummary::from_report(
-                form,
-                export_planned_record_files(forge, plan, records, target, options),
-            )
+            write_files(forge, plan, records, form, target, options, retain_receipt)
         }
         RecordForm::Ndjson
         | RecordForm::FlatCsv
         | RecordForm::FlatCsvRaw
-        | RecordForm::FlatNdjson => ndjson::write(forge, records, form, target, options),
+        | RecordForm::FlatNdjson => {
+            ndjson::write(forge, records, form, target, options, retain_receipt)
+        }
     }
+}
+
+fn write_files<F: RecordFileFormat>(
+    forge: &DataForge<'_>,
+    plan: &RecordFilePlan<F>,
+    records: &[Record<'_>],
+    form: RecordForm,
+    target: &Path,
+    options: &RecordExportOptions<'_>,
+    retain_receipt: bool,
+) -> RecordExportSummary {
+    let report = if retain_receipt {
+        export_planned_record_files_with_receipt(forge, plan, records, target, options)
+    } else {
+        export_planned_record_files(forge, plan, records, target, options)
+    };
+    RecordExportSummary::from_report(form, report)
 }
 
 /// The files of the Records of one DataForge as Record XML and as Record JSON, each planned on

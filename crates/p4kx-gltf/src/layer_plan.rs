@@ -8,8 +8,9 @@ use p4kx_model::{
 };
 
 use crate::shading::{Shaded, shaded_layers};
+use crate::surface_finish::SurfaceFinish;
 use crate::texture_report::TextureRole;
-use crate::texture_roles::{Source, canonical, sources_of};
+use crate::texture_roles::{Source, canonical, layer_gloss_sources, sources_of};
 
 /// The most layers one baked image blends; the others keep out of it.
 pub(crate) const MAX_BAKED_LAYERS: usize = 8;
@@ -26,6 +27,9 @@ const TEXTURE_MODIFIER: &str = "TexMod";
 /// One layer of a layered material as the image bake sees it.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LayerPlan {
+    pub(crate) gloss: Vec<(Source, [f32; 2])>,
+    pub(crate) finish: Option<SurfaceFinish>,
+    pub(crate) roughness: f32,
     /// The layer's position in the material's `MatLayers`.
     pub(crate) at: usize,
     /// The share the layer has without a blend mask: by its position and the wear share.
@@ -40,6 +44,13 @@ pub(crate) struct LayerPlan {
     pub(crate) specular: [f32; 3],
     /// How metallic the layer is: its colour moves towards its specular colour by this much.
     pub(crate) metal: f32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LayerMaps {
+    Diffuse,
+    Normal,
+    Smoothness,
 }
 
 /// What the images of a layered material are blended of.
@@ -125,7 +136,29 @@ fn plan_of(
                 .is_some_and(|n| n.file == texture.file)
         })
         .map_or(DIFFUSE_SLOT, |texture| texture.map.as_str());
+    let gloss = (if shaded.layer.finish.is_some() {
+        layer_gloss_sources(material, &surface.textures, refused)
+    } else {
+        Vec::new()
+    })
+    .into_iter()
+    .map(|source| {
+        let tiling = repeats(
+            layer,
+            &surface.textures,
+            surface
+                .textures
+                .iter()
+                .find(|slot| slot.file == source.file)
+                .map_or(DIFFUSE_SLOT, |slot| slot.map.as_str()),
+        );
+        (source, tiling)
+    })
+    .collect();
     Some(LayerPlan {
+        gloss,
+        finish: shaded.layer.finish,
+        roughness: shaded.layer.roughness,
         at: shaded.at,
         share: shaded.share,
         diffuse: tiled(found.diffuse, DIFFUSE_SLOT),
@@ -150,9 +183,11 @@ pub(crate) fn layered_of(material: &Material) -> Option<Layered> {
         .filter_map(|layer| plan_of(material, layer, &mut refused))
         .collect();
     layers.truncate(MAX_BAKED_LAYERS);
-    let mapped = layers
-        .iter()
-        .any(|layer| layer.diffuse.is_some() || layer.normal.is_some());
+    let mapped = layers.iter().any(|layer| {
+        layer.diffuse.is_some()
+            || layer.normal.is_some()
+            || layer.finish.is_some_and(|_| !layer.gloss.is_empty())
+    });
     mapped.then_some(Layered {
         layers,
         mask,
@@ -199,41 +234,67 @@ impl Layered {
         })
     }
 
-    /// Returns the sources that may give the image its size, in order: the mask, then the maps of
-    /// the layers.
-    pub(crate) fn size_sources(&self, normal: bool) -> impl Iterator<Item = &Source> {
+    pub(crate) fn size_sources(&self, maps: LayerMaps) -> impl Iterator<Item = &Source> {
         self.mask
             .iter()
-            .chain(self.layers.iter().filter_map(move |layer| {
-                let map = if normal {
-                    &layer.normal
-                } else {
-                    &layer.diffuse
+            .chain(self.layers.iter().flat_map(move |layer| {
+                let primary = match maps {
+                    LayerMaps::Diffuse => &layer.diffuse,
+                    _ => &layer.normal,
                 };
-                map.as_ref().map(|(source, _)| source)
+                primary
+                    .iter()
+                    .filter(move |(source, _)| maps != LayerMaps::Smoothness || source.gloss)
+                    .map(|(source, _)| source)
+                    .chain(
+                        layer
+                            .gloss
+                            .iter()
+                            .filter(move |_| maps == LayerMaps::Smoothness)
+                            .map(|(source, _)| source),
+                    )
             }))
     }
 
-    /// Returns the source that gives the image its size: the mask, else the first layer's map.
     pub(crate) fn sizing(&self, normal: bool) -> Option<&Source> {
         self.mask.as_ref().or_else(|| self.first(normal))
     }
 
-    /// Returns the paths of the textures the image of the diffuse or normal maps is blended of.
-    pub(crate) fn paths(&self, normal: bool) -> impl Iterator<Item = &str> {
-        self.mask.iter().map(|mask| mask.path.as_str()).chain(
-            self.layers
-                .iter()
-                .filter_map(move |layer| {
-                    if normal {
-                        &layer.normal
-                    } else {
-                        &layer.diffuse
-                    }
+    pub(crate) fn paths(&self, maps: LayerMaps) -> impl Iterator<Item = &str> {
+        self.size_sources(maps).map(|source| source.path.as_str())
+    }
+
+    pub(crate) fn has_sampled_finish(&self) -> bool {
+        self.layers.iter().any(|layer| layer.finish.is_some())
+            && self.layers.iter().any(|layer| {
+                layer
+                    .normal
                     .as_ref()
-                })
-                .map(|(source, _)| source.path.as_str()),
-        )
+                    .is_some_and(|(source, _)| source.gloss)
+                    || !layer.gloss.is_empty()
+            })
+    }
+
+    pub(crate) fn finish_fingerprint(&self) -> String {
+        let mut text = self.fingerprint(true);
+        for layer in &self.layers {
+            let _ = write!(
+                text,
+                "|finish={:?}:{:x}",
+                layer.finish,
+                layer.roughness.to_bits()
+            );
+            for (source, tiling) in &layer.gloss {
+                let _ = write!(
+                    text,
+                    "|gloss={}:{:x}:{:x}",
+                    source.identity(),
+                    tiling[0].to_bits(),
+                    tiling[1].to_bits()
+                );
+            }
+        }
+        text
     }
 
     /// Returns a text that is equal for equal blends of the diffuse or normal maps; the key of

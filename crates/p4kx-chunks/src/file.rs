@@ -7,8 +7,8 @@ use p4kx_foundation::ByteReader;
 
 use crate::{ByteOrder, Chunk, ChunkError, ChunkType, Container};
 
-const HEADER_LEN: usize = 16;
-const TABLE_ENTRY_LEN: usize = 16;
+pub(crate) const HEADER_LEN: usize = 16;
+pub(crate) const TABLE_ENTRY_LEN: usize = 16;
 const CRCH_BIG_ENDIAN_FLAG: u16 = 0x8000;
 
 /// A parsed chunk file: its container form and its chunk table over the file's bytes.
@@ -17,6 +17,7 @@ pub struct ChunkFile<B> {
     bytes: B,
     container: Container,
     chunks: Vec<Chunk>,
+    table: Range<u64>,
 }
 
 impl<B: AsRef<[u8]>> ChunkFile<B> {
@@ -29,32 +30,28 @@ impl<B: AsRef<[u8]>> ChunkFile<B> {
     /// [`ChunkError::TableOutOfBounds`], [`ChunkError::ChunkOutOfBounds`] or
     /// [`ChunkError::ChunkInHeaderOrTable`] when it is truncated or corrupt.
     pub fn parse(bytes: B) -> Result<Self, ChunkError> {
+        Self::parse_with(bytes, || Ok(()))
+    }
+
+    /// Parses the original chunk table with caller checkpoints between rows.
+    ///
+    /// # Errors
+    /// Returns a structural container error or the caller's checkpoint failure.
+    pub fn parse_with<E: From<ChunkError>>(
+        bytes: B,
+        checkpoint: impl FnMut() -> Result<(), E>,
+    ) -> Result<Self, E> {
         let data = bytes.as_ref();
-        let mut reader = ByteReader::new(data);
-        let signature = reader.read_bytes(4)?;
-        let container =
-            Container::from_signature(signature).ok_or_else(|| ChunkError::UnknownSignature {
-                signature: <[u8; 4]>::try_from(signature).unwrap_or_default(),
-            })?;
-        let version = reader.read_u32()?;
-        if version != container.version() {
-            return Err(ChunkError::UnsupportedVersion { container, version });
-        }
-        let count = reader.read_u32()?;
-        let table_offset = reader.read_u32()?;
-        let table = table(data, table_offset, count)?;
-        let layout = Layout {
-            len: data.len() as u64,
-            table: table.offset()..table.offset() + table.remaining() as u64,
-        };
-        let chunks = match container {
-            Container::Ivo => read_ivo(&layout, table)?,
-            Container::CrCh => read_crch(&layout, table)?,
-        };
+        let header = ChunkHeader::read(data, data.len() as u64)?;
+        let start = usize::try_from(header.table.start).map_err(|_| header.table_error())?;
+        let end = usize::try_from(header.table.end).map_err(|_| header.table_error())?;
+        let table = data.get(start..end).ok_or_else(|| header.table_error())?;
+        let chunks = read_table(&header, table, checkpoint)?;
         Ok(Self {
             bytes,
-            container,
+            container: header.container,
             chunks,
+            table: header.table,
         })
     }
 
@@ -68,6 +65,20 @@ impl<B: AsRef<[u8]>> ChunkFile<B> {
     #[must_use]
     pub fn chunks(&self) -> &[Chunk] {
         &self.chunks
+    }
+
+    /// Returns the byte interval occupied by the validated table.
+    #[must_use]
+    pub fn table_range(&self) -> Range<u64> {
+        self.table.clone()
+    }
+
+    /// Returns the source intervals of one original table row.
+    #[must_use]
+    pub fn table_row(&self, index: usize) -> Option<ChunkTableRow> {
+        self.chunks.get(index)?;
+        let start = self.table.start + index as u64 * TABLE_ENTRY_LEN as u64;
+        Some(ChunkTableRow::at(start, self.container))
     }
 
     /// Returns the data of the chunk at `index` in the table, or `None` when there is no such chunk.
@@ -111,36 +122,120 @@ impl<B: AsRef<[u8]>> ChunkFile<B> {
     }
 }
 
-fn table(data: &[u8], offset: u32, count: u32) -> Result<ByteReader<'_>, ChunkError> {
-    let len = data.len() as u64;
-    let out_of_bounds = || ChunkError::TableOutOfBounds {
-        offset: u64::from(offset),
-        count,
-        len,
-    };
-    let start = usize::try_from(offset).map_err(|_| out_of_bounds())?;
-    if start < HEADER_LEN {
-        return Err(out_of_bounds());
-    }
-    let table_len = u64::from(count) * TABLE_ENTRY_LEN as u64;
-    let end = u64::from(offset)
-        .checked_add(table_len)
-        .filter(|&end| end <= len)
-        .and_then(|end| usize::try_from(end).ok())
-        .ok_or_else(out_of_bounds)?;
-    let bytes = data.get(start..end).ok_or_else(out_of_bounds)?;
-    Ok(ByteReader::with_base(bytes, u64::from(offset)))
+/// Byte intervals for the stored words of a validated chunk table row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ChunkTableRow {
+    /// The chunk type word.
+    pub kind: Range<u64>,
+    /// The layout version, including the byte-order flag in CrCh.
+    pub version: Range<u64>,
+    /// The chunk ID word when stored.
+    pub id: Option<Range<u64>>,
+    /// The payload offset word.
+    pub offset: Range<u64>,
+    /// The payload size word when stored.
+    pub size: Option<Range<u64>>,
 }
 
-fn read_crch(layout: &Layout, mut table: ByteReader<'_>) -> Result<Vec<Chunk>, ChunkError> {
+impl ChunkTableRow {
+    pub(crate) fn at(start: u64, container: Container) -> Self {
+        let at = |from: u64, to: u64| start + from..start + to;
+        match container {
+            Container::Ivo => Self {
+                kind: at(0, 4),
+                version: at(4, 8),
+                id: None,
+                offset: at(8, 16),
+                size: None,
+            },
+            Container::CrCh => Self {
+                kind: at(0, 2),
+                version: at(2, 4),
+                id: Some(at(4, 8)),
+                offset: at(12, 16),
+                size: Some(at(8, 12)),
+            },
+        }
+    }
+}
+
+pub(crate) struct ChunkHeader {
+    pub(crate) container: Container,
+    pub(crate) table: Range<u64>,
+    pub(crate) count: u32,
+    len: u64,
+}
+
+impl ChunkHeader {
+    pub(crate) fn read(bytes: &[u8], len: u64) -> Result<Self, ChunkError> {
+        let mut reader = ByteReader::new(bytes);
+        let signature = reader.read_bytes(4)?;
+        let container =
+            Container::from_signature(signature).ok_or_else(|| ChunkError::UnknownSignature {
+                signature: <[u8; 4]>::try_from(signature).unwrap_or_default(),
+            })?;
+        let version = reader.read_u32()?;
+        if version != container.version() {
+            return Err(ChunkError::UnsupportedVersion { container, version });
+        }
+        let count = reader.read_u32()?;
+        let start = u64::from(reader.read_u32()?);
+        let end = start + u64::from(count) * TABLE_ENTRY_LEN as u64;
+        let header = Self {
+            container,
+            table: start..end,
+            count,
+            len,
+        };
+        if start < HEADER_LEN as u64 || end > len {
+            return Err(header.table_error());
+        }
+        Ok(header)
+    }
+
+    pub(crate) const fn table_error(&self) -> ChunkError {
+        ChunkError::TableOutOfBounds {
+            offset: self.table.start,
+            count: self.count,
+            len: self.len,
+        }
+    }
+}
+
+pub(crate) fn read_table<E: From<ChunkError>>(
+    header: &ChunkHeader,
+    bytes: &[u8],
+    mut checkpoint: impl FnMut() -> Result<(), E>,
+) -> Result<Vec<Chunk>, E> {
+    let layout = Layout {
+        len: header.len,
+        table: header.table.clone(),
+    };
+    let table = ByteReader::with_base(bytes, header.table.start);
+    match header.container {
+        Container::Ivo => read_ivo(&layout, table, &mut checkpoint),
+        Container::CrCh => read_crch(&layout, table, &mut checkpoint),
+    }
+}
+
+fn read_crch<E: From<ChunkError>>(
+    layout: &Layout,
+    mut table: ByteReader<'_>,
+    checkpoint: &mut impl FnMut() -> Result<(), E>,
+) -> Result<Vec<Chunk>, E> {
     let count = table.remaining() / TABLE_ENTRY_LEN;
-    let mut chunks = Vec::with_capacity(count);
+    let mut chunks = Vec::new();
+    chunks
+        .try_reserve_exact(count)
+        .map_err(|_| ChunkError::Allocation)?;
     for index in 0..count {
-        let type_id = table.read_u16()?;
-        let raw_version = table.read_u16()?;
-        let id = table.read_u32()?;
-        let size = u64::from(table.read_u32()?);
-        let offset = u64::from(table.read_u32()?);
+        checkpoint()?;
+        let type_id = table.read_u16().map_err(ChunkError::from)?;
+        let raw_version = table.read_u16().map_err(ChunkError::from)?;
+        let id = table.read_u32().map_err(ChunkError::from)?;
+        let size = u64::from(table.read_u32().map_err(ChunkError::from)?);
+        let offset = u64::from(table.read_u32().map_err(ChunkError::from)?);
         layout.check(index, offset, size, Span::Exact)?;
 
         let byte_order = if raw_version & CRCH_BIG_ENDIAN_FLAG == 0 {
@@ -160,14 +255,22 @@ fn read_crch(layout: &Layout, mut table: ByteReader<'_>) -> Result<Vec<Chunk>, C
     Ok(chunks)
 }
 
-fn read_ivo(layout: &Layout, mut table: ByteReader<'_>) -> Result<Vec<Chunk>, ChunkError> {
+fn read_ivo<E: From<ChunkError>>(
+    layout: &Layout,
+    mut table: ByteReader<'_>,
+    checkpoint: &mut impl FnMut() -> Result<(), E>,
+) -> Result<Vec<Chunk>, E> {
     let len = layout.len;
     let count = table.remaining() / TABLE_ENTRY_LEN;
-    let mut chunks = Vec::with_capacity(count);
+    let mut chunks = Vec::new();
+    chunks
+        .try_reserve_exact(count)
+        .map_err(|_| ChunkError::Allocation)?;
     for index in 0..count {
-        let type_id = table.read_u32()?;
-        let version = table.read_u32()?;
-        let offset = table.read_u64()?;
+        checkpoint()?;
+        let type_id = table.read_u32().map_err(ChunkError::from)?;
+        let version = table.read_u32().map_err(ChunkError::from)?;
+        let offset = table.read_u64().map_err(ChunkError::from)?;
         layout.check(index, offset, 0, Span::Start)?;
 
         chunks.push(Chunk {
@@ -179,16 +282,22 @@ fn read_ivo(layout: &Layout, mut table: ByteReader<'_>) -> Result<Vec<Chunk>, Ch
             byte_order: ByteOrder::Little,
         });
     }
-    let mut order: Vec<(u64, usize)> = chunks
-        .iter()
-        .enumerate()
-        .map(|(index, chunk)| (chunk.offset, index))
-        .collect();
+    let mut order = Vec::new();
+    order
+        .try_reserve_exact(count)
+        .map_err(|_| ChunkError::Allocation)?;
+    for (index, chunk) in chunks.iter().enumerate() {
+        checkpoint()?;
+        order.push((chunk.offset, index));
+    }
+    checkpoint()?;
     order.sort_unstable();
+    checkpoint()?;
     let table_start = layout.table.start;
     let mut next = len;
     let mut group = len;
     for &(offset, index) in order.iter().rev() {
+        checkpoint()?;
         if offset != group {
             next = group;
             group = offset;

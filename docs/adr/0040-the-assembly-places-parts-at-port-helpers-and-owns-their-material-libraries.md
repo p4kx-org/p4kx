@@ -53,8 +53,8 @@ that names a library (ADR-0150).
 ## Limits and failures
 
 Everything comes from the Archive and is untrusted. An Assembly holds at most 16,384 parts, at most
-2^25 vertices counted per part, and is built no deeper than 2 × 32 + 2 levels; the Loadout's own
-32-level and 65,536-port limits apply before. Models are read in file order in waves of distinct
+2^25 vertices counted per part, and is built no deeper than 2 × 32 + 2 levels. The Loadout's
+32-level depth limit applies before flattening. Models are read in file order in waves of distinct
 files in parallel, and no further wave is started once the models read so far hold the vertex
 budget (ADR-0150); the parts are then taken in order, so the same Archive always gives the same
 Assembly. A part over the

@@ -20,7 +20,7 @@ use thiserror::Error;
 
 use crate::cli::{Conflict, DcbExportArgs, RecordFormat};
 use crate::exit;
-use crate::extract::{cancel_on_interrupt, policy, prepare_target};
+use crate::extract::{cancel_on_interrupt, policy, prepare_target_protected};
 use crate::forge_input::ForgeInput;
 use crate::json;
 use crate::loc::{LanguageNotInArchive, print_notes};
@@ -187,9 +187,12 @@ impl Job<'_, '_> {
             tags,
         } = *self;
         let entry = input.entry();
-        let target = prepare_target(args.out.as_deref(), input.archive())?;
         let cancel = cancel_on_interrupt()?;
+        let protection = p4kx_extraction::ArchiveWriteProtection::new(input.path(), cancel.flag())?;
+        let target =
+            prepare_target_protected(args.out.as_deref(), input.archive(), &protection, &cancel)?;
         let options = RecordExportOptions {
+            protection: Some(&protection),
             policy: policy(args.conflict),
             cancel: Some(&cancel),
             progress: None,

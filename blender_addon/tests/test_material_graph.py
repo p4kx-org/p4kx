@@ -128,6 +128,14 @@ def test_the_second_layer_takes_the_palette_gloss_and_gloss_mult() -> None:
     assert graph.linked(blend.key, "Roughness B") is not None
 
 
+def test_authored_zero_layer_gloss_multiplier_is_applied() -> None:
+    raw = manifest_11()
+    raw["materials"][0]["layers"][1]["gloss_mult"] = 0.0
+    graph = graph_of(package.parse_manifest(raw, Path(".")), "x0001", "p0001")
+    blend = next(n for n in graph.nodes if n.group == LAYER_BLEND)
+    assert blend.inputs["Roughness A"] == 1.0
+
+
 def test_layer_normal_and_smoothness_come_from_the_layer_texture() -> None:
     graph = graph_of(load(), "x0001", "p0001")
     kinds = graph.kinds()
@@ -488,12 +496,18 @@ def test_shared_groups_are_described_once_each() -> None:
 def test_pairing_prefers_the_p4kx_index_over_names() -> None:
     manifest = [(0, "Mat"), (1, "Mat"), (2, "Other")]
     created = [("Mat", 1), ("Mat.001", 0), ("Other", None)]
-    assert pair_by_index(manifest, created) == {0: "Mat.001", 1: "Mat", 2: "Other"}
+    assert pair_by_index(manifest, created) == {0: ["Mat.001"], 1: ["Mat"], 2: ["Other"]}
 
 
 def test_pairing_falls_back_to_names_without_extras() -> None:
     manifest = [(0, "A"), (1, "B")]
-    assert pair_by_index(manifest, [("B", None), ("A", None)]) == {0: "A", 1: "B"}
+    assert pair_by_index(manifest, [("B", None), ("A", None)]) == {0: ["A"], 1: ["B"]}
+
+
+def test_pairing_reserves_every_indexed_variant_before_legacy_name_matching() -> None:
+    manifest = [(0, "Paint"), (1, "Paint"), (2, "Paint.003")]
+    created = [("Paint.002", None), ("Paint.003", 99), ("Paint.001", 0), ("Paint", 0)]
+    assert pair_by_index(manifest, created) == {0: ["Paint", "Paint.001"], 1: ["Paint.002"]}
 
 
 def test_index_property_values() -> None:

@@ -206,7 +206,13 @@ fn materials(model: &Model) -> String {
     };
     model.material_library.as_ref().map_or_else(
         || format!("no material library, {ids}"),
-        |library| format!("{} ({}), {ids}", printable(library), status(model)),
+        |library| {
+            let target = model
+                .materials
+                .target()
+                .map_or_else(String::new, |target| format!(" -> {}", printable(target)));
+            format!("{}{target} ({}), {ids}", printable(library), status(model))
+        },
     )
 }
 

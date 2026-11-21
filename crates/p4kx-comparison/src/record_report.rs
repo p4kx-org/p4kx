@@ -4,6 +4,10 @@
 use schemars::JsonSchema;
 use serde::Serialize;
 
+#[path = "report_record_origins.rs"]
+mod origins;
+
+use crate::report_origins::{ReportOriginFields, ReportOrigins};
 use crate::value_report::{GuidSchema, ValueReport, display};
 use crate::{
     Comparison, FieldChange, Guid, RecordChange, RecordChangeKind, RecordCounts, RecordError,
@@ -18,6 +22,9 @@ pub(crate) struct RecordLevel<'a> {
     /// Every added, removed, moved, changed or unreadable Record, ordered by record path ignoring
     /// case and separator kind, then by GUID.
     changes: Vec<RecordChangeReport<'a>>,
+    #[serde(flatten)]
+    #[schemars(with = "ReportOriginFields")]
+    origins: ReportOrigins,
 }
 
 /// One added, removed, moved, changed or unreadable Record.
@@ -81,16 +88,16 @@ struct RecordStateReport<'a> {
 
 /// One field or array element whose value differs, or that only one side has.
 #[derive(Debug, Serialize, JsonSchema)]
-struct FieldChangeReport<'a> {
+pub(crate) struct FieldChangeReport<'a> {
     /// Where the value lies in the Record: the field names separated by `.`, with `[index]`
     /// after an array field, e.g. `hull.plates[1].armor`.
     path: &'a str,
     /// The old value, absent when the old side has no such field or element.
     #[serde(skip_serializing_if = "Option::is_none")]
-    old: Option<ValueReport<'a>>,
+    pub(crate) old: Option<ValueReport<'a>>,
     /// The new value, absent when the new side has no such field or element.
     #[serde(skip_serializing_if = "Option::is_none")]
-    new: Option<ValueReport<'a>>,
+    pub(crate) new: Option<ValueReport<'a>>,
 }
 
 impl<'a> From<RecordState<'a>> for RecordStateReport<'a> {
@@ -136,12 +143,14 @@ impl<'a> From<&'a RecordChange<'_>> for RecordChangeReport<'a> {
 }
 
 pub(crate) fn record_level<'a>(comparison: &'a Comparison<'_>) -> RecordLevel<'a> {
+    let changes = comparison
+        .record_changes()
+        .iter()
+        .map(RecordChangeReport::from)
+        .collect::<Vec<_>>();
     RecordLevel {
         counts: comparison.record_counts(),
-        changes: comparison
-            .record_changes()
-            .iter()
-            .map(RecordChangeReport::from)
-            .collect(),
+        origins: ReportOrigins(origins::capture(comparison, &changes)),
+        changes,
     }
 }

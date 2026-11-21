@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Paints and their ship assignment in the Basetool catalog of a real Archive; runs with
+//! Paints and their ship assignment in the P4KX catalog of a real Archive; runs with
 //! `--ignored` when `P4KX_DATA_P4K` names one.
 
 use std::collections::{BTreeSet, HashSet};
@@ -106,12 +106,12 @@ fn check_counts(built: &BuiltCatalog, catalog: &Value) -> TestResult {
 fn check_references(built: &BuiltCatalog, catalog: &Value) -> TestResult {
     let ships: HashSet<&str> = list(catalog, "ships")?
         .iter()
-        .filter_map(|ship| ship["guid"].as_str())
-        .collect();
+        .map(|ship| crate::catalog_v3_consumer::identity(ship, Kind::Ships))
+        .collect::<Result<_, _>>()?;
     let items: HashSet<&str> = list(catalog, "items")?
         .iter()
-        .filter_map(|item| item["guid"].as_str())
-        .collect();
+        .map(|item| crate::catalog_v3_consumer::identity(item, Kind::Items))
+        .collect::<Result<_, _>>()?;
     let mut used = HashSet::new();
     for paint in list(catalog, "paints")? {
         let item = paint["itemGuid"].as_str().ok_or("itemGuid")?;

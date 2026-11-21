@@ -10,13 +10,16 @@ use std::path::{Path, PathBuf};
 
 use p4kx_extraction::{
     Archive, ConflictPolicy, EntryFailure, Exclusion, ExtractOptions, ExtractionReport, Filter,
-    FolderError, FolderFileError, FolderSource, RecordExportReport, convert_folder, extract,
+    FolderError, FolderFileError, FolderSource, convert_folder, extract,
 };
 use p4kx_testkit::{
     ArchiveBuilder, CryXmlByteOrder, CryXmlSignature, DataForgeBuilder, SplitDds, TestCodec,
     TestElement, TestEntry, TestRecord, TestStruct, TestTextureFormat, TestType, TestValue,
     TestWem, test_signal,
 };
+
+#[path = "folder_dds_origins.rs"]
+mod dds_origins;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -136,36 +139,6 @@ fn tree(root: &Path) -> Result<BTreeMap<String, Vec<u8>>, Box<dyn Error>> {
         }
     }
     Ok(found)
-}
-
-#[test]
-fn a_converted_folder_equals_what_extraction_with_conversion_writes() -> TestResult {
-    let fixture = Fixture::new()?;
-    let expected = fixture.extract("converted", true)?;
-    let raw = fixture.extract("raw", false)?;
-
-    let report = fixture.convert(&raw, "from-folder", None, true)?;
-
-    assert!(report.is_complete(), "complete: {report:?}");
-    let written = tree(&fixture.folder("from-folder"))?;
-    assert_eq!(
-        written,
-        tree(&expected)?,
-        "the same files with the same bytes"
-    );
-    assert!(
-        written
-            .keys()
-            .any(|name| Path::new(name).extension().is_some_and(|ext| ext == "png")),
-        "the texture became a PNG: {:?}",
-        written.keys().collect::<Vec<_>>()
-    );
-    assert!(
-        written.keys().any(|name| name == "Data/Sounds/Media/5.wav"),
-        "the sound was decoded"
-    );
-    assert_eq!(report.records().map(RecordExportReport::written), Some(1));
-    Ok(())
 }
 
 #[test]

@@ -3,8 +3,8 @@
 
 use thiserror::Error;
 
-use crate::LoadoutError;
 use crate::issue_text::{animations_left_out, attachments_left_out};
+use crate::{ContainerAmbiguity, LoadoutError, PortHelperDiagnostic};
 
 /// What went wrong with a part of an Assembly.
 #[derive(Debug, Clone, PartialEq, Error)]
@@ -22,15 +22,13 @@ pub enum IssueKind {
         /// The path the Record names.
         path: String,
     },
-    /// The sub-geometry the port's flags choose does not exist, so the part keeps the main
-    /// geometry of its Entity.
+    /// The port's tagged sub-geometry is absent, so the part uses its main geometry.
     #[error("the sub-geometry {path} does not exist; the main geometry is used")]
     SubGeometryMissing {
         /// The path of the sub-geometry.
         path: String,
     },
-    /// The sub-geometry tagged for the body of the character does not exist, so the part has no
-    /// model; the main geometry, a placeholder, is not drawn instead.
+    /// The body variant's model is missing, so the placeholder is left out.
     #[error("the {body} sub-geometry {path} does not exist")]
     BodyGeometryMissing {
         /// The body variant the sub-geometry is tagged for, e.g. `Male`.
@@ -38,8 +36,7 @@ pub enum IssueKind {
         /// The path of the sub-geometry.
         path: String,
     },
-    /// A worn item names only a prop of the world (a cardboard box) as its geometry and no model
-    /// for the body, so the part has no model.
+    /// A worn item names only world-prop geometry, so it has no worn model.
     #[error("the geometry {path} is a prop of the world, not a model of the worn item")]
     WorldPropNotWorn {
         /// The path of the prop the Record names.
@@ -53,36 +50,45 @@ pub enum IssueKind {
         /// What is wrong.
         reason: String,
     },
-    /// The material library of the model is missing or unreadable, so the engine's default
-    /// material is used.
+    /// The engine's default material replaces a missing or unreadable model material library.
     #[error("{reason}")]
     MaterialLibrary {
         /// What is wrong.
         reason: String,
     },
-    /// A tint palette the Entity or its material library names cannot be resolved, so the part
-    /// falls back to the next palette or to the colours of its library.
+    /// An unresolved tint palette falls back to the next palette or the library's colours.
     #[error("{reason}")]
     Palette {
         /// What is wrong.
         reason: String,
     },
-    /// The helper of a port or of an object container is no node of the model of the Entity it
-    /// belongs to, so the part or the container sits at that Entity's origin.
+    /// The fitted paint cannot choose a unique appearance for the root.
+    #[error("the paint on {port}: {reason}; the base appearance is used")]
+    PaintAppearance {
+        /// The port of the fitted item.
+        port: String,
+        /// The failed selection or compatibility rule.
+        reason: &'static str,
+    },
+    /// The attachment uses its root helper while the tag selector remains unresolved.
+    #[error(transparent)]
+    PortHelperUnresolved(Box<PortHelperDiagnostic>),
+    /// The model lacks the named helper, so the attachment stays at the Entity's origin.
     #[error("the helper {helper} is no node of the Entity's model")]
     HelperNotFound {
         /// The helper the port or the container names.
         helper: String,
     },
-    /// The geometry is a character definition (`.cdf`); its skin is drawn and the files of its
-    /// other attachments are not.
+    /// The rigid piece has no valid mount after a worn overlay.
+    #[error("the rigid piece cannot be mounted: {0}")]
+    WornMountUnresolved(&'static str),
+    /// A character definition's skin is drawn and its attachments are omitted.
     #[error("{}", attachments_left_out(.files))]
     AttachmentsLeftOut {
         /// The files of the attachments that are not drawn.
         files: Vec<String>,
     },
-    /// The skeleton file of a character definition (`.cdf`) does not exist; the skin is drawn as
-    /// it is.
+    /// The character definition has no skeleton file, so the skin is drawn as it is.
     #[error("the skeleton {path} the character definition names does not exist")]
     SkeletonMissing {
         /// The path the definition names, with `/` as separator.
@@ -110,6 +116,9 @@ pub enum IssueKind {
         /// The name the description gives.
         name: String,
     },
+    /// A nested container has several physical matches and is left out.
+    #[error(transparent)]
+    ContainerAmbiguous(ContainerAmbiguity),
     /// A nested container cannot be opened, so it and what is in it are left out.
     #[error("the container {name} cannot be opened: {reason}")]
     ContainerUnreadable {
@@ -191,6 +200,9 @@ pub enum IssueKind {
         /// How many.
         count: usize,
     },
+    /// A direct vehicle tile light kept its original placement because a source join failed.
+    #[error("tile light could not be anchored: {0}")]
+    LightAnchor(crate::SocTileLightAnchorError),
     /// Lights of a type `KHR_lights_punctual` cannot express (ambient lights, which stand in for
     /// global illumination, planar area lights and unknown types), so they are left out.
     #[error(

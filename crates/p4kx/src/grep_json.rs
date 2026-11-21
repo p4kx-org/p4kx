@@ -1,14 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io;
 use std::path::Path;
 use std::time::Duration;
 
-use p4kx_search::{Excerpt, SearchReport, SearchStats, Source};
+use anyhow::Result;
+use p4kx_extraction::{FieldOrigins, SourceInventory};
+use p4kx_search::{Excerpt, ObservedSearch, SearchStats, Source};
 use serde::Serialize;
 
 use crate::json;
+
+#[path = "grep_origins.rs"]
+mod origins;
 
 #[derive(Serialize)]
 struct GrepJson<'a> {
@@ -21,6 +25,9 @@ struct GrepJson<'a> {
     more: Vec<&'static str>,
     unavailable: Vec<UnavailableJson<'a>>,
     stats: StatsJson,
+    #[serde(rename = "fieldOrigins")]
+    field_origins: FieldOrigins,
+    provenance: SourceInventory,
 }
 
 #[derive(Serialize)]
@@ -101,9 +108,11 @@ fn span(excerpt: &Excerpt) -> [usize; 2] {
 pub(crate) fn print(
     archive: &Path,
     text: &str,
-    report: &SearchReport,
+    observed: &ObservedSearch<'_>,
     elapsed: Duration,
-) -> io::Result<()> {
+) -> Result<()> {
+    let (field_origins, provenance) = origins::capture(observed)?;
+    let report = observed.report();
     json::print(&GrepJson {
         archive: json::path(archive),
         text,
@@ -152,5 +161,8 @@ pub(crate) fn print(
             })
             .collect(),
         stats: report.stats.into(),
-    })
+        field_origins,
+        provenance,
+    })?;
+    Ok(())
 }

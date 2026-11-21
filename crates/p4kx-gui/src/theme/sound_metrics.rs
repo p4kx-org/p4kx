@@ -18,13 +18,10 @@ const CONTROLS_PADDING: f32 = 16.0;
 pub(super) const PANEL_CHROME: f32 = 37.0;
 /// The default height of the preview while it lists the WEMs of a soundbank: the tab bar, the path
 /// line, the facts bar, the controls, the head and [`SOUNDBANK_VISIBLE_ROWS`] rows.
-pub const PREVIEW_SOUNDBANK_HEIGHT: f32 = TOUCH_TARGET
-    + PREVIEW_PATH_HEIGHT
-    + FACTS_HEIGHT
-    + CONTROLS_PADDING
-    + BUTTON_XS_HEIGHT
-    + ROW_HEIGHT * (1.0 + SOUNDBANK_VISIBLE_ROWS)
-    + PANEL_CHROME;
+pub const PREVIEW_SOUNDBANK_HEIGHT: f32 = ROW_HEIGHT.mul_add(
+    1.0 + SOUNDBANK_VISIBLE_ROWS,
+    TOUCH_TARGET + PREVIEW_PATH_HEIGHT + FACTS_HEIGHT + CONTROLS_PADDING + BUTTON_XS_HEIGHT,
+) + PANEL_CHROME;
 /// The width of the ID column of the WEM list: the widest ID of ten digits in bold at the row
 /// font, 105.4, and the cell padding on both sides, rounded up.
 pub const SOUND_ID_COLUMN: f32 = 106.0;

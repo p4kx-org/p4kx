@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::io;
 use std::path::Path;
+use std::sync::atomic::AtomicBool;
 
-use p4kx_assembly::{Armour, CharacterAnimations, PartOrigin};
-use p4kx_gltf::{GlbOptions, GlbSummary, TextureLoader};
+use p4kx_assembly::{Armour, ArmourPart, CharacterAnimations, PartOrigin};
+use p4kx_gltf::{GlbOptions, GlbSummary, GltfError, MeshVertexMap, TextureLoader};
 
 use crate::build::assembly_issue;
 use crate::manifest::{CharacterSource, EntityRef, Manifest, Node, NodeKind, Source};
 use crate::manifest_rig::{Rig, RigClip, RigPart, RigPartOrigin};
-use crate::rig_package::{RigScene, rig_manifest, write_rig_package};
+use crate::mesh_vertex_map::Writer;
+use crate::rig_package::{RigScene, RigWriter, WrittenRig, rig_manifest, write_rig_package};
 use crate::{PackageInfo, PackageResult, PackageSummary};
 
 /// A Character ready to be written as a package: its [`Armour`] with the body, head and pieces it
@@ -68,11 +71,11 @@ impl<'a> CharacterScene<'a> {
 ///
 /// # Errors
 ///
-/// Returns [`PackageError::Refused`] when `out` lies inside a Star Citizen installation,
-/// [`PackageError::NotAPackage`] when `out` is something else than an empty folder or a package,
-/// [`PackageError::Mesh`] when the Character does not fit in a GLB file,
-/// [`PackageError::Write`] when a file or folder cannot be written and
-/// [`PackageError::Cancelled`] when `cancelled` returned true.
+/// Returns [`crate::PackageError::Refused`] when `out` lies inside a Star Citizen installation,
+/// [`crate::PackageError::NotAPackage`] when `out` is something else than an empty folder or a package,
+/// [`crate::PackageError::Mesh`] when the Character does not fit in a GLB file,
+/// [`crate::PackageError::Write`] when a file or folder cannot be written and
+/// [`crate::PackageError::Cancelled`] when `cancelled` returned true.
 pub fn write_character_package(
     character: &CharacterScene<'_>,
     textures: &dyn TextureLoader,
@@ -81,21 +84,85 @@ pub fn write_character_package(
     out: &Path,
     cancelled: &(dyn Fn() -> bool + Sync),
 ) -> PackageResult<PackageSummary> {
+    let observed = AtomicBool::new(false);
+    write_character_package_with_context(
+        character,
+        textures,
+        options,
+        info,
+        out,
+        &crate::PackageWriteContext::standalone(cancelled, &observed),
+    )
+}
+
+/// Writes a Character package with source protection at every output boundary.
+///
+/// # Errors
+/// Returns protection, cancellation, package validation, mesh or file failures.
+pub fn write_character_package_with_context(
+    character: &CharacterScene<'_>,
+    textures: &dyn TextureLoader,
+    options: &GlbOptions,
+    info: &PackageInfo,
+    out: &Path,
+    context: &crate::PackageWriteContext<'_>,
+) -> PackageResult<PackageSummary> {
     write_rig_package(
         out,
         character.name,
         options,
-        cancelled,
-        |options, writer| {
-            character.armour.write_glb_animated_with(
-                character.animations,
-                options,
-                textures,
-                writer,
-            )
-        },
+        context,
+        |options, writer, map| write_mesh(character, textures, options, writer, map, context),
         |written| manifest(character, info, options, written),
     )
+}
+
+fn write_mesh(
+    character: &CharacterScene<'_>,
+    textures: &dyn TextureLoader,
+    options: &GlbOptions,
+    writer: &mut RigWriter<'_, '_>,
+    map: Option<&mut Writer>,
+    context: &crate::PackageWriteContext<'_>,
+) -> Result<WrittenRig, GltfError> {
+    let armour = character.armour;
+    let animations = character.animations;
+    let visitor = map.map(|map| {
+        move |row: MeshVertexMap<'_>, part: &ArmourPart| {
+            map.observe(&row, part.model(), part.model_archive_sources(), context)
+        }
+    });
+    if !armour
+        .parts()
+        .iter()
+        .any(|part| part.mount_source().is_some())
+    {
+        return match visitor {
+            Some(mut visitor) => armour
+                .write_glb_with_vertex_origins(animations, options, textures, writer, &mut visitor)
+                .map(WrittenRig::geometry),
+            None => armour
+                .write_glb_animated_with(animations, options, textures, writer)
+                .map(WrittenRig::geometry),
+        };
+    }
+    let (summary, emission) = match visitor {
+        Some(mut visitor) => armour.write_glb_animated_observed_with_vertex_origins(
+            animations,
+            options,
+            textures,
+            writer,
+            &mut visitor,
+        ),
+        None => armour.write_glb_animated_observed(animations, options, textures, writer),
+    }?;
+    let origins = armour
+        .worn_mount_origins(&emission)
+        .map_err(|error| GltfError::Write(io::Error::other(error)))?;
+    Ok(WrittenRig {
+        summary,
+        worn_origins: Some(origins),
+    })
 }
 
 fn source(character: &CharacterScene<'_>, info: &PackageInfo) -> Source {
@@ -105,6 +172,7 @@ fn source(character: &CharacterScene<'_>, info: &PackageInfo) -> Source {
         entity: EntityRef {
             class_name: character.name.to_owned(),
             guid: String::new(),
+            classification: None,
         },
         character: Some(CharacterSource {
             name: character.name.to_owned(),
@@ -148,12 +216,19 @@ fn manifest(
             .map(assembly_issue)
             .collect(),
     };
-    rig_manifest(scene, info, options, written)
+    let mut manifest = rig_manifest(scene, info, options, written);
+    if written.default_material_ids > 0 {
+        manifest.default_material = armour
+            .default_material(options.lod)
+            .map(p4kx_extraction::ArchiveDefaultMaterial::receipt);
+    }
+    manifest
 }
 
 fn rig(armour: &Armour, written: &GlbSummary) -> Rig {
     Rig {
         body: Some(armour.variant().code().to_owned()),
+        worn_mount_provenance: None,
         skeleton: armour.skeleton_file().to_owned(),
         bones: written.bones,
         skinned_meshes: written.skinned_meshes,

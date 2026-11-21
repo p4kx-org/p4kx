@@ -3,61 +3,184 @@
 
 use std::collections::HashMap;
 
+use p4kx_extraction::SourceValue;
 use p4kx_foundation::read_text_number;
 
-use super::{PartKind, VehicleItemPort, VehicleItemType, VehiclePart};
+use super::aggregate_evidence::Checkpoint;
+use super::{PartKind, VehicleAggregateEvidence, VehicleItemPort, VehicleItemType, VehiclePart};
 use crate::markup::Element;
 use crate::merge::port_key;
 
-/// Reads the parts below the `Parts` element of a `Vehicle` element; parts marked `skipPart`
-/// are left out with everything below them.
-pub(super) fn parts(vehicle: &Element) -> Vec<VehiclePart> {
-    vehicle
-        .children_named("Parts")
-        .flat_map(part_list)
-        .collect()
+#[derive(Debug, Clone)]
+pub(super) struct IndexedPort {
+    pub(super) path: Box<[usize]>,
+    pub(super) prefix: Option<Checkpoint>,
 }
 
-fn part_list(container: &Element) -> Vec<VehiclePart> {
-    container
-        .children
-        .iter()
-        .flat_map(|child| {
+impl PartialEq for IndexedPort {
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path
+    }
+}
+
+pub(super) struct PartTree {
+    pub(super) parts: Vec<VehiclePart>,
+    pub(super) paths: HashMap<String, IndexedPort>,
+    pub(super) selectors: Option<VehicleAggregateEvidence>,
+    pub(super) rolling_parts: bool,
+    pub(super) rolling_selectors: Option<VehicleAggregateEvidence>,
+}
+
+pub(super) fn parts(
+    vehicle: &Element,
+    totals: Option<&mut VehicleAggregateEvidence>,
+    observe_ports: bool,
+) -> PartTree {
+    let rolling_selectors = totals.is_some().then(VehicleAggregateEvidence::new);
+    let mut reader = PartReader {
+        totals,
+        selectors: observe_ports.then(VehicleAggregateEvidence::new),
+        rolling_observation: rolling_selectors,
+        rolling_parts: false,
+        found_wheel: false,
+        paths: HashMap::new(),
+        path: Vec::new(),
+    };
+    reader.element(vehicle, "$children");
+    let mut parts = Vec::new();
+    for child in &vehicle.children {
+        reader.element(child, "$name");
+        if child.name.eq_ignore_ascii_case("Parts") {
+            reader.append_parts(child, &mut parts);
+        }
+    }
+    PartTree {
+        parts,
+        paths: reader.paths,
+        selectors: reader.selectors,
+        rolling_parts: reader.rolling_parts,
+        rolling_selectors: reader.rolling_observation,
+    }
+}
+
+struct PartReader<'scope> {
+    totals: Option<&'scope mut VehicleAggregateEvidence>,
+    selectors: Option<VehicleAggregateEvidence>,
+    rolling_observation: Option<VehicleAggregateEvidence>,
+    rolling_parts: bool,
+    found_wheel: bool,
+    paths: HashMap<String, IndexedPort>,
+    path: Vec<usize>,
+}
+
+impl PartReader<'_> {
+    fn rolling_field(&mut self, element: &Element, field: &str) {
+        if let Some(selectors) = self.rolling_observation() {
+            if element.attribute(field).is_some() && element.origins.evidence(field).is_none() {
+                selectors.issue(super::VehicleAggregateIssue::OriginalEvidenceUnavailable);
+            } else {
+                selectors.field(element, field);
+            }
+        }
+    }
+
+    const fn rolling_observation(&mut self) -> Option<&mut VehicleAggregateEvidence> {
+        if self.found_wheel {
+            None
+        } else {
+            self.rolling_observation.as_mut()
+        }
+    }
+    fn element(&mut self, element: &Element, field: &str) {
+        if let Some(totals) = &mut self.totals {
+            totals.element(element, field);
+        }
+        if let Some(selectors) = &mut self.selectors {
+            selectors.element(element, field);
+        }
+        if let Some(selectors) = self.rolling_observation() {
+            selectors.element(element, field);
+        }
+    }
+
+    fn append_parts(&mut self, container: &Element, parts: &mut Vec<VehiclePart>) {
+        self.element(container, "$children");
+        for child in &container.children {
+            self.element(child, "$name");
             if child.name.eq_ignore_ascii_case("Part") {
-                part(child).into_iter().collect()
+                self.path.push(parts.len());
+                parts.extend(self.part(child));
+                self.path.pop();
             } else if child.name.eq_ignore_ascii_case("Parts") {
-                part_list(child)
+                self.append_parts(child, parts);
+            }
+        }
+    }
+
+    fn part(&mut self, element: &Element) -> Option<VehiclePart> {
+        if let Some(totals) = &mut self.totals {
+            totals.field(element, "skipPart");
+        }
+        if let Some(selectors) = &mut self.selectors {
+            selectors.field(element, "skipPart");
+        }
+        self.rolling_field(element, "skipPart");
+        if is_set(element.attribute("skipPart")) {
+            return None;
+        }
+        let name = element.attribute("name").unwrap_or_default();
+        let class = element.attribute("class").unwrap_or_default();
+        let kind = kind_of(class);
+        self.rolling_field(element, "class");
+        self.rolling_parts |= matches!(kind, PartKind::Wheel | PartKind::Tread);
+        self.found_wheel |= kind == PartKind::Wheel;
+        let port = self.item_port(element, name);
+        let mut children = Vec::new();
+        self.append_parts(element, &mut children);
+        Some(VehiclePart {
+            name_proof: element.port_name.clone(),
+            name: name.to_owned(),
+            class: class.to_owned(),
+            kind,
+            mass: number(element.attribute("mass")),
+            damage_max: number(element.attribute("damageMax")),
+            detach_ratio: number(element.attribute("detachRatio")),
+            destroy_ratio: destroy_ratio(element),
+            attributes: element.attributes.clone(),
+            origins: element.origins.clone(),
+            item_port: port,
+            tread_wheels: if kind == PartKind::Tread {
+                tread_wheels(element)
             } else {
                 Vec::new()
-            }
+            },
+            children,
         })
-        .collect()
-}
-
-fn part(element: &Element) -> Option<VehiclePart> {
-    if is_set(element.attribute("skipPart")) {
-        return None;
     }
-    let class = element.attribute("class").unwrap_or_default();
-    let kind = kind_of(class);
-    Some(VehiclePart {
-        name: element.attribute("name").unwrap_or_default().to_owned(),
-        class: class.to_owned(),
-        kind,
-        mass: number(element.attribute("mass")),
-        damage_max: number(element.attribute("damageMax")),
-        detach_ratio: number(element.attribute("detachRatio")),
-        destroy_ratio: destroy_ratio(element),
-        attributes: element.attributes.clone(),
-        origins: element.origins.clone(),
-        item_port: element.child("ItemPort").map(item_port),
-        tread_wheels: if kind == PartKind::Tread {
-            tread_wheels(element)
+
+    fn item_port(&mut self, part: &Element, name: &str) -> Option<VehicleItemPort> {
+        let source = if let Some(selectors) = &mut self.selectors {
+            selectors.element(part, "$children");
+            let source = part.children.iter().find(|child| {
+                selectors.element(child, "$name");
+                child.name.eq_ignore_ascii_case("ItemPort")
+            })?;
+            selectors.field(part, "name");
+            source
         } else {
-            Vec::new()
-        },
-        children: part_list(element),
-    })
+            part.child("ItemPort")?
+        };
+        self.paths
+            .entry(port_key(name))
+            .or_insert_with(|| IndexedPort {
+                path: self.path.as_slice().into(),
+                prefix: self
+                    .selectors
+                    .as_ref()
+                    .map(VehicleAggregateEvidence::checkpoint),
+            });
+        Some(item_port(source))
+    }
 }
 
 const fn kind_of(class: &str) -> PartKind {
@@ -76,17 +199,11 @@ fn item_port(element: &Element) -> VehicleItemPort {
     VehicleItemPort {
         min_size: size(element.attribute("minSize")),
         max_size: size(element.attribute("maxSize")),
-        flags: element.attribute("flags").unwrap_or_default().to_owned(),
+        flags: element.attribute("flags").map(str::to_owned),
         id: element.attribute("id").map(str::to_owned),
-        display_name: element
-            .attribute("display_name")
-            .filter(|name| !name.is_empty())
-            .map(str::to_owned),
-        port_tags: element.attribute("portTags").unwrap_or_default().to_owned(),
-        required_tags: element
-            .attribute("requiredTags")
-            .unwrap_or_default()
-            .to_owned(),
+        display_name: element.attribute("display_name").map(str::to_owned),
+        port_tags: element.attribute("portTags").map(str::to_owned),
+        required_tags: element.attribute("requiredTags").map(str::to_owned),
         types: type_elements(element)
             .filter_map(|kind| kind.attribute("type"))
             .map(str::to_owned)
@@ -107,6 +224,7 @@ fn item_port(element: &Element) -> VehicleItemPort {
             })
             .collect(),
         origins: element.origins.clone(),
+        light_attachments: super::light_ports::attachments(element),
     }
 }
 
@@ -134,8 +252,13 @@ fn is_set(value: Option<&str>) -> bool {
     })
 }
 
-fn size(value: Option<&str>) -> Option<u32> {
-    value?.trim().parse().ok()
+fn size(value: Option<&str>) -> SourceValue<u32> {
+    value.map_or(SourceValue::Absent, |value| {
+        value
+            .trim()
+            .parse()
+            .map_or(SourceValue::Invalid, SourceValue::Present)
+    })
 }
 
 /// Returns the share of `damageMax` at which the part destroys the vehicle: the `damageRatioMin`
@@ -157,29 +280,4 @@ fn destroy_ratio(part: &Element) -> Option<f64> {
 /// number has none.
 pub(crate) fn number(value: Option<&str>) -> Option<f64> {
     read_text_number(value?).map(|number| number.value())
-}
-
-/// Returns where each item port sits, by lower-case part name: the child indices from the top
-/// level down to the part. The first part of a name decides.
-pub(super) fn port_paths(parts: &[VehiclePart]) -> HashMap<String, Box<[usize]>> {
-    let mut map = HashMap::new();
-    let mut path = Vec::new();
-    collect_paths(parts, &mut path, &mut map);
-    map
-}
-
-fn collect_paths(
-    parts: &[VehiclePart],
-    path: &mut Vec<usize>,
-    map: &mut HashMap<String, Box<[usize]>>,
-) {
-    for (index, part) in parts.iter().enumerate() {
-        path.push(index);
-        if part.item_port.is_some() {
-            map.entry(port_key(&part.name))
-                .or_insert_with(|| path.as_slice().into());
-        }
-        collect_paths(&part.children, path, map);
-        path.pop();
-    }
 }

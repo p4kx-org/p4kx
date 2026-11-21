@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::borrow::Cow;
+use std::cell::Cell;
 
 use p4kx_gfx::{Localise, Localised, localise_text};
 
@@ -31,24 +32,50 @@ pub(crate) fn is_placeholder(text: &str) -> bool {
     key.is_empty() || PLACEHOLDERS.contains(&key)
 }
 
+pub(super) struct ResolvedText<'a> {
+    pub(super) text: Cow<'a, str>,
+    pub(super) lookup_key: Option<Box<str>>,
+}
+
 /// Looks the localisation key `source` up, or returns it as it is, with a note why.
 pub(super) fn resolve<'a>(
     localise: Option<Localise<'_>>,
     source: &'a str,
     notes: &mut Notes,
-) -> Cow<'a, str> {
+    observe: bool,
+) -> ResolvedText<'a> {
     let Some(lookup) = localise else {
         if source.starts_with('@') {
             notes.push("localisation key drawn as it is: no language given".to_owned());
         }
-        return Cow::Borrowed(source);
+        return ResolvedText {
+            text: Cow::Borrowed(source),
+            lookup_key: None,
+        };
     };
-    match localise_text(source, lookup) {
+    let key_used = Cell::new(None);
+    let selected = |key: &str| {
+        let text = lookup(key);
+        if observe && text.is_some() {
+            key_used.set(Some(Box::from(key)));
+        }
+        text
+    };
+    let text = match localise_text(source, &selected) {
         Localised::Plain => Cow::Borrowed(source),
-        Localised::Text(text) => Cow::Owned(text),
+        Localised::Text(text) => {
+            return ResolvedText {
+                text: Cow::Owned(text),
+                lookup_key: key_used.take(),
+            };
+        }
         Localised::Missing(_) => {
             notes.push("localisation key not in the language: drawn as it is".to_owned());
             Cow::Borrowed(source)
         }
+    };
+    ResolvedText {
+        text,
+        lookup_key: None,
     }
 }

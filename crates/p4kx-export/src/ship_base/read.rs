@@ -1,26 +1,28 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::sync::Arc;
+#[path = "aggregate.rs"]
+mod aggregate;
+#[path = "observe.rs"]
+mod observation;
 
 use p4kx_assembly::{
-    Attachment, Entities, EntityNode, LoadoutEntry, LoadoutFiles, LoadoutResolver, OriginTally,
-    PartThreshold, PortNode, PortSource, UnreadableValue, ValueOrigin, VehicleImplementation,
-    VehicleTotals,
+    Attachment, EntityNode, LoadoutEntry, LoadoutResolver, OriginTally, PartThreshold, PortNode,
+    PortSource, UnreadableValue, ValueOrigin, VehicleImplementation, VehicleTotals,
 };
-use p4kx_extraction::{DataForge, Record, RecordTree, TreeBuilder};
+use p4kx_extraction::{Record, RecordTree, TreeBuilder};
 
 use super::cargo::{CargoReader, rounded};
 use super::model::{
     Hull, HullThreshold, Implementation, LoadoutPort, Mass, MassBasis, PartialPartValue, ShipBase,
     ShipRead, Source, SourceKind, SourceShare, Sourced, UnreadablePartValue, VehicleKind,
 };
-use crate::CatalogFailure;
 use crate::Kind;
 use crate::digest::Digest;
 use crate::paint_port::VehiclePorts;
 use crate::record_fields::{class_name, component, integer, number, structure, text};
 use crate::selection::starts_with_folder;
+use crate::{CatalogFailure, CatalogReadFailure};
 
 const SIZE_FIELD: &str = "Components/SAttachableComponentParams/AttachDef/Size";
 const PHYSICS_MASS_FIELD: &str = "Components/SEntityPhysicsControllerParams/PhysType/Mass";
@@ -47,28 +49,6 @@ impl std::fmt::Debug for ShipReader<'_> {
 }
 
 impl<'f> ShipReader<'f> {
-    /// Creates a reader over `forge` that reads the vehicle implementations and XML Loadouts from
-    /// `files`. Docked vehicles in a Loadout stay in their port, marked, and are not expanded.
-    #[must_use]
-    pub fn new(forge: &'f DataForge<'f>, files: &'f dyn LoadoutFiles) -> Self {
-        Self::with_entities(Arc::new(Entities::new(forge)), files)
-    }
-
-    /// Creates a reader like [`new`](Self::new) over the DataForge of `entities`, sharing its
-    /// index with every reader built from the same `Arc`, so that readers working in parallel
-    /// walk the Records once.
-    #[must_use]
-    pub fn with_entities(entities: Arc<Entities<'f>>, files: &'f dyn LoadoutFiles) -> Self {
-        let forge = entities.forge();
-        Self {
-            resolver: LoadoutResolver::with_entities(entities)
-                .with_files(files)
-                .stopping_at_docked_vehicles(),
-            trees: TreeBuilder::new(),
-            cargo: CargoReader::new(forge),
-        }
-    }
-
     /// Reads the base data of the ship `record`.
     ///
     /// # Errors
@@ -94,7 +74,9 @@ impl<'f> ShipReader<'f> {
         record: &Record<'f>,
         tree: &RecordTree<'f>,
     ) -> Result<ShipBase, CatalogFailure> {
-        self.read_with_digest(record, tree).map(|read| read.base)
+        self.read_with_digest(record, tree)
+            .map(|read| read.base)
+            .map_err(CatalogReadFailure::into_interpreted)
     }
 
     /// As [`read_tree`](Self::read_tree), with the digest of the vehicle implementation.
@@ -102,13 +84,29 @@ impl<'f> ShipReader<'f> {
         &mut self,
         record: &Record<'f>,
         tree: &RecordTree<'f>,
-    ) -> Result<ShipRead, CatalogFailure> {
+    ) -> Result<ShipRead, CatalogReadFailure<'f>> {
+        self.read_with_digest_using(record, tree, VehicleImplementation::totals, || {
+            let physics = structure(
+                component(tree, "SEntityPhysicsControllerParams"),
+                "PhysType",
+            );
+            number(physics, "Mass")
+        })
+    }
+
+    pub(crate) fn read_with_digest_using(
+        &mut self,
+        record: &Record<'f>,
+        tree: &RecordTree<'f>,
+        mut totals_of: impl FnMut(&VehicleImplementation) -> VehicleTotals,
+        physics_mass: impl FnOnce() -> Option<f32>,
+    ) -> Result<ShipRead, CatalogReadFailure<'f>> {
         let node = self
             .resolver
             .resolve_tree(record, tree)
-            .map_err(|error| CatalogFailure::of(record, &error))?;
+            .map_err(|error| CatalogReadFailure::of(record, &error))?;
         let vehicle = node.vehicle();
-        let totals = vehicle.map(VehicleImplementation::totals);
+        let totals = vehicle.map(&mut totals_of);
         let mut issues: Vec<String> = node.issues().iter().map(ToString::to_string).collect();
         issues.extend(
             vehicle
@@ -125,10 +123,12 @@ impl<'f> ShipReader<'f> {
             class_name: class_name(tree).to_owned(),
             record_path: tree.record_path().to_owned(),
             implementation: vehicle.map(implementation),
-            vehicle_kind: vehicle_kind(tree.record_path(), vehicle),
+            vehicle_kind: VehicleKindPath::of(tree.record_path()).classify(vehicle),
             size: size(tree),
-            mass: mass(tree, vehicle, totals.as_ref()),
-            hull: vehicle.zip(totals.as_ref()).and_then(|(v, t)| hull(v, t)),
+            mass: aggregate::mass(tree, vehicle, totals.as_ref(), physics_mass),
+            hull: vehicle
+                .zip(totals.as_ref())
+                .and_then(|(vehicle, totals)| aggregate::hull(vehicle, totals)),
             cargo: self.cargo.read(&entries, &mut self.trees),
             loadout_source: node.loadout_file().map_or_else(
                 || record_source(tree.record_path(), LOADOUT_FIELD),
@@ -172,23 +172,34 @@ fn in_folder(record_path: &str, index: usize) -> bool {
         .is_some_and(|prefix| starts_with_folder(record_path, prefix))
 }
 
-/// Decides the kind from the folder of the record path and the wheels and treads of the vehicle
-/// implementation: a ground vehicle is one in the ground folder, a spaceship one in the spaceship
-/// folder without a wheel or tread; a spaceship folder with wheels or treads is no evidence either
-/// way. The folders are matched like the selection of the `ships` kind matches its prefixes.
-fn vehicle_kind(record_path: &str, vehicle: Option<&VehicleImplementation>) -> Option<VehicleKind> {
-    let rolling = vehicle.is_some_and(|vehicle| {
-        vehicle.wheels().next().is_some() || vehicle.treads().next().is_some()
-    });
-    if in_folder(record_path, GROUND_FOLDER) {
-        Some(VehicleKind::GroundVehicle)
-    } else if in_folder(record_path, SPACESHIP_FOLDER) && !rolling {
-        Some(VehicleKind::Spaceship)
-    } else {
-        None
-    }
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum VehicleKindPath {
+    Ground,
+    Space,
+    Other,
 }
 
+impl VehicleKindPath {
+    pub(crate) fn of(record_path: &str) -> Self {
+        if in_folder(record_path, GROUND_FOLDER) {
+            Self::Ground
+        } else if in_folder(record_path, SPACESHIP_FOLDER) {
+            Self::Space
+        } else {
+            Self::Other
+        }
+    }
+
+    fn classify(self, vehicle: Option<&VehicleImplementation>) -> Option<VehicleKind> {
+        match self {
+            Self::Ground => Some(VehicleKind::GroundVehicle),
+            Self::Space if !vehicle.is_some_and(VehicleImplementation::has_rolling_parts) => {
+                Some(VehicleKind::Spaceship)
+            }
+            Self::Space | Self::Other => None,
+        }
+    }
+}
 fn implementation(vehicle: &VehicleImplementation) -> Implementation {
     Implementation {
         file: vehicle.path().to_owned(),
@@ -206,74 +217,6 @@ fn size(tree: &RecordTree<'_>) -> Option<Sourced<i64>> {
             file: tree.record_path().to_owned(),
             field: SIZE_FIELD.to_owned(),
         },
-    })
-}
-
-fn mass(
-    tree: &RecordTree<'_>,
-    vehicle: Option<&VehicleImplementation>,
-    totals: Option<&VehicleTotals>,
-) -> Option<Mass> {
-    if let (Some(vehicle), Some(totals)) = (vehicle, totals)
-        && totals.mass_parts() > 0
-        && totals.mass() > 0.0
-        && let kg = rounded(totals.mass())
-        && kg.is_finite()
-    {
-        return Some(Mass {
-            kg,
-            basis: MassBasis::Parts,
-            parts: totals.mass_parts(),
-            sources: shares(vehicle, totals.mass_origins(), PARTS_MASS),
-            unreadable: unreadable(totals, &["mass"]),
-            partial: partial(totals, &["mass"]),
-            cleaned: totals.cleaned_mass(),
-        });
-    }
-    let physics = structure(
-        component(tree, "SEntityPhysicsControllerParams"),
-        "PhysType",
-    );
-    let kg = number(physics, "Mass").filter(|kg| *kg > 0.0)?;
-    let kg = rounded(f64::from(kg));
-    if !kg.is_finite() {
-        return None;
-    }
-    Some(Mass {
-        kg,
-        basis: MassBasis::Physics,
-        parts: 0,
-        sources: vec![SourceShare {
-            source: Source {
-                kind: SourceKind::Record,
-                file: tree.record_path().to_owned(),
-                field: PHYSICS_MASS_FIELD.to_owned(),
-            },
-            values: 1,
-        }],
-        unreadable: totals.map_or_else(Vec::new, |totals| unreadable(totals, &["mass"])),
-        partial: Vec::new(),
-        cleaned: 0,
-    })
-}
-
-fn hull(vehicle: &VehicleImplementation, totals: &VehicleTotals) -> Option<Hull> {
-    if totals.health_parts() == 0 {
-        return None;
-    }
-    let health = rounded(totals.health());
-    if !health.is_finite() {
-        return None;
-    }
-    Some(Hull {
-        health,
-        parts: totals.health_parts(),
-        sources: shares(vehicle, totals.health_origins(), PARTS_DAMAGE),
-        destruction: thresholds(totals.destruction()),
-        detach: thresholds(totals.detach()),
-        unreadable: unreadable(totals, &["damageMax", "detachRatio"]),
-        partial: partial(totals, &["damageMax", "detachRatio"]),
-        cleaned: totals.cleaned_damage(),
     })
 }
 

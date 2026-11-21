@@ -75,6 +75,10 @@ impl<'a> RecordTable<'a> {
         Ok(Self { bytes, layout })
     }
 
+    pub(crate) const fn bytes(&self) -> &'a [u8] {
+        self.bytes
+    }
+
     pub(crate) const fn len(&self) -> usize {
         self.bytes.len() / self.layout.row_len()
     }

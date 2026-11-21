@@ -31,7 +31,15 @@ fn the_synthetic_glbs_are_written_for_the_validator() -> TestResult {
         glass("lens", "%PER_VERTEX_TINT"),
         TestMtlMaterial::new("plain"),
     ])?;
+    let emissive = coloured_bytes(&[
+        TestMtlMaterial::new("unused"),
+        TestMtlMaterial::new("glow")
+            .emissive([1.0, 0.5, 0.0])
+            .glow(4.0),
+        TestMtlMaterial::new("plain"),
+    ])?;
     let samples = [
+        ("emissive_strength.glb", emissive),
         ("head_with_morph_targets.glb", head),
         ("skinned_mesh.glb", skinned),
         ("per_primitive_color_0.glb", coloured),

@@ -38,6 +38,7 @@ pub(super) fn structures(builder: DataForgeBuilder, mass_multiplier: bool) -> Da
             .field("minPercentage", TestType::Single)
             .field("maxPercentage", TestType::Single)
             .field("probability", TestType::Single)
+            .field("qualityScale", TestType::Double)
             .field("mineableElement", TestType::Reference),
         TestStruct::new("MineableComposition")
             .field("depositName", TestType::Locale)
@@ -83,10 +84,18 @@ pub(super) fn structures(builder: DataForgeBuilder, mass_multiplier: bool) -> Da
             .array("harvestables", class("HarvestableElement")),
         TestStruct::new("HarvestableAreaTypeObjectPreset")
             .array("objectPresetPaths", TestType::String),
+        TestStruct::new("HarvestableAreaModifier")
+            .field(
+                "harvestableElement",
+                TestType::WeakPointer("HarvestableElement".to_owned()),
+            )
+            .field("harvestableModifier", TestType::Single)
+            .array("geometries", class("HarvestableGeometry")),
         TestStruct::new("HarvestableAreaPreset")
             .field("debugGroupName", TestType::String)
             .field("globalModifier", TestType::Single)
-            .field("areaType", pointer("HarvestableAreaTypeObjectPreset")),
+            .field("areaType", pointer("HarvestableAreaTypeObjectPreset"))
+            .array("modifiers", class("HarvestableAreaModifier")),
         TestStruct::new("HarvestableProviderPreset")
             .array("harvestableGroups", class("HarvestableElementGroup"))
             .array("areas", class("HarvestableAreaPreset")),

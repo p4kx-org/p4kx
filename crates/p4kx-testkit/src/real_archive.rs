@@ -5,7 +5,11 @@ use std::ffi::OsString;
 use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use p4kx_foundation::ArchiveKey;
+use p4kx_foundation::{ArchiveKey, FolderKind, base_folder};
+
+#[cfg(test)]
+#[path = "real_archive_profile_tests.rs"]
+mod profile_tests;
 
 /// The environment variable that holds the key of a real `Data.p4k` for the real-Archive suite.
 pub const REAL_ARCHIVE_KEY_VAR: &str = "P4KX_ARCHIVE_KEY";
@@ -69,8 +73,8 @@ impl std::error::Error for MissingRealKey {}
 /// Returns the Archive key of the real-Archive suite, as the CLI and the GUI find it.
 ///
 /// The first valid key wins: `P4KX_ARCHIVE_KEY`, the file named by `P4KX_KEY_FILE`, then the key
-/// stored in the profile (`%APPDATA%\P4KX\archive.key` on Windows, then the old
-/// `%APPDATA%\P4K-Extractor\archive.key`).
+/// stored in the platform config folder, with `P4KX` before the legacy `P4K-Extractor`.
+/// The shared folder resolver honours `P4KX_FOLDERS_ROOT`.
 ///
 /// # Errors
 ///
@@ -81,15 +85,16 @@ pub fn real_archive_key() -> Result<ArchiveKey, MissingRealKey> {
     let named = std::env::var_os(REAL_ARCHIVE_KEY_FILE_VAR)
         .filter(|path| !path.is_empty())
         .map(PathBuf::from);
-    let profile: Vec<PathBuf> = dirs::config_dir()
-        .map(|dir| {
-            PROFILE_FOLDERS
-                .map(|folder| dir.join(folder).join(PROFILE_FILE))
-                .to_vec()
-        })
-        .unwrap_or_default();
-    let profile: Vec<&Path> = profile.iter().map(PathBuf::as_path).collect();
-    find_key(variable.as_deref(), named.as_deref(), &profile)
+    let paths = base_folder(FolderKind::Config)
+        .map(|dir| PROFILE_FOLDERS.map(|folder| dir.join(folder).join(PROFILE_FILE)));
+    let profile = paths
+        .as_ref()
+        .map(|paths| paths.each_ref().map(PathBuf::as_path));
+    let profile_files: &[&Path] = match &profile {
+        Some(paths) => paths,
+        None => &[],
+    };
+    find_key(variable.as_deref(), named.as_deref(), profile_files)
 }
 
 fn read_profile_files(files: &[&Path]) -> Result<ArchiveKey, Outcome> {

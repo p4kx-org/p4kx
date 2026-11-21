@@ -64,14 +64,13 @@ fn clip_names(folder: &Path) -> Result<Vec<String>, Box<dyn std::error::Error>> 
     Ok(manifest
         .pointer("/meshes/0/rig/animations")
         .and_then(serde_json::Value::as_array)
-        .map(|clips| {
+        .map_or_default(|clips| {
             clips
                 .iter()
                 .filter_map(|clip| clip.get("name").and_then(serde_json::Value::as_str))
                 .map(str::to_owned)
                 .collect()
-        })
-        .unwrap_or_default())
+        }))
 }
 
 #[test]

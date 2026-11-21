@@ -4,6 +4,7 @@
 use std::time::{Duration, Instant};
 
 use super::*;
+use crate::texture_budget::{Tally, Verdict};
 
 fn neighbouring_jobs(count: usize) -> Vec<Job> {
     (0..count)
@@ -16,6 +17,7 @@ fn neighbouring_jobs(count: usize) -> Vec<Job> {
                 diffuse: None,
                 normal: Some(source(path, true)),
                 specular: None,
+                explicit_gloss: Vec::new(),
                 tints: TINTS,
                 layered: None,
             }
@@ -31,6 +33,7 @@ fn job_of(path: &str) -> Job {
         diffuse: None,
         normal: Some(source(path.to_owned(), true)),
         specular: None,
+        explicit_gloss: Vec::new(),
         tints: TINTS,
         layered: None,
     }
@@ -66,6 +69,44 @@ fn sources_shared_by_neighbouring_jobs_are_decoded_once_though_the_decode_is_par
 
     assert_eq!(images, 64, "every image is made");
     assert_eq!(loads, 33, "one decode per distinct source");
+}
+
+#[test]
+fn packed_gloss_reserves_a_fitting_specular_size_and_keeps_fallback_possible() {
+    let job = Job {
+        key: Key::MetallicRoughness {
+            finish: None,
+            gloss: None,
+            explicit_gloss: vec!["coat_gloss.dds".to_owned()],
+            specular: Some(("coat_spec.dds".to_owned(), [u8::MAX; 3])),
+        },
+        diffuse: None,
+        normal: None,
+        specular: Some(source("coat_spec.dds".to_owned(), false)),
+        explicit_gloss: vec![source("coat_gloss.dds".to_owned(), false)],
+        tints: TINTS,
+        layered: None,
+    };
+    let sized = Squares::new(4).sized();
+    let mut store = SourceStore::new(&sized, 0, 0);
+    let mut ample = Tally::new(Budget {
+        images: 1,
+        pixels: 16,
+    });
+    assert!(matches!(
+        ample.plan(&job, &mut store),
+        Verdict::Reserved(16)
+    ));
+
+    let mut smaller = Tally::new(Budget {
+        images: 1,
+        pixels: 15,
+    });
+    assert!(matches!(smaller.plan(&job, &mut store), Verdict::Unknown));
+
+    let unreadable = Squares::new(4).unsizable();
+    let mut store = SourceStore::new(&unreadable, 0, 0);
+    assert!(matches!(smaller.plan(&job, &mut store), Verdict::Unknown));
 }
 
 #[test]

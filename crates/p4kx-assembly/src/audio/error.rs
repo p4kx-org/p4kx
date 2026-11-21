@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_archive::{Archive, Entry, ObservedEntry, ObservedEntryBinding};
 use p4kx_audio::BankError;
 use thiserror::Error;
 
@@ -45,6 +46,15 @@ pub enum AudioFileError {
 }
 
 impl AudioFileError {
+    /// Returns whether a configured limit caused the omission.
+    #[must_use]
+    pub const fn is_capacity_limit(&self) -> bool {
+        matches!(
+            self,
+            Self::TooLarge { .. } | Self::TooManyTriggers | Self::TooManyMedia
+        )
+    }
+
     /// Returns a stable code for the kind of error, e.g. `too_large`, for scripts.
     #[must_use]
     pub const fn kind(&self) -> &'static str {
@@ -60,13 +70,63 @@ impl AudioFileError {
 }
 
 /// An Entry left out of the audio index, with the reason.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct AudioIssue {
-    pub(crate) path: Box<str>,
-    pub(crate) error: AudioFileError,
+    path: Box<str>,
+    error: AudioFileError,
+    owner: Option<ObservedEntryBinding>,
 }
 
+impl PartialEq for AudioIssue {
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path && self.error == other.error
+    }
+}
+
+impl Eq for AudioIssue {}
+
 impl AudioIssue {
+    pub(super) fn new(archive: &Archive, entry: &Entry, error: AudioFileError) -> Self {
+        Self {
+            path: entry.path().into(),
+            error,
+            owner: archive
+                .observed_entry(entry)
+                .map(|observed| observed.binding()),
+        }
+    }
+
+    pub(super) fn with_position(
+        archive: &Archive,
+        path: Box<str>,
+        position: usize,
+        error: AudioFileError,
+    ) -> Self {
+        let owner = archive
+            .entries()
+            .get(position)
+            .and_then(|entry| archive.observed_entry(entry))
+            .map(|observed| observed.binding());
+        Self { path, error, owner }
+    }
+
+    /// Returns the actual Entry that produced this issue in its owning Archive.
+    #[must_use]
+    pub fn source<'archive>(&self, archive: &'archive Archive) -> Option<ObservedEntry<'archive>> {
+        let owner = self.owner.as_ref()?;
+        let entry = archive
+            .entries()
+            .get(usize::try_from(owner.entry_index()).ok()?)?;
+        let observed = archive.observed_entry(entry)?;
+        owner.is_same_entry(&observed.binding()).then_some(observed)
+    }
+
+    /// Returns whether a limit caused the original issue.
+    #[must_use]
+    pub const fn is_capacity_limit(&self) -> bool {
+        self.error.is_capacity_limit()
+    }
+
     /// Returns the path of the Entry.
     #[must_use]
     pub fn path(&self) -> &str {

@@ -1,43 +1,51 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::{DataForge, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::contract::{LocalisedText, every_field_required};
+use crate::Kind;
+use crate::canonical_record_header::CanonicalRecordHeader;
+use crate::catalog_table::CatalogTable;
+use crate::catalog_text_contract::GameTextRef;
+use crate::contract::every_field_required;
 use crate::guid_text::CatalogGuid;
 
 /// A mission type: a `MissionType` Record under `missiontype`.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct MissionType<'a> {
-    /// The GUID of the Record, the target of `contracts[].missionTypeGuid`.
-    pub(crate) guid: CatalogGuid,
-    /// The Record name without its type, e.g. `missiontype.job`.
-    pub(crate) class_name: &'a str,
-    /// The record path, without `.xml`.
-    pub(crate) record_path: &'a str,
+pub struct MissionType<'a> {
+    #[serde(flatten)]
+    pub(crate) source: CanonicalRecordHeader<'a>,
     /// The localised name of the type (`LocalisedTypeName`).
     #[schemars(extend("x-gameText" = true))]
-    pub(crate) type_name: LocalisedText<'a>,
+    pub(crate) type_name: SourcedValue<GameTextRef>,
 }
 
-/// A mission locality: a `MissionLocality` Record under `missiondata/pu_missionlocality`, a named
-/// set of starmap objects. The game does not localise its name.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct MissionLocality<'a> {
-    /// The GUID of the Record.
-    pub(crate) guid: CatalogGuid,
-    /// The Record name without its type, e.g. `pyro`.
-    pub(crate) class_name: &'a str,
-    /// The record path, without `.xml`.
-    pub(crate) record_path: &'a str,
-    /// The `availableLocations`, the `guid`s of entries of `starmapObjects`, in the stored order.
-    /// A Reference to no Record is left out; a GUID missing from `starmapObjects` is kept.
-    pub(crate) starmap_object_guids: Vec<CatalogGuid>,
+impl<'source> MissionType<'source> {
+    /// The physical identity and origin of the mission type.
+    #[must_use]
+    pub const fn header(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// The authored localized name reference.
+    #[must_use]
+    pub const fn type_name(&self) -> &SourcedValue<GameTextRef> {
+        &self.type_name
+    }
+
+    pub(crate) fn table(forge: &DataForge<'_>, mut rows: Vec<Self>) -> CatalogTable<Self> {
+        rows.sort_by_cached_key(|row| {
+            (
+                row.source.guid.value().map(|guid| guid.text()),
+                row.source.record_index.value().copied(),
+            )
+        });
+        CatalogTable::new(forge, &[Kind::MissionTypes.records().type_name], rows)
+    }
 }
 
 /// A contract scenario: a `ScenarioProgress` Record under `contracts/contractscenarios`, the
@@ -61,8 +69,7 @@ pub(crate) struct ContractScenario<'a> {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct ScenarioFactionTiers<'a> {
-    /// The GUID of the `Faction` Record, `null` for a null or dangling Reference. No kind lists
-    /// `Faction` Records; `factionReputationGuid` is the link into the catalog.
+    /// The authored `Faction` GUID, including dangling or filtered targets of `definitions.factions`.
     pub(crate) faction_guid: Option<CatalogGuid>,
     /// The `factionReputationRef` of the `Faction` Record, an entry of `factionReputations`;
     /// `null` when the Record is missing, unreadable or names none.
@@ -104,6 +111,6 @@ pub(crate) struct ScenarioTier<'a> {
     /// The `globalPointsMultiplier`.
     pub(crate) global_points_multiplier: Option<f32>,
     /// The blueprint pools the tier rewards (`blueprintPool`), the `guid`s of entries of
-    /// `blueprintPools`, in the stored order.
+    /// `definitions.blueprintPools`, in the stored order.
     pub(crate) blueprint_pool_guids: Vec<CatalogGuid>,
 }

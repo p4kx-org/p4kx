@@ -1,0 +1,63 @@
+[package]
+name = "p4kx-msi-path"
+description = "Private transactional per-user MSI PATH ownership helper."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[package.metadata.p4kx]
+layer = "frontend"
+
+[features]
+native-fixtures = []
+
+[[example]]
+name = "p4kx-msi-registry-fixture"
+path = "examples/msi_registry_fixture.rs"
+required-features = ["native-fixtures"]
+
+[[bin]]
+name = "p4kx-msi-path"
+path = "src/main.rs"
+
+[target.'cfg(windows)'.dependencies]
+getrandom.workspace = true
+winreg = { workspace = true, features = ["transactions"] }
+windows-sys = { workspace = true, features = ["Win32_System_Threading", "Win32_UI_WindowsAndMessaging"] }
+
+[dev-dependencies]
+serde.workspace = true
+serde_json.workspace = true
+
+[target.'cfg(not(windows))'.dev-dependencies]
+getrandom.workspace = true
+
+[lints.rust]
+missing_docs = "deny"
+unsafe_code = "deny"
+unused_qualifications = "deny"
+unreachable_pub = "deny"
+
+[lints.clippy]
+all = { level = "deny", priority = -1 }
+pedantic = { level = "deny", priority = -1 }
+nursery = { level = "deny", priority = -1 }
+allow_attributes = "deny"
+allow_attributes_without_reason = "deny"
+dbg_macro = "deny"
+expect_used = "deny"
+get_unwrap = "deny"
+indexing_slicing = "deny"
+missing_assert_message = "deny"
+panic = "deny"
+print_stderr = "deny"
+print_stdout = "deny"
+redundant_pub_crate = "allow"
+todo = "deny"
+undocumented_unsafe_blocks = "deny"
+unimplemented = "deny"
+unwrap_in_result = "deny"
+unwrap_used = "deny"

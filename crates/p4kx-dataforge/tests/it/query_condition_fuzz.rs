@@ -4,6 +4,9 @@
 //! Random `where` conditions over a synthetic DataForge compile or fail with a span inside the
 //! Query, and running them never panics.
 
+#[path = "query_condition_fuzz_failure.rs"]
+mod failure;
+
 use std::error::Error;
 use std::num::NonZeroUsize;
 
@@ -190,13 +193,17 @@ fn random_conditions_compile_or_fail_inside_the_query_and_run() -> TestResult {
         match query.compile(&forge) {
             Ok(compiled) => {
                 compiled_count += 1;
-                let run = compiled.run();
-                let rows: usize = run
-                    .pages(NonZeroUsize::MIN.saturating_add(9))
-                    .map(|page| page.len())
-                    .sum();
-                assert_eq!(rows, run.len(), "{text}");
-                assert!(rows <= 128, "{text}");
+                match compiled.run() {
+                    Ok(run) => {
+                        let rows: usize = run
+                            .pages(NonZeroUsize::MIN.saturating_add(9))
+                            .map(|page| page.len())
+                            .sum();
+                        assert_eq!(rows, run.len(), "{text}");
+                        assert!(rows <= 128, "{text}");
+                    }
+                    Err(error) => failure::check(&forge, &query, &error, &text)?,
+                }
             }
             Err(error) => {
                 failed_count += 1;

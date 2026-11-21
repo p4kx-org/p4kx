@@ -5,6 +5,12 @@
 
 mod comparison;
 mod corrupt;
+mod original_node;
 mod parse;
+mod source_document;
+mod source_syntax;
 mod text_depth;
+mod write_child_absence;
+mod write_observed;
+mod write_positioned;
 mod xml;

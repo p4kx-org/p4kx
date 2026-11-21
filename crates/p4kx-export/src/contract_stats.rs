@@ -1,36 +1,39 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::contract::every_field_required;
 use crate::contract_stats_gear::{
     ArmorStats, ClothingStats, RadarStats, TractorBeamStats, WeaponModifierStats,
 };
 use crate::contract_stats_mining::{MiningLaserStats, MiningModifierStats};
 
-/// The typed stat blocks of an item, raw facts of the Archive (ADR-0065, ADR-0072).
-///
-/// Every block is `null` for an item that does not have it; the item has `stats` only when it
-/// has at least one block: `weapon`, `shield`, `quantumDrive`, `powerPlant`, `cooler`, `missile`,
-/// `armor`, `clothing`, `radar`, `tractorBeam`, `weaponModifier`, `miningLaser` or
-/// `miningModifier`. No value is derived: a number is what the Archive states, in the unit the
-/// game stores it; a value that is not a finite number is `null`.
-#[derive(Debug, Serialize, JsonSchema)]
+/// Item stats in the compact order used by variant identity (ADR-0356).
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct ItemStats<'a> {
-    /// The weapon block, from `SCItemWeaponComponentParams`.
     pub(crate) weapon: Option<WeaponStats<'a>>,
-    /// The shield generator block, from `SCItemShieldGeneratorParams`.
     pub(crate) shield: Option<ShieldStats>,
-    /// The quantum drive block, from `SCItemQuantumDriveParams`.
     pub(crate) quantum_drive: Option<QuantumDriveStats>,
-    /// The power plant block, for an item of the type `PowerPlant`.
+    #[serde(flatten)]
+    pub(crate) fields: ItemStatsFields<'a>,
+}
+
+/// Remaining private variant identity fields in compact serialization order.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ItemStatsFields<'a> {
     pub(crate) power_plant: Option<PowerPlantStats<'a>>,
-    /// The cooler block, for an item of the type `Cooler`.
     pub(crate) cooler: Option<CoolerStats<'a>>,
+    #[serde(flatten)]
+    pub(crate) blocks: ItemStatBlocks<'a>,
+    pub(crate) resource_states: Vec<ResourceState<'a>>,
+}
+
+/// Specialist blocks in variant identity serialization order.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ItemStatBlocks<'a> {
     /// The missile block, from `SCItemMissileParams`.
     pub(crate) missile: Option<MissileStats<'a>>,
     /// The suit armour block, from `SCItemSuitArmorParams`.
@@ -52,14 +55,39 @@ pub(crate) struct ItemStats<'a> {
     pub(crate) mining_modifier: Option<MiningModifierStats<'a>>,
     /// The hit points, from `SHealthComponentParams.Health`.
     pub(crate) health: Option<f32>,
-    /// The states of `ItemResourceComponentParams` in stored order: signatures and resource flows.
-    pub(crate) resource_states: Vec<ResourceState<'a>>,
+}
+
+impl ItemStats<'_> {
+    pub(crate) const fn has_specialist(&self) -> bool {
+        self.weapon.is_some()
+            || self.shield.is_some()
+            || self.quantum_drive.is_some()
+            || self.fields.has_specialist()
+    }
+}
+
+impl ItemStatsFields<'_> {
+    const fn has_specialist(&self) -> bool {
+        self.power_plant.is_some() || self.cooler.is_some() || self.blocks.has_specialist()
+    }
+}
+
+impl ItemStatBlocks<'_> {
+    const fn has_specialist(&self) -> bool {
+        self.missile.is_some()
+            || self.armor.is_some()
+            || self.clothing.is_some()
+            || self.radar.is_some()
+            || self.tractor_beam.is_some()
+            || self.weapon_modifier.is_some()
+            || self.mining_laser.is_some()
+            || self.mining_modifier.is_some()
+    }
 }
 
 /// One state of the resource component: its signatures and the resources it generates and uses.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct ResourceState<'a> {
     /// The `name` of the state, e.g. `Online`.
     pub(crate) name: Option<&'a str>,
@@ -72,9 +100,8 @@ pub(crate) struct ResourceState<'a> {
 }
 
 /// A signature of a state.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct Signature {
     /// `nominalSignature`.
     pub(crate) nominal: Option<f32>,
@@ -83,9 +110,8 @@ pub(crate) struct Signature {
 }
 
 /// One generation or consumption of a resource, per second, in the unit the Archive states.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct ResourceFlow<'a> {
     /// The struct of the delta, e.g. `ItemResourceDeltaGeneration`. A closed set the game may
     /// extend; the schema keeps a string.
@@ -102,9 +128,8 @@ pub(crate) struct ResourceFlow<'a> {
 }
 
 /// A weapon: its fire modes and the ammunition it fires.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct WeaponStats<'a> {
     /// The fire modes of `fireActions` in stored order; a sequence is flattened to its entries.
     pub(crate) fire_actions: Vec<FireAction<'a>>,
@@ -118,9 +143,8 @@ pub(crate) struct WeaponStats<'a> {
 }
 
 /// One fire mode of a weapon.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct FireAction<'a> {
     /// The struct of the fire mode, e.g. `SWeaponActionFireRapidParams`. A closed set the game
     /// may extend; the schema keeps a string.
@@ -158,9 +182,8 @@ pub(crate) struct FireAction<'a> {
 }
 
 /// The spread of a fire mode, as stored in `SSpreadParams`.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct Spread {
     /// `min`.
     pub(crate) min: Option<f32>,
@@ -175,9 +198,8 @@ pub(crate) struct Spread {
 }
 
 /// The ammunition of a weapon.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct AmmoStats {
     /// `speed`, in metres per second.
     pub(crate) speed: Option<f32>,
@@ -194,9 +216,8 @@ pub(crate) struct AmmoStats {
 }
 
 /// Damage by type, as the Archive states it.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct Damage {
     /// `DamagePhysical`.
     pub(crate) physical: Option<f32>,
@@ -212,10 +233,9 @@ pub(crate) struct Damage {
     pub(crate) stun: Option<f32>,
 }
 
-/// A shield generator.
-#[derive(Debug, Serialize, JsonSchema)]
+/// The shield block used by item variant identity.
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct ShieldStats {
     /// `MaxShieldHealth`.
     pub(crate) max_health: Option<f32>,
@@ -229,10 +249,9 @@ pub(crate) struct ShieldStats {
     pub(crate) damaged_regen_delay: Option<f32>,
 }
 
-/// A quantum drive.
-#[derive(Debug, Serialize, JsonSchema)]
+/// The compact quantum values consumed by variant identity.
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct QuantumDriveStats {
     /// `quantumFuelRequirement`, as stored.
     pub(crate) fuel_requirement: Option<f32>,
@@ -255,9 +274,8 @@ pub(crate) struct QuantumDriveStats {
 }
 
 /// A power plant.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct PowerPlantStats<'a> {
     /// The `amount` of the first `generation` flow of `resourceStates` whose resource is `Power`.
     pub(crate) power_output: Option<f32>,
@@ -266,9 +284,8 @@ pub(crate) struct PowerPlantStats<'a> {
 }
 
 /// A cooler.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct CoolerStats<'a> {
     /// The `amount` of the first `generation` flow of `resourceStates` whose resource is
     /// `Coolant`.
@@ -278,9 +295,8 @@ pub(crate) struct CoolerStats<'a> {
 }
 
 /// A missile.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
 pub(crate) struct MissileStats<'a> {
     /// The damage of the explosion, from the `damage` of `explosionParams`.
     pub(crate) damage: Option<Damage>,

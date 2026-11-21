@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashMap;
-
 use crate::Bone;
+use crate::controller_binding::{BoneControllers, ControllerEligibility};
 
 /// The keys of one channel of a track: the frames they sit at and their values.
 ///
@@ -119,7 +118,7 @@ impl Animation {
     /// it; when several bones share a controller ID, the first of them gets the track.
     #[must_use]
     pub fn bind(&self, bones: &[Bone]) -> BoundTracks<'_> {
-        let matches = bind_controllers(bones, self.tracks.iter().map(|track| track.controller_id));
+        let matches = self.track_binding_indices(bones);
         let mut bound = Vec::new();
         let mut unbound = Vec::new();
         for (track, bone) in self.tracks.iter().zip(matches) {
@@ -130,6 +129,12 @@ impl Animation {
         }
         BoundTracks { bound, unbound }
     }
+
+    /// Returns each decoded track's first matching bone index in track order.
+    #[must_use]
+    pub fn track_binding_indices(&self, bones: &[Bone]) -> Vec<Option<usize>> {
+        bind_controllers(bones, self.tracks.iter().map(|track| track.controller_id))
+    }
 }
 
 /// Matches `controllers`, in order, to the index of the bone of `bones` each animates: the first
@@ -138,22 +143,15 @@ pub(crate) fn bind_controllers(
     bones: &[Bone],
     controllers: impl IntoIterator<Item = u32>,
 ) -> Vec<Option<usize>> {
-    let mut by_controller: HashMap<u32, usize> = HashMap::with_capacity(bones.len());
-    for (index, bone) in bones.iter().enumerate() {
-        by_controller.entry(bone.controller_id).or_insert(index);
-    }
-    let mut taken = vec![false; bones.len()];
+    let bones = BoneControllers::new(bones);
+    let mut binder = bones.binder();
     controllers
         .into_iter()
-        .map(|controller| {
-            let bone = by_controller
-                .get(&controller)
-                .copied()
-                .filter(|&bone| taken.get(bone).is_some_and(|taken| !taken))?;
-            if let Some(slot) = taken.get_mut(bone) {
-                *slot = true;
-            }
-            Some(bone)
+        .enumerate()
+        .map(|(ordinal, id)| {
+            binder
+                .observe(ordinal, id, ControllerEligibility::Track)
+                .bound_bone()
         })
         .collect()
 }

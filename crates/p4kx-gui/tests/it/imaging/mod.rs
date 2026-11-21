@@ -10,7 +10,9 @@ use std::path::PathBuf;
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use p4kx_gui::{Browser, ImagePreview, ImageStatus, Language, MipStatus, Model, Preview, ui};
+use p4kx_gui::{
+    ArchiveKey, Browser, ImagePreview, ImageStatus, Language, MipStatus, Model, Preview, ui,
+};
 use p4kx_testkit::{ArchiveBuilder, SplitDds, TestEntry, TestTextureFormat};
 use tempfile::TempDir;
 
@@ -65,7 +67,17 @@ pub(crate) fn opened_with(
     language: Language,
     entries: Vec<TestEntry>,
 ) -> Result<(TempDir, Harness<'static, Model>), Box<dyn Error>> {
+    opened_with_key(language, entries, None)
+}
+
+pub(crate) fn opened_with_key(
+    language: Language,
+    entries: Vec<TestEntry>,
+    key: Option<ArchiveKey>,
+) -> Result<(TempDir, Harness<'static, Model>), Box<dyn Error>> {
     let (folder, path) = archive(entries)?;
+    let mut model = Model::new(language);
+    model.set_archive_key(key);
     let mut harness = Harness::builder()
         .with_context_setup(p4kx_gui::theme::apply)
         .with_size([1600.0, 900.0])
@@ -73,7 +85,7 @@ pub(crate) fn opened_with(
             |ui, model: &mut Model| {
                 ui::show(ui, model);
             },
-            Model::new(language),
+            model,
         );
     harness.state_mut().open(path, || {});
     wait_until(&mut harness, |model| model.browser().is_some())?;

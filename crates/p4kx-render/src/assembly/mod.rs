@@ -6,11 +6,16 @@
 //! frame draws.
 
 mod build;
+mod build_place;
 mod draw;
 mod flatten;
 mod frustum;
+mod gear_key_trace;
+mod material_suppression;
+mod mesh_node_input;
 mod mips;
 mod pieces;
+mod source_inputs;
 mod surface;
 #[cfg(test)]
 pub(crate) mod synthetic;
@@ -23,8 +28,13 @@ use std::ops::Range;
 use super::scene::{Bounds, Rows, Vertex};
 
 pub use build::{BuildError, BuildOptions, Hooks, Progress};
-pub use draw::{DrawList, GroupDraw, Instance};
+pub use draw::{DrawList, GroupDraw, Instance, ObservedDrawList};
+pub use material_suppression::{
+    MaterialSuppression, MaterialSuppressionEffect, MaterialSuppressionReason,
+};
+pub use mesh_node_input::MeshNodeInput;
 pub(crate) use mips::{Level, chain, level_count};
+pub use source_inputs::{AssemblyPieceSource, PlacedPieceInput};
 pub use visibility::hidden_mask;
 
 /// The most vertices the shared meshes of a [`AssemblyScene`] hold; models that would pass it are
@@ -60,6 +70,7 @@ pub(crate) struct Group {
 /// One material range of a part: the group that holds its triangles and the colour it is drawn in.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub(crate) struct Item {
+    pub(crate) library_slot: Option<usize>,
     pub(crate) group: u32,
     pub(crate) colour: [f32; 4],
 }
@@ -67,6 +78,7 @@ pub(crate) struct Item {
 /// One part of the Assembly as the Loadout tree knows it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PartInfo {
+    source: AssemblyPieceSource,
     name: String,
     path: String,
     parent: Option<usize>,
@@ -142,8 +154,7 @@ impl ViewTexture {
     pub(crate) fn take_pixels(&self) -> (Vec<u8>, Vec<Level>) {
         self.pixels
             .lock()
-            .map(|mut pixels| std::mem::take(&mut *pixels))
-            .unwrap_or_default()
+            .map_or_default(|mut pixels| std::mem::take(&mut *pixels))
     }
 }
 
@@ -169,6 +180,8 @@ pub struct AssemblyScene {
     items: Vec<Item>,
     draws: Vec<PartDraw>,
     parts: Vec<PartInfo>,
+    material_suppressions: Option<Vec<MaterialSuppression>>,
+    mesh_node_inputs: Option<mesh_node_input::MeshNodeInputs>,
     textures: Vec<ViewTexture>,
     meshes: usize,
     bounds: Bounds,

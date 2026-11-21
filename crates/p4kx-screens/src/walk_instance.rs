@@ -6,17 +6,24 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use p4kx_dataforge::Guid;
 
 use crate::canvas::Canvas;
+use crate::report::{ContentOmissionCode, OmissionInput};
 use crate::style::{Modifiers, merge};
 use crate::walk::Walk;
-use crate::widget::{CloneModifier, Widget};
+use crate::widget::{ARRAY_VARIABLE, CloneModifier, Widget};
 
 const CLONE: &str = "BuildingBlocks_WidgetClone";
 const LIST: &str = "BuildingBlocks_WidgetList";
 
 const NO_TARGET: &str = "no target that is a widget of the canvas: nothing repeated";
 const CYCLE: &str = "the template contains a clone of itself: not repeated";
-const AT_REST: &str = "list rows come from run-time data: none drawn at rest";
 const FROM_STATIC: &str = "list rows repeat the template without the values of their rows";
+
+#[derive(Debug, Clone, Copy)]
+enum KidsOmission {
+    NoTarget,
+    Cycle,
+    RuntimeRows,
+}
 
 /// The modifiers of a clone, in force while the widget it instantiates is laid out.
 #[derive(Debug)]
@@ -33,7 +40,7 @@ pub(crate) struct KidsPlan {
     pub(crate) kids: Vec<usize>,
     pub(crate) own: usize,
     repeats: usize,
-    note: Option<&'static str>,
+    note: Option<KidsOmission>,
     cut: bool,
 }
 
@@ -53,11 +60,11 @@ impl Walk<'_, '_, '_, '_> {
         }
         let repeat = &widget.repeat;
         let Some(at) = repeat.target.and_then(|target| canvas.target_index(target)) else {
-            plan.note = Some(NO_TARGET);
+            plan.note = Some(KidsOmission::NoTarget);
             return plan;
         };
         if self.templates.contains(&(canvas.guid, at)) {
-            plan.note = Some(CYCLE);
+            plan.note = Some(KidsOmission::Cycle);
             return plan;
         }
         let rows = if is_list {
@@ -69,7 +76,7 @@ impl Walk<'_, '_, '_, '_> {
                 plan.cut = rows > self.limits.rows;
                 rows.min(self.limits.rows)
             } else {
-                plan.note = Some(AT_REST);
+                plan.note = Some(KidsOmission::RuntimeRows);
                 0
             }
         } else {
@@ -82,8 +89,8 @@ impl Walk<'_, '_, '_, '_> {
 
     /// Counts the instances `plan` makes against the limit and reports what it left out.
     pub(crate) fn commit_kids(&mut self, widget: &Widget, plan: &mut KidsPlan) {
-        if let Some(reason) = plan.note {
-            self.cx.report.note(&widget.type_name, reason, &widget.name);
+        if let Some(omission) = plan.note {
+            self.note_kids(widget, omission);
         }
         self.cx.report.truncated |= plan.cut;
         if plan.repeats == 0 {
@@ -101,6 +108,36 @@ impl Walk<'_, '_, '_, '_> {
                 .report
                 .note(&widget.type_name, FROM_STATIC, &widget.name);
         }
+    }
+
+    fn note_kids(&mut self, widget: &Widget, omission: KidsOmission) {
+        let reason = match omission {
+            KidsOmission::NoTarget => NO_TARGET,
+            KidsOmission::Cycle => CYCLE,
+            KidsOmission::RuntimeRows => {
+                let source = widget.repeat.array_variable.as_deref();
+                let (code, reason) = if source.is_some() {
+                    (
+                        ContentOmissionCode::RuntimeArray,
+                        "list rows come from run-time data: none drawn at rest",
+                    )
+                } else {
+                    (
+                        ContentOmissionCode::SourceMissing,
+                        "the Record field arrayVariable names no list rows",
+                    )
+                };
+                self.cx.content_omission(
+                    widget,
+                    ARRAY_VARIABLE,
+                    source,
+                    code,
+                    OmissionInput::WidgetField(ARRAY_VARIABLE),
+                );
+                reason
+            }
+        };
+        self.cx.report.note(&widget.type_name, reason, &widget.name);
     }
 
     /// Returns what the modifiers in force add to the key of a resolved style or a measure.

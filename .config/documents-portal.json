@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "version": "1.22.1",
+  "source_commit": "1d20fadc304f6601452b5db65ed91197dba77041",
+  "url": "https://github.com/flatpak/xdg-desktop-portal/releases/download/1.22.1/xdg-desktop-portal-1.22.1.tar.xz",
+  "bytes": 1264992,
+  "sha256": "d4879ddb3d65ff1a8f19187497e6f13dc5d267bcac404a5d501218be355753d3",
+  "wraps": {
+    "libglnx": "ff64d52116ae74f0d25e24f089db28921ea171ff",
+    "gvdb": "c6f2359cc1d00f16e0a0e2527fa0bc1882b8b5ab"
+  },
+  "options": [
+    "--wrap-mode=nodownload",
+    "--buildtype=release",
+    "-Dflatpak-interfaces=disabled",
+    "-Dgeoclue=disabled",
+    "-Dgudev=disabled",
+    "-Dsystemd=disabled",
+    "-Ddocumentation=disabled",
+    "-Dtests=disabled",
+    "-Dman-pages=disabled",
+    "-Dsandboxed-image-validation=enabled",
+    "-Dsandboxed-sound-validation=enabled"
+  ],
+  "apt_packages": [
+    "build-essential", "meson", "ninja-build", "pkg-config", "gettext",
+    "libglib2.0-dev", "libjson-glib-dev", "libfuse3-dev", "libgdk-pixbuf-2.0-dev",
+    "libgstreamer-plugins-base1.0-dev", "libpipewire-0.3-dev", "bubblewrap", "attr"
+  ],
+  "pkg_config": [
+    "glib-2.0", "gio-2.0", "gio-unix-2.0", "json-glib-1.0", "fuse3",
+    "gdk-pixbuf-2.0", "gstreamer-pbutils-1.0", "libpipewire-0.3"
+  ]
+}

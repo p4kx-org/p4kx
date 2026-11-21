@@ -1,6 +1,6 @@
 [package]
 name = "p4kx-export"
-description = "Record export and Basetool catalog"
+description = "Record export and P4KX catalog"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -20,13 +20,15 @@ rayon.workspace = true
 roxmltree.workspace = true
 schemars.workspace = true
 serde.workspace = true
-serde_json.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
 sha2.workspace = true
 tempfile.workspace = true
 thiserror.workspace = true
 zstd.workspace = true
 
 [dev-dependencies]
+num-bigint = "0.4.8"
+num-traits = "0.2.19"
 p4kx-testkit.workspace = true
 jsonschema.workspace = true
 tempfile.workspace = true

@@ -4,20 +4,12 @@
 use std::ops::Range;
 
 use crate::bank_reader::SectionReader;
+use crate::bank_stid;
+use crate::bank_structure::{self, DIDX_ENTRY_LEN, MediaTriplet, SECTION_HEADER_LEN, SeenSections};
 use crate::soundbank::BankHeader;
 use crate::{BankError, BankWarning, HircObject, SectionId, hirc};
 
-const SECTION_HEADER_LEN: usize = 8;
-const DIDX_ENTRY_LEN: usize = 12;
-const STID_ENTRY_MIN_LEN: usize = 5;
 const LAST_UNSUPPORTED_VERSION: u32 = 48;
-const UNIQUE_SECTIONS: [SectionId; 5] = [
-    SectionId::BKHD,
-    SectionId::DIDX,
-    SectionId::DATA,
-    SectionId::HIRC,
-    SectionId::STID,
-];
 
 #[derive(Debug, Clone)]
 pub(crate) struct SectionRange {
@@ -28,14 +20,44 @@ pub(crate) struct SectionRange {
 #[derive(Debug, Clone)]
 pub(crate) struct MediaRange {
     pub(crate) id: u32,
-    pub(crate) offset: u64,
+    pub(crate) offset: u32,
+    pub(crate) ordinal: u64,
     pub(crate) range: Range<usize>,
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct MediaSection {
+    pub(crate) ordinal: u64,
+    pub(crate) body_offset: u64,
+    pub(crate) body_length: u64,
+}
+
+impl MediaSection {
+    const fn of(ordinal: usize, section: &SectionRange) -> Self {
+        Self {
+            ordinal: ordinal as u64,
+            body_offset: section.body.start as u64,
+            body_length: section.body.end as u64 - section.body.start as u64,
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct MediaSections {
+    pub(crate) didx: MediaSection,
+    pub(crate) data: MediaSection,
+}
+
+#[derive(Debug, Default, Clone)]
+pub(crate) struct MediaTable {
+    pub(crate) sections: MediaSections,
+    pub(crate) entries: Vec<MediaRange>,
 }
 
 pub(crate) struct Parsed {
     pub(crate) header: BankHeader,
     pub(crate) sections: Vec<SectionRange>,
-    pub(crate) media: Vec<MediaRange>,
+    pub(crate) media: MediaTable,
     pub(crate) objects: Vec<HircObject>,
     pub(crate) names: Vec<(u32, Range<usize>)>,
     pub(crate) warnings: Vec<BankWarning>,
@@ -60,16 +82,7 @@ pub(crate) fn parse(bytes: &[u8]) -> Result<Parsed, BankError> {
     let (_, header) = body(SectionId::BKHD).ok_or(BankError::NotSoundbank)?;
     let header = parse_header(header)?;
     let mut warnings = Vec::new();
-    let media = match (body(SectionId::DIDX), body(SectionId::DATA)) {
-        (Some((_, index)), Some((data, _))) => media(index, data, &mut warnings)?,
-        (Some((_, index)), None) => {
-            warnings.push(BankWarning::MediaWithoutData {
-                entries: (index.len() / DIDX_ENTRY_LEN) as u64,
-            });
-            Vec::new()
-        }
-        (None, _) => Vec::new(),
-    };
+    let media = media_table(bytes, &sections, &mut warnings)?;
     let objects = match body(SectionId::HIRC) {
         Some((range, hirc)) => {
             let hirc = hirc::parse(header.version, hirc, range.start)?;
@@ -83,7 +96,7 @@ pub(crate) fn parse(bytes: &[u8]) -> Result<Parsed, BankError> {
         None => Vec::new(),
     };
     let names = match body(SectionId::STID) {
-        Some((range, stid)) => names(stid, range.start, &mut warnings)?,
+        Some((range, stid)) => bank_stid::parse_names(stid, range.start, &mut warnings)?,
         None => Vec::new(),
     };
     Ok(Parsed {
@@ -97,30 +110,24 @@ pub(crate) fn parse(bytes: &[u8]) -> Result<Parsed, BankError> {
 }
 
 fn sections(bytes: &[u8]) -> Result<Vec<SectionRange>, BankError> {
-    let mut sections: Vec<SectionRange> = Vec::new();
+    let mut sections = Vec::new();
+    let mut seen = SeenSections::default();
     let mut position = 0;
     while position < bytes.len() {
         let rest = bytes.get(position..).unwrap_or_default();
-        let mut tag = [b'?'; 4];
-        for (target, byte) in tag.iter_mut().zip(rest) {
-            *target = *byte;
+        let layout = bank_structure::section_layout(rest, rest.len() as u64)?;
+        if seen.repeat(layout.id) {
+            return Err(BankError::DuplicateSection(layout.id));
         }
-        let id = SectionId(tag);
-        let size = rest
-            .get(4..SECTION_HEADER_LEN)
-            .and_then(|field| field.first_chunk::<4>())
-            .map(|field| u32::from_le_bytes(*field))
-            .ok_or_else(|| BankError::truncated(id, rest.len(), SECTION_HEADER_LEN as u64))?;
-        let needed = SECTION_HEADER_LEN as u64 + u64::from(size);
-        let end = usize::try_from(needed)
-            .ok()
-            .filter(|&len| len <= rest.len())
-            .ok_or_else(|| BankError::truncated(id, rest.len(), needed))?;
-        if UNIQUE_SECTIONS.contains(&id) && sections.iter().any(|section| section.id == id) {
-            return Err(BankError::DuplicateSection(id));
-        }
+        let end = usize::try_from(SECTION_HEADER_LEN as u64 + layout.body_len).map_err(|_| {
+            BankError::truncated(
+                layout.id,
+                rest.len(),
+                SECTION_HEADER_LEN as u64 + layout.body_len,
+            )
+        })?;
         sections.push(SectionRange {
-            id,
+            id: layout.id,
             body: position + SECTION_HEADER_LEN..position + end,
         });
         position += end;
@@ -128,12 +135,31 @@ fn sections(bytes: &[u8]) -> Result<Vec<SectionRange>, BankError> {
     Ok(sections)
 }
 
-fn parse_header(body: &[u8]) -> Result<BankHeader, BankError> {
+pub(crate) fn parse_header(body: &[u8]) -> Result<BankHeader, BankError> {
+    header_with(body, |version| {
+        if supported_version(version) {
+            Ok(())
+        } else {
+            Err(BankError::UnsupportedVersion { version })
+        }
+    })
+}
+
+pub(crate) fn raw_header(body: &[u8]) -> Result<BankHeader, BankError> {
+    header_with(body, |_| Ok(()))
+}
+
+pub(crate) const fn supported_version(version: u32) -> bool {
+    version > LAST_UNSUPPORTED_VERSION && version <= u16::MAX as u32
+}
+
+fn header_with(
+    body: &[u8],
+    validate_version: impl FnOnce(u32) -> Result<(), BankError>,
+) -> Result<BankHeader, BankError> {
     let mut reader = SectionReader::new(SectionId::BKHD, body);
     let version = reader.u32()?;
-    if version <= LAST_UNSUPPORTED_VERSION || version > u32::from(u16::MAX) {
-        return Err(BankError::UnsupportedVersion { version });
-    }
+    validate_version(version)?;
     Ok(BankHeader {
         version,
         id: reader.u32()?,
@@ -141,9 +167,41 @@ fn parse_header(body: &[u8]) -> Result<BankHeader, BankError> {
     })
 }
 
-fn media(
+fn media_table(
+    bytes: &[u8],
+    sections: &[SectionRange],
+    warnings: &mut Vec<BankWarning>,
+) -> Result<MediaTable, BankError> {
+    let section = |id| {
+        sections
+            .iter()
+            .enumerate()
+            .find(|(_, section)| section.id == id)
+    };
+    let Some((index_ordinal, index)) = section(SectionId::DIDX) else {
+        return Ok(MediaTable::default());
+    };
+    let Some((data_ordinal, data)) = section(SectionId::DATA) else {
+        warnings.push(BankWarning::MediaWithoutData {
+            entries: (index.body.len() / DIDX_ENTRY_LEN) as u64,
+        });
+        return Ok(MediaTable::default());
+    };
+    let sections = MediaSections {
+        didx: MediaSection::of(index_ordinal, index),
+        data: MediaSection::of(data_ordinal, data),
+    };
+    let entries = media_entries(
+        bytes.get(index.body.clone()).unwrap_or_default(),
+        sections.data,
+        warnings,
+    )?;
+    Ok(MediaTable { sections, entries })
+}
+
+fn media_entries(
     index: &[u8],
-    data: Range<usize>,
+    data: MediaSection,
     warnings: &mut Vec<BankWarning>,
 ) -> Result<Vec<MediaRange>, BankError> {
     if !index.len().is_multiple_of(DIDX_ENTRY_LEN) {
@@ -152,31 +210,19 @@ fn media(
             "its size is not a multiple of 12 bytes",
         ));
     }
-    let data_len = data.len() as u64;
+    let data_len = data.body_length;
     let mut reader = SectionReader::new(SectionId::DIDX, index);
     let mut media = Vec::with_capacity(index.len() / DIDX_ENTRY_LEN);
     while reader.remaining() > 0 {
-        let id = reader.u32()?;
-        let offset = u64::from(reader.u32()?);
-        let end = offset + u64::from(reader.u32()?);
-        let in_data = |at: u64| {
-            usize::try_from(at)
-                .ok()
-                .and_then(|at| data.start.checked_add(at))
-                .filter(|&at| at <= data.end)
-        };
-        let (Some(start), Some(stop)) = (in_data(offset), in_data(end)) else {
-            return Err(BankError::MediaOutsideData {
-                id,
-                offset,
-                end,
-                data_len,
-            });
-        };
+        let triplet = MediaTriplet::read(&mut reader)?;
+        let range = triplet.range_in(data.body_offset, data_len)?;
+        let start = usize::try_from(range.start).map_err(|_| triplet.outside_data(data_len))?;
+        let end = usize::try_from(range.end).map_err(|_| triplet.outside_data(data_len))?;
         media.push(MediaRange {
-            id,
-            offset,
-            range: start..stop,
+            id: triplet.id,
+            offset: triplet.offset,
+            ordinal: media.len() as u64,
+            range: start..end,
         });
     }
     media.sort_by_key(|media| media.id);
@@ -188,32 +234,4 @@ fn media(
         repeated
     });
     Ok(media)
-}
-
-fn names(
-    body: &[u8],
-    base: usize,
-    warnings: &mut Vec<BankWarning>,
-) -> Result<Vec<(u32, Range<usize>)>, BankError> {
-    let mut reader = SectionReader::new(SectionId::STID, body);
-    let _string_type = reader.u32()?;
-    let count = usize::try_from(reader.u32()?).unwrap_or(usize::MAX);
-    if count > reader.remaining() / STID_ENTRY_MIN_LEN {
-        return Err(BankError::invalid(
-            SectionId::STID,
-            "it lists more names than its body holds",
-        ));
-    }
-    let mut names = Vec::with_capacity(count);
-    for _ in 0..count {
-        let id = reader.u32()?;
-        let len = usize::from(reader.u8()?);
-        let range = reader.skip(len)?;
-        if std::str::from_utf8(body.get(range.clone()).unwrap_or_default()).is_err() {
-            warnings.push(BankWarning::NonUtf8BankName { id });
-            continue;
-        }
-        names.push((id, base + range.start..base + range.end));
-    }
-    Ok(names)
 }

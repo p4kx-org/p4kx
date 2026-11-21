@@ -54,12 +54,6 @@ pub enum GfxError {
         /// The bytes left.
         available: usize,
     },
-    /// Sprites are nested deeper than the limit.
-    #[error("sprites are nested deeper than {limit} levels")]
-    SpriteDepth {
-        /// The deepest nesting read.
-        limit: u32,
-    },
     /// The shapes of the movie hold more records than the limit.
     #[error("the shapes of the movie hold more than {limit} records")]
     TooManyRecords {

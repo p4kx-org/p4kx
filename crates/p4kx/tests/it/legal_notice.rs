@@ -38,6 +38,7 @@ fn help_names_the_fan_project_and_the_users_responsibility() -> TestResult {
         ))
         .stdout(predicate::str::contains("Ships no game data"))
         .stdout(predicate::str::contains("reads only your own installation"))
-        .stdout(predicate::str::contains("EULA and Terms of Service"));
+        .stdout(predicate::str::contains("EULA and Terms of Service"))
+        .stdout(predicate::str::contains("check-update"));
     Ok(())
 }

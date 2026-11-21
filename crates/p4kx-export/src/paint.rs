@@ -3,13 +3,15 @@
 
 use std::collections::{HashMap, HashSet};
 
-use p4kx_extraction::{CancelToken, DataForge, TagTree};
+use p4kx_assembly::PaintTagIndex;
+use p4kx_extraction::CancelToken;
 use rayon::prelude::*;
 
+use crate::catalog_v3::tag_catalog::TagDependencies;
 use crate::contract::{Item, Paint};
 use crate::guid_text::CatalogGuid;
 use crate::paint_port::{PaintPort, VehicleFacts};
-use crate::{CatalogError, PaintSummary};
+use crate::{CatalogError, ExportAccountingError, PaintSummary};
 
 const PAINT_TYPE: &str = "Paints";
 
@@ -18,8 +20,15 @@ pub(crate) const fn is_paint_type(kind: &str) -> bool {
     kind.eq_ignore_ascii_case(PAINT_TYPE)
 }
 
+/// Returns whether the selected item is a paint.
+pub(crate) fn is_paint(item: &Item<'_>) -> bool {
+    item.paint.item_type.is_some_and(is_paint_type)
+}
+
 /// The paints of a catalog and what was counted deriving them.
-pub(crate) struct Paints {
+pub(crate) struct Paints<'f> {
+    pub(crate) ledger: crate::export_ledger::ExportLedger,
+    pub(crate) failures: Vec<crate::CatalogReadFailure<'f>>,
     pub(crate) list: Vec<Paint>,
     pub(crate) summary: PaintSummary,
     pub(crate) unreadable_files: Vec<String>,
@@ -37,37 +46,41 @@ pub(crate) struct Paints {
 /// # Errors
 ///
 /// Returns [`CatalogError::Cancelled`] once `cancel` is cancelled.
-pub(crate) fn paints(
-    forge: &DataForge<'_>,
+pub(crate) fn paints<'f>(
+    tags: Option<TagDependencies<'f>>,
     items: &[Item<'_>],
     vehicles: &[VehicleFacts],
+    sources: &crate::export_ledger::ExportLedger,
     cancel: Option<&CancelToken>,
-) -> Result<Paints, CatalogError> {
-    let candidates: Vec<&Item<'_>> = items
-        .iter()
-        .filter(|item| item.r#type.is_some_and(is_paint_type))
-        .collect();
-    if candidates.is_empty() {
+) -> Result<Paints<'f>, CatalogError> {
+    let candidates: Vec<&Item<'_>> = items.iter().filter(|item| is_paint(item)).collect();
+    let mut ledger = crate::paint_ledger::inputs(sources, &candidates, vehicles)?;
+    if candidates.is_empty() != tags.is_none() {
+        return Err(ExportAccountingError::ConflictingTagTrace.into());
+    }
+    let Some(tags) = tags else {
         return Ok(Paints {
+            ledger,
+            failures: Vec::new(),
             list: Vec::new(),
             summary: PaintSummary::default(),
             unreadable_files: Vec::new(),
         });
-    }
+    };
     let (groups, mut unreadable_files) = group_ships(vehicles);
     let unreadable = unreadable_files.len();
     unreadable_files.sort_unstable();
     unreadable_files.dedup();
-    let tags = TagTree::build(forge);
-    let index = TagIndex::new(&tags);
+    ledger.merge(tags.ledger);
+    let index = PaintTagIndex::new(tags.tree.tree());
     let mut paints: Vec<Paint> = candidates
         .par_iter()
         .map(|item| {
             if cancel.is_some_and(CancelToken::is_cancelled) {
                 return Err(CatalogError::Cancelled);
             }
-            let have = lowered(&item.tags);
-            let required = lowered(&item.required_tags);
+            let have = lowered(&item.paint.tags);
+            let required = lowered(&item.paint.required_tags);
             let mut ship_guids: Vec<CatalogGuid> = groups
                 .iter()
                 .filter(|(group, _)| group.accepts(&have, &required, &index))
@@ -75,7 +88,7 @@ pub(crate) fn paints(
                 .collect();
             ship_guids.sort_by_cached_key(|guid| guid.text());
             Ok(Paint {
-                item_guid: item.guid,
+                item_guid: item.identity.guid,
                 ship_guids,
             })
         })
@@ -83,6 +96,8 @@ pub(crate) fn paints(
     paints.sort_by_cached_key(|paint| paint.item_guid.text());
     let summary = summarise(&paints, unreadable);
     Ok(Paints {
+        ledger,
+        failures: tags.failures,
         list: paints,
         summary,
         unreadable_files,
@@ -98,17 +113,10 @@ struct ShipPorts {
 }
 
 impl ShipPorts {
-    fn accepts(&self, have: &[String], required: &[String], index: &TagIndex<'_>) -> bool {
-        self.ports.iter().any(|port| {
-            fits(port, have, index)
-                && required.iter().all(|wanted| {
-                    port.port_tags
-                        .iter()
-                        .chain(&port.required_tags)
-                        .chain(&self.tags)
-                        .any(|offered| index.matches(offered, wanted))
-                })
-        })
+    fn accepts(&self, have: &[String], required: &[String], index: &PaintTagIndex<'_>) -> bool {
+        self.ports
+            .iter()
+            .any(|port| port.accepts(have, required, &self.tags, index))
     }
 }
 
@@ -159,48 +167,4 @@ fn summarise(paints: &[Paint], unreadable_vehicles: usize) -> PaintSummary {
 
 fn lowered(tags: &[&str]) -> Vec<String> {
     tags.iter().map(|tag| tag.to_ascii_lowercase()).collect()
-}
-
-fn fits(port: &PaintPort, have: &[String], index: &TagIndex<'_>) -> bool {
-    !port.required_tags.is_empty()
-        && port
-            .required_tags
-            .iter()
-            .all(|wanted| have.iter().any(|tag| index.matches(tag, wanted)))
-}
-
-/// The tags of the tag tree by lower-case name.
-struct TagIndex<'t> {
-    tree: &'t TagTree,
-    positions: HashMap<String, Vec<usize>>,
-}
-
-impl<'t> TagIndex<'t> {
-    fn new(tree: &'t TagTree) -> Self {
-        let mut positions: HashMap<String, Vec<usize>> = HashMap::new();
-        for tag in tree.iter() {
-            positions
-                .entry(tag.name().to_ascii_lowercase())
-                .or_default()
-                .push(tag.position());
-        }
-        Self { tree, positions }
-    }
-
-    /// Returns whether the tag `have` is the tag `wanted` or lies below a tag of that name.
-    fn matches(&self, have: &str, wanted: &str) -> bool {
-        if have == wanted {
-            return true;
-        }
-        let (Some(below), Some(above)) = (self.positions.get(have), self.positions.get(wanted))
-        else {
-            return false;
-        };
-        below.iter().filter_map(|&at| self.tree.at(at)).any(|tag| {
-            above
-                .iter()
-                .filter_map(|&at| self.tree.at(at))
-                .any(|ancestor| tag.is_within(&ancestor))
-        })
-    }
 }

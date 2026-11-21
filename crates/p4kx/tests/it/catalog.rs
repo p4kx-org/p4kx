@@ -6,13 +6,19 @@
 
 use crate::catalog_support;
 
+#[path = "catalog_compression.rs"]
+mod compression;
+#[path = "catalog_phase_reporting.rs"]
+mod phase_reporting;
+
 use std::error::Error;
 use std::fs;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use assert_cmd::Command;
-use catalog_support::{EXPORTED_AT, english, write_archive, write_archive_with};
+use catalog_support::{EXPORTED_AT, english, origins, write_archive, write_archive_with};
+use p4kx_export::Kind;
+use p4kx_extraction::Language;
 use p4kx_testkit::TestEntry;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -50,6 +56,16 @@ fn printed_schema() -> Result<String, Box<dyn Error>> {
     Ok(String::from_utf8(output.stdout)?)
 }
 
+fn redact_written_size(summary: &str, file: &Path) -> Result<String, Box<dyn Error>> {
+    let bytes = fs::metadata(file)?.len();
+    let checked = summary.replacen(&format!(": {bytes} bytes,"), ": [BYTES] bytes,", 1);
+    assert_ne!(
+        checked, summary,
+        "the summary reports the written file size"
+    );
+    Ok(checked)
+}
+
 fn redact_version(text: &str) -> String {
     text.replace(
         &format!("\"toolVersion\":\"{}\"", env!("CARGO_PKG_VERSION")),
@@ -57,11 +73,49 @@ fn redact_version(text: &str) -> String {
     )
 }
 
+fn manufacturer_name(
+    catalog: &serde_json::Value,
+    index: usize,
+) -> Result<&serde_json::Value, Box<dyn Error>> {
+    let row = catalog
+        .pointer("/definitions/manufacturers/rows")
+        .and_then(|rows| rows.get(index))
+        .ok_or("manufacturer")?;
+    assert_eq!(
+        row.pointer("/localization/state")
+            .and_then(serde_json::Value::as_str),
+        Some("present"),
+        "the selected Manufacturer has an authored localization"
+    );
+    let reference = row
+        .pointer("/localization/value/name")
+        .ok_or("name carrier")?;
+    assert_eq!(
+        reference.get("state").and_then(serde_json::Value::as_str),
+        Some("present"),
+        "the Manufacturer name has a canonical reference"
+    );
+    let target = reference
+        .get("value")
+        .and_then(serde_json::Value::as_str)
+        .ok_or("name reference")?;
+    catalog
+        .pointer("/texts/publicNames")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("public names")?
+        .iter()
+        .find(|text| {
+            text.pointer("/id/value")
+                .and_then(serde_json::Value::as_str)
+                == Some(target)
+        })
+        .ok_or_else(|| "canonical manufacturer name".into())
+}
+
 #[test]
 fn catalog_schema_prints_the_checked_in_schema() -> TestResult {
     let checked_in = fs::read_to_string(
-        PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("../../schemas/basetool-catalog.schema.json"),
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../schemas/p4kx-catalog.schema.json"),
     )?;
     assert!(
         printed_schema()? == checked_in,
@@ -74,7 +128,7 @@ fn catalog_schema_prints_the_checked_in_schema() -> TestResult {
 fn catalog_writes_a_catalog_that_the_schema_accepts() -> TestResult {
     let dir = tempfile::tempdir()?;
     let archive = write_archive(dir.path())?;
-    let out = dir.path().join("basetool-catalog.json");
+    let out = dir.path().join("p4kx-catalog.json");
 
     let summary = catalog(&archive, &out, &[])?;
 
@@ -87,44 +141,31 @@ fn catalog_writes_a_catalog_that_the_schema_accepts() -> TestResult {
         .map(|error| error.to_string())
         .collect();
     assert!(errors.is_empty(), "valid against the schema: {errors:?}");
+    let completeness = instance
+        .get("completeness")
+        .ok_or("catalog selection completeness")?;
+    for kind in Kind::ALL {
+        assert_eq!(
+            completeness
+                .get(kind.name())
+                .and_then(|selection| selection.get("status"))
+                .and_then(serde_json::Value::as_str),
+            Some("complete"),
+            "unfiltered coverage of {kind}"
+        );
+    }
+    assert!(instance.get("manufacturers").is_none());
+    assert_eq!(
+        instance["definitions"]["manufacturers"]["availability"],
+        "available"
+    );
+    assert_eq!(
+        manufacturer_name(&instance, 1)?["key"]["value"],
+        "@manufacturer_NameACAS"
+    );
     insta::assert_snapshot!("catalog_file", redact_version(&text));
+    let summary = redact_written_size(&summary, &out)?;
     insta::assert_snapshot!("catalog_summary", summary);
-    Ok(())
-}
-
-#[test]
-fn catalog_to_a_zst_name_writes_a_zstd_frame_with_the_bytes_of_the_plain_catalog() -> TestResult {
-    let dir = tempfile::tempdir()?;
-    let archive = write_archive(dir.path())?;
-    let plain = dir.path().join("plain.json");
-    let packed = dir.path().join("basetool-catalog.json.zst");
-
-    catalog(&archive, &plain, &[])?;
-    let summary = catalog(&archive, &packed, &["--json"])?;
-
-    let frame = fs::read(&packed)?;
-    assert_eq!(frame.get(..4), Some(&[0x28, 0xb5, 0x2f, 0xfd][..]), "magic");
-    let mut decoded = Vec::new();
-    zstd::Decoder::new(frame.as_slice())?.read_to_end(&mut decoded)?;
-    assert!(decoded == fs::read(&plain)?, "byte-identical JSON");
-    let json: serde_json::Value = serde_json::from_str(&summary)?;
-    assert_eq!(json["size"], decoded.len(), "uncompressed size");
-    assert_eq!(json["compressed_size"], frame.len(), "compressed size");
-    assert_eq!(json["decompressed_limit"], 1_000_000_000, "limit");
-    Ok(())
-}
-
-#[test]
-fn catalog_to_a_json_name_stays_plain_json_without_a_compressed_size() -> TestResult {
-    let dir = tempfile::tempdir()?;
-    let archive = write_archive(dir.path())?;
-    let out = dir.path().join("plain.json");
-
-    let summary = catalog(&archive, &out, &["--json"])?;
-
-    assert_eq!(fs::read(&out)?.first(), Some(&b'{'), "plain JSON");
-    let json: serde_json::Value = serde_json::from_str(&summary)?;
-    assert_eq!(json["compressed_size"], serde_json::Value::Null, "none");
     Ok(())
 }
 
@@ -171,6 +212,42 @@ fn catalog_with_a_filter_marks_the_kind_partial_and_prints_json() -> TestResult 
         serde_json::json!({"status": "partial", "filter": "*/acas"}),
         "partial with the Filter"
     );
+    assert_eq!(
+        catalog.get("schemaVersion"),
+        Some(&serde_json::json!(3)),
+        "filtered output uses the current catalog version"
+    );
+    assert!(
+        catalog.get("commodities").is_none() && catalog.get("manufacturers").is_none(),
+        "filtered output has no legacy commodity array"
+    );
+    for pointer in [
+        "/definitions/commodities/rows",
+        "/projections/commodityPresentation/rows",
+    ] {
+        assert_eq!(
+            catalog.pointer(pointer),
+            Some(&serde_json::json!([])),
+            "the manufacturer filter excludes commodity rows at {pointer}"
+        );
+    }
+    assert_eq!(
+        catalog.pointer("/declarations/shopInventoryResolution"),
+        Some(&serde_json::json!({"availability": "unavailable", "rows": []})),
+        "the Record filter omits the shop registry scan",
+    );
+    let output_size = fs::metadata(&out)?.len();
+    let result: serde_json::Value = serde_json::from_str(&summary)?;
+    assert_eq!(
+        result.get("size").and_then(serde_json::Value::as_u64),
+        Some(output_size),
+        "the JSON summary reports the written file size"
+    );
+    let summary = summary.replacen(
+        &format!(r#""size":{output_size}"#),
+        r#""size":"[BYTES]""#,
+        1,
+    );
     insta::assert_snapshot!("catalog_filter_json", summary);
     Ok(())
 }
@@ -197,41 +274,41 @@ fn catalog_without_an_output_file_is_invalid_input() -> TestResult {
 }
 
 #[test]
-fn catalog_to_a_gz_name_is_refused_instead_of_writing_plain_json() -> TestResult {
-    let dir = tempfile::tempdir()?;
-    let archive = write_archive(dir.path())?;
-    let out = dir.path().join("basetool-catalog.json.gz");
-
-    let output = p4kx(&["catalog"])?
-        .arg(&archive)
-        .arg("--out")
-        .arg(&out)
-        .output()?;
-
-    assert_eq!(output.status.code(), Some(2), "invalid input: {output:?}");
-    let stderr = String::from_utf8(output.stderr)?;
-    assert!(
-        stderr.contains("gzip") && stderr.contains(".json.zst"),
-        "names the cause and the alternative: {stderr}"
-    );
-    assert!(!out.exists(), "nothing is written");
-    Ok(())
-}
-
-#[test]
 fn catalog_without_a_german_global_ini_leaves_german_null_and_counts_it() -> TestResult {
     let dir = tempfile::tempdir()?;
     let archive = write_archive_with(dir.path(), &[english()])?;
     let out = dir.path().join("english-only.json");
+    origins::assert_input_encryption(&archive, Language::English)?;
 
     let summary = catalog(&archive, &out, &[])?;
 
     let catalog: serde_json::Value = serde_json::from_str(&fs::read_to_string(&out)?)?;
-    assert_eq!(
-        catalog["manufacturers"][1]["name"],
-        serde_json::json!({"key": "@manufacturer_NameACAS", "en": "Ace Astrogation", "de": null}),
-        "English only"
+    let name = manufacturer_name(&catalog, 1)?;
+    assert_eq!(name["key"]["value"], "@manufacturer_NameACAS");
+    for field in ["sourceText", "displayText"] {
+        let form = &name["translations"]["value"]["en"][field];
+        assert_eq!(
+            form["value"], "Ace Astrogation",
+            "both forms retain the original unpadded English fixture text"
+        );
+        assert_eq!(
+            form["state"], "present",
+            "the original English winner remains present"
+        );
+        assert_eq!(
+            form["sourceSetComplete"], true,
+            "each form retains its complete original input set"
+        );
+        assert_eq!(
+            form["containsEncryptedSource"], true,
+            "the original localization key is selected from the encrypted DataForge Entry"
+        );
+    }
+    assert!(
+        name["translations"]["value"].get("de").is_none(),
+        "no German input"
     );
+    let summary = redact_written_size(&summary, &out)?;
     insta::assert_snapshot!("catalog_summary_without_german", summary);
     Ok(())
 }
@@ -245,6 +322,7 @@ fn catalog_reads_a_german_global_ini_with_invalid_bytes_lossily() -> TestResult 
     );
     let archive = write_archive_with(dir.path(), &[english(), damaged])?;
     let out = dir.path().join("damaged.json");
+    origins::assert_input_encryption(&archive, Language::German)?;
     let output = p4kx(&["catalog"])?
         .arg(&archive)
         .arg("--out")
@@ -263,9 +341,25 @@ fn catalog_reads_a_german_global_ini_with_invalid_bytes_lossily() -> TestResult 
         "the clean Entry is not named: {stderr}"
     );
     let catalog: serde_json::Value = serde_json::from_str(&fs::read_to_string(out)?)?;
-    assert_eq!(
-        catalog["manufacturers"][1]["name"]["de"], "Ace\u{fffd}",
-        "the bad byte is replaced, the text kept"
-    );
+    let name = manufacturer_name(&catalog, 1)?;
+    for field in ["sourceText", "displayText"] {
+        let form = &name["translations"]["value"]["de"][field];
+        assert_eq!(
+            form["value"], "Ace\u{fffd}",
+            "the actual invalid source byte is decoded in both forms"
+        );
+        assert_eq!(
+            form["state"], "present",
+            "lossy decoding retains the winning value"
+        );
+        assert_eq!(
+            form["sourceSetComplete"], true,
+            "known contributors remain complete despite lossy decoding"
+        );
+        assert_eq!(
+            form["containsEncryptedSource"], true,
+            "the original encrypted key contributes independently of lossy decoding"
+        );
+    }
     Ok(())
 }

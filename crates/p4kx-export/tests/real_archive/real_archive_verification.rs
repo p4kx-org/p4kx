@@ -2,9 +2,19 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 //! The verification of M3 over real Archives: the whole catalog against the checked-in schema,
-//! plausible counts, no development leftovers, resolved texts and the upload limit; runs with
+//! plausible counts, no development leftovers, resolved texts and transport measurements; runs with
 //! `--ignored` when `P4KX_DATA_P4K` names one; the test of the second Channel returns early
 //! while `P4KX_DATA_P4K_B` is unset.
+
+#[path = "real_archive_definition_identity.rs"]
+mod definition_identity;
+
+#[path = "real_archive_ammo_projection.rs"]
+mod ammo_projection;
+
+#[path = "real_archive_identity.rs"]
+mod identity;
+pub(crate) use identity::check_unique_guids;
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -13,18 +23,16 @@ use std::path::Path;
 use std::time::SystemTime;
 
 use p4kx_export::{
-    CatalogOptions, CatalogSummary, Compression, DECOMPRESSED_LIMIT, EXCLUDED_TOKENS, Kind,
-    UPLOAD_LIMIT, catalog_schema, write_catalog,
+    CatalogOptions, CatalogSummary, Compression, EXCLUDED_TOKENS, Kind, catalog_schema,
+    write_catalog,
 };
-use p4kx_extraction::Archive;
+use p4kx_extraction::{Archive, DataForgeEntry};
 use p4kx_testkit::{real_archive_b_path, real_archive_path};
 use serde_json::Value;
 
-use crate::real_archive_broker_entries::check_broker_links;
-use crate::real_archive_contract_templates::check_template_links;
-use crate::real_archive_npc_spawns::check_npc_links;
-use crate::real_archive_spawns::check_spawn_links;
+use crate::real_archive_catalog_links;
 
+use crate::catalog_v3_consumer;
 use crate::real_archive_texts::check_texts;
 
 pub(crate) type TestResult = Result<(), Box<dyn Error>>;
@@ -84,17 +92,13 @@ fn built(archive: &Archive) -> Result<(CatalogSummary, Value), Box<dyn Error>> {
         Compression::ZSTD,
         || Ok(Vec::new()),
     )?;
-    assert_eq!(
-        summary.compressed_size(),
-        Some(u64::try_from(frame.len())?),
-        "the compressed size is the frame size"
-    );
+
     let mut json = Vec::new();
     zstd::Decoder::new(frame.as_slice())?.read_to_end(&mut json)?;
-    assert_eq!(
-        summary.size(),
+    crate::real_archive::check_transport(
+        &summary,
         u64::try_from(json.len())?,
-        "the decompressed size"
+        Some(u64::try_from(frame.len())?),
     );
     let catalog = serde_json::from_slice(&json)?;
     Ok((summary, catalog))
@@ -102,18 +106,19 @@ fn built(archive: &Archive) -> Result<(CatalogSummary, Value), Box<dyn Error>> {
 
 /// Returns the `guid` of every entry of the kind `kind` of `catalog`.
 pub(crate) fn guids<'c>(catalog: &'c Value, kind: &str) -> Result<HashSet<&'c str>, String> {
-    Ok(catalog[kind]
-        .as_array()
-        .ok_or_else(|| format!("{kind} is a list"))?
+    let kind = Kind::ALL
+        .into_iter()
+        .find(|candidate| candidate.name() == kind)
+        .ok_or("known Kind")?;
+    catalog_v3_consumer::rows(catalog, kind)
+        .map_err(|error| error.to_string())?
         .iter()
-        .filter_map(|entry| entry["guid"].as_str())
-        .collect())
+        .map(|row| catalog_v3_consumer::identity(row, kind).map_err(|error| error.to_string()))
+        .collect()
 }
 
 pub(crate) fn list(catalog: &Value, kind: Kind) -> Result<&Vec<Value>, String> {
-    catalog[kind.name()]
-        .as_array()
-        .ok_or_else(|| format!("the {kind} array"))
+    catalog_v3_consumer::rows(catalog, kind).map_err(|error| error.to_string())
 }
 
 /// Returns the leftover word of `text`; `template` is none for a contract template, which live
@@ -167,64 +172,74 @@ fn verify_catalog(path: &Path, baselined: bool) -> Result<Value, Box<dyn Error>>
             Kind::Shops => "key",
             _ => "guid",
         };
-        let guids: Vec<&str> = entities.iter().filter_map(|e| e[own].as_str()).collect();
+        let guids: Vec<&str> = entities
+            .iter()
+            .map(|entry| catalog_v3_consumer::identity(entry, kind))
+            .collect::<Result<_, _>>()?;
         assert_eq!(guids.len(), entities.len(), "{kind} all have a {own}");
-        assert!(
-            guids.is_sorted_by(|a, b| a < b),
-            "{kind} strictly ordered by {own}, none twice"
-        );
+        if kind == Kind::Loadouts {
+            check_loadout_order(entities, &guids)?;
+            continue;
+        }
+        if matches!(
+            kind,
+            Kind::Items
+                | Kind::BlueprintCategories
+                | Kind::BlueprintCategoryLists
+                | Kind::GameplayProperties
+                | Kind::CargoManifests
+                | Kind::MissionTypes
+                | Kind::MissionLocalities
+                | Kind::DismantleProcesses
+                | Kind::ReputationContexts
+                | Kind::FactionReputations
+                | Kind::ReputationScopes
+                | Kind::ReputationStandings
+                | Kind::QualityDistributions
+                | Kind::QualityQuantizations
+        ) {
+            assert!(
+                guids.is_sorted(),
+                "{kind} orders nominal GUIDs while retaining physical alternatives"
+            );
+            definition_identity::check(&catalog, kind)?;
+        } else {
+            assert!(
+                guids.is_sorted_by(|a, b| a < b),
+                "{kind} strictly ordered by {own}, none twice"
+            );
+        }
     }
     check_unique_guids(&catalog)?;
-    assert_eq!(
-        summary.size_warning(),
-        None,
-        "the file is below 90 % of the upload limit of {UPLOAD_LIMIT} bytes"
-    );
-    assert_eq!(
-        summary.decompressed_warning(),
-        None,
-        "the catalog is below 90 % of the decompressed limit of {DECOMPRESSED_LIMIT} bytes"
-    );
-    assert!(
-        summary.upload_size() <= UPLOAD_LIMIT,
-        "within the upload limit"
-    );
-    assert!(
-        summary.size() <= DECOMPRESSED_LIMIT,
-        "within the decompressed limit"
-    );
+    if !list(&catalog, Kind::Items)?.is_empty()
+        || !list(&catalog, Kind::BlueprintCategoryLists)?.is_empty()
+        || !list(&catalog, Kind::GameplayProperties)?.is_empty()
+        || !list(&catalog, Kind::ExplosionDefinitions)?.is_empty()
+        || !list(&catalog, Kind::AmmoDefinitions)?.is_empty()
+        || !list(&catalog, Kind::MissionLocalities)?.is_empty()
+    {
+        let entry = DataForgeEntry::read(&archive)?;
+        let forge = entry.open()?;
+        definition_identity::check_original_items(&catalog, &forge)?;
+        definition_identity::check_original_lists(&catalog, &forge)?;
+        definition_identity::check_original_properties(&catalog, &forge)?;
+        definition_identity::check_original_explosions(&catalog, &forge)?;
+        definition_identity::check_original_ammo(&catalog, &forge)?;
+        definition_identity::check_original_localities(&catalog, &forge)?;
+    }
     check_leftovers(&catalog)?;
     check_texts(&archive, &catalog, baselined)?;
     Ok(catalog)
 }
 
-/// Checks that no GUID occurs twice; a paint carries no GUID of its own, only the `itemGuid` of
-/// its item, and a shop is identified by its `key` (its `entityGuid` is shared by the placements
-/// of one shop module). A contract and its sub contracts share the `guid`, so the identity of a contract is
-/// the pair of `guid` and `subContractGuid`, which is unique and strictly ordered within the kind.
-fn check_unique_guids(catalog: &Value) -> TestResult {
-    let mut seen = HashSet::new();
-    let identities: Vec<(&str, &str)> = list(catalog, Kind::Contracts)?
-        .iter()
-        .map(|entry| {
-            (
-                entry["guid"].as_str().unwrap_or_default(),
-                entry["subContractGuid"].as_str().unwrap_or_default(),
-            )
-        })
-        .collect();
-    assert!(
-        identities.is_sorted_by(|a, b| a < b),
-        "contracts strictly ordered by guid and subContractGuid, none twice"
-    );
-    let kinds = Kind::ALL
-        .into_iter()
-        .filter(|kind| !kind.is_derived() && !matches!(kind, Kind::Contracts | Kind::Crafters));
-    for kind in kinds {
-        for entity in list(catalog, kind)? {
-            let guid = entity["guid"].as_str().ok_or("a GUID")?;
-            assert!(seen.insert(guid), "{guid} occurs twice, also in {kind}");
-        }
+fn check_loadout_order(rows: &[Value], guids: &[&str]) -> TestResult {
+    assert!(guids.is_sorted(), "Loadouts are ordered by nominal GUID");
+    let mut indices = HashSet::with_capacity(rows.len());
+    for row in rows {
+        let index = catalog_v3_consumer::field(row, Kind::Loadouts, "sourceRecordIndex")?
+            .as_u64()
+            .ok_or("original physical Loadout Record index")?;
+        assert!(indices.insert(index), "a physical Loadout occurs only once");
     }
     Ok(())
 }
@@ -233,74 +248,45 @@ fn check_leftovers(catalog: &Value) -> TestResult {
     for kind in Kind::ALL {
         for entity in list(catalog, kind)? {
             for field in ["recordPath", "className"] {
-                let text = entity[field].as_str().unwrap_or_default();
+                if matches!(
+                    kind,
+                    Kind::BlueprintCategories | Kind::BlueprintCategoryLists
+                ) && field == "className"
+                {
+                    let carrier = entity.get(field).ok_or("required category class carrier")?;
+                    if matches!(
+                        carrier.get("state").and_then(Value::as_str),
+                        Some("absent" | "null")
+                    ) {
+                        catalog_v3_consumer::source_value(carrier)?;
+                        continue;
+                    }
+                }
+                let text = if matches!(
+                    kind,
+                    Kind::BlueprintCategories
+                        | Kind::BlueprintCategoryLists
+                        | Kind::Manufacturers
+                        | Kind::Commodities
+                        | Kind::ResourceTypes
+                        | Kind::QualityDistributions
+                        | Kind::QualityQuantizations
+                        | Kind::MissionLocalities
+                ) {
+                    catalog_v3_consumer::field(entity, kind, field)?
+                        .as_str()
+                        .ok_or("canonical identity field")?
+                } else {
+                    entity
+                        .get(field)
+                        .and_then(Value::as_str)
+                        .unwrap_or_default()
+                };
                 assert_eq!(
                     has_excluded_token(kind, text),
                     None,
                     "development leftover in {kind}: {text}"
                 );
-            }
-        }
-    }
-    Ok(())
-}
-
-fn check_links(catalog: &Value) -> TestResult {
-    check_spawn_links(catalog)?;
-    check_npc_links(catalog)?;
-    check_template_links(catalog)?;
-    check_broker_links(catalog)?;
-    let guids = |kind: Kind| -> Result<HashSet<&str>, String> {
-        Ok(list(catalog, kind)?
-            .iter()
-            .filter_map(|e| e["guid"].as_str())
-            .collect())
-    };
-    let manufacturers = guids(Kind::Manufacturers)?;
-    let producible: HashSet<&str> = guids(Kind::Items)?
-        .union(&guids(Kind::Ships)?)
-        .copied()
-        .collect();
-    let items = guids(Kind::Items)?;
-    let groups = guids(Kind::ResourceGroups)?;
-    let categories = guids(Kind::BlueprintCategories)?;
-    let resources: HashSet<&str> = list(catalog, Kind::Commodities)?
-        .iter()
-        .filter_map(|e| e["subtypeGuid"].as_str())
-        .collect();
-    for kind in [Kind::Items, Kind::Ships] {
-        for entity in list(catalog, kind)? {
-            if let Some(guid) = entity["manufacturerGuid"].as_str() {
-                assert!(manufacturers.contains(guid), "{kind} manufacturer {guid}");
-            }
-        }
-    }
-    for commodity in list(catalog, Kind::Commodities)? {
-        if let Some(guid) = commodity["typeGuid"].as_str() {
-            assert!(groups.contains(guid), "commodity type {guid}");
-        }
-    }
-    let mut nested = 0_usize;
-    for group in list(catalog, Kind::ResourceGroups)? {
-        if let Some(guid) = group["parentGuid"].as_str() {
-            assert!(groups.contains(guid), "parent group {guid}");
-            nested += 1;
-        }
-    }
-    assert!(nested > 0, "at least one nested resource group");
-    for blueprint in list(catalog, Kind::Blueprints)? {
-        if let Some(guid) = blueprint["categoryGuid"].as_str() {
-            assert!(categories.contains(guid), "blueprint category {guid}");
-        }
-        if let Some(guid) = blueprint["producedItemGuid"].as_str() {
-            assert!(producible.contains(guid), "produced entity {guid}");
-        }
-        for ingredient in blueprint["ingredients"].as_array().into_iter().flatten() {
-            if let Some(guid) = ingredient["resourceGuid"].as_str() {
-                assert!(resources.contains(guid), "resource {guid}");
-            }
-            if let Some(guid) = ingredient["itemGuid"].as_str() {
-                assert!(items.contains(guid), "ingredient item {guid}");
             }
         }
     }
@@ -316,12 +302,7 @@ pub(crate) fn print_line(line: &str) {
 }
 
 fn report(path: &Path, summary: &CatalogSummary) {
-    print_line(&format!(
-        "{}: catalog {} bytes decompressed (limit {DECOMPRESSED_LIMIT}), {} bytes compressed (upload limit {UPLOAD_LIMIT})",
-        path.display(),
-        summary.size(),
-        summary.upload_size()
-    ));
+    print_line(&format!("catalog input: {}", path.display()));
     for kind in summary.kinds() {
         print_line(&format!("{kind:?}"));
     }
@@ -333,16 +314,16 @@ fn report(path: &Path, summary: &CatalogSummary) {
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn the_catalog_of_a_real_archive_is_complete_plausible_and_within_the_limit() -> TestResult {
+fn the_catalog_of_a_real_archive_is_complete_and_plausible() -> TestResult {
     let path = real_archive_path()?;
-    check_links(&verify_catalog(&path, true)?)
+    real_archive_catalog_links::check(&verify_catalog(&path, true)?)
 }
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn the_catalog_of_a_second_real_archive_is_complete_plausible_and_within_the_limit() -> TestResult {
+fn the_catalog_of_a_second_real_archive_is_complete_and_plausible() -> TestResult {
     let Some(path) = real_archive_b_path() else {
         return Ok(());
     };
-    check_links(&verify_catalog(&path, false)?)
+    real_archive_catalog_links::check(&verify_catalog(&path, false)?)
 }

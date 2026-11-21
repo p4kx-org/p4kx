@@ -4,16 +4,11 @@
 //! The one rule for stencil decals: which texture is the stencil map and how the stencil is
 //! coloured.
 
-use crate::{Material, TextureSlot};
+use crate::{Material, TextureSlot, mtl_observe_ignore, mtl_stencil_read};
 
 /// The material slot of the stencil map of a stencil decal.
 pub const STENCIL_SLOT: &str = "TexSlot7";
 
-const STENCIL_FLAG: &str = "STENCIL_MAP";
-const MESH_DECAL: &str = "MeshDecal";
-const COLOUR: &str = "StencilDiffuseColor";
-const OPACITY: &str = "StencilOpacity";
-const TINT_OVERRIDE: &str = "StencilTintOverride";
 /// The `StencilTintOverride` whose masks take the livery's decal colours; LIVE has only 0, 1 and 2.
 const DECAL_COLOURS_OVERRIDE: f32 = 2.0;
 
@@ -45,7 +40,7 @@ pub struct Stencil {
     pub tint: StencilTint,
 }
 
-fn tint_of(value: f32) -> StencilTint {
+pub(crate) fn tint_of(value: f32) -> StencilTint {
     if (value - DECAL_COLOURS_OVERRIDE).abs() < 0.5 {
         StencilTint::DecalColours
     } else if value > 0.0 {
@@ -60,26 +55,14 @@ impl Material {
     /// generation mask, whose [stencil map](Self::stencil_texture) cuts the motif out.
     #[must_use]
     pub fn is_stencil_decal(&self) -> bool {
-        self.shader.eq_ignore_ascii_case(MESH_DECAL)
-            && self
-                .string_gen_mask
-                .split('%')
-                .any(|flag| flag == STENCIL_FLAG)
+        mtl_observe_ignore::result(mtl_stencil_read::decal(self, &mut |_| Ok(())))
     }
 
     /// Returns the stencil parameters of a [stencil decal](Self::is_stencil_decal), `None` for any
     /// other material.
     #[must_use]
     pub fn stencil(&self) -> Option<Stencil> {
-        self.is_stencil_decal().then(|| Stencil {
-            colour: self.public_colour(COLOUR),
-            opacity: self
-                .public_param(OPACITY)
-                .map_or(1.0, |opacity| opacity[0].clamp(0.0, 1.0)),
-            tint: self
-                .public_param(TINT_OVERRIDE)
-                .map_or(StencilTint::None, |tint| tint_of(tint[0])),
-        })
+        mtl_observe_ignore::result(mtl_stencil_read::parameters(self, &mut |_| Ok(())))
     }
 
     /// Returns the stencil parameters when the decal is drawn by its [stencil
@@ -88,7 +71,7 @@ impl Material {
     /// add-on draws is what is exported.
     #[must_use]
     pub fn stencil_motif(&self) -> Option<Stencil> {
-        self.stencil_texture().and_then(|_| self.stencil())
+        mtl_observe_ignore::result(mtl_stencil_read::motif(self, &mut |_| Ok(())))
     }
 
     /// Returns the stencil map a [stencil decal](Self::is_stencil_decal) is drawn by: the file of
@@ -98,10 +81,7 @@ impl Material {
     /// own, which is drawn by that map.
     #[must_use]
     pub fn stencil_texture(&self) -> Option<&TextureSlot> {
-        if !self.is_stencil_decal() || self.has_diffuse_map() {
-            return None;
-        }
-        self.stencil_slot()
+        mtl_observe_ignore::result(mtl_stencil_read::texture(self, &mut |_| Ok(())))
     }
 
     /// Returns whether the material is a stencil decal that has nothing to draw: neither a stencil
@@ -114,12 +94,7 @@ impl Material {
 
     /// Returns the slot of the stencil map when it names a file rather than a placeholder.
     fn stencil_slot(&self) -> Option<&TextureSlot> {
-        self.textures.iter().find(|texture| {
-            let file = texture.file.trim();
-            texture.map.eq_ignore_ascii_case(STENCIL_SLOT)
-                && !file.is_empty()
-                && !file.starts_with('$')
-        })
+        mtl_observe_ignore::result(mtl_stencil_read::slot(self, &mut |_| Ok(())))
     }
 }
 

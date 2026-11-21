@@ -17,10 +17,10 @@ use crate::theme::desktop::{
 };
 use crate::theme::palette;
 use crate::theme::tokens::{
-    CORNER_NONE, CORNER_SM, FS_XS, RADIUS_SM_POINTS, SPACE_2, TOUCH_TARGET, Weight,
+    CORNER_CONTROL, CORNER_NONE, FS_XS, RADIUS_CONTROL_POINTS, SPACE_2, TOUCH_TARGET, Weight,
 };
 
-const INNER_RADIUS: u8 = RADIUS_SM_POINTS - 1;
+const INNER_RADIUS: u8 = RADIUS_CONTROL_POINTS - 1;
 const SEGMENT_COUNT_GAP: f32 = SPACE_2;
 
 /// One tab of a `.tab-nav` laid out once: its label and an optional `.tab-count`.
@@ -279,7 +279,7 @@ fn group(
     ui.spacing_mut().item_spacing.x = spacing;
     ui.painter().rect_stroke(
         group,
-        CORNER_SM,
+        CORNER_CONTROL,
         Stroke::new(1.0, palette::CONTROL_BORDER),
         StrokeKind::Inside,
     );
@@ -363,7 +363,12 @@ fn segment(
         paint_left(ui, room, Arc::clone(count), colour);
     }
     if response.has_focus() {
-        focus_ring_square(ui, rect, palette::PRIMARY, SEGMENT_FOCUS_OFFSET);
+        let colour = if pressed {
+            palette::CONTROL_SELECTED_FG
+        } else {
+            palette::PRIMARY
+        };
+        focus_ring_square(ui, rect, colour, SEGMENT_FOCUS_OFFSET);
     }
     response
 }

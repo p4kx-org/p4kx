@@ -18,10 +18,12 @@ p4kx-channels.workspace = true
 p4kx-comparison.workspace = true
 p4kx-export.workspace = true
 p4kx-extraction.workspace = true
+p4kx-media.workspace = true
 p4kx-render.workspace = true
 p4kx-screens.workspace = true
 p4kx-search.workspace = true
 p4kx-settings.workspace = true
+p4kx-update.workspace = true
 anyhow.workspace = true
 clap = { workspace = true, features = ["env"] }
 ctrlc.workspace = true
@@ -37,6 +39,7 @@ winresource.workspace = true
 [dev-dependencies]
 p4kx-testkit.workspace = true
 assert_cmd.workspace = true
+base64.workspace = true
 crc32fast.workspace = true
 exr.workspace = true
 insta.workspace = true

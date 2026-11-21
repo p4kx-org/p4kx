@@ -58,19 +58,22 @@ pub(crate) fn source_of(
 /// Checks the Entries of the container in `source` against the limits, leaves out folder
 /// Entries and writes their paths with backslashes.
 pub(crate) fn admit(directory: Directory, source: &Source) -> Result<Directory, FormatError> {
-    let Directory { entries, log } = directory;
+    let Directory {
+        entries,
+        log,
+        installation_flags,
+        metadata,
+    } = directory;
     let mut admitted = Vec::with_capacity(entries.len());
     let mut kept = IssueLog::default();
-    let mut dropped = 0;
     let mut listed = log.listed.into_iter().peekable();
     let mut raw_paths = log.raw_paths.into_iter().peekable();
+    let mut hashes = log.hash_block_sizes.into_iter().peekable();
     for (position, mut entry) in entries.into_iter().enumerate() {
         let index = admitted.len();
-        let folder = entry.path.ends_with(['\\', '/']) && entry.uncompressed_size == 0;
+        let folder = entry.is_empty_folder();
         while let Some((_, issue)) = listed.next_if(|(at, _)| *at == position) {
-            if folder {
-                dropped += 1;
-            } else {
+            if !folder {
                 kept.listed.push((index, issue));
             }
         }
@@ -78,6 +81,11 @@ pub(crate) fn admit(directory: Directory, source: &Source) -> Result<Directory, 
             if !folder {
                 kept.raw_paths.push((index, raw));
             }
+        }
+        if let Some((_, range)) = hashes.next_if(|(at, _)| *at == position)
+            && !folder
+        {
+            kept.hash_block_sizes.push((index, range));
         }
         if folder {
             continue;
@@ -89,11 +97,13 @@ pub(crate) fn admit(directory: Directory, source: &Source) -> Result<Directory, 
         entry.index = u32::try_from(index).unwrap_or(u32::MAX);
         admitted.push(entry);
     }
-    kept.count = log.count.saturating_sub(dropped);
+    kept.count = log.count - log.empty_folder_issues;
     check_disjoint(&admitted, source)?;
     Ok(Directory {
         entries: admitted,
         log: kept,
+        installation_flags,
+        metadata,
     })
 }
 

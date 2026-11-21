@@ -45,7 +45,7 @@ body:
         - Textures and images
         - Audio and Wwise sounds
         - UI movies, ship screens and holograms
-        - Basetool catalog and ship base data
+        - P4KX catalog and ship base data
         - Localisation
         - Installer / update check
         - Other (describe below)

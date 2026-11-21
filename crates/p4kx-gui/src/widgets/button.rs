@@ -15,7 +15,7 @@ use crate::theme::desktop::{
     OUTLINE_HOVER, QUIET_DANGER_HOVER, TRANSITION,
 };
 use crate::theme::palette;
-use crate::theme::tokens::{CORNER_SM, FS_XS, GLOW_PRIMARY, GLOW_PRIMARY_LG, Weight};
+use crate::theme::tokens::{CORNER_CONTROL, FS_XS, GLOW_PRIMARY, GLOW_PRIMARY_LG, Weight};
 
 /// A rung of the theme's action hierarchy.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -98,7 +98,7 @@ pub(crate) const fn look(kind: Kind, phase: Phase) -> Look {
             fill: palette::CONTROL_BG,
             tint: palette::CONTROL_SELECTED_BG,
             border: palette::PRIMARY,
-            text: palette::PRIMARY,
+            text: palette::CONTROL_SELECTED_FG,
             glow: None,
         },
     }
@@ -338,17 +338,17 @@ pub(crate) fn ghost_icon(ui: &Ui, response: &Response, label: &str, icon: impl F
         focus_ring(ui, response.rect, palette::PRIMARY, FOCUS_OFFSET);
     }
 }
-/// Paints the fill, tint, border and glow of `look` over `rect` with the `radius-sm` corner.
+/// Paints the fill, tint, border and glow of `look` over `rect` with the control radius.
 pub(crate) fn paint(ui: &Ui, rect: Rect, look: Look) {
     let painter = ui.painter();
     if let Some(glow) = look.glow {
-        painter.add(glow.as_shape(rect, CORNER_SM));
+        painter.add(glow.as_shape(rect, CORNER_CONTROL));
     }
-    painter.rect_filled(rect, CORNER_SM, look.fill);
-    painter.rect_filled(rect, CORNER_SM, look.tint);
+    painter.rect_filled(rect, CORNER_CONTROL, look.fill);
+    painter.rect_filled(rect, CORNER_CONTROL, look.tint);
     painter.rect_stroke(
         rect,
-        CORNER_SM,
+        CORNER_CONTROL,
         Stroke::new(1.0, look.border),
         StrokeKind::Inside,
     );

@@ -1,6 +1,6 @@
 # P4KX · Desktop-Vorgaben des P4KX-Designs
 
-Grundlage: die Tokens des P4KX-Themes (gemessene Palette, `radius-sm` 4 px). Maschinenlesbar:
+Grundlage: die P4KX-Tokens für Farben, Formen und Typografie. Maschinenlesbar:
 [`p4kx-desktop-spec.json`](p4kx-desktop-spec.json). Artboards: Design-Canvas „P4KX Desktop".
 
 Alle Maße in px bei 1 rem = 16 px. Farben, Glows und Gewichte als Token-Namen aus der Token-Fixture `crates/p4kx-gui/src/theme/fixtures/tokens.json`.
@@ -34,31 +34,31 @@ sind keine neuen Farben.
 | Dropdown | `.combobox__listbox` | – | y 4 | Untermenü −4 überlappend | – | – | bg `color-gray-4` | 1 `color-primary` | `shadow-dropdown` | – |
 | Dropdown-Eintrag | `.combobox__option` | 36 | x 12 | Spalten 12 | 14,4 / 400 / 0; Kürzel 12,8 `color-gray-2-text` | nein | `color-gray-1`; Hover bg `color-gray-3` + `color-primary`; Tastatur bg `color-primary` + `color-bg-black` | Trenner 1 `color-gray-3`, y 4 | – | Tastatur = Füllung |
 | Seitenleisten-Titel | `.page-head__eyebrow` | ~32 | 14 / 12 / 6 | – | 11,2 / 700 / 0,15 em | ja | `color-gray-2-text` | – | – | – |
-| Channel-Zeile | `.master-row` | 36 | x 12 | Name↔Build 8 | Name 12,8 / 700 / 0,05 em; Build 12,8 / 400 | Namen sind Konstanten | `color-gray-1`, Build `color-gray-2-text`; Hover `rgba(255,255,255,0.03)`; aktiv bg `color-surface-input`, Text `color-white` | unten 1 `color-gray-3`; aktiv links 3 `color-primary` (innen) | – | innen −2 |
+| Channel-Zeile | `.master-row` | 36 | x 12 | Name↔Build 8 | Name 12,8 / 700 / 0,05 em; Build 12,8 / 400 | Namen sind Konstanten | `color-gray-1`, Build `color-gray-2-text`; Hover `rgba(255,255,255,0.03)`; aktiv bg `control-selected-bg`, Text `color-white` | unten 1 `color-gray-3`; aktiv links 3 `color-primary` (innen) | – | innen −2 |
 | Baumzeile | `.tree-row` / `.tree-name` | 36 | links 8 + 12 je Ebene, rechts 8 | Chevron↔Name 6 | 13,76 / 400; aktiv 700 | nein | wie Channel-Zeile, Hover `rgba(255,255,255,0.025)` (`.tree-row--mid:hover`); Chevron `color-primary` 12 px, Strich 3 | Ebenen-Schiene 1 `color-gray-3` | – | innen −2 |
-| Listen-Panel | `.list-panel` / `.master-detail` | füllt | Rand zur Tab-Leiste und zum Fenster 12 (`space-3`), Lücke zwischen den Panels 6 (Größenänderungs-Griff) | – | – | – | bg `surface-panel` | 1 `color-gray-3`, Radius `radius-sm` | – | – |
+| Listen-Panel | `.list-panel` / `.master-detail` | füllt | Rand zur Tab-Leiste und zum Fenster 12 (`space-3`), Lücke zwischen den Panels 6 (Größenänderungs-Griff) | – | – | – | bg `surface-panel` | 1 `color-gray-3`, Radius `radius-box` | – | – |
 | Toolbar | `.list-panel__toolbar` | 68 | 12 | 12, bricht um | – | – | bg `surface-panel` | unten 1 `color-gray-3` | – | – |
 | Suchfeld | `.list-panel__search input` | 44 | links 38,4, rechts 12 | Basis 260, min. 200 | 16 / 400; Platzhalter kursiv | nein | bg `control-bg`, Text `color-gray-1`, Platzhalter `color-gray-2-text` | 1 `control-border`; Fokus `color-primary` | Fokus `glow-primary` | Rahmen + Glow |
-| Schnellfilter | `.segmented--sm` / `__item[aria-pressed]` | 34 | x 12 | Label↔Gruppe 12 | 12,8 / 400 (gewählt 700) / 0 | **nein** | `control-fg` auf `control-bg`; Hover `control-bg-hover` + `color-white`; gewählt `control-selected-bg` + `control-selected-fg` | 1 `control-border`, Trenner 1; gewählt innen 1 + unten 3 `control-selected-border` | – | innen −3 |
-| Button-Grundform | `.btn` | 44 (xs 32) | x 16, y 8 (xs 8,8 / 4) | Icon↔Text 8 | 12,8 / 700 / 0,03 em (xs 10,88) | ja | siehe Leiter | Radius `radius-sm` | – | 2 / +2 |
+| Schnellfilter | `.segmented--sm` / `__item[aria-pressed]` | 34 | x 12 | Label↔Gruppe 12 | 12,8 / 400 (gewählt 700) / 0 | **nein** | `control-fg` auf `control-bg`; Hover `control-bg-hover` + `color-white`; gewählt `control-selected-bg` + `control-selected-fg` | 1 `control-border`, Trenner 1; gewählt innen 1 + unten 3 `control-selected-border` | – | innen −3, gewählt `control-selected-fg` |
+| Button-Grundform | `.btn` | 44 (xs 32) | x 16, y 8 (xs 8,8 / 4) | Icon↔Text 8 | 12,8 / 700 / 0,03 em (xs 10,88) | ja | siehe Leiter | Radius `radius-control` | – | 2 / +2 |
 | CTA | `.btn.btn--cta` | 44 | wie oben | – | wie oben | ja | bg `color-primary`, Text `color-bg-black`; Hover `color-accent-light`; gedrückt `color-accent-dark` | – | `glow-primary`, Hover `glow-primary-lg` | weiß, +2 |
 | Outline | `.btn-outline` | 44 | wie oben | – | wie oben | ja | `color-primary` auf transparent; Hover `color-accent-light` | 1 `color-primary` | – | 2 / +2 |
 | Ghost | `.btn-ghost` | 44 | wie oben | – | wie oben | ja | `control-fg` auf `control-bg`; Hover `color-accent-light` | 1 `control-border`; Hover `color-primary` | – | 2 / +2 |
 | Quiet-Danger | `.btn-quiet-danger` | 44 | wie oben | – | wie oben | ja | `color-gray-2-text` auf `control-bg`; Hover `color-danger-text` | 1 `control-border`; Hover `color-danger` | – | 2 / +2 |
 | Tabellenkopf | `th` / `.tree-head .tree-cell` | 36 | x 12,8 | – | 11,84 / 700 / 0,07 em | ja | bg `color-surface-input`, `color-gray-1`; sortiert `color-white` | unten 2 `color-primary` | – | innen −2 |
 | Sortieranzeige | Chevron (Icon-Set) | 12 | – | Label↔Icon 6 | – | – | aktiv `color-primary`; Hover-Vorschau `color-gray-2-text` | – | – | über Kopfzelle |
-| Tabellenzeile | `tbody tr` / `td` | 36 | x 12,8; Checkbox-Spalte 44 | – | 13,76 / 400; aktiv 700 | nein | `color-gray-1`; Zebra `table-stripe-bg` (`color-control` bei 50 %, auf dem Panel `#30353A`); Hover `control-bg`; ausgewählt `control-selected-bg`; aktiv bg `color-surface-input`, Text `color-white` | unten 1 `color-gray-3`; aktiv links 3 `color-primary` (innen) | – | innen −2 |
+| Tabellenzeile | `tbody tr` / `td` | 36 | x 12,8; Checkbox-Spalte 44 | – | 13,76 / 400; aktiv 700 | nein | `color-gray-1`; Zebra `table-stripe-bg`; Hover `table-row-hover`; ausgewählt `control-selected-bg`; aktiv bg `control-selected-bg`, Text `color-white` | unten 1 `color-gray-3`; aktiv links 3 `color-primary` (innen) | – | innen −2 |
 | Checkbox | `input[type=checkbox]` | 19,2 | – | Trefferfläche = Zelle | Haken | – | bg `control-bg`; an `color-primary`, Haken `color-bg-black`; gemischt: Balken 10 × 2 | 1 `control-border`, Radius 2; Hover `color-primary` | – | `glow-primary`, kein Ring (`input:focus`) |
 | Radio | `input[type=radio]` | 19,2 (Zeile 36) | – | Label 12 | Label 14,4 / 400 | nein | wie Checkbox, Punkt 8 `color-bg-black` | 1 `control-border`, rund | – | `glow-primary`, kein Ring (`input:focus`) |
 | Tab-Leiste | `.tab-nav` / `.tab` | 44 | Tab x 14, Leiste links 12 | – | 11,52 / 700 / 0,06 em | ja | `color-gray-2-text`; Hover `color-gray-1`; aktiv `color-white` | unten 1 `color-gray-3`; aktiv 3 `color-primary` | – | innen −2 |
-| Vorschau-Panel | Fläche + `.tab-nav` | Start 236, min. 120 | Pfadzeile 32, x 16; Inhalt x 16 y 8 | – | Pfad 12,8 / 400 | nein | bg `surface-panel`; Pfad `color-gray-1`, Größe `color-gray-2-text` | 1 `color-gray-3`, Radius `radius-sm` | – | – |
+| Vorschau-Panel | Fläche + `.tab-nav` | Start 236, min. 120 | Pfadzeile 32, x 16; Inhalt x 16 y 8 | – | Pfad 12,8 / 400 | nein | bg `surface-panel`; Pfad `color-gray-1`, Größe `color-gray-2-text` | 1 `color-gray-3`, Radius `radius-box` | – | – |
 | Hex-Zeile | – | 20 | – | Offset 88; Byte-Zelle 22 + 2; nach 8 Bytes 10; ASCII-Abstand 16, Zelle 10 | 12,8 / 400, Ziffern tabellarisch | Hex in Großbuchstaben | Offset und `00` `color-gray-2-text`; Bytes/ASCII `color-gray-1`; nicht druckbar „." gedämpft | – | – | – |
 | Statusleiste | `.footer` (Desktop-Dichte) | 32 | x 16; Einträge x 12 | Trenner 1 `color-gray-3` | 12,8 / 400 | nein | bg `surface-bar`, `color-gray-2-text`; Pfad `color-gray-1`; „Suche …" `color-primary` | oben 1 `color-gray-3` | – | – |
-| Leerzustand | `.empty-state` | füllt | 24 | 12 | Titel 13,6 / 700 / 0,06 em; Text 12,8 | Titel ja | bg `color-bg-dark-gray`, Titel `color-gray-1`, Text `color-gray-2-text`; Ziehen: `rgba(231,126,35,0.06)` (`.drop-zone.is-over`) | 1 gestrichelt `color-gray-3`, Radius `radius-sm`; Ziehen `color-primary` | – | Aktion |
+| Leerzustand | `.empty-state` | füllt | 24 | 12 | Titel 13,6 / 700 / 0,06 em; Text 12,8 | Titel ja | bg `color-bg-dark-gray`, Titel `color-title`, Text `color-gray-2-text`; Ziehen: `rgba(231,126,35,0.06)` (`.drop-zone.is-over`) | 1 gestrichelt `color-gray-3`, Radius `radius-box`; Ziehen `color-primary` | – | Aktion |
 | Hinweisleiste | `.alert.alert-warning` | ~44 | x 16, y 10 | 12 | 14,4 / 400 | nein | bg `rgba(255,210,63,0.15)`, Text `color-gray-1`, Icon `color-warning` | 1 `color-warning`, links 4 | – | Aktion |
-| Modal | `.modal` (`--wide` 600) | – | Kopf 16 / 12, Körper 16, Fuß 16 / 12 | Gruppen 20, Fuß 8 | Titel 13,6 / 700 / 0,06 em; Körper 14,4 / 400 | Titel ja | bg `color-bg-dark-gray`, Titel `color-white`; Scrim `rgba(0,0,0,0.8)` flach | 1 `color-gray-3`, oben 3 `color-primary`, Ecken 13 × 2 | `glow-primary-lg` | Fokusfalle, Esc |
+| Modal | `.modal` (`--wide` 600) | – | Kopf 16 / 12, Körper 16, Fuß 16 / 12 | Gruppen 20, Fuß 8 | Titel 13,6 / 700 / 0,06 em; Körper 14,4 / 400 | Titel ja | bg `color-bg-dark-gray`, Titel `color-title`; Scrim `rgba(0,0,0,0.8)` flach | 1 `color-gray-3`, oben 3 `color-primary`, Ecken 13 × 2 entlang `radius-box` | `glow-primary-lg` | Fokusfalle, Esc |
 | Modal Danger | `.modal--danger` | – | wie Modal | – | Titel `color-danger-text` | ja | – | oben 3 + Ecken `color-danger` | `glow-danger-lg` | wie Modal |
-| Aufklappbarer Abschnitt | `.panel-header` | 44 | x 16, y 12,8 | Liste max. 180 hoch | 13,6 / 700 / 1 px | ja | bg `color-surface-input`, Titel `color-white`, Chevron `color-primary`; Hover `color-gray-3` | 1 `color-gray-3`, Radius `radius-sm`, links 4 `color-primary` | – | 2 / +2 |
+| Aufklappbarer Abschnitt | `.panel-header` | 44 | x 16, y 12,8 | Liste max. 180 hoch | 13,6 / 700 / 1 px | ja | bg `color-surface-input`, Titel `color-white`, Chevron `color-primary`; Hover `color-gray-3` | 1 `color-gray-3`, Radius `radius-control`, links 4 `color-primary` | – | 2 / +2 |
 | Fortschrittsbalken | `.attendance-meter` | 8 | – | Text→Balken 12 | Text 14,4 / 400, tabellarisch | nein | Spur `color-surface-input`; Füllung `color-primary`; beim Abbrechen `color-gray-2` | 1 `color-gray-3` | – | – |
 | Spinner | `.spinner` | 20 (inline 14) | – | Text 8 | – | – | Spur `rgba(231,126,35,0.25)`, Bogen `color-primary` | Ring 2 | – | – |
 | Detailliste | `.kv-list.kv-ruled` | – | unten 8,8 | Zeilen 8,8, Spalten 20; Schlüsselspalte min. 140 | Schlüssel 14,4 / 700 / 0,04 em; Wert 16,8 / 300 | Schlüssel ja | Schlüssel `color-gray-2-text`, Wert `data-fg` | unten 1 `color-gray-3` | – | – |
@@ -92,6 +92,37 @@ sind keine neuen Farben.
 | Gespeicherte Abfragen | `.panel-header` + Zeile + `.btn-xs` | Kopf 44, Zeile 36; Liste max. 180 | Zeile x 12; Aktionen x 8 | unter den Editor-Aktionen; Name↔Abfrage 8 | Name 12,8 / 700, max. 240 breit mit Auslassung; Abfrage 12,8 / 400, einzeilig, gekürzt | Kopf ja, Namen nein | Name `color-gray-1`, Abfrage `color-gray-2-text`; Hover `color-gray-3`; „Umbenennen" Ghost, „Löschen" Quiet-Danger | unten 1 `color-gray-3` | – | Zeile innen −2; Aktionen 2 / +2 |
 | Abfrage speichern / umbenennen / löschen | `.modal` / `.modal--danger` + `.btn-danger` | – | wie Modal | Feld→Hinweis 12; Fuß wie Modal | Feld 16 / 400, Platzhalter kursiv; Hinweis 14,4 / 400 | Titel ja | Hinweis „ersetzt" `color-gray-2-text`, Fehler `color-danger-text` | wie Modal | wie Modal | Fokus im Namensfeld; Enter führt aus, Esc schließt |
 
+## Flächen, Radien und Kontrast
+
+| Rolle | Token | Farbe |
+| --- | --- | --- |
+| Hintergrund der Arbeitsfläche | `surface-canvas` | `#0D0F12` |
+| Kopf, Fuß und Tabellenkopf | `surface-bar` | `#14171C` |
+| Listen, Vorschauen und Dialogflächen | `surface-panel` | `#1A1E24` |
+| Kacheln auf einer Arbeitsfläche | `surface-card` | `#20252C` |
+| Vertiefte Inhalte und Modellhintergrund | `surface-inset` | `#14171C` |
+| Zebra und Tabellen-Hover | `table-stripe-bg`, `table-row-hover` | `#1E2329`, `#272D35` |
+| Rahmen und Bedienelemente | `color-gray-3`, `control-border` | `#2A3038`, `#8F9399` |
+| Ruhende und berührte Bedienelemente | `control-bg`, `control-bg-hover` | `#2F3640`, `#353C48` |
+| Text, gedämpfter Text und Flächentitel | `color-gray-1`, `color-gray-2-text`, `color-title` | `#D7DADE`, `#9AA1AB`, `#C9CED5` |
+
+Arbeitsflächen, Dialoge und Leerzustände haben `radius-box` (10 px).
+Kacheln, Hinweise und Menüs verwenden `radius-tile` (8 px), Knöpfe und
+Eingaben `radius-control` (6 px), Chips und Faktenleisten `radius-sm` (4 px).
+Tabellenzellen und die Bildlaufleiste bleiben rechteckig. Arbeitsflächen haben
+innen 4 px Abstand, damit bis zum Rand reichende rechteckige Kinder die
+gerundeten Ecken frei lassen. Die Browse-Liste hält mindestens 252 px für
+Werkzeugleiste, Tabellenkopf und eine vollständige Zeile vor. Zusammen mit der
+Vorschau ergibt das 488 px Arbeitshöhe. Das Fenster kann weiterhin auf
+640 × 400 px verkleinert werden.
+
+Die sichtbaren Kontrollrahmen erreichen auf ihrem Grund mindestens 3:1.
+Kleine Beschriftungen verwenden hellen Akzent oder Weiß auf getönten
+Bedienflächen. Die aktive Zeile zeigt zusätzlich zum getönten Hintergrund
+den 3 px breiten linken Balken. Die Checkbox bleibt ein separates Klickziel.
+Klicks auf die restlichen Zellen öffnen die Zeile. Tastenfokus folgt der
+Kontur des Bedienelements. Auf der gefüllten Hauptaktion ist er weiß.
+
 ## Entscheidungen
 
 **D.1 Zeilendichte: 36 px (Tree-Table-Dichte), keine 44-px-Pflicht für Datenzeilen.**
@@ -113,6 +144,12 @@ Schriftlizenz sind modal, mit flachem Scrim `rgba(0,0,0,0.8)`. „Extraktion lä
 „Extraktion beendet" sind nicht modal und haben keinen Scrim. Während der Extraktion kann man
 weiter browsen und die Vorschau nutzen, das Archiv wird nur gelesen. Die drei
 Extraktionsaktionen und „Neu laden" sind gesperrt, bis die Extraktion endet.
+
+Ein Startfehler oder unerwartetes Ende des Systemdialogs erscheint als breites Gefahrenmodal
+mit der lokalisierten Überschrift „Auswahldialog fehlgeschlagen“, dem tatsächlichen Grund
+in einer Gefahrenmeldung und „Schließen“ als einziger Fußaktion. Kopf und Fuß stehen fest;
+lange Gründe verwenden den vorhandenen scrollbaren Körper. Ein regulärer Abbruch ist kein
+Fehler. Das Modal verwendet ausschließlich die bestehenden Dark-/Lato-Tokens.
 
 **D.4 Marke: Logo-Zeichen vor der Wortmarke, in Orange.** In der Kopfzeile steht das Logo-Zeichen
 (Datenklammern um ein X, [`logo.md`](logo.md), ADR-0075) 32 px groß (`brandMarkSize`), 8 px
@@ -192,6 +229,8 @@ größere Mips scrollen. Mips, die größer sind, als die Vorschau zeigen kann (
 8192 × 8192 Pixel oder über der größten Texturgröße des Renderers), werden nicht angeboten;
 hat eine Textur kein solches Mip, sagt der Tab das. Einen Schachbrett-Hintergrund für Transparenz gibt es nicht, weil das DS dafür keine
 Farben hat; Alpha wird auf `surface-panel` gemischt.
+Das vorhandene Tooltip-Widget zeigt an Faktenleiste, Mip-Auswahl und Bild die
+Verschlüsselungsherkunft der jeweiligen Daten.
 
 **D.15 Abfrage als dritter Tab im Arbeitsbereich.** „Abfrage" folgt auf „Durchsuchen" und
 „Vergleich". Oben steht der Editor als `textarea` mit „Abfrage ausführen" als der einen CTA des
@@ -245,7 +284,9 @@ starten", nicht „Exportieren", damit sie sich vom Menü „Export" unterscheid
 Screenreader. Fortschritt und Zusammenfassung sind wie bei der Extraktion nicht modal (D.3, D.7)
 und haben je genau eine Aktion im Fuß: „Abbrechen" als Ghost, „Schließen" als CTA. Der Balken
 zeigt erst beim Schreiben einen Anteil (D.5); davor steht ein Spinner mit „Lese DataForge …"
-bzw. „Wähle Records aus …". Der Hinweis auf einen Abbruch steht in `color-warning` (D.8, D.11).
+bzw. „Wähle Records aus …“. Der Hinweis auf einen Abbruch steht in `color-warning` (D.8, D.11).
+Der Tooltip der Zusammenfassung zeigt die Verschlüsselungsherkunft der als geschrieben
+gezählten Records.
 
 **D.18 Töne im Tab „Audio".** Wählt man eine WEM (`.wem`), öffnet die Vorschau den Tab „Audio";
 andere Einträge kehren zu „Text" zurück. Codec, Kanäle, Abtastrate und Dauer stehen als
@@ -262,7 +303,8 @@ oder pausiert, solange kein anderes Bedienelement den Fokus hat. Der Barrierefre
 Position ist die Zeit. Wechselt der Vorschau-Tab weg von „Audio" oder der Arbeitsbereich weg von
 „Durchsuchen", pausiert der Ton an seiner Stelle; „Abspielen" macht dort weiter. Ein Codec ohne
 Decoder, ein zu langer Ton und ein Fehler beim Dekodieren oder am Audiogerät stehen als Text in
-`color-danger-text` im Panel; Text und Hex bleiben erreichbar.
+`color-danger-text` im Panel; Text und Hex bleiben erreichbar. Der Tooltip der Faktenleiste zeigt
+bei einer direkt geöffneten WEM die ursprüngliche Verschlüsselungsherkunft zu jedem Wert.
 
 **D.19 CryXml im Tab „XML".** Ist der gewählte Eintrag CryXml (erkannt an der Signatur, nicht an
 der Endung), bietet die Vorschau den Tab „XML" hinter „Hex" an und öffnet ihn, sobald der Anfang
@@ -280,22 +322,43 @@ nach 64 MiB an einer Zeilengrenze gekürzt und trägt dann den Kürzungshinweis 
 wie der Tab „Text". Schlägt die Umwandlung fehl, steht der Grund in `color-danger-text` im Tab;
 „Text" und „Hex" zeigen die Daten weiter. „Kopieren" kopiert im Tab „XML" das umgewandelte XML.
 
-**D.20 Basetool-Katalog im Export-Menü ohne eigenen Dialog.** „Basetool-Katalog …" steht im
-Menü „Export" unter „Record-Export …" und ist gesperrt, solange das Archiv kein DataForge hat oder
-DataForge nicht geladen werden konnte, und während ein Katalog erstellt wird. Es gibt nichts zu
-entscheiden außer der Zieldatei, deshalb öffnet der Eintrag direkt den Speichern-Dialog des
-Systems mit `basetool-catalog.json` (D.3); erst die gewählte Datei startet den Katalog. Fortschritt
-und Ergebnis sind wie beim Record-Export nicht modal mit je genau einer Aktion im Fuß (D.7, D.17):
+**D.20 P4KX-Katalog im Export-Menü ohne eigenen Dialog.** „P4KX-Katalog …" und
+„P4KX-Diagnosekatalog …" stehen im Menü „Export" unter „Record-Export …". Beide sind gesperrt,
+solange das Archiv kein DataForge hat oder DataForge nicht geladen werden konnte, und während ein
+Katalog erstellt wird. Jeder Eintrag öffnet direkt den Speichern-Dialog des Systems (D.3), mit
+`p4kx-catalog.json.zst` bzw. `p4kx-catalog.diagnostic.json.zst`; erst die gewählte Datei
+startet den Katalog. Die Diagnosefreigabe gilt nur für diesen Auftrag und wird nicht gespeichert.
+Normale Exporte verweigern bei unvollständigen Quellen oder Projektionen das Erstellen oder Ersetzen
+der Datei; das Gefahrenfenster erläutert die separate Diagnoseaktion. Fortschritts- und Ergebnistitel
+benennen einen Diagnosekatalog ausdrücklich. Dessen Ergebnis zeigt zusätzlich einen Hinweis in
+`color-warning`. Fortschritt und Ergebnis sind wie beim Record-Export nicht modal mit je genau einer Aktion im Fuß (D.7, D.17):
 Spinner beim Lesen von DataForge und beim Schreiben, dazwischen der Balken mit geprüften Records.
-Die Zusammenfassung gliedert sich mit Gruppenlabels in „Arten" (je Art geschrieben, übersprungen,
+Die Zusammenfassung beginnt mit dem Exportzustand: vollständige Quellen und Projektionen in
+`color-gray-1`, unvollständige in `color-warning`. Sie gliedert sich mit Gruppenlabels in
+„Arten (Auswahlumfang)" (je Art geschrieben, übersprungen,
 vollständig oder teilweise, darunter die übersprungenen Entwicklungsreste) und „Texte" (je Sprache
-aufgelöst, fehlend, Platzhalter, darunter die fehlenden Texte), dann Größe mit Upload-Limit und
-Datei, alles in `color-gray-1`. Größe und Limit stehen in Dezimaleinheiten, das Limit wie in der
-Dokumentation als „64 MB". Nahe am Upload-Limit steht oben `.alert-warning`, darüber
-`.alert-danger`, weil das Basetool den Upload dann ablehnt. Ein Abbruch schreibt keine Datei und
+aufgelöst, fehlend, Platzhalter, darunter die fehlenden Texte), dann Dateigröße und Pfad in
+`color-gray-1`. Größen und Richtwerte stehen in Dezimaleinheiten. Nahe am Richtwert steht oben
+`.alert-warning`, darüber `.alert-danger`. Ein Abbruch schreibt keine Datei und
 lässt eine vorhandene unverändert; der Hinweis darauf steht in `color-warning`. Ist die gewählte
 Datei das offene Archiv, startet nichts, und das Gefahrenfenster sagt es in `color-danger-text`.
 Der Katalog liest DataForge aus dem einen Cache des offenen Archivs (D.22), also nur einmal.
+
+Unter Flatpak ersetzt eine gemeinsame Zielauswahl den Speichern-Dialog für Dateiexporte und
+die Zielordnerwahl für Blender-Pakete: Sie zeigt den übergeordneten Ordner, einen einzelnen
+Datei- oder Paketordnernamen und den vollständigen Zielpfad. „Ordner wählen …“ öffnet den
+Ordnerdialog des Systems für den übergeordneten Ordner; dessen Rückgabepfad bleibt erhalten.
+„Export starten“ bestätigt Katalog, Diagnosekatalog, Query, Vergleichsbericht oder UI-Bild und
+startet genau diesen Auftrag. Bei Modell-, Entity- und Charakter-Setups übernimmt „Ziel übernehmen“
+nur das Ziel in den bestehenden Exportdialog. Ohne gewählten Elternordner oder mit leerem Namen,
+Steuerzeichen, absolutem Pfad, Pfadtrennern oder den Komponenten `.` / `..` bleibt die Bestätigung
+gesperrt. Die Anzeige enthält dieselbe GLB- und Katalognamensnormalisierung wie der Schreiber.
+Die Diagnosefreigabe gilt weiterhin nur für diesen Auftrag; Abbrechen und Besitzerwechsel
+verwerfen sie. Verspätete Ordnerantworten einer verworfenen Auswahl werden ignoriert.
+Außerhalb Flatpaks bleibt der bisherige Systemdialog bestehen. Die gemeinsame Auswahl verwendet
+`modal--wide`, bestehende Feld-, Ghost- und CTA-Widgets, Lato und die vorhandenen Dark-Tokens;
+es entstehen keine neuen Maße. Eine Ordnerwahl ersetzt keine Schutz- oder Identitätsprüfung.
+
 
 Entscheidungen ab **D.22** (Record-Vorschau, Texturgruppen, Scrollflächen, Lokalisierung, Sprache der Record-Texte,
 Abfrage-Vervollständigung, Container als Ordner, Tonformat der Extraktion, 3D-Ansicht des Modells, Tags) stehen in

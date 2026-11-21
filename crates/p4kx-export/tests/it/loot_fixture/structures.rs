@@ -73,6 +73,9 @@ fn archetype_structs() -> Vec<TestStruct> {
 fn table_structs() -> Vec<TestStruct> {
     vec![
         TestStruct::new("LootTableOptionalDataV3"),
+        TestStruct::new("LootTableOptionalDataV3_FixtureExtension")
+            .parent("LootTableOptionalDataV3")
+            .field("unknownField", TestType::UInt16),
         TestStruct::new("LootTableOptionalDataV3_PriorityChoice")
             .parent("LootTableOptionalDataV3")
             .field("priorityCount", TestType::Int32),

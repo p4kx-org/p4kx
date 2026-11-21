@@ -94,6 +94,9 @@ fn keep_only(mesh: &mut Mesh, keep: impl Fn(u16) -> bool) -> Result<(), Misfit> 
         parts.push(moved);
         indices.extend_from_slice(slice);
     }
+    if parts.len() != mesh.submeshes.len() {
+        mesh.invalidate_vertex_origin_order();
+    }
     mesh.indices = indices;
     mesh.submeshes = parts;
     Ok(())

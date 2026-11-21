@@ -5,10 +5,7 @@
 
 use std::error::Error;
 
-use p4kx_dataforge::{
-    DataForge, DataForgeError, Field, MAX_NESTING_DEPTH, MAX_RECORD_VALUES, RecordTree, Value,
-    ValueError,
-};
+use p4kx_dataforge::{DataForge, Field, RecordTree, Value, ValueError};
 use p4kx_testkit::{
     DataForgeBuilder, TestInstance, TestPool, TestRecord, TestStruct, TestType, TestValue,
 };
@@ -205,94 +202,6 @@ fn an_instance_owned_twice_is_an_error_and_ends_a_cycle() -> TestResult {
 }
 
 #[test]
-fn owned_structs_nested_too_deep_are_errors() -> TestResult {
-    let mut chain = TestValue::Null;
-    for _ in 0..MAX_NESTING_DEPTH + 5 {
-        chain = TestValue::Struct(TestInstance::new("Node").value("next", chain));
-    }
-    let bytes = DataForgeBuilder::new()
-        .structure(node())
-        .record(TestRecord::new(SAMPLE, "Node", "Node.One", "node.xml").value("next", chain))
-        .build();
-    let forge = DataForge::open(&bytes)?;
-
-    let tree = forge.records().next().ok_or("no Record")?.tree()?;
-
-    let mut depth = 0;
-    let mut current = value(&tree, "next")?;
-    while let Value::Struct(structure) = current {
-        depth += 1;
-        current = structure.fields().first().map(Field::value).ok_or("next")?;
-    }
-    assert_eq!(depth, MAX_NESTING_DEPTH, "nested structs below the Record");
-    assert_eq!(
-        current,
-        &Value::Error(ValueError::TooDeep {
-            limit: MAX_NESTING_DEPTH
-        }),
-        "the next level is an error"
-    );
-    Ok(())
-}
-
-#[test]
-fn a_struct_that_contains_itself_inline_stops_at_the_value_limit() -> TestResult {
-    let bytes = DataForgeBuilder::new()
-        .structure(
-            TestStruct::new("Loop")
-                .field("left", TestType::Class("Loop".to_owned()))
-                .field("right", TestType::Class("Loop".to_owned()))
-                .declared_size(0),
-        )
-        .record(TestRecord::new(SAMPLE, "Loop", "Loop.One", "loop.xml"))
-        .build();
-    let forge = DataForge::open(&bytes)?;
-
-    let result = forge.records().next().ok_or("no Record")?.tree();
-
-    assert!(
-        matches!(
-            result,
-            Err(DataForgeError::RecordTooLarge {
-                limit: MAX_RECORD_VALUES
-            })
-        ),
-        "bounded: {result:?}"
-    );
-    Ok(())
-}
-
-#[test]
-fn an_array_larger_than_the_value_limit_is_an_error_at_its_field() -> TestResult {
-    let count = u32::try_from(MAX_RECORD_VALUES + 1)?;
-    let bytes = DataForgeBuilder::new()
-        .structure(TestStruct::new("Big").array("bytes", TestType::Int8))
-        .values(TestPool::Int8, count)
-        .record(
-            TestRecord::new(SAMPLE, "Big", "Big.One", "big.xml").value("bytes", raw([count, 0])),
-        )
-        .build();
-    let forge = DataForge::open(&bytes)?;
-
-    let tree = forge.records().next().ok_or("no Record")?.tree()?;
-
-    assert_eq!(
-        value(&tree, "bytes")?,
-        &Value::Error(ValueError::TooManyValues {
-            count,
-            limit: MAX_RECORD_VALUES
-        }),
-        "rejected before it is read"
-    );
-    let located: Vec<_> = tree
-        .located_errors()
-        .map(|(location, _)| location.to_string())
-        .collect();
-    assert_eq!(located, ["bytes"], "the field itself");
-    Ok(())
-}
-
-#[test]
 fn error_values_of_nested_data_carry_a_reason() -> TestResult {
     let reasons = [
         (
@@ -319,8 +228,8 @@ fn error_values_of_nested_data_carry_a_reason() -> TestResult {
             "instance 1 of struct 0 is owned more than once in the Record",
         ),
         (
-            ValueError::TooDeep { limit: 64 },
-            "the value is nested deeper than 64 structs",
+            ValueError::InlineClassCycle { struct_index: 0 },
+            "inline class 0 contains itself",
         ),
         (
             ValueError::DanglingReference {
@@ -334,10 +243,6 @@ fn error_values_of_nested_data_carry_a_reason() -> TestResult {
                 instance_index: 3,
             },
             "the weak pointer refers to instance 3 of struct 2, which lies outside the Record",
-        ),
-        (
-            ValueError::TooManyValues { count: 9, limit: 8 },
-            "the array of 9 values is larger than the 8 values a Record may hold",
         ),
         (
             ValueError::UnknownStruct { index: 7 },
@@ -370,9 +275,12 @@ fn only_a_dangling_reference_gives_the_guid_of_a_missing_record() -> TestResult 
         "a Record of another type exists"
     );
     assert_eq!(
-        ValueError::TooDeep { limit: 64 }.dangling_guid(),
+        ValueError::InlineClassCycle { struct_index: 0 }.dangling_guid(),
         None,
         "no Reference"
     );
     Ok(())
 }
+
+#[path = "invalid_values_owned.rs"]
+mod owned;

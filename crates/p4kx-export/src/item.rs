@@ -3,15 +3,31 @@
 
 use p4kx_extraction::RecordTree;
 
-use crate::Playability;
-use crate::contract::Item;
-use crate::guid_text::CatalogGuid;
+use crate::catalog_projection::CatalogProjection;
+use crate::catalog_read::original::OriginalFlowFields;
+use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition;
+use crate::catalog_v3::catalog_item_components::selection::ItemSourceSelection;
 use crate::item_class::ClassLine;
 use crate::playability_rules;
-use crate::record_fields::{
-    class_name, component, integer, locale_key, reference, single, structure, text,
-};
-use crate::texts::Texts;
+use crate::record_fields::{component, locale_key, structure, text};
+use crate::{CatalogError, Playability};
+
+#[path = "item_class_projection.rs"]
+mod classification;
+#[path = "item_projection_inputs.rs"]
+mod inputs;
+#[path = "item_paint_facts.rs"]
+mod paint_facts;
+#[path = "item_playability_projection.rs"]
+mod playability_projection;
+#[path = "item_projection.rs"]
+mod projection;
+
+use inputs::SelectedItem;
+use paint_facts::ItemPaintFacts;
+pub(crate) use projection::Item;
+use projection::ItemIdentity;
+pub use projection::ItemSource;
 
 /// Returns the playability of the item Record tree `tree`.
 pub(crate) fn playability(tree: &RecordTree<'_>) -> Option<Playability> {
@@ -26,52 +42,75 @@ pub(crate) fn is_paint(tree: &RecordTree<'_>) -> bool {
     text(definition, "Type").is_some_and(crate::paint::is_paint_type)
 }
 
-/// Returns the item the Record tree `tree` describes and the `Class:` line of its English
-/// description, its texts resolved by `texts`.
-pub(crate) fn item<'f>(tree: &RecordTree<'f>, texts: &Texts<'f>) -> (Item<'f>, ClassLine) {
-    let definition = structure(component(tree, "SAttachableComponentParams"), "AttachDef");
-    let localization = structure(definition, "Localization");
-    let description = texts.localised(locale_key(localization, "Description"));
-    let line = ClassLine::read(description.en.as_deref());
-    let physics = structure(
-        component(tree, "SEntityPhysicsControllerParams"),
-        "PhysType",
-    );
-    let name_key = locale_key(localization, "Name");
-    let r#type = text(definition, "Type");
-    let item = Item {
-        guid: CatalogGuid(tree.guid()),
-        class_name: class_name(tree),
-        record_path: tree.record_path(),
-        name: texts.localised(name_key),
-        description,
-        r#type,
-        sub_type: text(definition, "SubType"),
-        size: integer(definition, "Size"),
-        grade: integer(definition, "Grade"),
-        mass: single(physics, "Mass"),
-        manufacturer_guid: reference(definition, "Manufacturer"),
-        tags: words(text(definition, "Tags")),
-        display_type: texts.localised(locale_key(
-            component(tree, "SCItemPurchasableParams"),
-            "displayType",
-        )),
-        class: line.class(),
-        playability: playability(tree),
-        variant_of: None,
-        stats: None,
-        variant_key: None,
-        required_tags: if r#type.is_some_and(crate::paint::is_paint_type) {
-            words(text(definition, "RequiredTags"))
-        } else {
-            Vec::new()
+/// Projects classifications from the already read physical Item source family.
+pub(crate) fn item<'source>(
+    tree: &RecordTree<'source>,
+    definition: &ItemDefinition<'source>,
+    originals: &OriginalFlowFields<'_, '_, 'source>,
+    projection: &CatalogProjection<'_, 'source>,
+) -> Result<(Item<'source>, ClassLine), CatalogError> {
+    let read = project_source(tree, definition, originals, projection, |inputs| {
+        ItemPaintFacts::read(inputs.attachment())
+    })?;
+    let identity = ItemIdentity::read(read.source.source())?;
+    Ok((
+        Item {
+            source: read.source,
+            variant_of: None,
+            identity,
+            paint: read.extra,
+            variant_key: None,
         },
-    };
-    (item, line)
+        read.line,
+    ))
 }
 
-fn words(value: Option<&str>) -> Vec<&str> {
-    value
-        .map(|tags| tags.split_whitespace().collect())
-        .unwrap_or_default()
+pub(crate) fn source<'source>(
+    tree: &RecordTree<'source>,
+    definition: &ItemDefinition<'source>,
+    originals: &OriginalFlowFields<'_, '_, 'source>,
+    projection: &CatalogProjection<'_, 'source>,
+) -> Result<ItemSource<'source>, CatalogError> {
+    Ok(project_source(tree, definition, originals, projection, |_| ())?.source)
 }
+
+struct ProjectedSource<'source, T> {
+    source: ItemSource<'source>,
+    line: ClassLine,
+    extra: T,
+}
+
+fn project_source<'source, T>(
+    tree: &RecordTree<'source>,
+    definition: &ItemDefinition<'source>,
+    originals: &OriginalFlowFields<'_, '_, 'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    extra: impl FnOnce(&SelectedItem<'_, 'source>) -> T,
+) -> Result<ProjectedSource<'source, T>, CatalogError> {
+    projection::check_source(tree, definition, projection)?;
+    let selection = ItemSourceSelection::read(tree, originals)?;
+    let inputs = SelectedItem::read(definition, &selection)?;
+    let description = inputs.description();
+    let class = match description.input {
+        Some(input) => classification::read(input, projection)?,
+        None => classification::absent(description.state, description.cause, projection)?,
+    };
+    let class_value = description.add_parents(class.value, &projection.origins().uses)?;
+    let playability = playability_projection::read(&inputs, projection)?;
+    let extra = extra(&inputs);
+    let header = definition.source().clone();
+    Ok(ProjectedSource {
+        source: ItemSource {
+            header,
+            selection,
+            class: class_value,
+            playability,
+        },
+        line: class.line,
+        extra,
+    })
+}
+
+#[cfg(test)]
+#[path = "item_projection_semantic_tests.rs"]
+mod semantic_tests;

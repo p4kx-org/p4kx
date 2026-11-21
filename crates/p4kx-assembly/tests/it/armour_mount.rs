@@ -5,12 +5,12 @@
 
 use std::error::Error;
 
-use p4kx_assembly::{ArchiveModels, Armour, AssemblyOptions, BodyVariant, LoadoutResolver};
-use p4kx_extraction::{Archive, DataForgeEntry};
+use p4kx_assembly::{ArchiveModels, Armour, AssemblyOptions, BodyVariant, LoadoutResolver, Piece};
+use p4kx_extraction::{Archive, DataForgeEntry, SourceEncryptionState, SourceLocation};
 use p4kx_gltf::GlbOptions;
 use p4kx_testkit::{
     CheckedGlb, MOUNT_BONE, MOUNT_COURIER, MOUNT_DRIFTER, SATCHEL_HELPER_Z, check_glb,
-    mounted_item_entries,
+    mounted_item_entries, mounted_overlay_entries,
 };
 
 use crate::assembly_support::{TestResult, fixture};
@@ -129,5 +129,144 @@ fn a_port_whose_bone_the_armour_lacks_is_listed_and_the_backpack_stays_at_the_or
         issue.kind()
     );
     assert_eq!(parent_name(&glb, "satchel"), None, "a root of the scene");
+    Ok(())
+}
+
+fn wear_overlay(holder: &str, replace_item: bool) -> Result<Armour, Box<dyn Error>> {
+    let fixture = fixture(mounted_overlay_entries())?;
+    let archive = Archive::open(&fixture.path)?;
+    let entry = DataForgeEntry::read(&archive)?;
+    let forge = entry.open()?;
+    let mut resolver = LoadoutResolver::new(&forge);
+    let character = resolver.entities().find(MOUNT_COURIER)?;
+    let tree = resolver.resolve(&character)?;
+    let holder = resolver.entities().find(holder)?;
+    let mut pieces = vec![Piece::wearable(resolver.wearable(&holder)?)];
+    if replace_item {
+        let item = resolver.entities().find("Mount_Explicit_Satchel")?;
+        pieces.push(Piece::wearable(resolver.wearable(&item)?));
+    }
+    let (pieces, replaced) = resolver.worn_layered(&tree, pieces);
+    assert_eq!(
+        replaced.len(),
+        if replace_item { 2 } else { 1 },
+        "replacing the torso retains the normal piece-replacement report"
+    );
+    assert_eq!(
+        replaced.first().map(p4kx_assembly::Replaced::name),
+        Some("torso/Mount_Carrier"),
+        "the report retains the old torso occurrence"
+    );
+    Ok(Armour::build(
+        BodyVariant::Male,
+        &pieces,
+        &ArchiveModels::new(&archive),
+        &AssemblyOptions::default(),
+    )?)
+}
+
+#[test]
+fn a_replaced_holder_uses_its_current_port_for_a_retained_or_explicit_piece() -> TestResult {
+    for replace_item in [false, true] {
+        let armour = wear_overlay("Mount_New_Carrier", replace_item)?;
+        let glb = glb_of(&armour)?;
+        assert_eq!(parent_name(&glb, "satchel"), Some(MOUNT_BONE));
+        let (translation, _) = placement(&glb, "satchel")?;
+        assert!(
+            close(&translation, &[0.0, 0.6, -SATCHEL_HELPER_Z + 0.8]),
+            "the new torso's port contributes the replacement offset: {translation:?}"
+        );
+        assert!(
+            armour
+                .issues()
+                .iter()
+                .all(|issue| issue.kind().code() != "worn_mount_unresolved"),
+            "a unique compatible slot was bound"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn a_conflicting_or_incompatible_replacement_never_writes_the_rigid_piece_at_the_origin()
+-> TestResult {
+    for (holder, reason) in [
+        ("Mount_Duplicate_Carrier", "competing"),
+        ("Mount_Incompatible_Carrier", "item type, subtype or size"),
+    ] {
+        let armour = wear_overlay(holder, false)?;
+        assert!(
+            placement(&glb_of(&armour)?, "satchel").is_err(),
+            "the rigid geometry is omitted"
+        );
+        let issue = armour
+            .issues()
+            .iter()
+            .find(|issue| issue.kind().code() == "worn_mount_unresolved")
+            .ok_or("a scoped mount failure")?;
+        assert!(issue.kind().skips());
+        assert_eq!(issue.name(), "pack/Mount_Satchel");
+        assert!(issue.kind().to_string().contains(reason), "{issue:?}");
+        assert!(
+            armour.parts().iter().any(|part| part.name() == holder),
+            "the skinned holder remains"
+        );
+    }
+    Ok(())
+}
+
+fn port_evidence(
+    archive: &Archive,
+    entry: &DataForgeEntry,
+    presented_entry: &DataForgeEntry,
+) -> Result<SourceEncryptionState, Box<dyn Error>> {
+    let forge = entry.open()?;
+    let mut resolver = LoadoutResolver::new(&forge).with_forge_entry(presented_entry);
+    let record = resolver.entities().find(MOUNT_COURIER)?;
+    let tree = resolver.resolve(&record)?;
+    let models = ArchiveModels::new(archive).with_model_node_sources();
+    let armour = Armour::build(
+        BodyVariant::Male,
+        &resolver.worn(&tree),
+        &models,
+        &AssemblyOptions::default(),
+    )?;
+    let animated = armour.animate(&[], &models);
+    let (_, emission) = armour.write_glb_animated_observed(
+        &animated,
+        &GlbOptions::default(),
+        &models.textures(),
+        &mut Vec::new(),
+    )?;
+    let (inventory, fields) = armour.worn_mount_origins(&emission)?.into_field_origins()?;
+    assert!(
+        fields.iter().next().is_some(),
+        "the authored mount addresses are exported"
+    );
+    let source = inventory
+        .iter_uses()
+        .find(|source| matches!(source.location(), SourceLocation::DataForge { .. }))
+        .ok_or("the authored port field is observed")?;
+    Ok(source.effective_encryption())
+}
+
+#[test]
+fn mount_port_evidence_keeps_its_original_dataforge_input() -> TestResult {
+    let mounted = fixture(mounted_item_entries())?;
+    let foreign = fixture(mounted_item_entries())?;
+    let archive = Archive::open(&mounted.path)?;
+    let other_archive = Archive::open(&foreign.path)?;
+    let entry = DataForgeEntry::read(&archive)?;
+    let other_entry = DataForgeEntry::read(&other_archive)?;
+    assert_eq!(
+        port_evidence(&archive, &entry, &entry)?,
+        SourceEncryptionState::Unencrypted,
+        "the admitted original entry proves the actual port source"
+    );
+    assert_eq!(
+        port_evidence(&archive, &entry, &other_entry)?,
+        SourceEncryptionState::Unknown,
+        "an identical but separately read database cannot supply this port's provenance"
+    );
     Ok(())
 }

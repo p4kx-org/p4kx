@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Items and ships in the Basetool catalog: selection, fields and item class, through the public
+//! Items and ships in the P4KX catalog: selection, fields and item class, through the public
 //! API.
 
 use crate::catalog_fixture;
@@ -9,14 +9,23 @@ use crate::catalog_fixture;
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use catalog_fixture::{Maker, english, write_archive, write_archive_with};
-use p4kx_export::{
-    BuiltCatalog, CatalogOptions, Filter, ItemClass, ItemClassSummary, Kind, build_catalog,
-};
+use catalog_fixture::{english, write_archive};
+use p4kx_export::{BuiltCatalog, CatalogOptions, ItemClass, ItemClassSummary, Kind, build_catalog};
 use p4kx_extraction::Archive;
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
+
+#[path = "catalog_items_completeness.rs"]
+mod completeness;
+#[path = "catalog_item_definitions.rs"]
+pub(crate) mod definitions;
+#[path = "catalog_item_projection_checks.rs"]
+mod item_projection_checks;
+#[path = "catalog_ship_manufacturers.rs"]
+mod ship_manufacturers;
+#[path = "catalog_ship_texts.rs"]
+mod ship_texts;
 
 const EXPORTED_AT: Duration = Duration::from_secs(1_792_000_000);
 
@@ -35,72 +44,22 @@ fn catalog_with(options: &CatalogOptions<'_>) -> Result<(BuiltCatalog, Value), B
     Ok((built, json))
 }
 
-fn catalog_of(maker: Maker) -> Result<Value, Box<dyn Error>> {
-    let dir = tempfile::tempdir()?;
-    let archive = Archive::open_with_key(
-        write_archive_with(dir.path(), &[english()], maker)?,
-        Some(p4kx_testkit::test_key()),
-    )?;
-    let built = build_catalog(&archive, &options())?;
-    Ok(serde_json::from_slice(built.json())?)
-}
-
-fn manufacturer_guids<'c>(catalog: &'c Value, kind: &str) -> Vec<&'c Value> {
-    catalog[kind]
-        .as_array()
-        .map(|list| {
-            list.iter()
-                .filter(|entry| entry["className"] != "Counter_Shop")
-                .map(|entry| &entry["manufacturerGuid"])
-                .collect()
-        })
-        .unwrap_or_default()
-}
-
-#[test]
-fn a_manufacturer_given_by_reference_is_its_guid() -> TestResult {
-    let catalog = catalog_of(Maker::Reference)?;
-    for kind in ["items", "ships"] {
-        let guids = manufacturer_guids(&catalog, kind);
-        assert!(!guids.is_empty(), "{kind} present");
-        assert!(
-            guids
-                .iter()
-                .all(|guid| **guid == "10000000-0000-4000-8000-000000000001"),
-            "{kind}: {guids:?}"
-        );
-    }
-    Ok(())
-}
-
-#[test]
-fn a_manufacturer_given_by_a_strong_or_weak_pointer_is_null() -> TestResult {
-    for maker in [Maker::StrongPointer, Maker::WeakPointer] {
-        let catalog = catalog_of(maker)?;
-        for kind in ["items", "ships"] {
-            let guids = manufacturer_guids(&catalog, kind);
-            assert!(!guids.is_empty(), "{kind} present");
-            assert!(guids.iter().all(|guid| guid.is_null()), "{kind}: {guids:?}");
-        }
-    }
-    Ok(())
-}
-
 fn class_names<'c>(catalog: &'c Value, kind: &str) -> Vec<&'c str> {
-    catalog[kind]
-        .as_array()
-        .map(|list| {
-            list.iter()
-                .filter_map(|entry| entry["className"].as_str())
-                .collect()
-        })
-        .unwrap_or_default()
+    catalog[kind].as_array().map_or_default(|list| {
+        list.iter()
+            .filter_map(|entry| entity_field(entry, kind, "className").and_then(Value::as_str))
+            .collect()
+    })
 }
 
 fn entity<'c>(catalog: &'c Value, kind: &str, class: &str) -> Result<&'c Value, String> {
     catalog[kind]
         .as_array()
-        .and_then(|list| list.iter().find(|entry| entry["className"] == class))
+        .and_then(|list| {
+            list.iter().find(|entry| {
+                entity_field(entry, kind, "className").and_then(Value::as_str) == Some(class)
+            })
+        })
         .ok_or_else(|| format!("{kind} {class}"))
 }
 
@@ -130,52 +89,76 @@ fn items_are_entity_class_definitions_under_scitem_and_legacyitems_ordered_by_gu
 #[test]
 fn an_item_carries_its_definition_mass_display_type_and_class() -> TestResult {
     let (_, catalog) = catalog_with(&options())?;
-    let mut actual = entity(&catalog, "items", "POWR_ACAS_S01")?.clone();
-    if let Some(fields) = actual.as_object_mut() {
-        fields.remove("variantOf");
+    let projection = entity(&catalog, "items", "POWR_ACAS_S01")?;
+    let definition = item_definition(&catalog, projection)?;
+    item_projection_checks::original_values(&catalog, projection, definition)?;
+    check_item_texts(&catalog, definition)
+}
+
+fn item_definition<'a>(
+    catalog: &'a Value,
+    projection: &Value,
+) -> Result<&'a Value, Box<dyn Error>> {
+    let index = projection
+        .get("recordIndex")
+        .ok_or("sourced physical item index")?;
+    crate::health_origin_assertions::rows(catalog, "/definitions/items/rows")?
+        .iter()
+        .find(|definition| definition.get("recordIndex") == Some(index))
+        .ok_or_else(|| "exact Item definition".into())
+}
+
+fn check_item_texts(catalog: &Value, definition: &Value) -> TestResult {
+    let components = crate::health_origin_assertions::rows(definition, "/components/value")?;
+    let attachment = components
+        .iter()
+        .find(|component| component["kind"] == "attachment")
+        .ok_or("first attachment")?;
+    let purchase = components
+        .iter()
+        .find(|component| component["kind"] == "purchasable")
+        .ok_or("first purchasable component")?;
+    for (carrier, table, key, english) in [
+        (
+            attachment.pointer("/value/value/localization/value/name/value"),
+            "publicNames",
+            "@item_NamePOWR_ACAS_S01",
+            "Lumen",
+        ),
+        (
+            attachment.pointer("/value/value/localization/value/description/value"),
+            "gameTexts",
+            "@item_DescPOWR_ACAS_S01",
+            "Item Type: Power Plant\nClass:\u{a0}Military \n\nSteady power.",
+        ),
+        (
+            purchase.pointer("/value/displayType/value"),
+            "gameTexts",
+            "@item_DisplayType_PowerPlant",
+            "Power Plant",
+        ),
+    ] {
+        let id = carrier.ok_or("selected Item text reference")?;
+        let texts = crate::health_origin_assertions::rows(catalog, &format!("/texts/{table}"))?;
+        let text = texts
+            .iter()
+            .find(|row| row.pointer("/id/value") == Some(id))
+            .ok_or("canonical Item text target")?;
+        assert_eq!(
+            text.pointer("/key/value"),
+            Some(&json!(key)),
+            "original Item text key"
+        );
+        assert_eq!(
+            text.pointer("/translations/value/en/displayText/value"),
+            Some(&json!(english)),
+            "normalized English Item display text"
+        );
+        assert!(
+            text.pointer("/translations/value/de").is_none(),
+            "German was not loaded"
+        );
     }
-    assert_eq!(
-        &actual,
-        &json!({
-            "guid": "30000000-0000-4000-8000-000000000001",
-            "className": "POWR_ACAS_S01",
-            "recordPath": "libs/foundry/records/entities/scitem/ships/powerplant/powr_acas_s01",
-            "name": {"key": "@item_NamePOWR_ACAS_S01", "en": "Lumen", "de": null},
-            "description": {
-                "key": "@item_DescPOWR_ACAS_S01",
-                "en": "Item Type: Power Plant\nClass:\u{a0}Military \n\nSteady power.",
-                "de": null
-            },
-            "type": "PowerPlant",
-            "subType": "Power",
-            "size": 1,
-            "grade": 3,
-            "mass": 125.5,
-            "manufacturerGuid": "10000000-0000-4000-8000-000000000001",
-            "tags": ["flightReady", "$Small"],
-            "displayType": {"key": "@item_DisplayType_PowerPlant", "en": "Power Plant", "de": null},
-            "itemClass": "Military",
-            "playability": null,
-            "stats": {
-                "weapon": null,
-                "shield": null,
-                "quantumDrive": null,
-                "powerPlant": {"powerOutput": null, "unit": null},
-                "cooler": null,
-                "missile": null,
-                "armor": null,
-                "clothing": null,
-                "radar": null,
-                "tractorBeam": null,
-                "weaponModifier": null,
-                "miningLaser": null,
-                "miningModifier": null,
-                "health": null,
-                "resourceStates": []
-            },
-        }),
-        "the item fields"
-    );
     Ok(())
 }
 
@@ -190,15 +173,37 @@ fn an_item_without_an_item_definition_keeps_its_identity_and_null_fields() -> Te
         "grade",
         "mass",
         "manufacturerGuid",
-        "itemClass",
+        "tags",
     ] {
-        assert_eq!(counter[field], Value::Null, "{field} is null");
+        assert!(
+            counter.get(field).is_none(),
+            "{field} has one original source-family location"
+        );
     }
-    assert_eq!(counter["tags"], json!([]), "no tags");
     assert_eq!(
-        counter["name"],
-        json!({"key": null, "en": null, "de": null}),
-        "no name"
+        counter.pointer("/itemClass/state"),
+        Some(&json!("absent")),
+        "no class without a source definition"
+    );
+    assert_eq!(
+        counter.pointer("/itemClass/value"),
+        Some(&Value::Null),
+        "missing class is explicitly nullable"
+    );
+    assert_eq!(
+        counter.pointer("/selection/attachmentComponentOrdinal/state"),
+        Some(&json!("absent")),
+        "complete original absence is retained"
+    );
+    let definition = item_definition(&catalog, counter)?;
+    let mut components = definition
+        .pointer("/components/value")
+        .and_then(Value::as_array)
+        .into_iter()
+        .flatten();
+    assert!(
+        components.all(|entry| entry["kind"] != "attachment"),
+        "the Item has no attachment name carrier"
     );
     Ok(())
 }
@@ -207,7 +212,7 @@ fn an_item_without_an_item_definition_keeps_its_identity_and_null_fields() -> Te
 fn the_item_class_comes_from_the_class_line_of_the_english_description() -> TestResult {
     let (built, catalog) = catalog_with(&options())?;
     let class = |name: &str| -> Result<Value, String> {
-        Ok(entity(&catalog, "items", name)?["itemClass"].clone())
+        Ok(entity(&catalog, "items", name)?["itemClass"]["value"].clone())
     };
     assert_eq!(class("POWR_ACAS_S01")?, "Military", "a valid value");
     assert_eq!(
@@ -269,110 +274,45 @@ fn ships_are_entity_class_definitions_under_spaceships_and_groundvehicles_withou
 }
 
 #[test]
-fn a_ship_carries_names_role_career_crew_manufacturer_and_vehicle_definition() -> TestResult {
+fn a_ship_carries_crew_and_vehicle_definition() -> TestResult {
     let (_, catalog) = catalog_with(&options())?;
-    assert_eq!(
-        catalog["ships"][0],
-        json!({
-            "guid": "90000000-0000-4000-8000-000000000001",
-            "className": "ACAS_Ship",
-            "recordPath": "libs/foundry/records/entities/spaceships/acas_ship",
-            "name": {"key": "@vehicle_NameACAS_Ship", "en": "Ace Hauler", "de": null},
-            "description": {"key": "@vehicle_DescACAS_Ship", "en": null, "de": null},
-            "role": {"key": "@LOC_PLACEHOLDER", "en": null, "de": null},
-            "career": {"key": "@vehicle_focus_transporter", "en": "Transporter", "de": null},
-            "crewSize": 2,
-            "manufacturerGuid": "10000000-0000-4000-8000-000000000001",
-            "vehicleDefinition": "scripts/entities/vehicles/implementations/xml/acas_ship.xml",
-            "playability": null,
-            "variantOf": null,
-            "vehicleKind": "spaceship",
-            "size": null,
-            "mass": null,
-            "massBasis": null,
-            "hullHealth": null,
-            "cargoScu": 0.0,
-            "cargoGridsWithIssue": 0,
-            "insurance": null,
-        }),
-        "the ship fields"
-    );
-    Ok(())
-}
-
-#[test]
-fn every_kind_states_its_completeness() -> TestResult {
-    let (_, catalog) = catalog_with(&options())?;
-    assert_eq!(
-        catalog["completeness"],
-        json!({
-            "manufacturers": {"status": "complete"},
-            "items": {"status": "complete"},
-            "ships": {"status": "complete"},
-            "commodities": {"status": "complete"},
-            "blueprints": {"status": "complete"},
-            "resourceGroups": {"status": "complete"},
-            "blueprintCategories": {"status": "complete"},
-            "gameplayProperties": {"status": "complete"},
-            "qualityDistributions": {"status": "complete"},
-            "qualityQuantizations": {"status": "complete"},
-            "blueprintPools": {"status": "complete"},
-            "dismantleProcesses": {"status": "complete"},
-            "paints": {"status": "complete"},
-            "loadouts": {"status": "complete"},
-            "starmapObjects": {"status": "complete"},
-            "contracts": {"status": "complete"},
-            "mineableElements": {"status": "complete"},
-            "refiningProcesses": {"status": "complete"},
-            "mineableCompositions": {"status": "complete"},
-            "miningGlobalParams": {"status": "complete"},
-            "harvestableProviderPresets": {"status": "complete"},
-            "subHarvestableMultiConfigs": {"status": "complete"},
-            "harvestableLocations": {"status": "complete"},
-            "shops": {"status": "complete"},
-            "factionReputations": {"status": "complete"},
-            "reputationScopes": {"status": "complete"},
-            "reputationStandings": {"status": "complete"},
-            "reputationContexts": {"status": "complete"},
-            "missionTypes": {"status": "complete"},
-            "missionLocalities": {"status": "complete"},
-            "contractScenarios": {"status": "complete"},
-            "cargoManifests": {"status": "complete"},
-            "missionLocationTemplates": {"status": "complete"},
-            "contractShipSpawns": {"status": "complete"},
-            "contractLocationQueries": {"status": "complete"},
-            "contractTemplates": {"status": "complete"},
-            "missionBrokerEntries": {"status": "complete"},
-            "contractNpcSpawns": {"status": "complete"},
-            "contractEntitySpawns": {"status": "complete"},
-            "lootTables": {"status": "complete"},
-            "lootArchetypes": {"status": "complete"},
-            "lootPoolFilters": {"status": "complete"},
-            "legacyLootTables": {"status": "complete"},
-            "legacyLootArchetypes": {"status": "complete"},
-            "lootContainers": {"status": "complete"},
-            "mineableEntities": {"status": "complete"},
-            "crafters": {"status": "complete"},
-            "shipStoreSlugs": {"status": "complete"},
-        }),
-        "complete"
-    );
-    let filter = Filter::new("*/spaceships/*");
-    let (built, catalog) = catalog_with(&CatalogOptions {
-        filter: Some(&filter),
-        ..options()
-    })?;
-    assert_eq!(
-        catalog["completeness"]["items"],
-        json!({"status": "partial", "filter": "*/spaceships/*"}),
-        "partial"
-    );
-    assert_eq!(class_names(&catalog, "items"), Vec::<&str>::new(), "none");
-    assert_eq!(class_names(&catalog, "ships"), ["ACAS_Ship"], "the ship");
-    assert!(
-        built.summary().kinds().iter().all(|kind| !kind.complete),
-        "every kind partial"
-    );
+    let ship = &catalog["ships"][0];
+    let proof = crate::health_origin_assertions::present;
+    proof(
+        ship,
+        "guid",
+        &json!("90000000-0000-4000-8000-000000000001"),
+        Some(true),
+    )?;
+    proof(ship, "className", &json!("ACAS_Ship"), Some(true))?;
+    proof(
+        ship,
+        "recordPath",
+        &json!("libs/foundry/records/entities/spaceships/acas_ship"),
+        Some(true),
+    )?;
+    proof(
+        ship,
+        "crewSize",
+        &json!({"type": "int32", "value": 2}),
+        Some(true),
+    )?;
+    proof(
+        ship,
+        "vehicleDefinition",
+        &json!("scripts/entities/vehicles/implementations/xml/acas_ship.xml"),
+        Some(true),
+    )?;
+    for field in ["size", "insurance", "playability"] {
+        crate::health_origin_assertions::cell(ship, field, "absent")?;
+    }
+    assert!(ship["variantOf"].is_null(), "the fixture has no variantOf");
+    for field in ["mass", "massBasis", "hullHealth"] {
+        crate::health_origin_assertions::cell(ship, field, "unreadable")?;
+    }
+    assert_eq!(ship["vehicleKind"]["value"], "spaceship");
+    assert_eq!(ship["cargoScu"], 0.0);
+    assert_eq!(ship["cargoGridsWithIssue"], 0);
     Ok(())
 }
 
@@ -387,4 +327,47 @@ fn the_summary_lists_the_kinds_in_catalog_order() -> TestResult {
         .collect();
     assert_eq!(kinds, Kind::ALL, "order");
     Ok(())
+}
+
+pub(crate) fn entity_field<'a>(row: &'a Value, kind: &str, field: &str) -> Option<&'a Value> {
+    match kind {
+        "items" => row.get(field)?.get("value"),
+        "ships"
+            if matches!(
+                field,
+                "guid"
+                    | "recordName"
+                    | "className"
+                    | "recordPath"
+                    | "recordIndex"
+                    | "sourceType"
+                    | "fileName"
+                    | "metadataTag"
+                    | "playability"
+            ) =>
+        {
+            row.get(field)?.get("value")
+        }
+        "ships" | "crafters" => row.get(field),
+        _ => None,
+    }
+}
+
+pub(crate) fn selected_attachment<'a>(
+    catalog: &'a Value,
+    projection: &Value,
+) -> Result<&'a Value, Box<dyn Error>> {
+    let definition = item_definition(catalog, projection)?;
+    let slot = projection
+        .pointer("/selection/attachmentComponentOrdinal/value")
+        .ok_or("selected attachment slot")?;
+    definition
+        .pointer("/components/value")
+        .and_then(Value::as_array)
+        .and_then(|rows| {
+            rows.iter()
+                .find(|row| row.pointer("/componentOrdinal/value") == Some(slot))
+        })
+        .and_then(|row| row.pointer("/value/value"))
+        .ok_or_else(|| "exact physically selected source attachment".into())
 }

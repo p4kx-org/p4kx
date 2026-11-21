@@ -92,10 +92,7 @@ fn a_compressed_entry_decodes_at_most_the_skip_limit_to_reach_an_offset() -> Tes
         ),
         "the skip is refused before decoding: {result:?}"
     );
-    let message = result
-        .err()
-        .map(|error| error.to_string())
-        .unwrap_or_default();
+    let message = result.err().map_or_default(|error| error.to_string());
     assert!(message.contains("compressed"), "{message}");
     Ok(())
 }

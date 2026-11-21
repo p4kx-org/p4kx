@@ -12,6 +12,9 @@ use serde::Serialize;
 use crate::cli::{AudioAction, AudioArgs, AudioSource};
 use crate::json;
 
+#[path = "audio_info_origins.rs"]
+mod info_origins;
+
 const UNKNOWN: &str = "unknown";
 const NONE: &str = "none";
 
@@ -66,16 +69,20 @@ struct OggJson<'a> {
 /// Runs `p4kx audio info`, `p4kx audio wav` or `p4kx audio ogg`.
 pub(crate) fn run(args: &AudioArgs, as_json: bool) -> Result<()> {
     match &args.action {
-        AudioAction::Info(source) => info(&open(source)?, as_json),
-        AudioAction::Wav { source, out } => wav(&open(source)?, out, as_json),
-        AudioAction::Ogg { source, out } => ogg(&open(source)?, out, as_json),
+        AudioAction::Info(source) => info(&open(source, as_json)?, as_json),
+        AudioAction::Wav { source, out } => wav(&open(source, false)?, out, as_json),
+        AudioAction::Ogg { source, out } => ogg(&open(source, false)?, out, as_json),
     }
 }
 
-fn open(source: &AudioSource) -> Result<Sound> {
-    Ok(match &source.entry {
-        Some(entry) => Sound::from_archive(&crate::key::open(&source.path)?, entry)?,
-        None => Sound::from_file(&source.path)?,
+fn open(source: &AudioSource, observe: bool) -> Result<Sound> {
+    Ok(match (&source.entry, observe) {
+        (Some(entry), true) => {
+            Sound::from_archive_observed(&crate::key::open(&source.path)?, entry)?
+        }
+        (Some(entry), false) => Sound::from_archive(&crate::key::open(&source.path)?, entry)?,
+        (None, true) => Sound::from_file_observed(&source.path)?,
+        (None, false) => Sound::from_file(&source.path)?,
     })
 }
 
@@ -96,7 +103,7 @@ fn info(sound: &Sound, as_json: bool) -> Result<()> {
             .map(|points| loop_json(points.start, points.end)),
     };
     if as_json {
-        json::print(&info)?;
+        json::print(&info_origins::report(sound, info)?)?;
         return Ok(());
     }
     let lines = [

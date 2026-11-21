@@ -7,6 +7,8 @@ use crate::comparing;
 use crate::waiting::{RunQuiet, wait_for};
 
 use std::error::Error;
+use std::fs;
+use std::path::PathBuf;
 
 use comparing::{Pair, TestResult, pair};
 use egui::accesskit::Role;
@@ -15,10 +17,12 @@ use egui_kittest::kittest::{NodeT, Queryable};
 use p4kx_channels::SearchPaths;
 use p4kx_gui::ui::{self, Dialog, Requests};
 use p4kx_gui::{
-    ChangeColumn, ChannelList, ComparisonSide, ComparisonStatus, Language, Model, SortDirection,
-    WorkTab,
+    ChangeColumn, ChannelList, ComparisonSide, ComparisonStatus, Language, Model, ReportStatus,
+    SortDirection, WorkTab,
 };
 use p4kx_settings::{ManualChannels, RecentArchives};
+use p4kx_testkit::{ArchiveBuilder, TestContainer, TestEntry};
+use serde_json::Value;
 
 type State = (Model, Requests);
 
@@ -271,4 +275,112 @@ fn the_german_tab_speaks_german() -> TestResult {
         assert!(harness.query_by_label(text).is_some(), "{text}");
     }
     Ok(())
+}
+
+const MIXED_CHECKSUM_PATH: &str = "Data/same.txt";
+const INCOMPARABLE_NOTICE: &str =
+    "1 Entry pairs use different checksum algorithms and cannot be compared.";
+
+#[test]
+fn incomparable_entries_follow_the_filter_and_the_saved_report() -> TestResult {
+    let pair = mixed_checksum_pair()?;
+    let mut harness = compared(&pair, Language::BritishEnglish)?;
+    assert_incomparable_summary(&harness);
+
+    apply_filter(&mut harness, "DATA\\SAME.TXT")?;
+    assert_incomparable_summary(&harness);
+    let included = saved_report(&mut harness, pair.dir.path().join("included.json"))?;
+    assert_eq!(
+        included
+            .pointer("/entries/incomparable/0/path")
+            .and_then(Value::as_str),
+        Some(MIXED_CHECKSUM_PATH),
+        "the visible matching pair is in the saved report"
+    );
+    assert_eq!(
+        included
+            .pointer("/entries/counts/changed")
+            .and_then(Value::as_u64),
+        Some(0),
+        "the report has no confirmed change"
+    );
+
+    apply_filter(&mut harness, "Engine")?;
+    assert!(
+        harness.query_by_label(INCOMPARABLE_NOTICE).is_none(),
+        "the incomparable notice follows the filter"
+    );
+    assert!(
+        harness
+            .query_by_label("No change matches the filter.")
+            .is_some(),
+        "the empty list describes the filter result"
+    );
+    let excluded = saved_report(&mut harness, pair.dir.path().join("excluded.json"))?;
+    assert!(
+        excluded.pointer("/entries/incomparable").is_none(),
+        "the saved report omits the excluded pair"
+    );
+    Ok(())
+}
+
+fn mixed_checksum_pair() -> Result<Pair, Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    let old = dir.path().join("old.zip");
+    let entry = || TestEntry::stored(MIXED_CHECKSUM_PATH, b"123456789");
+    let plain_zip = TestContainer::new().entry(entry()).build();
+    fs::write(&old, plain_zip)?;
+    let new = comparing::write(
+        dir.path(),
+        "PTU",
+        "4.3.2.10400",
+        &ArchiveBuilder::new().entry(entry()),
+    )?;
+    Ok(Pair { dir, old, new })
+}
+
+fn assert_incomparable_summary(harness: &Harness<'_, State>) {
+    for label in [
+        "Changed 0",
+        INCOMPARABLE_NOTICE,
+        "No confirmed Entry changes.",
+    ] {
+        assert!(harness.query_by_label(label).is_some(), "{label}");
+    }
+    for label in ["Extract old (0)…", "Extract new (0)…"] {
+        assert!(
+            harness.get_by_label(label).accesskit_node().is_disabled(),
+            "{label} is disabled"
+        );
+    }
+}
+
+fn apply_filter(harness: &mut Harness<'_, State>, text: &str) -> TestResult {
+    harness
+        .state_mut()
+        .0
+        .comparison_mut()
+        .view_mut()
+        .ok_or("finished comparison")?
+        .set_filter(text, || {});
+    settle(harness, finished)
+}
+
+fn saved_report(harness: &mut Harness<'_, State>, path: PathBuf) -> Result<Value, Box<dyn Error>> {
+    harness
+        .state_mut()
+        .0
+        .comparison_mut()
+        .view_mut()
+        .ok_or("finished comparison")?
+        .save_report(path.clone(), || {});
+    settle(harness, |model| {
+        model.comparison().view().is_some_and(|view| {
+            matches!(
+                view.report_status(),
+                Some(ReportStatus::Saved(_) | ReportStatus::Failed(_, _))
+            )
+        })
+    })?;
+    Ok(serde_json::from_slice(&fs::read(path)?)?)
 }

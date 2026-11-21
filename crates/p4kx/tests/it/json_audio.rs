@@ -9,6 +9,9 @@ use std::path::{Path, PathBuf};
 use p4kx_testkit::{ArchiveBuilder, TestCodec, TestEntry, TestWem, test_signal};
 use serde_json::Value;
 
+#[path = "json_audio_origins.rs"]
+mod origins;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const SOUND: &str = "Data\\Sounds\\wwise\\Media\\100.wem";
@@ -22,7 +25,7 @@ fn sound_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
     Ok(archive)
 }
 
-fn json(dir: &Path, args: &[&std::ffi::OsStr]) -> Result<String, Box<dyn Error>> {
+fn json(dir: &Path, args: &[&std::ffi::OsStr]) -> Result<Value, Box<dyn Error>> {
     let output = p4kx_testkit::p4kx()?.arg("--json").args(args).output()?;
     assert_eq!(output.status.code(), Some(0), "exit code: {output:?}");
     let mut value: Value = serde_json::from_slice(&output.stdout)?;
@@ -31,7 +34,7 @@ fn json(dir: &Path, args: &[&std::ffi::OsStr]) -> Result<String, Box<dyn Error>>
     {
         *text = format!("[DIR]{}", rest.replace('\\', "/"));
     }
-    Ok(serde_json::to_string_pretty(&value)?)
+    Ok(value)
 }
 
 #[test]
@@ -39,7 +42,7 @@ fn audio_info() -> TestResult {
     let dir = tempfile::tempdir()?;
     let archive = sound_archive(dir.path())?;
 
-    let json = json(
+    let mut value = json(
         dir.path(),
         &[
             "audio".as_ref(),
@@ -49,7 +52,17 @@ fn audio_info() -> TestResult {
         ],
     )?;
 
+    remove_info_metadata(&mut value)?;
+    let json = serde_json::to_string_pretty(&value)?;
     insta::assert_snapshot!(json);
+    Ok(())
+}
+
+pub(super) fn remove_info_metadata(value: &mut Value) -> TestResult {
+    let fields = value.as_object_mut().ok_or("Audio Info JSON object")?;
+    for key in ["fieldOrigins", "provenance"] {
+        assert!(fields.remove(key).is_some(), "Audio Info includes {key}");
+    }
     Ok(())
 }
 
@@ -59,7 +72,7 @@ fn audio_wav() -> TestResult {
     let archive = sound_archive(dir.path())?;
     let out = dir.path().join("100.wav");
 
-    let json = json(
+    let value = json(
         dir.path(),
         &[
             "audio".as_ref(),
@@ -71,6 +84,7 @@ fn audio_wav() -> TestResult {
         ],
     )?;
 
+    let json = serde_json::to_string_pretty(&value)?;
     insta::assert_snapshot!(json);
     Ok(())
 }

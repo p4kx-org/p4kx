@@ -3,17 +3,17 @@
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
-use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
+use std::sync::mpsc::{self, Receiver, TryRecvError};
 use std::thread;
 use std::time::Duration;
 
-use p4kx_extraction::{Codec, Soundbank, Wem};
+use p4kx_extraction::{Codec, EmbeddedWem, EntryOrigin, ObservedEntry, Soundbank, Wem};
 
+use super::audio_worker::{Source, Worker};
 use super::bank_cache::BankCache;
-use super::entry_bytes::{Unreadable, read_whole};
+use super::wem_header_provenance::{WemHeaderEvidenceError, WemHeaderProvenance};
 use crate::EntryIndex;
-use crate::audio::{self, Pcm, Player, Undecoded};
-use crate::model::describe;
+use crate::audio::{Pcm, Player, Undecoded};
 
 static SERIAL: AtomicU64 = AtomicU64::new(0);
 
@@ -84,11 +84,48 @@ pub enum SoundStatus<'a> {
 }
 
 #[derive(Debug)]
-enum Event {
+pub(super) struct SoundHeader {
+    info: SoundInfo,
+    provenance: Option<Result<Box<WemHeaderProvenance>, WemHeaderEvidenceError>>,
+}
+
+impl SoundHeader {
+    pub(super) fn of<B: AsRef<[u8]>>(wem: &Wem<B>) -> Self {
+        Self {
+            info: SoundInfo::of(wem),
+            provenance: None,
+        }
+    }
+
+    pub(super) fn observed<B: AsRef<[u8]>>(
+        wem: &Wem<B>,
+        source: Option<ObservedEntry<'_>>,
+    ) -> Self {
+        Self {
+            info: SoundInfo::of(wem),
+            provenance: Some(WemHeaderProvenance::capture(wem, source).map(Box::new)),
+        }
+    }
+
+    pub(super) fn observed_embedded<B: AsRef<[u8]>>(
+        wem: &Wem<B>,
+        embedded: &EmbeddedWem<'_>,
+        source: Option<&EntryOrigin>,
+    ) -> Self {
+        let provenance = WemHeaderProvenance::capture_embedded(wem, embedded, source);
+        Self {
+            info: SoundInfo::of(wem),
+            provenance: Some(provenance.map(Box::new)),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub(super) enum Event {
     TooLarge,
     Failed(Option<String>),
     ArchiveChanged,
-    Opened(SoundInfo),
+    Opened(SoundHeader),
     Decoded(Result<Pcm, Undecoded>),
 }
 
@@ -107,7 +144,7 @@ enum State {
     TooLarge,
     Failed(Option<String>),
     ArchiveChanged,
-    Opened(SoundInfo, Sound),
+    Opened(SoundHeader, Sound),
 }
 
 /// The audio preview of a WEM: read and decoded to PCM on a background thread, then played
@@ -117,6 +154,7 @@ pub struct AudioPreview {
     serial: u64,
     dropped: Arc<AtomicBool>,
     events: Receiver<Event>,
+    watched_index: Option<Arc<EntryIndex>>,
     state: State,
 }
 
@@ -136,9 +174,17 @@ impl AudioPreview {
     pub(crate) fn start_embedded(
         bank: &Arc<Soundbank<Vec<u8>>>,
         id: u32,
+        original: Option<&Arc<EntryOrigin>>,
         wake: impl Fn() + Send + 'static,
     ) -> Self {
-        Self::spawn(Source::Embedded(Arc::clone(bank), id), wake)
+        Self::spawn(
+            Source::Embedded {
+                bank: Arc::clone(bank),
+                id,
+                original: original.cloned(),
+            },
+            wake,
+        )
     }
 
     /// Starts reading the soundbank Entry `bank` of `index`, unless `cache` keeps it, and decoding
@@ -157,11 +203,11 @@ impl AudioPreview {
     fn spawn(source: Source, wake: impl Fn() + Send + 'static) -> Self {
         let (sender, events) = mpsc::channel();
         let dropped = Arc::new(AtomicBool::new(false));
-        let worker = Worker {
-            source,
-            events: sender,
-            dropped: Arc::clone(&dropped),
+        let watched_index = match &source {
+            Source::Entry(index, _) => Some(Arc::clone(index)),
+            _ => None,
         };
+        let worker = Worker::new(source, sender, Arc::clone(&dropped));
         let spawned = thread::Builder::new()
             .name("audio-preview".to_owned())
             .spawn(move || worker.run(&wake));
@@ -173,6 +219,7 @@ impl AudioPreview {
             serial: SERIAL.fetch_add(1, Ordering::Relaxed),
             dropped,
             events,
+            watched_index,
             state,
         }
     }
@@ -186,12 +233,29 @@ impl AudioPreview {
     /// Returns where the preview stands.
     #[must_use]
     pub fn status(&self) -> AudioStatus<'_> {
+        if self.archive_changed() {
+            return AudioStatus::ArchiveChanged;
+        }
         match &self.state {
             State::Opening => AudioStatus::Opening,
             State::TooLarge => AudioStatus::TooLarge,
             State::Failed(reason) => AudioStatus::Failed(reason.as_deref()),
             State::ArchiveChanged => AudioStatus::ArchiveChanged,
-            State::Opened(info, sound) => AudioStatus::Opened(info, sound_status(sound)),
+            State::Opened(header, sound) => AudioStatus::Opened(&header.info, sound_status(sound)),
+        }
+    }
+
+    /// Returns the original contributions to the facts of an opened WEM.
+    #[must_use]
+    pub fn header_provenance(
+        &self,
+    ) -> Option<Result<&WemHeaderProvenance, &WemHeaderEvidenceError>> {
+        if self.archive_changed() {
+            return None;
+        }
+        match &self.state {
+            State::Opened(header, _) => header.provenance.as_ref().map(Result::as_deref),
+            _ => None,
         }
     }
 
@@ -224,6 +288,12 @@ impl AudioPreview {
     /// Takes the results of the background thread and a failure of the audio output; returns
     /// whether one arrived.
     pub(crate) fn poll(&mut self) -> bool {
+        if self.archive_changed() {
+            let changed = !matches!(self.state, State::ArchiveChanged);
+            self.dropped.store(true, Ordering::Release);
+            self.state = State::ArchiveChanged;
+            return changed;
+        }
         let mut changed = self.player_mut().is_some_and(Player::poll);
         loop {
             match self.events.try_recv() {
@@ -237,24 +307,30 @@ impl AudioPreview {
         }
     }
 
+    fn archive_changed(&self) -> bool {
+        self.watched_index
+            .as_ref()
+            .is_some_and(|index| index.watch().is_changed())
+    }
+
     fn apply(&mut self, event: Event) {
         self.state = match event {
             Event::TooLarge => State::TooLarge,
             Event::Failed(reason) => State::Failed(reason),
             Event::ArchiveChanged => State::ArchiveChanged,
-            Event::Opened(info) => State::Opened(info, Sound::Decoding),
+            Event::Opened(header) => State::Opened(header, Sound::Decoding),
             Event::Decoded(decoded) => {
-                let State::Opened(info, Sound::Decoding) = self.state else {
+                let State::Opened(_, sound @ Sound::Decoding) = &mut self.state else {
                     return;
                 };
-                let sound = match decoded {
+                *sound = match decoded {
                     Ok(pcm) => Sound::Ready(Player::new(pcm, 1.0)),
                     Err(Undecoded::Unsupported(codec)) => Sound::Unsupported(codec),
                     Err(Undecoded::TooLong) => Sound::TooLong,
                     Err(Undecoded::Cancelled) => Sound::Failed(None),
                     Err(Undecoded::Failed(reason)) => Sound::Failed(Some(reason)),
                 };
-                State::Opened(info, sound)
+                return;
             }
         };
     }
@@ -282,114 +358,5 @@ fn sound_status(sound: &Sound) -> SoundStatus<'_> {
         Sound::TooLong => SoundStatus::TooLong,
         Sound::Failed(reason) => SoundStatus::Failed(reason.as_deref()),
         Sound::Ready(player) => SoundStatus::Ready(player),
-    }
-}
-
-/// Where the WEM of one audio preview comes from.
-enum Source {
-    Entry(Arc<EntryIndex>, u32),
-    Embedded(Arc<Soundbank<Vec<u8>>>, u32),
-    InBank(Arc<EntryIndex>, (u32, u32), BankCache),
-}
-
-/// What the background thread of one audio preview works with.
-struct Worker {
-    source: Source,
-    events: Sender<Event>,
-    dropped: Arc<AtomicBool>,
-}
-
-impl Worker {
-    fn send(&self, event: Event, wake: &impl Fn()) -> bool {
-        let sent = !self.dropped.load(Ordering::Acquire) && self.events.send(event).is_ok();
-        if sent {
-            wake();
-        }
-        sent
-    }
-
-    fn run(&self, wake: &impl Fn()) {
-        let event = match &self.source {
-            Source::Entry(index, id) => self.run_entry(index, *id, wake),
-            Source::Embedded(bank, id) => self.run_embedded(bank, *id, wake),
-            Source::InBank(index, ids, cache) => self.run_in_bank(index, (*ids, cache), wake),
-        };
-        if let Some(event) = event {
-            self.send(event, wake);
-        }
-    }
-
-    fn run_entry(&self, index: &EntryIndex, id: u32, wake: &impl Fn()) -> Option<Event> {
-        let wem = match read_whole(index, id, &self.dropped)
-            .map_err(Event::from)
-            .and_then(|bytes| {
-                Wem::parse(bytes).map_err(|error| Event::Failed(Some(describe(&error))))
-            }) {
-            Ok(wem) => wem,
-            Err(event) => return Some(event),
-        };
-        let decoded = self.decode(&wem, wake)?;
-        drop(wem);
-        Some(if index.watch().check().is_err() {
-            Event::ArchiveChanged
-        } else {
-            Event::Decoded(decoded)
-        })
-    }
-
-    fn run_in_bank(
-        &self,
-        index: &EntryIndex,
-        ((bank, id), cache): ((u32, u32), &BankCache),
-        wake: &impl Fn(),
-    ) -> Option<Event> {
-        let bank = match cache.get(bank) {
-            Some(kept) => kept,
-            None => match read_whole(index, bank, &self.dropped) {
-                Ok(bytes) => match Soundbank::parse(bytes) {
-                    Ok(parsed) => {
-                        let parsed = Arc::new(parsed);
-                        cache.keep(bank, &parsed);
-                        parsed
-                    }
-                    Err(error) => return Some(Event::Failed(Some(describe(&error)))),
-                },
-                Err(unread) => return Some(Event::from(unread)),
-            },
-        };
-        let event = self.run_embedded(&bank, id, wake)?;
-        Some(match event {
-            Event::Decoded(_) if index.watch().check().is_err() => Event::ArchiveChanged,
-            other => other,
-        })
-    }
-
-    fn run_embedded(&self, bank: &Soundbank<Vec<u8>>, id: u32, wake: &impl Fn()) -> Option<Event> {
-        let Some(embedded) = bank.wem(id) else {
-            return Some(Event::Failed(None));
-        };
-        match embedded.parse() {
-            Ok(wem) => self.decode(&wem, wake).map(Event::Decoded),
-            Err(error) => Some(Event::Failed(Some(describe(&error)))),
-        }
-    }
-
-    fn decode<B: AsRef<[u8]>>(
-        &self,
-        wem: &Wem<B>,
-        wake: &impl Fn(),
-    ) -> Option<Result<Pcm, Undecoded>> {
-        self.send(Event::Opened(SoundInfo::of(wem)), wake)
-            .then(|| audio::decode(wem, &self.dropped))
-    }
-}
-
-impl From<Unreadable> for Event {
-    fn from(unread: Unreadable) -> Self {
-        match unread {
-            Unreadable::TooLarge => Self::TooLarge,
-            Unreadable::ArchiveChanged => Self::ArchiveChanged,
-            Unreadable::Failed(reason) => Self::Failed(reason),
-        }
     }
 }

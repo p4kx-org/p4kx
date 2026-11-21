@@ -8,6 +8,8 @@ menu-recent = Zuletzt geöffnet
 recent-none = Noch kein Archiv geöffnet
 channels-heading = Channels
 channels-none = Keine Channels gefunden. Füge über das Menü Archiv einen Ordner oder ein Archiv hinzu.
+channels-discovery-incomplete = Die automatische Suche oder der Installationsschutz war unvollständig. Füge fehlende Spielordner oder Archive manuell hinzu.
+channels-discovery-stopped = Die Channel-Suche endete ohne Ergebnis.
 sidebar-show = Seitenleiste einblenden
 sidebar-hide = Seitenleiste ausblenden
 menu-language = Sprache
@@ -77,7 +79,7 @@ archive-issues =
         [one] Das Verzeichnis des Archivs hat einen Fehler in einem Eintrag. Der Eintrag bleibt aufgelistet, seine Daten sind aber womöglich nicht lesbar; eine Extraktion meldet ihn, wenn er scheitert, und `p4kx info` nennt ihn.
        *[other] Das Verzeichnis des Archivs hat { $count } Fehler in seinen Einträgen. Die Einträge bleiben aufgelistet, ihre Daten sind aber womöglich nicht lesbar; eine Extraktion meldet die gescheiterten, und `p4kx info` nennt sie.
     }
-game-running = Star Citizen läuft. Nutze dieses Werkzeug bei beendetem Spiel: Lesen funktioniert weiter, aber der RSI Launcher kann das Archiv beim Aktualisieren ändern, und das Werkzeug schreibt nie in die Installation.
+game-running = Star Citizen läuft möglicherweise. Nutze dieses Werkzeug bei beendetem Spiel: Lesen funktioniert weiter, aber der RSI Launcher kann das Archiv beim Aktualisieren ändern, und das Werkzeug schreibt nie in die Installation.
 archive-test-build =
     { $kind ->
         [one] Dieses Archiv gehört zum Channel { $channel }, der Testbuilds von Star Citizen enthält. Material aus Testbuilds ist nach den Nutzungsbedingungen von Star Citizen vertraulich: Gib nichts daraus weiter und veröffentliche nichts davon.
@@ -152,6 +154,7 @@ extraction-summary-failed = Fehlgeschlagen ({ $number })
 extraction-summary-skipped = Übersprungen ({ $number })
 extraction-summary-cancelled = Abgebrochen ({ $number })
 extraction-summary-unconverted = Nicht umgewandelt ({ $number })
+extraction-summary-texture-receipts = DDS-Herkunftsbelege ({ $number })
 extraction-summary-failure = { $path }: { $reason }
 extraction-summary-records-failed = Nicht geschriebene Records ({ $number })
 extraction-summary-record-failure = { $path } ({ $guid }): { $reason }
@@ -209,6 +212,8 @@ comparison-report-saving = Der Bericht wird in { $path } gespeichert …
 comparison-report-saved = Bericht gespeichert in { $path }
 comparison-report-failed = Der Bericht kann nicht in { $path } gespeichert werden: { $reason }
 comparison-no-differences = Kein Eintrag unterscheidet sich zwischen den Archiven.
+comparison-no-confirmed-differences = Keine nachgewiesenen Änderungen an Einträgen.
+comparison-incomparable = { $number } Eintragspaare verwenden unterschiedliche Prüfsummenverfahren und sind unvergleichbar.
 comparison-no-matches = Keine Änderung passt zum Filter.
 comparison-shown = { $number } angezeigt
 comparison-row = { $change }: { $path }
@@ -268,7 +273,8 @@ query-archive-changed = Das Archiv wurde auf der Festplatte geändert. Laden Sie
 query-invalid = Zeile { $line }, Spalte { $column }: { $reason }
 query-empty-title = Kein Archiv geöffnet
 query-empty-hint = Öffnen Sie ein Archiv, um Abfragen über sein DataForge auszuführen.
-query-prompt = Schreiben Sie eine Abfrage und führen Sie sie mit Strg+Enter aus, z. B. from AmmoParams select speed where speed >= 1500
+query-prompt = Schreiben Sie eine Abfrage und führen Sie sie mit { $shortcut } aus, z. B. from AmmoParams select speed where speed >= 1500
+query-run-shortcut = Strg+Enter
 query-no-rows = Kein Record passt zur Abfrage.
 query-rows =
     { $count ->
@@ -399,6 +405,10 @@ change-extraction-summary-changed = Das Archiv hat sich während der Extraktion 
 preview-tab-image = Bild
 image-mip = Mip
 image-format = Format
+image-pixels = Pixel
+image-origin-encrypted = Enthält verschlüsselte Quelldaten
+image-origin-plain = Unverschlüsselte Quelldaten
+image-origin-unknown = Verschlüsselung der Quelle unbekannt
 image-size = Größe
 image-mips = Mips
 image-faces = Cubemap-Seiten
@@ -449,6 +459,7 @@ record-export-summary-title = Record-Export abgeschlossen
 record-export-summary-cancelled-title = Record-Export abgebrochen
 record-export-summary-cancelled = Der Record-Export wurde abgebrochen, bevor alle Records geschrieben waren.
 record-export-summary-counts = Records geschrieben { $written }, übersprungen { $skipped }, fehlgeschlagen { $failed }, abgebrochen { $cancelled }
+record-export-summary-written = Geschriebene Records
 record-export-summary-errors = Records mit Fehlerwerten: { $erroneous }, Fehlerwerte: { $errors }
 record-export-summary-no-match = Kein Record passt zum Filter.
 record-export-summary-target = Ziel: { $path }
@@ -460,10 +471,32 @@ record-export-failed-title = Record-Export fehlgeschlagen
 record-export-failed = Der Record-Export nach { $path } ist fehlgeschlagen: { $reason }
 record-export-stopped = Der Record-Export nach { $path } brach ohne Ergebnis ab.
 
-catalog-action = Basetool-Katalog …
-catalog-file-filter = Basetool-Katalog (JSON)
-catalog-file-filter-compressed = Basetool-Katalog (JSON, zstd-komprimiert)
-catalog-running-title = Erstelle Basetool-Katalog
+catalog-action = P4KX-Katalog …
+catalog-diagnostic-action = P4KX-Diagnosekatalog …
+catalog-diagnostic-running-title = Erstelle P4KX-Diagnosekatalog
+catalog-diagnostic-summary-title = P4KX-Diagnosekatalog geschrieben
+catalog-diagnostic-notice = Diagnosekatalog. Prüfe den gemeldeten Exportzustand, bevor fehlende Daten als Löschungen gewertet werden.
+catalog-incomplete = Einige ausgewählte Daten konnten nicht gelesen oder übernommen werden. Es wurde keine Datei erstellt oder ersetzt. Nutze einen Diagnosekatalog, um das Teilergebnis zu untersuchen.
+catalog-health-complete = Exportzustand: Alle ausgewählten Quellen wurden erfolgreich gelesen und übernommen.
+catalog-health-incomplete = Exportzustand: unvollständig. Einige ausgewählte Quellen konnten nicht gelesen oder übernommen werden.
+catalog-health-entry-diagnostic = { $kind ->
+    [catalog] Katalog
+    [shopInventories] Offline-Shop-Inventare
+    [shops] Shops
+   *[other] { $kind }
+}: { $reason ->
+    [malformed] ungültige Quelldaten
+    [unreadable] Quelle konnte nicht gelesen werden
+    [missing] Quelle fehlt
+    [unsupported] nicht unterstützte Quelldaten
+   *[failed] Quellvorgang fehlgeschlagen
+} ({ $number } { $singular ->
+    [yes] Archivvorgang
+   *[no] Archivvorgänge
+})
+catalog-file-filter = P4KX-Katalog (JSON)
+catalog-file-filter-compressed = P4KX-Katalog (JSON, zstd-komprimiert)
+catalog-running-title = Erstelle P4KX-Katalog
 catalog-reading = Lese DataForge …
 catalog-progress = { $done } von { $total } Records geprüft, { $percent } %
 catalog-crafting-progress = Crafting-Daten werden gelesen: { $done } von { $total } Records, { $percent } %
@@ -483,16 +516,41 @@ catalog-warning = { $kind ->
 }
 catalog-warning-more = und { $number } weitere
 catalog-writing = Schreibe { $path } …
-catalog-summary-title = Basetool-Katalog erstellt
-catalog-kinds-heading = Arten
+catalog-summary-title = P4KX-Katalog erstellt
+catalog-kinds-heading = Arten (Auswahlumfang)
 catalog-summary-kind = { $kind ->
+    [tags] Globale Tags
     [manufacturers] Hersteller
     [items] Items
     [ships] Schiffe
     [commodities] Waren
     [blueprints] Blaupausen
     [resourceGroups] Ressourcengruppen
+    [resourceTypes] Ressourcentypen
+    [missionPropertySets] Eigenschaftssätze für Missionen
     [blueprintCategories] Blaupausenkategorien
+    [blueprintCategoryLists] Blaupausenkategorielisten
+    [factions] Fraktionen
+    [factionIdentities] Fraktionsidentitäten
+    [reputationPerks] Rufvorteile
+    [reputationTriggerRecords] Rufauslöser-Definitionen
+    [reputationRewardAmounts] Rufbelohnungswerte
+    [infractions] Verstöße
+    [infractionSets] Verstoßsammlungen
+    [jurisdictions] Rechtsgebiete
+    [securityNetworkManifests] Sicherheitsnetzwerk-Manifeste
+    [missionModuleDeclarations] Missionsmodul-Deklarationen
+    [locationClasses] Ortsklassen
+    [locationFunctions] Ortsfunktionen
+    [locationSizes] Ortsgrößen
+    [locationClassRegistries] Register der Ortsklassen
+    [locationFunctionRegistries] Register der Ortsfunktionen
+    [locationSizeRegistries] Register der Ortsgrößen
+    [contractScopes] Vertragsgeltungsbereiche
+    [inventoryContainers] Inventarbehälter
+    [starmapTypes] Sternkartentypen
+    [starmapPresets] Sternkartenvorlagen
+    [starmapAmenities] Sternkarteneinrichtungen
     [paints] Lackierungen
     [loadouts] Loadouts
    *[other] { $kind }
@@ -522,22 +580,22 @@ catalog-summary-texts-unavailable = { $language ->
    *[other] { $language }
 }: das Archiv enthält keine global.ini, { $missing } fehlen
 catalog-summary-missing = Fehlende Texte: { $number }
-catalog-summary-size = Größe: { $size } vom Upload-Limit { $limit }
-catalog-summary-size-compressed = Größe: { $compressed } komprimiert (vom Upload-Limit { $limit }), { $size } unkomprimiert
-catalog-near-limit = Der Katalog liegt nahe am Upload-Limit des Basetools von { $limit }.
-catalog-over-limit = Der Katalog liegt über dem Upload-Limit des Basetools von { $limit }; das Basetool lehnt den Upload ab.
-catalog-near-limit-plain = Der JSON-Katalog liegt nahe am Upload-Limit des Basetools von { $limit }. Schreibe den Katalog für den Upload als .json.zst; reines .json dient der Ansicht.
-catalog-over-limit-plain = Der JSON-Katalog liegt über dem Upload-Limit des Basetools von { $limit }; das Basetool lehnt ihn ab. Schreibe den Katalog für den Upload als .json.zst; reines .json dient der Ansicht.
-catalog-decompressed-near-limit = Der entpackte Katalog liegt nahe am Limit des Basetools von { $limit } für entpackte Inhalte.
-catalog-decompressed-over-limit = Der entpackte Katalog liegt über dem Limit des Basetools von { $limit } für entpackte Inhalte; das Basetool lehnt ihn ab.
+catalog-summary-size = Größe: { $size } (Richtwert { $limit })
+catalog-summary-size-compressed = Größe: { $compressed } komprimiert (Richtwert { $limit }), { $size } entpackt
+catalog-near-limit = Der Katalog liegt nahe am Richtwert von { $limit } für die Übertragung.
+catalog-over-limit = Der Katalog überschreitet den Richtwert von { $limit } für die Übertragung.
+catalog-near-limit-plain = Der JSON-Katalog liegt nahe am Richtwert von { $limit } für die Übertragung. Wähle .json.zst für einen komprimierten Katalog.
+catalog-over-limit-plain = Der JSON-Katalog überschreitet den Richtwert von { $limit } für die Übertragung. Wähle .json.zst für einen komprimierten Katalog.
+catalog-decompressed-near-limit = Der entpackte Katalog liegt nahe am Richtwert von { $limit }.
+catalog-decompressed-over-limit = Der entpackte Katalog überschreitet den Richtwert von { $limit }.
 catalog-summary-file = Datei: { $path }
-catalog-cancelled-title = Basetool-Katalog abgebrochen
-catalog-cancelled = Der Basetool-Katalog wurde abgebrochen. Es wurde keine Datei geschrieben.
-catalog-failed-title = Basetool-Katalog fehlgeschlagen
-catalog-failed = Der Basetool-Katalog { $path } ließ sich nicht erstellen: { $reason }
-catalog-stopped = Der Basetool-Katalog { $path } brach ohne Ergebnis ab.
-catalog-output-is-archive = Der Basetool-Katalog kann nicht nach { $path } geschrieben werden, weil das das geöffnete Archiv ist. Eine andere Datei wählen.
-catalog-output-gzip = Der Basetool-Katalog wird nicht nach { $path } geschrieben, weil gzip nicht unterstützt wird. Einen Namen mit der Endung .json.zst für einen komprimierten oder .json für einen einfachen Katalog verwenden.
+catalog-cancelled-title = P4KX-Katalog abgebrochen
+catalog-cancelled = Der P4KX-Katalog wurde abgebrochen. Es wurde keine Datei geschrieben.
+catalog-failed-title = P4KX-Katalog fehlgeschlagen
+catalog-failed = Der P4KX-Katalog { $path } ließ sich nicht erstellen: { $reason }
+catalog-stopped = Der P4KX-Katalog { $path } brach ohne Ergebnis ab.
+catalog-output-is-archive = Der P4KX-Katalog kann nicht nach { $path } geschrieben werden, weil das das geöffnete Archiv ist. Eine andere Datei wählen.
+catalog-output-gzip = Der P4KX-Katalog wird nicht nach { $path } geschrieben, weil gzip nicht unterstützt wird. Einen Namen mit der Endung .json.zst für einen komprimierten oder .json für einen einfachen Katalog verwenden.
 preview-tab-xml = XML
 xml-converting = { $path } wird in XML umgewandelt …
 xml-too-large = { $path } ist { $size } groß. CryXml-Einträge über { $limit } werden in der Vorschau nicht umgewandelt; zum Lesen mit Umwandlung extrahieren.
@@ -582,6 +640,7 @@ audio-plugin = Plug-in
 audio-plugin-note = WEM { $id } ist ein Plug-in-Medium, etwa ein Faltungshall-Impuls, und enthält keinen Ton zum Abspielen.
 audio-midi = MIDI
 audio-midi-note = Das Medium { $id } ist eine MIDI-Datei und enthält keinen Ton zum Abspielen.
+audio-bank-wem-count = Anzahl eingebetteter WEMs
 audio-bank-summary =
     { $size } · { $count ->
         [one] { $number } WEM
@@ -941,6 +1000,7 @@ model-info-usage-unknown = Unbekannt, übersprungen
 model-info-file-model = Modelldatei
 model-info-file-geometry = Geometriedatei
 model-info-file-lod = Geometrie von LOD { $level }
+model-info-file-lod-model = Modelldatei von LOD { $level }
 model-info-type-unknown = Unbekannt
 model-export-action = Als GLB exportieren …
 model-export-title = Als GLB exportieren
@@ -982,6 +1042,8 @@ model-export-summary-counts = Knoten { $nodes }, Meshes { $meshes }, Materialien
 model-export-summary-bones = Knochen { $bones }, Meshes mit Skinning { $skinned }
 model-export-summary-library-missing = Die Materialbibliothek { $library } existiert nicht; es wird das Standardmaterial verwendet.
 model-export-summary-library-unreadable = Die Materialbibliothek { $library } ist nicht lesbar ({ $reason }); es wird das Standardmaterial verwendet.
+model-export-summary-library-missing-mapped = Die Materialbibliothek { $library } (aufgelöst zu { $target }) existiert nicht; es wird das Standardmaterial verwendet.
+model-export-summary-library-unreadable-mapped = Die Materialbibliothek { $library } (aufgelöst zu { $target }) ist nicht lesbar ({ $reason }); es wird das Standardmaterial verwendet.
 model-export-summary-default-materials = { $count ->
     [one] Eine Material-ID hat kein Teilmaterial in der Bibliothek; dafür wird das Standardmaterial verwendet.
    *[other] { $number } Material-IDs haben kein Teilmaterial in der Bibliothek; dafür wird das Standardmaterial verwendet.
@@ -1444,6 +1506,16 @@ ui-kind-element-undrawn = Widgets nicht gezeichnet
 ui-report-skipped = Übersprungen
 ui-report-effect = Ohne Effekt gezeichnet
 ui-report-left-out = Ausgelassen
+ui-report-omission-details = Ausgelassene Inhalte
+ui-report-omission-row = { $widget } ({ $element }) · Datensatz { $record }, { $section }[{ $slot }] · Feld { $field } · Quelle { $source }
+ui-report-omission-no-source = nicht angegeben
+ui-report-omission-source-missing = Fehlende Quelle
+ui-report-omission-runtime-target = Laufzeitbild
+ui-report-omission-runtime-array = Laufzeitliste
+ui-report-omission-variable-missing = Fehlender Wert
+ui-report-omission-unsupported-field = Nicht unterstütztes Feld
+ui-report-omission-unresolved-input = Nicht aufgelöste Eingabe
+ui-report-omission-other = Inhalt ausgelassen
 ui-report-missing-canvas = Canvas nicht gezeichnet
 ui-report-missing-texture = Textur nicht im Archiv
 ui-report-unknown-variable = Spielvariable, die der Screen nicht liest
@@ -1464,3 +1536,40 @@ folder-conversion-summary-input = Eingabeordner: { $path }
 folder-conversion-failed-title = Umwandlung fehlgeschlagen
 folder-conversion-failed = { $path } lässt sich nicht umwandeln: { $reason }
 folder-conversion-stopped = Die Umwandlung von { $path } wurde ohne Ergebnis beendet.
+
+protection-target-identity = Der Hostpfad des Ziels konnte nicht verifiziert werden. Das Schreiben ist hier gesperrt. Wähle einen anderen Ordner oder prüfe den Zugriff auf seinen Hostpfad.
+protection-source-identity = Der Hostpfad des Archivs konnte nicht verifiziert werden. Das Schreiben von Daten aus diesem Archiv ist gesperrt. Gib das Archiv erneut frei.
+protection-source-membership = Es konnte nicht festgestellt werden, ob der übergeordnete Archivordner { $parent } zu einer Spielinstallation gehört. Wähle einen Exportordner außerhalb dieses Ordners oder gib den Quellordner frei.
+protection-identity-unavailable = Der Ausgabepfad konnte nicht sicher identifiziert werden. Das Schreiben ist hier gesperrt.
+protection-prerequisite-title = Flatpak-Voraussetzung fehlt
+protection-prerequisite = Dieses Flatpak benötigt ein Documents-Portal mit API 5 oder neuer und funktionierender Hostpfadabfrage. Aktualisiere dein Desktop-Portal oder nutze das Paket als tar.gz, AppImage oder deb.
+protection-source-overwrite = Diese Ausgabe würde ein Eingabearchiv ersetzen. Wähle eine andere Datei oder einen anderen Ordner.
+gui-command-help =
+    P4KX Desktop
+    Aufruf: p4kx-gui [ARCHIV]
+    -h, --help: Diese Hilfe anzeigen
+    -V, --version: Die Version anzeigen
+    Flatpak benötigt das Documents-Portal mit API 5 oder neuer und authentifizierter Hostpfadabfrage.
+
+output-target-title = Exportziel wählen
+output-target-parent = Übergeordneter Ordner
+output-target-choose-parent = Ordner wählen …
+output-target-no-parent = Kein übergeordneter Ordner gewählt
+output-target-file-name = Dateiname
+output-target-package-name = Name des Paketordners
+output-target-destination = Ziel
+output-target-no-destination = Wähle einen übergeordneten Ordner und gib einen Namen ein.
+output-target-parent-hint = Wähle den übergeordneten Ordner. Darin erhält die Ausgabe den unten eingegebenen Namen.
+output-target-file-hint = Die Datei wird im gewählten Ordner gespeichert.
+output-target-package-hint = Das Paket ist ein Unterordner des gewählten Ordners. Ein vorhandenes P4KX-Paket wird erst ersetzt, wenn das neue vollständig ist.
+output-target-diagnostic-hint = Diese Diagnosefreigabe gilt nur für diesen Export. Beim Schließen dieser Auswahl verfällt sie.
+output-target-confirm = Ziel übernehmen
+output-target-start-export = Export starten
+output-target-cancel = Abbrechen
+output-target-empty = Gib einen Namen ein.
+output-target-component = Gib einen einzelnen Namen ohne übergeordneten oder absoluten Pfad ein; . und .. sind nicht zulässig.
+output-target-control = Der Name darf keine Steuerzeichen enthalten.
+output-target-picker-failed = Der Auswahldialog konnte nicht geöffnet werden: { $reason }
+output-target-picker-failure-title = Auswahldialog fehlgeschlagen
+output-target-picker-disconnected = Der Auswahldialog wurde ohne Antwort beendet. Öffne ihn erneut.
+output-target-picker-relative = Der Ordnerdialog hat keinen absoluten Elternpfad zurückgegeben. Die bisherige Auswahl bleibt erhalten.

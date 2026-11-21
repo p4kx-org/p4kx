@@ -1,16 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "catalog_json_text_kind.rs"]
+mod text_kind;
+use text_kind::TextKindJson;
+
 use std::path::Path;
 
 use p4kx_export::{
-    CatalogSummary, CraftingWarning, DECOMPRESSED_LIMIT, KindSummary, LoadoutSummary, PaintSummary,
-    Playability, PlayabilityCounts, SCHEMA_VERSION, SizeWarning, StarmapSummary, UPLOAD_LIMIT,
-    VariantCounts,
+    ArchiveKeyState, CatalogSummary, CraftingWarning, DECOMPRESSED_LIMIT, ExportHealth,
+    KindSummary, LoadoutSummary, PaintSummary, Playability, PlayabilityCounts, SCHEMA_VERSION,
+    SizeWarning, StarmapSummary, UPLOAD_LIMIT, VariantCounts,
 };
-use p4kx_extraction::Archive;
+use p4kx_extraction::{Archive, SourceInventory};
 use serde::Serialize;
 
+use crate::catalog_failure_json::FailureJson;
 use crate::catalog_json_shops::ShopsJson;
 use crate::catalog_json_slugs::StoreSlugsJson;
 use crate::json;
@@ -20,6 +25,10 @@ pub(super) struct SummaryJson<'a> {
     archive: String,
     out: String,
     schema_version: u32,
+    archive_key: ArchiveKeyState,
+    encrypted_entries_unread: u64,
+    export_health: &'a ExportHealth,
+    provenance: &'a SourceInventory,
     size: u64,
     compressed_size: Option<u64>,
     upload_limit: u64,
@@ -40,6 +49,7 @@ pub(super) struct SummaryJson<'a> {
     variants: VariantsJson,
     quantizations: QuantizationsJson,
     texts: Vec<TextJson>,
+    text_kind_coverage: Vec<TextKindJson>,
     unresolved: usize,
 }
 
@@ -123,6 +133,7 @@ impl From<StarmapSummary> for StarmapJson {
 enum WarningJson {
     UnreadableRewardRecords { count: usize },
     UnknownModifierRanges { count: usize, details: Vec<String> },
+    UnknownTemplateValues { count: usize, details: Vec<String> },
     AmbiguousDismantle { count: usize },
     UnreadableVehicleFiles { count: usize, details: Vec<String> },
     UnplacedStarmapContainers { count: usize },
@@ -143,6 +154,12 @@ impl From<&CraftingWarning> for WarningJson {
             }
             CraftingWarning::UnknownModifierRanges { count, details } => {
                 Self::UnknownModifierRanges {
+                    count: *count,
+                    details: details.clone(),
+                }
+            }
+            CraftingWarning::UnknownTemplateValues { count, details } => {
+                Self::UnknownTemplateValues {
                     count: *count,
                     details: details.clone(),
                 }
@@ -179,13 +196,6 @@ impl From<&CraftingWarning> for WarningJson {
             },
         }
     }
-}
-
-#[derive(Serialize)]
-struct FailureJson<'a> {
-    guid: String,
-    path: &'a str,
-    error: &'a str,
 }
 
 #[derive(Serialize)]
@@ -293,6 +303,10 @@ pub(super) fn summary_json<'a>(
         archive: json::path(archive.path()),
         out: json::path(out),
         schema_version: SCHEMA_VERSION,
+        archive_key: summary.archive_key().state(),
+        encrypted_entries_unread: summary.archive_key().entries_unread(),
+        export_health: summary.export_health(),
+        provenance: summary.source_inventory(),
         size: summary.size(),
         compressed_size: summary.compressed_size(),
         upload_limit: UPLOAD_LIMIT,
@@ -301,15 +315,7 @@ pub(super) fn summary_json<'a>(
         decompressed_warning: summary.decompressed_warning().map(warning_name),
         kinds: summary.kinds().iter().map(KindJson::from).collect(),
         skipped: summary.skipped(),
-        failed: summary
-            .failures()
-            .iter()
-            .map(|failure| FailureJson {
-                guid: failure.guid.to_string(),
-                path: &failure.record_path,
-                error: &failure.reason,
-            })
-            .collect(),
+        failed: summary.failures().iter().map(FailureJson::from).collect(),
         warnings: summary.warnings().iter().map(WarningJson::from).collect(),
         item_classes: ItemClassJson {
             classified: summary.item_classes().classified,
@@ -343,6 +349,11 @@ pub(super) fn summary_json<'a>(
                 unresolved: text.unresolved,
                 placeholder: text.placeholder,
             })
+            .collect(),
+        text_kind_coverage: summary
+            .text_kind_coverage()
+            .iter()
+            .map(TextKindJson::from)
             .collect(),
         unresolved: summary.unresolved(),
     }

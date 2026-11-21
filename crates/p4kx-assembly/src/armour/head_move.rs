@@ -6,12 +6,12 @@ use std::sync::Arc;
 use p4kx_gltf::MorphTarget;
 use p4kx_model::{Mesh, Model};
 
-use super::ArmourPart;
 use super::face_build::Face;
 use super::follow::follow;
 use super::follow_blend::HeadSkin;
 use super::follow_joints::bind;
 use super::follow_morphs::{Followed, follow_morphs};
+use super::{ArmourPart, ShapeArchiveSources};
 use crate::{Issue, IssueKind};
 
 /// The head as it was made and as it was shaped, with its morph targets, which what follows the
@@ -20,6 +20,7 @@ pub(super) struct HeadMove {
     pub(super) before: Arc<Model>,
     pub(super) after: Arc<Model>,
     pub(super) morphs: Vec<MorphTarget>,
+    pub(super) shape_sources: Option<Arc<ShapeArchiveSources>>,
 }
 
 /// A job as it is worn: its model, its morph targets, the face of a head, and, for what follows
@@ -29,8 +30,27 @@ pub(super) struct Worn {
     pub(super) morphs: Vec<MorphTarget>,
     pub(super) face: Option<Face>,
     pub(super) follows: Vec<usize>,
+    pub(super) shape_sources: Vec<Arc<ShapeArchiveSources>>,
     /// What was not done while the job was worn, for the report.
     pub(super) kinds: Vec<IssueKind>,
+}
+
+impl Worn {
+    pub(super) fn fitted(
+        model: Arc<Model>,
+        morphs: Vec<MorphTarget>,
+        face: Option<Face>,
+        shape_sources: Option<Arc<ShapeArchiveSources>>,
+    ) -> Self {
+        Self {
+            model,
+            morphs,
+            face,
+            shape_sources: shape_sources.into_iter().collect(),
+            follows: Vec::new(),
+            kinds: Vec::new(),
+        }
+    }
 }
 
 /// Leaves out of the animation the parts that follow the head whose morph targets do not match the
@@ -82,7 +102,7 @@ pub(super) fn first_mesh(model: &Model) -> Option<&Mesh> {
 /// done, `kinds` of the result says why and the vertices keep their own bones.
 pub(super) fn followed(model: &Arc<Model>, head: &HeadMove) -> Worn {
     let mut kinds = Vec::new();
-    let (model, moved) = match (first_mesh(&head.before), first_mesh(&head.after)) {
+    let (model, moved, shape_sources) = match (first_mesh(&head.before), first_mesh(&head.after)) {
         (Some(before), Some(after)) => {
             let mut bound = Model::clone(model);
             if let Err(reason) =
@@ -95,15 +115,17 @@ pub(super) fn followed(model: &Arc<Model>, head: &HeadMove) -> Worn {
             (
                 Arc::new(follow(bound, before, after)),
                 follow_morphs(model, before, &head.morphs),
+                head.shape_sources.clone(),
             )
         }
-        _ => (Arc::clone(model), Followed::none()),
+        _ => (Arc::clone(model), Followed::none(), None),
     };
     Worn {
         model,
         morphs: moved.targets,
         face: None,
         follows: moved.of,
+        shape_sources: shape_sources.into_iter().collect(),
         kinds,
     }
 }

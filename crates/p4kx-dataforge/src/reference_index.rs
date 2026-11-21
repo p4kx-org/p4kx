@@ -4,6 +4,8 @@
 mod assemble;
 mod collect;
 mod files;
+mod observed;
+mod observed_file_graph;
 
 use std::fmt::Write as _;
 use std::ops::Range;
@@ -13,11 +15,15 @@ use rayon::prelude::*;
 use crate::{DataForge, Guid, TreeBuilder};
 
 pub use files::FileGraph;
+pub use observed::{
+    IndexedReferenceOrigin, ObservedReferenceIndex, ReferenceIndexError, ReferenceScanGap,
+};
 
-/// The most References an index keeps: 8,388,608 against the 1.6 million of Star Citizen's LIVE.
-///
-/// A DataForge with more is indexed up to this many, the first ones in Record order, and reported
-/// as [truncated](ReferenceIndex::is_truncated).
+pub use observed_file_graph::{ObservedFileEdge, ObservedFileGraph};
+
+use observed::Evidence;
+
+/// An optional occurrence budget for callers that request a bounded Reference index.
 pub const MAX_INDEXED_REFERENCES: usize = 1 << 23;
 
 const WAVE_TASKS_PER_THREAD: usize = 4;
@@ -38,16 +44,15 @@ pub(crate) const UNRESOLVED: u32 = u32::MAX;
 pub struct ReferenceIndex {
     sources: Vec<u32>,
     targets: Vec<u32>,
-    shapes: Vec<u32>,
-    index_starts: Vec<u32>,
+    shapes: Vec<usize>,
+    index_starts: Vec<usize>,
     indices: Vec<u32>,
     shape_text: String,
-    shape_ends: Vec<u32>,
-    shape_arrays: Vec<u16>,
-    unresolved: Vec<(u32, [u8; 16])>,
-    source_offsets: Vec<u32>,
-    target_offsets: Vec<u32>,
-    by_target: Vec<u32>,
+    shape_ends: Vec<usize>,
+    unresolved: Vec<(usize, [u8; 16])>,
+    source_offsets: Vec<usize>,
+    target_offsets: Vec<usize>,
+    by_target: Vec<usize>,
     unreadable: u32,
     truncated: bool,
 }
@@ -55,13 +60,19 @@ pub struct ReferenceIndex {
 impl ReferenceIndex {
     /// Reads every Record of `forge` in parallel on rayon's threads and indexes its References.
     ///
-    /// A Record whose tree cannot be built adds no References and is counted by
-    /// [`unreadable_records`](Self::unreadable_records). The work per Record is bounded by
-    /// [`MAX_RECORD_VALUES`](crate::MAX_RECORD_VALUES) and the index by
-    /// [`MAX_INDEXED_REFERENCES`].
+    /// Counts Records whose trees cannot be built in the unreadable Record count.
     #[must_use]
     pub fn build(forge: &DataForge<'_>) -> Self {
-        Self::build_with(forge, MAX_INDEXED_REFERENCES, &|| false).unwrap_or_default()
+        Self::build_cancellable(forge, &|| false).unwrap_or_default()
+    }
+
+    /// Builds the complete index and returns None when cancelled.
+    #[must_use]
+    pub fn build_cancellable(
+        forge: &DataForge<'_>,
+        stop: &(dyn Fn() -> bool + Sync),
+    ) -> Option<Self> {
+        Self::build_with(forge, usize::MAX, stop)
     }
 
     /// Indexes like [build](Self::build) but keeps at most `limit` References, the first ones in
@@ -73,6 +84,14 @@ impl ReferenceIndex {
         limit: usize,
         stop: &(dyn Fn() -> bool + Sync),
     ) -> Option<Self> {
+        Self::scan::<false>(forge, limit, stop).map(|(index, _)| index)
+    }
+
+    fn scan<const OBSERVED: bool>(
+        forge: &DataForge<'_>,
+        limit: usize,
+        stop: &(dyn Fn() -> bool + Sync),
+    ) -> Option<(Self, Option<Evidence>)> {
         let count = u32::try_from(forge.record_count()).unwrap_or(u32::MAX);
         let _warm = forge.record_by_guid(Guid::default());
         let tasks = count.div_ceil(collect::RECORDS_PER_TASK);
@@ -80,7 +99,7 @@ impl ReferenceIndex {
             u32::try_from(rayon::current_num_threads().saturating_mul(WAVE_TASKS_PER_THREAD))
                 .unwrap_or(u32::MAX)
                 .max(1);
-        let mut assembler = assemble::Assembler::new(limit);
+        let mut assembler = assemble::Assembler::new(limit, OBSERVED);
         let mut next = 0_u32;
         while next < tasks && !assembler.is_full() {
             if stop() {
@@ -93,11 +112,11 @@ impl ReferenceIndex {
                     let start = task * collect::RECORDS_PER_TASK;
                     let range: Range<u32> =
                         start..count.min(start.saturating_add(collect::RECORDS_PER_TASK));
-                    collect::collect(forge, builder, range, limit, stop)
+                    collect::collect::<OBSERVED>(forge, builder, range, limit, stop)
                 })
                 .collect();
             for chunk in chunks {
-                assembler.push(&chunk);
+                assembler.push(chunk);
             }
             next = end;
         }
@@ -115,11 +134,11 @@ impl ReferenceIndex {
             .copied()
             .filter(|target| *target != UNRESOLVED);
         self.target_offsets = offsets(resolved, record_count);
-        let mut next: Vec<u32> = self.target_offsets.clone();
-        self.by_target = vec![0; self.target_offsets.last().copied().unwrap_or_default() as usize];
-        for (entry, target) in (0_u32..).zip(self.targets.iter().copied()) {
+        let mut next = self.target_offsets.clone();
+        self.by_target = vec![0; self.target_offsets.last().copied().unwrap_or_default()];
+        for (entry, target) in self.targets.iter().copied().enumerate() {
             if let Some(cursor) = next.get_mut(target as usize)
-                && let Some(slot) = self.by_target.get_mut(*cursor as usize)
+                && let Some(slot) = self.by_target.get_mut(*cursor)
             {
                 *slot = entry;
                 *cursor += 1;
@@ -159,8 +178,7 @@ impl ReferenceIndex {
         usize::try_from(self.unreadable).unwrap_or(usize::MAX)
     }
 
-    /// Returns whether the DataForge held more than [`MAX_INDEXED_REFERENCES`] References, so
-    /// that the index is incomplete.
+    /// Returns whether the requested occurrence budget omitted at least one Reference.
     #[must_use]
     pub const fn is_truncated(&self) -> bool {
         self.truncated
@@ -170,7 +188,7 @@ impl ReferenceIndex {
     /// them and of the fields within each.
     pub fn incoming(&self, record: u32) -> impl ExactSizeIterator<Item = IndexedReference<'_>> {
         let entries = Self::window(&self.target_offsets, record)
-            .and_then(|range| self.by_target.get(range.start as usize..range.end as usize))
+            .and_then(|range| self.by_target.get(range))
             .unwrap_or_default();
         entries.iter().map(|entry| IndexedReference {
             index: self,
@@ -202,17 +220,15 @@ impl ReferenceIndex {
         found
     }
 
-    fn window(offsets: &[u32], record: u32) -> Option<Range<u32>> {
+    fn window(offsets: &[usize], record: u32) -> Option<Range<usize>> {
         let at = record as usize;
         let start = *offsets.get(at)?;
         let end = *offsets.get(at.checked_add(1)?)?;
         Some(start..end)
     }
 
-    fn shape_of(&self, entry: u32) -> usize {
-        self.shapes
-            .get(entry as usize)
-            .map_or(0, |shape| *shape as usize)
+    fn shape_of(&self, entry: usize) -> usize {
+        self.shapes.get(entry).copied().unwrap_or_default()
     }
 }
 
@@ -220,7 +236,7 @@ impl ReferenceIndex {
 #[derive(Debug, Clone, Copy)]
 pub struct IndexedReference<'i> {
     index: &'i ReferenceIndex,
-    entry: u32,
+    entry: usize,
 }
 
 impl<'i> IndexedReference<'i> {
@@ -229,7 +245,7 @@ impl<'i> IndexedReference<'i> {
     pub fn source(&self) -> u32 {
         self.index
             .sources
-            .get(self.entry as usize)
+            .get(self.entry)
             .copied()
             .unwrap_or_default()
     }
@@ -239,7 +255,7 @@ impl<'i> IndexedReference<'i> {
     pub fn target(&self) -> Option<u32> {
         self.index
             .targets
-            .get(self.entry as usize)
+            .get(self.entry)
             .copied()
             .filter(|target| *target != UNRESOLVED)
     }
@@ -267,31 +283,29 @@ impl<'i> IndexedReference<'i> {
             .index
             .shape_ends
             .get(shape)
-            .map_or(0, |end| *end as usize);
+            .copied()
+            .unwrap_or_default();
         let start = shape
             .checked_sub(1)
             .and_then(|before| self.index.shape_ends.get(before))
-            .map_or(0, |start| *start as usize);
+            .copied()
+            .unwrap_or_default();
         self.index.shape_text.get(start..end).unwrap_or_default()
     }
 
     /// Returns the index of the element in each array of the field path, outermost first.
     #[must_use]
     pub fn indices(&self) -> &'i [u32] {
-        let start = self
+        let Some(&start) = self.index.index_starts.get(self.entry) else {
+            return &[];
+        };
+        let end = self
             .index
             .index_starts
-            .get(self.entry as usize)
-            .map_or(0, |start| *start as usize);
-        let count = self
-            .index
-            .shape_arrays
-            .get(self.index.shape_of(self.entry))
-            .map_or(0, |count| usize::from(*count));
-        self.index
-            .indices
-            .get(start..start.saturating_add(count))
-            .unwrap_or_default()
+            .get(self.entry + 1)
+            .copied()
+            .unwrap_or(self.index.indices.len());
+        self.index.indices.get(start..end).unwrap_or_default()
     }
 
     /// Returns the place of the Reference as the Record preview writes it, e.g.
@@ -313,14 +327,14 @@ impl<'i> IndexedReference<'i> {
     }
 }
 
-fn offsets(sorted: impl Iterator<Item = u32>, record_count: usize) -> Vec<u32> {
-    let mut offsets = vec![0_u32; record_count.saturating_add(1)];
+fn offsets(sorted: impl Iterator<Item = u32>, record_count: usize) -> Vec<usize> {
+    let mut offsets = vec![0_usize; record_count.saturating_add(1)];
     for key in sorted {
         if let Some(slot) = offsets.get_mut((key as usize).saturating_add(1)) {
             *slot += 1;
         }
     }
-    let mut sum = 0_u32;
+    let mut sum = 0_usize;
     for slot in &mut offsets {
         sum += *slot;
         *slot = sum;

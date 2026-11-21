@@ -186,7 +186,7 @@ pub struct CargoGrid {
     pub shape: Option<&'static str>,
     /// The capacity in standard cargo units; `null` when it cannot be read.
     pub scu: Option<f64>,
-    /// The cells of 1.25 m an open grid holds; `null` for any other grid.
+    /// The cells of 1.25 m an open grid holds when the count fits in `u64`.
     pub cells: Option<u64>,
     /// The interior size of an open grid in metres, `[x, y, z]`.
     pub dimensions: Option<[f64; 3]>,
@@ -203,7 +203,7 @@ pub struct Cargo {
     /// The sum of the readable grids' capacity in standard cargo units, rounded to four
     /// decimals: 0 for a ship with no cargo grid, `null` when it has grids and none is readable.
     pub scu: Option<f64>,
-    /// The sum of the open grids' cells, `null` like `scu`.
+    /// The sum of readable open grids' cells when each count and the sum fit in `u64`.
     pub cells: Option<u64>,
     /// How many grids have an `issue`; when it is not 0 the sums are a lower bound.
     pub grids_with_issue: usize,

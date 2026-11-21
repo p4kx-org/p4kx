@@ -4,18 +4,23 @@
 use std::collections::{BTreeMap, HashMap};
 
 use p4kx_model::Material;
+use p4kx_texture::DdsTransfer;
 
 use crate::layer_jobs::{fallback_guards, layer_jobs, layer_normals_last};
-use crate::layer_plan::Layered;
+use crate::layer_plan::{LayerMaps, Layered};
 use crate::material_alpha::uses_alpha;
 use crate::materials::{MaterialPlan, Slot, display_name};
 use crate::shading::shading;
+use crate::surface_finish::SurfaceFinish;
 use crate::texture_assemble::Wish;
 use crate::texture_loader::{TextureLoader, WithFallbacks};
 use crate::texture_make::{Budget, run_guarded};
+use crate::texture_origins::{TextureMaterialSource, TextureReadUse};
 use crate::texture_pixels::Tints;
 use crate::texture_report::{TextureFallback, TextureRole};
-use crate::texture_roles::{Source, Sources, draws_by_opacity_map, sources_with};
+use crate::texture_roles::{
+    Source, Sources, draws_by_opacity_map, explicit_gloss_sources, sources_with,
+};
 
 /// The most images one GLB embeds.
 pub const MAX_TEXTURE_IMAGES: usize = 256;
@@ -38,15 +43,21 @@ pub(crate) enum Key {
         tint: [u8; 3],
         decal: Option<[[u8; 3]; 3]>,
         keep_alpha: bool,
+        opacity_source: bool,
     },
     Normal {
         normal: String,
     },
     MetallicRoughness {
+        finish: Option<SurfaceFinish>,
         gloss: Option<String>,
+        explicit_gloss: Vec<String>,
         specular: Option<(String, [u8; 3])>,
     },
     LayerBase {
+        blend: String,
+    },
+    LayerRoughness {
         blend: String,
     },
     LayerNormal {
@@ -62,11 +73,20 @@ pub(crate) struct Job {
     pub(crate) diffuse: Option<Source>,
     pub(crate) normal: Option<Source>,
     pub(crate) specular: Option<Source>,
+    pub(crate) explicit_gloss: Vec<Source>,
     pub(crate) tints: Tints,
     pub(crate) layered: Option<Layered>,
 }
 
 impl Job {
+    pub(crate) const fn layer_maps(&self) -> LayerMaps {
+        match self.key {
+            Key::LayerNormal { .. } => LayerMaps::Normal,
+            Key::LayerRoughness { .. } => LayerMaps::Smoothness,
+            _ => LayerMaps::Diffuse,
+        }
+    }
+
     /// Returns the file `source` is reported by: its name in the material file, and for a layered
     /// image the image it is the size source of.
     pub(crate) fn file_of(&self, source: &Source) -> String {
@@ -81,6 +101,10 @@ impl Job {
                     source.file
                 )
             }
+            Key::LayerRoughness { .. } => format!(
+                "{} (layered roughness image of {count} layers)",
+                source.file
+            ),
             Key::LayerNormal { .. } => {
                 format!("{} (layered normal image of {count} layers)", source.file)
             }
@@ -104,13 +128,17 @@ impl Job {
                 .and_then(|layered| layered.sizing(true))
                 .or(self.normal.as_ref())
                 .map(|s| (TextureRole::Normal, s)),
-            Key::MetallicRoughness { gloss, .. } => {
-                if gloss.is_some() {
-                    self.normal.as_ref().map(|s| (TextureRole::Normal, s))
-                } else {
-                    self.specular.as_ref().map(|s| (TextureRole::Specular, s))
-                }
-            }
+            Key::LayerRoughness { .. } => self
+                .layered
+                .as_ref()
+                .and_then(|layered| layered.size_sources(LayerMaps::Smoothness).next())
+                .map(|source| (TextureRole::Gloss, source)),
+            Key::MetallicRoughness { .. } => self
+                .normal
+                .as_ref()
+                .map(|s| (TextureRole::Normal, s))
+                .or_else(|| self.explicit_gloss.first().map(|s| (TextureRole::Gloss, s)))
+                .or_else(|| self.specular.as_ref().map(|s| (TextureRole::Specular, s))),
         }
     }
 }
@@ -121,6 +149,8 @@ pub(crate) struct EncodedImage {
     pub(crate) png: Vec<u8>,
     pub(crate) width: u32,
     pub(crate) height: u32,
+    pub(crate) transfer: DdsTransfer,
+    pub(crate) sources: Vec<TextureReadUse>,
 }
 
 /// A texture that a job could not use.
@@ -161,6 +191,8 @@ pub(crate) struct SlotImages {
 #[derive(Debug, Default)]
 pub(crate) struct TextureSet {
     pub(crate) images: Vec<EncodedImage>,
+    pub(crate) image_sources: Vec<Vec<TextureReadUse>>,
+    pub(crate) image_materials: Vec<Option<TextureMaterialSource>>,
     pub(crate) slots: BTreeMap<(usize, Slot), SlotImages>,
     pub(crate) fallbacks: Vec<TextureFallback>,
 }
@@ -195,6 +227,7 @@ impl TextureSet {
     /// material keeps its plain colour for it.
     pub(crate) fn build(parts: &[PartSlots<'_>], mip: u32, loader: &dyn TextureLoader) -> Self {
         let mut jobs: Vec<Job> = Vec::new();
+        let mut authors = Vec::new();
         let mut known: HashMap<Key, usize> = HashMap::new();
         let mut wanted: Vec<Wish> = Vec::new();
         for requested in parts {
@@ -203,6 +236,7 @@ impl TextureSet {
                 let mut add = |job: Job| -> usize {
                     *known.entry(job.key.clone()).or_insert_with(|| {
                         jobs.push(job);
+                        authors.push((requested.part, slot, material));
                         jobs.len() - 1
                     })
                 };
@@ -217,7 +251,7 @@ impl TextureSet {
                 });
             }
         }
-        let jobs = layer_normals_last(jobs, &mut wanted);
+        let (jobs, order) = layer_normals_last(jobs, &mut wanted);
         let guards = fallback_guards(&wanted, jobs.len());
         let own: HashMap<String, String> = parts
             .iter()
@@ -232,7 +266,11 @@ impl TextureSet {
             };
             run_guarded(&jobs, mip, &loader, Budget::DEFAULT, &guards)
         };
-        Self::assemble(&wanted, outcomes)
+        let authors: Vec<_> = order
+            .into_iter()
+            .map(|old| authors.get(old).copied())
+            .collect();
+        Self::assemble(&wanted, outcomes, &authors)
     }
 
     /// Returns the images the material of `slot` of the model instance `part` is drawn with.
@@ -294,10 +332,12 @@ fn base_job(
                 .filter(|_| diffuse.opacity)
                 .map(|colours| colours.map(quantise)),
             keep_alpha: diffuse.opacity || uses_alpha(material),
+            opacity_source: diffuse.opacity,
         },
         diffuse: Some(diffuse.clone()),
         normal: None,
         specular: found.specular.clone(),
+        explicit_gloss: Vec::new(),
         tints,
         layered: None,
     }
@@ -313,13 +353,15 @@ fn jobs_of(
     if found.diffuse.as_ref().is_none_or(|diffuse| diffuse.opacity) {
         found.specular = None;
     }
+    let explicit_gloss = explicit_gloss_sources(material, &mut found.refused);
     let mut refused = refusals(&found.refused);
     let tints = tints_of(material);
     let specular_key = found
         .specular
         .as_ref()
         .map(|specular| (specular.identity(), quantise(tints.specular)));
-    let (layer_base, layer_normal, layer_refused) = layer_jobs(material, &found, tints);
+    let (layer_base, layer_normal, layer_finish, layer_refused) =
+        layer_jobs(material, &found, tints);
     refused.extend(refusals(&layer_refused));
     let base = match (&found.diffuse, layer_base) {
         (Some(diffuse), _) => Some(add(base_job(
@@ -338,6 +380,7 @@ fn jobs_of(
             diffuse: None,
             normal: found.normal.clone(),
             specular: None,
+            explicit_gloss: Vec::new(),
             tints,
             layered: None,
         })
@@ -345,19 +388,15 @@ fn jobs_of(
     let (normal, fallback) = layer_normal.map_or((plain_normal, None), |layered| {
         (Some(add(layered)), plain_normal)
     });
-    let gloss = found.normal.as_ref().filter(|normal| normal.gloss);
-    let packed = (gloss.is_some() || specular_key.is_some()).then(|| {
-        add(Job {
-            key: Key::MetallicRoughness {
-                gloss: gloss.map(Source::identity),
-                specular: specular_key.clone(),
-            },
-            diffuse: None,
-            normal: gloss.cloned(),
-            specular: found.specular.clone(),
+    let packed = layer_finish.map(&mut *add).or_else(|| {
+        crate::texture_finish_plan::own_packed(
+            material,
+            &found,
+            explicit_gloss,
+            specular_key,
             tints,
-            layered: None,
-        })
+        )
+        .map(&mut *add)
     });
     ([base, normal, packed], fallback, refused)
 }

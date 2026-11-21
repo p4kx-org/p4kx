@@ -7,7 +7,8 @@ use std::error::Error;
 use std::path::{Path, PathBuf};
 
 use p4kx_testkit::{
-    ArchiveBuilder, INTERIOR_ROOT, LIT_ROOM, check_glb, interior_entries, lit_room_entries,
+    ArchiveBuilder, INTERIOR_ROOT, LIT_ROOM, TestEntry, check_glb, interior_entries,
+    lit_room_entries,
 };
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -95,6 +96,44 @@ fn the_json_report_has_a_stable_shape() -> TestResult {
         shaped[key] = serde_json::Value::String(format!("<{key}>"));
     }
     insta::assert_snapshot!(serde_json::to_string_pretty(&shaped)?);
+    Ok(())
+}
+
+#[test]
+fn fallback_for_the_nested_scene_comes_from_the_game_archive() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = dir.path().join("Data.p4k");
+    let fallback = TestEntry::stored(
+        "Data/Materials/material_default.mtl",
+        br#"<Material Name="archive-fallback" Shader="Illum" Diffuse="0.1,0.2,0.3"/>"#,
+    );
+    interior_entries()
+        .into_iter()
+        .chain([fallback])
+        .fold(ArchiveBuilder::new(), ArchiveBuilder::entry)
+        .write_to(&archive)?;
+    let out = dir.path().join("physical.glb");
+    let run = glb(&archive, INTERIOR_ROOT, &out, true)?;
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    let report: serde_json::Value = serde_json::from_str(&run.stdout)?;
+    let receipt = &report["default_material"];
+    assert_eq!(receipt["state"], "resolved", "actual Archive lookup");
+    assert_eq!(
+        receipt["source"]["containers"],
+        serde_json::json!([]),
+        "root Entry ownership"
+    );
+    assert_eq!(
+        report["default_material_ids"], 4,
+        "only actual drawable fallback IDs"
+    );
+    let glb = check_glb(&std::fs::read(&out)?)?;
+    assert!(
+        glb.document
+            .materials()
+            .any(|material| material.name() == Some("archive-fallback")),
+        "the nested scene uses the root physical material"
+    );
     Ok(())
 }
 

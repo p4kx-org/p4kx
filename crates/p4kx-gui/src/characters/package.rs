@@ -4,12 +4,14 @@
 use p4kx_assembly::{
     AnimationFolders, ArchiveModels, CharacterAnimations, LoadoutChanges, character_animations,
 };
-use p4kx_blender::{CharacterScene, write_character_package};
-use p4kx_extraction::{AnimationSet, CancelToken, ConversionError, GlbSummary};
+use p4kx_blender::{CharacterScene, PackageWriteContext, write_character_package_with_context};
+use p4kx_extraction::{
+    AnimationSet, ArchiveWriteProtection, CancelToken, ConversionError, GlbSummary,
+};
 
 use super::export::{CharacterExportSummary, Ended, Request};
 use crate::assembly_export::{PartIssue, StoppableTextures, failure_of, info_of, package_failure};
-use crate::{EntryIndex, NoEntries};
+use crate::{EntryIndex, ModelExportFailure, NoEntries};
 
 /// Reads the animations of the animation folders of the Character: the folder of the story
 /// character of its Loadout first, then those of its body.
@@ -66,13 +68,19 @@ pub(super) fn write(index: &EntryIndex, request: &Request, cancel: &CancelToken)
         request.origin.loadout.as_deref(),
     );
     let info = info_of(index, &LoadoutChanges::default());
-    let written = write_character_package(
+    let protection = match ArchiveWriteProtection::new(index.path(), cancel.flag()) {
+        Ok(protection) => protection,
+        Err(error) if error.is_cancelled() => return Ended::Cancelled,
+        Err(error) => return Ended::Failed(ModelExportFailure::Refused(error)),
+    };
+    let context = PackageWriteContext::new(&protection, cancel.flag());
+    let written = write_character_package_with_context(
         &scene,
         &textures,
         &request.options(),
         &info,
         &request.file,
-        &|| cancel.is_cancelled(),
+        &context,
     );
     match written {
         Ok(package) => Ended::Written(Box::new(CharacterExportSummary {

@@ -7,7 +7,7 @@ use p4kx_archive::{Archive, ArchiveError, Entry};
 use p4kx_dataforge::{DataForge, DataForgeError};
 use thiserror::Error;
 
-use crate::ArchiveChanged;
+use crate::{ArchiveChanged, DataForgeOrigin};
 
 /// The Entries that may hold DataForge, the preferred one first.
 pub const DATAFORGE_ENTRIES: [&str; 2] = ["Data\\Game2.dcb", "Data\\Game.dcb"];
@@ -22,6 +22,7 @@ const READ_CHUNK: u64 = 1 << 20;
 pub struct DataForgeEntry {
     path: String,
     bytes: Vec<u8>,
+    origin: DataForgeOrigin,
 }
 
 impl DataForgeEntry {
@@ -55,7 +56,12 @@ impl DataForgeEntry {
         let reader = archive
             .open_entry(entry)
             .map_err(DataForgeLoadError::Archive)?;
-        Self::read_stream(path, size, reader, stop)
+        let origin = archive
+            .entry_origin(entry)
+            .map_or(DataForgeOrigin::Unknown, DataForgeOrigin::Archive);
+        let mut loaded = Self::read_stream(path, size, reader, stop)?;
+        loaded.set_origin(origin);
+        Ok(loaded)
     }
 
     /// Reads `size` bytes of `reader` in mebibytes, polling `stop` before each one.
@@ -88,7 +94,11 @@ impl DataForgeEntry {
             }
         }
         bytes.shrink_to_fit();
-        Ok(Self { path, bytes })
+        Ok(Self {
+            path,
+            bytes,
+            origin: DataForgeOrigin::Unknown,
+        })
     }
 
     /// Returns the Entry [`DataForgeEntry::read`] reads, or `None` when the Archive holds no
@@ -109,6 +119,23 @@ impl DataForgeEntry {
         &self.path
     }
 
+    /// Returns the measured number of original payload bytes supplied to DataForge.
+    #[must_use]
+    pub const fn byte_len(&self) -> u64 {
+        self.bytes.len() as u64
+    }
+
+    pub(crate) fn set_origin(&mut self, origin: DataForgeOrigin) {
+        self.origin = origin;
+    }
+
+    /// Returns the physical input retained when these bytes were read.
+    /// Standalone files retain their own input; generic streams remain Unknown.
+    #[must_use]
+    pub const fn origin(&self) -> &DataForgeOrigin {
+        &self.origin
+    }
+
     /// Opens the DataForge over the Entry's bytes.
     ///
     /// # Errors
@@ -116,6 +143,12 @@ impl DataForgeEntry {
     /// Returns a [`DataForgeError`] for an unsupported version or a corrupt database.
     pub fn open(&self) -> Result<DataForge<'_>, DataForgeError> {
         DataForge::open(&self.bytes)
+    }
+
+    /// Returns the physical origin when the DataForge uses this exact opened input.
+    #[must_use]
+    pub fn origin_of(&self, forge: &DataForge<'_>) -> Option<&DataForgeOrigin> {
+        forge.is_opened_over(&self.bytes).then_some(&self.origin)
     }
 }
 
@@ -221,7 +254,25 @@ fn same_path(left: &str, right: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use std::error::Error;
+
     use super::*;
+
+    #[test]
+    fn a_generic_stream_has_no_trusted_archive_origin() -> Result<(), Box<dyn Error>> {
+        let bytes = b"synthetic stream";
+        let entry = DataForgeEntry::read_stream(
+            "Game2.dcb".to_owned(),
+            u64::try_from(bytes.len())?,
+            bytes.as_slice(),
+            &|| false,
+        )?;
+        assert!(
+            matches!(entry.origin(), DataForgeOrigin::Unknown),
+            "a path-like label does not establish an Archive origin"
+        );
+        Ok(())
+    }
 
     #[test]
     fn the_limit_of_a_read_is_two_gibibytes_and_is_reported() {

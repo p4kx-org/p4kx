@@ -13,6 +13,9 @@ use p4kx_testkit::{
 };
 use serde_json::Value;
 
+#[path = "json_snapshot_paths.rs"]
+mod snapshot_paths;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const TEXTURE: &str = "Data\\Textures\\hull_ddna.dds";
@@ -84,22 +87,15 @@ impl Fixture {
         let stdout = String::from_utf8(output.stdout)?;
         assert_eq!(stdout.lines().count(), 1, "one line of JSON: {stdout}");
         let mut value: Value = serde_json::from_str(&stdout)?;
-        redact(&mut value, &self.dir().display().to_string());
+        snapshot_paths::redact(&mut value, self.dir())?;
         Ok(serde_json::to_string_pretty(&value)?)
     }
 }
 
-fn redact(value: &mut Value, dir: &str) {
-    match value {
-        Value::String(text) => {
-            if let Some(rest) = text.strip_prefix(dir) {
-                *text = format!("[DIR]{}", rest.replace('\\', "/"));
-            }
-        }
-        Value::Array(items) => items.iter_mut().for_each(|item| redact(item, dir)),
-        Value::Object(map) => map.values_mut().for_each(|item| redact(item, dir)),
-        _ => {}
-    }
+fn checked_entry_snapshot(text: &str) -> Result<String, Box<dyn Error>> {
+    let mut value = serde_json::from_str(text)?;
+    crate::entry_listing_origins::remove_checked_origins_for_snapshot(&mut value)?;
+    Ok(serde_json::to_string_pretty(&value)?)
 }
 
 #[test]
@@ -108,6 +104,7 @@ fn list() -> TestResult {
     let archive = fixture.channel("LIVE", false)?;
 
     let json = fixture.json(fixture.p4kx()?.arg("list").arg(&archive), 0)?;
+    let json = checked_entry_snapshot(&json)?;
 
     insta::assert_snapshot!(json);
     Ok(())
@@ -127,6 +124,7 @@ fn search() -> TestResult {
         0,
     )?;
 
+    let json = checked_entry_snapshot(&json)?;
     insta::assert_snapshot!(json);
     Ok(())
 }
@@ -167,7 +165,7 @@ fn info_with_a_build() -> TestResult {
     let archive = fixture.channel("PTU", true)?;
 
     let json = fixture.json(fixture.p4kx()?.arg("info").arg(&archive), 0)?;
-
+    let json = super::info_layout::without_origin_companion(&json)?;
     insta::assert_snapshot!(json);
     Ok(())
 }
@@ -178,7 +176,7 @@ fn info_without_a_build() -> TestResult {
     let archive = fixture.channel("LIVE", false)?;
 
     let json = fixture.json(fixture.p4kx()?.arg("info").arg(&archive), 0)?;
-
+    let json = super::info_layout::without_origin_companion(&json)?;
     insta::assert_snapshot!(json);
     Ok(())
 }
@@ -327,7 +325,26 @@ fn texture_info() -> TestResult {
         0,
     )?;
 
-    insta::assert_snapshot!(json);
+    let mut value: Value = serde_json::from_str(&json)?;
+    let object = value.as_object_mut().ok_or("texture info JSON object")?;
+    let fields = object
+        .remove("field_origins")
+        .ok_or("texture field origins")?;
+    let source = object
+        .remove("provenance")
+        .ok_or("texture source inventory")?;
+    assert!(
+        fields.get("/source_metadata/raw/legacy/width").is_some(),
+        "authored width has exact evidence"
+    );
+    assert!(
+        source
+            .get("uses")
+            .and_then(Value::as_array)
+            .is_some_and(|uses| !uses.is_empty()),
+        "field uses resolve in the shared inventory"
+    );
+    insta::assert_snapshot!(serde_json::to_string_pretty(&value)?);
     Ok(())
 }
 

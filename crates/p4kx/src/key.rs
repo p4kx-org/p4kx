@@ -7,21 +7,27 @@ use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use anyhow::{Context, Result};
-use p4kx_channels::{SearchPaths, detect};
+use p4kx_channels::SearchRecipe;
 use p4kx_comparison::LineDiffError;
 use p4kx_extraction::{
     Archive, ArchiveError, ArchiveKey, ArchiveKeyError, Entry, KeyCheck, OpenOptions,
     archive_error_in,
 };
 use p4kx_settings::{
-    ChosenKey, KEY_VARIABLE, KeyChoiceError, KeySource, KeyStore, KeyText, Settings, choose_key,
-    default_settings_file,
+    ChosenKey, KEY_VARIABLE, KeyChoiceError, KeySource, KeyStore, KeyText, choose_key,
 };
 use serde::Serialize;
 use thiserror::Error;
 
 use crate::cli::{Cli, Command, KeyAction, KeyArgs};
 use crate::json;
+
+/// How to give the key, after an error or note about a missing key.
+pub(crate) const REQUIRED_HINT: &str = "give the Archive key with --key <hex> or the \
+     P4KX_ARCHIVE_KEY environment variable, or store it once with `p4kx key set`";
+/// What to do about a key that does not fit.
+pub(crate) const WRONG_HINT: &str = "the Archive key does not fit this Archive; correct --key or \
+     P4KX_ARCHIVE_KEY, or replace the stored key with `p4kx key set`";
 
 static KEY: OnceLock<Option<ArchiveKey>> = OnceLock::new();
 static RECOVER: AtomicBool = AtomicBool::new(false);
@@ -98,13 +104,15 @@ pub(crate) fn init(cli: &Cli) -> Result<()> {
 }
 
 /// Opens the Archive at `path` with the key of this run, if there is one, and notes on stderr
-/// that it belongs to a test build.
+/// that it belongs to a test build. The encrypted Entries it cannot read are counted for the note
+/// of [`crate::key_note`].
 pub(crate) fn open(path: impl AsRef<Path>) -> Result<Archive, ArchiveError> {
     crate::guard::on_archive_open(path.as_ref());
     let options = OpenOptions::new()
         .key(KEY.get().cloned().flatten())
         .recover(RECOVER.load(Ordering::Relaxed));
     let archive = Archive::open_with(path.as_ref(), options)?;
+    crate::key_note::watch(archive.key_demand());
     crate::issues::warn_archive_wide(&archive);
     crate::test_build::announce(path.as_ref());
     Ok(archive)
@@ -114,15 +122,9 @@ pub(crate) fn open(path: impl AsRef<Path>) -> Result<Archive, ArchiveError> {
 pub(crate) fn hint(error: &anyhow::Error) -> Option<&'static str> {
     let archive_error = archive_error(error)?;
     if archive_error.is_key_required() {
-        Some(
-            "give the Archive key with --key <hex> or the P4KX_ARCHIVE_KEY environment variable, \
-             or store it once with `p4kx key set`",
-        )
+        Some(REQUIRED_HINT)
     } else if archive_error.is_wrong_key() {
-        Some(
-            "the Archive key does not fit this Archive; correct --key or P4KX_ARCHIVE_KEY, or \
-             replace the stored key with `p4kx key set`",
-        )
+        Some(WRONG_HINT)
     } else {
         None
     }
@@ -188,6 +190,7 @@ fn set(store: &KeyStore, text: Option<&str>, archive: Option<&Path>, as_json: bo
     };
     let key = ArchiveKey::from_hex(text).map_err(InvalidKey::Text)?;
     let checked_against = check_against(&key, archive)?;
+    crate::guard::ensure_writable(store.file())?;
     store.save(&key)?;
     if as_json {
         json::print(&StoredJson {
@@ -229,7 +232,7 @@ fn check_against(key: &ArchiveKey, archive: Option<&Path>) -> Result<Option<Path
         let checked = open_unkeyed(path)?.verify_key(key)?;
         return Ok((checked == KeyCheck::Verified).then(|| path.to_path_buf()));
     }
-    for path in installed_archives() {
+    for path in installed_archives()? {
         let Ok(archive) = open_unkeyed(&path) else {
             continue;
         };
@@ -244,22 +247,16 @@ fn open_unkeyed(path: &Path) -> Result<Archive, ArchiveError> {
     Archive::open(path)
 }
 
-fn installed_archives() -> Vec<PathBuf> {
-    let settings = default_settings_file()
-        .and_then(|file| Settings::load(&file).ok())
-        .unwrap_or_default();
-    let standard = SearchPaths::standard();
-    let paths = SearchPaths {
-        default_library: standard.default_library,
-        launcher: standard.launcher,
-        wine_prefixes: standard.wine_prefixes,
-        manual_folders: settings.channels.folders,
-        manual_archives: settings.channels.archives,
-    };
-    detect(&paths)
+fn installed_archives() -> Result<Vec<PathBuf>> {
+    let settings = crate::launcher_discovery::profile_settings();
+    let recipe = SearchRecipe::standard();
+    let (channels, _patches) =
+        crate::launcher_discovery::reported(recipe.snapshot_with_settings(&settings).detect())?
+            .into_parts();
+    Ok(channels
         .iter()
         .map(|channel| channel.archive().to_path_buf())
-        .collect()
+        .collect())
 }
 
 fn show(store: &KeyStore, flag: Option<&str>, as_json: bool) -> Result<()> {
@@ -302,6 +299,7 @@ fn in_use(chosen: &ChosenKey) -> InUseJson {
 }
 
 fn remove(store: &KeyStore, as_json: bool) -> Result<()> {
+    crate::guard::ensure_writable(store.file())?;
     let removed = store.remove()?;
     if as_json {
         json::print(&RemovedJson {

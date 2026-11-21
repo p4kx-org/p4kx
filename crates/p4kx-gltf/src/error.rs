@@ -34,6 +34,14 @@ pub enum GltfError {
         /// The length the file would need.
         len: u64,
     },
+    /// The padded GLB JSON chunk exceeds the caller's byte budget.
+    #[error("the GLB JSON chunk needs {actual} bytes, exceeding the budget of {budget} bytes")]
+    JsonBudgetExceeded {
+        /// The actual padded size in bytes.
+        actual: u64,
+        /// The selected byte budget.
+        budget: u64,
+    },
     /// The glTF JSON could not be serialised.
     #[error("cannot serialise the glTF JSON")]
     Json(#[from] serde_json::Error),

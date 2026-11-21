@@ -7,8 +7,8 @@
 use std::error::Error;
 
 use crate::ships::{database, rows, schema};
-use p4kx_dataforge::DataForge;
-use p4kx_dataforge::query::MAX_PATH_VALUES;
+use p4kx_dataforge::query::{MAX_PATH_VALUES, Query};
+use p4kx_dataforge::{DataForge, ValueError};
 use p4kx_testkit::{TestInstance, TestRecord, TestValue};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -68,11 +68,31 @@ fn a_step_that_cannot_be_read_gives_an_error_value_at_its_place() -> TestResult 
              | [] | null | null",
         ],
     )?;
-    assert_rows(
-        &forge,
-        "from Ship where anchor.x = 0 or tags[*] = \"\"",
-        &[],
-    )
+    let compiled =
+        Query::parse("from Ship where anchor.x = 0 or tags[*] = \"\"")?.compile(&forge)?;
+    let error = compiled
+        .run()
+        .err()
+        .ok_or("a demanded pointer error was hidden")?;
+    assert_eq!(
+        error.record_path(),
+        "libs/ships/broken",
+        "the first failing Record"
+    );
+    assert_eq!(
+        error.comparison_index(),
+        0,
+        "the demanded anchor comparison"
+    );
+    assert_eq!(
+        error.value_error(),
+        &ValueError::UnexpectedPointerType {
+            struct_index: 4,
+            declared: 0
+        },
+        "the original pointer error"
+    );
+    Ok(())
 }
 
 #[test]
@@ -93,7 +113,26 @@ fn an_instance_shorter_than_its_declared_layout_is_an_error_value() -> TestResul
              reads up to byte 8"
         )],
     )?;
-    assert_rows(&forge, "from Ship where not anchor.y = 1", &[])
+    let compiled = Query::parse("from Ship where not anchor.y = 1")?.compile(&forge)?;
+    let error = compiled
+        .run()
+        .err()
+        .ok_or("a demanded short instance was hidden")?;
+    assert_eq!(
+        error.record_path(),
+        "libs/ships/short",
+        "the failing Record"
+    );
+    assert_eq!(
+        error.value_error(),
+        &ValueError::InstanceTooShort {
+            struct_index: TINY_STRUCT,
+            size: 4,
+            needed: 8
+        },
+        "the original short-instance error"
+    );
+    Ok(())
 }
 
 #[test]
@@ -191,7 +230,7 @@ fn the_budget_counts_every_level_of_nested_arrays() -> TestResult {
 }
 
 #[test]
-fn the_columns_of_a_row_share_one_budget_and_each_comparison_has_its_own() -> TestResult {
+fn columns_share_one_budget_and_comparisons_stream_every_element() -> TestResult {
     let many = MAX_PATH_VALUES + 1;
     let tags = |count: usize| {
         TestValue::Array(
@@ -225,17 +264,21 @@ fn the_columns_of_a_row_share_one_budget_and_each_comparison_has_its_own() -> Te
         "two paths over half the budget each: {:?}",
         rows.get(1).map(String::len)
     );
-    assert_rows(&forge, "from Station where tags[*] = 1", &["half: "])?;
+    assert_rows(
+        &forge,
+        "from Station where tags[*] = 1",
+        &["big: ", "half: "],
+    )?;
     assert_rows(&forge, "from Station where not tags[*] = 1", &[])?;
     assert_rows(
         &forge,
         "from Station where tags[*] = -1 or tags[*] = 1",
-        &["half: "],
+        &["big: ", "half: "],
     )?;
     assert_rows(
         &forge,
         "from Station where tags[*] = 1 and tags[*] = 2 and tags[*] = 2048",
-        &["half: "],
+        &["big: ", "half: "],
     )?;
     assert_rows(&forge, "from Station where tags[4096] = 4096", &["big: "])
 }

@@ -37,8 +37,9 @@ which are counted as skipped. Version 2 left out the ships with the three ship w
 {"schemaVersion": 2, "source": {…}, "filter": null, "ships": [ … ]}
 ```
 
-`source` is the `source` object of the Basetool catalog (Channel, Build, Archive size and time,
-tool version, export time). NDJSON has the ship objects only.
+`source` is the `source` object of the P4KX catalog (Channel, Build, Archive size and time,
+whether the Archive key was there and how many encrypted Entries stayed unread, tool version,
+export time). NDJSON has the ship objects only.
 
 ## Ship
 
@@ -70,8 +71,8 @@ the origins that supplied a value appear.
 `entities/spaceships` whose vehicle implementation has no wheel (`class="SubPartWheel"`) or tread
 (`class="Tread"`) part. A missing or unreadable vehicle implementation counts as no wheels, so such
 a Record under `entities/spaceships` is a `spaceship`. A wheeled or tracked Record under `entities/spaceships` gives `null`: the
-folder and the implementation disagree, and the kind is not guessed. The Basetool catalog carries
-the value as `vehicleKind` (`basetool-catalog.md`, "Ship base data").
+folder and the implementation disagree, and the kind is not guessed. The P4KX catalog carries
+the value as `vehicleKind` (`catalog.md`, "Ship base data").
 
 ### Mass
 
@@ -112,7 +113,7 @@ is read from the `InventoryContainer` Record its `SCItemInventoryContainerCompon
 `containerParams`:
 
 - an open container (`InventoryOpenContainerType`) from its `interiorDimensions` in metres:
-  `scu` is x · y · z / 1.953125 (1.25 m cubed), `cells` the product of `floor(side / 1.25)` per
+  `scu` is x · y · z / 1.953125 (1.25 m cubed), `cells` the product of `floor(side / 1.25 + 0.0001)` per
   side;
 - a closed container (`InventoryClosedContainerType`) from its `capacity`:
   `SStandardCargoUnit` as it is, `SCentiCargoUnit` divided by 100, `SMicroCargoUnit` divided by
@@ -120,10 +121,14 @@ is read from the `InventoryContainer` Record its `SCItemInventoryContainerCompon
 
 Each grid lists `port` path, `className`, `guid`, `container`, `shape` (`open` or `closed`), `scu`,
 `cells`, `dimensions`, its `source` (the container Record and field) and an `issue` when its
-capacity cannot be read. The ship's `scu` and `cells` sum the readable grids, rounded to four
-decimals; `gridsWithIssue` counts the others, and when it is not 0 the sums are a lower bound. A
-container with a side that is not a positive length up to 1000 m, or a capacity outside 0 to 10^9
-SCU, is not readable (an `issue`); sums saturate and never overflow.
+capacity cannot be read. Open dimensions must be finite and positive. Closed capacity must be
+finite and nonnegative. The ship's `scu` sums the readable grid capacities and rounds the
+result to four decimals. `gridsWithIssue` counts the unreadable capacities, making the
+reported SCU a lower bound when this count is positive. The open-grid and ship `cells`
+counts are `null` if the count exceeds the `u64` range. Readable SCU stays available
+independently of the cell count. The sum includes readable grids flagged `miningOnly` or
+`invisible`. The v3 catalog exposes their capacity and both flags per grid.
+See [Cargo grid facilities](catalog-ship-facilities.md#cargo-grid-facilities).
 On LIVE, 76 grids carry an `issue`, in two kinds that are facts of the game data, not of the
 reading: the Javelin's and the Hornet F7C's grids refer to `InventoryContainer` Records that do not
 exist (dangling References, so no capacity), and `MISC_Hull_A_CargoPlate` is a `CargoGrid` item
@@ -141,4 +146,4 @@ or XML Loadout file whose entry supplied the attachment, the Record that defines
 `port_default` (field `Components/SItemPortContainerComponentParams/Ports`), an included XML file as its own file), `unresolved` (the reason, or
 `null`) and `dockedVehicle` (present and `true` for a docked vehicle: its `AttachDef.Type` starts
 with `NOITEM_Vehicle`, ignoring case; it stays in its port and its own ports are not listed or counted). The walk
-is `EntityNode::loadout` of `p4kx-assembly`, which the Basetool catalog's loadout kind shares.
+is `EntityNode::loadout` of `p4kx-assembly`, which the P4KX catalog's loadout kind shares.

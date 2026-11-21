@@ -4,12 +4,16 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use p4kx_model::Transform;
+use p4kx_model::{PrefabRef, Transform};
 
+use super::capture::{Capture, ObjectKey};
+use super::resolution_source::OwnedPrefabLocation;
 use super::set::Lookup;
 use super::{
     MAX_PREFAB_DEPTH, MAX_PREFAB_ISSUES, MAX_PREFAB_OBJECTS, MAX_PREFAB_VISITS, PrefabError,
-    PrefabFile, PrefabIssue, PrefabIssueKind, PrefabSet, ResolvedObject, ResolvedPrefab,
+    PrefabFile, PrefabGuidRemappingInstance, PrefabInstanceSource, PrefabIssue, PrefabIssueKind,
+    PrefabIssueSource, PrefabLinkSource, PrefabSelectionSource, PrefabSet, ResolvedObject,
+    ResolvedPrefab,
 };
 
 impl PrefabSet<'_> {
@@ -32,10 +36,14 @@ impl PrefabSet<'_> {
                 name: prefab.to_owned(),
             });
         };
+        let capture = self.captures_objects().then(|| Capture::new(&file, index));
         let mut walk = Walk {
             set: self,
+            capture,
             objects: Vec::new(),
             issues: Vec::new(),
+            instance_path: Vec::new(),
+            guid_remapping_instances: Vec::new(),
             visits: 0,
             prefabs: 0,
             stack: Vec::new(),
@@ -44,7 +52,13 @@ impl PrefabSet<'_> {
             stopped: false,
         };
         let root: Arc<str> = Arc::from("");
-        walk.expand(&file, index, Transform::IDENTITY, &root)?;
+        let visit = Visit {
+            file: &file,
+            index,
+            container: &root,
+            route: None,
+        };
+        walk.expand(&visit, Transform::IDENTITY)?;
         let name = file
             .library()
             .prefabs
@@ -57,14 +71,45 @@ impl PrefabSet<'_> {
             objects: walk.objects,
             prefabs: walk.prefabs,
             issues: walk.issues,
+            source: walk.capture.map(|capture| capture.source),
+            guid_remapping_instances: walk.guid_remapping_instances,
         })
     }
 }
 
+struct Visit<'a> {
+    file: &'a Arc<PrefabFile>,
+    index: usize,
+    container: &'a Arc<str>,
+    route: Option<&'a Arc<PrefabInstanceSource>>,
+}
+
+impl Visit<'_> {
+    fn owner(&self) -> OwnedPrefabLocation {
+        OwnedPrefabLocation {
+            file: Arc::clone(self.file),
+            prefab_index: self.index,
+        }
+    }
+
+    fn key(&self, object: usize) -> ObjectKey {
+        (self.file.slot(), self.index, object)
+    }
+}
+
+#[derive(Default)]
+struct NestedDecision {
+    target: Option<(Arc<PrefabFile>, usize)>,
+    source: Option<Arc<PrefabLinkSource>>,
+}
+
 struct Walk<'s, 'a> {
     set: &'s mut PrefabSet<'a>,
+    capture: Option<Capture>,
     objects: Vec<ResolvedObject>,
     issues: Vec<PrefabIssue>,
+    instance_path: Vec<usize>,
+    guid_remapping_instances: Vec<PrefabGuidRemappingInstance>,
     visits: usize,
     prefabs: usize,
     stack: Vec<(usize, usize)>,
@@ -74,7 +119,14 @@ struct Walk<'s, 'a> {
 }
 
 impl Walk<'_, '_> {
-    fn note(&mut self, container: &str, name: &str, kind: PrefabIssueKind) {
+    fn note(
+        &mut self,
+        visit: &Visit<'_>,
+        object_index: Option<usize>,
+        name: &str,
+        kind: PrefabIssueKind,
+        link: Option<&Arc<PrefabLinkSource>>,
+    ) {
         if self.issues.len() > MAX_PREFAB_ISSUES {
             return;
         }
@@ -86,17 +138,25 @@ impl Walk<'_, '_> {
             kind
         };
         self.issues.push(PrefabIssue {
-            container: container.to_owned(),
+            container: visit.container.to_string(),
             name: name.to_owned(),
             kind,
         });
+        if let Some(capture) = &mut self.capture {
+            capture.source.issues.push(PrefabIssueSource {
+                owner: visit.owner(),
+                object_index,
+                route: visit.route.cloned(),
+                link: link.cloned(),
+            });
+        }
     }
 
-    fn report_prefab(&mut self, file: &PrefabFile, index: usize, container: &str) {
-        let Some(prefab) = file.library().prefabs.get(index) else {
+    fn report_prefab(&mut self, visit: &Visit<'_>) {
+        let Some(prefab) = visit.file.library().prefabs.get(visit.index) else {
             return;
         };
-        if !self.reported.insert((file.slot(), index)) {
+        if !self.reported.insert((visit.file.slot(), visit.index)) {
             return;
         }
         if prefab.invalid > 0 {
@@ -104,7 +164,7 @@ impl Walk<'_, '_> {
                 prefab: prefab.name.clone(),
                 count: prefab.invalid,
             };
-            self.note(container, "", kind);
+            self.note(visit, None, "", kind, None);
         }
         let attached = prefab
             .objects
@@ -116,23 +176,20 @@ impl Walk<'_, '_> {
                 prefab: prefab.name.clone(),
                 count: attached,
             };
-            self.note(container, "", kind);
+            self.note(visit, None, "", kind, None);
         }
     }
 
-    fn expand(
-        &mut self,
-        file: &Arc<PrefabFile>,
-        index: usize,
-        world: Transform,
-        container: &Arc<str>,
-    ) -> Result<(), PrefabError> {
-        let Some(prefab) = file.library().prefabs.get(index) else {
+    fn expand(&mut self, visit: &Visit<'_>, world: Transform) -> Result<(), PrefabError> {
+        let Some(prefab) = visit.file.library().prefabs.get(visit.index) else {
             return Ok(());
         };
         self.prefabs += 1;
-        self.report_prefab(file, index, container);
-        self.stack.push((file.slot(), index));
+        if let (Some(capture), Some(route)) = (&mut self.capture, visit.route) {
+            capture.record_entered(route);
+        }
+        self.report_prefab(visit);
+        self.stack.push((visit.file.slot(), visit.index));
         for (at, object) in prefab.objects.iter().enumerate() {
             if self.stopped {
                 break;
@@ -143,37 +200,97 @@ impl Walk<'_, '_> {
                 let kind = PrefabIssueKind::TooManyVisits {
                     limit: MAX_PREFAB_VISITS,
                 };
-                self.note(container, "", kind);
+                self.note(visit, None, "", kind, None);
                 break;
             }
             let placed = world.then(&object.transform);
             let nested = match &object.nested {
-                Some(reference) => self.nested(container, &object.name, reference)?,
-                None => None,
+                Some(reference) => self.nested(visit, at, &object.name, reference)?,
+                None => NestedDecision::default(),
             };
-            match nested {
+            self.record_remapping(visit, at, object.nested.as_ref(), &nested);
+            match nested.target {
                 Some((inner, target)) => {
-                    let path: Arc<str> = if container.is_empty() {
+                    let path: Arc<str> = if visit.container.is_empty() {
                         Arc::from(object.name.as_str())
                     } else {
-                        Arc::from(format!("{container}/{}", object.name))
+                        Arc::from(format!("{}/{}", visit.container, object.name))
                     };
-                    self.expand(&inner, target, placed, &path)?;
+                    let route = nested.source.map(|source| self.instance(visit, at, source));
+                    let child = Visit {
+                        file: &inner,
+                        index: target,
+                        container: &path,
+                        route: route.as_ref(),
+                    };
+                    self.instance_path.push(at);
+                    self.expand(&child, placed)?;
+                    self.instance_path.pop();
                 }
-                None => self.push(file, index, at, placed, container),
+                None => self.push(visit, at, placed, nested.source),
             }
         }
         self.stack.pop();
         Ok(())
     }
 
+    fn record_remapping(
+        &mut self,
+        visit: &Visit<'_>,
+        at: usize,
+        reference: Option<&PrefabRef>,
+        nested: &NestedDecision,
+    ) {
+        if reference.is_some_and(|reference| !reference.guid_remapping_blocks.is_empty()) {
+            let mut path = self.instance_path.clone();
+            path.push(at);
+            self.guid_remapping_instances
+                .push(PrefabGuidRemappingInstance {
+                    path,
+                    owner: visit.owner(),
+                    object_index: at,
+                    entered_target: nested.target.as_ref().map(|(file, index)| {
+                        OwnedPrefabLocation {
+                            file: Arc::clone(file),
+                            prefab_index: *index,
+                        }
+                    }),
+                    route: visit.route.cloned(),
+                    lookup: nested.source.clone(),
+                });
+        }
+    }
+
+    fn instance(
+        &self,
+        visit: &Visit<'_>,
+        object_index: usize,
+        lookup: Arc<PrefabLinkSource>,
+    ) -> Arc<PrefabInstanceSource> {
+        let selection = self
+            .capture
+            .as_ref()
+            .and_then(|capture| capture.selections.get(&visit.key(object_index)))
+            .cloned()
+            .unwrap_or_else(|| {
+                Arc::new(PrefabSelectionSource {
+                    owner: visit.owner(),
+                    object_index,
+                    lookup,
+                })
+            });
+        Arc::new(PrefabInstanceSource {
+            selection,
+            parent: visit.route.cloned(),
+        })
+    }
+
     fn push(
         &mut self,
-        file: &Arc<PrefabFile>,
-        prefab: usize,
+        visit: &Visit<'_>,
         object: usize,
         world: Transform,
-        container: &Arc<str>,
+        unexpanded_source: Option<Arc<PrefabLinkSource>>,
     ) {
         if self.objects.len() >= MAX_PREFAB_OBJECTS {
             if !self.stopped {
@@ -181,53 +298,67 @@ impl Walk<'_, '_> {
                 let kind = PrefabIssueKind::TooManyObjects {
                     limit: MAX_PREFAB_OBJECTS,
                 };
-                self.note(container, "", kind);
+                self.note(visit, None, "", kind, None);
             }
             return;
         }
         self.objects.push(ResolvedObject {
-            file: Arc::clone(file),
-            prefab,
+            file: Arc::clone(visit.file),
+            prefab: visit.index,
             object,
             world,
-            container: Arc::clone(container),
+            container: Arc::clone(visit.container),
             depth: self.stack.len().saturating_sub(1),
+            route: visit.route.cloned(),
+            unexpanded_source,
         });
     }
 
     fn nested(
         &mut self,
-        container: &str,
+        visit: &Visit<'_>,
+        object: usize,
         name: &str,
-        reference: &p4kx_model::PrefabRef,
-    ) -> Result<Option<(Arc<PrefabFile>, usize)>, PrefabError> {
-        let (file, target) = match self.set.find_nested(reference)? {
+        reference: &PrefabRef,
+    ) -> Result<NestedDecision, PrefabError> {
+        let lookup = self.set.find_nested(reference)?;
+        let source = lookup.source;
+        let (file, target) = match lookup.outcome {
             Lookup::Found(file, target) => (file, target),
             Lookup::Missing(unreadable) => {
                 if let Some((library, reason)) = unreadable {
                     let kind = PrefabIssueKind::LibraryUnreadable { library, reason };
-                    self.note(container, name, kind);
+                    self.note(visit, Some(object), name, kind, source.as_ref());
                 }
                 let kind = PrefabIssueKind::Missing {
                     prefab: reference.name.clone(),
                 };
-                self.note(container, name, kind);
-                return Ok(None);
+                self.note(visit, Some(object), name, kind, source.as_ref());
+                return Ok(NestedDecision {
+                    target: None,
+                    source,
+                });
             }
         };
         if self.stack.contains(&(file.slot(), target)) {
             let kind = PrefabIssueKind::Cycle {
                 prefab: reference.name.clone(),
             };
-            self.note(container, name, kind);
-            return Ok(None);
+            self.note(visit, Some(object), name, kind, source.as_ref());
+            return Ok(NestedDecision {
+                target: None,
+                source,
+            });
         }
         if self.stack.len() >= MAX_PREFAB_DEPTH {
             let kind = PrefabIssueKind::TooDeep {
                 limit: MAX_PREFAB_DEPTH,
             };
-            self.note(container, name, kind);
-            return Ok(None);
+            self.note(visit, Some(object), name, kind, source.as_ref());
+            return Ok(NestedDecision {
+                target: None,
+                source,
+            });
         }
         if let Some(found) = file.library().prefabs.get(target)
             && !reference.guid.is_empty()
@@ -242,8 +373,11 @@ impl Walk<'_, '_> {
                 named: reference.guid.clone(),
                 found: found.id.clone(),
             };
-            self.note(container, name, kind);
+            self.note(visit, Some(object), name, kind, source.as_ref());
         }
-        Ok(Some((file, target)))
+        Ok(NestedDecision {
+            target: Some((file, target)),
+            source,
+        })
     }
 }

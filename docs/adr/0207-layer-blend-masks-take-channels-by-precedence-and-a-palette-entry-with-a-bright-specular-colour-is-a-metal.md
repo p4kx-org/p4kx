@@ -1,5 +1,8 @@
 # Layer blend masks take channels by precedence, and a palette entry with a bright specular colour is a metal
 
+Amended by ADR-0400: explicitly selected HardSurface palette finish multiplies sampled
+smoothness before its linear inverse; GLB layer roughness uses the same finish controls.
+
 Decided for issues #730 and #733. It amends ADR-0147 (the share of the blend mask), ADR-0100 (the
 add-on's surface mapping) and ADR-0195 (painted materials). Evidence: the LIVE Archive, imported
 into Blender 5.2 with the add-on and compared against in-game screenshots and the in-game item

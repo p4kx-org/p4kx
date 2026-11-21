@@ -7,8 +7,8 @@ use std::error::Error;
 use std::fs;
 
 use p4kx_extraction::{
-    Archive, Checksum, ConflictPolicy, Entry, ExtractOptions, ExtractionError, VerifyOptions,
-    extract, verify,
+    Archive, CancelToken, Checksum, ConflictPolicy, Entry, ExtractOptions, ExtractionError,
+    VerificationOutcome, VerifyOptions, extract, verify, verify_observed,
 };
 use p4kx_testkit::{ArchiveBuilder, TestEntry, test_key};
 
@@ -70,6 +70,113 @@ fn verification_reports_every_mismatch_and_counts_the_good_entries() -> TestResu
         "the mismatches in Entry order with their stored checksum"
     );
     assert!(!report.is_complete(), "mismatches make the run incomplete");
+    Ok(())
+}
+
+#[test]
+fn observed_verification_retains_each_physical_entry_with_the_same_path() -> TestResult {
+    const PATH: &str = "Data\\duplicate.bin";
+    let builder = ArchiveBuilder::new()
+        .entry(TestEntry::stored(PATH, DATA))
+        .entry(TestEntry::deflated(PATH, DATA).with_crc32c(1))
+        .entry(TestEntry::zstd(PATH, DATA).with_crc32c(2));
+    let (_dir, archive) = open(&builder)?;
+    let entries: Vec<_> = archive.entries().iter().rev().collect();
+    let observed = verify_observed(&archive, &entries, &VerifyOptions::default());
+    let report = observed.report();
+    assert_eq!(report.verified(), 1, "one original duplicate is correct");
+    assert_eq!(report.failures().len(), 2, "both failing duplicates remain");
+
+    let outcomes = [
+        VerificationOutcome::Failed { failure_index: 0 },
+        VerificationOutcome::Failed { failure_index: 1 },
+        VerificationOutcome::Verified,
+    ];
+    assert_eq!(
+        observed.observations().len(),
+        outcomes.len(),
+        "one observation per input"
+    );
+    for (position, ((observation, entry), outcome)) in observed
+        .observations()
+        .zip(entries.iter().copied())
+        .zip(outcomes)
+        .enumerate()
+    {
+        assert_eq!(
+            observation.position(),
+            position,
+            "the supplied selection order"
+        );
+        assert!(
+            std::ptr::eq(observation.entry(), entry),
+            "the actual Entry reference"
+        );
+        assert_eq!(
+            observation.entry().path(),
+            PATH,
+            "literal path aliases every Entry"
+        );
+        assert_eq!(observation.outcome(), outcome, "the verdict for this Entry");
+    }
+    let expected: Vec<_> = report
+        .checksum_mismatches()
+        .filter_map(p4kx_extraction::EntryFailure::checksum_mismatch)
+        .map(|(expected, _)| expected)
+        .collect();
+    assert_eq!(
+        expected,
+        [Checksum::Crc32c(2), Checksum::Crc32c(1)],
+        "failure indices address the corresponding checksums in supplied order"
+    );
+    Ok(())
+}
+
+#[test]
+fn observed_verification_retains_cancelled_entry_positions() -> TestResult {
+    let (_dir, archive) = open(&mixed())?;
+    let entries: Vec<_> = archive.entries().iter().rev().take(2).collect();
+    let cancel = CancelToken::new();
+    cancel.cancel();
+    let options = VerifyOptions {
+        cancel: Some(&cancel),
+        ..VerifyOptions::default()
+    };
+    let observed = verify_observed(&archive, &entries, &options);
+    assert_eq!(
+        observed.report().verified(),
+        0,
+        "pre-cancelled run checked no Entries"
+    );
+    assert!(
+        observed.report().failures().is_empty(),
+        "cancellation is no read failure"
+    );
+    assert_eq!(
+        observed.report().cancelled(),
+        ["Data\\also_good.bin", "Data\\bad_encrypted.bin"],
+        "cancelled paths remain in selection order"
+    );
+    for (position, (observation, entry)) in observed
+        .observations()
+        .zip(entries.iter().copied())
+        .enumerate()
+    {
+        assert_eq!(
+            observation.position(),
+            position,
+            "actual cancelled selection position"
+        );
+        assert!(
+            std::ptr::eq(observation.entry(), entry),
+            "actual cancelled Entry"
+        );
+        assert_eq!(
+            observation.outcome(),
+            VerificationOutcome::Cancelled,
+            "no check result"
+        );
+    }
     Ok(())
 }
 

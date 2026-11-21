@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::str::FromStr;
 
 use p4kx_extraction::Guid;
@@ -133,7 +133,7 @@ impl StoreSlugs {
         ships: impl IntoIterator<Item = (Guid, &'a str)>,
         filtered: bool,
     ) -> Resolved<'_> {
-        let classes: HashMap<Guid, &str> = ships.into_iter().collect();
+        let classes: HashSet<(Guid, &str)> = ships.into_iter().collect();
         let mut summary = StoreSlugSummary {
             slugs: self.slugs.len(),
             ..StoreSlugSummary::default()
@@ -145,16 +145,17 @@ impl StoreSlugs {
                 continue;
             };
             summary.mapped += 1;
-            let found = classes.get(&mapped.guid).copied();
-            let resolves = found == Some(mapped.class_name.as_str());
             if slug.retired {
                 summary.retired += 1;
-                if found.is_some() && !filtered {
+                if filtered {
+                    continue;
+                }
+                if classes.iter().any(|(guid, _)| *guid == mapped.guid) {
                     summary.stale.push(slug.slug.clone());
-                } else if !filtered {
+                } else {
                     exported.push(entry(slug, None));
                 }
-            } else if resolves {
+            } else if classes.contains(&(mapped.guid, mapped.class_name.as_str())) {
                 summary.resolved += 1;
                 exported.push(entry(slug, Some(mapped)));
             } else if !filtered {

@@ -244,7 +244,12 @@ impl Cell<'_, '_> {
         let tag = self.row.tag();
         let rect = ui.max_rect();
         response.widget_info(|| {
-            WidgetInfo::selected(Role::Button, true, self.row.is_selected(), tag.path())
+            WidgetInfo::selected(
+                Role::Button,
+                true,
+                self.row.is_selected(),
+                tag.path_view().to_string(),
+            )
         });
         let chevron = rails(ui, rect, tag.depth());
         let toggled = self.row.is_expandable() && {

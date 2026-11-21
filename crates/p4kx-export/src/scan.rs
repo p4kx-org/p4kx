@@ -1,42 +1,57 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use p4kx_assembly::{ArchiveFiles, Entities};
 use p4kx_extraction::{
-    CancelToken, DataForge, DataForgeError, Filter, Guid, PointerProbe, Record, RecordTree,
-    TreeBuilder,
+    CancelToken, DataForge, DataForgeError, Filter, PointerProbe, Record, TreeBuilder,
 };
-use rayon::prelude::*;
 
+use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_crafting::CraftingKinds;
-use crate::commodity::{resource_commodity, resource_type_guid};
-use crate::contract::{Blueprint, QualityQuantization};
-use crate::contract_recipe::CostLine;
+use crate::catalog_projection::CatalogProjection;
+use crate::catalog_v3::catalog_entity_configurations;
+use crate::catalog_v3::catalog_harvest_modules::harvest_provider_dependencies::ProviderDependencies;
+use crate::catalog_v3::catalog_item_alignment::AlignmentOptions;
+use crate::collected::Collected;
 use crate::entity_selection::{Selected, select};
-use crate::harvest_config::multi_config;
+use crate::export_diagnostic::ExportSourceRole;
+use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::harvest_link::Links;
-use crate::harvest_preset::provider_preset;
 use crate::item::is_paint;
-use crate::mining::mineable_entity;
 use crate::picked::Picked;
 use crate::playability_rules::Evidence;
-use crate::resource_group::{Groups, Listing, listing};
+use crate::record_observation::RecordObservation;
+use crate::resource_group::Groups;
+use crate::scan_health::{RecordEntityRows, RecordScan, ScanError, SourceTrace};
 use crate::scan_signature::SignatureSlot;
 use crate::ship_pool::ShipPool;
-use crate::starmap::{TypeNames, starmap_object};
-use crate::starmap_containers::Placements;
-use crate::texts::Texts;
-use crate::{CatalogError, CatalogFailure, CatalogOptions, CatalogPhase, CatalogProgress, Kind};
-use crate::{item_stats, item_variant};
+use crate::starmap::TypeNames;
+use crate::{CatalogError, CatalogOptions, CatalogPhase, CatalogProgress, Kind};
 
 const PROGRESS_STEP: usize = 1024;
 const RESOURCE_TYPE: &str = "ResourceType";
-const CRAFTER_FIELD: &str = "Components";
-const CRAFTER_STRUCT: &str = "CrafterComponentParams";
+pub(crate) const CRAFTER_FIELD: &str = "Components";
+pub(crate) const CRAFTER_STRUCT: &str = "CrafterComponentParams";
+
+#[path = "scan_ammo.rs"]
+mod ammo;
+#[path = "scan_complete.rs"]
+mod complete;
+#[path = "scan_definition_projection.rs"]
+mod definition_projection;
+#[path = "scan_domain.rs"]
+mod domain;
+pub(crate) use domain::ScanDomain;
+#[path = "scan_groups.rs"]
+mod groups;
+#[path = "scan_projection.rs"]
+mod projection;
+use self::projection::SelectedProjection;
+#[path = "scan_resources.rs"]
+mod resources;
 
 /// Returns whether the `resourceGroups` kind selects `record` under `filter`; a Record whose path
 /// or type cannot be read is not selected here, the check of the Record reports it.
@@ -47,196 +62,134 @@ fn selects_group(record: &Record<'_>, filter: Option<&Filter>) -> bool {
     )
 }
 
-/// Appends to `out` the `ResourceType` GUID of every resource line of `line`, selections opened.
-fn resources_of(line: &CostLine<'_>, out: &mut Vec<Guid>) {
-    out.extend(line.resource_guid.map(|guid| guid.0));
-    for option in &line.options {
-        resources_of(option, out);
-    }
-}
-
-/// The parallel check of every Record, with its progress.
+/// Checks all eligible Records and reports scan progress.
 pub(crate) struct Scan<'o, 'a, 'f> {
     forge: &'f DataForge<'f>,
+    original: &'f OriginalCatalogInput<'f, 'f>,
     ships: ShipPool<'f>,
+    ammo: ammo::AmmoReads<'a, 'o, 'f>,
     options: &'o CatalogOptions<'a>,
-    texts: &'o Texts<'f>,
-    placements: &'o Placements,
+    projection: &'o CatalogProjection<'o, 'f>,
+    domain: ScanDomain<'o>,
     types: TypeNames<'f>,
     links: Links<'f>,
+    provider_dependencies: ProviderDependencies,
     crafters: Option<PointerProbe<'f>>,
     groups: Groups,
     evidence: Evidence,
     signature_slot: SignatureSlot,
+    alignment_options: AlignmentOptions<'f>,
     done: AtomicUsize,
     total: usize,
 }
 
+struct ScanCandidate<'record, 'f> {
+    record: &'record Record<'f>,
+    selection: Result<Option<Selected>, DataForgeError>,
+}
+
 impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
-    /// Checks every Record of `forge` in parallel and returns those a kind selected; a ship's base
-    /// data is read here, once, by the worker that checks it.
+    /// Projects selected Records and reads each ship base in physical Record order.
     pub(crate) fn run(
-        forge: &'f DataForge<'f>,
+        original: &'f OriginalCatalogInput<'f, 'f>,
         files: &'f ArchiveFiles<'f>,
         entities: Arc<Entities<'f>>,
         options: &'o CatalogOptions<'a>,
-        texts: &'o Texts<'f>,
-        crafting: &CraftingKinds<'f>,
-        placements: &'o Placements,
-    ) -> Result<Vec<Picked<'f>>, CatalogError> {
-        let records: Vec<Record<'f>> = forge.records().collect();
-        let (groups, group_failures) = Self::groups(&records, options.filter);
-        let (evidence, evidence_failures) = Evidence::read(&records);
-        let (signature_slot, slot_failures, slot_problem) = SignatureSlot::read(&records);
+        projection: &'o CatalogProjection<'o, 'f>,
+        crafting: CraftingKinds<'f>,
+        domain: ScanDomain<'o>,
+    ) -> Result<Collected<'f>, CatalogError> {
+        let forge = original.forge();
+        projection.original().check_forge(forge)?;
+        let records = domain.records(forge);
+        let groups::GroupRead {
+            groups,
+            members,
+            failures: group_failures,
+            ledger: group_ledger,
+        } = Self::groups(
+            &records,
+            options.filter,
+            projection.original(),
+            options.cancel,
+        )?;
+        let (evidence, evidence_failures, evidence_ledger) =
+            Evidence::read_captured(&records, projection.original(), options.cancel)?;
+        let (signature_slot, slot_failures, slot_problem, slot_ledger) =
+            SignatureSlot::read_captured(&records, projection.original(), options.cancel)?;
         let scan = Self {
             forge,
+            original,
             ships: ShipPool::new(entities, files),
+            ammo: ammo::AmmoReads::new(projection, options.filter, options.cancel),
             options,
-            texts,
-            placements,
+            projection,
+            domain,
             types: TypeNames::default(),
             links: Links::default(),
+            provider_dependencies: ProviderDependencies::default(),
             crafters: forge.pointer_probe(CRAFTER_FIELD, CRAFTER_STRUCT),
             groups,
             evidence,
             signature_slot,
+            alignment_options: AlignmentOptions::read(forge, options.cancel)?,
             done: AtomicUsize::new(0),
             total: records.len(),
         };
-        let mut picked: Vec<Picked<'f>> = records
-            .par_iter()
-            .map_init(TreeBuilder::new, |trees, record| scan.check(trees, record))
-            .filter_map(Result::transpose)
-            .collect::<Result<_, _>>()?;
-        picked.extend(
+        let mut ledger = group_ledger;
+        ledger.merge(evidence_ledger);
+        ledger.merge(slot_ledger);
+        let mut read = scan.complete(
+            &records,
+            ledger,
             group_failures
                 .into_iter()
                 .chain(evidence_failures)
-                .chain(slot_failures)
-                .map(Picked::Failed),
-        );
-        let resources =
-            scan.resource_commodities(&picked, &crafting.blueprints, &crafting.quantizations);
-        picked.extend(resources);
-        picked.extend(scan.links.warning().map(Picked::Warned));
-        let has_signatures = picked.iter().any(
-            |pick| matches!(pick, Picked::MineableEntity(entity) if !entity.signatures.is_empty()),
-        );
-        if options.filter.is_none() && has_signatures {
-            picked.extend(slot_problem.map(|problem| Picked::Warned(problem.warning())));
-        }
-        Ok(picked)
-    }
-
-    /// Returns what the `ResourceTypeGroup` Records of the `resourceGroups` kind list, the first
-    /// group in Record order winning a `ResourceType` or group several list, and the groups that
-    /// cannot be read and that the kind, under the Filter, does not report itself.
-    fn groups(records: &[Record<'f>], filter: Option<&Filter>) -> (Groups, Vec<CatalogFailure>) {
-        let listed: Vec<Result<Option<Listing>, CatalogFailure>> = records
-            .par_iter()
-            .map_init(TreeBuilder::new, |trees, record| {
-                if !selects_group(record, None) {
-                    return Ok(None);
-                }
-                match trees.build(record) {
-                    Ok(tree) => Ok(Some(listing(&tree))),
-                    Err(_) if selects_group(record, filter) => Ok(None),
-                    Err(source) => Err(CatalogFailure::of(record, &source)),
-                }
-            })
-            .collect();
-        let mut groups = Groups::default();
-        let mut failures = Vec::new();
-        for result in listed {
-            match result {
-                Ok(Some(listing)) => groups.add(listing),
-                Ok(None) => {}
-                Err(failure) => failures.push(failure),
-            }
-        }
-        (groups, failures)
-    }
-
-    /// Returns a commodity for every `ResourceType` the ingredients of the picked blueprints and
-    /// the kept quality quantizations use that no picked commodity carries, those the Filter
-    /// matches; one that cannot be read becomes a failure.
-    fn resource_commodities(
-        &self,
-        picked: &[Picked<'f>],
-        blueprints: &[Blueprint<'f>],
-        quantizations: &[QualityQuantization<'f>],
-    ) -> Vec<Picked<'f>> {
-        let mut carried = HashSet::new();
-        for pick in picked {
-            if let Picked::Commodity(commodity) = pick {
-                carried.extend(commodity.subtype_guid.map(|guid| guid.0));
-            }
-        }
-        let mut used = Vec::new();
-        for tier in blueprints.iter().flat_map(|blueprint| &blueprint.tiers) {
-            for line in tier.mandatory.iter().chain(&tier.optional) {
-                resources_of(line, &mut used);
-            }
-        }
-        used.extend(
-            quantizations
-                .iter()
-                .flat_map(|quantization| &quantization.resource_type_guids)
-                .map(|guid| guid.0),
-        );
-        used.sort_unstable();
-        used.dedup();
-        let mut trees = TreeBuilder::new();
-        let mut found = Vec::new();
-        for guid in used.into_iter().filter(|guid| !carried.contains(guid)) {
-            let Some(record) = self.forge.record_by_guid(guid) else {
-                continue;
-            };
-            match self.resource(&mut trees, &record) {
-                Ok(Some(pick)) => found.push(pick),
-                Ok(None) => {}
-                Err(source) => found.push(Picked::Failed(CatalogFailure::of(&record, &source))),
-            }
-        }
-        found
-    }
-
-    fn resource(
-        &self,
-        trees: &mut TreeBuilder<'f>,
-        record: &Record<'f>,
-    ) -> Result<Option<Picked<'f>>, DataForgeError> {
-        if record.type_name()? != RESOURCE_TYPE {
-            return Ok(None);
-        }
-        let path = record.record_path()?;
-        if self
-            .options
-            .filter
-            .is_some_and(|filter| !filter.matches(path))
-        {
-            return Ok(None);
-        }
-        let tree = trees.build(record)?;
-        Ok(Some(Picked::Commodity(resource_commodity(
-            &tree,
-            self.texts,
-            &self.groups,
-        ))))
+                .chain(slot_failures),
+            slot_problem,
+            crafting,
+        )?;
+        read.resource_group_members = members;
+        Ok(read)
     }
 
     fn check(
         &self,
         trees: &mut TreeBuilder<'f>,
-        record: &Record<'f>,
-    ) -> Result<Option<Picked<'f>>, CatalogError> {
+        candidate: ScanCandidate<'_, 'f>,
+    ) -> Result<Option<RecordScan<'f>>, CatalogError> {
         if self.options.cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
         self.tick();
-        Ok(self
-            .select(trees, record)
-            .unwrap_or_else(|source| Some(Picked::Failed(CatalogFailure::of(record, &source)))))
+        let record = candidate.record;
+        let mut trace = SourceTrace::new(record);
+        let mut ledger = ExportLedger::default();
+        let capture = Arc::new(
+            crate::export_builder_capture::BuilderCapture::for_input_root(
+                self.original,
+                record,
+                self.options.cancel,
+            )?,
+        );
+        trees.set_read_observer(Some(capture.clone()));
+        let mut entity = RecordEntityRows::default();
+        let result = self.select(
+            trees,
+            candidate,
+            &mut trace,
+            &mut ledger,
+            &capture,
+            &mut entity,
+        );
+        trees.set_read_observer(None);
+        ledger.merge(capture.finish()?);
+        let mut checked =
+            crate::scan_health::finish(self.original, record, &trace, result, ledger)?;
+        if let Some(checked) = &mut checked {
+            checked.entity = entity;
+        }
+        Ok(checked)
     }
 
     /// Returns what a development leftover of kind counts as: a skipped Record, a skipped paint
@@ -246,70 +199,139 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         trees: &mut TreeBuilder<'f>,
         record: &Record<'f>,
         kind: Kind,
-    ) -> Result<Option<Picked<'f>>, DataForgeError> {
-        Ok(match kind {
-            Kind::Items if trees.build(record).is_ok_and(|tree| is_paint(&tree)) => {
-                Some(Picked::SkippedPaint)
-            }
-            Kind::Crafters if !self.holds_crafter(trees, record)? => None,
-            kind => Some(Picked::Skipped(kind, record.guid())),
-        })
+        ledger: &mut ExportLedger,
+    ) -> Result<Option<Picked<'f>>, ScanError> {
+        if kind == Kind::Items {
+            let admission = RecordObservation::capture(self.original, record)?;
+            let tree = match trees.build(record) {
+                Ok(tree) => tree,
+                Err(error) => {
+                    ledger.observe(
+                        admission
+                            .source(
+                                Some(kind),
+                                ExportSourceRole::Dependency,
+                                SourceDisposition::ReadFailed,
+                            )?
+                            .diagnosed(crate::export_source_failure::diagnosis(&error)),
+                    );
+                    return Ok(Some(Picked::Skipped(kind, record.guid())));
+                }
+            };
+            ledger.merge(crate::export_field_walk::inspect_observed(
+                Some(self.original),
+                &tree,
+                &admission,
+                Some(kind),
+                ExportSourceRole::Dependency,
+                self.options.cancel,
+            )?);
+            ledger.observe(admission.source(
+                Some(kind),
+                ExportSourceRole::Dependency,
+                SourceDisposition::Projected,
+            )?);
+            return Ok(Some(if is_paint(&tree) {
+                Picked::SkippedPaint
+            } else {
+                Picked::Skipped(kind, record.guid())
+            }));
+        }
+        Ok(Some(Picked::Skipped(kind, record.guid())))
     }
 
     fn select(
         &self,
         trees: &mut TreeBuilder<'f>,
-        record: &Record<'f>,
-    ) -> Result<Option<Picked<'f>>, DataForgeError> {
-        let kind = match select(record, self.options.filter)? {
+        candidate: ScanCandidate<'_, 'f>,
+        trace: &mut SourceTrace,
+        ledger: &mut ExportLedger,
+        capture: &crate::export_builder_capture::BuilderCapture<'_>,
+        entity: &mut RecordEntityRows<'f>,
+    ) -> Result<Option<Picked<'f>>, ScanError> {
+        let ScanCandidate { record, selection } = candidate;
+        let kind = match selection? {
             None => return Ok(None),
-            Some(Selected::Leftover(kind)) => return self.leftover(trees, record, kind),
-            Some(Selected::Entity(Kind::Crafters)) if !self.holds_crafter(trees, record)? => {
-                return Ok(None);
+            Some(Selected::Leftover(kind)) => {
+                if kind == Kind::Crafters {
+                    trace.candidate(kind);
+                    if !self.holds_crafter(trees, record)? {
+                        return Ok(None);
+                    }
+                }
+                trace.selected(kind);
+                capture.activate(kind)?;
+                return self.leftover(trees, record, kind, ledger);
+            }
+            Some(Selected::Entity(Kind::Crafters)) => {
+                trace.candidate(Kind::Crafters);
+                if !self.holds_crafter(trees, record)? {
+                    return Ok(None);
+                }
+                Kind::Crafters
             }
             Some(Selected::Entity(kind)) => kind,
         };
+        trace.selected(kind);
+        capture.activate(kind)?;
+        self.project_selected(kind, trees, record, trace, ledger, entity)
+    }
+
+    fn project_selected(
+        &self,
+        kind: Kind,
+        trees: &mut TreeBuilder<'f>,
+        record: &Record<'f>,
+        trace: &mut SourceTrace,
+        ledger: &mut ExportLedger,
+        entity: &mut RecordEntityRows<'f>,
+    ) -> Result<Option<Picked<'f>>, ScanError> {
+        if kind == Kind::AmmoDefinitions {
+            let definition = self.ammo.selected(record, ledger)?;
+            trace.projecting();
+            return Ok(Some(Picked::AmmoDefinition(Box::new(definition))));
+        }
+        let admission = RecordObservation::capture(self.original, record)?;
         let tree = trees.build(record)?;
-        if let Some(picked) = self.harvestable(kind, trees, &tree) {
-            return Ok(Some(picked));
-        }
-        if kind == Kind::MineableEntities {
-            let entity = Picked::MineableEntity(mineable_entity(&tree, self.signature_slot));
-            return Ok(Some(entity.crafted(&tree)));
-        }
-        if kind == Kind::StarmapObjects {
-            let object = starmap_object(
-                trees,
-                &tree,
-                self.texts,
-                self.forge,
-                &self.types,
-                self.placements,
-            );
-            return Ok(Some(Picked::Starmap(object)));
-        }
-        let resource_type = match kind {
-            Kind::Commodities => self.resource_type(trees, &tree)?,
-            _ => None,
-        };
-        let mut picked = Picked::entity(
-            kind,
+        trace.projecting();
+        ledger.merge(crate::export_field_walk::inspect_observed(
+            Some(self.original),
             &tree,
-            self.texts,
-            resource_type.as_ref(),
-            &self.groups,
-            &self.evidence,
-            &|| self.ships.read(record, &tree),
-        );
-        if let Some(Picked::Item(item, _, _)) = &mut picked {
-            item.stats = item_stats::read(&tree, self.forge, trees).map(Box::new);
-            item.variant_key = item_variant::key(&tree, item.stats.as_deref());
+            &admission,
+            Some(kind),
+            ExportSourceRole::Selected,
+            self.options.cancel,
+        )?);
+        let selected = SelectedProjection::new(self, kind);
+        if tree.type_name() == "EntityClassDefinition" {
+            let input = self.original;
+            let cancel = self.options.cancel;
+            let (tags, mut notes) =
+                crate::catalog_v3::tag_catalog::entity(&tree, input, &admission, cancel)?;
+            let (configurations, configuration_notes) = catalog_entity_configurations::read(
+                &tree,
+                &selected.projection,
+                &admission,
+                &self.alignment_options,
+                cancel,
+            )?;
+            notes.extend(configuration_notes);
+            crate::source_projection_notes::record(
+                kind,
+                ExportSourceRole::Selected,
+                &admission,
+                &tree,
+                notes,
+                ledger,
+            )?;
+            entity.tags = Some(tags);
+            entity.configurations = configurations;
         }
-        Ok(picked.map(|picked| picked.crafted(&tree)))
+        selected.project(trees, &admission, &tree, ledger)
     }
 
     /// Returns whether the Components of `record` hold a crafter component, read without building
-    /// the Record tree; alse without any such component in the DataForge.
+    /// the Record tree; `false` without any such component in the DataForge.
     fn holds_crafter(
         &self,
         trees: &mut TreeBuilder<'f>,
@@ -318,45 +340,6 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         self.crafters
             .as_ref()
             .map_or(Ok(false), |probe| trees.holds(probe, record))
-    }
-
-    /// Returns the provider preset or multi config `tree` describes when `kind` is one of the
-    /// kinds that follow a harvestable to its entity.
-    fn harvestable(
-        &self,
-        kind: Kind,
-        trees: &mut TreeBuilder<'f>,
-        tree: &RecordTree<'f>,
-    ) -> Option<Picked<'f>> {
-        match kind {
-            Kind::HarvestableProviderPresets => Some(Picked::Provider(provider_preset(
-                trees,
-                tree,
-                self.forge,
-                &self.links,
-            ))),
-            Kind::SubHarvestableMultiConfigs => Some(Picked::MultiConfig(multi_config(
-                trees,
-                tree,
-                self.forge,
-                &self.links,
-            ))),
-            _ => None,
-        }
-    }
-
-    fn resource_type(
-        &self,
-        trees: &mut TreeBuilder<'f>,
-        commodity: &RecordTree<'f>,
-    ) -> Result<Option<RecordTree<'f>>, DataForgeError> {
-        let Some(guid) = resource_type_guid(commodity) else {
-            return Ok(None);
-        };
-        self.forge
-            .record_by_guid(guid.0)
-            .map(|record| trees.build(&record))
-            .transpose()
     }
 
     fn tick(&self) {
@@ -372,6 +355,3 @@ impl<'o, 'a, 'f> Scan<'o, 'a, 'f> {
         }
     }
 }
-
-#[cfg(test)]
-mod tests;

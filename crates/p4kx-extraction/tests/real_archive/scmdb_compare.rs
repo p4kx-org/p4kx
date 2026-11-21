@@ -14,7 +14,9 @@
 mod blueprints;
 mod contracts;
 mod findings;
+mod input;
 mod mining;
+mod reward_coverage;
 #[cfg(test)]
 mod tests;
 mod version;
@@ -60,9 +62,11 @@ impl Dumps {
 /// Compares every 1:1 DataForge value of `dumps` with `p4kx`.
 pub(crate) fn compare(dumps: &Dumps, p4kx: &P4kx) -> Findings {
     let mut findings = Findings::default();
+    input::validate(dumps, &mut findings);
     blueprints::compare(&dumps.blueprints, &p4kx.records, &mut findings);
     mining::compare(&dumps.mining, &p4kx.records, &mut findings);
     contracts::compare(&dumps.merged, p4kx, &mut findings);
+    reward_coverage::report(dumps, &mut findings);
     findings
 }
 

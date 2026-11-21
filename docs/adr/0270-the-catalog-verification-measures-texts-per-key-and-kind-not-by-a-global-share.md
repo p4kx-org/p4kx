@@ -14,7 +14,7 @@ Decided for issue #916. Evidence: LIVE 4.10. Builds on ADR-0054 (additive catalo
     lookup: the key without its `@`, ASCII case ignored, a `key,P=` line standing for `key`, the
     first non-empty text, `\n` decoded and the text trimmed. The catalog's text must equal it; a key
     the file lacks or holds empty must be `null` (the Basetool falls back to English). A
-    contradiction fails and names the kind, the keys and both texts. A contract text with a
+    contradiction fails and is counted by kind and language. A contract text with a
     `~mission(…)` token is rewritten by the exporter, so only its presence is compared;
   - every `name` and every field marked `x-gameText` in the JSON Schema is measured wherever it
     sits in an entry, so a new text field is covered without a change of the test;
@@ -23,7 +23,9 @@ Decided for issue #916. Evidence: LIVE 4.10. Builds on ADR-0054 (additive catalo
     listed has a baseline of zero, so a new kind with untranslated keys names itself and its
     baseline is added on purpose. Other Channels check only the contradictions (ADR-0038: no
     test-channel numbers in committed tests).
-- The numbers of every kind are printed, with the first keys the English file lacks.
+- The report gives each kind's row count and the exact totals, resolutions, fallbacks and
+  contradictions per language. Supplemental contradictions have a separate count. Structural
+  failures are reported by kind and failure category. Checks continue for the remaining kinds.
 - `missionLocationTemplates[].names[]` exports `displayName` as a game text (`x-gameText`) again,
   like every other named kind: #910 had reduced it to the `nameKey` to stay above the German floor.
   The catalog stays additive within schema version 2 (ADR-0054).
@@ -43,3 +45,25 @@ Decided for issue #916. Evidence: LIVE 4.10. Builds on ADR-0054 (additive catalo
   exporter; the only one in the catalog's texts is the `~mission(…)` rule.
 - A change of the game that moves a share past its baseline is a deliberate edit of the baseline,
   made after looking at the kind.
+
+## Independent oracle and primary-test alignment
+
+[ADR-0346](0346-localisation-verification-reads-source-lines-and-keeps-per-kind-baselines.md)
+records the LIVE reproduction for #1041 and aligns the older primary catalog test with this
+contract. The oracle now parses decoded source lines independently of the production INI index.
+For duplicate lines it uses the last plain and last suffixed declarations, preferring a non-empty
+plain value; this clarifies the abbreviated first-non-empty rule above. Per-kind baselines and
+German floors remain unchanged.
+
+On LIVE 13165946, the schema-v3 oracle counted 6 English and 2,316 German source gaps
+out of 2,402 MissionPropertySet text occurrences, plus 0 English and 130 German gaps
+out of 403 ResourceType text occurrences. Both comparisons found zero contradictions.
+Their independent ceilings are 0.01/0.97 and 0.00/0.33 for English/German respectively.
+
+On the same LIVE Build the scoped Ship query independently matched the original
+DataForge Locale declarations and both original INI files for all 1,024 Ship Records.
+The two shipped text fields had 2,046 non-placeholder occurrences. German was missing
+318 name occurrences and 339 description occurrences. English had 3 missing and 11
+explicitly empty occurrences. Neither language had a contradiction. The German Ship
+ceiling rounds up from 657/2,046 to 0.33 under the existing rule. English rounds
+up from 14/2,046 to 0.01. A nonempty Ship dataset requires verifiable original keys.

@@ -55,13 +55,25 @@ impl RecordError {
 }
 
 /// What identifies a Record on one side: its record path, name, tag and type.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy)]
 pub struct RecordState<'a> {
     pub(crate) record_path: &'a str,
     pub(crate) name: &'a str,
     pub(crate) tag: Option<&'a str>,
     pub(crate) type_name: &'a str,
+    pub(crate) structure: u32,
 }
+
+impl PartialEq for RecordState<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.record_path == other.record_path
+            && self.name == other.name
+            && self.tag == other.tag
+            && self.type_name == other.type_name
+    }
+}
+
+impl Eq for RecordState<'_> {}
 
 impl<'a> RecordState<'a> {
     /// Returns the record path, without `.xml`.
@@ -91,11 +103,18 @@ impl<'a> RecordState<'a> {
 }
 
 /// One field or array element whose value differs, or that only one side has.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct FieldChange<'a> {
     pub(crate) path: Location<'a>,
     pub(crate) old: Option<ChangedValue<'a>>,
     pub(crate) new: Option<ChangedValue<'a>>,
+    pub(crate) evidence: Option<Box<crate::field_change_evidence::FieldEvidence>>,
+}
+
+impl PartialEq for FieldChange<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.path == other.path && self.old == other.old && self.new == other.new
+    }
 }
 
 impl<'a> FieldChange<'a> {

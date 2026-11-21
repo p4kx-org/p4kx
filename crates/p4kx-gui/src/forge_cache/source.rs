@@ -10,7 +10,7 @@ use std::time::Duration;
 use p4kx_export::RecordFilePlans;
 use p4kx_extraction::TagTree;
 use p4kx_extraction::query::QuerySchema;
-use p4kx_extraction::{DataForgeEntry, MAX_INDEXED_REFERENCES, ReferenceIndex};
+use p4kx_extraction::{DataForgeEntry, ReferenceIndex};
 
 use crate::ModelExportFailure;
 use crate::model::describe;
@@ -93,11 +93,11 @@ impl ForgeSource {
     }
 
     /// Returns the completion schema, building it from the DataForge already read unless it was
-    /// built before. The build runs outside the [`OnceLock`], because it uses rayon.
+    /// built before. The build runs before publishing the immutable schema.
     ///
     /// # Errors
     ///
-    /// Returns why the DataForge cannot be opened.
+    /// Returns why the DataForge cannot be opened or its completion schema cannot be built.
     pub(crate) fn schema(&self) -> Result<Arc<QuerySchema>, ReadFailure> {
         let _turn = self
             .schema_turn
@@ -111,7 +111,9 @@ impl ForgeSource {
             .open()
             .map_err(|error| ReadFailure::Unreadable(describe(&error)))?;
         self.schema_builds.fetch_add(1, Ordering::Relaxed);
-        let built = Arc::new(QuerySchema::of(&forge));
+        let built = Arc::new(
+            QuerySchema::of(&forge).map_err(|error| ReadFailure::Unreadable(describe(&error)))?,
+        );
         Ok(Arc::clone(self.schema.get_or_init(|| built)))
     }
 
@@ -173,7 +175,7 @@ impl ForgeSource {
             .entry
             .open()
             .map_err(|error| ReadFailure::Unreadable(describe(&error)))?;
-        let Some(built) = ReferenceIndex::build_with(&forge, MAX_INDEXED_REFERENCES, stop) else {
+        let Some(built) = ReferenceIndex::build_cancellable(&forge, stop) else {
             return Ok(None);
         };
         self.references_builds.fetch_add(1, Ordering::Relaxed);

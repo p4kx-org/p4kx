@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Paints and the ships they fit in the Basetool catalog, through the public API.
+//! Paints and the ships they fit in the P4KX catalog, through the public API.
 
 use crate::paints_fixture;
 
@@ -30,6 +30,7 @@ fn build(filter: Option<&Filter>) -> Result<(BuiltCatalog, Value), Box<dyn Error
     let archive =
         Archive::open_with_key(write_archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
     let mut options = CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT);
+    options.publication_mode = p4kx_export::CatalogPublicationMode::DiagnosticPartial;
     options.filter = filter;
     let built = build_catalog(&archive, &options)?;
     let json = serde_json::from_slice(built.json())?;
@@ -201,13 +202,7 @@ fn the_summary_counts_the_paints_with_and_without_a_ship() -> TestResult {
         detail.to_ascii_lowercase().contains("acas_broken.xml"),
         "the warning names the file: {details:?}"
     );
-    let missing = guid(SHIP_MISSING);
-    let loadout = catalog["loadouts"]
-        .as_array()
-        .ok_or("loadouts")?
-        .iter()
-        .find(|entry| entry["entityGuid"] == missing.as_str())
-        .ok_or("the loadout of the ship without a vehicle file")?;
+    let loadout = crate::loadouts_support::loadout(&catalog, SHIP_MISSING)?;
     assert!(
         loadout["issues"]
             .as_array()
@@ -246,13 +241,13 @@ fn every_ship_of_an_assignment_is_a_catalog_ship() -> TestResult {
         .as_array()
         .ok_or("ships")?
         .iter()
-        .filter_map(|ship| ship["guid"].as_str())
+        .filter_map(|ship| ship["guid"]["value"].as_str())
         .collect();
     let items: BTreeSet<&str> = catalog["items"]
         .as_array()
         .ok_or("items")?
         .iter()
-        .filter_map(|item| item["guid"].as_str())
+        .filter_map(|item| item.pointer("/guid/value").and_then(Value::as_str))
         .collect();
     for paint in catalog["paints"].as_array().ok_or("paints")? {
         assert!(

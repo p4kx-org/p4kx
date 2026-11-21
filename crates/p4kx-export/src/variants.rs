@@ -3,14 +3,15 @@
 
 use std::collections::HashMap;
 use std::hash::Hash;
+use std::mem;
 
 use crate::collected::Collected;
 use crate::digest::Digest;
 use crate::guid_text::CatalogGuid;
 use crate::item_variant::ItemKey;
-use crate::{Playability, VariantCounts, VariantSummary};
+use crate::{ExportAccountingError, Playability, VariantCounts, VariantSummary};
 
-/// What the ships of one variant group share (`docs/basetool-catalog.md`): the vehicle
+/// What the ships of one variant group share (`docs/catalog.md`): the vehicle
 /// definition path, compared without regard to case and separator, and the digest of the vehicle
 /// implementation after the Modification.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -45,25 +46,42 @@ fn normalised(path: &str) -> Box<str> {
 }
 
 impl Collected<'_> {
+    /// Moves physically bound ship variant keys out of the vehicle facts.
+    ///
+    /// # Errors
+    /// Returns an accounting error if a vehicle has no physical Record binding.
+    pub(crate) fn take_ship_variant_keys(
+        &mut self,
+    ) -> Result<HashMap<u32, ShipKey>, ExportAccountingError> {
+        let mut keys = HashMap::new();
+        for vehicle in mem::take(&mut self.vehicles) {
+            let index = vehicle
+                .source_record_index
+                .ok_or(ExportAccountingError::MissingFieldInspection)?;
+            if let Some(key) = vehicle.variant_key {
+                keys.insert(index, key);
+            }
+        }
+        Ok(keys)
+    }
+
     /// Sets `variant_of` of the ships and the items that belong to a variant group and returns the
     /// counts.
-    pub(crate) fn group_variants(&mut self) -> VariantSummary {
-        let keys: HashMap<CatalogGuid, &ShipKey> = self
-            .vehicles
-            .iter()
-            .filter_map(|vehicle| Some((vehicle.ship, vehicle.variant_key.as_ref()?)))
-            .collect();
-        let candidates: Vec<Candidate<'_, &ShipKey>> = self
-            .ships
-            .iter()
-            .map(|ship| Candidate {
-                guid: ship.guid,
-                class_name: ship.class_name,
-                playability: ship.playability,
-                key: keys.get(&ship.guid).copied(),
-            })
-            .collect();
-        let (bases, counts) = group(&candidates);
+    pub(crate) fn group_variants(&mut self, ship_keys: HashMap<u32, ShipKey>) -> VariantSummary {
+        let (bases, counts) = {
+            let candidates: Vec<Candidate<'_, &ShipKey>> = self
+                .ships
+                .iter()
+                .map(|ship| Candidate {
+                    guid: ship.identity.guid,
+                    class_name: ship.identity.class_name,
+                    playability: ship.playability.value().copied(),
+                    key: ship_keys.get(&ship.source_record_index),
+                })
+                .collect();
+            group(&candidates)
+        };
+        drop(ship_keys);
         for (ship, base) in self.ships.iter_mut().zip(bases) {
             ship.variant_of = base;
         }
@@ -71,9 +89,9 @@ impl Collected<'_> {
             .items
             .iter()
             .map(|item| Candidate {
-                guid: item.guid,
-                class_name: item.class_name,
-                playability: item.playability,
+                guid: item.identity.guid,
+                class_name: item.identity.class_name,
+                playability: item.source.playability().value().copied(),
                 key: item.variant_key,
             })
             .collect();

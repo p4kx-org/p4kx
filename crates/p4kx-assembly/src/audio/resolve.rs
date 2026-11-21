@@ -1,13 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::{Archive, ConversionError};
 use rayon::prelude::*;
 
+use super::hirc_path_source::PathSourceMode;
+use super::resolve_bounded;
+use super::resolve_options::ResolveWork;
 use super::walk::{self, Found};
-use super::walk_banks::{Banks, Loaded, Spare, select_holders, soundbank_at};
+use super::walk_banks::{self, Banks, Loaded, Spare};
 use super::{
-    ArchiveAudio, AudioFileError, AudioIndex, BreakReason, BrokenLink, LanguageChoice,
-    MAX_EVENT_OBJECTS, MAX_TRIGGER_OBJECTS, NodeKind, PathStep, TriggerSounds, WwiseEvent,
+    ArchiveAudio, AudioFileError, AudioIndex, BreakReason, BrokenLink, IndexedSoundbank,
+    LanguageChoice, NodeKind, PathStep, ResolveOptions, TriggerSounds, WwiseEvent,
 };
 
 type BankWalk<'i> = (u32, Result<Vec<(usize, Found<'i>)>, AudioFileError>);
@@ -25,51 +29,116 @@ impl ArchiveAudio<'_> {
     /// containers, and every broken link.
     ///
     /// A localised event is followed only in the soundbanks of the language `choice` names, or of
-    /// its fallback language when the first has none; a streamed localised sound is located in
+    /// its fallback language when the first has none. A streamed localised sound is located in
     /// that language's folder of loose WEMs. Where neither language has the sound, the trigger
     /// gets a [`BreakReason::NoLocalisation`] break.
     ///
     /// Each soundbank holding one of the events is read again from the Archive, in parallel, and
-    /// dropped once followed. A walk that leaves its soundbank reads one other soundbank; the
-    /// events of one soundbank share the last other soundbank read. Where a reference names
-    /// several soundbanks, one per language, a walk that has no language chosen follows the first
-    /// in path order, so [`resolve_trigger`](Self::resolve_trigger) lists the first language only
-    /// beyond the soundbank of the event (ADR-0033). Returns `None` when no ATL definition has the
-    /// trigger.
+    /// dropped once followed. Active referenced banks share their decoded owners. Events of one
+    /// start soundbank share the last foreign result. Where a reference names several soundbanks,
+    /// one per language, a walk that has no language chosen follows the first in path order
+    /// (ADR-0033). Returns `None` when no ATL definition has the trigger.
     #[must_use]
     pub fn resolve_trigger_in(
         &self,
         name: &str,
         choice: &LanguageChoice,
     ) -> Option<TriggerSounds<'_>> {
-        let index = self.index();
+        self.resolve_with_index(self.index(), name, choice, ResolveOptions::default())
+    }
+
+    /// Resolves a trigger and retains the original HIRC byte spans of the visited path steps.
+    #[must_use]
+    pub fn resolve_trigger_with_path_sources(
+        &self,
+        name: &str,
+        choice: &LanguageChoice,
+    ) -> Option<TriggerSounds<'_>> {
+        self.resolve_with_index(
+            self.index(),
+            name,
+            choice,
+            ResolveOptions::default().with_path_sources(),
+        )
+    }
+
+    /// Resolves a trigger with optional traversal and cancellation controls.
+    ///
+    /// A visit budget follows authored events and eligible soundbanks in output order.
+    /// Exhaustion yields a partial inspection with a [`BreakReason::TooManyObjects`] diagnostic.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`ConversionError::Cancelled`] if the caller cancels resolution.
+    pub fn resolve_trigger_with_options(
+        &self,
+        name: &str,
+        choice: &LanguageChoice,
+        options: ResolveOptions<'_>,
+    ) -> Result<Option<TriggerSounds<'_>>, ConversionError> {
+        let index = if let Some(cancel) = options.cancel {
+            self.index_until(cancel).ok_or(ConversionError::Cancelled)?
+        } else {
+            self.index()
+        };
+        let sounds = self.resolve_with_index(index, name, choice, options);
+        if options.cancelled() {
+            return Err(ConversionError::Cancelled);
+        }
+        Ok(sounds)
+    }
+
+    fn resolve_with_index<'i>(
+        &self,
+        index: &'i AudioIndex,
+        name: &str,
+        choice: &LanguageChoice,
+        options: ResolveOptions<'_>,
+    ) -> Option<TriggerSounds<'i>> {
         let trigger = index.trigger(name)?;
-        let events = trigger.events();
-        let holders: Vec<Vec<u32>> = events
-            .iter()
-            .map(|event| select_holders(index, index.event_holders(event.id()), choice))
-            .collect();
-        let mut walks = self.walk_soundbanks(index, events, &holders, choice);
+        let definition = index.definition_file(trigger);
         let mut sounds = TriggerSounds {
             trigger,
-            definition_path: index.definition_path(trigger),
+            definition_path: definition.map(|(path, _)| path),
+            definition_entry: definition.map(|(_, position)| position),
+            choice: choice.clone(),
             variants: Vec::new(),
             breaks: Vec::new(),
         };
-        for (number, event) in events.iter().enumerate() {
-            let event_step = Box::new([PathStep {
-                kind: NodeKind::Event,
-                id: event.id(),
-            }]);
-            let selected = holders.get(number).map_or(&[][..], Vec::as_slice);
+        if options.max_visits.is_some() {
+            resolve_bounded::walk(self.archive(), index, choice, options, &mut sounds);
+        } else {
+            self.resolve_parallel(index, choice, options, &mut sounds);
+        }
+        Some(sounds)
+    }
+
+    fn resolve_parallel<'i>(
+        &self,
+        index: &'i AudioIndex,
+        choice: &LanguageChoice,
+        options: ResolveOptions<'_>,
+        sounds: &mut TriggerSounds<'i>,
+    ) {
+        let events = sounds.trigger.events();
+        let holders: Vec<Vec<u32>> = events
+            .iter()
+            .take_while(|_| !options.cancelled())
+            .map(|event| walk_banks::select_holders(index, index.event_holders(event.id()), choice))
+            .collect();
+        let mut walks = self.walk_soundbanks(index, events, &holders, choice, options);
+        for (number, (event, selected)) in events.iter().zip(holders).enumerate() {
+            if options.cancelled() {
+                return;
+            }
             if selected.is_empty() {
                 sounds
                     .breaks
-                    .push(unselected(index, event, choice, event_step));
+                    .push(unselected(index, event, choice, event_path(event)));
                 continue;
             }
-            for &position in selected {
-                let Some(soundbank) = soundbank_at(index, position) else {
+            for position in selected {
+                let Some(soundbank) = walk_banks::soundbank_at(index, position) else {
                     continue;
                 };
                 let Ok(slot) = walks.binary_search_by_key(&position, |(at, _)| *at) else {
@@ -82,17 +151,17 @@ impl ArchiveAudio<'_> {
                             sounds.breaks.append(&mut found.breaks);
                         }
                     }
-                    Some(Err(error)) => sounds.breaks.push(BrokenLink {
+                    Some(Err(error)) => sounds.breaks.push(event_break(
+                        self.archive(),
                         event,
-                        soundbank: Some(soundbank),
-                        path: event_step.clone(),
-                        reason: BreakReason::Unreadable(error.clone()),
-                    }),
+                        soundbank,
+                        BreakReason::Unreadable(error.clone()),
+                        options.path_sources,
+                    )),
                     None => {}
                 }
             }
         }
-        Some(sounds)
     }
 
     fn walk_soundbanks<'i>(
@@ -101,18 +170,17 @@ impl ArchiveAudio<'_> {
         events: &'i [WwiseEvent],
         holders: &[Vec<u32>],
         choice: &LanguageChoice,
+        options: ResolveOptions<'_>,
     ) -> Vec<BankWalk<'i>> {
         let mut positions: Vec<u32> = holders.iter().flatten().copied().collect();
         positions.sort_unstable();
         positions.dedup();
-        let pairs: usize = holders.iter().map(Vec::len).sum();
-        let budget = (MAX_TRIGGER_OBJECTS / pairs.max(1)).clamp(1, MAX_EVENT_OBJECTS);
         positions
             .par_iter()
             .map(|&position| {
                 (
                     position,
-                    self.walk_soundbank(index, position, events, holders, choice, budget),
+                    self.walk_soundbank(index, position, events, holders, choice, options),
                 )
             })
             .collect()
@@ -125,27 +193,57 @@ impl ArchiveAudio<'_> {
         events: &'i [WwiseEvent],
         holders: &[Vec<u32>],
         choice: &LanguageChoice,
-        budget: usize,
+        options: ResolveOptions<'_>,
     ) -> Result<Vec<(usize, Found<'i>)>, AudioFileError> {
+        let mut work = ResolveWork::new(options);
+        if work.cancelled() {
+            return Ok(Vec::new());
+        }
         let home = Loaded::read(self.archive(), index, position)?;
         let mut spare = Spare::default();
         Ok(events
             .iter()
+            .zip(holders)
             .enumerate()
-            .filter(|(number, _)| {
-                holders
-                    .get(*number)
-                    .is_some_and(|selected| selected.contains(&position))
-            })
-            .map(|(number, event)| {
+            .take_while(|_| !options.cancelled())
+            .filter(|(_, (_, selected))| selected.contains(&position))
+            .map(|(number, (event, _))| {
                 let banks = Banks::new(self.archive(), index, choice, home.clone(), &mut spare);
-                (number, walk::event(banks, event, budget))
+                (
+                    number,
+                    walk::event(banks, event, options.path_sources, &mut work),
+                )
             })
             .collect())
     }
 }
 
-fn unselected<'i>(
+pub(super) fn event_path(event: &WwiseEvent) -> Box<[PathStep]> {
+    Box::new([PathStep {
+        kind: NodeKind::Event,
+        id: event.id(),
+    }])
+}
+
+pub(super) fn event_break<'i>(
+    archive: &Archive,
+    event: &'i WwiseEvent,
+    bank: &'i IndexedSoundbank,
+    reason: BreakReason,
+    path_sources: PathSourceMode,
+) -> BrokenLink<'i> {
+    BrokenLink {
+        event,
+        soundbank: Some(bank),
+        bank_source: path_sources.entry_binding(archive, bank.entry_position()),
+        path: event_path(event),
+        path_sources: Box::default(),
+        failed_edge: None,
+        reason,
+    }
+}
+
+pub(super) fn unselected<'i>(
     index: &AudioIndex,
     event: &'i WwiseEvent,
     choice: &LanguageChoice,
@@ -159,7 +257,10 @@ fn unselected<'i>(
     BrokenLink {
         event,
         soundbank: None,
+        bank_source: None,
         path,
+        path_sources: Box::default(),
+        failed_edge: None,
         reason,
     }
 }

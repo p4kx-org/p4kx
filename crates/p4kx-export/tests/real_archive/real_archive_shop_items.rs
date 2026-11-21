@@ -8,23 +8,32 @@ use std::collections::{BTreeMap, BTreeSet, HashSet};
 use std::error::Error;
 use std::time::SystemTime;
 
-use p4kx_export::{CatalogOptions, build_catalog};
+use p4kx_export::{CatalogOptions, Kind, build_catalog};
 use p4kx_extraction::{Archive, DataForgeEntry, Guid};
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
 
+use crate::catalog_v3_consumer;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
-const KINDS_WITH_ITEMS: [&str; 5] = ["items", "ships", "commodities", "paints", "loadouts"];
+const KINDS_WITH_ITEMS: [Kind; 5] = [
+    Kind::Items,
+    Kind::Ships,
+    Kind::Commodities,
+    Kind::Paints,
+    Kind::Loadouts,
+];
 const PLACEHOLDERS: [&str; 2] = ["temp_outpost_shopinventory", "inv_cryastro_dummy"];
 
-fn guids_of(catalog: &Value) -> HashSet<&str> {
-    KINDS_WITH_ITEMS
-        .iter()
-        .filter_map(|kind| catalog[*kind].as_array())
-        .flatten()
-        .filter_map(|entry| entry["guid"].as_str())
-        .collect()
+pub(crate) fn guids_of(catalog: &Value) -> Result<HashSet<&str>, Box<dyn Error>> {
+    let mut result = HashSet::new();
+    for kind in KINDS_WITH_ITEMS {
+        for row in catalog_v3_consumer::rows(catalog, kind)? {
+            result.insert(catalog_v3_consumer::identity(row, kind)?);
+        }
+    }
+    Ok(result)
 }
 
 #[test]
@@ -94,7 +103,7 @@ fn shops_get_item_lists_from_the_inventories_their_containers_name() -> TestResu
         summary.inventory_missing,
         summary.inventory_unreadable
     );
-    let known = guids_of(&catalog);
+    let known = guids_of(&catalog)?;
     let mut total = 0_usize;
     let mut resolved = 0_usize;
     let mut unresolved: BTreeSet<&str> = BTreeSet::new();

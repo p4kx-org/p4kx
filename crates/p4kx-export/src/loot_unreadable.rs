@@ -4,6 +4,7 @@
 use std::fmt;
 
 use crate::loot_soc::SocError;
+use crate::starmap_xml::XmlError;
 
 /// Why a container or one of its files cannot be read for the loot containers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -14,14 +15,20 @@ pub(crate) enum Unreadable {
     /// The entry is no container.
     #[error("cannot be opened as a container")]
     NotAContainer,
-    /// An entity file is over the size limit or cannot be read.
+    /// An entity file cannot be read in full.
     #[error("an entity file cannot be read")]
     EntityFile,
+    /// An entity file could be read but is not valid XML.
+    #[error("an entity file {0}")]
+    EntityXml(#[from] XmlError),
     /// An entity places a container that the Archive lacks.
     #[error("placed by an entity but not in the Archive")]
     MissingFromArchive,
-    /// A `.soc` file is over the size limit or cannot be read.
-    #[error("a .soc is over the limit or cannot be read")]
+    /// An authored path has several physical candidate containers.
+    #[error("several physical containers match the authored path")]
+    AmbiguousContainer,
+    /// A `.soc` file cannot be read in full.
+    #[error("a .soc cannot be read in full")]
     SocFile,
     /// A `.soc` file cannot be counted.
     #[error("{0}")]

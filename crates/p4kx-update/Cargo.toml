@@ -18,5 +18,8 @@ serde_json.workspace = true
 thiserror.workspace = true
 ureq.workspace = true
 
+[dev-dependencies]
+tempfile.workspace = true
+
 [lints]
 workspace = true

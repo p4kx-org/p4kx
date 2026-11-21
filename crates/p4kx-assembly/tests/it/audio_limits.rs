@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The caps of the audio index on untrusted Archive data: Entry sizes, trigger count and events
-//! per trigger.
+//! Source Entry and trigger limits, with complete admitted ATL event lists.
 
 use std::error::Error;
 use std::fmt::Write as _;
 
 use p4kx_assembly::audio::{
-    AudioFileError, AudioIndex, MAX_ATL_LEN, MAX_AUDIO_TRIGGERS, MAX_SOUNDBANK_LEN,
-    MAX_TRIGGER_EVENTS, WwiseEvent, wwise_id,
+    AudioFileError, AudioIndex, MAX_ATL_LEN, MAX_AUDIO_TRIGGERS, MAX_SOUNDBANK_LEN, WwiseEvent,
+    wwise_id,
 };
 use p4kx_extraction::Archive;
 use p4kx_testkit::{ArchiveBuilder, TestAtl, TestEntry};
@@ -108,8 +107,8 @@ fn a_full_index_reports_the_definition_whose_triggers_it_leaves_out() -> TestRes
 }
 
 #[test]
-fn a_trigger_keeps_at_most_the_first_events_of_its_definition() -> TestResult {
-    let names: Vec<String> = (0..MAX_TRIGGER_EVENTS + 10)
+fn a_trigger_keeps_every_event_of_its_admitted_definition() -> TestResult {
+    let names: Vec<String> = (0..266)
         .map(|position| format!("Play_Event_{position}"))
         .collect();
     let events: Vec<&str> = names.iter().map(String::as_str).collect();
@@ -119,12 +118,19 @@ fn a_trigger_keeps_at_most_the_first_events_of_its_definition() -> TestResult {
         atl.to_cryxml(),
     )])?;
     let trigger = index.trigger("Play_Many").ok_or("Play_Many")?;
-    assert_eq!(trigger.events().len(), MAX_TRIGGER_EVENTS, "truncated");
+    assert_eq!(
+        trigger.events().len(),
+        names.len(),
+        "every original event is kept"
+    );
     assert_eq!(
         trigger.events().first().map(WwiseEvent::name),
         Some("Play_Event_0"),
-        "the first events are kept"
+        "the original first event stays first"
     );
-    assert!(index.issues().is_empty(), "truncation is no issue");
+    assert!(
+        index.issues().is_empty(),
+        "the complete valid definition needs no issue"
+    );
     Ok(())
 }

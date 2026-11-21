@@ -3,9 +3,9 @@
 
 //! Edge cases of resource groups and blueprint categories: leftovers, unreadable groups, cycles.
 
+use crate::catalog_crafting_support::{blueprint_categories, commodity, groups};
 use crate::crafting_fixture;
 
-use std::collections::HashSet;
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
@@ -57,6 +57,25 @@ fn build_from(
     forge: &DataForgeBuilder,
     filter: Option<&Filter>,
 ) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
+    build_mode(forge, filter, p4kx_export::CatalogPublicationMode::Normal)
+}
+
+fn diagnostic_from(
+    forge: &DataForgeBuilder,
+    filter: Option<&Filter>,
+) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
+    build_mode(
+        forge,
+        filter,
+        p4kx_export::CatalogPublicationMode::DiagnosticPartial,
+    )
+}
+
+fn build_mode(
+    forge: &DataForgeBuilder,
+    filter: Option<&Filter>,
+    publication_mode: p4kx_export::CatalogPublicationMode,
+) -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("Data.p4k");
     ArchiveBuilder::new()
@@ -66,6 +85,7 @@ fn build_from(
         .write_to(&path)?;
     let archive = Archive::open_with_key(&path, Some(p4kx_testkit::test_key()))?;
     let options = CatalogOptions {
+        publication_mode,
         filter,
         ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))
     };
@@ -81,20 +101,12 @@ fn groups_only(records: Vec<TestRecord>) -> DataForgeBuilder {
     )
 }
 
-fn parent_of(catalog: &Value, guid: &str) -> Option<Value> {
-    catalog["resourceGroups"]
-        .as_array()?
-        .iter()
-        .find(|group| group["guid"] == guid)
-        .map(|group| group["parentGuid"].clone())
-}
-
 #[test]
 fn a_group_that_lists_itself_has_no_parent() -> TestResult {
     let (_, catalog) = build_from(&groups_only(vec![group(FIRST, "Loop", &[FIRST])]), None)?;
     assert_eq!(
-        parent_of(&catalog, "10000000-0000-4000-8000-000000000001"),
-        Some(Value::Null),
+        *groups::parent_guid(&catalog, "10000000-0000-4000-8000-000000000001")?,
+        Value::Null,
         "a self-list is no parent"
     );
     Ok(())
@@ -111,16 +123,16 @@ fn two_groups_that_list_each_other_are_each_others_parent_and_the_build_ends() -
         None,
     )?;
     assert_eq!(
-        parent_of(&catalog, "10000000-0000-4000-8000-000000000001"),
-        Some(json!("20000000-0000-4000-8000-000000000002"))
+        *groups::parent_guid(&catalog, "10000000-0000-4000-8000-000000000001")?,
+        json!("20000000-0000-4000-8000-000000000002")
     );
     assert_eq!(
-        parent_of(&catalog, "20000000-0000-4000-8000-000000000002"),
-        Some(json!("10000000-0000-4000-8000-000000000001"))
+        *groups::parent_guid(&catalog, "20000000-0000-4000-8000-000000000002")?,
+        json!("10000000-0000-4000-8000-000000000001")
     );
     assert_eq!(
-        parent_of(&catalog, "30000000-0000-4000-8000-000000000003"),
-        Some(Value::Null)
+        *groups::parent_guid(&catalog, "30000000-0000-4000-8000-000000000003")?,
+        Value::Null
     );
     assert!(built.summary().is_complete(), "a cycle is no failure");
     Ok(())
@@ -137,20 +149,19 @@ fn a_leftover_group_names_no_parent_and_every_parent_resolves() -> TestResult {
         ]),
         None,
     )?;
-    let guids: HashSet<&str> = catalog["resourceGroups"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|group| group["guid"].as_str())
-        .collect();
+    let guids = groups::guids(&catalog)?;
     assert_eq!(guids.len(), 3, "the leftover group is left out");
     assert_eq!(
-        parent_of(&catalog, "30000000-0000-4000-8000-000000000003"),
-        Some(Value::Null),
+        *groups::parent_guid(&catalog, "30000000-0000-4000-8000-000000000003")?,
+        Value::Null,
         "a leftover lists it, so it names no parent"
     );
-    for group in catalog["resourceGroups"].as_array().into_iter().flatten() {
-        if let Some(parent) = group["parentGuid"].as_str() {
+    for group in groups::definitions(&catalog)? {
+        let guid = group
+            .pointer("/guid/value")
+            .and_then(Value::as_str)
+            .ok_or("required group GUID")?;
+        if let Some(parent) = groups::parent_guid(&catalog, guid)?.as_str() {
             assert!(guids.contains(parent), "parent {parent}");
         }
     }
@@ -176,12 +187,12 @@ fn unreadable_groups() -> DataForgeBuilder {
 
 #[test]
 fn an_unreadable_group_is_reported_once() -> TestResult {
-    let (built, _) = build_from(&unreadable_groups(), None)?;
+    let (built, _) = diagnostic_from(&unreadable_groups(), None)?;
     let failures: Vec<String> = built
         .summary()
         .failures()
         .iter()
-        .map(|failure| failure.guid.to_string())
+        .map(|failure| failure.guid().to_string())
         .collect();
     assert_eq!(failures, ["10000000-0000-4000-8000-000000000001"]);
     Ok(())
@@ -190,7 +201,7 @@ fn an_unreadable_group_is_reported_once() -> TestResult {
 #[test]
 fn an_unreadable_group_outside_the_filter_is_still_reported_once() -> TestResult {
     let filter = Filter::new("*/blueprintcategories/*");
-    let (built, _) = build_from(&unreadable_groups(), Some(&filter))?;
+    let (built, _) = diagnostic_from(&unreadable_groups(), Some(&filter))?;
     assert_eq!(
         built.summary().failures().len(),
         1,
@@ -240,8 +251,11 @@ fn a_blueprint_whose_category_is_unreadable_has_no_category_guid() -> TestResult
                 ),
             ),
         );
-    let (built, catalog) = build_from(&forge, None)?;
-    assert_eq!(catalog["blueprints"][0]["categoryGuid"], Value::Null);
+    let (built, catalog) = diagnostic_from(&forge, None)?;
+    assert_eq!(
+        catalog["projections"]["blueprintPresentation"]["rows"][0]["category"]["value"],
+        Value::Null
+    );
     assert_eq!(
         built.summary().failures().len(),
         1,
@@ -296,15 +310,17 @@ fn a_resource_type_listed_only_by_a_leftover_group_gives_its_commodity_no_type_g
         .record(commodity)
         .record(leftover);
     let (_, catalog) = build_from(&forge, None)?;
-    let zinc = catalog["commodities"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find(|commodity| commodity["className"] == "zinc")
-        .ok_or("the zinc commodity")?;
-    assert_eq!(zinc["typeGuid"], Value::Null);
+    let definition = commodity::definitions(&catalog)?
+        .iter()
+        .find(|definition| definition["className"]["value"] == "zinc")
+        .ok_or("the zinc Commodity definition")?;
+    let guid = definition["guid"]["value"]
+        .as_str()
+        .ok_or("the zinc Commodity GUID")?;
+    let zinc = commodity::presentation(&catalog, guid)?;
+    assert_eq!(zinc["typeGuid"]["value"], Value::Null);
     assert!(
-        zinc["subtypeGuid"].is_string(),
+        zinc["subtypeGuid"]["value"].is_string(),
         "the ResourceType is still linked"
     );
     Ok(())
@@ -330,27 +346,23 @@ fn a_blueprint_whose_category_is_a_leftover_has_no_category_guid() -> TestResult
         ),
     );
     let (_, catalog) = build_from(&crafting_fixture::database().record(orphan), None)?;
-    let categories: HashSet<&str> = catalog["blueprintCategories"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .filter_map(|category| category["guid"].as_str())
-        .collect();
-    let blueprints = catalog["blueprints"].as_array().ok_or("blueprints")?;
-    let orphan = blueprints
+    let categories = blueprint_categories::guids(&catalog)?;
+    let orphan = crate::catalog_crafting_support::blueprint::definitions(&catalog)?
         .iter()
-        .find(|blueprint| blueprint["className"] == "BP_CRAFT_orphan")
+        .position(|definition| definition["className"]["value"] == "BP_CRAFT_orphan")
         .ok_or("the orphan blueprint")?;
-    assert_eq!(orphan["categoryGuid"], Value::Null);
-    for blueprint in blueprints {
-        if let Some(guid) = blueprint["categoryGuid"].as_str() {
+    let orphan = crate::catalog_crafting_support::blueprint::by_index(&catalog, orphan)?;
+    assert_eq!(orphan.presentation["category"]["state"], "absent");
+    let rows = catalog["projections"]["blueprintPresentation"]["rows"]
+        .as_array()
+        .ok_or("Blueprint presentations")?;
+    for blueprint in rows {
+        if let Some(guid) = blueprint["category"]["value"].as_str() {
             assert!(categories.contains(guid), "category {guid}");
         }
     }
     assert!(
-        blueprints
-            .iter()
-            .any(|blueprint| blueprint["categoryGuid"].is_string()),
+        rows.iter().any(|row| row["category"]["value"].is_string()),
         "the others keep theirs"
     );
     Ok(())

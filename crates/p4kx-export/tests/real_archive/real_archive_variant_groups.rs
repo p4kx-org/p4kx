@@ -48,8 +48,13 @@ fn the_groups_read_without_a_catalog_are_the_variant_of_of_the_catalog() -> Test
                 Value::Null => None,
                 value => Some(guid(value)?),
             };
-            if groups.base_of(guid(&entity["guid"])?) != expected {
-                wrong.push(entity["className"].as_str().unwrap_or_default().to_owned());
+            if groups.base_of(guid(&entity["guid"]["value"])?) != expected {
+                wrong.push(
+                    entity["className"]["value"]
+                        .as_str()
+                        .unwrap_or_default()
+                        .to_owned(),
+                );
             }
         }
     }

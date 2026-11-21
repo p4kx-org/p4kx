@@ -1,43 +1,22 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_assembly::{LoadoutError, LoadoutFileError, VehicleImplementation};
+pub(crate) use p4kx_assembly::PaintPort;
+use p4kx_assembly::{LoadoutError, VehicleImplementation};
+
+#[cfg(test)]
+mod tests;
 
 use crate::guid_text::CatalogGuid;
 use crate::variants::ShipKey;
 
 const PAINTS: &str = "Paints";
 
-/// An item port of paints, in a ship's Record or its vehicle implementation: the tags an item
-/// needs to carry to fit it and the tags the port offers, as lower-case tag names.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
-pub(crate) struct PaintPort {
-    pub(crate) port_tags: Vec<String>,
-    pub(crate) required_tags: Vec<String>,
-}
-
-impl PaintPort {
-    /// Returns the port with the white-space separated tag lists `port_tags` and `required_tags`.
-    pub(crate) fn new(port_tags: Option<&str>, required_tags: Option<&str>) -> Self {
-        Self {
-            port_tags: tags(port_tags),
-            required_tags: tags(required_tags),
-        }
-    }
-}
-
-fn tags(value: Option<&str>) -> Vec<String> {
-    value
-        .unwrap_or_default()
-        .split_whitespace()
-        .map(str::to_ascii_lowercase)
-        .collect()
-}
-
 /// What the paints of a ship are derived from: the paint ports of its Record and of the vehicle
 /// implementation the ship base data read.
 #[derive(Debug)]
 pub(crate) struct VehicleFacts {
+    pub(crate) source_record_index: Option<u32>,
     pub(crate) ship: CatalogGuid,
     pub(crate) tags: Vec<String>,
     pub(crate) paint_ports: Vec<PaintPort>,
@@ -55,9 +34,8 @@ pub(crate) struct VehiclePorts {
 
 /// Returns whether `issue` only says that the Archive lacks a vehicle implementation file or a
 /// patch file.
-fn is_missing_file(issue: &LoadoutError) -> bool {
-    matches!(issue, LoadoutError::VehicleImplementation { reason, .. }
-        if *reason == LoadoutFileError::NotFound.to_string())
+const fn is_missing_file(issue: &LoadoutError) -> bool {
+    matches!(issue, LoadoutError::MissingVehicleImplementation { .. })
 }
 
 /// Returns the first of `issues` that is more than a file the Archive lacks.
@@ -78,9 +56,13 @@ impl VehiclePorts {
     ) -> Self {
         let Some(implementation) = vehicle else {
             let own = || {
-                read_issues
-                    .iter()
-                    .filter(|issue| matches!(issue, LoadoutError::VehicleImplementation { .. }))
+                read_issues.iter().filter(|issue| {
+                    matches!(
+                        issue,
+                        LoadoutError::VehicleImplementation { .. }
+                            | LoadoutError::MissingVehicleImplementation { .. }
+                    )
+                })
             };
             let lacks_file = own().next().is_some() && own().all(is_missing_file);
             return Self {

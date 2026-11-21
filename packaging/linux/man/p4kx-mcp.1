@@ -1,0 +1,21 @@
+.TH P4KX-MCP 1 "" "P4KX" "User Commands"
+.SH NAME
+p4kx-mcp \- Model Context Protocol server for local Star Citizen Archives
+.SH SYNOPSIS
+.B p4kx-mcp
+.RI [ OPTIONS ]
+.SH DESCRIPTION
+P4KX provides read-only tools over the Model Context Protocol on standard input
+and standard output. Configure an MCP client to launch this command.
+The --archive option selects a Channel or an absolute Archive path.
+The --help option lists all server options.
+It contains no game files or Archive key.
+.SH FILES
+Settings and the stored Archive key are in the P4KX directory below
+XDG_CONFIG_HOME, or ~/.config when that variable is absent.
+P4KX_FOLDERS_ROOT selects an absolute isolated root for config, cache and data.
+.SH SEE ALSO
+.BR p4kx (1),
+.BR p4kx-gui (1)
+.PP
+https://github.com/p4kx-org/p4kx/blob/main/docs/commands.md

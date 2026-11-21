@@ -1,169 +1,133 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::cell::RefCell;
+use p4kx_extraction::{CancelToken, DataForge, Filter};
 
-use p4kx_extraction::{CancelToken, DataForge, Filter, RecordTree, StructValue};
-
-use crate::CatalogError;
-use crate::broker_entry::BrokerEntry;
-use crate::broker_identity::{module, names};
-use crate::broker_links::{links, tags};
-use crate::broker_requirements::{requirements, results};
-use crate::broker_schedule::schedule;
-use crate::broker_terms::{availability, cooldowns, finish, instances, reward};
-use crate::contract_hauling::HaulingOrder;
-use crate::contract_template_read::settings;
-use crate::guid_text::CatalogGuid;
-use crate::mission_hauling::objective_orders;
-use crate::mission_hauling_levels::HaulingLevels;
+use crate::broker_canonical_read::{self, BrokerEmission, CanonicalBroker, Sources};
+use crate::broker_entry::BrokerProjection;
+use crate::catalog_projection::CatalogProjection;
+use crate::catalog_rows::mission_definitions::{
+    DefinitionSource, MissionDefinitionOutput, MissionDefinitionWriter,
+};
+use crate::catalog_v3::tag_catalog::CapturedTags;
+use crate::export_field_inspection::WholeInspectionFold;
+use crate::export_ledger::ExportLedger;
 use crate::mission_index::MissionIndex;
-use crate::record_fields::{boolean, class_name, integer};
-use crate::record_read::{KindRead, ReadError, read_kind};
+use crate::record_read::{KindRead, KindReadAccounting, visit_kind_by_record_guid};
 use crate::selection::Kind;
-use crate::spawn_layers::Level;
-use crate::spawn_model::SpawnLevel;
 use crate::spawn_pools::SpawnPools;
-use crate::spawn_read::Reader;
-use crate::template_extras::{owner, partial_payout};
-use crate::template_flow::FlowReader;
+use crate::template_configuration::{MissionFlowConfiguration, MissionPropertyConfiguration};
 use crate::template_issues::Unknowns;
-use crate::template_modifier::modifiers;
-use crate::template_objective_read::ObjectiveReader;
-use crate::template_property_read::PropertyReader;
-use crate::texts::Texts;
+use crate::{CatalogError, CatalogReadFailure};
 
-/// The mission broker entries of a DataForge, what was left out and the spawn descriptions and
-/// location queries their properties state.
-pub(crate) struct BrokerEntries<'f> {
-    pub(crate) read: KindRead<BrokerEntry<'f>>,
-    pub(crate) pools: SpawnPools<'f>,
+/// Source definitions, contextual rows, and the associated mission content.
+pub(crate) struct BrokerEntries<'source> {
+    pub(crate) read: KindRead<'source, BrokerProjection<'source>>,
+    pub(crate) pools: SpawnPools<'source>,
+    pub(crate) definitions: MissionDefinitionOutput,
+    pub(crate) flows: Vec<MissionFlowConfiguration>,
+    pub(crate) properties: Vec<MissionPropertyConfiguration>,
 }
 
-/// What an entry is read with.
-struct Sources<'r, 'f> {
-    forge: &'r DataForge<'f>,
-    texts: &'r Texts<'f>,
-    index: &'r MissionIndex<'f>,
-    unknowns: &'r Unknowns,
+struct BrokerRows<'stage, 'source> {
+    definitions: MissionDefinitionWriter<'stage>,
+    projections: Vec<BrokerProjection<'source>>,
+    flows: Vec<MissionFlowConfiguration>,
+    properties: Vec<MissionPropertyConfiguration>,
+    pools: SpawnPools<'source>,
+    ledger: ExportLedger,
+    failures: Vec<CatalogReadFailure<'source>>,
 }
 
-/// Reads the `MissionBrokerEntry` Records `filter` matches, ordered by GUID; a development leftover
-/// is left out and counted. A Record that nests its phases or conditions too deep or holds a
-/// struct the catalog does not know is a failure.
-///
-/// # Errors
-///
-/// Returns [`CatalogError::Cancelled`] once `cancel` is cancelled.
-pub(crate) fn read<'f>(
-    forge: &'f DataForge<'f>,
-    (texts, index, unknowns): (&Texts<'f>, &MissionIndex<'f>, &Unknowns),
+/// Reads the selected physical Broker records and their separate contextual interpretations.
+pub(crate) fn read<'source>(
+    forge: &'source DataForge<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    (tags, index, unknowns): (
+        &CapturedTags<'_, 'source>,
+        &MissionIndex<'source>,
+        &Unknowns,
+    ),
     filter: Option<&Filter>,
     cancel: Option<&CancelToken>,
-) -> Result<BrokerEntries<'f>, CatalogError> {
+    inspections: &mut WholeInspectionFold<'_>,
+) -> Result<BrokerEntries<'source>, CatalogError> {
     let sources = Sources {
-        forge,
-        texts,
+        projection,
+        tags,
         index,
         unknowns,
     };
-    let read = read_kind(
-        forge,
-        Kind::MissionBrokerEntries,
-        (filter, cancel),
-        |tree| entry(&sources, tree),
-        |(entry, _)| entry.guid,
-    )?;
-    let mut pools = SpawnPools::default();
-    let items = read
-        .items
-        .into_iter()
-        .map(|(entry, found)| {
-            pools.merge(found);
-            entry
-        })
-        .collect();
-    Ok(BrokerEntries {
-        read: KindRead {
-            items,
-            skipped: read.skipped,
-            failures: read.failures,
-        },
-        pools,
-    })
-}
-
-fn entry<'f>(
-    sources: &Sources<'_, 'f>,
-    tree: &RecordTree<'f>,
-) -> Result<(BrokerEntry<'f>, SpawnPools<'f>), ReadError> {
-    let Sources {
-        forge,
-        texts,
-        index,
-        unknowns,
-    } = *sources;
-    let root = Some(tree.root());
-    let reader = Reader::new(index.tags(), tree.root());
-    let pools = RefCell::new(SpawnPools::default());
-    let spawns = Level::read(
-        SpawnLevel::Broker,
-        &reader,
-        (root, "properties"),
-        (None, ""),
-        &mut pools.borrow_mut(),
-    )?
-    .resolved();
-    let properties = PropertyReader::new(&reader, texts, unknowns, &pools);
-    let flow = FlowReader {
-        reader: &reader,
-        unknowns,
-    };
-    let entry = BrokerEntry {
-        guid: CatalogGuid(tree.guid()),
-        class_name: class_name(tree),
-        record_path: tree.record_path(),
-        not_for_release: boolean(root, "notForRelease"),
-        names: names(texts, root),
-        links: links(root),
-        module: module(root),
-        tags: tags(&reader, root),
-        owner: owner(forge, root),
-        difficulty: integer(root, "missionDifficulty"),
-        pre_show_objectives: boolean(root, "preShowObjectives"),
-        show_life_time_in_mobi_glas: boolean(root, "showLifeTimeInMobiGlas"),
-        settings: settings(tree.root()),
-        availability: availability(root),
-        schedule: schedule(unknowns, root),
-        cooldowns: cooldowns(root),
-        instances: instances(root),
-        reward: reward(root),
-        buy_in_amount: integer(root, "missionBuyInAmount"),
-        refund_buy_in_on_withdraw: boolean(root, "refundBuyInOnWithdraw"),
-        finish: finish(texts, unknowns, root),
-        standing_requirements: requirements(unknowns, root)?,
-        reputation_results: results(index, root),
-        mission_properties: properties.mission_properties(root, "properties")?,
-        ship_spawns: spawns.ship_spawns,
-        npc_spawns: spawns.npc_spawns,
-        entity_spawns: spawns.entity_spawns,
-        location_queries: spawns.location_queries,
-        hauling_orders: hauling_orders(root),
-        objectives: ObjectiveReader::new(&reader, texts, unknowns, &pools).objectives(root)?,
-        partial_payout: partial_payout(root),
-        modifiers: modifiers(&reader, unknowns, root)?,
-        mission_flow: flow.triggers(root)?,
-    };
-    Ok((entry, pools.into_inner()))
-}
-
-/// Returns the orders of the hauling objectives of the entry `root`.
-fn hauling_orders<'f>(root: Option<&StructValue<'f>>) -> Vec<HaulingOrder<'f>> {
-    let objective = objective_orders(root);
-    HaulingLevels {
+    let scratch = std::env::temp_dir();
+    let mut rows = BrokerRows {
+        definitions: MissionDefinitionWriter::new(Kind::MissionBrokerEntries, &scratch, cancel),
+        projections: Vec::new(),
+        flows: Vec::new(),
         properties: Vec::new(),
-        template_objective: &[],
-        broker_objective: &objective,
+        pools: SpawnPools::default(),
+        ledger: ExportLedger::default(),
+        failures: Vec::new(),
+    };
+    let accounting = visit_kind_by_record_guid(
+        forge,
+        projection.original(),
+        Kind::MissionBrokerEntries,
+        (filter, cancel, Some(inspections)),
+        |record, tree| {
+            broker_canonical_read::read(&sources, record, tree, cancel)
+                .map_err(|error| Box::new(error) as crate::record_read::ReadError)
+        },
+        |piece| rows.append(piece),
+    )?;
+    rows.finish(forge, accounting)
+}
+
+impl<'source> BrokerRows<'_, 'source> {
+    fn append(&mut self, piece: CanonicalBroker<'source>) -> Result<(), CatalogError> {
+        self.definitions
+            .append(piece.definition, |definition| DefinitionSource {
+                guid: definition.physical_guid.0,
+                path: definition.physical_path,
+                numbers: definition.numbers,
+            })?;
+        self.flows.extend(piece.flows);
+        self.properties.extend(piece.properties);
+        match piece.projection {
+            Ok(BrokerEmission {
+                projection,
+                pools: found,
+                ledger: observations,
+                failures: sources,
+            }) => {
+                self.projections.push(projection);
+                self.pools.merge(found);
+                self.ledger.merge(observations);
+                self.failures.extend(sources);
+            }
+            Err(failed) => {
+                self.ledger.merge(failed.ledger);
+                self.failures.push(failed.failure);
+            }
+        }
+        Ok(())
     }
-    .orders()
+
+    fn finish(
+        self,
+        forge: &DataForge<'_>,
+        accounting: KindReadAccounting<'source>,
+    ) -> Result<BrokerEntries<'source>, CatalogError> {
+        let definitions = self.definitions.finish(forge)?;
+        let mut read = accounting.into_read(self.projections);
+        crate::mission_pool_ledger::broker(&mut read.ledger);
+        read.ledger.merge(self.ledger);
+        read.failures.extend(self.failures);
+        Ok(BrokerEntries {
+            read,
+            pools: self.pools,
+            definitions,
+            flows: self.flows,
+            properties: self.properties,
+        })
+    }
 }

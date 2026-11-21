@@ -1,39 +1,88 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::{BTreeMap, BinaryHeap, HashMap, HashSet};
 use std::sync::Arc;
 
+use p4kx_assembly::ChildContainerPath;
 use p4kx_extraction::{Archive, Entry};
 
 pub(crate) const SYSTEM_FOLDER: &str = "data\\objectcontainers\\pu\\system\\";
 pub(crate) const SOCPAK: &str = ".socpak";
 const SYSTEM_SUFFIX: &str = "system.socpak";
+const UNREFERENCED_SAMPLE: usize = 200;
 
 /// The socpak Entries of an Archive by normalised path.
 pub(crate) struct Index<'a> {
     pub(crate) entries: &'a [Entry],
     pub(crate) by_path: HashMap<String, usize>,
+    duplicates: HashMap<String, Vec<usize>>,
 }
 
 impl<'a> Index<'a> {
     pub(crate) fn new(archive: &'a Archive) -> Self {
         let entries = archive.entries();
-        let by_path = entries
+        let mut by_path = HashMap::new();
+        let mut duplicates = HashMap::new();
+        for (at, entry) in entries
             .iter()
             .enumerate()
-            .filter(|(_, entry)| is_socpak(entry.path()))
-            .map(|(at, entry)| (key(entry.path()), at))
-            .collect();
-        Self { entries, by_path }
+            .filter(|(_, e)| is_socpak(e.path()))
+        {
+            let path = key(entry.path());
+            if let Some(previous) = by_path.insert(path.clone(), at) {
+                duplicates
+                    .entry(path)
+                    .or_insert_with(|| vec![previous])
+                    .push(at);
+            }
+        }
+        Self {
+            entries,
+            by_path,
+            duplicates,
+        }
     }
 
+    #[cfg(test)]
     pub(crate) fn find(&self, path: &str) -> Option<usize> {
+        match self.candidates(path) {
+            [entry] => Some(*entry),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn candidates(&self, path: &str) -> &[usize] {
+        let Some((key, selected)) = self.selected_key(path) else {
+            return &[];
+        };
+        self.candidates_for(key, selected)
+    }
+
+    /// Returns every physical Entry at a normalized root key without applying other lookup forms.
+    pub(crate) fn exact_normalized_candidates(&self, normalized: &str) -> &[usize] {
+        let Some(selected) = self.by_path.get(normalized) else {
+            return &[];
+        };
+        self.candidates_for(normalized, selected)
+    }
+
+    fn candidates_for<'index>(&'index self, key: &str, selected: &'index usize) -> &'index [usize] {
+        self.duplicates
+            .get(key)
+            .map_or_else(|| std::slice::from_ref(selected), Vec::as_slice)
+    }
+
+    fn selected_key(&self, path: &str) -> Option<(&String, &usize)> {
         let mut wanted = key(path);
         if !wanted.starts_with("data\\") {
             wanted.insert_str(0, "data\\");
         }
-        self.by_path.get(&wanted).copied()
+        self.by_path.get_key_value(&wanted).or_else(|| {
+            ChildContainerPath::new(path)?
+                .root_candidates()
+                .find_map(|candidate| self.by_path.get_key_value(&key(&candidate)))
+        })
     }
 
     /// Returns the folder name and the Entry of the main container of every star system, ordered
@@ -109,15 +158,62 @@ pub(crate) fn key(path: &str) -> String {
 
 /// Returns the system containers that were not opened, up to 200, and the total.
 pub(crate) fn unreferenced(index: &Index<'_>, opened: &HashSet<usize>) -> Vec<String> {
-    let mut paths: Vec<String> = index
-        .by_path
-        .iter()
-        .filter(|(path, at)| path.starts_with(SYSTEM_FOLDER) && !opened.contains(at))
-        .map(|(path, _)| path.clone())
+    let mut sample = BinaryHeap::new();
+    let mut total = 0;
+    for (path, at) in &index.by_path {
+        if !path.starts_with(SYSTEM_FOLDER) || opened.contains(at) {
+            continue;
+        }
+        total += 1;
+        let candidate = path.as_str();
+        if sample.len() < UNREFERENCED_SAMPLE {
+            sample.push(candidate);
+        } else if let Some(mut greatest) = sample.peek_mut()
+            && candidate < *greatest
+        {
+            *greatest = candidate;
+        }
+    }
+    let mut paths: Vec<_> = sample
+        .into_sorted_vec()
+        .into_iter()
+        .map(str::to_owned)
         .collect();
-    paths.sort_unstable();
-    let total = paths.len();
-    paths.truncate(200);
     paths.push(format!("{total} in total"));
     paths
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{HashMap, HashSet};
+
+    use super::{Index, SYSTEM_FOLDER, UNREFERENCED_SAMPLE, unreferenced};
+
+    #[test]
+    fn the_unreferenced_report_keeps_the_sorted_sample_and_full_count() {
+        let count = UNREFERENCED_SAMPLE + 50;
+        let visited = HashSet::from([1, UNREFERENCED_SAMPLE - 1, count - 1]);
+        let path = |ordinal| format!("{SYSTEM_FOLDER}fixture\\item-{ordinal:04}.socpak");
+        let mut by_path: HashMap<_, _> = (0..count)
+            .rev()
+            .map(|ordinal| (path(ordinal), ordinal))
+            .collect();
+        by_path.insert("data\\other\\excluded.socpak".to_owned(), count);
+        let index = Index {
+            entries: &[],
+            by_path,
+            duplicates: HashMap::new(),
+        };
+        let mut expected: Vec<_> = (0..count)
+            .filter(|ordinal| !visited.contains(ordinal))
+            .take(UNREFERENCED_SAMPLE)
+            .map(path)
+            .collect();
+        expected.push(format!("{} in total", count - visited.len()));
+        assert_eq!(
+            unreferenced(&index, &visited),
+            expected,
+            "retain the smallest reported paths and count every eligible entry"
+        );
+    }
 }

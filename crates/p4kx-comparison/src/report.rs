@@ -7,9 +7,14 @@ use p4kx_archive::Checksum;
 use schemars::JsonSchema;
 use serde::Serialize;
 
+#[path = "report_entry_origins.rs"]
+mod entry_origins;
+
 use crate::record_report::{RecordLevel, record_level};
+use crate::report_origins::{ReportOriginFields, ReportOrigins};
 use crate::{
-    Build, ChangeKind, Comparison, DirectoryCounts, Entry, EntryChange, EntryCounts, Level, Side,
+    Build, ChangeKind, Comparison, DirectoryCounts, Entry, EntryChange, EntryCounts,
+    IncomparableEntry, IncomparableReason, Level, Side,
 };
 
 /// The version of the report shape; it grows only when the shape changes incompatibly.
@@ -76,7 +81,7 @@ struct BuildReport<'a> {
     public_patch: Option<String>,
 }
 
-/// The Entries added, removed and changed.
+/// The Entry comparison outcomes.
 #[derive(Debug, Serialize, JsonSchema)]
 struct EntryLevel<'a> {
     /// The number of Entries per change kind.
@@ -85,6 +90,12 @@ struct EntryLevel<'a> {
     directories: Vec<DirectoryCounts<'a>>,
     /// Every added, removed or changed Entry, ordered by path ignoring case and separator kind.
     changes: Vec<EntryChangeReport<'a>>,
+    /// Matched pairs that the declared checksum algorithms cannot compare.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    incomparable: Vec<IncomparableEntryReport<'a>>,
+    #[serde(flatten)]
+    #[schemars(with = "ReportOriginFields")]
+    origins: ReportOrigins,
 }
 
 /// One added, removed or changed Entry.
@@ -94,12 +105,42 @@ struct EntryChangeReport<'a> {
     path: &'a str,
     /// How the Entry differs.
     change: ChangeKind,
+    /// Whether more than one physical pairing remains possible.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pairing_ambiguous: bool,
     /// The Entry on the old side, absent when it was added.
     #[serde(skip_serializing_if = "Option::is_none")]
     old: Option<EntryState>,
     /// The Entry on the new side, absent when it was removed.
     #[serde(skip_serializing_if = "Option::is_none")]
     new: Option<EntryState>,
+}
+
+#[derive(Debug, Serialize, JsonSchema)]
+struct IncomparableEntryReport<'a> {
+    /// The Entry path as the new side stores it.
+    path: &'a str,
+    /// Why the directory comparison could not decide the pair.
+    reason: IncomparableReason,
+    /// Whether more than one physical pairing remains possible.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pairing_ambiguous: bool,
+    /// Original directory values on the old side.
+    old: EntryState,
+    /// Original directory values on the new side.
+    new: EntryState,
+}
+
+impl<'a> From<&IncomparableEntry<'a>> for IncomparableEntryReport<'a> {
+    fn from(entry: &IncomparableEntry<'a>) -> Self {
+        Self {
+            path: entry.path(),
+            reason: entry.reason(),
+            pairing_ambiguous: entry.pairing_is_ambiguous(),
+            old: EntryState::from(entry.old_entry()),
+            new: EntryState::from(entry.new_entry()),
+        }
+    }
 }
 
 /// What the central directory says about one side of an Entry.
@@ -124,6 +165,16 @@ enum ChecksumReport {
     /// The SHA-256 as 64 lower-case hex digits; an Entry's checksum is never one, the arm keeps
     /// the report total.
     Sha256(String),
+}
+
+impl ChecksumReport {
+    const fn field_name(&self) -> &'static str {
+        match self {
+            Self::Crc32c(_) => "crc32c",
+            Self::Crc32(_) => "crc32",
+            Self::Sha256(_) => "sha256",
+        }
+    }
 }
 
 impl From<&Entry> for EntryState {
@@ -177,6 +228,7 @@ impl<'a> From<&EntryChange<'a>> for EntryChangeReport<'a> {
         Self {
             path: change.path(),
             change: change.kind(),
+            pairing_ambiguous: change.pairing_is_ambiguous(),
             old: change.old_entry().map(EntryState::from),
             new: change.new_entry().map(EntryState::from),
         }
@@ -189,19 +241,38 @@ pub(crate) fn to_report<'a>(comparison: &'a Comparison<'_>) -> Report<'a> {
         source: sources(comparison.old_side(), comparison.new_side()),
         levels: comparison.levels().selected().collect(),
         filter: comparison.filter(),
-        entries: comparison.levels().entries.then(|| EntryLevel {
-            counts: comparison.entry_counts(),
-            directories: comparison.directory_counts(),
-            changes: comparison
-                .entry_changes()
-                .iter()
-                .map(EntryChangeReport::from)
-                .collect(),
-        }),
+        entries: comparison.levels().entries.then(|| entry_level(comparison)),
         records: comparison
             .levels()
             .records
             .then(|| record_level(comparison)),
+    }
+}
+
+fn entry_level<'a>(comparison: &'a Comparison<'_>) -> EntryLevel<'a> {
+    let changes: Vec<_> = comparison
+        .entry_changes()
+        .iter()
+        .map(EntryChangeReport::from)
+        .collect();
+    let incomparable: Vec<_> = comparison
+        .incomparable_entries()
+        .iter()
+        .map(IncomparableEntryReport::from)
+        .collect();
+    let directories = comparison.directory_counts();
+    let origins = ReportOrigins(entry_origins::capture(
+        comparison,
+        &changes,
+        &incomparable,
+        &directories,
+    ));
+    EntryLevel {
+        counts: comparison.entry_counts(),
+        directories,
+        changes,
+        incomparable,
+        origins,
     }
 }
 

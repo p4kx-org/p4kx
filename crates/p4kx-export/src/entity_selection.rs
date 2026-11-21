@@ -15,24 +15,33 @@ pub(crate) enum Selected {
     Leftover(Kind),
 }
 
-/// Returns what the kind of `record` makes of it: the kinds that
-/// [`read_crafting`](crate::read_crafting) fills do not select, and a Record is selected when its
-/// struct is the type of its kind and, with a `filter`, its record path matches.
+/// Selects generic catalog Records by their declared type and filtered owning path.
+/// Dedicated readers select their own source scopes.
 pub(crate) fn select(
     record: &Record<'_>,
     filter: Option<&Filter>,
 ) -> Result<Option<Selected>, DataForgeError> {
     let path = record.record_path()?;
-    let Some(kind) = Kind::by_record(path, record.type_name()?).filter(|kind| !kind.is_crafting())
-    else {
-        return Ok(None);
-    };
     if filter.is_some_and(|filter| !filter.matches(path)) {
         return Ok(None);
     }
+    let Some(kind) = Kind::by_record(path, record.type_name()?).filter(|kind| owns(*kind)) else {
+        return Ok(None);
+    };
     Ok(Some(if is_kind_leftover(kind, path, record.name()?) {
         Selected::Leftover(kind)
     } else {
         Selected::Entity(kind)
     }))
+}
+
+const fn owns(kind: Kind) -> bool {
+    !kind.has_dedicated_reader()
+        && !matches!(
+            kind,
+            Kind::Contracts
+                | Kind::MissionLocationTemplates
+                | Kind::ContractTemplates
+                | Kind::MissionBrokerEntries
+        )
 }

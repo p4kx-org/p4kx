@@ -172,7 +172,7 @@ fn crowded() -> TestMtlMaterial {
 }
 
 #[test]
-fn lists_inside_a_material_are_capped_and_counted() -> TestResult {
+fn material_lists_keep_every_original_value_and_count() -> TestResult {
     let install = Install::new(vec![TestEntry::stored(
         "Data/Objects/Test/crowded.mtl",
         TestMtl::multi(&[crowded()]).text_xml(),
@@ -193,19 +193,16 @@ fn lists_inside_a_material_are_capped_and_counted() -> TestResult {
     assert_eq!(material["texture_count"], 64, "and counted");
     assert_eq!(
         material["public_params"].as_array().map(Vec::len),
-        Some(64),
-        "parameters capped"
+        Some(70),
+        "all original shader parameters"
     );
     assert_eq!(material["public_param_count"], 70, "and counted");
     assert_eq!(
         material["layers"].as_array().map(Vec::len),
-        Some(64),
-        "layers capped"
+        Some(70),
+        "all original layers"
     );
-    assert_eq!(
-        material["layer_count"], 64,
-        "and counted, as far as the reader keeps them"
-    );
+    assert_eq!(material["layer_count"], 70, "all original layers counted");
     Ok(())
 }
 

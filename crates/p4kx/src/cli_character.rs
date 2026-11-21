@@ -31,7 +31,25 @@ pub(crate) enum CharacterAction {
     /// GLB file, there are no texture files. Pieces that cannot be fitted and animations that fit
     /// nothing are listed in the manifest and the report.
     #[command(after_help = EXIT_CODES_HELP)]
-    Package(CharacterPackageArgs),
+    Package(Box<CharacterPackageArgs>),
+    /// Writes original body, item-port and player default loadout declarations as JSON.
+    #[command(after_help = EXIT_CODES_HELP)]
+    Source(CharacterSourceArgs),
+}
+
+#[derive(Debug, Args)]
+pub(crate) struct CharacterSourceArgs {
+    /// Path of the Data.p4k Archive.
+    pub(crate) archive: PathBuf,
+    /// Body variant whose default CHF is selected. Repeat with --bundle.
+    #[arg(long, value_enum, value_name = "VARIANT", required = true)]
+    pub(crate) body: Vec<BodyArg>,
+    /// Writes a source bundle to a new directory.
+    #[arg(long)]
+    pub(crate) bundle: bool,
+    /// JSON file, or a new directory with --bundle.
+    #[arg(long, value_name = "PATH")]
+    pub(crate) out: PathBuf,
 }
 
 /// Arguments of `p4kx character package`.
@@ -79,6 +97,9 @@ pub(crate) struct CharacterPackageArgs {
     /// Leaves the vertex colours out of the meshes.
     #[arg(long)]
     pub(crate) no_vertex_colours: bool,
+    /// Writes a source vertex map for the rigged GLB.
+    #[arg(long)]
+    pub(crate) vertex_maps: bool,
     /// Writes only the expression with this name as a morph target, as for `chf glb
     /// --expression`; repeat the option for more.
     #[arg(

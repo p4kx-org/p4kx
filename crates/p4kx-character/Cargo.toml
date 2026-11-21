@@ -20,6 +20,9 @@ serde.workspace = true
 serde_json = { workspace = true, features = ["raw_value"] }
 thiserror.workspace = true
 
+[features]
+verification = []
+
 [dev-dependencies]
 p4kx-testkit.workspace = true
 proptest.workspace = true

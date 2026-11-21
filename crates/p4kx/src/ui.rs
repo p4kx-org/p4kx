@@ -13,7 +13,7 @@ use crate::ui_extract::extract;
 use crate::ui_hologram;
 use crate::ui_json::{AssetsJson, describe};
 use crate::ui_render::render;
-use crate::{exit, json, ui_screen_render, ui_screens};
+use crate::{exit, ui_asset_origins, ui_screen_render, ui_screens};
 
 const NONE: &str = "-";
 
@@ -22,9 +22,11 @@ pub(crate) fn run(args: &UiArgs, as_json: bool) -> Result<ExitCode> {
     match &args.action {
         UiAction::Screens(screens) => ui_screens::run(screens, as_json),
         UiAction::Hologram(hologram) => ui_hologram::run(hologram, as_json),
-        UiAction::Assets(source) => with_movie(source, None, |movie| assets(movie, as_json)),
+        UiAction::Assets(source) => {
+            with_movie(source, None, as_json, |movie| assets(movie, as_json))
+        }
         UiAction::Extract { source, out } => {
-            with_movie(source, None, |movie| extract(movie, out, as_json))
+            with_movie(source, None, true, |movie| extract(movie, out, as_json))
         }
         UiAction::Render {
             source,
@@ -57,7 +59,7 @@ pub(crate) fn run(args: &UiArgs, as_json: bool) -> Result<ExitCode> {
             svg,
             lang,
             ..
-        } => with_movie(source, *lang, |movie| {
+        } => with_movie(source, *lang, false, |movie| {
             render(movie, out, *size, *background, *svg, as_json)
         }),
     }
@@ -66,6 +68,7 @@ pub(crate) fn run(args: &UiArgs, as_json: bool) -> Result<ExitCode> {
 fn with_movie(
     source: &UiSource,
     lang: Option<Language>,
+    observe_file: bool,
     run: impl FnOnce(&UiMovie<'_>) -> Result<ExitCode>,
 ) -> Result<ExitCode> {
     match &source.entry {
@@ -78,19 +81,20 @@ fn with_movie(
             };
             run(&movie)
         }
+        None if observe_file => run(&UiMovie::from_file_observed(&source.path)?),
         None => run(&UiMovie::from_file(&source.path)?),
     }
 }
 
 fn assets(movie: &UiMovie<'_>, as_json: bool) -> Result<ExitCode> {
-    let assets = movie.movie().assets();
-    let described = describe(movie, &assets);
-    if as_json {
-        json::print(&described)?;
+    let complete = if as_json {
+        ui_asset_origins::print(movie)?
     } else {
-        print_assets(&described)?;
-    }
-    Ok(ExitCode::from(if assets.failures.is_empty() {
+        let assets = movie.movie().assets();
+        print_assets(&describe(movie, &assets))?;
+        assets.failures.is_empty()
+    };
+    Ok(ExitCode::from(if complete {
         exit::SUCCESS
     } else {
         exit::PARTIAL_FAILURE

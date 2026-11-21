@@ -19,19 +19,20 @@ either: the Record tree reports it as outside the Record (`ValueError::OutsideRe
 not know which Record owns the instance, so only a weak pointer to the instance a Record is
 defined by links the two Records.
 
-The References live in columns of `u32` without a heap object per Reference: source Record,
-target Record (or none), an interned field shape with `[]` for every array on the way, and the
-index of the element in each array in one shared buffer. A shape is `Components[].fireActions[].ammo`;
+The index stores References in columns and shared buffers. Each target is the physical Record
+selected by the decoder, including when two Records share a GUID. Occurrence positions and buffer
+offsets use the platform's addressable width. On a 64-bit target the wider columns take 12
+additional bytes per indexed occurrence. Source and target Record indices and original array
+indices stay 32-bit. A shape is `Components[].fireActions[].ammo`;
 the text with indices, `Components[3].fireActions[0].ammo`, is built on demand. Each parallel task
 collects its Records in order with a local interner; the tasks run in waves of a few per thread
 and the chunks of a wave are appended in Record order and freed as they are moved, so the
 outgoing References of a Record are one run, and incoming ones are grouped by target with one
-counting pass. The work per Record is bounded by `MAX_RECORD_VALUES`, the index by
-`MAX_INDEXED_REFERENCES` (2^23, five times the 1.55 million of LIVE): the limit is applied only
-while appending, in Record order, so a truncated index holds the first References of the first
-Records whatever the number of threads, and no wave starts once it is full. A Record whose tree
-cannot be built adds nothing and is counted, and an index that stopped at the limit says so. The
-build polls a stop function between Records, so the window can cancel it. All of it runs outside
+counting pass. Canonical owned traversal uses the actual source values without a mixed
+value/work cutoff; [canonical owned values](../canonical-owned-values.md) describes its costs.
+The ordinary build indexes every readable Reference. An explicit occurrence budget retains the
+first occurrences in Record order and signals truncation at the first omitted Reference.
+Unreadable Record trees are counted separately. The build polls cancellation between Records. All of it runs outside
 any `OnceLock` initialiser, because the build uses rayon.
 
 The window builds the index lazily, the first time the "Referenced by" tab is shown or a Query

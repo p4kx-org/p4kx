@@ -11,7 +11,9 @@ use crate::build::issue;
 use crate::build_head_library::use_head_libraries;
 use crate::build_models::{Models, Outcome, fall_back, read_models};
 use crate::flatten::Draft;
-use crate::{AssemblyError, AssemblyOptions, Issue, IssueKind, ModelFailure, ModelProvider};
+use crate::{
+    AssemblyError, AssemblyOptions, DeployedGear, Issue, IssueKind, ModelFailure, ModelProvider,
+};
 
 /// Reads the model of every part, falls back from a missing sub-geometry to the main geometry and
 /// poses the landing gear.
@@ -52,16 +54,17 @@ pub(crate) fn pose_gears(
             }
         })
         .collect();
-    let posed: Vec<(String, Result<Option<Model>, ModelFailure>)> = wanted
+    let posed: Vec<(String, Result<Option<DeployedGear>, ModelFailure>)> = wanted
         .par_iter()
-        .map(|(key, path, model)| (key.clone(), provider.deployed(path, model)))
+        .map(|(key, path, model)| (key.clone(), provider.deployed_observed(path, model)))
         .collect();
     let mut reasons: Vec<(String, String)> = Vec::new();
     for (key, result) in posed {
         match result {
-            Ok(Some(model)) => {
+            Ok(Some(deployed)) => {
                 if let Some(Outcome::Loaded(loaded)) = models.get_mut(&key) {
-                    loaded.model = Arc::new(model);
+                    loaded.model = Arc::new(deployed.model);
+                    loaded.gear_pose = deployed.sources.map(Arc::new);
                 }
             }
             Ok(None) => reasons.push((key, "the Archive has no deploy clip for it".to_owned())),

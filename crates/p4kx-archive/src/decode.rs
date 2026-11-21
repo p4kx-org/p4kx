@@ -7,7 +7,7 @@ use std::mem;
 use ruzstd::decoding::{FrameDecoder, StreamingDecoder};
 
 use crate::decrypt::AES_BLOCK_LEN;
-use crate::{Compression, DataError};
+use crate::{Compression, DataError, EffectiveEncoding};
 
 const ZSTD_MAGIC: [u8; 4] = [0x28, 0xB5, 0x2F, 0xFD];
 const MIN_ZSTD_WINDOW: u64 = 128 * 1024 * 1024;
@@ -33,6 +33,14 @@ impl<R: Read> ZstdOrPlain<R> {
         Self {
             stage: ZstdStage::Start(inner),
             max_window: uncompressed_size.max(MIN_ZSTD_WINDOW),
+        }
+    }
+
+    pub(crate) const fn effective_encoding(&self) -> EffectiveEncoding {
+        match self.stage {
+            ZstdStage::Start(_) | ZstdStage::Failed => EffectiveEncoding::Undetermined,
+            ZstdStage::Frame(_) => EffectiveEncoding::Zstandard,
+            ZstdStage::Plain(_) => EffectiveEncoding::PassThrough,
         }
     }
 
@@ -84,6 +92,10 @@ pub(crate) struct CorruptAs<R> {
 }
 
 impl<R> CorruptAs<R> {
+    pub(crate) const fn inner(&self) -> &R {
+        &self.inner
+    }
+
     pub(crate) const fn new(inner: R, compression: Compression) -> Self {
         Self { inner, compression }
     }
@@ -131,6 +143,10 @@ pub(crate) struct ExactSize<R> {
 }
 
 impl<R> ExactSize<R> {
+    pub(crate) const fn inner(&self) -> &R {
+        &self.inner
+    }
+
     pub(crate) const fn new(inner: R, expected: u64) -> Self {
         Self {
             inner,

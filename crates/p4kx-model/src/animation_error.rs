@@ -117,6 +117,9 @@ pub enum CorruptAnimation {
         /// The most the reader accepts.
         limit: u64,
     },
+    /// The database declares a key total wider than the count type.
+    #[error("the declared database key count does not fit in u64")]
+    DeclaredKeyCountOverflow,
     /// The names of a database are fewer than its animations.
     #[error("the name table holds fewer than the {animations} animation names")]
     Names {

@@ -2,11 +2,10 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 //! Field statistics of Records that are odd: References, weak pointers, enum and locale values,
-//! an instance owned twice, a Record with too many values and a DataForge with too many paths.
+//! an instance owned twice, complete large Records and a DataForge with too many paths.
 
 use p4kx_dataforge::{
-    DataForge, FieldStat, FieldStatistics, FieldStatisticsError, MAX_FIELD_PATHS,
-    MAX_RECORD_VALUES, Number,
+    DataForge, FieldStat, FieldStatistics, FieldStatisticsError, MAX_FIELD_PATHS, Number,
 };
 use p4kx_testkit::{
     DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue,
@@ -184,7 +183,7 @@ fn an_instance_owned_twice_is_counted_once_and_reported() -> TestResult {
 }
 
 fn large_database(elements: usize) -> Vec<u8> {
-    let fields = MAX_RECORD_VALUES / 35;
+    let fields = 29_959;
     let mut big = TestStruct::new("Big");
     for field in 0..fields {
         big = big.field(format!("b{field}"), TestType::Int32);
@@ -217,27 +216,69 @@ fn large_database(elements: usize) -> Vec<u8> {
 }
 
 #[test]
-fn a_record_with_too_many_values_is_not_counted_at_all() -> TestResult {
+fn a_large_valid_record_is_counted_completely_and_atomically() -> TestResult {
     let bytes = large_database(18);
     let forge = DataForge::open(&bytes)?;
-
+    let source = forge
+        .structs()
+        .find(|value| value.name().is_ok_and(|name| name == "Big"))
+        .ok_or("the original Big declaration")?;
+    assert_eq!(
+        source.properties().count(),
+        29_959,
+        "the actual original field count"
+    );
+    assert_eq!(source.size(), 119_836, "the original Int32 storage size");
+    assert_eq!(
+        source.instance_count(),
+        19,
+        "all original small and large array elements exist"
+    );
+    assert_eq!(forge.records().len(), 2, "both original owners exist");
     let statistics = FieldStatistics::of_all(&forge)?;
-
-    assert_eq!(statistics.records(), 2, "examined");
-    assert_eq!(statistics.unreadable_records(), 1, "the large Record");
+    assert_eq!(
+        statistics.records(),
+        2,
+        "both original Records are examined"
+    );
+    assert_eq!(
+        statistics.unreadable_records(),
+        0,
+        "both valid Records are fully counted"
+    );
     let before = stat(&statistics, "before")?;
-    assert_eq!(before.occurrences(), 1, "only the small Record counts");
-    assert_eq!(before.records(), 1, "records");
-    assert_eq!(before.max(), Some(Number::Integer(5)), "max");
+    assert_eq!(
+        before.occurrences(),
+        2,
+        "both complete source values contribute"
+    );
+    assert_eq!(before.records(), 2, "both original records contribute");
+    assert_eq!(
+        before.max(),
+        Some(Number::Integer(7)),
+        "the final original scalar contributes"
+    );
     let bigs = stat(&statistics, "bigs")?;
-    assert_eq!(bigs.occurrences(), 1, "one element, of the small Record");
-    assert_eq!(stat(&statistics, "bigs/b0")?.occurrences(), 1, "its field");
-    assert_eq!(statistics.unreadable_values(), 0, "nothing else is lost");
+    assert_eq!(
+        bigs.occurrences(),
+        19,
+        "all original array elements survive"
+    );
+    assert_eq!(
+        stat(&statistics, "bigs/b0")?.occurrences(),
+        19,
+        "each original field occurrence survives"
+    );
+    assert_eq!(
+        statistics.unreadable_values(),
+        0,
+        "no source values are discarded"
+    );
     Ok(())
 }
 
 #[test]
-fn a_record_just_below_the_value_limit_is_counted() -> TestResult {
+fn a_second_large_valid_record_shape_is_counted() -> TestResult {
     let bytes = large_database(17);
     let forge = DataForge::open(&bytes)?;
 

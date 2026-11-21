@@ -15,6 +15,7 @@ import synthetic
 IDENTITY_MATRIX = (1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1)
 TIP_BIND = (1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, -1, 0, 1)
 QUARTER_TURN_Z = (0.0, 0.0, 0.70710678, 0.70710678)
+RIG_BASE_COLOUR = (0.1, 0.1, 0.1, 1.0)
 
 
 def character_manifest(**overrides: Any) -> dict[str, Any]:
@@ -79,14 +80,19 @@ def character_manifest(**overrides: Any) -> dict[str, Any]:
     return base
 
 
-def write_character_package(folder: Path, data: dict[str, Any] | None = None) -> Path:
+def write_character_package(
+    folder: Path,
+    data: dict[str, Any] | None = None,
+    *,
+    base_colour: tuple[float, ...] = RIG_BASE_COLOUR,
+) -> Path:
     """Writes ``data`` (default: ``character_manifest()``) and its files; returns ``scene.json``."""
     data = data if data is not None else character_manifest()
     (folder / "meshes").mkdir(parents=True, exist_ok=True)
     (folder / "textures").mkdir(parents=True, exist_ok=True)
     for mesh in data["meshes"]:
         content = (
-            rig_glb()
+            rig_glb(base_colour)
             if mesh.get("rig")
             else synthetic.glb(mesh["id"], [m["name"] for m in mesh["materials"]])
         )
@@ -96,7 +102,7 @@ def write_character_package(folder: Path, data: dict[str, Any] | None = None) ->
     return path
 
 
-def rig_glb() -> bytes:
+def rig_glb(base_colour: tuple[float, ...] = RIG_BASE_COLOUR) -> bytes:
     """Returns a GLB with two bones, a skinned triangle with one morph target and one animation."""
     blocks = [
         struct.pack("<9f", 0, 0, 0, 1, 0, 0, 0, 1, 0),
@@ -138,7 +144,7 @@ def rig_glb() -> bytes:
                 "extras": {"targetNames": ["smile"]},
             }
         ],
-        "materials": [{"name": "armour", "pbrMetallicRoughness": {"baseColorFactor": [0.1, 0.1, 0.1, 1.0]}}],
+        "materials": [{"name": "armour", "pbrMetallicRoughness": {"baseColorFactor": base_colour}}],
         "skins": [{"joints": [1, 2], "inverseBindMatrices": 4, "skeleton": 1}],
         "animations": [
             {

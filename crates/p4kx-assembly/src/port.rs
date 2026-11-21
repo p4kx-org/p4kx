@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_dataforge::StructValue;
+use std::sync::Arc;
 
-use crate::read::{flag, struct_field, struct_items, text, texts, unsigned, xyz};
+use p4kx_dataforge::{StructValue, Value};
+use p4kx_extraction::{DataForgeOrigin, SourceValue};
+
+use crate::port_sub_helper::{self, PortSubHelper, PortSubHelpers};
+use crate::read::{as_struct, struct_field, struct_items, text, texts, unsigned, xyz};
 
 const ATTACHMENT_PREFIX: &str = "SItemPortDefAttachmentImplementation";
 const SKIN_ATTACHMENT: &str = "Skin";
@@ -12,6 +16,8 @@ const SKIN_ATTACHMENT: &str = "Skin";
 /// it sits.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PortDefinition {
+    pub(crate) position: PortDefinitionPosition,
+    pub(crate) forge_origin: Option<Arc<DataForgeOrigin>>,
     pub(crate) display_name: String,
     pub(crate) flags: String,
     pub(crate) min_size: Option<u32>,
@@ -19,18 +25,31 @@ pub struct PortDefinition {
     pub(crate) types: Vec<PortType>,
     pub(crate) port_tags: String,
     pub(crate) required_tags: String,
+    pub(crate) requires_attachment_tags: bool,
     pub(crate) transform: Option<PortTransform>,
+    pub(crate) helper_tree: PortSubHelpers,
     pub(crate) skin: bool,
-    pub(crate) no_rotation: bool,
+    no_rotation: SourceValue<bool>,
     pub(crate) detach_direction: [f32; 3],
 }
 
 impl PortDefinition {
-    /// Returns whether the item keeps its own orientation and takes only the translation of the
-    /// port (`constraintParams.noRotation` of an entity attachment), as gimbals and turrets do.
+    /// Returns the physical Record, component and port occurrence.
+    #[must_use]
+    pub const fn position(&self) -> PortDefinitionPosition {
+        self.position
+    }
+
+    /// Returns whether the authored entity attachment flag is true.
     #[must_use]
     pub const fn no_rotation(&self) -> bool {
-        self.no_rotation
+        matches!(self.no_rotation, SourceValue::Present(true))
+    }
+
+    /// Returns the original rotation constraint and its source state.
+    #[must_use]
+    pub const fn no_rotation_source(&self) -> &SourceValue<bool> {
+        &self.no_rotation
     }
 
     /// Returns the direction in which the item leaves the port when detached, `[x, y, z]` as
@@ -90,10 +109,50 @@ impl PortDefinition {
         self.skin
     }
 
-    /// Returns where the port sits, or `None` when the Record gives no attachment helper.
+    /// Returns the root attachment helper's transform.
     #[must_use]
     pub const fn transform(&self) -> Option<&PortTransform> {
         self.transform.as_ref()
+    }
+
+    /// Returns the root helper's authored tag selector.
+    #[must_use]
+    pub fn root_helper_tags(&self) -> Option<&str> {
+        self.helper_tree.root_tags.text()
+    }
+
+    /// Returns the authored subhelpers in depth-first source order.
+    #[must_use]
+    pub fn sub_helpers(&self) -> &[PortSubHelper] {
+        &self.helper_tree.nodes
+    }
+}
+
+/// Original coordinates of one DataForge item port definition.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct PortDefinitionPosition {
+    pub(crate) record: u32,
+    pub(crate) component: usize,
+    pub(crate) port: usize,
+}
+
+impl PortDefinitionPosition {
+    /// Returns the physical Entity Record index.
+    #[must_use]
+    pub const fn record_index(self) -> u32 {
+        self.record
+    }
+
+    /// Returns the original ordinal in the Record's Components array.
+    #[must_use]
+    pub const fn component_ordinal(self) -> usize {
+        self.component
+    }
+
+    /// Returns the original ordinal in the component's Ports array.
+    #[must_use]
+    pub const fn port_ordinal(self) -> usize {
+        self.port
     }
 }
 
@@ -126,6 +185,7 @@ pub struct PortTransform {
     pub(crate) offset_helper: String,
     pub(crate) position: [f32; 3],
     pub(crate) rotation: [f32; 3],
+    offset_fields: [bool; 2],
 }
 
 impl PortTransform {
@@ -153,17 +213,44 @@ impl PortTransform {
         self.position
     }
 
+    pub(crate) const fn offset_fields(&self) -> [bool; 2] {
+        self.offset_fields
+    }
+
     /// Returns the rotation from the helper in degrees as stored, `[x, y, z]`.
     #[must_use]
     pub const fn rotation(&self) -> [f32; 3] {
         self.rotation
     }
+
+    pub(crate) fn read(node: &StructValue<'_>, attachment: &str) -> Option<Self> {
+        let helper = struct_field(node, "Helper")?;
+        let offset = struct_field(helper, "Offset");
+        let position = offset.and_then(|offset| struct_field(offset, "Position"));
+        let rotation = offset.and_then(|offset| struct_field(offset, "Rotation"));
+        Some(Self {
+            attachment: attachment.to_owned(),
+            helper: text(helper, "Name").to_owned(),
+            offset_helper: text(helper, "ItemOffsetHelperName").to_owned(),
+            position: xyz(position),
+            rotation: xyz(rotation),
+            offset_fields: [position.is_some(), rotation.is_some()],
+        })
+    }
 }
 
 /// Reads one `SItemPortDef`.
-pub(crate) fn read_definition(port: &StructValue<'_>) -> PortDefinition {
-    let attachment = struct_field(port, "AttachmentImplementation");
+pub(crate) fn read_definition(
+    port: &StructValue<'_>,
+    position: PortDefinitionPosition,
+) -> PortDefinition {
+    let attachment_value = port.field("AttachmentImplementation");
+    let attachment = attachment_value.and_then(as_struct);
+    let helper = attachment.and_then(|attachment| struct_field(attachment, "Helper"));
+    let kind = attachment.map_or("", attachment_kind);
     PortDefinition {
+        position,
+        forge_origin: None,
         display_name: text(port, "DisplayName").to_owned(),
         flags: text(port, "Flags").to_owned(),
         min_size: unsigned(port, "MinSize"),
@@ -176,29 +263,43 @@ pub(crate) fn read_definition(port: &StructValue<'_>) -> PortDefinition {
             .collect(),
         port_tags: text(port, "PortTags").to_owned(),
         required_tags: text(port, "RequiredPortTags").to_owned(),
-        transform: attachment.and_then(read_transform),
-        skin: attachment.is_some_and(|attachment| attachment_kind(attachment) == SKIN_ATTACHMENT),
-        no_rotation: attachment
-            .and_then(|attachment| struct_field(attachment, "constraintParams"))
-            .is_some_and(|constraints| flag(constraints, "noRotation")),
+        requires_attachment_tags: crate::spec::has_tag_requirements(port.field("RequiredPortTags")),
+        transform: helper.and_then(|helper| PortTransform::read(helper, kind)),
+        helper_tree: port_sub_helper::read(attachment_value, kind),
+        skin: kind == SKIN_ATTACHMENT,
+        no_rotation: no_rotation_at_port(attachment_value),
         detach_direction: xyz(struct_field(port, "detachDirection")),
+    }
+}
+
+fn no_rotation_at_port(attachment: Option<&Value<'_>>) -> SourceValue<bool> {
+    match attachment {
+        Some(Value::Struct(implementation)) => attachment_no_rotation(implementation),
+        None | Some(Value::Null) => SourceValue::Absent,
+        Some(Value::Error(_)) => SourceValue::Unreadable,
+        _ => SourceValue::Invalid,
+    }
+}
+
+/// Reads the authored rotation constraint of an attachment implementation.
+#[must_use]
+pub fn attachment_no_rotation(implementation: &StructValue<'_>) -> SourceValue<bool> {
+    match implementation.field("constraintParams") {
+        Some(Value::Struct(constraints)) => match constraints.field("noRotation") {
+            Some(Value::Bool(value)) => SourceValue::Present(*value),
+            Some(Value::Null) => SourceValue::Null,
+            Some(Value::Error(_)) => SourceValue::Unreadable,
+            None => SourceValue::Absent,
+            _ => SourceValue::Invalid,
+        },
+        Some(Value::Null) => SourceValue::Null,
+        Some(Value::Error(_)) => SourceValue::Unreadable,
+        None => SourceValue::Absent,
+        _ => SourceValue::Invalid,
     }
 }
 
 fn attachment_kind<'a>(attachment: &StructValue<'a>) -> &'a str {
     let kind = attachment.type_name();
     kind.strip_prefix(ATTACHMENT_PREFIX).unwrap_or(kind)
-}
-
-fn read_transform(attachment: &StructValue<'_>) -> Option<PortTransform> {
-    let helper =
-        struct_field(attachment, "Helper").and_then(|node| struct_field(node, "Helper"))?;
-    let offset = struct_field(helper, "Offset");
-    Some(PortTransform {
-        attachment: attachment_kind(attachment).to_owned(),
-        helper: text(helper, "Name").to_owned(),
-        offset_helper: text(helper, "ItemOffsetHelperName").to_owned(),
-        position: xyz(offset.and_then(|offset| struct_field(offset, "Position"))),
-        rotation: xyz(offset.and_then(|offset| struct_field(offset, "Rotation"))),
-    })
 }

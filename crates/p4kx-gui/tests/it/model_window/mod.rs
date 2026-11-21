@@ -10,4 +10,5 @@ mod export;
 mod export_cancel;
 mod export_window;
 mod info;
+mod info_lod_source_render;
 mod info_render;

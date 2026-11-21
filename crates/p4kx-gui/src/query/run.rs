@@ -172,7 +172,12 @@ fn query_over(
         .iter()
         .map(ColumnKind::is_multi_valued)
         .collect();
-    let Some(read) = read_rows(&compiled.run(), &lists, cancel, set) else {
+    let run = match compiled.run_while(|| !cancel.is_cancelled()) {
+        Ok(Some(run)) => run,
+        Ok(None) => return Outcome::Cancelled,
+        Err(error) => return Outcome::Failed(Some(describe(&error))),
+    };
+    let Some(read) = read_rows(&run, &lists, cancel, set) else {
         return Outcome::Cancelled;
     };
     let columns = compiled

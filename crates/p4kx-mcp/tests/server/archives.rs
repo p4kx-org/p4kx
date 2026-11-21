@@ -65,8 +65,7 @@ fn list_channels_includes_manual_archives_from_the_settings() -> TestResult {
     let channels = server.ok("list_channels", &json!({}))?;
     let names: Vec<&str> = channels["channels"]
         .as_array()
-        .map(|list| list.iter().filter_map(|c| c["name"].as_str()).collect())
-        .unwrap_or_default();
+        .map_or_default(|list| list.iter().filter_map(|c| c["name"].as_str()).collect());
     assert_eq!(names, ["LIVE", "PTU"], "default first, then manual");
     assert_eq!(channels["channels"][1]["source"], "manual", "PTU is manual");
     let first = server.ok("list_channels", &json!({ "limit": 1 }))?;
@@ -87,7 +86,32 @@ fn archive_info_by_channel_name_summarises_the_archive() -> TestResult {
     let install = Install::standard()?;
     write_launcher_log(&install)?;
     let mut server = install.serve(&[])?;
-    let info = server.ok("archive_info", &json!({ "archive": "live" }))?;
+    let mut info = server.ok("archive_info", &json!({ "archive": "live" }))?;
+    let metadata = info
+        .as_object_mut()
+        .ok_or("Archive summary object")?
+        .remove("metadata")
+        .ok_or("cached source metadata")?;
+    assert_cached_layout(&metadata, &install)?;
+    let fields = info.as_object_mut().ok_or("Archive summary object")?;
+    let origins = fields
+        .remove("fieldOrigins")
+        .ok_or("layout field origins")?;
+    assert_eq!(
+        origins.pointer(
+            "/~1structuredContent~1metadata~1zip~1end~1directoryOffset/containsEncryptedSource"
+        ),
+        Some(&json!(false)),
+        "root directory words stay plain with an encrypted payload elsewhere"
+    );
+    check_summary_origins(
+        &origins,
+        fields.get("provenance").ok_or("source inventory")?,
+    )?;
+    assert!(
+        fields.remove("provenance").is_some(),
+        "the summary carries its source inventory"
+    );
     assert_eq!(
         info,
         json!({
@@ -104,16 +128,150 @@ fn archive_info_by_channel_name_summarises_the_archive() -> TestResult {
             "encrypted_count": 1,
             "issue_count": 0,
             "issues": [],
-            "compressed_size": info["compressed_size"],
+            "compressed_size": info.get("compressed_size"),
             "size": 4 + 80 + 50 + 3 + 3 + 5
         }),
         "the summary of LIVE"
     );
     assert!(
-        info["compressed_size"]
-            .as_u64()
+        info.get("compressed_size")
+            .and_then(Value::as_u64)
             .is_some_and(|size| size > 0),
-        "a stored size"
+        "the admitted entries have positive stored sizes"
+    );
+    Ok(())
+}
+
+fn check_summary_origins(origins: &Value, provenance: &Value) -> TestResult {
+    for key in ["entry_count", "encrypted_count", "compressed_size", "size"] {
+        let marker = origins
+            .get(format!("/structuredContent/{key}"))
+            .ok_or("aggregate origin")?;
+        assert_eq!(
+            marker
+                .get("containsEncryptedSource")
+                .and_then(Value::as_bool),
+            Some(false),
+            "the directory independently supplies {key}"
+        );
+        assert_eq!(
+            marker.get("sourceSetComplete").and_then(Value::as_bool),
+            Some(true),
+            "the original admitted directory is complete for {key}"
+        );
+    }
+    assert_eq!(
+        origins.get("/structuredContent/issue_count"),
+        Some(&json!({
+            "containsEncryptedSource": null,
+            "sourceUsesRefs": [],
+            "sourceSetComplete": false,
+        })),
+        "the actual MCP response retains an explicit unknown origin for the diagnostic total"
+    );
+    let references = origins
+        .get("/structuredContent/encrypted_count")
+        .and_then(|marker| marker.get("sourceUsesRefs"))
+        .and_then(Value::as_array)
+        .ok_or("encrypted count uses")?;
+    let inventory = provenance
+        .get("uses")
+        .and_then(Value::as_array)
+        .ok_or("inventory uses")?;
+    assert!(
+        inventory.iter().any(|site| {
+            site.get("id").is_some_and(|id| references.contains(id))
+                && site.get("scope").and_then(Value::as_str) == Some("archiveDirectoryMetadata")
+                && site.pointer("/location/namespace").and_then(Value::as_str)
+                    == Some("archiveDirectoryAdmittedFields")
+                && site.pointer("/location/field").and_then(Value::as_str)
+                    == Some("encryption_declarations")
+                && site.pointer("/location/indices") == Some(&json!(["0", "6"]))
+        }),
+        "the encrypted count links to directory declarations across the six admitted rows"
+    );
+    check_manifest_origins(origins)
+}
+
+fn check_manifest_origins(origins: &Value) -> TestResult {
+    let build_marker = origins
+        .get("/structuredContent/build/build_id")
+        .ok_or("build ID origin")?;
+    assert_eq!(
+        build_marker
+            .get("sourceSetComplete")
+            .and_then(Value::as_bool),
+        Some(true),
+        "the original manifest ID and parse selectors are available"
+    );
+    assert_eq!(
+        build_marker.get("containsEncryptedSource"),
+        Some(&Value::Null),
+        "the external Build manifest has unknown P4K lineage"
+    );
+    let patch = origins
+        .get("/structuredContent/build/public_patch")
+        .ok_or("patch origin")?;
+    assert_eq!(
+        patch.get("sourceSetComplete").and_then(Value::as_bool),
+        Some(false),
+        "the launcher log input is unbound"
+    );
+    Ok(())
+}
+
+fn assert_cached_layout(metadata: &Value, install: &Install) -> TestResult {
+    assert_eq!(
+        metadata.get("version"),
+        Some(&json!("1.0")),
+        "layout payload version"
+    );
+    assert_eq!(
+        metadata.get("layout"),
+        Some(&json!("zip64")),
+        "observed ZIP64 reader route"
+    );
+    assert_eq!(
+        metadata.get("declarationState"),
+        Some(&json!("available")),
+        "cached header availability is separate from lazy row checks"
+    );
+    assert_eq!(
+        metadata.get("sourceLength"),
+        Some(&json!(
+            std::fs::metadata(install.archive())?.len().to_string()
+        )),
+        "source length covers the immediately owning Archive"
+    );
+    assert_eq!(
+        metadata.get("v2"),
+        Some(&Value::Null),
+        "ZIP has no v2 declarations"
+    );
+    assert_eq!(
+        metadata.pointer("/zip/count"),
+        Some(&json!("6")),
+        "exact directory count"
+    );
+    assert_eq!(
+        metadata.pointer("/zip/end/disk"),
+        Some(&json!(65535)),
+        "original disk marker"
+    );
+    assert_eq!(
+        metadata.pointer("/zip/end/directoryOffset"),
+        Some(&json!(4_294_967_295_u32)),
+        "original ZIP64 offset marker"
+    );
+    assert_eq!(
+        metadata.pointer("/zip/zip64/entries"),
+        Some(&json!("6")),
+        "exact ZIP64 count"
+    );
+    assert_eq!(
+        metadata.pointer("/zip/installation"),
+        Some(&Value::Null),
+        "absent installation table"
     );
     Ok(())
 }

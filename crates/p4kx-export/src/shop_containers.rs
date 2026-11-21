@@ -1,15 +1,22 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::{BTreeMap, BTreeSet, HashMap};
 
 use p4kx_extraction::{Archive, CancelToken, Entry};
 use rayon::prelude::*;
 
 use crate::CatalogError;
-use crate::shop_container_scan::{Shops, shop_entities};
-use crate::shop_prefabs::Prefabs;
+use crate::catalog_read::original::EntryCapture;
+use crate::export_ledger::ExportLedger;
+use crate::shop_container_scan::{Scanned, shop_entities};
+use crate::shop_inventory_observations::InventoryObservations;
+use crate::shop_inventory_path::InventoryStem;
 use crate::starmap_index::key;
+
+#[cfg(test)]
+#[path = "shop_invalid_suffix_witness.rs"]
+mod invalid_suffix_witness;
 
 const SHOPS: &str = "data\\objectcontainers\\pu\\shops\\";
 const LOC: &str = "data\\objectcontainers\\pu\\loc\\";
@@ -60,7 +67,7 @@ pub(crate) enum Component {
     /// The component is there and names no inventory file.
     NoFile,
     /// The component names this file (lower-case stem).
-    File(String),
+    File(InventoryStem),
     /// The container's components for the Entity disagree.
     Conflict,
 }
@@ -69,6 +76,7 @@ pub(crate) enum Component {
 struct Named {
     classes: Vec<Class>,
     inventories: Vec<Component>,
+    observations: InventoryObservations,
     placed: bool,
     prefab: bool,
 }
@@ -80,8 +88,8 @@ pub(crate) fn verdict(states: &[Component]) -> Inventory<'_> {
     for state in states {
         match state {
             Component::File(stem) => match file {
-                Some(held) if held != stem => conflict = true,
-                _ => file = Some(stem),
+                Some(held) if held != stem.as_str() => conflict = true,
+                _ => file = Some(stem.as_str()),
             },
             Component::Conflict => conflict = true,
             Component::NotFound => not_found = true,
@@ -102,6 +110,10 @@ pub(crate) fn verdict(states: &[Component]) -> Inventory<'_> {
 /// name.
 #[derive(Debug, Default)]
 pub(crate) struct Containers {
+    pub(crate) ledger: ExportLedger,
+    #[cfg(test)]
+    pub(crate) soc_findings: Vec<crate::shop_container_scan::soc_subtypes::EntryFindings>,
+    pub(crate) unattributed_declarations: bool,
     by_entity: HashMap<String, Named>,
     pub(crate) listed: usize,
     pub(crate) unreadable: usize,
@@ -120,72 +132,90 @@ impl Containers {
     pub(crate) fn read(
         archive: &Archive,
         cancel: Option<&CancelToken>,
+        capture: &EntryCapture<'_>,
     ) -> Result<Self, CatalogError> {
         let listed = listed(archive);
-        let read: Vec<Option<(Shops, usize)>> = listed
-            .par_iter()
-            .map(|(entry, _)| {
-                if cancel.is_some_and(CancelToken::is_cancelled) {
-                    return None;
-                }
-                shop_entities(archive, entry)
-            })
-            .collect();
+        let mut containers = Self::default();
+        for window in listed.chunks(rayon::current_num_threads()) {
+            let scanned = window
+                .par_iter()
+                .map(|(entry, _)| {
+                    if cancel.is_some_and(CancelToken::is_cancelled) {
+                        return Err(CatalogError::Cancelled);
+                    }
+                    shop_entities(archive, entry, cancel, capture)
+                })
+                .collect::<Result<Vec<_>, CatalogError>>()?;
+            for ((_, class), entities) in window.iter().zip(scanned) {
+                containers.retain(class.as_ref(), entities)?;
+            }
+        }
         if cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
-        }
-        let mut containers = Self::default();
-        for ((_, class), entities) in listed.into_iter().zip(read) {
-            if class.is_some() {
-                containers.listed += 1;
-            } else {
-                containers.other_scanned += 1;
-            }
-            let Some((entities, rejected)) = entities else {
-                if class.is_some() {
-                    containers.unreadable += 1;
-                } else {
-                    containers.other_unreadable += 1;
-                }
-                continue;
-            };
-            containers.rejected += rejected;
-            if !entities.is_empty() {
-                if class.is_some() {
-                    containers.with_shop += 1;
-                } else {
-                    containers.other_with_shop += 1;
-                }
-            }
-            for (entity, inventory) in entities {
-                containers.components += usize::from(inventory != Component::NotFound);
-                let named = containers.by_entity.entry(entity).or_default();
-                named.placed = true;
-                if let Some(class) = &class
-                    && !named.classes.contains(class)
-                {
-                    named.classes.push(class.clone());
-                }
-                if !named.inventories.contains(&inventory) {
-                    named.inventories.push(inventory);
-                }
-            }
         }
         Ok(containers)
     }
 
-    /// Adds the inventory files the shop prefabs name as one more place per Entity.
-    pub(crate) fn add_prefabs(&mut self, prefabs: &Prefabs) {
-        for (entity, stems) in &prefabs.by_entity {
-            let named = self.by_entity.entry(entity.clone()).or_default();
-            named.prefab = true;
-            for stem in stems {
-                let state = Component::File(stem.clone());
-                if !named.inventories.contains(&state) {
-                    named.inventories.push(state);
-                }
+    fn retain(&mut self, class: Option<&Class>, scanned: Scanned) -> Result<(), CatalogError> {
+        if class.is_some() {
+            self.listed += 1;
+        } else {
+            self.other_scanned += 1;
+        }
+        self.ledger.merge(scanned.ledger);
+        #[cfg(test)]
+        self.soc_findings.extend(scanned.soc_findings);
+        self.unattributed_declarations |= scanned.unattributed_declarations;
+        let mut observations = scanned.observations;
+        let Some((entities, rejected)) = scanned.entities else {
+            if class.is_some() {
+                self.unreadable += 1;
+            } else {
+                self.other_unreadable += 1;
+            }
+            return Ok(());
+        };
+        self.rejected += rejected;
+        if !entities.is_empty() {
+            if class.is_some() {
+                self.with_shop += 1;
+            } else {
+                self.other_with_shop += 1;
             }
         }
+        for (entity, inventory) in entities {
+            self.components += usize::from(inventory != Component::NotFound);
+            let original = observations.remove(&entity);
+            let named = self.by_entity.entry(entity).or_default();
+            if let Some(original) = original {
+                named.observations.merge(original)?;
+            }
+            named.placed = true;
+            if let Some(class) = class
+                && !named.classes.contains(class)
+            {
+                named.classes.push(class.clone());
+            }
+            append_inventory(&mut named.inventories, inventory)?;
+        }
+        Ok(())
+    }
+
+    /// Moves the declared prefab inventories into each Entity and counts ambiguous selections.
+    pub(crate) fn add_prefabs(
+        &mut self,
+        inventories: HashMap<String, Vec<InventoryStem>>,
+    ) -> Result<usize, CatalogError> {
+        let mut ambiguous = 0;
+        for (entity, stems) in inventories {
+            let named = self.by_entity.entry(entity).or_default();
+            named.prefab = true;
+            for stem in stems {
+                append_inventory(&mut named.inventories, Component::File(stem))?;
+            }
+            ambiguous += usize::from(matches!(verdict(&named.inventories), Inventory::Ambiguous));
+        }
+        Ok(ambiguous)
     }
 
     /// Returns whether a prefab names the Entity and no container holds it.
@@ -216,6 +246,31 @@ impl Containers {
             .map_or(Inventory::None, |named| verdict(&named.inventories))
     }
 
+    pub(crate) fn inventory_observations(
+        &self,
+        entity: &str,
+    ) -> Option<(&[Component], &InventoryObservations)> {
+        self.by_entity
+            .get(entity)
+            .map(|named| (named.inventories.as_slice(), &named.observations))
+    }
+
+    pub(crate) fn inventory_selections(
+        &self,
+    ) -> Result<BTreeMap<&str, InventoryStem>, CatalogError> {
+        let mut paths: BTreeMap<&str, InventoryStem> = BTreeMap::new();
+        for state in self.by_entity.values().flat_map(|named| &named.inventories) {
+            if let Component::File(stem) = state {
+                if let Some(held) = paths.get_mut(stem.as_str()) {
+                    held.merge(stem)?;
+                } else {
+                    paths.insert(stem.as_str(), stem.clone());
+                }
+            }
+        }
+        Ok(paths)
+    }
+
     /// Returns the inventory file stems any container names, ordered.
     pub(crate) fn inventory_stems(&self) -> BTreeSet<&str> {
         self.by_entity
@@ -227,6 +282,17 @@ impl Containers {
             })
             .collect()
     }
+}
+
+fn append_inventory(states: &mut Vec<Component>, state: Component) -> Result<(), CatalogError> {
+    if let Some(held) = states.iter_mut().find(|held| **held == state) {
+        if let (Component::File(held), Component::File(incoming)) = (held, &state) {
+            held.merge(incoming)?;
+        }
+    } else {
+        states.push(state);
+    }
+    Ok(())
 }
 
 fn listed(archive: &Archive) -> Vec<(&Entry, Option<Class>)> {
@@ -278,7 +344,7 @@ mod tests {
     use super::{Component, Inventory, classify, verdict};
 
     fn file(stem: &str) -> Component {
-        Component::File(stem.to_owned())
+        Component::File(crate::shop_inventory_path::InventoryStem::accounting(stem))
     }
 
     #[test]

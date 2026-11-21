@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The playability of ships and items in the Basetool catalog, through the public API.
+//! The playability of ships and items in the P4KX catalog, through the public API.
 
 use crate::playability_fixture;
 
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
+use p4kx_export::catalog_queries::equipment::with_ship_sources;
+use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_export::{CatalogOptions, Playability, PlayabilityCounts, build_catalog};
 use p4kx_extraction::Archive;
 use playability_fixture::{Corrupt, write_archive_with};
@@ -18,16 +20,35 @@ type TestResult = Result<(), Box<dyn Error>>;
 const EXPORTED_AT: Duration = Duration::from_secs(1_792_000_000);
 
 fn catalog() -> Result<(p4kx_export::BuiltCatalog, Value), Box<dyn Error>> {
-    catalog_of(Corrupt::Nothing)
+    catalog_mode(
+        Corrupt::Nothing,
+        p4kx_export::CatalogPublicationMode::Normal,
+    )
 }
 
 fn catalog_of(corrupt: Corrupt) -> Result<(p4kx_export::BuiltCatalog, Value), Box<dyn Error>> {
+    catalog_mode(
+        corrupt,
+        p4kx_export::CatalogPublicationMode::DiagnosticPartial,
+    )
+}
+
+fn catalog_mode(
+    corrupt: Corrupt,
+    publication_mode: p4kx_export::CatalogPublicationMode,
+) -> Result<(p4kx_export::BuiltCatalog, Value), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let archive = Archive::open_with_key(
         write_archive_with(dir.path(), corrupt)?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let built = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT))?;
+    let built = build_catalog(
+        &archive,
+        &CatalogOptions {
+            publication_mode,
+            ..CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT)
+        },
+    )?;
     let json = serde_json::from_slice(built.json())?;
     Ok((built, json))
 }
@@ -35,8 +56,13 @@ fn catalog_of(corrupt: Corrupt) -> Result<(p4kx_export::BuiltCatalog, Value), Bo
 fn playability<'c>(catalog: &'c Value, kind: &str, class: &str) -> Result<&'c Value, String> {
     catalog[kind]
         .as_array()
-        .and_then(|list| list.iter().find(|entry| entry["className"] == class))
-        .map(|entry| &entry["playability"])
+        .and_then(|list| {
+            list.iter().find(|entry| {
+                crate::catalog_items::entity_field(entry, kind, "className").and_then(Value::as_str)
+                    == Some(class)
+            })
+        })
+        .and_then(|entry| crate::catalog_items::entity_field(entry, kind, "playability"))
         .ok_or_else(|| format!("{kind} {class} missing"))
 }
 
@@ -51,6 +77,9 @@ fn assert_ships(catalog: &Value, expected: &[(&str, Option<&str>)]) -> TestResul
     }
     Ok(())
 }
+
+#[path = "catalog_ship_playability_sdk.rs"]
+mod sdk;
 
 #[test]
 fn a_ship_without_ai_evidence_that_the_game_ships_is_a_player_ship() -> TestResult {

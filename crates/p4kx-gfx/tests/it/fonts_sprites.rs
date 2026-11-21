@@ -3,7 +3,7 @@
 
 //! Fonts with their glyphs, codes and layout, and sprites with their nested timelines.
 
-use p4kx_gfx::{FontFormat, GfxError, MAX_SPRITE_DEPTH, Movie, Point, ShapeRecord};
+use p4kx_gfx::{FontFormat, Movie, Point, ShapeRecord};
 use p4kx_testkit::{
     TestGlyph, TestMovie, TestShape, TestShapeRecord, TestSignature, font_name_body, font3_body,
     place_object2_body, sprite_body,
@@ -172,23 +172,81 @@ fn a_sprite_reads_its_timeline_and_its_nested_definitions() {
 }
 
 #[test]
-fn sprites_nested_deeper_than_the_limit_are_failures() {
-    let depth = usize::try_from(MAX_SPRITE_DEPTH).expect("small") + 2;
-    let mut body = sprite_body(1, 1, &[]);
+fn deeply_nested_sprite_definitions_and_following_tags_are_all_read() {
+    let depth = 512_u16;
+    let mut body = sprite_body(1, 1, &[(43, b"leaf\0".to_vec()), (1, Vec::new())]);
     for id in 2..=depth {
-        body = sprite_body(u16::try_from(id).expect("small"), 1, &[(39, body)]);
+        body = sprite_body(id, 1, &[(39, body)]);
     }
-    let movie = parse(&TestMovie::new(TestSignature::Gfx).tag(39, &body));
+    let movie = parse(
+        &TestMovie::new(TestSignature::Gfx)
+            .tag(39, &body)
+            .tag(43, b"after\0"),
+    );
     let assets = movie.assets();
-    assert_eq!(
-        assets.sprites.len(),
-        usize::try_from(MAX_SPRITE_DEPTH).expect("small"),
-        "read up to the limit"
-    );
-    assert_eq!(assets.failures.len(), 1, "one failure");
+    assert!(assets.failures.is_empty(), "{:?}", assets.failures);
     assert!(
-        matches!(assets.failures[0].error, GfxError::SpriteDepth { limit } if limit == MAX_SPRITE_DEPTH),
-        "{:?}",
-        assets.failures
+        assets
+            .sprites
+            .iter()
+            .map(|sprite| sprite.id)
+            .eq((1..=depth).rev()),
+        "every physical definition is retained in parent-first source order"
     );
+    let leaf = assets.sprites.last().expect("nested leaf");
+    assert_eq!(leaf.timeline.frame_of("leaf"), Some(0));
+    assert_eq!(leaf.timeline.frames, 1);
+    assert_eq!(assets.timeline.frame_of("after"), Some(0));
+    assert_eq!(
+        assets
+            .tag_counts
+            .iter()
+            .find(|tag| tag.code == 39)
+            .map(|tag| tag.count),
+        Some(u32::from(depth))
+    );
+}
+
+#[test]
+fn shorter_font_info_overrides_only_the_glyph_code_prefix_it_supplies() {
+    let glyphs = [
+        glyph(u16::from(b'D'), 12_000, 10_000),
+        glyph(u16::from(b'E'), 12_000, 10_000),
+        glyph(u16::from(b'F'), 12_000, 10_000),
+    ];
+    let all_codes = b"\x04\0\x01a\0ABC";
+    let first_code = b"\x04\0\x01b\0Z";
+    let only_style = b"\x04\0\x01c\0";
+    let input = TestMovie::new(TestSignature::Gfx)
+        .tag(75, &font3_body(4, "Original", &glyphs))
+        .tag(13, all_codes)
+        .tag(13, first_code)
+        .tag(13, only_style)
+        .bytes();
+    let movie = Movie::parse(input.clone()).expect("synthetic movie");
+    let observed = movie.assets_observed();
+    let font = observed.assets.fonts.first().expect("one font");
+    let codes: Vec<_> = font.glyphs.iter().filter_map(|glyph| glyph.code).collect();
+    assert_eq!(codes, [90, 66, 67], "the effective codes use both tags");
+    assert_eq!(font.name, "c", "last info supplies the name");
+
+    let origins = observed.origins.fonts.first().expect("font origins");
+    let name = origins.info.expect("font name override");
+    assert_eq!(
+        input.get(name.body.offset..name.body.end()),
+        Some(only_style.as_slice()),
+        "the latest tag supplied the name independently of the codes"
+    );
+    for (index, body) in [first_code.as_slice(), all_codes, all_codes]
+        .into_iter()
+        .enumerate()
+    {
+        let site = origins.glyph_code_override(index).expect("code override");
+        assert_eq!(site.ordinal, index, "index inside the accepted tag");
+        assert_eq!(
+            input.get(site.tag.body.offset..site.tag.body.end()),
+            Some(body),
+            "the retained code source for glyph {index}"
+        );
+    }
 }

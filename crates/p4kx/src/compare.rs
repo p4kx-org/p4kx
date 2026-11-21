@@ -6,10 +6,9 @@ use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 
 use anyhow::Result;
-use p4kx_channels::PublicPatches;
 use p4kx_comparison::{
     Archive, ArchiveError, CompareOptions, Comparison, DEFAULT_CONTEXT, DataForges,
-    DirectoryCounts, Filter, Levels, Side, compare, line_diff,
+    DirectoryCounts, Filter, Levels, Side, compare, compare_with_dataforge_entries, line_diff,
 };
 use thiserror::Error;
 
@@ -29,8 +28,8 @@ pub(crate) struct ReportNotWritten {
 }
 
 /// Compares both Archives, or prints the line diff of one Entry with `--diff`; writes the report
-/// when asked, prints the summary or the report as JSON, and returns 0 without differences and 1
-/// with differences, also when stdout was closed.
+/// when asked and prints the summary or the report as JSON. Exit code 1 means a difference or
+/// an incomparable Entry pair was found, including when stdout was closed.
 pub(crate) fn run(args: &CompareArgs, as_json: bool) -> Result<ExitCode> {
     let (old, new) = open_both(&args.old, &args.new)?;
     if let Some(path) = &args.diff {
@@ -44,7 +43,9 @@ pub(crate) fn run(args: &CompareArgs, as_json: bool) -> Result<ExitCode> {
         return schema::run(&old, &new, as_json);
     }
     let filter = args.filter.as_deref().map(Filter::parse).transpose()?;
-    let patches = (as_json || args.report.is_some()).then(PublicPatches::standard);
+    let patches = (as_json || args.report.is_some())
+        .then(crate::launcher_discovery::patches)
+        .transpose()?;
     let options = CompareOptions {
         levels: levels(args),
         filter: filter.as_ref(),
@@ -60,22 +61,57 @@ pub(crate) fn run(args: &CompareArgs, as_json: bool) -> Result<ExitCode> {
         .as_ref()
         .map(|(old, new)| dataforges::open_both(old, new))
         .transpose()?;
-    let both = forges.as_ref().map(|(old, new)| DataForges { old, new });
-    let comparison = compare(&old, &new, both, &options)?;
-    if let Some(path) = &args.report {
+    let comparison = match (&forge_entries, &forges) {
+        (Some((old_entry, new_entry)), Some((before, after)))
+            if as_json || args.report.is_some() =>
+        {
+            compare_with_dataforge_entries(
+                &old,
+                &new,
+                DataForges {
+                    old: before,
+                    new: after,
+                },
+                [old_entry, new_entry],
+                &options,
+            )
+        }
+        (_, Some((before, after))) => compare(
+            &old,
+            &new,
+            Some(DataForges {
+                old: before,
+                new: after,
+            }),
+            &options,
+        ),
+        _ => compare(&old, &new, None, &options),
+    }?;
+    write_output(&comparison, args.report.as_deref(), as_json)
+}
+
+fn write_output(
+    comparison: &Comparison<'_>,
+    report: Option<&Path>,
+    as_json: bool,
+) -> Result<ExitCode> {
+    if let Some(path) = report {
         comparison
             .save_report(path)
             .map_err(|source| ReportNotWritten {
-                path: path.clone(),
+                path: path.to_owned(),
                 source,
             })?;
     }
     let printed = if as_json {
-        json::print(&comparison)
+        json::print(comparison)
     } else {
-        print_summary(&comparison)
+        print_summary(comparison)
     };
-    finish(printed, comparison.has_differences())
+    finish(
+        printed,
+        comparison.has_differences() || !comparison.incomparable_entries().is_empty(),
+    )
 }
 
 /// Returns the exit code for a printed result, ignoring a closed stdout.
@@ -123,6 +159,10 @@ fn print_summary(comparison: &Comparison<'_>) -> io::Result<()> {
         write_line(&mut out, "Added", &counts.added.to_string())?;
         write_line(&mut out, "Removed", &counts.removed.to_string())?;
         write_line(&mut out, "Changed", &counts.changed.to_string())?;
+        let incomparable = comparison.incomparable_entries().len();
+        if incomparable != 0 {
+            write_line(&mut out, "Incomparable", &incomparable.to_string())?;
+        }
     }
     if comparison.levels().records {
         let counts = comparison.record_counts();

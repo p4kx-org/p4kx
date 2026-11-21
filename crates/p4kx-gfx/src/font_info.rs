@@ -21,15 +21,17 @@ pub(crate) struct FontInfo {
 }
 
 impl FontInfo {
-    /// Gives `font` the name, style and glyph codes.
-    pub(crate) fn apply(self, font: &mut Font) {
+    /// Gives `font` the name, style and glyph codes and returns the number of codes written.
+    pub(crate) fn apply(self, font: &mut Font) -> usize {
         font.name = self.name;
         font.bold = self.flags & INFO_BOLD != 0;
         font.italic = self.flags & INFO_ITALIC != 0;
         font.small_text = self.flags & INFO_SMALL_TEXT != 0;
+        let written = font.glyphs.len().min(self.codes.len());
         for (glyph, code) in font.glyphs.iter_mut().zip(self.codes) {
             glyph.code = Some(code);
         }
+        written
     }
 }
 

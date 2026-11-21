@@ -23,7 +23,11 @@ fn conversion_merges_a_split_texture_and_exports_its_largest_mip_once() -> TestR
     assert_eq!(report.converted(), Some(4), "every Entry of the texture");
     assert_eq!(
         files(&fixture.target)?,
-        ["Data/Textures/rock_diff.dds", "Data/Textures/rock_diff.png"],
+        [
+            "Data/Textures/rock_diff.dds",
+            "Data/Textures/rock_diff.dds.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.png",
+        ],
         "one DDS and one PNG, no parts"
     );
     assert_eq!(
@@ -78,7 +82,14 @@ fn merging_alone_writes_only_the_merged_dds() -> TestResult {
     let report = run_with(&fixture, ConflictPolicy::Skip, textures);
 
     assert!(report.is_complete(), "{report:?}");
-    assert_eq!(files(&fixture.target)?, ["Data/Textures/rock_diff.dds"]);
+    assert_eq!(
+        files(&fixture.target)?,
+        [
+            "Data/Textures/rock_diff.dds",
+            "Data/Textures/rock_diff.dds.p4kx-origin.jsonl"
+        ],
+        "merge-only output and its companion"
+    );
     assert_eq!(
         fixture.read("Data/Textures/rock_diff.dds")?,
         merged_layout(&rock())
@@ -105,6 +116,7 @@ fn keeping_raw_parts_with_the_merge_writes_the_parts_next_to_the_merged_dds() ->
             "Data/Textures/rock_diff.dds.1",
             "Data/Textures/rock_diff.dds.2",
             "Data/Textures/rock_diff.dds.3",
+            "Data/Textures/rock_diff.dds.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.png",
         ]
     );
@@ -237,8 +249,10 @@ fn a_texture_without_parts_and_other_entries_convert_alongside() -> TestResult {
         files(&fixture.target)?,
         [
             "Data/Textures/rock_diff.dds",
+            "Data/Textures/rock_diff.dds.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.png",
             "Data/UI/icon.DDS",
+            "Data/UI/icon.DDS.p4kx-origin.jsonl",
             "Data/UI/icon.png",
             "Data/readme.txt",
         ]

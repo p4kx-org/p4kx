@@ -30,13 +30,12 @@ fn model_paths(server: &mut Server, filter: &str) -> TestResult<Vec<String>> {
     Ok(found
         .get("entries")
         .and_then(Value::as_array)
-        .map(|entries| {
+        .map_or_default(|entries| {
             entries
                 .iter()
                 .filter_map(|entry| entry.get("path").and_then(Value::as_str).map(str::to_owned))
                 .collect()
-        })
-        .unwrap_or_default())
+        }))
 }
 
 fn first_model(server: &mut Server, filter: &str, bones: bool) -> TestResult<(String, Value)> {

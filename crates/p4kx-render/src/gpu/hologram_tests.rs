@@ -5,7 +5,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use super::probe::{self, Probe};
-use super::{Adapters, AssemblyDraw, Colours, Frame, Hologram, Look, Picture, Shading, Subject};
+use super::{AssemblyDraw, Colours, Frame, Hologram, Look, Picture, Shading, Subject};
 use crate::assembly::AssemblyScene;
 use crate::assembly::synthetic::{ship, stacked};
 use crate::{Camera, DrawList, HologramView};
@@ -75,8 +75,8 @@ fn frame_of(
     }
 }
 
-fn software(test: &str) -> Option<Probe> {
-    probe::open(test, Adapters::Software)
+fn open_probe(test: &str) -> Option<Probe> {
+    probe::open(test, probe::TEST_ADAPTERS)
 }
 
 fn pixel(picture: &Picture, x: u32, y: u32) -> [u8; 4] {
@@ -93,7 +93,7 @@ fn pixels(picture: &Picture) -> impl Iterator<Item = [u8; 4]> + '_ {
 }
 
 fn drawn(look: Hologram) -> Option<Picture> {
-    let mut offscreen = software("the hologram")?;
+    let mut offscreen = open_probe("the hologram")?;
     Some(
         offscreen
             .draw(&frame(SIZE, TRANSPARENT, look))
@@ -101,13 +101,14 @@ fn drawn(look: Hologram) -> Option<Picture> {
     )
 }
 
+#[cfg(not(target_os = "macos"))]
 #[test]
 #[expect(
     clippy::print_stderr,
     reason = "names the adapter in the log of the CI run"
 )]
 fn the_software_adapter_is_named() {
-    let Some(offscreen) = software("the_software_adapter_is_named") else {
+    let Some(offscreen) = open_probe("the_software_adapter_is_named") else {
         return;
     };
 
@@ -174,7 +175,7 @@ fn median_alpha(picture: &Picture, mask: &[bool]) -> u8 {
 
 #[test]
 fn the_silhouette_band_is_more_opaque_than_the_interior() {
-    let Some(mut offscreen) = software("the_silhouette_band") else {
+    let Some(mut offscreen) = open_probe("the_silhouette_band") else {
         return;
     };
     let from_above = frame_at(SIZE, TRANSPARENT, Hologram::default(), 70.0);
@@ -242,7 +243,7 @@ fn stacked_layers_climb_to_the_cap_and_stop_there() {
         glow: 0.0,
         ..Hologram::default()
     };
-    let Some(mut offscreen) = software("stacked_layers") else {
+    let Some(mut offscreen) = open_probe("stacked_layers") else {
         return;
     };
     let piled = frame_of(
@@ -267,7 +268,7 @@ fn stacked_layers_climb_to_the_cap_and_stop_there() {
 
 #[test]
 fn an_opaque_background_shows_through_the_body() {
-    let Some(mut offscreen) = software("an_opaque_background") else {
+    let Some(mut offscreen) = open_probe("an_opaque_background") else {
         return;
     };
     let background = [10, 20, 30, 255];

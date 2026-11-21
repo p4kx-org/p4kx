@@ -25,8 +25,7 @@ pub struct Regions {
     pub work_room: Option<Rect>,
     /// The `Ui` that holds what the work surface shows, whatever part of it is scrolled out.
     pub work_ui: Option<Id>,
-    /// The `Ui` of the content of each scroll area inside the work surface that was marked with
-    /// [`clip`], with the part of it that shows.
+    /// Content identifiers and visible rectangles of marked scroll areas inside the work surface.
     pub clips: Vec<(Id, Rect)>,
     /// The Entry list of the Browse tab, with its toolbar.
     pub list: Option<Rect>,

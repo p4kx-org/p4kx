@@ -29,6 +29,15 @@ impl BoneTransform {
 /// parent is already on the walk.
 #[must_use]
 pub fn chained_world_poses(bones: &[Bone]) -> Vec<BoneTransform> {
+    chained_world_poses_observing(bones, |_, _| {})
+}
+
+/// Composes the same poses and reports the actual parent used for each bone.
+#[must_use]
+pub fn chained_world_poses_observing(
+    bones: &[Bone],
+    mut observe: impl FnMut(usize, Option<usize>),
+) -> Vec<BoneTransform> {
     let mut poses: Vec<Option<BoneTransform>> = vec![None; bones.len()];
     let mut walking = vec![false; bones.len()];
     let mut chain = Vec::new();
@@ -54,7 +63,8 @@ pub fn chained_world_poses(bones: &[Bone]) -> Vec<BoneTransform> {
                 *flag = false;
             }
         }
-        let mut parent = at
+        let mut parent_index = at.filter(|index| poses.get(*index).is_some_and(Option::is_some));
+        let mut parent = parent_index
             .and_then(|index| poses.get(index).copied().flatten())
             .unwrap_or(BoneTransform::IDENTITY);
         for &index in chain.iter().rev() {
@@ -62,7 +72,9 @@ pub fn chained_world_poses(bones: &[Bone]) -> Vec<BoneTransform> {
                 continue;
             };
             let pose = parent.then(&bone.relative);
+            observe(index, parent_index);
             parent = pose;
+            parent_index = Some(index);
             if let Some(slot) = poses.get_mut(index) {
                 *slot = Some(pose);
             }

@@ -17,6 +17,7 @@ mod seen;
 mod tests;
 mod trie;
 mod walk;
+mod walk_frame;
 
 use std::cmp::Ordering;
 use std::fmt;
@@ -40,6 +41,13 @@ pub const MAX_FIELD_PATHS: usize = 1 << 20;
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum FieldStatisticsError {
+    /// A source-layout operation failed before complete statistics could be produced.
+    #[error("field statistics could not read a layout: {source}")]
+    Read {
+        /// The layout operation that failed.
+        #[source]
+        source: crate::DataForgeError,
+    },
     /// The Records have more distinct field paths than [`MAX_FIELD_PATHS`].
     #[error("the Records have more than {limit} distinct field paths")]
     TooManyPaths {
@@ -335,14 +343,15 @@ impl FieldStatistics {
         self.records
     }
 
-    /// Returns how many Records could not be read, or hold more values than a Record tree may.
+    /// Returns how many requested Record positions or root instances/layouts could not be read.
     #[must_use]
     pub const fn unreadable_records(&self) -> u64 {
         self.unreadable_records
     }
 
-    /// Returns how many values could not be read or reached: a bad text offset or array range, a
-    /// pointer to no instance, an instance owned twice, a struct nested too deep.
+    /// Returns the number of unreadable scalar occurrences and rejected nested source edges.
+    ///
+    /// Bad arrays, missing instances, unreadable layouts, repeated owners and inline cycles count.
     #[must_use]
     pub const fn unreadable_values(&self) -> u64 {
         self.unreadable_values

@@ -3,7 +3,9 @@
 
 //! Finding prefabs and libraries: dotted names, GUIDs, library names and unreadable libraries.
 
-use p4kx_assembly::{MAX_PREFAB_ISSUES, PrefabError, PrefabIssueKind, PrefabSet};
+use p4kx_assembly::{
+    MAX_PREFAB_ISSUES, PrefabError, PrefabIssueKind, PrefabLookupRoute, PrefabSet,
+};
 use p4kx_testkit::{TestEntry, TestPrefabLibrary, TestPrefabObject, prefab_guid};
 
 use crate::assembly_support::TestResult;
@@ -176,4 +178,99 @@ fn the_issue_list_is_bounded() -> TestResult {
     );
     assert_eq!(resolved.file, "test/rooms");
     Ok(())
+}
+
+#[test]
+fn provenance_retains_actual_guid_selection_instance_origins_and_empty_visits() -> TestResult {
+    let rooms = TestPrefabLibrary::new("test/rooms").prefab(
+        "hall",
+        vec![
+            TestPrefabObject::nested("moved", "test/props", "part", [2.0, 0.0, 0.0], IDENTITY)
+                .attribute("PrefabName", "test/rooms.hall"),
+            TestPrefabObject::nested("vacant", "test/props", "empty", [1.0, 0.0, 0.0], IDENTITY),
+        ],
+    );
+    let props = TestPrefabLibrary::new("test/props")
+        .prefab("part", vec![brush("bolt", [1.0, 0.0, 0.0])])
+        .prefab("empty", Vec::new());
+    with_archive(vec![rooms.entry(), props.entry()], |archive| {
+        let mut set = PrefabSet::with_object_sources(archive);
+        let resolved = set.resolve("test/rooms", "hall")?;
+        assert_eq!(resolved.prefabs, 3);
+        assert_eq!(resolved.objects.len(), 1);
+        let bolt = resolved.objects.first().ok_or("expanded leaf")?;
+        assert_eq!(bolt.world().translation(), [3.0, 0.0, 0.0]);
+        assert_eq!(bolt.location().prefab.file.file_name(), "test/props");
+        assert!(bolt.location().source().is_some());
+        let route = bolt.instance_route().ok_or("nested instance evidence")?;
+        assert!(route.parent().is_none());
+        let selection = route.selection();
+        assert_eq!(selection.object().prefab.file.file_name(), "test/rooms");
+        assert_eq!(selection.object().object_index, 0);
+        assert!(selection.object().source().is_some());
+        let link = selection.lookup();
+        assert_eq!(link.route(), PrefabLookupRoute::GuidIndex);
+        assert_eq!(
+            link.compared_name()
+                .ok_or("compared name")?
+                .file
+                .file_name(),
+            "test/rooms"
+        );
+        assert_eq!(
+            link.target().ok_or("GUID target")?.file.file_name(),
+            "test/props"
+        );
+        let source = resolved.source().ok_or("root resolution evidence")?;
+        assert!(set.source_entry(source.root().file).is_some());
+        assert_eq!(source.entered().len(), 2);
+        assert_eq!(
+            source
+                .entered()
+                .last()
+                .ok_or("empty visit evidence")?
+                .lookup()
+                .route(),
+            PrefabLookupRoute::NameAndGuid
+        );
+        Ok(())
+    })
+}
+
+#[test]
+fn an_unreadable_target_contributes_a_failed_attempt_without_a_target_payload() -> TestResult {
+    let room = TestPrefabLibrary::new("test/room").prefab(
+        "hall",
+        vec![
+            TestPrefabObject::nested("x", "test/broken", "p", [0.0; 3], IDENTITY)
+                .attribute("PrefabGUID", ""),
+        ],
+    );
+    let broken = TestEntry::stored(
+        "Data\\Prefabs\\test\\broken.xml",
+        b"<ObjectContainer/>".to_vec(),
+    );
+    with_archive(vec![room.entry(), broken], |archive| {
+        let index = archive
+            .entries()
+            .iter()
+            .find(|entry| entry.path().ends_with("broken.xml"))
+            .ok_or("broken Entry")?
+            .index();
+        let resolved = PrefabSet::with_object_sources(archive).resolve("test/room", "hall")?;
+        let kept = resolved.objects.first().ok_or("unexpanded object")?;
+        let lookup = kept.unexpanded_source().ok_or("lookup attempt evidence")?;
+        assert_eq!(lookup.route(), PrefabLookupRoute::UnmatchedName);
+        assert!(lookup.target().is_none());
+        assert_eq!(lookup.failed_entry_indices(), [index]);
+        let source = resolved.source().ok_or("resolution evidence")?;
+        assert_eq!(source.issues().len(), resolved.issues.len());
+        assert_eq!(source.issues().len(), 2);
+        assert!(source.issues().iter().all(|issue| {
+            issue
+                .object()
+                .is_some_and(|object| object.object_index == 0)
+        }));
+        Ok(())
+    })
 }

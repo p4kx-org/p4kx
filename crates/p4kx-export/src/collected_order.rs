@@ -1,0 +1,77 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use super::Collected;
+use crate::Kind;
+use crate::export_diagnostic::ExportSourceRole;
+use crate::guid_text::{CatalogGuid, sort_by_guid};
+
+impl Collected<'_> {
+    /// Orders the completed selection and retains category skip and failure identities.
+    pub(crate) fn finish_selection(&mut self) {
+        self.missing_blueprint_categories.extend(
+            self.ledger
+                .sources
+                .iter()
+                .filter(|source| {
+                    source.kind == Some(Kind::BlueprintCategories)
+                        && matches!(
+                            source.role,
+                            ExportSourceRole::Selected | ExportSourceRole::SelectionCandidate
+                        )
+                        && source.disposition.failed()
+                })
+                .map(|source| source.guid),
+        );
+        self.order();
+        self.resource_group_members
+            .sort_by_cached_key(|row| (row.physical.guid.text(), row.physical.record_index));
+    }
+
+    /// Orders the failures and the picked kinds by the text of the GUID.
+    pub(super) fn order(&mut self) {
+        self.order_failures();
+        crate::catalog_v3::medical::medical_tier_config::order(&mut self.medical_item_tier_configs);
+        self.inventory_containers
+            .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
+        self.explosion_definitions
+            .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
+        crate::catalog_v3::ammo_definition::order(&mut self.ammo_definitions);
+        sort_by_guid(&mut self.manufacturers, |entity| entity.guid);
+        self.factions
+            .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
+        sort_by_guid(&mut self.items, |entity| entity.identity.guid);
+        self.ships
+            .sort_by_cached_key(|ship| (ship.identity.guid.text(), ship.source_record_index));
+        sort_by_guid(&mut self.commodities, |entity| entity.guid);
+        self.resource_groups
+            .sort_by_cached_key(|row| (row.guid.text(), row.record_index));
+        sort_by_guid(&mut self.resource_types, |entity| entity.guid);
+        sort_by_guid(&mut self.blueprint_categories, |entity| entity.guid);
+        sort_by_guid(&mut self.blueprint_category_lists, |entity| entity.guid);
+        self.starmap_objects
+            .sort_by_cached_key(|row| (row.guid.text(), row.record_index));
+        self.starmap_definitions.order();
+        crate::contract::MineableElement::order(&mut self.mineable_elements);
+        crate::catalog_v3::mining_process_catalog::order_refining(&mut self.refining_processes);
+        crate::contract::MineableComposition::order(&mut self.mineable_compositions);
+        crate::catalog_v3::mining_process_catalog::order_globals(&mut self.mining_global_params);
+        self.mineable_entities.sort_by_cached_key(|row| {
+            (
+                row.source.guid.value().map(|guid| guid.text()),
+                row.source.record_index.value().copied(),
+            )
+        });
+        sort_by_guid(&mut self.crafters, |entity| entity.guid);
+        crate::contract::HarvestableProviderPreset::order(&mut self.harvestable_provider_presets);
+        sort_by_guid(&mut self.sub_harvestable_multi_configs, |entity| {
+            entity.guid
+        });
+        self.mission_kinds.order();
+        self.law.order();
+        self.location_vocabulary.order();
+        self.npc_spawn_definitions.order();
+        crate::catalog_v3::faction_identity_definition::order(&mut self.faction_identities);
+        self.loot_kinds.order();
+    }
+}

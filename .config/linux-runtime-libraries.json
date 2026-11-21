@@ -1,0 +1,258 @@
+{
+  "x86_64": [
+    {
+      "name": "musl",
+      "version": "1.2.5-r24",
+      "origin": "musl",
+      "recipe_commit": "fd05fc094264bce4fb76efc6c7f61ba4abfcb609",
+      "license": "MIT",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/musl-1.2.5-r24.apk",
+      "sha256": "d49d703392f1a6d2fe822db1b57e61735063077e1ad846d5f40d79fe507ec727"
+    },
+    {
+      "name": "musl-dev",
+      "version": "1.2.5-r24",
+      "origin": "musl",
+      "recipe_commit": "fd05fc094264bce4fb76efc6c7f61ba4abfcb609",
+      "license": "MIT",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/musl-dev-1.2.5-r24.apk",
+      "sha256": "9a45a27051991319c020abd2e4f300f01b85febd745634d9e71cdbf133363448"
+    },
+    {
+      "name": "zlib",
+      "version": "1.4-r0",
+      "origin": "zlib",
+      "recipe_commit": "0436c6d655a04cbfd7987202a970f5aa7870a901",
+      "license": "Zlib",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/zlib-1.4-r0.apk",
+      "sha256": "22ff5ae6b704ac1786d6565dcb3f5dde489e44a5038297a565382b76f656ee08"
+    },
+    {
+      "name": "zlib-dev",
+      "version": "1.4-r0",
+      "origin": "zlib",
+      "recipe_commit": "0436c6d655a04cbfd7987202a970f5aa7870a901",
+      "license": "Zlib",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/zlib-dev-1.4-r0.apk",
+      "sha256": "4531555c57b1208f0eaa8ef2eefcd2f53afc928d0794cce1c4989adfecf5198d"
+    },
+    {
+      "name": "zlib-static",
+      "version": "1.4-r0",
+      "origin": "zlib",
+      "recipe_commit": "0436c6d655a04cbfd7987202a970f5aa7870a901",
+      "license": "Zlib",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/zlib-static-1.4-r0.apk",
+      "sha256": "3ab561f1538672728a4f9e20018f3ee6e1107ba60fd593aedcb9d8cd3806d064"
+    },
+    {
+      "name": "zstd-dev",
+      "version": "1.5.7-r2",
+      "origin": "zstd",
+      "recipe_commit": "3c6e2ee2b16f403d53eab39c4426eb61f003c322",
+      "license": "BSD-3-Clause OR GPL-2.0-or-later",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/zstd-dev-1.5.7-r2.apk",
+      "sha256": "a956233bf93dc4f3cc814257938c4f185b83797e473b6656ae2dbb85d7fc3866"
+    },
+    {
+      "name": "zstd-libs",
+      "version": "1.5.7-r2",
+      "origin": "zstd",
+      "recipe_commit": "3c6e2ee2b16f403d53eab39c4426eb61f003c322",
+      "license": "BSD-3-Clause OR GPL-2.0-or-later",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/zstd-libs-1.5.7-r2.apk",
+      "sha256": "d5fcc58f7f071a5658d97b09838668e4443203217631992915b8e60656904104"
+    },
+    {
+      "name": "zstd-static",
+      "version": "1.5.7-r2",
+      "origin": "zstd",
+      "recipe_commit": "3c6e2ee2b16f403d53eab39c4426eb61f003c322",
+      "license": "BSD-3-Clause OR GPL-2.0-or-later",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/zstd-static-1.5.7-r2.apk",
+      "sha256": "d76fd1febaf9630d348d9e7c4ad6d8d00479087bb311b8827fb62de0e0e08bfb"
+    },
+    {
+      "name": "mimalloc2",
+      "version": "2.2.3-r2",
+      "origin": "mimalloc2",
+      "recipe_commit": "254024f3b0572339fd24fae8865a4e313239ba71",
+      "license": "MIT",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/community/x86_64/mimalloc2-2.2.3-r2.apk",
+      "sha256": "f378583a2471abcf79229b0c64a803f4a605b322aa2bd7a961a4556991e10d19"
+    },
+    {
+      "name": "mimalloc2-debug",
+      "version": "2.2.3-r2",
+      "origin": "mimalloc2",
+      "recipe_commit": "254024f3b0572339fd24fae8865a4e313239ba71",
+      "license": "MIT",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/community/x86_64/mimalloc2-debug-2.2.3-r2.apk",
+      "sha256": "bb1e98bc7ab3745be8c33dcf4f387c4b45259f347f3b2d3ec4b01df5caf6e337"
+    },
+    {
+      "name": "mimalloc2-dev",
+      "version": "2.2.3-r2",
+      "origin": "mimalloc2",
+      "recipe_commit": "254024f3b0572339fd24fae8865a4e313239ba71",
+      "license": "MIT",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/community/x86_64/mimalloc2-dev-2.2.3-r2.apk",
+      "sha256": "05584030fb1f35d8d52539721dbf06c1a88468bc2106a8c12990f773918ef556"
+    },
+    {
+      "name": "mimalloc2-insecure",
+      "version": "2.2.3-r2",
+      "origin": "mimalloc2",
+      "recipe_commit": "254024f3b0572339fd24fae8865a4e313239ba71",
+      "license": "MIT",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/community/x86_64/mimalloc2-insecure-2.2.3-r2.apk",
+      "sha256": "e0d2bda3473398425dac88029926f6760aa364b5fc8294f72805c60ce8c4111d"
+    },
+    {
+      "name": "gcc",
+      "version": "15.2.0-r2",
+      "origin": "gcc",
+      "recipe_commit": "7fa6e7fd3465c5ff89cc33a56d20bf4d59105aaf",
+      "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/gcc-15.2.0-r2.apk",
+      "sha256": "039886b6ad6e36a040a18db0ffa898f8ad1d0fc69eadd49d3c77270eafdc5e7e"
+    },
+    {
+      "name": "libgcc",
+      "version": "15.2.0-r2",
+      "origin": "gcc",
+      "recipe_commit": "7fa6e7fd3465c5ff89cc33a56d20bf4d59105aaf",
+      "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/libgcc-15.2.0-r2.apk",
+      "sha256": "4279d14cbf43311312d3a7d43619f4c15ede2e46d5608ba421ed157ded57c700"
+    }
+  ],
+  "aarch64": [
+    {
+      "name": "musl",
+      "version": "1.2.5-r24",
+      "origin": "musl",
+      "recipe_commit": "fd05fc094264bce4fb76efc6c7f61ba4abfcb609",
+      "license": "MIT",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/musl-1.2.5-r24.apk",
+      "sha256": "d7043c549029c98d438e9bc94213b006e5c88540eb58d1f5b0f0d1d56dbf9c98"
+    },
+    {
+      "name": "musl-dev",
+      "version": "1.2.5-r24",
+      "origin": "musl",
+      "recipe_commit": "fd05fc094264bce4fb76efc6c7f61ba4abfcb609",
+      "license": "MIT",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/musl-dev-1.2.5-r24.apk",
+      "sha256": "8e3a2e5b78069ebd1307cb092972de2f95deb0b21b866a788d1ac7d6972db43e"
+    },
+    {
+      "name": "zlib",
+      "version": "1.4-r0",
+      "origin": "zlib",
+      "recipe_commit": "0436c6d655a04cbfd7987202a970f5aa7870a901",
+      "license": "Zlib",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/zlib-1.4-r0.apk",
+      "sha256": "c9bc3c75104ffba5785277b38eb83bf90ea83539e3bb26c617864fb78dcb4462"
+    },
+    {
+      "name": "zlib-dev",
+      "version": "1.4-r0",
+      "origin": "zlib",
+      "recipe_commit": "0436c6d655a04cbfd7987202a970f5aa7870a901",
+      "license": "Zlib",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/zlib-dev-1.4-r0.apk",
+      "sha256": "0a3a7a4f23f1bc853d8aad7ab892e73b9b81f103fa74b53d427966db729ff399"
+    },
+    {
+      "name": "zlib-static",
+      "version": "1.4-r0",
+      "origin": "zlib",
+      "recipe_commit": "0436c6d655a04cbfd7987202a970f5aa7870a901",
+      "license": "Zlib",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/zlib-static-1.4-r0.apk",
+      "sha256": "88b41ba28000b841781875939cec705cbf3e84e9d60762381b94fc31ea14cab3"
+    },
+    {
+      "name": "zstd-dev",
+      "version": "1.5.7-r2",
+      "origin": "zstd",
+      "recipe_commit": "3c6e2ee2b16f403d53eab39c4426eb61f003c322",
+      "license": "BSD-3-Clause OR GPL-2.0-or-later",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/zstd-dev-1.5.7-r2.apk",
+      "sha256": "20b55b2e5e7854542dcb9bddb948029d12cfbda9f01e66b9fadc38968262a3a6"
+    },
+    {
+      "name": "zstd-libs",
+      "version": "1.5.7-r2",
+      "origin": "zstd",
+      "recipe_commit": "3c6e2ee2b16f403d53eab39c4426eb61f003c322",
+      "license": "BSD-3-Clause OR GPL-2.0-or-later",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/zstd-libs-1.5.7-r2.apk",
+      "sha256": "50a998e56e4bf31504996e49c1b4a23eed5e0cd4e24b8a1356a54daf1a6eabbe"
+    },
+    {
+      "name": "zstd-static",
+      "version": "1.5.7-r2",
+      "origin": "zstd",
+      "recipe_commit": "3c6e2ee2b16f403d53eab39c4426eb61f003c322",
+      "license": "BSD-3-Clause OR GPL-2.0-or-later",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/zstd-static-1.5.7-r2.apk",
+      "sha256": "a4c81cff4018928fbc3bf58519c4a916690b42fe860bf04378649425275ef75d"
+    },
+    {
+      "name": "mimalloc2",
+      "version": "2.2.3-r2",
+      "origin": "mimalloc2",
+      "recipe_commit": "254024f3b0572339fd24fae8865a4e313239ba71",
+      "license": "MIT",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/community/aarch64/mimalloc2-2.2.3-r2.apk",
+      "sha256": "7b7aa468b79e2bd94c7b2bd0dba385ffaf586068a8566daf6a94817f79fad8d1"
+    },
+    {
+      "name": "mimalloc2-debug",
+      "version": "2.2.3-r2",
+      "origin": "mimalloc2",
+      "recipe_commit": "254024f3b0572339fd24fae8865a4e313239ba71",
+      "license": "MIT",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/community/aarch64/mimalloc2-debug-2.2.3-r2.apk",
+      "sha256": "26e22ce0d30401e5a0e7853e47911dc887c3b6ffad11ac720006ee8cba96a6b0"
+    },
+    {
+      "name": "mimalloc2-dev",
+      "version": "2.2.3-r2",
+      "origin": "mimalloc2",
+      "recipe_commit": "254024f3b0572339fd24fae8865a4e313239ba71",
+      "license": "MIT",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/community/aarch64/mimalloc2-dev-2.2.3-r2.apk",
+      "sha256": "cbab7c2785a5b9eebda2e21b722f38b161d9f74e62a3dab47815be743c0c90a3"
+    },
+    {
+      "name": "mimalloc2-insecure",
+      "version": "2.2.3-r2",
+      "origin": "mimalloc2",
+      "recipe_commit": "254024f3b0572339fd24fae8865a4e313239ba71",
+      "license": "MIT",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/community/aarch64/mimalloc2-insecure-2.2.3-r2.apk",
+      "sha256": "6b2cdc962db568725b76102b4b08f14a8b2b62da804b68b0d8107471f82a709b"
+    },
+    {
+      "name": "gcc",
+      "version": "15.2.0-r2",
+      "origin": "gcc",
+      "recipe_commit": "7fa6e7fd3465c5ff89cc33a56d20bf4d59105aaf",
+      "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/gcc-15.2.0-r2.apk",
+      "sha256": "a06f4242b1e12a2449c1525a0e750c1503774de9e79db34f554b31241783ce48"
+    },
+    {
+      "name": "libgcc",
+      "version": "15.2.0-r2",
+      "origin": "gcc",
+      "recipe_commit": "7fa6e7fd3465c5ff89cc33a56d20bf4d59105aaf",
+      "license": "GPL-2.0-or-later AND LGPL-2.1-or-later",
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/libgcc-15.2.0-r2.apk",
+      "sha256": "eaaafda78fde1c904e1741680ddea91649f051e29a343152c8a4327605704b0f"
+    }
+  ]
+}

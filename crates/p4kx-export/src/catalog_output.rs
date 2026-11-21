@@ -8,7 +8,9 @@ use p4kx_extraction::CancelToken;
 use zstd::Encoder;
 
 use crate::CatalogError;
+use crate::catalog_rows::spool::RowSpoolError;
 use crate::contract::Catalog;
+use crate::options::{CatalogRun, CatalogStage};
 
 /// The zstd level a compressed catalog is written at.
 pub const ZSTD_LEVEL: i32 = 19;
@@ -57,6 +59,7 @@ pub(crate) struct Written<W> {
     pub(crate) sink: W,
     pub(crate) size: u64,
     pub(crate) compressed: Option<u64>,
+    pub(crate) staged_row_bytes: u128,
 }
 
 /// Serialises `catalog` as JSON followed by a newline into `out`, through the compression.
@@ -64,20 +67,26 @@ pub(crate) fn emit<W: Write>(
     catalog: &Catalog<'_>,
     out: W,
     compression: Compression,
-    cancel: Option<&CancelToken>,
+    run: CatalogRun<'_, '_>,
 ) -> Result<Written<W>, CatalogError> {
+    let cancel = run.options.cancel;
+    let staged_row_bytes = staged_row_bytes(catalog);
     match compression {
         Compression::None => {
+            run.begin(CatalogStage::WriteJson);
             let mut counted = Counting::new(out, cancel);
             write_json(catalog, &mut counted, cancel)?;
             Ok(Written {
                 size: counted.count,
                 sink: counted.inner,
                 compressed: None,
+                staged_row_bytes,
             })
         }
         Compression::Zstd { level } => {
+            run.begin(CatalogStage::MeasureJson);
             let length = measure(catalog, cancel)?;
+            run.begin(CatalogStage::WriteJson);
             let encoder =
                 encoder(Counting::new(out, None), level, length).map_err(CatalogError::Write)?;
             let mut counted = Counting::new(encoder, cancel);
@@ -88,9 +97,59 @@ pub(crate) fn emit<W: Write>(
                 size,
                 compressed: Some(packed.count),
                 sink: packed.inner,
+                staged_row_bytes,
             })
         }
     }
+}
+
+fn staged_row_bytes(catalog: &Catalog<'_>) -> u128 {
+    catalog.placements.staged_row_bytes()
+        + u128::from(catalog.loadouts.stored_bytes())
+        + u128::from(catalog.configurations.durability.stored_bytes())
+        + u128::from(catalog.declarations.entity_tags.stored_bytes())
+        + u128::from(
+            catalog
+                .declarations
+                .loot_entity_container_documents
+                .stored_bytes(),
+        )
+        + u128::from(catalog.definitions.items.stored_bytes())
+        + u128::from(catalog.definitions.blueprints.stored_bytes())
+        + u128::from(catalog.definitions.particle_libraries.stored_bytes())
+        + u128::from(catalog.definitions.flare_libraries.stored_bytes())
+        + u128::from(catalog.definitions.subsumption_events.stored_bytes())
+        + u128::from(catalog.definitions.contract_generators.stored_bytes())
+        + u128::from(catalog.definitions.contract_templates.stored_bytes())
+        + u128::from(catalog.definitions.mission_broker_entries.stored_bytes())
+        + u128::from(
+            catalog
+                .configurations
+                .entity_configurations
+                .alignment
+                .item_ports
+                .stored_bytes(),
+        )
+        + u128::from(
+            catalog
+                .configurations
+                .entity_configurations
+                .interactions
+                .stored_bytes(),
+        )
+        + u128::from(
+            catalog
+                .configurations
+                .entity_configurations
+                .item_bounds()
+                .stored_bytes(),
+        )
+        + u128::from(
+            catalog
+                .projections
+                .weapon_player_animation_candidates
+                .stored_bytes(),
+        )
 }
 
 fn encoder<'a, W: Write>(sink: W, level: i32, length: u64) -> io::Result<Encoder<'a, W>> {
@@ -103,6 +162,57 @@ fn encoder<'a, W: Write>(sink: W, level: i32, length: u64) -> io::Result<Encoder
     Ok(encoder)
 }
 
+fn take_row_spool_failure(catalog: &Catalog<'_>) -> Option<RowSpoolError> {
+    catalog
+        .placements
+        .take_row_spool_failure()
+        .or_else(|| catalog.loadouts.take_failure())
+        .or_else(|| catalog.configurations.durability.take_failure())
+        .or_else(|| catalog.declarations.entity_tags.take_failure())
+        .or_else(|| {
+            catalog
+                .declarations
+                .loot_entity_container_documents
+                .take_failure()
+        })
+        .or_else(|| catalog.definitions.items.take_failure())
+        .or_else(|| catalog.definitions.blueprints.take_failure())
+        .or_else(|| catalog.definitions.contract_generators.take_failure())
+        .or_else(|| catalog.definitions.contract_templates.take_failure())
+        .or_else(|| catalog.definitions.mission_broker_entries.take_failure())
+        .or_else(|| catalog.definitions.particle_libraries.take_failure())
+        .or_else(|| catalog.definitions.flare_libraries.take_failure())
+        .or_else(|| catalog.definitions.subsumption_events.take_failure())
+        .or_else(|| {
+            catalog
+                .configurations
+                .entity_configurations
+                .alignment
+                .item_ports
+                .take_failure()
+        })
+        .or_else(|| {
+            catalog
+                .configurations
+                .entity_configurations
+                .interactions
+                .take_failure()
+        })
+        .or_else(|| {
+            catalog
+                .configurations
+                .entity_configurations
+                .item_bounds()
+                .take_failure()
+        })
+        .or_else(|| {
+            catalog
+                .projections
+                .weapon_player_animation_candidates
+                .take_failure()
+        })
+}
+
 fn write_json(
     catalog: &Catalog<'_>,
     out: &mut impl Write,
@@ -111,6 +221,10 @@ fn write_json(
     let mut buffered = BufWriter::with_capacity(BUFFER, out);
     let written = serde_json::to_writer(&mut buffered, catalog)
         .map_err(|error| {
+            let failure = take_row_spool_failure(catalog);
+            if let Some(failure) = failure {
+                return CatalogError::from(failure);
+            }
             if error.is_io() {
                 CatalogError::Write(error.into())
             } else {

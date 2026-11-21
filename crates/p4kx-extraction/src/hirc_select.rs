@@ -8,6 +8,7 @@ use p4kx_audio::{HircKind, HircLayout, HircObject};
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::bank::Bank;
 use crate::hirc_view::ObjectView;
 
 /// How many objects of a whole bank the reader decodes, does not decode, does not support in the
@@ -90,6 +91,22 @@ pub fn select(
     }
 }
 
+/// Selects one page with checked physical source fields from the owning bank.
+#[must_use]
+pub fn select_with_sources(
+    bank: &Bank,
+    kind: Option<HircKind>,
+    id: Option<u32>,
+    offset: usize,
+    limit: usize,
+) -> ObjectPage<'_> {
+    let mut page = select(bank.soundbank().objects(), kind, id, offset, limit);
+    for object in &mut page.shown {
+        object.attach_source_fields(bank);
+    }
+    page
+}
+
 #[cfg(test)]
 mod tests {
     use p4kx_audio::Soundbank;
@@ -104,7 +121,7 @@ mod tests {
             .object(TestHircObject::sound(10, 100, 2, 4096))
             .object(TestHircObject::event(11, &[12]))
             .object(TestHircObject::sound(12, 101, 2, 4096))
-            .object(TestHircObject::raw(7, 13, [0; 4]))
+            .object(TestHircObject::raw(0xFE, 13, [0; 4]))
             .bytes()
     }
 

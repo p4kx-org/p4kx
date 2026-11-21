@@ -188,7 +188,11 @@ fn export(
         cancel: Some(cancel),
         ..QueryExportOptions::default()
     };
-    match export_query(&compiled, &compiled.run(), out, archive, &options) {
+    let run = compiled
+        .run_while(|| !cancel.is_cancelled())
+        .map_err(|error| failed(describe(&error)))?
+        .ok_or(Stopped::Cancelled)?;
+    match export_query(&compiled, &run, out, archive, &options) {
         Ok(export) => Ok(export),
         Err(QueryExportError::Cancelled) => Err(Stopped::Cancelled),
         Err(error) => Err(failed(describe(&error))),

@@ -6,11 +6,11 @@ use std::process::ExitCode;
 
 use anyhow::Result;
 use p4kx_extraction::Bank;
-use p4kx_extraction::hirc_select::{LayoutCounts, ObjectPage, select};
+use p4kx_extraction::hirc_select::{LayoutCounts, ObjectPage, select_with_sources};
 use p4kx_extraction::hirc_view::ObjectView;
 use serde::Serialize;
 
-use crate::bnk::open;
+use crate::bnk::{self, open};
 use crate::bnk_objects_text::write_object;
 use crate::cli::BnkObjectsArgs;
 use crate::{exit, json};
@@ -31,11 +31,15 @@ struct ObjectsJson<'a> {
 
 /// Runs `p4kx bnk objects`.
 pub(crate) fn run(args: &BnkObjectsArgs, as_json: bool) -> Result<ExitCode> {
-    let bank = open(&args.source)?;
+    let bank = if as_json {
+        bnk::open_observed(&args.source)?
+    } else {
+        open(&args.source)?
+    };
     let objects = bank.soundbank().objects();
     let offset = usize::try_from(args.offset)?;
     let limit = usize::try_from(args.limit)?;
-    let page = select(objects, args.kind, args.id, offset, limit);
+    let page = select_with_sources(&bank, args.kind, args.id, offset, limit);
     let counts = LayoutCounts::of(objects);
     if as_json {
         json::print(&ObjectsJson {

@@ -24,7 +24,7 @@ const PER_ITEM_COMPONENTS: [&str; 4] = [
     "SActorUsableParams",
 ];
 
-/// What the items of one variant group share (`docs/basetool-catalog.md`).
+/// What the items of one variant group share (`docs/catalog.md`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) struct ItemKey<'f> {
     kind: &'f str,
@@ -104,3 +104,7 @@ impl<H: Hasher> io::Write for HasherWriter<'_, H> {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "item_variant_stats_tests.rs"]
+mod stats_tests;

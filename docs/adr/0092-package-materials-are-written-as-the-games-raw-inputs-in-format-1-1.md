@@ -18,9 +18,12 @@ stay next to it.
 the layers (`MatLayers`, all attributes), the shader parameters (`PublicParams`), every other
 attribute of the material, the attributes and child elements of each texture slot (`TexMod`
 carries the UV tiling and offset) and every other child element, as name and text value in file
-order. Elements are kept to a depth of 8 and a count of 4096 per material, layers to 64, as the
-file is untrusted. Beyond a limit the reader cuts off and records it (`Material::truncated`, an
-issue in the package); it never fails the file, so `entity glb` loses no material to it.
+order. Texture slots and layers retain all admitted original occurrences, including empty and
+repeated layers. Raw unknown element fragments retain the separate depth-8 and count-4096
+budgets; they do not charge or cut typed layer declarations. A raw-fragment cut is recorded in
+`Material::truncated` and as a package issue. Retained authored syntax and layer companion reads
+have their own explicit budgets; these are not file-format maxima or reasons to hide complete
+advertised layer fields.
 Descriptions are keyed by library path and index, with the model's folder for a bare library name. A parameter, attribute or element the writer has never heard of is therefore
 in the package, unchanged: no list of known parameters has to be maintained for a new game
 version. The few values importers always need as numbers (`TintColor`, `WearTint`, `UVTiling`,

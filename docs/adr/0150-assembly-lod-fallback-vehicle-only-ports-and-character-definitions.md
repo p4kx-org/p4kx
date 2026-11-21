@@ -1,4 +1,4 @@
-# An Assembly reads the lowest level when none is low enough, lists the ports only the vehicle declares and draws the skin of a character definition
+# An Assembly reads the lowest level when none is low enough, lists the ports only the vehicle declares and selects the model of a character definition
 
 Decided for issue #375. Amends ADR-0028, which rejected a fallback from a missing level of detail,
 and ADR-0040. Evidence: `crates/p4kx-assembly/tests/real_archive/real_followups.rs` over ten ships of
@@ -26,15 +26,27 @@ visibility that of the part. `skipPart` parts stay out. The ports count in `port
 
 ## Character definitions
 
-A geometry that is a `.cdf` is a `CharacterDefinition`: a skeleton (`Model File`, a `.chr`
-without meshes) and an `AttachmentList` of skins (`CA_SKIN`) and bone attachments (`CA_BONE`,
-usually a `.cga`). The provider reads the definition (at most 1 MiB), takes the binding of its
-first skin attachment, else of its first attachment, and reads that file as the part's model; the
-attachment's `Material`, if any, replaces the library the model names. The files of the other
-attachments are not drawn and are listed in the issue `attachments_left_out`, once per
-definition. A bone attachment needs a second model per part, placed at a bone of the skeleton;
-that is not decided here. A definition that names nothing, another definition or a missing file
-is `geometry_unreadable`.
+Main model selection updated for #1088.
+
+A geometry that is a `.cdf` is a `CharacterDefinition`. It can contain a `Model File` declaration
+and an ordered `AttachmentList`. The declaration may supply drawable geometry and a skeleton.
+The provider reads the definition (at most 1 MiB) and selects the part's model in this order:
+
+1. The first `CA_SKIN` with a nonempty `Binding`.
+2. With no bound skin, the declared `Model File` when the normal model read supplies
+   a drawable submesh at the retained LOD.
+3. The first attachment with a nonempty `Binding`, or the declared `Model File`
+   when there are no bound attachments.
+
+An attachment supplying the part's model may override its material library with `Material`.
+The attachment pass excludes that selected occurrence. When `Model File` supplies the model,
+all readable bound bone attachments are placed independently. Empty bindings add no model.
+See [ADR-0257](0257-the-bone-attachments-of-a-character-definition-are-models-the-part-carries-at-its-bones.md).
+
+A definition with no candidate, a selected nested definition or a missing selected attachment
+is `geometry_unreadable`. Independent validation of the declared file retains the skeleton
+diagnostics and fatal Archive-key handling described in
+[ADR-0255](0255-the-skeleton-of-a-character-definition-is-checked-and-a-creature-without-files-is-a-listed-gap.md).
 
 ## Smaller changes
 

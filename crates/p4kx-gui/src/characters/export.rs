@@ -8,7 +8,8 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use p4kx_assembly::{ArchiveModels, Armour};
 use p4kx_blender::PackageSummary;
 use p4kx_extraction::{
-    CancelToken, ConversionError, GlbOptions, GlbSummary, GltfError, MaterialMode, write_replacing,
+    ArchiveWriteProtection, CancelToken, ConversionError, GlbOptions, GlbSummary, GltfError,
+    MaterialMode, write_replacing_protected,
 };
 use p4kx_settings::ModelMaterials;
 
@@ -316,27 +317,33 @@ fn run(index: &EntryIndex, request: &Request, cancel: &CancelToken, written: &At
         cancel,
     };
     let options = request.options();
-    let outcome = write_replacing(&request.file, |writer| {
-        let mut observed = Observed {
-            inner: writer,
-            cancel,
-            written,
-        };
-        request
-            .armour
-            .write_glb_with(&options, &textures, &mut observed)
-            .map_err(|error| match error {
-                GltfError::Write(_) if cancel.is_cancelled() => ConversionError::Cancelled,
-                GltfError::Write(source) => ConversionError::Write {
-                    path: request.file.clone(),
-                    source,
-                },
-                source => ConversionError::Glb {
-                    file: request.name.clone(),
-                    source,
-                },
-            })
-    });
+    let protection = match ArchiveWriteProtection::new(index.path(), cancel.flag()) {
+        Ok(protection) => protection,
+        Err(error) if error.is_cancelled() => return Ended::Cancelled,
+        Err(error) => return Ended::Failed(ModelExportFailure::Refused(error)),
+    };
+    let outcome =
+        write_replacing_protected(&request.file, Some(&protection), Some(cancel), |writer| {
+            let mut observed = Observed {
+                inner: writer,
+                cancel,
+                written,
+            };
+            request
+                .armour
+                .write_glb_with(&options, &textures, &mut observed)
+                .map_err(|error| match error {
+                    GltfError::Write(_) if cancel.is_cancelled() => ConversionError::Cancelled,
+                    GltfError::Write(source) => ConversionError::Write {
+                        path: request.file.clone(),
+                        source,
+                    },
+                    source => ConversionError::Glb {
+                        file: request.name.clone(),
+                        source,
+                    },
+                })
+        });
     match outcome {
         Ok(summary) => Ended::Written(Box::new(CharacterExportSummary {
             file: request.file.clone(),

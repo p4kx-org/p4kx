@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File};
 use std::io::{self, BufWriter};
 use std::num::NonZeroUsize;
 use std::path::{Path, PathBuf};
@@ -57,6 +57,18 @@ pub struct QueryExport {
 #[derive(Debug, Error)]
 #[non_exhaustive]
 pub enum QueryExportError {
+    /// Ownership capture or verified cleanup failed without losing its typed cause.
+    #[error(transparent)]
+    OwnedOutput(Box<p4kx_guard::OwnedOutputError>),
+    /// An unpublished output could not be removed after completion or failure.
+    #[error("owned output cleanup failed: {cleanup}")]
+    CleanupFailed {
+        /// The original failure when one preceded cleanup.
+        #[source]
+        primary: Option<Box<dyn std::error::Error + Send + Sync>>,
+        /// The separate cleanup failure.
+        cleanup: Box<p4kx_guard::OwnedOutputCleanupError>,
+    },
     /// The export was cancelled; the target is unchanged.
     #[error("the export was cancelled")]
     Cancelled,
@@ -72,9 +84,9 @@ pub enum QueryExportError {
         #[source]
         source: io::Error,
     },
-    /// The target lies inside a Star Citizen installation; nothing is written there.
+    /// Source or target protection refused the write.
     #[error(transparent)]
-    Installation(#[from] p4kx_guard::WriteRefused),
+    Installation(p4kx_guard::WriteProtectionError),
 }
 
 /// Writes the result of `run`, selected by `query` over the Archive at `archive`, to the file
@@ -97,36 +109,60 @@ pub fn export_query(
     archive: &Path,
     options: &QueryExportOptions<'_>,
 ) -> Result<QueryExport, QueryExportError> {
+    if options.cancel.is_some_and(CancelToken::is_cancelled) {
+        return Err(QueryExportError::Cancelled);
+    }
     if is_same_file(out, archive) {
         return Err(QueryExportError::OutputIsArchive(out.to_path_buf()));
     }
-    p4kx_guard::ensure_writable(out)?;
+    let protection = crate::ArchiveWriteProtection::new(
+        archive,
+        crate::output_file::cancel_flag(options.cancel),
+    )?;
+    crate::check_protected_output(out, Some(&protection), options.cancel)?;
     let write_error = |source| QueryExportError::Write {
         path: out.to_path_buf(),
         source,
     };
     let temporary = temporary_path(out).map_err(write_error)?;
-    let file = OpenOptions::new()
-        .write(true)
-        .create_new(true)
-        .open(&temporary)
-        .map_err(write_error)?;
+    crate::check_protected_output(&temporary, Some(&protection), options.cancel)?;
+    let (file, ownership) = crate::create_output_file(
+        &temporary,
+        Some(&protection),
+        crate::output_file::cancel_flag(options.cancel),
+    )
+    .map_err(|error| match error {
+        crate::OwnedOutputError::Io { source, .. } => write_error(source),
+        other => other.into(),
+    })?
+    .into_parts();
     let result = write_rows(query, run, file, format, options).and_then(|(file, export)| {
         file.sync_all()?;
+        ownership
+            .ensure_writable(&temporary, crate::output_file::cancel_flag(options.cancel))
+            .map_err(Stop::Protection)?;
+        protection
+            .ensure_writable(out, crate::output_file::cancel_flag(options.cancel))
+            .map_err(Stop::Protection)?;
         fs::rename(&temporary, out)?;
         Ok(export)
     });
-    if result.is_err() {
-        let _ignored = fs::remove_file(&temporary);
-    }
-    result.map_err(|stop| match stop {
+    let result = result.map_err(|stop| match stop {
         Stop::Cancelled => QueryExportError::Cancelled,
         Stop::Io(source) => write_error(source),
-    })
+        Stop::Protection(error) if error.is_cancelled() => QueryExportError::Cancelled,
+        Stop::Protection(error) => QueryExportError::Installation(error),
+    });
+    if result.is_err() {
+        crate::output_cleanup::query(result, &ownership, &temporary, options.cancel)
+    } else {
+        result
+    }
 }
 
 /// Why writing the rows stopped early.
 enum Stop {
+    Protection(p4kx_guard::WriteProtectionError),
     Cancelled,
     Io(io::Error),
 }

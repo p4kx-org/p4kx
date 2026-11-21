@@ -1,6 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+/// Physical CAF and DBA headers independent of rendering choices.
+#[path = "animation_catalogue_headers.rs"]
+pub mod headers;
+
 use std::path::{Path, PathBuf};
 
 use p4kx_model::AnimationHeader;

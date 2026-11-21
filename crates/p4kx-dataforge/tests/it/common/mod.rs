@@ -117,7 +117,7 @@ pub(crate) fn database() -> Vec<u8> {
 /// Returns the last part of each selected record path, `!` behind a Record that failed.
 pub(crate) fn names(forge: &DataForge<'_>, text: &str) -> Result<Vec<String>, Box<dyn Error>> {
     let compiled = Query::parse(text)?.compile(forge)?;
-    let run = compiled.run();
+    let run = compiled.run()?;
     let mut names = Vec::new();
     for page in run.pages(NonZeroUsize::MIN.saturating_add(63)) {
         for row in page {

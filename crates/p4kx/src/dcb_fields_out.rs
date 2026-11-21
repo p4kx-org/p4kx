@@ -174,14 +174,8 @@ fn cells(field: &FieldStat) -> [String; COLUMNS] {
         field.records().to_string(),
         field.empty().to_string(),
         distinct,
-        field
-            .min()
-            .map(|number| number.to_string())
-            .unwrap_or_default(),
-        field
-            .max()
-            .map(|number| number.to_string())
-            .unwrap_or_default(),
+        field.min().map_or_default(|number| number.to_string()),
+        field.max().map_or_default(|number| number.to_string()),
     ]
 }
 

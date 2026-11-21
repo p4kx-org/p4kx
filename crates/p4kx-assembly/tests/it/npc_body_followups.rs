@@ -7,11 +7,15 @@
 use std::error::Error;
 
 use p4kx_assembly::{
-    ArchiveModels, Assembly, AssemblyOptions, EntityNode, Geometry, LoadoutResolver,
+    ArchiveModels, Assembly, AssemblyOptions, EntityNode, ForgePalettes, Geometry, LoadoutResolver,
+    PaletteSelection,
 };
 use p4kx_dataforge::DataForge;
-use p4kx_extraction::{Archive, DataForgeEntry};
-use p4kx_testkit::{DataForgeBuilder, TestEntity, TestEntry, TestModel, TestPort, entity_schema};
+use p4kx_extraction::{Archive, DataForgeEntry, SourceLocation};
+use p4kx_testkit::{
+    DataForgeBuilder, TestEntity, TestEntry, TestModel, TestPort, entity_schema,
+    tint_palette_record,
+};
 
 use crate::assembly_support::{TestResult, fixture};
 
@@ -22,6 +26,7 @@ const JACKET: u128 = 0x3000;
 const VISOR: u128 = 0x3100;
 const COAT: u128 = 0x3200;
 const TROUSERS: u128 = 0x3300;
+const JACKET_PALETTE: u128 = 0x4000;
 const BOX: &str = "Objects/Test/box.cgf";
 const CUBE: &str = "Objects/Test/cube.cgf";
 
@@ -35,6 +40,7 @@ fn records() -> Vec<TestEntity> {
         .geometry(CUBE, None);
     let jacket = worn(JACKET, "TEST_Jacket", "Char_Clothing_Torso_1")
         .geometry(BOX, Some("Objects/Test/box.mtl"))
+        .palette(JACKET_PALETTE, "")
         .geometry_variant("Male", CUBE, None)
         .geometry_variant("Female", "Objects/Test/jacket_f.skin", None);
     let visor = worn(VISOR, "TEST_Visor", "Char_Clothing_Hat")
@@ -65,6 +71,13 @@ fn database() -> Vec<u8> {
         .fold(entity_schema(DataForgeBuilder::new()), |builder, entity| {
             builder.record(entity.record())
         })
+        .record(tint_palette_record(
+            JACKET_PALETTE,
+            "jacket",
+            [[255, 0, 0]; 3],
+            [255; 3],
+            [200; 3],
+        ))
         .build()
 }
 
@@ -137,8 +150,7 @@ fn the_body_and_the_head_that_names_it_are_found_in_the_tree() -> TestResult {
     Ok(())
 }
 
-#[test]
-fn a_missing_body_variant_file_is_reported_with_the_body_and_the_path() -> TestResult {
+fn assemble_man() -> Result<(Assembly, u32), Box<dyn Error>> {
     let model = TestModel::cube();
     let fixture = fixture(vec![
         TestEntry::zstd("Data\\Game2.dcb", database()),
@@ -148,13 +160,45 @@ fn a_missing_body_variant_file_is_reported_with_the_body_and_the_path() -> TestR
     let archive = Archive::open(&fixture.path)?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
-    let mut resolver = LoadoutResolver::new(&forge);
+    let mut resolver = LoadoutResolver::new(&forge).with_forge_entry(&entry);
     let record = resolver.entities().find("TEST_Man")?;
     let tree = resolver.resolve(&record)?;
+    let jacket = child(&tree, "torso")?
+        .record_index()
+        .ok_or("the jacket Record")?;
     let models = ArchiveModels::new(&archive);
+    let assembly = Assembly::build_with_palettes(
+        &tree,
+        &models,
+        &ForgePalettes::new(&forge).with_entry(&entry),
+        &AssemblyOptions::default(),
+    )?;
+    Ok((assembly, jacket))
+}
 
-    let assembly = Assembly::build(&tree, &models, &AssemblyOptions::default())?;
+#[test]
+fn a_body_variant_uses_the_original_main_palette_field_when_unset() -> TestResult {
+    let (assembly, jacket) = assemble_man()?;
+    let torso = assembly.part_at("torso").ok_or("the worn jacket")?;
+    assert_eq!(torso.geometry(), Some(CUBE));
+    assert_eq!(
+        torso.palette().map(|palette| palette.primary.tint),
+        Some([1.0, 0.0, 0.0])
+    );
+    let source = torso.palette_source().ok_or("the selected main palette")?;
+    assert_eq!(source.inherited_from(), None);
+    assert!(matches!(
+        source.selection(),
+        PaletteSelection::Named {
+            location: Some(SourceLocation::DataForge { record_index, field })
+        } if *record_index == jacket && field == "Components[0].Geometry.Geometry.Palette.RootRecord"
+    ));
+    Ok(())
+}
 
+#[test]
+fn a_missing_body_variant_file_is_reported_with_the_body_and_the_path() -> TestResult {
+    let (assembly, _) = assemble_man()?;
     let legs: Vec<_> = assembly
         .issues()
         .iter()

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The links of the ship spawns and location queries of contracts in the Basetool catalog of a
+//! The links of the ship spawns and location queries of contracts in the P4KX catalog of a
 //! real Archive.
 
 use std::collections::HashSet;
@@ -24,7 +24,7 @@ const KNOWN_DANGLING: &str = "NorthRock_Bounty";
 pub(crate) fn check_spawn_links(catalog: &Value) -> TestResult {
     let pools = guids(catalog, "contractShipSpawns")?;
     let queries = guids(catalog, "contractLocationQueries")?;
-    for contract in catalog["contracts"].as_array().ok_or("contracts")? {
+    for contract in crate::real_archive_contracts::v3::rows(catalog)? {
         for link in contract["shipSpawns"].as_array().ok_or("shipSpawns")? {
             let guid = link["poolGuid"].as_str().ok_or("poolGuid")?;
             assert!(pools.contains(guid), "ship spawn pool {guid}");
@@ -61,11 +61,10 @@ fn the_spawn_links_of_a_real_archive_resolve() -> TestResult {
     let catalog: Value = serde_json::from_slice(built.json())?;
     check_spawn_links(&catalog)?;
     let count = |kind: &str| catalog[kind].as_array().map_or(0, Vec::len);
+    let contracts = crate::real_archive_contracts::v3::rows(&catalog)?;
     let links = |field: &str| -> usize {
-        catalog["contracts"]
-            .as_array()
-            .into_iter()
-            .flatten()
+        contracts
+            .iter()
             .map(|contract| contract[field].as_array().map_or(0, Vec::len))
             .sum()
     };

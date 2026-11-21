@@ -47,7 +47,12 @@ fn every_mapped_store_slug_resolves_to_a_ship_of_the_archive() -> Result<(), Box
         .as_array()
         .ok_or("ships")?
         .iter()
-        .filter_map(|ship| Some((ship["guid"].as_str()?, ship["className"].as_str()?)))
+        .filter_map(|ship| {
+            Some((
+                ship["guid"]["value"].as_str()?,
+                ship["className"]["value"].as_str()?,
+            ))
+        })
         .collect();
     let slugs = catalog["shipStoreSlugs"]
         .as_array()

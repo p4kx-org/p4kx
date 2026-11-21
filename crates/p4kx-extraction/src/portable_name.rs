@@ -39,6 +39,9 @@ pub enum NameRule {
     /// The part is a Windows device name, with or without an extension.
     #[error("the name is a Windows device name")]
     DeviceName,
+    /// The part is reserved for an origin publication lock.
+    #[error("the name is reserved for the origin publication lock")]
+    ReservedOriginLock,
     /// The part is longer than [`MAX_PART_BYTES`] in UTF-8, which also bounds it in UTF-16 units.
     #[error("the name is {0} bytes in UTF-8, more than {MAX_PART_BYTES}")]
     TooManyBytes(usize),

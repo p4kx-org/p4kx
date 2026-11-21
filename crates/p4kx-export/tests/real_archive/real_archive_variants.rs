@@ -1,17 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The variant groups of ships and items in the Basetool catalog of a real Archive; runs with
+//! The variant groups of ships and items in the P4KX catalog of a real Archive; runs with
 //! `--ignored` when `P4KX_DATA_P4K` names one.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::error::Error;
 use std::time::SystemTime;
 
-use p4kx_export::{CatalogOptions, build_catalog};
+use p4kx_export::{CatalogOptions, Kind as CatalogKind, build_catalog};
 use p4kx_extraction::Archive;
 use p4kx_testkit::real_archive_path;
 use serde_json::Value;
+
+use crate::catalog_v3_consumer;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -28,20 +30,29 @@ fn print_line(line: &str) {
 }
 
 struct Kind<'c> {
-    name: &'static str,
+    name: CatalogKind,
     entries: &'c [Value],
 }
 
 impl Kind<'_> {
-    fn class(entry: &Value) -> &str {
-        entry["className"].as_str().unwrap_or_default()
+    fn class(entry: &Value, kind: CatalogKind) -> &str {
+        catalog_v3_consumer::field(entry, kind, "className")
+            .ok()
+            .and_then(Value::as_str)
+            .unwrap_or_default()
+    }
+
+    fn guid<'row>(&self, entry: &'row Value) -> Option<&'row str> {
+        catalog_v3_consumer::field(entry, self.name, "guid")
+            .ok()
+            .and_then(Value::as_str)
     }
 
     fn groups(&self) -> BTreeMap<&str, Vec<&Value>> {
         let by_guid: HashMap<&str, &Value> = self
             .entries
             .iter()
-            .filter_map(|entry| Some((entry["guid"].as_str()?, entry)))
+            .filter_map(|entry| Some((self.guid(entry)?, entry)))
             .collect();
         let mut groups: BTreeMap<&str, Vec<&Value>> = BTreeMap::new();
         for entry in self.entries {
@@ -81,7 +92,7 @@ impl Kind<'_> {
             let classes: Vec<&str> = members
                 .iter()
                 .take(MEMBERS)
-                .map(|m| Self::class(m))
+                .map(|m| Self::class(m, self.name))
                 .collect();
             print_line(&format!(
                 "  {} members, base {}: {}",
@@ -97,7 +108,7 @@ impl Kind<'_> {
         let grouped: HashSet<&str> = groups
             .values()
             .flatten()
-            .filter_map(|entry| entry["guid"].as_str())
+            .filter_map(|entry| self.guid(entry))
             .collect();
         let stem = |class: &str| {
             class
@@ -106,13 +117,15 @@ impl Kind<'_> {
         };
         let mut stems: HashMap<String, usize> = HashMap::new();
         for entry in self.entries {
-            *stems.entry(stem(Self::class(entry))).or_default() += 1;
+            *stems
+                .entry(stem(Self::class(entry, self.name)))
+                .or_default() += 1;
         }
         let singles: Vec<&str> = self
             .entries
             .iter()
-            .filter(|entry| entry["guid"].as_str().is_some_and(|g| !grouped.contains(g)))
-            .map(Self::class)
+            .filter(|entry| self.guid(entry).is_some_and(|g| !grouped.contains(g)))
+            .map(|entry| Self::class(entry, self.name))
             .filter(|class| stems.get(&stem(class)).is_some_and(|count| *count > 1))
             .take(SAMPLES)
             .collect();
@@ -127,27 +140,27 @@ impl Kind<'_> {
         let guids: HashSet<&str> = self
             .entries
             .iter()
-            .filter_map(|entry| entry["guid"].as_str())
+            .filter_map(|entry| self.guid(entry))
             .collect();
         for entry in self.entries {
             let value = &entry["variantOf"];
             assert!(
                 value.is_null() || value.is_string(),
                 "{} variantOf",
-                Self::class(entry)
+                Self::class(entry, self.name)
             );
             if let Some(base) = value.as_str() {
                 assert!(
                     guids.contains(base),
                     "{} {} variantOf resolves to another kind or nothing",
                     self.name,
-                    Self::class(entry)
+                    Self::class(entry, self.name)
                 );
                 assert_ne!(
                     Some(base),
-                    entry["guid"].as_str(),
+                    self.guid(entry),
                     "{} is its own base",
-                    Self::class(entry)
+                    Self::class(entry, self.name)
                 );
             }
         }
@@ -159,14 +172,14 @@ fn base_class(catalog: &Value, class: &str) -> Option<String> {
     let ships = catalog["ships"].as_array()?;
     let ship = ships
         .iter()
-        .find(|ship| Kind::class(ship).eq_ignore_ascii_case(class))?;
+        .find(|ship| Kind::class(ship, CatalogKind::Ships).eq_ignore_ascii_case(class))?;
     let Some(base) = ship["variantOf"].as_str() else {
         return Some(class.to_ascii_lowercase());
     };
     ships
         .iter()
-        .find(|ship| ship["guid"].as_str() == Some(base))
-        .map(|ship| Kind::class(ship).to_ascii_lowercase())
+        .find(|ship| ship.pointer("/guid/value").and_then(Value::as_str) == Some(base))
+        .map(|ship| Kind::class(ship, CatalogKind::Ships).to_ascii_lowercase())
 }
 
 fn assert_cutlass_family(catalog: &Value) {
@@ -202,18 +215,24 @@ fn print_family(catalog: &Value, needle: &str) {
     let ships = catalog["ships"].as_array().map_or(&[][..], Vec::as_slice);
     let by_guid: HashMap<&str, &str> = ships
         .iter()
-        .filter_map(|ship| Some((ship["guid"].as_str()?, ship["className"].as_str()?)))
+        .filter_map(|ship| {
+            Some((
+                ship.pointer("/guid/value").and_then(Value::as_str)?,
+                ship.pointer("/className/value").and_then(Value::as_str)?,
+            ))
+        })
         .collect();
     for ship in ships {
-        let class = Kind::class(ship);
+        let class = Kind::class(ship, CatalogKind::Ships);
         if class.to_ascii_lowercase().contains(needle) {
             let base = ship["variantOf"]
                 .as_str()
                 .and_then(|guid| by_guid.get(guid));
             print_line(&format!(
                 "  {class}: definition {}, playability {}, variantOf {}",
-                ship["vehicleDefinition"],
-                ship["playability"],
+                ship.pointer("/vehicleDefinition/value")
+                    .unwrap_or(&Value::Null),
+                ship.pointer("/playability/value").unwrap_or(&Value::Null),
                 base.copied().unwrap_or("-")
             ));
         }
@@ -234,12 +253,12 @@ fn the_variant_groups_of_a_real_archive_resolve_within_their_kind() -> TestResul
     ));
     let kinds = [
         Kind {
-            name: "ships",
+            name: CatalogKind::Ships,
             entries: catalog["ships"].as_array().map_or(&[][..], Vec::as_slice),
         },
         Kind {
-            name: "items",
-            entries: catalog["items"].as_array().map_or(&[][..], Vec::as_slice),
+            name: CatalogKind::Items,
+            entries: catalog_v3_consumer::rows(&catalog, CatalogKind::Items)?,
         },
     ];
     for kind in &kinds {

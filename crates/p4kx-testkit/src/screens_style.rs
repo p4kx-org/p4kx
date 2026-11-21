@@ -15,6 +15,8 @@ pub enum TestCondition {
     Type(&'static str),
     /// The widget has the `Tag` Record `guid` or one below it.
     Tag(u128),
+    /// The widget has one of these tags or one below it.
+    AnyOfTag(Vec<u128>),
     /// The parent widget meets every condition.
     Parent(Vec<Self>),
     /// Some ancestor widget meets every condition.
@@ -40,6 +42,12 @@ impl TestCondition {
                 .value("type", TestValue::text(*kind)),
             Self::Tag(guid) => TestInstance::new("BuildingBlocks_StyleSelectorConditionTag")
                 .value("tag", TestValue::Reference(*guid)),
+            Self::AnyOfTag(tags) => {
+                TestInstance::new("BuildingBlocks_StyleSelectorConditionAnyOfTag").value(
+                    "tags",
+                    TestValue::Array(tags.iter().copied().map(TestValue::Reference).collect()),
+                )
+            }
             Self::Parent(inner) => TestInstance::new("BuildingBlocks_StyleSelectorConditionParent")
                 .value(
                     "conditions",

@@ -28,9 +28,10 @@ impl Server {
         substring or a glob with * and ?, ignoring case, matched against trigger and event names; without it every trigger \
         is listed. Each result lists the trigger, the Wwise events it posts with the soundbanks that hold them, why it \
         leads to no soundbank if so, and, only if entities is above 0, the Entities that name it (entities: how many to list; the lookup \
-        reads the Record of every Entity on each call and takes seconds on a real Archive). Events and soundbanks \
-        per trigger are listed up to 25 and 10 with their totals. Paged in definition order with a cursor. The first call of a session reads \
-        every ATL definition and soundbank of the Archive. The content may be forwarded by the client to third parties; \
+        reads the Record of every Entity on each call and takes seconds on a real Archive). Events are complete; at most 10 soundbanks \
+        per event are listed with their totals. Paged in definition order with a cursor. The first call of a session reads \
+        every ATL definition and soundbank of the Archive. Retained text is complete within the existing 256 KiB response budget; an item that cannot fit first is refused. \
+        The content may be forwarded by the client to third parties; \
         game texts and media must not be redistributed.",
         output_schema = rmcp::handler::server::tool::schema_for_output::<TriggerSearchResult>(),
         annotations(
@@ -63,7 +64,8 @@ impl Server {
         description = "Show the audio chain of an Entity: the audio triggers its Record names (by GUID, record path or \
         class name), each with the ATL definition that defines it, the Wwise events it posts, the soundbanks that hold \
         each event, and why it leads to no soundbank if so. Paged with a cursor. resolve_audio_trigger follows a \
-        trigger on to its sounds and WEM IDs. The content may be forwarded by the client to third parties; game texts \
+        trigger on to its sounds and WEM IDs. Retained text is complete within the existing 256 KiB response budget; an item that cannot fit first is refused. \
+        The content may be forwarded by the client to third parties; game texts \
         and media must not be redistributed.",
         output_schema = rmcp::handler::server::tool::schema_for_output::<EntitySoundsResult>(),
         annotations(
@@ -90,11 +92,15 @@ impl Server {
 
     #[tool(
         description = "Resolve an audio trigger to its sounds: follow each Wwise event through its actions and random, \
-        sequence, switch and blend containers and list every variant with its soundbank, WEM ID, how the source is \
+        sequence, switch and blend containers and list the variants reached with their soundbank, WEM ID, how the source is \
         stored, where the WEM is (embedded in a soundbank, or a loose WEM Entry for streamed sounds) and the object \
         path from the event. Localised sounds are resolved for lang, with fallback_lang where that has none. Broken \
-        links and their reasons come with the first page. Variants are paged with a cursor. Only paths, IDs and \
-        metadata are returned, no audio. The content may be forwarded by the client to third parties; game texts \
+        links and their reasons come with the first page. An optional max_visits bounds HIRC object and music track \
+        source visits across the whole trigger. If it leaves references unfollowed, truncated_by_limits is true on \
+        every page and counts describe the variants reached. Use the same max_visits when continuing with a cursor. \
+        Returns paths, IDs, metadata and per-field original source evidence. The 256 KiB response budget includes that evidence; \
+        an item that cannot fit first is refused. Aggregate provenance can report incomplete source sets. \
+        The content may be forwarded by the client to third parties; game texts \
         and media must not be redistributed.",
         output_schema = rmcp::handler::server::tool::schema_for_output::<TriggerSoundsResult>(),
         annotations(
@@ -128,6 +134,7 @@ impl Server {
                 &params.trigger,
                 &params.lang,
                 &params.fallback_lang,
+                params.max_visits,
             );
             let page = Page::new(&listing, params.cursor.as_deref(), params.limit)?;
             audio::resolve(&opened, &params, page)
@@ -139,7 +146,8 @@ impl Server {
         description = "List the WEMs a soundbank (.bnk Entry) embeds, page by page: per WEM its ID, size, codec, \
         channels, sample rate, frame count and duration, whether it only is the prefetched start of a streamed sound \
         (whose whole file is a loose WEM Entry named by the ID) and why it cannot be read if so. Only metadata is \
-        returned, no audio. The content may be forwarded by the client to third parties; game texts and media must \
+        returned, with per-field original source evidence and encryption markers. The response budget includes \
+        that evidence. The content may be forwarded by the client to third parties; game texts and media must \
         not be redistributed.",
         output_schema = rmcp::handler::server::tool::schema_for_output::<SoundbankWemsResult>(),
         annotations(
@@ -170,7 +178,9 @@ impl Server {
         --json` does: per object its position, ID, type, how far the reader decodes it (decoded, undecoded, unsupported or \
         malformed, with the reason), parent and children, and for sounds, actions, containers and music segments, tracks, \
         switch containers and playlists their fields (media source, target, clips, markers, stingers, switches, playlist \
-        items with nesting and loop counts). type (e.g. music-playlist, sound, event) and id narrow the list; matched \
+        items with nesting and loop counts, original transition rules and music switch decision trees). A switch with \
+        compact targets retains its original decision nodes and groups. \
+        type (e.g. music-playlist, sound, event) and id narrow the list; matched \
         counts the objects that pass, total and layouts count the whole bank, and objects the reader does not decode are \
         listed and counted, not skipped. Only structure is returned, no audio; resolve_audio_trigger resolves a trigger \
         to its sounds. The content may be forwarded by the client to third parties; game texts and media must not be \
@@ -213,8 +223,9 @@ impl Server {
     #[tool(
         description = "Describe one WEM, named by wem_id or by the Entry path of a loose WEM: every place that holds it \
         (embedded in a soundbank, or a loose Entry per language; paged with a cursor) and, read from the first place that holds the whole \
-        sound, its codec, channels, sample rate, frame count, duration and whether it loops. Only metadata is returned, \
-        no audio. The content may be forwarded by the client to third parties; game texts and media must not be \
+        sound, its codec, channels, sample rate, frame count, duration and whether it loops. Metadata includes per-field \
+        source evidence and encryption markers. Only metadata is returned. The content may be forwarded by the client \
+        to third parties. Game texts and media must not be \
         redistributed.",
         output_schema = rmcp::handler::server::tool::schema_for_output::<WemInfoResult>(),
         annotations(
@@ -277,7 +288,7 @@ impl Server {
         Ok(Sounded {
             value,
             wav,
-            notice: done.notice,
+            notes: done.notes,
         })
     }
 }

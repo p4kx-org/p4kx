@@ -22,7 +22,7 @@ fn run(dir: &Path, paths: &[String]) -> Result<ExtractionReport, Box<dyn Error>>
     builder.write_to(&archive_path)?;
     let archive = Archive::open_with_key(&archive_path, Some(p4kx_testkit::test_key()))?;
     let target = dir.join("out");
-    fs::create_dir(&target)?;
+    fs::create_dir_all(&target)?;
     let entries: Vec<_> = archive.entries().iter().collect();
     Ok(extract(
         &archive,
@@ -190,6 +190,30 @@ fn a_file_and_a_folder_that_differ_only_in_case_collide() -> TestResult {
         })
         .collect();
     assert_eq!(earlier, ["Data\\A", "Data\\B\\y.txt"]);
+    Ok(())
+}
+
+#[test]
+fn an_existing_foreign_file_is_not_reported_as_an_archive_collision() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let parent = dir.path().join("out").join("Data");
+    fs::create_dir_all(&parent)?;
+    let foreign = parent.join("Blocking");
+    fs::write(&foreign, b"foreign data")?;
+
+    let report = run(dir.path(), &paths(&["Blocking\\child.txt"]))?;
+
+    assert_eq!(report.extracted(), 0);
+    assert_eq!(report.failures().len(), 1);
+    let failure = report
+        .failures()
+        .first()
+        .ok_or("foreign parent obstructs output")?;
+    assert!(!matches!(
+        failure.error(),
+        ExtractionError::CaseCollision { .. }
+    ));
+    assert_eq!(fs::read(foreign)?, b"foreign data");
     Ok(())
 }
 

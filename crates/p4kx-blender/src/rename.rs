@@ -6,6 +6,8 @@ use std::path::Path;
 use std::thread;
 use std::time::Duration;
 
+use crate::PackageError;
+
 const ATTEMPTS: u32 = 6;
 const FIRST_DELAY: Duration = Duration::from_millis(20);
 #[cfg(windows)]
@@ -31,10 +33,27 @@ pub(crate) const fn is_busy(_error: &io::Error) -> bool {
     false
 }
 
-/// Renames `from` to `to`, trying again a few times with a doubling pause while the error says the
-/// folder may only be held briefly; returns the last error.
-pub(crate) fn rename(from: &Path, to: &Path) -> io::Result<()> {
-    retry(ATTEMPTS, FIRST_DELAY, || std::fs::rename(from, to))
+/// Checks destination absence before each bounded rename attempt.
+pub(crate) fn rename_to_absent(from: &Path, to: &Path) -> io::Result<()> {
+    retry(ATTEMPTS, FIRST_DELAY, || {
+        match std::fs::symlink_metadata(to) {
+            Ok(_) => return Err(io::Error::from(io::ErrorKind::AlreadyExists)),
+            Err(source) if source.kind() == io::ErrorKind::NotFound => {}
+            Err(source) => return Err(source),
+        }
+        std::fs::rename(from, to)
+    })
+}
+
+pub(crate) fn moving_error(path: &Path, source: io::Error) -> PackageError {
+    if is_busy(&source) {
+        PackageError::InUse {
+            path: path.to_path_buf(),
+            source,
+        }
+    } else {
+        PackageError::write(path, source)
+    }
 }
 
 fn retry(

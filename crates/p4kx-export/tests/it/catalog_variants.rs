@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The variant groups of ships in the Basetool catalog, through the public API.
+//! The variant groups of ships in the P4KX catalog, through the public API.
 
 use crate::variants_fixture;
 
@@ -22,7 +22,13 @@ fn build() -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
         variants_fixture::write_archive(dir.path())?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let built = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT))?;
+    let built = build_catalog(
+        &archive,
+        &CatalogOptions {
+            publication_mode: p4kx_export::CatalogPublicationMode::DiagnosticPartial,
+            ..CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT)
+        },
+    )?;
     let json = serde_json::from_slice(built.json())?;
     Ok((built, json))
 }
@@ -30,7 +36,12 @@ fn build() -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
 fn entry<'c>(catalog: &'c Value, kind: &str, class: &str) -> Result<&'c Value, String> {
     catalog[kind]
         .as_array()
-        .and_then(|list| list.iter().find(|entry| entry["className"] == class))
+        .and_then(|list| {
+            list.iter().find(|entry| {
+                crate::catalog_items::entity_field(entry, kind, "className").and_then(Value::as_str)
+                    == Some(class)
+            })
+        })
         .ok_or_else(|| format!("{kind} {class} missing"))
 }
 
@@ -41,8 +52,13 @@ fn base_of(catalog: &Value, kind: &str, class: &str) -> Result<Option<String>, S
     }
     catalog[kind]
         .as_array()
-        .and_then(|list| list.iter().find(|entry| entry["guid"] == *base))
-        .and_then(|entry| entry["className"].as_str())
+        .and_then(|list| {
+            list.iter()
+                .find(|entry| crate::catalog_items::entity_field(entry, kind, "guid") == Some(base))
+        })
+        .and_then(|entry| {
+            crate::catalog_items::entity_field(entry, kind, "className").and_then(Value::as_str)
+        })
         .map(|name| Some(name.to_owned()))
         .ok_or_else(|| format!("variantOf of {class} resolves to no {kind} entry"))
 }
@@ -209,7 +225,7 @@ fn every_ship_carries_the_field_and_it_is_a_guid_or_null() -> TestResult {
         assert!(
             value.is_null() || value.is_string(),
             "{}",
-            ship["className"]
+            ship["className"]["value"]
         );
     }
     Ok(())
@@ -227,3 +243,8 @@ fn the_summary_counts_groups_and_variants() -> TestResult {
     );
     Ok(())
 }
+
+#[path = "catalog_variant_identity_fixture.rs"]
+mod physical_fixture;
+#[path = "catalog_variant_physical_identity.rs"]
+mod physical_identity;

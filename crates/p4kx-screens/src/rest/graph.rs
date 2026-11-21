@@ -4,6 +4,7 @@
 use p4kx_dataforge::{Guid, Reference, StructValue, Value};
 
 use super::Rest;
+use super::integer_number_switch::IntegerNumberSwitch;
 use super::ops::{Arith, Cmp};
 use crate::bindings::index_at;
 use crate::reader::{as_struct, exact, flag, int, items, reference, text};
@@ -52,6 +53,7 @@ pub(crate) enum Node {
         branches: [Input; 2],
         whole: bool,
     },
+    NumberSwitch(IntegerNumberSwitch),
     Same(Input),
     Arith {
         op: Arith,
@@ -100,6 +102,7 @@ pub(crate) enum FieldKind {
 /// A `Bindings…Field` operation: the field of a widget that the value of `input` sets.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct Binding {
+    pub(crate) operation: usize,
     pub(crate) widget: usize,
     pub(crate) field: String,
     pub(crate) kind: FieldKind,
@@ -160,9 +163,13 @@ fn source(short: &str, op: &StructValue<'_>) -> Option<Node> {
             parameter: parameter(),
             default: Rest::Bool(flag(op, "defaultValue").unwrap_or(false)),
         },
-        "NumberComponentParameter" | "IntegerComponentParameter" => Node::Param {
+        "NumberComponentParameter" => Node::Param {
             parameter: parameter(),
             default: Rest::Num(number(op, "defaultValue")?),
+        },
+        "IntegerComponentParameter" => Node::Param {
+            parameter: parameter(),
+            default: Rest::Integer(number(op, "defaultValue")?),
         },
         "LocalizedComponentParameter" => Node::TextParam {
             parameter: parameter(),
@@ -250,6 +257,7 @@ fn numeric(short: &str, op: &StructValue<'_>) -> Option<Node> {
             ],
             whole,
         },
+        "NumberFromIntegerSwitch" => Node::NumberSwitch(IntegerNumberSwitch::read(op, input())?),
         "NumberFromInteger" => Node::Same(input()),
         "NumberArithmatic" | "IntegerArithmatic" => {
             let arith = Arith::parse(text(op, "type"))?;
@@ -279,8 +287,11 @@ fn numeric(short: &str, op: &StructValue<'_>) -> Option<Node> {
 }
 
 impl Operations {
-    /// Reads the `operations` of a canvas whose scene has `scene_len` widgets before its library.
-    pub(crate) fn read(root: &StructValue<'_>, scene_len: usize) -> Self {
+    /// Reads the `operations` of a canvas and resolves their authored widget references.
+    pub(crate) fn read(
+        root: &StructValue<'_>,
+        find_widget: &impl Fn(&Reference<'_>) -> Option<usize>,
+    ) -> Self {
         let mut found = Self::default();
         for operation in items(root, "operations") {
             let Some(op) = as_struct(operation) else {
@@ -292,14 +303,10 @@ impl Operations {
             let short = name.rsplit_once('_').map_or(name, |(_, short)| short);
             let short = short.strip_prefix("Bindings").unwrap_or(short);
             if let Some(kind) = field_kind(short) {
-                let widget = reference(op, "widget").and_then(|widget| {
-                    let location = widget.location();
-                    index_at(location, "scene").or_else(|| {
-                        index_at(location, "library").and_then(|at| at.checked_add(scene_len))
-                    })
-                });
+                let widget = reference(op, "widget").and_then(find_widget);
                 if let (Some(widget), Some(field)) = (widget, text(op, "field")) {
                     found.bindings.push(Binding {
+                        operation: found.nodes.len(),
                         widget,
                         field: field.to_owned(),
                         kind,

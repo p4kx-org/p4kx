@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The Basetool catalog of a real Archive written as zstd at levels 15, 17 and 19: sizes, ratios
-//! and times, the limits of the Basetool, and the decoded bytes against the plain catalog; runs
+//! The P4KX catalog of a real Archive written as zstd at levels 15, 17 and 19: sizes, ratios
+//! and times, reference size thresholds, and the decoded bytes against the plain catalog; runs
 //! with `--ignored` when `P4KX_DATA_P4K` names an Archive. The level 19 frame is left in the
-//! temporary folder as `basetool-catalog-<channel>.json.zst`, so that `zstd -d --long=27` can
+//! temporary folder as `p4kx-catalog-<channel>.json.zst`, so that `zstd -d --long=27` can
 //! check it.
 
 use std::error::Error;
@@ -13,8 +13,8 @@ use std::io::Read;
 use std::time::{Duration, Instant, SystemTime};
 
 use p4kx_export::{
-    CatalogOptions, Compression, DECOMPRESSED_LIMIT, UPLOAD_LIMIT, ZSTD_LEVEL, ZSTD_WINDOW_LOG,
-    build_catalog_from, write_catalog_from,
+    CatalogOptions, Compression, ZSTD_LEVEL, ZSTD_WINDOW_LOG, build_catalog_from,
+    write_catalog_from,
 };
 use p4kx_extraction::{Archive, DataForgeEntry};
 use p4kx_testkit::real_archive_path;
@@ -41,7 +41,7 @@ fn ratio(size: u64, compressed: u64) -> f64 {
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn the_catalog_of_a_real_archive_compresses_within_the_limits_at_every_level() -> TestResult {
+fn the_catalog_of_a_real_archive_round_trips_at_every_compression_level() -> TestResult {
     let path = real_archive_path()?;
     let archive = Archive::open_with_key(&path, Some(p4kx_testkit::real_archive_key()?))?;
     let entry = DataForgeEntry::read(&archive)?;
@@ -54,10 +54,7 @@ fn the_catalog_of_a_real_archive_compresses_within_the_limits_at_every_level() -
         "{channel}: {} bytes uncompressed, window log {ZSTD_WINDOW_LOG}",
         plain.json().len()
     ));
-    assert!(
-        plain.summary().size() <= DECOMPRESSED_LIMIT,
-        "within the decompressed limit"
-    );
+    crate::real_archive::check_transport(plain.summary(), u64::try_from(plain.json().len())?, None);
 
     for level in LEVELS {
         let started = Instant::now();
@@ -76,23 +73,20 @@ fn the_catalog_of_a_real_archive_compresses_within_the_limits_at_every_level() -
             (plain.summary().size(), compressed),
             (plain_took, took),
         );
-        assert_eq!(
-            summary.compressed_size(),
-            Some(compressed),
-            "compressed size"
-        );
-        assert!(
-            compressed <= UPLOAD_LIMIT,
-            "within the upload limit at level {level}"
-        );
+
         let mut reader = zstd::Decoder::new(frame.as_slice())?;
         reader.window_log_max(ZSTD_WINDOW_LOG)?;
         let mut json = Vec::new();
         reader.read_to_end(&mut json)?;
+        crate::real_archive::check_transport(
+            &summary,
+            u64::try_from(json.len())?,
+            Some(compressed),
+        );
         assert_eq!(json.len(), plain.json().len(), "decoded length");
         assert!(json == plain.json(), "byte-identical JSON at level {level}");
         if level == ZSTD_LEVEL {
-            let file = std::env::temp_dir().join(format!("basetool-catalog-{channel}.json.zst"));
+            let file = std::env::temp_dir().join(format!("p4kx-catalog-{channel}.json.zst"));
             fs::write(&file, &frame)?;
             print_line(&format!("level {level} frame: {}", file.display()));
         }

@@ -9,7 +9,7 @@ use anyhow::Result;
 use p4kx_assembly::{
     Assembly, ChangedLoadout, CreatureAnimations, CreatureClips, EntityNode, Issue, LoadoutChanges,
 };
-use p4kx_extraction::GlbSummary;
+use p4kx_extraction::{ArchiveDefaultMaterial, DefaultMaterialReceipt, GlbSummary};
 use serde::Serialize;
 
 use crate::cli_entity::EntityGlbArgs;
@@ -18,6 +18,11 @@ use crate::entity_glb_placements::{PlacementJson, painted, placements_json};
 use crate::json;
 use crate::layers_json::LayersJson;
 use crate::model_animations::WrittenJson;
+
+#[path = "entity_glb_animation_sources.rs"]
+mod animation_sources;
+
+use animation_sources::AnimationSourcesJson;
 
 /// What the JSON report of one `entity glb` run is built from.
 pub(crate) struct GlbReport<'a> {
@@ -35,18 +40,10 @@ pub(crate) struct GlbReport<'a> {
 impl GlbReport<'_> {
     /// Prints the report to stdout.
     pub(crate) fn print(&self) -> Result<()> {
-        let Self {
-            archive,
-            args,
-            tree,
-            assembly,
-            summary,
-            applied,
-            changes,
-            animations: (found, animated),
-        } = *self;
+        let (args, tree, assembly, summary) = (self.args, self.tree, self.assembly, self.summary);
+        let (applied, changes) = (self.applied, self.changes);
         Ok(json::print(&GlbJson {
-            archive: json::path(archive),
+            archive: json::path(self.archive),
             entity: tree.class_name(),
             guid: tree.guid().to_string(),
             out: json::path(&args.out),
@@ -64,6 +61,9 @@ impl GlbReport<'_> {
             texture_pixels: summary.texture_pixels,
             texture_fallbacks: fallbacks_json(summary),
             default_material_ids: summary.default_material_ids,
+            default_material: assembly
+                .default_material(args.lod)
+                .map(ArchiveDefaultMaterial::receipt),
             hidden_primitives: summary.hidden_primitives,
             bones: summary.bones,
             skinned_meshes: summary.skinned_meshes,
@@ -92,7 +92,13 @@ impl GlbReport<'_> {
                 .collect(),
             placements: placements_json(assembly),
             animations: summary.animations.iter().map(WrittenJson::of).collect(),
-            issues: issues_json(assembly, (found, animated)),
+            animation_sources: self
+                .animations
+                .0
+                .sources
+                .as_ref()
+                .map(AnimationSourcesJson::from),
+            issues: issues_json(assembly, self.animations),
         })?)
     }
 }
@@ -117,6 +123,8 @@ struct GlbJson<'a> {
     texture_pixels: u64,
     texture_fallbacks: Vec<FallbackJson<'a>>,
     default_material_ids: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    default_material: Option<DefaultMaterialReceipt>,
     hidden_primitives: usize,
     bones: usize,
     skinned_meshes: usize,
@@ -145,6 +153,8 @@ struct GlbJson<'a> {
     placements: Vec<PlacementJson<'a>>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     animations: Vec<WrittenJson>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    animation_sources: Option<AnimationSourcesJson<'a>>,
     issues: Vec<IssueJson<'a>>,
 }
 

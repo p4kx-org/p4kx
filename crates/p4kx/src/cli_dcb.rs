@@ -213,7 +213,7 @@ pub(crate) struct DcbExportArgs {
     #[arg(long)]
     pub(crate) tags: bool,
     /// Target folder; created if missing, files already in it are handled by --conflict. Defaults
-    /// to a new folder SC-EXPORT-<Channel>-<Build version>-<timestamp> in the current directory.
+    /// to a new folder `SC-EXPORT-<Channel>-<Build version>-<timestamp>` in the current directory.
     #[arg(long, value_name = "FOLDER")]
     pub(crate) out: Option<PathBuf>,
     /// What to do with a file that already exists in the target.

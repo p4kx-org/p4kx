@@ -7,6 +7,12 @@ server-side, and UEX IDs never enter the catalog. The spike found a registry of 
 containers and item lists without a link to the shops. This ADR fixes what the kind `shops` is and
 what it leaves out.
 
+## Catalog v3 amendment
+
+`definitions.shopInventories` selects physical offline inventory files independently of registry
+rows. The `ShopBackup.ID` chain remains the shop identity. The inventory's authored `ShopID` is
+retained with the physical file as evidence.
+
 ## Decision
 
 - **`shops` is an additive kind** (ADR-0054, `schemaVersion` stays 1), derived from Archive files,

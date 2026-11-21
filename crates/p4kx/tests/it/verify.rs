@@ -10,6 +10,8 @@ use assert_cmd::Command;
 use p4kx_testkit::{ArchiveBuilder, TestContainer, TestEntry};
 use predicates::prelude::predicate;
 use serde_json::Value;
+#[path = "verify_origins.rs"]
+mod origins;
 
 type TestResult = Result<(), Box<dyn Error>>;
 

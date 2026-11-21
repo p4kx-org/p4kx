@@ -67,6 +67,10 @@ pub enum ModelExportText {
     SummaryLibraryMissing,
     /// The material library cannot be read; takes `library` and `reason`.
     SummaryLibraryUnreadable,
+    /// The mapped material library does not exist; takes `library` and `target`.
+    SummaryLibraryMissingMapped,
+    /// The mapped library cannot be read; takes `library`, `target` and `reason`.
+    SummaryLibraryUnreadableMapped,
     /// Material IDs without a sub-material; takes `number`.
     SummaryDefaultMaterials,
     /// Library entries that are no material; takes `number`.
@@ -115,7 +119,7 @@ pub enum ModelExportText {
 
 impl ModelExportText {
     /// Every text, for checks of the Fluent files.
-    pub(crate) const ALL: [Self; 52] = [
+    pub(crate) const ALL: [Self; 54] = [
         Self::Action,
         Self::SetupTitle,
         Self::Model,
@@ -147,6 +151,8 @@ impl ModelExportText {
         Self::SummaryBones,
         Self::SummaryLibraryMissing,
         Self::SummaryLibraryUnreadable,
+        Self::SummaryLibraryMissingMapped,
+        Self::SummaryLibraryUnreadableMapped,
         Self::SummaryDefaultMaterials,
         Self::SummaryUnnamedMaterials,
         Self::SummaryMissingLayers,
@@ -205,6 +211,10 @@ impl ModelExportText {
             Self::SummaryBones => "model-export-summary-bones",
             Self::SummaryLibraryMissing => "model-export-summary-library-missing",
             Self::SummaryLibraryUnreadable => "model-export-summary-library-unreadable",
+            Self::SummaryLibraryMissingMapped => "model-export-summary-library-missing-mapped",
+            Self::SummaryLibraryUnreadableMapped => {
+                "model-export-summary-library-unreadable-mapped"
+            }
             Self::SummaryDefaultMaterials => "model-export-summary-default-materials",
             Self::SummaryUnnamedMaterials => "model-export-summary-unnamed-materials",
             Self::SummaryMissingLayers => "model-export-summary-missing-layers",

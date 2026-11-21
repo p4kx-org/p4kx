@@ -1,8 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use schemars::JsonSchema;
-use serde::Serialize;
+use serde::{Serialize, Serializer};
 
 use crate::contract::every_field_required;
 use crate::guid_text::CatalogGuid;
@@ -64,5 +66,15 @@ pub(crate) struct Shop {
     pub(crate) inventory: Option<String>,
     /// The `EntityClassDefinition` GUIDs of the items in that inventory file, lower case, ordered
     /// and without repeats; `null` exactly when `inventory` is. No price, stock or rental data.
-    pub(crate) item_guids: Option<Vec<String>>,
+    #[serde(serialize_with = "serialize_item_guids")]
+    #[schemars(with = "Option<Vec<String>>")]
+    pub(crate) item_guids: Option<Arc<[String]>>,
+}
+
+#[expect(clippy::ref_option, reason = "serde passes the field by reference")]
+fn serialize_item_guids<S: Serializer>(
+    guids: &Option<Arc<[String]>>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    guids.as_deref().serialize(serializer)
 }

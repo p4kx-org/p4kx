@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The standing range and the reputation prerequisites of contracts in the Basetool catalog.
+//! The standing range and the reputation prerequisites of contracts in the P4KX catalog.
 
 use crate::catalog_contracts::{A, B, SUB_ONE, TestResult, build, entry};
 

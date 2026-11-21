@@ -27,7 +27,7 @@ pub(crate) fn check(root: &Path) -> Result<Vec<String>> {
             lines
         };
         if lines > MAX_LINES {
-            let shown = file.strip_prefix(root).unwrap_or(&file);
+            let shown = file.trim_prefix(root);
             violations.push(format!(
                 "file too long: {} has {lines} lines, the limit is {MAX_LINES}",
                 shown.display()

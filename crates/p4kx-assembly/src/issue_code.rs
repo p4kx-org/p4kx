@@ -7,6 +7,10 @@ impl IssueKind {
     /// Returns a stable code for the kind, e.g. `geometry_missing`, for scripts; the message is
     /// text for people.
     #[must_use]
+    #[expect(
+        clippy::too_many_lines,
+        reason = "The exhaustive lookup keeps stable diagnostic codes in one mapping."
+    )]
     pub const fn code(&self) -> &'static str {
         match self {
             Self::Unresolved(_) => "unresolved",
@@ -18,7 +22,10 @@ impl IssueKind {
             Self::GeometryUnreadable { .. } => "geometry_unreadable",
             Self::MaterialLibrary { .. } => "material_library",
             Self::Palette { .. } => "palette",
+            Self::PaintAppearance { .. } => "paint_appearance",
+            Self::PortHelperUnresolved(_) => "port_helper_unresolved",
             Self::HelperNotFound { .. } => "helper_not_found",
+            Self::WornMountUnresolved(_) => "worn_mount_unresolved",
             Self::AttachmentsLeftOut { .. } => "attachments_left_out",
             Self::SkeletonMissing { .. } => "skeleton_missing",
             Self::SkeletonUnreadable { .. } => "skeleton_unreadable",
@@ -27,6 +34,7 @@ impl IssueKind {
             Self::TooManyVertices { .. } => "too_many_vertices",
             Self::TooDeep { .. } => "too_deep",
             Self::ContainerMissing { .. } => "container_missing",
+            Self::ContainerAmbiguous(_) => "container_ambiguous",
             Self::ContainerUnreadable { .. } => "container_unreadable",
             Self::ContainerCycle { .. } => "container_cycle",
             Self::TooManyContainers { .. } => "too_many_containers",
@@ -38,6 +46,7 @@ impl IssueKind {
             Self::ObjectsLeftOut { .. } => "objects_left_out",
             Self::UnsupportedObjects { .. } => "unsupported_objects",
             Self::EntitiesLeftOut { .. } => "entities_left_out",
+            Self::LightAnchor(_) => "light_anchor",
             Self::LightUnsupported { .. } => "light_unsupported",
             Self::BodyZonesHidden(_) => "body_zones_hidden",
             Self::BodyZonesUnknown(_) => "body_zones_unknown",
@@ -74,6 +83,7 @@ impl IssueKind {
         matches!(
             self,
             Self::Unresolved(_)
+                | Self::WornMountUnresolved(_)
                 | Self::GeometryMissing { .. }
                 | Self::BodyGeometryMissing { .. }
                 | Self::WorldPropNotWorn { .. }
@@ -82,6 +92,7 @@ impl IssueKind {
                 | Self::TooManyVertices { .. }
                 | Self::TooDeep { .. }
                 | Self::ContainerMissing { .. }
+                | Self::ContainerAmbiguous(_)
                 | Self::ContainerUnreadable { .. }
                 | Self::ContainerCycle { .. }
                 | Self::TooManyContainers { .. }

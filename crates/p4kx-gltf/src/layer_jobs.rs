@@ -18,7 +18,7 @@ type Numbered = (usize, Job);
 /// normal images only a fallback uses, so that when the budget of images runs out, every
 /// material has its colours before a layered one has its normals; returns the jobs with the
 /// numbers in `wanted` following them.
-pub(crate) fn layer_normals_last(jobs: Vec<Job>, wanted: &mut [Wish]) -> Vec<Job> {
+pub(crate) fn layer_normals_last(jobs: Vec<Job>, wanted: &mut [Wish]) -> (Vec<Job>, Vec<usize>) {
     let primary: HashSet<usize> = wanted
         .iter()
         .flat_map(|wish| wish.jobs.into_iter().flatten())
@@ -57,7 +57,10 @@ pub(crate) fn layer_normals_last(jobs: Vec<Job>, wanted: &mut [Wish]) -> Vec<Job
             *job = moved.get(*job).copied().unwrap_or(*job);
         }
     }
-    numbered.into_iter().map(|(_, (_, job))| job).collect()
+    numbered
+        .into_iter()
+        .map(|(_, (old, job))| (job, old))
+        .unzip()
 }
 
 /// Returns for each of `len` jobs the layered normal jobs of the materials that use it only as
@@ -106,6 +109,7 @@ pub(crate) fn layer_job(
         diffuse: None,
         normal: own.cloned(),
         specular: None,
+        explicit_gloss: Vec::new(),
         tints,
         layered: Some(layered.clone()),
     }
@@ -113,7 +117,12 @@ pub(crate) fn layer_job(
 
 /// The jobs of the base colour and the normal image of a layered material, and the texture files
 /// its layers name that have no safe path.
-pub(crate) type LayerJobs = (Option<Job>, Option<Job>, Vec<(TextureRole, String)>);
+pub(crate) type LayerJobs = (
+    Option<Job>,
+    Option<Job>,
+    Option<Job>,
+    Vec<(TextureRole, String)>,
+);
 
 /// Returns the jobs of the base colour and the normal image that the layers of `material` give
 /// when it has no diffuse map of its own and a layer has a diffuse or a normal map.
@@ -124,7 +133,7 @@ pub(crate) fn layer_jobs(material: &Material, found: &Sources, tints: Tints) -> 
         .then(|| layered_of(material))
         .flatten()
     else {
-        return (None, None, Vec::new());
+        return (None, None, None, Vec::new());
     };
     (
         layered
@@ -133,6 +142,17 @@ pub(crate) fn layer_jobs(material: &Material, found: &Sources, tints: Tints) -> 
         layered
             .has_normal()
             .then(|| layer_job(&layered, true, found.normal.as_ref(), tints)),
+        layered.has_sampled_finish().then(|| Job {
+            key: Key::LayerRoughness {
+                blend: layered.finish_fingerprint(),
+            },
+            diffuse: None,
+            normal: None,
+            specular: None,
+            explicit_gloss: Vec::new(),
+            tints,
+            layered: Some(layered.clone()),
+        }),
         layered.refused,
     )
 }

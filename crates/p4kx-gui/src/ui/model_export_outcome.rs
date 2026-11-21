@@ -55,15 +55,7 @@ pub(super) fn show(ui: &Ui, model: &mut Model) {
             ui.ctx().request_repaint_after(REFRESH);
         }
         ModelExportStatus::Finished(summary) => {
-            let laid = Laid::get(ui, texts, (run.id(), summary));
-            close = outcome_window(
-                ui,
-                texts,
-                (OUTCOME, T::SummaryTitle.into(), Tone::Normal),
-                |ui| {
-                    finished(ui, &laid);
-                },
-            );
+            close = summary_window(ui, texts, (run.id(), summary));
         }
         ModelExportStatus::Cancelled => {
             let title = (OUTCOME, T::SummaryCancelledTitle.into(), Tone::Normal);
@@ -112,13 +104,7 @@ fn failed(
             Tone::Normal,
         ),
         ModelExportFailure::Refused(refused) => (
-            texts.format(
-                ExtractionText::TargetInInstallation,
-                &[(
-                    "installation",
-                    refused.installation.display().to_string().into(),
-                )],
-            ),
+            crate::installation::message(texts, refused),
             palette::DANGER_TEXT,
             Tone::Danger,
         ),
@@ -187,6 +173,16 @@ fn running(
     } else {
         frames::foot_action(ui, &texts.get(ExtractionText::Cancel), Kind::Ghost)
     }
+}
+
+fn summary_window(ui: &Ui, texts: &Texts, (run, summary): (u64, &ModelExportSummary)) -> bool {
+    let laid = Laid::get(ui, texts, (run, summary));
+    outcome_window(
+        ui,
+        texts,
+        (OUTCOME, T::SummaryTitle.into(), Tone::Normal),
+        |ui| finished(ui, &laid),
+    )
 }
 
 /// The texts of one summary, formatted once per export and language.
@@ -288,3 +284,7 @@ fn finished(ui: &mut Ui, laid: &Laid) {
         true,
     );
 }
+
+#[cfg(test)]
+#[path = "model_export_outcome_render_tests.rs"]
+mod render_tests;

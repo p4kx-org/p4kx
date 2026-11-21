@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::fmt;
+
+use p4kx_cryxml::Document;
 use rayon::prelude::*;
 
-use crate::decode::{Decoded, Encoding, decode};
+use crate::cryxml_lines::{self, CryXmlLines};
+use crate::decode::{DecodeOutcome, Decoded, Encoding, LoadedEntry, load};
 use crate::path_key::eq_normalised;
 use crate::{Archive, CancelToken, ChangeKind, Entry, LineDiffError, TextDiff};
 
@@ -28,28 +32,76 @@ pub enum DiffBody {
 }
 
 /// The line diff of one Entry between an old and a new Archive.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct LineDiff<'a> {
-    old: Option<&'a Entry>,
-    new: Option<&'a Entry>,
-    old_encoding: Option<Encoding>,
-    new_encoding: Option<Encoding>,
+    old: LineInput<'a>,
+    new: LineInput<'a>,
     body: DiffBody,
+    cryxml_lines: [CryXmlLines; 2],
 }
 
+#[derive(Clone, Copy)]
+pub(crate) struct LineInput<'a> {
+    pub(crate) archive: &'a Archive,
+    pub(crate) entry: Option<&'a Entry>,
+    pub(crate) outcome: Option<DecodeOutcome>,
+}
+
+impl LineInput<'_> {
+    const fn encoding(self) -> Option<Encoding> {
+        match self.outcome {
+            Some(DecodeOutcome::Text(encoding)) => Some(encoding),
+            _ => None,
+        }
+    }
+}
+
+impl fmt::Debug for LineDiff<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("LineDiff")
+            .field("old", &self.old.entry)
+            .field("new", &self.new.entry)
+            .field("old_encoding", &self.old_encoding())
+            .field("new_encoding", &self.new_encoding())
+            .field("body", &self.body)
+            .finish()
+    }
+}
+
+impl PartialEq for LineDiff<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.old.entry == other.old.entry
+            && self.new.entry == other.new.entry
+            && self.old_encoding() == other.old_encoding()
+            && self.new_encoding() == other.new_encoding()
+            && self.body == other.body
+    }
+}
+
+impl Eq for LineDiff<'_> {}
+
 impl<'a> LineDiff<'a> {
+    pub(crate) const fn original_inputs(&self) -> [LineInput<'a>; 2] {
+        [self.old, self.new]
+    }
+
+    pub(crate) const fn cryxml_lines(&self) -> &[CryXmlLines; 2] {
+        &self.cryxml_lines
+    }
+
     /// Returns the Entry path as the new side stores it, or as the old side does for a removed
     /// Entry.
     #[must_use]
     pub fn path(&self) -> &'a str {
-        self.new.or(self.old).map_or("", Entry::path)
+        self.new.entry.or(self.old.entry).map_or("", Entry::path)
     }
 
     /// Returns how the Entry differs by its central-directory size and CRC-32C, `None` when it
     /// is unchanged.
     #[must_use]
     pub fn kind(&self) -> Option<ChangeKind> {
-        match (self.old, self.new) {
+        match (self.old.entry, self.new.entry) {
             (Some(old), Some(new)) => (old.uncompressed_size() != new.uncompressed_size()
                 || old.checksum() != new.checksum())
             .then_some(ChangeKind::Changed),
@@ -61,25 +113,25 @@ impl<'a> LineDiff<'a> {
     /// Returns the Entry of the old side, `None` when it was added.
     #[must_use]
     pub const fn old_entry(&self) -> Option<&'a Entry> {
-        self.old
+        self.old.entry
     }
 
     /// Returns the Entry of the new side, `None` when it was removed.
     #[must_use]
     pub const fn new_entry(&self) -> Option<&'a Entry> {
-        self.new
+        self.new.entry
     }
 
     /// Returns how the old side was read, `None` when it is missing or not text.
     #[must_use]
     pub const fn old_encoding(&self) -> Option<Encoding> {
-        self.old_encoding
+        self.old.encoding()
     }
 
     /// Returns how the new side was read, `None` when it is missing or not text.
     #[must_use]
     pub const fn new_encoding(&self) -> Option<Encoding> {
-        self.new_encoding
+        self.new.encoding()
     }
 
     /// Returns the hunks, or why there are none.
@@ -164,49 +216,98 @@ fn diff<'a>(
             path: path.to_owned(),
         });
     }
+    let old_input = LineInput {
+        archive: old,
+        entry: old_entry,
+        outcome: None,
+    };
+    let new_input = LineInput {
+        archive: new,
+        entry: new_entry,
+        outcome: None,
+    };
+    let mut loaded = load_sides([old_input, new_input], cancel)?;
+    let [old_loaded, new_loaded] = &mut loaded;
     let (old_side, new_side) = rayon::join(
-        || {
-            old_entry
-                .map(|entry| decode(old, entry, cancel))
-                .transpose()
-        },
-        || {
-            new_entry
-                .map(|entry| decode(new, entry, cancel))
-                .transpose()
-        },
+        || decode_side(old_loaded, cancel),
+        || decode_side(new_loaded, cancel),
     );
     let (old_side, new_side) = (old_side?, new_side?);
     check()?;
-    let encoding = |side: &Option<Decoded>| match side {
-        Some(Decoded::Text(_, encoding)) => Some(*encoding),
-        _ => None,
+    let old = LineInput {
+        outcome: old_side.as_ref().map(Decoded::outcome),
+        ..old_input
     };
-    let (old_encoding, new_encoding) = (encoding(&old_side), encoding(&new_side));
-    let body = match (old_side, new_side) {
-        (Some(Decoded::TooLarge), _) | (_, Some(Decoded::TooLarge)) => {
-            DiffBody::NotText(NotText::TooLarge)
-        }
-        (Some(Decoded::Binary), _) | (_, Some(Decoded::Binary)) => {
-            DiffBody::NotText(NotText::Binary)
-        }
-        (old_side, new_side) => {
-            DiffBody::Text(TextDiff::new(text_of(old_side), text_of(new_side), context))
-        }
+    let new = LineInput {
+        outcome: new_side.as_ref().map(Decoded::outcome),
+        ..new_input
     };
+    let (body, cryxml_lines) = diff_text(old_side, new_side, context, cancel)?;
     Ok(LineDiff {
-        old: old_entry,
-        new: new_entry,
-        old_encoding,
-        new_encoding,
+        old,
+        new,
         body,
+        cryxml_lines,
     })
 }
 
-fn text_of(side: Option<Decoded>) -> Vec<u8> {
+fn load_sides<'archive>(
+    inputs: [LineInput<'archive>; 2],
+    cancel: Option<&CancelToken>,
+) -> Result<[Option<LoadedEntry<'archive>>; 2], LineDiffError> {
+    let [old, new] = inputs;
+    let load_side = |side: LineInput<'archive>| {
+        side.entry
+            .map(|entry| load(side.archive, entry, cancel))
+            .transpose()
+    };
+    let (old, new) = rayon::join(|| load_side(old), || load_side(new));
+    let mut old = old?;
+    let new = match new {
+        Ok(new) => new,
+        Err(error) => {
+            drop(decode_side(&mut old, cancel)?);
+            return Err(error);
+        }
+    };
+    Ok([old, new])
+}
+
+fn decode_side<'raw>(
+    loaded: &'raw mut Option<LoadedEntry<'_>>,
+    cancel: Option<&CancelToken>,
+) -> Result<Option<Decoded<'raw>>, LineDiffError> {
+    loaded.as_mut().map(|side| side.decode(cancel)).transpose()
+}
+
+fn diff_text(
+    old: Option<Decoded<'_>>,
+    new: Option<Decoded<'_>>,
+    context: usize,
+    cancel: Option<&CancelToken>,
+) -> Result<(DiffBody, [CryXmlLines; 2]), LineDiffError> {
+    let non_text = match (&old, &new) {
+        (Some(Decoded::TooLarge(_)), _) | (_, Some(Decoded::TooLarge(_))) => {
+            Some(NotText::TooLarge)
+        }
+        (Some(Decoded::Binary), _) | (_, Some(Decoded::Binary)) => Some(NotText::Binary),
+        _ => None,
+    };
+    if let Some(reason) = non_text {
+        return Ok((DiffBody::NotText(reason), Default::default()));
+    }
+    let (old_bytes, old_xml) = text_of(old);
+    let (new_bytes, new_xml) = text_of(new);
+    let text = TextDiff::new(old_bytes, new_bytes, context);
+    let cryxml_lines =
+        cryxml_lines::capture(&text, [old_xml.as_deref(), new_xml.as_deref()], cancel)?;
+    Ok((DiffBody::Text(text), cryxml_lines))
+}
+
+fn text_of(side: Option<Decoded<'_>>) -> (Vec<u8>, Option<Box<Document<'_>>>) {
     match side {
-        Some(Decoded::Text(text, _)) => text,
-        _ => Vec::new(),
+        Some(Decoded::Text(text)) => (text.bytes, text.cryxml),
+        _ => (Vec::new(), None),
     }
 }
 

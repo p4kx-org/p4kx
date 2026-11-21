@@ -14,6 +14,9 @@ use p4kx_model::{
 use p4kx_testkit::gltf::scene as gltf_node;
 use p4kx_testkit::{CheckedGlb, TestModel, TestMtl, TestMtlMaterial, check_glb};
 
+#[path = "scene_mesh_instances.rs"]
+mod mesh_instances;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const LIBRARY: &str = "objects/test/cube";

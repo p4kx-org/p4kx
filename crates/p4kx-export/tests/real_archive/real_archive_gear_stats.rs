@@ -1,98 +1,91 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The gear stat blocks (armour, clothing, radar, tractor beam, salvage modifier, mining laser) and
-//! the trace of every gameplay property to a stat field, on a real Archive; runs with `--ignored`
-//! when `P4KX_DATA_P4K` names one.
+//! Physical gear source fields and their documented gameplay property mapping.
 
-use std::error::Error;
-use std::time::SystemTime;
-
-use p4kx_export::{CatalogOptions, build_catalog};
-use p4kx_extraction::Archive;
-use p4kx_testkit::real_archive_path;
+use p4kx_export::Kind;
 use serde_json::Value;
 
-type TestResult = Result<(), Box<dyn Error>>;
+use crate::catalog_v3_consumer;
+use crate::real_archive_equipment_catalog::{
+    TestResult, WEAPONS, action_nodes, catalog, definition, item, item_catalog, owner, scalar,
+};
+use crate::real_archive_item_durability::rows;
 
-const DOCS: &str = include_str!("../../../../docs/basetool-catalog.md");
+const DOCS: &str = include_str!("../../../../docs/catalog.md");
 
 #[expect(clippy::print_stdout, reason = "the numbers are the result of the run")]
 fn report(line: &str) {
     println!("{line}");
 }
 
-fn catalog() -> Result<Value, Box<dyn Error>> {
-    let archive = Archive::open_with_key(real_archive_path()?, None)?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
-    Ok(serde_json::from_slice(built.json())?)
-}
-
-fn item<'c>(catalog: &'c Value, class: &str) -> Result<&'c Value, String> {
-    catalog["items"]
-        .as_array()
-        .and_then(|items| {
-            items.iter().find(|item| {
-                item["className"]
-                    .as_str()
-                    .is_some_and(|name| name.eq_ignore_ascii_case(class))
-            })
-        })
-        .ok_or_else(|| format!("no item {class}"))
-}
-
-fn show(label: &str, block: &Value) {
-    report(&format!("{label}: {block}"));
-}
-
-fn count(catalog: &Value, block: &str) -> usize {
-    catalog["items"].as_array().map_or(0, |items| {
-        items
-            .iter()
-            .filter(|item| {
-                item.get("stats")
-                    .and_then(|stats| stats.get(block))
-                    .is_some_and(|value| !value.is_null())
-            })
-            .count()
-    })
-}
-
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn an_armour_piece_states_its_resistances_and_its_worn_values() -> TestResult {
-    let catalog = catalog()?;
-    let armour = item(&catalog, "cds_armor_heavy_core_01_01_01")?;
-    show("armor", &armour["stats"]["armor"]);
-    show("clothing", &armour["stats"]["clothing"]);
-    report(&format!(
-        "armor blocks: {}, clothing blocks: {}",
-        count(&catalog, "armor"),
-        count(&catalog, "clothing")
-    ));
-    let physical = &armour["stats"]["armor"]["damageResistance"]["physical"];
-    assert_eq!(physical["multiplier"], 0.6);
-    assert_eq!(physical["threshold"], 0.0);
-    assert_eq!(armour["stats"]["armor"]["integrityMilestoneToBreak"], 0.1);
-    let clothing = &armour["stats"]["clothing"];
-    assert_eq!(clothing["temperatureResistanceMin"], -70.0);
-    assert_eq!(clothing["temperatureResistanceMax"], 100.0);
-    assert_eq!(clothing["radiationCapacity"], 26800.0);
-    assert_eq!(clothing["radiationDissipationRate"], 145.8);
-    Ok(())
+    const ARMOR: &str = "cds_armor_heavy_core_01_01_01";
+    let catalog = item_catalog(ARMOR)?;
+    let armour = item(&catalog, ARMOR)?;
+    let suit = owner(&catalog, "/configurations/suitArmor/rows", armour)?;
+    scalar(suit, "/integrityMilestoneToBreak", 0.1)?;
+    let target = suit
+        .pointer("/damageResistance/value/targetRecordIndex/value")
+        .ok_or("an original damage resistance target")?;
+    let macro_row = definition(
+        &catalog,
+        "/definitions/damageResistanceMacros/rows",
+        target,
+        "/source/recordIndex/value",
+    )
+    .ok_or("the exact physical macro definition")?;
+    scalar(
+        macro_row,
+        "/damageResistance/value/physical/value/multiplier",
+        0.6,
+    )?;
+    scalar(
+        macro_row,
+        "/damageResistance/value/physical/value/threshold",
+        0.0,
+    )?;
+    let clothing = owner(&catalog, "/configurations/clothing/rows", armour)?;
+    scalar(
+        clothing,
+        "/temperatureResistance/value/minResistance",
+        -70.0,
+    )?;
+    scalar(
+        clothing,
+        "/temperatureResistance/value/maxResistance",
+        100.0,
+    )?;
+    scalar(
+        clothing,
+        "/radiationResistance/value/maximumRadiationCapacity",
+        26800.0,
+    )?;
+    scalar(
+        clothing,
+        "/radiationResistance/value/radiationDissipationRate",
+        145.8,
+    )
 }
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn a_clothing_piece_states_its_temperature_range() -> TestResult {
-    let catalog = catalog()?;
-    let shoes = item(&catalog, "987_shoes_01_01_01")?;
-    show("clothing", &shoes["stats"]["clothing"]);
-    show("armor", &shoes["stats"]["armor"]);
-    assert_eq!(shoes["stats"]["clothing"]["temperatureResistanceMax"], 25.0);
+    const SHOES: &str = "987_shoes_01_01_01";
+    let catalog = item_catalog(SHOES)?;
+    let shoes = owner(
+        &catalog,
+        "/configurations/clothing/rows",
+        item(&catalog, SHOES)?,
+    )?;
+    scalar(shoes, "/temperatureResistance/value/maxResistance", 25.0)?;
     assert!(
-        shoes["stats"]["clothing"]["temperatureResistanceMin"].is_number(),
-        "a minimum temperature"
+        shoes
+            .pointer("/temperatureResistance/value/minResistance/value/finite")
+            .is_some_and(Value::is_number),
+        "a readable original minimum temperature"
     );
     Ok(())
 }
@@ -100,64 +93,71 @@ fn a_clothing_piece_states_its_temperature_range() -> TestResult {
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn a_radar_states_its_aim_assist_distances() -> TestResult {
-    let catalog = catalog()?;
-    let radar = item(&catalog, "radr_bltr_s01_hunter")?;
-    show("radar", &radar["stats"]["radar"]);
-    report(&format!("radar blocks: {}", count(&catalog, "radar")));
-    assert_eq!(radar["stats"]["radar"]["aimAssistDistanceMin"], 780.0);
-    assert_eq!(radar["stats"]["radar"]["aimAssistDistanceMax"], 1028.5);
-    Ok(())
+    const RADAR: &str = "radr_bltr_s01_hunter";
+    let catalog = item_catalog(RADAR)?;
+    let radar = owner(
+        &catalog,
+        "/configurations/itemRadars/rows",
+        item(&catalog, RADAR)?,
+    )?;
+    scalar(radar, "/aimAssist/value/distanceMinAssignment", 780.0)?;
+    scalar(radar, "/aimAssist/value/distanceMaxAssignment", 1028.5)
 }
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn a_tractor_beam_states_force_distances_and_volume() -> TestResult {
-    let catalog = catalog()?;
-    let beam = item(&catalog, "grin_tractorbeam_s1")?;
-    show("tractorBeam", &beam["stats"]["tractorBeam"]);
-    report(&format!(
-        "tractor beams: {}",
-        count(&catalog, "tractorBeam")
-    ));
-    let block = &beam["stats"]["tractorBeam"];
-    assert_eq!(block["maxForce"], 500_000.0);
-    assert_eq!(block["maxDistance"], 150.0);
-    assert_eq!(block["fullStrengthDistance"], 75.0);
-    assert_eq!(block["maxVolume"], 300_000.0);
-    Ok(())
+    const TRACTOR: &str = "grin_tractorbeam_s1";
+    let catalog = item_catalog(TRACTOR)?;
+    let weapon = owner(&catalog, WEAPONS, item(&catalog, TRACTOR)?)?;
+    let action = action_nodes(weapon)
+        .find(|node| node["kind"]["type"] == "tractorBeam")
+        .ok_or("original tractor beam action")?;
+    let beam = &action["kind"]["value"];
+    scalar(beam, "/maxForce", 500_000.0)?;
+    scalar(beam, "/maxDistance", 150.0)?;
+    scalar(beam, "/fullStrengthDistance", 75.0)?;
+    scalar(beam, "/maxVolume", 300_000.0)
 }
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn a_salvage_modifier_states_its_multipliers() -> TestResult {
-    let catalog = catalog()?;
-    let scraper = item(&catalog, "salvage_modifier_scraper_medium")?;
-    show("weaponModifier", &scraper["stats"]["weaponModifier"]);
-    report(&format!(
-        "weapon modifiers: {}",
-        count(&catalog, "weaponModifier")
-    ));
-    let salvage = &scraper["stats"]["weaponModifier"]["salvage"];
-    assert_eq!(salvage["salvageSpeedMultiplier"], 0.15);
-    assert_eq!(salvage["radiusMultiplier"], 3.5);
-    assert_eq!(salvage["extractionEfficiency"], 0.9);
-    Ok(())
+    const SCRAPER: &str = "salvage_modifier_scraper_medium";
+    let catalog = item_catalog(SCRAPER)?;
+    let scraper = owner(
+        &catalog,
+        "/configurations/attachableModifiers/rows",
+        item(&catalog, SCRAPER)?,
+    )?;
+    let salvage = rows(scraper, "/modifiers/value")?
+        .iter()
+        .find_map(|row| {
+            row.pointer("/value/value/weaponModifier/value/weaponStats/value/salvageModifier/value")
+                .filter(|value| value.is_object())
+        })
+        .ok_or("authored salvage settings")?;
+    scalar(salvage, "/salvageSpeedMultiplier", 0.15)?;
+    scalar(salvage, "/radiusMultiplier", 3.5)?;
+    scalar(salvage, "/extractionEfficiency", 0.9)
 }
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn a_mining_laser_states_its_damage_per_second() -> TestResult {
-    let catalog = catalog()?;
-    let laser = item(&catalog, "mining_laser_grin_arbor_s1")?;
-    show("weapon", &laser["stats"]["weapon"]["fireActions"]);
-    let power = laser["stats"]["weapon"]["fireActions"]
-        .as_array()
-        .and_then(|actions| {
-            actions
-                .iter()
-                .find_map(|action| action["damagePerSecond"]["energy"].as_f64())
-        });
-    assert_eq!(power, Some(2340.0));
+    const LASER: &str = "mining_laser_grin_arbor_s1";
+    let catalog = item_catalog(LASER)?;
+    let weapon = owner(&catalog, WEAPONS, item(&catalog, LASER)?)?;
+    let beam = action_nodes(weapon)
+        .find_map(|node| {
+            node.pointer("/kind/value/damagePerSecond/value/value/energy")
+                .filter(|cell| cell["state"] == "present")
+        })
+        .ok_or("original energy damage rate")?;
+    assert_eq!(
+        beam["value"]["finite"], 2340.0,
+        "the first authored beam damage rate"
+    );
     Ok(())
 }
 
@@ -165,12 +165,12 @@ fn a_mining_laser_states_its_damage_per_second() -> TestResult {
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn every_gameplay_property_is_traced_to_a_stat_field_or_listed_as_none() -> TestResult {
     let catalog = catalog()?;
-    let properties = catalog["gameplayProperties"]
-        .as_array()
-        .ok_or("the gameplayProperties array")?;
+    let properties = catalog_v3_consumer::rows(&catalog, Kind::GameplayProperties)?;
     let mut untraced = Vec::new();
     for property in properties {
-        let class = property["className"].as_str().ok_or("a className")?;
+        let class = catalog_v3_consumer::field(property, Kind::GameplayProperties, "className")?
+            .as_str()
+            .ok_or("a present className")?;
         let row = DOCS
             .lines()
             .find(|line| line.starts_with("| `") && line.contains(&format!("`{class}`")));
@@ -194,20 +194,18 @@ fn every_gameplay_property_is_traced_to_a_stat_field_or_listed_as_none() -> Test
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn fire_modes_state_their_pellets() -> TestResult {
     let catalog = catalog()?;
-    let items = catalog["items"].as_array().ok_or("the items")?;
-    let mut modes = 0_usize;
-    let mut with_pellets = 0_usize;
-    for item in items {
-        let Some(actions) = item["stats"]["weapon"]["fireActions"].as_array() else {
-            continue;
-        };
-        for action in actions {
-            modes += 1;
-            if action["pellets"].as_i64().is_some_and(|count| count > 0) {
-                with_pellets += 1;
-            }
-        }
-    }
+    let weapons = rows(&catalog, WEAPONS)?;
+    let modes = weapons.iter().flat_map(action_nodes).count();
+    let with_pellets = weapons
+        .iter()
+        .flat_map(action_nodes)
+        .filter(|action| {
+            action
+                .pointer("/kind/value/launchParams/value/pelletCount/value")
+                .and_then(Value::as_i64)
+                .is_some_and(|count| count > 0)
+        })
+        .count();
     report(&format!(
         "fire modes: {modes}, with pellets: {with_pellets}"
     ));

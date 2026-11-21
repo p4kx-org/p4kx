@@ -5,15 +5,14 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use p4kx_extraction::{
-    CancelToken, ScreenTexts, WriteRefused, ensure_writable, is_same_file, write_bytes_replacing,
+    ArchiveWriteProtection, CancelToken, ScreenTexts, WriteProtectionError, is_same_file,
 };
-use p4kx_screens::{StillFormat, StillRequest};
+use p4kx_screens::{ArchiveScreen, ArchiveScreenError, ScreenError, StillFormat, StillRequest};
 
 use super::job::{Job, Poll};
 use super::render::{Fail, RenderKey, UiSource, checkpoint, open_movie, reason};
 use super::report::UiReport;
 use super::settings::UiFormat;
-use super::still;
 use crate::EntryIndex;
 use crate::UiText;
 
@@ -44,8 +43,8 @@ pub enum UiExportStatus<'a> {
     IsArchive,
     /// The Archive changed on disk before the file was written, so nothing was written.
     ArchiveChanged,
-    /// The file lies inside this Star Citizen installation, where nothing is written.
-    Refused(&'a Path),
+    /// The output violates a protection or identity boundary.
+    Refused(&'a WriteProtectionError),
     /// Writing failed for the reason given, or stopped without a result.
     Failed(Option<&'a str>),
 }
@@ -57,6 +56,7 @@ enum Outcome {
     ArchiveChanged,
     Stopped,
     Failed(String),
+    Refused(WriteProtectionError),
 }
 
 enum State {
@@ -65,7 +65,7 @@ enum State {
     DoneArchiveChanged(UiExportSummary),
     IsArchive,
     ArchiveChanged,
-    Refused(PathBuf),
+    Refused(WriteProtectionError),
     Failed(Option<String>),
 }
 
@@ -129,6 +129,7 @@ impl UiExport {
             Poll::Ready(Outcome::IsArchive) => State::IsArchive,
             Poll::Ready(Outcome::ArchiveChanged) => State::ArchiveChanged,
             Poll::Ready(Outcome::Failed(reason)) => State::Failed(Some(reason)),
+            Poll::Ready(Outcome::Refused(error)) => State::Refused(error),
             Poll::Ready(Outcome::Stopped) | Poll::Lost => State::Failed(None),
         };
         true
@@ -143,11 +144,11 @@ pub(super) struct Request {
     pub(super) texts: Option<Arc<ScreenTexts>>,
 }
 
-/// Returns the export that did not start because `file` lies inside a Star Citizen installation.
-pub(super) fn refused(file: PathBuf, refused: WriteRefused) -> UiExport {
+/// Returns an export refused by an output-protection boundary.
+pub(super) const fn refused(file: PathBuf, refused: WriteProtectionError) -> UiExport {
     UiExport {
         file,
-        state: State::Refused(refused.installation),
+        state: State::Refused(refused),
     }
 }
 
@@ -175,15 +176,14 @@ fn run(index: &EntryIndex, request: &Request, cancel: &CancelToken) -> Outcome {
     if index.watch().check().is_err() {
         return Outcome::ArchiveChanged;
     }
-    let written = ensure_writable(&request.file)
-        .map_err(|error| reason(&error))
-        .and_then(|()| write(index, request, cancel));
+    let written = write(index, request, cancel);
     match written {
         Ok(summary) if index.watch().check().is_err() => Outcome::DoneArchiveChanged(summary),
         Ok(summary) => Outcome::Done(summary),
         Err(Fail::ArchiveChanged) => Outcome::ArchiveChanged,
         Err(Fail::Stopped) => Outcome::Stopped,
         Err(Fail::Reason(reason)) => Outcome::Failed(reason),
+        Err(Fail::Protected(error)) => Outcome::Refused(error),
     }
 }
 
@@ -254,11 +254,8 @@ fn write_screen(
     let (key, file) = (&request.key, &request.file);
     let source = index.forge().read(index, || {})?;
     checkpoint(cancel)?;
-    let forge = source.entry.open().map_err(|e| reason(&e))?;
-    let texts = match request.texts.clone() {
-        Some(texts) => texts,
-        None => Arc::new(still::load_texts(index, &forge, key.language)?),
-    };
+    let archive = index.entries_archive().map_err(|error| reason(&error))?;
+    let screen = ArchiveScreen::new(archive, &source.entry).map_err(|error| reason(&error))?;
     checkpoint(cancel)?;
     let asked = StillRequest {
         screen: canvas,
@@ -270,14 +267,34 @@ fn write_screen(
             UiFormat::Svg => StillFormat::Svg,
         },
     };
-    let (still, warnings) = still::draw(index, &forge, &texts, &asked, cancel)?;
+    let draw = |texts: &ScreenTexts| {
+        let mut warnings = Vec::new();
+        screen
+            .render(texts, &asked, cancel, &mut warnings)
+            .map(|drawn| (drawn, warnings))
+    };
+    let (drawn, warnings) = request
+        .texts
+        .as_deref()
+        .map_or_else(|| draw(&screen.load_texts(key.language)), draw)
+        .map_err(|error| match error {
+            ArchiveScreenError::Draw(ScreenError::Stopped) => Fail::Stopped,
+            other => reason(&other),
+        })?;
     checkpoint(cancel)?;
-    let bytes = still.encode().map_err(|e| reason(&e))?;
-    write_bytes_replacing(file, &bytes).map_err(|e| reason(&e))?;
+    if index.watch().check().is_err() {
+        return Err(Fail::ArchiveChanged);
+    }
+    let protection =
+        ArchiveWriteProtection::new(index.path(), cancel.flag()).map_err(|error| reason(&error))?;
+    drawn
+        .publish(file, &protection, cancel)
+        .map_err(|error| reason(&error))?;
+    let still = drawn.still();
     Ok(UiExportSummary {
         file: file.clone(),
         width: still.width(),
         height: still.height(),
-        left_out: counted(&UiReport::of_still(&still, &warnings)),
+        left_out: counted(&UiReport::of_still(still, &warnings)),
     })
 }

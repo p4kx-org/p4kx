@@ -112,6 +112,46 @@ fn the_json_report_has_a_stable_shape() -> TestResult {
 }
 
 #[test]
+fn physical_fallback_preserves_the_authored_library_failure() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let mut entries = assembly_entries();
+    entries.retain(|entry| !entry.path().ends_with("ship.mtl"));
+    entries.push(TestEntry::stored(
+        "Data/Materials/material_default.mtl",
+        br#"<Material Name="archive-fallback" Shader="Illum" Diffuse="0.1,0.2,0.3"/>"#,
+    ));
+    let archive = write_archive(dir.path(), entries)?;
+    let out = dir.path().join("physical.glb");
+    let run = glb(&archive, &out, &[], true)?;
+    assert_eq!(run.code, Some(0), "{}", run.stderr);
+    let report: serde_json::Value = serde_json::from_str(&run.stdout)?;
+    assert_eq!(
+        report["default_material"]["state"], "resolved",
+        "actual archive lookup"
+    );
+    assert_eq!(
+        report["default_material"]["source"]["contains_encrypted_source"], false,
+        "the original fallback Entry is unencrypted"
+    );
+    assert!(
+        report["issues"]
+            .as_array()
+            .ok_or("assembly issues")?
+            .iter()
+            .any(|issue| issue["kind"] == "material_library"),
+        "authored library remains independently missing"
+    );
+    let glb = check_glb(&std::fs::read(&out)?)?;
+    assert!(
+        glb.document
+            .materials()
+            .any(|material| material.name() == Some("archive-fallback")),
+        "the combined scene uses the physical material"
+    );
+    Ok(())
+}
+
+#[test]
 fn an_output_that_is_the_archive_is_invalid_input() -> TestResult {
     let dir = tempfile::tempdir()?;
     let archive = write_archive(dir.path(), assembly_entries())?;

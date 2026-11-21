@@ -12,6 +12,9 @@ use p4kx_texture::{
     DdsHeader, Mip, RgbaImage, SiblingReader, TextureError, cube_cross, merge, read_mip,
 };
 
+#[path = "merge_spans.rs"]
+mod merge_spans;
+
 /// Parts held in memory, by part number.
 struct Parts(BTreeMap<u32, Vec<u8>>);
 
@@ -201,7 +204,7 @@ fn a_cubemap_mip_holds_every_face_from_its_part_or_the_header() -> Result<(), Te
         assert_eq!(mip.surfaces(), 6, "six faces of mip {level}");
         for face in 0..6 {
             assert_eq!(
-                mip.surface(face),
+                mip.surface(u64::from(face)),
                 Some(dds.surface_mip(face, level).as_slice()),
                 "face {face} of mip {level}"
             );

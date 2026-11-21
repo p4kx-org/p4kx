@@ -15,7 +15,7 @@ use p4kx_testkit::{ArchiveBuilder, TestEntry, write_build_manifest};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-fn entries_only() -> CompareOptions<'static> {
+pub(super) fn entries_only() -> CompareOptions<'static> {
     CompareOptions {
         levels: Levels::ENTRIES,
         ..CompareOptions::default()
@@ -30,7 +30,7 @@ fn write(dir: &Path, channel: &str, builder: &ArchiveBuilder) -> Result<PathBuf,
     Ok(path)
 }
 
-fn pair() -> Result<(tempfile::TempDir, Archive, Archive), Box<dyn Error>> {
+pub(super) fn pair() -> Result<(tempfile::TempDir, Archive, Archive), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let old = ArchiveBuilder::new()
         .entry(TestEntry::stored("Data\\same.txt", b"same".to_vec()))

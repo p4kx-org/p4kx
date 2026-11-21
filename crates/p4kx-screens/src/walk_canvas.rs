@@ -8,6 +8,7 @@ use p4kx_dataforge::Guid;
 
 use crate::canvas::{Canvas, find_canvas};
 use crate::colour::Palette;
+use crate::elements;
 use crate::fit::fit;
 use crate::layout::Frame;
 use crate::paint::Area;
@@ -27,8 +28,22 @@ impl Walk<'_, '_, '_, '_> {
         depth: usize,
         sizing: CanvasSizing,
     ) {
+        self.enter_roots(canvas, &canvas.roots, frame, alpha, depth, sizing);
+    }
+
+    fn enter_roots(
+        &mut self,
+        canvas: &Canvas,
+        roots: &[usize],
+        frame: Area,
+        alpha: f32,
+        depth: usize,
+        sizing: CanvasSizing,
+    ) {
         self.cx.report.canvases += 1;
         self.stack.push(canvas.guid);
+        #[cfg(test)]
+        self.trace_enter_canvas(canvas, roots);
         let sheet = self.sheet(canvas);
         self.note_unsupported(canvas.guid, &sheet);
         self.sheets.push(sheet);
@@ -58,7 +73,9 @@ impl Walk<'_, '_, '_, '_> {
             }
         }
         self.push_chain(&over);
-        self.lay_out(canvas, frame, alpha, depth, sizing);
+        self.lay_out(canvas, roots, frame, alpha, depth, sizing);
+        #[cfg(test)]
+        self.trace_leave_canvas();
         self.chain.pop();
         self.cx.palette = inherited;
         self.rests.pop();
@@ -73,6 +90,7 @@ impl Walk<'_, '_, '_, '_> {
     fn lay_out(
         &mut self,
         canvas: &Canvas,
+        roots: &[usize],
         frame: Area,
         alpha: f32,
         depth: usize,
@@ -93,9 +111,9 @@ impl Walk<'_, '_, '_, '_> {
             let frame = Frame {
                 content: fitted.layout,
                 flex: None,
+                owner: None,
                 centred: fitted.centred,
             };
-            let roots = &canvas.roots;
             self.siblings(canvas, roots, roots.len(), &frame, alpha, depth);
             self.chain.pop();
             if scaled {
@@ -147,7 +165,10 @@ impl Walk<'_, '_, '_, '_> {
                     uses = uses.or(over.uses());
                     reachable.extend(over.canvases());
                 }
-                reachable.extend(widget.canvas);
+                reachable.extend(widget.canvas.guid());
+                if widget.button.is_some() {
+                    reachable.extend(elements::standard_canvas(widget, self.store.forge()));
+                }
                 reachable.extend(
                     widget
                         .inline
@@ -215,7 +236,7 @@ impl Walk<'_, '_, '_, '_> {
     pub(crate) fn nested(
         &mut self,
         guid: Guid,
-        handover: Handover,
+        mut handover: Handover<'_>,
         frame: Area,
         sizing: CanvasSizing,
         alpha: f32,
@@ -232,10 +253,33 @@ impl Walk<'_, '_, '_, '_> {
             self.cx.report.missing_canvases.push(guid.to_string());
             return;
         };
+        let widget = handover.widget;
+        let proxy = if let Some(button) = widget.button.as_deref() {
+            let Some(proxy) = button.template_root(&canvas) else {
+                self.cx.report.note(
+                    &widget.type_name,
+                    button.missing_root_reason(),
+                    &widget.name,
+                );
+                return;
+            };
+            button.transfer(
+                (canvas.as_ref(), proxy),
+                self.tags,
+                &mut handover,
+                &mut self.cx.report,
+            );
+            Some(proxy)
+        } else {
+            None
+        };
+        let roots = proxy
+            .as_ref()
+            .map_or(canvas.roots.as_slice(), std::slice::from_ref);
         self.params.push(handover.text);
         self.typed.push(handover.typed);
         self.pending_sheet = handover.stylesheet;
-        self.enter(&canvas, frame, alpha, depth, sizing);
+        self.enter_roots(&canvas, roots, frame, alpha, depth, sizing);
         self.typed.pop();
         self.params.pop();
     }

@@ -1,0 +1,137 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use p4kx_extraction::SourcedValue;
+use schemars::JsonSchema;
+use serde::Serialize;
+
+use super::authored_fields::Observed;
+use super::catalog_unit_source::UnitSource;
+use crate::CatalogError;
+use crate::resource_float::ResourceFloat32;
+use crate::schema_fields::every_field_required;
+use crate::source_fields::FieldError;
+
+use super::cargo_source::{BASE, CargoUnit};
+
+/// A capacity retains the concrete unit and its own stored numeric member.
+#[derive(Debug, Serialize, JsonSchema)]
+#[non_exhaustive]
+#[serde(
+    tag = "kind",
+    rename_all = "camelCase",
+    rename_all_fields = "camelCase"
+)]
+#[schemars(transform = every_field_required)]
+pub enum ResourceCapacity<'source> {
+    /// The base capacity source without a concrete numeric unit.
+    Base {
+        /// The original concrete type and unprojected members.
+        #[serde(flatten)]
+        source: UnitSource<'source>,
+    },
+    /// An original capacity in centi-SCU.
+    CentiCargoUnit {
+        /// The original concrete type and unprojected members.
+        #[serde(flatten)]
+        source: UnitSource<'source>,
+        /// The original centi-SCU amount.
+        #[serde(rename = "centiSCU")]
+        centi_scu: SourcedValue<i32>,
+    },
+    /// An original capacity in micro-SCU.
+    MicroCargoUnit {
+        /// The original concrete type and unprojected members.
+        #[serde(flatten)]
+        source: UnitSource<'source>,
+        /// The original micro-SCU amount.
+        #[serde(rename = "microSCU")]
+        micro_scu: SourcedValue<i32>,
+    },
+    /// An original capacity in standard cargo units.
+    StandardCargoUnit {
+        /// The original concrete type and unprojected members.
+        #[serde(flatten)]
+        source: UnitSource<'source>,
+        /// The original standard-cargo-unit amount.
+        standard_cargo_units: SourcedValue<ResourceFloat32>,
+    },
+    /// A retained concrete subtype outside the recognized capacity units.
+    UnknownUnit {
+        /// The original concrete type and unprojected members.
+        #[serde(flatten)]
+        source: UnitSource<'source>,
+    },
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum CargoAmount<'amount> {
+    Standard(&'amount SourcedValue<ResourceFloat32>),
+    Integer(CargoUnit, &'amount SourcedValue<i32>),
+}
+
+impl<'source> ResourceCapacity<'source> {
+    /// Borrows the concrete capacity type and unprojected original members.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        match self {
+            Self::Base { source }
+            | Self::CentiCargoUnit { source, .. }
+            | Self::MicroCargoUnit { source, .. }
+            | Self::StandardCargoUnit { source, .. }
+            | Self::UnknownUnit { source } => source,
+        }
+    }
+
+    pub(super) const fn cargo_amount(&self) -> Option<CargoAmount<'_>> {
+        match self {
+            Self::StandardCargoUnit {
+                standard_cargo_units,
+                ..
+            } => Some(CargoAmount::Standard(standard_cargo_units)),
+            Self::CentiCargoUnit { centi_scu, .. } => {
+                Some(CargoAmount::Integer(CargoUnit::Centi, centi_scu))
+            }
+            Self::MicroCargoUnit { micro_scu, .. } => {
+                Some(CargoAmount::Integer(CargoUnit::Micro, micro_scu))
+            }
+            Self::Base { .. } | Self::UnknownUnit { .. } => None,
+        }
+    }
+
+    pub(super) fn read(
+        source: Observed<'_, '_, '_, 'source>,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<Self, CatalogError> {
+        let name = source.source_type()?;
+        let Some(unit) = CargoUnit::from_source(name) else {
+            let source = UnitSource::read(source, [])?;
+            return Ok(if name == BASE {
+                Self::Base { source }
+            } else {
+                Self::UnknownUnit { source }
+            });
+        };
+        let field = unit.amount_field();
+        Ok(match unit {
+            CargoUnit::Centi => {
+                let centi_scu = source.int32(field, notes)?;
+                let source = UnitSource::read(source, [(field, centi_scu.state())])?;
+                Self::CentiCargoUnit { source, centi_scu }
+            }
+            CargoUnit::Micro => {
+                let micro_scu = source.int32(field, notes)?;
+                let source = UnitSource::read(source, [(field, micro_scu.state())])?;
+                Self::MicroCargoUnit { source, micro_scu }
+            }
+            CargoUnit::Standard => {
+                let standard_cargo_units = source.single(field, notes)?;
+                let source = UnitSource::read(source, [(field, standard_cargo_units.state())])?;
+                Self::StandardCargoUnit {
+                    source,
+                    standard_cargo_units,
+                }
+            }
+        })
+    }
+}

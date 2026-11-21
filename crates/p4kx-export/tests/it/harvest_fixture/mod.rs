@@ -4,6 +4,7 @@
 //! A synthetic Archive with mining and harvestable Records and the containers that name a
 //! provider preset in their `.soc`.
 
+use std::convert::identity;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
@@ -15,9 +16,11 @@ use p4kx_testkit::{
 use crate::starmap_fixture::{child, children, guid_text};
 
 mod mineables;
+mod provider;
 mod structures;
 
 pub(crate) use mineables::Radar;
+use provider::provider;
 use structures::structures;
 
 pub(crate) const RESOURCE: u128 = 0x7000_0000_0000_4000_8000_0000_0000_0001;
@@ -60,6 +63,7 @@ fn part(minimum: f32, element: u128) -> TestValue {
             .value("minPercentage", TestValue::Single(minimum))
             .value("maxPercentage", TestValue::Single(70.0))
             .value("probability", TestValue::Single(0.8))
+            .value("qualityScale", TestValue::Double(0.500_000_000_000_000_1))
             .value("mineableElement", TestValue::Reference(element)),
     )
 }
@@ -114,65 +118,6 @@ fn ship_params(mass_multiplier: bool) -> TestRecord {
         "MiningGlobalParamsShip",
         100.0,
         mass_multiplier.then_some(1.5),
-    )
-}
-
-fn harvestable_entry(harvestable: Option<u128>, entity: Option<u128>) -> TestValue {
-    let mut element = TestInstance::new("HarvestableElement")
-        .value("relativeProbability", TestValue::Single(22.0))
-        .value("clustering", TestValue::Reference(RESOURCE))
-        .value(
-            "geometries",
-            TestValue::Array(vec![TestValue::Struct(
-                TestInstance::new("HarvestableGeometry")
-                    .value("tag", TestValue::Reference(RESOURCE)),
-            )]),
-        );
-    if let Some(harvestable) = harvestable {
-        element = element.value("harvestable", TestValue::Reference(harvestable));
-    }
-    if let Some(entity) = entity {
-        element = element.value("harvestableEntityClass", TestValue::Reference(entity));
-    }
-    TestValue::Struct(element)
-}
-
-fn provider(guid: u128, name: &str, with_entity_only: bool) -> TestRecord {
-    let mut elements = vec![harvestable_entry(Some(HARVESTABLE), None)];
-    if with_entity_only {
-        elements.push(harvestable_entry(None, Some(ENTITY)));
-    }
-    record(
-        guid,
-        "HarvestableProviderPreset",
-        name,
-        &format!("{PRESETS}{}", name.to_lowercase()),
-    )
-    .value(
-        "harvestableGroups",
-        TestValue::Array(vec![TestValue::Struct(
-            TestInstance::new("HarvestableElementGroup")
-                .value("groupName", TestValue::text("SpaceShip_Mineables"))
-                .value("groupProbability", TestValue::Single(6.0))
-                .value("harvestables", TestValue::Array(elements)),
-        )]),
-    )
-    .value(
-        "areas",
-        TestValue::Array(vec![TestValue::Struct(
-            TestInstance::new("HarvestableAreaPreset")
-                .value("debugGroupName", TestValue::text("Acidic"))
-                .value("globalModifier", TestValue::Single(1.0))
-                .value(
-                    "areaType",
-                    TestValue::Struct(TestInstance::new("HarvestableAreaTypeObjectPreset").value(
-                        "objectPresetPaths",
-                        TestValue::Array(vec![TestValue::text(
-                            "Libs/ObjectPresets/PU/system/stanton/hurston/acidic_pools_01.opr",
-                        )]),
-                    )),
-                ),
-        )]),
     )
 }
 
@@ -346,26 +291,36 @@ pub(crate) fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
 
 /// Writes the fixture Archive whose radar parameters are `radar` into `dir`.
 pub(crate) fn write_archive_with(dir: &Path, radar: Radar) -> Result<PathBuf, Box<dyn Error>> {
-    write_archive_layout(dir, radar, true)
+    write_archive_layout(dir, radar, true, identity)
 }
 
 /// Writes the fixture Archive whose `MiningGlobalParams` struct lacks the mass multiplier, as in
 /// an older game version, into `dir`.
 pub(crate) fn write_archive_without_mass_multiplier(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
-    write_archive_layout(dir, Radar::Named, false)
+    write_archive_layout(dir, Radar::Named, false, identity)
+}
+
+/// Writes the same fixture with a readable DataForge and unknown stored encryption.
+pub(crate) fn write_archive_with_unknown_dcb_encryption(
+    dir: &Path,
+) -> Result<PathBuf, Box<dyn Error>> {
+    const UNKNOWN_ENCRYPTION_DECLARATION: u16 = 7;
+    write_archive_layout(dir, Radar::Named, true, |entry| {
+        entry.with_encryption_field(UNKNOWN_ENCRYPTION_DECLARATION)
+    })
 }
 
 fn write_archive_layout(
     dir: &Path,
     radar: Radar,
     mass_multiplier: bool,
+    mark_dcb: impl FnOnce(TestEntry) -> TestEntry,
 ) -> Result<PathBuf, Box<dyn Error>> {
     let path = dir.join("Data.p4k");
+    let dcb =
+        TestEntry::zstd("Data\\Game2.dcb", database(radar, mass_multiplier).build()).encrypted();
     ArchiveBuilder::new()
-        .entry(
-            TestEntry::zstd("Data\\Game2.dcb", database(radar, mass_multiplier).build())
-                .encrypted(),
-        )
+        .entry(mark_dcb(dcb))
         .entry(TestEntry::zstd(
             "Data\\Localization\\english\\global.ini",
             GlobalIniBuilder::new()

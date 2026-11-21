@@ -11,7 +11,8 @@ use p4kx_dataforge::{
 use rayon::prelude::*;
 
 use crate::counting::{Counting, holds};
-use crate::write::{create_temporary, read_existing_error, write_error};
+use crate::output_creation::create_temporary_protected;
+use crate::write::{read_existing_error, write_error};
 use crate::{
     CancelToken, ConflictPolicy, ExtractionError, RecordExportError, RecordExportOptions,
     RecordExportReport, RecordFailure,
@@ -45,31 +46,55 @@ pub fn export_combined(
     file: &Path,
     options: &RecordExportOptions<'_>,
 ) -> Result<RecordExportReport, ExtractionError> {
-    p4kx_guard::ensure_writable(file)?;
+    let mut report = RecordExportReport::default();
+    let mut selected = records.len();
+    match write_combined(forge, records, file, options, &mut report, &mut selected) {
+        Ok(()) => Ok(report),
+        Err(error) if crate::guard_cancellation::extraction_cancelled(&error) => {
+            Ok(RecordExportReport {
+                cancelled: selected.saturating_sub(report.failures.len()),
+                failures: report.failures,
+                ..RecordExportReport::default()
+            })
+        }
+        Err(error) => Err(error),
+    }
+}
+
+fn write_combined(
+    forge: &DataForge<'_>,
+    records: &[Record<'_>],
+    file: &Path,
+    options: &RecordExportOptions<'_>,
+    report: &mut RecordExportReport,
+    selected: &mut usize,
+) -> Result<(), ExtractionError> {
+    crate::check_protected_output(file, options.protection, options.cancel)?;
     let name = file
         .file_name()
         .ok_or_else(|| write_error(file.to_path_buf(), io::ErrorKind::InvalidInput.into()))?
         .to_string_lossy()
         .into_owned();
     let existing = existing_file(file)?;
-    let mut report = RecordExportReport::default();
     if existing && options.policy == ConflictPolicy::Skip {
         report.skipped.push(name);
-        return Ok(report);
+        return Ok(());
     }
-    let order = order(forge, records, &mut report);
+    let order = order(forge, records, report);
     let foreign = report.failures.len();
+    *selected = order.len().saturating_add(foreign);
     let folder = match file.parent() {
         Some(parent) if !parent.as_os_str().is_empty() => parent.to_path_buf(),
         _ => PathBuf::from("."),
     };
-    let (temporary, part) = create_temporary(&folder)?;
+    let (temporary, part, ownership) =
+        create_temporary_protected(&folder, options.protection, options.cancel)?;
     let streamed = Document::new(part, file)
-        .and_then(|document| document.stream(records, &order, options, &mut report));
+        .and_then(|document| document.stream(records, &order, options, report));
     let placed = streamed.and_then(|streamed| {
         let Some((len, crc)) = streamed else {
             let failed = report.failures.len().saturating_sub(foreign);
-            report = RecordExportReport {
+            *report = RecordExportReport {
                 cancelled: order.len().saturating_sub(failed),
                 failures: report.failures.split_off(0),
                 ..RecordExportReport::default()
@@ -85,14 +110,21 @@ pub fn export_combined(
             report.written = 0;
             return Ok(false);
         }
+        crate::check_protected_output(file, options.protection, options.cancel)?;
+        ownership.ensure_writable(&temporary, crate::output_file::cancel_flag(options.cancel))?;
         fs::rename(&temporary, file)
             .map(|()| true)
             .map_err(|source| write_error(file.to_path_buf(), source))
     });
     if !matches!(placed, Ok(true)) {
-        let _ignored = fs::remove_file(&temporary);
+        return crate::output_cleanup::extraction(
+            placed.map(|_| ()),
+            &ownership,
+            &temporary,
+            options.cancel,
+        );
     }
-    placed.map(|_| report)
+    placed.map(|_| ())
 }
 
 /// Returns whether a file is at `file`; a folder or link there is an error.

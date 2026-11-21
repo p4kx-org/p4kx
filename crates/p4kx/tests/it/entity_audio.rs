@@ -12,6 +12,9 @@ use p4kx_testkit::{
     audio_schema, entity_schema, real_archive_path, wwise_short_id,
 };
 
+#[path = "entity_audio_origin_tests.rs"]
+mod origins;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const PLAY: u16 = 0x0403;
@@ -124,7 +127,8 @@ fn the_triggers_are_listed_with_events_and_soundbanks_as_text() -> TestResult {
 fn the_triggers_are_listed_as_json_with_a_stable_shape() -> TestResult {
     let run = sample("0079c5d5-1678-4f8c-85ba-18ca8f642af6", true, 0)?;
     assert_eq!(run.stdout.lines().count(), 1, "one line of JSON");
-    let value: serde_json::Value = serde_json::from_str(&run.stdout)?;
+    let mut value: serde_json::Value = serde_json::from_str(&run.stdout)?;
+    super::wwise_resolve::remove_origins_for_payload_snapshot(&mut value)?;
     insta::assert_snapshot!(serde_json::to_string_pretty(&value)?);
     Ok(())
 }

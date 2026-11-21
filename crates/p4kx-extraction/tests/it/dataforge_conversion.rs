@@ -365,6 +365,7 @@ fn cryxml_textures_and_the_dataforge_convert_in_one_run() -> TestResult {
         files(&fixture.target)?,
         [
             "Data/Textures/rock_diff.dds",
+            "Data/Textures/rock_diff.dds.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.png",
             "Data/libs/foundry/records/items/n0.xml",
             "Data/libs/foundry/records/items/n1.xml",

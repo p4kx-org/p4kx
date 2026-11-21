@@ -1,14 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use serde::ser::{SerializeSeq, SerializeStruct};
+use serde::ser::{Error as _, SerializeSeq, SerializeStruct};
 use serde::{Serialize, Serializer};
 
+use crate::line_diff_origins;
 use crate::{DiffBody, DiffLine, Encoding, Entry, Hunk, LineDiff, NotText};
 
 impl Serialize for LineDiff<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        let mut out = serializer.serialize_struct("LineDiff", 7)?;
+        let origins = line_diff_origins::capture(self).map_err(S::Error::custom)?;
+        let mut out = serializer.serialize_struct("LineDiff", 9)?;
         out.serialize_field("path", self.path())?;
         match self.kind() {
             Some(kind) => out.serialize_field("change", &kind)?,
@@ -25,6 +27,8 @@ impl Serialize for LineDiff<'_> {
             &self.new_entry().map(|e| Side(e, self.new_encoding())),
         )?;
         out.serialize_field("hunks", &Hunks(self.body()))?;
+        out.serialize_field("fieldOrigins", &origins.field_origins)?;
+        out.serialize_field("provenance", &origins.provenance)?;
         out.end()
     }
 }

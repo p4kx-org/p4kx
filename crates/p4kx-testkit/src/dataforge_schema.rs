@@ -170,6 +170,7 @@ pub struct TestRecord {
     pub(crate) name: String,
     pub(crate) file_name: String,
     pub(crate) tag: String,
+    pub(crate) instance_index: Option<u16>,
     pub(crate) without_name: bool,
     pub(crate) without_tag: bool,
     pub(crate) values: Vec<(String, TestValue)>,
@@ -194,10 +195,18 @@ impl TestRecord {
             name: name.into(),
             file_name: file_name.into(),
             tag: String::new(),
+            instance_index: None,
             without_name: false,
             without_tag: false,
             values: Vec::new(),
         }
+    }
+
+    /// Stores an explicit original Record instance index instead of the assigned one.
+    #[must_use]
+    pub const fn with_instance_index(mut self, instance_index: u16) -> Self {
+        self.instance_index = Some(instance_index);
+        self
     }
 
     /// Sets the tag a version 8 database stores with the Record, e.g. `SystemsDesign`; it is

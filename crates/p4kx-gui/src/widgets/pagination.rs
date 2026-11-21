@@ -14,7 +14,7 @@ use crate::theme::desktop::{
     PAGE_STATUS_PADDING_X, TRANSITION,
 };
 use crate::theme::palette;
-use crate::theme::tokens::{CORNER_SM, TOUCH_TARGET};
+use crate::theme::tokens::{CORNER_CONTROL, TOUCH_TARGET};
 
 /// The accessible names of the page buttons and of the page status.
 #[derive(Debug, Clone, Copy)]
@@ -125,10 +125,10 @@ fn page_button(ui: &mut Ui, step: Step, name: &str, enabled: bool) -> Response {
     let border = dim(palette::CONTROL_BORDER.lerp_to_gamma(palette::PRIMARY, hover));
     let colour = dim(palette::CONTROL_FG.lerp_to_gamma(palette::PRIMARY, hover));
     let painter = ui.painter();
-    painter.rect_filled(rect, CORNER_SM, dim(palette::CONTROL_BG));
+    painter.rect_filled(rect, CORNER_CONTROL, dim(palette::CONTROL_BG));
     painter.rect_stroke(
         rect,
-        CORNER_SM,
+        CORNER_CONTROL,
         Stroke::new(1.0, border),
         StrokeKind::Inside,
     );

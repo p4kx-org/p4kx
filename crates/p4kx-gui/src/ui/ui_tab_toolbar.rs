@@ -17,8 +17,8 @@ use crate::widgets::indicator;
 use crate::widgets::tab;
 use crate::widgets::text::{line, plain};
 use crate::{
-    ExtractionText, Model, Texts, UiBackground, UiExport, UiExportStatus, UiExportSummary,
-    UiFormat, UiMode, UiPower, UiSettings, UiSize, UiText, format,
+    Model, Texts, UiBackground, UiExport, UiExportStatus, UiExportSummary, UiFormat, UiMode,
+    UiPower, UiSettings, UiSize, UiText, format,
 };
 
 /// A labelled group of segments.
@@ -320,14 +320,8 @@ fn status_line(texts: &Texts, export: &UiExport) -> (String, Color32, bool) {
             palette::WARNING,
             false,
         ),
-        UiExportStatus::Refused(installation) => (
-            texts.format(
-                ExtractionText::TargetInInstallation,
-                &[(
-                    "installation",
-                    FluentValue::from(installation.display().to_string()),
-                )],
-            ),
+        UiExportStatus::Refused(refused) => (
+            crate::installation::message(texts, refused),
             palette::DANGER_TEXT,
             false,
         ),

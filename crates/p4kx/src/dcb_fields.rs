@@ -119,7 +119,7 @@ fn statistics(forge: &DataForge<'_>, selection: Option<&Selection>) -> Result<Fi
         .query
         .compile(forge)
         .map_err(|error| compile_error(&error, &selection.text))?;
-    let run = compiled.run();
+    let run = compiled.run()?;
     Ok(FieldStatistics::of_records(forge, run.indexes())?)
 }
 

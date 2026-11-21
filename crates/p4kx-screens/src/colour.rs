@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use p4kx_dataforge::{DataForge, Guid, RecordTree, Value};
 use p4kx_gfx::Rgba;
 
-use crate::canvas::{Canvas, StyleRef};
+use crate::canvas::{BrandStyle, Canvas, StyleRef};
 use crate::reader::{as_struct, child, float, int, items, reference};
 
 const COLOUR_SLOT_MARKERS: [&str; 3] = ["Base", "Accent1", "Bright"];
@@ -64,14 +64,25 @@ pub(crate) fn slot_names(forge: &DataForge<'_>) -> Vec<String> {
     Vec::new()
 }
 
+#[cfg(test)]
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct PaletteSite {
+    pub(crate) record_index: u32,
+    pub(crate) slot: usize,
+}
+
 #[derive(Debug, Clone, Default)]
 pub(crate) struct Palette {
     slots: HashMap<String, Rgba>,
+    #[cfg(test)]
+    pub(crate) sources: HashMap<String, PaletteSite>,
 }
 
 impl Palette {
     pub(crate) fn overlay(&mut self, other: Self) {
         self.slots.extend(other.slots);
+        #[cfg(test)]
+        self.sources.extend(other.sources);
     }
 
     pub(crate) fn of_canvas(
@@ -83,7 +94,10 @@ impl Palette {
         cache: &mut HashMap<Guid, Self>,
     ) -> Self {
         let own = cache.entry(canvas.guid).or_insert_with(|| {
-            let chosen = canvas.pick_brand(brand).map(|chosen| &chosen.style);
+            let chosen = canvas
+                .pick_brand(brand)
+                .into_iter()
+                .flat_map(BrandStyle::styles);
             let styles: Vec<&StyleRef> = canvas.shared.iter().chain(chosen).collect();
             Self::of_styles(forge, slot_names, &styles)
         });
@@ -114,13 +128,24 @@ impl Palette {
         style: &RecordTree<'_>,
         slot_names: &[String],
     ) -> Self {
-        let mut slots = HashMap::new();
-        for (name, value) in slot_names.iter().zip(items(style.root(), "colorStyles")) {
+        let mut palette = Self::default();
+        for (slot, value) in items(style.root(), "colorStyles").iter().enumerate() {
+            let Some(name) = slot_names.get(slot) else {
+                break;
+            };
             if let Some(colour) = resolved_entry(forge, value) {
-                slots.insert(name.clone(), colour);
+                palette.slots.insert(name.clone(), colour);
+                #[cfg(test)]
+                palette.sources.insert(
+                    name.clone(),
+                    PaletteSite {
+                        record_index: style.record_index(),
+                        slot,
+                    },
+                );
             }
         }
-        Self { slots }
+        palette
     }
 
     pub(crate) fn resolve(&self, spec: &ColorSpec, inherited: f32) -> Result<Rgba, String> {

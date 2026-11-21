@@ -40,6 +40,10 @@ impl Slot {
         })
     }
 
+    pub(crate) const fn property_index(self) -> usize {
+        self.property
+    }
+
     /// Returns the type of the field's values.
     pub(crate) const fn data_type(&self) -> DataType {
         self.data_type
@@ -57,7 +61,7 @@ impl Slot {
     }
 
     /// Returns the field name.
-    pub(crate) fn name<'f>(&self, forge: &'f DataForge<'f>) -> Result<&'f str, DataForgeError> {
+    pub(crate) fn name<'f>(&self, forge: &DataForge<'f>) -> Result<&'f str, DataForgeError> {
         forge.blob.get(self.def.name)
     }
 

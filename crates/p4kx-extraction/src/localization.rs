@@ -3,8 +3,8 @@
 
 use std::io::{self, Read};
 
-use p4kx_archive::{Archive, ArchiveError, Entry};
-use p4kx_localization::{GlobalIni, IniText, Language, LocalizationError, MAX_GLOBAL_INI_SIZE};
+use p4kx_archive::{Archive, ArchiveError, Entry, EntryOrigin};
+use p4kx_localization::{GlobalIni, IniText, Language, LocalizationError, LocalizationLimits};
 use rayon::prelude::*;
 use thiserror::Error;
 
@@ -18,36 +18,48 @@ pub struct LocalizationEntry {
     language: Language,
     path: String,
     text: IniText<'static>,
+    original_byte_len: u64,
+    origin: Option<EntryOrigin>,
+    limits: LocalizationLimits,
 }
 
 impl LocalizationEntry {
-    /// Reads the `global.ini` of `language` from `archive`; case and separator kind of the path do
-    /// not matter.
+    /// Reads the `global.ini` of `language` with the default unrestricted policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::read_with_limits`].
+    pub fn read(archive: &Archive, language: Language) -> Result<Self, LocalizationLoadError> {
+        Self::read_with_limits(archive, language, LocalizationLimits::UNLIMITED)
+    }
+
+    /// Reads the language Entry with the caller's limits, retained for subsequent indexing.
     ///
     /// # Errors
     ///
     /// Returns [`LocalizationLoadError::Missing`] when the Archive holds no such Entry,
-    /// [`LocalizationLoadError::TooLarge`] when its size exceeds [`MAX_GLOBAL_INI_SIZE`], and
-    /// another [`LocalizationLoadError`] when the Entry cannot be read.
-    pub fn read(archive: &Archive, language: Language) -> Result<Self, LocalizationLoadError> {
+    /// [`LocalizationLoadError::TooLarge`] when its declared uncompressed size exceeds the
+    /// source-byte limit, and another [`LocalizationLoadError`] when it cannot be read or decoded.
+    pub fn read_with_limits(
+        archive: &Archive,
+        language: Language,
+        limits: LocalizationLimits,
+    ) -> Result<Self, LocalizationLoadError> {
         let entry =
             Self::locate(archive, language).ok_or(LocalizationLoadError::Missing { language })?;
-        Self::read_entry(archive, language, entry)
+        Self::read_entry_with_limits(archive, language, entry, limits)
     }
 
-    pub(crate) fn read_entry(
+    pub(crate) fn read_entry_with_limits(
         archive: &Archive,
         language: Language,
         entry: &Entry,
+        limits: LocalizationLimits,
     ) -> Result<Self, LocalizationLoadError> {
         let path = entry.path().to_owned();
         let size = entry.uncompressed_size();
-        if size > MAX_GLOBAL_INI_SIZE {
-            return Err(LocalizationLoadError::TooLarge {
-                path,
-                size,
-                limit: MAX_GLOBAL_INI_SIZE,
-            });
+        if let Some(limit) = limits.source_bytes().filter(|&limit| size > limit) {
+            return Err(LocalizationLoadError::TooLarge { path, size, limit });
         }
         let mut bytes = Vec::new();
         let reserve = usize::try_from(size.min(INITIAL_RESERVE)).unwrap_or_default();
@@ -62,14 +74,20 @@ impl LocalizationEntry {
         if let Err(source) = read {
             return Err(LocalizationLoadError::Read { path, source });
         }
-        let text = IniText::decode_vec(bytes).map_err(|source| LocalizationLoadError::Decode {
-            path: path.clone(),
-            source,
+        let original_byte_len = bytes.len() as u64;
+        let text = IniText::decode_vec_with_limits(bytes, limits).map_err(|source| {
+            LocalizationLoadError::Decode {
+                path: path.clone(),
+                source,
+            }
         })?;
         Ok(Self {
             language,
             path,
             text,
+            original_byte_len,
+            origin: archive.entry_origin(entry),
+            limits,
         })
     }
 
@@ -110,6 +128,16 @@ impl LocalizationEntry {
         &self.path
     }
 
+    /// Returns the actual language Entry and its complete containing-input context.
+    #[must_use]
+    pub const fn origin(&self) -> Option<&EntryOrigin> {
+        self.origin.as_ref()
+    }
+
+    pub(crate) const fn original_byte_len(&self) -> u64 {
+        self.original_byte_len
+    }
+
     /// Returns the decoded text of the file.
     #[must_use]
     pub const fn text(&self) -> &IniText<'static> {
@@ -120,9 +148,10 @@ impl LocalizationEntry {
     ///
     /// # Errors
     ///
-    /// Returns a [`LocalizationError`] when the file exceeds a limit.
+    /// Returns a [`LocalizationError`] when indexing exceeds the retained limits or the index
+    /// cannot be allocated.
     pub fn parse(&self) -> Result<GlobalIni<'_>, LocalizationError> {
-        self.text.index()
+        self.text.index_with_limits(self.limits)
     }
 }
 
@@ -136,7 +165,7 @@ pub enum LocalizationLoadError {
         /// The language.
         language: Language,
     },
-    /// The Entry is larger than [`MAX_GLOBAL_INI_SIZE`].
+    /// The Entry's declared size exceeds the caller's source-byte limit.
     #[error("the Entry {path} claims {size} bytes, more than the limit of {limit} bytes")]
     TooLarge {
         /// The Entry path.

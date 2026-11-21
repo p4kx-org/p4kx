@@ -29,6 +29,7 @@ pub(crate) struct Worn<'a> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Wearable {
     pub(crate) guid: Guid,
+    pub(crate) record_index: Option<u32>,
     pub(crate) record_path: String,
     pub(crate) class_name: String,
     pub(crate) item_type: String,
@@ -43,11 +44,12 @@ impl Wearable {
     pub(crate) fn from_spec(spec: &EntitySpec) -> Self {
         Self {
             guid: spec.guid,
+            record_index: spec.record_index,
             record_path: spec.record_path.clone(),
             class_name: crate::entities::class_name_of(&spec.name)
                 .unwrap_or(&spec.name)
                 .to_owned(),
-            item_type: spec.attach_type.clone(),
+            item_type: spec.classification.item_type_text().to_owned(),
             geometry: spec.geometry.clone(),
             variants: spec.variants.clone(),
             tags: spec.attach_tags.clone(),
@@ -177,18 +179,16 @@ mod tests {
 
     fn variant(tags: &[&str], path: &str) -> GeometryVariant {
         GeometryVariant {
+            tag_locations: Box::default(),
             tags: tags.iter().map(|tag| (*tag).to_owned()).collect(),
-            geometry: Geometry {
-                path: path.to_owned(),
-                material: None,
-                palette: None,
-            },
+            geometry: Geometry::fixture(path),
         }
     }
 
     fn teeth() -> Wearable {
         Wearable {
             guid: Guid::from_stored([0; 16]),
+            record_index: None,
             record_path: String::new(),
             class_name: "Head_Teeth".to_owned(),
             item_type: "Char_Head_Teeth".to_owned(),

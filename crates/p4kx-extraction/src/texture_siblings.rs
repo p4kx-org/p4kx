@@ -7,12 +7,14 @@ use std::io::{self, Read};
 use p4kx_texture::SiblingReader;
 
 use crate::texture_parts::{PartReader, Parts};
+use crate::textures::FilePartReads;
 
 /// The parts of a texture, keeping a copy of one part's data as it is read.
 pub(crate) struct Capturing<'p, 'a> {
     pub(crate) parts: &'p Parts<'a>,
     pub(crate) capture: Option<u32>,
     pub(crate) data: RefCell<Vec<u8>>,
+    pub(crate) file_reads: Option<&'p RefCell<FilePartReads>>,
 }
 
 impl SiblingReader for Capturing<'_, '_> {
@@ -36,6 +38,8 @@ impl SiblingReader for Capturing<'_, '_> {
         Ok(CapturingReader {
             inner: self.parts.open_part(index)?,
             sink,
+            index,
+            file_reads: self.file_reads,
         })
     }
 }
@@ -44,6 +48,8 @@ impl SiblingReader for Capturing<'_, '_> {
 pub(crate) struct CapturingReader<'r> {
     inner: PartReader<'r>,
     sink: Option<RefMut<'r, Vec<u8>>>,
+    index: u32,
+    file_reads: Option<&'r RefCell<FilePartReads>>,
 }
 
 impl Read for CapturingReader<'_> {
@@ -53,6 +59,16 @@ impl Read for CapturingReader<'_> {
             sink.extend_from_slice(buffer.get(..count).unwrap_or_default());
         }
         Ok(count)
+    }
+}
+
+impl Drop for CapturingReader<'_> {
+    fn drop(&mut self) {
+        if let Some(reads) = self.file_reads {
+            reads
+                .borrow_mut()
+                .record(self.index, self.inner.file_origin());
+        }
     }
 }
 

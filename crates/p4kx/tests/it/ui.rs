@@ -155,7 +155,18 @@ fn assets_as_json() -> TestResult {
     )?;
 
     assert_eq!(code, Some(1), "an unreadable tag");
-    insta::assert_snapshot!(json);
+    let mut report: Value = serde_json::from_str(&json)?;
+    crate::ui_asset_origins::assert_all_fields(&report)?;
+    let fields = report.as_object_mut().ok_or("UI assets report")?;
+    assert!(
+        fields.remove("fieldOrigins").is_some(),
+        "origins accompany the old fields"
+    );
+    assert!(
+        fields.remove("provenance").is_some(),
+        "source inventory accompanies the old fields"
+    );
+    insta::assert_snapshot!(serde_json::to_string_pretty(&report)?);
     Ok(())
 }
 
@@ -229,7 +240,13 @@ fn extract_as_json() -> TestResult {
     )?;
 
     assert_eq!(code, Some(1), "partial failure");
-    insta::assert_snapshot!(json);
+    let mut report: Value = serde_json::from_str(&json)?;
+    assert_eq!(report["originReceipt"], ".p4kx-origin.jsonl");
+    let fields = report.as_object_mut().ok_or("extract report")?;
+    assert!(fields.remove("fieldOrigins").is_some());
+    assert!(fields.remove("provenance").is_some());
+    assert!(fields.remove("originReceipt").is_some());
+    insta::assert_snapshot!(serde_json::to_string_pretty(&report)?);
     Ok(())
 }
 

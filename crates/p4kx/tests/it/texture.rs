@@ -10,6 +10,9 @@ use assert_cmd::Command;
 use p4kx_testkit::{ArchiveBuilder, SplitDds, TestEntry, TestTextureFormat};
 use predicates::prelude::predicate;
 
+#[path = "texture_merge_origins.rs"]
+mod merge_origins;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const HEADER: &str = "Data\\Textures\\hull_ddna.dds";
@@ -117,7 +120,17 @@ fn info_of_a_file_prints_json() -> TestResult {
         .output()?;
 
     assert_eq!(output.status.code(), Some(0), "success");
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    let mut json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    let metadata = json
+        .as_object_mut()
+        .ok_or("info JSON object")?
+        .remove("source_metadata")
+        .ok_or("additive source metadata")?;
+    assert!(
+        metadata.is_object(),
+        "the shared additive source projection is present"
+    );
+    check_disk_origins(&mut json)?;
     assert_eq!(
         json,
         serde_json::json!({
@@ -138,6 +151,34 @@ fn info_of_a_file_prints_json() -> TestResult {
     Ok(())
 }
 
+fn check_disk_origins(json: &mut serde_json::Value) -> TestResult {
+    let object = json.as_object_mut().ok_or("info JSON object")?;
+    let fields = object.remove("field_origins").ok_or("field origin map")?;
+    let width = fields.get("/width").ok_or("width origin")?;
+    assert_eq!(
+        width.get("containsEncryptedSource"),
+        Some(&serde_json::Value::Null),
+        "standalone encryption is unknown"
+    );
+    assert_eq!(
+        width.get("sourceSetComplete"),
+        Some(&serde_json::json!(true)),
+        "actual disk source is bound"
+    );
+    assert!(
+        object.remove("provenance").is_some(),
+        "original file inventory"
+    );
+    let tail = object
+        .get_mut("alpha_tail")
+        .and_then(serde_json::Value::as_object_mut)
+        .ok_or("alpha metadata")?;
+    assert!(
+        tail.remove("source_metadata").is_some(),
+        "additive alpha DDS metadata"
+    );
+    Ok(())
+}
 #[test]
 fn info_reports_a_broken_alpha_tail_instead_of_failing() -> TestResult {
     let dir = tempfile::tempdir()?;
@@ -192,37 +233,6 @@ fn merge_of_an_entry_writes_the_standard_dds_layout() -> TestResult {
         .stdout(predicate::str::contains("4 parts"));
 
     assert_standard_layout(&std::fs::read(&out)?, &dds);
-    Ok(())
-}
-
-#[test]
-fn merge_of_a_file_with_its_parts_next_to_it_writes_json() -> TestResult {
-    let dir = tempfile::tempdir()?;
-    let dds = texture();
-    let header = dds.write_files(dir.path(), "hull_ddna.dds")?;
-    let out = dir.path().join("merged.dds");
-
-    let output = p4kx()?
-        .args(["texture", "merge", "--json"])
-        .arg(&header)
-        .arg("--out")
-        .arg(&out)
-        .output()?;
-
-    assert_eq!(output.status.code(), Some(0), "success");
-    let merged = std::fs::read(&out)?;
-    assert_standard_layout(&merged, &dds);
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-    assert_eq!(
-        json,
-        serde_json::json!({
-            "texture": header.display().to_string(),
-            "output": out.display().to_string(),
-            "parts": 4,
-            "size": merged.len(),
-        }),
-        "the JSON shape"
-    );
     Ok(())
 }
 
@@ -298,5 +308,48 @@ fn unreadable_entry_data_or_an_unreadable_file_is_a_read_error() -> TestResult {
         .arg(&folder)
         .assert()
         .code(3);
+    Ok(())
+}
+
+#[test]
+fn info_json_keeps_encrypted_alpha_receipts_separate_from_the_color_header() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = dir.path().join("Data.p4k");
+    let dds = texture().alpha(TestTextureFormat::R8);
+    let tail = dds.alpha_tail().ok_or("alpha fixture")?;
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored(HEADER, dds.header_bytes()))
+        .entry(TestEntry::stored(format!("{HEADER}.a"), tail.header_bytes()).encrypted())
+        .write_to(&archive)?;
+    let output = p4kx()?
+        .args(["texture", "info", "--json"])
+        .arg(&archive)
+        .arg(HEADER)
+        .assert()
+        .code(0)
+        .get_output()
+        .stdout
+        .clone();
+    let info: serde_json::Value = serde_json::from_slice(&output)?;
+    let fields = info.get("field_origins").ok_or("per-field evidence")?;
+    for (field, expected) in [
+        ("/width", false),
+        ("/source_metadata/raw/dx10/misc_flags2", false),
+        ("/alpha_tail/format", true),
+        ("/alpha_tail/source_metadata/normalized/width", true),
+    ] {
+        assert_eq!(
+            fields
+                .get(field)
+                .and_then(|origin| origin.get("containsEncryptedSource")),
+            Some(&serde_json::json!(expected)),
+            "encryption marker for {field}"
+        );
+    }
+    assert_eq!(
+        info.pointer("/alpha_tail/source_metadata/raw/magic_present"),
+        Some(&serde_json::json!(false)),
+        "alpha raw header is exported independently"
+    );
     Ok(())
 }

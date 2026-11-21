@@ -9,10 +9,14 @@ mod archive_key;
 mod byte_reader;
 mod parse_error;
 mod path_pattern;
+#[cfg(feature = "platform-folders")]
+mod platform_folders;
 mod text_number;
 
 pub use archive_key::{ARCHIVE_IV, ArchiveKey, ArchiveKeyError};
 pub use byte_reader::ByteReader;
 pub use parse_error::ParseError;
 pub use path_pattern::PathPattern;
+#[cfg(feature = "platform-folders")]
+pub use platform_folders::{FOLDERS_ROOT_VARIABLE, FolderKind, XdgEnvironment, base_folder};
 pub use text_number::{TextNumber, is_format_character, read_text_number};

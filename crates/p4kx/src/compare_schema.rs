@@ -5,7 +5,6 @@ use std::io::{self, BufWriter, Write};
 use std::process::ExitCode;
 
 use anyhow::Result;
-use p4kx_channels::PublicPatches;
 use p4kx_comparison::{
     Archive, EnumChange, KindCounts, OptionChangeKind, PropertyChange, SchemaDiff, Side,
     StructChange, compare_schema, schema_report,
@@ -22,7 +21,7 @@ pub(crate) fn run(old: &Archive, new: &Archive, as_json: bool) -> Result<ExitCod
     let (old_forge, new_forge) = dataforges::open_both(&old_entry, &new_entry)?;
     let diff = compare_schema(&old_forge, &new_forge);
     let printed = if as_json {
-        let patches = PublicPatches::standard();
+        let patches = crate::launcher_discovery::patches()?;
         json::print(&schema_report(old, new, &diff, Some(&patches)))
     } else {
         print(&diff, old, new)

@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::mesh_origin::MeshSubmeshOrigin;
 use crate::reader::to_usize;
 use crate::skin::{RawSubmesh, SkinMesh};
 use crate::smooth_normals::smooth_normals;
-use crate::{CorruptChunk, Mesh, Submesh};
+use crate::{CorruptChunk, Mesh, MeshSubmeshSource, Submesh};
 
 const UNUSED: u32 = u32::MAX;
 const OPAQUE_WHITE: [u8; 4] = [u8::MAX; 4];
@@ -60,7 +61,11 @@ pub(crate) fn split_by_node(
     Ok(meshes)
 }
 
-fn check_range(position: usize, submesh: &RawSubmesh, total: u32) -> Result<(), CorruptChunk> {
+pub(crate) fn check_range(
+    position: usize,
+    submesh: &RawSubmesh,
+    total: u32,
+) -> Result<(), CorruptChunk> {
     let fits = submesh
         .first_index
         .checked_add(submesh.index_count)
@@ -101,6 +106,9 @@ impl<'s, 'a> MeshBuilder<'s, 'a> {
                 node,
                 positions: Vec::new(),
                 source: Vec::new(),
+                origin: None,
+                index_width: Some(skin.streams.indices.width()),
+                original_vertex_order_changed: false,
                 normals: skin.streams.normals.map(|_| Vec::new()),
                 normals_computed: false,
                 tangents: skin.streams.tangents.map(|_| Vec::new()),
@@ -125,8 +133,11 @@ impl<'s, 'a> MeshBuilder<'s, 'a> {
         let first = self.mesh.indices.len();
         let start = to_usize(submesh.first_index);
         for at in start..start + to_usize(submesh.index_count) {
-            let index =
-                u64::from(self.skin.streams.indices.index(at)?) + u64::from(submesh.page_base);
+            let index = self
+                .skin
+                .streams
+                .indices
+                .source_vertex(at, submesh.page_base)?;
             let out_of_range = CorruptChunk::IndexRange {
                 submesh: position,
                 index,
@@ -145,6 +156,10 @@ impl<'s, 'a> MeshBuilder<'s, 'a> {
             node_id: submesh.node,
             first_index: first,
             index_count: self.mesh.indices.len() - first,
+            origin: Some(MeshSubmeshOrigin::new(
+                MeshSubmeshSource::from_raw(position, *submesh),
+                self.skin.streams.indices.word_start(submesh.first_index),
+            )),
         });
         Ok(())
     }

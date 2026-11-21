@@ -44,7 +44,7 @@ pub(super) fn string_hash(key: &str) -> TestValue {
         TestValue::Array(vec![TestValue::Struct(
                 TestInstance::new("MissionPropertyValueOption_StringHash")
                     .value("textId", TestValue::text(key))
-                    .value("weighting", TestValue::Int32(1)),
+                    .value("weighting", TestValue::Single(1.0)),
             )]),
     ))
 }
@@ -211,10 +211,10 @@ fn delivery_contract() -> TestInstance {
     )
 }
 
-fn contractor_params(key: &str) -> TestValue {
+fn contractor_params(keys: &[&str]) -> TestValue {
     TestValue::Struct(TestInstance::new("ContractParamOverrides").value(
         "stringParamOverrides",
-        TestValue::Array(vec![param("Contractor", key)]),
+        TestValue::Array(keys.iter().map(|key| param("Contractor", key)).collect()),
     ))
 }
 
@@ -250,7 +250,7 @@ fn delivery_handler() -> TestValue {
         CONTRACT_B,
         "Deliver_B",
         TEMPLATE,
-        overrides(None, None, Vec::new()),
+        contractor_params(&["@LOC_EMPTY", "@contractor_bypassed"]),
     )
     .value(
         "additionalPrerequisites",
@@ -284,7 +284,7 @@ fn delivery_handler() -> TestValue {
         .value("missionBrokerEntry", reference(BROKER));
     handler(
         "Delivery_Career",
-        contractor_params("@contractor_acme"),
+        contractor_params(&["@contractor_acme"]),
         vec![
             TestValue::Struct(delivery),
             TestValue::Struct(bare),
@@ -323,7 +323,7 @@ fn copy_handler() -> TestValue {
         CONTRACT_H,
         "Deliver_H",
         STRAY_TEMPLATE,
-        overrides(None, None, Vec::new()),
+        contractor_params(&["@contractor_local", "@contractor_bypassed"]),
     )
     .value("additionalPrerequisites", gaps::requirement())
     .value("contractResults", gaps::rival_only());

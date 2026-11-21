@@ -1,0 +1,26 @@
+.TH P4KX 1 "" "P4KX" "User Commands"
+.SH NAME
+p4kx \- browse, extract and convert Star Citizen Archives
+.SH SYNOPSIS
+.B p4kx
+.RI [ OPTIONS ]
+.I COMMAND
+.RI [ ARGUMENTS ]
+.SH DESCRIPTION
+P4KX reads local Star Citizen Archives and exports their Entries.
+It includes format conversion and structured data exports.
+It contains no game files or Archive key.
+.SH OPTIONS
+.B p4kx --help
+lists the available commands and global options.
+.B p4kx help COMMAND
+describes a command and its options.
+.SH FILES
+Settings and the stored Archive key are in the P4KX directory below
+XDG_CONFIG_HOME, or ~/.config when that variable is absent.
+P4KX_FOLDERS_ROOT selects an absolute isolated root for config, cache and data.
+.SH SEE ALSO
+.BR p4kx-gui (1),
+.BR p4kx-mcp (1)
+.PP
+https://github.com/p4kx-org/p4kx/blob/main/docs/commands.md

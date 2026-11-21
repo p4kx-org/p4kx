@@ -1,29 +1,39 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io::Write;
 use std::sync::Arc;
 
-use p4kx_gltf::{
-    GlbOptions, GlbSummary, GltfError, Scene, SceneLight, SceneNode, ScenePart, TextureLoader,
-    write_scene_glb, write_scene_glb_with,
+use p4kx_extraction::{
+    ArchiveDefaultMaterial, ArchiveMaterialRead, MaterialArchiveOrigins, ModelArchiveSource,
 };
+use p4kx_gltf::SceneLight;
 use p4kx_model::{Lod, MaterialStatus, Model, SocLight, TintPalette, Transform};
 
 use crate::Issue;
 
 mod build;
+mod child_container_path;
 mod classes;
+mod default_material;
 mod files;
+
+pub use child_container_path::ChildContainerPath;
+pub(crate) use files::{is_plain as plain_container_path, stem as container_stem};
+pub use p4kx_model::is_external_child_value;
 mod layers;
 mod light;
 mod models;
 mod scan;
+pub(crate) mod tile_light;
 mod unresolved;
 mod walk;
 mod watch;
 
 pub use classes::InteriorForge;
+pub use tile_light::{
+    InteriorLightHelper, InteriorLightHelperError, InteriorLightHelperFrame,
+    InteriorLightHelperSource, InteriorLightPlacement, InteriorTilePort,
+};
 pub use watch::{InteriorProgress, InteriorWatch};
 
 pub(crate) fn model_vertices(model: &Model) -> usize {
@@ -143,9 +153,11 @@ pub struct InteriorPart {
     pub(crate) world: Transform,
     pub(crate) model_path: Option<String>,
     pub(crate) model: Option<Arc<Model>>,
-    pub(crate) materials: Arc<MaterialStatus>,
-    pub(crate) palette: Option<Arc<TintPalette>>,
+    pub(crate) model_archive_sources: Arc<[ModelArchiveSource]>,
+    pub(crate) materials: Arc<ArchiveMaterialRead>,
+    pub(crate) palette: Option<crate::palette::ChosenPalette>,
     pub(crate) light: Option<SocLight>,
+    pub(crate) light_placement: Option<Box<InteriorLightPlacement>>,
 }
 
 impl InteriorPart {
@@ -154,7 +166,13 @@ impl InteriorPart {
     /// [`InteriorForge`] or when there is none.
     #[must_use]
     pub fn palette(&self) -> Option<&TintPalette> {
-        self.palette.as_deref()
+        self.palette.as_ref().map(|chosen| chosen.palette.as_ref())
+    }
+
+    /// Returns the physical observations used to choose this part's palette.
+    #[must_use]
+    pub fn palette_source(&self) -> Option<&crate::PaletteSource> {
+        self.palette.as_ref().map(|chosen| &chosen.source)
     }
 
     /// Returns the light of a [`Light`](InteriorPartKind::Light) part as the `.soc` file states
@@ -162,6 +180,12 @@ impl InteriorPart {
     #[must_use]
     pub const fn light(&self) -> Option<&SocLight> {
         self.light.as_ref()
+    }
+
+    /// Returns separate placement evidence for a baked light in a direct vehicle container.
+    #[must_use]
+    pub fn light_placement(&self) -> Option<&InteriorLightPlacement> {
+        self.light_placement.as_deref()
     }
 
     /// Returns the light of a [`Light`](InteriorPartKind::Light) part as glTF expresses it: its
@@ -218,10 +242,22 @@ impl InteriorPart {
         self.model.as_deref()
     }
 
+    /// Returns the physical model and companion Entries observed at load time.
+    #[must_use]
+    pub fn model_archive_sources(&self) -> &[ModelArchiveSource] {
+        &self.model_archive_sources
+    }
+
     /// Returns the material library the part's model is drawn with.
     #[must_use]
     pub fn materials(&self) -> &MaterialStatus {
-        &self.materials
+        &self.materials.status
+    }
+
+    /// Returns the physical reads retained by this placed model's material resolver.
+    #[must_use]
+    pub fn material_archive_origins(&self) -> &MaterialArchiveOrigins {
+        &self.materials.origins
     }
 }
 
@@ -239,6 +275,7 @@ pub struct Interior {
     pub(crate) issues: Vec<Issue>,
     pub(crate) lod: u32,
     pub(crate) containers: usize,
+    pub(crate) default_material: Option<Arc<ArchiveDefaultMaterial>>,
 }
 
 impl Interior {
@@ -320,76 +357,5 @@ impl Interior {
             .iter()
             .filter(|part| part.model.is_some())
             .count()
-    }
-
-    /// Adds the parts to `scene`, the root container below the node `parent` placed by
-    /// `placement`, every other part below its own parent; returns the index of the root's node,
-    /// or `None` when the Interior has no parts and nothing was added.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`GltfError::InvalidSceneNode`] when `parent` is not a node of `scene`.
-    pub fn add_to_scene<'s>(
-        &'s self,
-        scene: &mut Scene<'s>,
-        parent: Option<usize>,
-        placement: Transform,
-    ) -> Result<Option<usize>, GltfError> {
-        let mut nodes = Vec::with_capacity(self.parts.len());
-        for part in &self.parts {
-            let (above, local) = part.parent.map_or((parent, placement), |index| {
-                (nodes.get(index).copied(), part.local)
-            });
-            let mut node = SceneNode::new(part.name.clone(), above, local);
-            if let Some(model) = &part.model {
-                let mut scene_part = ScenePart::new(model, &part.materials);
-                if let Some(palette) = &part.palette {
-                    scene_part = scene_part.with_palette(palette);
-                }
-                node = node.with_part(scene_part);
-            }
-            if let Some(light) = part.scene_light() {
-                node = node.with_light(light);
-            }
-            nodes.push(scene.push(node)?);
-        }
-        Ok(nodes.first().copied())
-    }
-
-    /// Writes the Interior as a GLB file to `out`: a node per part below the node of its parent,
-    /// placed by its transform, with the nodes of its model below it; `out` should be buffered.
-    /// `options.lod` should be the level the Interior was built at.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`GltfError::TooLarge`] when the Interior does not fit in a GLB file and
-    /// [`GltfError::Write`] when `out` fails.
-    pub fn write_glb(
-        &self,
-        options: &GlbOptions,
-        out: &mut impl Write,
-    ) -> Result<GlbSummary, GltfError> {
-        let mut scene = Scene::new();
-        self.add_to_scene(&mut scene, None, Transform::IDENTITY)?;
-        write_scene_glb(&scene, options, out)
-    }
-
-    /// Writes the Interior as a GLB file to `out` like [`Self::write_glb`], taking the textures
-    /// of [`MaterialMode::Textures`](p4kx_gltf::MaterialMode::Textures) from `textures`; a texture
-    /// that cannot be loaded leaves the material's plain colour and is listed in
-    /// [`GlbSummary::texture_fallbacks`].
-    ///
-    /// # Errors
-    ///
-    /// As [`Self::write_glb`].
-    pub fn write_glb_with(
-        &self,
-        options: &GlbOptions,
-        textures: &dyn TextureLoader,
-        out: &mut impl Write,
-    ) -> Result<GlbSummary, GltfError> {
-        let mut scene = Scene::new();
-        self.add_to_scene(&mut scene, None, Transform::IDENTITY)?;
-        write_scene_glb_with(&scene, options, textures, out)
     }
 }

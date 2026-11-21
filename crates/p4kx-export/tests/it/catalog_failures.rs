@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! A selected Record that cannot be read is left out and reported; the catalog is still built.
+//! Explicit diagnostic publication retains readable rows and measured source failures.
 
 use std::error::Error;
 use std::path::PathBuf;
@@ -76,7 +76,10 @@ fn built() -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
         .entry(TestEntry::zstd("Data\\Game2.dcb", database().build()).encrypted())
         .write_to(&path)?;
     let archive = Archive::open_with_key(&path, Some(p4kx_testkit::test_key()))?;
-    let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    let options = CatalogOptions {
+        publication_mode: p4kx_export::CatalogPublicationMode::DiagnosticPartial,
+        ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))
+    };
     let built = build_catalog(&archive, &options)?;
     let catalog = serde_json::from_slice(built.json())?;
     Ok((built, catalog))
@@ -87,12 +90,16 @@ fn an_unreadable_record_is_left_out_and_the_catalog_is_still_built() -> TestResu
     let (built, catalog) = built()?;
 
     assert_eq!(
-        catalog["manufacturers"].as_array().map(Vec::len),
+        catalog["definitions"]["manufacturers"]["rows"]
+            .as_array()
+            .map(Vec::len),
         Some(1),
         "the readable manufacturer is written"
     );
     assert_eq!(
-        catalog["blueprints"].as_array().map(Vec::len),
+        catalog["definitions"]["blueprints"]["rows"]
+            .as_array()
+            .map(Vec::len),
         Some(0),
         "the unreadable blueprints are left out"
     );
@@ -111,7 +118,7 @@ fn an_unreadable_record_is_counted_and_reported_with_path_guid_and_reason() -> T
     let guids: Vec<String> = summary
         .failures()
         .iter()
-        .map(|failure| failure.guid.to_string())
+        .map(|failure| failure.guid().to_string())
         .collect();
     assert_eq!(
         guids,
@@ -124,9 +131,9 @@ fn an_unreadable_record_is_counted_and_reported_with_path_guid_and_reason() -> T
     let failure = summary
         .failures()
         .iter()
-        .find(|failure| failure.record_path == BROKEN_PATH)
+        .find(|failure| failure.record_path() == BROKEN_PATH)
         .ok_or("the record path")?;
-    assert!(!failure.reason.is_empty(), "a reason");
+    assert!(!failure.reason().is_empty(), "a reason");
     Ok(())
 }
 

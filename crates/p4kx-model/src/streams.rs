@@ -5,14 +5,15 @@ use p4kx_foundation::ByteReader;
 
 use crate::CorruptChunk;
 use crate::bone_map::BoneMapStream;
-use crate::reader::to_usize;
+pub(crate) use crate::index_stream::IndexStream;
+use crate::mesh_stream_source::{StreamScan, StreamStep};
 use crate::second_uv::SecondUvStream;
 use crate::vector::{
     dequantise, finite_uv, normal_of_quaternion, normal_of_tangent_frame, normalise,
     tangent_of_quaternion, tangent_of_tangent_frame, unpack_unit_vector,
 };
 
-const INDICES: u32 = 0xEECD_C168;
+pub(crate) const INDICES: u32 = 0xEECD_C168;
 const VERTS_UVS: u32 = 0x9132_9AE9;
 const VERTS_UVS_2: u32 = 0xB3A7_0D5E;
 const NORMALS: u32 = 0x9CF3_F615;
@@ -21,7 +22,7 @@ const TANGENTS: u32 = 0xB95E_9A1B;
 const QTANGENTS: u32 = 0xEE05_7252;
 const BONEMAP: u32 = 0x677C_7B23;
 const BONEMAP32: u32 = 0x6ECA_3708;
-const STREAM_ALIGNMENT: usize = 8;
+
 const COLOUR_FROM_END: usize = 8;
 
 /// The vertex positions and texture coordinates of a mesh.
@@ -159,24 +160,6 @@ impl NormalStream<'_> {
     }
 }
 
-/// The index list of a mesh, 16 or 32 bits per index.
-#[derive(Debug, Clone, Copy)]
-pub(crate) struct IndexStream<'a> {
-    data: &'a [u8],
-    wide: bool,
-}
-
-impl IndexStream<'_> {
-    /// Returns index `position` of the list.
-    pub(crate) fn index(&self, position: usize) -> Result<u32, CorruptChunk> {
-        if self.wide {
-            element(self.data, position, 4, "index").map(|bytes| u32_at(bytes, 0))
-        } else {
-            element(self.data, position, 2, "index").map(|bytes| u32::from(u16_at(bytes, 0)))
-        }
-    }
-}
-
 /// The data streams of a mesh chunk that a model reads.
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Streams<'a> {
@@ -200,7 +183,7 @@ pub(crate) struct StreamCounts {
 /// Reads the streams that follow the submeshes until the end of the chunk; each is a type tag,
 /// an element size and one element per vertex or index, padded to 8 bytes.
 pub(crate) fn read_streams<'a>(
-    reader: &mut ByteReader<'a>,
+    reader: ByteReader<'a>,
     counts: StreamCounts,
 ) -> Result<Streams<'a>, CorruptChunk> {
     let mut vertices = None;
@@ -210,22 +193,29 @@ pub(crate) fn read_streams<'a>(
     let mut bone_map: Option<BoneMapStream<'a>> = None;
     let mut indices = None;
     let mut seen = 0_u16;
-    while reader.remaining() >= 4 {
-        let tag = reader.read_u32()?;
-        if tag == 0 {
-            continue;
-        }
-        let size = reader.read_u32()?;
-        if let Some(bit) = read_tag_bit(tag) {
-            if seen & bit != 0 {
-                return Err(CorruptChunk::RepeatedStream(tag));
+    let scan = StreamScan::new(reader, counts.vertices, counts.indices);
+    for step in scan {
+        let (tag, size, data, start) = match step? {
+            StreamStep::Complete(stream) => (
+                stream.header().tag(),
+                stream.header().stride(),
+                stream.bytes(),
+                stream.payload_range().start,
+            ),
+            StreamStep::Incomplete(stream, error) => {
+                if repeat(&mut seen, stream.tag()) {
+                    return Err(CorruptChunk::RepeatedStream(stream.tag()));
+                }
+                if stream.is_recognized() {
+                    return Err(error.into());
+                }
+                break;
             }
-            seen |= bit;
-        }
-        let Some(data) = stream_data(reader, tag, size, counts)? else {
-            break;
         };
-        match classify(tag, size, data, counts)? {
+        if repeat(&mut seen, tag) {
+            return Err(CorruptChunk::RepeatedStream(tag));
+        }
+        match classify(tag, size, data, start, counts)? {
             Some(Found::Indices(stream)) => indices = Some(stream),
             Some(Found::Vertices(stream)) => vertices = Some(stream),
             Some(Found::Normals(stream)) => {
@@ -255,30 +245,19 @@ pub(crate) fn read_streams<'a>(
     })
 }
 
-/// Takes the elements and the padding of the stream `tag` off `reader`, or `None` when an
-/// unknown stream claims more than the chunk has left, which ends the walk.
-fn stream_data<'a>(
-    reader: &mut ByteReader<'a>,
-    tag: u32,
-    size: u32,
-    counts: StreamCounts,
-) -> Result<Option<&'a [u8]>, CorruptChunk> {
-    let count = if tag == INDICES {
-        counts.indices
-    } else {
-        counts.vertices
+const fn repeat(seen: &mut u16, tag: u32) -> bool {
+    let Some(bit) = read_tag_bit(tag) else {
+        return false;
     };
-    let len = to_usize(size).checked_mul(to_usize(count));
-    let known = matches!(tag, INDICES | VERTS_UVS | VERTS_UVS_2 | BONEMAP | BONEMAP32)
-        || (tag, size) == (NORMALS_2, 4)
-        || normal_kind(tag, size).is_some();
-    let Some(len) = len.filter(|&len| known || len <= reader.remaining()) else {
-        return Ok(None);
-    };
-    let data = reader.read_bytes(len)?;
-    let padding = len.next_multiple_of(STREAM_ALIGNMENT) - len;
-    reader.skip(padding.min(reader.remaining()))?;
-    Ok(Some(data))
+    let repeated = *seen & bit != 0;
+    *seen |= bit;
+    repeated
+}
+
+pub(crate) const fn recognized(tag: u32, size: u32) -> bool {
+    matches!(tag, INDICES | VERTS_UVS | VERTS_UVS_2 | BONEMAP | BONEMAP32)
+        || (tag == NORMALS_2 && size == 4)
+        || normal_kind(tag, size).is_some()
 }
 
 const fn read_tag_bit(tag: u32) -> Option<u16> {
@@ -308,14 +287,16 @@ fn classify(
     tag: u32,
     size: u32,
     data: &[u8],
+    start: u64,
     counts: StreamCounts,
 ) -> Result<Option<Found<'_>>, CorruptChunk> {
     let (min, max) = (counts.min, counts.max);
     Ok(match (tag, size) {
-        (INDICES, 2 | 4) => Some(Found::Indices(IndexStream {
+        (INDICES, 2 | 4) => Some(Found::Indices(IndexStream::positioned(
             data,
-            wide: size == 4,
-        })),
+            size == 4,
+            start,
+        ))),
         (VERTS_UVS | VERTS_UVS_2, 16) => Some(Found::Vertices(VertexStream {
             data,
             layout: VertexLayout::Quantised { min, max },
@@ -379,7 +360,7 @@ fn i16_at(bytes: &[u8], at: usize) -> i16 {
     i16::from_le_bytes(u16_at(bytes, at).to_le_bytes())
 }
 
-fn u32_at(bytes: &[u8], at: usize) -> u32 {
+pub(crate) fn u32_at(bytes: &[u8], at: usize) -> u32 {
     let word = bytes
         .get(at..at + 4)
         .and_then(|word| <[u8; 4]>::try_from(word).ok());

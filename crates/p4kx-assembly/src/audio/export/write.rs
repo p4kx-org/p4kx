@@ -7,18 +7,31 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use p4kx_audio::{AudioError, Codec, Loop, Soundbank, Wem};
+use p4kx_archive::ObservedEntry;
+use p4kx_audio::{AudioError, Codec, Soundbank, Wem};
 use p4kx_extraction::{
-    ConflictPolicy, ConversionError, MAX_SOUND_LEN, check_path_length, write_replacing_counted,
+    ArchiveWriteProtection, ConflictPolicy, ConversionError, MAX_SOUND_LEN, check_path_length,
+    write_replacing_counted_protected,
 };
 use rayon::prelude::*;
 
-use super::plan::{Job, Origin};
+#[path = "write_input.rs"]
+mod input;
+
+use self::input::{GroupInput, SoundInput};
+use super::loop_origins::{CaptureOrigins, CapturedSoundOrigin};
+use super::plan::Job;
+use super::source::SourceEntry;
 use super::{ExportFailure, ExportOptions, ExportState, ExportWatch, ExportedSound, SoundFormat};
 use crate::audio::read::entry_bytes;
 use crate::audio::{ArchiveAudio, MAX_SOUNDBANK_LEN};
 
-type Outcome = Result<ExportedSound, ExportFailure>;
+type Outcome = Result<WrittenSound, ExportFailure>;
+
+pub(super) struct WrittenSound {
+    pub(super) sound: ExportedSound,
+    pub(super) origin: Option<CapturedSoundOrigin>,
+}
 
 /// The folder the sounds go into.
 #[derive(Debug, Clone, Copy)]
@@ -27,6 +40,8 @@ pub(super) struct Target<'a> {
     pub(super) folder: &'a Path,
     /// The absolute path of the folder, on which the path limit of ADR-0248 is measured.
     pub(super) absolute: &'a Path,
+    /// Immutable source evidence retained by this Archive job.
+    pub(super) protection: &'a ArchiveWriteProtection,
 }
 
 impl Target<'_> {
@@ -48,12 +63,14 @@ pub(super) fn run(
     target: Target<'_>,
     options: ExportOptions,
     watch: &ExportWatch,
+    capture: CaptureOrigins,
 ) -> Vec<Outcome> {
-    let mut groups: Vec<(Origin, Vec<usize>)> = Vec::new();
-    let mut slots: HashMap<Origin, usize> = HashMap::new();
+    let mut groups: Vec<(SourceEntry, Vec<usize>)> = Vec::new();
+    let mut slots: HashMap<SourceEntry, usize> = HashMap::new();
     for (position, job) in jobs.iter().enumerate() {
-        let slot = *slots.entry(job.origin).or_insert_with(|| {
-            groups.push((job.origin, Vec::new()));
+        let entry = job.source.entry();
+        let slot = *slots.entry(entry).or_insert_with(|| {
+            groups.push((entry, Vec::new()));
             groups.len() - 1
         });
         if let Some((_, members)) = groups.get_mut(slot) {
@@ -63,7 +80,14 @@ pub(super) fn run(
     let mut outcomes: Vec<(usize, Outcome)> = groups
         .par_iter()
         .flat_map_iter(|(origin, members)| {
-            run_group(audio, jobs, (*origin, members), (target, options), watch)
+            run_group(
+                audio,
+                jobs,
+                (*origin, members),
+                (target, options),
+                watch,
+                capture,
+            )
         })
         .collect();
     outcomes.sort_unstable_by_key(|(position, _)| *position);
@@ -73,9 +97,10 @@ pub(super) fn run(
 fn run_group(
     audio: &ArchiveAudio<'_>,
     jobs: &[Job],
-    (origin, members): (Origin, &[usize]),
+    (origin, members): (SourceEntry, &[usize]),
     (target, options): (Target<'_>, ExportOptions),
     watch: &ExportWatch,
+    capture: CaptureOrigins,
 ) -> Vec<(usize, Outcome)> {
     if watch.is_cancelled() {
         return Vec::new();
@@ -90,8 +115,8 @@ fn run_group(
             .collect()
     };
     let (index, limit) = match origin {
-        Origin::Soundbank(index) => (index, MAX_SOUNDBANK_LEN),
-        Origin::Loose(index) => (index, MAX_SOUND_LEN),
+        SourceEntry::Soundbank(index) => (index, MAX_SOUNDBANK_LEN),
+        SourceEntry::Loose(index) => (index, MAX_SOUND_LEN),
     };
     let Some(entry) = audio.archive().entries().get(index) else {
         return failed_all("the Archive no longer holds the Entry".to_owned());
@@ -101,12 +126,41 @@ fn run_group(
         Err(error) => return failed_all(format!("{}: {error}", entry.path())),
     };
     let bank = match origin {
-        Origin::Soundbank(_) => match Soundbank::parse(bytes.as_slice()) {
+        SourceEntry::Soundbank(_) => match Soundbank::parse(bytes.as_slice()) {
             Ok(bank) => Some(bank),
             Err(error) => return failed_all(format!("{}: {error}", entry.path())),
         },
-        Origin::Loose(_) => None,
+        SourceEntry::Loose(_) => None,
     };
+    let binding = match capture {
+        CaptureOrigins::Omit => None,
+        CaptureOrigins::Retain => audio
+            .archive()
+            .observed_entry(entry)
+            .as_ref()
+            .map(ObservedEntry::binding),
+    };
+    let input = GroupInput {
+        bytes: &bytes,
+        bank: bank.as_ref(),
+        binding: binding.as_ref(),
+    };
+    run_members(
+        jobs,
+        members,
+        &input,
+        entry.path(),
+        (target, options, watch),
+    )
+}
+
+fn run_members(
+    jobs: &[Job],
+    members: &[usize],
+    input: &GroupInput<'_>,
+    entry_path: &str,
+    (target, options, watch): (Target<'_>, ExportOptions, &ExportWatch),
+) -> Vec<(usize, Outcome)> {
     let mut outcomes: Vec<(usize, Outcome)> = members
         .par_iter()
         .filter_map(|&position| {
@@ -114,18 +168,11 @@ fn run_group(
                 return None;
             }
             let job = jobs.get(position)?;
-            let outcome = match bank.as_ref().map(|bank| bank.wem(job.wem_id)) {
-                None => write_sound(&bytes, false, job, target, (options, watch))?,
-                Some(Some(wem)) => write_sound(
-                    wem.bytes(),
-                    wem.is_prefetch(),
+            let outcome = match input.for_wem(job.wem_id, job.source) {
+                Some(wem) => write_sound(&wem, job, target, (options, watch))?,
+                None => Err(failure(
                     job,
-                    target,
-                    (options, watch),
-                )?,
-                Some(None) => Err(failure(
-                    job,
-                    format!("{} no longer embeds the WEM", entry.path()),
+                    format!("{entry_path} no longer embeds the WEM"),
                 )),
             };
             watch.advance(1);
@@ -150,72 +197,57 @@ struct Emitted {
     state: ExportState,
 }
 
-/// Returns the loop of `wem`, or, when `raw` and no WEM was parsed for a conversion, of the WEM
-/// `bytes` hold.
-fn loop_of(wem: Option<&Wem<&[u8]>>, bytes: &[u8], raw: bool) -> Option<Loop> {
-    match wem {
-        Some(wem) => wem.loop_points(),
-        None if raw => Wem::parse(bytes).ok().and_then(|wem| wem.loop_points()),
-        None => None,
-    }
-}
-
-/// Parses `bytes` for a conversion to `format`, or returns why they are written unchanged: the
-/// format is raw (no reason), only the start of a streamed WEM is there, or the WEM cannot be parsed.
+/// Parses the available WEM once for loop metadata and any requested conversion.
 fn parse_for(
     bytes: &[u8],
     prefetch: bool,
     format: SoundFormat,
 ) -> (Option<Wem<&[u8]>>, Option<String>) {
-    if format == SoundFormat::Raw {
-        return (None, None);
-    }
     if prefetch {
-        let note = "only the prefetched start of a streamed WEM is available".to_owned();
-        return (None, Some(note));
+        let note = (format != SoundFormat::Raw)
+            .then(|| "only the prefetched start of a streamed WEM is available".to_owned());
+        return (None, note);
     }
     match Wem::parse(bytes) {
         Ok(wem) => (Some(wem), None),
+        Err(_) if format == SoundFormat::Raw => (None, None),
         Err(error) => (None, Some(error.to_string())),
     }
 }
 
 fn write_sound(
-    bytes: &[u8],
-    prefetch: bool,
+    input: &SoundInput<'_>,
     job: &Job,
     target: Target<'_>,
     (options, watch): (ExportOptions, &ExportWatch),
 ) -> Option<Outcome> {
-    let (wem, mut note) = parse_for(bytes, prefetch, options.format);
-    let loop_points = loop_of(
-        wem.as_ref(),
-        bytes,
-        options.format == SoundFormat::Raw && !prefetch,
-    );
-    let chain: &[SoundFormat] = match (&wem, options.format) {
-        (None, _) => &[SoundFormat::Raw],
-        (Some(wem), SoundFormat::Ogg) if matches!(wem.codec(), Codec::Vorbis | Codec::Opus) => {
-            &[SoundFormat::Ogg, SoundFormat::Wav, SoundFormat::Raw]
-        }
-        (Some(_), _) => &[SoundFormat::Wav, SoundFormat::Raw],
-    };
+    let (wem, mut note) = parse_for(input.bytes, input.prefetch, options.format);
+    let loop_points = wem.as_ref().and_then(Wem::loop_points);
+    let chain = formats(wem.as_ref(), options.format);
     for &format in chain {
         let path = match target.file(job, format) {
             Ok(path) => path,
             Err(failed) => return Some(Err(failed)),
         };
-        let sound = |emitted: Emitted, note: Option<String>| ExportedSound {
-            trigger: job.trigger.clone(),
-            wem_id: job.wem_id,
-            path: path.clone(),
-            format,
-            size: emitted.size,
-            state: emitted.state,
-            unconverted: note
-                .filter(|_| format == SoundFormat::Raw && options.format != SoundFormat::Raw),
-            loop_points,
-            prefetch_only: prefetch,
+        let sound = |emitted: Emitted, note: Option<String>| WrittenSound {
+            sound: ExportedSound {
+                trigger: job.trigger.clone(),
+                wem_id: job.wem_id,
+                source: job.source,
+                path: path.clone(),
+                format,
+                size: emitted.size,
+                state: emitted.state,
+                unconverted: note
+                    .filter(|_| format == SoundFormat::Raw && options.format != SoundFormat::Raw),
+                loop_points,
+                prefetch_only: input.prefetch,
+            },
+            origin: if emitted.state == ExportState::Written {
+                input.origin(job.wem_id, wem.as_ref())
+            } else {
+                None
+            },
         };
         if options.policy == ConflictPolicy::Skip
             && let Ok(existing) = fs::symlink_metadata(&path)
@@ -226,8 +258,20 @@ fn write_sound(
             };
             return Some(Ok(sound(emitted, note)));
         }
-        match emit(format, wem.as_ref(), bytes, &path, (job, options, watch)) {
+        match emit(
+            format,
+            wem.as_ref(),
+            input.bytes,
+            &path,
+            Some(target.protection),
+            (job, options, watch),
+        ) {
             Ok(emitted) => return Some(Ok(sound(emitted, note))),
+            Err(
+                error @ (ConversionError::OwnedOutput(_) | ConversionError::CleanupFailed { .. }),
+            ) => {
+                return Some(Err(failure(job, chain_text(&error))));
+            }
             Err(_) if watch.is_cancelled() => return None,
             Err(ConversionError::Audio { source, .. }) if format != SoundFormat::Raw => {
                 note = Some(source.to_string());
@@ -236,6 +280,16 @@ fn write_sound(
         }
     }
     Some(Err(failure(job, "no form could be written".to_owned())))
+}
+
+const fn formats(wem: Option<&Wem<&[u8]>>, requested: SoundFormat) -> &'static [SoundFormat] {
+    match (wem, requested) {
+        (None, _) | (_, SoundFormat::Raw) => &[SoundFormat::Raw],
+        (Some(wem), SoundFormat::Ogg) if matches!(wem.codec(), Codec::Vorbis | Codec::Opus) => {
+            &[SoundFormat::Ogg, SoundFormat::Wav, SoundFormat::Raw]
+        }
+        (Some(_), _) => &[SoundFormat::Wav, SoundFormat::Raw],
+    }
 }
 
 /// Fails a write once the export is cancelled, so the file being written is dropped.
@@ -262,6 +316,7 @@ fn emit(
     wem: Option<&Wem<&[u8]>>,
     bytes: &[u8],
     path: &Path,
+    protection: Option<&ArchiveWriteProtection>,
     (job, options, watch): (&Job, ExportOptions, &ExportWatch),
 ) -> Result<Emitted, ConversionError> {
     let convert = |source: AudioError, path: &Path| match source {
@@ -274,8 +329,12 @@ fn emit(
             source,
         },
     };
-    let replaced =
-        write_replacing_counted(path, options.policy == ConflictPolicy::IfChanged, |out| {
+    let replaced = write_replacing_counted_protected(
+        path,
+        options.policy == ConflictPolicy::IfChanged,
+        protection,
+        Some(&watch.token),
+        |out| {
             let mut guarded = Guarded { inner: out, watch };
             match (format, wem) {
                 (SoundFormat::Ogg, Some(wem)) => wem.write_ogg(&mut guarded).map(drop),
@@ -283,7 +342,8 @@ fn emit(
                 _ => guarded.write_all(bytes).map_err(AudioError::Write),
             }
             .map_err(|source| convert(source, path))
-        })?;
+        },
+    )?;
     Ok(Emitted {
         size: replaced.len,
         state: if replaced.changed {
@@ -306,77 +366,5 @@ fn chain_text(error: &ConversionError) -> String {
 }
 
 #[cfg(test)]
-mod tests {
-    use std::fs;
-
-    use p4kx_extraction::ConflictPolicy;
-
-    use super::super::plan::{Job, Origin};
-    use super::super::{ExportOptions, ExportWatch, SoundFormat};
-    use super::{ExportState, emit};
-
-    fn job() -> Job {
-        Job {
-            trigger: "Play".to_owned(),
-            stem: "Play".to_owned(),
-            wem_id: 1,
-            origin: Origin::Loose(0),
-        }
-    }
-
-    #[test]
-    fn a_write_after_cancel_fails_and_leaves_no_file_behind() {
-        let dir = tempfile::tempdir().expect("folder");
-        let watch = ExportWatch::default();
-        watch.cancel();
-        let options = ExportOptions {
-            format: SoundFormat::Raw,
-            policy: ConflictPolicy::Overwrite,
-        };
-
-        let emitted = emit(
-            SoundFormat::Raw,
-            None,
-            &[7; 64],
-            &dir.path().join("Play.wem"),
-            (&job(), options, &watch),
-        );
-
-        assert!(emitted.is_err(), "the write stops");
-        assert_eq!(fs::read_dir(dir.path()).expect("read").count(), 0);
-    }
-
-    #[test]
-    fn an_uncancelled_write_reports_the_bytes_it_wrote() {
-        let dir = tempfile::tempdir().expect("folder");
-        let options = ExportOptions {
-            format: SoundFormat::Raw,
-            policy: ConflictPolicy::IfChanged,
-        };
-        let path = dir.path().join("Play.wem");
-        let watch = ExportWatch::default();
-
-        let first = emit(
-            SoundFormat::Raw,
-            None,
-            &[7; 64],
-            &path,
-            (&job(), options, &watch),
-        )
-        .expect("first");
-        let second = emit(
-            SoundFormat::Raw,
-            None,
-            &[7; 64],
-            &path,
-            (&job(), options, &watch),
-        )
-        .expect("second");
-
-        assert_eq!((first.size, second.size), (64, 64));
-        assert_eq!(
-            (first.state, second.state),
-            (ExportState::Written, ExportState::Kept)
-        );
-    }
-}
+#[path = "write_tests.rs"]
+mod tests;

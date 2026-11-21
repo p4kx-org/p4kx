@@ -10,8 +10,9 @@ use std::path::{Path, PathBuf};
 use rayon::prelude::*;
 use thiserror::Error;
 
+use crate::observed_file_origin::ObservedFileStream;
 use crate::source::{EntrySource, SourceEntry, SourceReader};
-use crate::{CancelToken, EntryFailure, Exclusion, ExtractionError, Filter};
+use crate::{CancelToken, EntryFailure, Exclusion, ExtractionError, FileStamp, Filter};
 
 /// The most files, folders and rejected names [`FolderSource::scan`] visits; it bounds the memory
 /// of the listing, of the rejected names and of the folders waiting to be read.
@@ -119,7 +120,7 @@ pub enum FolderError {
     },
     /// The output folder lies inside a Star Citizen installation.
     #[error(transparent)]
-    Installation(#[from] p4kx_guard::WriteRefused),
+    Installation(#[from] p4kx_guard::WriteProtectionError),
     /// The run was cancelled while the folder was read.
     #[error("cancelled")]
     Cancelled,
@@ -369,7 +370,9 @@ impl EntrySource for FolderSource {
         if !resolved.starts_with(&self.root) {
             return Err(FolderFileError::Outside.into());
         }
-        Ok(Box::new(opened.take(file.size)))
+        let stamp = FileStamp::from_metadata(&metadata);
+        let stream = ObservedFileStream::with_stamp(file.disk.as_path(), opened, Some(stamp));
+        Ok(SourceReader::File(stream.take(file.size)))
     }
 
     fn checksum(&self, _index: usize) -> Option<p4kx_archive::Checksum> {

@@ -75,6 +75,12 @@ pub(crate) struct LocExportArgs {
     /// The file to write; an existing file is replaced. The table goes to stdout without it.
     #[arg(long, value_name = "FILE")]
     pub(crate) out: Option<PathBuf>,
+    /// Writes the raw stdout table's field-origin companion to stderr.
+    #[arg(long, conflicts_with = "out")]
+    pub(crate) origin_stderr: bool,
+    /// Saves the raw stdout table's field-origin companion to this file.
+    #[arg(long, value_name = "FILE", conflicts_with = "out")]
+    pub(crate) origin_out: Option<PathBuf>,
 }
 
 /// The values of `p4kx loc export --format`.

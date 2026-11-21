@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The Basetool catalog written as plain JSON or as a zstd frame, through the public API.
+//! The P4KX catalog written as plain JSON or as a zstd frame, through the public API.
 
 use std::error::Error;
 use std::fs;
@@ -80,7 +80,7 @@ pub(crate) fn options() -> CatalogOptions<'static> {
 
 #[test]
 fn a_path_ending_in_zst_selects_zstd_and_any_other_path_plain_json() {
-    let zstd = Compression::for_path(Path::new("out/basetool-catalog.json.zst"));
+    let zstd = Compression::for_path(Path::new("out/p4kx-catalog.json.zst"));
     let upper = Compression::for_path(Path::new("CATALOG.JSON.ZST"));
     assert_eq!(zstd, Compression::ZSTD, "json.zst");
     assert_eq!(upper, Compression::ZSTD, "case is ignored");
@@ -236,6 +236,33 @@ fn a_plain_write_equals_the_built_json_and_has_no_compressed_size() -> TestResul
 }
 
 #[test]
+fn counting_a_catalog_to_a_sink_matches_the_complete_file_frame() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = archive(dir.path())?;
+    let entry = DataForgeEntry::read(&archive)?;
+    let options = options();
+    let (counted, _) = write_catalog_from(&archive, &entry, &options, Compression::ZSTD, || {
+        Ok(io::sink())
+    })?;
+    let (buffered, frame) =
+        write_catalog_from(&archive, &entry, &options, Compression::ZSTD, || {
+            Ok(Vec::new())
+        })?;
+    let decoded = io::copy(&mut zstd::Decoder::new(frame.as_slice())?, &mut io::sink())?;
+    assert_eq!(
+        counted, buffered,
+        "discarding output leaves the writer summary unchanged"
+    );
+    assert_eq!(
+        counted.compressed_size(),
+        Some(u64::try_from(frame.len())?),
+        "exact encoded bytes"
+    );
+    assert_eq!(counted.size(), decoded, "exact decoded bytes");
+    Ok(())
+}
+
+#[test]
 fn the_catalog_is_streamed_in_pieces_not_in_one_write() -> TestResult {
     struct Chunks(Vec<usize>);
     impl Write for Chunks {
@@ -344,6 +371,6 @@ fn a_file_is_written_to_a_path() -> TestResult {
 
     let mut decoded = Vec::new();
     zstd::Decoder::new(fs::File::open(&out)?)?.read_to_end(&mut decoded)?;
-    assert!(decoded.starts_with(b"{\"schemaVersion\":2"), "JSON");
+    assert!(decoded.starts_with(b"{\"schemaVersion\":3"), "JSON");
     Ok(())
 }

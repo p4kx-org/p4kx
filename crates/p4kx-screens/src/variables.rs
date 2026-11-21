@@ -159,7 +159,7 @@ impl Variable {
                     .map(|number| Rest::Bool(number != 0.0))
                     .ok_or_else(|| refuse("a boolean")),
             },
-            Rest::Num(_) => self
+            Rest::Num(_) | Rest::Integer(_) => self
                 .value
                 .parse::<f64>()
                 .ok()

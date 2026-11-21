@@ -3,6 +3,7 @@
 
 use std::path::Path;
 
+use p4kx_export::Compression;
 use thiserror::Error;
 
 /// An export time that no system time can hold.
@@ -29,16 +30,33 @@ pub(crate) struct MissingCatalogArgs;
 )]
 pub(crate) struct GzipNotSupported(String);
 
-/// Returns whether `error` is a command line `p4kx catalog` refuses: a missing Archive or output,
-/// an export time out of range or an output file that would silently be plain JSON.
+/// An explicit zstd level was given for a plain output file.
+#[derive(Debug, Error)]
+#[error("--zstd-level requires an --out filename ending in .zst")]
+struct ZstdLevelNeedsCompressedOutput;
+
+/// Returns whether `error` is invalid catalog command-line input.
 pub(crate) fn is_invalid_input(error: &anyhow::Error) -> bool {
     error.downcast_ref::<InvalidExportTime>().is_some()
         || error.downcast_ref::<MissingCatalogArgs>().is_some()
         || error.downcast_ref::<GzipNotSupported>().is_some()
+        || error
+            .downcast_ref::<ZstdLevelNeedsCompressedOutput>()
+            .is_some()
+}
+
+/// Selects a compression based on the output extension and optional zstd override.
+pub(crate) fn compression(out: &Path, zstd_level: Option<i32>) -> anyhow::Result<Compression> {
+    refuse_gzip(out)?;
+    match (Compression::for_path(out), zstd_level) {
+        (compression, None) => Ok(compression),
+        (Compression::Zstd { .. }, Some(level)) => Ok(Compression::Zstd { level }),
+        (Compression::None, Some(_)) => Err(ZstdLevelNeedsCompressedOutput.into()),
+    }
 }
 
 /// Fails for an output file ending in `.gz`, ignoring case.
-pub(crate) fn refuse_gzip(out: &Path) -> Result<(), GzipNotSupported> {
+fn refuse_gzip(out: &Path) -> Result<(), GzipNotSupported> {
     if out
         .extension()
         .is_some_and(|extension| extension.eq_ignore_ascii_case("gz"))

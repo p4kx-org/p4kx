@@ -152,6 +152,7 @@ fn reward_structs() -> Vec<TestStruct> {
 
 fn quality_structs() -> Vec<TestStruct> {
     vec![
+        TestStruct::new("StarMapObject"),
         TestStruct::new("CraftingQualityDistributionRecord").field(
             "qualityDistribution",
             pointer("CraftingQualityDistribution"),
@@ -159,8 +160,8 @@ fn quality_structs() -> Vec<TestStruct> {
         TestStruct::new("CraftingQualityDistribution"),
         TestStruct::new("CraftingQualityDistributionNormal")
             .parent("CraftingQualityDistribution")
-            .field("min", TestType::Single)
-            .field("max", TestType::Single)
+            .field("min", TestType::Int32)
+            .field("max", TestType::Int32)
             .field("mean", TestType::Single)
             .field("stddev", TestType::Double),
         TestStruct::new("CraftingQualityLocationOverrideRecord")

@@ -3,16 +3,8 @@
 
 use std::collections::HashMap;
 
-use crate::LocalizationError;
 use crate::key::Key;
-
-/// The largest `global.ini` that is read, 64 MiB; the English one of a Build has about 11 MB.
-pub const MAX_GLOBAL_INI_SIZE: u64 = 64 << 20;
-
-/// The most keys a `global.ini` may hold; the English one of a Build has about 91,000.
-pub const MAX_GLOBAL_INI_KEYS: usize = 1 << 20;
-
-const BYTES_PER_KEY_ESTIMATE: usize = 128;
+use crate::{LocalizationError, LocalizationLimits};
 
 /// The texts of one key: the line `key=` and the line `key,suffix=`.
 #[derive(Debug, Clone, Copy, Default)]
@@ -53,26 +45,27 @@ impl<'a> GlobalIni<'a> {
     ///
     /// # Errors
     ///
-    /// Returns [`LocalizationError::TooLarge`] when `text` exceeds [`MAX_GLOBAL_INI_SIZE`],
-    /// [`LocalizationError::OutOfMemory`] when the index cannot be reserved and
-    /// [`LocalizationError::TooManyKeys`] when it holds more than [`MAX_GLOBAL_INI_KEYS`] keys.
+    /// Returns [`LocalizationError::OutOfMemory`] when index storage cannot be reserved.
     pub fn parse(text: &'a str) -> Result<Self, LocalizationError> {
-        let size = u64::try_from(text.len()).unwrap_or(u64::MAX);
-        if size > MAX_GLOBAL_INI_SIZE {
-            return Err(LocalizationError::TooLarge {
-                size,
-                limit: MAX_GLOBAL_INI_SIZE,
-            });
-        }
-        let text = text.strip_prefix('\u{feff}').unwrap_or(text);
+        Self::parse_with_limits(text, LocalizationLimits::UNLIMITED)
+    }
+
+    /// Indexes the text with the caller's decoded byte and distinct key budgets.
+    ///
+    /// # Errors
+    ///
+    /// Returns a budget error when a configured budget is exceeded or
+    /// [`LocalizationError::OutOfMemory`] when index storage cannot be reserved.
+    pub fn parse_with_limits(
+        text: &'a str,
+        limits: LocalizationLimits,
+    ) -> Result<Self, LocalizationError> {
+        let text = text.trim_prefix('\u{feff}');
+        limits.check_decoded_bytes(text.len())?;
         let mut texts = HashMap::new();
-        let keys = (text.len() / BYTES_PER_KEY_ESTIMATE).min(MAX_GLOBAL_INI_KEYS);
-        texts
-            .try_reserve(keys)
-            .map_err(|_| LocalizationError::OutOfMemory { keys })?;
         let mut skipped = 0;
         for line in text.split('\n') {
-            let line = line.strip_suffix('\r').unwrap_or(line);
+            let line = line.trim_suffix('\r');
             let key = line.split_once('=').and_then(|(key, value)| {
                 let (key, suffixed) = key
                     .split_once(',')
@@ -84,12 +77,7 @@ impl<'a> GlobalIni<'a> {
                 skipped += usize::from(!line.trim().is_empty());
                 continue;
             };
-            if texts.len() == MAX_GLOBAL_INI_KEYS && !texts.contains_key(&Key(key)) {
-                return Err(LocalizationError::TooManyKeys {
-                    limit: MAX_GLOBAL_INI_KEYS,
-                });
-            }
-            let slot: &mut Texts<'a> = texts.entry(Key(key)).or_default();
+            let slot = text_slot(&mut texts, Key(key), limits.keys())?;
             if suffixed {
                 slot.suffixed = Some(value);
             } else {
@@ -117,7 +105,7 @@ impl<'a> GlobalIni<'a> {
     }
 
     fn texts_of(&self, key: &str) -> Option<Texts<'a>> {
-        let key = key.strip_prefix('@').unwrap_or(key);
+        let key = key.trim_prefix('@');
         let texts: &HashMap<Key<'_>, Texts<'a>> = &self.texts;
         texts.get(&Key(key)).copied()
     }
@@ -152,4 +140,25 @@ impl<'a> GlobalIni<'a> {
     pub const fn skipped(&self) -> usize {
         self.skipped
     }
+}
+
+fn text_slot<'index, 'source>(
+    texts: &'index mut HashMap<Key<'source>, Texts<'source>>,
+    key: Key<'source>,
+    limit: Option<usize>,
+) -> Result<&'index mut Texts<'source>, LocalizationError> {
+    let count = texts.len();
+    if (limit == Some(count) || count == texts.capacity()) && !texts.contains_key(&key) {
+        if let Some(limit) = limit
+            && count == limit
+        {
+            return Err(LocalizationError::TooManyKeys { limit });
+        }
+        texts
+            .try_reserve(1)
+            .map_err(|_| LocalizationError::OutOfMemory {
+                keys: count.saturating_add(1),
+            })?;
+    }
+    Ok(texts.entry(key).or_default())
 }

@@ -42,7 +42,7 @@ impl Rotation {
         (length.is_finite() && length > f64::EPSILON).then_some(Self { w, x, y, z })
     }
 
-    const fn parts(self) -> [f64; 4] {
+    pub(crate) const fn parts(self) -> [f64; 4] {
         [self.w, self.x, self.y, self.z]
     }
 

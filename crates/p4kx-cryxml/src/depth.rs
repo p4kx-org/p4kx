@@ -34,6 +34,10 @@ impl TextTooDeep {
 ///
 /// Returns [`TextTooDeep`] when an element opens at a depth above the limit.
 pub fn check_text_depth(text: &str) -> Result<(), TextTooDeep> {
+    check_text_depth_with_limit(text, MAX_TEXT_DEPTH)
+}
+
+pub(crate) fn check_text_depth_with_limit(text: &str, limit: usize) -> Result<(), TextTooDeep> {
     let bytes = text.as_bytes();
     let mut depth = 0_usize;
     let mut at = 0;
@@ -58,10 +62,8 @@ pub fn check_text_depth(text: &str) -> Result<(), TextTooDeep> {
                 depth = depth.saturating_sub(1);
             } else if !tag.ends_with(b"/>") {
                 depth = depth.saturating_add(1);
-                if depth > MAX_TEXT_DEPTH {
-                    return Err(TextTooDeep {
-                        limit: MAX_TEXT_DEPTH,
-                    });
+                if depth > limit {
+                    return Err(TextTooDeep { limit });
                 }
             }
             at = end;

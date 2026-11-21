@@ -292,3 +292,6 @@ fn a_malformed_line_is_an_error() {
     assert!(ReferenceList::parse("missions thing Name").is_err());
     assert!(ReferenceList::parse("a record B extra").is_err());
 }
+
+#[path = "coverage_inheritance.rs"]
+mod coverage_inheritance;

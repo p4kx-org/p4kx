@@ -10,7 +10,7 @@ use std::path::{Path, PathBuf};
 
 use p4kx_testkit::{
     ArchiveBuilder, CryXmlByteOrder, CryXmlSignature, SplitDds, TestCodec, TestElement, TestEntry,
-    TestTextureFormat, TestWem, p4kx, test_signal,
+    TestTextureFormat, TestWem, check_dds_origin_pair, p4kx, test_signal,
 };
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -78,6 +78,9 @@ fn tree(root: &Path) -> Result<BTreeMap<String, Vec<u8>>, Box<dyn Error>> {
 
 #[test]
 fn convert_writes_what_extract_with_convert_writes() -> TestResult {
+    const DDS: &str = "Data/Textures/rock_diff.dds";
+    const RECEIPT: &str = "Data/Textures/rock_diff.dds.p4kx-origin.jsonl";
+
     let fixture = fixture()?;
     let expected = fixture.extract("converted", true)?;
     let raw = fixture.extract("raw", false)?;
@@ -94,7 +97,27 @@ fn convert_writes_what_extract_with_convert_writes() -> TestResult {
     assert_eq!(output.status.code(), Some(0), "success: {output:?}");
     let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
     assert_eq!(json["failed"], serde_json::json!([]), "no failure");
-    assert_eq!(tree(&out)?, tree(&expected)?, "the same files");
+    let merged = json["merged_texture_artifacts"]
+        .as_array()
+        .ok_or("DDS summary")?;
+    let [artifact] = merged.as_slice() else {
+        return Err("the folder conversion must publish one merged DDS receipt".into());
+    };
+    assert_eq!(artifact["path"], DDS, "the written DDS");
+    assert_eq!(
+        artifact["origin_receipt"], RECEIPT,
+        "the portable loose receipt"
+    );
+    let mut loose = tree(&out)?;
+    let mut archive = tree(&expected)?;
+    let archive_receipt = archive.remove(RECEIPT).ok_or("Archive DDS receipt")?;
+    let loose_receipt = loose.remove(RECEIPT).ok_or("loose DDS receipt")?;
+    check_dds_origin_pair(
+        loose.get(DDS).ok_or("the written DDS")?,
+        &archive_receipt,
+        &loose_receipt,
+    )?;
+    assert_eq!(loose, archive, "the same payload files");
     Ok(())
 }
 

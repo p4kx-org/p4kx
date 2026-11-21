@@ -66,8 +66,7 @@ the translation, and its bind rotation times that quaternion on the right (`bind
 delta turns in the joint's own axes). Order, signs and side are those StarBreaker documents for the
 engine; they are tested for what the code does (two axes, a rotated bind pose).
 
-Amendment (#565), what the data settles. No in-game reference is available, so the rotations were
-checked on LIVE against motions whose direction is known (`real_head_rotation.rs`, clip
+Amendment (#565). The rotations were checked on LIVE against motions whose direction is known (`real_head_rotation.rs`, clip
 `facerom_t0_face`, forward kinematics over the skeleton, the probe joint a descendant of the
 rotated one). With the convention above, `eyeLookUp` moves the pupil up by 6 mm and `eyeLookDown`
 down by 3.5 mm, `blinkL` and `blinkR` move the upper eyelid down by 7 mm, and `CTL_C_jaw ty` moves
@@ -82,6 +81,12 @@ or by under 1 mm (eyelids). They rest on StarBreaker's reading of the engine
 `bind.rotation * euler_xyz_to_quat(delta)`), and stay open (#627) until an in-game or engine
 reference of one expression with a rotated bind pose, such as a nostril or a lip corner, can be
 compared.
+
+The Assembly verification feature evaluates all four combinations of XYZ or ZYX and bind-first or
+delta-first composition at explicit clip frames on one rig. The resulting GLB actions share the
+original frame times, translations and morph weights. The private verification records bind each
+row of original Euler radians to its CAF frame and mapped RigLogic joint. A candidate remains
+unselected until comparison with an independent reference resolves the difference.
 
 The 495 activations are also the weights of the morph targets: the targets of the head are the
 blendshapes that move a vertex, in the order of their numbers, and the build keeps the number of

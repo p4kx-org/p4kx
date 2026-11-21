@@ -15,12 +15,12 @@ use crate::query_table::one_line;
 /// containers' entities looked up in `forge`.
 pub(crate) fn with_interior(
     assembly: Assembly,
-    (archive, forge): (&Archive, &DataForge<'_>),
+    (archive, entry, forge): (&Archive, &DataForgeEntry, &DataForge<'_>),
     tree: &EntityNode,
     lod: u32,
 ) -> Result<Assembly> {
     let options = InteriorOptions::default().with_lod(lod);
-    let classes = InteriorForge::new(forge);
+    let classes = InteriorForge::new(forge).with_entry(entry);
     let interior = EntityInterior::build_with(
         archive,
         &assembly,
@@ -60,7 +60,10 @@ pub(crate) fn build(
         .filter(|outer| DataForgeEntry::locate(outer).is_some())
         .and_then(|outer| or_warn(DataForgeEntry::read(outer)));
     let forge = forge_entry.as_ref().and_then(|entry| or_warn(entry.open()));
-    let classes = forge.as_ref().map(InteriorForge::new);
+    let classes = forge
+        .as_ref()
+        .zip(forge_entry.as_ref())
+        .map(|(forge, entry)| InteriorForge::new(forge).with_entry(entry));
     Ok(Interior::build_with(
         &refs,
         entry,

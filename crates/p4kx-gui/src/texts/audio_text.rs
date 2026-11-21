@@ -55,6 +55,8 @@ pub enum AudioText {
     /// The path line of a soundbank: its size and the number of WEMs; takes `size`, `count` and
     /// `number`.
     BankSummary,
+    /// The key of the count of embedded WEMs.
+    BankWemCount,
     /// Shown for a soundbank that embeds no WEM; takes `path`.
     BankEmpty,
     /// Shown when a soundbank cannot be read; takes `path` and `reason`.
@@ -70,7 +72,7 @@ pub enum AudioText {
 
 impl AudioText {
     /// Every text of the audio preview.
-    pub(crate) const ALL: [Self; 30] = [
+    pub(crate) const ALL: [Self; 31] = [
         Self::Tab,
         Self::Codec,
         Self::Channels,
@@ -96,6 +98,7 @@ impl AudioText {
         Self::PluginNote,
         Self::MidiNote,
         Self::BankSummary,
+        Self::BankWemCount,
         Self::BankEmpty,
         Self::BankFailed,
         Self::WemName,
@@ -132,6 +135,7 @@ impl AudioText {
             Self::PluginNote => "audio-plugin-note",
             Self::MidiNote => "audio-midi-note",
             Self::BankSummary => "audio-bank-summary",
+            Self::BankWemCount => "audio-bank-wem-count",
             Self::BankEmpty => "audio-bank-empty",
             Self::BankFailed => "audio-bank-failed",
             Self::WemName => "audio-wem-name",

@@ -3,7 +3,7 @@
 
 use std::io::{self, Read, Write};
 
-use p4kx_cryxml::{Format, Signature, detect, parse};
+use p4kx_cryxml::{Document, Format, Signature, detect, parse};
 
 use crate::{Archive, CancelToken, Entry, LineDiffError};
 
@@ -47,24 +47,81 @@ impl Encoding {
     }
 }
 
-/// One side of a line diff after reading it.
-#[derive(Debug)]
-pub(crate) enum Decoded {
-    Text(Vec<u8>, Encoding),
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DecodeOutcome {
+    Text(Encoding),
     Binary,
-    TooLarge,
+    TooLarge(LimitSource),
 }
 
-/// Reads `entry` of `archive` as text, converting `CryXml` to XML and decoding UTF-16; stops
-/// once `cancel` is set.
-pub(crate) fn decode(
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum LimitSource {
+    DeclaredSize,
+    DecodedPayload,
+}
+
+/// A side's text together with the parsed source needed for selected CryXml hunk evidence.
+#[derive(Debug)]
+pub(crate) struct DecodedText<'raw> {
+    pub(crate) bytes: Vec<u8>,
+    encoding: Encoding,
+    pub(crate) cryxml: Option<Box<Document<'raw>>>,
+}
+
+/// One side of a line diff after decoding it.
+#[derive(Debug)]
+pub(crate) enum Decoded<'raw> {
+    Text(DecodedText<'raw>),
+    Binary,
+    TooLarge(LimitSource),
+}
+
+impl Decoded<'_> {
+    pub(crate) const fn outcome(&self) -> DecodeOutcome {
+        match self {
+            Self::Text(text) => DecodeOutcome::Text(text.encoding),
+            Self::Binary => DecodeOutcome::Binary,
+            Self::TooLarge(source) => DecodeOutcome::TooLarge(*source),
+        }
+    }
+}
+
+/// A physical Entry read whose bytes remain available to the CryXml document.
+pub(crate) struct LoadedEntry<'archive> {
+    entry: &'archive Entry,
+    bytes: Option<Vec<u8>>,
+}
+
+impl LoadedEntry<'_> {
+    pub(crate) fn decode(
+        &mut self,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Decoded<'_>, LineDiffError> {
+        let Some(bytes) = self.bytes.as_mut() else {
+            return Ok(Decoded::TooLarge(LimitSource::DeclaredSize));
+        };
+        let decoded = match detect(bytes) {
+            Some(Format::CryXml(signature)) => convert(bytes, signature, self.entry, cancel)?,
+            _ => text(std::mem::take(bytes)),
+        };
+        Ok(match decoded {
+            Decoded::Text(text) if line_count(&text.bytes) > MAX_DIFF_LINES => {
+                Decoded::TooLarge(LimitSource::DecodedPayload)
+            }
+            decoded => decoded,
+        })
+    }
+}
+
+/// Reads the verified original payload unless its declared size exceeds the line diff limit.
+pub(crate) fn load<'archive>(
     archive: &Archive,
-    entry: &Entry,
+    entry: &'archive Entry,
     cancel: Option<&CancelToken>,
-) -> Result<Decoded, LineDiffError> {
+) -> Result<LoadedEntry<'archive>, LineDiffError> {
     let declared = entry.uncompressed_size();
     if declared > MAX_DIFF_LEN {
-        return Ok(Decoded::TooLarge);
+        return Ok(LoadedEntry { entry, bytes: None });
     }
     let path = || entry.path().to_owned();
     let mut bytes = Vec::with_capacity(initial_capacity(declared));
@@ -91,22 +148,18 @@ pub(crate) fn decode(
             declared,
         });
     }
-    let decoded = match detect(&bytes) {
-        Some(Format::CryXml(signature)) => convert(&bytes, signature, entry, cancel)?,
-        _ => text(bytes),
-    };
-    Ok(match decoded {
-        Decoded::Text(text, _) if line_count(&text) > MAX_DIFF_LINES => Decoded::TooLarge,
-        decoded => decoded,
+    Ok(LoadedEntry {
+        entry,
+        bytes: Some(bytes),
     })
 }
 
-fn convert(
-    bytes: &[u8],
+fn convert<'raw>(
+    bytes: &'raw [u8],
     signature: Signature,
     entry: &Entry,
     cancel: Option<&CancelToken>,
-) -> Result<Decoded, LineDiffError> {
+) -> Result<Decoded<'raw>, LineDiffError> {
     let document = parse(bytes).map_err(|source| LineDiffError::CryXml {
         path: entry.path().to_owned(),
         source,
@@ -116,9 +169,15 @@ fn convert(
         cancel,
     };
     match document.write_xml(&mut out) {
-        Ok(()) => Ok(Decoded::Text(out.bytes, Encoding::CryXml(signature))),
+        Ok(()) => Ok(Decoded::Text(DecodedText {
+            bytes: out.bytes,
+            encoding: Encoding::CryXml(signature),
+            cryxml: Some(Box::new(document)),
+        })),
         Err(_) if cancel.is_some_and(CancelToken::is_cancelled) => Err(LineDiffError::Cancelled),
-        Err(error) if error.kind() == io::ErrorKind::FileTooLarge => Ok(Decoded::TooLarge),
+        Err(error) if error.kind() == io::ErrorKind::FileTooLarge => {
+            Ok(Decoded::TooLarge(LimitSource::DecodedPayload))
+        }
         Err(source) => Err(LineDiffError::Read {
             path: entry.path().to_owned(),
             source,
@@ -129,7 +188,7 @@ fn convert(
 /// Returns `bytes` as text: strict UTF-16 after its byte order mark, otherwise the bytes as they
 /// are; binary when they hold a NUL, or when UTF-16 holds a NUL, an unpaired surrogate or an odd
 /// trailing byte.
-fn text(bytes: Vec<u8>) -> Decoded {
+fn text(bytes: Vec<u8>) -> Decoded<'static> {
     let utf16 = bytes
         .strip_prefix(UTF16_LE_BOM)
         .map(|units| (utf16(units, u16::from_le_bytes), Encoding::Utf16Le))
@@ -139,10 +198,18 @@ fn text(bytes: Vec<u8>) -> Decoded {
                 .map(|units| (utf16(units, u16::from_be_bytes), Encoding::Utf16Be))
         });
     match utf16 {
-        Some((Some(text), encoding)) => Decoded::Text(text.into_bytes(), encoding),
+        Some((Some(text), encoding)) => Decoded::Text(DecodedText {
+            bytes: text.into_bytes(),
+            encoding,
+            cryxml: None,
+        }),
         Some((None, _)) => Decoded::Binary,
         None if bytes.contains(&0) => Decoded::Binary,
-        None => Decoded::Text(bytes, Encoding::Text),
+        None => Decoded::Text(DecodedText {
+            bytes,
+            encoding: Encoding::Text,
+            cryxml: None,
+        }),
     }
 }
 

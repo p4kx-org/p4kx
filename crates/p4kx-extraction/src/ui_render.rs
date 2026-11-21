@@ -4,16 +4,16 @@
 use std::path::Path;
 
 use p4kx_gfx::{
-    GfxError, Localise, MAX_BITMAP_PIXELS, RasterOptions, RgbaImage, Scene, Skipped, TagFailure,
-    TextOptions,
+    Assets, GfxError, Localise, MAX_BITMAP_PIXELS, Raster, RasterOptions, RgbaImage, Scene,
+    SceneOrigins, Skipped, TagFailure, TextOptions,
 };
 use p4kx_localization::decode_line_breaks;
 
-use crate::output_file::{write_error, write_replacing};
 use crate::texture_parts::is_same_file;
-use crate::ui_imports::{ImportReport, ImportedFonts, resolve_fonts};
+use crate::ui_imports::{ImportReport, ImportReportSources, ImportedFonts, resolve_fonts};
 use crate::ui_movie::Origin;
 use crate::ui_render_bitmaps::FrameBitmaps;
+use crate::ui_service::ui_font_sources::FrameFonts;
 use crate::{ConversionError, UiMovie};
 
 /// The pixels the decoded bitmaps of one rendered frame may hold together, granted in ascending
@@ -45,9 +45,12 @@ pub struct UiRender {
 }
 
 /// A composed first frame with its decoded bitmaps.
-pub(crate) struct ComposedFrame {
+pub(crate) struct ComposedFrame<'archive> {
     pub(crate) scene: Scene,
-    pub(crate) bitmaps: FrameBitmaps,
+    pub(crate) origins: Option<SceneOrigins>,
+    pub(crate) fonts: FrameFonts<'archive>,
+    pub(crate) import_sources: ImportReportSources<'archive>,
+    pub(crate) bitmaps: FrameBitmaps<'archive>,
     pub(crate) tag_failures: Vec<TagFailure>,
     pub(crate) imports: ImportReport,
 }
@@ -60,7 +63,7 @@ impl UiRender {
     }
 }
 
-impl UiMovie<'_> {
+impl<'archive> UiMovie<'archive> {
     /// Renders the first frame of the main timeline, with its sprites, to an image.
     ///
     /// The bitmaps the frame fills with are decoded in parallel as [`UiMovie::extract_assets`]
@@ -79,13 +82,7 @@ impl UiMovie<'_> {
             .scene
             .rasterize(&frame.bitmaps.images, options)
             .map_err(|source| self.frame_error(source))?;
-        Ok(UiRender {
-            image: raster.image,
-            skipped: raster.skipped,
-            bitmap_failures: frame.bitmaps.failures,
-            tag_failures: frame.tag_failures,
-            imports: frame.imports,
-        })
+        Ok(frame.into_render(raster))
     }
 
     /// Composes the first frame and decodes the bitmaps it fills with, after checking that the
@@ -93,8 +90,16 @@ impl UiMovie<'_> {
     pub(crate) fn compose_frame(
         &self,
         options: &RasterOptions,
-    ) -> Result<ComposedFrame, ConversionError> {
-        let mut assets = self.movie().assets();
+    ) -> Result<ComposedFrame<'archive>, ConversionError> {
+        self.compose_frame_with_assets(options, self.movie().assets(), false)
+    }
+
+    pub(crate) fn compose_frame_with_assets(
+        &self,
+        options: &RasterOptions,
+        mut assets: Assets<'_>,
+        observe: bool,
+    ) -> Result<ComposedFrame<'archive>, ConversionError> {
         let ini = self
             .texts()
             .map(|texts| {
@@ -111,7 +116,7 @@ impl UiMovie<'_> {
         };
         let imported = match self.origin() {
             Origin::Entry(archive) => {
-                resolve_fonts(archive, self.name(), &assets, self.font_language())
+                resolve_fonts(archive, self.name(), &assets, self.font_language(), observe)
             }
             Origin::File(_) => ImportedFonts::default(),
         };
@@ -119,16 +124,27 @@ impl UiMovie<'_> {
             fonts: &imported.fonts,
             localise: ini.as_ref().map(|_| &lookup as Localise<'_>),
         };
-        let scene = self.movie().first_frame_with_text(&assets, &text_options);
+        let (scene, origins) = if observe {
+            let observed = self.movie().first_frame_observed(&assets, &text_options);
+            (observed.scene, Some(observed.origins))
+        } else {
+            (
+                self.movie().first_frame_with_text(&assets, &text_options),
+                None,
+            )
+        };
         scene
             .canvas_size(options.size)
             .map_err(|source| self.frame_error(source))?;
         let bitmaps = self.frame_bitmaps(&assets, &scene.bitmap_ids());
         Ok(ComposedFrame {
             scene,
+            origins,
+            fonts: FrameFonts::new(assets.fonts.len(), imported.sources),
             bitmaps,
             tag_failures: std::mem::take(&mut assets.failures),
             imports: imported.report,
+            import_sources: imported.report_sources,
         })
     }
 
@@ -161,7 +177,7 @@ impl UiMovie<'_> {
     /// Renders the first frame as [`UiMovie::render`] does and writes it to `out` as an 8-bit
     /// RGBA PNG, replacing the file.
     ///
-    /// The PNG is written whole or not at all.
+    /// The committed PNG is bound by a sibling source-origin companion.
     ///
     /// # Errors
     ///
@@ -172,20 +188,25 @@ impl UiMovie<'_> {
         options: &RasterOptions,
         out: &Path,
     ) -> Result<UiRender, ConversionError> {
-        self.check_output(out)?;
-        let render = self.render(options)?;
-        write_replacing(out, |writer| {
-            render
-                .image
-                .write_png(writer)
-                .map_err(|source| match source {
-                    GfxError::Write(source) => write_error(out, source),
-                    source => ConversionError::UiMovie {
-                        movie: self.name().to_owned(),
-                        source,
-                    },
-                })
-        })?;
-        Ok(render)
+        self.render_to_file_with_origin(options, out)
+            .map(|written| written.render)
+    }
+}
+
+impl ComposedFrame<'_> {
+    pub(crate) const fn has_no_omissions(&self) -> bool {
+        self.bitmaps.failures.is_empty()
+            && self.tag_failures.is_empty()
+            && self.imports.unresolved.is_empty()
+    }
+
+    pub(crate) fn into_render(self, raster: Raster) -> UiRender {
+        UiRender {
+            image: raster.image,
+            skipped: raster.skipped,
+            bitmap_failures: self.bitmaps.failures,
+            tag_failures: self.tag_failures,
+            imports: self.imports,
+        }
     }
 }

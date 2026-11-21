@@ -92,15 +92,12 @@ pub(crate) fn serve(install: &Install) -> TestResult<Server> {
 }
 
 fn names(value: &Value, key: &str) -> Vec<String> {
-    value
-        .as_array()
-        .map(|items| {
-            items
-                .iter()
-                .filter_map(|item| item[key].as_str().map(str::to_owned))
-                .collect()
-        })
-        .unwrap_or_default()
+    value.as_array().map_or_default(|items| {
+        items
+            .iter()
+            .filter_map(|item| item[key].as_str().map(str::to_owned))
+            .collect()
+    })
 }
 
 #[test]
@@ -271,6 +268,10 @@ fn a_trigger_resolves_to_sound_variants_with_wem_ids_and_locations() -> TestResu
     )?;
     assert_eq!(result["trigger"]["name"], "Play_Engine", "the trigger");
     assert_eq!(
+        result["truncated_by_limits"], false,
+        "every reference was followed"
+    );
+    assert_eq!(
         result["counts"],
         json!({ "variants": 3, "located": 3, "unlocated": 0, "plugins": 0, "breaks": 0 }),
         "counts"
@@ -320,6 +321,10 @@ fn an_unmatched_event_is_a_break_and_unknown_triggers_and_languages_are_errors()
     )?;
     assert_eq!(nowhere["counts"]["breaks"], 1, "one break");
     assert_eq!(nowhere["breaks"][0]["kind"], "no_soundbank", "its reason");
+    assert_eq!(
+        nowhere["truncated_by_limits"], false,
+        "missing data is a distinct break"
+    );
     let message = server.error(
         "resolve_audio_trigger",
         &json!({ "trigger": "Play_Undefined" }),

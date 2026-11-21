@@ -54,6 +54,8 @@ pub enum RecordExportText {
     SummaryCancelled,
     /// The counts of the summary; takes `written`, `skipped`, `failed` and `cancelled`.
     SummaryCounts,
+    /// The written count in the summary provenance tooltip.
+    SummaryWritten,
     /// The Records with error values; takes `erroneous` and `errors`.
     SummaryErrors,
     /// Shown when the filter matched no Record.
@@ -78,7 +80,7 @@ pub enum RecordExportText {
 
 impl RecordExportText {
     /// Every text, for checks of the Fluent files.
-    pub const ALL: [Self; 34] = [
+    pub const ALL: [Self; 35] = [
         Self::Menu,
         Self::Action,
         Self::SetupTitle,
@@ -103,6 +105,7 @@ impl RecordExportText {
         Self::SummaryCancelledTitle,
         Self::SummaryCancelled,
         Self::SummaryCounts,
+        Self::SummaryWritten,
         Self::SummaryErrors,
         Self::SummaryNoMatch,
         Self::SummaryTarget,
@@ -143,6 +146,7 @@ impl RecordExportText {
             Self::SummaryCancelledTitle => "record-export-summary-cancelled-title",
             Self::SummaryCancelled => "record-export-summary-cancelled",
             Self::SummaryCounts => "record-export-summary-counts",
+            Self::SummaryWritten => "record-export-summary-written",
             Self::SummaryErrors => "record-export-summary-errors",
             Self::SummaryNoMatch => "record-export-summary-no-match",
             Self::SummaryTarget => "record-export-summary-target",

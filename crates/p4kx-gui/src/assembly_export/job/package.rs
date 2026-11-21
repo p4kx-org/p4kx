@@ -3,13 +3,13 @@
 
 use p4kx_assembly::{ArchiveModels, Assembly, Interior, LoadoutChanges};
 use p4kx_blender::{
-    BuildInfo, InteriorScene, PackageError, PackageInfo, PackageSummary, Replacement,
-    write_interior_package, write_package,
+    BuildInfo, InteriorScene, PackageError, PackageInfo, PackageSummary, PackageWriteContext,
+    Replacement, write_interior_package_with_context, write_package_with_context,
 };
 use p4kx_channels::channel_name;
-use p4kx_extraction::{CancelToken, WriteRefused};
+use p4kx_extraction::{ArchiveWriteProtection, CancelToken, WriteProtectionError};
 
-use super::run::failure_of;
+use super::failure_of;
 use super::stop::{Stoppable, StoppableTextures};
 use super::{Ended, Request};
 use crate::assembly_export::AssemblyExportSummary;
@@ -30,14 +30,21 @@ pub(super) fn write(
         cancel,
     };
     let info = info_of(index, changes);
-    let written = write_package(
+    let protection = match ArchiveWriteProtection::new(index.path(), cancel.flag()) {
+        Ok(protection) => protection,
+        Err(error) if error.is_cancelled() => return Ended::Cancelled,
+        Err(error) => return Ended::Failed(ModelExportFailure::Refused(error)),
+    };
+    let context =
+        PackageWriteContext::new(&protection, cancel.flag()).with_archive_texture_source(&loader);
+    let written = write_package_with_context(
         assembly,
         &provider,
         &textures,
         &request.options(),
         &info,
         &request.file,
-        &|| cancel.is_cancelled(),
+        &context,
     );
     ended(index, cancel, written, |summary| {
         AssemblyExportSummary::of_package(
@@ -63,14 +70,21 @@ pub(super) fn write_interior(
         cancel,
     };
     let info = info_of(index, &LoadoutChanges::default());
-    let written = write_interior_package(
+    let protection = match ArchiveWriteProtection::new(index.path(), cancel.flag()) {
+        Ok(protection) => protection,
+        Err(error) if error.is_cancelled() => return Ended::Cancelled,
+        Err(error) => return Ended::Failed(ModelExportFailure::Refused(error)),
+    };
+    let context =
+        PackageWriteContext::new(&protection, cancel.flag()).with_archive_texture_source(&loader);
+    let written = write_interior_package_with_context(
         &InteriorScene::new(&request.name, interior),
         &provider,
         &textures,
         &request.options(),
         &info,
         &request.file,
-        &|| cancel.is_cancelled(),
+        &context,
     );
     ended(index, cancel, written, |summary| {
         AssemblyExportSummary::of_interior_package(
@@ -94,7 +108,7 @@ fn ended(
     }
 }
 
-/// Returns why a package export failed with rror, or None when it was cancelled.
+/// Returns the package failure, or `None` when the operation was cancelled.
 pub(crate) fn package_failure(
     index: &EntryIndex,
     error: PackageError,
@@ -110,18 +124,16 @@ pub(crate) fn package_failure(
 #[derive(Debug)]
 enum Verdict {
     Cancelled,
-    Refused(WriteRefused),
+    Refused(WriteProtectionError),
     Failed(PackageError),
 }
 
-/// Decides how a failed package ends: a refusal and a package that could not be moved back are
-/// never taken for a cancel, whatever the token says.
+/// Preserves typed failures; ordinary writes after cancellation end as cancellation.
 fn verdict(error: PackageError, cancelled: bool) -> Verdict {
     match error {
         PackageError::Cancelled => Verdict::Cancelled,
         PackageError::Refused(refused) => Verdict::Refused(refused),
-        error @ PackageError::NotRestored { .. } => Verdict::Failed(error),
-        _ if cancelled => Verdict::Cancelled,
+        PackageError::Write { .. } if cancelled => Verdict::Cancelled,
         error => Verdict::Failed(error),
     }
 }
@@ -168,6 +180,43 @@ mod tests {
             verdict(not_restored(), true),
             Verdict::Failed(PackageError::NotRestored { .. })
         ));
+    }
+
+    #[test]
+    fn cleanup_failure_remains_visible_after_a_cancel() {
+        let error = PackageError::Cleanup(p4kx_extraction::OwnedOutputCleanupError::Io {
+            path: PathBuf::from("out.stage"),
+            source: io::Error::other("cleanup failed"),
+        });
+        assert!(
+            matches!(
+                verdict(error, true),
+                Verdict::Failed(PackageError::Cleanup(_))
+            ),
+            "a retained temporary output is an operation failure"
+        );
+    }
+
+    #[test]
+    fn refused_restoration_remains_visible_after_a_cancel() {
+        let error = PackageError::RestoreRefused {
+            path: PathBuf::from("out"),
+            old: PathBuf::from("out.old"),
+            cause: Box::new(PackageError::Refused(
+                WriteProtectionError::SourceOverwrite {
+                    archive: PathBuf::from("source.p4k"),
+                    target: PathBuf::from("out.old"),
+                },
+            )),
+            replacement: Box::new(PackageError::Cancelled),
+        };
+        assert!(
+            matches!(
+                verdict(error, true),
+                Verdict::Failed(PackageError::RestoreRefused { .. })
+            ),
+            "an unrestored earlier package is an operation failure"
+        );
     }
 
     #[test]

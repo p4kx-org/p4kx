@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use p4kx_dataforge::{DataForge, DataForgeError, MAX_INHERITANCE_DEPTH, Property, Struct};
+use p4kx_dataforge::{DataForge, DataForgeError, Property, Struct};
 
 use crate::PropertyShape;
 
@@ -114,14 +114,13 @@ impl<'f> SideSchema<'f> {
         }
     }
 
-    /// Returns `name` and its ancestors, nearest first, stopping at a repeated struct and after
-    /// [`MAX_INHERITANCE_DEPTH`] ancestors.
+    /// Returns `name` and its ancestors, nearest first, stopping at a repeated struct.
     fn chain(&self, name: &'f str) -> Vec<&'f str> {
         let mut chain = vec![name];
+        let mut seen = BTreeSet::from([name]);
         let mut at = self.structs.get(name).and_then(|def| def.parent);
         while let Some(parent) = at
-            && chain.len() <= MAX_INHERITANCE_DEPTH
-            && !chain.contains(&parent)
+            && seen.insert(parent)
         {
             chain.push(parent);
             at = self.structs.get(parent).and_then(|def| def.parent);

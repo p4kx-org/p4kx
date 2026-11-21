@@ -18,7 +18,7 @@ use p4kx_extraction::DataForge;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
-fn export(
+pub(super) fn export(
     bytes: &[u8],
     form: RecordForm,
     target: &Path,
@@ -201,6 +201,7 @@ fn the_conflict_policies_apply_to_json_files_and_the_ndjson_file() -> TestResult
         let path = dir.path().join(file);
         let options = |policy| RecordExportOptions {
             policy,
+            protection: None,
             cancel: None,
             progress: None,
             texts: None,
@@ -268,6 +269,7 @@ fn a_cancelled_ndjson_export_leaves_no_file() -> TestResult {
         dir.path(),
         &RecordExportOptions {
             policy: ConflictPolicy::Skip,
+            protection: None,
             cancel: Some(&cancel),
             progress: None,
             texts: None,
@@ -323,6 +325,7 @@ fn a_folder_in_the_way_of_the_ndjson_file_is_an_error() -> TestResult {
         dir.path(),
         &RecordExportOptions {
             policy: ConflictPolicy::Overwrite,
+            protection: None,
             cancel: None,
             progress: None,
             texts: None,

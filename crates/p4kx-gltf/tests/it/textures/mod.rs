@@ -3,8 +3,10 @@
 
 //! Textured PBR materials in the GLB of the testkit cube, with the textures held in memory.
 
+mod gloss;
 mod mapping;
 mod metals;
 mod reports;
 mod stencil;
 pub(crate) mod support;
+mod transfer;

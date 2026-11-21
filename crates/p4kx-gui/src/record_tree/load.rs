@@ -32,7 +32,10 @@ pub(super) fn load(index: &EntryIndex, cancelled: &AtomicBool) -> Outcome {
     if cancelled.load(Ordering::Relaxed) {
         return Outcome::Failed(DataForgeFailure::Stopped);
     }
-    let built = source.entry.open().map(|forge| RecordIndex::build(&forge));
+    let built = source.entry.open().map(|forge| {
+        let actual = source.entry.origin_of(&forge);
+        RecordIndex::build(&forge, actual)
+    });
     if index.watch().check().is_err() {
         return Outcome::ArchiveChanged;
     }

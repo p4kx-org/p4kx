@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The ship base data in the `ships` kind of the Basetool catalog of a real Archive; runs with
+//! The ship base data in the `ships` kind of the P4KX catalog of a real Archive; runs with
 //! `--ignored` when `P4KX_DATA_P4K` names one.
 //!
 //! Run with `--nocapture` to see the counts, the field survey and the build time.
 //!
 //! The anchors and counts are the exact values of LIVE and follow each patch; a failure after a
 //! patch means the value moved, to be checked against the Archive and updated here and in
-//! `docs/basetool-catalog.md`. The survey test asserts the documented findings on the field
+//! `docs/catalog.md`. The survey test asserts the documented findings on the field
 //! names of the ship Records.
 
 use std::collections::BTreeMap;
@@ -109,7 +109,11 @@ fn catalog() -> Result<&'static Json, Box<dyn Error>> {
 fn ship<'c>(catalog: &'c Json, class_name: &str) -> Result<&'c Json, Box<dyn Error>> {
     catalog["ships"]
         .as_array()
-        .and_then(|ships| ships.iter().find(|ship| ship["className"] == class_name))
+        .and_then(|ships| {
+            ships.iter().find(|ship| {
+                ship.pointer("/className/value").and_then(Json::as_str) == Some(class_name)
+            })
+        })
         .ok_or_else(|| format!("the catalog has no ship {class_name}").into())
 }
 
@@ -122,21 +126,21 @@ fn the_known_ships_carry_their_mass_hull_and_cargo() -> TestResult {
         print_line(&format!(
             "{}: mass {} hull {} cargo {} (grids with issue {}) kind {} size {}",
             anchor.class_name,
-            ship["mass"],
-            ship["hullHealth"],
+            ship["mass"]["value"],
+            ship["hullHealth"]["value"],
             ship["cargoScu"],
             ship["cargoGridsWithIssue"],
-            ship["vehicleKind"],
+            ship["vehicleKind"]["value"],
             ship["size"]
         ));
         assert_eq!(
-            ship["mass"].as_f64(),
+            ship["mass"]["value"].as_f64(),
             Some(anchor.mass),
             "{}",
             anchor.class_name
         );
         assert_eq!(
-            ship["hullHealth"].as_f64(),
+            ship["hullHealth"]["value"].as_f64(),
             Some(anchor.hull),
             "{}",
             anchor.class_name
@@ -147,7 +151,11 @@ fn the_known_ships_carry_their_mass_hull_and_cargo() -> TestResult {
             "{}",
             anchor.class_name
         );
-        assert_eq!(ship["vehicleKind"], "spaceship", "{}", anchor.class_name);
+        assert_eq!(
+            ship["vehicleKind"]["value"], "spaceship",
+            "{}",
+            anchor.class_name
+        );
     }
     Ok(())
 }
@@ -174,12 +182,18 @@ fn dangling_container_references_leave_the_cargo_unknown() -> TestResult {
 fn assert_entry_equals_base(entry: &Json, base: &ShipBase) -> TestResult {
     let name = base.class_name.as_str();
     assert_eq!(
-        entry["mass"].as_f64(),
+        entry
+            .pointer("/mass/value")
+            .ok_or("the sourced mass has a value field")?
+            .as_f64(),
         base.mass.as_ref().map(|mass| mass.kg),
         "{name}"
     );
     assert_eq!(
-        entry["hullHealth"].as_f64(),
+        entry
+            .pointer("/hullHealth/value")
+            .ok_or("the sourced hull health has a value field")?
+            .as_f64(),
         base.hull.as_ref().map(|hull| hull.health),
         "{name}"
     );
@@ -190,7 +204,7 @@ fn assert_entry_equals_base(entry: &Json, base: &ShipBase) -> TestResult {
         "{name}"
     );
     assert_eq!(
-        entry["size"].as_i64(),
+        entry.pointer("/size/value/value").and_then(Json::as_i64),
         base.size.as_ref().map(|size| size.value),
         "{name}"
     );
@@ -198,9 +212,15 @@ fn assert_entry_equals_base(entry: &Json, base: &ShipBase) -> TestResult {
         Some(mass) => serde_json::to_value(mass.basis)?,
         None => Json::Null,
     };
-    assert_eq!(entry["massBasis"], mass_basis, "{name}");
     assert_eq!(
-        entry["vehicleKind"].as_str(),
+        entry
+            .pointer("/massBasis/value")
+            .ok_or("the sourced mass basis has a value field")?,
+        &mass_basis,
+        "{name}"
+    );
+    assert_eq!(
+        entry.pointer("/vehicleKind/value").and_then(Json::as_str),
         base.vehicle_kind.map(p4kx_export::VehicleKind::code),
         "{name}"
     );
@@ -222,30 +242,34 @@ fn the_catalog_ships_equal_the_ship_base_export_and_the_kind_is_settled() -> Tes
     assert_eq!(ships.len(), bases.ships().len());
     let mut kinds: BTreeMap<String, usize> = BTreeMap::new();
     for ship in ships {
-        *kinds.entry(ship["vehicleKind"].to_string()).or_default() += 1;
+        *kinds
+            .entry(ship["vehicleKind"]["value"].to_string())
+            .or_default() += 1;
     }
     print_line(&format!("vehicle kinds {kinds:?}"));
     for base in bases.ships() {
         let entry = ships
             .iter()
-            .find(|ship| ship["guid"] == base.guid.to_string().as_str())
+            .find(|ship| ship["guid"]["value"] == base.guid.to_string().as_str())
             .ok_or_else(|| format!("{} is missing", base.class_name))?;
         assert_entry_equals_base(entry, base)?;
     }
     let ground = ships
         .iter()
         .filter(|ship| {
-            ship["recordPath"]
+            ship["recordPath"]["value"]
                 .as_str()
                 .is_some_and(|path| path.contains("/entities/groundvehicles/"))
         })
-        .all(|ship| ship["vehicleKind"] == "groundVehicle");
+        .all(|ship| ship["vehicleKind"]["value"] == "groundVehicle");
     assert!(
         ground,
         "every ship under groundvehicles is a ground vehicle"
     );
     assert!(
-        ships.iter().all(|ship| !ship["vehicleKind"].is_null()),
+        ships
+            .iter()
+            .all(|ship| !ship["vehicleKind"]["value"].is_null()),
         "no ship has an undecided kind: no Record under spaceships has a wheel or tread"
     );
     Ok(())

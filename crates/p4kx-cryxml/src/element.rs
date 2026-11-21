@@ -6,6 +6,7 @@ use std::slice;
 
 use crate::document::{Document, Node};
 use crate::strings::Span;
+use crate::{SourceAttribute, SourceElement};
 
 /// One attribute of an element.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,8 +41,24 @@ impl<'d> Element<'d> {
         Self { document, index }
     }
 
+    /// Returns the original node-table position in this element's owning document.
+    #[must_use]
+    pub const fn index(self) -> u32 {
+        self.index
+    }
+
+    /// Returns whether this element borrows the given actual parsed document.
+    #[must_use]
+    pub fn is_from(self, document: &Document<'_>) -> bool {
+        std::ptr::eq(self.document, document)
+    }
+
     fn node(self) -> Option<&'d Node> {
         self.document.nodes.get(self.index as usize)
+    }
+
+    pub(crate) fn first_attribute_index(self) -> u32 {
+        self.node().map_or(0, |node| node.first_attribute)
     }
 
     /// Returns the element's name as stored in the file.
@@ -75,6 +92,11 @@ impl<'d> Element<'d> {
             text: &self.document.text,
             spans: spans.iter(),
         }
+    }
+
+    /// Returns each attribute with its original node and attribute table coordinates.
+    pub fn source_attributes(self) -> impl Iterator<Item = SourceAttribute<'d>> {
+        SourceElement::cryxml(self).attributes()
     }
 
     /// Returns the value of the first attribute named `name`.

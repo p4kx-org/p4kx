@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::{FieldOrigins, SourceInventory};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::audio_shapes::LocationShape;
 
 /// What the header of a WEM says.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct WemShape {
     /// The WEM ID; absent for a loose WEM Entry whose file name is no ID.
     pub(crate) id: Option<u32>,
@@ -53,6 +54,11 @@ pub(crate) struct SoundbankWemsResult {
     /// The cursor of the next page; absent on the last page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) next_cursor: Option<String>,
+    /// Immediate per-field origins at pointers into this result.
+    #[serde(rename = "fieldOrigins")]
+    pub(crate) field_origins: FieldOrigins,
+    /// Physical sources and uses referenced by the field origins on this page.
+    pub(crate) provenance: SourceInventory,
 }
 
 /// A WEM with where the Archive holds it.
@@ -73,6 +79,11 @@ pub(crate) struct WemInfoResult {
     pub(crate) described: LocationShape,
     /// The WEM as read from `described`.
     pub(crate) wem: WemShape,
+    /// Immediate per-field origins at pointers into this result.
+    #[serde(rename = "fieldOrigins")]
+    pub(crate) field_origins: FieldOrigins,
+    /// Physical sources and uses referenced by this result.
+    pub(crate) provenance: SourceInventory,
 }
 
 /// An audio excerpt; the WAV itself is the audio content block of the result.
@@ -106,4 +117,9 @@ pub(crate) struct ExcerptResult {
     pub(crate) max_bytes: usize,
     /// Whether the excerpt is shorter than asked for: cut by the size cap or the sound's end.
     pub(crate) truncated: bool,
+    /// Origin of each structured field and of the WAV content block.
+    #[serde(rename = "fieldOrigins")]
+    pub(crate) field_origins: crate::audio_excerpt_origin::ExcerptFieldOrigins,
+    /// Original source and contribution coordinates used by this response.
+    pub(crate) provenance: SourceInventory,
 }

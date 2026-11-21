@@ -11,7 +11,7 @@ use zune_jpeg::JpegDecoder;
 use zune_jpeg::errors::DecodeErrors;
 
 use crate::GfxError;
-use crate::bitmap::{EmbeddedFormat, Jpeg};
+use crate::bitmap::{DecodedBitmap, EmbeddedFormat, Jpeg};
 use crate::embedded_png::{decode_png, png_size};
 use crate::image::{RgbaImage, checked_pixels, inflate_exact};
 use crate::lossless::unmultiply;
@@ -22,17 +22,24 @@ const MAX_SIDE: usize = 16_384;
 /// Decodes an embedded JPEG or PNG to straight-alpha RGBA, with the JPEG tables of the movie for
 /// a `DefineBits` image and the alpha channel of a `DefineBitsJPEG3` or `DefineBitsJPEG4` image,
 /// whose colours are premultiplied.
-pub(crate) fn decode_jpeg(jpeg: &Jpeg<'_>, tables: Option<&[u8]>) -> Result<RgbaImage, GfxError> {
+pub(crate) fn decode_jpeg(
+    jpeg: &Jpeg<'_>,
+    tables: Option<&[u8]>,
+) -> Result<DecodedBitmap, GfxError> {
     match jpeg.format() {
         EmbeddedFormat::Gif => Err(GfxError::Gif),
-        EmbeddedFormat::Png => decode_png(jpeg.data),
+        EmbeddedFormat::Png => decode_png(jpeg.data).map(DecodedBitmap::without_tables),
         EmbeddedFormat::Jpeg => {
-            let data = without_end_then_start(own_tables(jpeg, tables), jpeg.data);
+            let tables = own_tables(jpeg, tables);
+            let data = without_end_then_start(tables, jpeg.data);
             let mut image = decode_jpeg_data(&data)?;
             if let Some(alpha) = jpeg.alpha {
                 apply_alpha(&mut image, alpha)?;
             }
-            Ok(image)
+            Ok(DecodedBitmap {
+                image,
+                used_jpeg_tables: !tables.is_empty(),
+            })
         }
     }
 }

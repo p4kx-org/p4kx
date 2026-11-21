@@ -2,16 +2,19 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::borrow::Cow;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
-use p4kx_texture::{RgbaImage, TextureError};
+use p4kx_texture::{DdsTransfer, RgbaImage, TextureError};
 
 use crate::layer_plan::{LayerPlan, Layered, MAX_BAKED_LAYERS};
-use crate::texture_pixels::{OPAQUE, RGBA, encode, fill, linear, sampled, texel};
+use crate::layer_sampling::{self, Tile, TileChannels, round_byte};
+#[cfg(test)]
+use crate::layer_sampling::{axis, minify_rgb as minify, tile_len};
+use crate::texture_loader::LoadedTexture;
+use crate::texture_pixels::{OPAQUE, RGBA, colour_decoder, encode, fill, sampled, texel};
 
 const BYTE_UNIT: f32 = 1.0 / 255.0;
 const HALF_BYTE: f32 = 127.5;
-
-type Tile<'a> = Cow<'a, RgbaImage>;
 
 /// What a layer is blended from: the map of one layer in the form it is sampled from.
 pub(crate) struct Maps<'a> {
@@ -22,147 +25,12 @@ fn byte(value: u8) -> f32 {
     f32::from(value) * BYTE_UNIT
 }
 
-#[expect(
-    clippy::cast_precision_loss,
-    clippy::cast_possible_truncation,
-    clippy::cast_sign_loss,
-    reason = "image sides are far below 2^24 and the ratio is positive"
-)]
-fn tile_len(output: usize, repeats: f32, source: usize) -> usize {
-    let wanted = (output as f32 / repeats).round() as usize;
-    wanted.clamp(1, source.max(1))
-}
-
-/// Returns `image` averaged down to `width` × `height` texels, a box filter; the averages of a
-/// colour map are taken in linear light.
-fn minify(
-    image: &RgbaImage,
-    (width, height): (usize, usize),
-    colour: bool,
-) -> Result<RgbaImage, TextureError> {
-    let (source_width, source_height) = (image.width() as usize, image.height() as usize);
-    fill(
-        u32::try_from(width).unwrap_or(u32::MAX),
-        u32::try_from(height).unwrap_or(u32::MAX),
-        |y, out| {
-            let top = y * source_height / height;
-            let bottom = ((y + 1) * source_height / height).clamp(top + 1, source_height);
-            for (x, target) in out.as_chunks_mut::<RGBA>().0.iter_mut().enumerate() {
-                let left = x * source_width / width;
-                let right = ((x + 1) * source_width / width).clamp(left + 1, source_width);
-                let mut sum = [0.0_f32; 3];
-                for row in top..bottom {
-                    for column in left..right {
-                        let [red, green, blue, _] = texel(image, column, row);
-                        for (total, value) in sum.iter_mut().zip([red, green, blue]) {
-                            *total += if colour {
-                                linear(value)
-                            } else {
-                                f32::from(value)
-                            };
-                        }
-                    }
-                }
-                #[expect(
-                    clippy::cast_precision_loss,
-                    reason = "the box holds far fewer than 2^24 texels"
-                )]
-                let count = ((bottom - top) * (right - left)) as f32;
-                let [red, green, blue] = sum.map(|total| total / count);
-                let [red, green, blue] = if colour {
-                    [encode(red), encode(green), encode(blue)]
-                } else {
-                    [red, green, blue].map(round_byte)
-                };
-                *target = [red, green, blue, OPAQUE];
-            }
-        },
-    )
-}
-
-const fn round_byte(value: f32) -> u8 {
-    #[expect(
-        clippy::cast_possible_truncation,
-        clippy::cast_sign_loss,
-        reason = "the value is between 0 and 255"
-    )]
-    let byte = value.round().clamp(0.0, 255.0) as u8;
-    byte
-}
-
-/// Returns the tile of `image` that repeats `repeats` times over an output of `size` texels: the
-/// image itself when it is not larger than that, else averaged down to the texels one repeat
-/// covers, so that a heavily tiled layer gives its mean colour and not noise.
-fn tile_of(
-    image: &RgbaImage,
-    repeats: [f32; 2],
-    size: (usize, usize),
-    colour: bool,
-) -> Result<Tile<'_>, TextureError> {
-    let (width, height) = (image.width() as usize, image.height() as usize);
-    if width == 0 || height == 0 {
-        return Ok(Cow::Borrowed(image));
-    }
-    let wanted = (
-        tile_len(size.0, repeats[0], width),
-        tile_len(size.1, repeats[1], height),
-    );
-    if wanted == (width, height) {
-        Ok(Cow::Borrowed(image))
-    } else {
-        minify(image, wanted, colour).map(Cow::Owned)
-    }
-}
-
-#[expect(
-    clippy::cast_precision_loss,
-    clippy::cast_possible_truncation,
-    clippy::cast_possible_wrap,
-    reason = "tile sides are far below 2^24"
-)]
-fn axis(coordinate: f32, repeats: f32, length: usize) -> (usize, usize, f32) {
-    let scaled = (coordinate * repeats)
-        .rem_euclid(1.0)
-        .mul_add(length as f32, -0.5);
-    let floor = scaled.floor();
-    let side = length.max(1) as isize;
-    let first = (floor as isize).rem_euclid(side) as usize;
-    let second = (first + 1) % length.max(1);
-    (first, second, scaled - floor)
-}
-
-/// Returns the texel of `tile` at (`u`, `v`) of the output, with the tile repeated `repeats`
-/// times, interpolated between the four nearest texels and wrapped; `decode` turns a byte into
-/// the value interpolated.
-fn sample(
-    tile: &RgbaImage,
-    repeats: [f32; 2],
-    (u, v): (f32, f32),
-    decode: fn(u8) -> f32,
-) -> [f32; 3] {
-    let (left, right, across) = axis(u, repeats[0], tile.width() as usize);
-    let (top, bottom, down) = axis(v, repeats[1], tile.height() as usize);
-    let corners = [
-        (texel(tile, left, top), (1.0 - across) * (1.0 - down)),
-        (texel(tile, right, top), across * (1.0 - down)),
-        (texel(tile, left, bottom), (1.0 - across) * down),
-        (texel(tile, right, bottom), across * down),
-    ];
-    let mut mixed = [0.0_f32; 3];
-    for ([red, green, blue, _], weight) in corners {
-        for (total, value) in mixed.iter_mut().zip([red, green, blue]) {
-            *total = decode(value).mul_add(weight, *total);
-        }
-    }
-    mixed
-}
-
 impl<'a> Maps<'a> {
     /// Prepares the maps of the layers for an output of `size` texels: `images` has the loaded map
     /// of each layer, in the order of the layers, and `normal` says whether they are normal maps.
     pub(crate) fn new(
         layered: &Layered,
-        images: &[Option<&'a RgbaImage>],
+        images: &[Option<&'a LoadedTexture>],
         size: (usize, usize),
         normal: bool,
     ) -> Result<Self, TextureError> {
@@ -178,7 +46,14 @@ impl<'a> Maps<'a> {
                 };
                 match (image, map) {
                     (Some(image), Some((_, repeats))) => {
-                        tile_of(image, *repeats, size, !normal).map(Some)
+                        let colour = (!normal).then(|| image.decoded_transfer());
+                        let pixels = if normal {
+                            Cow::Borrowed(&image.image)
+                        } else {
+                            image.colour_image()?
+                        };
+                        layer_sampling::tile_of(pixels, *repeats, size, colour, TileChannels::Rgb)
+                            .map(Some)
                     }
                     _ => Ok(None),
                 }
@@ -202,7 +77,9 @@ fn centre(position: usize, length: usize) -> f32 {
 fn layer_colour(layer: &LayerPlan, tile: Option<&Tile<'_>>, uv: (f32, f32)) -> [f32; 3] {
     let own = match (tile, &layer.diffuse) {
         (Some(tile), Some((_, repeats))) => {
-            let [red, green, blue] = sample(tile, *repeats, uv, linear);
+            let transfer = tile.colour().unwrap_or(DdsTransfer::Unknown);
+            let [red, green, blue] =
+                layer_sampling::sample(tile.image(), *repeats, uv, colour_decoder(transfer));
             let [tint_red, tint_green, tint_blue] = layer.colour;
             [red * tint_red, green * tint_green, blue * tint_blue]
         }
@@ -215,6 +92,12 @@ fn layer_colour(layer: &LayerPlan, tile: Option<&Tile<'_>>, uv: (f32, f32)) -> [
     mixed
 }
 
+pub(crate) struct LayerPixels {
+    pub(crate) image: RgbaImage,
+    pub(crate) sampled_maps: usize,
+    pub(crate) used_layers: usize,
+}
+
 /// Returns the base colour image of `layered` of `size` texels: the layers' diffuse maps, tiled,
 /// multiplied by the layers' colours, moved towards their specular colour by their metalness
 /// and blended by the layers' shares, which `mask` (of that size) gives where the material has
@@ -224,17 +107,31 @@ pub(crate) fn base_colour(
     maps: &Maps<'_>,
     mask: Option<&RgbaImage>,
     (width, height): (u32, u32),
-) -> Result<RgbaImage, TextureError> {
+) -> Result<LayerPixels, TextureError> {
     let size = (width as usize, height as usize);
-    fill(width, height, |y, out| {
+    let sampled_maps = AtomicUsize::new(0);
+    let used_layers = AtomicUsize::new(0);
+    let image = fill(width, height, |y, out| {
+        let mut sampled_row = 0;
+        let mut layer_row = 0;
         let mut shares = [0.0_f32; MAX_BAKED_LAYERS];
         for (x, target) in out.as_chunks_mut::<RGBA>().0.iter_mut().enumerate() {
             let uv = (centre(x, size.0), centre(y, size.1));
             layered.shares(mask_at(mask, x, y), &mut shares);
             let mut sum = [0.0_f32; 3];
-            for ((layer, tile), share) in layered.layers.iter().zip(&maps.tiles).zip(shares) {
+            for (index, ((layer, tile), share)) in layered
+                .layers
+                .iter()
+                .zip(&maps.tiles)
+                .zip(shares)
+                .enumerate()
+            {
                 if share <= 0.0 {
                     continue;
+                }
+                layer_row |= 1 << index;
+                if tile.is_some() {
+                    sampled_row |= 1 << index;
                 }
                 let colour = layer_colour(layer, tile.as_ref(), uv);
                 for (total, value) in sum.iter_mut().zip(colour) {
@@ -244,6 +141,13 @@ pub(crate) fn base_colour(
             let [red, green, blue] = sum;
             *target = [encode(red), encode(green), encode(blue), OPAQUE];
         }
+        sampled_maps.fetch_or(sampled_row, Ordering::Relaxed);
+        used_layers.fetch_or(layer_row, Ordering::Relaxed);
+    })?;
+    Ok(LayerPixels {
+        image,
+        sampled_maps: sampled_maps.into_inner(),
+        used_layers: used_layers.into_inner(),
     })
 }
 
@@ -273,22 +177,32 @@ pub(crate) fn normal_colour(
     own: Option<&RgbaImage>,
     mask: Option<&RgbaImage>,
     (width, height): (u32, u32),
-) -> Result<RgbaImage, TextureError> {
+) -> Result<LayerPixels, TextureError> {
     let size = (width as usize, height as usize);
-    fill(width, height, |y, out| {
+    let sampled_maps = AtomicUsize::new(0);
+    let image = fill(width, height, |y, out| {
+        let mut sampled_row = 0;
         let mut shares = [0.0_f32; MAX_BAKED_LAYERS];
         for (x, target) in out.as_chunks_mut::<RGBA>().0.iter_mut().enumerate() {
             let uv = (centre(x, size.0), centre(y, size.1));
             layered.shares(mask_at(mask, x, y), &mut shares);
             let mut slopes = own.map_or([0.0_f32; 2], |own| slope(sampled(own, (x, y), size)));
-            for ((layer, tile), share) in layered.layers.iter().zip(&maps.tiles).zip(shares) {
+            for (index, ((layer, tile), share)) in layered
+                .layers
+                .iter()
+                .zip(&maps.tiles)
+                .zip(shares)
+                .enumerate()
+            {
                 let (Some(tile), Some((_, repeats))) = (tile, &layer.normal) else {
                     continue;
                 };
                 if share <= 0.0 {
                     continue;
                 }
-                let [across, down, _] = sample(tile, *repeats, uv, decode_slope);
+                sampled_row |= 1 << index;
+                let [across, down, _] =
+                    layer_sampling::sample(tile.image(), *repeats, uv, decode_slope);
                 slopes[0] = across.mul_add(share, slopes[0]);
                 slopes[1] = down.mul_add(share, slopes[1]);
             }
@@ -306,39 +220,15 @@ pub(crate) fn normal_colour(
                 OPAQUE,
             ];
         }
+        sampled_maps.fetch_or(sampled_row, Ordering::Relaxed);
+    })?;
+    let sampled_maps = sampled_maps.into_inner();
+    Ok(LayerPixels {
+        image,
+        sampled_maps,
+        used_layers: sampled_maps,
     })
 }
 
 #[cfg(test)]
-mod tests {
-    use p4kx_texture::RgbaImage;
-
-    use super::{axis, minify, tile_len};
-
-    #[test]
-    fn a_tile_is_as_large_as_one_repeat_covers_but_never_larger_than_the_source() {
-        assert_eq!(tile_len(1024, 80.0, 1024), 13);
-        assert_eq!(tile_len(1024, 1.0, 512), 512);
-        assert_eq!(tile_len(4, 100.0, 64), 1);
-    }
-
-    #[test]
-    fn the_coordinates_wrap_around_the_tile() {
-        let (first, second, share) = axis(0.0, 1.0, 4);
-        assert_eq!((first, second), (3, 0));
-        assert!((share - 0.5).abs() < 1e-6);
-        let (first, ..) = axis(2.0, 1.0, 4);
-        assert_eq!(first, 3);
-    }
-
-    #[test]
-    fn a_box_averages_the_normal_bytes() -> Result<(), Box<dyn std::error::Error>> {
-        let pixels = [
-            0_u8, 0, 0, 255, 100, 200, 0, 255, 0, 0, 0, 255, 100, 200, 0, 255,
-        ];
-        let image = RgbaImage::new(2, 2, pixels.to_vec())?;
-        let small = minify(&image, (1, 1), false)?;
-        assert_eq!(small.pixels(), [50, 100, 0, 255]);
-        Ok(())
-    }
-}
+mod tests;

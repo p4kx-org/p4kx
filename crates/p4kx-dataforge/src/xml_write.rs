@@ -41,7 +41,7 @@ pub(crate) fn write_reference(
         attribute(out, "at", location.as_str())?;
     }
     if let Some(path) = annotations.tag_path(reference) {
-        attribute(out, "tag", path)?;
+        attribute(out, "tag", path.as_ref())?;
     }
     out.write_all(b"/>\n")
 }

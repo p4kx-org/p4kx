@@ -29,7 +29,7 @@ fn point(x: f32) -> TestValue {
     TestValue::Struct(TestInstance::new("Inner").value("x", TestValue::Single(x)))
 }
 
-fn database() -> Vec<u8> {
+pub(crate) fn database() -> Vec<u8> {
     DataForgeBuilder::new()
         .enumeration("Size", ["Small", "Large"])
         .structure(TestStruct::new("Inner").field("x", TestType::Single))

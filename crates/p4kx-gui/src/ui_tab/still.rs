@@ -4,7 +4,7 @@
 use p4kx_extraction::gfx::Localise;
 use p4kx_extraction::{ArchiveImages, CancelToken, DataForge, ScreenTexts, decode_line_breaks};
 use p4kx_screens::{
-    ImageSources, MAX_SVG_BYTES, ScreenComposer, ScreenError, Still, StillRequest, TextSources,
+    ImageSources, MAX_SVG_BYTES, ScreenError, ScreenFontFile, Still, StillRequest, TextSources,
 };
 
 use super::render::{Fail, reason};
@@ -57,11 +57,6 @@ pub(super) fn draw(
     Ok((still, warnings))
 }
 
-/// Returns the Record path of the font movie the screens of `forge` draw their texts with.
-pub(super) fn font_file(forge: &DataForge<'_>) -> String {
-    ScreenComposer::new(forge).font_file()
-}
-
 /// Reads the fonts and, for `language`, the texts the screens of `forge` are drawn with.
 pub(super) fn load_texts(
     index: &EntryIndex,
@@ -69,5 +64,6 @@ pub(super) fn load_texts(
     language: Option<crate::TextLanguage>,
 ) -> Result<ScreenTexts, Fail> {
     let archive = index.entries_archive().map_err(|e| reason(&e))?;
-    Ok(ScreenTexts::load(archive, &font_file(forge), language))
+    let font = ScreenFontFile::read(forge);
+    Ok(ScreenTexts::load_observed(archive, &font.path, language))
 }

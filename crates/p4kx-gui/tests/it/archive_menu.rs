@@ -7,6 +7,7 @@ use crate::waiting::{RunQuiet, click_shown_once, wait_for_model};
 use std::error::Error;
 use std::path::PathBuf;
 
+use egui::os::OperatingSystem;
 use egui::{Key, Modifiers};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
@@ -17,6 +18,10 @@ use tempfile::TempDir;
 type TestResult = Result<(), Box<dyn Error>>;
 
 fn opened() -> Result<(TempDir, Harness<'static, Model>), Box<dyn Error>> {
+    opened_on(OperatingSystem::from_target_os())
+}
+
+fn opened_on(os: OperatingSystem) -> Result<(TempDir, Harness<'static, Model>), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let path: PathBuf = dir.path().join("Data.p4k");
     ArchiveBuilder::new()
@@ -24,6 +29,7 @@ fn opened() -> Result<(TempDir, Harness<'static, Model>), Box<dyn Error>> {
         .entry(TestEntry::stored("readme.txt", "readme"))
         .write_to(&path)?;
     let mut harness = Harness::builder()
+        .with_os(os)
         .with_context_setup(p4kx_gui::theme::apply)
         .with_size([1400.0, 900.0])
         .build_ui_state(
@@ -82,18 +88,39 @@ fn ctrl_e_opens_the_extraction_of_the_selected_entries() -> TestResult {
 }
 
 #[test]
-fn the_menu_entry_extracts_the_selected_entries() -> TestResult {
-    let (_dir, mut harness) = opened()?;
+fn the_menu_entry_extracts_with_the_platform_shortcut_label() -> TestResult {
+    for (os, hint) in [
+        (OperatingSystem::Nix, "Ctrl+E"),
+        (OperatingSystem::Mac, "Cmd+E"),
+    ] {
+        let (_dir, mut harness) = opened_on(os)?;
+        check_first(&mut harness)?;
+        harness.get_by_label("Archive").click();
+        harness.run_quiet();
+        click_shown_once(&mut harness, hint)?;
+        harness.run_quiet();
+        assert!(
+            harness.state().extraction_setup().is_some(),
+            "the setup opens"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn macos_command_e_opens_extraction_for_checked_entries() -> TestResult {
+    let (_dir, mut harness) = opened_on(OperatingSystem::Mac)?;
     check_first(&mut harness)?;
-
-    harness.get_by_label("Archive").click();
+    let command = Modifiers {
+        mac_cmd: true,
+        command: true,
+        ..Modifiers::NONE
+    };
+    harness.key_press_modifiers(command, Key::E);
     harness.run_quiet();
-    click_shown_once(&mut harness, "Ctrl+E")?;
-    harness.run_quiet();
-
     assert!(
         harness.state().extraction_setup().is_some(),
-        "the setup opens"
+        "Command+E opens the setup"
     );
     Ok(())
 }

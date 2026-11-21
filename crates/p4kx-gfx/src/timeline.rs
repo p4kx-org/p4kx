@@ -3,9 +3,10 @@
 
 use std::collections::BTreeMap;
 
-use crate::GfxError;
+use crate::asset_origins::TimelineOrigins;
 use crate::place::{PlaceCommand, Placement};
 use crate::tag::Tag;
+use crate::{GfxError, TagSite};
 
 const PLACE_HAS_CHARACTER: u8 = 0x02;
 const PLACE3_HAS_CLASS_NAME: u8 = 0x08;
@@ -100,20 +101,38 @@ impl DisplayList {
     }
 
     /// Applies a `PlaceObject` tag.
-    pub(crate) fn place(&mut self, command: PlaceCommand) {
+    pub(crate) fn place(
+        &mut self,
+        command: PlaceCommand,
+        site: TagSite,
+        origin: Option<&mut TimelineOrigins>,
+    ) {
         let depth = command.depth;
-        if let Some(placement) = command.apply(self.0.remove(&depth)) {
+        let observe = |retained, command: &PlaceCommand| {
+            if let Some(origin) = origin {
+                origin.place(command, site, retained);
+            }
+        };
+        if let Some(placement) = command.apply(self.0.remove(&depth), observe) {
             self.0.insert(depth, placement);
         }
     }
 
     /// Applies a `RemoveObject` or `RemoveObject2` tag.
-    pub(crate) fn remove(&mut self, tag: &Tag<'_>) -> Result<(), GfxError> {
+    pub(crate) fn remove(
+        &mut self,
+        tag: &Tag<'_>,
+        origin: Option<&mut TimelineOrigins>,
+    ) -> Result<(), GfxError> {
         let mut reader = tag.reader();
         if tag.code == 5 {
             reader.u16()?;
         }
-        self.0.remove(&reader.u16()?);
+        let depth = reader.u16()?;
+        self.0.remove(&depth);
+        if let Some(origin) = origin {
+            origin.first_frame.remove(&depth);
+        }
         Ok(())
     }
 }

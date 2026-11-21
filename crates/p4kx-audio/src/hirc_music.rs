@@ -4,8 +4,20 @@
 //! The music objects of the `HIRC` section, decoded in bank version 154.
 
 use std::fmt;
+use std::ops::Range;
 
+use crate::bank_object_fields::BankHircField;
+use crate::bank_structure::counted_id_byte_range;
 use crate::hirc::SoundSource;
+use crate::hirc_music_playlist::MusicPlaylistLoopEvidence;
+use crate::hirc_music_playlist_depth::PlaylistDepth;
+use crate::hirc_music_stinger::BankMusicStinger;
+pub use crate::hirc_music_stinger::MusicStinger;
+use crate::hirc_music_track::MusicTrackEvidence;
+use crate::hirc_music_transition::{
+    MusicTransitionEvidence, MusicTransitionFadeEvidence, MusicTransitionFeatures,
+    MusicTransitionSchedulingEvidence, MusicTransitionSegmentEvidence,
+};
 
 /// The tempo and time signature of a music node.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -22,15 +34,6 @@ pub struct MusicMeter {
     pub beat_value: u8,
 }
 
-/// A segment a music node plays when a trigger fires.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct MusicStinger {
-    /// The ID of the trigger.
-    pub trigger_id: u32,
-    /// The ID of the segment it plays.
-    pub segment_id: u32,
-}
-
 /// The fields every music node shares: its place in the hierarchy, its children, its meter and
 /// its stingers.
 #[derive(Debug, Clone, PartialEq)]
@@ -44,6 +47,22 @@ pub struct MusicNode {
     pub meter: MusicMeter,
     /// The stingers of the node.
     pub stingers: Vec<MusicStinger>,
+    pub(crate) child_count: Option<BankHircField<u32>>,
+    pub(crate) scheduled_stingers: Box<[(usize, BankMusicStinger)]>,
+}
+
+impl MusicNode {
+    /// Returns the original checked child count and its bank-relative range.
+    #[must_use]
+    pub const fn child_count_evidence(&self) -> Option<&BankHircField<u32>> {
+        self.child_count.as_ref()
+    }
+
+    /// Returns the bank-relative range of the child ID at its original physical ordinal.
+    #[must_use]
+    pub fn child_id_byte_range(&self, ordinal: usize) -> Option<Range<u64>> {
+        counted_id_byte_range(self.child_count_evidence()?, ordinal)
+    }
 }
 
 /// A named position in a music segment.
@@ -128,6 +147,11 @@ pub struct MusicTrack {
     pub kind: MusicTrackKind,
     /// The switch group of a switch track.
     pub switch: Option<MusicTrackSwitch>,
+    /// At least one original automation row contains checked points.
+    pub has_automation: bool,
+    /// An original switch transition fade has a nonzero time or offset.
+    pub has_switch_fades: bool,
+    pub(crate) evidence: MusicTrackEvidence,
 }
 
 /// A music switch container: plays the child that matches the current states or switches.
@@ -138,10 +162,68 @@ pub struct MusicSwitch {
     pub node: MusicNode,
     /// The number of transition rules.
     pub rule_count: u32,
+    /// Features observed in the original transition rules.
+    pub transition_features: MusicTransitionFeatures,
     /// The IDs of the state or switch groups the decision tree tests, outermost first.
     pub group_ids: Vec<u32>,
-    /// The IDs of the nodes the leaves of the decision tree play, in tree order, 0 left out.
+    /// Expanded nonzero target IDs in route order, or an empty vector for a compact graph.
     pub targets: Vec<u32>,
+    /// Whether the original decision block is required to recover the target routes.
+    pub targets_compact: bool,
+    /// The checked tree is nonempty and declares state or switch groups.
+    pub has_decision_conditions: bool,
+    pub(crate) decision_evidence: Option<MusicSwitchDecisionEvidence>,
+    pub(crate) transition_evidence: MusicTransitionEvidence,
+}
+
+impl MusicSwitch {
+    /// Returns the original checked child count and its bank-relative range.
+    #[must_use]
+    pub const fn child_count_evidence(&self) -> Option<&BankHircField<u32>> {
+        self.node.child_count_evidence()
+    }
+
+    /// Returns the bank-relative range of the child ID at its original physical ordinal.
+    #[must_use]
+    pub fn child_id_byte_range(&self, ordinal: usize) -> Option<Range<u64>> {
+        self.node.child_id_byte_range(ordinal)
+    }
+
+    /// Returns the original group count and tree size of a checked conditional tree.
+    #[must_use]
+    pub const fn decision_conditions_evidence(&self) -> Option<&MusicSwitchDecisionEvidence> {
+        self.decision_evidence.as_ref()
+    }
+
+    /// Returns the first nonzero fade timing word in the complete transition rules.
+    #[must_use]
+    pub const fn transition_fade_evidence(&self) -> Option<&MusicTransitionFadeEvidence> {
+        self.transition_evidence.fade.as_ref()
+    }
+
+    /// Returns the first allocated transition object with a nonzero segment reference.
+    #[must_use]
+    pub const fn transition_segment_evidence(&self) -> Option<&MusicTransitionSegmentEvidence> {
+        self.transition_evidence.segment.as_ref()
+    }
+
+    /// Returns the first enabled scheduling flag in the transition rules.
+    #[must_use]
+    pub const fn transition_scheduling_evidence(
+        &self,
+    ) -> Option<&MusicTransitionSchedulingEvidence> {
+        self.transition_evidence.scheduling.as_ref()
+    }
+}
+
+/// The original header words proving a nonempty conditional tree.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct MusicSwitchDecisionEvidence {
+    /// Original nonzero group count.
+    pub group_count: BankHircField<u32>,
+    /// Original nonzero size of the checked decision tree.
+    pub tree_size: BankHircField<u32>,
 }
 
 /// One item of a music playlist.
@@ -262,27 +344,49 @@ pub struct MusicPlaylist {
     pub node: MusicNode,
     /// The number of transition rules.
     pub rule_count: u32,
+    /// Features observed in the original transition rules.
+    pub transition_features: MusicTransitionFeatures,
     /// The playlist items in bank order, children after their parent.
     pub items: Vec<MusicPlaylistItem>,
+    /// At least one checked item differs from one play with zero loop modifiers.
+    pub has_authored_loops: bool,
+    pub(crate) loop_evidence: Option<MusicPlaylistLoopEvidence>,
+    pub(crate) transition_evidence: MusicTransitionEvidence,
 }
 
 impl MusicPlaylist {
+    /// Returns the first original item word that makes its loop controls non-neutral.
+    #[must_use]
+    pub const fn authored_loop_evidence(&self) -> Option<&MusicPlaylistLoopEvidence> {
+        self.loop_evidence.as_ref()
+    }
+
+    /// Returns the first nonzero fade timing word in the complete transition rules.
+    #[must_use]
+    pub const fn transition_fade_evidence(&self) -> Option<&MusicTransitionFadeEvidence> {
+        self.transition_evidence.fade.as_ref()
+    }
+
+    /// Returns the first allocated transition object with a nonzero segment reference.
+    #[must_use]
+    pub const fn transition_segment_evidence(&self) -> Option<&MusicTransitionSegmentEvidence> {
+        self.transition_evidence.segment.as_ref()
+    }
+
+    /// Returns the first enabled scheduling flag in the transition rules.
+    #[must_use]
+    pub const fn transition_scheduling_evidence(
+        &self,
+    ) -> Option<&MusicTransitionSchedulingEvidence> {
+        self.transition_evidence.scheduling.as_ref()
+    }
+
     /// Returns the nesting depth of every item, 0 for an item of the top group: an item with
     /// `children` of N is followed by its N child items (each with their own).
     pub fn item_depths(&self) -> impl Iterator<Item = usize> + '_ {
-        let mut open: Vec<u32> = Vec::new();
-        self.items.iter().map(move |item| {
-            while open.last() == Some(&0) {
-                open.pop();
-            }
-            let depth = open.len();
-            if let Some(left) = open.last_mut() {
-                *left = left.saturating_sub(1);
-            }
-            if item.children > 0 {
-                open.push(item.children);
-            }
-            depth
-        })
+        let mut depth = PlaylistDepth::default();
+        self.items
+            .iter()
+            .map(move |item| depth.advance(item.children))
     }
 }

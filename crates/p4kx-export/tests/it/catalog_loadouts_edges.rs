@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Loadouts of the Basetool catalog through the public API: an Entity that holds itself and an
+//! Loadouts of the P4KX catalog through the public API: an Entity that holds itself and an
 //! empty port with a nested Loadout.
 
 use crate::loadouts_fixture::{ALPHA, GUN, LOOP, NESTED};
@@ -72,7 +72,7 @@ fn vehicle_parts_sharing_a_port_name_all_take_the_first_part_as_the_tree_does() 
     let ports = &loadout(&catalog, ALPHA)?["ports"];
     let gun = port(ports, "hardpoint_gun")?;
     assert_eq!(
-        (&gun["minSize"], &gun["maxSize"]),
+        (&gun["minSize"]["value"], &gun["maxSize"]["value"]),
         (&json!(1), &json!(3)),
         "a part named in another case does not replace the first"
     );
@@ -80,8 +80,13 @@ fn vehicle_parts_sharing_a_port_name_all_take_the_first_part_as_the_tree_does() 
         .as_array()
         .into_iter()
         .flatten()
-        .filter(|port| port["name"] == "hardpoint_empty")
-        .map(|port| (port["minSize"].clone(), port["maxSize"].clone()))
+        .filter(|port| port["name"]["value"] == "hardpoint_empty")
+        .map(|port| {
+            (
+                port["minSize"]["value"].clone(),
+                port["maxSize"]["value"].clone(),
+            )
+        })
         .collect();
     assert_eq!(
         sizes,

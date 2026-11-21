@@ -28,20 +28,44 @@ Labels were drawn on solid pale-blue chips on the Aegis SHIELDS page and on the 
 ## Decision
 
 - A requested brand code that a canvas has no brand style for gives that canvas no brand style:
-  the shared styles and the default entries apply, as they do in the game for a brand the screen
-  does not name. Without a requested code the first brand style is still used, so a screen
-  rendered without `--brand` is unchanged.
-- The pale-blue chips of the RSI power page stay: the data enables them, with `Accent2` and black
-  text, and nothing disables them. This is the one place where the render may differ from the
-  game; see below.
+  the shared styles and the default entries apply. Without a requested code the renderer
+  uses the first brand style.
+- The renderer draws the RSI power page's source-enabled backgrounds. An authored style or supported
+  state binding may change how a widget is drawn. The renderer uses the same rules for every
+  brand and page.
 
-## Compared with the game
+## Render evidence
 
-Before and after renders of the powered `m_mfd_screen`, page SHIELDS, brand `aegs`: the solid chip
-and the oversized black `SHIELDS` text are gone; the page shows the generic shields canvas (a faint
-panel for the run-time readout) and the tab bar. The Aegis power page and its tab bar are
-unchanged.
+In the powered SHIELDS still, the generic Aegis canvas draws the faint readout panel and tab bar.
+The archive-backed Aegis/RSI comparison uses the RSI SHIELDS chip as its positive control.
 
-Not compared: the owner's in-game screenshots are not part of the repository. If the RSI power
-page shows no chips in the game, something the data does not carry (a run-time state) hides them;
-that is an open question for the owner.
+The historical LIVE inspection found the enabled parent background and no authored rule in the
+inspected sources that removed it from the still. Recheck the selected power-page canvas, parent
+and label fields, resolved palette, applicable styles and relevant binding inputs after an Archive
+update. The renderer evaluates supplied variables and their at-rest defaults. The report lists
+unsupported bindings and approximations. The owner's in-game state and the appearance of the
+labels there remain unverified.
+
+## Trace on the installed Archive
+
+The source test traces the original Record, scene or library position, parent Reference,
+enabled background, inline fill and declared font for the painted pairs. It verifies the
+background against the palette slot of the winning style Record and checks for active background
+style overrides. The original parent name is independent of this test. Installed LIVE and PTU
+both contain named enabled DisplayWidget parents with the relevant palette slots.
+
+The test checks authored candidates in each entered static POWER canvas against the observed
+`Instantiated` and `IsActive` gates. It follows original local binding operations on the painted
+pairs and their ancestors, classifies supplied and missing variable declarations, and matches
+renderer omissions to their original operation positions. Both installed inputs preserve the
+authored background in the powered still. With no supplied variables the POWER canvas is outside
+the entered canvas set, so that state provides no equivalent label visit.
+
+Run the test with the ordinary installed-Archive fixture environment.
+
+    cargo test -p p4kx-screens --lib -- --ignored --exact --nocapture power_source_witness::the_rsi_power_source_trace_binds_painted_labels_to_original_parents_and_palette
+
+The offline evidence covers entered canvases, evaluated styles and the observed operations.
+Game state, inactive dynamic canvas routes and the exact appearance in the game remain unresolved.
+The renderer retains the source-backed background and reports unavailable runtime inputs through
+the ordinary diagnostics.

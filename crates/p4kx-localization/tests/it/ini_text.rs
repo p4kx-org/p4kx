@@ -5,7 +5,7 @@
 
 use std::error::Error;
 
-use p4kx_localization::{IniEncoding, IniText};
+use p4kx_localization::{IniEncoding, IniText, LocalizationError, LocalizationLimits};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -148,5 +148,59 @@ fn owned_invalid_utf8_is_decoded_lossily() -> TestResult {
 fn an_empty_file_has_no_keys() -> TestResult {
     let text = IniText::decode(b"")?;
     assert!(text.index()?.is_empty(), "empty");
+    Ok(())
+}
+
+#[test]
+fn source_and_decoded_budgets_are_independent() -> TestResult {
+    let bytes = b"\xef\xbb\xbfa=1";
+    let limits = LocalizationLimits::UNLIMITED
+        .with_source_bytes(6)
+        .with_decoded_bytes(3);
+    assert_eq!(
+        IniText::decode_with_limits(bytes, limits)?.text(),
+        "a=1",
+        "BOM belongs to the source size only"
+    );
+    assert!(
+        matches!(
+            IniText::decode_with_limits(bytes, limits.with_source_bytes(5)),
+            Err(LocalizationError::TooLarge { size: 6, limit: 5 })
+        ),
+        "encoded size is validated first"
+    );
+    assert!(
+        matches!(
+            IniText::decode_vec_with_limits(bytes.to_vec(), limits.with_decoded_bytes(2)),
+            Err(LocalizationError::DecodedTooLarge { size: 3, limit: 2 })
+        ),
+        "the decoded UTF-8 byte count is a separate error"
+    );
+    Ok(())
+}
+
+#[test]
+fn transcoding_applies_the_utf8_budget_after_each_decoded_part() -> TestResult {
+    let limits = LocalizationLimits::UNLIMITED.with_decoded_bytes(4);
+    let bytes = utf16("a=日", false);
+    assert!(
+        matches!(
+            IniText::decode_with_limits(&bytes, limits),
+            Err(LocalizationError::DecodedTooLarge { size: 5, limit: 4 })
+        ),
+        "UTF-16 input expands in the decoded text"
+    );
+    assert!(
+        matches!(
+            IniText::decode_vec_with_limits(b"a=\xff".to_vec(), limits),
+            Err(LocalizationError::DecodedTooLarge { size: 5, limit: 4 })
+        ),
+        "a UTF-8 replacement contributes all three bytes"
+    );
+    assert_eq!(
+        IniText::decode_with_limits(&bytes, limits.with_decoded_bytes(5))?.text(),
+        "a=日",
+        "the exact decoded boundary is admitted"
+    );
     Ok(())
 }

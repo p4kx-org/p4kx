@@ -7,6 +7,9 @@ use std::error::Error;
 use std::fs::File;
 use std::path::Path;
 
+use p4kx_extraction::texture_codec::{
+    DdsAlphaAssociation, DdsAlphaTransform, DdsPngEncoding, DdsTransfer,
+};
 use p4kx_extraction::{Archive, ConversionError, PngReport, Texture, TextureError, TextureFormat};
 use p4kx_testkit::{ArchiveBuilder, SplitDds, TestTextureFormat};
 
@@ -54,6 +57,9 @@ fn the_largest_mip_of_an_entry_is_exported_as_png() -> TestResult {
             height: 16,
             files: vec![out.clone()],
             alpha_tail: false,
+            encoding: DdsPngEncoding::of(texture.header().format(), DdsTransfer::Unknown),
+            alpha_association: DdsAlphaAssociation::Straight,
+            alpha_transform: DdsAlphaTransform::Preserve,
         },
         "the report"
     );

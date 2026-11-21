@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The crafting stations of the Basetool catalog of a real Archive; runs with `--ignored` when
+//! The crafting stations of the P4KX catalog of a real Archive; runs with `--ignored` when
 //! `P4KX_DATA_P4K` names one.
 //!
 //! The anchors are the values of LIVE 4.10 and follow each patch; a failure after a patch means
 //! the value moved, to be checked against the Archive and updated here and in
-//! `docs/basetool-catalog.md`.
+//! `docs/catalog.md`.
 
 use std::collections::HashSet;
 use std::error::Error;
@@ -16,6 +16,8 @@ use p4kx_export::{CatalogOptions, Kind, build_catalog};
 use p4kx_extraction::Archive;
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::{Value, json};
+
+use crate::catalog_v3_consumer;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -60,12 +62,10 @@ fn the_crafters_of_a_real_archive_resolve_their_categories_and_report_nothing_un
     let archive = Archive::open_with_key(real_archive_path()?, real_archive_key().ok())?;
     let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
     let catalog: Value = serde_json::from_slice(built.json())?;
-    let categories: HashSet<&str> = catalog["blueprintCategories"]
-        .as_array()
-        .ok_or("the blueprint categories")?
+    let categories = catalog_v3_consumer::rows(&catalog, Kind::BlueprintCategories)?
         .iter()
-        .filter_map(|category| category["guid"].as_str())
-        .collect();
+        .map(|category| catalog_v3_consumer::identity(category, Kind::BlueprintCategories))
+        .collect::<Result<HashSet<_>, _>>()?;
     let guids_resolve = |rule: &Value| {
         !matches!(
             rule["kind"].as_str(),

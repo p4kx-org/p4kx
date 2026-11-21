@@ -1,0 +1,9 @@
+#!/bin/sh
+set -eu
+case "${1-}" in
+    --cli) command=p4kx; shift ;;
+    --mcp) command=p4kx-mcp; shift ;;
+    *) command=p4kx-gui ;;
+esac
+export LD_LIBRARY_PATH="$APPDIR/usr/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+exec "$APPDIR/usr/bin/$command" "$@"

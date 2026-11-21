@@ -2,9 +2,11 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::entity_armour::{MALE_ARMOUR, armour_database, armour_files};
+use crate::entity_port::helper_node;
+use crate::entity_schema::add_port_subhelper_fields;
 use crate::{
-    DataForgeBuilder, TestEntity, TestEntry, TestLoadout, TestLoadoutEntry, TestModel, TestNode,
-    TestPort,
+    DataForgeBuilder, TestEntity, TestEntry, TestInstance, TestLoadout, TestLoadoutEntry,
+    TestModel, TestNode, TestPort, TestValue,
 };
 
 /// The class name of the character whose backpack hangs on a bone its armour has.
@@ -45,16 +47,21 @@ fn satchel_model() -> TestModel {
     ])
 }
 
-fn carrier(guid: u128, class: &str, helper: &str) -> TestEntity {
+fn satchel_port(helper: &str) -> TestPort {
+    rigid_satchel_port()
+        .helper(helper, [0.0, 0.1, 0.2], [0.0; 3])
+        .item_helper("satchel_loc")
+}
+
+fn rigid_satchel_port() -> TestPort {
+    TestPort::new("pack").item_type("Char_Armor_Backpack", Vec::<String>::new())
+}
+
+fn carrier(guid: u128, class: &str, port: TestPort) -> TestEntity {
     TestEntity::new(guid, class, format!("entities/scitem/{class}.xml"))
         .attach_type("Char_Armor_Torso")
         .geometry_variant("Male", format!("{MALE_ARMOUR}/plain.skin"), None)
-        .port(
-            TestPort::new("pack")
-                .item_type("Char_Armor_Backpack", Vec::<String>::new())
-                .helper(helper, [0.0, 0.1, 0.2], [0.0; 3])
-                .item_helper("satchel_loc"),
-        )
+        .port(port)
         .loadout(TestLoadout::Manual(vec![TestLoadoutEntry::class(
             "pack",
             "Mount_Satchel",
@@ -68,13 +75,17 @@ fn character(guid: u128, class: &str, torso: &str) -> TestEntity {
 }
 
 fn database() -> DataForgeBuilder {
+    database_with_carrier(satchel_port("cloth"))
+}
+
+fn database_with_carrier(port: TestPort) -> DataForgeBuilder {
     let satchel = TestEntity::new(0x40, "Mount_Satchel", "entities/scitem/mount_satchel.xml")
         .attach_type("Char_Armor_Backpack")
         .geometry_variant("Male", format!("{MALE_ARMOUR}/satchel.cgf"), None);
     [
         satchel,
-        carrier(0x41, "Mount_Carrier", "cloth"),
-        carrier(0x42, "Mount_Lost", "nowhere"),
+        carrier(0x41, "Mount_Carrier", port),
+        carrier(0x42, "Mount_Lost", satchel_port("nowhere")),
         character(0x43, MOUNT_COURIER, "Mount_Carrier"),
         character(0x44, MOUNT_DRIFTER, "Mount_Lost"),
     ]
@@ -97,8 +108,38 @@ fn database() -> DataForgeBuilder {
 /// [`armour_entries`]: crate::armour_entries
 #[must_use]
 pub fn mounted_item_entries() -> Vec<TestEntry> {
+    mounted_entries(&database())
+}
+
+/// Returns the mounted-item fixture with a tagged alternative at original helper ordinals [1, 0].
+#[must_use]
+pub fn mounted_unresolved_helper_entries() -> Vec<TestEntry> {
+    mounted_unresolved_helper_fixture(satchel_port("cloth"))
+}
+
+/// Returns the tagged helper fixture with no root transform.
+#[must_use]
+pub fn mounted_unresolved_helper_without_root_entries() -> Vec<TestEntry> {
+    mounted_unresolved_helper_fixture(rigid_satchel_port())
+}
+
+fn mounted_unresolved_helper_fixture(port: TestPort) -> Vec<TestEntry> {
+    let node_type = "SItemPortDefHelperNode";
+    let alternative = helper_node("pelvis", "satchel", [0.0, 0.1, 0.8], [0.0; 3])
+        .value("Tags", TestValue::text("FixtureUnresolvedTag"));
+    let group = TestInstance::new(node_type)
+        .value("Tags", TestValue::text(""))
+        .value(
+            "SubHelpers",
+            TestValue::Array(vec![TestValue::Struct(alternative)]),
+        );
+    let port = port.sub_helpers(vec![TestValue::Null, TestValue::Struct(group)]);
+    mounted_entries(&add_port_subhelper_fields(database_with_carrier(port)))
+}
+
+fn mounted_entries(database: &DataForgeBuilder) -> Vec<TestEntry> {
     let satchel = satchel_model();
-    let mut entries = vec![TestEntry::zstd("Data\\Game2.dcb", database().build())];
+    let mut entries = vec![TestEntry::zstd("Data\\Game2.dcb", database.build())];
     entries.extend(armour_files());
     entries.push(TestEntry::stored(
         format!("Data\\{}\\satchel.cgf", MALE_ARMOUR.replace('/', "\\")),
@@ -109,4 +150,93 @@ pub fn mounted_item_entries() -> Vec<TestEntry> {
         satchel.cgfm(),
     ));
     entries
+}
+
+/// Returns the mounted-item fixture with replacement carriers and an explicit satchel.
+#[must_use]
+pub fn mounted_overlay_entries() -> Vec<TestEntry> {
+    let explicit_satchel = TestEntity::new(
+        0x45,
+        "Mount_Explicit_Satchel",
+        "entities/scitem/mount_explicit_satchel.xml",
+    )
+    .attach_type("Char_Armor_Backpack")
+    .geometry_variant("Male", format!("{MALE_ARMOUR}/satchel.cgf"), None);
+    let database = database()
+        .record(explicit_satchel.record())
+        .record(
+            overlay_carrier(0x46, "Mount_New_Carrier")
+                .port(overlay_port())
+                .record(),
+        )
+        .record(
+            overlay_carrier(0x47, "Mount_Duplicate_Carrier")
+                .port(overlay_port())
+                .port(overlay_port())
+                .record(),
+        )
+        .record(
+            overlay_carrier(0x48, "Mount_Incompatible_Carrier")
+                .port(
+                    TestPort::new("pack")
+                        .item_type("Char_Armor_Helmet", Vec::<String>::new())
+                        .helper("cloth", [0.0, 0.1, 0.8], [0.0; 3]),
+                )
+                .record(),
+        );
+    mounted_entries(&with_overlay_occupancy(database))
+}
+
+fn with_overlay_occupancy(database: DataForgeBuilder) -> DataForgeBuilder {
+    database
+        .record(character(0x49, "Mount_Free_Wearer", "Mount_New_Carrier").record())
+        .record(character(0x4a, "Mount_Occupied_Wearer", "Mount_Occupied_Carrier").record())
+        .record(character(0x4b, "Mount_Ambiguous_Wearer", "Mount_Duplicate_Carrier").record())
+        .record(character(0x4c, "Mount_Unknown_Wearer", "Mount_Unknown_Carrier").record())
+        .record(
+            overlay_carrier(0x4d, "Mount_Occupied_Carrier")
+                .port(overlay_port())
+                .loadout(TestLoadout::Manual(vec![TestLoadoutEntry::class(
+                    "pack",
+                    "Mount_Nonworn_Prop",
+                )]))
+                .record(),
+        )
+        .record(
+            TestEntity::new(
+                0x4e,
+                "Mount_Nonworn_Prop",
+                "entities/scitem/nonworn_prop.xml",
+            )
+            .attach_type("Misc")
+            .record(),
+        )
+        .record(
+            overlay_carrier(0x4f, "Mount_Unknown_Carrier")
+                .port(overlay_port().tags("", "SyntheticRequirement"))
+                .record(),
+        )
+        .record(
+            TestEntity::new(
+                0x50,
+                "Mount_Second_Satchel",
+                "entities/scitem/mount_second_satchel.xml",
+            )
+            .attach_type("Char_Armor_Backpack")
+            .geometry_variant("Male", format!("{MALE_ARMOUR}/satchel.cgf"), None)
+            .record(),
+        )
+}
+
+fn overlay_port() -> TestPort {
+    TestPort::new("pack")
+        .item_type("Char_Armor_Backpack", Vec::<String>::new())
+        .helper("cloth", [0.0, 0.1, 0.8], [0.0; 3])
+        .item_helper("satchel_loc")
+}
+
+fn overlay_carrier(guid: u128, class: &str) -> TestEntity {
+    TestEntity::new(guid, class, format!("entities/scitem/{class}.xml"))
+        .attach_type("Char_Armor_Torso")
+        .geometry_variant("Male", format!("{MALE_ARMOUR}/plain.skin"), None)
 }

@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::Material;
-use crate::mtl_texture::{DIFFUSE_SLOT, texture_suffix_lowercase as suffix};
+use crate::mtl_texture::texture_suffix_lowercase as suffix;
+use crate::{mtl_observe_ignore, mtl_role_read, mtl_stencil_read};
 
 /// What a texture of a material is used for.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -40,20 +41,7 @@ impl TextureRole {
     /// `TexSlot1` is the diffuse map.
     #[must_use]
     pub fn of(slot: &str, file: &str) -> Self {
-        match suffix(file).as_str() {
-            "ddna" | "ddn" => Self::Normal,
-            "spec" => Self::Specular,
-            "mask" | "opac" => Self::Mask,
-            "blend" => Self::Blend,
-            "detail" => Self::Detail,
-            "wear" => Self::Wear,
-            "ao" => Self::Occlusion,
-            "displ" | "disp" => Self::Displacement,
-            "gloss" => Self::Gloss,
-            "id" | "scalp" | "dir" | "dirm" | "hal" => Self::Other,
-            _ if slot.eq_ignore_ascii_case(DIFFUSE_SLOT) => Self::Diffuse,
-            _ => Self::Other,
-        }
+        mtl_observe_ignore::result(mtl_role_read::role(slot, file, &mut |_| Ok(())))
     }
 }
 
@@ -61,10 +49,7 @@ impl TextureRole {
 /// such as `$RenderToTexture`, whose [role](TextureRole::of) is [`TextureRole::Diffuse`].
 #[must_use]
 pub fn is_diffuse_map(slot: &str, file: &str) -> bool {
-    let file = file.trim();
-    !file.is_empty()
-        && !file.starts_with('$')
-        && TextureRole::of(slot, file) == TextureRole::Diffuse
+    mtl_observe_ignore::result(mtl_role_read::diffuse(slot, file, &mut |_| Ok(())))
 }
 
 impl Material {
@@ -89,9 +74,7 @@ impl Material {
     /// share this test.
     #[must_use]
     pub fn has_diffuse_map(&self) -> bool {
-        self.textures
-            .iter()
-            .any(|texture| is_diffuse_map(&texture.map, &texture.file))
+        mtl_observe_ignore::result(mtl_stencil_read::diffuse(self, &mut |_| Ok(())))
     }
 
     /// Returns the roles of the material's textures that name a file, leaving out an engine

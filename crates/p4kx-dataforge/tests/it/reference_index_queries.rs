@@ -52,7 +52,7 @@ fn with_forge(check: impl Fn(&DataForge<'_>) -> TestResult) -> TestResult {
 
 fn rows(forge: &DataForge<'_>, text: &str) -> Result<Vec<String>, Box<dyn std::error::Error>> {
     let compiled = Query::parse(text)?.compile(forge)?;
-    let run = compiled.run();
+    let run = compiled.run()?;
     let mut rows = Vec::new();
     for page in run.pages(std::num::NonZeroUsize::MIN.saturating_add(99)) {
         for row in page {
@@ -106,7 +106,7 @@ fn compiling_without_the_index_is_an_error_for_referencing_only() -> TestResult 
         assert!(plain.compile_with(forge, None).is_ok(), "no clause");
         let index = ReferenceIndex::build(forge);
         let given = Query::parse(text)?.compile_with(forge, Some(&index))?;
-        assert_eq!(given.run().len(), 2, "with the index");
+        assert_eq!(given.run()?.len(), 2, "with the index");
         Ok(())
     })
 }
@@ -130,7 +130,7 @@ fn the_index_is_asked_for_only_after_the_names_are_checked() -> TestResult {
         assert_eq!(asked.get(), 0, "no index built for a Query that fails");
         let compiled =
             Query::parse(r#"from Ship referencing "libs/hub""#)?.compile_lazily(forge, ask)?;
-        assert_eq!(compiled.run().len(), 2, "the Query that compiles");
+        assert_eq!(compiled.run()?.len(), 2, "the Query that compiles");
         assert_eq!(asked.get(), 1, "built once for it");
         Ok(())
     })

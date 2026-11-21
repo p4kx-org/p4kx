@@ -1,106 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::AnimationChoice;
+use p4kx_extraction::{AnimationChoice, ArchivePositionedAnimation, EntryOrigin, SourceLocation};
 use p4kx_model::{Animation, Model};
 
 use crate::cdf::{self, MAX_CDF_BYTES, is_character_definition};
-use crate::markup::{self, Budget};
-use crate::{ArchiveModels, ModelFailure, ModelProvider};
+use crate::gear_params::{self, ParameterSource};
+use crate::gear_pose;
+use crate::{ArchiveModels, DeployedGear, GearPoseSources, ModelFailure, ModelProvider};
 
-/// The most bytes of a skeleton's parameter file that are read.
-pub(crate) const MAX_CHRPARAMS_BYTES: u64 = 1 << 20;
-
-/// The most folders, and the most databases, of a parameter file that are kept; every folder costs
-/// a scan of the Archive's entries.
-pub(crate) const MAX_PARAM_SOURCES: usize = 64;
-
-/// What a skeleton's parameter file (`.chrparams`) lists: the folders and databases its animations
-/// are stored in, in file order, and the animations by name and file.
-#[derive(Debug, PartialEq, Eq)]
-pub(crate) struct ChrParams {
-    /// The `#filepath` folders, at most [`MAX_PARAM_SOURCES`]; past it the last slot holds the
-    /// latest, so the last folder is always the file's last.
-    pub(crate) folders: Vec<String>,
-    /// The `$TracksDatabase` files, capped like `folders`.
-    pub(crate) databases: Vec<String>,
-    pub(crate) clips: Vec<(String, String)>,
-    /// Whether folders or databases were dropped for the cap.
-    pub(crate) capped: bool,
-}
-
-/// Adds `path` to `list`, which holds at most [`MAX_PARAM_SOURCES`]; returns whether one was
-/// dropped for it.
-fn keep_last(list: &mut Vec<String>, path: String) -> bool {
-    if list.len() < MAX_PARAM_SOURCES {
-        list.push(path);
-        false
-    } else {
-        if let Some(last) = list.last_mut() {
-            *last = path;
-        }
-        true
-    }
-}
-
-/// Reads the parameter file in `bytes`.
-///
-/// # Errors
-///
-/// Returns why the document is no parameter file.
-pub(crate) fn read_params(bytes: &[u8]) -> Result<ChrParams, String> {
-    let mut budget = Budget::new(bytes.len());
-    let root = markup::parse(bytes, &mut budget)?;
-    if !root.name.eq_ignore_ascii_case("Params") {
-        return Err(format!("the root element is {}, not Params", root.name));
-    }
-    let mut params = ChrParams {
-        folders: Vec::new(),
-        databases: Vec::new(),
-        clips: Vec::new(),
-        capped: false,
-    };
-    for list in root.children_named("AnimationList") {
-        for clip in list.children_named("Animation") {
-            let (Some(name), Some(file)) = (clip.attribute("name"), clip.attribute("path")) else {
-                continue;
-            };
-            let dropped = match name {
-                "#filepath" => keep_last(&mut params.folders, file.replace('\\', "/")),
-                "$TracksDatabase" => keep_last(&mut params.databases, file.replace('\\', "/")),
-                _ => {
-                    params.clips.push((name.to_owned(), file.to_owned()));
-                    false
-                }
-            };
-            params.capped |= dropped;
-        }
-    }
-    Ok(params)
-}
-
-impl ChrParams {
-    /// Returns the last `#filepath` folder and the last `$TracksDatabase`, the only ones a landing
-    /// gear's clip is looked for in.
-    pub(crate) fn last_sources(&self) -> (Option<&str>, Option<&str>) {
-        (
-            self.folders.last().map(String::as_str),
-            self.databases.last().map(String::as_str),
-        )
-    }
-
-    /// Returns the file of the clip that deploys the gear: the first whose name has `extend`,
-    /// else the first with `deploy`, but never one that also names a retraction or compression.
-    pub(crate) fn deploy_clip(&self) -> Option<&str> {
-        ["extend", "deploy"].iter().find_map(|word| {
-            self.clips.iter().find_map(|(name, file)| {
-                let lower = name.to_ascii_lowercase();
-                (lower.contains(word) && !lower.contains("retract") && !lower.contains("compress"))
-                    .then_some(file.as_str())
-            })
-        })
-    }
-}
+pub(crate) use crate::gear_params::{
+    ChrParams, MAX_CHRPARAMS_BYTES, MAX_PARAM_SOURCES, read_params,
+};
 
 /// Returns `path` with the extension `.chrparams`.
 pub(crate) fn params_path(skeleton: &str) -> String {
@@ -113,59 +24,214 @@ impl ArchiveModels<'_> {
         &self,
         path: &str,
         model: &Model,
-    ) -> Result<Option<Model>, ModelFailure> {
+    ) -> Result<Option<DeployedGear>, ModelFailure> {
         let Some(entry) = self.entry_of(path) else {
             return Ok(None);
         };
         if !is_character_definition(&entry) {
             return Ok(None);
         }
-        let unreadable = |reason: String| ModelFailure::Unreadable { reason };
-        let bytes = self.file(&entry, MAX_CDF_BYTES)?;
-        let character = cdf::read(&bytes).map_err(unreadable)?;
-        let Some(skeleton) = character.skeleton else {
+        let observe = self.observes_model_sources();
+        let (origin, bytes) = self.gear_file(&entry, MAX_CDF_BYTES, observe);
+        let bytes = bytes?;
+        let (skeleton, location) = if observe {
+            cdf::read_skeleton_with_position(&bytes).map_err(unreadable)?
+        } else {
+            (cdf::read(&bytes).map_err(unreadable)?.skeleton, None)
+        };
+        let Some(skeleton) = skeleton else {
             return Ok(None);
         };
-        let params = match self.file(&params_path(&skeleton), MAX_CHRPARAMS_BYTES) {
-            Ok(bytes) => read_params(&bytes).map_err(unreadable)?,
+        let cdf_selector = origin.zip(location);
+        let (params_origin, bytes) =
+            self.gear_file(&params_path(&skeleton), MAX_CHRPARAMS_BYTES, observe);
+        let read_parameters = if observe {
+            gear_params::read_params_with_positions
+        } else {
+            read_params
+        };
+        let params = match bytes {
+            Ok(bytes) => read_parameters(&bytes).map_err(unreadable)?,
             Err(ModelFailure::Missing) => return Ok(None),
             Err(other) => return Err(other),
         };
         let Some(clip) = params.deploy_clip() else {
             return Ok(None);
         };
-        let animation = self.read_clip(&params, clip)?;
-        crate::gear_pose::posed(model, &animation)
-            .map(Some)
-            .map_err(|failure| unreadable(failure.to_string()))
+        let candidates = ClipCandidates::of(self, &params, clip)?;
+        if observe {
+            let chosen = self
+                .positioned_deploy_clip(clip, &candidates.paths)
+                .map_err(|error| unreadable(error.to_string()))?
+                .ok_or_else(|| missing_clip(clip))?;
+            let selectors = DeploySelectors {
+                cdf: cdf_selector,
+                parameters: params_origin,
+            };
+            self.pose_observed(model, &chosen, selectors, &params, &candidates, clip)
+                .map(Some)
+        } else {
+            let animation = self.read_clip(clip, &candidates.paths)?;
+            let (model, _) = gear_pose::posed(model, &animation, None)
+                .map_err(|failure| unreadable(failure.to_string()))?;
+            Ok(Some(DeployedGear::from_model(model)))
+        }
     }
 
-    fn read_clip(&self, params: &ChrParams, clip: &str) -> Result<Animation, ModelFailure> {
-        let (folder, database) = params.last_sources();
-        let extra: Vec<String> = database
-            .into_iter()
-            .filter_map(|database| self.entry_of(database))
-            .chain(folder.into_iter().filter_map(|folder| {
-                self.entry_of(&format!("{}/{clip}", folder.trim_end_matches('/')))
-            }))
-            .collect();
-        if extra.is_empty() {
-            return Err(ModelFailure::Unreadable {
-                reason: "the animation database and the clip are not in the Archive".to_owned(),
-            });
+    fn gear_file(
+        &self,
+        path: &str,
+        limit: u64,
+        observe: bool,
+    ) -> (Option<EntryOrigin>, Result<Vec<u8>, ModelFailure>) {
+        if observe {
+            self.observed_file(path, limit)
+        } else {
+            (None, self.file(path, limit))
         }
+    }
+
+    fn read_clip(&self, clip: &str, paths: &[String]) -> Result<Animation, ModelFailure> {
         let choice = AnimationChoice::Named(vec![clip.to_owned()]);
-        let set =
-            self.animations_of(&extra, &choice)
-                .map_err(|error| ModelFailure::Unreadable {
-                    reason: error.to_string(),
-                })?;
+        let set = self
+            .animations_of(paths, &choice)
+            .map_err(|error| unreadable(error.to_string()))?;
         set.animations
             .into_iter()
             .find(|animation| !animation.additive)
-            .ok_or_else(|| ModelFailure::Unreadable {
-                reason: format!("the clip {clip} is not in the animation database"),
-            })
+            .ok_or_else(|| missing_clip(clip))
+    }
+
+    fn pose_observed(
+        &self,
+        model: &Model,
+        chosen: &ArchivePositionedAnimation,
+        selectors: DeploySelectors,
+        params: &ChrParams,
+        candidates: &ClipCandidates,
+        clip: &str,
+    ) -> Result<DeployedGear, ModelFailure> {
+        let positioned = chosen.animation();
+        let (model, lods) = gear_pose::posed(model, positioned.animation(), Some(positioned))
+            .map_err(|failure| unreadable(failure.to_string()))?;
+        let route = candidates.used_route(self, clip, chosen.origin());
+        let selectors = selectors.sources(params, route);
+        Ok(DeployedGear {
+            model,
+            sources: Some(GearPoseSources {
+                clip: chosen.origin().cloned(),
+                clip_ordinal: positioned.clip_ordinal(),
+                selectors,
+                lods,
+            }),
+        })
+    }
+}
+
+const fn unreadable(reason: String) -> ModelFailure {
+    ModelFailure::Unreadable { reason }
+}
+
+fn missing_clip(clip: &str) -> ModelFailure {
+    unreadable(format!("the clip {clip} is not in the animation database"))
+}
+
+struct ClipCandidates {
+    paths: Vec<String>,
+    database: bool,
+    folder: bool,
+}
+
+impl ClipCandidates {
+    fn of(
+        models: &ArchiveModels<'_>,
+        params: &ChrParams,
+        clip: &str,
+    ) -> Result<Self, ModelFailure> {
+        let (folder, database) = params.last_sources();
+        let database = database.and_then(|database| models.entry_of(database));
+        let file = folder.and_then(|folder| {
+            models.entry_of(&format!("{}/{clip}", folder.trim_end_matches('/')))
+        });
+        let candidates = Self {
+            database: database.is_some(),
+            folder: file.is_some(),
+            paths: database.into_iter().chain(file).collect(),
+        };
+        if candidates.paths.is_empty() {
+            return Err(unreadable(
+                "the animation database and the clip are not in the Archive".to_owned(),
+            ));
+        }
+        Ok(candidates)
+    }
+
+    fn used_route(
+        &self,
+        models: &ArchiveModels<'_>,
+        clip: &str,
+        selected: Option<&EntryOrigin>,
+    ) -> Option<ParamRoute> {
+        let selected = selected?.binding();
+        let is_selected = |path| {
+            models
+                .animation_entry_binding(path)
+                .is_some_and(|entry| entry == selected)
+        };
+        if is_selected(clip) {
+            return None;
+        }
+        if self.database && self.paths.first().is_some_and(|path| is_selected(path)) {
+            Some(ParamRoute::Database)
+        } else if self.folder && self.paths.last().is_some_and(|path| is_selected(path)) {
+            Some(ParamRoute::Folder)
+        } else {
+            None
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum ParamRoute {
+    Database,
+    Folder,
+}
+
+struct DeploySelectors {
+    cdf: Option<(EntryOrigin, SourceLocation)>,
+    parameters: Option<EntryOrigin>,
+}
+
+impl DeploySelectors {
+    fn sources(
+        self,
+        params: &ChrParams,
+        route: Option<ParamRoute>,
+    ) -> Vec<(EntryOrigin, SourceLocation)> {
+        let mut sources: Vec<_> = self.cdf.into_iter().collect();
+        if let Some(origin) = self.parameters {
+            let mut add = |source: Option<&ParameterSource>, fields| {
+                if let Some(source) = source {
+                    sources.extend(
+                        source
+                            .locations(fields)
+                            .map(|location| (origin.clone(), location)),
+                    );
+                }
+            };
+            add(params.deploy_source(), ["clipName", "clipPath"]);
+            match route {
+                Some(ParamRoute::Database) => add(
+                    params.database_source.as_ref(),
+                    ["databaseName", "databasePath"],
+                ),
+                Some(ParamRoute::Folder) => {
+                    add(params.folder_source.as_ref(), ["folderName", "folderPath"]);
+                }
+                None => {}
+            }
+        }
+        sources
     }
 }
 

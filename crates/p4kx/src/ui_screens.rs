@@ -13,12 +13,19 @@ use serde::Serialize;
 use crate::cli::UiScreensArgs;
 use crate::{exit, json};
 
+#[path = "ui_screens_origins.rs"]
+mod origins;
+
+use self::origins::Evidence;
+
 #[derive(Serialize)]
 struct ScreensJson<'a> {
     archive: String,
     entry: &'a str,
     #[serde(flatten)]
     listing: &'a EntityScreens,
+    #[serde(flatten)]
+    evidence: Evidence,
 }
 
 /// Runs `p4kx ui screens`.
@@ -30,15 +37,17 @@ pub(crate) fn run(args: &UiScreensArgs, as_json: bool) -> Result<ExitCode> {
     let mut resolver = LoadoutResolver::new(&forge).with_files(&files);
     let record = resolver.entities().find(&args.entity)?;
     let tree = resolver.resolve(&record)?;
-    let listing = ScreenComposer::new(&forge).screens_of(&tree);
+    let mut composer = ScreenComposer::new(&forge);
     if as_json {
+        let observed = composer.screens_of_observed(&tree);
         json::print(&ScreensJson {
             archive: json::path(archive.path()),
             entry: entry.path(),
-            listing: &listing,
+            listing: observed.listing(),
+            evidence: Evidence::of(&entry, &observed)?,
         })?;
     } else {
-        match print(&listing) {
+        match print(&composer.screens_of(&tree)) {
             Err(error) if error.kind() != io::ErrorKind::BrokenPipe => return Err(error.into()),
             _ => {}
         }

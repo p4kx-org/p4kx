@@ -100,6 +100,14 @@ impl<W: Write> ResultWriter<W> {
         Ok(())
     }
 
+    /// Returns the column positions the JSON row writer retains.
+    pub fn json_columns(&self) -> impl Iterator<Item = usize> + '_ {
+        self.keys
+            .iter()
+            .enumerate()
+            .filter_map(|(index, key)| key.as_ref().map(|_| index))
+    }
+
     /// Returns the number of rows written.
     #[must_use]
     pub const fn rows(&self) -> u64 {

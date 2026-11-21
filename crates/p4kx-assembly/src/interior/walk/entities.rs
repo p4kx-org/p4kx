@@ -4,11 +4,13 @@
 use std::sync::Arc;
 
 use p4kx_dataforge::Guid;
+use p4kx_extraction::{ArchiveMaterialRead, EntryOrigin};
 use p4kx_model::{MaterialStatus, SocEntities, SocPalette, Transform};
 
 use super::{Placement, Todo, Walker};
 use crate::interior::files::stem;
 use crate::interior::light::scene_light;
+use crate::interior::tile_light::TileLightPlacement;
 use crate::interior::{InteriorPart, InteriorPartKind};
 use crate::{IssueKind, PaletteRef};
 
@@ -70,9 +72,11 @@ impl Walker<'_> {
             world: world.then(&placed.transform),
             model_path: placed.path.map(str::to_owned),
             model: None,
-            materials: Arc::new(MaterialStatus::Unnamed),
+            model_archive_sources: Arc::default(),
+            materials: Arc::new(ArchiveMaterialRead::unobserved(MaterialStatus::Unnamed)),
             palette: None,
             light: None,
+            light_placement: None,
         });
         true
     }
@@ -82,10 +86,10 @@ impl Walker<'_> {
     pub(super) fn add_entities(
         &mut self,
         todo: &Todo,
-        at: usize,
-        world: Transform,
+        (at, world): (usize, Transform),
         file: &str,
         entities: &SocEntities,
+        tile: Option<(&TileLightPlacement<'_>, Option<&Arc<EntryOrigin>>)>,
     ) -> bool {
         let mut invalid = entities.invalid;
         for prop in &entities.props {
@@ -121,7 +125,7 @@ impl Walker<'_> {
                 IssueKind::EntitiesLeftOut { count: invalid },
             );
         }
-        self.add_lights(todo, at, world, file, entities)
+        self.add_lights(todo, (at, world), file, entities, tile)
     }
 
     /// Adds the entities whose class Record names geometry; returns whether there was room for
@@ -171,10 +175,10 @@ impl Walker<'_> {
     fn add_lights(
         &mut self,
         todo: &Todo,
-        at: usize,
-        world: Transform,
+        (at, world): (usize, Transform),
         file: &str,
         entities: &SocEntities,
+        tile: Option<(&TileLightPlacement<'_>, Option<&Arc<EntryOrigin>>)>,
     ) -> bool {
         let mut unsupported: Vec<(String, usize)> = Vec::new();
         for light in &entities.lights {
@@ -188,17 +192,25 @@ impl Walker<'_> {
                 }
                 continue;
             }
-            let placed = Placed::new(
-                light.name.clone(),
-                InteriorPartKind::Light,
-                None,
-                light.transform,
-            );
+            let evidence = tile.and_then(|(tile, origin)| {
+                let group = light.group_placement.as_deref()?;
+                Some(tile.resolve(light, group, origin.cloned()))
+            });
+            if let Some((_, evidence)) = &evidence
+                && let Some(Err(error)) = evidence.anchor
+            {
+                self.note(&todo.path, file, IssueKind::LightAnchor(error));
+            }
+            let transform = evidence
+                .as_ref()
+                .map_or(light.transform, |(frame, _)| *frame);
+            let placed = Placed::new(light.name.clone(), InteriorPartKind::Light, None, transform);
             if !self.add_placed(todo, at, world, placed) {
                 return false;
             }
             if let Some(part) = self.parts.last_mut() {
                 part.light = Some(light.clone());
+                part.light_placement = evidence.map(|(_, evidence)| Box::new(evidence));
             }
         }
         for (light_type, count) in unsupported {
@@ -227,6 +239,7 @@ impl Walker<'_> {
         Some(PaletteRef {
             guid,
             child_path: palette.child.clone(),
+            selector: crate::geometry::PaletteReferenceSource::SocEntity,
         })
     }
 }

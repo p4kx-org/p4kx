@@ -85,7 +85,7 @@ fn put_bone_map(out: &mut Vec<u8>, model: &TestModel) {
     let (tag, influences) = if *wide { (BONEMAP32, 8) } else { (BONEMAP, 4) };
     stream(out, tag, influences * 3, |data| {
         for vertex in 0..model.vertices.len() {
-            let entry = entries.get(vertex).map(Vec::as_slice).unwrap_or_default();
+            let entry = entries.get(vertex).map_or_default(Vec::as_slice);
             let at = |slot: usize| entry.get(slot).copied().unwrap_or((0, 0));
             for slot in 0..influences as usize {
                 put_u16(data, at(slot).0);

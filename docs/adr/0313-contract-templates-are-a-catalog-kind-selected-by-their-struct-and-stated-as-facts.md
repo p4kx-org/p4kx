@@ -46,14 +46,16 @@ held only because those two conditions were `other`.
   `other` with its `structName` and the fields its siblings share; none occurs on LIVE. A weak
   pointer to an objective is the `id` of that objective, a weak pointer to a property its
   `missionVariableName`, a pointer to nothing is `null`.
-- **Depth.** Nothing is cut silently. A Record whose objective phases nest deeper than 32 levels
-  or whose flow conditions nest deeper than 16 cannot be read: it is a failure of the build with
-  that reason and no entry. The Records of LIVE nest five and three levels.
+- **Depth.** Every readable objective phase is flattened in source preorder with its parent ID;
+  the catalog adds no phase-depth cutoff. Canonical reader resource-policy errors remain explicit
+  and cannot be published as complete source data. Flow conditions nested deeper than 16 still
+  fail their Record. The historical LIVE observation was five phase and three condition levels.
 - **Closed sets and unknown names.** Stored enum names (a state, a category, a comms timing or
   reason, a kind of objective property) are closed value sets (ADR-0054): a string with
   `x-values`. A name the catalog does not know is `null` and counted in the warning
-  `unknown_template_values` of the build, with each kind and value; the real-Archive test requires
-  none on LIVE.
+  `unknown_template_values` of the build. Warnings carry ordered category counts and unsupported
+  declared struct names. The catalog retains authored enum and string values in their sourced
+  fields. The real-Archive test requires no unknown names on LIVE.
 - **Reuse.** The rewards and the reputation of a contract are read for `contracts` and are not
   repeated: the payout links to `reputationScopes`. The Record reading loop is one helper
   (`read_kind`) shared with the mission location templates; the links come from the same level

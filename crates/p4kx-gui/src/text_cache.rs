@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::TryReserveError;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
@@ -16,6 +17,8 @@ pub(crate) enum TextFailure {
     ArchiveChanged,
     /// The `global.ini` cannot be read or indexed, for the reason given.
     Unreadable(String),
+    /// Owned localisation storage could not be reserved.
+    Reserve(TryReserveError),
 }
 
 type Loaded = Result<Arc<OwnedTextSet>, TextFailure>;
@@ -80,7 +83,8 @@ impl TextCache {
         let set = files
             .index()
             .map_err(|error| unreadable(&error))?
-            .to_owned_set();
+            .try_to_owned_set()
+            .map_err(TextFailure::Reserve)?;
         index.watch().check().map_err(changed)?;
         Ok(Arc::new(set))
     }

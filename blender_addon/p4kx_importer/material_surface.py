@@ -6,7 +6,7 @@
 from __future__ import annotations
 
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import NamedTuple
 
 from .graph_spec import Ref
@@ -53,6 +53,7 @@ class BuildContext:
     palette: Palette | None
     texture_alpha: Mapping[str, str]
     loadable: Callable[[str], bool] | None = None
+    ddna_pairs: Mapping[str, str] = field(default_factory=dict)
 
     def usable(self, desc: MaterialDesc) -> MaterialDesc:
         """Returns ``desc`` without the texture slots that cannot be loaded."""

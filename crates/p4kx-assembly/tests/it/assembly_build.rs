@@ -6,10 +6,10 @@
 use crate::assembly_support;
 
 use assembly_support::{TestResult, assemble, entries, fixture};
-use p4kx_assembly::{IssueKind, Part, Placement};
-use p4kx_extraction::Archive;
-use p4kx_extraction::model::MaterialStatus;
-use p4kx_testkit::ASSEMBLY_GUN_PAINT as GUN_PAINT;
+use p4kx_assembly::{IssueKind, Part, Placement, PortPlacementField};
+use p4kx_extraction::model::{MaterialStatus, ModelFile};
+use p4kx_extraction::{Archive, SourceEncryption};
+use p4kx_testkit::{ASSEMBLY_GUN_PAINT as GUN_PAINT, test_key};
 
 fn close(actual: [f32; 4], expected: [f32; 4]) -> bool {
     actual
@@ -60,6 +60,18 @@ fn world_transforms_come_from_the_helpers_and_port_offsets() -> TestResult {
         .part_at("hardpoint_weapon_nose")
         .ok_or("the mount")?;
     assert_eq!(mount.placement(), &Placement::Helper("hp_nose".to_owned()));
+    let placement = mount
+        .port_placement_source()
+        .ok_or("the original helper inputs")?;
+    assert_eq!(placement.port().port_ordinal(), 0);
+    assert_eq!(
+        placement.fields().collect::<Vec<_>>(),
+        [
+            PortPlacementField::Helper,
+            PortPlacementField::Position,
+            PortPlacementField::Rotation,
+        ]
+    );
     assert!(
         close(mount.local().rows[0], [0.0, -1.0, 0.0, 0.0])
             && close(mount.local().rows[1], [1.0, 0.0, 0.0, 4.0])
@@ -87,6 +99,10 @@ fn world_transforms_come_from_the_helpers_and_port_offsets() -> TestResult {
         "no helper, so the node named like the port"
     );
     assert_eq!(relay.world().translation(), [3.0, 0.0, 0.0]);
+    assert!(
+        relay.port_placement_source().is_none(),
+        "the port name comes from the loadout"
+    );
     Ok(())
 }
 
@@ -268,6 +284,82 @@ fn a_missing_library_is_reported_once_and_the_part_keeps_its_model() -> TestResu
     assert!(
         gun.materials().library().is_none(),
         "the model's own library does not take over"
+    );
+    Ok(())
+}
+
+#[test]
+fn placed_models_and_libraries_keep_only_their_selected_archive_reads() -> TestResult {
+    let fixture = fixture(
+        entries()
+            .into_iter()
+            .map(|entry| {
+                if entry.path().ends_with("ship_lod1.cgfm") || entry.path().ends_with("ship.mtl") {
+                    entry.encrypted()
+                } else {
+                    entry
+                }
+            })
+            .collect(),
+    )?;
+    let archive = Archive::open_with_key(&fixture.path, Some(test_key()))?;
+    let detailed = assemble(&archive, "TEST_Ship", 0)?;
+    let coarse = assemble(&archive, "TEST_Ship", 1)?;
+    for (assembly, role, path, encrypted) in [
+        (
+            &detailed,
+            ModelFile::Geometry,
+            "ship.cgfm",
+            SourceEncryption::Unencrypted,
+        ),
+        (
+            &coarse,
+            ModelFile::LodGeometry(1),
+            "ship_lod1.cgfm",
+            SourceEncryption::Encrypted,
+        ),
+    ] {
+        let root = assembly.root().ok_or("placed ship")?;
+        let geometry = root
+            .model_archive_sources()
+            .iter()
+            .find(|read| read.file() == role)
+            .and_then(|read| read.origin())
+            .ok_or("selected model input")?;
+        assert!(geometry.entry().path().ends_with(path));
+        assert_eq!(geometry.encryption(), encrypted);
+        let excluded = if role == ModelFile::Geometry {
+            ModelFile::LodGeometry(1)
+        } else {
+            ModelFile::Geometry
+        };
+        assert!(
+            root.model_archive_sources()
+                .iter()
+                .all(|read| read.file() != excluded)
+        );
+        let library = root
+            .material_archive_origins()
+            .library()
+            .ok_or("used ship material library")?;
+        assert!(library.entry().path().ends_with("ship.mtl"));
+        assert_eq!(library.encryption(), SourceEncryption::Encrypted);
+        without_model_inputs(assembly)?;
+    }
+    Ok(())
+}
+
+fn without_model_inputs(assembly: &p4kx_assembly::Assembly) -> TestResult {
+    let seat = assembly
+        .part_at("hardpoint_seat")
+        .ok_or("seat without geometry")?;
+    assert!(
+        seat.model_archive_sources().is_empty(),
+        "the seat has no model read"
+    );
+    assert!(
+        seat.material_archive_origins().library().is_none(),
+        "the seat has no library read"
     );
     Ok(())
 }

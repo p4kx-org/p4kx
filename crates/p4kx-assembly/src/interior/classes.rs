@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 use p4kx_dataforge::{DataForge, Guid};
+use p4kx_extraction::DataForgeEntry;
 
 use crate::entities::is_entity;
 use crate::spec::read_geometry;
@@ -42,6 +43,13 @@ impl<'f> InteriorForge<'f> {
             palettes: ForgePalettes::new(forge),
             geometries: Mutex::new(HashMap::new()),
         }
+    }
+
+    /// Binds palette reads to the Entry that supplied this exact DataForge.
+    #[must_use]
+    pub fn with_entry(mut self, entry: &'f DataForgeEntry) -> Self {
+        self.palettes = self.palettes.with_entry(entry);
+        self
     }
 
     fn read(&self, guid: Guid) -> Option<Arc<Geometry>> {

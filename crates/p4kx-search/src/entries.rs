@@ -2,12 +2,14 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::cmp::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering as AtomicOrdering};
 
 use p4kx_extraction::{Archive, Entry, Language};
 use rayon::prelude::*;
 
 use crate::entry_scan::{Context, Outcome, scan};
 use crate::gate::Gate;
+use crate::observed_search::{EntryMatchSource, LocatedEntryHit};
 use crate::waves::{Chunk, collect};
 use crate::{EntryHit, Found, Needle, SearchOptions, Source};
 
@@ -39,8 +41,9 @@ const MEMORY_BUDGET: u64 = 256 << 20;
 /// searched, and with one every Entry whose path matches; the `global.ini` files are left to
 /// [`search_localization`](crate::search_localization) when [`SearchOptions::sources`] holds
 /// [`Source::Localization`]. Entries are searched in path order in parallel waves: plain text
-/// is streamed line by line, `CryXml` and UTF-16 are read whole, holding at most 256 MiB at once
-/// counting the tables parsed from a `CryXml` Entry and the buffer that decodes UTF-16.
+/// is matched incrementally without retaining a whole line. `CryXml` and UTF-16 are read whole
+/// under a 256 MiB admission budget counting literal state, excerpts, parsed `CryXml` tables
+/// and the buffer that decodes UTF-16.
 /// A hit names the line, counted in the XML form for `CryXml`; an Entry reports at most
 /// [`SearchOptions::per_item`] hits. An Entry above [`SearchOptions::max_entry_len`], one that
 /// holds binary data, an encrypted one without the Archive key and one that cannot be read are
@@ -52,6 +55,27 @@ pub fn search_entries(
     options: &SearchOptions,
     stop: &(dyn Fn() -> bool + Sync),
 ) -> Option<Found<EntryHit>> {
+    observed(archive, needle, options, stop).map(|found| found.map_hits(|located| located.hit))
+}
+
+pub(crate) fn observed<'archive>(
+    archive: &'archive Archive,
+    needle: &Needle,
+    options: &SearchOptions,
+    stop: &(dyn Fn() -> bool + Sync),
+) -> Option<Found<LocatedEntryHit<'archive>>> {
+    let cancelled = AtomicBool::new(false);
+    let stopped = || {
+        if cancelled.load(AtomicOrdering::Relaxed) {
+            return true;
+        }
+        if stop() {
+            cancelled.store(true, AtomicOrdering::Relaxed);
+            return true;
+        }
+        false
+    };
+    let stop: &(dyn Fn() -> bool + Sync) = &stopped;
     let candidates = candidates(archive, options);
     let gate = Gate::new(MEMORY_BUDGET);
     let context = Context {
@@ -70,14 +94,22 @@ pub fn search_entries(
             .unwrap_or_default();
         let mut chunk = Chunk::default();
         let mut buffer = Vec::new();
-        for entry in slice {
+        for &entry in slice {
             if stop() || chunk.hits.len() > limit {
                 break;
             }
             match scan(archive, entry, &context, &mut buffer) {
-                Outcome::Scanned(hits) => {
+                Outcome::Scanned { hits, encoding } => {
                     chunk.stats.entries_scanned += 1;
-                    chunk.hits.extend(hits);
+                    if !hits.is_empty() {
+                        let source = EntryMatchSource {
+                            origin: archive.observed_entry(entry),
+                            encoding,
+                        };
+                        chunk
+                            .hits
+                            .extend(hits.into_iter().map(|hit| LocatedEntryHit { hit, source }));
+                    }
                 }
                 Outcome::Binary => chunk.stats.entries_binary += 1,
                 Outcome::TooLarge => chunk.stats.entries_too_large += 1,

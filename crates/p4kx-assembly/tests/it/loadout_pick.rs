@@ -169,7 +169,7 @@ fn the_pick_of_an_alternative_that_is_no_loadout_is_an_issue() -> TestResult {
         "unreadable",
         &[(
             "Body",
-            vec![body("Body_Red"), TestLoadout::Xml(String::new())],
+            vec![body("Body_Red"), TestLoadout::UnreadableXmlPath],
         )],
     );
     let changes = LoadoutChanges::new().with_picks(LoadoutPicks::new().group("Body", 1));
@@ -179,3 +179,45 @@ fn the_pick_of_an_alternative_that_is_no_loadout_is_an_issue() -> TestResult {
     assert!(tree.issues()[0].to_string().contains("alternative 1"));
     Ok(())
 }
+
+#[test]
+fn picking_an_empty_xml_choice_preserves_the_following_index() -> TestResult {
+    let record = assortment_record(
+        ASSORTMENT,
+        "empty_path",
+        &[(
+            "Body",
+            vec![
+                body("Body_Red"),
+                TestLoadout::Xml(String::new()),
+                body("Body_Blue"),
+            ],
+        )],
+    );
+    let empty = LoadoutChanges::new().with_picks(LoadoutPicks::new().group("Body", 1));
+    let tree = resolve_changed(
+        generated(&[ASSORTMENT]),
+        None,
+        vec![record.clone()],
+        Some(&empty),
+    )?;
+    assert!(
+        tree.issues().is_empty(),
+        "selected empty XML path is a usable choice"
+    );
+    assert!(
+        attached(&tree).is_empty(),
+        "the selected slot supplies no layer"
+    );
+
+    let next = LoadoutChanges::new().with_picks(LoadoutPicks::new().group("Body", 2));
+    let tree = resolve_changed(generated(&[ASSORTMENT]), None, vec![record], Some(&next))?;
+    assert!(
+        tree.issues().is_empty(),
+        "the following index remains available"
+    );
+    assert_eq!(attached(&tree), [pair("Body_ItemPort", "Body_Blue")]);
+    Ok(())
+}
+#[path = "loadout_pick_pointer_slots.rs"]
+mod pointer_slots;

@@ -45,6 +45,7 @@ struct SummaryTexts {
     new_key: String,
     new: String,
     kinds: [(String, String); 3],
+    incomparable: Option<String>,
     directories_title: String,
     directory_head: [String; 4],
     directories: Vec<[String; 4]>,
@@ -78,6 +79,9 @@ pub(super) fn show(ui: &mut Ui, model: &Model) {
                     kpi_tile(ui, label, value, tone, width);
                 }
             });
+            if let Some(message) = &summary.incomparable {
+                ui.label(message);
+            }
         });
     if section_header(
         ui,
@@ -124,6 +128,12 @@ fn make(texts: &Texts, view: &ComparisonView, summary: &Summary) -> SummaryTexts
             (ComparisonText::Changed, counts.changed),
         ]
         .map(|(text, count)| (texts.get(text), number(count))),
+        incomparable: (summary.incomparables != 0).then(|| {
+            texts.format(
+                ComparisonText::Incomparable,
+                &[("number", number(summary.incomparables).into())],
+            )
+        }),
         directories_title: texts.format(
             ComparisonText::Directories,
             &[("number", number(summary.directories.len()).into())],

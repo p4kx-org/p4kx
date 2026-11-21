@@ -120,6 +120,16 @@ pub struct Found<T> {
     pub stats: SearchStats,
 }
 
+impl<T> Found<T> {
+    pub(crate) fn map_hits<U>(self, project: impl FnMut(T) -> U) -> Found<U> {
+        Found {
+            hits: self.hits.into_iter().map(project).collect(),
+            has_more: self.has_more,
+            stats: self.stats,
+        }
+    }
+}
+
 /// The result of a search over several sources.
 ///
 /// Hits are in the order of their source: Records in Record order, localisation by language and

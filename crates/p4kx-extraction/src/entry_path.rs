@@ -1,25 +1,36 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ffi::OsStr;
 use std::path::PathBuf;
 
-use crate::ExtractionError;
+use crate::file_receipt::is_origin_lock_name;
 use crate::part_escape::hex_digit;
 use crate::portable_name::check_part;
+use crate::{ExtractionError, NameRule};
 
 /// Returns the path below the target an Entry is written to, or the part that is no valid file
-/// name on Linux and Windows and the rule it breaks ([`ExtractionError::InvalidName`]); empty and
-/// dot parts, which could leave the target, are among them.
+/// extraction name and the rule it breaks ([`ExtractionError::InvalidName`]).
 pub(crate) fn relative_path(entry_path: &str) -> Result<PathBuf, ExtractionError> {
     let mut relative = PathBuf::new();
     for part in entry_path.split(['\\', '/']) {
-        check_part(part).map_err(|rule| ExtractionError::InvalidName {
-            part: part.to_owned(),
-            rule,
-        })?;
+        check_output_part(part)?;
         relative.push(part);
     }
     Ok(relative)
+}
+
+/// Checks a portable part against the extraction output namespace.
+pub(crate) fn check_output_part(part: &str) -> Result<(), ExtractionError> {
+    let rule = if is_origin_lock_name(OsStr::new(part)) {
+        Err(NameRule::ReservedOriginLock)
+    } else {
+        check_part(part)
+    };
+    rule.map_err(|rule| ExtractionError::InvalidName {
+        part: part.to_owned(),
+        rule,
+    })
 }
 
 /// Returns the Entry path to extract for stored path bytes that are not UTF-8: the valid text as

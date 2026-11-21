@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashMap;
-
-use crate::diff::{Changes, Trail, hex, text};
-use crate::{ColorParam, FloatParam, ItemPort, Material, NameTable, SubMaterial, Texture};
+use crate::diff::{Changes, hex, text};
+use crate::diff_pair::{self, Paired};
+use crate::diff_source::{MatchSite, Trail};
+use crate::{
+    ChfNameKind, ColorParam, FloatParam, ItemPort, Material, NameTable, SubMaterial, Texture,
+};
 
 /// How the items of a list are paired, named and shown when only one file has them.
 struct Kind<T> {
     key: fn(&T) -> u32,
-    name: for<'n> fn(&'n NameTable, u32) -> Option<&'n str>,
+    name: Option<ChfNameKind>,
+    hash_field: &'static str,
     value: fn(&T) -> String,
     numbered: bool,
 }
@@ -19,96 +22,23 @@ impl<T> Kind<T> {
         if self.numbered {
             hash.to_string()
         } else {
-            (self.name)(names, hash).map_or_else(|| hex(&hash), str::to_owned)
+            self.name
+                .and_then(|kind| names.get(kind, hash))
+                .map_or_else(|| hex(&hash), str::to_owned)
         }
     }
-}
-
-struct Paired<'a, T> {
-    hash: u32,
-    ordinal: usize,
-    old: Option<&'a T>,
-    new: Option<&'a T>,
-    new_at: Option<usize>,
-}
-
-fn ordinals<T>(items: &[T], key: fn(&T) -> u32) -> Vec<(u32, usize)> {
-    let mut seen: HashMap<u32, usize> = HashMap::with_capacity(items.len());
-    items
-        .iter()
-        .map(|item| {
-            let hash = key(item);
-            let ordinal = seen.entry(hash).or_default();
-            let at = *ordinal;
-            *ordinal += 1;
-            (hash, at)
-        })
-        .collect()
-}
-
-fn first_free(
-    keys: &[(u32, usize)],
-    taken: &[bool],
-    hash: u32,
-    accept: impl Fn(usize) -> bool,
-) -> Option<usize> {
-    keys.iter()
-        .zip(taken)
-        .enumerate()
-        .find(|(at, ((other, _), taken))| !**taken && *other == hash && accept(*at))
-        .map(|(at, _)| at)
-}
-
-fn claim(mate: Option<usize>, taken: &mut [bool]) -> Option<usize> {
-    if let Some(slot) = mate.and_then(|at| taken.get_mut(at)) {
-        *slot = true;
-    }
-    mate
-}
-
-/// Pairs the items of two lists that have the same hash: first those that are equal, then the
-/// rest in order. The pairs follow the first list, the items only in the second come last.
-fn pair<'a, T: PartialEq>(old: &'a [T], new: &'a [T], key: fn(&T) -> u32) -> Vec<Paired<'a, T>> {
-    let old_keys = ordinals(old, key);
-    let new_keys = ordinals(new, key);
-    let mut taken = vec![false; new.len()];
-    let mut mates: Vec<Option<usize>> = Vec::with_capacity(old.len());
-    for (item, (hash, _)) in old.iter().zip(&old_keys) {
-        let mate = first_free(&new_keys, &taken, *hash, |at| new.get(at) == Some(item));
-        mates.push(claim(mate, &mut taken));
-    }
-    for (mate, (hash, _)) in mates.iter_mut().zip(&old_keys) {
-        if mate.is_none() {
-            let found = first_free(&new_keys, &taken, *hash, |_| true);
-            *mate = claim(found, &mut taken);
+    fn site(&self, names: &NameTable, pair: &Paired<'_, T>) -> MatchSite {
+        MatchSite {
+            before: pair.old_at,
+            after: pair.new_at,
+            hash: pair.hash,
+            ordinal: pair.ordinal,
+            hash_field: self.hash_field,
+            name_kind: self
+                .name
+                .filter(|kind| names.get(*kind, pair.hash).is_some()),
         }
     }
-    let mut pairs: Vec<_> = old
-        .iter()
-        .zip(&old_keys)
-        .zip(&mates)
-        .map(|((item, (hash, ordinal)), mate)| Paired {
-            hash: *hash,
-            ordinal: *ordinal,
-            old: Some(item),
-            new: mate.and_then(|at| new.get(at)),
-            new_at: *mate,
-        })
-        .collect();
-    pairs.extend(
-        new.iter()
-            .zip(&new_keys)
-            .zip(&taken)
-            .filter(|(_, taken)| !**taken)
-            .map(|((item, (hash, ordinal)), _)| Paired {
-                hash: *hash,
-                ordinal: *ordinal,
-                old: None,
-                new: Some(item),
-                new_at: None,
-            }),
-    );
-    pairs
 }
 
 fn each<T: PartialEq>(
@@ -118,10 +48,10 @@ fn each<T: PartialEq>(
     kind: &Kind<T>,
     both: impl Fn(&mut Changes<'_>, &Trail, &T, &T),
 ) {
-    let pairs = pair(lists.0, lists.1, kind.key);
+    let pairs = diff_pair::pair(lists.0, lists.1, kind.key);
     for pair in &pairs {
         let label = kind.label(changes.names, pair.hash);
-        let at = trail.segment(&label, &hex(&pair.hash), pair.ordinal);
+        let at = trail.segment(&label, &hex(&pair.hash), &kind.site(changes.names, pair));
         match (pair.old, pair.new) {
             (Some(old), Some(new)) if old != new => both(changes, &at, old, new),
             (Some(old), None) => changes.removed(&at, (kind.value)(old)),
@@ -131,6 +61,7 @@ fn each<T: PartialEq>(
     }
     let mut matched: Vec<(usize, &Paired<'_, T>)> = pairs
         .iter()
+        .filter(|pair| pair.old_at.is_some())
         .filter_map(|pair| pair.new_at.map(|at| (at, pair)))
         .collect();
     if matched
@@ -155,7 +86,11 @@ fn each<T: PartialEq>(
         };
         let old = list(&matched);
         matched.sort_by_key(|(at, _)| *at);
-        changes.replaced(&trail.key("order"), old, list(&matched));
+        let lookups = matched
+            .iter()
+            .filter_map(|(_, pair)| trail.lookup(&kind.site(names, pair)))
+            .collect();
+        changes.order(&trail.display_key("order"), old, list(&matched), lookups);
     }
 }
 
@@ -198,13 +133,14 @@ fn port_fields(changes: &mut Changes<'_>, trail: &Trail, old: &ItemPort, new: &I
     changes.field(trail, "tail_count", &old.tail_count, &new.tail_count, text);
     let kind = Kind {
         key: |port: &ItemPort| port.port,
-        name: NameTable::port,
+        name: Some(ChfNameKind::Port),
+        hash_field: "port",
         value: port_text,
         numbered: false,
     };
     each(
         changes,
-        trail,
+        &trail.clone().source_key("children"),
         (&old.children, &new.children),
         &kind,
         port_fields,
@@ -231,7 +167,8 @@ pub(crate) fn diff_materials(
 ) {
     let kind = Kind {
         key: |material: &Material| material.attachment,
-        name: NameTable::attachment,
+        name: Some(ChfNameKind::Attachment),
+        hash_field: "attachment",
         value: material_text,
         numbered: false,
     };
@@ -251,7 +188,8 @@ fn material(changes: &mut Changes<'_>, at: &Trail, old: &Material, new: &Materia
     });
     let kind = Kind {
         key: |sub: &SubMaterial| sub.name,
-        name: NameTable::sub_material,
+        name: Some(ChfNameKind::SubMaterial),
+        hash_field: "name",
         value: |sub| {
             format!(
                 "{}, {}, {}",
@@ -274,7 +212,8 @@ fn material(changes: &mut Changes<'_>, at: &Trail, old: &Material, new: &Materia
 fn sub_material(changes: &mut Changes<'_>, at: &Trail, old: &SubMaterial, new: &SubMaterial) {
     let textures = Kind {
         key: |texture: &Texture| u32::from(texture.slot),
-        name: |_, _| None,
+        name: None,
+        hash_field: "slot",
         value: |texture| texture.texture.to_string(),
         numbered: true,
     };
@@ -289,7 +228,8 @@ fn sub_material(changes: &mut Changes<'_>, at: &Trail, old: &SubMaterial, new: &
     );
     let floats = Kind {
         key: |float: &FloatParam| float.name,
-        name: NameTable::param,
+        name: Some(ChfNameKind::Parameter),
+        hash_field: "name",
         value: |float| float_text(float.value),
         numbered: false,
     };
@@ -310,7 +250,8 @@ fn sub_material(changes: &mut Changes<'_>, at: &Trail, old: &SubMaterial, new: &
     );
     let colors = Kind {
         key: |color: &ColorParam| color.name,
-        name: NameTable::param,
+        name: Some(ChfNameKind::Parameter),
+        hash_field: "name",
         value: |color| colour_text(color.rgba),
         numbered: false,
     };

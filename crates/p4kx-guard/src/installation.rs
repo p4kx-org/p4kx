@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ffi::OsString;
 use std::fs;
 use std::path::{Component, Path, PathBuf, Prefix};
 
@@ -17,7 +18,7 @@ pub struct Installation {
 #[derive(Debug, Clone)]
 struct Protected {
     shown: PathBuf,
-    key: Vec<String>,
+    key: Vec<OsString>,
 }
 
 impl Installation {
@@ -33,7 +34,10 @@ impl Installation {
     pub fn add(&mut self, folder: &Path) {
         let resolved = resolve(folder);
         let key = key(&resolved);
-        if key.is_empty() || self.folders.iter().any(|known| known.key == key) {
+        if key.is_empty()
+            || self.folders.iter().any(|known| known.key == key)
+            || self.existing_directory_alias(&resolved).is_some()
+        {
             return;
         }
         self.folders.push(Protected {
@@ -51,11 +55,8 @@ impl Installation {
     /// Checks that writing to `target`, a file or folder that may not exist yet, stays outside
     /// every protected folder.
     ///
-    /// The comparison is canonical: `.` and `..`, symbolic links and junctions, the `\\?\` form
-    /// and, on Windows and macOS, letter case do not change the outcome. A path that reaches the
-    /// same folder by another route, such as a loopback share `\\localhost\D$\...`, is caught by
-    /// the identity of the folder (volume and file index) of the target's existing ancestors. For
-    /// a path that does not exist yet, its nearest existing ancestor decides.
+    /// Resolves existing symbolic links, junctions and platform path aliases. Existing directory
+    /// identity and the target's nearest existing ancestor account for a volume's case behavior.
     ///
     /// # Errors
     ///
@@ -88,6 +89,36 @@ impl Installation {
             })
             .map_or(Ok(()), |folder| Err(refused(folder)))
     }
+
+    pub(crate) fn check_namespace(&self, target: &Path) -> Result<(), WriteRefused> {
+        let Some(parent) = target.parent() else {
+            return self.check(target);
+        };
+        self.check(parent)?;
+        let target_key = key(target);
+        self.folders
+            .iter()
+            .find(|folder| target_key.starts_with(&folder.key))
+            .or_else(|| self.existing_directory_alias(target))
+            .map_or(Ok(()), |folder| {
+                Err(WriteRefused {
+                    target: target.to_path_buf(),
+                    installation: without_verbatim_prefix(&folder.shown),
+                })
+            })
+    }
+
+    fn existing_directory_alias(&self, path: &Path) -> Option<&Protected> {
+        if !cfg!(target_os = "macos")
+            || !fs::symlink_metadata(path).is_ok_and(|entry| entry.is_dir())
+        {
+            return None;
+        }
+        let identity = Handle::from_path(path).ok()?;
+        self.folders
+            .iter()
+            .find(|folder| Handle::from_path(&folder.shown).is_ok_and(|known| known == identity))
+    }
 }
 
 /// Returns `path` spelled the way a person writes it: `\\?\C:\x` as `C:\x` and `\\?\UNC\s\x` as
@@ -105,7 +136,7 @@ pub fn without_verbatim_prefix(path: &Path) -> PathBuf {
 }
 
 /// Makes `path` absolute and resolves `.`, `..` and every link that exists.
-fn resolve(path: &Path) -> PathBuf {
+pub(crate) fn resolve(path: &Path) -> PathBuf {
     let absolute = std::path::absolute(path).unwrap_or_else(|_| path.to_path_buf());
     let mut resolved = PathBuf::new();
     for component in absolute.components() {
@@ -126,12 +157,13 @@ fn resolve(path: &Path) -> PathBuf {
     resolved
 }
 
-fn key(resolved: &Path) -> Vec<String> {
+fn key(resolved: &Path) -> Vec<OsString> {
     resolved
         .components()
         .filter_map(|component| match component {
-            Component::Prefix(prefix) => Some(prefix_key(prefix.kind())),
-            Component::Normal(name) => Some(fold(&name.to_string_lossy())),
+            Component::Prefix(prefix) => Some(prefix_key(prefix.kind()).into()),
+            Component::Normal(name) if cfg!(windows) => Some(fold(&name.to_string_lossy()).into()),
+            Component::Normal(name) => Some(name.to_os_string()),
             Component::RootDir | Component::CurDir | Component::ParentDir => None,
         })
         .collect()
@@ -152,7 +184,7 @@ fn prefix_key(prefix: Prefix<'_>) -> String {
 }
 
 fn fold(name: &str) -> String {
-    if cfg!(any(windows, target_os = "macos")) {
+    if cfg!(windows) {
         name.to_lowercase()
     } else {
         name.to_owned()

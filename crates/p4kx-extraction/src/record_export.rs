@@ -3,25 +3,29 @@
 
 use std::collections::HashSet;
 use std::fs;
-use std::io::{self, Write};
+use std::io::Write;
 use std::path::Path;
 
 use p4kx_dataforge::{Annotations, DataForge, Record, RecordXml, TreeBuilder};
 use rayon::prelude::*;
 
-use crate::counting::holds_sized;
 use crate::dependent::split_dependent;
 use crate::entry_path::relative_path;
 use crate::folder_cache::FolderCache;
+use crate::output_creation::create_temporary_protected;
 use crate::portable_name::{check_path_length, fold};
 use crate::record_files::RecordFiles;
 use crate::record_format::RecordFileFormat;
 use crate::record_plan::RecordFilePlan;
-use crate::write::{create_temporary, read_existing_error, write_error};
+use crate::write::write_error;
 use crate::{
     ConflictPolicy, ExtractionError, RecordExportError, RecordExportOptions, RecordExportReport,
-    RecordFailure, RecordRenamed,
+    RecordRenamed,
 };
+
+#[path = "record_export_accounting.rs"]
+mod accounting;
+use accounting::summarise;
 
 /// Writes `records` of `forge` as Record XML, one file per Record, below the existing folder
 /// `target`; [`export_record_files`] with [`RecordXml`].
@@ -54,7 +58,7 @@ pub fn export_record_files<F: RecordFileFormat>(
     options: &RecordExportOptions<'_>,
 ) -> RecordExportReport {
     let plan = RecordFiles::plan(forge, F::EXTENSION);
-    write_with_options::<F>(forge, &plan, records, target, options)
+    write_with_options::<F>(forge, &plan, records, target, options, false)
 }
 
 /// Writes `records` of `forge` like [`export_record_files`], with the files of `plan`.
@@ -69,11 +73,37 @@ pub fn export_planned_record_files<F: RecordFileFormat>(
     target: &Path,
     options: &RecordExportOptions<'_>,
 ) -> RecordExportReport {
-    if plan.fits(forge) {
-        write_with_options::<F>(forge, plan.files(), records, target, options)
+    write_planned(forge, plan, records, target, options, false)
+}
+
+/// Writes the planned Records and retains the definition positions of the committed files.
+#[must_use]
+pub fn export_planned_record_files_with_receipt<F: RecordFileFormat>(
+    forge: &DataForge<'_>,
+    plan: &RecordFilePlan<F>,
+    records: &[Record<'_>],
+    target: &Path,
+    options: &RecordExportOptions<'_>,
+) -> RecordExportReport {
+    write_planned(forge, plan, records, target, options, true)
+}
+
+fn write_planned<F: RecordFileFormat>(
+    forge: &DataForge<'_>,
+    plan: &RecordFilePlan<F>,
+    records: &[Record<'_>],
+    target: &Path,
+    options: &RecordExportOptions<'_>,
+    retain_receipt: bool,
+) -> RecordExportReport {
+    let rebuilt;
+    let files = if plan.fits(forge) {
+        plan.files()
     } else {
-        export_record_files::<F>(forge, records, target, options)
-    }
+        rebuilt = RecordFiles::plan(forge, F::EXTENSION);
+        &rebuilt
+    };
+    write_with_options::<F>(forge, files, records, target, options, retain_receipt)
 }
 
 fn write_with_options<F: RecordFileFormat>(
@@ -82,9 +112,12 @@ fn write_with_options<F: RecordFileFormat>(
     records: &[Record<'_>],
     target: &Path,
     options: &RecordExportOptions<'_>,
+    retain_receipt: bool,
 ) -> RecordExportReport {
     let (cancel, progress) = (options.cancel, options.progress);
     let run = RecordRun {
+        protection: options.protection,
+        cancel: options.cancel,
         policy: options.policy,
         annotations: options.annotations(),
         stop: &|| cancel.is_some_and(crate::CancelToken::is_cancelled),
@@ -94,12 +127,14 @@ fn write_with_options<F: RecordFileFormat>(
             }
         },
     };
-    write_records::<F>(forge, plan, records, target, &run)
+    write_records_inner::<F>(forge, plan, records, target, &run, retain_receipt)
 }
 
 /// How a run writes Record files: the Conflict policy, whether to stop before the next Record,
 /// and what to call once a Record ended.
 pub(crate) struct RecordRun<'a> {
+    pub(crate) protection: Option<&'a crate::ArchiveWriteProtection>,
+    pub(crate) cancel: Option<&'a crate::CancelToken>,
     pub(crate) policy: ConflictPolicy,
     pub(crate) annotations: Annotations<'a>,
     pub(crate) stop: &'a (dyn Fn() -> bool + Sync),
@@ -108,21 +143,40 @@ pub(crate) struct RecordRun<'a> {
 
 /// Writes `records` of `forge` in the format `F` to the files of `plan` like
 /// [`export_record_files`], under the control of `run`.
-pub(crate) fn write_records<'f, F: RecordFileFormat>(
+pub(crate) fn write_records<F: RecordFileFormat>(
+    forge: &DataForge<'_>,
+    plan: &RecordFiles,
+    records: &[Record<'_>],
+    target: &Path,
+    run: &RecordRun<'_>,
+) -> RecordExportReport {
+    write_records_inner::<F>(forge, plan, records, target, run, false)
+}
+
+fn write_records_inner<'f, F: RecordFileFormat>(
     forge: &DataForge<'_>,
     plan: &RecordFiles,
     records: &[Record<'f>],
     target: &Path,
     run: &RecordRun<'_>,
+    retain_receipt: bool,
 ) -> RecordExportReport {
-    if let Err(refused) = p4kx_guard::ensure_writable(target) {
+    let written_record_indices = retain_receipt.then(Vec::new);
+    if let Err(refused) = crate::check_protected_output(target, run.protection, run.cancel) {
+        if refused.is_cancelled() {
+            return RecordExportReport {
+                cancelled: records.len(),
+                written_record_indices,
+                ..RecordExportReport::default()
+            };
+        }
         let outcomes = (0..records.len())
             .map(|index| {
                 let error = ExtractionError::Installation(refused.clone());
                 (index, RecordOutcome::Failed(error.into()))
             })
             .collect();
-        return summarise(records, outcomes);
+        return summarise(records, outcomes, written_record_indices);
     }
     let files = select_files(forge, plan, records);
     let (independent, dependent) = split_dependent(files.iter().map(|file| match file {
@@ -131,6 +185,8 @@ pub(crate) fn write_records<'f, F: RecordFileFormat>(
     }));
     let absolute = std::path::absolute(target).unwrap_or_else(|_| target.to_path_buf());
     let writer = Writer {
+        protection: run.protection,
+        cancel: run.cancel,
         target: &absolute,
         policy: run.policy,
         annotations: run.annotations,
@@ -161,7 +217,7 @@ pub(crate) fn write_records<'f, F: RecordFileFormat>(
     let mut scratch = Scratch::default();
     outcomes.extend(dependent.into_iter().map(|index| run(&mut scratch, index)));
     outcomes.sort_unstable_by_key(|(index, _)| *index);
-    let mut report = summarise(records, outcomes);
+    let mut report = summarise(records, outcomes, written_record_indices);
     report.renamed = renamed(forge, plan, records);
     report
 }
@@ -204,41 +260,6 @@ fn select_files<'p>(
         .collect()
 }
 
-fn summarise(records: &[Record<'_>], outcomes: Vec<(usize, RecordOutcome)>) -> RecordExportReport {
-    let mut report = RecordExportReport::default();
-    for (index, outcome) in outcomes {
-        let errors = match outcome {
-            RecordOutcome::Written { errors } => {
-                report.written += 1;
-                errors
-            }
-            RecordOutcome::Kept { file, errors } => {
-                report.skipped.push(file);
-                errors
-            }
-            RecordOutcome::Cancelled => {
-                report.cancelled += 1;
-                0
-            }
-            RecordOutcome::Failed(error) => {
-                let record = records.get(index);
-                report.failures.push(RecordFailure {
-                    guid: record.map(Record::guid).unwrap_or_default(),
-                    record_path: record
-                        .and_then(|record| record.record_path().ok())
-                        .unwrap_or_default()
-                        .to_owned(),
-                    error,
-                });
-                0
-            }
-        };
-        report.error_values += errors;
-        report.records_with_errors += usize::from(errors > 0);
-    }
-    report
-}
-
 /// The file a selected Record is written to, if it can be.
 #[derive(Clone, Copy)]
 enum Selected<'p> {
@@ -273,6 +294,8 @@ struct Scratch<'f, F> {
 }
 
 struct Writer<'a> {
+    protection: Option<&'a crate::ArchiveWriteProtection>,
+    cancel: Option<&'a crate::CancelToken>,
     target: &'a Path,
     policy: ConflictPolicy,
     annotations: Annotations<'a>,
@@ -292,6 +315,11 @@ impl Writer<'_> {
         }
         match self.try_write(record, file, scratch) {
             Ok(outcome) => outcome,
+            Err(RecordExportError::Write(error))
+                if crate::guard_cancellation::extraction_cancelled(&error) =>
+            {
+                RecordOutcome::Cancelled
+            }
             Err(error) => RecordOutcome::Failed(error),
         }
     }
@@ -307,68 +335,51 @@ impl Writer<'_> {
         let name = relative.file_name().ok_or(ExtractionError::UnsafePath)?;
         let tree = scratch.trees.build(record)?;
         let errors = tree.error_count();
-        let folder = self.folders.folder(self.target, relative.parent())?;
+        let folder = self.folders.folder_protected(
+            self.target,
+            relative.parent(),
+            self.protection,
+            self.cancel,
+        )?;
         let destination = folder.join(name);
         scratch.bytes.clear();
         scratch
             .format
             .write_file(&tree, self.annotations, &mut scratch.bytes)
             .map_err(|source| write_error(destination.clone(), source))?;
-        if self.keep(&destination, scratch)? {
+        if crate::record_existing::keep(
+            &destination,
+            self.policy,
+            &scratch.bytes,
+            &mut scratch.read,
+        )? {
             return Ok(RecordOutcome::Kept {
                 file: file.to_owned(),
                 errors,
             });
         }
-        let (temporary, mut part) = create_temporary(&folder)?;
+        let (temporary, mut part, ownership) =
+            create_temporary_protected(&folder, self.protection, self.cancel)?;
         let written = part
             .write_all(&scratch.bytes)
             .map_err(|source| write_error(temporary.clone(), source))
             .and_then(|()| {
                 drop(part);
+                ownership
+                    .ensure_writable(&temporary, crate::output_file::cancel_flag(self.cancel))?;
+                crate::check_protected_output(&destination, self.protection, self.cancel)?;
                 fs::rename(&temporary, &destination)
                     .map_err(|source| write_error(destination.clone(), source))
             });
         if let Err(error) = written {
-            let _ignored = fs::remove_file(&temporary);
-            return Err(error.into());
+            return crate::output_cleanup::extraction(
+                Err(error),
+                &ownership,
+                &temporary,
+                self.cancel,
+            )
+            .map_err(Into::into);
         }
         Ok(RecordOutcome::Written { errors })
-    }
-
-    fn keep<F>(
-        &self,
-        destination: &Path,
-        scratch: &mut Scratch<'_, F>,
-    ) -> Result<bool, ExtractionError> {
-        let metadata = match fs::symlink_metadata(destination) {
-            Ok(metadata) => metadata,
-            Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(false),
-            Err(source) => return Err(read_existing_error(destination, source)),
-        };
-        if !metadata.is_file() {
-            return Err(write_error(
-                destination.to_path_buf(),
-                io::Error::new(
-                    io::ErrorKind::AlreadyExists,
-                    "a folder or link is in the way",
-                ),
-            ));
-        }
-        match self.policy {
-            ConflictPolicy::Skip => Ok(true),
-            ConflictPolicy::Overwrite => Ok(false),
-            ConflictPolicy::IfChanged => {
-                let bytes = &scratch.bytes;
-                holds_sized(
-                    destination,
-                    metadata.len(),
-                    bytes.len() as u64,
-                    || crc32c::crc32c(bytes),
-                    &mut scratch.read,
-                )
-                .map_err(|source| read_existing_error(destination, source))
-            }
-        }
     }
 }

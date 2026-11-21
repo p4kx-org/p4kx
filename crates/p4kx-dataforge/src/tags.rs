@@ -1,8 +1,20 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::borrow::Cow;
+
 use crate::tag_build::layout;
 use crate::{DataForge, Guid, TagResolver};
+
+#[path = "tag_events.rs"]
+mod events;
+#[path = "tag_path.rs"]
+mod path;
+
+pub(crate) use path::Node;
+pub use path::TagPath;
+
+pub use events::{TagBuildEvent, TagPathEdgeKind, TagPathIncoming, TagRelationIssue};
 
 /// The struct of the Record that lists the root tags.
 pub const TAG_DATABASE_TYPE: &str = "TagDatabase";
@@ -10,33 +22,40 @@ pub const TAG_DATABASE_TYPE: &str = "TagDatabase";
 /// The character that joins the names of a tag and its ancestors into the tag path.
 pub const TAG_PATH_SEPARATOR: char = '.';
 
-/// The deepest tag the tree keeps; the children of a tag that deep are left out.
+/// Historical tag depth limit.
+#[deprecated(note = "Tag trees retain the full readable hierarchy")]
 pub const MAX_TAG_DEPTH: usize = 64;
 
-/// The longest tag name the tree keeps, in bytes; a longer one is left out with everything below.
+/// Historical tag name byte limit.
+#[deprecated(note = "Tag trees retain the full readable name")]
 pub const MAX_TAG_NAME_BYTES: usize = 256;
 
-/// The longest tag path the tree keeps, in bytes; a tag with a longer one is left out with
-/// everything below it.
+/// Historical joined tag path byte limit.
+#[deprecated(note = "Tag trees retain the full selected path")]
 pub const MAX_TAG_PATH_BYTES: usize = 1024;
 
-/// The most bytes the tag paths of one tree may take together; a tag past it is left out with
-/// everything below it.
+/// Historical cumulative tag path byte limit.
+#[deprecated(note = "Tag trees retain all readable selected paths")]
 pub const MAX_TAG_TEXT_BYTES: usize = 64 << 20;
 
 /// What the tag tree could not take from the DataForge. The tree is built from whatever reads.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct TagTreeIssues {
+    pub(crate) unclassified: usize,
     pub(crate) unreadable: usize,
     pub(crate) dangling: usize,
     pub(crate) repeated: usize,
-    pub(crate) too_deep: usize,
-    pub(crate) too_long: usize,
     pub(crate) duplicate: usize,
     pub(crate) unlisted: usize,
 }
 
 impl TagTreeIssues {
+    /// Returns the number of Records whose unreadable type prevents classifying tag-family membership.
+    #[must_use]
+    pub const fn unclassified(&self) -> usize {
+        self.unclassified
+    }
+
     /// Returns the number of Tag Records whose fields cannot be read; they are left out.
     #[must_use]
     pub const fn unreadable(&self) -> usize {
@@ -56,19 +75,18 @@ impl TagTreeIssues {
         self.repeated
     }
 
-    /// Returns the number of tags left out, with everything below each, because their parent is
-    /// [`MAX_TAG_DEPTH`] levels deep.
+    /// Returns zero because readable depth does not omit tags.
+    #[deprecated(note = "Tag trees retain the full readable hierarchy")]
     #[must_use]
     pub const fn too_deep(&self) -> usize {
-        self.too_deep
+        0
     }
 
-    /// Returns the number of tags left out, with everything below each, because their name is
-    /// over [`MAX_TAG_NAME_BYTES`], their path over [`MAX_TAG_PATH_BYTES`] or the tree over
-    /// [`MAX_TAG_TEXT_BYTES`] of paths.
+    /// Returns zero because readable names and paths do not omit tags.
+    #[deprecated(note = "Tag trees retain the full readable name and path")]
     #[must_use]
     pub const fn too_long(&self) -> usize {
-        self.too_long
+        0
     }
 
     /// Returns the number of Tag Records left out because an earlier one has their GUID.
@@ -87,27 +105,13 @@ impl TagTreeIssues {
     /// Returns whether the tree is exactly what the DataForge lists.
     #[must_use]
     pub const fn is_clean(&self) -> bool {
-        self.unreadable == 0
+        self.unclassified == 0
+            && self.unreadable == 0
             && self.dangling == 0
             && self.repeated == 0
-            && self.too_deep == 0
-            && self.too_long == 0
             && self.duplicate == 0
             && self.unlisted == 0
     }
-}
-
-#[derive(Debug)]
-pub(crate) struct Node {
-    pub(crate) guid: Guid,
-    pub(crate) path: Box<str>,
-    pub(crate) name_start: u32,
-    pub(crate) legacy_id: Option<u32>,
-    pub(crate) parent: Option<u32>,
-    pub(crate) children: Vec<u32>,
-    pub(crate) end: u32,
-    pub(crate) depth: u16,
-    pub(crate) listed: bool,
 }
 
 /// The tag tree of a DataForge: the `TagDatabase` with its tags and their children, each tag with
@@ -142,18 +146,46 @@ impl TagTree {
     /// returns `true`; `stop` is polled between Records and between tags.
     #[must_use]
     pub fn build_with(forge: &DataForge<'_>, stop: &dyn Fn() -> bool) -> Option<Self> {
-        let laid = layout(forge, stop)?;
+        layout(forge, stop)
+            .map(Self::from_layout)
+            .filter(|_| !stop())
+    }
+
+    /// Builds a tag tree and reports actual source, relation, and projection operations.
+    ///
+    /// Returns `None` once `stop` requests cancellation.
+    ///
+    /// # Errors
+    ///
+    /// Returns the observer's error without completing the tree.
+    pub fn build_observed<'f, E>(
+        forge: &'f DataForge<'f>,
+        stop: &dyn Fn() -> bool,
+        observe: &mut impl for<'r> FnMut(TagBuildEvent<'r, 'f>) -> Result<(), E>,
+    ) -> Result<Option<Self>, E> {
+        let Some(layout) = crate::tag_build::layout_observed(forge, stop, observe)? else {
+            return Ok(None);
+        };
+        let tree = Self::from_layout(layout);
+        if stop() {
+            observe(TagBuildEvent::Cancelled)?;
+            return Ok(None);
+        }
+        Ok(Some(tree))
+    }
+
+    fn from_layout(laid: crate::tag_build::Layout) -> Self {
         let mut by_guid: Vec<(Guid, u32)> = (0..)
             .zip(&laid.nodes)
             .map(|(index, node)| (node.guid, index))
             .collect();
         by_guid.sort_unstable();
-        Some(Self {
+        Self {
             nodes: laid.nodes,
             roots: laid.roots,
             by_guid: by_guid.into_boxed_slice(),
             issues: laid.issues,
-        })
+        }
     }
 
     /// Returns the number of tags in the tree.
@@ -209,7 +241,7 @@ impl TagTree {
         path: &'p str,
     ) -> impl Iterator<Item = Tag<'t>> + use<'t, 'p> {
         self.iter()
-            .filter(move |tag| tag.path().eq_ignore_ascii_case(path))
+            .filter(move |tag| tag.path_view().eq_ignore_ascii_case(path))
     }
 
     /// Returns the tag path of the Tag Record `guid`, e.g. `Weapon.Gun`, or `None` when the tree
@@ -227,6 +259,11 @@ impl TagTree {
 impl TagResolver for TagTree {
     fn tag_path(&self, guid: Guid) -> Option<&str> {
         self.path_of(guid)
+    }
+
+    fn tag_path_text(&self, guid: Guid) -> Option<Cow<'_, str>> {
+        self.get(guid)
+            .map(|tag| Cow::Owned(tag.path_view().to_string()))
     }
 }
 
@@ -252,22 +289,26 @@ impl<'t> Tag<'t> {
     /// Returns the GUID of the Tag Record, which fields refer to.
     #[must_use]
     pub fn guid(&self) -> Guid {
-        self.node().map(|node| node.guid).unwrap_or_default()
+        self.node().map_or_default(|node| node.guid)
     }
 
     /// Returns the name of the tag alone, e.g. `Gun`.
     #[must_use]
     pub fn name(&self) -> &'t str {
-        self.node()
-            .and_then(|node| node.path.get(node.name_start as usize..))
-            .unwrap_or_default()
+        self.node().map_or("", |node| &node.name)
     }
 
     /// Returns the tag path: the names from the root down to the tag, joined by
     /// [`TAG_PATH_SEPARATOR`], e.g. `Weapon.Gun`.
     #[must_use]
     pub fn path(&self) -> &'t str {
-        self.node().map_or("", |node| &node.path)
+        self.path_view().as_str()
+    }
+
+    /// Returns a borrowed path for inspection without retaining the joined text.
+    #[must_use]
+    pub fn path_view(&self) -> TagPath<'t> {
+        TagPath::new(&self.tree.nodes, self.node())
     }
 
     /// Returns the number stored as `legacyGUID`, or `None` when the tag has none.
@@ -279,7 +320,7 @@ impl<'t> Tag<'t> {
     /// Returns how many tags lie between the tag and its root: 0 for a root.
     #[must_use]
     pub fn depth(&self) -> usize {
-        self.node().map_or(0, |node| usize::from(node.depth))
+        self.node().map_or(0, |node| node.depth as usize)
     }
 
     /// Returns whether the `TagDatabase` lists the tag, directly or below another tag.

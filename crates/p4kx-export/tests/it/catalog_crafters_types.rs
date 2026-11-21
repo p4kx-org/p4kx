@@ -159,8 +159,8 @@ fn attachable(shape: Shape) -> TestValue {
     TestValue::Struct(TestInstance::new("SAttachableComponentParams").value("AttachDef", attach))
 }
 
-/// Builds the catalog of an Archive with one crafter of `shape` and returns that crafter.
-fn crafter(shape: Shape) -> Result<Value, Box<dyn Error>> {
+/// Builds the catalog of an Archive with one crafter of the given shape.
+fn crafter_catalog(shape: Shape) -> Result<Value, Box<dyn Error>> {
     let record = TestRecord::new(
         CRAFTER,
         "EntityClassDefinition",
@@ -181,7 +181,13 @@ fn crafter(shape: Shape) -> Result<Value, Box<dyn Error>> {
         .write_to(&path)?;
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
     let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    Ok(serde_json::from_slice(
+        build_catalog(&archive, &options)?.json(),
+    )?)
+}
+
+fn crafter(shape: Shape) -> Result<Value, Box<dyn Error>> {
+    let catalog = crafter_catalog(shape)?;
     catalog
         .get("crafters")
         .and_then(Value::as_array)
@@ -271,5 +277,42 @@ fn an_attach_def_with_a_wrong_type_is_reported() -> TestResult {
     assert_eq!(entry["type"], "Crafter");
     assert_eq!(entry["size"], Value::Null);
     assert_eq!(entry["issues"], json!(["unreadable_attach_def"]));
+    Ok(())
+}
+
+#[test]
+fn readable_alternate_attach_restrictions_retain_their_original_storage() -> TestResult {
+    for (shape, key, original) in [
+        (
+            Shape::AttachTypeNumber,
+            "itemType",
+            json!({"type":"number", "value":{"type":"int32", "value":5}}),
+        ),
+        (
+            Shape::AttachSizeText,
+            "size",
+            json!({"type":"string", "value":{"type":"gameText", "sourceText":"large"}}),
+        ),
+    ] {
+        let catalog = crafter_catalog(shape)?;
+        let cell = catalog
+            .pointer(&format!(
+                "/configurations/itemAttachmentConstraints/rows/0/definition/value/{key}"
+            ))
+            .ok_or("authored alternate restriction")?;
+        assert_eq!(
+            cell["state"], "present",
+            "the original storage was readable"
+        );
+        assert_eq!(
+            cell["containsEncryptedSource"], true,
+            "the original DCB was encrypted"
+        );
+        assert_eq!(
+            cell.pointer("/value/values/0/value/value"),
+            Some(&original),
+            "the original restriction keeps its storage and value"
+        );
+    }
     Ok(())
 }

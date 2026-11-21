@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_audio::{HircKind, HircValue, MusicStinger, Soundbank};
+use std::ops::Range;
 
+use p4kx_audio::{HircKind, HircValue, MusicNode, MusicStinger, Soundbank};
+
+use super::AudioFileError;
+use super::event_sources::EventDeclaration;
 use super::language::bank_language;
-use super::{AudioFileError, MAX_STINGERS};
 
 /// A soundbank Entry of the audio index.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -14,6 +17,8 @@ pub struct IndexedSoundbank {
     language_id: u32,
     event_count: u32,
     pub(crate) entry: usize,
+    pub(super) media_data_body: Option<u64>,
+    prefetched_wems: Box<[u32]>,
 }
 
 impl IndexedSoundbank {
@@ -21,6 +26,12 @@ impl IndexedSoundbank {
     #[must_use]
     pub fn path(&self) -> &str {
         &self.path
+    }
+
+    /// Returns the position of the soundbank Entry in the owning Archive.
+    #[must_use]
+    pub const fn entry_position(&self) -> usize {
+        self.entry
     }
 
     /// Returns the file name of the soundbank Entry, e.g. `SSAM_ORIG_890J.bnk`.
@@ -53,6 +64,10 @@ impl IndexedSoundbank {
     pub const fn event_count(&self) -> u32 {
         self.event_count
     }
+
+    pub(super) fn has_prefetched_wem(&self, id: u32) -> bool {
+        self.prefetched_wems.binary_search(&id).is_ok()
+    }
 }
 
 /// A WEM a soundbank embeds: its ID, its offset in the `DATA` section and its length.
@@ -61,47 +76,85 @@ pub(crate) struct EmbeddedMedia {
     pub(crate) id: u32,
     pub(crate) offset: u64,
     pub(crate) len: u64,
+    pub(crate) triplet_offset: u64,
 }
 
 /// What the audio index keeps of one soundbank.
 #[derive(Debug)]
 pub(crate) struct BankContents {
     pub(crate) soundbank: IndexedSoundbank,
-    pub(crate) events: Vec<u32>,
+    pub(super) events: Vec<EventDeclaration>,
+    pub(super) event_version: Option<Range<usize>>,
     pub(crate) media: Vec<EmbeddedMedia>,
-    pub(crate) stingers: Vec<MusicStinger>,
+    pub(crate) stingers: Vec<BankStinger>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct BankStinger {
+    pub(crate) ids: MusicStinger,
+    pub(crate) scheduled_at: Option<StingerDeclaration>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(super) struct StingerDeclaration {
+    pub(super) object: usize,
+    pub(super) row: usize,
+}
+
+pub(super) const fn music_node(value: &HircValue) -> Option<&MusicNode> {
+    match value {
+        HircValue::MusicSegment(segment) => Some(&segment.node),
+        HircValue::MusicSwitch(switch) => Some(&switch.node),
+        HircValue::MusicPlaylist(playlist) => Some(&playlist.node),
+        _ => None,
+    }
 }
 
 /// Parses the soundbank at the Archive position `entry` and returns it with the IDs of its Event
 /// objects and the WEMs it embeds.
 pub(crate) fn read(path: &str, entry: usize, bytes: &[u8]) -> Result<BankContents, AudioFileError> {
     let bank = Soundbank::parse(bytes)?;
-    let events: Vec<u32> = bank
+    let events: Vec<_> = bank
         .objects()
         .iter()
-        .filter(|object| object.kind == HircKind::Event)
-        .map(|object| object.id)
+        .enumerate()
+        .filter(|(_, object)| object.kind == HircKind::Event)
+        .map(|(ordinal, object)| EventDeclaration::of(ordinal, object))
         .collect();
-    let media = bank
-        .wems()
-        .map(|wem| EmbeddedMedia {
-            id: wem.id(),
-            offset: wem.offset(),
-            len: u64::try_from(wem.bytes().len()).unwrap_or(u64::MAX),
+    let mut wems = bank.wems().peekable();
+    let media_data_body = wems.peek().map(|wem| wem.source().data_body_offset());
+    let mut prefetched_wems = Vec::new();
+    let media = wems
+        .map(|wem| {
+            if wem.is_prefetch() {
+                prefetched_wems.push(wem.id());
+            }
+            EmbeddedMedia {
+                id: wem.id(),
+                offset: wem.offset(),
+                len: u64::try_from(wem.bytes().len()).unwrap_or(u64::MAX),
+                triplet_offset: wem.source().triplet_offset(),
+            }
         })
         .collect();
     let stingers = bank
         .objects()
         .iter()
-        .flat_map(|object| match &object.value {
-            HircValue::MusicSegment(segment) => &segment.node.stingers[..],
-            HircValue::MusicSwitch(switch) => &switch.node.stingers[..],
-            HircValue::MusicPlaylist(playlist) => &playlist.node.stingers[..],
-            _ => &[],
+        .enumerate()
+        .filter_map(|(ordinal, object)| Some((ordinal, music_node(&object.value)?)))
+        .flat_map(|(object, node)| {
+            node.stingers
+                .iter()
+                .copied()
+                .enumerate()
+                .filter(|(_, ids)| ids.segment_id != 0)
+                .map(move |(row, ids)| BankStinger {
+                    ids,
+                    scheduled_at: node
+                        .stinger_scheduling_evidence(row)
+                        .map(|_| StingerDeclaration { object, row }),
+                })
         })
-        .filter(|stinger| stinger.segment_id != 0)
-        .take(MAX_STINGERS)
-        .copied()
         .collect();
     let header = bank.header();
     Ok(BankContents {
@@ -111,8 +164,11 @@ pub(crate) fn read(path: &str, entry: usize, bytes: &[u8]) -> Result<BankContent
             language_id: header.language_id,
             event_count: u32::try_from(events.len()).unwrap_or(u32::MAX),
             entry,
+            media_data_body,
+            prefetched_wems: prefetched_wems.into_boxed_slice(),
         },
         events,
+        event_version: bank.version_byte_range(),
         media,
         stingers,
     })

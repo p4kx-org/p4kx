@@ -12,6 +12,9 @@ use p4kx_testkit::{ArchiveBuilder, TestContainer, TestEntry};
 use predicates::prelude::predicate;
 use serde_json::Value;
 
+#[path = "socpak_list_origins.rs"]
+mod list_origins;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const SHIP: &str = "Data\\ObjectContainers\\Ships\\AEGS\\ship_interior.socpak";
@@ -108,6 +111,11 @@ fn list_as_json_names_the_archive_and_the_containers() -> TestResult {
             .replace(&dir.path().display().to_string(), "[DIR]")
             .replace('\\', "/");
     }
+    list_origins::assert_container_origins(&value, false)?;
+    let object = value.as_object_mut().ok_or("socpak listing")?;
+    object.remove("fieldOrigins");
+    object.remove("provenance");
+    crate::entry_listing_origins::remove_checked_origins_for_snapshot(&mut value)?;
     insta::assert_snapshot!(serde_json::to_string_pretty(&value)?);
     Ok(())
 }
@@ -309,5 +317,67 @@ fn extract_as_json_prints_the_report_of_p4kx_extract() -> TestResult {
             .replace('\\', "/");
     }
     insta::assert_snapshot!(serde_json::to_string_pretty(&value)?);
+    Ok(())
+}
+
+#[test]
+fn socpak_actions_refuse_duplicate_root_containers() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let archive = dir.path().join("Data.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored(SHIP, cockpit().build()))
+        .entry(TestEntry::stored(r"Data\readme.txt", "unrelated"))
+        .entry(TestEntry::stored(SHIP, "invalid container"))
+        .write_to(&archive)?;
+    assert_ambiguous_route(
+        &archive,
+        &["data/objectcontainers/ships/aegs/SHIP_INTERIOR.socpak"],
+        &dir.path().join("out"),
+        [0, 2],
+    )
+}
+
+#[test]
+fn socpak_actions_refuse_duplicate_nested_containers() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let duplicate = ship().entry(TestEntry::stored(ROOM, "invalid container"));
+    let archive = write_archive(dir.path(), &duplicate)?;
+    assert_ambiguous_route(
+        &archive,
+        &[SHIP, "ship_interior/modules/COCKPIT.socpak"],
+        &dir.path().join("out"),
+        [2, 3],
+    )
+}
+
+fn assert_ambiguous_route(
+    archive: &Path,
+    chain: &[&str],
+    out: &Path,
+    entries: [usize; 2],
+) -> TestResult {
+    let (selector, parents) = chain
+        .split_last()
+        .ok_or("missing fixture container selector")?;
+    let depth = parents.len();
+    let diagnostic = format!(
+        "container {selector:?} is ambiguous in Archive layer {depth} (Entry indexes {entries:?})"
+    );
+    for action in ["list", "extract", "verify"] {
+        let mut command = p4kx()?;
+        command
+            .args(["--json", "socpak", action])
+            .arg(archive)
+            .args(chain);
+        if action == "extract" {
+            command.arg("--out").arg(out);
+        }
+        command
+            .assert()
+            .code(2)
+            .stdout("")
+            .stderr(predicate::str::contains(&diagnostic));
+    }
+    assert!(!out.exists(), "ambiguous extraction creates no target");
     Ok(())
 }

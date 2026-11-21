@@ -5,10 +5,10 @@ use super::{HEADER_COMMENT, HEADER_IDENT, VorbisError};
 use crate::loops::LOOP_COMMENTS;
 use crate::{ByteOrder, Loop};
 
-const VORB_LEN: usize = 0x2A;
+pub(super) const VORB_LEN: usize = 0x2A;
 const EMBEDDED_VORB_OFFSET: usize = 0x18;
 const EMBEDDED_FMT_LEN: usize = EMBEDDED_VORB_OFFSET + VORB_LEN;
-const AVERAGE_BYTES_OFFSET: usize = 8;
+pub(super) const AVERAGE_BYTES_OFFSET: usize = 8;
 const MOD_SIGNAL_OFFSET: usize = 0x04;
 const SETUP_OFFSET: usize = 0x10;
 const AUDIO_OFFSET: usize = 0x14;
@@ -40,14 +40,19 @@ impl Header {
         channels: u16,
         sample_rate: u32,
     ) -> Result<Self, VorbisError> {
-        let vorb = match vorb {
-            Some(vorb) if vorb.len() == VORB_LEN => vorb,
-            Some(vorb) => return Err(VorbisError::UnsupportedHeader { len: vorb.len() }),
-            None if fmt.len() == EMBEDDED_FMT_LEN => {
-                fmt.get(EMBEDDED_VORB_OFFSET..).unwrap_or_default()
-            }
-            None => return Err(VorbisError::UnsupportedHeader { len: fmt.len() }),
-        };
+        let offset = configuration_offset(fmt.len(), vorb.map(<[u8]>::len))?;
+        let configuration = vorb.unwrap_or(fmt).get(offset..).unwrap_or_default();
+        let average_bytes = order.u32_at(fmt, AVERAGE_BYTES_OFFSET).unwrap_or_default();
+        Self::parse(order, average_bytes, configuration, channels, sample_rate)
+    }
+
+    pub(super) fn parse(
+        order: ByteOrder,
+        average_bytes: u32,
+        vorb: &[u8],
+        channels: u16,
+        sample_rate: u32,
+    ) -> Result<Self, VorbisError> {
         let field = |offset| order.u32_at(vorb, offset).unwrap_or_default();
         let offset = |offset| usize::try_from(field(offset)).unwrap_or(usize::MAX);
         let short_bits = vorb.get(BLOCK_SIZES_OFFSET).copied().unwrap_or_default();
@@ -64,7 +69,6 @@ impl Header {
                 long: long_bits,
             });
         }
-        let average_bytes = order.u32_at(fmt, AVERAGE_BYTES_OFFSET).unwrap_or_default();
         Ok(Self {
             channels: u8::try_from(channels).map_err(|_| VorbisError::TooManyChannels(channels))?,
             sample_rate,
@@ -98,6 +102,18 @@ impl Header {
         packet[28] = self.short_bits | self.long_bits << 4;
         packet[29] = 1;
         packet
+    }
+}
+
+pub(super) const fn configuration_offset(
+    fmt_len: usize,
+    vorb_len: Option<usize>,
+) -> Result<usize, VorbisError> {
+    match vorb_len {
+        Some(VORB_LEN) => Ok(0),
+        Some(len) => Err(VorbisError::UnsupportedHeader { len }),
+        None if fmt_len == EMBEDDED_FMT_LEN => Ok(EMBEDDED_VORB_OFFSET),
+        None => Err(VorbisError::UnsupportedHeader { len: fmt_len }),
     }
 }
 

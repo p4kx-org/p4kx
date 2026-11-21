@@ -4,6 +4,11 @@
 //! The face of a story character's own head: the joints of its `.RigLogic` file move with a face
 //! animation, and the blendshapes of its geometry file are its expressions.
 
+#[path = "face_rotation_standalone.rs"]
+mod face_rotation_standalone;
+#[path = "face_rotation_verification.rs"]
+mod face_rotation_verification;
+
 use std::error::Error;
 
 use p4kx_assembly::{
@@ -34,22 +39,24 @@ fn build(entries: Vec<TestEntry>, expressions: &Expressions) -> Result<Npc, Box<
     let archive = Archive::open(&fixture.path)?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
-    let files = ArchiveFiles::new(&archive);
-    let mut resolver = LoadoutResolver::new(&forge).with_files(&files);
-    let record = resolver.entities().find(NPC_CLASS)?;
-    let tree = resolver.resolve(&record)?;
-    let head = resolver
-        .npc_head(&tree)
-        .ok_or("the tree has no head")?
-        .with_expressions(expressions);
-    let mut pieces = resolver.worn(&tree);
-    pieces.extend(head.pieces().iter().cloned());
-    let armour = Armour::build(
-        head.variant(),
-        &pieces,
-        &ArchiveModels::new(&archive),
-        &AssemblyOptions::default(),
-    )?;
+    let armour = {
+        let files = ArchiveFiles::new(&archive);
+        let mut resolver = LoadoutResolver::new(&forge).with_files(&files);
+        let record = resolver.entities().find(NPC_CLASS)?;
+        let tree = resolver.resolve(&record)?;
+        let head = resolver
+            .npc_head(&tree)
+            .ok_or("the tree has no head")?
+            .with_expressions(expressions);
+        let mut pieces = resolver.worn(&tree);
+        pieces.extend(head.pieces().iter().cloned());
+        Armour::build(
+            head.variant(),
+            &pieces,
+            &ArchiveModels::new(&archive),
+            &AssemblyOptions::default(),
+        )?
+    };
     Ok(Npc {
         armour,
         archive,

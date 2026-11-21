@@ -3,22 +3,35 @@
 
 use p4kx_extraction::StructValue;
 
+use crate::CatalogError;
+use crate::catalog_read::original::OriginalFlowFields;
 use crate::contract_loot::{LootArchetypeEntry, LootSelector, QuantityRange, SpawnWith};
-use crate::record_fields::{integer, number, references, structs, structure, text};
+use crate::record_fields::{integer_value, number, references, structs, structure, text};
+#[path = "loot_entry_origin.rs"]
+mod origin;
+pub(crate) use origin::{dupe_limit, weight};
 
 /// Returns the entries of the archetype the struct `archetype` holds, in stored order.
 pub(crate) fn archetype_entries<'f>(
     archetype: Option<&StructValue<'f>>,
-) -> Vec<LootArchetypeEntry<'f>> {
-    structs(archetype, "entries").map(entry).collect()
+    source: &OriginalFlowFields<'_, '_, 'f>,
+) -> Result<Vec<LootArchetypeEntry<'f>>, CatalogError> {
+    structs(archetype, "entries")
+        .map(|entry| archetype_entry(entry, source))
+        .collect()
 }
 
-fn entry<'f>(entry: &StructValue<'f>) -> LootArchetypeEntry<'f> {
+fn archetype_entry<'f>(
+    entry: &StructValue<'f>,
+    source: &OriginalFlowFields<'_, '_, 'f>,
+) -> Result<LootArchetypeEntry<'f>, CatalogError> {
     let value = Some(entry);
     let optional: Vec<&StructValue<'f>> = structs(value, "optionalData").collect();
-    LootArchetypeEntry {
+    let (weight, weight_source) = weight(source, entry)?;
+    Ok(LootArchetypeEntry {
         name: text(value, "name"),
-        weight: number(value, "weight"),
+        weight,
+        weight_source,
         selector: selector(structure(value, "selector")),
         stack_size: optional
             .iter()
@@ -28,7 +41,7 @@ fn entry<'f>(entry: &StructValue<'f>) -> LootArchetypeEntry<'f> {
             .filter(|data| data.field("selector").is_some())
             .map(|data| spawn_with(data))
             .collect(),
-    }
+    })
 }
 
 fn spawn_with<'f>(data: &StructValue<'f>) -> SpawnWith<'f> {
@@ -69,5 +82,5 @@ pub(crate) fn optional_number(entry: Option<&StructValue<'_>>, field: &str) -> O
 
 /// Returns the first whole number of `field` among the `optionalData` elements of `entry`.
 pub(crate) fn optional_integer(entry: Option<&StructValue<'_>>, field: &str) -> Option<i64> {
-    structs(entry, "optionalData").find_map(|data| integer(Some(data), field))
+    structs(entry, "optionalData").find_map(|data| integer_value(data.field(field)?))
 }

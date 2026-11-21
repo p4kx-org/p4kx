@@ -53,6 +53,9 @@ fn layered_job(with_mask: bool) -> Job {
 
 fn layered_job_of(prefix: &str, with_mask: bool) -> Job {
     let layer = |at: usize, share: f32| LayerPlan {
+        gloss: Vec::new(),
+        finish: None,
+        roughness: 0.5,
         at,
         share,
         diffuse: Some((
@@ -76,6 +79,7 @@ fn layered_job_of(prefix: &str, with_mask: bool) -> Job {
         diffuse: None,
         normal: None,
         specular: None,
+        explicit_gloss: Vec::new(),
         tints: TINTS,
         layered: Some(layered),
     }

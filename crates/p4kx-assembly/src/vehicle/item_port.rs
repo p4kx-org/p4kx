@@ -1,7 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use super::{PortVisibility, ValueOrigin};
+use p4kx_extraction::SourceValue;
+
+use super::{PortVisibility, ValueOrigin, VehicleAttributeEvidence};
+use crate::markup::AttributeOrigins;
+
+pub(crate) const PORT_OBSERVED_ATTRIBUTES: [&str; 5] = [
+    "minSize",
+    "maxSize",
+    "portTags",
+    "requiredTags",
+    "display_name",
+];
 
 /// Returns whether `flags`, words separated by white space, contain `flag`, ignoring ASCII case
 /// and a leading `$`.
@@ -36,30 +47,53 @@ impl VehicleItemType {
 /// The item port of a part of the vehicle implementation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct VehicleItemPort {
-    pub(crate) min_size: Option<u32>,
-    pub(crate) max_size: Option<u32>,
-    pub(crate) flags: String,
+    pub(crate) min_size: SourceValue<u32>,
+    pub(crate) max_size: SourceValue<u32>,
+    pub(crate) flags: Option<String>,
     pub(crate) id: Option<String>,
     pub(crate) display_name: Option<String>,
-    pub(crate) port_tags: String,
-    pub(crate) required_tags: String,
+    pub(crate) port_tags: Option<String>,
+    pub(crate) required_tags: Option<String>,
     pub(crate) types: Vec<String>,
     pub(crate) item_types: Vec<VehicleItemType>,
-    pub(crate) origins: Vec<(String, ValueOrigin)>,
+    pub(crate) light_attachments: Vec<super::VehicleLightAttachment>,
+    pub(crate) origins: AttributeOrigins,
 }
 
 impl VehicleItemPort {
     /// Returns the tags the port offers, as stored: words separated by white space.
     #[must_use]
     pub fn port_tags(&self) -> &str {
-        &self.port_tags
+        self.port_tags.as_deref().unwrap_or_default()
     }
 
     /// Returns the tags an item must carry to fit the port, as stored: words separated by white
     /// space.
     #[must_use]
     pub fn required_tags(&self) -> &str {
-        &self.required_tags
+        self.required_tags.as_deref().unwrap_or_default()
+    }
+
+    /// Borrows the applied port tags and their original attribute evidence.
+    #[must_use]
+    pub fn port_tags_source(&self) -> (Option<&str>, Option<&VehicleAttributeEvidence>) {
+        (
+            self.port_tags.as_deref(),
+            self.origins
+                .evidence("portTags")
+                .map(std::sync::Arc::as_ref),
+        )
+    }
+
+    /// Borrows the required attachment tags and their original attribute evidence.
+    #[must_use]
+    pub fn required_tags_source(&self) -> (Option<&str>, Option<&VehicleAttributeEvidence>) {
+        (
+            self.required_tags.as_deref(),
+            self.origins
+                .evidence("requiredTags")
+                .map(std::sync::Arc::as_ref),
+        )
     }
 
     /// Returns the item types the port takes, the `type` of each `Types/Type` element.
@@ -78,19 +112,57 @@ impl VehicleItemPort {
     /// when the XML gives none.
     #[must_use]
     pub fn display_name(&self) -> Option<&str> {
-        self.display_name.as_deref()
+        self.display_name.as_deref().filter(|name| !name.is_empty())
+    }
+
+    /// Borrows the original display name, including empty text, and its effective attribute evidence.
+    #[must_use]
+    pub fn display_name_source(&self) -> (Option<&str>, Option<&VehicleAttributeEvidence>) {
+        let evidence = self
+            .origins
+            .evidence("display_name")
+            .map(std::sync::Arc::as_ref);
+        let authored = self
+            .display_name
+            .as_deref()
+            .filter(|_| !evidence.is_some_and(|site| site.original().checked_absence()));
+        (authored, evidence)
     }
 
     /// Returns the smallest item size the port takes, or `None` when the XML gives none.
     #[must_use]
     pub const fn min_size(&self) -> Option<u32> {
-        self.min_size
+        match self.min_size {
+            SourceValue::Present(value) => Some(value),
+            _ => None,
+        }
     }
 
     /// Returns the largest item size the port takes, or `None` when the XML gives none.
     #[must_use]
     pub const fn max_size(&self) -> Option<u32> {
-        self.max_size
+        match self.max_size {
+            SourceValue::Present(value) => Some(value),
+            _ => None,
+        }
+    }
+
+    /// Borrows the minimum size and the effective attribute that supplied or omitted it.
+    #[must_use]
+    pub fn min_size_source(&self) -> (&SourceValue<u32>, Option<&VehicleAttributeEvidence>) {
+        (
+            &self.min_size,
+            self.origins.evidence("minSize").map(std::sync::Arc::as_ref),
+        )
+    }
+
+    /// Borrows the maximum size and the effective attribute that supplied or omitted it.
+    #[must_use]
+    pub fn max_size_source(&self) -> (&SourceValue<u32>, Option<&VehicleAttributeEvidence>) {
+        (
+            &self.max_size,
+            self.origins.evidence("maxSize").map(std::sync::Arc::as_ref),
+        )
     }
 
     /// Returns the item port's own id, which Modifications address, if it has one.
@@ -102,13 +174,13 @@ impl VehicleItemPort {
     /// Returns the flags as stored, e.g. `invisible $uneditable`.
     #[must_use]
     pub fn flags(&self) -> &str {
-        &self.flags
+        self.flags.as_deref().unwrap_or_default()
     }
 
     /// Returns whether the flags contain `flag`, ignoring ASCII case and a leading `$`.
     #[must_use]
     pub fn has_flag(&self, flag: &str) -> bool {
-        flags_contain(&self.flags, flag)
+        flags_contain(self.flags(), flag)
     }
 
     /// Returns [`PortVisibility::Invisible`] when the port carries the flag `invisible`.
@@ -124,9 +196,18 @@ impl VehicleItemPort {
     /// Returns where the attribute `name` of the item port got its value, ignoring ASCII case.
     #[must_use]
     pub fn origin_of(&self, name: &str) -> ValueOrigin {
-        self.origins
-            .iter()
-            .find(|(key, _)| key.eq_ignore_ascii_case(name))
-            .map_or(ValueOrigin::Base, |(_, origin)| *origin)
+        self.origins.origin_of(name)
+    }
+
+    /// Returns the original attribute evidence supplying the effective flags.
+    #[must_use]
+    pub fn flags_evidence(&self) -> Option<&VehicleAttributeEvidence> {
+        self.origins.evidence("flags").map(std::sync::Arc::as_ref)
+    }
+
+    /// Borrows the applied flags and their original attribute evidence.
+    #[must_use]
+    pub fn flags_source(&self) -> (Option<&str>, Option<&VehicleAttributeEvidence>) {
+        (self.flags.as_deref(), self.flags_evidence())
     }
 }

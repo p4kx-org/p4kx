@@ -4,9 +4,10 @@
 //! Music segments, tracks, switch containers and playlists of the `HIRC` section, and the soundbank
 //! a Play action names, decoded from synthetic banks.
 
-use p4kx_audio::{
-    BankError, HircKind, HircValue, MediaStorage, MusicTrackKind, PlayBank, SectionId, Soundbank,
-};
+mod decisions;
+mod track;
+
+use p4kx_audio::{BankError, HircKind, HircValue, PlayBank, SectionId, Soundbank};
 use p4kx_testkit::{TestBank, TestHircObject};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
@@ -82,54 +83,6 @@ fn a_music_segment_is_decoded_with_its_tracks_meter_stingers_and_markers() -> Te
 }
 
 #[test]
-fn a_music_track_is_decoded_with_its_sources_clips_and_kind() -> TestResult {
-    let object = TestHircObject::music_track(6, &[700, 800]);
-    let HircValue::MusicTrack(track) = decoded(object, 154)?.1 else {
-        return Err("a music track".into());
-    };
-    assert_eq!(track.parent_id, PARENT, "parent");
-    assert_eq!(track.kind, MusicTrackKind::Normal, "kind");
-    assert_eq!(track.switch, None, "no switch group");
-    assert_eq!(
-        track
-            .sources
-            .iter()
-            .map(|source| (source.source_id, source.storage, source.in_memory_size))
-            .collect::<Vec<_>>(),
-        [
-            (700, MediaStorage::Streamed, 4096),
-            (800, MediaStorage::Streamed, 4096)
-        ],
-        "sources"
-    );
-    assert_eq!(
-        track
-            .clips
-            .iter()
-            .map(|clip| (clip.source_id, clip.begin_trim.to_bits()))
-            .collect::<Vec<_>>(),
-        [(700, 0.5_f64.to_bits()), (800, 0.5_f64.to_bits())],
-        "clips"
-    );
-    Ok(())
-}
-
-#[test]
-fn a_switch_track_keeps_its_group_and_switches() -> TestResult {
-    let object = TestHircObject::music_switch_track(6, &[700], 0x4000, &[0x61, 0x62]);
-    let HircValue::MusicTrack(track) = decoded(object, 154)?.1 else {
-        return Err("a music track".into());
-    };
-    assert_eq!(track.kind, MusicTrackKind::Switch);
-    let switch = track.switch.ok_or("a switch group")?;
-    assert_eq!(
-        (switch.group_id, switch.default_switch, switch.switches),
-        (0x4000, 0, vec![0x61, 0x62])
-    );
-    Ok(())
-}
-
-#[test]
 fn a_music_switch_container_lists_its_children_and_the_targets_of_its_decision_tree() -> TestResult
 {
     let object = TestHircObject::music_switch(7, &[40, 41, 42], 0x4000, &[41, 0, 42]);
@@ -140,6 +93,23 @@ fn a_music_switch_container_lists_its_children_and_the_targets_of_its_decision_t
     assert_eq!(switch.rule_count, 2, "transition rules");
     assert_eq!(switch.group_ids, [0x4000], "groups");
     assert_eq!(switch.targets, [41, 42], "leaves, 0 left out");
+    assert!(
+        switch.has_decision_conditions,
+        "nonempty original graph and arguments"
+    );
+    Ok(())
+}
+
+#[test]
+fn an_empty_music_switch_tree_does_not_apply_decision_conditions() -> TestResult {
+    let object = TestHircObject::music_switch_with_tree(7, &[], &[(0x4000, 0)], &[]);
+    let HircValue::MusicSwitch(switch) = decoded(object, 154)?.1 else {
+        return Err("checked empty MusicSwitch".into());
+    };
+    assert!(
+        !switch.has_decision_conditions,
+        "an argument without any node is insufficient"
+    );
     Ok(())
 }
 
@@ -151,6 +121,10 @@ fn a_music_playlist_keeps_its_items_with_their_loop_counts() -> TestResult {
     };
     assert_eq!(playlist.node.children, [40, 41], "segments");
     assert_eq!(playlist.rule_count, 2, "transition rules");
+    assert!(
+        playlist.has_authored_loops,
+        "original item count and modifiers"
+    );
     assert_eq!(
         playlist
             .items
@@ -255,12 +229,21 @@ fn a_decision_tree_that_lies_outside_the_tree_is_malformed() -> TestResult {
 }
 
 #[test]
-fn a_decision_tree_that_reaches_a_node_twice_or_fans_out_past_its_nodes_is_malformed() -> TestResult
-{
+fn an_ancestor_cycle_or_out_of_bounds_children_are_malformed() -> TestResult {
     for (name, targets, first, count) in [
-        ("a leaf reached twice", vec![40], 1_u16, 2_u16),
-        ("every node listed as a child", vec![40, 41, 42], 0, 4),
-        ("the same children listed again", vec![40, 41, 42], 1, 4),
+        (
+            "a child interval spilling past its only leaf",
+            vec![40],
+            1_u16,
+            2_u16,
+        ),
+        ("the root listed as its own child", vec![40, 41, 42], 0, 4),
+        (
+            "a child interval one past the node extent",
+            vec![40, 41, 42],
+            1,
+            4,
+        ),
     ] {
         let body = body_of(TestHircObject::music_switch(7, &[40], 0x4000, &targets))?;
         let tree_start = body.len() - 12 * (targets.len() + 1);

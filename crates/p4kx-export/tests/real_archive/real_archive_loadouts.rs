@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Loadouts in the Basetool catalog of a real Archive; runs with `--ignored` when `P4KX_DATA_P4K`
+//! Loadouts in the P4KX catalog of a real Archive; runs with `--ignored` when `P4KX_DATA_P4K`
 //! names one.
 
 use std::collections::{BTreeMap, HashSet};
@@ -97,19 +97,20 @@ fn check_counts(built: &BuiltCatalog, catalog: &Value) -> TestResult {
     reason = "the unresolved GUIDs are the result of the verification"
 )]
 fn check_references(built: &BuiltCatalog, catalog: &Value) -> TestResult {
-    let known: HashSet<&str> = ["items", "ships"]
-        .into_iter()
-        .map(|kind| list(catalog, kind))
-        .collect::<Result<Vec<_>, _>>()?
-        .into_iter()
-        .flatten()
-        .filter_map(|entity| entity["guid"].as_str())
-        .collect();
+    let mut known = HashSet::new();
+    for kind in [Kind::Items, Kind::Ships] {
+        for entity in list(catalog, kind.name())? {
+            known.insert(crate::catalog_v3_consumer::identity(entity, kind)?);
+        }
+    }
     let mut owners = HashSet::new();
     let mut outside = HashSet::new();
     let mut classes = HashSet::new();
     for entry in list(catalog, "loadouts")? {
-        let owner = entry["entityGuid"].as_str().ok_or("entityGuid")?;
+        let owner = entry
+            .pointer("/entityGuid/value")
+            .and_then(Value::as_str)
+            .ok_or("entityGuid")?;
         assert!(known.contains(owner), "owner {owner} is an item or a ship");
         assert!(owners.insert(owner), "{owner} has one loadout");
         walk(ports(entry), &mut |port| {
@@ -138,11 +139,15 @@ fn check_references(built: &BuiltCatalog, catalog: &Value) -> TestResult {
     Ok(())
 }
 
+fn port_name(port: &Value) -> Option<&str> {
+    port.pointer("/name/value").and_then(Value::as_str)
+}
+
 fn same(tree: &[PortNode], listed: &[Value], at: &str) {
     assert!(listed.len() >= tree.len(), "{at}: ports");
     for (port, json) in tree.iter().zip(listed) {
         let here = format!("{at}/{}", port.name());
-        assert_eq!(json["name"], port.name(), "{here}: name");
+        assert_eq!(port_name(json), Some(port.name()), "{here}: name");
         let source = if port.source() == PortSource::Empty {
             VEHICLE_ONLY
         } else {
@@ -155,8 +160,12 @@ fn same(tree: &[PortNode], listed: &[Value], at: &str) {
             "{here}: visibility"
         );
         if let Some(definition) = port.definition() {
-            assert_eq!(json["minSize"], json!(definition.min_size()), "{here}: min");
-            assert_eq!(json["maxSize"], json!(definition.max_size()), "{here}: max");
+            for (field, size) in [
+                ("/minSize/value", definition.min_size()),
+                ("/maxSize/value", definition.max_size()),
+            ] {
+                assert_eq!(json.pointer(field), Some(&json!(size)), "{here}: {field}");
+            }
             let types: Vec<&str> = json["types"]
                 .as_array()
                 .into_iter()
@@ -197,6 +206,29 @@ fn same(tree: &[PortNode], listed: &[Value], at: &str) {
     }
 }
 
+fn check_known_ship_row(catalog: &Value, index: u32) -> Result<&Value, Box<dyn Error>> {
+    let listed = list(catalog, "loadouts")?
+        .iter()
+        .find(|entry| {
+            entry
+                .pointer("/sourceRecordIndex/value")
+                .and_then(Value::as_u64)
+                == Some(u64::from(index))
+        })
+        .ok_or("the Loadout of the selected physical ship")?;
+    assert_eq!(
+        crate::catalog_v3_consumer::identity(listed, Kind::Loadouts)?,
+        ORIG_100I,
+        "the original ship GUID"
+    );
+    assert_eq!(
+        listed.pointer("/entityKind/value").and_then(Value::as_str),
+        Some("ship"),
+        "the original owner is a ship"
+    );
+    Ok(listed)
+}
+
 fn check_known_ship(archive: &Archive, catalog: &Value) -> TestResult {
     let entry = DataForgeEntry::read(archive)?;
     let forge = entry.open()?;
@@ -206,11 +238,7 @@ fn check_known_ship(archive: &Archive, catalog: &Value) -> TestResult {
         .stopping_at_docked_vehicles();
     let record = resolver.entities().find(ORIG_100I)?;
     let tree = resolver.resolve(&record)?;
-    let listed = list(catalog, "loadouts")?
-        .iter()
-        .find(|entry| entry["entityGuid"] == ORIG_100I)
-        .ok_or("the loadout of the 100i")?;
-    assert_eq!(listed["entityKind"], "ship", "a ship");
+    let listed = check_known_ship_row(catalog, record.index())?;
     same(tree.ports(), ports(listed), "100i");
     assert_eq!(
         ports(listed).len(),
@@ -236,7 +264,7 @@ fn check_known_ship(archive: &Archive, catalog: &Value) -> TestResult {
         "tree ports with the vehicle-only ones"
     );
     let top = ports(listed);
-    let by_name = |name: &str| top.iter().find(|port| port["name"] == name);
+    let by_name = |name: &str| top.iter().find(|port| port_name(port) == Some(name));
     let power = by_name("hardpoint_power_plant").ok_or("the power plant port")?;
     assert_eq!(
         power["itemGuid"], "4a4a2a9c-040f-4f36-befe-7101b230fa53",

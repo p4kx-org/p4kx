@@ -9,7 +9,7 @@ use anyhow::Result;
 use p4kx_assembly::audio::{
     ArchiveAudio, ExportOptions, ExportReport, ExportState, ExportWatch, SoundFormat, TriggerSounds,
 };
-use p4kx_extraction::CancelToken;
+use p4kx_extraction::{CancelToken, ConversionError};
 use serde::Serialize;
 
 use crate::cli::AudioOutput;
@@ -30,7 +30,7 @@ struct ExtractJson<'a> {
     #[serde(flatten)]
     export: ExportJson,
     #[serde(skip_serializing_if = "Option::is_none")]
-    txtp: Option<TxtpJson>,
+    txtp: Option<TxtpJson<'a>>,
     issues: Vec<IssueJson<'a>>,
 }
 
@@ -82,12 +82,15 @@ pub(crate) fn export(
     args: &SoundExportArgs,
     cancel: &CancelToken,
 ) -> Result<ExportReport> {
-    let options = ExportOptions {
+    let watch = ExportWatch::linked(cancel.clone());
+    Ok(audio.export_sounds_watched(triggers, out, export_options(args), &watch)?)
+}
+
+const fn export_options(args: &SoundExportArgs) -> ExportOptions {
+    ExportOptions {
         format: sound_format(args.format),
         policy: policy(args.conflict),
-    };
-    let watch = ExportWatch::linked(cancel.clone());
-    Ok(audio.export_sounds_watched(triggers, out, options, &watch)?)
+    }
 }
 
 /// Returns the JSON shape of `report`.
@@ -184,13 +187,35 @@ pub(crate) fn run(args: &WwiseExtractArgs, as_json: bool) -> Result<ExitCode> {
     let cancel = cancel_on_interrupt()?;
     let archive = crate::key::open(&args.archive)?;
     let audio = ArchiveAudio::new(&archive);
-    let index = audio.index();
-    let choice = language_choice(index, &args.language)?;
+    let index = audio
+        .index_until(&cancel)
+        .ok_or(ConversionError::Cancelled)?;
+    let choice = language_choice(index, &args.resolve)?;
+    let mut options = args.resolve.options(&cancel);
+    if args.txtp {
+        options = options.with_path_sources();
+    }
     let sounds = audio
-        .resolve_trigger_in(&args.trigger, &choice)
+        .resolve_trigger_with_options(&args.trigger, &choice, options)?
         .ok_or_else(|| UnknownTrigger::new(&args.trigger))?;
-    let report = export(&audio, &[&sounds], &args.out, &args.export, &cancel)?;
-    let txtp = (args.txtp && !report.cancelled).then(|| wwise_txtp::write(&sounds, &report, args));
+    let (report, txtp) = if args.txtp {
+        let watch = ExportWatch::linked(cancel.clone());
+        let (report, origins) = audio.export_sounds_watched_with_loop_origins(
+            &[&sounds],
+            &args.out,
+            export_options(&args.export),
+            &watch,
+        )?;
+        let txtp = (!report.cancelled)
+            .then(|| wwise_txtp::write(&sounds, &report, args, &archive, &cancel, &origins))
+            .transpose()?;
+        (report, txtp)
+    } else {
+        (
+            export(&audio, &[&sounds], &args.out, &args.export, &cancel)?,
+            None,
+        )
+    };
     if as_json {
         json::print(&ExtractJson {
             archive: json::path(archive.path()),

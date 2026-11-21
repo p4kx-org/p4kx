@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::archive_metadata::ArchiveMetadata;
 use crate::format_error::FormatError;
+
+pub(crate) use crate::entry_count_limit::check_entry_count;
 use crate::issue::Directory;
 use crate::source::Source;
 use crate::{Checksum, central_directory, directory_v2, end_records, recovery};
@@ -37,22 +40,12 @@ pub(crate) fn read_entries_recovering(source: &Source) -> Result<Directory, Form
             | FormatError::Corrupt { .. }
             | FormatError::Truncated(_)),
         ) if layout_version(source)?.is_none() => {
-            let hint = end_records::locate_directory(source)
+            let hint = end_records::locate_directory(source, None)
                 .ok()
                 .map(|location| location.offset);
             recovery::recover(source, hint)?.ok_or(error)
         }
         other => other,
-    }
-}
-
-/// Refuses an Entry count above `max_entries`.
-pub(crate) fn check_entry_count(count: u64, max_entries: Option<u64>) -> Result<(), FormatError> {
-    match max_entries {
-        Some(max) if count > max => Err(FormatError::LimitExceeded(format!(
-            "it holds {count} Entries, more than {max}"
-        ))),
-        _ => Ok(()),
     }
 }
 
@@ -68,7 +61,15 @@ fn layout_version(source: &Source) -> Result<Option<u16>, FormatError> {
 }
 
 fn read_v1_entries(source: &Source, max_entries: Option<u64>) -> Result<Directory, FormatError> {
-    let location = end_records::locate_directory(source)?;
+    let location = end_records::locate_directory(source, max_entries)?;
+    read_v1_directory(source, &location, max_entries)
+}
+
+fn read_v1_directory(
+    source: &Source,
+    location: &end_records::DirectoryLocation,
+    max_entries: Option<u64>,
+) -> Result<Directory, FormatError> {
     check_entry_count(location.entry_count, max_entries)?;
     let size = usize::try_from(location.size).map_err(|_| {
         FormatError::corrupt(
@@ -77,8 +78,12 @@ fn read_v1_entries(source: &Source, max_entries: Option<u64>) -> Result<Director
         )
     })?;
     let directory = source.read_at(location.offset, size)?;
-    let mut directory =
-        central_directory::parse_entries(&directory, location.offset, location.entry_count)?;
+    let mut directory = central_directory::parse_entries(
+        &directory,
+        location.offset,
+        location.entry_count,
+        ArchiveMetadata::zip(source.len(), &location.metadata),
+    )?;
     if !location.zip64 {
         for entry in &mut directory.entries {
             if let Some(value) = entry.crc32c() {

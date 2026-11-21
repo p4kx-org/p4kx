@@ -9,9 +9,9 @@ pub enum TestCapacity {
     /// `SStandardCargoUnit`: standard cargo units.
     Standard(f32),
     /// `SCentiCargoUnit`: hundredths of a standard cargo unit.
-    Centi(f32),
-    /// `SMicroCargoUnit`: millionths of a standard cargo unit, stored as an unsigned integer.
-    Micro(u32),
+    Centi(i32),
+    /// `SMicroCargoUnit`: millionths of a standard cargo unit, stored as a signed integer.
+    Micro(i32),
 }
 
 fn pointer(name: &str) -> TestType {
@@ -49,10 +49,10 @@ pub(crate) fn cargo_structs() -> Vec<TestStruct> {
             .field("standardCargoUnits", TestType::Single),
         TestStruct::new("SCentiCargoUnit")
             .parent("InventoryCapacityBase")
-            .field("centiSCU", TestType::Single),
+            .field("centiSCU", TestType::Int32),
         TestStruct::new("SMicroCargoUnit")
             .parent("InventoryCapacityBase")
-            .field("microSCU", TestType::UInt32),
+            .field("microSCU", TestType::Int32),
     ]
 }
 
@@ -120,10 +120,10 @@ pub fn closed_container_record(guid: u128, name: &str, capacity: TestCapacity) -
         TestCapacity::Standard(value) => TestInstance::new("SStandardCargoUnit")
             .value("standardCargoUnits", TestValue::Single(value)),
         TestCapacity::Centi(value) => {
-            TestInstance::new("SCentiCargoUnit").value("centiSCU", TestValue::Single(value))
+            TestInstance::new("SCentiCargoUnit").value("centiSCU", TestValue::Int32(value))
         }
         TestCapacity::Micro(value) => {
-            TestInstance::new("SMicroCargoUnit").value("microSCU", TestValue::UInt32(value))
+            TestInstance::new("SMicroCargoUnit").value("microSCU", TestValue::Int32(value))
         }
     };
     container_record(

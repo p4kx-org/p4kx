@@ -1,40 +1,67 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::hash_map::Entry;
 use std::sync::Arc;
 
+use crate::loadout_file_cache::CachedDocument;
 use crate::resolver::VehicleResult;
+use crate::resolver_observation::Observation;
 use crate::spec::EntitySpec;
-use crate::{LandingGear, LoadoutError, LoadoutResolver, vehicle};
+use crate::{
+    LandingGear, LoadoutError, LoadoutRequest, LoadoutResolver, LoadoutTargetGuid, vehicle,
+};
+
+#[derive(PartialEq, Eq, Hash)]
+pub(crate) struct VehicleCacheKey {
+    definition: String,
+    modification: Arc<str>,
+    class_name: String,
+    capture_paint: bool,
+}
 
 impl LoadoutResolver<'_> {
     /// Returns the vehicle implementation `spec` names with its Modification, read once per
     /// resolver, or `None` when the Entity names none, its `vehicleDefinition` is empty, or no
     /// files were given. The class-name fallback applies to a definition the Archive lacks, not
     /// to an empty one.
-    pub(crate) fn vehicle_of(&mut self, spec: &EntitySpec) -> Option<VehicleResult> {
+    pub(crate) fn vehicle_of(
+        &mut self,
+        spec: &EntitySpec,
+    ) -> Option<(VehicleResult, LoadoutRequest)> {
         let vehicle_spec = spec.vehicle.as_ref()?;
-        let files = self.files?;
+        let files = self
+            .files
+            .filter(|files| files.reads_vehicle_implementations())?;
         let class_name = crate::entities::class_name_of(&spec.name).unwrap_or(&spec.name);
         if vehicle_spec.definition.is_empty() {
             return None;
         }
-        let key = format!(
-            "{}\0{}\0{}",
-            vehicle_spec.definition.to_ascii_lowercase(),
-            vehicle_spec.modification.to_ascii_lowercase(),
-            class_name.to_ascii_lowercase()
-        );
-        let loaded = self.vehicles.entry(key).or_insert_with(|| {
-            vehicle::load(
-                files,
-                class_name,
-                &vehicle_spec.definition,
-                &vehicle_spec.modification,
-            )
-            .map(Arc::new)
-        });
-        Some(loaded.clone())
+        let capture_paint = self.captures_vehicle_appearance();
+        let key = VehicleCacheKey {
+            definition: vehicle_spec.definition.to_ascii_lowercase(),
+            modification: Arc::clone(vehicle_spec.modification.text()),
+            class_name: class_name.to_ascii_lowercase(),
+            capture_paint,
+        };
+        let caller = LoadoutRequest::Vehicle {
+            definition: vehicle_spec.definition.clone(),
+            modification: vehicle_spec.modification.clone(),
+            class_name: vehicle_spec.class_name.clone(),
+        };
+        let observation = self.observation.as_deref();
+        let loaded = match self.vehicles.entry(key) {
+            Entry::Occupied(entry) => entry.into_mut().reused(observation, &caller),
+            Entry::Vacant(entry) => Ok(entry
+                .insert(CachedDocument::read(|trace| {
+                    let capture = capture_paint.then(Observation::capture_vehicle_port_attributes);
+                    let observation = observation.or(capture.as_ref());
+                    vehicle::load_observed(files, class_name, &caller, observation, trace)
+                        .map(Arc::new)
+                }))
+                .value()),
+        };
+        Some((loaded.map_or_else(Err, Clone::clone), caller))
     }
 
     /// Returns the gears of the landing gear Record the vehicle component of `spec` names, read
@@ -45,31 +72,40 @@ impl LoadoutResolver<'_> {
         spec: &EntitySpec,
         issues: &mut Vec<LoadoutError>,
     ) -> Arc<[LandingGear]> {
-        let Some(guid) = spec
+        let Some(reference) = spec
             .vehicle
             .as_ref()
-            .and_then(|vehicle| vehicle.landing_system)
+            .and_then(|vehicle| vehicle.landing_system.as_ref())
         else {
             return Arc::from([]);
         };
+        let guid = reference.guid();
         if !self.landing.contains_key(&guid) {
             let read = match self.entities.forge().record_by_guid(guid) {
-                None => Err(LoadoutError::DanglingReference { guid }),
-                Some(record) => self
-                    .builder
-                    .build(&record)
+                None => Err(LoadoutError::DanglingReference {
+                    guid: LoadoutTargetGuid::unbound(guid),
+                }),
+                Some(record) => {
+                    self.remember_read(crate::resolver_observation::Cache::LandingGear, record);
+                    crate::resolver_observation::canonical(
+                        &mut self.builder,
+                        &record,
+                        self.observation.as_deref(),
+                    )
                     .map(|tree| vehicle::gears(&tree))
-                    .map_err(|error| LoadoutError::UnreadableRecord {
-                        guid,
-                        reason: error.to_string(),
-                    }),
+                }
             };
             self.landing.insert(guid, read);
+        } else if let Err(error) =
+            self.reuse_read(crate::resolver_observation::Cache::LandingGear, guid)
+        {
+            issues.push(error);
+            return Arc::from([]);
         }
         match self.landing.get(&guid) {
             Some(Ok(gears)) => Arc::clone(gears),
             Some(Err(error)) => {
-                issues.push(error.clone());
+                issues.push(error.clone().with_reference(reference));
                 Arc::from([])
             }
             None => Arc::from([]),

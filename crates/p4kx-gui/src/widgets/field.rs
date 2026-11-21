@@ -8,7 +8,7 @@ use egui::{Color32, Label, Rect, Sense, Shape, Stroke, StrokeKind, Ui, vec2};
 use super::indicator::warning_icon;
 use super::text::plain;
 use crate::theme::palette;
-use crate::theme::tokens::{CORNER_SM, FS_XS, GLOW_PRIMARY, REM, Weight};
+use crate::theme::tokens::{CORNER_CONTROL, FS_XS, GLOW_PRIMARY, REM, Weight};
 
 /// The `margin-top` of `.field-error`.
 const ERROR_TOP: f32 = 0.4 * REM;
@@ -48,7 +48,7 @@ fn paint(ui: &Ui, slot: ShapeIdx, rect: Rect, border: Color32) {
         slot,
         RectShape::new(
             rect,
-            CORNER_SM,
+            CORNER_CONTROL,
             palette::CONTROL_BG,
             Stroke::new(1.0, border),
             StrokeKind::Inside,
@@ -59,7 +59,7 @@ fn paint(ui: &Ui, slot: ShapeIdx, rect: Rect, border: Color32) {
 /// Fills `slot` with the `glow-primary` bloom around `rect`.
 pub(crate) fn paint_bloom(ui: &Ui, slot: ShapeIdx, rect: Rect) {
     ui.painter()
-        .set(slot, GLOW_PRIMARY.as_shape(rect, CORNER_SM));
+        .set(slot, GLOW_PRIMARY.as_shape(rect, CORNER_CONTROL));
 }
 
 /// Shows `text` under a field as `.field-error`: `fs-xs` in `color-danger-text` with a warning

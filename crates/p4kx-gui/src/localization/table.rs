@@ -2,10 +2,10 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::cmp::Ordering;
+use std::collections::TryReserveError;
 
 use p4kx_extraction::{
-    Archive, Language, LocalizationError, LocalizationLoadError, LocalizationSet,
-    MAX_GLOBAL_INI_KEYS, OwnedTextSet, TextSet, display_text,
+    Archive, Language, LocalizationLoadError, LocalizationSet, OwnedTextSet, TextSet, display_text,
 };
 
 /// The localisation keys of every language of an Archive with their texts, read once.
@@ -28,9 +28,8 @@ impl LocalizationTable {
     ///
     /// # Errors
     ///
-    /// Returns the [`LocalizationLoadError`] of the first Entry that cannot be read or indexed,
-    /// or [`LocalizationError::TooManyKeys`] when the languages together hold more keys than a
-    /// single `global.ini` may.
+    /// Returns a [`TableError`] for unreadable Entries, unrepresentable table coordinates or
+    /// failed table reservations.
     pub(super) fn read(archive: &Archive) -> Result<Self, TableError> {
         let set = LocalizationSet::read_all(archive)?;
         let indexed = set.index()?;
@@ -43,26 +42,21 @@ impl LocalizationTable {
     }
 
     fn from_texts(indexed: &TextSet<'_>, notes: Vec<String>) -> Result<Self, TableError> {
-        let sorted = indexed.keys();
-        let too_many = || LocalizationError::TooManyKeys {
-            limit: MAX_GLOBAL_INI_KEYS,
-        };
-        if sorted.len() > MAX_GLOBAL_INI_KEYS {
-            return Err(too_many().into());
-        }
+        let sorted = indexed.try_keys()?;
+        validate_row_count(sorted.len())?;
         let mut keys = String::new();
+        keys.try_reserve_exact(key_bytes(sorted.iter().map(|key| key.len()))?)?;
         let mut ends = Vec::new();
-        ends.try_reserve_exact(sorted.len())
-            .map_err(|_| too_many())?;
+        ends.try_reserve_exact(sorted.len())?;
         for key in sorted {
             keys.push_str(key);
-            ends.push(u32::try_from(keys.len()).map_err(|_| too_many())?);
+            ends.push(u32::try_from(keys.len()).map_err(|_| TableError::KeyOffset)?);
         }
         Ok(Self {
             languages: indexed.languages().collect(),
             keys,
             ends,
-            texts: indexed.to_owned_set(),
+            texts: indexed.try_to_owned_set()?,
             notes,
         })
     }
@@ -129,13 +123,13 @@ impl LocalizationTable {
 
     #[cfg(test)]
     pub(super) fn from_inis(files: &[(Language, &str)]) -> Self {
-        let parsed = files.iter().filter_map(|&(language, text)| {
-            p4kx_extraction::GlobalIni::parse(text)
-                .ok()
-                .map(|ini| (language, ini))
+        let parsed = files.iter().map(|&(language, text)| {
+            let ini = p4kx_extraction::GlobalIni::parse(text)
+                .unwrap_or_else(|error| unreachable!("valid localisation fixture: {error}"));
+            (language, ini)
         });
         Self::from_texts(&TextSet::new(parsed), Vec::new())
-            .unwrap_or_else(|error| unreachable!("a small table is within the limits: {error}"))
+            .unwrap_or_else(|error| unreachable!("small localisation table: {error}"))
     }
 
     pub(super) const fn texts(&self) -> &OwnedTextSet {
@@ -158,6 +152,19 @@ impl LocalizationTable {
     }
 }
 
+fn validate_row_count(count: usize) -> Result<(), TableError> {
+    u32::try_from(count.saturating_sub(1)).map_err(|_| TableError::RowIndex { count })?;
+    Ok(())
+}
+
+fn key_bytes(mut lengths: impl Iterator<Item = usize>) -> Result<usize, TableError> {
+    let bytes = lengths
+        .try_fold(0, usize::checked_add)
+        .ok_or(TableError::KeyOffset)?;
+    u32::try_from(bytes).map_err(|_| TableError::KeyOffset)?;
+    Ok(bytes)
+}
+
 fn fold_cmp(a: &str, b: &str) -> Ordering {
     a.bytes()
         .map(|byte| byte.to_ascii_lowercase())
@@ -170,7 +177,44 @@ pub(super) enum TableError {
     /// A `global.ini` cannot be read or indexed.
     #[error(transparent)]
     Load(#[from] LocalizationLoadError),
-    /// The languages together hold more keys than the limit.
-    #[error(transparent)]
-    Limit(#[from] LocalizationError),
+    /// A row index cannot fit in the table's representation.
+    #[error("the localisation table has {count} rows, exceeding its 32-bit row indices")]
+    RowIndex { count: usize },
+    /// The combined key bytes cannot fit in the table's offset representation.
+    #[error("the localisation key bytes exceed the table's 32-bit offsets")]
+    KeyOffset,
+    /// The table storage could not be reserved.
+    #[error("cannot reserve memory for the localisation table")]
+    Reserve(#[from] TryReserveError),
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{TableError, key_bytes, validate_row_count};
+
+    #[test]
+    fn table_coordinates_use_their_representable_range() -> Result<(), Box<dyn std::error::Error>> {
+        let max = usize::try_from(u32::MAX)?;
+        validate_row_count((1 << 20) + 1)?;
+        assert_eq!(
+            key_bytes([max - 1, 1].into_iter())?,
+            max,
+            "largest key offset"
+        );
+        assert!(
+            matches!(key_bytes([max, 1].into_iter()), Err(TableError::KeyOffset)),
+            "out-of-range key offset remains distinct from a reservation failure"
+        );
+        if let Some(count) = max.checked_add(1) {
+            validate_row_count(count)?;
+            assert!(
+                matches!(
+                    validate_row_count(count + 1),
+                    Err(TableError::RowIndex { .. })
+                ),
+                "the first unrepresentable row index has an explicit error"
+            );
+        }
+        Ok(())
+    }
 }

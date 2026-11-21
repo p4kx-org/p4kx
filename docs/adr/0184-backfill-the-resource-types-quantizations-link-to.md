@@ -10,7 +10,7 @@ Decided for issue #699. Builds on ADR-0177.
   distinct `ResourceType`s on LIVE).
 - **The entry is built exactly as the existing backfill builds it**, with no new field. Like
   every commodity it carries `name` (a short name) and `description` (a game text,
-  `x-gameText`), and it falls under the game-text policy of `docs/basetool-catalog.md`: the
+  `x-gameText`), and it falls under the game-text policy of `docs/catalog.md`: the
   catalog keeps the `description` for the Basetool's logged-in members, the Basetool keeps it
   away from third parties.
 - **Leftovers stay out:** a development leftover `ResourceType` neither links (ADR-0177) nor is

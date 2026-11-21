@@ -261,9 +261,37 @@ fn english() -> TestEntry {
 /// Writes the fixture Archive whose `corrupt` Records cannot be read into `dir` and returns its
 /// path.
 pub(crate) fn write_archive_with(dir: &Path, corrupt: Corrupt) -> Result<PathBuf, Box<dyn Error>> {
+    write_archive(dir, &database(corrupt), true)
+}
+
+/// Writes a fixture whose empty crew manifest has a second, crewed physical Record.
+pub(crate) fn write_archive_with_crew_alias(
+    dir: &Path,
+    encrypted: bool,
+) -> Result<PathBuf, Box<dyn Error>> {
+    let database = database(Corrupt::Nothing).record(manifest(
+        EMPTY_MANIFEST,
+        "crew_alias",
+        1,
+        Corrupt::Nothing,
+    ));
+    write_archive(dir, &database, encrypted)
+}
+
+fn write_archive(
+    dir: &Path,
+    database: &DataForgeBuilder,
+    encrypted: bool,
+) -> Result<PathBuf, Box<dyn Error>> {
     let path = dir.join("Data.p4k");
+    let dataforge = TestEntry::zstd("Data\\Game2.dcb", database.build());
+    let dataforge = if encrypted {
+        dataforge.encrypted()
+    } else {
+        dataforge
+    };
     ArchiveBuilder::new()
-        .entry(TestEntry::zstd("Data\\Game2.dcb", database(corrupt).build()).encrypted())
+        .entry(dataforge)
         .entry(english())
         .write_to(&path)?;
     Ok(path)

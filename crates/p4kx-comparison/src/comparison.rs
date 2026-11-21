@@ -1,23 +1,32 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::fs::File;
-use std::io::{self, BufWriter, Write};
+use std::borrow::Cow;
+use std::fmt;
+use std::io::{self, Write};
 use std::path::Path;
+use std::sync::atomic::AtomicBool;
 
 use p4kx_channels::PublicPatches;
+use p4kx_extraction::{
+    ArchiveWriteProtection, CancelToken, ConversionError, DataForgeOrigin,
+    write_replacing_protected,
+};
 use serde::{Serialize, Serializer};
 
+use crate::compare::CollisionEvidence;
 use crate::entry_change::{count, count_by_directory};
+use crate::entry_incomparable::IncomparableEntry;
 use crate::{
     Archive, Build, DirectoryCounts, EntryChange, EntryCounts, Levels, RecordChange, RecordCounts,
     Report, report::to_report,
 };
 
 /// One of the two Archives of a Comparison.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone)]
 pub struct Side<'a> {
     archive: &'a Path,
+    owner: &'a Archive,
     channel: Option<String>,
     build: Option<&'a Build>,
     public_patch: Option<String>,
@@ -29,6 +38,7 @@ impl<'a> Side<'a> {
     pub fn of(archive: &'a Archive) -> Self {
         Self {
             archive: archive.path(),
+            owner: archive,
             channel: p4kx_channels::channel_name(archive.path()),
             build: archive.build(),
             public_patch: None,
@@ -57,6 +67,10 @@ impl<'a> Side<'a> {
         self.archive
     }
 
+    pub(crate) const fn owner(&self) -> &'a Archive {
+        self.owner
+    }
+
     /// Returns the Channel: the name of the folder holding the Archive.
     #[must_use]
     pub fn channel(&self) -> Option<&str> {
@@ -70,15 +84,68 @@ impl<'a> Side<'a> {
     }
 }
 
+impl PartialEq for Side<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.archive == other.archive
+            && self.channel == other.channel
+            && self.build == other.build
+            && self.public_patch == other.public_patch
+    }
+}
+
+impl Eq for Side<'_> {}
+
+impl fmt::Debug for Side<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Side")
+            .field("archive", &self.archive)
+            .field("channel", &self.channel)
+            .field("build", &self.build)
+            .field("public_patch", &self.public_patch)
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub(crate) struct RecordSources {
+    pub(crate) old: Option<DataForgeOrigin>,
+    pub(crate) new: Option<DataForgeOrigin>,
+}
+
+impl RecordSources {
+    pub(crate) fn new(old: Option<&DataForgeOrigin>, new: Option<&DataForgeOrigin>) -> Self {
+        Self {
+            old: old.cloned(),
+            new: new.cloned(),
+        }
+    }
+}
+
 /// The result of comparing an old with a new Archive.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Comparison<'a> {
     pub(crate) old: Side<'a>,
     pub(crate) new: Side<'a>,
     pub(crate) levels: Levels,
     pub(crate) filter: Option<String>,
     pub(crate) entries: Vec<EntryChange<'a>>,
+    pub(crate) incomparables: Vec<IncomparableEntry<'a>>,
+    pub(crate) entry_collisions: Cow<'a, [CollisionEvidence]>,
     pub(crate) records: Vec<RecordChange<'a>>,
+    pub(crate) record_sources: RecordSources,
+}
+
+impl PartialEq for Comparison<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.old == other.old
+            && self.new == other.new
+            && self.levels == other.levels
+            && self.filter == other.filter
+            && self.entries == other.entries
+            && self.incomparables == other.incomparables
+            && self.records == other.records
+    }
 }
 
 impl<'a> Comparison<'a> {
@@ -113,6 +180,12 @@ impl<'a> Comparison<'a> {
         &self.entries
     }
 
+    /// Returns matched Entry pairs with different checksum algorithms, in normalised path order.
+    #[must_use]
+    pub fn incomparable_entries(&self) -> &[IncomparableEntry<'a>] {
+        &self.incomparables
+    }
+
     /// Returns the number of changed Entries per change kind.
     #[must_use]
     pub fn entry_counts(&self) -> EntryCounts {
@@ -127,6 +200,7 @@ impl<'a> Comparison<'a> {
     }
 
     /// Returns whether any compared level found a difference.
+    /// The incomparable Entry pairs have their own result list.
     #[must_use]
     pub const fn has_differences(&self) -> bool {
         !self.entries.is_empty() || !self.records.is_empty()
@@ -151,24 +225,54 @@ impl<'a> Comparison<'a> {
         to_report(self)
     }
 
-    /// Writes the JSON report to the file at `path` as pretty JSON with a final newline and
-    /// flushes it to disk.
+    /// Atomically writes the JSON report as pretty JSON with a final newline.
     ///
     /// # Errors
-    ///
-    /// Returns the error of creating, writing or syncing the file, or a
-    /// [`PermissionDenied`](io::ErrorKind::PermissionDenied) error holding the
-    /// [`WriteRefused`](p4kx_extraction::WriteRefused) when `path` lies inside a Star Citizen
-    /// installation.
+    /// Returns an I/O error or a permission error retaining the source/target protection refusal.
     pub fn save_report(&self, path: &Path) -> io::Result<()> {
-        p4kx_extraction::ensure_writable(path)
-            .map_err(|refused| io::Error::new(io::ErrorKind::PermissionDenied, refused))?;
-        let mut out = BufWriter::new(File::create(path)?);
-        serde_json::to_writer_pretty(&mut out, self)?;
-        writeln!(out)?;
-        out.into_inner()
-            .map_err(io::IntoInnerError::into_error)?
-            .sync_all()
+        self.save_report_with_cancel(path, None)
+    }
+
+    /// Atomically writes the report, keeping the target unchanged when cancelled.
+    ///
+    /// # Errors
+    /// Returns an I/O or protection error, or `Interrupted` when cancelled.
+    pub fn save_report_with_cancel(
+        &self,
+        path: &Path,
+        cancel: Option<&CancelToken>,
+    ) -> io::Result<()> {
+        static NEVER_CANCELLED: AtomicBool = AtomicBool::new(false);
+        if cancel.is_some_and(CancelToken::is_cancelled) {
+            return Err(io::Error::from(io::ErrorKind::Interrupted));
+        }
+        let flag = cancel.map_or(&NEVER_CANCELLED, CancelToken::flag);
+        let protection = ArchiveWriteProtection::for_sources(
+            &[self.old_side().archive(), self.new_side().archive()],
+            flag,
+        )
+        .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error))?;
+        write_replacing_protected(path, Some(&protection), cancel, |writer| {
+            serde_json::to_writer_pretty(&mut *writer, self)
+                .map_err(io::Error::other)
+                .and_then(|()| writeln!(writer))
+                .map_err(|source| ConversionError::Write {
+                    path: path.to_path_buf(),
+                    source,
+                })?;
+            if cancel.is_some_and(CancelToken::is_cancelled) {
+                return Err(ConversionError::Cancelled);
+            }
+            Ok(())
+        })
+        .map_err(|error| match error {
+            ConversionError::Installation(error) => {
+                io::Error::new(io::ErrorKind::PermissionDenied, error)
+            }
+            ConversionError::Cancelled => io::Error::from(io::ErrorKind::Interrupted),
+            ConversionError::Write { source, .. } => source,
+            error => io::Error::other(error),
+        })
     }
 }
 

@@ -76,7 +76,7 @@ fn every_decoded_kind_is_unsupported_above_version_154() -> TestResult {
 fn objects_that_are_never_decoded_stay_raw_in_any_version() -> TestResult {
     let bytes = TestBank::new(1)
         .version(168)
-        .object(TestHircObject::raw(8, 1, [1, 2]))
+        .object(TestHircObject::raw(0xa8, 1, [1, 2]))
         .bytes();
 
     let bank = Soundbank::parse(bytes.as_slice())?;

@@ -10,12 +10,12 @@ use p4kx_assembly::{
     ArchiveModels, Armour, AssemblyOptions, BodyVariant, Expressions, Issue, IssueKind, Piece,
 };
 use p4kx_chunks::ChunkFile;
-use p4kx_extraction::Archive;
+use p4kx_extraction::{Archive, SourceEncryption};
 use p4kx_gltf::GlbOptions;
 use p4kx_model::Animation;
 use p4kx_testkit::{
     HEAD_VERTICES, MALE_RIG_HASH, TestAnimation, TestSkeleton, TestTrack, check_glb, head_entries,
-    head_rig,
+    head_rig, test_key,
 };
 
 use crate::assembly_support::{Fixture, TestResult, fixture};
@@ -46,11 +46,31 @@ fn body_animation() -> TestAnimation {
     )
 }
 
+fn is_dna(path: &str) -> bool {
+    std::path::Path::new(path)
+        .extension()
+        .is_some_and(|ext| ext.eq_ignore_ascii_case("dna"))
+}
+
 fn build() -> Result<(Armour, Archive, Fixture), Box<dyn Error>> {
-    let fixture = fixture(head_entries(Some(
-        head_rig(HEAD_VERTICES, MALE_RIG_HASH).build(),
-    )))?;
-    let archive = Archive::open(&fixture.path)?;
+    build_with_rig_encryption(false)
+}
+
+fn build_with_rig_encryption(
+    encrypted: bool,
+) -> Result<(Armour, Archive, Fixture), Box<dyn Error>> {
+    let entries = head_entries(Some(head_rig(HEAD_VERTICES, MALE_RIG_HASH).build()))
+        .into_iter()
+        .map(|entry| {
+            if encrypted && is_dna(entry.path()) {
+                entry.encrypted()
+            } else {
+                entry
+            }
+        })
+        .collect();
+    let fixture = fixture(entries)?;
+    let archive = Archive::open_with_key(&fixture.path, encrypted.then(test_key))?;
     let piece = Piece::file("head", head_path(), None)
         .shaped(dna_of_head_two_in_region_three())
         .with_expressions(Expressions::All);
@@ -239,5 +259,38 @@ fn control_values_are_held_to_zero_and_one() -> TestResult {
         "{weights:?}"
     );
     assert_eq!(weights[2], 1.0);
+    Ok(())
+}
+
+#[test]
+fn shaping_and_the_emitted_face_animation_retain_their_actual_encrypted_rig_reads() -> TestResult {
+    let (armour, archive, _directory) = build_with_rig_encryption(true)?;
+    let models = ArchiveModels::new(&archive);
+    let head = armour
+        .parts()
+        .iter()
+        .find(|part| part.name() == "head")
+        .ok_or("head part")?;
+    let [shape] = head.shape_archive_sources() else {
+        return Err("one head shape source".into());
+    };
+    let rig = shape.rig.entry.as_ref().ok_or("shaping rig Entry")?;
+    assert_eq!(rig.encryption(), SourceEncryption::Encrypted);
+    assert!(is_dna(rig.entry().path()));
+    assert!(head.has_facial_rig());
+
+    let list = [animation(&face_animation())?, animation(&body_animation())?];
+    let animated = armour.animate(&list, &models);
+    assert!(animated.rig_read_for(0).is_none());
+    let sampled = animated
+        .rig_read_for(1)
+        .and_then(|rig| rig.entry.as_ref())
+        .ok_or("sampled rig Entry")?;
+    assert_eq!(sampled.entry().path(), rig.entry().path());
+    assert_eq!(sampled.encryption(), SourceEncryption::Encrypted);
+    let mut glb = Vec::new();
+    let summary = armour.write_glb_animated(&animated, &GlbOptions::default(), &mut glb)?;
+    assert_eq!(summary.animations.len(), 2);
+    assert!(summary.animations[1].channels > 0);
     Ok(())
 }

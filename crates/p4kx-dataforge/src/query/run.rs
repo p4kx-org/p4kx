@@ -8,11 +8,12 @@ use std::slice::Chunks;
 use rayon::prelude::*;
 
 use crate::dataforge::out_of_range;
-use crate::query::CompiledQuery;
 use crate::query::compile::Plan;
 use crate::query::shared::Recordings;
+use crate::query::source::{CellTrace, QueryCellSources};
 use crate::query::state::WalkState;
 use crate::query::walk::Place;
+use crate::query::{CompiledQuery, MAX_PATH_VALUES};
 use crate::{DataForgeError, Record, Value};
 
 /// The Records a compiled Query selects, ordered by record path and then by definition order;
@@ -24,33 +25,6 @@ pub struct QueryRun<'q, 'f> {
 }
 
 impl<'f> CompiledQuery<'f> {
-    /// Selects the Records by type and record path and keeps those that meet the condition, in
-    /// parallel over every Record.
-    ///
-    /// Records whose record path cannot be read are never selected. A Record whose values cannot
-    /// be read to decide the condition is kept, and its row reports why.
-    #[must_use]
-    pub fn run(&self) -> QueryRun<'_, 'f> {
-        self.resume(self.select(|| true))
-    }
-
-    /// Selects the Records as [`run`](Self::run) does, asking `proceed` before every Record;
-    /// returns `None` as soon as it has answered `false` and the selection is dropped.
-    #[must_use]
-    pub fn run_while(&self, proceed: impl Fn() -> bool + Sync) -> Option<QueryRun<'_, 'f>> {
-        let records = self.select(&proceed);
-        proceed().then(|| self.resume(records))
-    }
-
-    fn select(&self, proceed: impl Fn() -> bool + Sync) -> Vec<u32> {
-        self.forge
-            .path_order()
-            .par_iter()
-            .copied()
-            .filter(|&record| proceed() && self.selects(record))
-            .collect()
-    }
-
     /// Returns the run that selected `records`, the indexes [`QueryRun::indexes`] gave for this
     /// Query over the same DataForge; an index that is no Record gives no row.
     #[must_use]
@@ -61,35 +35,7 @@ impl<'f> CompiledQuery<'f> {
         }
     }
 
-    fn selects(&self, record: u32) -> bool {
-        self.plan_of(record).is_some()
-            && self
-                .referrers
-                .as_ref()
-                .is_none_or(|referrers| referrers.binary_search(&record).is_ok())
-            && self.pattern.as_ref().is_none_or(|pattern| {
-                self.forge
-                    .path_of(record)
-                    .is_some_and(|path| pattern.matches(path))
-            })
-            && self.meets_condition(record)
-    }
-
-    /// Returns whether the Record meets the condition or cannot be read to decide it.
-    fn meets_condition(&self, record: u32) -> bool {
-        let Some(predicate) = &self.predicate else {
-            return true;
-        };
-        match self.plan_of(record) {
-            Some(Plan::Read { tests, .. }) => self.instance_of(record).map_or(true, |place| {
-                predicate.eval(self.forge, tests, place) == Some(true)
-            }),
-            Some(Plan::Broken(_)) => true,
-            None => false,
-        }
-    }
-
-    fn plan_of(&self, record: u32) -> Option<&Plan> {
+    pub(super) fn plan_of(&self, record: u32) -> Option<&Plan> {
         let def = self.forge.record_def(record)?;
         self.plans
             .get(usize::try_from(def.struct_index).ok()?)?
@@ -132,7 +78,16 @@ impl<'f> QueryRun<'_, 'f> {
         let end = range.end.min(self.records.len());
         let start = range.start.min(end);
         self.query
-            .rows_of(self.records.get(start..end).unwrap_or_default())
+            .rows_of(self.records.get(start..end).unwrap_or_default(), false)
+    }
+
+    /// Returns rows with the original inputs used by each selected cell.
+    #[must_use]
+    pub fn rows_observed(&self, range: Range<usize>) -> Vec<Row<'f>> {
+        let end = range.end.min(self.records.len());
+        let start = range.start.min(end);
+        self.query
+            .rows_of(self.records.get(start..end).unwrap_or_default(), true)
     }
 
     /// Returns the rows in pages of at most `page_size`; each page is built in parallel when it
@@ -158,7 +113,7 @@ impl<'f> Iterator for Pages<'_, 'f> {
 
     fn next(&mut self) -> Option<Self::Item> {
         let chunk = self.chunks.next()?;
-        Some(self.query.rows_of(chunk))
+        Some(self.query.rows_of(chunk, false))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -173,6 +128,8 @@ pub struct Row<'f> {
     record_path: &'f str,
     cells: Result<Vec<Option<Value<'f>>>, DataForgeError>,
     unresolved: usize,
+    visited_elements: usize,
+    sources: Option<Vec<QueryCellSources>>,
 }
 
 impl<'f> Row<'f> {
@@ -199,6 +156,18 @@ impl<'f> Row<'f> {
         self.cells.as_deref()
     }
 
+    /// Returns evidence by selected column position when built with original inputs.
+    #[must_use]
+    pub fn cell_sources(&self) -> Option<&[QueryCellSources]> {
+        self.sources.as_deref()
+    }
+
+    /// Returns how many array elements the selected columns admitted during this row read.
+    #[must_use]
+    pub const fn visited_elements(&self) -> usize {
+        self.visited_elements
+    }
+
     /// Returns how many distinct links the columns followed with `->` to no Record or instance:
     /// null or dangling References and null weak pointers, each counted once however many
     /// columns reach it.
@@ -216,28 +185,54 @@ struct Scratch<'f> {
 }
 
 impl Scratch<'_> {
-    const fn new() -> Self {
+    const fn new(limit: usize) -> Self {
         Self {
-            state: WalkState::new(),
+            state: WalkState::new(limit),
             recordings: Vec::new(),
         }
     }
 }
 
 impl<'f> CompiledQuery<'f> {
-    fn rows_of(&self, records: &[u32]) -> Vec<Row<'f>> {
+    fn rows_of(&self, records: &[u32], observe: bool) -> Vec<Row<'f>> {
         records
             .par_iter()
-            .map_init(Scratch::new, |scratch, &record| self.row(record, scratch))
+            .map_init(
+                || Scratch::new(MAX_PATH_VALUES),
+                |scratch, &record| {
+                    let record_path = self.forge.path_of(record)?;
+                    self.row(record, record_path, scratch, observe)
+                },
+            )
             .flatten()
             .collect()
     }
 
-    fn row(&self, index: u32, scratch: &mut Scratch<'f>) -> Option<Row<'f>> {
+    /// Reads one explicitly selected physical Record with source coordinates.
+    ///
+    /// The caller supplies the row traversal budget. Missing filename metadata does not
+    /// select away an otherwise readable physical Record.
+    #[must_use]
+    pub fn physical_row_observed(&self, index: u32, path_values: usize) -> Option<Row<'f>> {
+        self.row(
+            index,
+            self.forge.path_of(index).unwrap_or_default(),
+            &mut Scratch::new(path_values),
+            true,
+        )
+    }
+
+    fn row(
+        &self,
+        index: u32,
+        record_path: &'f str,
+        scratch: &mut Scratch<'f>,
+        observe: bool,
+    ) -> Option<Row<'f>> {
         let record = self.forge.record(index)?;
-        let record_path = self.forge.path_of(index)?;
         let Scratch { state, recordings } = scratch;
         state.reset();
+        let mut sources = observe.then(Vec::new);
         let cells = match self.plan_of(index)? {
             _ if self.columns.is_empty() && self.predicate.is_none() => Ok(Vec::new()),
             Plan::Broken(error) => Err(error.clone()),
@@ -246,17 +241,23 @@ impl<'f> CompiledQuery<'f> {
             } => self.instance_of(index).map(|place| {
                 let groups = self.share_prefixes.then_some(shared);
                 if let Some(groups) = groups {
-                    groups.reset(recordings);
+                    groups.reset(recordings, observe);
                 }
                 columns
                     .iter()
                     .enumerate()
                     .map(|(at, column)| {
-                        let reader = column.as_ref()?;
-                        let prefix = groups.and_then(|groups| {
-                            groups.prefix_of(at, reader, self.forge, place, recordings)
+                        let mut trace = observe.then(CellTrace::default);
+                        let value = column.as_ref().map(|reader| {
+                            let prefix = groups.and_then(|groups| {
+                                groups.prefix_of(at, reader, self.forge, place, recordings)
+                            });
+                            reader.cell(self.forge, place, state, prefix, trace.as_mut())
                         });
-                        Some(reader.cell(self.forge, place, state, prefix))
+                        if let Some((sources, trace)) = sources.as_mut().zip(trace) {
+                            sources.push(trace.finish());
+                        }
+                        value
                     })
                     .collect()
             }),
@@ -266,11 +267,13 @@ impl<'f> CompiledQuery<'f> {
             record_path,
             cells,
             unresolved: state.unresolved(),
+            visited_elements: state.visited(),
+            sources,
         })
     }
 
     /// Returns the Record's instance, which the Record tree reads its values from.
-    fn instance_of(&self, index: u32) -> Result<Place<'f>, DataForgeError> {
+    pub(super) fn instance_of(&self, index: u32) -> Result<Place<'f>, DataForgeError> {
         let forge = self.forge;
         let def = forge
             .record_def(index)

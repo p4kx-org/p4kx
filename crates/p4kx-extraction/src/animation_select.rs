@@ -3,6 +3,7 @@
 
 use std::collections::HashSet;
 
+use p4kx_archive::EntryOrigin;
 use rayon::prelude::*;
 
 use crate::animation_load::{Described, Kind, Loaded, kind};
@@ -13,6 +14,8 @@ use crate::{AnimationChoice, ChunkSource, ConversionError, UnreadAnimation};
 pub(crate) struct Gathered<T> {
     pub(crate) animations: Vec<T>,
     pub(crate) origins: Vec<String>,
+    pub(crate) archive_sources: Vec<Option<EntryOrigin>>,
+    pub(crate) matched_specs: Vec<Vec<String>>,
     pub(crate) unread: Vec<UnreadAnimation>,
     pub(crate) files: usize,
 }
@@ -22,6 +25,8 @@ impl<T> Default for Gathered<T> {
         Self {
             animations: Vec::new(),
             origins: Vec::new(),
+            archive_sources: Vec::new(),
+            matched_specs: Vec::new(),
             unread: Vec::new(),
             files: 0,
         }
@@ -32,18 +37,28 @@ impl<T> Default for Gathered<T> {
 pub(crate) struct Wanted<'a> {
     specs: Vec<&'a str>,
     by_name: bool,
+    capture_matches: bool,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum MatchEvidence {
+    Off,
+    Capture,
 }
 
 impl<'a> Wanted<'a> {
-    fn of(choice: &'a AnimationChoice) -> Self {
+    fn of(choice: &'a AnimationChoice, evidence: MatchEvidence) -> Self {
+        let capture_matches = matches!(evidence, MatchEvidence::Capture);
         match choice {
             AnimationChoice::Named(specs) => Self {
                 specs: specs.iter().map(String::as_str).collect(),
                 by_name: true,
+                capture_matches,
             },
             AnimationChoice::All => Self {
                 specs: Vec::new(),
                 by_name: false,
+                capture_matches,
             },
         }
     }
@@ -68,26 +83,33 @@ impl<'a> Wanted<'a> {
 
 /// Sorts and merges `sources`, reads those the choice wants and collects the animations.
 pub(crate) fn read<T: Described + Send>(
-    mut sources: Vec<Source>,
+    sources: Vec<Source>,
     choice: &AnimationChoice,
     open: impl Fn(&str) -> Result<ChunkSource, ConversionError> + Sync,
     load: impl Fn(&ChunkSource, &str, Kind, bool) -> Result<Loaded<T>, ConversionError> + Sync,
 ) -> Result<Gathered<T>, ConversionError> {
-    sources.sort_by_cached_key(|source| (normalised(&source.label), !source.whole));
-    sources.dedup_by(|later, earlier| {
-        let same = normalised(&later.label) == normalised(&earlier.label);
-        earlier.explicit |= same && later.explicit;
-        earlier.whole |= same && later.whole;
-        same
-    });
-    let wanted = Wanted::of(choice);
+    read_observing(sources, choice, open, load, MatchEvidence::Off, |_, _| {})
+}
+
+pub(crate) fn read_observing<T: Described + Send>(
+    mut sources: Vec<Source>,
+    choice: &AnimationChoice,
+    open: impl Fn(&str) -> Result<ChunkSource, ConversionError> + Sync,
+    load: impl Fn(&ChunkSource, &str, Kind, bool) -> Result<Loaded<T>, ConversionError> + Sync,
+    evidence: MatchEvidence,
+    mut observe: impl FnMut(Option<&EntryOrigin>, &Loaded<T>),
+) -> Result<Gathered<T>, ConversionError> {
+    merge_sources(&mut sources);
+    let wanted = Wanted::of(choice, evidence);
     let results: Vec<_> = sources
         .par_iter()
         .filter_map(|source| {
             let kind = kind(&source.label)?;
             wanted.reads(source, kind).then(|| {
-                let loaded = open(&source.label)
-                    .and_then(|file| load(&file, &source.label, kind, source.explicit));
+                let loaded = open(&source.label).and_then(|file| {
+                    load(&file, &source.label, kind, source.explicit)
+                        .map(|loaded| (file.archive_origin().cloned(), loaded))
+                });
                 (source, loaded)
             })
         })
@@ -95,7 +117,7 @@ pub(crate) fn read<T: Described + Send>(
     let mut set = Gathered::default();
     let mut matched: HashSet<&str> = HashSet::new();
     for (source, result) in results {
-        let loaded = match result {
+        let (origin, loaded) = match result {
             Ok(loaded) => loaded,
             Err(error) if is_fatal(source, &error) => return Err(error),
             Err(error) => {
@@ -107,9 +129,17 @@ pub(crate) fn read<T: Described + Send>(
                 continue;
             }
         };
+        observe(origin.as_ref(), &loaded);
         set.files += 1;
         set.unread.extend(loaded.unread);
-        keep(&mut set, &mut matched, &wanted, source, loaded.animations);
+        keep(
+            &mut set,
+            &mut matched,
+            &wanted,
+            source,
+            origin.as_ref(),
+            loaded.animations,
+        );
     }
     let missing: Vec<String> = wanted
         .specs
@@ -129,6 +159,16 @@ pub(crate) fn read<T: Described + Send>(
     }
 }
 
+fn merge_sources(sources: &mut Vec<Source>) {
+    sources.sort_by_cached_key(|source| (normalised(&source.label), !source.whole));
+    sources.dedup_by(|later, earlier| {
+        let same = normalised(&later.label) == normalised(&earlier.label);
+        earlier.explicit |= same && later.explicit;
+        earlier.whole |= same && later.whole;
+        same
+    });
+}
+
 /// Adds the animations of `source` that the choice wants to `set`, and lists the additive ones
 /// nothing names as unread.
 fn keep<'a, T: Described>(
@@ -136,6 +176,7 @@ fn keep<'a, T: Described>(
     matched: &mut HashSet<&'a str>,
     wanted: &Wanted<'a>,
     source: &Source,
+    origin: Option<&EntryOrigin>,
     animations: Vec<T>,
 ) {
     let caf_by_caller = source.explicit && kind(&source.label) == Some(Kind::Caf);
@@ -151,8 +192,13 @@ fn keep<'a, T: Described>(
                 reason: ADDITIVE_REASON.to_owned(),
             });
         } else if source.whole || !wanted.by_name || !hits.is_empty() {
+            if wanted.capture_matches {
+                set.matched_specs
+                    .push(hits.iter().map(|spec| (*spec).to_owned()).collect());
+            }
             matched.extend(hits);
             set.origins.push(source.label.clone());
+            set.archive_sources.push(origin.cloned());
             set.animations.push(animation);
         }
     }

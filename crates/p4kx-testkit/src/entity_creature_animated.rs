@@ -3,8 +3,8 @@
 
 use crate::entity_creature::skinned_creature;
 use crate::{
-    TestAnimation, TestEntity, TestEntry, TestInstance, TestSkeleton, TestStruct, TestTrack,
-    TestType, TestValue,
+    TestAnimation, TestDba, TestEntity, TestEntry, TestInstance, TestSkeleton, TestStruct,
+    TestTrack, TestType, TestValue,
 };
 
 /// A creature of [`CREATURE`](crate::CREATURE)'s skeleton with an animation database.
@@ -24,6 +24,9 @@ pub const CREATURE_ANIMATION_PARAMS_LOST: &str = "Test_Creature_AnimationParamsL
 /// is still named.
 pub const CREATURE_ANIMATION_NESTED_LOST: &str = "Test_Creature_AnimationNestedLost";
 
+/// A creature whose CDF skeleton names the scope for clips from a nested animation database.
+pub const CREATURE_ANIMATION_SCOPED: &str = "Test_Creature_AnimationScoped";
+
 const DATABASE: &str = "Animations/Mannequin/ADB/Creatures/Test/test.adb";
 const SKELETON_FOLDER: &str = r"Data\Objects\Characters\Creatures\Test";
 const CLIP_FOLDER: &str = r"Data\Animations\Characters\Creatures\Test\ai";
@@ -36,6 +39,15 @@ const ADB: &str = r#"<AnimDB>
       <Fragment><AnimLayer><Animation name="lean"/></AnimLayer></Fragment>
     </Idle>
   </FragmentList>
+</AnimDB>"#;
+
+const SCOPED_ADB: &str = r#"<AnimDB><SubADBs>
+  <SubADB File="Animations/Mannequin/ADB/Creatures/Test/scoped_child.adb"/>
+</SubADBs></AnimDB>"#;
+const SCOPED_CHILD_ADB: &str = r#"<AnimDB>
+  <FragmentList><Idle><Fragment><AnimLayer>
+    <Animation name="scoped"/><Animation name="SCOPED"/><Animation name="wave"/>
+  </AnimLayer></Fragment></Idle></FragmentList>
 </AnimDB>"#;
 
 const NESTED_ADB: &str = r#"<AnimDB>
@@ -71,7 +83,7 @@ fn animated(id: u128, class: &str, skeleton: &str, database: &str) -> TestEntity
 
 /// Returns the creatures [`CREATURE_ANIMATED`], [`CREATURE_ANIMATION_DATABASE_LOST`] and
 /// [`CREATURE_ANIMATION_PARAMS_LOST`] and [`CREATURE_ANIMATION_NESTED_LOST`].
-pub(crate) fn animated_entities() -> [TestEntity; 4] {
+pub(crate) fn animated_entities() -> [TestEntity; 5] {
     [
         animated(0x20, CREATURE_ANIMATED, "creature_skel.chr", DATABASE),
         animated(
@@ -91,6 +103,12 @@ pub(crate) fn animated_entities() -> [TestEntity; 4] {
             CREATURE_ANIMATION_NESTED_LOST,
             "creature_skel.chr",
             "Animations/Mannequin/ADB/Creatures/Test/nested.adb",
+        ),
+        animated(
+            0x24,
+            CREATURE_ANIMATION_SCOPED,
+            "definition.cdf",
+            "Animations/Mannequin/ADB/Creatures/Test/scoped.adb",
         ),
     ]
 }
@@ -128,6 +146,25 @@ pub(crate) fn animation_entries() -> Vec<TestEntry> {
         caf(&clip("wave", tip)),
         caf(&clip("stray", 0x1234_5678)),
         caf(&clip("lean", tip).additive()),
+        TestEntry::stored(
+            r"Data\Animations\Mannequin\ADB\Creatures\Test\scoped.adb",
+            SCOPED_ADB.as_bytes().to_vec(),
+        ),
+        TestEntry::stored(
+            r"Data\Animations\Mannequin\ADB\Creatures\Test\scoped_child.adb",
+            SCOPED_CHILD_ADB.as_bytes().to_vec(),
+        ),
+        TestEntry::stored(
+            format!("{CLIP_FOLDER}\\scoped.dba"),
+            TestDba::new()
+                .animation(clip("other", tip))
+                .animation(clip("scoped", tip))
+                .bytes(),
+        ),
+        TestEntry::stored(
+            r"Data\Animations\Outside\scoped.caf",
+            clip("scoped", tip).caf(),
+        ),
         TestEntry::stored(
             r"Data\Animations\Mannequin\ADB\Creatures\Test\nested.adb",
             NESTED_ADB.as_bytes().to_vec(),

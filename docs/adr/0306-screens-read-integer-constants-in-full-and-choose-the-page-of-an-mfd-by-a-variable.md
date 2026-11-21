@@ -104,10 +104,9 @@ description.
   `100` over `100` are a run-time picture and number.
 - **RSI (Constellation), POWER MANAGEMENT.** The palette matches the screenshot: pale lavender
   arrows and text, orange `BATTERY` and `OFFLINE`, an angled darker footer with the page name in
-  wide capitals. Not matching: the page name has no `«` and `»` (the buttons are
-  `ComponentGeneralButton` widgets, which have no renderer), the labels sit on pale-blue
-  rectangles (a background that the style sets on a text), and the red block with the warning
-  triangle is missing.
+  wide capitals. At the time, the `ComponentGeneralButton` widgets left the `«` and `»`
+  undrawn. The style supplied pale-blue rectangles behind the labels, and the red block
+  with the warning triangle was absent.
 
 ## Still different from the game, not decided here
 
@@ -115,9 +114,70 @@ description.
   of the power page (`OUTPUT`) are far too large; the tab bar text is right.
 - **Labels on a pale-blue background** on the Aegis SHIELDS and the RSI power pages: the
   background belongs to the text widget in the Records; whether the game draws it is not known.
-- **Buttons.** `ComponentGeneralButton*` has no renderer (the RSI `«` `»`, the arrows of the
-  Aegis bar are drawn through their icons).
+- **Buttons.** The General, GeneralLarge and Secondary families have data-driven default rendering paths.
+  Other button families and game-driven interaction states need separate evidence.
 - **Run-time pictures and numbers** (silhouette, readouts, rows, pips).
+
+## Default Secondary buttons
+
+The inspected LIVE MFD footer contains two `ComponentGeneralButtonSecondary` instances. The
+corresponding standard template has an authored proxy root and ordered frame, label and icon
+parts. The still renderer enters that proxy subtree and applies its parent and ancestor style
+conditions. The template's tag switches supply the effective choices for fill style and icon
+position. The instance supplies the label, visibility, anchors and scale when authored. The graph
+keeps Integer and Number parameters distinct when their names match.
+
+A selected brand can supply shared style entries for both template proxy mounts. A DisplayWidget
+paints an enabled SVG fill with its authored scaling and explicit nine-slice edges. A reported
+icon-asset override, missing SVG or undecidable template selector identifies the affected widget.
+
+The synthetic checks cover vector, frame and label paint, hidden parts, draw order and an invalid
+proxy. The installed LIVE check isolates both original footer button paint ranges and verifies
+their side-by-side pixels. Both styled SVG references are absent from that Archive, so the observed
+pixels come from the authored background and frame. Other button families require their own source mapping.
+
+## Default General buttons
+
+The still renderer associates the exact General class with the standard General component
+canvas when the original widget has no canvas reference. Scoped LIVE General owners have
+empty direct canvas fields. The standard template supplies the proxy root and ordered icon
+and text parts. The selected RSI shared Style uses the General-Button-Primary tag on the
+holder to select the proxy frame and label styles.
+
+The instance transfers the label text and the two Boolean visibility inputs. The template's
+authored Integer switches supply the fill and icon-position state tags. The General template
+owns its remaining Integer and String defaults. The still renderer leaves icon-asset overrides
+and game-driven interaction to the original game.
+
+## Default GeneralLarge buttons
+
+The exact GeneralLarge class selects the separate standard Large component canvas when its
+original canvas field is empty. The template has an empty proxy field and one parentless
+DisplayWidget in its original scene. The still renderer mounts that root and preserves its
+label, icon and two frame children under their original parent. A present invalid canvas or
+proxy cannot select an implicit route.
+
+The selected RSI shared Style matches the `general-button-large` holder tag and the original
+tags of the frame children. The instance transfers the localized label, the Boolean visibility
+inputs and authored numeric anchor and scale parameters. The template evaluates its own
+geometry and defaults. This template has no matching fill or icon-position switches. A value
+for either setting stays an unevaluated input.
+
+## Installed default-button checks
+
+The LIVE source census at change 13165946 found 483 General, 48 GeneralLarge,
+and 365 Secondary instances. The selected General source produced 359,840
+frame pixels and 301 label pixels. The MFD footer proof found two original
+Secondary frames with 5,680 visible pixels each.
+
+In the selected GeneralLarge Canvas a nonshrinking automatic flex sibling
+has one active leaf with no measurable content. The leaf has zero height
+when placed. Including that same extent in intrinsic measurement prevents
+the sibling from taking the whole parent height. The holder retains space
+after the row gap and mounts its original template in the stage. Both
+original frame widgets read their SVGs from the Archive. Removing the
+tracked frame and label items from separate passes changes 372,218 and
+50,532 pixels respectively.
 
 ## Guesses, unverified against the game
 

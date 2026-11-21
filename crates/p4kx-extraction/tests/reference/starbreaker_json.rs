@@ -117,6 +117,11 @@ fn embedded(map: &serde_json::Map<String, Value>) -> Option<Box<Embedded>> {
 /// Returns what is wrong with the text: invalid JSON, or a Record without GUID or root struct.
 pub(crate) fn record(text: &str) -> Result<RecordDoc, String> {
     let value: Value = serde_json::from_str(text).map_err(|error| error.to_string())?;
+    record_value(&value)
+}
+
+/// Reads a Record object from an explicit manifest location.
+pub(crate) fn record_value(value: &Value) -> Result<RecordDoc, String> {
     let guid = value
         .get(RECORD_ID_KEY)
         .and_then(Value::as_str)

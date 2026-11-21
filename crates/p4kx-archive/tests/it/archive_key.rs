@@ -10,31 +10,31 @@ use std::path::Path;
 use p4kx_archive::{Archive, ArchiveError, Entry, KeyCheck};
 use p4kx_testkit::{ArchiveBuilder, TestContainer, TestEntry, other_test_key, test_key};
 
-type TestResult = Result<(), Box<dyn Error>>;
+pub(crate) type TestResult = Result<(), Box<dyn Error>>;
 
-const SECRET: &[u8] = b"<secret data of the Archive/>";
-const SOCPAK: &str = "Data\\room.socpak";
+pub(crate) const SECRET: &[u8] = b"<secret data of the Archive/>";
+pub(crate) const SOCPAK: &str = "Data\\room.socpak";
 
-fn builder() -> ArchiveBuilder {
+pub(crate) fn builder() -> ArchiveBuilder {
     ArchiveBuilder::new()
         .entry(TestEntry::stored("Data\\plain.xml", b"<plain/>".to_vec()))
         .entry(TestEntry::deflated("Data\\secret.xml", SECRET.to_vec()).encrypted())
 }
 
-fn open(dir: &Path, builder: &ArchiveBuilder) -> Result<Archive, Box<dyn Error>> {
+pub(crate) fn open(dir: &Path, builder: &ArchiveBuilder) -> Result<Archive, Box<dyn Error>> {
     let path = dir.join("Data.p4k");
     builder.write_to(&path)?;
     Ok(Archive::open(&path)?)
 }
 
-fn read(archive: &Archive, path: &str) -> Result<Vec<u8>, Box<dyn Error>> {
+pub(crate) fn read(archive: &Archive, path: &str) -> Result<Vec<u8>, Box<dyn Error>> {
     let entry = find(archive, path)?;
     let mut data = Vec::new();
     archive.open_entry(entry)?.read_to_end(&mut data)?;
     Ok(data)
 }
 
-fn find<'a>(archive: &'a Archive, path: &str) -> Result<&'a Entry, Box<dyn Error>> {
+pub(crate) fn find<'a>(archive: &'a Archive, path: &str) -> Result<&'a Entry, Box<dyn Error>> {
     Ok(archive
         .entries()
         .iter()

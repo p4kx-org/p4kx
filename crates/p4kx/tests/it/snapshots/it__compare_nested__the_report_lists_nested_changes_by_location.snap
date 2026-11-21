@@ -1,5 +1,6 @@
 ---
-source: crates/p4kx/tests/compare_nested.rs
+source: crates/p4kx/tests/it/compare_nested.rs
+assertion_line: 158
 expression: report
 ---
 {
@@ -149,6 +150,2195 @@ expression: report
           }
         ]
       }
-    ]
+    ],
+    "fieldOrigins": {
+      "/records/changes/0/fields/0/new/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u33",
+          "u34",
+          "u35"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/0/new/value": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u33",
+          "u34",
+          "u35",
+          "u36"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/0/old/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u29",
+          "u30",
+          "u31"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/0/old/value": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u29",
+          "u30",
+          "u31",
+          "u32"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/0/path": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u23",
+          "u24",
+          "u25",
+          "u26",
+          "u27",
+          "u28"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/1/new/type": {
+        "containsEncryptedSource": null,
+        "sourceUsesRefs": [
+          "u33",
+          "u43",
+          "u44"
+        ],
+        "sourceSetComplete": false
+      },
+      "/records/changes/0/fields/1/new/value": {
+        "containsEncryptedSource": null,
+        "sourceUsesRefs": [
+          "u33",
+          "u43",
+          "u45"
+        ],
+        "sourceSetComplete": false
+      },
+      "/records/changes/0/fields/1/old/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u29",
+          "u39",
+          "u40",
+          "u41"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/1/old/value": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u29",
+          "u39",
+          "u40",
+          "u42"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/1/path": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u23",
+          "u24",
+          "u37",
+          "u38"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/2/new/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u49",
+          "u52"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/2/new/value": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u49",
+          "u52",
+          "u53"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/2/old/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u48",
+          "u50"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/2/old/value": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u48",
+          "u50",
+          "u51"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/2/path": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u46",
+          "u47",
+          "u48",
+          "u49"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/3/old/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u48",
+          "u50"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/3/old/value": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u48",
+          "u50",
+          "u54"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/3/path": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u46",
+          "u47",
+          "u48"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/4/new/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u59",
+          "u60"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/4/new/value": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u59",
+          "u60",
+          "u61"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/4/old/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u57",
+          "u58"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/4/path": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u55",
+          "u56"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/5/new/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u35",
+          "u59",
+          "u60"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/5/new/value": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u35",
+          "u59",
+          "u60",
+          "u64"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/5/path": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u55",
+          "u56",
+          "u62",
+          "u63"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/6/new/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u59",
+          "u60",
+          "u67"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/6/new/value": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u59",
+          "u60",
+          "u67",
+          "u68"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/6/path": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u55",
+          "u56",
+          "u65",
+          "u66"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/7/new/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u78",
+          "u79",
+          "u80",
+          "u81",
+          "u82",
+          "u83"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/7/new/value/guid": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u78",
+          "u84"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/7/new/value/record_path": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u78",
+          "u79",
+          "u80",
+          "u81"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/7/new/value/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u78",
+          "u79",
+          "u82",
+          "u83"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/7/old/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u71",
+          "u72",
+          "u73",
+          "u74",
+          "u75",
+          "u76"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/7/old/value/guid": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u71",
+          "u77"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/7/old/value/record_path": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u71",
+          "u72",
+          "u73",
+          "u74"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/7/old/value/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u71",
+          "u72",
+          "u75",
+          "u76"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/7/path": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u69",
+          "u70"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/8/new/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u100",
+          "u19",
+          "u61",
+          "u96",
+          "u97",
+          "u98",
+          "u99"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/8/new/value/at": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u100",
+          "u101",
+          "u102",
+          "u96",
+          "u97",
+          "u99"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/8/new/value/guid": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u100",
+          "u14",
+          "u96",
+          "u97",
+          "u99"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/8/new/value/record_path": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u100",
+          "u19",
+          "u96",
+          "u97",
+          "u98",
+          "u99"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/8/new/value/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u100",
+          "u61",
+          "u96",
+          "u97",
+          "u99"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/8/old/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u15",
+          "u87",
+          "u88",
+          "u89",
+          "u90",
+          "u91",
+          "u92"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/8/old/value/at": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u87",
+          "u88",
+          "u90",
+          "u91",
+          "u94",
+          "u95"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/8/old/value/guid": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u87",
+          "u88",
+          "u90",
+          "u91",
+          "u93"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/8/old/value/record_path": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u15",
+          "u87",
+          "u88",
+          "u89",
+          "u90",
+          "u91"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/8/old/value/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u87",
+          "u88",
+          "u90",
+          "u91",
+          "u92"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/fields/8/path": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u85",
+          "u86"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/guid": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u14"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/new/name": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u20"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/new/record_path": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u19"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/new/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u21",
+          "u22"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/old/name": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u16"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/old/record_path": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u15"
+        ],
+        "sourceSetComplete": true
+      },
+      "/records/changes/0/old/type": {
+        "containsEncryptedSource": false,
+        "sourceUsesRefs": [
+          "u17",
+          "u18"
+        ],
+        "sourceSetComplete": true
+      }
+    },
+    "provenance": {
+      "sources": [
+        {
+          "id": "a0.0",
+          "ancestors": [],
+          "storedEncryption": "unencrypted",
+          "kind": "archiveEntry",
+          "entryIndex": 0,
+          "path": {
+            "state": "present",
+            "value": "Data\\Game2.dcb",
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u0"
+            ],
+            "sourceSetComplete": true
+          },
+          "recordFormat": "zipCentralDirectory",
+          "recordRange": {
+            "offset": "766",
+            "length": "266"
+          },
+          "zipFlags": {
+            "state": "present",
+            "value": 0,
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u1"
+            ],
+            "sourceSetComplete": true
+          },
+          "declarations": {
+            "state": "present",
+            "value": [
+              {
+                "state": "present",
+                "value": {
+                  "kind": "cigExtraBlock",
+                  "valueOffset": "994",
+                  "declaredBlockLength": {
+                    "state": "present",
+                    "value": 6,
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u2"
+                    ],
+                    "sourceSetComplete": true
+                  },
+                  "rawWord": {
+                    "state": "present",
+                    "value": 0,
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u3"
+                    ],
+                    "sourceSetComplete": true
+                  },
+                  "rawBytes": {
+                    "state": "present",
+                    "value": [
+                      0,
+                      0
+                    ],
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u4"
+                    ],
+                    "sourceSetComplete": true
+                  }
+                },
+                "containsEncryptedSource": false,
+                "sourceUsesRefs": [
+                  "u5"
+                ],
+                "sourceSetComplete": true
+              }
+            ],
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u6"
+            ],
+            "sourceSetComplete": true
+          }
+        },
+        {
+          "id": "a1.0",
+          "ancestors": [],
+          "storedEncryption": "unencrypted",
+          "kind": "archiveEntry",
+          "entryIndex": 0,
+          "path": {
+            "state": "present",
+            "value": "Data\\Game2.dcb",
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u7"
+            ],
+            "sourceSetComplete": true
+          },
+          "recordFormat": "zipCentralDirectory",
+          "recordRange": {
+            "offset": "762",
+            "length": "266"
+          },
+          "zipFlags": {
+            "state": "present",
+            "value": 0,
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u8"
+            ],
+            "sourceSetComplete": true
+          },
+          "declarations": {
+            "state": "present",
+            "value": [
+              {
+                "state": "present",
+                "value": {
+                  "kind": "cigExtraBlock",
+                  "valueOffset": "990",
+                  "declaredBlockLength": {
+                    "state": "present",
+                    "value": 6,
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u9"
+                    ],
+                    "sourceSetComplete": true
+                  },
+                  "rawWord": {
+                    "state": "present",
+                    "value": 0,
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u10"
+                    ],
+                    "sourceSetComplete": true
+                  },
+                  "rawBytes": {
+                    "state": "present",
+                    "value": [
+                      0,
+                      0
+                    ],
+                    "containsEncryptedSource": false,
+                    "sourceUsesRefs": [
+                      "u11"
+                    ],
+                    "sourceSetComplete": true
+                  }
+                },
+                "containsEncryptedSource": false,
+                "sourceUsesRefs": [
+                  "u12"
+                ],
+                "sourceSetComplete": true
+              }
+            ],
+            "containsEncryptedSource": false,
+            "sourceUsesRefs": [
+              "u13"
+            ],
+            "sourceSetComplete": true
+          }
+        }
+      ],
+      "uses": [
+        {
+          "id": "u0",
+          "source": "a0.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "path"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u1",
+          "source": "a0.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "generalPurposeFlags"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u10",
+          "source": "a1.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].rawWord"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u100",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "702",
+              "710"
+            ],
+            "field": "arrayHeader"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u101",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "9"
+            ],
+            "field": "name"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u102",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "589",
+              "594"
+            ],
+            "field": "text"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u11",
+          "source": "a1.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].rawBytes"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u12",
+          "source": "a1.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0]"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u13",
+          "source": "a1.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u14",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "dataForge",
+            "recordIndex": 2,
+            "field": "guid"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u15",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "dataForge",
+            "recordIndex": 2,
+            "field": "fileName"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u16",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "dataForge",
+            "recordIndex": 2,
+            "field": "recordName"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u17",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "dataForge",
+            "recordIndex": 2,
+            "field": "sourceType"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u18",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeStructDefinition",
+            "indices": [
+              "3"
+            ],
+            "field": "name"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u19",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "dataForge",
+            "recordIndex": 2,
+            "field": "fileName"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u2",
+          "source": "a0.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].declaredBlockLength"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u20",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "dataForge",
+            "recordIndex": 2,
+            "field": "recordName"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u21",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "dataForge",
+            "recordIndex": 2,
+            "field": "sourceType"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u22",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeStructDefinition",
+            "indices": [
+              "3"
+            ],
+            "field": "name"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u23",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "5"
+            ],
+            "field": "name"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u24",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "575",
+              "579"
+            ],
+            "field": "text"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u25",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "2"
+            ],
+            "field": "name"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u26",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "547",
+              "552"
+            ],
+            "field": "text"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u27",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "0"
+            ],
+            "field": "name"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u28",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "530",
+              "535"
+            ],
+            "field": "text"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u29",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "5"
+            ],
+            "field": "targetedInstanceLayout"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u3",
+          "source": "a0.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].rawWord"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u30",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "2"
+            ],
+            "field": "targetedInstanceLayout"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u31",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "0"
+            ],
+            "field": "instanceLayout"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u32",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "661",
+              "665"
+            ],
+            "field": "slot"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u33",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "5"
+            ],
+            "field": "targetedInstanceLayout"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u34",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "2"
+            ],
+            "field": "targetedInstanceLayout"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u35",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "0"
+            ],
+            "field": "instanceLayout"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u36",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "657",
+              "661"
+            ],
+            "field": "slot"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u37",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "3"
+            ],
+            "field": "name"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u38",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "553",
+              "558"
+            ],
+            "field": "text"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u39",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "3"
+            ],
+            "field": "instanceLayout"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u4",
+          "source": "a0.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].rawBytes"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u40",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "666",
+              "670"
+            ],
+            "field": "slot"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u41",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "456",
+              "460"
+            ],
+            "field": "text"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u42",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "456",
+              "460"
+            ],
+            "field": "text"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u43",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "3"
+            ],
+            "field": "instanceLayout"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u44",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "662",
+              "666"
+            ],
+            "field": "slot"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u45",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "662",
+              "666"
+            ],
+            "field": "slot"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u46",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "6"
+            ],
+            "field": "name"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u47",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "580",
+              "585"
+            ],
+            "field": "text"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u48",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "670",
+              "678"
+            ],
+            "field": "arrayHeader"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u49",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "666",
+              "674"
+            ],
+            "field": "arrayHeader"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u5",
+          "source": "a0.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0]"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u50",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "6"
+            ],
+            "field": "instanceLayout"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u51",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "448",
+              "452"
+            ],
+            "field": "arrayElement"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u52",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "6"
+            ],
+            "field": "instanceLayout"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u53",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "448",
+              "452"
+            ],
+            "field": "arrayElement"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u54",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "452",
+              "456"
+            ],
+            "field": "arrayElement"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u55",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "7"
+            ],
+            "field": "name"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u56",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "586",
+              "591"
+            ],
+            "field": "text"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u57",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "7"
+            ],
+            "field": "instanceLayout"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u58",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "678",
+              "686"
+            ],
+            "field": "slot"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u59",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "7"
+            ],
+            "field": "instanceLayout"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u6",
+          "source": "a0.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u60",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "674",
+              "682"
+            ],
+            "field": "pointerSelector"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u61",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeStructDefinition",
+            "indices": [
+              "0"
+            ],
+            "field": "name"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u62",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "0"
+            ],
+            "field": "name"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u63",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "521",
+              "526"
+            ],
+            "field": "text"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u64",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "634",
+              "638"
+            ],
+            "field": "slot"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u65",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "1"
+            ],
+            "field": "name"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u66",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "527",
+              "532"
+            ],
+            "field": "text"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u67",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "1"
+            ],
+            "field": "instanceLayout"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u68",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "638",
+              "639"
+            ],
+            "field": "slot"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u69",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "8"
+            ],
+            "field": "name"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u7",
+          "source": "a1.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "path"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u70",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "592",
+              "597"
+            ],
+            "field": "text"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u71",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "8"
+            ],
+            "field": "instanceLayout"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u72",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "690",
+              "706"
+            ],
+            "field": "slot"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u73",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "dataForge",
+            "recordIndex": 0,
+            "field": "fileName"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u74",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "461",
+              "480"
+            ],
+            "field": "text"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u75",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "dataForge",
+            "recordIndex": 0,
+            "field": "sourceType"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u76",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeStructDefinition",
+            "indices": [
+              "2"
+            ],
+            "field": "name"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u77",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "690",
+              "706"
+            ],
+            "field": "slot"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u78",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "8"
+            ],
+            "field": "instanceLayout"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u79",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "686",
+              "702"
+            ],
+            "field": "slot"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u8",
+          "source": "a1.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "generalPurposeFlags"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u80",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "dataForge",
+            "recordIndex": 1,
+            "field": "fileName"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u81",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "472",
+              "491"
+            ],
+            "field": "text"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u82",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "dataForge",
+            "recordIndex": 1,
+            "field": "sourceType"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u83",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeStructDefinition",
+            "indices": [
+              "2"
+            ],
+            "field": "name"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u84",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "686",
+              "702"
+            ],
+            "field": "slot"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u85",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "10"
+            ],
+            "field": "name"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u86",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "604",
+              "609"
+            ],
+            "field": "text"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u87",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "10"
+            ],
+            "field": "instanceLayout"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u88",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "714",
+              "722"
+            ],
+            "field": "slot"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u89",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "501",
+              "523"
+            ],
+            "field": "text"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u9",
+          "source": "a1.0",
+          "scope": "archiveDirectoryMetadata",
+          "role": "payload",
+          "location": {
+            "type": "metadata",
+            "field": "encryptionDeclarations[0].declaredBlockLength"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u90",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "9"
+            ],
+            "field": "targetedInstanceLayout"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u91",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "706",
+              "714"
+            ],
+            "field": "arrayHeader"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u92",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeStructDefinition",
+            "indices": [
+              "0"
+            ],
+            "field": "name"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u93",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "dataForge",
+            "recordIndex": 2,
+            "field": "guid"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u94",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "9"
+            ],
+            "field": "name"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u95",
+          "source": "a0.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "598",
+              "603"
+            ],
+            "field": "text"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u96",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "10"
+            ],
+            "field": "instanceLayout"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u97",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "selector",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "710",
+              "718"
+            ],
+            "field": "slot"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u98",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "payload",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgeDecodedBytes",
+            "indices": [
+              "492",
+              "514"
+            ],
+            "field": "text"
+          },
+          "effectiveEncryption": "unencrypted"
+        },
+        {
+          "id": "u99",
+          "source": "a1.0",
+          "scope": "payload",
+          "role": "conversion",
+          "location": {
+            "type": "subresource",
+            "namespace": "dataforgePropertyDefinition",
+            "indices": [
+              "9"
+            ],
+            "field": "targetedInstanceLayout"
+          },
+          "effectiveEncryption": "unencrypted"
+        }
+      ]
+    }
   }
 }

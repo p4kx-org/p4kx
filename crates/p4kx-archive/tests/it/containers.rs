@@ -237,8 +237,7 @@ fn a_corrupt_container_gives_an_error_naming_the_entry() -> TestResult {
     let message = archive
         .open_container(entry(&archive, "Data\\damaged.socpak")?)
         .err()
-        .map(|error| error.to_string())
-        .unwrap_or_default();
+        .map_or_default(|error| error.to_string());
     assert!(
         message.contains("Data\\damaged.socpak"),
         "the message names the Entry: {message}"

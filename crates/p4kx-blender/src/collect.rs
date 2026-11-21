@@ -4,26 +4,33 @@
 use std::collections::{BTreeMap, HashMap, HashSet};
 
 use p4kx_assembly::ModelProvider;
-use p4kx_gltf::{DrawnMaterial, drawn_materials, texture_path};
-use p4kx_model::{LayerBudget, Material, MaterialLayer, MaterialLibrary, TintPalette};
+use p4kx_extraction::{ArchiveDefaultMaterial, EntryOrigin};
+use p4kx_gltf::{DrawnMaterial, drawn_materials_with_fallback};
+use p4kx_model::{LayerBudget, Material, MaterialLibrary, TintPalette};
 
-use crate::TextureUse;
-use crate::describe::{describe, layer_shares, library_path};
+use crate::describe::{describe, library_path};
 use crate::items::Item;
 use crate::manifest::{Issue, IssueOrigin};
 use crate::manifest_materials::MaterialDescription;
+use crate::material_library_sources::MaterialLibrarySources;
 use crate::plan::MeshPlan;
-use crate::roles::{classify_in, has_smoothness};
+use crate::texture_encoding::TextureMode;
 use crate::textures::Wanted;
+use crate::{PackageResult, PackageWriteContext};
+
+#[path = "collect_layers.rs"]
+mod layers;
+#[path = "collect_textures.rs"]
+mod textures;
 
 /// How many material layers deep a layer's own layers are followed.
 const MAX_LAYER_DEPTH: usize = 8;
 
-/// A material description and, for each of its texture slots, the path of the texture it names.
+/// A material description and the selected output texture of each slot.
 #[derive(Debug)]
 pub(crate) struct Described {
     pub(crate) description: MaterialDescription,
-    pub(crate) paths: Vec<Option<String>>,
+    pub(crate) texture_positions: Vec<Option<usize>>,
     followed_at: Option<usize>,
 }
 
@@ -36,20 +43,34 @@ pub(crate) struct Refused {
 
 type MaterialKey = (String, Option<usize>);
 
+#[derive(Clone, Copy)]
+struct LibraryInput<'a> {
+    library: &'a MaterialLibrary,
+    entry: Option<&'a EntryOrigin>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct MaterialOccurrence {
+    library: usize,
+    description: usize,
+}
+
 /// The materials of every distinct mesh, their descriptions, their palettes and the distinct
 /// texture files they name.
 #[derive(Debug, Default)]
 pub(crate) struct Collected {
+    pub(crate) library_sources: MaterialLibrarySources,
     pub(crate) materials: Vec<Vec<DrawnMaterial>>,
     pub(crate) described: Vec<Vec<Option<usize>>>,
+    pub(crate) authored_libraries: Vec<Option<usize>>,
     pub(crate) descriptions: Vec<Described>,
     pub(crate) palettes: Vec<TintPalette>,
     pub(crate) palette_of: Vec<Option<usize>>,
     pub(crate) wanted: Vec<Wanted>,
     pub(crate) refused: Vec<Refused>,
     pub(crate) issues: Vec<Issue>,
-    index_of: HashMap<String, usize>,
-    keys: HashMap<MaterialKey, usize>,
+    index_of: HashMap<(String, TextureMode), usize>,
+    keys: HashMap<MaterialKey, Vec<MaterialOccurrence>>,
     layer_budget: LayerBudget,
     layer_issues: HashSet<(String, String, String)>,
     cut: BTreeMap<usize, (String, String)>,
@@ -63,43 +84,87 @@ impl Collected {
         plan: &MeshPlan,
         level: u32,
         models: &dyn ModelProvider,
-    ) -> Self {
+        fallback: Option<&ArchiveDefaultMaterial>,
+        context: &PackageWriteContext<'_>,
+    ) -> PackageResult<Self> {
+        let fallback = fallback.and_then(|fallback| {
+            Some(LibraryInput {
+                library: fallback.library()?,
+                entry: fallback.original(),
+            })
+        });
         let mut collected = Self {
             layer_budget: models.layer_budget(),
             ..Self::default()
         };
         for index in 0..plan.len() {
+            context.check()?;
             let item = plan.first(index).and_then(|position| items.get(position));
-            let drawn = item
-                .and_then(|item| item.drawn)
-                .map(|drawn| drawn_materials(drawn.model, drawn.materials, level))
-                .unwrap_or_default();
-            let palette = item
-                .and_then(|item| item.drawn?.palette)
-                .map(|palette| collected.palette_index(palette));
-            collected.palette_of.push(palette);
-            collected.folder = item
-                .and_then(|item| item.geometry)
-                .and_then(|geometry| {
-                    geometry
-                        .replace('\\', "/")
-                        .rsplit_once('/')
-                        .map(|(folder, _)| folder.to_ascii_lowercase())
-                })
-                .unwrap_or_default();
-            let library = item.and_then(|item| item.drawn?.materials.library());
-            let described = drawn
-                .iter()
-                .map(|material| {
-                    let position = material.library_index?;
-                    collected.describe(library?, position, Some(material), models, 0)
-                })
-                .collect();
-            collected.described.push(described);
-            collected.materials.push(drawn);
+            collected.add_mesh(item, level, models, fallback, context)?;
         }
         collected.cut_issues();
-        collected
+        collected.library_sources.finish(context)?;
+        Ok(collected)
+    }
+
+    fn add_mesh(
+        &mut self,
+        item: Option<&Item<'_>>,
+        level: u32,
+        models: &dyn ModelProvider,
+        fallback: Option<LibraryInput<'_>>,
+        context: &PackageWriteContext<'_>,
+    ) -> PackageResult<()> {
+        let drawn = item.and_then(|item| item.drawn).map_or_default(|drawn| {
+            drawn_materials_with_fallback(
+                drawn.model,
+                drawn.materials,
+                level,
+                fallback.and_then(|fallback| fallback.library.materials.first()),
+            )
+        });
+        let palette = item
+            .and_then(|item| item.drawn?.palette)
+            .map(|palette| self.palette_index(palette));
+        self.palette_of.push(palette);
+        self.folder = item
+            .and_then(|item| item.geometry)
+            .and_then(|geometry| {
+                geometry
+                    .replace('\\', "/")
+                    .rsplit_once('/')
+                    .map(|(folder, _)| folder.to_ascii_lowercase())
+            })
+            .unwrap_or_default();
+        let library = item.and_then(|item| {
+            let drawn = item.drawn?;
+            Some(LibraryInput {
+                library: drawn.materials.library()?,
+                entry: drawn.material_entry,
+            })
+        });
+        let authored = self.library_sources.capture_fallback(
+            library.map(|library| library.library),
+            library.and_then(|library| library.entry),
+            &drawn,
+            &mut self.issues,
+            context,
+        )?;
+        self.authored_libraries.push(authored);
+        let described = drawn
+            .iter()
+            .map(|material| {
+                let (library, position) = material
+                    .library_index
+                    .map_or((fallback, 0), |position| (library, position));
+                library.map_or(Ok(None), |library| {
+                    self.describe(library, position, Some(material), models, 0, context)
+                })
+            })
+            .collect::<PackageResult<_>>()?;
+        self.described.push(described);
+        self.materials.push(drawn);
+        Ok(())
     }
 
     fn palette_index(&mut self, palette: &TintPalette) -> usize {
@@ -114,218 +179,143 @@ impl Collected {
 
     fn describe(
         &mut self,
-        library: &MaterialLibrary,
+        input: LibraryInput<'_>,
         position: usize,
         drawn: Option<&DrawnMaterial>,
         models: &dyn ModelProvider,
         depth: usize,
-    ) -> Option<usize> {
-        let original = library.materials.get(position)?;
+        context: &PackageWriteContext<'_>,
+    ) -> PackageResult<Option<usize>> {
+        let LibraryInput { library, entry } = input;
+        let Some(original) = library.materials.get(position) else {
+            return Ok(None);
+        };
+        let source_library =
+            self.library_sources
+                .capture(library, entry, &mut self.issues, context)?;
         let adjusted = original.hair_cap_of_body(&library.path);
         let material = adjusted.as_ref().unwrap_or(original);
         let index = (!library.single).then_some(position);
-        let path = library_path(&library.path);
-        let identity = if path.contains('/') {
-            path.to_ascii_lowercase()
-        } else {
-            format!("{}/{}", self.folder, path.to_ascii_lowercase())
-        };
+        let (path, identity) = self.library_identity(library);
         let key = (identity, index);
-        if let Some(&known) = self.keys.get(&key) {
+        let occurrences = self.keys.entry(key).or_default();
+        if let Some(known) = occurrences
+            .iter()
+            .find(|occurrence| occurrence.library == source_library)
+            .map(|occurrence| occurrence.description)
+        {
             let shallower = self
                 .descriptions
                 .get(known)
                 .is_some_and(|known| known.followed_at.is_none_or(|at| depth < at));
             if shallower && depth < MAX_LAYER_DEPTH {
-                self.follow_layers(known, material, models, depth);
+                self.follow_layers(known, material, models, depth, context)?;
             }
-            return Some(known);
+            if let Some(drawn) = drawn {
+                self.want_drawn(drawn);
+            }
+            return Ok(Some(known));
         }
         let at = self.descriptions.len();
-        let description = describe(
+        let first = occurrences.first().map(|occurrence| occurrence.library);
+        occurrences.push(MaterialOccurrence {
+            library: source_library,
+            description: at,
+        });
+        if let Some(issue) =
+            self.library_sources
+                .conflict(first, source_library, &path, &material.name)
+        {
+            self.issues.push(issue);
+        }
+        let mut description = describe(
             id_of(at),
             &path,
             index,
             material,
             library.default_palette.as_deref(),
         );
-        let paths = self.want_textures(material, drawn);
-        self.keys.insert(key, at);
+        description.source_library = Some(source_library);
+        self.add_description(description, input, position, material, drawn)?;
+        if depth < MAX_LAYER_DEPTH {
+            self.follow_layers(at, material, models, depth, context)?;
+        } else if !material.layers.is_empty() {
+            self.cut.insert(at, (path, material.name.clone()));
+        }
+        Ok(Some(at))
+    }
+
+    fn library_identity(&self, library: &MaterialLibrary) -> (String, String) {
+        let relative = p4kx_model::material_library_path(&library.path);
+        let mapped_root = relative.is_none() && library.target.is_some();
+        let path = relative
+            .unwrap_or_else(|| library_path(library.target.as_deref().unwrap_or(&library.path)));
+        let identity = if mapped_root || path.contains('/') {
+            path.to_ascii_lowercase()
+        } else {
+            format!("{}/{}", self.folder, path.to_ascii_lowercase())
+        };
+        (path, identity)
+    }
+
+    fn add_description(
+        &mut self,
+        mut description: MaterialDescription,
+        input: LibraryInput<'_>,
+        position: usize,
+        material: &Material,
+        drawn: Option<&DrawnMaterial>,
+    ) -> PackageResult<()> {
+        if let Some(source) = input.library.emission_source(position)
+            && crate::package_material_emission::relevant(&source)
+            && let Some(source_library) = description.source_library
+        {
+            let evidence = self.library_sources.evidence(source_library, input.entry)?;
+            description.emission_source = Some(crate::PackageMaterialEmission::of(
+                &source,
+                source_library,
+                material,
+                evidence,
+            )?);
+        }
+        let texture_positions =
+            self.want_textures(material, drawn, description.emission_source.as_ref());
+        if let Some(drawn) = drawn {
+            self.want_drawn(drawn);
+        }
+        self.note_truncation(&description.library, material);
         self.descriptions.push(Described {
             description,
-            paths,
+            texture_positions,
             followed_at: None,
         });
+        Ok(())
+    }
+
+    fn note_truncation(&mut self, path: &str, material: &Material) {
         for cut in &material.truncated {
             self.issues.push(Issue {
                 origin: IssueOrigin::Material,
                 kind: "material".to_owned(),
-                path: path.clone(),
+                path: path.to_owned(),
                 name: material.name.clone(),
                 skipped: false,
                 reason: format!("the material file is cut off: {cut}"),
             });
         }
-        if depth < MAX_LAYER_DEPTH {
-            self.follow_layers(at, material, models, depth);
-        } else if !material.layers.is_empty() {
-            self.cut.insert(at, (path, material.name.clone()));
-        }
-        Some(at)
     }
 
-    fn follow_layers(
-        &mut self,
-        at: usize,
-        material: &Material,
-        models: &dyn ModelProvider,
-        depth: usize,
-    ) {
-        if let Some(parent) = self.descriptions.get_mut(at) {
-            parent.followed_at = Some(depth);
-        }
-        self.cut.remove(&at);
-        let mut resolved = vec![false; material.layers.len()];
-        for (number, layer) in material.layers.iter().enumerate() {
-            let found = self.layer_material(material, layer, models, depth);
-            if let Some(found) = found
-                && let Some(slot) = self
-                    .descriptions
-                    .get_mut(at)
-                    .and_then(|parent| parent.description.layers.get_mut(number))
-            {
-                slot.material = Some(id_of(found));
-                if let Some(flag) = resolved.get_mut(number) {
-                    *flag = true;
-                }
-            }
-        }
-        if let Some(parent) = self.descriptions.get_mut(at) {
-            parent.description.layer_shares = layer_shares(material, |number| {
-                resolved.get(number).copied().unwrap_or(false)
-            });
-        }
-    }
-
-    fn cut_issues(&mut self) {
-        for (path, name) in std::mem::take(&mut self.cut).into_values() {
-            self.issues.push(Issue {
-                origin: IssueOrigin::Material,
-                kind: "layer_material".to_owned(),
-                path,
-                name,
-                skipped: false,
-                reason: format!("layers are followed {MAX_LAYER_DEPTH} files deep"),
-            });
-        }
-    }
-
-    fn layer_material(
-        &mut self,
-        parent: &Material,
-        layer: &MaterialLayer,
-        models: &dyn ModelProvider,
-        depth: usize,
-    ) -> Option<usize> {
-        let path = layer.attribute("Path").map(str::trim).unwrap_or_default();
-        if path.is_empty() {
-            return None;
-        }
-        let status = models.layer_library(path, &mut self.layer_budget);
-        let Some(library) = status.library() else {
-            let problem = status.problem().unwrap_or_default();
-            self.layer_issue(parent, path, &problem);
-            return None;
-        };
-        let Some(position) = library.layer_position(layer.attribute("Submtl").unwrap_or_default())
-        else {
-            self.layer_issue(parent, path, "the layer file has no such sub-material");
-            return None;
-        };
-        self.describe(library, position, None, models, depth + 1)
-    }
-
-    fn layer_issue(&mut self, parent: &Material, path: &str, reason: &str) {
-        let first =
-            self.layer_issues
-                .insert((path.to_owned(), parent.name.clone(), reason.to_owned()));
-        if !first {
-            return;
-        }
-        self.issues.push(Issue {
-            origin: IssueOrigin::Material,
-            kind: "layer_material".to_owned(),
-            path: path.to_owned(),
-            name: parent.name.clone(),
-            skipped: false,
-            reason: reason.to_owned(),
-        });
-    }
-
-    fn want_textures(
-        &mut self,
-        material: &Material,
-        drawn: Option<&DrawnMaterial>,
-    ) -> Vec<Option<String>> {
-        material
-            .textures
-            .iter()
-            .map(|slot| {
-                let Some(path) = texture_path(&slot.file) else {
-                    if !slot.file.trim_start().starts_with('$') {
-                        self.refused.push(Refused {
-                            file: slot.file.clone(),
-                            material: material.name.clone(),
-                        });
-                    }
-                    return None;
-                };
-                let role = drawn
-                    .and_then(|drawn| gltf_role(drawn, &path))
-                    .unwrap_or_else(|| classify_in(material, &slot.map, &slot.file));
-                let gloss = role == TextureUse::Normal && has_smoothness(&slot.file);
-                self.want(&path, &slot.file, role, gloss, &material.name);
-                Some(path)
-            })
-            .collect()
-    }
-
-    fn want(&mut self, path: &str, file: &str, role: TextureUse, gloss: bool, material: &str) {
-        let identity = path.to_ascii_lowercase();
-        if self.index_of.contains_key(&identity) {
-            return;
-        }
-        self.index_of.insert(identity, self.wanted.len());
-        self.wanted.push(Wanted {
-            path: path.to_owned(),
-            file: file.to_owned(),
-            material: material.to_owned(),
-            role,
-            gloss,
-        });
-    }
-
-    /// Returns the position among the wanted textures of the texture at `path`.
-    pub(crate) fn position_of(&self, path: &str) -> Option<usize> {
-        self.index_of.get(&path.to_ascii_lowercase()).copied()
+    pub(crate) fn position_of(&self, path: &str, mode: TextureMode) -> Option<usize> {
+        self.index_of
+            .get(&(path.to_ascii_lowercase(), mode))
+            .copied()
     }
 }
+
+#[cfg(test)]
+mod tests;
 
 /// Returns the id of the description at position `at`.
 pub(crate) fn id_of(at: usize) -> String {
     format!("x{:04}", at + 1)
-}
-
-fn gltf_role(drawn: &DrawnMaterial, path: &str) -> Option<TextureUse> {
-    [
-        (&drawn.diffuse, TextureUse::Diffuse),
-        (&drawn.normal, TextureUse::Normal),
-        (&drawn.specular, TextureUse::Specular),
-    ]
-    .into_iter()
-    .find_map(|(file, role)| {
-        file.as_ref()
-            .is_some_and(|file| file.path.eq_ignore_ascii_case(path))
-            .then_some(role)
-    })
 }

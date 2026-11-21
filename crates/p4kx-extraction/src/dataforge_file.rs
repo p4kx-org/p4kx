@@ -8,7 +8,10 @@ use std::path::Path;
 use p4kx_dataforge::{SNIFF_LEN, looks_like_dataforge};
 
 use crate::dataforge::check_size_within;
-use crate::{ArchiveChanged, DataForgeEntry, DataForgeLoadError, MAX_DATAFORGE_SIZE};
+use crate::{
+    ArchiveChanged, DataForgeEntry, DataForgeFileOrigin, DataForgeLoadError, DataForgeOrigin,
+    FileStamp, MAX_DATAFORGE_SIZE,
+};
 
 /// Returns whether the file at `path` starts like a DataForge database, whatever its name.
 ///
@@ -68,15 +71,21 @@ impl DataForgeEntry {
             path: name.clone(),
             source,
         };
-        let handle = File::open(file).map_err(read)?;
+        let source_path = std::path::absolute(file).map_err(read)?;
+        let handle = File::open(&source_path).map_err(read)?;
         let opened = handle.metadata().map_err(read)?;
         let size = opened.len();
         check_size_within(&name, size, limit)?;
-        let entry = Self::read_stream(name.clone(), size, handle, stop)?;
-        let now = std::fs::metadata(file).map_err(read)?;
-        if now.len() != size || now.modified().ok() != opened.modified().ok() {
+        let mut entry = Self::read_stream(name.clone(), size, handle, stop)?;
+        let now = std::fs::metadata(&source_path).map_err(read)?;
+        let stamp = FileStamp::from_metadata(&opened);
+        if FileStamp::from_metadata(&now) != stamp {
             return Err(DataForgeLoadError::ArchiveChanged(ArchiveChanged::of(file)));
         }
+        entry.set_origin(DataForgeOrigin::File(DataForgeFileOrigin::new(
+            source_path,
+            stamp,
+        )));
         Ok(entry)
     }
 }

@@ -31,10 +31,15 @@ Tags); the game decides at spawn time. The Tags themselves are in the Archive, t
   - No Requirement, a null pointer, and a tag Requirement with neither required nor banned Tags
     restrict nothing: `Met`.
   - A tag Requirement that names a Tag is `Undecided`, as is a Requirement of a type not listed
-    above, an `OR` without parts, a `NOT` without a part, and one nested deeper than 16 levels.
+    above, an `OR` without parts, and a `NOT` without a part.
   - `OR` is `Met` when a part is `Met`, `Unmet` when all parts are `Unmet`, otherwise `Undecided`;
     `NOT` swaps `Met` and `Unmet` and keeps `Undecided`. Nothing in LIVE reaches `Unmet`; the rule
     follows from the two above and is there for a patch that adds such a Requirement.
+- **Nested decoded Requirements retain their meaning.** Borrowed NOT/OR frames evaluate the
+  original operands in source order without an evaluator depth cutoff or a width-sized work
+  list. An OR stops at its first Met part; earlier Undecided parts do not hide a later Met part.
+  Empty or unreadable operands and unrecognized types retain their Undecided meaning. The
+  canonical reader's independent source admission remains unchanged.
 - **An `Unmet` assortment or group gives nothing.**
 - **An `Undecided` assortment or group is used and noted, never an issue.** It contributes its
   first alternative as ADR-0289 states, so that no export changes. The Loadout of the Entity gets

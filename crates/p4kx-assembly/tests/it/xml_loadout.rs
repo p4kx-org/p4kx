@@ -8,8 +8,8 @@ use std::error::Error;
 use std::fmt::Write as _;
 
 use p4kx_assembly::{
-    Attachment, EntityNode, LoadoutError, LoadoutFileError, LoadoutFiles, LoadoutResolver,
-    PortNode, PortSource,
+    Attachment, EntityNode, LoadoutError, LoadoutFileError, LoadoutFiles, LoadoutOrigin,
+    LoadoutResolver, PortNode, PortSource,
 };
 use p4kx_dataforge::DataForge;
 use p4kx_testkit::{
@@ -314,10 +314,13 @@ fn a_huge_xml_loadout_merges_its_includes_in_linear_time() -> TestResult {
     let started = std::time::Instant::now();
     let tree = resolve(&builder, Some(&files))?;
     let elapsed = started.elapsed();
-    assert_eq!(
-        tree.ports().len(),
-        p4kx_assembly::MAX_LOADOUT_PORTS,
-        "capped after the merge"
+    assert_eq!(tree.ports().len(), count, "every merged port");
+    assert!(tree.issues().is_empty(), "the merged Loadout is complete");
+    let last = tree.ports().last().ok_or("the final merged port")?;
+    assert_eq!(last.name(), "port_199999", "original merged order");
+    assert!(
+        matches!(last.origin(), Some(LoadoutOrigin::File(path)) if path.as_ref() == "Loadouts/Door.xml"),
+        "the final override retains its original XML Loadout",
     );
     assert!(
         tree.ports()
@@ -346,19 +349,28 @@ impl LoadoutFiles for Counting {
 }
 
 #[test]
-fn includes_are_read_once_and_their_number_is_capped() -> TestResult {
-    let builder = database(TestLoadout::Xml("Scripts/Loadouts/Door.xml".to_owned()));
+fn a_wide_loadout_reads_distinct_includes_and_preserves_port_order() -> TestResult {
+    const INCLUDES: usize = 257;
+    let root = "scripts/loadouts/door.xml";
+    let builder = database(TestLoadout::Xml(root.to_owned()));
     let mut loadouts = TestElement::new("Loadouts");
-    for number in 0..(2 * p4kx_assembly::MAX_XML_INCLUDES) {
+    let mut documents = HashMap::new();
+    for number in 0..INCLUDES {
+        let path = format!("scripts/loadouts/{number}.xml");
         for _ in 0..2 {
-            loadouts = loadouts.child(
-                TestElement::new("Loadout").attribute("loadout", format!("Missing/{number}.xml")),
-            );
+            loadouts =
+                loadouts.child(TestElement::new("Loadout").attribute("loadout", path.as_str()));
         }
+        let child = TestElement::new("Loadout")
+            .child(TestElement::new("Items").child(item(&format!("port_{number}"), "Decal_Red")));
+        documents.insert(path, cryxml(&child));
     }
-    let door = TestElement::new("Loadout").child(loadouts);
+    documents.insert(
+        root.to_owned(),
+        cryxml(&TestElement::new("Loadout").child(loadouts)),
+    );
     let counting = Counting {
-        files: files(&[("scripts/loadouts/door.xml", cryxml(&door))]),
+        files: Files(documents),
         reads: std::sync::atomic::AtomicUsize::new(0),
     };
     let bytes = builder.build();
@@ -368,14 +380,12 @@ fn includes_are_read_once_and_their_number_is_capped() -> TestResult {
     let tree = resolver.resolve(&record)?;
 
     let reads = counting.reads.load(std::sync::atomic::Ordering::Relaxed);
-    assert_eq!(reads, p4kx_assembly::MAX_XML_INCLUDES, "files read");
-    assert_eq!(
-        tree.issues().len(),
-        p4kx_assembly::MAX_XML_INCLUDES,
-        "{} missing includes and the one left out",
-        p4kx_assembly::MAX_XML_INCLUDES - 1
-    );
-    let last = tree.issues().last().ok_or("an issue")?.to_string();
-    assert!(last.contains("left out"), "{last}");
+    assert_eq!(reads, INCLUDES + 1, "one read per distinct document");
+    assert!(tree.issues().is_empty(), "issues: {:?}", tree.issues());
+    let actual: Vec<_> = tree.ports().iter().map(PortNode::name).collect();
+    let expected: Vec<_> = (0..INCLUDES)
+        .map(|number| format!("port_{number}"))
+        .collect();
+    assert_eq!(actual, expected, "every included port in source order");
     Ok(())
 }

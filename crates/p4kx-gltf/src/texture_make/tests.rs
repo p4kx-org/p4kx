@@ -100,6 +100,7 @@ pub(super) fn normal_jobs(count: usize) -> Vec<Job> {
                 diffuse: None,
                 normal: Some(source(path, true)),
                 specular: None,
+                explicit_gloss: Vec::new(),
                 tints: TINTS,
                 layered: None,
             }
@@ -216,17 +217,21 @@ fn a_texture_shared_by_two_jobs_is_decoded_once() {
         diffuse: None,
         normal: Some(source(path.clone(), true)),
         specular: None,
+        explicit_gloss: Vec::new(),
         tints: TINTS,
         layered: None,
     };
     let packed = Job {
         key: Key::MetallicRoughness {
+            finish: None,
             gloss: Some(path.clone()),
+            explicit_gloss: Vec::new(),
             specular: None,
         },
         diffuse: None,
         normal: Some(source(path, true)),
         specular: None,
+        explicit_gloss: Vec::new(),
         tints: TINTS,
         layered: None,
     };
@@ -267,12 +272,15 @@ fn a_metallic_roughness_image_with_two_sources_is_not_sized_by_the_normal_map() 
     let (normal, specular) = source_pair("objects/a.dds");
     let job = Job {
         key: Key::MetallicRoughness {
+            finish: None,
             gloss: Some(normal.path.clone()),
+            explicit_gloss: Vec::new(),
             specular: Some((specular.path.clone(), [255; 3])),
         },
         diffuse: None,
         normal: Some(normal),
         specular: Some(specular),
+        explicit_gloss: Vec::new(),
         tints: TINTS,
         layered: None,
     };

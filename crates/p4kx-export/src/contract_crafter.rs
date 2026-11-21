@@ -91,7 +91,7 @@ pub(crate) struct CategoryRule<'a> {
     pub(crate) kind: &'static str,
     /// The name of the struct; `null` when the field holds none.
     pub(crate) struct_name: Option<&'a str>,
-    /// The `guid`s of the `blueprintCategories` entries `categories` links to, in stored order;
+    /// Category Record GUIDs in `definitions.blueprintCategories.rows`, in stored order;
     /// `[]` for `none` and `unknown`.
     pub(crate) blueprint_category_guids: Vec<CatalogGuid>,
 }

@@ -7,9 +7,8 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 
+from .glb_material_slots import INDEX_PROPERTY
 from .package import pair_materials
-
-INDEX_PROPERTY = "p4kx_index"
 
 
 def index_of(value: object) -> int | None:
@@ -25,19 +24,19 @@ def index_of(value: object) -> int | None:
 
 def pair_by_index(
     manifest: Sequence[tuple[int, str]], created: Sequence[tuple[str, int | None]]
-) -> dict[int, str]:
-    """Pairs manifest ``(index, name)`` entries with created ``(name, p4kx_index)`` materials.
+) -> dict[int, list[str]]:
+    """Groups every Blender material carrying a manifest slot's index.
 
-    A created material that carries ``p4kx_index`` pairs with the manifest entry of that index.
-    The rest are paired by name, as ``pair_materials`` does, among the entries still unpaired.
+    Only unindexed materials participate in the legacy name pairing for unmatched slots.
     """
     known = {index for index, _ in manifest}
-    pairs: dict[int, str] = {}
-    for name, index in sorted(created, key=lambda item: (item[0], -1 if item[1] is None else item[1])):
-        if index in known and index not in pairs:
-            pairs[index] = name
-    taken = set(pairs.values())
-    rest_manifest = [(index, name) for index, name in manifest if index not in pairs]
-    rest_created = [name for name, _ in created if name not in taken]
-    pairs.update(pair_materials(rest_manifest, rest_created))
+    pairs: dict[int, list[str]] = {}
+    unindexed = []
+    for name, index in sorted(created, key=lambda item: item[0]):
+        if index is None:
+            unindexed.append(name)
+        elif index in known:
+            pairs.setdefault(index, []).append(name)
+    remaining = [(index, name) for index, name in manifest if index not in pairs]
+    pairs.update({index: [name] for index, name in pair_materials(remaining, unindexed).items()})
     return pairs

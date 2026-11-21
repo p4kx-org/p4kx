@@ -3,18 +3,26 @@
 
 //! Exports the sounds of audio triggers as files named after the trigger.
 
+mod loop_origins;
 pub(super) mod name;
 mod plan;
+mod source;
 mod write;
 
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 use p4kx_audio::Loop;
-use p4kx_extraction::{CancelToken, ConflictPolicy, ConversionError, ensure_writable};
+use p4kx_extraction::{ArchiveWriteProtection, CancelToken, ConflictPolicy, ConversionError};
 
+use self::loop_origins::CaptureOrigins;
+pub(crate) use self::loop_origins::ExportedWemOrigin;
+pub use self::loop_origins::{ExportLoopOrigin, ExportLoopOrigins};
+pub(super) use self::source::ResolvedMedia;
+pub use self::source::WemExportSource;
 use self::write::Target;
+use super::export_preflight;
 use super::{ArchiveAudio, TriggerSounds};
 
 /// The file format a sound is exported in.
@@ -55,8 +63,7 @@ pub struct ExportOptions {
 /// leaving no partial file; the files it finished stay.
 #[derive(Debug, Default)]
 pub struct ExportWatch {
-    cancelled: AtomicBool,
-    token: Option<CancelToken>,
+    token: CancelToken,
     done: AtomicUsize,
     total: AtomicUsize,
 }
@@ -66,21 +73,26 @@ impl ExportWatch {
     #[must_use]
     pub fn linked(token: CancelToken) -> Self {
         Self {
-            token: Some(token),
+            token,
             ..Self::default()
         }
     }
 
-    /// Asks the export to stop at the next write.
+    /// Returns the token that stops resolution and export.
+    #[must_use]
+    pub const fn cancel_token(&self) -> &CancelToken {
+        &self.token
+    }
+
+    /// Asks the export to stop.
     pub fn cancel(&self) {
-        self.cancelled.store(true, Ordering::Relaxed);
+        self.token.cancel();
     }
 
     /// Returns whether the export was asked to stop.
     #[must_use]
     pub fn is_cancelled(&self) -> bool {
-        self.cancelled.load(Ordering::Relaxed)
-            || self.token.as_ref().is_some_and(CancelToken::is_cancelled)
+        self.token.is_cancelled()
     }
 
     /// Returns how many sounds are handled so far, written, kept or failed.
@@ -115,11 +127,14 @@ pub enum ExportState {
 
 /// One sound file of an export.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ExportedSound {
     /// The audio trigger the sound belongs to.
     pub trigger: String,
     /// The WEM ID.
     pub wem_id: u32,
+    /// The selected source in the Archive used to plan this file.
+    pub source: WemExportSource,
     /// The file.
     pub path: PathBuf,
     /// The format the file is in.
@@ -198,8 +213,8 @@ impl ExportReport {
 
 impl ArchiveAudio<'_> {
     /// Writes the sounds of `triggers` into `folder` as `<trigger>.<ext>` for a trigger with one
-    /// sound and `<trigger>_<WEM ID>.<ext>` for one with several; a WEM several variants lead to
-    /// is written once.
+    /// sound and `<trigger>_<WEM ID>.<ext>` for one with several. Repeated references to the same
+    /// physical media share one file.
     ///
     /// Names follow the portable file-name rule of ADR-0248: a character it forbids becomes `%`
     /// and two hex digits, a name too long for a file becomes `sound`, and a name already taken
@@ -213,8 +228,7 @@ impl ArchiveAudio<'_> {
     ///
     /// # Errors
     ///
-    /// Returns a [`ConversionError`] when `folder` is in a Star Citizen installation or cannot be
-    /// created.
+    /// Returns a [`ConversionError`] for a truncated resolution or an invalid output folder.
     pub fn export_sounds(
         &self,
         triggers: &[&TriggerSounds<'_>],
@@ -229,8 +243,7 @@ impl ArchiveAudio<'_> {
     ///
     /// # Errors
     ///
-    /// Returns a [`ConversionError`] when `folder` is in a Star Citizen installation or cannot be
-    /// created.
+    /// Returns the same errors as [`Self::export_sounds`].
     pub fn export_sounds_watched(
         &self,
         triggers: &[&TriggerSounds<'_>],
@@ -238,15 +251,50 @@ impl ArchiveAudio<'_> {
         options: ExportOptions,
         watch: &ExportWatch,
     ) -> Result<ExportReport, ConversionError> {
+        self.export_sounds_with(triggers, folder, options, watch, CaptureOrigins::Omit)
+            .map(|(report, _)| report)
+    }
+
+    /// Exports the sounds and their original WEM loop inputs for newly written files.
+    ///
+    /// # Errors
+    /// Returns the same output errors as [`Self::export_sounds_watched`].
+    pub fn export_sounds_watched_with_loop_origins(
+        &self,
+        triggers: &[&TriggerSounds<'_>],
+        folder: &Path,
+        options: ExportOptions,
+        watch: &ExportWatch,
+    ) -> Result<(ExportReport, ExportLoopOrigins), ConversionError> {
+        self.export_sounds_with(triggers, folder, options, watch, CaptureOrigins::Retain)
+    }
+
+    fn export_sounds_with(
+        &self,
+        triggers: &[&TriggerSounds<'_>],
+        folder: &Path,
+        options: ExportOptions,
+        watch: &ExportWatch,
+        capture: CaptureOrigins,
+    ) -> Result<(ExportReport, ExportLoopOrigins), ConversionError> {
+        if let Some(cut) = export_preflight::traversal_cut(triggers) {
+            return Err(cut.into_error());
+        }
         let plan = plan::build(triggers);
+        let mut origins = ExportLoopOrigins::default();
         watch.plan(plan.jobs.len());
         let mut report = ExportReport {
             failures: plan.failures,
             ..ExportReport::default()
         };
-        ensure_writable(folder)?;
+        if watch.is_cancelled() {
+            report.cancelled = !plan.jobs.is_empty();
+            return Ok((report, origins));
+        }
+        let protection = ArchiveWriteProtection::new(self.archive().path(), watch.token.flag())?;
+        protection.ensure_writable(folder, watch.token.flag())?;
         if plan.jobs.is_empty() {
-            return Ok(report);
+            return Ok((report, origins));
         }
         fs::create_dir_all(folder).map_err(|source| ConversionError::Write {
             path: folder.to_path_buf(),
@@ -259,14 +307,20 @@ impl ArchiveAudio<'_> {
         let target = Target {
             folder,
             absolute: &absolute,
+            protection: &protection,
         };
-        for outcome in write::run(self, &plan.jobs, target, options, watch) {
+        for outcome in write::run(self, &plan.jobs, target, options, watch, capture) {
             match outcome {
-                Ok(sound) => report.sounds.push(sound),
+                Ok(written) => {
+                    if let Some(origin) = written.origin {
+                        origins.insert(&written.sound, origin);
+                    }
+                    report.sounds.push(written.sound);
+                }
                 Err(failure) => report.failures.push(failure),
             }
         }
         report.cancelled = watch.is_cancelled() && watch.done() < plan.jobs.len();
-        Ok(report)
+        Ok((report, origins))
     }
 }

@@ -5,16 +5,15 @@ use std::collections::BTreeMap;
 
 use crate::entity_spawn_model::EntitySpawnPool;
 use crate::guid_text::CatalogGuid;
-use crate::npc_spawn_model::NpcSpawnPool;
+use crate::npc_spawn_model::DraftNpcPool;
 use crate::spawn_model::{LocationQuery, ShipSpawnPool};
 use crate::spawn_read::Spawn;
-use crate::texts::Texts;
 
 /// The distinct ship, NPC and entity spawn descriptions and location queries, by identifier.
 #[derive(Debug, Default)]
 pub(crate) struct SpawnPools<'f> {
     pub(crate) ships: BTreeMap<[u8; 36], ShipSpawnPool>,
-    pub(crate) npcs: BTreeMap<[u8; 36], NpcSpawnPool<'f>>,
+    pub(crate) npcs: BTreeMap<[u8; 36], DraftNpcPool<'f>>,
     pub(crate) entities: BTreeMap<[u8; 36], EntitySpawnPool>,
     pub(crate) locations: BTreeMap<[u8; 36], LocationQuery>,
 }
@@ -91,10 +90,5 @@ impl<'f> SpawnPools<'f> {
                 store(&mut self.locations, query, id, Target::Location)
             }
         }
-    }
-
-    /// Resolves the texts the pools hold by their keys.
-    pub(crate) fn resolve_texts(&mut self, texts: &Texts<'f>) {
-        self.npcs.values_mut().for_each(|pool| pool.resolve(texts));
     }
 }

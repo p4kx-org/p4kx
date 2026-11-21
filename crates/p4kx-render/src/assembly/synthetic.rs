@@ -3,7 +3,7 @@
 
 //! A small ship of boxes for the tests that draw: the nose points along +X, Z is up.
 
-use super::{AssemblyScene, Group, Item, Left, PartDraw, PartInfo};
+use super::{AssemblyPieceSource, AssemblyScene, Group, Item, Left, PartDraw, PartInfo};
 use crate::scene::{Bounds, Rows, Vertex, next_serial};
 
 const FACES: [([f32; 3], [f32; 3], [f32; 3]); 6] = [
@@ -171,6 +171,7 @@ pub(crate) fn ship() -> AssemblyScene {
         placed.include(centre.map(|value| value + radius));
         let number = u32::try_from(at).unwrap_or_default();
         items.push(Item {
+            library_slot: None,
             group: u32::from(at == 0),
             colour: [0.55, 0.60, 0.65, 1.0],
         });
@@ -184,6 +185,7 @@ pub(crate) fn ship() -> AssemblyScene {
             items: number..number + 1,
         });
         parts.push(PartInfo {
+            source: AssemblyPieceSource::Part(at),
             name: format!("port{at}/part"),
             path: format!("port{at}"),
             parent: at.checked_sub(1).map(|_| 0),
@@ -198,6 +200,8 @@ pub(crate) fn ship() -> AssemblyScene {
         items,
         draws,
         parts,
+        material_suppressions: None,
+        mesh_node_inputs: None,
         textures: Vec::new(),
         meshes: 2,
         bounds,

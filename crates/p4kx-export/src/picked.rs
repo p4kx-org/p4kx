@@ -3,63 +3,106 @@
 
 use p4kx_extraction::{Guid, RecordTree};
 
-use crate::blueprint_category::blueprint_category;
-use crate::commodity::commodity;
+use crate::blueprint_category::BlueprintCategory;
+use crate::catalog_read_failure::CatalogReadFailure;
+use crate::catalog_v3::ammo_definition::PreparedAmmoDefinition;
+use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
+use crate::catalog_v3::cargo_globals::{PreparedCargoLoadingGlobal, PreparedShopCommodityGlobal};
+use crate::catalog_v3::catalog_item_components::ItemComponentRows;
+use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition;
+use crate::catalog_v3::catalog_item_components::resolution::MagazineDependency;
+use crate::catalog_v3::catalog_resource_network_read::resource_network_global::PreparedResourceNetworkGlobal;
+use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
+use crate::catalog_v3::faction_definition::PreparedFaction;
+use crate::catalog_v3::inventory_container_definition::PreparedInventoryContainer;
+use crate::catalog_v3::law_kinds::LawPick;
+use crate::catalog_v3::location_vocabulary::LocationVocabularyPick;
+use crate::catalog_v3::loot_definition_catalog::LootDefinition;
+use crate::catalog_v3::medical::medical_tier_config::PreparedMedicalTier;
+use crate::catalog_v3::npc_spawn_definitions::NpcSpawnDefinitionsPick;
+use crate::catalog_v3::procedural_planet_audio::PreparedPlanetAudio;
+use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitionPick;
+use crate::catalog_v3::starmap_object_definition::StarmapObjectRead;
 use crate::contract::{
-    BlueprintCategory, Commodity, Crafter, HarvestableProviderPreset, Item, Manufacturer,
-    MineableComposition, MineableElement, MineableEntity, MiningGlobalParams, RefiningProcess,
-    ResourceGroup, Ship, StarmapObject, SubHarvestableMultiConfig,
+    Commodity, Crafter, HarvestableProviderPreset, Item, MineableComposition, MineableElement,
+    MineableEntity, MiningGlobalParams, RefiningProcess, ResourceGroup, ResourceType, Ship,
+    SubHarvestableMultiConfig,
 };
 use crate::crafter::crafter;
 use crate::crafting_warning::CraftingWarning;
-use crate::item::item;
 use crate::item_class::ClassLine;
-use crate::loadout::carries_ports;
 use crate::loot_kinds::LootPick;
-use crate::manufacturer::manufacturer;
-use crate::mining::{mineable_composition, mineable_element, refining_process};
-use crate::mining_params::mining_global_params;
+use crate::manufacturer::Manufacturer;
 use crate::mission_kinds::MissionPick;
 use crate::paint_port::VehicleFacts;
-use crate::playability_rules::Evidence;
-use crate::resource_group::{Groups, resource_group};
-use crate::ship::ship;
 use crate::ship_base::ShipRead;
-use crate::texts::Texts;
-use crate::{CatalogFailure, Kind};
+use crate::{CatalogError, Kind};
+
+pub(crate) struct PickedItem<'f> {
+    pub(crate) entity: Item<'f>,
+    pub(crate) line: ClassLine,
+    pub(crate) ports: Option<crate::loadout::Wanted>,
+    pub(crate) components: ItemComponentRows<'f>,
+    pub(crate) definition: ItemDefinition<'f>,
+}
 
 /// A Record a kind selected: its entity, or a development leftover of the kind.
 ///
 /// The kinds that [`read_crafting`](crate::read_crafting) fills are not picked.
 pub(crate) enum Picked<'f> {
     /// A manufacturer.
-    Manufacturer(Manufacturer<'f>),
-    /// An item, the `Class:` line of its English description and whether it may have ports.
-    Item(Item<'f>, ClassLine, bool),
+    Manufacturer(Box<Manufacturer<'f>>),
+    /// An item and the configurations read from its original Record.
+    Item(Box<PickedItem<'f>>),
     /// A ship and the vehicle facts its paints are derived from.
-    Ship(Ship<'f>, VehicleFacts),
+    Ship(Box<Ship<'f>>, VehicleFacts),
     /// A commodity.
-    Commodity(Commodity<'f>),
+    Commodity(Box<Commodity<'f>>),
     /// A resource group.
-    ResourceGroup(ResourceGroup<'f>),
+    ResourceGroup(Box<ResourceGroup<'f>>),
+    /// A resource definition with its authored source properties.
+    ResourceType(Box<ResourceType<'f>>),
     /// A blueprint category.
     BlueprintCategory(BlueprintCategory<'f>),
+    /// One original category database list.
+    BlueprintCategoryList(PreparedBlueprintCategoryList<'f>),
+    /// One original explosion definition.
+    ExplosionDefinition(Box<PreparedExplosionDefinition<'f>>),
+    AmmoDefinition(Box<PreparedAmmoDefinition<'f>>),
+    AmmoMagazineDependency(Box<MagazineDependency<'f>>),
+    InventoryContainer(Box<PreparedInventoryContainer<'f>>),
+    MedicalItemTierConfig(Box<PreparedMedicalTier<'f>>),
+    ProceduralPlanetAudio(Box<PreparedPlanetAudio<'f>>),
+    ResourceNetworkGlobal(Box<PreparedResourceNetworkGlobal<'f>>),
+    CargoLoadingGlobal(Box<PreparedCargoLoadingGlobal<'f>>),
+    ShopCommodityGlobal(Box<PreparedShopCommodityGlobal<'f>>),
+    FactionIdentity(
+        Box<crate::catalog_v3::faction_identity_definition::PreparedFactionIdentity<'f>>,
+    ),
+    Faction(Box<PreparedFaction<'f>>),
+    Law(LawPick<'f>),
+    LocationVocabulary(LocationVocabularyPick<'f>),
+    NpcSpawnDefinitions(NpcSpawnDefinitionsPick<'f>),
     /// A starmap object.
-    Starmap(StarmapObject<'f>),
+    Starmap(Box<StarmapObjectRead<'f>>),
+    StarmapDefinition(StarmapDefinitionPick<'f>),
     /// A mineable element.
-    Mineable(MineableElement<'f>),
+    Mineable(Box<MineableElement>),
     /// A refining process.
-    Refining(RefiningProcess<'f>),
+    Refining(Box<RefiningProcess<'f>>),
     /// A mineable composition.
-    Composition(MineableComposition<'f>),
+    Composition(Box<MineableComposition>),
     /// The mining parameters of a kind of miner.
-    MiningParams(MiningGlobalParams<'f>),
+    MiningParams(Box<MiningGlobalParams<'f>>),
     /// A mineable entity.
     MineableEntity(MineableEntity<'f>),
     /// A harvestable provider preset.
-    Provider(HarvestableProviderPreset<'f>),
-    /// A sub harvestable multi config.
-    MultiConfig(SubHarvestableMultiConfig<'f>),
+    Provider(Box<HarvestableProviderPreset>),
+    /// A physical multi config with an optional slot-preset projection.
+    MultiConfig {
+        definition: Box<LootDefinition<'f>>,
+        projection: Option<SubHarvestableMultiConfig<'f>>,
+    },
     /// An entity of a mission or reputation kind.
     Mission(MissionPick<'f>),
     /// An entity of a loot kind.
@@ -73,60 +116,91 @@ pub(crate) enum Picked<'f> {
     /// A development leftover that is an item and a paint.
     SkippedPaint,
     /// A Record that could not be read.
-    Failed(CatalogFailure),
+    Failed(CatalogReadFailure<'f>),
     /// A warning the check of the Records found.
     Warned(CraftingWarning),
 }
 
 impl<'f> Picked<'f> {
-    /// Returns the entity of `kind` the Record tree `tree` describes, its texts resolved by
-    /// `texts`; a commodity may take texts from its `ResourceType` Record `resource_type` and its
-    /// type from `groups`, a ship its playability from `evidence`. A ship's base data is read by
-    /// `ship_base`, called for a ship only; a ship it cannot read becomes a
-    /// [`Failed`](Self::Failed), never a missing Record. `None` for a kind that
-    /// [`read_crafting`](crate::read_crafting) fills.
-    pub(crate) fn entity(
-        kind: Kind,
-        tree: &RecordTree<'f>,
-        texts: &Texts<'f>,
-        resource_type: Option<&RecordTree<'f>>,
-        groups: &Groups,
-        evidence: &Evidence,
-        ship_base: &dyn Fn() -> Result<ShipRead, CatalogFailure>,
-    ) -> Option<Self> {
-        Some(match kind {
-            Kind::Manufacturers => Self::Manufacturer(manufacturer(tree, texts)),
-            Kind::Items => {
-                let (item, line) = item(tree, texts);
-                Self::Item(item, line, carries_ports(tree))
+    /// Returns the entity of `kind` the Record tree describes when no dedicated reader owns it.
+    #[expect(
+        clippy::too_many_lines,
+        reason = "one exhaustive dispatch for the catalog kinds"
+    )]
+    pub(crate) fn entity(kind: Kind, tree: &RecordTree<'f>) -> Option<Self> {
+        match kind {
+            Kind::Crafters => crafter(tree).map(Self::Crafter),
+            Kind::ContractScenarios => MissionPick::entity(kind, tree).map(Self::Mission),
+            Kind::LegacyLootTables | Kind::LegacyLootArchetypes => {
+                LootPick::entity(kind, tree).map(Self::Loot)
             }
-            Kind::Ships => Self::of_ship(ship_base(), |read| ship(tree, texts, evidence, read)),
-            Kind::Commodities => Self::Commodity(commodity(tree, texts, resource_type, groups)),
-            Kind::Crafters => return crafter(tree).map(Self::Crafter),
-            Kind::ResourceGroups => Self::ResourceGroup(resource_group(tree, texts, groups)),
-            Kind::BlueprintCategories => Self::BlueprintCategory(blueprint_category(tree, texts)),
-            Kind::MineableElements => Self::Mineable(mineable_element(tree)),
-            Kind::RefiningProcesses => Self::Refining(refining_process(tree, texts)),
-            Kind::MineableCompositions => Self::Composition(mineable_composition(tree, texts)),
-            Kind::MiningGlobalParams => Self::MiningParams(mining_global_params(tree)),
-            Kind::FactionReputations
+            Kind::Items
+            | Kind::LootTables
+            | Kind::LootArchetypes
+            | Kind::RefiningProcesses
+            | Kind::MiningGlobalParams
+            | Kind::MineableElements
+            | Kind::MineableCompositions
+            | Kind::LootPoolFilters
+            | Kind::LootSecondaryChoiceSingleLayers
+            | Kind::LootSecondaryChoiceMultiLayers
+            | Kind::LootThemes
+            | Kind::HierarchicalContextualDataPresets
+            | Kind::LootGenerationGlobalParams
+            | Kind::SubHarvestableConfigs
+            | Kind::Tags
+            | Kind::Manufacturers
+            | Kind::Ships
+            | Kind::Commodities
+            | Kind::ResourceGroups
+            | Kind::ResourceTypes
+            | Kind::Blueprints
+            | Kind::BlueprintCategories
+            | Kind::BlueprintCategoryLists
+            | Kind::ReputationContexts
+            | Kind::FactionReputations
             | Kind::ReputationScopes
             | Kind::ReputationStandings
-            | Kind::ReputationContexts
-            | Kind::MissionTypes
+            | Kind::ExplosionDefinitions
+            | Kind::AmmoDefinitions
+            | Kind::InventoryContainers
+            | Kind::MedicalItemTierConfigs
+            | Kind::ProceduralPlanetAudio
+            | Kind::ResourceNetworkGlobals
+            | Kind::CargoLoadingGlobals
+            | Kind::ShopCommodityGlobals
+            | Kind::Factions
+            | Kind::FactionIdentities
+            | Kind::ReputationPerks
+            | Kind::ReputationTriggerRecords
+            | Kind::ReputationRewardAmounts
+            | Kind::Infractions
+            | Kind::InfractionSets
+            | Kind::Jurisdictions
+            | Kind::SecurityNetworkManifests
+            | Kind::MissionScenarios
+            | Kind::CargoManifests
             | Kind::MissionLocalities
-            | Kind::ContractScenarios
-            | Kind::CargoManifests => {
-                return MissionPick::entity(kind, tree, texts).map(Self::Mission);
-            }
-            Kind::LootTables
-            | Kind::LootArchetypes
-            | Kind::LootPoolFilters
-            | Kind::LegacyLootTables
-            | Kind::LegacyLootArchetypes => {
-                return LootPick::entity(kind, tree).map(Self::Loot);
-            }
-            Kind::Blueprints
+            | Kind::MissionTypes
+            | Kind::MissionModuleDeclarations
+            | Kind::MissionItems
+            | Kind::LocationClasses
+            | Kind::LocationFunctions
+            | Kind::LocationSizes
+            | Kind::LocationResourceSlots
+            | Kind::LocationEntityDeclarations
+            | Kind::LocationClassRegistries
+            | Kind::LocationFunctionRegistries
+            | Kind::LocationSizeRegistries
+            | Kind::ContractScopes
+            | Kind::NpcArchetypes
+            | Kind::NpcClassPools
+            | Kind::AutoSpawns
+            | Kind::AutoSpawnSets
+            | Kind::EncounterIndices
+            | Kind::StarmapTypes
+            | Kind::StarmapPresets
+            | Kind::StarmapAmenities
             | Kind::GameplayProperties
             | Kind::QualityDistributions
             | Kind::QualityQuantizations
@@ -141,6 +215,7 @@ impl<'f> Picked<'f> {
             | Kind::ContractLocationQueries
             | Kind::ContractNpcSpawns
             | Kind::ContractEntitySpawns
+            | Kind::MissionPropertySets
             | Kind::ContractTemplates
             | Kind::MissionBrokerEntries
             | Kind::HarvestableProviderPresets
@@ -148,8 +223,24 @@ impl<'f> Picked<'f> {
             | Kind::HarvestableLocations
             | Kind::LootContainers
             | Kind::MineableEntities
-            | Kind::Shops => return None,
-        })
+            | Kind::Shops
+            | Kind::ShopInventories
+            | Kind::ParticleLibraries
+            | Kind::FlareLibraries
+            | Kind::SubsumptionEvents
+            | Kind::ClientProfileSettings
+            | Kind::RadarAudio
+            | Kind::PlanetResources
+            | Kind::Creatures
+            | Kind::ClimateAssets
+            | Kind::GeologyAssets
+            | Kind::Ecosystems
+            | Kind::GeologySets
+            | Kind::GeologyTextureSets
+            | Kind::Soils
+            | Kind::SoilTextureSets
+            | Kind::ShadingClasses => None,
+        }
     }
 
     /// Returns `self` joined with the crafting station `tree` describes when `self` is an item,
@@ -157,7 +248,7 @@ impl<'f> Picked<'f> {
     pub(crate) fn crafted(self, tree: &RecordTree<'f>) -> Self {
         if !matches!(
             self,
-            Self::Item(..) | Self::Ship(..) | Self::Commodity(_) | Self::MineableEntity(_)
+            Self::Item(_) | Self::Ship(..) | Self::Commodity(_) | Self::MineableEntity(_)
         ) {
             return self;
         }
@@ -170,15 +261,15 @@ impl<'f> Picked<'f> {
     /// Returns the ship `build` makes of the base data `read`, or the failure when the base data
     /// could not be read: a ship is never left out without a trace.
     pub(crate) fn of_ship(
-        read: Result<ShipRead, CatalogFailure>,
-        build: impl FnOnce(&ShipRead) -> (Ship<'f>, VehicleFacts),
-    ) -> Self {
-        match read {
+        read: Result<ShipRead, CatalogReadFailure<'f>>,
+        build: impl FnOnce(&ShipRead) -> Result<(Ship<'f>, VehicleFacts), CatalogError>,
+    ) -> Result<Self, CatalogError> {
+        Ok(match read {
             Ok(read) => {
-                let (ship, vehicle) = build(&read);
-                Self::Ship(ship, vehicle)
+                let (ship, vehicle) = build(&read)?;
+                Self::Ship(Box::new(ship), vehicle)
             }
             Err(failure) => Self::Failed(failure),
-        }
+        })
     }
 }

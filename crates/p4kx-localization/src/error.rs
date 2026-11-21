@@ -7,12 +7,22 @@ use thiserror::Error;
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum LocalizationError {
-    /// The file is larger than the limit.
+    /// The source byte count exceeds the caller's budget.
     #[error("the global.ini has {size} bytes, more than the limit of {limit} bytes")]
     TooLarge {
         /// The size of the file in bytes.
         size: u64,
-        /// The largest size that is read.
+        /// The caller's source byte budget.
+        limit: u64,
+    },
+    /// The decoded UTF-8 byte count exceeds the caller's budget.
+    #[error(
+        "the decoded global.ini needs at least {size} UTF-8 bytes, more than the limit of {limit} bytes"
+    )]
+    DecodedTooLarge {
+        /// The size of the decoded text or its first over-budget prefix.
+        size: u64,
+        /// The caller's decoded UTF-8 byte budget.
         limit: u64,
     },
     /// The memory to decode the file to UTF-8 cannot be reserved.
@@ -27,10 +37,10 @@ pub enum LocalizationError {
         /// The number of keys the reservation was for.
         keys: usize,
     },
-    /// The file holds more keys than the limit.
+    /// The file holds more distinct keys than the caller's budget.
     #[error("the global.ini holds more than {limit} keys")]
     TooManyKeys {
-        /// The most keys that are read.
+        /// The caller's distinct key budget.
         limit: usize,
     },
 }

@@ -1,17 +1,20 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::borrow::Cow;
 use std::sync::Arc;
 
 use p4kx_channels::PublicPatches;
 use thiserror::Error;
 
-use crate::compare::{Joined, check_levels, join};
+use crate::compare::{JoinResult, check_levels, join};
+use crate::comparison::RecordSources;
 use crate::record_compare::{compare_record, compare_records};
 use crate::{
     Archive, CancelToken, CompareOptions, Comparison, ComparisonError, ComparisonProgress,
-    DataForgeEntry, DataForgeError, DataForges, EntryChange, Filter, Levels, RecordChange,
-    RecordKey, SchemaDiff, Side, compare, compare_schema,
+    DataForgeEntry, DataForgeError, DataForges, EntryChange, Filter, IncomparableEntry, Levels,
+    RecordChange, RecordKey, SchemaDiff, Side, compare, compare_schema,
+    compare_with_dataforge_entries,
 };
 
 /// The DataForge Entries of the old and the new Archive, owned.
@@ -61,7 +64,7 @@ pub struct OwnedComparison {
     dataforges: Option<OwnedDataForges>,
     levels: Levels,
     filter: Option<String>,
-    changes: Vec<Joined>,
+    joined: JoinResult,
     public_patches: Option<PublicPatches>,
 }
 
@@ -81,14 +84,14 @@ impl OwnedComparison {
         options: &CompareOptions<'_>,
     ) -> Result<Self, ComparisonError> {
         check_levels(options, dataforges.is_some())?;
-        let (changes, _) = join(&old, &new, options)?;
+        let joined = join(&old, &new, options)?;
         Ok(Self {
             old,
             new,
             dataforges: dataforges.filter(|_| options.levels.records),
             levels: options.levels,
             filter: options.filter.map(|filter| filter.as_str().to_owned()),
-            changes,
+            joined,
             public_patches: options.public_patches.cloned(),
         })
     }
@@ -126,19 +129,30 @@ impl OwnedComparison {
     /// Returns the number of added, removed and changed Entries.
     #[must_use]
     pub const fn len(&self) -> usize {
-        self.changes.len()
+        self.joined.changes.len()
     }
 
     /// Returns whether no Entry was added, removed or changed.
     #[must_use]
     pub const fn is_empty(&self) -> bool {
-        self.changes.is_empty()
+        self.joined.changes.is_empty()
     }
 
     /// Returns the Entry change at `index` in normalised path order, `None` past the end.
     #[must_use]
     pub fn entry_change(&self, index: usize) -> Option<EntryChange<'_>> {
-        self.changes.get(index)?.resolve(&self.old, &self.new)
+        self.joined
+            .changes
+            .get(index)?
+            .resolve(&self.old, &self.new)
+    }
+
+    /// Returns matched Entries with different checksum algorithms, in normalised path order.
+    pub fn incomparable_entries(&self) -> impl Iterator<Item = IncomparableEntry<'_>> {
+        self.joined
+            .incomparables
+            .iter()
+            .filter_map(|joined| joined.resolve_incomparable(&self.old, &self.new))
     }
 
     /// Returns the Entry level as a Comparison, for its counts; it holds no Record changes.
@@ -146,10 +160,12 @@ impl OwnedComparison {
     pub fn comparison(&self) -> Comparison<'_> {
         Comparison {
             entries: self
+                .joined
                 .changes
                 .iter()
                 .filter_map(|joined| joined.resolve(&self.old, &self.new))
                 .collect(),
+            incomparables: self.incomparable_entries().collect(),
             ..self.without_changes()
         }
     }
@@ -160,6 +176,7 @@ impl OwnedComparison {
     pub fn comparison_of(&self, selected: &[bool]) -> Comparison<'_> {
         Comparison {
             entries: self
+                .joined
                 .changes
                 .iter()
                 .zip(selected)
@@ -172,7 +189,7 @@ impl OwnedComparison {
 
     /// Compares both Archives again on the levels of this Comparison, narrowed to `filter`, and
     /// hands the whole Comparison, the Record level included, to `use_it`; it is what
-    /// [`compare`] gives with these settings.
+    /// [`compare_with_dataforge_entries`] gives with these settings.
     ///
     /// # Errors
     ///
@@ -195,8 +212,16 @@ impl OwnedComparison {
             progress: None,
             public_patches: self.public_patches.as_ref(),
         };
-        let both = forges.as_ref().map(|(old, new)| DataForges { old, new });
-        let comparison = compare(&self.old, &self.new, both, &options)?;
+        let comparison = match (&self.dataforges, &forges) {
+            (Some(entries), Some((old, new))) => compare_with_dataforge_entries(
+                &self.old,
+                &self.new,
+                DataForges { old, new },
+                [&entries.old, &entries.new],
+                &options,
+            ),
+            _ => compare(&self.old, &self.new, None, &options),
+        }?;
         Ok(use_it(&comparison))
     }
 
@@ -231,7 +256,12 @@ impl OwnedComparison {
             old: &old,
             new: &new,
         };
-        let changes = compare_records(forges, &options, ComparisonProgress::default())?;
+        let changes = compare_records(
+            forges,
+            &options,
+            ComparisonProgress::default(),
+            &RecordSources::default(),
+        )?;
         Ok(use_it(&changes))
     }
 
@@ -284,7 +314,10 @@ impl OwnedComparison {
             levels: self.levels,
             filter: self.filter.clone(),
             entries: Vec::new(),
+            incomparables: Vec::new(),
+            entry_collisions: Cow::Borrowed(&self.joined.collisions),
             records: Vec::new(),
+            record_sources: RecordSources::default(),
         }
     }
 }

@@ -14,8 +14,12 @@ mod clip_files;
 mod component;
 mod database;
 mod fit;
+mod owner;
 mod source;
 
-pub(crate) use component::database_of;
+pub(crate) use component::{AnimationDatabase, database_of};
 pub use fit::CreatureAnimations;
+pub use owner::{
+    CreatureAnimationClipSource, CreatureAnimationOwner, CreatureAnimationSourceReport,
+};
 pub use source::{CreatureClips, creature_animations};

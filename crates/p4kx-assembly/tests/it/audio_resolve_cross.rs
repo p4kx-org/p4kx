@@ -6,9 +6,7 @@
 
 use std::error::Error;
 
-use p4kx_assembly::audio::{
-    ArchiveAudio, BreakReason, BrokenLink, LanguageChoice, MAX_ACTION_CHAIN, TriggerSounds,
-};
+use p4kx_assembly::audio::{ArchiveAudio, BreakReason, BrokenLink, LanguageChoice, TriggerSounds};
 use p4kx_extraction::Archive;
 use p4kx_testkit::{ArchiveBuilder, TestAtl, TestBank, TestEntry, TestHircObject, wwise_short_id};
 
@@ -160,7 +158,7 @@ fn a_play_event_action_follows_an_event_another_soundbank_holds() -> TestResult 
 }
 
 #[test]
-fn a_walk_reads_at_most_one_other_soundbank() -> TestResult {
+fn a_walk_follows_each_referenced_indexed_soundbank() -> TestResult {
     let bank = |name: &str, event: u32, sound: u32| {
         TestBank::new(wwise_short_id(name))
             .object(TestHircObject::event(event, &[2]))
@@ -175,14 +173,18 @@ fn a_walk_reads_at_most_one_other_soundbank() -> TestResult {
         ],
         &LanguageChoice::any(),
         |sounds| {
-            assert_eq!(names(&sounds), [(Some(7000), "First.bnk".to_owned())]);
-            let reasons: Vec<_> = sounds.breaks().iter().map(BrokenLink::reason).collect();
             assert_eq!(
-                reasons,
-                [&BreakReason::OtherSoundbank {
-                    id: 600,
-                    bank_id: wwise_short_id("Second")
-                }]
+                names(&sounds),
+                [
+                    (Some(7000), "First.bnk".to_owned()),
+                    (Some(7001), "Second.bnk".to_owned())
+                ],
+                "both original foreign terminals remain in authored branch order"
+            );
+            assert!(
+                sounds.breaks().is_empty(),
+                "all original indexed references resolve: {:?}",
+                sounds.breaks()
             );
             Ok(())
         },
@@ -240,30 +242,22 @@ fn an_event_posted_back_across_soundbanks_is_cut_as_a_cycle() -> TestResult {
 }
 
 #[test]
-fn a_chain_of_play_event_actions_stops_at_the_limit() -> TestResult {
-    let limit = u32::try_from(MAX_ACTION_CHAIN)?;
+fn nine_play_event_hops_reach_the_terminal_sound() -> TestResult {
+    const HOPS: u32 = 9;
     resolve(
-        &[("Music", chained(limit))],
+        &[("Music", chained(HOPS))],
         &LanguageChoice::any(),
         |sounds| {
-            assert_eq!(sounds.variants().len(), 1);
-            assert!(sounds.breaks().is_empty(), "{:?}", sounds.breaks());
-            Ok(())
-        },
-    )?;
-    resolve(
-        &[("Music", chained(limit + 1))],
-        &LanguageChoice::any(),
-        |sounds| {
-            assert_eq!(sounds.variants().len(), 0, "no variants");
-            let reasons: Vec<_> = sounds.breaks().iter().map(BrokenLink::reason).collect();
+            let [variant] = sounds.variants() else {
+                return Err(format!("one variant after every hop: {:?}", sounds.breaks()).into());
+            };
+            assert_eq!(variant.wem_id(), Some(7000), "the terminal WEM plays");
             assert_eq!(
-                reasons,
-                [&BreakReason::ChainTooLong {
-                    limit: MAX_ACTION_CHAIN
-                }]
+                variant.path().len(),
+                usize::try_from(2 * HOPS + 3)?,
+                "the path retains every posted Event and Action"
             );
-            assert_eq!(sounds.breaks()[0].reason().kind(), "chain_too_long");
+            assert!(sounds.breaks().is_empty(), "{:?}", sounds.breaks());
             Ok(())
         },
     )

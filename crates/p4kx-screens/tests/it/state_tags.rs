@@ -73,6 +73,46 @@ fn a_state_tag_selects_the_style_entry_that_colours_the_widget() -> TestResult {
 }
 
 #[test]
+fn a_parent_background_stays_at_rest_and_only_the_authored_style_hides_it() -> TestResult {
+    let hide = TestStyleEntry::new("hide background")
+        .when(TestCondition::Tag(ON))
+        .set(TestModifier::EnableBackground(false));
+    let chip = canvas()
+        .embedded(hide)
+        .operation("flag", TestOp::BoolVar)
+        .operation("pick", TestOp::TagFromBool("flag", ON, OFF))
+        .widget(swatch().background(BLUE))
+        .widget(
+            TestWidget::display("label")
+                .parent("swatch")
+                .size(TestDim::Fixed(4.0), TestDim::Fixed(4.0))
+                .background(GREEN),
+        )
+        .operation(
+            "bind",
+            TestOp::TagField("swatch", "PrimaryStateTag", "pick"),
+        );
+    let at_rest = compose(&chip, &[])?.rasterize(&stage())?.image;
+    let changed = compose(&chip, &["variable=true"])?
+        .rasterize(&stage())?
+        .image;
+    assert!(
+        blue_at(&at_rest, 8, 8),
+        "the parent background draws at rest"
+    );
+    assert!(
+        empty_at(&changed, 8, 8),
+        "the active style hides the parent background"
+    );
+    assert!(green_at(&at_rest, 1, 1), "the child draws at rest");
+    assert!(
+        green_at(&changed, 1, 1),
+        "the parent style leaves the child visible"
+    );
+    Ok(())
+}
+
+#[test]
 fn a_state_tag_is_not_listed_as_left_out() -> TestResult {
     let composed = compose(&bound(), &[])?;
     let listed = composed

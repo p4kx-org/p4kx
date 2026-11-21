@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The limits of the tag tree: depth, name and path length and duplicate GUIDs, over synthetic
-//! DataForges built to be hostile.
+//! Tag source boundaries and duplicate GUIDs over synthetic DataForges.
 
 use std::error::Error;
 
-use p4kx_dataforge::{DataForge, MAX_TAG_DEPTH, MAX_TAG_NAME_BYTES, MAX_TAG_PATH_BYTES, TagTree};
+use p4kx_dataforge::{DataForge, TagTree};
 use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct, TestType, TestValue};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -62,15 +61,14 @@ fn chain(length: usize, name: impl Fn(usize) -> String) -> Vec<u8> {
 }
 
 #[test]
-fn a_chain_deeper_than_the_limit_is_cut_and_not_rooted_again() -> TestResult {
-    let bytes = chain(MAX_TAG_DEPTH + 6, |index| format!("T{index}"));
+fn a_chain_keeps_its_actual_parent_and_deepest_tag() -> TestResult {
+    let bytes = chain(70, |index| format!("T{index}"));
     let forge = DataForge::open(&bytes)?;
 
     let tags = TagTree::build(&forge);
 
-    assert_eq!(tags.len(), MAX_TAG_DEPTH, "the first 64 levels");
+    assert_eq!(tags.len(), 70, "every physical Tag");
     let issues = tags.issues();
-    assert_eq!(issues.too_deep(), 1, "the one child at the limit, once");
     assert_eq!(
         issues.unlisted(),
         0,
@@ -78,11 +76,12 @@ fn a_chain_deeper_than_the_limit_is_cut_and_not_rooted_again() -> TestResult {
     );
     assert_eq!(tags.roots().count(), 1, "one root");
     let deepest = tags.iter().last().ok_or("no tag")?;
-    assert_eq!(deepest.depth(), MAX_TAG_DEPTH - 1, "the deepest kept tag");
-    assert!(
-        tags.get(forge_guid(MAX_TAG_DEPTH)?).is_none(),
-        "the first tag left out has no path"
-    );
+    assert_eq!(deepest.depth(), 69, "the actual deepest tag");
+    let tag = tags
+        .get(forge_guid(64)?)
+        .ok_or("original Tag at depth 64")?;
+    assert_eq!(tag.depth(), 64);
+    assert_eq!(tag.parent().map(|parent| parent.position()), Some(63));
     Ok(())
 }
 
@@ -100,18 +99,16 @@ fn forge_guid(index: usize) -> Result<p4kx_dataforge::Guid, Box<dyn Error>> {
 }
 
 #[test]
-fn huge_names_in_a_chain_keep_the_tree_small() -> TestResult {
+fn large_names_in_a_chain_keep_their_full_joined_length() -> TestResult {
     let bytes = chain(40, |_| "x".repeat(64 << 10));
     let forge = DataForge::open(&bytes)?;
 
     let tags = TagTree::build(&forge);
 
-    assert!(tags.is_empty(), "no name of 64 KiB is kept");
-    assert_eq!(
-        tags.issues().too_long(),
-        1,
-        "the root, with everything below it"
-    );
+    assert_eq!(tags.len(), 40);
+    let tail = tags.at(39).ok_or("the final physical tag")?;
+    assert_eq!(tail.name().len(), 64 << 10);
+    assert_eq!(tail.path_view().byte_len(), 40 * (64 << 10) + 39);
     assert_eq!(
         tags.issues().unlisted(),
         0,
@@ -121,25 +118,14 @@ fn huge_names_in_a_chain_keep_the_tree_small() -> TestResult {
 }
 
 #[test]
-fn a_path_over_the_limit_cuts_the_chain_there() -> TestResult {
-    let name = "n".repeat(MAX_TAG_NAME_BYTES);
+fn a_long_path_keeps_the_chain_and_exact_spelling() -> TestResult {
+    let name = "n".repeat(256);
     let bytes = chain(20, |_| name.clone());
     let forge = DataForge::open(&bytes)?;
 
     let tags = TagTree::build(&forge);
 
-    let kept = MAX_TAG_PATH_BYTES / (MAX_TAG_NAME_BYTES + 1);
-    assert_eq!(tags.len(), kept, "as many levels as fit");
-    assert!(
-        tags.iter()
-            .all(|tag| tag.path().len() <= MAX_TAG_PATH_BYTES),
-        "every path is within the limit"
-    );
-    assert_eq!(
-        tags.issues().too_long(),
-        1,
-        "the first tag that does not fit"
-    );
+    assert_eq!(tags.len(), 20);
     assert_eq!(
         tags.issues().unlisted(),
         0,
@@ -147,21 +133,33 @@ fn a_path_over_the_limit_cuts_the_chain_there() -> TestResult {
     );
     let last = tags.iter().last().ok_or("no tag")?;
     assert_eq!(last.name(), name, "the name is the end of the path");
+    let expected = vec![name.as_str(); 20].join(".");
+    assert!(
+        last.path_view().eq_text(&expected),
+        "all names and separators are retained"
+    );
     Ok(())
 }
 
 #[test]
-fn a_name_at_the_limit_is_kept_and_a_longer_one_is_not() -> TestResult {
+fn adjacent_name_lengths_keep_their_exact_text() -> TestResult {
     let bytes = builder(&[guid_of(0), guid_of(1)])
-        .record(tag(guid_of(0), &"a".repeat(MAX_TAG_NAME_BYTES), &[]))
-        .record(tag(guid_of(1), &"b".repeat(MAX_TAG_NAME_BYTES + 1), &[]))
+        .record(tag(guid_of(0), &"a".repeat(256), &[]))
+        .record(tag(guid_of(1), &"b".repeat(257), &[]))
         .build();
     let forge = DataForge::open(&bytes)?;
 
     let tags = TagTree::build(&forge);
 
-    assert_eq!(tags.len(), 1, "only the first");
-    assert_eq!(tags.issues().too_long(), 1);
+    assert_eq!(tags.len(), 2);
+    assert_eq!(
+        tags.at(0).ok_or("first physical Tag")?.name(),
+        "a".repeat(256)
+    );
+    assert_eq!(
+        tags.at(1).ok_or("second physical Tag")?.name(),
+        "b".repeat(257)
+    );
     Ok(())
 }
 
@@ -185,3 +183,56 @@ fn a_repeated_guid_keeps_the_first_tag_and_is_counted() -> TestResult {
     assert!(!tags.issues().is_clean());
     Ok(())
 }
+
+#[test]
+fn the_sdk_retains_physical_depth_above_uint16() -> TestResult {
+    let depth = usize::from(u16::MAX) + 1;
+    let bytes = chain(depth + 1, |_| "x".to_owned());
+    let forge = DataForge::open(&bytes)?;
+    let source = forge
+        .record(u32::try_from(depth + 1)?)
+        .ok_or("original last Tag")?;
+    assert_eq!(source.guid(), forge_guid(depth)?);
+    assert_eq!(source.tree()?.error_count(), 0);
+    let parent_source = forge
+        .record(u32::try_from(depth)?)
+        .ok_or("original parent Tag")?;
+    let parent_tree = parent_source.tree()?;
+    let Some(p4kx_dataforge::Value::Array(children)) = parent_tree.field("children") else {
+        return Err("original terminal Reference array".into());
+    };
+    let [p4kx_dataforge::Value::Reference(child)] = children.as_ref() else {
+        return Err("one actual terminal Reference".into());
+    };
+    assert_eq!(child.record_index(), source.index());
+
+    let tags = TagTree::build(&forge);
+    let root = tags.roots().next().ok_or("original listed root")?;
+    assert_eq!(root.descendants().len(), depth);
+    let tail = tags.get(source.guid()).ok_or("the selected last Tag")?;
+    assert_eq!(tail.depth(), depth);
+    assert_eq!(
+        tail.parent().map(|tag| tag.guid()),
+        Some(parent_source.guid())
+    );
+    assert_eq!(tail.path_view().byte_len(), u64::try_from(depth)? * 2 + 1);
+    Ok(())
+}
+
+#[test]
+#[expect(
+    deprecated,
+    reason = "Verifies the released Tag SDK compatibility surface"
+)]
+fn released_tag_limit_names_remain_available_without_pruning() {
+    assert_eq!(p4kx_dataforge::MAX_TAG_DEPTH, 64);
+    assert_eq!(p4kx_dataforge::MAX_TAG_NAME_BYTES, 256);
+    assert_eq!(p4kx_dataforge::MAX_TAG_PATH_BYTES, 1024);
+    assert_eq!(p4kx_dataforge::MAX_TAG_TEXT_BYTES, 64 << 20);
+    let issues = p4kx_dataforge::TagTreeIssues::default();
+    assert_eq!(issues.too_deep(), 0);
+    assert_eq!(issues.too_long(), 0);
+}
+
+#[path = "tag_default_source.rs"]
+mod default_source;

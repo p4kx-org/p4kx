@@ -56,7 +56,7 @@ fn the_vehicle_definition_spellings_and_guids_of_a_real_archive() -> TestResult 
 
     let mut spellings: BTreeMap<String, BTreeSet<&str>> = BTreeMap::new();
     for ship in entries(&catalog, "ships") {
-        if let Some(definition) = ship["vehicleDefinition"].as_str() {
+        if let Some(definition) = ship["vehicleDefinition"]["value"].as_str() {
             spellings
                 .entry(normalised(definition))
                 .or_default()
@@ -77,7 +77,7 @@ fn the_vehicle_definition_spellings_and_guids_of_a_real_archive() -> TestResult 
     for kind in ["ships", "items"] {
         let mut seen: HashMap<&str, usize> = HashMap::new();
         for entry in entries(&catalog, kind) {
-            if let Some(guid) = entry["guid"].as_str() {
+            if let Some(guid) = entry["guid"]["value"].as_str() {
                 *seen.entry(guid).or_default() += 1;
             }
         }

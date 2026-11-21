@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::num::NonZeroU64;
+
 use p4kx_model::{MAX_INFLUENCES, Material};
 
 /// How an export writes the materials.
@@ -66,6 +68,7 @@ pub struct GlbOptions {
     /// Whether every glTF material gets the `extras` `{"p4kx_index": <index>}`, its index in the
     /// file; the rigged writers ignore it.
     pub material_indices: bool,
+    pub(crate) json_byte_budget: Option<NonZeroU64>,
 }
 
 impl Default for GlbOptions {
@@ -77,6 +80,7 @@ impl Default for GlbOptions {
             vertex_colours: VertexColours::Tints,
             max_influences: MAX_INFLUENCES,
             material_indices: false,
+            json_byte_budget: None,
         }
     }
 }
@@ -124,6 +128,13 @@ impl GlbOptions {
         if matches!(self.vertex_colours, VertexColours::Tints) {
             self.vertex_colours = VertexColours::TintsAndShares;
         }
+        self
+    }
+
+    /// Returns the options with a byte budget for the padded GLB JSON chunk.
+    #[must_use]
+    pub const fn with_json_byte_budget(mut self, budget: NonZeroU64) -> Self {
+        self.json_byte_budget = Some(budget);
         self
     }
 

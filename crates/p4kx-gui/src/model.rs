@@ -16,6 +16,7 @@ mod archive_key;
 mod assembly_export_control;
 mod audio_control;
 mod catalog_control;
+mod channel_discovery;
 mod characters_control;
 mod content_navigation;
 mod describe;
@@ -24,6 +25,8 @@ mod folder_conversion_control;
 mod game_watch;
 mod model_export_control;
 mod opening;
+#[cfg(test)]
+mod opening_tests;
 mod record_export_control;
 mod record_text;
 mod sounds_control;
@@ -64,7 +67,7 @@ pub struct Failure {
 
 struct Opening {
     path: PathBuf,
-    result: Receiver<Result<EntryIndex, ArchiveError>>,
+    result: Receiver<crate::protected_open::ProtectedResult<EntryIndex, ArchiveError>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,6 +80,7 @@ enum HelpWindow {
 pub struct Model {
     texts: Texts,
     channels: ChannelList,
+    channel_refresh: crate::channel_refresh::ChannelRefresh,
     recent: RecentArchives,
     browser: Option<Browser>,
     opening: Option<Opening>,
@@ -160,6 +164,7 @@ impl Model {
         Self {
             texts: Texts::new(language),
             channels: ChannelList::default(),
+            channel_refresh: crate::channel_refresh::ChannelRefresh::default(),
             recent: RecentArchives::default(),
             browser: None,
             opening: None,
@@ -216,24 +221,6 @@ impl Model {
         &self.channels
     }
 
-    /// Replaces the Channels the picker offers.
-    pub fn set_channels(&mut self, channels: ChannelList) {
-        self.channels = channels;
-        self.protect_manual_entries();
-    }
-
-    /// Adds `path` as a manual entry; returns whether it was not listed yet.
-    pub fn add_manual(&mut self, path: PathBuf) -> bool {
-        let added = self.channels.add(path);
-        self.protect_manual_entries();
-        added
-    }
-
-    fn protect_manual_entries(&self) {
-        let manual = self.channels.manual();
-        p4kx_extraction::protect_manual(&manual.folders, &manual.archives);
-    }
-
     /// Returns the recently opened Archives.
     #[must_use]
     pub const fn recent(&self) -> &RecentArchives {
@@ -272,6 +259,7 @@ impl Model {
 
     /// Takes the result of a finished opening; returns whether one finished.
     pub fn poll(&mut self) -> bool {
+        self.poll_channel_refresh();
         let Some(opening) = &self.opening else {
             return false;
         };
@@ -288,7 +276,8 @@ impl Model {
         let Some(opening) = self.opening.take() else {
             return false;
         };
-        match received {
+        self.channels.record_protection_issues(received.issues);
+        match received.result {
             Ok(index) => {
                 let path = opening.path;
                 self.recent.push(std::path::absolute(&path).unwrap_or(path));

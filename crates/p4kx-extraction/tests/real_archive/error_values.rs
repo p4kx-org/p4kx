@@ -59,8 +59,7 @@ const fn kind(error: &ValueError) -> &'static str {
         ValueError::InvalidPointer { .. } => "InvalidPointer",
         ValueError::ArrayOutOfRange { .. } => "ArrayOutOfRange",
         ValueError::OwnedTwice { .. } => "OwnedTwice",
-        ValueError::TooManyValues { .. } => "TooManyValues",
-        ValueError::TooDeep { .. } => "TooDeep",
+        ValueError::InlineClassCycle { .. } => "InlineClassCycle",
         ValueError::DanglingReference { .. } => "DanglingReference",
         ValueError::OutsideRecord { .. } => "OutsideRecord",
         _ => "Other",
@@ -82,7 +81,8 @@ fn struct_note(forge: &DataForge<'_>, struct_index: u32) -> String {
 
 fn note(forge: &DataForge<'_>, error: &ValueError) -> String {
     match error {
-        ValueError::InvalidPointer { struct_index, .. }
+        ValueError::InlineClassCycle { struct_index }
+        | ValueError::InvalidPointer { struct_index, .. }
         | ValueError::OwnedTwice { struct_index, .. }
         | ValueError::OutsideRecord { struct_index, .. } => struct_note(forge, *struct_index),
         ValueError::UnknownStruct { index } => format!("struct index {index}"),

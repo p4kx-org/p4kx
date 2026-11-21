@@ -120,13 +120,12 @@ pub(crate) fn ports(model: &Model) -> Vec<(String, p4kx_gui::RowChange)> {
         .entities()
         .loadout()
         .and_then(p4kx_gui::LoadoutSession::view)
-        .map(|view| {
+        .map_or_default(|view| {
             view.rows()
                 .iter()
                 .map(|row| (row.path().to_owned(), row.change()))
                 .collect()
         })
-        .unwrap_or_default()
 }
 
 pub(crate) fn resolved(model: &Model) -> bool {

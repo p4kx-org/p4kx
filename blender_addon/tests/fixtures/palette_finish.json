@@ -1,0 +1,86 @@
+{
+  "version": 1,
+  "scope": "P4KX selected HardSurface palette approximation; detail disabled",
+  "cases": [
+    {
+      "name": "paint_low",
+      "smoothness": 0.75,
+      "paletteByte": 51,
+      "multiplier": 1.0,
+      "roughness": 0.85
+    },
+    {
+      "name": "paint_high",
+      "smoothness": 0.75,
+      "paletteByte": 204,
+      "multiplier": 1.0,
+      "roughness": 0.4
+    },
+    {
+      "name": "authored_half",
+      "smoothness": 0.75,
+      "paletteByte": 204,
+      "multiplier": 0.5,
+      "roughness": 0.7
+    },
+    {
+      "name": "zero_multiplier",
+      "smoothness": 0.75,
+      "paletteByte": 204,
+      "multiplier": 0.0,
+      "roughness": 1.0
+    },
+    {
+      "name": "zero_palette",
+      "smoothness": 0.75,
+      "paletteByte": 0,
+      "multiplier": 2.0,
+      "roughness": 1.0
+    },
+    {
+      "name": "full_palette",
+      "smoothness": 0.75,
+      "paletteByte": 255,
+      "multiplier": 1.0,
+      "roughness": 0.25
+    },
+    {
+      "name": "upper_clamp",
+      "smoothness": 0.75,
+      "paletteByte": 255,
+      "multiplier": 2.0,
+      "roughness": 0.0
+    },
+    {
+      "name": "no_palette",
+      "smoothness": 0.75,
+      "paletteByte": null,
+      "multiplier": 0.5,
+      "roughness": 0.625
+    },
+    {
+      "name": "zero_sample",
+      "smoothness": 0.0,
+      "paletteByte": 204,
+      "multiplier": 2.0,
+      "roughness": 1.0
+    },
+    {
+      "name": "full_sample",
+      "smoothness": 1.0,
+      "paletteByte": 204,
+      "multiplier": 1.0,
+      "roughness": 0.2
+    },
+    {
+      "name": "operator_discriminator",
+      "baseRoughness": 0.48,
+      "smoothness": 0.7696000000000001,
+      "paletteByte": 184,
+      "multiplier": 1.0,
+      "roughness": 0.4446807843137255,
+      "roughnessSpaceAlternative": 0.2532796640776636,
+      "sqrtAlternative": 0.6668438980104155
+    }
+  ]
+}

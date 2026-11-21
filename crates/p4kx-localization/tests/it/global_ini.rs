@@ -5,9 +5,7 @@
 
 use std::error::Error;
 
-use p4kx_localization::{
-    GlobalIni, IniText, LocalizationError, MAX_GLOBAL_INI_KEYS, MAX_GLOBAL_INI_SIZE,
-};
+use p4kx_localization::{GlobalIni, IniText, LocalizationError, LocalizationLimits};
 use p4kx_testkit::GlobalIniBuilder;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -202,37 +200,73 @@ fn iter_yields_every_key_with_its_text() -> TestResult {
 }
 
 #[test]
-fn an_input_above_the_size_limit_is_rejected() -> TestResult {
-    let limit = usize::try_from(MAX_GLOBAL_INI_SIZE)?;
-    let bytes = vec![b'\n'; limit + 1];
-    assert!(
-        matches!(
-            IniText::decode(&bytes),
-            Err(LocalizationError::TooLarge { .. })
-        ),
-        "too large to decode"
-    );
-    let text = String::from_utf8(bytes)?;
-    assert!(
-        matches!(
-            GlobalIni::parse(&text),
-            Err(LocalizationError::TooLarge { .. })
-        ),
-        "too large to index"
-    );
+fn complete_index_keeps_the_key_after_64_mib() -> TestResult {
+    const PADDING_BYTES: usize = 64 << 20;
+    const TAIL: &[u8] = b"\ntail=sentinel";
+
+    let mut bytes = Vec::with_capacity(PADDING_BYTES + TAIL.len());
+    bytes.extend_from_slice(b"padding=");
+    bytes.resize(PADDING_BYTES, b'x');
+    bytes.extend_from_slice(TAIL);
+    let text = IniText::decode(&bytes)?;
+    let ini = text.index()?;
+    assert_eq!(ini.len(), 2, "both original keys are indexed");
+    assert_eq!(ini.resolve("tail"), Some("sentinel"), "tail value");
     Ok(())
 }
 
 #[test]
-fn more_keys_than_the_limit_are_rejected() -> TestResult {
-    let mut bytes = Vec::new();
-    for index in 0..=MAX_GLOBAL_INI_KEYS {
-        bytes.extend_from_slice(format!("{index:x}=\n").as_bytes());
+fn complete_index_keeps_more_than_one_million_distinct_keys() -> TestResult {
+    use std::fmt::Write as _;
+
+    const BASE_KEYS: usize = 1 << 20;
+
+    let mut source = String::new();
+    for index in 0..BASE_KEYS {
+        writeln!(source, "{index:x}=")?;
     }
-    let text = IniText::decode(&bytes)?;
+    source.push_str("tail=sentinel\n");
+    let ini = GlobalIni::parse(&source)?;
+    assert_eq!(ini.len(), BASE_KEYS + 1, "every original key is indexed");
+    assert_eq!(ini.resolve("tail"), Some("sentinel"), "final key value");
+    Ok(())
+}
+
+#[test]
+fn distinct_key_budget_admits_variants_and_duplicates_of_existing_keys() -> TestResult {
+    let limits = LocalizationLimits::UNLIMITED.with_keys(1);
+    let source = " A =first\na,P=suffix\na=last\n";
+    let ini = GlobalIni::parse_with_limits(source, limits)?;
+    assert_eq!(ini.len(), 1, "both variants share the original key slot");
+    assert_eq!(ini.resolve("A"), Some("last"), "later plain value wins");
+    assert_eq!(ini.resolve_suffixed("a"), Some("suffix"), "suffix retained");
+    let text = IniText::decode(b"a=first\na=last\nb=tail")?;
     assert!(
-        matches!(text.index(), Err(LocalizationError::TooManyKeys { .. })),
-        "too many keys"
+        matches!(
+            text.index_with_limits(limits),
+            Err(LocalizationError::TooManyKeys { limit: 1 })
+        ),
+        "a new key exceeds the explicit budget"
+    );
+    assert_eq!(text.index()?.resolve("b"), Some("tail"), "complete default");
+    Ok(())
+}
+
+#[test]
+fn indexing_uses_decoded_bytes_without_the_byte_order_mark() -> TestResult {
+    let source = "\u{feff}a=1";
+    let limits = LocalizationLimits::UNLIMITED.with_decoded_bytes(3);
+    assert_eq!(
+        GlobalIni::parse_with_limits(source, limits)?.resolve("a"),
+        Some("1"),
+        "BOM is outside the decoded text"
+    );
+    assert!(
+        matches!(
+            GlobalIni::parse_with_limits(source, limits.with_decoded_bytes(2)),
+            Err(LocalizationError::DecodedTooLarge { size: 3, limit: 2 })
+        ),
+        "a separate decoded byte error is reported"
     );
     Ok(())
 }

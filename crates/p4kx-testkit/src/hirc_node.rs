@@ -34,6 +34,14 @@ pub enum TestNodeBase {
 }
 
 impl TestHircObject {
+    /// A v154 `ActorMixer` with ordered physical child IDs.
+    #[must_use]
+    pub fn actor_mixer(id: u32, children: &[u32], base: TestNodeBase) -> Self {
+        let mut body = node_base(base);
+        put_children(&mut body, children);
+        Self::raw(7, id, body)
+    }
+
     /// A container object of `kind` with `children`, laid out as bank version 154 writes it.
     #[must_use]
     pub fn container(

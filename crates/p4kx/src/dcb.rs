@@ -5,6 +5,9 @@ use std::io::{self, Write};
 use std::process::ExitCode;
 
 use anyhow::Result;
+use p4kx_extraction::{
+    FieldOrigins, FieldPath, InputScope, SourceInventory, SourceLocation, SourceUseRole, SourceUses,
+};
 use serde::Serialize;
 
 use crate::cli::{DcbArgs, DcbCommand, DcbInfoArgs};
@@ -19,6 +22,15 @@ struct Summary<'a> {
     record_count: usize,
     struct_count: usize,
     enum_count: usize,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct JsonSummary<'a> {
+    #[serde(flatten)]
+    summary: Summary<'a>,
+    field_origins: FieldOrigins,
+    provenance: SourceInventory,
 }
 
 /// Runs a `p4kx dcb` subcommand.
@@ -46,11 +58,54 @@ fn info(args: &DcbInfoArgs, as_json: bool) -> Result<()> {
         enum_count: forge.enum_count(),
     };
     if as_json {
-        json::print(&summary)?;
+        json::print(&json_summary(&input, summary)?)?;
     } else {
         print_lines(&summary, input.archive().is_some())?;
     }
     Ok(())
+}
+
+fn json_summary<'summary>(
+    input: &ForgeInput,
+    summary: Summary<'summary>,
+) -> Result<JsonSummary<'summary>> {
+    let uses = SourceUses::new();
+    let scope = uses.observe(input.source_input()?, InputScope::Payload)?;
+    let mut fields = FieldOrigins::new();
+    for (path, field) in [
+        ("/version", "version"),
+        ("/record_count", "recordCount"),
+        ("/struct_count", "structCount"),
+        ("/enum_count", "enumCount"),
+    ] {
+        let datum = scope.at(
+            SourceLocation::Subresource {
+                namespace: "dataforgeHeader".to_owned(),
+                indices: Vec::new(),
+                field: field.to_owned(),
+            },
+            SourceUseRole::Payload,
+        )?;
+        fields.insert(FieldPath::parse(path)?, uses.origin(&[datum], true))?;
+    }
+    let name_scope = if input.archive().is_some() {
+        InputScope::ArchiveDirectoryMetadata
+    } else {
+        InputScope::FileMetadata
+    };
+    let name = scope.for_scope(name_scope).at(
+        SourceLocation::Metadata {
+            field: "path".to_owned(),
+        },
+        SourceUseRole::Payload,
+    )?;
+    fields.insert(FieldPath::parse("/entry")?, uses.origin(&[name], true))?;
+    fields.insert(FieldPath::parse("/archive")?, uses.origin(&[], true))?;
+    Ok(JsonSummary {
+        summary,
+        field_origins: fields,
+        provenance: uses.freeze()?,
+    })
 }
 
 fn print_lines(summary: &Summary<'_>, from_archive: bool) -> io::Result<()> {

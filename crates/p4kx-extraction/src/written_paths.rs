@@ -89,11 +89,7 @@ impl EntryWriter<'_> {
             .conflict(relative, entry.index())
             .map_or(Ok(()), |earlier| {
                 Err(ExtractionError::CaseCollision {
-                    earlier: self
-                        .source
-                        .path_of(earlier)
-                        .map(str::to_owned)
-                        .unwrap_or_default(),
+                    earlier: self.source.path_of(earlier).map_or_default(str::to_owned),
                 })
             })
     }

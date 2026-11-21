@@ -8,6 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from .worn_mount_provenance import WornMountProvenance, read as read_worn_mount_provenance
+
 MAX_RIG_ITEMS = 100_000
 
 
@@ -46,6 +48,7 @@ class Rig:
     morph_targets: int
     parts: tuple[RigPart, ...]
     animations: tuple[RigClip, ...]
+    worn_mount_provenance: WornMountProvenance | None = None
 
 
 def parse_rig(value: object, where: str) -> Rig:
@@ -70,6 +73,7 @@ def parse_rig(value: object, where: str) -> Rig:
         morph_targets=_count(entry, "morph_targets", where),
         parts=parts,
         animations=animations,
+        worn_mount_provenance=read_worn_mount_provenance(entry.get("worn_mount_provenance")),
     )
 
 

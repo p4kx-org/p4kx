@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Shops in the Basetool catalog, through the public API.
+//! Shops in the P4KX catalog, through the public API.
 
 use crate::shops_fixture::{self, EXCHANGE, LOOSE, write_archive};
 use crate::starmap_fixture;
@@ -9,7 +9,10 @@ use crate::starmap_fixture;
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{BuiltCatalog, CatalogOptions, CraftingWarning, Filter, Kind, build_catalog};
+use p4kx_export::{
+    BuiltCatalog, CatalogOptions, CatalogPublicationMode, CraftingWarning, Filter, Kind,
+    build_catalog,
+};
 use p4kx_extraction::Archive;
 use serde_json::Value;
 
@@ -34,6 +37,7 @@ fn build(
     let dir = tempfile::tempdir()?;
     let archive = Archive::open_with_key(archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
     let mut options = CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT);
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     options.filter = filter;
     let built = build_catalog(&archive, &options)?;
     let json = serde_json::from_slice(built.json())?;
@@ -51,6 +55,26 @@ fn shop<'a>(catalog: &'a Value, location_id: &str) -> Result<&'a Value, Box<dyn 
                 .is_some_and(|key| key.contains(location_id))
         })
         .ok_or_else(|| format!("the shop at {location_id}").into())
+}
+
+#[test]
+fn merging_shop_scans_in_archive_order_preserves_catalog_bytes() -> TestResult {
+    use rayon::ThreadPoolBuilder;
+
+    let dir = tempfile::tempdir()?;
+    let archive =
+        Archive::open_with_key(write_archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
+    let mut options = CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT);
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
+    let serial = ThreadPoolBuilder::new().num_threads(1).build()?;
+    let parallel = ThreadPoolBuilder::new().num_threads(4).build()?;
+    let one = serial.install(|| build_catalog(&archive, &options))?;
+    let four = parallel.install(|| build_catalog(&archive, &options))?;
+    assert!(
+        one.json() == four.json(),
+        "Shop data, health and provenance preserve archive order across worker counts"
+    );
+    Ok(())
 }
 
 #[test]

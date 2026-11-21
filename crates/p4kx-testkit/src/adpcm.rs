@@ -82,8 +82,7 @@ fn encode(
 fn best(candidates: impl Iterator<Item = Encoded>) -> Vec<u8> {
     candidates
         .min_by_key(|encoded| encoded.error)
-        .map(|encoded| encoded.bytes)
-        .unwrap_or_default()
+        .map_or_default(|encoded| encoded.bytes)
 }
 
 fn ima_sub_block(input: &[i32], start: u8) -> Encoded {

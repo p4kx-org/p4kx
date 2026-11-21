@@ -47,14 +47,13 @@ fn shown(model: &Model) -> Vec<String> {
     model
         .query()
         .completion_shown()
-        .map(|(completion, _)| {
+        .map_or_default(|(completion, _)| {
             completion
                 .candidates()
                 .iter()
                 .map(|candidate| candidate.name().to_owned())
                 .collect()
         })
-        .unwrap_or_default()
 }
 
 fn type_text(harness: &mut Harness<'_, Model>, text: &str) {

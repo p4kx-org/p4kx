@@ -32,9 +32,9 @@ pub(crate) struct ConvertArgs {
     /// What to do with a file that already exists in the target.
     #[arg(long, value_enum, default_value_t = Conflict::Skip)]
     pub(crate) conflict: Conflict,
-    /// What to write for a texture <name>.dds, its parts <name>.dds.1 … .N and any alpha tail
-    /// <name>.dds.a, as `extract --convert --textures` does: `merge` one standard DDS, `png` the
-    /// mip --mip as <name>.png (a high-range texture as OpenEXR, a cubemap as six faces), `raw`
+    /// What to write for a texture `<name>.dds`, its parts `<name>.dds.1` … .N and any alpha tail
+    /// `<name>.dds.a`, as `extract --convert --textures` does: `merge` one standard DDS, `png` the
+    /// mip --mip as `<name>.png` (a high-range texture as OpenEXR, a cubemap as six faces), `raw`
     /// the files unchanged. A texture whose parts are missing or that cannot be converted is
     /// reported and written unchanged.
     #[arg(
@@ -50,7 +50,7 @@ pub(crate) struct ConvertArgs {
     /// levels exports its smallest.
     #[arg(long, default_value_t = 0, value_name = "LEVEL")]
     pub(crate) mip: u32,
-    /// What to write for a WEM sound <name>.wem and for each WEM a soundbank <name>.bnk embeds,
+    /// What to write for a WEM sound `<name>.wem` and for each WEM a soundbank `<name>.bnk` embeds,
     /// as `extract --convert --audio` does.
     #[arg(
         long,

@@ -4,7 +4,11 @@
 use std::io::{self, Write};
 use std::path::Path;
 
-use p4kx_assembly::audio::{ExportReport, ExportState, TriggerSounds, TxtpReport, write_txtp};
+use p4kx_assembly::audio::{
+    ExportLoopOrigins, ExportReport, ExportState, TriggerSounds, TxtpApproximation, TxtpReport,
+    write_txtp_with_loop_origins,
+};
+use p4kx_extraction::{Archive, CancelToken, FieldOrigins, SourceInventory};
 use serde::Serialize;
 
 use crate::cli_wwise::WwiseExtractArgs;
@@ -13,22 +17,43 @@ use crate::json;
 
 /// The JSON shape of the TXTP files of an export.
 #[derive(Serialize)]
-pub(crate) struct TxtpJson {
+pub(crate) struct TxtpJson<'a> {
     written: usize,
     kept: usize,
     skipped: usize,
-    files: Vec<TxtpFileJson>,
+    files: Vec<TxtpFileJson<'a>>,
     skips: Vec<TxtpSkipJson>,
 }
 
 #[derive(Serialize)]
-struct TxtpFileJson {
+struct TxtpFileJson<'a> {
     trigger: String,
     event: String,
     file: String,
     size: u64,
     kept: bool,
     breaks: usize,
+    approximations: Option<Vec<&'static str>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    commands: Option<Vec<SoundCommandJson>>,
+    #[serde(rename = "fieldOrigins", skip_serializing_if = "Option::is_none")]
+    field_origins: Option<&'a FieldOrigins>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    provenance: Option<&'a SourceInventory>,
+    #[serde(rename = "originReceipt")]
+    origin_receipt: Option<String>,
+}
+
+#[derive(Serialize)]
+struct SoundCommandJson {
+    #[serde(rename = "loop", skip_serializing_if = "Option::is_none")]
+    loop_points: Option<LoopJson>,
+}
+
+#[derive(Serialize)]
+struct LoopJson {
+    start: u64,
+    end: u64,
 }
 
 #[derive(Serialize)]
@@ -43,12 +68,23 @@ pub(crate) fn write(
     sounds: &TriggerSounds<'_>,
     exported: &ExportReport,
     args: &WwiseExtractArgs,
-) -> TxtpReport {
-    write_txtp(&[sounds], exported, &args.out, policy(args.export.conflict))
+    archive: &Archive,
+    cancel: &CancelToken,
+    loop_origins: &ExportLoopOrigins,
+) -> io::Result<TxtpReport> {
+    write_txtp_with_loop_origins(
+        archive,
+        &[sounds],
+        exported,
+        &args.out,
+        policy(args.export.conflict),
+        cancel,
+        loop_origins,
+    )
 }
 
 /// Returns the JSON shape of `report`.
-pub(crate) fn to_json(report: &TxtpReport) -> TxtpJson {
+pub(crate) fn to_json(report: &TxtpReport) -> TxtpJson<'_> {
     TxtpJson {
         written: report.written_count(),
         kept: report.kept_count(),
@@ -63,6 +99,32 @@ pub(crate) fn to_json(report: &TxtpReport) -> TxtpJson {
                 size: file.size,
                 kept: file.state == ExportState::Kept,
                 breaks: file.breaks,
+                approximations: file.approximations.as_ref().map(|reasons| {
+                    reasons
+                        .iter()
+                        .copied()
+                        .map(TxtpApproximation::code)
+                        .collect()
+                }),
+                commands: file.command_loops.as_ref().map(|commands| {
+                    commands
+                        .iter()
+                        .map(|points| SoundCommandJson {
+                            loop_points: points.map(|points| LoopJson {
+                                start: points.start,
+                                end: points.end,
+                            }),
+                        })
+                        .collect()
+                }),
+                field_origins: file.origins.as_ref().map(|origins| &origins.field_origins),
+                provenance: file.origins.as_ref().map(|origins| &origins.provenance),
+                origin_receipt: file
+                    .origin_receipt
+                    .as_deref()
+                    .and_then(Path::file_name)
+                    .and_then(std::ffi::OsStr::to_str)
+                    .map(str::to_owned),
             })
             .collect(),
         skips: report

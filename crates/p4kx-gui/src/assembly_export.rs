@@ -11,7 +11,7 @@ pub(crate) use job::stop::{Observed, Stoppable, StoppableTextures};
 pub use job::{AssemblyExport, AssemblyExportProgress, AssemblyExportStage, AssemblyExportStatus};
 pub(crate) use job::{Request, Subject, failure_of, info_of, package_failure, start};
 use p4kx_assembly::{ChangeError, LoadoutChanges, LoadoutPicks};
-use p4kx_extraction::{Guid, WriteRefused};
+use p4kx_extraction::{Guid, WriteProtectionError};
 use p4kx_settings::{AssemblyExportSettings, ModelMaterials};
 pub use summary::{AssemblyExportSummary, InteriorFacts, PartIssue};
 pub(crate) use target::Output;
@@ -29,7 +29,7 @@ pub const ASSEMBLY_MATERIALS: [ModelMaterials; 2] =
 /// The subject is an Entity with the changes made to its Loadout and whether its Interior comes
 /// with it, or an Interior container on its own; the other choices are the level of detail, the
 /// materials and the file.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub struct AssemblyExportSetup {
     entity: Option<Guid>,
     container: Vec<String>,
@@ -48,6 +48,10 @@ pub struct AssemblyExportSetup {
 }
 
 impl AssemblyExportSetup {
+    pub(crate) fn output_owner(&self) -> crate::output_target::Witness {
+        self.output.owner()
+    }
+
     pub(crate) fn new(
         (guid, name): (Guid, &str),
         (changes, has_interior): (&LoadoutChanges, bool),
@@ -271,10 +275,9 @@ impl AssemblyExportSetup {
         self.output.set_file(file);
     }
 
-    /// Returns why the chosen file or package folder cannot be written, when it lies inside a Star
-    /// Citizen installation.
+    /// Returns the protection refusal for the chosen output.
     #[must_use]
-    pub fn refusal(&self) -> Option<&WriteRefused> {
+    pub fn refusal(&self) -> Option<&WriteProtectionError> {
         self.output.refusal()
     }
 

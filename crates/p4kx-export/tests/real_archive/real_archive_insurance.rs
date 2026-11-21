@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The ship insurance and the item recovery rules of the Basetool catalog of a real Archive; runs
+//! The ship insurance of the P4KX catalog of a real Archive; runs
 //! with `--ignored` when `P4KX_DATA_P4K` names one.
 //!
 //! Run with `--nocapture` to see the counts. The anchors are the exact values of LIVE and follow
 //! each patch; a failure after a patch means the value moved, to be checked against the Archive
-//! and updated here and in `docs/basetool-catalog.md`.
+//! and updated here and in `docs/catalog.md`.
 
 use std::error::Error;
 use std::sync::OnceLock;
@@ -43,7 +43,11 @@ fn catalog() -> Result<&'static Value, Box<dyn Error>> {
 fn ship<'c>(catalog: &'c Value, class_name: &str) -> Result<&'c Value, Box<dyn Error>> {
     catalog["ships"]
         .as_array()
-        .and_then(|ships| ships.iter().find(|ship| ship["className"] == class_name))
+        .and_then(|ships| {
+            ships.iter().find(|ship| {
+                ship.pointer("/className/value").and_then(Value::as_str) == Some(class_name)
+            })
+        })
         .ok_or_else(|| format!("the catalog has no ship {class_name}").into())
 }
 
@@ -56,11 +60,14 @@ fn every_ship_of_a_real_archive_carries_its_insurance() -> TestResult {
         .ok_or("the catalog has no ships")?;
     let insured = ships
         .iter()
-        .filter(|ship| !ship["insurance"].is_null())
+        .filter(|ship| ship["insurance"]["state"] == "present")
         .count();
     let with_fee = ships
         .iter()
-        .filter(|ship| ship["insurance"]["expediteFee"].is_u64())
+        .filter(|ship| {
+            ship.pointer("/insurance/value/shipInsuranceParams/value/expediteFee/state")
+                .is_some_and(|state| state == "present")
+        })
         .count();
     print_line(&format!(
         "{} ships, {insured} with insurance, {with_fee} with an expedite fee",
@@ -77,70 +84,34 @@ fn the_gladius_and_the_idris_carry_the_values_of_their_records() -> TestResult {
     let catalog = catalog()?;
     let gladius = ship(catalog, "AEGS_Gladius")?;
     print_line(&format!("AEGS_Gladius: {}", gladius["insurance"]));
-    let insurance = &gladius["insurance"];
-    assert_eq!(insurance["restoreOnClaim"], true, "restoreOnClaim");
-    assert_eq!(insurance["shipEntityClassName"], "AEGS_Gladius", "class");
+    let insurance = &gladius["insurance"]["value"];
+    let params = &insurance["shipInsuranceParams"]["value"];
+    assert_eq!(insurance["restoreOnClaim"]["value"], true, "restoreOnClaim");
     assert_eq!(
-        insurance["baseWaitTimeMinutes"].as_f64(),
-        Some(5.83),
+        params["shipEntityClassName"]["value"], "AEGS_Gladius",
+        "class"
+    );
+    assert_eq!(
+        params["baseWaitTimeMinutes"]["value"]["rawBits"],
+        format!("{:08x}", 5.83_f32.to_bits()),
         "claim time"
     );
     assert_eq!(
-        insurance["mandatoryWaitTimeMinutes"].as_f64(),
-        Some(1.94),
+        params["mandatoryWaitTimeMinutes"]["value"]["rawBits"],
+        format!("{:08x}", 1.94_f32.to_bits()),
         "mandatory wait"
     );
-    assert_eq!(insurance["expediteFee"], 2335, "fee");
+    assert_eq!(params["expediteFee"]["value"]["value"], 2335, "fee");
     assert_eq!(
-        gladius["recordPath"], "libs/foundry/records/entities/spaceships/aegs_gladius",
+        gladius["recordPath"]["value"], "libs/foundry/records/entities/spaceships/aegs_gladius",
         "the source path"
     );
     let idris = ship(catalog, "AEGS_Idris_M")?;
     print_line(&format!("AEGS_Idris_M: {}", idris["insurance"]));
-    assert_eq!(idris["insurance"]["expediteFee"], 150_990, "Idris-M fee");
-    Ok(())
-}
-
-#[test]
-#[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
-fn the_recovery_rules_name_the_idris_in_a_group_of_multiplier_one() -> TestResult {
-    let catalog = catalog()?;
-    let idris = ship(catalog, "AEGS_Idris_M")?;
-    let recovery = &catalog["itemRecovery"];
-    print_line(&format!(
-        "item recovery: claim {} expedite {} overrides {}",
-        recovery["claimCostMultiplier"],
-        recovery["maxExpeditedClaimCostMultiplier"],
-        recovery["overrides"].as_array().map_or(0, Vec::len)
-    ));
     assert_eq!(
-        recovery["recordPath"], "libs/foundry/records/entitlementpolicies/globalitemrecovery",
-        "the source path"
-    );
-    assert_eq!(
-        recovery["claimCostMultiplier"].as_f64(),
-        Some(0.003),
-        "claimCostMultiplier"
-    );
-    assert_eq!(
-        recovery["maxExpeditedClaimCostMultiplier"].as_f64(),
-        Some(0.0003),
-        "maxExpeditedClaimCostMultiplier"
-    );
-    let group = recovery["overrides"]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find(|group| {
-            group["classGuids"]
-                .as_array()
-                .is_some_and(|guids| guids.contains(&idris["guid"]))
-        })
-        .ok_or("no override group names AEGS_Idris_M")?;
-    assert_eq!(
-        group["claimCostMultiplier"].as_f64(),
-        Some(1.0),
-        "the Idris-M group"
+        idris["insurance"]["value"]["shipInsuranceParams"]["value"]["expediteFee"]["value"]["value"],
+        150_990,
+        "Idris-M fee"
     );
     Ok(())
 }

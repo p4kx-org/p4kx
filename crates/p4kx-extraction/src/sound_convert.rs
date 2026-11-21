@@ -113,6 +113,9 @@ impl EntryWriter<'_> {
         let credited = AtomicU64::new(0);
         let done = match convert(self, entry, buffers, &credited) {
             Ok(done) => done,
+            Err(error) if crate::guard_cancellation::retained_output(&error) => {
+                Converted::of(Outcome::Failed(error))
+            }
             Err(_) if self.tracker.archive_file_changed() => Converted::of(Outcome::Cancelled),
             Err(error) => Converted::of(Outcome::Failed(error)),
         };
@@ -166,10 +169,7 @@ impl EntryWriter<'_> {
         let stem = sound_role(&disk_name)
             .and_then(|(_, stem)| stem.rsplit(['\\', '/']).next())
             .ok_or(ExtractionError::UnsafePath)?;
-        let folder = self
-            .tracker
-            .folders
-            .folder(self.target, relative.parent())?;
+        let folder = self.folder(relative.parent())?;
         let sound = SoundFile {
             folder: &folder,
             stem,

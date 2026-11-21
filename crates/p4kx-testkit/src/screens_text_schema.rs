@@ -13,7 +13,10 @@ pub(crate) fn text_structs() -> Vec<TestStruct> {
             .field("show", TestType::Bool)
             .field("label", TestType::String)
             .field("style", TestType::String)
-            .field("caseModifier", TestType::String),
+            .field("caseModifier", TestType::String)
+            .field("anchorToParentX", TestType::Single)
+            .field("anchorToParentY", TestType::Single)
+            .field("scale", TestType::Single),
         TestStruct::new("BuildingBlocks_FontStyle")
             .field("font", TestType::String)
             .field("paintFile", TestType::String)

@@ -104,13 +104,47 @@ pub(super) fn notes(texts: &Texts, summary: &ModelExportSummary) -> Vec<(String,
 }
 
 fn library_note(texts: &Texts, problem: &MaterialProblem) -> String {
-    let library = ("library", problem.library.clone().into());
-    match &problem.reason {
-        Some(reason) => texts.format(
-            T::SummaryLibraryUnreadable,
-            &[library, ("reason", reason.clone().into())],
+    match problem {
+        MaterialProblem::Missing {
+            library,
+            target: None,
+        } => texts.format(
+            T::SummaryLibraryMissing,
+            &[("library", library.as_str().into())],
         ),
-        None => texts.format(T::SummaryLibraryMissing, &[library]),
+        MaterialProblem::Missing {
+            library,
+            target: Some(target),
+        } => texts.format(
+            T::SummaryLibraryMissingMapped,
+            &[
+                ("library", library.as_str().into()),
+                ("target", target.as_str().into()),
+            ],
+        ),
+        MaterialProblem::Unreadable {
+            library,
+            target: None,
+            reason,
+        } => texts.format(
+            T::SummaryLibraryUnreadable,
+            &[
+                ("library", library.as_str().into()),
+                ("reason", reason.as_str().into()),
+            ],
+        ),
+        MaterialProblem::Unreadable {
+            library,
+            target: Some(target),
+            reason,
+        } => texts.format(
+            T::SummaryLibraryUnreadableMapped,
+            &[
+                ("library", library.as_str().into()),
+                ("target", target.as_str().into()),
+                ("reason", reason.as_str().into()),
+            ],
+        ),
     }
 }
 
@@ -130,3 +164,7 @@ fn counted(
     ];
     notes.push((texts.format(text, &args), colour));
 }
+
+#[cfg(test)]
+#[path = "model_export_notes_tests.rs"]
+mod tests;

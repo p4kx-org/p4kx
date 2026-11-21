@@ -4,16 +4,10 @@
 use std::ops::Range;
 use std::time::Duration;
 
-use crate::adpcm::Layout;
-use crate::loops::Loop;
-use crate::opus::{OPUS_RATE, TAG_SWITCH};
-use crate::riff::{Chunk, Chunks};
-use crate::{AudioError, ByteOrder, Codec};
+use crate::read_at::SliceSource;
+use crate::riff::{Chunk, Chunks, RiffHeader, slice_range};
+use crate::{AudioError, ByteOrder, Codec, Loop, WemInfoSource, WemMetadata};
 
-const SAMPLE_COUNT_OFFSET: usize = 0x18;
-const VORBIS_FMT_LEN: usize = 0x42;
-const CHANNEL_LAYOUT_OFFSET: usize = 0x14;
-const EXTRA_LEN_OFFSET: usize = 0x10;
 const NANOS_PER_SECOND: u64 = 1_000_000_000;
 
 /// One RIFF chunk of a WEM: its tag and its body.
@@ -29,28 +23,8 @@ pub struct WemChunk<'a> {
 #[derive(Debug, Clone)]
 pub struct Wem<B> {
     bytes: B,
-    order: ByteOrder,
-    format_tag: u16,
-    codec: Codec,
-    channels: u16,
-    sample_rate: u32,
-    block_align: u16,
-    channel_mask: u32,
-    sample_count: Option<u64>,
-    loop_points: Option<Loop>,
+    metadata: WemMetadata,
     data: Range<usize>,
-}
-
-struct Format {
-    tag: u16,
-    channels: u16,
-    sample_rate: u32,
-    block_align: u16,
-    bits: u16,
-    channel_mask: u32,
-    embedded_sample_count: Option<u32>,
-    extra_len: Option<u16>,
-    len: usize,
 }
 
 impl<B: AsRef<[u8]>> Wem<B> {
@@ -61,56 +35,14 @@ impl<B: AsRef<[u8]>> Wem<B> {
     /// Returns an [`AudioError`] when the bytes are not a WEM, are truncated, lack the `fmt` or
     /// `data` chunk, or declare a contradictory format.
     pub fn parse(bytes: B) -> Result<Self, AudioError> {
-        let all = bytes.as_ref();
-        let (order, chunks) = Chunks::of(all)?;
-        let mut fmt = None;
-        let mut vorb = None;
-        let mut smpl = None;
-        let mut data = None;
-        for chunk in chunks {
-            let Chunk { id, body } = chunk?;
-            match &id {
-                b"fmt " => fmt = Some(body),
-                b"vorb" => vorb = Some(body),
-                b"smpl" => smpl = Some(body),
-                b"data" => {
-                    data = Some(body);
-                    break;
-                }
-                _ => {}
-            }
-        }
-        let fmt = fmt.ok_or(AudioError::MissingChunk("fmt "))?;
-        let data = data.ok_or(AudioError::MissingChunk("data"))?;
-        let format = read_format(order, all.get(fmt).unwrap_or_default())?;
-        let codec = Codec::of_format(
-            format.tag,
-            format.channels,
-            format.block_align,
-            format.extra_len,
-        );
-        let vorb_sample_count = vorb.and_then(|vorb| order.u32_at(all, vorb.start));
-        let sample_count = sample_count(codec, &format, vorb_sample_count, data.len() as u64)?;
-        let loop_points = smpl.and_then(|smpl| {
-            Loop::from_smpl(order, all.get(smpl).unwrap_or_default(), sample_count)
-        });
-        let sample_rate = if codec == Codec::Opus {
-            OPUS_RATE
-        } else {
-            format.sample_rate
-        };
+        let mut input = SliceSource(bytes.as_ref());
+        let header = RiffHeader::read(&mut input)?;
+        let metadata = WemMetadata::read(&mut input, header)?;
+        let data = slice_range(metadata.data_chunk())?;
         Ok(Self {
-            order,
-            format_tag: format.tag,
-            codec,
-            channels: format.channels,
-            sample_rate,
-            block_align: format.block_align,
-            channel_mask: format.channel_mask,
-            sample_count,
-            loop_points,
-            data,
             bytes,
+            metadata,
+            data,
         })
     }
 
@@ -151,7 +83,7 @@ impl<B: AsRef<[u8]>> Wem<B> {
     /// conversion counts them.
     #[must_use]
     pub const fn sample_count(&self) -> Option<u64> {
-        self.sample_count
+        self.metadata.sample_count()
     }
 
     /// Returns the loop of a looping sound: the first forward loop of its `smpl` chunk, when it
@@ -159,13 +91,13 @@ impl<B: AsRef<[u8]>> Wem<B> {
     /// the sound. A `smpl` chunk after the `data` chunk is ignored.
     #[must_use]
     pub const fn loop_points(&self) -> Option<Loop> {
-        self.loop_points
+        self.metadata.loop_points()
     }
 
     /// Returns the playing time, when the sample count is known.
     #[must_use]
     pub fn duration(&self) -> Option<Duration> {
-        playing_time(self.sample_count?, self.sample_rate)
+        self.metadata.duration()
     }
 
     pub(crate) fn bytes(&self) -> &[u8] {
@@ -179,128 +111,60 @@ impl<B: AsRef<[u8]>> Wem<B> {
 }
 
 impl<B> Wem<B> {
+    /// Returns the shared decoded WEM summary.
+    #[must_use]
+    pub const fn metadata(&self) -> &WemMetadata {
+        &self.metadata
+    }
+
+    /// Returns the original decisions for this WEM's decoded summary.
+    #[must_use]
+    pub const fn info_source(&self) -> &WemInfoSource {
+        self.metadata.info_source()
+    }
+
     /// Returns the codec.
     #[must_use]
     pub const fn codec(&self) -> Codec {
-        self.codec
+        self.metadata.codec()
     }
 
     /// Returns the raw format tag of the `fmt` chunk.
     #[must_use]
     pub const fn format_tag(&self) -> u16 {
-        self.format_tag
+        self.metadata.format_tag()
     }
 
     /// Returns the byte order of the file.
     #[must_use]
     pub const fn byte_order(&self) -> ByteOrder {
-        self.order
+        self.metadata.byte_order()
     }
 
     /// Returns the number of channels, at least 1.
     #[must_use]
     pub const fn channels(&self) -> u16 {
-        self.channels
+        self.metadata.channels()
     }
 
     /// Returns the sample rate in Hz, at least 1; 48 000 for Opus, which always decodes at that
     /// rate.
     #[must_use]
     pub const fn sample_rate(&self) -> u32 {
-        self.sample_rate
+        self.metadata.sample_rate()
     }
 
     /// Returns the bytes per block or frame the `fmt` chunk declares; 0 for variable-rate codecs.
     #[must_use]
     pub const fn block_align(&self) -> u16 {
-        self.block_align
+        self.metadata.block_align()
     }
 
     /// Returns the speaker positions as a `WAVEFORMATEXTENSIBLE` channel mask, 0 when unknown.
     #[must_use]
     pub const fn channel_mask(&self) -> u32 {
-        self.channel_mask
+        self.metadata.channel_mask()
     }
-}
-
-fn read_format(order: ByteOrder, fmt: &[u8]) -> Result<Format, AudioError> {
-    let field16 = |offset| order.u16_at(fmt, offset);
-    let field32 = |offset| order.u32_at(fmt, offset);
-    let (Some(tag), Some(channels), Some(sample_rate), Some(block_align), Some(bits)) = (
-        field16(0),
-        field16(2),
-        field32(4),
-        field16(0x0C),
-        field16(0x0E),
-    ) else {
-        return Err(AudioError::InvalidFormat(
-            "the fmt chunk is shorter than 16 bytes",
-        ));
-    };
-    if channels == 0 {
-        return Err(AudioError::InvalidFormat("the WEM has no channels"));
-    }
-    if sample_rate == 0 {
-        return Err(AudioError::InvalidFormat("the sample rate is 0"));
-    }
-    let channel_mask = field32(CHANNEL_LAYOUT_OFFSET).map_or(0, |layout| {
-        let is_wwise_layout = layout & 0xFF == u32::from(channels) && (layout >> 8) & 0x0F == 1;
-        if is_wwise_layout {
-            layout >> 12
-        } else {
-            layout
-        }
-    });
-    Ok(Format {
-        tag,
-        channels,
-        sample_rate,
-        block_align,
-        bits,
-        channel_mask,
-        embedded_sample_count: field32(SAMPLE_COUNT_OFFSET),
-        extra_len: field16(EXTRA_LEN_OFFSET),
-        len: fmt.len(),
-    })
-}
-
-fn sample_count(
-    codec: Codec,
-    format: &Format,
-    vorb_sample_count: Option<u32>,
-    data_len: u64,
-) -> Result<Option<u64>, AudioError> {
-    let channels = u64::from(format.channels);
-    let block_align = u64::from(format.block_align);
-    Ok(match codec {
-        Codec::Pcm => {
-            if format.bits != 16 {
-                return Err(AudioError::InvalidFormat(
-                    "PCM WEMs must have 16 bits per sample",
-                ));
-            }
-            if block_align != channels * 2 {
-                return Err(AudioError::InvalidFormat(
-                    "the PCM block alignment does not match the channels",
-                ));
-            }
-            Some(data_len / block_align)
-        }
-        Codec::ImaAdpcm | Codec::PtAdpcm => Layout::of(codec, format.channels, format.block_align)
-            .map(|layout| layout.frames(data_len)),
-        Codec::Vorbis => vorb_sample_count
-            .or_else(|| {
-                format
-                    .embedded_sample_count
-                    .filter(|_| format.len == VORBIS_FMT_LEN)
-            })
-            .map(u64::from),
-        Codec::Opus => format
-            .embedded_sample_count
-            .filter(|_| format.tag != TAG_SWITCH || format.sample_rate == OPUS_RATE)
-            .map(u64::from),
-        _ => None,
-    })
 }
 
 /// Returns the playing time of `frames` frames at `sample_rate` Hz; `None` for a rate of 0.

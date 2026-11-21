@@ -1,112 +1,86 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::fs::File;
 use std::io::{self, BufRead, BufReader, Read, Seek, SeekFrom};
-use std::path::Path;
+use std::ops::ControlFlow;
 
-/// The most bytes of a log that count for the public patches: its tail. The launcher rotates its
-/// logs at 5 MiB.
 pub(crate) const PATCH_TAIL_BYTES: u64 = 16 << 20;
-/// The longest line looked at for a public patch.
 pub(crate) const PATCH_LINE_BYTES: usize = 64 << 10;
-/// The longest line looked at for a library folder; a longer one is skipped without being held.
 const LIBRARY_LINE_BYTES: usize = 1 << 20;
 const READ_BUFFER: usize = 64 << 10;
 
-/// Which part of a log file [`for_each_line`] reads.
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Part {
-    /// The whole file, lines up to 1 MiB: for library folders, which a protection depends on.
     Whole,
-    /// The last [`PATCH_TAIL_BYTES`] bytes, lines up to [`PATCH_LINE_BYTES`].
     Tail,
 }
 
-/// Calls `visit` with whether the line lies in the last [`PATCH_TAIL_BYTES`] bytes of the regular
-/// file `path` and its text without the line break.
-///
-/// A line over the limit of `part` is skipped without being held. When a tail starts inside a
-/// line, that partial line is dropped. A file that is missing, is not a regular file or cannot be
-/// read yields the lines read so far.
-pub(crate) fn for_each_line(path: &Path, part: Part, mut visit: impl FnMut(bool, &[u8])) {
-    read_lines(path, part, |start, tail_start, line| {
-        visit(start >= tail_start, line);
-    });
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ReadEnd {
+    Complete,
+    Stopped,
 }
 
-struct Opened {
-    file: File,
+pub(crate) fn for_each_opened(
+    mut file: impl Read + Seek,
     length: u64,
-    tail_start: u64,
-    start: u64,
-    skipping: bool,
-}
-
-fn open(path: &Path, part: Part) -> Option<Opened> {
-    if !std::fs::metadata(path).ok()?.is_file() {
-        return None;
-    }
-    let mut file = File::open(path).ok()?;
-    let opened = file.metadata().ok()?;
-    if !opened.is_file() {
-        return None;
-    }
-    let length = opened.len();
+    part: Part,
+    visit: impl FnMut(bool, &[u8]) -> ControlFlow<()>,
+) -> io::Result<ReadEnd> {
     let tail_start = length.saturating_sub(PATCH_TAIL_BYTES);
-    let (mut start, mut skipping) = (0, false);
-    if part == Part::Tail && tail_start > 0 {
-        file.seek(SeekFrom::Start(tail_start - 1)).ok()?;
+    let (start, skipping) = if part == Part::Tail && tail_start > 0 {
+        file.seek(SeekFrom::Start(tail_start - 1))?;
         let mut before = [0_u8; 1];
-        file.read_exact(&mut before).ok()?;
-        skipping = before != *b"\n";
-        start = tail_start;
-    }
-    Some(Opened {
-        file,
-        length,
-        tail_start,
-        start,
-        skipping,
-    })
-}
-
-fn read_lines(path: &Path, part: Part, mut visit: impl FnMut(u64, u64, &[u8])) -> u64 {
-    let Some(Opened {
-        file,
-        length,
-        tail_start,
-        start,
-        mut skipping,
-    }) = open(path, part)
-    else {
-        return 0;
+        file.read_exact(&mut before)?;
+        (tail_start, before != *b"\n")
+    } else {
+        file.seek(SeekFrom::Start(0))?;
+        (0, false)
     };
-    let max_line = match part {
+    let maximum = match part {
         Part::Whole => LIBRARY_LINE_BYTES,
         Part::Tail => PATCH_LINE_BYTES,
     };
-    let mut reader = BufReader::with_capacity(READ_BUFFER, file.take(length.saturating_sub(start)));
-    let mut line: Vec<u8> = Vec::new();
+    let input = file.take(length.saturating_sub(start));
+    lines(input, start, length, tail_start, maximum, skipping, visit)
+}
+
+fn lines(
+    input: impl Read,
+    start: u64,
+    length: u64,
+    tail_start: u64,
+    maximum: usize,
+    mut skipping: bool,
+    mut visit: impl FnMut(bool, &[u8]) -> ControlFlow<()>,
+) -> io::Result<ReadEnd> {
+    let mut reader = BufReader::with_capacity(READ_BUFFER, input);
+    let mut line = Vec::new();
     let mut line_start = start;
     let mut position = start;
     loop {
         let buffer = match reader.fill_buf() {
             Ok(buffer) => buffer,
             Err(error) if error.kind() == io::ErrorKind::Interrupted => continue,
-            Err(_) => return tail_start,
+            Err(error) => return Err(error),
         };
         if buffer.is_empty() {
-            if !skipping {
-                emit(line_start, tail_start, &line, &mut visit);
+            if position != length {
+                return Err(io::Error::new(
+                    io::ErrorKind::UnexpectedEof,
+                    "launcher log was truncated",
+                ));
             }
-            return tail_start;
+            if !skipping && emit(line_start, tail_start, &line, &mut visit).is_break() {
+                return Ok(ReadEnd::Stopped);
+            }
+            return Ok(ReadEnd::Complete);
         }
         let newline = buffer.iter().position(|&byte| byte == b'\n');
         let chunk = newline.map_or(buffer, |end| buffer.get(..end).unwrap_or_default());
         let consumed = newline.map_or(buffer.len(), |end| end + 1);
         if !skipping {
-            if line.len() + chunk.len() > max_line {
+            if chunk.len() > maximum.saturating_sub(line.len()) {
                 skipping = true;
                 line.clear();
             } else {
@@ -114,10 +88,10 @@ fn read_lines(path: &Path, part: Part, mut visit: impl FnMut(u64, u64, &[u8])) -
             }
         }
         reader.consume(consumed);
-        position += consumed as u64;
+        position += u64::try_from(consumed).map_err(io::Error::other)?;
         if newline.is_some() {
-            if !skipping {
-                emit(line_start, tail_start, &line, &mut visit);
+            if !skipping && emit(line_start, tail_start, &line, &mut visit).is_break() {
+                return Ok(ReadEnd::Stopped);
             }
             line.clear();
             skipping = false;
@@ -126,8 +100,17 @@ fn read_lines(path: &Path, part: Part, mut visit: impl FnMut(u64, u64, &[u8])) -
     }
 }
 
-fn emit(start: u64, tail_start: u64, line: &[u8], visit: &mut impl FnMut(u64, u64, &[u8])) {
-    if !line.is_empty() {
-        visit(start, tail_start, line.strip_suffix(b"\r").unwrap_or(line));
+fn emit(
+    start: u64,
+    tail_start: u64,
+    line: &[u8],
+    visit: &mut impl FnMut(bool, &[u8]) -> ControlFlow<()>,
+) -> ControlFlow<()> {
+    if line.is_empty() {
+        return ControlFlow::Continue(());
     }
+    visit(
+        start >= tail_start,
+        line.strip_suffix(b"\r").unwrap_or(line),
+    )
 }

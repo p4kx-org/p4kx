@@ -1,15 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Loadouts of ships and items in the Basetool catalog, through the public API: the references
+//! Loadouts of ships and items in the P4KX catalog, through the public API: the references
 //! of the ports, the summary, the Filter and the order.
 
-use crate::loadouts_fixture::{ALPHA, BROKEN, GUN_TEMPLATE, MISSING, SNUB};
-use crate::loadouts_support::{build, guid, known, loadout, names, port};
+use crate::loadouts_fixture::{
+    self, ALPHA, BROKEN, GUN_DEFAULT, GUN_OVERRIDE, GUN_TEMPLATE, MISSING, SNUB, TURRET,
+};
+use crate::loadouts_support::{self, build, guid, known, loadout, names, port};
 
 use std::error::Error;
 
 use p4kx_export::{Filter, Kind, LoadoutSummary};
+use p4kx_extraction::{Archive, ArchiveWatch, DataForgeEntry};
+use rayon::ThreadPoolBuilder;
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -133,7 +137,10 @@ fn every_attached_guid_resolves_except_the_counted_ones() -> TestResult {
     }
     assert_eq!(outside.len(), built.summary().loadouts().outside, "counted");
     for entry in catalog["loadouts"].as_array().ok_or("loadouts")? {
-        let owner = entry["entityGuid"].as_str().ok_or("a GUID")?;
+        let owner = entry
+            .pointer("/entityGuid/value")
+            .and_then(Value::as_str)
+            .ok_or("a GUID")?;
         assert!(known.contains(&owner), "{owner} is an item or a ship");
     }
     Ok(())
@@ -148,7 +155,7 @@ fn a_filter_limits_the_loadouts_to_the_selected_entities_and_marks_the_kind_part
         .as_array()
         .ok_or("loadouts")?
         .iter()
-        .filter_map(|entry| entry["entityKind"].as_str())
+        .filter_map(|entry| entry.pointer("/entityKind/value").and_then(Value::as_str))
         .collect();
     assert_eq!(owners, ["ship", "ship", "ship", "ship"], "only the ships");
     assert_eq!(
@@ -162,6 +169,76 @@ fn a_filter_limits_the_loadouts_to_the_selected_entities_and_marks_the_kind_part
         "no item loadout under the Filter"
     );
     Ok(())
+}
+
+#[test]
+fn a_shared_dataforge_preserves_sequential_ship_and_item_catalogs() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = loadouts_fixture::write_archive(dir.path())?;
+    let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
+    let watch = ArchiveWatch::new(&archive);
+    watch.check()?;
+    let entry = DataForgeEntry::read(&archive)?;
+
+    {
+        let ships = compare_reused_catalog(&archive, &entry, "*/spaceships/*")?;
+        let ports = &loadout(&ships, ALPHA)?["ports"];
+        let empty = port(ports, "hardpoint_empty")?;
+        assert_eq!(empty["itemGuid"], Value::Null, "the empty vehicle port");
+        let turret = port(ports, "hardpoint_turret")?;
+        let nested = port(&turret["ports"], "gun_1")?;
+        assert_eq!(
+            nested["itemGuid"],
+            json!(guid(GUN_OVERRIDE)),
+            "the ship's nested attachment override"
+        );
+    }
+    watch.check()?;
+
+    let items = compare_reused_catalog(&archive, &entry, "*/scitem/*")?;
+    let own = port(&loadout(&items, TURRET)?["ports"], "gun_1")?;
+    assert_eq!(
+        own["itemGuid"],
+        json!(guid(GUN_DEFAULT)),
+        "the next filtered read retains the item's own default attachment"
+    );
+    watch.check()?;
+    Ok(())
+}
+
+fn compare_reused_catalog(
+    archive: &Archive,
+    entry: &DataForgeEntry,
+    pattern: &str,
+) -> Result<Value, Box<dyn Error>> {
+    let filter = Filter::new(pattern);
+    let options = loadouts_support::options(Some(&filter));
+    let serial = ThreadPoolBuilder::new().num_threads(1).build()?;
+    let parallel = ThreadPoolBuilder::new().num_threads(4).build()?;
+    let direct = serial.install(|| p4kx_export::build_catalog(archive, &options))?;
+    let reused = parallel.install(|| p4kx_export::build_catalog_from(archive, entry, &options))?;
+    let reused_bytes = reused.json();
+    let direct_bytes = direct.json();
+    if reused_bytes != direct_bytes {
+        let offset = reused_bytes
+            .iter()
+            .zip(direct_bytes)
+            .position(|(reused, direct)| reused != direct)
+            .unwrap_or_else(|| reused_bytes.len().min(direct_bytes.len()));
+        let context = |bytes: &[u8]| {
+            let start = offset.saturating_sub(72);
+            let end = offset.saturating_add(128).min(bytes.len());
+            String::from_utf8_lossy(bytes.get(start..end).unwrap_or_default()).into_owned()
+        };
+        return Err(format!(
+            "{pattern} catalog bytes diverged at {offset}: reused {:?}, direct {:?}",
+            context(reused_bytes),
+            context(direct_bytes)
+        )
+        .into());
+    }
+    assert_eq!(reused.summary(), direct.summary(), "{pattern} summary");
+    Ok(serde_json::from_slice(reused.json())?)
 }
 
 #[test]

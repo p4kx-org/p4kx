@@ -3,8 +3,8 @@
 
 //! Clones, lists and library templates: what they draw at rest and how they are bounded.
 
-use p4kx_screens::Limits;
-use p4kx_testkit::{TestCanvas, TestDim, TestModifier, TestWidget, clone_modifiers};
+use p4kx_screens::{ContentOmissionCode, Limits};
+use p4kx_testkit::{TestCanvas, TestDim, TestModifier, TestValue, TestWidget, clone_modifiers};
 
 use crate::support::{
     BLUE, GREEN, RED, SCREEN, TestResult, blue_at, compose, compose_with, empty_at, green_at,
@@ -71,6 +71,39 @@ fn two_clones_of_a_template_are_laid_out_by_their_parent() -> TestResult {
 }
 
 #[test]
+fn repeated_runtime_images_share_the_template_omission() -> TestResult {
+    let picture = |name| {
+        TestWidget::new("BuildingBlocks_WidgetRuntimeImage", name)
+            .size(TestDim::Fixed(10.0), TestDim::Fixed(10.0))
+            .with("imageSource", TestValue::text("synthetic-render-target"))
+    };
+    let composed = compose(
+        &canvas()
+            .template(picture("template"))
+            .widget(TestWidget::clone_of("first", "template"))
+            .widget(TestWidget::clone_of("second", "template"))
+            .widget(picture("standalone")),
+    )?;
+    let report = composed.report();
+    let image_visits = report
+        .unsupported
+        .iter()
+        .find(|entry| entry.element == "WidgetRuntimeImage")
+        .ok_or("no grouped runtime image omissions")?;
+    assert_eq!(
+        image_visits.count, 3,
+        "two visits to the template and one standalone"
+    );
+    let [template, standalone] = report.content_omissions.as_slice() else {
+        return Err("expected one detail per authored runtime image".into());
+    };
+    assert_eq!(template.widget, "template");
+    assert_eq!(standalone.widget, "standalone");
+    assert_ne!(template.widget_input, standalone.widget_input);
+    Ok(())
+}
+
+#[test]
 fn the_modifiers_of_a_clone_change_its_template() -> TestResult {
     let image = render(&canvas().template(template("tmpl", 40.0, 30.0)).widget(
         TestWidget::clone_of("copy", "tmpl").with(
@@ -116,6 +149,15 @@ fn a_list_with_run_time_rows_is_empty_at_rest_and_says_so() -> TestResult {
         .find(|entry| entry.element == "WidgetList")
         .ok_or("the list is not reported")?;
     assert!(note.reason.contains("run-time"), "{}", note.reason);
+    let missing = composed
+        .report()
+        .content_omissions
+        .first()
+        .ok_or("no runtime array omission")?;
+    assert_eq!(missing.widget, "list");
+    assert_eq!(missing.field, "arrayVariable");
+    assert_eq!(missing.source.as_deref(), Some("FlightController/Ticks"));
+    assert_eq!(missing.code, ContentOmissionCode::RuntimeArray);
     assert!(
         composed
             .report()

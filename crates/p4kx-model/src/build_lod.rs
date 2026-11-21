@@ -4,27 +4,62 @@
 use p4kx_chunks::ivo;
 
 use crate::bone_map::check_joints;
-use crate::build::{
-    Geometry, MAX_LOD, Rig, corrupt, fetch, first_of, read_meshes, read_skeleton, usage,
-};
+use crate::build;
+use crate::build::{Geometry, MAX_LOD, Rig, corrupt, fetch, first_of, read_meshes};
 use crate::companion::lod_file_name;
 use crate::model::MESH_TYPES;
-use crate::{Bone, CompanionResolver, Lod, LodSelection, ModelError, ModelFile, ModelIssue};
+use crate::skeleton_source;
+use crate::{
+    Bone, CompanionResolver, Lod, LodSelection, LodSkeletonOrigin, Mesh, MeshOrigin,
+    ModelBoneSources, ModelChunk, ModelError, ModelFile, ModelIssue,
+};
 
-/// Reads the skeleton of the model file of `level`, which a skinned level's bone indices refer
-/// to; `None` when the file is missing, holds no skeleton or the one `base` already is.
+struct LevelSkeleton {
+    bones: Option<Vec<Bone>>,
+    origin: LodSkeletonOrigin,
+}
+
+/// Reads a level's skeleton and keeps the file's chunk usage before sharing effective bones.
 fn level_skeleton(
     name: &str,
     level: u32,
     base: &[Bone],
     companions: &mut dyn CompanionResolver,
-) -> Result<Option<Vec<Bone>>, ModelError> {
+    chunks: &mut Vec<ModelChunk>,
+    sources: Option<&mut Vec<ModelBoneSources>>,
+    meshes: &[Mesh],
+) -> Result<LevelSkeleton, ModelError> {
+    if meshes.iter().all(|mesh| mesh.influences.is_none()) {
+        return Ok(LevelSkeleton {
+            bones: None,
+            origin: LodSkeletonOrigin::NotRead,
+        });
+    }
     let file_name = lod_file_name(name, level);
-    let Some(file) = fetch(companions, &file_name)? else {
-        return Ok(None);
+    let which = ModelFile::LodModel(level);
+    let Some(file) = fetch(companions, which, &file_name)? else {
+        return Ok(LevelSkeleton {
+            bones: None,
+            origin: LodSkeletonOrigin::MissingFile,
+        });
     };
-    let bones = read_skeleton(&file_name, &file, &mut Vec::new())?;
-    Ok((!bones.is_empty() && bones != base).then_some(bones))
+    let mut read = Vec::new();
+    let bones =
+        skeleton_source::read_model_skeleton(&file_name, &file, which, &mut read, sources, None)?;
+    chunks.extend(build::usage(&file, which, &read));
+    let origin = if read.is_empty() {
+        LodSkeletonOrigin::NoSkeleton
+    } else if bones.is_empty() {
+        LodSkeletonOrigin::EmptySkeleton
+    } else if bones == base {
+        LodSkeletonOrigin::EqualModel
+    } else {
+        LodSkeletonOrigin::Distinct
+    };
+    Ok(LevelSkeleton {
+        bones: (origin == LodSkeletonOrigin::Distinct).then_some(bones),
+        origin,
+    })
 }
 
 /// Reads the geometry companions `<stem>_lod<n>.<extension>m` of the levels from 1 on that
@@ -36,10 +71,12 @@ pub(crate) fn read_lod_companions(
     rig: Rig<'_>,
     read: &mut Vec<(ModelFile, usize)>,
     found: &mut Geometry,
+    mut sources: Option<&mut Vec<ModelBoneSources>>,
 ) -> Result<(), ModelError> {
     for level in (1..=MAX_LOD).filter(|&level| selection.wants(level)) {
         let companion_name = format!("{}m", lod_file_name(name, level));
-        let Some(companion) = fetch(companions, &companion_name)? else {
+        let Some(companion) = fetch(companions, ModelFile::LodGeometry(level), &companion_name)?
+        else {
             continue;
         };
         let Some(index) = first_of(&companion, &MESH_TYPES) else {
@@ -50,6 +87,11 @@ pub(crate) fn read_lod_companions(
                         file: companion_name,
                     });
                 }
+                found.chunks.extend(build::usage(
+                    &companion,
+                    ModelFile::LodGeometry(level),
+                    read,
+                ));
                 continue;
             }
             return Err(ModelError::NoMesh {
@@ -59,26 +101,33 @@ pub(crate) fn read_lod_companions(
         read.push((ModelFile::LodGeometry(level), index));
         let meshes = read_meshes(
             &companion_name,
-            index,
+            MeshOrigin::new(ModelFile::LodGeometry(level), index, level),
             companion.chunk_data(index),
             rig,
             false,
         )?;
-        let bones = if meshes.iter().any(|mesh| mesh.influences.is_some()) {
-            level_skeleton(name, level, rig.bones, companions)?
-        } else {
-            None
-        };
-        let count = bones.as_ref().map_or(rig.bones.len(), Vec::len);
+        let skeleton = level_skeleton(
+            name,
+            level,
+            rig.bones,
+            companions,
+            &mut found.chunks,
+            sources.as_deref_mut(),
+            &meshes,
+        )?;
+        let count = skeleton.bones.as_ref().map_or(rig.bones.len(), Vec::len);
         check_joints(&meshes, count).map_err(corrupt(&companion_name, index, "Skin"))?;
         found.lods.push(Lod {
             level,
             meshes,
-            bones,
+            bones: skeleton.bones,
+            skeleton_origin: skeleton.origin,
         });
-        found
-            .chunks
-            .extend(usage(&companion, ModelFile::LodGeometry(level), read));
+        found.chunks.extend(build::usage(
+            &companion,
+            ModelFile::LodGeometry(level),
+            read,
+        ));
     }
     Ok(())
 }

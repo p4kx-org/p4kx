@@ -199,16 +199,13 @@ fn check_floats(glb: &CheckedGlb, accessor: &Accessor<'_>) -> Result<(), String>
             clippy::cast_possible_truncation,
             reason = "the bound is compared as the f32 the data holds"
         )]
-        let declared: Vec<f32> = declared
-            .as_array()
-            .map(|values| {
-                values
-                    .iter()
-                    .filter_map(gltf::json::Value::as_f64)
-                    .map(|value| value as f32)
-                    .collect()
-            })
-            .unwrap_or_default();
+        let declared: Vec<f32> = declared.as_array().map_or_default(|values| {
+            values
+                .iter()
+                .filter_map(gltf::json::Value::as_f64)
+                .map(|value| value as f32)
+                .collect()
+        });
         if declared != actual {
             return Err(format!(
                 "accessor {index} declares {bound} {declared:?}, its data has {actual:?}"
@@ -220,7 +217,11 @@ fn check_floats(glb: &CheckedGlb, accessor: &Accessor<'_>) -> Result<(), String>
 
 fn check_meshes(glb: &CheckedGlb) -> Result<(), String> {
     for mesh in glb.document.meshes() {
-        for primitive in mesh.primitives() {
+        let primitives = mesh.primitives();
+        if primitives.len() == 0 {
+            return Err(format!("mesh {} has no primitives", mesh.index()));
+        }
+        for primitive in primitives {
             let name = format!("mesh {} primitive {}", mesh.index(), primitive.index());
             let position = primitive
                 .get(&Semantic::Positions)
@@ -367,4 +368,27 @@ fn check_nodes(glb: &CheckedGlb) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use gltf::Gltf;
+    use gltf::json::Value;
+
+    use super::{CheckedGlb, check_meshes};
+
+    #[test]
+    fn a_mesh_without_primitives_is_rejected() -> Result<(), Box<dyn std::error::Error>> {
+        let gltf = Gltf::from_slice_without_validation(
+            br#"{"asset":{"version":"2.0"},"meshes":[{"primitives":[]}]}"#,
+        )?;
+        let glb = CheckedGlb {
+            document: gltf.document,
+            blob: Vec::new(),
+            json: Value::Null,
+        };
+        let error = check_meshes(&glb).expect_err("glTF requires at least one primitive per mesh");
+        assert_eq!(error, "mesh 0 has no primitives");
+        Ok(())
+    }
 }

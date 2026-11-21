@@ -4,9 +4,10 @@
 //! Sizes, anchors and the other number fields of the layout that a canvas binds to its widgets.
 
 use p4kx_dataforge::DataForge;
-use p4kx_screens::{Composed, ScreenComposer, Variable};
+use p4kx_screens::{Composed, ContentOmissionCode, ScreenComposer, Variable};
 use p4kx_testkit::{
-    TestCanvas, TestDim, TestModifier, TestOp, TestStyleEntry, TestWidget, clone_modifiers,
+    TestCanvas, TestDim, TestInstance, TestModifier, TestOp, TestRecord, TestStyleEntry, TestValue,
+    TestWidget, clone_modifiers,
 };
 
 use crate::support::{
@@ -32,7 +33,14 @@ fn sized(canvas: TestCanvas, field: &'static str) -> TestCanvas {
 }
 
 fn compose(canvas: &TestCanvas, settings: &[&str]) -> Result<Composed, Box<dyn std::error::Error>> {
-    let bytes = database([canvas.record()]);
+    compose_record(canvas.record(), settings)
+}
+
+fn compose_record(
+    record: TestRecord,
+    settings: &[&str],
+) -> Result<Composed, Box<dyn std::error::Error>> {
+    let bytes = database([record]);
     let forge = DataForge::open(&bytes)?;
     let variables = settings
         .iter()
@@ -55,6 +63,109 @@ fn a_bound_size_sets_the_width_the_variables_decide() -> TestResult {
         .image;
     assert!(red_at(&set, 25, 5), "the width is 30 with the variable");
     assert!(empty_at(&set, 35, 5));
+    Ok(())
+}
+
+const WIDE_SWITCH_KEY: i64 = 1 << 40;
+
+fn switch_case(key: i64, constant: f32, input: Option<&str>) -> TestValue {
+    TestValue::Struct(
+        TestInstance::new("BuildingBlocks_IntegerNumberPair")
+            .value("first", TestValue::Int64(key))
+            .value("second", TestValue::Single(constant))
+            .value(
+                "secondOverride",
+                input.map_or(TestValue::Null, TestValue::pointer),
+            ),
+    )
+}
+
+fn switch_record(default_override: Option<&str>) -> TestRecord {
+    let selector = TestInstance::new("BuildingBlocks_BindingsIntegerVariable")
+        .named("selector")
+        .value("binding", TestValue::text("selector"));
+    let number = TestInstance::new("BuildingBlocks_BindingsNumberComponentParameter")
+        .named("number")
+        .value("parameter", TestValue::text("override"))
+        .value("defaultValue", TestValue::Single(32.0));
+    let flag = TestInstance::new("BuildingBlocks_BindingsBooleanVariable")
+        .named("flag")
+        .value("binding", TestValue::text("flag"));
+    let switch = TestInstance::new("BuildingBlocks_BindingsNumberFromIntegerSwitch")
+        .named("switch")
+        .value("input", TestValue::pointer("selector"))
+        .value("defaultValue", TestValue::Single(14.0))
+        .value(
+            "defaultOverride",
+            default_override.map_or(TestValue::Null, TestValue::pointer),
+        )
+        .value(
+            "values",
+            TestValue::Array(vec![
+                switch_case(WIDE_SWITCH_KEY, 24.0, None),
+                switch_case(WIDE_SWITCH_KEY, 4.0, Some("flag")),
+                switch_case(2, 4.0, Some("number")),
+                switch_case(3, 4.0, Some("flag")),
+                switch_case(4, f32::NAN, None),
+            ]),
+        );
+    let binding = TestInstance::new("BuildingBlocks_BindingsNumberField")
+        .value("field", TestValue::text("SizeX"))
+        .value("widget", TestValue::pointer("bar"))
+        .value("input", TestValue::pointer("switch"));
+    canvas().widget(bar()).record().value(
+        "operations",
+        TestValue::Array(
+            [selector, number, flag, switch, binding]
+                .into_iter()
+                .map(TestValue::Struct)
+                .collect(),
+        ),
+    )
+}
+
+#[test]
+fn an_integer_number_switch_selects_the_first_exact_case_or_default() -> TestResult {
+    let exact = format!("selector={WIDE_SWITCH_KEY}");
+    let fractional = format!("selector={WIDE_SWITCH_KEY}.125");
+    for (setting, default_override, width) in [
+        (exact.as_str(), None, 24),
+        (fractional.as_str(), None, 14),
+        ("selector=2", None, 32),
+        ("selector=5", Some("number"), 32),
+    ] {
+        let composed = compose_record(switch_record(default_override), &[setting])?;
+        let image = composed.rasterize(&stage())?.image;
+        assert!(red_at(&image, width - 2, 5), "{setting}");
+        assert!(empty_at(&image, width + 2, 5), "{setting}");
+        assert_eq!(
+            composed.report().content_omissions,
+            [],
+            "valid case or fallback for {setting}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn an_integer_number_switch_diagnoses_an_invalid_selected_branch() -> TestResult {
+    for (setting, default_override) in [
+        ("selector=3", None),
+        ("selector=4", None),
+        ("selector=5", Some("flag")),
+    ] {
+        let composed = compose_record(switch_record(default_override), &[setting])?;
+        let image = composed.rasterize(&stage())?.image;
+        assert!(red_at(&image, 8, 5), "authored width for {setting}");
+        assert!(empty_at(&image, 12, 5), "authored width for {setting}");
+        let [omission] = composed.report().content_omissions.as_slice() else {
+            return Err("one omission for the selected branch".into());
+        };
+        assert_eq!(omission.widget, "bar");
+        assert_eq!(omission.widget_input.slot, 0);
+        assert_eq!(omission.field, "SizeX");
+        assert_eq!(omission.code, ContentOmissionCode::UnresolvedInput);
+    }
     Ok(())
 }
 

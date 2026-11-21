@@ -107,23 +107,46 @@ fn sounds_actions_and_events_are_decoded_with_their_ids() -> TestResult {
 
 #[test]
 fn an_event_with_more_than_127_actions_reads_a_two_byte_count() -> TestResult {
-    let actions: Vec<u32> = (1..=200).collect();
+    let actions = vec![17_u32; 200];
     let bytes = TestBank::new(1)
         .object(TestHircObject::event(9, &actions))
         .bytes();
     let bank = Soundbank::parse(bytes.as_slice())?;
 
+    let event = bank.object(9).ok_or("decoded Event")?;
+    assert_eq!(event.value, HircValue::Event(actions), "all 200 actions");
+    let start = event.id_byte_range().end;
+    let end = u64::try_from(start + 2)?;
+    let count = event
+        .event_action_count_evidence()
+        .ok_or("original count")?;
+    assert_eq!(count.value, 200, "declared count");
     assert_eq!(
-        bank.objects().first().map(|object| &object.value),
-        Some(&HircValue::Event(actions)),
-        "all 200 actions"
+        count.range,
+        u64::try_from(start)?..end,
+        "two-byte count range"
     );
+    assert_eq!(
+        bytes.get(start..start + 2),
+        Some([0x81_u8, 0x48].as_slice()),
+        "count bytes"
+    );
+    for ordinal in [0, 1, 199] {
+        let offset = end + 4 * u64::try_from(ordinal)?;
+        assert_eq!(
+            event.event_action_id_byte_range(ordinal),
+            Some(offset..offset + 4),
+            "exact physical range for repeated Action ID"
+        );
+    }
+    assert_eq!(event.event_action_id_byte_range(200), None, "out of range");
     Ok(())
 }
 
 #[test]
 fn other_objects_keep_their_kind_id_and_raw_body() -> TestResult {
     let bytes = TestBank::new(1)
+        .version(153)
         .object(TestHircObject::raw(8, 0x1234, [9, 8, 7]))
         .object(TestHircObject::raw(0x30, 0x5678, []))
         .bytes();

@@ -1,8 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The Basetool catalog entry of the Export menu and its windows driven headless through
+//! The P4KX catalog entry of the Export menu and its windows driven headless through
 //! `egui_kittest`.
+
+#[path = "catalog_category_lists_window.rs"]
+mod category_lists;
+
+#[path = "catalog_entry_health_window.rs"]
+mod entry_health;
 
 use crate::cataloging;
 use crate::waiting::{RunQuiet, wait_for};
@@ -11,8 +17,9 @@ use cataloging::{TestResult, files_in, makers, opened};
 use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
+use p4kx_export::CatalogPublicationMode;
 use p4kx_gui::ui::{self, Dialog};
-use p4kx_gui::{CatalogExportStage, CatalogExportStatus, Language, Model};
+use p4kx_gui::{CatalogExportOptions, CatalogExportStage, CatalogExportStatus, Language, Model};
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
 struct Window {
@@ -67,8 +74,8 @@ fn the_export_menu_asks_for_the_catalog_file_only_with_a_dataforge() -> TestResu
     let mut with = harness(with);
     let mut without = harness(without);
 
-    pick(&mut without, "Export", "Basetool catalog…");
-    pick(&mut with, "Export", "Basetool catalog…");
+    pick(&mut without, "Export", "P4KX catalog…");
+    pick(&mut with, "Export", "P4KX catalog…");
 
     assert_eq!(without.state().dialog, None, "disabled without a DataForge");
     assert_eq!(
@@ -80,16 +87,54 @@ fn the_export_menu_asks_for_the_catalog_file_only_with_a_dataforge() -> TestResu
 }
 
 #[test]
+fn the_diagnostic_menu_requests_a_separate_save_dialog() -> TestResult {
+    let (_dir, model, _) = opened(&makers())?;
+    let mut harness = harness(model);
+
+    pick(&mut harness, "Export", "Diagnostic P4KX catalog…");
+
+    assert_eq!(
+        harness.state().dialog,
+        Some(Dialog::DiagnosticCatalogFile),
+        "diagnostic permission is an explicit menu choice"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_normal_incomplete_job_explains_the_refusal_without_a_success_window() -> TestResult {
+    let (_dir, mut model, out) = opened(&cataloging::unreadable())?;
+    model.start_catalog(out.join("catalog.json"), || {});
+    let mut harness = harness(model);
+
+    wait_for_the_end(&mut harness)?;
+
+    harness.get_by_label("P4KX catalog failed");
+    harness.get_by_label_contains("No file was created or replaced.");
+    assert!(
+        harness.query_by_label("P4KX catalog created").is_none(),
+        "the refusal cannot look like successful publication"
+    );
+    assert!(files_in(&out)?.is_empty(), "nothing was published");
+    Ok(())
+}
+
+#[test]
 fn the_summary_shows_the_kinds_the_texts_the_size_and_the_file() -> TestResult {
     let (_dir, mut model, out) = opened(&makers())?;
-    let file = out.join("basetool-catalog.json");
+    let file = out.join("p4kx-catalog.json");
     model.start_catalog(file.clone(), || {});
     let mut harness = harness(model);
 
     wait_for_the_end(&mut harness)?;
 
-    harness.get_by_label("Basetool catalog created");
+    harness.get_by_label("P4KX catalog created");
+    harness
+        .get_by_label("Export health: all selected sources were read and projected successfully.");
     harness.get_by_label("Manufacturers: 2 written, 1 skipped, complete");
+    harness.get_by_label("Resource types: 0 written, 0 skipped, complete");
+    harness.get_by_label("Global tags: 0 written, 0 skipped, complete");
+    harness.get_by_label("Mission property sets: 0 written, 0 skipped, complete");
     harness.get_by_label("Records skipped as development leftovers: 1");
     harness.get_by_label("Playability");
     harness.get_by_label("Items: 0 player, 0 AI, 0 mission, 0 special, 0 unclassified");
@@ -100,11 +145,11 @@ fn the_summary_shows_the_kinds_the_texts_the_size_and_the_file() -> TestResult {
     harness.get_by_label(&format!("File: {}", file.display()));
     assert!(
         harness
-            .query_by_label_contains("is close to the basetool upload limit")
+            .query_by_label_contains("is close to the transfer reference threshold")
             .is_none(),
         "no size warning"
     );
-    let window = harness.get_by_label("Basetool catalog created").rect();
+    let window = harness.get_by_label("P4KX catalog created").rect();
     let close = harness.get_by_label("Close").rect();
     assert!(
         window.max.y - close.max.y < 40.0,
@@ -117,15 +162,23 @@ fn the_summary_shows_the_kinds_the_texts_the_size_and_the_file() -> TestResult {
 }
 
 #[test]
-fn an_unreadable_record_is_listed_in_the_summary_and_the_catalog_is_written() -> TestResult {
+fn an_unreadable_record_is_listed_in_an_explicit_diagnostic_summary() -> TestResult {
     let (_dir, mut model, out) = opened(&cataloging::unreadable())?;
-    let file = out.join("basetool-catalog.json");
-    model.start_catalog(file.clone(), || {});
+    let file = out.join("p4kx-catalog.json");
+    model.start_catalog_with_options(
+        file.clone(),
+        CatalogExportOptions {
+            publication_mode: CatalogPublicationMode::DiagnosticPartial,
+            ..CatalogExportOptions::default()
+        },
+        || {},
+    );
     let mut harness = harness(model);
 
     wait_for_the_end(&mut harness)?;
 
-    harness.get_by_label("Basetool catalog created");
+    harness.get_by_label("Diagnostic P4KX catalog written");
+    harness.get_by_label_contains("Export health: incomplete.");
     harness.get_by_label_contains("Records that could not be read and were left out (1)");
     harness.get_by_label_contains(
         "libs/foundry/records/crafting/blueprints/crafting/broken (90000000-0000-4000-8000-000000000009)",
@@ -143,8 +196,8 @@ fn a_compressed_catalog_shows_both_sizes() -> TestResult {
 
     wait_for_the_end(&mut harness)?;
 
-    harness.get_by_label_contains(" compressed (of the upload limit of 64 MB), ");
-    harness.get_by_label_contains(" uncompressed");
+    harness.get_by_label_contains(" compressed (reference threshold 64 MB), ");
+    harness.get_by_label_contains(" decoded");
     Ok(())
 }
 
@@ -157,8 +210,9 @@ fn a_compressed_catalog_shows_both_sizes_in_german() -> TestResult {
 
     wait_for_the_end(&mut harness)?;
 
-    harness.get_by_label_contains(" komprimiert (vom Upload-Limit 64 MB), ");
-    harness.get_by_label_contains(" unkomprimiert");
+    harness.get_by_label("Globale Tags: 0 geschrieben, 0 übersprungen, vollständig");
+    harness.get_by_label_contains(" komprimiert (Richtwert 64 MB), ");
+    harness.get_by_label_contains(" entpackt");
     Ok(())
 }
 
@@ -170,9 +224,9 @@ fn a_plain_catalog_shows_one_size() -> TestResult {
 
     wait_for_the_end(&mut harness)?;
 
-    harness.get_by_label_contains("of the upload limit of 64 MB");
+    harness.get_by_label_contains("reference threshold 64 MB");
     assert!(
-        harness.query_by_label_contains("uncompressed").is_none(),
+        harness.query_by_label_contains(" decoded").is_none(),
         "no second size"
     );
     Ok(())
@@ -180,13 +234,13 @@ fn a_plain_catalog_shows_one_size() -> TestResult {
 
 #[test]
 fn a_catalog_near_the_upload_limit_shows_the_warning() -> TestResult {
-    let (_dir, mut model, out) = opened(&cataloging::wordy(30, 1_000_000))?;
+    let (_dir, mut model, out) = opened(&cataloging::near_upload_limit())?;
     model.start_catalog(out.join("catalog.json"), || {});
     let mut harness = harness(model);
 
     wait_for_the_end(&mut harness)?;
 
-    harness.get_by_label("The plain JSON catalog is close to the basetool upload limit of 64 MB. Write the catalog as .json.zst for the upload; plain .json is for inspection.");
+    harness.get_by_label("The JSON catalog is close to the transfer reference threshold of 64 MB. Choose .json.zst for a compressed catalog.");
     Ok(())
 }
 
@@ -199,11 +253,11 @@ fn a_catalog_over_the_upload_limit_shows_the_danger_alert() -> TestResult {
     wait_for_the_end(&mut harness)?;
 
     harness.get_by_label(
-        "The plain JSON catalog is over the basetool upload limit of 64 MB; the basetool will reject it. Write the catalog as .json.zst for the upload; plain .json is for inspection.",
+        "The JSON catalog exceeds the transfer reference threshold of 64 MB. Choose .json.zst for a compressed catalog.",
     );
     assert!(
         harness
-            .query_by_label_contains("is close to the basetool upload limit")
+            .query_by_label_contains("is close to the transfer reference threshold")
             .is_none(),
         "no warning besides the danger alert"
     );
@@ -248,9 +302,9 @@ fn the_open_archive_as_the_catalog_file_is_explained() -> TestResult {
 
     harness.run_quiet();
 
-    harness.get_by_label("Basetool catalog failed");
+    harness.get_by_label("P4KX catalog failed");
     harness.get_by_label(&format!(
-        "The Basetool catalog cannot be written to {}, because that is the open Archive. Choose another file.",
+        "The P4KX catalog cannot be written to {}, because that is the open Archive. Choose another file.",
         archive.display()
     ));
     Ok(())
@@ -260,7 +314,7 @@ fn the_open_archive_as_the_catalog_file_is_explained() -> TestResult {
 fn the_running_catalog_can_be_cancelled_from_its_window() -> TestResult {
     let (_dir, mut model, out) = opened(&makers())?;
     let hold = model.hold_catalog();
-    model.start_catalog(out.join("basetool-catalog.json"), || {});
+    model.start_catalog(out.join("p4kx-catalog.json"), || {});
     let mut harness = harness(model);
     wait_for(&mut harness, "the catalog to build", |harness| {
         harness.state().model.catalog().is_some_and(|run| {
@@ -272,7 +326,7 @@ fn the_running_catalog_can_be_cancelled_from_its_window() -> TestResult {
         })
     })?;
 
-    harness.get_by_label("Creating the Basetool catalog");
+    harness.get_by_label("Creating the P4KX catalog");
     harness
         .get_by_role_and_label(Role::Button, "Cancel")
         .click();
@@ -286,8 +340,8 @@ fn the_running_catalog_can_be_cancelled_from_its_window() -> TestResult {
     harness.run_quiet();
     drop(hold);
 
-    harness.get_by_label("Basetool catalog cancelled");
-    harness.get_by_label("The Basetool catalog was cancelled. No file was written.");
+    harness.get_by_label("P4KX catalog cancelled");
+    harness.get_by_label("The P4KX catalog was cancelled. No file was written.");
     assert!(files_in(&out)?.is_empty(), "no file");
     Ok(())
 }
@@ -302,16 +356,16 @@ fn the_catalog_windows_speak_german() -> TestResult {
         .get_by_role_and_label(Role::Button, "Export")
         .click();
     harness.run_quiet();
-    harness.get_by_label("Basetool-Katalog …");
+    harness.get_by_label("P4KX-Katalog …");
     let started = harness
         .state_mut()
         .model
-        .start_catalog(out.join("basetool-catalog.json"), || {});
+        .start_catalog(out.join("p4kx-catalog.json"), || {});
     wait_for_the_end(&mut harness)?;
 
     assert!(started, "started");
 
-    harness.get_by_label("Basetool-Katalog erstellt");
+    harness.get_by_label("P4KX-Katalog erstellt");
     harness.get_by_label("Hersteller: 2 geschrieben, 1 übersprungen, vollständig");
     harness.get_by_label("Deutsch: 3 aufgelöst, 1 fehlen, 0 Platzhalter");
     harness.get_by_label("Spielbarkeit");

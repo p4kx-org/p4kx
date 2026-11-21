@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 //! A text field takes the font size of its text preset from the canvas of the standard text field,
-//! and its font where the size comes from there too.
+//! its font where the size comes from there too, and its colour where none is authored on it.
 
 use p4kx_dataforge::DataForge;
 use p4kx_gfx::RgbaImage;
@@ -13,7 +13,7 @@ use p4kx_testkit::{
     named_tag_record, screens_text_sample,
 };
 
-use crate::support::{SCREEN, TestResult, guid_text, pixel, stage};
+use crate::support::{SCREEN, TestResult, blue_at, green_at, guid_text, pixel, red_at, stage};
 use crate::text::fonts;
 
 const KIT_FOLDER: &str = "libs/foundry/records/ui/buildingblocks/modularkit/standard/widgets/";
@@ -56,7 +56,10 @@ fn preset_entry(tag: u128, font: Option<u128>, size: f32) -> TestStyleEntry {
 fn standard() -> TestCanvas {
     TestCanvas::new(STANDARD, "textfieldwidgetstandard", 1920.0, 1080.0)
         .in_folder(KIT_FOLDER)
-        .default_style(preset_entry(HEADING1, None, DEFAULT_SIZE))
+        .default_style(
+            preset_entry(HEADING1, None, DEFAULT_SIZE)
+                .set(TestModifier::Fill(TestColour::Solid([0, 255, 0, 255]))),
+        )
         .default_style(preset_entry(
             HEADING2,
             Some(SCREEN_TEXT_STYLE),
@@ -67,7 +70,13 @@ fn standard() -> TestCanvas {
             Some(SCREEN_DEFAULT_STYLE),
             DEFAULT_SIZE,
         ))
-        .brand_style(BRAND, vec![preset_entry(HEADING1, None, BRAND_SIZE)])
+        .brand_style(
+            BRAND,
+            vec![
+                preset_entry(HEADING1, None, BRAND_SIZE)
+                    .set(TestModifier::Fill(TestColour::Slot("Accent1", 1.0))),
+            ],
+        )
 }
 
 fn ink() -> TestStyleEntry {
@@ -91,7 +100,17 @@ fn compose(
 ) -> Result<Composed, Box<dyn std::error::Error>> {
     let mut database = screens_text_sample()
         .record(canvas.record())
-        .record(TestStyle::new(BRAND, "s_test_hud", Vec::new()).record())
+        .record(
+            TestStyle::new(
+                BRAND,
+                "s_test_hud",
+                vec![
+                    TestColour::Solid([0, 0, 0, 255]),
+                    TestColour::Solid([0, 0, 255, 255]),
+                ],
+            )
+            .record(),
+        )
         .record(TestStyle::new(OTHER_BRAND, "s_other_hud", Vec::new()).record());
     if kit {
         for (tag, name) in [
@@ -248,5 +267,37 @@ fn without_the_standard_text_field_that_is_listed() -> TestResult {
         .iter()
         .any(|entry| entry.reason.contains("standard text field not found"));
     assert!(listed, "{:?}", composed.report().unsupported);
+    Ok(())
+}
+
+#[test]
+fn preset_colour_fills_the_gap_even_with_an_explicit_font_size() -> TestResult {
+    let size = TestStyleEntry::new("size").set(TestModifier::FontSize(BRAND_SIZE));
+    let canvas = TestCanvas::new(SCREEN, "text_preset", 60.0, 20.0)
+        .widget(TestWidget::display("root"))
+        .widget(field("Heading1").parent("root").inline_style(&size));
+    let branded = render(&canvas, Some("test"))?;
+    assert!(
+        blue_at(&branded, 1, 3),
+        "the preset's palette slot supplies the ink"
+    );
+    assert_small_size(&branded);
+
+    let unmatched = render(&canvas, Some("other"))?;
+    assert!(
+        green_at(&unmatched, 1, 3),
+        "the original default preset supplies the ink"
+    );
+    assert_small_size(&unmatched);
+    Ok(())
+}
+
+#[test]
+fn a_cascaded_colour_wins_over_the_presets_colour() -> TestResult {
+    let image = render(&screen("Heading1"), Some("test"))?;
+    assert!(
+        red_at(&image, 1, 3),
+        "the selected cascade colour stays in force"
+    );
     Ok(())
 }

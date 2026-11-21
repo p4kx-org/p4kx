@@ -1,6 +1,6 @@
 {
   "meta": {
-    "source": "P4KX theme tokens (measured palette, radius-sm)",
+    "source": "P4KX theme tokens and desktop component roles",
     "unit": "px; colours, glows and fonts as token names from the fixture crates/p4kx-gui/src/theme/fixtures/tokens.json",
     "rem": 16,
     "rowDensity": 36,
@@ -10,6 +10,16 @@
     "transitionMs": 200,
     "fontWeights": {"light": "fw-thin", "regular": "fw-regular", "bold": "fw-bold", "black": "fw-black"},
     "textRule": "text below 16 px uses fw-regular; fw-thin only for prose at 16 px or more"
+  },
+  "surfaces": {
+    "canvas": "surface-canvas",
+    "panel": "surface-panel",
+    "tile": "surface-card",
+    "recess": "surface-inset",
+    "bar": "surface-bar",
+    "frame": "color-gray-3",
+    "title": "color-title",
+    "controlBorder": "control-border"
   },
   "titleBar": {
     "native": true,
@@ -47,8 +57,10 @@
   "dropdown": {
     "dsClass": "combobox__listbox",
     "background": "color-gray-4",
+    "radius": "radius-tile",
     "border": {"width": 1, "color": "color-primary"},
     "shadow": "shadow-dropdown",
+    "paddingX": 4,
     "paddingY": 4,
     "minWidth": 240,
     "separator": {"height": 1, "color": "color-gray-3", "marginY": 4},
@@ -86,8 +98,9 @@
   "workSurface": {
     "decision": "D.59",
     "minWidth": 572,
-    "minHeight": 480,
-    "browseListMinHeight": 244,
+    "minHeight": 488,
+    "browseListMinHeight": 252,
+    "panelInset": 4,
     "wrappedActionsHeight": 56,
     "soundsToolbarMinHeight": 212,
     "scroll": "the room of a work tab below the tab bar is never smaller than minWidth by minHeight: a smaller window scrolls it in both directions, the tab bar stays; while a toolbar wraps its actions into a second row the room also keeps wrappedActionsHeight more, and the Entry list of the Browse tab keeps it more above the preview"
@@ -117,7 +130,7 @@
     "buildFontWeight": "fw-regular",
     "buildColor": "color-gray-2-text",
     "hoverBackground": "rgba(255,255,255,0.03)",
-    "activeBackground": "color-surface-input",
+    "activeBackground": "control-selected-bg",
     "activeBar": {"width": 3, "color": "color-primary", "side": "left", "inset": true},
     "activeColor": "color-white"
   },
@@ -134,7 +147,7 @@
     "fontWeight": "fw-regular",
     "color": "color-gray-1",
     "hoverBackground": "rgba(255,255,255,0.025)",
-    "activeBackground": "color-surface-input",
+    "activeBackground": "control-selected-bg",
     "activeBar": {"width": 3, "color": "color-primary", "side": "left", "inset": true},
     "activeColor": "color-white",
     "activeFontWeight": "fw-bold",
@@ -164,7 +177,7 @@
     "dsClass": "list-panel",
     "background": "surface-panel",
     "border": {"width": 1, "color": "color-gray-3"},
-    "radius": "radius-sm",
+    "radius": "radius-box",
     "canvasInset": 12,
     "gapToPreview": 6
   },
@@ -186,7 +199,7 @@
     "fontWeight": "fw-regular",
     "background": "control-bg",
     "border": {"width": 1, "color": "control-border"},
-    "radius": "radius-sm",
+    "radius": "radius-control",
     "focusBorder": "color-primary",
     "focusGlow": "glow-primary",
     "placeholderColor": "color-gray-2-text",
@@ -213,7 +226,7 @@
     "uppercase": false,
     "background": "control-bg",
     "border": {"width": 1, "color": "control-border"},
-    "radius": "radius-sm on the group, the items share its outer corners",
+    "radius": "radius-control on the group, end corners follow the group radius minus its 1 px border",
     "divider": {"width": 1, "color": "control-border"},
     "color": "control-fg",
     "hoverBackground": "control-bg-hover",
@@ -222,6 +235,8 @@
     "selectedColor": "control-selected-fg",
     "selectedBorder": {"width": 1, "color": "control-selected-border"},
     "selectedUnderline": {"width": 3, "color": "control-selected-border"},
+    "focusRingColor": "color-primary",
+    "selectedFocusRingColor": "control-selected-fg",
     "focusRingOffset": -3
   },
   "buttonBase": {
@@ -234,7 +249,7 @@
     "fontWeight": "fw-bold",
     "letterSpacingEm": 0.03,
     "uppercase": true,
-    "radius": "radius-sm",
+    "radius": "radius-control",
     "iconSize": 16
   },
   "buttonCompact": {
@@ -265,7 +280,8 @@
     "hoverBackground": "rgba(231,126,35,0.12)",
     "hoverColor": "color-accent-light",
     "hoverBorder": "color-accent-light",
-    "pressedBackground": "control-selected-bg"
+    "pressedBackground": "control-selected-bg",
+    "pressedColor": "control-selected-fg"
   },
   "buttonGhost": {
     "dsClass": "btn btn-ghost",
@@ -275,7 +291,8 @@
     "hoverBackground": "rgba(231,126,35,0.07)",
     "hoverColor": "color-accent-light",
     "hoverBorder": "color-primary",
-    "pressedBackground": "control-selected-bg"
+    "pressedBackground": "control-selected-bg",
+    "pressedColor": "control-selected-fg"
   },
   "buttonDanger": {
     "dsClass": "btn btn-danger",
@@ -328,9 +345,9 @@
     "color": "color-gray-1",
     "borderBottom": {"width": 1, "color": "color-gray-3"},
     "zebraBackground": "table-stripe-bg",
-    "hoverBackground": "control-bg",
+    "hoverBackground": "table-row-hover",
     "selectedBackground": "control-selected-bg",
-    "activeBackground": "color-surface-input",
+    "activeBackground": "control-selected-bg",
     "activeBar": {"width": 3, "color": "color-primary", "side": "left", "inset": true},
     "activeColor": "color-white",
     "activeFontWeight": "fw-bold",
@@ -396,7 +413,7 @@
     "minHeight": 120,
     "background": "surface-panel",
     "border": {"width": 1, "color": "color-gray-3"},
-    "radius": "radius-sm",
+    "radius": "radius-box",
     "pathLineHeight": 32,
     "pathLinePaddingX": 16,
     "pathFontSize": 12.8,
@@ -451,14 +468,14 @@
     "gap": 12,
     "border": {"width": 1, "color": "color-gray-3", "style": "dashed"},
     "background": "color-bg-dark-gray",
-    "radius": "radius-sm",
+    "radius": "radius-box",
     "iconSize": 32,
     "iconColor": "color-gray-2-text",
     "titleFontSize": 13.6,
     "titleFontWeight": "fw-bold",
     "titleLetterSpacingEm": 0.06,
     "titleUppercase": true,
-    "titleColor": "color-gray-1",
+    "titleColor": "color-title",
     "textFontSize": 12.8,
     "textColor": "color-gray-2-text",
     "textMaxWidthCh": 48,
@@ -472,7 +489,7 @@
     "paddingY": 10,
     "gap": 12,
     "background": "rgba(255,210,63,0.15)",
-    "radius": "radius-sm",
+    "radius": "radius-tile",
     "border": {"width": 1, "color": "color-warning"},
     "borderLeft": {"width": 4, "color": "color-warning"},
     "fontSize": 14.4,
@@ -487,10 +504,10 @@
     "width": 440,
     "wideWidth": 600,
     "background": "color-bg-dark-gray",
-    "radius": "radius-sm",
+    "radius": "radius-box",
     "border": {"width": 1, "color": "color-gray-3"},
     "borderTop": {"width": 3, "color": "color-primary"},
-    "cornerBrackets": {"size": 13, "width": 2, "color": "color-primary", "corners": "top-left, bottom-right"},
+    "cornerBrackets": {"size": 13, "width": 2, "color": "color-primary", "corners": "top-left, bottom-right, following radius-box"},
     "glow": "glow-primary-lg",
     "scrim": "rgba(0,0,0,0.8)",
     "headPaddingX": 16,
@@ -499,7 +516,7 @@
     "headTitleFontWeight": "fw-bold",
     "headTitleLetterSpacingEm": 0.06,
     "headTitleUppercase": true,
-    "headTitleColor": "color-white",
+    "headTitleColor": "color-title",
     "headBorderBottom": {"width": 1, "color": "color-gray-3"},
     "bodyPadding": 16,
     "bodyGroupGap": 20,
@@ -524,7 +541,7 @@
     "paddingX": 16,
     "paddingY": 12.8,
     "background": "color-surface-input",
-    "radius": "radius-sm",
+    "radius": "radius-control",
     "border": {"width": 1, "color": "color-gray-3"},
     "borderLeft": {"width": 4, "color": "color-primary"},
     "titleFontSize": 13.6,
@@ -674,7 +691,7 @@
     "toolbar": "toolbar padding, rows of labelled segmented--sm groups: the eyebrow Source with Files and Ships, Size with Stage, 1024 px wide, 2048 px wide and 1920 x 1080, Background with Transparent, Movie colour, Black and White, Format with PNG and SVG, then a btn-cta Export...; the groups wrap into rows by their measured width and the toolbar is at most toolbarMaxShare of the window height and scrolls when its rows or one group alone are larger, so that the work area stays visible at 640 x 400; Size, Background and Format are remembered in the settings file",
     "lists": "Files: a searchField with its eyebrow and a resizable list panel (sidebarMinWidth to sidebarMaxWidth) of GFx and SWF Entries, the file name in the row font bold when selected over its folder in color-gray-2-text; Ships: the same over the ships and vehicles, with a second list panel of the screens of the picked ship, the port or the own screen over the Entity and the size; listFooter with the number of rows or the number shown of all",
     "picture": "the picture scaled to fit the room, never above pictureMaxScale, centred, with a hairline in color-gray-3 around it; the full path of the file or the record path of the canvas above it, wrapped and selectable; a transparent picture shows the panel through it",
-    "detail": "below the picture a resizable panel (previewPanel height) with two segments Contents and Left out, each with its count; Contents is a facts bar that wraps and a list of rows of the kind in color-gray-2-text and the details; Left out is, for a screen, the facts bar of widgets, shapes and texts, then the lines of what the renderer skipped, drew without an effect, left out or could not read, in the words of p4kx ui render, wrapped, up to reportMaxLines",
+    "detail": "below the picture a resizable panel (previewPanel height) with two segments Contents and Left out, each with its count; Contents is a facts bar that wraps and a list of rows of the kind in color-gray-2-text and the details; Left out is, for a screen, the facts bar of widgets, shapes and texts, then the lines of what the renderer skipped, drew without an effect, left out or could not read, in the words of p4kx ui render, wrapped, up to reportMaxLines; Content omissions follows in the same scroll area for screens and lists each widget, original Record and slot, field, source and reason in virtualized rows with a tooltip for clipped text",
     "export": "btn-cta Export... opens the save dialog of the system for the chosen format with the proposed name; the outcome stands below the toolbar in color-success-text, color-warning when elements were left out, color-danger-text on failure, with a btn-ghost btn-xs Close; the open Archive is never overwritten and a file inside a Star Citizen installation is refused with the message of the other exports",
     "messages": "spinner with Drawing... while a picture is drawn; failure and stopped in a danger alert; archive changed in a warning alert; a picture above the texture limit of the device is not shown, with a note to export it"
   },
@@ -685,7 +702,7 @@
     "paddingRight": 32,
     "minWidth": 260,
     "background": "control-bg",
-    "radius": "radius-sm",
+    "radius": "radius-control",
     "border": {"width": 1, "color": "control-border"},
     "focusBorder": "color-primary",
     "focusGlow": "glow-primary",
@@ -719,6 +736,7 @@
   },
   "dataForgeSummary": {
     "decision": "D.27",
+    "originTooltips": "the existing tooltip shows original encryption provenance for each header fact and Record cell",
     "focusRingOffset": -2,
     "keyboard": "Tab focuses the summary of the DataForge tab (name DataForge summary); up and down arrows, Page Up, Page Down, Home and End scroll"
   },
@@ -733,14 +751,15 @@
     "setup": "modal wide: groups Records (radio tree selection with name and count, radio Record path filter over a searchField), Form (radio JSON, radio NDJSON, radio flat CSV, radio flat CSV exact, radio flat NDJSON, then checkbox \"Write the tag path next to every tag Reference\", off by default, disabled for the flat forms), Target (as the Extraction setup); bodyGroupGap between groups",
     "cta": "buttonCta Start export; Close is buttonGhost",
     "progress": "non-modal modal frame, width 440: spinner while DataForge is read and Records are chosen, then progressBar with done of total; Cancel buttonGhost alone in the foot",
+    "originTooltip": "the summary count line shows the encryption provenance of the original definitions of the Records actually written",
     "summary": "non-modal modal frame, width 600: cancel note in color-warning, counts and target in color-gray-1, failed Records as collapsibleSection rows with the reason in color-danger-text; Close buttonCta alone in the foot; no target line when none was created"
   },
-  "basetoolCatalog": {
-    "menu": "Export menu entry dropdownItem below Record export; disabled without a DataForge and while a catalog is created; opens the system save dialog with basetool-catalog.json",
-    "progress": "non-modal modal frame, width 440: spinner while DataForge is read and while the file is written, progressBar with Records checked of total between; Cancel buttonGhost alone in the foot",
-    "summary": "non-modal modal frame, width 600: alertWarning near the upload limit or alertDanger over it on top; group labels Kinds and Texts with one color-gray-1 line per kind and language, then size in decimal units with the upload limit of 64 MB and the file; Close buttonCta alone in the foot",
+  "catalog": {
+    "menu": "Two Export menu dropdownItems below Record export: normal P4KX catalog and explicit diagnostic P4KX catalog; disabled without a DataForge and while a catalog is created; outside Flatpak the system save dialog defaults to p4kx-catalog.json.zst or p4kx-catalog.diagnostic.json.zst, under Flatpak the shared parent/name selection uses those names; diagnostic permission applies to one job and is never persisted",
+    "progress": "non-modal modal frame, width 440: title explicitly names a diagnostic job; spinner while DataForge is read and while the file is written, progressBar with Records checked of total between; Cancel buttonGhost alone in the foot",
+    "summary": "non-modal modal frame, width 600: diagnostic title and color-warning notice for an explicit diagnostic export; source/projection health in color-gray-1 when complete or color-warning when incomplete; alertWarning near a size reference threshold or alertDanger over it; group labels Kinds (selection scope) and Texts with one color-gray-1 line per kind and language, then sizes and reference thresholds in decimal units and the file; Close buttonCta alone in the foot",
     "cancelled": "non-modal modal frame: note in color-warning, no file written",
-    "failed": "non-modal danger modal frame: the reason in color-danger-text, also when the chosen file is the open Archive, which is never written"
+    "failed": "non-modal danger modal frame: the reason in color-danger-text; incomplete normal export creates or replaces no file and explains the separate diagnostic action; choosing the open Archive never writes it"
   },
   "factsBar": {
     "dsClass": "facts-bar",
@@ -768,8 +787,8 @@
     "paddingX": 14,
     "paddingY": 10,
     "gap": 12,
-    "background": "color-surface-input",
-    "radius": "radius-sm",
+    "background": "surface-card",
+    "radius": "radius-tile",
     "border": {"width": 1, "color": "color-gray-3"},
     "borderLeft": {"width": 4, "color": "color-primary"},
     "label": "changeChip of the change kind, as the chip in kpi-card",
@@ -839,7 +858,7 @@
     "lineHeight": 1.5,
     "background": "control-bg",
     "color": "color-gray-1",
-    "radius": "radius-sm",
+    "radius": "radius-control",
     "border": {"width": 1, "color": "control-border"},
     "focusBorder": "color-primary",
     "focusGlow": "glow-primary",
@@ -855,7 +874,7 @@
     "paddingX": 16,
     "paddingY": 10,
     "background": "rgba(163,0,10,0.2)",
-    "radius": "radius-sm",
+    "radius": "radius-tile",
     "border": {"width": 1, "color": "color-danger"},
     "borderLeft": {"width": 4, "color": "color-danger"},
     "fontSize": 14.4,
@@ -868,7 +887,7 @@
     "buttonSize": 44,
     "buttonPaddingX": 8,
     "buttonBackground": "control-bg",
-    "buttonRadius": "radius-sm",
+    "buttonRadius": "radius-control",
     "buttonColor": "control-fg",
     "buttonBorder": {"width": 1, "color": "control-border"},
     "buttonHover": "border and chevron color-primary",
@@ -1036,7 +1055,7 @@
     "decision": "D.50",
     "entitiesButton": "btn-cta Export… in the Entities toolbar opens the export setup of the Entity",
     "output": "the group Output (GLB file, Blender package) as a segmented--sm control in one row with the level of detail, MODAL_GROUP_GAP between; with the package chosen the hint in color-gray-2-text FS_XS under the row, the Materials group is hidden and the group File becomes Package folder",
-    "folder": "the chosen folder is the package; new, empty or an earlier package of P4KX; an earlier package is named in color-warning and replaced as a whole once the new one is complete; anything else, a path without a folder name and an installation are a danger-alert and disable Export",
+    "folder": "outside Flatpak the chosen folder is the package; under Flatpak the system chooser selects its parent and the shared selection adds one package name; the final package path is new, empty or an earlier package of P4KX; an earlier package is named in color-warning and replaced as a whole once the new one is complete; anything else, a path without a folder name and an installation are a danger-alert and disable Export",
     "progress": "stage Writing shows the text without a byte count and Cancel; the summary Blender package written lists folder, counts, Interior, textures not written and the issues",
     "scope": "an Entity, an Interior container on its own (D.54) and the Character of the Characters tab (D.54)",
     "character": "D.54: btn-cta Export… in the Characters toolbar opens the modal Export Character with the group Output, the hint in color-gray-2-text FS_XS beside the group Animations (None, All; All by default; no picker of named clips, no --anim-from), starting on the GLB file whatever the Entity export chose, the group File or Package folder, the notices of the Entity and the foot Export and Close; detail and materials stay in the toolbar",
@@ -1102,6 +1121,7 @@
     "labelColor": "color-gray-2-text",
     "background": "surface-panel",
     "facts": "factsBar without direction: codec, channels, sample rate, duration",
+    "originTooltip": "the existing tooltip on the facts bar shows original encryption provenance for each fact of a loose WEM or of the selected embedded WEM",
     "toggle": "outline btn-xs, play or pause; Space while no other control has the focus",
     "pauses": "when the preview tab leaves Audio or the work tab leaves Browse",
     "messages": "unsupported codec, too long, decoding and output failure color-danger-text"
@@ -1122,6 +1142,7 @@
     "prefetched": "codec cell Prefetched in color-gray-2-text; the controls give way to a color-warning note",
     "pluginMedia": "codec cell Plug-in in color-gray-2-text; the controls give way to a color-warning note",
     "row": "tableRow with the active bar; accessible name WEM id, codec, duration",
+    "originTooltips": "show original encryption provenance for the path, size and embedded WEM count in the path line and for each value of each row",
     "focusRing": {"width": 2, "offset": -2, "color": "color-primary"},
     "keys": "Tab focuses the rows and the list; Enter or a click selects; arrows, Page Up, Page Down, Home and End scroll",
     "messages": "unreadable bank color-danger-text, empty bank plain text"
@@ -1133,6 +1154,7 @@
     "columnsFrom": "name: the sample name of forty characters Play_SC_Ship_Weapon_Ballistic_Fire_Heavy, 293.0, longer names clip; state: the longest status or head of the trigger table in German or British English, 131.4; language: the default language English(US) with the fallback mark in German or British English, 155.0; language folder names are Archive data, so other names may clip and the column is resizable; each in bold at the row font plus the cell padding twice, rounded up",
     "columnMin": 80,
     "dividers": "the column dividers of the trigger table end above the list footer, like the tag tree",
+    "originTooltips": "the existing tooltip on the variant heading, selected sound details and each broken-link row shows original encryption provenance field by field",
     "languagePicker": "a wrapping row between the Entity actions and the search field, shown only while the Archive holds more than one language folder: the eyebrow label, then one btn-xs per language, the chosen one in the selected colours of the controls (control-selected-bg, control-selected-border, control-selected-fg) and exposed as selected, the others btn-ghost; btn-outline stays the primary action"
   },
   "xmlPreview": {
@@ -1186,5 +1208,25 @@
     "glow-primary-lg": {"x": 0, "y": 0, "blur": 20, "spread": 0, "color": "rgba(231,126,35,0.2)"},
     "glow-danger-lg": {"x": 0, "y": 0, "blur": 20, "spread": 0, "color": "rgba(163,0,10,0.2)"},
     "shadow-dropdown": {"x": 0, "y": 8, "blur": 16, "spread": 0, "color": "rgba(0,0,0,0.8)"}
+  },
+  "systemChooserFailure": {
+    "decision": "D.3",
+    "presentation": "modal--wide danger frame, localized title, original reason in danger-alert, one Close CTA; existing Lato/dark tokens",
+    "layout": "fixed header and footer, existing bounded scrolling body",
+    "lifecycle": "Startup failure and unexpected disconnect remain visible; no output dispatch; normal cancellation is not an error"
+  },
+  "flatpakOutputSelection": {
+    "decision": "D.20, D.50",
+    "scope": "File exports and Blender packages only; existing folder-output choosers stay unchanged",
+    "presentation": "modal--wide; existing Lato/dark field, ghost, CTA, danger and warning widgets; no new tokens",
+    "fields": [
+      "parent Directory chooser",
+      "single native file/package name",
+      "resolved full destination"
+    ],
+    "lifecycle": "Exact source and setup/result owner; cancel/owner change discards; late parent replies ignored; take before one dispatch",
+    "diagnosticConsent": "DiagnosticCatalogFile only; current selection/job; never persisted or inherited",
+    "native": "Outside Flatpak all existing native save-file and package-folder chooser routes remain",
+    "protection": "Presentation only; no inferred file-grant sibling mapping and no source/host identity exception"
   }
 }

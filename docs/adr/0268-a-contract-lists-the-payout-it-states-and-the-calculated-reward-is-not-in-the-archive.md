@@ -26,8 +26,10 @@ states the reward after all.
 - `contracts[].fixedRewards` lists the `ContractResult_Reward` results that fire on success (first
   `missionResults` entry set), as stored, in stored order: `currency`, `amount`, `max`,
   `plusBonuses`, each `null` when absent. Additive within version 2 (ADR-0054).
-- No amount is derived or estimated for a contract with a calculated reward; `fixedRewards` is
-  empty for it. Recomputing the game's formula would be a model, not a fact (ADR-0065).
+- In catalog v3, `fixedRewards.value` retains the same parent-contract selection and order.
+  The list and each payout member have their own source evidence. `amount` and `max` are exact
+  signed decimal strings. See [Fixed payouts](../catalog-contract-generators.md#fixed-payouts).
+- A contract with only calculated rewards has an empty payout list (ADR-0065).
 - Third-party data stays out of the repository and CI: the community figures were only a hint.
 
 ## Consequences

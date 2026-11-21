@@ -12,7 +12,8 @@ use p4kx_model::{Animation, Bone};
 use crate::animation_budget::{KeyFit, ValueBudget};
 use crate::armour::MAX_ANIMATION_VALUES;
 use crate::armour::unused::summarise;
-use crate::{Assembly, Issue, IssueKind, creature_rig};
+use crate::paint_provenance::GLB_ASSET_KEY;
+use crate::{Assembly, Issue, IssueKind, PaintProvenance, creature_rig};
 
 /// Why an additive clip is left out: glTF cannot say that its keys are offsets.
 const ADDITIVE: &str = "additive animation, its keys are offsets that need a base animation";
@@ -162,6 +163,28 @@ impl Assembly {
         let scene = self
             .scene()?
             .with_animations(animations.fitted.iter().copied());
+        write_scene_glb_with(&scene, options, textures, out)
+    }
+}
+
+impl PaintProvenance<'_> {
+    /// Writes the observed assembly with its selected paint identities in glTF asset extras.
+    ///
+    /// # Errors
+    /// As [`Assembly::write_glb`].
+    pub fn write_glb_animated_with(
+        &self,
+        animations: &CreatureAnimations<'_>,
+        options: &GlbOptions,
+        textures: &dyn TextureLoader,
+        out: &mut impl Write,
+    ) -> Result<GlbSummary, GltfError> {
+        let extras = serde_json::json!({ (GLB_ASSET_KEY): self.appearance() });
+        let scene = self
+            .assembly
+            .scene()?
+            .with_animations(animations.fitted.iter().copied())
+            .with_asset_extras(&extras);
         write_scene_glb_with(&scene, options, textures, out)
     }
 }

@@ -1,0 +1,256 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use p4kx_extraction::DecimalU64;
+use schemars::JsonSchema;
+use serde::Serialize;
+
+use crate::{Artifact, ByteOrder, SourceRange};
+
+#[derive(Serialize, JsonSchema)]
+#[serde(
+    tag = "record_type",
+    content = "payload",
+    rename_all = "kebab-case",
+    deny_unknown_fields
+)]
+pub(crate) enum AudioPayload {
+    Wem(WemHeader),
+    WemChunk(WemChunk),
+    WemOpaque(WemOpaque),
+    WemFailure(WemFailure),
+    WemConversion(WemConversion),
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct WemHeader {
+    pub(crate) byte_order: ByteOrder,
+    pub(crate) format_tag: u16,
+    pub(crate) codec: &'static str,
+    pub(crate) channels: u16,
+    pub(crate) block_align: u16,
+    pub(crate) bits_per_sample: u16,
+    pub(crate) channel_layout: Option<u32>,
+    pub(crate) channel_mask: u32,
+    pub(crate) declared_sample_rate: u32,
+    pub(crate) sample_rate: u32,
+    /// Frames, with one sample per channel in each frame.
+    pub(crate) sample_count: Option<DecimalU64>,
+    pub(crate) duration: Option<WemDuration>,
+    pub(crate) loop_points: Option<WemLoop>,
+    /// First decoded byte after the declared RIFF or RIFX extent.
+    pub(crate) riff_end_exclusive: u64,
+    /// Bytes beyond the RIFF extent, available only through the retained raw Entry.
+    pub(crate) trailing_length: DecimalU64,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct WemDuration {
+    pub(crate) seconds: DecimalU64,
+    #[schemars(range(max = 999_999_999))]
+    pub(crate) nanoseconds: u32,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct WemLoop {
+    /// First included frame.
+    pub(crate) start: DecimalU64,
+    /// First excluded frame.
+    pub(crate) end: DecimalU64,
+    pub(crate) frames: DecimalU64,
+}
+
+impl WemLoop {
+    pub(crate) const fn from_frames(start: u64, end: u64) -> Self {
+        Self {
+            start: DecimalU64::new(start),
+            end: DecimalU64::new(end),
+            frames: DecimalU64::new(end.saturating_sub(start)),
+        }
+    }
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct WemConversion {
+    pub(crate) requested_format: EncodedAudioFormat,
+    pub(crate) source_codec: &'static str,
+    pub(crate) outcome: ConversionOutcome,
+}
+
+#[derive(Clone, Copy, Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum EncodedAudioFormat {
+    Wav,
+    Ogg,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(
+    tag = "type",
+    content = "payload",
+    rename_all = "kebab-case",
+    deny_unknown_fields
+)]
+pub(crate) enum ConversionOutcome {
+    Written(WrittenAudio),
+    Failed(ConversionFailure),
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(tag = "actual_codec", rename_all = "kebab-case", deny_unknown_fields)]
+pub(crate) enum WrittenAudio {
+    Pcm {
+        actual_format: WrittenWavFormat,
+        #[serde(flatten)]
+        signal: WrittenSignal,
+        source_range: SourceRange,
+        #[serde(flatten)]
+        inputs: PcmInputs,
+    },
+    Vorbis {
+        actual_format: WrittenOggFormat,
+        #[serde(flatten)]
+        signal: WrittenSignal,
+        source_range: SourceRange,
+        vorbis_inputs: Box<VorbisInputs>,
+    },
+    Opus {
+        actual_format: WrittenOggFormat,
+        #[serde(flatten)]
+        signal: WrittenSignal,
+        source_range: SourceRange,
+        opus_inputs: Box<OpusInputs>,
+    },
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(untagged, deny_unknown_fields)]
+#[schemars(extend("not" = {"required": ["opus_inputs", "vorbis_inputs"]}))]
+pub(crate) enum PcmInputs {
+    Direct {},
+    Opus { opus_inputs: Box<OpusInputs> },
+    Vorbis { vorbis_inputs: Box<VorbisWavInputs> },
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum WrittenWavFormat {
+    Wav,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum WrittenOggFormat {
+    Ogg,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct OpusInputs {
+    pub(crate) format: SourceRange,
+    pub(crate) seek_table: Option<SourceRange>,
+    pub(crate) embedded_headers: Option<SourceRange>,
+    pub(crate) checked_data: SourceRange,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct VorbisInputs {
+    pub(crate) average_byte_rate: SourceRange,
+    pub(crate) header: SourceRange,
+    pub(crate) setup_packet: SourceRange,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct VorbisWavInputs {
+    #[serde(flatten)]
+    pub(crate) setup: VorbisInputs,
+    pub(crate) checked_audio_packets: SourceRange,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct WrittenSignal {
+    pub(crate) artifact: Artifact,
+    pub(crate) channels: u16,
+    pub(crate) sample_rate: u32,
+    pub(crate) sample_count: DecimalU64,
+    pub(crate) loop_points: Option<WemLoop>,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(
+    tag = "type",
+    content = "payload",
+    rename_all = "kebab-case",
+    deny_unknown_fields
+)]
+pub(crate) enum ConversionFailure {
+    UnsupportedCodec,
+    WaveTooLarge,
+    InvalidRepresentation { detail: String },
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct WemChunk {
+    pub(crate) ordinal: DecimalU64,
+    /// Original `FourCC` bytes, including non-UTF-8 values.
+    pub(crate) tag: [u8; 4],
+    pub(crate) header_range: SourceRange,
+    pub(crate) body_range: SourceRange,
+    /// Pad bytes actually skipped by the RIFF traversal.
+    pub(crate) padding_range: Option<SourceRange>,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct WemOpaque {
+    pub(crate) class: WemOpaqueClass,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum WemOpaqueClass {
+    PluginMedia,
+    MidiMedia,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct WemFailure {
+    pub(crate) phase: WemPhase,
+    pub(crate) reason: WemFailureReason,
+}
+
+#[derive(Clone, Copy, Serialize, JsonSchema)]
+#[serde(rename_all = "kebab-case")]
+pub(crate) enum WemPhase {
+    RiffHeader,
+    Summary,
+    ChunkDirectory,
+}
+
+#[derive(Serialize, JsonSchema)]
+#[serde(tag = "type", rename_all = "kebab-case", deny_unknown_fields)]
+pub(crate) enum WemFailureReason {
+    InvalidSignature,
+    Truncated {
+        available: DecimalU64,
+        needed: DecimalU64,
+    },
+    MissingChunk {
+        name: &'static str,
+    },
+    InvalidFormat {
+        detail: &'static str,
+    },
+    UnsupportedReaderVariant {
+        detail: String,
+    },
+}

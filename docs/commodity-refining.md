@@ -1,4 +1,8 @@
 # Commodity refining in the DataForge
+Catalog schema 3 keeps source resource definitions in `definitions.resourceTypes` and Commodity
+choices in `projections.commodityPresentation`. Fields below describe the presentation's `value`
+payloads; raw units, exact numbers and authored references retain their own ResourceType owners.
+See the [canonical Commodity contract](catalog-commodity-types.md).
 
 Result of the spike #397 against the LIVE Archive: what the DataForge holds of the raw to refined
 relation, density, instability, counting in SCU or units, and refining methods and yields. Counts
@@ -26,7 +30,7 @@ commodity is the one whose `subtypeGuid` equals it, when the Archive has such a 
 
 Every `ResourceType` states the density in one unit only, `GramsPerCubicCentimeter`; the catalog
 carries it as `densityGramsPerCubicCentimetre`. The Wiki states other units for some commodities;
-a Basetool conversion is its own decision.
+consumers choose their own display units.
 
 ## Instability
 
@@ -34,8 +38,9 @@ Only the `MineableElement` Record holds `elementInstability` (with resistance an
 window), so it belongs to a mineable element, not to the commodity. 27 of the 46 elements link to
 a `ResourceType` that has a `refinedVersion`. Several elements may share a `ResourceType`, which
 makes a flat commodity field ambiguous, so the catalog carries no such field. The kind
-`mineableElements` exports every element with its `resourceTypeGuid` and the Basetool applies its
-own rule (ADR-0065, #460). One `ResourceType` carries `properties/ResourceTypeVolatility` (1 Record,
+`definitions.mineableElements` exports each element with its sourced `resourceType` link
+and original tuning. Consumers join a resolved link by its target Record identity and choose
+an aggregation rule when needed (ADR-0065, #460). One `ResourceType` carries `properties/ResourceTypeVolatility` (1 Record,
 with a `healthDecayPerSecond`), a decay of cargo, not the instability of a rock. The mining laser
 `laserInstability` modifiers (names matching `*nstab*`) are item stats, not commodity data.
 
@@ -54,11 +59,18 @@ for every speed and quality pair. They identify a method by GUID and record path
 holds no method names of the UEX kind, no yield per commodity and method, and no price: the only
 number near it is a `refiningQualityUnitMultiplier` on one Record. Refinery yields stay with UEX.
 
+Current schema 3 emits these physical declarations in `definitions.refiningProcesses.rows`.
+Each row has a sourced Record header and the complete original `fields` arena. `refiningSpeed`
+and `refiningQuality` are sourced open labels. `processName` is a protected text reference:
+join `processName.value` to `texts.gameTexts[].id.value` for the original Locale key and each
+language's sourced text forms. It is not an inline key/en/de object. The
+[mining/refining contract](catalog-mining-refining.md) defines the complete row and SDK shapes.
+
 ## Per-station yield profiles
 
 Third-party databases list refinery yield profiles per station: an ore mapped to a signed integer
 bonus, with one profile shared by several refineries. The LIVE Archive 4.10.197 holds no such
-table, and the Basetool catalog carries none. Only the LIVE channel was searched; the other
+table, and the P4KX catalog carries none. Only the LIVE channel was searched; the other
 channels were not. Result: none found. What was searched, with the commands (`<Data.p4k>` is the
 LIVE `Data.p4k`):
 
@@ -91,3 +103,7 @@ p4kx grep <Data.p4k> Hephaestanite --in entries --limit 50
 - Catalog fields added with this spike: `densityGramsPerCubicCentimetre`, `refinedSubtypeGuid`.
 - Catalog kinds added by #460: `mineableElements` (instability and the other plain numbers per
   element, no pick per commodity, ADR-0065) and `refiningProcesses` (the 9 Records).
+
+These bullets record the historical additions and counts. Current consumers use sourced element
+tuning and the `definitions.refiningProcesses` table; the Kind selector `refiningProcesses`
+remains valid without restoring the old root array or plain-field representation.

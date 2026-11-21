@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::field_storage::FieldStorage;
 use crate::{Guid, Reference, StructValue, ValueError};
 
 /// The value of one field or array element in the canonical Record tree.
@@ -8,7 +9,6 @@ use crate::{Guid, Reference, StructValue, ValueError};
 /// Text is borrowed from the DataForge. Owned children are nested; other Records and weak
 /// pointers are [`Value::Reference`] links and never embedded. A value that cannot be read is an
 /// [`Value::Error`] at its place, so the rest of the Record still builds.
-#[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub enum Value<'f> {
     /// A boolean.
@@ -80,13 +80,26 @@ impl Value<'_> {
 }
 
 /// One field of a Record or struct value: its name and its value.
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone)]
 pub struct Field<'f> {
+    pub(crate) storage: FieldStorage,
     pub(crate) name: &'f str,
     pub(crate) value: Value<'f>,
 }
 
+impl PartialEq for Field<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name && self.value == other.value
+    }
+}
+
 impl<'f> Field<'f> {
+    /// Returns the declaration used by the original decoder of this field and its elements.
+    #[must_use]
+    pub const fn storage(&self) -> FieldStorage {
+        self.storage
+    }
+
     /// Returns the field name as the struct declares it.
     #[must_use]
     pub const fn name(&self) -> &'f str {

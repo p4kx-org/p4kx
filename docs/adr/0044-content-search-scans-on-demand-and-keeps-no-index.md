@@ -21,9 +21,12 @@ searched by a parallel scan that streams:
   of its own.
 - **Entries.** The lines of text Entries and of `CryXml` Entries, converted to XML as the preview
   converts them, so that a line number and a byte offset of a hit are those of the preview. Plain
-  UTF-8 is streamed through a line sink that holds one line (at most 1 MiB of it); `CryXml` and
+  UTF-8 is matched incrementally across complete lines. Per-entry literal state is proportional
+  to the compiled needle, not the line length; excerpt state retains only its bounded context.
+  Original UTF-8 and binary classification continue through the whole admitted line, including
+  bytes after the first match. `CryXml` and
   UTF-16 are read whole, up to 32 MiB, under a budget of 256 MiB for all tasks together, counting
-  what is derived from them (ADR-0155). Without
+  what is derived from them and the per-entry literal/excerpt state (ADR-0155). Without
   a Filter the Entries with one of 15 text extensions (`xml`, `mtl`, `cdf`, `adb`, `entxml`,
   `chrparams`, `animevents`, `ini`, `cfg`, `json`, `txt`, `lua`, `csv`, `eco`, `tbl`) are searched,
   with a Filter every Entry whose path matches; the `global.ini` files are left to the
@@ -33,15 +36,20 @@ searched by a parallel scan that streams:
 
 Matching is a case-insensitive substring match: the text is lower-cased character by character
 with Unicode rules (`GLÄD` finds `Glädius`, `K` the Kelvin sign), `ß` is not folded to `ss`, and
-text that is ASCII on both sides takes a byte loop.
+text that is ASCII on both sides takes a byte loop for a whole-string search. Entry matching reuses
+the same compiled folded literal with prefix fallbacks. Matches start only at an original Unicode
+character boundary and may end inside that character's lowercase expansion; their byte range still
+includes the complete original character.
 
 **Order, bounds and cancellation.** Each source visits its items in a fixed order (Records in
 Record order, languages in `Language::ALL` order and lines in file order, Entries in path order),
 runs a wave of tasks of a few per thread in parallel, appends their results in task order and
 stops once more than `limit` hits exist (1,000 by default, at most 10,000, per source), so the
 hits, `has_more` and the counts depend on the data alone, not on the number of threads. No wave
-starts after the limit; a task polls a stop function between Records, Entries and every 1,024
-lines, which the window uses to cancel. Nothing runs inside an `OnceLock` initialiser: the build
+starts after the limit. Record/localisation tasks retain their source polling boundaries.
+Entry scanning polls between Entries and blocks of at most 64 KiB of decoded UTF-8 input; this
+is a cancellation work stride, not a search or line cut. One true Entry-search stop response is
+latched for that invocation, so later false responses cannot restore a partial result. Nothing runs inside an `OnceLock` initialiser: the build
 of the path order of the DataForge happens before the tasks start. A hit holds an excerpt of at
 most 32 characters before and 64 after the match with control characters and bidirectional
 controls replaced, so text from an Archive cannot drive a terminal; the CLI and the window show

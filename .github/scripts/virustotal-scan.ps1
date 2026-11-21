@@ -7,8 +7,8 @@ Hashes every file given with -Path (SHA-256), looks the hash up on VirusTotal, u
 when VirusTotal does not know it yet, waits for the analysis and writes one table row per file
 (detections and a report link) to -NotePath. Works on Windows and Linux with PowerShell 7.
 
-The scan never blocks a release. A missing API key, a rejected upload or a timeout is
-reported as a warning and as a sentence in the note; the script then exits with 0.
+Best-effort scans report unavailable or pending results in the note. A required scan
+also writes exact package evidence and fails if a completed report is unavailable.
 
 .PARAMETER Path
 The files to scan.
@@ -22,6 +22,21 @@ The VirusTotal API key. Defaults to the environment variable VIRUSTOTAL_API_KEY.
 .PARAMETER TimeoutMinutes
 How long to wait for each analysis before the report is linked as pending.
 
+.PARAMETER RequireComplete
+Requires a completed digest-bound report for every package.
+
+.PARAMETER EvidencePath
+The new JSON receipt for a complete required scan.
+
+.PARAMETER Version
+The exact release version for the receipt.
+
+.PARAMETER Revision
+The full source commit for the receipt.
+
+.PARAMETER RunId
+The workflow run identity for the receipt.
+
 .PARAMETER PollSeconds
 The pause between two polls of an analysis.
 
@@ -34,10 +49,21 @@ param(
     [Parameter(Mandatory)][string]$NotePath,
     [string]$ApiKey = $env:VIRUSTOTAL_API_KEY,
     [int]$TimeoutMinutes = 10,
-    [int]$PollSeconds = 30
+    [int]$PollSeconds = 30,
+    [switch]$RequireComplete,
+    [string]$EvidencePath,
+    [string]$Version,
+    [string]$Revision,
+    [string]$RunId
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'release-scan-evidence.ps1')
+if ($RequireComplete -and (-not $EvidencePath -or -not $Version -or
+    $Revision -cnotmatch '^(?:[0-9a-f]{40}|[0-9a-f]{64})$' -or $RunId -cnotmatch '^[1-9][0-9]*$' -or
+    (Test-Path -LiteralPath $EvidencePath))) {
+    throw 'A required VirusTotal scan needs new evidence and exact release identity.'
+}
 
 $api = 'https://www.virustotal.com/api/v3'
 $directUploadLimit = 32MB
@@ -61,10 +87,8 @@ function Write-Unavailable([string]$Reason) {
     $safe = Get-SafeText $Reason
     Write-Host "::warning title=VirusTotal::$safe - the release notes say the scan did not run."
     Write-Note "$heading`n`nThe VirusTotal scan did not run for this release ($safe)."
-    exit 0
+    if ($RequireComplete) { throw "Required VirusTotal scan is unavailable: $safe" }
 }
-
-trap { Write-Unavailable "unexpected error: $($_.Exception.Message)" }
 
 function Invoke-Vt {
     param([string]$Uri, [int]$TimeoutSec = 120)
@@ -101,10 +125,20 @@ function Send-MultipartFile([string]$Uri, [System.IO.FileInfo]$File) {
     }
 }
 
-function Get-FileStats([System.IO.FileInfo]$File, [string]$Sha256) {
-    $report = $null
+function Get-FileReport([string]$Sha256) {
     try { $report = Invoke-Vt "$api/files/$Sha256" }
-    catch { if ((Get-HttpStatus $_) -ne 404) { throw } }
+    catch {
+        if ((Get-HttpStatus $_) -eq 404) { return $null }
+        throw
+    }
+    if ($report.data.type -cne 'file' -or $report.data.id -cne $Sha256) {
+        throw 'The VirusTotal report does not identify the requested SHA-256.'
+    }
+    return $report
+}
+
+function Get-FileStats([System.IO.FileInfo]$File, [string]$Sha256) {
+    $report = Get-FileReport $Sha256
     if ($report) { return $report.data.attributes.last_analysis_stats }
 
     $uploadUrl = if ($File.Length -le $directUploadLimit) { "$api/files" } else { (Invoke-Vt "$api/files/upload_url").data }
@@ -114,54 +148,84 @@ function Get-FileStats([System.IO.FileInfo]$File, [string]$Sha256) {
         $why = if ($response.Status) { "HTTP $($response.Status)" } else { "curl exit $($response.CurlExit)" }
         throw "upload rejected ($why)"
     }
-    $analysisId = ($response.Body | ConvertFrom-Json).data.id
+    $submitted = ($response.Body | ConvertFrom-Json).data
+    if ($submitted.type -cne 'analysis' -or $submitted.id -isnot [string] -or -not $submitted.id) {
+        throw 'VirusTotal did not return an analysis identifier.'
+    }
+    $analysisId = [uri]::EscapeDataString($submitted.id)
 
     $deadline = (Get-Date).AddMinutes($TimeoutMinutes)
     while ((Get-Date) -lt $deadline) {
         Start-Sleep -Seconds $PollSeconds
         try { $analysis = Invoke-Vt "$api/analyses/$analysisId" }
         catch {
-            Write-Host "  poll failed ($($_.Exception.Message)) - retrying."
+            Write-Host "  poll failed ($(Get-SafeText $_.Exception.Message)) - retrying."
             continue
         }
+        if ($analysis.data.type -cne 'analysis' -or $analysis.data.id -cne $submitted.id) {
+            throw 'VirusTotal returned a different analysis.'
+        }
         Write-Host "  $($File.Name): $($analysis.data.attributes.status)"
-        if ($analysis.data.attributes.status -eq 'completed') { return $analysis.data.attributes.stats }
+        if ($analysis.data.attributes.status -ceq 'completed') {
+            $confirmed = Get-FileReport $Sha256
+            if ($confirmed.data.attributes.last_analysis_stats) {
+                return $confirmed.data.attributes.last_analysis_stats
+            }
+        }
     }
     return $null
 }
 
-if (-not $ApiKey) { Write-Unavailable 'VIRUSTOTAL_API_KEY is not set' }
-
-$rows = foreach ($item in $Path) {
-    $file = Get-Item -LiteralPath $item -ErrorAction SilentlyContinue
-    if (-not $file) { Write-Unavailable "no file at '$item'" }
-    $sha256 = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
-    $link = "[report](https://www.virustotal.com/gui/file/$sha256)"
-    try { $stats = Get-FileStats $file $sha256 }
-    catch {
-        $status = Get-HttpStatus $_
-        $hint = if ($status -eq 401) { 'the API key was rejected' }
-                elseif ($status -eq 429) { 'the API quota is exhausted' }
-                else { Get-SafeText $_.Exception.Message }
-        Write-Host "::warning title=VirusTotal::$($file.Name): $hint"
-        "| ``$($file.Name)`` | not scanned ($hint) | $link |"
-        continue
+function Get-AnalysisCounts($Stats) {
+    if (-not $Stats) { return $null }
+    foreach ($name in @('malicious', 'suspicious', 'undetected', 'harmless')) {
+        $value = $Stats.PSObject.Properties[$name].Value
+        if (-not (Test-P4kxScanInteger $value) -or $value -gt [int]::MaxValue) {
+            throw 'VirusTotal returned invalid engine counts.'
+        }
     }
-    $flagged = [int]$stats.malicious + [int]$stats.suspicious
-    $engines = $flagged + [int]$stats.undetected + [int]$stats.harmless
-    if (-not $stats -or $engines -eq 0) {
-        Write-Host "::warning title=VirusTotal::$($file.Name): no analysis result yet."
-        "| ``$($file.Name)`` | analysis pending | $link |"
-        continue
-    }
-    Write-Host "$($file.Name): $flagged / $engines engines flagged the file."
-    "| ``$($file.Name)`` | $flagged of $engines engines | $link |"
+    $flagged = [long]$Stats.malicious + [long]$Stats.suspicious
+    $engines = $flagged + [long]$Stats.undetected + [long]$Stats.harmless
+    if ($engines -gt 0) { return @{ flagged = $flagged; engines = $engines } }
+    return $null
 }
 
-Write-Note @"
+if (-not $ApiKey) {
+    Write-Unavailable 'VIRUSTOTAL_API_KEY is not set'
+    return
+}
+$receipts = [Collections.Generic.List[object]]::new()
+try {
+    $rows = foreach ($item in $Path) {
+        $file = Get-Item -LiteralPath $item -ErrorAction Stop
+        if ($file.PSIsContainer -or $file.Length -le 0) { throw "Invalid package at '$item'." }
+        $sha256 = (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+        $link = "[report](https://www.virustotal.com/gui/file/$sha256)"
+        try { $counts = Get-AnalysisCounts (Get-FileStats $file $sha256) }
+        catch {
+            $status = Get-HttpStatus $_
+            $hint = if ($status -eq 401) { 'the API key was rejected' }
+                    elseif ($status -eq 429) { 'the API quota is exhausted' }
+                    else { Get-SafeText $_.Exception.Message }
+            Write-Host "::warning title=VirusTotal::$($file.Name): $hint"
+            "| ``$($file.Name)`` | not scanned ($hint) | $link |"
+            continue
+        }
+        if (-not $counts) {
+            Write-Host "::warning title=VirusTotal::$($file.Name): no analysis result yet."
+            "| ``$($file.Name)`` | analysis pending | $link |"
+            continue
+        }
+        $receipts.Add([ordered]@{
+            name = $file.Name; sha256 = $sha256; flagged = $counts.flagged; engines = $counts.engines
+        })
+        Write-Host "$($file.Name): $($counts.flagged) / $($counts.engines) engines flagged the file."
+        "| ``$($file.Name)`` | $($counts.flagged) of $($counts.engines) engines | $link |"
+    }
+    Write-Note @"
 $heading
 
-Every binary asset was uploaded to VirusTotal straight after the CI build.
+Reports are identified by the SHA-256 of the packaged file.
 
 | File | Detections | Report |
 |:-----|:-----------|:-------|
@@ -170,3 +234,18 @@ $($rows -join "`n")
 An unsigned installer or archive that is new on every release can draw individual false
 positives; the report shows which engine says what.
 "@
+}
+catch {
+    Write-Unavailable "unexpected error: $($_.Exception.Message)"
+    return
+}
+
+if ($RequireComplete) {
+    if ($receipts.Count -ne $Path.Count) {
+        throw 'Required VirusTotal reports are missing or pending. See the scan notes.'
+    }
+    $evidence = [ordered]@{
+        schema = 1; version = $Version; revision = $Revision; run_id = $RunId; rows = $receipts.ToArray()
+    }
+    $evidence | ConvertTo-Json -Depth 6 | Set-Content -LiteralPath $EvidencePath -Encoding utf8NoBOM
+}

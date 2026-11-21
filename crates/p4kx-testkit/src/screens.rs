@@ -116,17 +116,23 @@ fn widget_structs() -> Vec<TestStruct> {
             .array("staticVariables", pointer("BuildingBlocks_StaticVariable"))
             .array("scene", pointer("BuildingBlocks_DisplayWidget"))
             .array("library", pointer("BuildingBlocks_DisplayWidget"))
+            .field(
+                "proxyRootNode",
+                TestType::WeakPointer("BuildingBlocks_DisplayWidget".to_owned()),
+            )
             .array("operations", pointer("BuildingBlocks_BindingsOperation")),
         TestStruct::new("BuildingBlocks_DefaultStyles")
             .field("sharedStyles", reference("BuildingBlocks_Style"))
             .array("entries", pointer("BuildingBlocks_StyleEntry")),
         TestStruct::new("BuildingBlocks_BrandStyles")
             .field("brandIdentifier", reference("BuildingBlocks_Style"))
+            .field("sharedStyles", reference("BuildingBlocks_Style"))
             .array("entries", pointer("BuildingBlocks_StyleEntry")),
         TestStruct::new("BuildingBlocks_DisplayWidget")
             .field("name", TestType::String)
             .field("isActive", TestType::Bool)
             .field("affectsLayout", TestType::Bool)
+            .field("layer", TestType::Int32)
             .field("inheritsAlpha", TestType::Bool)
             .field("alpha", TestType::Single)
             .array("styleTags", reference("Tag"))
@@ -146,6 +152,7 @@ fn widget_structs() -> Vec<TestStruct> {
             .field("padding", class("BuildingBlocks_TRBL"))
             .field("margin", class("BuildingBlocks_TRBL"))
             .field("background", class("BuildingBlocks_Background"))
+            .field("svgFill", class("BuildingBlocks_SvgFill"))
             .field("border", class("BuildingBlocks_Border"))
             .field("layoutPolicy", pointer("BuildingBlocks_LayoutPolicy"))
             .field("layoutPolicyItem", pointer("BuildingBlocks_FlexItem"))
@@ -159,6 +166,9 @@ fn widget_structs() -> Vec<TestStruct> {
 
 fn widget_kinds() -> Vec<TestStruct> {
     vec![
+        button_structure("BuildingBlocks_ComponentGeneralButtonSecondary"),
+        button_structure("BuildingBlocks_ComponentGeneralButton"),
+        button_structure("BuildingBlocks_ComponentGeneralButtonLarge"),
         TestStruct::new("BuildingBlocks_WidgetCard").parent("BuildingBlocks_DisplayWidget"),
         TestStruct::new("BuildingBlocks_WidgetCanvas")
             .parent("BuildingBlocks_DisplayWidget")
@@ -210,6 +220,23 @@ fn widget_kinds() -> Vec<TestStruct> {
     ]
 }
 
+fn button_structure(kind: &str) -> TestStruct {
+    TestStruct::new(kind)
+        .parent("BuildingBlocks_DisplayWidget")
+        .field("canvas", reference("BuildingBlocks_Canvas"))
+        .field("sizingMethod", TestType::String)
+        .field("fillStyle", TestType::String)
+        .field("iconPosition", TestType::String)
+        .field(
+            "labelProperties",
+            class("BuildingBlocks_ComponentLabelProperties"),
+        )
+        .field(
+            "iconProperties",
+            class("BuildingBlocks_ComponentIconProperties"),
+        )
+}
+
 fn style_structs() -> Vec<TestStruct> {
     vec![
         TestStruct::new("Tag").field("tagName", TestType::String),
@@ -254,6 +281,9 @@ fn condition_structs() -> Vec<TestStruct> {
         TestStruct::new("BuildingBlocks_StyleSelectorConditionTag")
             .parent("BuildingBlocks_StyleSelectorCondition")
             .field("tag", reference("Tag")),
+        TestStruct::new("BuildingBlocks_StyleSelectorConditionAnyOfTag")
+            .parent("BuildingBlocks_StyleSelectorCondition")
+            .array("tags", reference("Tag")),
         TestStruct::new("BuildingBlocks_StyleSelectorConditionParent")
             .parent("BuildingBlocks_StyleSelectorCondition")
             .array(

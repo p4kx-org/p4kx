@@ -143,6 +143,10 @@ fn tone_map_forces_an_8_bit_png() -> TestResult {
         .stdout(predicate::str::contains("tone-mapped to 8 bits"));
 
     let mut reader = png::Decoder::new(std::io::BufReader::new(File::open(&out)?)).read_info()?;
+    assert!(
+        reader.info().srgb.is_some(),
+        "tone-mapped samples are tagged sRGB"
+    );
     let mut pixels = vec![0; reader.output_buffer_size().unwrap_or_default()];
     let info = reader.next_frame(&mut pixels)?;
     assert_eq!(info.bit_depth, png::BitDepth::Eight, "8 bits per channel");

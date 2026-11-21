@@ -13,6 +13,16 @@ use crate::dcb_refs::JsonWithTable;
 use crate::forge_input::ForgeInput;
 use crate::{dcb_tags_json, dcb_tags_table, exit};
 
+#[path = "dcb_tags_origins.rs"]
+pub(crate) mod origins;
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum Selection {
+    All,
+    Guid,
+    Path,
+}
+
 /// The text names no tag.
 #[derive(Debug, Error)]
 #[error("no tag has the tag path or GUID `{0}`")]
@@ -32,6 +42,7 @@ pub(crate) struct Listing<'t> {
     pub(crate) rows: Vec<Row<'t>>,
     pub(crate) total: usize,
     pub(crate) issues: TagTreeIssues,
+    pub(crate) selection: Selection,
 }
 
 /// Lists the tag tree of the Archive's DataForge as the arguments ask and writes it to stdout.
@@ -41,13 +52,22 @@ pub(crate) fn run(args: &DcbTagsArgs, as_json: bool) -> Result<ExitCode> {
         (as_json, format) => as_json || format == Some(TagsFormat::Json),
     };
     let input = ForgeInput::open(&args.archive)?;
-    let forge = input.entry().open()?;
-    let tags = TagTree::build(&forge);
+    let origins = json
+        .then(|| origins::TagOrigins::build(&input))
+        .transpose()?;
+    let table_tags;
+    let tags = if let Some(origins) = &origins {
+        origins.tree()
+    } else {
+        let forge = input.entry().open()?;
+        table_tags = TagTree::build(&forge);
+        &table_tags
+    };
     warn(tags.issues());
-    let listing = listing(&tags, args.tag.as_deref())?;
+    let listing = listing(tags, args.tag.as_deref())?;
     let mut out = BufWriter::new(io::stdout().lock());
-    let written = if json {
-        dcb_tags_json::write(&mut out, &args.archive, &listing, args.tree)
+    let written = if let Some(origins) = &origins {
+        dcb_tags_json::write(&mut out, &args.archive, &listing, args.tree, origins)
     } else {
         dcb_tags_table::write(&mut out, &listing, args.tree)
     };
@@ -59,17 +79,22 @@ pub(crate) fn run(args: &DcbTagsArgs, as_json: bool) -> Result<ExitCode> {
 
 /// Returns the tags `text` names, each with everything below it, or every tag without `text`.
 fn listing<'t>(tags: &'t TagTree, text: Option<&str>) -> Result<Listing<'t>, UnknownTag> {
-    let tops: Vec<Tag<'t>> = match text {
-        None => tags.roots().collect(),
+    let (tops, selection) = match text {
+        None => (tags.roots().collect(), Selection::All),
         Some(text) => {
-            let found: Vec<Tag<'t>> = text.parse::<Guid>().map_or_else(
-                |_| tags.find_path(text).collect(),
-                |guid| tags.get(guid).into_iter().collect(),
+            let (found, selection) = text.parse::<Guid>().map_or_else(
+                |_| (tags.find_path(text).collect(), Selection::Path),
+                |guid| {
+                    (
+                        tags.get(guid).into_iter().collect::<Vec<_>>(),
+                        Selection::Guid,
+                    )
+                },
             );
             if found.is_empty() {
                 return Err(UnknownTag(text.to_owned()));
             }
-            found
+            (found, selection)
         }
     };
     let rows = tops
@@ -89,12 +114,17 @@ fn listing<'t>(tags: &'t TagTree, text: Option<&str>) -> Result<Listing<'t>, Unk
         rows,
         total: tags.len(),
         issues: tags.issues(),
+        selection,
     })
 }
 
 fn warn(issues: TagTreeIssues) {
     let mut err = io::stderr().lock();
     let notes = [
+        (
+            issues.unclassified(),
+            "Records cannot be classified because their type metadata is unreadable",
+        ),
         (
             issues.unreadable(),
             "Tag Records cannot be read and are left out",
@@ -103,11 +133,6 @@ fn warn(issues: TagTreeIssues) {
         (
             issues.repeated(),
             "tags are listed more than once; the first listing counts",
-        ),
-        (issues.too_deep(), "tags are too deep and left out"),
-        (
-            issues.too_long(),
-            "tags have a name or path that is too long and are left out",
         ),
         (
             issues.duplicate(),

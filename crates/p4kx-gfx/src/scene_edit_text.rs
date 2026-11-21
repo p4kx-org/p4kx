@@ -5,7 +5,7 @@ use std::rc::Rc;
 
 use crate::geometry::Rgba;
 use crate::place::Placement;
-use crate::scene_compose::{Composer, Context};
+use crate::scene_compose::{Composer, Context, SceneTextMeasureOrigin};
 use crate::scene_report::SkipReason;
 use crate::scene_text::Missing;
 use crate::text::EditText;
@@ -32,6 +32,7 @@ const PASSWORD_CHAR: char = '*';
 pub(crate) struct Prepared {
     parsed: Parsed,
     issues: Vec<SkipReason>,
+    localised: bool,
 }
 
 /// The metrics and the drawing of one character.
@@ -50,6 +51,7 @@ struct Resolved {
     height: f32,
     color: Rgba,
     blank: bool,
+    used_advance: bool,
 }
 
 impl Composer<'_> {
@@ -69,6 +71,7 @@ impl Composer<'_> {
             plain(source)
         };
         let mut issues = Vec::new();
+        let mut localised = false;
         if parsed.truncated {
             issues.push(SkipReason::TextTruncated);
         }
@@ -76,6 +79,7 @@ impl Composer<'_> {
             let plain_text: String = parsed.cells.iter().map(|cell| cell.ch).collect();
             if let Some(found) = reference(&plain_text) {
                 if let Some(template) = localise(found.key) {
+                    localised = true;
                     let style = parsed.cells.first().map_or(0, |cell| cell.style);
                     let replaced = plain(&fill(&template, &found.parameters));
                     if replaced.truncated && !issues.contains(&SkipReason::TextTruncated) {
@@ -101,7 +105,11 @@ impl Composer<'_> {
         if !self.charge_chars(placement, context, parsed.cells.len()) {
             return None;
         }
-        let prepared = Rc::new(Prepared { parsed, issues });
+        let prepared = Rc::new(Prepared {
+            parsed,
+            issues,
+            localised,
+        });
         self.text.prepared.insert(text.id, Rc::clone(&prepared));
         Some(prepared)
     }
@@ -127,9 +135,18 @@ impl Composer<'_> {
         }
         let mut missing = Missing::default();
         let (items, resolved) = self.items(text, &prepared.parsed, &mut missing);
+        if let (Some(origins), Some(definition)) = (&mut self.origins, inner.edit_definition()) {
+            origins.text_layout(definition, measured_fonts(&items, &resolved));
+        }
         let mut placed = Vec::new();
         layout(&items, &area(text), &mut placed);
-        self.draw_placed(placement, context, inner, &resolved, &placed);
+        self.draw_placed(
+            placement,
+            context,
+            inner.with_localisation(prepared.localised),
+            &resolved,
+            &placed,
+        );
         self.report_missing(placement, context, missing);
     }
 
@@ -207,6 +224,7 @@ impl Composer<'_> {
                 height,
                 color: style.color.or(text.color).unwrap_or(BLACK),
                 blank: kind != Kind::Glyph,
+                used_advance: kind != Kind::Newline && glyph_advance.is_some(),
             },
         }
     }
@@ -272,6 +290,7 @@ impl Composer<'_> {
                 continue;
             };
             let at = (spot.x, spot.baseline);
+            let inner = inner.with_layout_prefix(spot.inspected);
             if let (Some(font), Some(glyph)) = (one.font, one.glyph) {
                 let shape = self.glyph_shape(placement, context, (font, glyph), one.color);
                 if let Some(shape) = shape {
@@ -284,6 +303,25 @@ impl Composer<'_> {
             }
         }
     }
+}
+
+fn measured_fonts<'a>(
+    items: &'a [Item],
+    resolved: &'a [Resolved],
+) -> impl Iterator<Item = Option<SceneTextMeasureOrigin>> + 'a {
+    let mut has_content = false;
+    items.iter().zip(resolved).map(move |(item, one)| {
+        let newline = item.kind == Kind::Newline;
+        let uses_font = !newline || !has_content;
+        has_content = !newline;
+        one.font
+            .filter(|_| uses_font)
+            .map(|font| SceneTextMeasureOrigin {
+                font,
+                glyph: one.glyph,
+                used_advance: one.used_advance,
+            })
+    })
 }
 
 #[expect(

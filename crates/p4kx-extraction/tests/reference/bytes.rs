@@ -17,6 +17,8 @@ pub(crate) enum Verdict {
     ReferenceShorter {
         zeros_only: bool,
         extra: u64,
+        reference_len: u64,
+        last_reference_byte: Option<u8>,
     },
     /// The reference has bytes after the end of P4KX's.
     ReferenceLonger {
@@ -65,9 +67,13 @@ pub(crate) fn compare_streams(
     let mut left = vec![0_u8; BLOCK];
     let mut right = vec![0_u8; BLOCK];
     let mut offset = 0_u64;
+    let mut last_reference_byte = None;
     loop {
         let a = fill(&mut ours, &mut left)?;
         let b = fill(&mut reference, &mut right)?;
+        if let Some(index) = b.checked_sub(1) {
+            last_reference_byte = right.get(index).copied();
+        }
         let common = a.min(b);
         if let Some(position) = left
             .iter()
@@ -85,6 +91,8 @@ pub(crate) fn compare_streams(
             return Ok(Verdict::ReferenceShorter {
                 zeros_only,
                 extra: (a - common) as u64 + rest,
+                reference_len: offset + b as u64,
+                last_reference_byte,
             });
         }
         if b > common {

@@ -4,8 +4,10 @@
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use crate::forge_shapes::ForgeFieldOrigins;
+
 /// A file of the audio data that was left out because it could not be read.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct IssueShape {
     /// The Entry path.
     pub(crate) path: String,
@@ -16,7 +18,7 @@ pub(crate) struct IssueShape {
 }
 
 /// A soundbank that holds a Wwise event.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct SoundbankRef {
     /// The Entry path of the soundbank.
     pub(crate) path: String,
@@ -25,7 +27,7 @@ pub(crate) struct SoundbankRef {
 }
 
 /// A Wwise event of a trigger with the soundbanks that hold it.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct EventShape {
     /// The event name.
     pub(crate) name: String,
@@ -43,7 +45,7 @@ pub(crate) struct EventShape {
 }
 
 /// Why a trigger leads to no soundbank.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct UnmatchedShape {
     /// A stable code: `no_definition`, `no_event` or `no_soundbank`.
     pub(crate) kind: &'static str,
@@ -52,7 +54,7 @@ pub(crate) struct UnmatchedShape {
 }
 
 /// An Entity whose Record names a trigger.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct EntityRef {
     /// The GUID of the Record.
     pub(crate) guid: String,
@@ -63,7 +65,7 @@ pub(crate) struct EntityRef {
 }
 
 /// The Entities that name a trigger.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct EntitiesShape {
     /// How many Entities name the trigger.
     pub(crate) count: usize,
@@ -72,7 +74,7 @@ pub(crate) struct EntitiesShape {
 }
 
 /// An audio trigger a search found.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct TriggerHitShape {
     /// The trigger name as its ATL definition writes it.
     pub(crate) name: String,
@@ -82,7 +84,7 @@ pub(crate) struct TriggerHitShape {
     pub(crate) matched_trigger: bool,
     /// How many Wwise events the trigger posts.
     pub(crate) events_total: usize,
-    /// The first 25 Wwise events the trigger posts.
+    /// Every admitted Wwise event the trigger posts.
     pub(crate) events: Vec<EventShape>,
     /// Why the trigger leads to no soundbank; absent when it does.
     pub(crate) unmatched: Option<UnmatchedShape>,
@@ -114,10 +116,12 @@ pub(crate) struct TriggerSearchResult {
     /// The cursor of the next page; absent on the last page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) next_cursor: Option<String>,
+    #[serde(flatten)]
+    pub(crate) origins: ForgeFieldOrigins,
 }
 
 /// The Record of an Entity.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct EntityShape {
     /// The GUID of the Record.
     pub(crate) guid: String,
@@ -130,7 +134,7 @@ pub(crate) struct EntityShape {
 }
 
 /// An audio trigger an Entity names.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct EntityTriggerShape {
     /// The trigger name as the Entity writes it.
     pub(crate) name: String,
@@ -142,7 +146,7 @@ pub(crate) struct EntityTriggerShape {
     pub(crate) definition: Option<String>,
     /// How many Wwise events the trigger posts.
     pub(crate) events_total: usize,
-    /// The first 25 Wwise events the trigger posts.
+    /// Every admitted Wwise event the trigger posts.
     pub(crate) events: Vec<EventShape>,
     /// Why the trigger leads to no soundbank; absent when it does.
     pub(crate) unmatched: Option<UnmatchedShape>,
@@ -168,10 +172,12 @@ pub(crate) struct EntitySoundsResult {
     /// The cursor of the next page; absent on the last page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) next_cursor: Option<String>,
+    #[serde(flatten)]
+    pub(crate) origins: ForgeFieldOrigins,
 }
 
 /// The languages localised sounds were resolved in.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct LanguageShape {
     /// The language asked for.
     pub(crate) requested: Option<String>,
@@ -180,7 +186,7 @@ pub(crate) struct LanguageShape {
 }
 
 /// A Wwise event a trigger posts.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct TriggerEventShape {
     /// The event name.
     pub(crate) name: String,
@@ -191,7 +197,7 @@ pub(crate) struct TriggerEventShape {
 }
 
 /// A resolved trigger.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct TriggerShape {
     /// The trigger name as its ATL definition writes it.
     pub(crate) name: String,
@@ -199,12 +205,12 @@ pub(crate) struct TriggerShape {
     pub(crate) definition: Option<String>,
     /// How many events the trigger posts.
     pub(crate) events_total: usize,
-    /// The first 25 events the trigger posts.
+    /// Every admitted event the trigger posts.
     pub(crate) events: Vec<TriggerEventShape>,
 }
 
 /// One object of the path from an event to a sound.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct StepShape {
     /// The kind of object, e.g. `event`, `random` or `sound`.
     pub(crate) kind: &'static str,
@@ -229,7 +235,7 @@ pub(crate) struct LocationShape {
 }
 
 /// One sound a trigger may play.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct VariantShape {
     /// The event the sound is reached from.
     pub(crate) event: String,
@@ -254,7 +260,7 @@ pub(crate) struct VariantShape {
 }
 
 /// A link of the chain from an event to its sounds that is broken.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Debug, Clone, Serialize, JsonSchema)]
 pub(crate) struct BreakShape {
     /// The event.
     pub(crate) event: String,
@@ -272,10 +278,10 @@ pub(crate) struct BreakShape {
     pub(crate) message: String,
 }
 
-/// How many variants a trigger has and how they are located.
+/// How many variants the resolver found and how they are located.
 #[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
 pub(crate) struct CountsShape {
-    /// All variants.
+    /// Variants found across all pages.
     pub(crate) variants: usize,
     /// Variants whose WEM is located.
     pub(crate) located: usize,
@@ -298,10 +304,12 @@ pub(crate) struct TriggerSoundsResult {
     pub(crate) trigger: TriggerShape,
     /// How the variants and links count over all pages.
     pub(crate) counts: CountsShape,
+    /// Whether the caller's visit budget left references unfollowed.
+    pub(crate) truncated_by_limits: bool,
     /// The variants on this page.
     pub(crate) variants: Vec<VariantShape>,
-    /// The broken links, on the first page only, at most 25;
-    /// `counts.breaks` says how many there are.
+    /// Up to 25 broken links on the first page. The last slot includes a late visit cutoff.
+    /// `counts.breaks` gives the total reached.
     pub(crate) breaks: Vec<BreakShape>,
     /// The first files of the audio data that could not be read, at most 20.
     pub(crate) issues: Vec<IssueShape>,
@@ -310,4 +318,6 @@ pub(crate) struct TriggerSoundsResult {
     /// The cursor of the next page; absent on the last page.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) next_cursor: Option<String>,
+    #[serde(flatten)]
+    pub(crate) origins: ForgeFieldOrigins,
 }

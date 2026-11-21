@@ -3,7 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
-use p4kx_extraction::{EntryFailure, ExtractionReport, RecordExportReport};
+use p4kx_extraction::{Entry, EntryFailure, ExtractionReport, RecordExportReport};
 
 use crate::model::describe;
 use crate::record_export::{FailedRecord, RenamedRecord};
@@ -63,9 +63,27 @@ pub struct ExtractionSummary {
     records_renamed: Vec<RenamedRecord>,
     excluded_parts: usize,
     not_converted: usize,
+    merged_texture_receipts: Vec<String>,
 }
 
 impl ExtractionSummary {
+    /// Lists the selected Entries as cancelled before a target was prepared.
+    pub(crate) fn cancelled_selection(
+        target: PathBuf,
+        entries: &[&Entry],
+        convert: bool,
+        archive_changed: bool,
+    ) -> Self {
+        let mut summary = Self::new(target, &ExtractionReport::default());
+        summary.cancelled = entries
+            .iter()
+            .map(|entry| entry.path().to_owned())
+            .collect();
+        summary.converted = convert.then_some(0);
+        summary.archive_changed = archive_changed;
+        summary
+    }
+
     /// Returns the outcome of a conversion cancelled while its input folder was read: nothing
     /// was written, and the input folder is the one thing listed as cancelled.
     pub(crate) fn cancelled_scan(target: PathBuf, input: &Path) -> Self {
@@ -85,16 +103,19 @@ impl ExtractionSummary {
             cancelled: report.cancelled().to_vec(),
             archive_changed: report.archive_changed(),
             records: report.records().map(RecordCounts::new),
-            record_failures: report
-                .records()
-                .map(|records| records.failures().iter().map(FailedRecord::of).collect())
-                .unwrap_or_default(),
-            records_renamed: report
-                .records()
-                .map(|records| records.renamed().iter().map(RenamedRecord::of).collect())
-                .unwrap_or_default(),
+            record_failures: report.records().map_or_default(|records| {
+                records.failures().iter().map(FailedRecord::of).collect()
+            }),
+            records_renamed: report.records().map_or_default(|records| {
+                records.renamed().iter().map(RenamedRecord::of).collect()
+            }),
             excluded_parts: 0,
             not_converted: report.not_converted(),
+            merged_texture_receipts: report
+                .merged_texture_artifacts()
+                .iter()
+                .map(|artifact| artifact.origin_receipt.clone())
+                .collect(),
         }
     }
 
@@ -180,6 +201,10 @@ impl ExtractionSummary {
     #[must_use]
     pub const fn not_converted(&self) -> usize {
         self.not_converted
+    }
+
+    pub(crate) fn merged_texture_receipts(&self) -> &[String] {
+        &self.merged_texture_receipts
     }
 
     pub(crate) const fn with_excluded_parts(mut self, excluded_parts: usize) -> Self {
