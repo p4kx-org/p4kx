@@ -45,6 +45,10 @@ pub(crate) fn capture(
         }
         writer.insert("/decal", &inputs)?;
     }
+    if palette.decal_texture.is_some() {
+        let texture = writer.observe("root.decalTexture".to_owned(), SourceUseRole::Payload)?;
+        writer.insert("/decal_texture", texture.as_slice())?;
+    }
     Ok(writer.values)
 }
 

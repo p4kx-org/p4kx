@@ -326,7 +326,9 @@ fn record_paint_provenance(
             serde_json::to_value(paint)
                 .map_err(|error| PackageError::PaintEvidence(Box::new(error)))?,
         );
-        crate::manifest::PAINT_FORMAT_VERSION.clone_into(&mut manifest.version);
+        if manifest.version == crate::manifest::FORMAT_VERSION {
+            crate::manifest::PAINT_FORMAT_VERSION.clone_into(&mut manifest.version);
+        }
     }
     Ok(())
 }

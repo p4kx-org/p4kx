@@ -20,6 +20,7 @@ pub const FORMAT: &str = "p4kx-blender-package";
 pub const FORMAT_VERSION: &str = "1.21";
 
 pub(crate) const PAINT_FORMAT_VERSION: &str = "1.22";
+pub(crate) const PALETTE_DECAL_FORMAT_VERSION: &str = "1.23";
 
 /// The name of the manifest file in the package folder.
 pub const MANIFEST_FILE: &str = "scene.json";

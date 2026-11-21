@@ -4064,6 +4064,13 @@
             "null"
           ]
         },
+        "decal_texture": {
+          "description": "The palette's original decal texture resource string, including a stated empty string (1.23).",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "glass": {
           "description": "The colour of the tinted glass, linear.",
           "items": {

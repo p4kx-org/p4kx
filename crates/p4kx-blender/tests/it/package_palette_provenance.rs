@@ -4,7 +4,7 @@
 use p4kx_assembly::{ArchiveModels, Assembly, AssemblyOptions, ForgePalettes, LoadoutResolver};
 use p4kx_blender::{Manifest, PackageInfo, manifest_schema, write_package};
 use p4kx_extraction::{Archive, DataForgeEntry};
-use p4kx_testkit::{livery_entries, test_key};
+use p4kx_testkit::{livery_entries, livery_entries_with_decal_texture, test_key};
 use serde_json::Value;
 
 use crate::support::{TestResult, fixture, glb_options, never};
@@ -72,6 +72,68 @@ fn package_palette_fields_keep_their_source_separate_from_selection_and_inherita
             .palette_provenance
             .is_none(),
         "packages without palette evidence remain readable"
+    );
+    Ok(())
+}
+
+#[test]
+fn package_keeps_typed_decal_references_and_their_payload_origins() -> TestResult {
+    let entity_fixture = fixture(livery_entries())?;
+    let entities = Archive::open(&entity_fixture.path)?;
+    for file in [r"Objects\Test\emblem_stencil.tif", ""] {
+        let scratch = tempfile::tempdir()?;
+        let mut entries = livery_entries_with_decal_texture(file);
+        let forge = entries.remove(0).encrypted();
+        entries.insert(0, forge);
+        let palette_fixture = fixture(entries)?;
+        let palettes = Archive::open_with_key(&palette_fixture.path, Some(test_key()))?;
+        let manifest = package(&entities, &palettes, "TEST_Livery", scratch.path())?;
+        verify_decal_reference(&manifest, file)?;
+    }
+    Ok(())
+}
+
+fn verify_decal_reference(manifest: &Value, expected: &str) -> TestResult {
+    assert_eq!(
+        field(manifest, "/version")?,
+        "1.23",
+        "the added palette field selects its format"
+    );
+    let provenance = field(manifest, "/palette_provenance")?;
+    let root = binding(manifest, "")?;
+    let payload = row(provenance, "payloads", field(root, "/payload")?)?;
+    let palette = row(manifest, "palettes", field(payload, "/palette")?)?;
+    assert_eq!(
+        field(palette, "/decal_texture")?,
+        expected,
+        "the original string is preserved"
+    );
+    let origin = field(payload, "/fieldOrigins/~1decal_texture")?;
+    assert_eq!(
+        field(origin, "/containsEncryptedSource")?,
+        true,
+        "the original palette DCB is encrypted"
+    );
+    assert_eq!(
+        field(origin, "/sourceSetComplete")?,
+        true,
+        "the scalar has exactly one payload source"
+    );
+    let used = source_use(provenance, origin)?;
+    assert_eq!(
+        field(used, "/location/field")?,
+        "root.decalTexture",
+        "the original field"
+    );
+    assert_eq!(
+        field(used, "/role")?,
+        "payload",
+        "the unmodified reference is a payload"
+    );
+    assert_eq!(
+        field(used, "/location/recordIndex")?,
+        field(payload, "/record/index")?,
+        "the physical Record supplies the reference"
     );
     Ok(())
 }
@@ -165,11 +227,20 @@ fn field<'a>(value: &'a Value, address: &str) -> Result<&'a Value, Box<dyn std::
 }
 
 fn verify_payload(manifest: &Value, provenance: &Value, binding: &Value) -> TestResult {
+    assert_eq!(
+        field(manifest, "/version")?,
+        "1.21",
+        "a package without the new source field retains its format"
+    );
     let payload = row(provenance, "payloads", field(binding, "/payload")?)?;
     let palette = row(manifest, "palettes", field(payload, "/palette")?)?;
     let origins = field(payload, "/fieldOrigins")?
         .as_object()
         .ok_or("palette field origins")?;
+    assert!(
+        palette.get("decal_texture").is_none(),
+        "the fixture schema does not declare the field"
+    );
     assert_eq!(
         origins.len(),
         48,

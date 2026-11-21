@@ -11,7 +11,7 @@ use crate::items::Item;
 use crate::manifest::{
     Basis, ColourSpace, Coordinates, EntityRef, FORMAT_VERSION, Format, Generator, Issue,
     IssueOrigin, MESHES_FOLDER, Manifest, MaterialTextures, Mesh, MeshMaterial, Node, Options,
-    Source, TEXTURES_FOLDER, Texture, Unit,
+    PALETTE_DECAL_FORMAT_VERSION, Source, TEXTURES_FOLDER, Texture, Unit,
 };
 use crate::manifest_light::Light;
 use crate::manifest_materials::{MaterialDescription, Palette, PaletteColours};
@@ -34,10 +34,19 @@ pub(crate) struct Inputs<'a> {
 /// Builds the manifest of a package whose files are written.
 pub(crate) fn manifest(inputs: &Inputs<'_>) -> Manifest {
     let materials = materials(inputs);
+    let palettes = palettes(inputs);
+    let version = if palettes
+        .iter()
+        .any(|palette| palette.decal_texture.is_some())
+    {
+        PALETTE_DECAL_FORMAT_VERSION
+    } else {
+        FORMAT_VERSION
+    };
 
     Manifest {
         format: Format::P4kxBlenderPackage,
-        version: FORMAT_VERSION.to_owned(),
+        version: version.to_owned(),
         generator: generator(),
         source: Source {
             channel: inputs.info.channel.clone(),
@@ -63,7 +72,7 @@ pub(crate) fn manifest(inputs: &Inputs<'_>) -> Manifest {
             .descriptions()
             .cloned()
             .collect(),
-        palettes: palettes(inputs),
+        palettes,
         palette_provenance: None,
         paint_provenance: None,
         authored_soc: None,
@@ -270,6 +279,7 @@ fn palettes(inputs: &Inputs<'_>) -> Vec<Palette> {
             tertiary: colours(&palette.tertiary),
             glass: palette.glass,
             decal: palette.decal,
+            decal_texture: palette.decal_texture.clone(),
         })
         .collect()
 }

@@ -199,7 +199,7 @@ pub use entity_layer_chain::{LAYER_CHAIN_LENGTH, layer_chain_entries};
 pub use entity_layered::{LAYERED_MISSING_TEXTURE, LAYERED_TINTS, layered_entries};
 pub use entity_livery::{
     LIVERY_DEFAULT_PALETTE, LIVERY_DEFAULT_TINTS, LIVERY_GUN_TINTS, LIVERY_SHIP_DECALS,
-    LIVERY_SHIP_TINTS, livery_entries,
+    LIVERY_SHIP_TINTS, livery_entries, livery_entries_with_decal_texture,
 };
 pub use entity_loadout::{TestLoadout, TestLoadoutEntry};
 pub use entity_module_sample::{ENTITY_MODULE_CARRIER, ENTITY_MODULE_CLASS, entity_module_entries};

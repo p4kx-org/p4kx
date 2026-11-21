@@ -94,6 +94,7 @@ class Palette:
     tertiary: PaletteColours
     glass: Colour
     decal: tuple[Colour, Colour, Colour] | None = None
+    decal_texture: str | None = None
 
     def entry(self, name: str | None) -> PaletteColours | None:
         """Returns the paint entry ``name``, or ``None`` for ``glass``, ``decal`` and others."""
@@ -328,6 +329,7 @@ def _palette(item: object) -> Palette | None:
     glass = _colour(item.get("glass"), None)
     if primary is None or secondary is None or tertiary is None or glass is None:
         return None
+    decal_texture = item.get("decal_texture")
     return Palette(
         palette_id,
         _string(item.get("name")),
@@ -336,6 +338,7 @@ def _palette(item: object) -> Palette | None:
         tertiary,
         glass,
         _decal_colours(item.get("decal")),
+        decal_texture=decal_texture if isinstance(decal_texture, str) else None,
     )
 
 

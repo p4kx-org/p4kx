@@ -199,7 +199,7 @@ written (there are no `null`s).
 | Field | Meaning |
 | --- | --- |
 | `format` | Always `p4kx-blender-package`. |
-| `version` | `<major>.<minor>` of the package format. Current exports use 1.21, or 1.22 with fitted paint provenance. |
+| `version` | `<major>.<minor>` of the package format. Current exports use 1.21, 1.22 with fitted paint provenance, or 1.23 with an original palette decal-texture field. |
 | `generator` | `name` (`p4kx`) and `version` of the program that wrote the package. |
 | `source` | `channel` (the Channel folder, e.g. `LIVE`), `build` (`branch`, `version`, `public_patch`, `change_number`, `build_id` of the Archive's build manifest) and `entity` (`class_name`, `guid`). `channel` and `build` are absent when unknown. A Character package (1.3) also has `character` (`name`, `body`, `chf`, `loadout`), see "Characters", and puts the Character's name in `entity.class_name` with an empty `guid`. |
 | `coordinates` | `basis` is `gltf_y_up` and `unit` is `metre`. A reader refuses a `basis` or `unit` it does not know. |
@@ -621,6 +621,11 @@ opacity is the strongest of the three masks (before `stencil.opacity` and the ma
 channel as its opacity. Which colour a decal with `StencilTintOverride` 1 takes, and the order of
 overlapping masks, are not settled by the game data, see ADR-0310.
 
+`decal_texture` (1.23) is the original `TintPaletteTree.root.decalTexture` resource
+string. An empty string records an explicitly empty value. The field is absent when the
+source has no readable string. Its field origin addresses the actual palette Record.
+The value describes the source and does not assign an image to a material.
+
 The optional `palette_provenance` object in 1.20 separates the origin of a palette value from
 the action of selecting it. Its `payloads` refer to `palettes` by ordinal. Each carries
 `fieldOrigins` keyed by JSON Pointers into that palette, including separate entries for each
@@ -825,6 +830,8 @@ Its `appearance` carries the same values as the entity GLB's `asset.extras.p4kxP
 The keys in `fieldOrigins` are JSON Pointers relative to `appearance` and resolve in
 `sourceInventory`. Earlier readers can still draw the scene through the existing mesh, material
 and palette bindings.
+**1.23** adds the optional `palettes[].decal_texture` source value. It can coexist with
+fitted paint provenance.
 
 ### Authored Entity Glow
 

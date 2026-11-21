@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_dataforge::{DataForge, Guid, Record, StructValue};
+use p4kx_dataforge::{DataForge, Guid, Record, StructValue, Value};
 use p4kx_extraction::{DataForgeEntry, DataForgeOrigin};
 use p4kx_model::{TintEntry, TintPalette, srgb8_to_linear};
 use thiserror::Error;
@@ -186,6 +186,10 @@ fn read_record(record: &Record<'_>) -> Result<TintPalette, PaletteFailure> {
         [entry("entryA")?, entry("entryB")?, entry("entryC")?],
         glass,
     );
+    let palette = match root.field("decalTexture") {
+        Some(Value::String(file)) => palette.with_decal_texture(*file),
+        _ => palette,
+    };
     let decal = DECAL_COLOURS.map(|name| struct_field(root, name).and_then(read_colour));
     Ok(match decal {
         [Some(red), Some(green), Some(blue)] => palette.with_decal([red, green, blue]),

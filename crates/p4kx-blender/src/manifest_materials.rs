@@ -324,6 +324,9 @@ pub struct Palette {
     /// the palette states none and in a package before 1.7.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub decal: Option<[[f32; 3]; 3]>,
+    /// The palette's original decal texture resource string, including a stated empty string (1.23).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub decal_texture: Option<Box<str>>,
 }
 
 /// One authored library root retained independently of its interpreted child materials.
