@@ -52,7 +52,7 @@ pub(crate) mod mining_configurations;
 #[path = "catalog_ordered_curve.rs"]
 pub(super) mod ordered_curve;
 #[path = "turret_health.rs"]
-mod turret_health;
+pub(crate) mod turret_health;
 #[path = "worn_gear_tables.rs"]
 pub(crate) mod worn_gear;
 use consumables::{ConsumableConfigurations, ConsumableTables};

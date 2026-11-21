@@ -17,6 +17,12 @@ the resolved physical Records required by selected components. Physical
 Records with duplicate GUIDs stay distinct. The Reference follows the
 DataForge resolution order.
 
+Use `equipment::durability::with_turret_health` to query the turret components
+by physical Entity Record index or GUID. A resolved modifier index can be
+passed separately to `equipment::component_definitions::with_turret_health_modifiers`.
+The component query reads the original Reference and target identity.
+Definition bodies and curves are read by the definition query.
+
 Each definition's `damageMovementModifier.value` contains the inline
 `BezierCurve` with `useLUT` and the ordered `points.value` array of `Vec2`
 cells. Each coordinate keeps the original Single's `rawBits` and nullable

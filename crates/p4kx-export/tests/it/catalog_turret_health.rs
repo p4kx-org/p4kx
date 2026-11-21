@@ -11,6 +11,8 @@ use serde_json::{Value, json};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
 
+#[path = "catalog_turret_health_component_sdk.rs"]
+mod component_sdk;
 #[path = "catalog_turret_pointer_probe.rs"]
 mod pointer_probe;
 

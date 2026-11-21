@@ -16,7 +16,9 @@ use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::catalog_entity_component_read::{self, ComponentSelection};
+use crate::catalog_v3::catalog_item_components::source_getters;
 use crate::catalog_v3::catalog_unit_source::UnitSource;
+use crate::catalog_v3::component_sources::physical_component;
 use crate::catalog_v3::item_component_owner::ComponentOwner;
 use crate::catalog_v3::referenced_definition_read::{self, Selection};
 use crate::export_field_inspection::ConfigurationInspection;
@@ -31,11 +33,13 @@ const TURRET: ComponentKind = ComponentKind {
     inspection: ConfigurationInspection::TurretHealth,
 };
 
+physical_component!(TurretHealthComponents, TurretHealth, TURRET);
+
 /// The authored health modifier Reference of one physical turret component.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct TurretHealth<'source> {
+pub struct TurretHealth<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
@@ -45,6 +49,15 @@ pub(super) struct TurretHealth<'source> {
 }
 
 impl<'source> TurretHealth<'source> {
+    source_getters! {
+        /// Borrows the physical owner and original Components ordinal.
+        owner: ComponentOwner,
+        /// Borrows the original health modifier Reference and its resolved target state.
+        health_modifier_record: SourcedValue<Box<SourceRecordReference<'source>>>,
+        /// Borrows the original component declaration and additional fields.
+        original: UnitSource<'source>,
+    }
+
     fn read(
         owner: ComponentOwner,
         fields: Observed<'_, '_, '_, 'source>,

@@ -5,12 +5,14 @@ use p4kx_export::catalog_queries::equipment::component_definitions::{
     ComponentDefinitionSnapshot, with_consumable_subtypes, with_consumable_types,
     with_damage_resistance_macros, with_mining_laser_globals, with_turret_health_modifiers,
 };
+use p4kx_export::catalog_queries::equipment::durability::with_turret_health;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
 };
 use p4kx_extraction::{Archive, Language};
 use p4kx_testkit::{
-    ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, TestStruct, TestType, TestValue,
+    ArchiveBuilder, DataForgeBuilder, TestEntity, TestEntry, TestInstance, TestRecord, TestStruct,
+    TestType, TestValue, entity_schema,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -19,6 +21,7 @@ use super::{Route, TestResult};
 
 const REMAINING: &str =
     "typed schema and selected LIVE/PTU source samples witnessed; complete producer parity open";
+const TURRET: &str = "SCItemTurretParams";
 const TYPES: [&str; 5] = [
     "DamageResistanceMacro",
     "MiningLaserGlobalParams",
@@ -36,6 +39,13 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         })??,
         with_mining_laser_globals(&archive, all, None, |rows| {
             witness("/definitions/miningLaserGlobals", &rows)
+        })??,
+        with_turret_health(&archive, all, None, |snapshot| {
+            Route::queried_rows(
+                "/configurations/turretHealth",
+                snapshot.rows(),
+                "typed source query and synthetic producer parity witnessed; same-build installed producer parity open",
+            )
         })??,
         with_turret_health_modifiers(&archive, all, None, |rows| {
             witness("/definitions/turretHealthModifiers", &rows)
@@ -130,7 +140,26 @@ fn component_definition_queries_keep_physical_aliases_and_language_scope() -> Te
 
 fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {
     let folder = tempfile::tempdir()?;
-    let mut data = DataForgeBuilder::new().version(8);
+    let mut data = entity_schema(DataForgeBuilder::new().version(8))
+        .structure(
+            TestStruct::new(TURRET)
+                .parent("DataForgeComponentParams")
+                .field(
+                    "healthModifierRecord",
+                    TestType::ReferenceTo("STurretHealthModifierDef".to_owned()),
+                ),
+        )
+        .record(
+            TestEntity::new(
+                6,
+                "FixtureTurret",
+                "libs/foundry/records/entities/fixtures/turret_sdk.xml",
+            )
+            .component(TestValue::Struct(
+                TestInstance::new(TURRET).value("healthModifierRecord", TestValue::Reference(3)),
+            ))
+            .record(),
+        );
     for (index, (source_type, id)) in TYPES.into_iter().zip(1..=5_u128).enumerate() {
         let mut definition = TestStruct::new(source_type);
         let mut record = TestRecord::new(
