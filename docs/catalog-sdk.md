@@ -1773,6 +1773,19 @@ Rust callers can inspect the canonical payloads directly. Match
 EMP settings and missile guidance, targeting and shake expose the original
 `SourcedValue` fields, including absence, null and per-datum provenance.
 
+To compare selected Missile and Explosive rows with the same installed
+producer and original field contributors, set `P4KX_DATA_P4K` to the installed
+Archive and use the normal stored key lookup.
+
+```powershell
+cargo test -p p4kx-export --test real_archive real_archive_missile_configuration::source_selected_missile_signal_families_match_original_guidance_and_targeting -- --ignored --exact --test-threads=1
+```
+
+The test selects one physical Item per original missile signal family. It
+builds filtered Catalog excerpts in memory and checks each against a query
+for the same Record. This verifies selected rows and their field origins.
+Full-Catalog parity and system-memory acceptance require separate runs.
+
 ## Jump drives and quantum interdiction
 
 Use `equipment::ship_systems::with_jump_drives` and

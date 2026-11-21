@@ -21,6 +21,8 @@ use crate::real_archive_verification::print_line;
 
 #[path = "missile_configuration_observation.rs"]
 mod observation;
+#[path = "missile_sdk_witness.rs"]
+mod sdk_witness;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -44,6 +46,7 @@ fn source_selected_missile_signal_families_match_original_guidance_and_targeting
     for tree in selected.values() {
         let catalog = build(&archive, &entry, tree)?;
         compare(&catalog, entry.origin(), tree, &mut coverage)?;
+        sdk_witness::compare(&archive, &entry, &catalog, tree.record_index())?;
     }
     watch
         .check()
