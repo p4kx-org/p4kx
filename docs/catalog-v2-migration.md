@@ -34,6 +34,7 @@ identity and per-value provenance carried by v3.
 | `manufacturers[].name.key`, `description.key` | `key.value` of the corresponding public-name or game-text entry. |
 | `manufacturers[].name.en`, `name.de`, `description.en`, `description.de` | The corresponding entry's `translations.value.en.displayText.value` or `translations.value.de.displayText.value` when available. |
 | `commodities[].guid`, `className`, `recordPath` | Corresponding sourced field's `value` under `definitions.commodities.rows[]`. |
+| `ships[].cargoScu`, `cargoGridsWithIssue` | Read `projections.shipBaseFacts.rows[].cargo.scu.value` and `cargo.gridsWithIssue.value`. Select the Ship by its physical `shipRecordIndex.value` in the same Build. The nominal `shipGuid.value` can identify multiple physical Ship rows. |
 | `commodities[].subtypeGuid`, `refinedSubtypeGuid`, `typeGuid`, `densityGramsPerCubicCentimetre` | Corresponding nullable `value` under `projections.commodityPresentation.rows[]`. Join the old Commodity GUID to `commodityGuid.value`. |
 | `commodities[].name`, `description`, `displayType` | Read the nullable text reference from the same presentation row. `name` joins `texts.publicNames[].id.value`. Both protected fields join `texts.gameTexts[].id.value`. |
 | Commodity `name`, `description`, `displayType` subfields `key`, `en`, `de` | Use the joined text entry's `key.value` and `translations.value.en.displayText.value` or `translations.value.de.displayText.value` when available. |

@@ -6,7 +6,7 @@ use std::fmt;
 use p4kx_extraction::{StructValue, Value};
 
 use crate::catalog_v3::cargo_source::{self, CargoUnit};
-use crate::record_fields::{number_value, structure};
+use crate::record_fields::number_value;
 
 pub(super) enum ContainerInput<'read, 'source> {
     Open([Option<&'read Value<'source>>; 3]),
@@ -23,23 +23,48 @@ pub(super) enum MeasuredCapacity<'source> {
     Unavailable(CapacityFailure<'source>),
 }
 
+pub(super) type OperandObserver<'observe, 'read, 'source> = dyn FnMut(&'read StructValue<'source>, &'static str, Option<&'read Value<'source>>, OperandRole)
+    + 'observe;
+
+#[derive(Clone, Copy)]
+pub(super) enum OperandRole {
+    Kind,
+    Field,
+    Amount,
+}
+
 impl<'read, 'source> ContainerInput<'read, 'source> {
-    pub(super) fn select(root: &'read StructValue<'source>) -> Self {
-        let Some(inventory) = structure(Some(root), "inventoryType") else {
+    pub(super) fn select(
+        root: &'read StructValue<'source>,
+        observe: &mut OperandObserver<'_, 'read, 'source>,
+    ) -> Self {
+        let Some(inventory) = structure(operand(root, "inventoryType", OperandRole::Kind, observe))
+        else {
             return Self::Unavailable(CapacityFailure::MissingInventoryType);
         };
         match inventory.type_name() {
             cargo_source::OPEN => {
-                let dimensions = structure(Some(root), "interiorDimensions");
-                Self::Open(["x", "y", "z"].map(|axis| dimensions.and_then(|size| size.field(axis))))
+                let dimensions = structure(operand(
+                    root,
+                    "interiorDimensions",
+                    OperandRole::Field,
+                    observe,
+                ));
+                Self::Open(["x", "y", "z"].map(|axis| {
+                    dimensions.and_then(|size| operand(size, axis, OperandRole::Amount, observe))
+                }))
             }
-            cargo_source::CLOSED => Self::select_closed(inventory),
+            cargo_source::CLOSED => Self::select_closed(inventory, observe),
             other => Self::Unavailable(CapacityFailure::UnknownInventoryType(other)),
         }
     }
 
-    fn select_closed(inventory: &'read StructValue<'source>) -> Self {
-        let Some(capacity) = structure(Some(inventory), "capacity") else {
+    fn select_closed(
+        inventory: &'read StructValue<'source>,
+        observe: &mut OperandObserver<'_, 'read, 'source>,
+    ) -> Self {
+        let Some(capacity) = structure(operand(inventory, "capacity", OperandRole::Kind, observe))
+        else {
             return Self::Unavailable(CapacityFailure::MissingCargoUnit);
         };
         let Some(unit) = CargoUnit::from_source(capacity.type_name()) else {
@@ -47,7 +72,7 @@ impl<'read, 'source> ContainerInput<'read, 'source> {
         };
         Self::Closed {
             unit,
-            amount: capacity.field(unit.amount_field()),
+            amount: operand(capacity, unit.amount_field(), OperandRole::Amount, observe),
         }
     }
 
@@ -57,6 +82,26 @@ impl<'read, 'source> ContainerInput<'read, 'source> {
             Self::Closed { unit, amount } => measure_closed(unit, amount),
             Self::Unavailable(reason) => MeasuredCapacity::Unavailable(reason),
         }
+    }
+}
+
+fn operand<'read, 'source>(
+    parent: &'read StructValue<'source>,
+    name: &'static str,
+    role: OperandRole,
+    observe: &mut OperandObserver<'_, 'read, 'source>,
+) -> Option<&'read Value<'source>> {
+    let value = parent.field(name);
+    observe(parent, name, value, role);
+    value
+}
+
+const fn structure<'read, 'source>(
+    value: Option<&'read Value<'source>>,
+) -> Option<&'read StructValue<'source>> {
+    match value {
+        Some(Value::Struct(value)) => Some(value),
+        _ => None,
     }
 }
 

@@ -16,6 +16,9 @@ use super::catalog_item_components::resolution::WeaponMagazineResolution;
 use super::catalog_weapon_projectile_ammo::WeaponProjectileAmmoSelection;
 use super::weapon_combat_base::WeaponCombatBase;
 
+#[path = "ship_base_facts.rs"]
+pub(crate) mod ship_base_facts;
+
 #[path = "weapon_reload.rs"]
 pub(crate) mod weapon_reload;
 
@@ -31,6 +34,7 @@ pub(crate) enum JumpConnection {}
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct CatalogProjections<'source> {
+    pub(crate) ship_base_facts: CatalogTable<ship_base_facts::ShipBaseFacts>,
     pub(crate) contracts: CatalogTable<ContractEntry<'source>>,
     pub(crate) mission_titles: CatalogTable<MissionTitles<'source>>,
     pub(crate) blueprint_presentation: CatalogTable<

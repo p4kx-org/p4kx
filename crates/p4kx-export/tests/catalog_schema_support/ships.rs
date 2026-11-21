@@ -32,8 +32,6 @@ pub(super) fn rows() -> Value {
         "mass": present(json!(1210.0)),
         "massBasis": present(json!("parts")),
         "hullHealth": present(json!(600.0)),
-        "cargoScu": 18.5,
-        "cargoGridsWithIssue": 0,
         "playability": present(json!("ai")),
         "variantOf": "a0000000-0000-4000-8000-000000000001",
         "insurance": present(json!({
@@ -52,6 +50,19 @@ pub(super) fn rows() -> Value {
             "crewManifestComponentOrdinal": absent(), "crewManifest": absent()
         }
     }])
+}
+
+pub(super) fn base_facts() -> Value {
+    json!({"availability": "available", "rows": [{
+        "shipGuid": present(json!("90000000-0000-4000-8000-000000000001")),
+        "shipRecordIndex": present(json!(2)),
+        "cargo": {
+            "scu": present(json!(18.5)),
+            "gridsWithIssue": present(json!(0)),
+            "unresolvedLoadout": false,
+            "mounts": []
+        }
+    }]})
 }
 
 fn single(value: f32) -> Value {

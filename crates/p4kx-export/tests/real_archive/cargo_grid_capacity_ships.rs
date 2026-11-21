@@ -169,7 +169,7 @@ pub(super) fn compare(
 ) -> TestResult<Counts> {
     let mut counts = Counts::default();
     for ship in ships {
-        compare_total(&catalog.ships, ship)?;
+        compare_total(catalog, ship)?;
         let placements = &catalog.placements.facility_instances.rows;
         let actual = published_ports(placements, ship, grids)?;
         if actual != ship.ports {
@@ -185,21 +185,33 @@ pub(super) fn compare(
     Ok(counts)
 }
 
-fn compare_total(rows: &[Value], ship: &Ship) -> TestResult {
-    let mut found = rows
+fn compare_total(catalog: &WireCatalog, ship: &Ship) -> TestResult {
+    let mut found = catalog
+        .ships
         .iter()
         .filter(|row| index(row, "/recordIndex/value") == Some(u64::from(ship.record)));
     let row = found
         .next()
         .ok_or("the nominated physical Ship must be present")?;
-    let cargo = row.get("cargoScu").ok_or("legacy cargoScu field")?;
+    let mut facts = catalog
+        .projections
+        .ship_base_facts
+        .rows
+        .iter()
+        .filter(|fact| index(fact, "/shipRecordIndex/value") == Some(u64::from(ship.record)));
+    let projection = facts.next().ok_or("canonical physical Ship base facts")?;
+    let cargo = projection
+        .pointer("/cargo/scu/value")
+        .ok_or("projected SCU value")?;
     if found.next().is_some()
+        || facts.next().is_some()
+        || projection["shipGuid"] != row["guid"]
         || catalog_v3_consumer::present(&row["recordIndex"])?.as_u64()
             != Some(u64::from(ship.record))
         || catalog_v3_consumer::present(&row["recordPath"])?.as_str() != Some(ship.path.as_str())
         || !(cargo.is_null() || cargo.is_number())
         || !same_scu(cargo.as_f64(), ship.total.scu)
-        || index(row, "/cargoGridsWithIssue") != Some(ship.total.issues)
+        || index(projection, "/cargo/gridsWithIssue/value") != Some(ship.total.issues)
     {
         return Err(
             "the legacy cargo sum and unresolved grid count differ from original Loadout operands"

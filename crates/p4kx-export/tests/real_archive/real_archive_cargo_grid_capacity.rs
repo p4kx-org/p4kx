@@ -107,8 +107,15 @@ struct WireCatalog {
     schema_version: u32,
     source: Value,
     configurations: WireConfigurations,
+    projections: WireProjections,
     placements: WirePlacements,
     ships: Vec<Value>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WireProjections {
+    ship_base_facts: WireTable,
 }
 
 #[derive(Deserialize)]

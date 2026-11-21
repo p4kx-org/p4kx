@@ -56,6 +56,7 @@ fn same_guid_ship_records_keep_their_physical_authored_values() -> TestResult {
     for ((row, record), case) in rows.iter().zip(&records).zip(&fixture::CASES) {
         check_ship(&catalog, row, record, case)?;
     }
+    check_cargo_projection(&catalog, rows)?;
     assert_ne!(rows[0]["crewSize"]["value"], rows[1]["crewSize"]["value"]);
     assert_ne!(rows[0]["insurance"]["value"], rows[1]["insurance"]["value"]);
     assert_ne!(
@@ -63,6 +64,29 @@ fn same_guid_ship_records_keep_their_physical_authored_values() -> TestResult {
         rows[1]["vehicleDefinition"]["value"]
     );
     proof::closure(&catalog)
+}
+
+fn check_cargo_projection(catalog: &Value, ships: &[Value]) -> TestResult {
+    let facts = proof::rows(catalog, "/projections/shipBaseFacts/rows")?;
+    assert_eq!(facts.len(), ships.len(), "one projection per physical Ship");
+    for (fact, ship) in facts.iter().zip(ships) {
+        assert_eq!(
+            fact.get("shipRecordIndex")
+                .ok_or("projection Record index")?,
+            ship.get("recordIndex").ok_or("Ship Record index")?,
+            "the projection uses the same sourced physical Record identity"
+        );
+        assert_eq!(
+            fact.get("shipGuid").ok_or("projection Ship GUID")?,
+            ship.get("guid").ok_or("Ship GUID")?,
+            "the projection retains the same sourced nominal identity"
+        );
+        assert!(
+            ship.get("cargoScu").is_none(),
+            "v3 keeps a single cargo projection"
+        );
+    }
+    Ok(())
 }
 
 fn check_ship(catalog: &Value, row: &Value, record: &Record<'_>, case: &Case) -> TestResult {

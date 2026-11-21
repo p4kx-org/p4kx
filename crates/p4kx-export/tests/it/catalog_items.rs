@@ -311,8 +311,9 @@ fn a_ship_carries_crew_and_vehicle_definition() -> TestResult {
         crate::health_origin_assertions::cell(ship, field, "unreadable")?;
     }
     assert_eq!(ship["vehicleKind"]["value"], "spaceship");
-    assert_eq!(ship["cargoScu"], 0.0);
-    assert_eq!(ship["cargoGridsWithIssue"], 0);
+    let cargo = &catalog["projections"]["shipBaseFacts"]["rows"][0]["cargo"];
+    assert_eq!(cargo["scu"]["value"], 0.0);
+    assert_eq!(cargo["gridsWithIssue"]["value"], 0);
     Ok(())
 }
 

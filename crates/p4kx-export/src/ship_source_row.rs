@@ -4,6 +4,7 @@
 use p4kx_extraction::SourcedValue;
 
 use crate::canonical_record_header::CanonicalRecordHeader;
+use crate::catalog_projections::ship_base_facts::ShipBaseFacts;
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
 use crate::catalog_v3::authored_fields::ship_presentation::{
     ShipAttachmentManufacturer, ShipVehicleManufacturer,
@@ -12,6 +13,7 @@ use crate::catalog_v3::authored_fields::ship_source_read::{ShipPlayabilityInputs
 use crate::contract_insurance::ShipInsurance;
 use crate::loadout::ledger::ShipAggregateValues;
 use crate::resource_number::ResourceNumber;
+use crate::ship_base::ShipCargoSource;
 use crate::{MassBasis, Playability, VehicleKind};
 
 /// Canonical source-backed fields of one physical Ship, including resolved mass and hull.
@@ -31,6 +33,7 @@ pub struct ShipSource<'source> {
     pub(crate) mass: SourcedValue<f64>,
     pub(crate) mass_basis: SourcedValue<MassBasis>,
     pub(crate) hull_health: SourcedValue<f64>,
+    pub(crate) base_facts: ShipBaseFacts,
     pub(crate) insurance: SourcedValue<Box<ShipInsurance<'source>>>,
     pub(crate) playability_inputs: ShipPlayabilityInputs<'source>,
     pub(crate) playability: SourcedValue<Playability>,
@@ -43,6 +46,7 @@ impl<'source> ShipSource<'source> {
         playability: SourcedValue<Playability>,
     ) -> Self {
         let presentation = source.presentation;
+        let base_facts = ShipBaseFacts::new(&source.header, aggregates.cargo);
         Self {
             header: source.header,
             name: presentation.name,
@@ -58,6 +62,7 @@ impl<'source> ShipSource<'source> {
             mass: aggregates.mass,
             mass_basis: aggregates.mass_basis,
             hull_health: aggregates.hull_health,
+            base_facts,
             insurance: source.insurance,
             playability_inputs: source.playability_inputs,
             playability,
@@ -146,6 +151,18 @@ impl<'source> ShipSource<'source> {
     #[must_use]
     pub const fn hull_health(&self) -> &SourcedValue<f64> {
         &self.hull_health
+    }
+
+    /// Borrows the canonical cargo projection and its positive mount evidence.
+    #[must_use]
+    pub const fn cargo(&self) -> &ShipCargoSource {
+        self.base_facts.cargo()
+    }
+
+    /// Borrows the canonical Ship base facts projection and its sourced cargo operands.
+    #[must_use]
+    pub const fn base_facts(&self) -> &ShipBaseFacts {
+        &self.base_facts
     }
 
     /// Borrows the original insurance declaration and parameter states.

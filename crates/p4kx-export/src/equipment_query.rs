@@ -234,6 +234,7 @@ pub use weapon_recoil::{
     with_weapon_recoil_definitions_from,
 };
 
+pub use crate::catalog_projections::ship_base_facts::ShipBaseFacts;
 pub use crate::catalog_v3::authored_fields::authored_manufacturer::ManufacturerValue as ShipManufacturerValue;
 pub use crate::catalog_v3::authored_fields::ship_presentation::{
     ShipAttachmentManufacturer, ShipVehicleManufacturer,
@@ -241,6 +242,7 @@ pub use crate::catalog_v3::authored_fields::ship_presentation::{
 pub use crate::catalog_v3::authored_fields::ship_source_read::ShipPlayabilityInputs;
 pub use crate::contract_insurance::{ShipInsurance, ShipInsuranceParams};
 pub use crate::ship::ShipSource;
+pub use crate::ship_base::{ShipCargoMountSource, ShipCargoSource};
 pub use ship_sources::{
     ShipSourceDependencyCoverage, ShipSourceEntryFailure, ShipSourceFailureStage,
     ShipSourceSnapshot, with_ship_sources, with_ship_sources_from,

@@ -15,7 +15,10 @@ use super::super::{
 };
 use super::{Route, TestResult};
 
-pub(super) fn read() -> TestResult<[Route; 5]> {
+#[path = "sdk_ship_base_facts_route.rs"]
+mod base_facts;
+
+pub(super) fn read() -> TestResult<[Route; 6]> {
     const REMAINING: &str = "typed Item query and synthetic producer parity witnessed; complete installed producer parity open";
     const TUNING_REMAINING: &str = "typed tuning Record query and synthetic producer parity witnessed; complete installed producer parity open";
     let directory = tempfile::tempdir()?;
@@ -29,6 +32,7 @@ pub(super) fn read() -> TestResult<[Route; 5]> {
     let parsed = session.parsed(None)?;
     let selected = CatalogRecordSelection::All;
     Ok([
+        base_facts::read()?,
         parsed.with_shield_generators(selected, None, |snapshot| {
             Route::queried_rows(SHIELD_GENERATORS, snapshot.rows(), REMAINING)
         })??,

@@ -170,7 +170,7 @@ fn verify_original(archive: &Archive) -> TestResult {
 
 fn check_available_capacity(catalog: &Value, grid: &Value, encrypted: bool) -> TestResult {
     assert_eq!(
-        proof::at(catalog, "/ships/0/cargoScu")?,
+        proof::at(catalog, "/projections/shipBaseFacts/rows/0/cargo/scu/value")?,
         GRID_SCU * 2.0,
         "legacy ShipBase capacity includes both placements with the original grid flags"
     );

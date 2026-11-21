@@ -32,7 +32,7 @@ The concrete unit controls the shape of its present value.
 
 The numeric amount retains its original scale and sign. A stored zero remains
 present. Absent declarations, null pointers and unreadable fields have their
-own states. Ship inventory `cargoScu` and quantum-drive fuel requirements
+own states. Ship inventory `projections.shipBaseFacts.rows[].cargo.scu` and quantum-drive fuel requirements
 keep their existing domain and source.
 
 ## Loadout instances

@@ -81,13 +81,6 @@ pub(crate) struct Ship<'a> {
     pub(crate) mass_basis: SourcedValue<MassBasis>,
     /// The sum of positive structural part `damageMax` values, rounded to four decimals.
     pub(crate) hull_health: SourcedValue<f64>,
-    /// The cargo capacity in standard cargo units (SCU) of the cargo grids the default Loadout
-    /// reaches, rounded to four decimals: 0 for a ship without a cargo grid, `null` when it has
-    /// grids and none can be read. With `cargoGridsWithIssue` above 0 the value is a lower bound.
-    pub(crate) cargo_scu: Option<f64>,
-    /// How many cargo grids of the default Loadout have no readable capacity, e.g. because their
-    /// container Record does not exist.
-    pub(crate) cargo_grids_with_issue: usize,
     /// The sourced classification selected by the original Ship rules.
     #[schemars(with = "SourcedValue<String>")]
     pub(crate) playability: SourcedValue<Playability>,

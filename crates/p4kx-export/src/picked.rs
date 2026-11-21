@@ -4,6 +4,7 @@
 use p4kx_extraction::{Guid, RecordTree};
 
 use crate::blueprint_category::BlueprintCategory;
+use crate::catalog_projections::ship_base_facts::ShipBaseFacts;
 use crate::catalog_read_failure::CatalogReadFailure;
 use crate::catalog_v3::ammo_definition::PreparedAmmoDefinition;
 use crate::catalog_v3::blueprint_category_list::PreparedBlueprintCategoryList;
@@ -55,7 +56,7 @@ pub(crate) enum Picked<'f> {
     /// An item and the configurations read from its original Record.
     Item(Box<PickedItem<'f>>),
     /// A ship and the vehicle facts its paints are derived from.
-    Ship(Box<Ship<'f>>, VehicleFacts),
+    Ship(Box<Ship<'f>>, VehicleFacts, Box<ShipBaseFacts>),
     /// A commodity.
     Commodity(Box<Commodity<'f>>),
     /// A resource group.
@@ -246,12 +247,12 @@ impl<'f> Picked<'f> {
     /// could not be read: a ship is never left out without a trace.
     pub(crate) fn of_ship(
         read: Result<ShipRead, CatalogReadFailure<'f>>,
-        build: impl FnOnce(&ShipRead) -> Result<(Ship<'f>, VehicleFacts), CatalogError>,
+        build: impl FnOnce(&ShipRead) -> Result<(Ship<'f>, VehicleFacts, ShipBaseFacts), CatalogError>,
     ) -> Result<Self, CatalogError> {
         Ok(match read {
             Ok(read) => {
-                let (ship, vehicle) = build(&read)?;
-                Self::Ship(Box::new(ship), vehicle)
+                let (ship, vehicle, facts) = build(&read)?;
+                Self::Ship(Box::new(ship), vehicle, Box::new(facts))
             }
             Err(failure) => Self::Failed(failure),
         })

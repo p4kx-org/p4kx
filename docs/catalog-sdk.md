@@ -1434,9 +1434,24 @@ persistent state only after the outer operation succeeds and the required covera
 The sourced `playability()` getter retains the canonical classification and the original
 rule inputs, including linked crew or tag results and their physical Record lookup. A computed
 classification can carry incomplete source coverage. A failed linked Record read that blocks
-the decision yields `unreadable`. Use a Catalog snapshot for cargo projections, derived vehicle
-kind and variant choices. See [the Ship contract](catalog.md#ship-dcb-source-fields) and
+the decision yields `unreadable`. Use a Catalog snapshot for variant choices. See
+[the Ship contract](catalog.md#ship-dcb-source-fields) and
 [ADR-0410](adr/0410-equipment-sdk-shares-original-family-readers-and-canonical-variant-choices.md).
+
+`ShipSource::base_facts()` returns the canonical typed row published in
+`projections.shipBaseFacts`. It carries the physical Ship Record index, GUID and cargo
+facts with their sources in the query snapshot's source inventory. The `cargo()` getter
+returns the same row's SCU total, issue count and mount evidence.
+Each reached mount keeps its resolved port path, selected physical grid Record, original
+storage reference, first physical inventory Record and capacity inputs. Separate mounts of
+the same grid contribute separately. With known capacity on only some reached mounts, the
+reported sum is a lower bound. If no reached mount has readable capacity, the sum is
+unreadable. A Loadout without reached cargo grids retains the canonical zero. Check
+`has_unresolved_loadout()` for unresolved or undecided branches that can leave other grids
+unaccounted for. A physical mount's `position()` keeps the original Loadout Record index
+and nested port ordinals. The aggregate origin lists observed contributors and has incomplete
+coverage of exclusion decisions. This state is independent of the result's owner and
+dependency coverage and the marker can still be true when a known contributor is encrypted.
 
 The Catalog's `mass`, `massBasis` and `hullHealth` are immediate sourced aggregate cells.
 Their input sets bind the current physical Record to the original Vehicle XML, the selected

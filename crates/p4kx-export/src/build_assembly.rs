@@ -14,7 +14,7 @@ use crate::build_derived::{
 use crate::catalog_definitions::CatalogDefinitions;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
-use crate::catalog_projections::CatalogProjections;
+use crate::catalog_projections::{CatalogProjections, ship_base_facts};
 use crate::catalog_read::original::EntryCapture;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::catalog_independent_configurations;
@@ -136,13 +136,8 @@ pub(super) fn assemble<R>(
     drop(collected.failures);
     let key_use = ArchiveKeyUse::of(archive);
     let store_slugs = StoreSlugs::embedded()?;
-    let resolved = store_slugs.resolve(
-        collected
-            .ships
-            .iter()
-            .map(|ship| (ship.identity.guid.0, ship.identity.class_name)),
-        options.filter.is_some(),
-    );
+    let resolved =
+        parts::ship_store_slugs(&store_slugs, &collected.ships, options.filter.is_some());
     let commodity_tables = crate::commodity::tables(&forge, collected.commodities);
     let group_tables = crate::catalog_v3::resource_group_catalog::tables(
         &forge,
@@ -281,6 +276,7 @@ pub(super) fn assemble<R>(
             starmap: collected.starmap_definitions.into_tables(&forge),
         },
         projections: CatalogProjections {
+            ship_base_facts: ship_base_facts::table(&forge, collected.ship_base_facts),
             crafter_hosts,
             contracts: CatalogTable::new(&forge, &["ContractGenerator"], collected.contracts),
             mission_titles: CatalogTable::new(

@@ -89,6 +89,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) item_health: StagedCatalogTable,
     pub(crate) entity_configurations: EntityConfigurationRows<'f>,
     pub(crate) ships: Vec<Ship<'f>>,
+    pub(crate) ship_base_facts: Vec<crate::catalog_projections::ship_base_facts::ShipBaseFacts>,
     pub(crate) commodities: Vec<Commodity<'f>>,
     pub(crate) blueprints: Vec<BlueprintRow<'f>>,
     pub(crate) missing_blueprint_categories: HashSet<Guid>,
@@ -183,6 +184,7 @@ impl<'f> Collected<'f> {
             item_health: StagedCatalogTable::empty(DatasetAvailability::Absent),
             entity_configurations: EntityConfigurationRows::default(),
             ships: Vec::new(),
+            ship_base_facts: Vec::new(),
             commodities: Vec::new(),
             blueprints: crafting.blueprints,
             missing_blueprint_categories: HashSet::new(),
@@ -289,12 +291,13 @@ impl<'f> Collected<'f> {
                 self.items.push(entity);
                 self.item_components.extend(components);
             }
-            Picked::Ship(entity, vehicle) => {
+            Picked::Ship(entity, vehicle, facts) => {
                 self.playability
                     .ships
                     .count(entity.playability.value().copied());
                 self.ships.push(*entity);
                 self.vehicles.push(vehicle);
+                self.ship_base_facts.push(*facts);
             }
             Picked::Commodity(entity) => self.commodities.push(*entity),
             Picked::ResourceGroup(entity) => self.resource_groups.push(*entity),

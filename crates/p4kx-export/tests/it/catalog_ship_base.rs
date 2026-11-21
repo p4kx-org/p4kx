@@ -75,6 +75,36 @@ fn ships(built: &Built) -> Result<&Vec<Value>, Box<dyn Error>> {
         .ok_or_else(|| "the catalog has no ships".into())
 }
 
+fn cargo<'catalog>(
+    built: &'catalog Built,
+    ship: &Value,
+) -> Result<&'catalog Value, Box<dyn Error>> {
+    let index = ship
+        .pointer("/recordIndex/value")
+        .and_then(Value::as_u64)
+        .ok_or("physical Ship Record index")?;
+    let rows = built
+        .catalog
+        .pointer("/projections/shipBaseFacts/rows")
+        .and_then(Value::as_array)
+        .ok_or("canonical Ship base facts")?;
+    let mut matched = rows.iter().filter(|row| {
+        row.pointer("/shipRecordIndex/value")
+            .and_then(Value::as_u64)
+            == Some(index)
+    });
+    let row = matched.next().ok_or("physical Ship base facts")?;
+    assert!(
+        matched.next().is_none(),
+        "one result for each physical Ship"
+    );
+    assert_eq!(
+        row["shipGuid"], ship["guid"],
+        "the same original GUID and source"
+    );
+    row.get("cargo").ok_or_else(|| "canonical cargo".into())
+}
+
 fn ship(built: &Built, value: u128) -> Result<&Value, Box<dyn Error>> {
     let wanted = guid(value);
     ships(built)?
@@ -91,10 +121,11 @@ fn mass_hull_cargo_size_and_kind_come_from_the_ship_base_data() -> TestResult {
     assert_eq!(alpha["massBasis"]["value"], "parts");
     assert_eq!(alpha["hullHealth"]["value"], 600.0);
     assert_eq!(
-        alpha["cargoScu"], 18.5,
+        cargo(&built, alpha)?["scu"]["value"],
+        18.5,
         "the docked snub craft's grid is not counted"
     );
-    assert_eq!(alpha["cargoGridsWithIssue"], 0);
+    assert_eq!(cargo(&built, alpha)?["gridsWithIssue"]["value"], 0);
     assert_eq!(alpha["size"]["state"], "present");
     assert_eq!(
         alpha["size"]["value"],
@@ -134,8 +165,12 @@ fn every_catalog_ship_equals_its_ship_base_data() -> TestResult {
             None => Value::Null,
         };
         assert_eq!(entry["massBasis"]["value"], basis, "{}", base.class_name);
-        assert_eq!(entry["cargoScu"], json(base.cargo.scu));
-        assert_eq!(entry["cargoGridsWithIssue"], base.cargo.grids_with_issue);
+        let cargo = cargo(&built, entry)?;
+        assert_eq!(cargo["scu"]["value"], json(base.cargo.scu));
+        assert_eq!(
+            cargo["gridsWithIssue"]["value"],
+            base.cargo.grids_with_issue
+        );
         let size = &entry["size"];
         if let Some(expected) = &base.size {
             assert_eq!(size["state"], "present");
@@ -167,10 +202,10 @@ fn unavailable_aggregate_payloads_remain_null() -> TestResult {
     crate::health_origin_assertions::cell(broken, "size", "absent")?;
     let unknown = ship(&built, UNKNOWN)?;
     assert!(
-        unknown["cargoScu"].is_null(),
+        cargo(&built, unknown)?["scu"]["value"].is_null(),
         "grids without a readable capacity: unknown, not 0"
     );
-    assert_eq!(unknown["cargoGridsWithIssue"], 2);
+    assert_eq!(cargo(&built, unknown)?["gridsWithIssue"]["value"], 2);
     assert!(unknown["hullHealth"]["value"].is_null());
     assert!(unknown["mass"]["value"].is_number());
     Ok(())
@@ -199,8 +234,8 @@ fn a_part_value_too_large_to_round_is_unknown_and_never_null_with_a_basis() -> T
 fn a_lower_bound_is_flagged_by_the_grids_with_an_issue() -> TestResult {
     let built = build()?;
     let mixed = ship(&built, MIXED)?;
-    assert_eq!(mixed["cargoScu"], 16.0);
-    assert_eq!(mixed["cargoGridsWithIssue"], 2);
+    assert_eq!(cargo(&built, mixed)?["scu"]["value"], 16.0);
+    assert_eq!(cargo(&built, mixed)?["gridsWithIssue"]["value"], 2);
     Ok(())
 }
 
@@ -208,7 +243,7 @@ fn a_lower_bound_is_flagged_by_the_grids_with_an_issue() -> TestResult {
 fn a_ship_without_cargo_grids_has_zero_scu() -> TestResult {
     let built = build()?;
     let ground = ship(&built, GROUND)?;
-    assert_eq!(ground["cargoScu"], 0.0);
+    assert_eq!(cargo(&built, ground)?["scu"]["value"], 0.0);
     assert_eq!(ground["mass"]["value"], 5400.0);
     assert_eq!(ground["massBasis"]["value"], "physics");
     assert!(ground["hullHealth"]["value"].is_null());

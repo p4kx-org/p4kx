@@ -178,8 +178,11 @@ observed file operation.
 The selective Ship source query and canonical scan share one source-read, ShipPool/Capture and
 conditional-Physics-diagnostic module. A common immutable ShipSource packet holds the exact
 original Header, presentation, manufacturer, crew, vehicle selector, size, insurance and
-crew-manifest cells, plus the three actually resolved aggregate cells. The canonical producer
-moves those same cells into its existing Ship fields without changing their meaning or shape.
+crew-manifest cells, resolved mass, mass basis and hull health, and the typed
+Ship base facts projection. It retains the canonical vehicle kind and playability.
+The producer moves the same fields into the Ship row and publishes the base facts
+in `projections.shipBaseFacts`. The [cargo decision](0416-ship-cargo-projection-retains-physical-mount-evidence.md)
+defines its physical mount joins and origin coverage.
 
 The query exposes free Archive/decoded-Entry, session and parsed-view interfaces. Physical
 selection admits the same canonical owners. GUID selection retains all physical aliases, and
@@ -195,8 +198,7 @@ marker, including known encrypted contributors beside unknown inputs.
 
 Cancellation and Archive-change checks surround selection, source capture and callback delivery.
 Publish consumer-owned state after successful completion of the outer query and acceptance of
-the required coverage. Use the full Catalog for canonical cargo, derived kind and playability,
-and unfiltered variant projections.
+the required coverage. Use the unfiltered Catalog for variant projections.
 
 ## Selective resolved Loadouts
 

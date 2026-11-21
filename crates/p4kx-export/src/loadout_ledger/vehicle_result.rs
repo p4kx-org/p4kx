@@ -9,7 +9,7 @@ use super::Capture;
 use super::vehicle_capture;
 use super::vehicle_stage::{Contributions, PendingVehicle};
 use crate::catalog_read::original::{EntryCapture, RecordSubjectKey, VehicleFileSelection};
-use crate::ship_base::{ShipRead, VehicleKindPath};
+use crate::ship_base::{ShipCargoObservation, ShipCargoSource, ShipRead, VehicleKindPath};
 use crate::{CatalogError, ExportAccountingError, MassBasis, VehicleKind};
 
 /// The actual `ShipReader` aggregates and their immediate source sets.
@@ -18,6 +18,7 @@ pub(crate) struct ShipAggregateValues {
     pub(crate) mass: SourcedValue<f64>,
     pub(crate) mass_basis: SourcedValue<MassBasis>,
     pub(crate) hull_health: SourcedValue<f64>,
+    pub(crate) cargo: ShipCargoSource,
     pub(crate) physics_used: bool,
 }
 
@@ -28,6 +29,7 @@ impl Capture<'_> {
         record: &Record<'_>,
         read: Option<&ShipRead>,
         physics_used: bool,
+        cargo: ShipCargoObservation<'_, '_>,
     ) -> Result<Option<ShipAggregateValues>, CatalogError> {
         self.check_record(record)?;
         let input = self
@@ -64,6 +66,7 @@ impl Capture<'_> {
             &EntryCapture::for_input(input),
             archive,
             physics_used,
+            cargo.finish(&read.base.cargo)?,
         )?))
     }
 }
@@ -74,6 +77,7 @@ fn bind_values(
     capture: &EntryCapture<'_>,
     archive: &Archive,
     physics_used: bool,
+    cargo: ShipCargoSource,
 ) -> Result<ShipAggregateValues, CatalogError> {
     let uses = capture.source_uses();
     let selected_inputs = vehicle_inputs(pending, capture, archive)?;
@@ -113,6 +117,7 @@ fn bind_values(
         mass,
         mass_basis,
         hull_health,
+        cargo,
         physics_used,
     })
 }

@@ -29,6 +29,8 @@ use crate::build::source;
 use crate::guid_text::CatalogGuid;
 use crate::{CatalogFailure, CatalogPhase, CatalogProgress};
 
+pub(crate) use cargo::Observation as ShipCargoObservation;
+pub use cargo::{ShipCargoMountSource, ShipCargoSource};
 pub(crate) use model::ShipRead;
 pub use model::{
     Cargo, CargoGrid, Hull, HullThreshold, Implementation, LoadoutPort, Mass, MassBasis,

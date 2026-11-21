@@ -34,7 +34,10 @@ fn cargo_grid_closed_container_uses_its_authored_unit() -> TestResult {
                 "{authored:?} provides a valid nonnegative closed capacity"
             );
             assert_eq!(
-                proof::at(&catalog, "/ships/0/cargoScu")?,
+                proof::at(
+                    &catalog,
+                    "/projections/shipBaseFacts/rows/0/cargo/scu/value"
+                )?,
                 &json!(expected * 2.0),
                 "the same closed grid contributes once at each original port"
             );

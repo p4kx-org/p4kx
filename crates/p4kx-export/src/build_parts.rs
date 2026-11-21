@@ -20,6 +20,7 @@ use crate::catalog_v3::subsumption_event;
 use crate::client_profile_settings::{self, ClientProfileSettings};
 use crate::collected::Collected;
 use crate::options::{CatalogRun, CatalogStage};
+use crate::ship_store_slugs::{Resolved, StoreSlugs};
 use crate::starmap_report::StarmapReport;
 use crate::{
     CatalogProvenance, CatalogSummary, CraftingWarning, LoadoutSummary, PaintSummary, ShopSummary,
@@ -73,6 +74,19 @@ impl Parts {
             compressed_size: written.compressed,
         }
     }
+}
+
+pub(super) fn ship_store_slugs<'mapping>(
+    mapping: &'mapping StoreSlugs,
+    ships: &[crate::contract_entities::Ship<'_>],
+    filtered: bool,
+) -> Resolved<'mapping> {
+    mapping.resolve(
+        ships
+            .iter()
+            .map(|ship| (ship.identity.guid.0, ship.identity.class_name)),
+        filtered,
+    )
 }
 
 pub(super) fn blueprint_tables(

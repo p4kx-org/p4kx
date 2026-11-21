@@ -90,7 +90,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 |---|---|---|
 | manufacturers | D.manufacturers | Sourced raw header/code and owned Localization states; canonical public Name/protected Description; physical target-row joins |
 | items | D.items; C.itemAttachmentConstraints | Shared original header and physical component positions; source grade, manufacturer, mass and texts. Join authored classification and tags by owner and slot. [Item definitions](catalog-item-definitions.md) |
-| ships | D.ships; V.shipBaseFacts | Entity identity, playability, role, career, mass, hull, cargo, size and crew. The earlier vehicle `manufacturerGuid` comes from `vehicleManufacturer.manufacturer.value.guid.value`. `attachmentManufacturer` carries the separate AttachDef declaration. |
+| ships | `ships`; `projections.shipBaseFacts` | Entity identity, playability, role, career, mass, hull, size and crew remain on the Ship row. Sourced cargo totals and physical mounts use the [base facts projection](catalog.md#projected-cargo). The earlier vehicle `manufacturerGuid` comes from `vehicleManufacturer.manufacturer.value.guid.value`. `attachmentManufacturer` carries the separate AttachDef declaration. |
 | commodities | D.commodities; V.commodityPresentation | Entity vs resource fallback, GUID identity, existing first Resource/group/name/density meaning |
 | resourceTypes | D.resourceTypes | complete resource source fact owner |
 | resourceGroups | D.resourceGroups; A.resourceGroupMembers; V.resourceGroupParents | all direct ordered memberships, repeats/nulls/cycles; first-selected parent retains actual physical/slot provenance ([contract](catalog-resource-groups.md)) |

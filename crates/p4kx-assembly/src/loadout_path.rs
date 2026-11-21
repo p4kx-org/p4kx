@@ -168,48 +168,10 @@ impl fmt::Display for LoadoutPath {
     }
 }
 
-/// Receives actual Record path getters while their original tree remains borrowed.
-pub trait LoadoutPathObserver {
-    /// Captures the actual parent and accepted datum before its path text is copied.
-    fn record_path(
-        &self,
-        selection: &LoadoutSelection,
-        parent: &StructValue<'_>,
-        value: &Value<'_>,
-    ) -> ControlFlow<()>;
+#[path = "loadout_path_observer.rs"]
+mod observer;
 
-    /// Captures an accepted original Reference before its GUID is copied.
-    fn record_reference(
-        &self,
-        _selection: &LoadoutReferenceSelection,
-        _parent: &StructValue<'_>,
-        _value: &Value<'_>,
-    ) -> ControlFlow<()> {
-        ControlFlow::Continue(())
-    }
-
-    /// Captures an accepted original class name before its text is copied.
-    fn record_class(
-        &self,
-        _selection: &LoadoutClassSelection,
-        _parent: &StructValue<'_>,
-        _value: &Value<'_>,
-    ) -> ControlFlow<()> {
-        ControlFlow::Continue(())
-    }
-
-    /// Captures the resolved definition and its original struct during the same Record read.
-    fn record_port_definition(
-        &self,
-        _definition: &PortDefinition,
-        _original: &StructValue<'_>,
-    ) -> ControlFlow<()> {
-        ControlFlow::Continue(())
-    }
-
-    /// Captures the actual Record name before its vehicle class fallback is copied.
-    fn record_name(&self, selection: &LoadoutSelection, tree: &RecordTree<'_>) -> ControlFlow<()>;
-}
+pub use observer::LoadoutPathObserver;
 
 pub(crate) const XML_LOADOUT_PATH: &str = "loadoutPath";
 
@@ -362,6 +324,22 @@ impl<'scope> PathRead<'scope> {
             && let Some(observer) = self.observer
             && observer
                 .record_port_definition(definition, original)
+                .is_break()
+        {
+            self.stop();
+        }
+    }
+
+    pub(crate) fn inventory_container(
+        &self,
+        component: Option<&StructValue<'_>>,
+        value: Option<&Value<'_>>,
+        guid: Option<p4kx_dataforge::Guid>,
+    ) {
+        if !self.stopped()
+            && let Some(observer) = self.observer
+            && observer
+                .record_inventory_container(component, value, guid)
                 .is_break()
         {
             self.stop();

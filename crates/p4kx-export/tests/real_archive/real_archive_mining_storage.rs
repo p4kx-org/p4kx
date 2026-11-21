@@ -156,8 +156,15 @@ struct WireCatalog {
     schema_version: u32,
     source: Value,
     configurations: WireConfigurations,
+    projections: WireProjections,
     ships: Vec<Value>,
     loadouts: Vec<Value>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct WireProjections {
+    ship_base_facts: WireTable,
 }
 
 #[derive(Deserialize)]
@@ -330,15 +337,26 @@ fn compare_ship(
     let row = candidates
         .next()
         .ok_or("expected the nominated physical Ship")?;
-    let cargo = row.get("cargoScu").ok_or("legacy cargoScu field")?;
+    let mut facts = catalog
+        .projections
+        .ship_base_facts
+        .rows
+        .iter()
+        .filter(|fact| index(fact, "/shipRecordIndex/value") == Some(u64::from(ship.index())));
+    let projection = facts.next().ok_or("canonical physical Ship base facts")?;
+    let cargo = projection
+        .pointer("/cargo/scu/value")
+        .ok_or("projected SCU value")?;
     let expected = legacy_total(forge, node);
     if candidates.next().is_some()
+        || facts.next().is_some()
+        || projection["shipGuid"] != row["guid"]
         || present(&row["recordIndex"])?.as_u64() != Some(u64::from(ship.index()))
         || present(&row["guid"])?.as_str() != Some(guid.as_str())
         || present(&row["recordPath"])?.as_str() != Some(path)
         || !(cargo.is_null() || cargo.is_number())
         || !same_scu(cargo.as_f64(), expected.scu)
-        || index(row, "/cargoGridsWithIssue") != Some(expected.issues)
+        || index(projection, "/cargo/gridsWithIssue/value") != Some(expected.issues)
     {
         return Err("legacy ship cargo differs from the actual InventoryContainer operands".into());
     }

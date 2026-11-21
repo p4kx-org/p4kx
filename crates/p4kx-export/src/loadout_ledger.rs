@@ -3,6 +3,8 @@
 
 #[path = "loadout_ledger/alignment.rs"]
 mod alignment;
+#[path = "loadout_ledger/cargo_storage.rs"]
+mod cargo_storage;
 #[path = "loadout_ledger/file_dependencies.rs"]
 mod file_dependencies;
 #[path = "loadout_ledger/file_proofs.rs"]
@@ -58,6 +60,8 @@ struct State {
     ledger: ExportLedger,
     inspections: BTreeMap<u32, FieldInspection>,
     files: FileProofs,
+    cargo_storage_origins:
+        BTreeMap<u32, p4kx_extraction::SourcedValue<crate::guid_text::CatalogGuid>>,
     paths: path_proofs::PathProofs,
     port_attributes: port_attributes::RecordPortAttributes,
     references: reference_proofs::ReferenceProofs,
@@ -76,6 +80,7 @@ impl State {
             ledger: ExportLedger::default(),
             inspections: BTreeMap::new(),
             files: FileProofs::default(),
+            cargo_storage_origins: BTreeMap::new(),
             paths: path_proofs::PathProofs::default(),
             port_attributes: port_attributes::RecordPortAttributes::default(),
             references: reference_proofs::ReferenceProofs::default(),
@@ -192,7 +197,7 @@ impl<'f> Capture<'f> {
         crate::export_evidence_lock::lock(&self.state)
     }
 
-    pub(super) fn record_error(&self, error: CatalogError) {
+    pub(crate) fn record_error(&self, error: CatalogError) {
         if let Ok(mut state) = self.lock() {
             state.error.get_or_insert(error);
         }
@@ -201,6 +206,15 @@ impl<'f> Capture<'f> {
     fn fail(&self, error: CatalogError) -> ControlFlow<()> {
         self.record_error(error);
         ControlFlow::Break(())
+    }
+
+    pub(crate) fn cargo_context(
+        &self,
+    ) -> Result<(&OriginalCatalogInput<'_, '_>, Option<&CancelToken>), CatalogError> {
+        let input = self
+            .input
+            .ok_or(ExportAccountingError::UnboundHealthSubject)?;
+        Ok((input, self.cancel.as_ref()))
     }
 
     fn stopped(&self) -> bool {

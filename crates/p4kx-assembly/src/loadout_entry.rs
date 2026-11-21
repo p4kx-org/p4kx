@@ -10,13 +10,40 @@ use crate::{Attachment, EntityNode, PortNode, Target};
 pub struct LoadoutEntry<'n> {
     pub(crate) path: String,
     pub(crate) port: &'n PortNode,
+    pub(crate) port_ordinals: Option<Box<[usize]>>,
 }
 
 impl<'n> LoadoutEntry<'n> {
+    pub(crate) fn collect(ports: &'n [PortNode], positions: bool) -> Vec<Self> {
+        use std::convert::Infallible;
+        let mut entries = Vec::new();
+        match crate::tree_walk::try_visit_indexed(ports, |path, route, ordinals| {
+            if let Some(&port) = route.last()
+                && !matches!(port.attachment, Attachment::Empty)
+            {
+                entries.push(Self {
+                    path: path.to_owned(),
+                    port,
+                    port_ordinals: positions.then(|| ordinals.into()),
+                });
+            }
+            Ok::<_, Infallible>(())
+        }) {
+            Ok(()) => entries,
+            Err(never) => match never {},
+        }
+    }
+
     /// Returns the path of port names joined by `/`.
     #[must_use]
     pub fn path(&self) -> &str {
         &self.path
+    }
+
+    /// Borrows the physical route through sibling port arrays when requested.
+    #[must_use]
+    pub fn port_ordinals(&self) -> Option<&[usize]> {
+        self.port_ordinals.as_deref()
     }
 
     /// Returns the port.

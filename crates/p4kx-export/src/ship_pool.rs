@@ -6,7 +6,7 @@ use std::sync::{Arc, Mutex, PoisonError};
 use p4kx_assembly::{ArchiveFiles, Entities};
 use p4kx_extraction::{Record, RecordTree};
 
-use crate::ship_base::{ShipRead, ShipReader};
+use crate::ship_base::{ShipCargoObservation, ShipRead, ShipReader};
 use crate::{CatalogFailure, CatalogReadFailure};
 
 #[cfg(test)]
@@ -96,6 +96,7 @@ impl<'f> ShipPool<'f> {
         observed.capture.seed_proofs(sources)?;
         observed.capture.begin_vehicle(record, operands)?;
         let mut physics_used = false;
+        let mut cargo = ShipCargoObservation::new(&observed.capture);
         let read = observed.reader.read_with_digest_using(
             record,
             tree,
@@ -104,12 +105,14 @@ impl<'f> ShipPool<'f> {
                 physics_used = true;
                 operands.physics.value().copied()
             },
+            Some(&mut cargo),
         );
         let aggregates = observed.capture.finish_vehicle(
             self.files.archive(),
             record,
             read.as_ref().ok(),
             physics_used,
+            cargo,
         )?;
         let ledger = observed.capture.finish()?;
         crate::export_evidence_lock::lock(&self.observed)?.push(observed);

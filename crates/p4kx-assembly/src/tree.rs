@@ -231,11 +231,13 @@ impl EntityNode {
     /// first in port order. Ports that hold nothing are left out; [`Self::walk`] lists them.
     #[must_use]
     pub fn loadout(&self) -> Vec<LoadoutEntry<'_>> {
-        self.walk()
-            .into_iter()
-            .filter(|(_, port)| !matches!(port.attachment, Attachment::Empty))
-            .map(|(path, port)| LoadoutEntry { path, port })
-            .collect()
+        LoadoutEntry::collect(self.ports(), false)
+    }
+
+    /// Returns default Loadout entries with their physical nested port positions.
+    #[must_use]
+    pub fn loadout_with_port_positions(&self) -> Vec<LoadoutEntry<'_>> {
+        LoadoutEntry::collect(self.ports(), true)
     }
 
     /// Returns every port in the tree that cannot be resolved, with its path of port names

@@ -167,6 +167,7 @@ impl EntitySpec {
             vehicle.appearance_only = variants.appearance_only;
         }
         let classification = ItemClassification::read(tree, attachable);
+        let container = inventory_container(&components, paths, classification.item_type_text());
         Self {
             attach_tags: tag_words(attach_tags),
             requires_attachment_tags: definition
@@ -177,7 +178,7 @@ impl EntitySpec {
             size: definition.and_then(|definition| unsigned(definition, "Size")),
             docked_vehicle: is_docked_vehicle_type(classification.item_type_text()),
             classification,
-            container: inventory_container(&components),
+            container,
             object_containers: crate::object_containers::read(tree, component_slots(tree)).into(),
             zones: read_zones(&components),
             animation_database: crate::creature_animation::database_of(
@@ -349,15 +350,24 @@ fn attachable_component<'v, 'f>(tree: &'v RecordTree<'f>) -> Option<(usize, &'v 
     component_slots(tree).find(|(_, component)| component.type_name() == ATTACHABLE)
 }
 
-fn inventory_container(components: &[&StructValue<'_>]) -> Option<Guid> {
-    components
+fn inventory_container(
+    components: &[&StructValue<'_>],
+    paths: &PathRead<'_>,
+    attach_type: &str,
+) -> Option<Guid> {
+    let component = components
         .iter()
-        .find(|component| component.type_name() == INVENTORY_CONTAINER)
-        .and_then(|component| component.field("containerParams"))
-        .and_then(|value| match target_spec::reference_target(value) {
-            TargetSpec::Reference(reference) => Some(reference.guid()),
-            _ => None,
-        })
+        .copied()
+        .find(|component| component.type_name() == INVENTORY_CONTAINER);
+    let value = component.and_then(|component| component.field("containerParams"));
+    let guid = value.and_then(|value| match target_spec::reference_target(value) {
+        TargetSpec::Reference(reference) => Some(reference.guid()),
+        _ => None,
+    });
+    if attach_type.eq_ignore_ascii_case("CargoGrid") {
+        paths.inventory_container(component, value, guid);
+    }
+    guid
 }
 
 /// Returns whether an `AttachDef.Type` marks a docked vehicle: it starts with `NOITEM_Vehicle`,

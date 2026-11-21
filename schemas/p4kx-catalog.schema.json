@@ -6190,6 +6190,9 @@
         "resourceGroupParents": {
           "$ref": "#/$defs/CatalogTableOfResourceGroupParent"
         },
+        "shipBaseFacts": {
+          "$ref": "#/$defs/CatalogTableOfShipBaseFacts"
+        },
         "tagPaths": {
           "$ref": "#/$defs/CatalogTableOfTagPath"
         },
@@ -6216,6 +6219,7 @@
         "missionTitles",
         "qualityQuantizationResources",
         "resourceGroupParents",
+        "shipBaseFacts",
         "tagPaths",
         "weaponCombatBases",
         "weaponMagazineResolutions",
@@ -9127,6 +9131,25 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/ShieldGenerator"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfShipBaseFacts": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/ShipBaseFacts"
           },
           "type": "array"
         }
@@ -46669,20 +46692,6 @@
           "$ref": "#/$defs/SourcedValueOfPublicNameRef",
           "description": "The career, from `vehicleCareer`, e.g. `@vehicle_focus_transporter`."
         },
-        "cargoGridsWithIssue": {
-          "description": "How many cargo grids of the default Loadout have no readable capacity, e.g. because their\ncontainer Record does not exist.",
-          "format": "uint",
-          "minimum": 0,
-          "type": "integer"
-        },
-        "cargoScu": {
-          "description": "The cargo capacity in standard cargo units (SCU) of the cargo grids the default Loadout\nreaches, rounded to four decimals: 0 for a ship without a cargo grid, `null` when it has\ngrids and none can be read. With `cargoGridsWithIssue` above 0 the value is a lower bound.",
-          "format": "double",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
         "className": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
@@ -46779,8 +46788,6 @@
       "required": [
         "attachmentManufacturer",
         "career",
-        "cargoGridsWithIssue",
-        "cargoScu",
         "className",
         "crewSize",
         "description",
@@ -46824,6 +46831,81 @@
         "attachDefPresent",
         "componentOrdinal",
         "manufacturer"
+      ],
+      "type": "object"
+    },
+    "ShipBaseFacts": {
+      "description": "Interpreted base facts for one physical Ship Record.",
+      "properties": {
+        "cargo": {
+          "$ref": "#/$defs/ShipCargoSource"
+        },
+        "shipGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "shipRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "cargo",
+        "shipGuid",
+        "shipRecordIndex"
+      ],
+      "type": "object"
+    },
+    "ShipCargoMountSource": {
+      "description": "A physical contributing attachment and its selected inventory capacity operands.",
+      "properties": {
+        "attachment": {
+          "$ref": "#/$defs/AttachmentIdentity"
+        },
+        "capacityScu": {
+          "$ref": "#/$defs/SourcedValueOfdouble"
+        },
+        "inventoryRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "position": {
+          "$ref": "#/$defs/SourcedValueOfLoadoutPosition"
+        },
+        "storage": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        }
+      },
+      "required": [
+        "attachment",
+        "capacityScu",
+        "inventoryRecordIndex",
+        "position",
+        "storage"
+      ],
+      "type": "object"
+    },
+    "ShipCargoSource": {
+      "description": "Cargo values and the actually reached mounts in the canonical Ship calculation.",
+      "properties": {
+        "gridsWithIssue": {
+          "$ref": "#/$defs/SourcedValueOfuint64"
+        },
+        "mounts": {
+          "items": {
+            "$ref": "#/$defs/ShipCargoMountSource"
+          },
+          "type": "array"
+        },
+        "scu": {
+          "$ref": "#/$defs/SourcedValueOfdouble"
+        },
+        "unresolvedLoadout": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "gridsWithIssue",
+        "mounts",
+        "scu",
+        "unresolvedLoadout"
       ],
       "type": "object"
     },

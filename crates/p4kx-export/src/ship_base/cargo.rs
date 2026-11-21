@@ -6,11 +6,22 @@ use std::collections::HashMap;
 use p4kx_assembly::{EntityNode, LoadoutEntry};
 use p4kx_extraction::{DataForge, DataForgeError, Guid, TreeBuilder};
 
+use crate::loadout::ledger::Capture;
+
 use super::model::{Cargo, CargoGrid, Source, SourceKind};
 use crate::catalog_v3::cargo_source::round_capacity;
 #[path = "cargo_container.rs"]
 mod cargo_container;
 use cargo_container::{ContainerInput, MeasuredCapacity};
+
+#[path = "cargo_capacity_origin.rs"]
+mod cargo_capacity_origin;
+#[path = "cargo_observed.rs"]
+mod cargo_observed;
+
+use cargo_capacity_origin::CapacitySource;
+pub(crate) use cargo_observed::Observation;
+pub use cargo_observed::{ShipCargoMountSource, ShipCargoSource};
 
 const GRID_TYPE: &str = "CargoGrid";
 const TEMPLATE_SUFFIX: &str = "_template";
@@ -23,20 +34,31 @@ const CELL_COUNT_LIMIT: f64 = (1_u128 << u64::BITS) as f64;
 struct Container<'source> {
     record_path: &'source str,
     capacity: MeasuredCapacity<'source>,
+    origin: Option<CapacitySource>,
 }
 
 enum ContainerReadError {
     Missing,
-    Unreadable(DataForgeError),
+    Unreadable {
+        error: DataForgeError,
+        origin: Option<CapacitySource>,
+    },
 }
 
 impl ContainerReadError {
+    const fn origin(&self) -> Option<&CapacitySource> {
+        match self {
+            Self::Missing => None,
+            Self::Unreadable { origin, .. } => origin.as_ref(),
+        }
+    }
+
     fn for_guid(&self, guid: Guid) -> String {
         match self {
             Self::Missing => format!(
                 "the inventory container {guid} does not exist: a dangling Reference in the game data"
             ),
-            Self::Unreadable(error) => {
+            Self::Unreadable { error, .. } => {
                 format!("cannot read the inventory container {guid}: {error}")
             }
         }
@@ -65,12 +87,30 @@ impl<'f> CargoReader<'f> {
         entries: &[LoadoutEntry<'_>],
         trees: &mut TreeBuilder<'f>,
     ) -> Cargo {
+        self.read_inner(entries, trees, None)
+    }
+
+    pub(crate) fn read_observed(
+        &mut self,
+        entries: &[LoadoutEntry<'_>],
+        trees: &mut TreeBuilder<'f>,
+        observation: &mut Observation<'_, 'f>,
+    ) -> Cargo {
+        self.read_inner(entries, trees, Some(observation))
+    }
+
+    fn read_inner(
+        &mut self,
+        entries: &[LoadoutEntry<'_>],
+        trees: &mut TreeBuilder<'f>,
+        mut observation: Option<&mut Observation<'_, 'f>>,
+    ) -> Cargo {
         let mut grids = Vec::new();
         for entry in entries {
             if let Some(node) = entry.entity()
                 && is_grid(node)
             {
-                grids.push(self.grid(entry, node, trees));
+                grids.push(self.grid(entry, node, trees, observation.as_deref_mut()));
             }
         }
         let with_issue = grids.iter().filter(|grid| grid.scu.is_none()).count();
@@ -89,6 +129,7 @@ impl<'f> CargoReader<'f> {
         entry: &LoadoutEntry<'_>,
         node: &EntityNode,
         trees: &mut TreeBuilder<'f>,
+        mut observation: Option<&mut Observation<'_, 'f>>,
     ) -> CargoGrid {
         let mut grid = CargoGrid {
             port: entry.path().to_owned(),
@@ -102,13 +143,26 @@ impl<'f> CargoReader<'f> {
             source: None,
             issue: None,
         };
-        let Some(container) = grid.container else {
+        let origin = if let Some(container) = grid.container {
+            let capture = observation
+                .as_ref()
+                .map(|observation| observation.capture());
+            match self.container(container, trees, capture) {
+                Err(error) => {
+                    grid.issue = Some(error.for_guid(container));
+                    error.origin()
+                }
+                Ok(read) => {
+                    fill(&mut grid, read);
+                    read.origin.as_ref()
+                }
+            }
+        } else {
             grid.issue = Some("the Entity names no inventory container".to_owned());
-            return grid;
+            None
         };
-        match self.container(container, trees) {
-            Err(error) => grid.issue = Some(error.for_guid(container)),
-            Ok(read) => fill(&mut grid, read),
+        if let Some(observation) = &mut observation {
+            observation.mount(entry, node, &grid, origin);
         }
         grid
     }
@@ -117,6 +171,7 @@ impl<'f> CargoReader<'f> {
         &mut self,
         guid: Guid,
         trees: &mut TreeBuilder<'f>,
+        capture: Option<&Capture<'f>>,
     ) -> &Result<Container<'f>, ContainerReadError> {
         let forge = self.forge;
         self.containers.entry(guid).or_insert_with(|| {
@@ -125,11 +180,26 @@ impl<'f> CargoReader<'f> {
                 .ok_or(ContainerReadError::Missing)?;
             let tree = trees
                 .build(&record)
-                .map_err(ContainerReadError::Unreadable)?;
-            let capacity = ContainerInput::select(tree.root()).measure();
+                .map_err(|error| ContainerReadError::Unreadable {
+                    error,
+                    origin: capture
+                        .and_then(|capture| cargo_observed::unreadable(capture, &record)),
+                })?;
+            let observed =
+                capture.and_then(|capture| cargo_observed::capacity(capture, &record, &tree));
+            let (capacity, origin) = observed.map_or_else(
+                || {
+                    (
+                        ContainerInput::select(tree.root(), &mut |_, _, _, _| {}).measure(),
+                        None,
+                    )
+                },
+                |(capacity, origin)| (capacity, Some(origin)),
+            );
             Ok(Container {
                 record_path: tree.record_path(),
                 capacity,
+                origin,
             })
         })
     }

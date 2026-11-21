@@ -128,7 +128,9 @@ fn a_new_value_of_a_closed_value_set_is_additive() -> TestResult {
     );
 
     let mut unknown_values = catalog.clone();
-    unknown_values["ships"][0]["cargoScu"] = Value::Null;
+    let cargo = &mut unknown_values["projections"]["shipBaseFacts"]["rows"][0]["cargo"]["scu"];
+    cargo["state"] = json!("unreadable");
+    cargo["value"] = Value::Null;
     for field in ["vehicleKind", "mass", "massBasis", "hullHealth"] {
         unknown_values["ships"][0][field]["state"] = json!("absent");
         unknown_values["ships"][0][field]["value"] = Value::Null;

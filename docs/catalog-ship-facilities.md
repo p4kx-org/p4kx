@@ -83,8 +83,8 @@ to include in a commodity total. A value of `true` identifies mining-only capaci
 the capacity or classification as unknown when its corresponding value is unavailable.
 `invisible` remains a separate authored flag. A complete commodity total requires a classification
 and readable capacity for each eligible grid. A Loadout attachment without a matching facility
-remains unclassified. ShipBase and the ship catalog's `cargoScu` retain readable capacity from
-both flag values. [Ship base data](ship-base-data.md#cargo)
+remains unclassified. ShipBase and `projections.shipBaseFacts.rows[].cargo.scu` retain readable
+capacity from both flag values. [Ship base data](ship-base-data.md#cargo)
 
 An occupied Loadout attachment with a `ResourceContainer` component supplies its own
 capacity and resource restrictions in `configurations.resourceContainers.rows`. This is

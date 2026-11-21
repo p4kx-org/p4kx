@@ -20,6 +20,7 @@ use dataset_audit::{NO_WITNESS, audit};
 
 const LANGUAGE_SOURCES: &str = "/texts/languageSources";
 const ITEM_DEFINITIONS: &str = "/definitions/items";
+const SHIP_BASE_FACTS: &str = "/projections/shipBaseFacts";
 const LOADOUTS: &str = "/loadouts";
 const ITEM_PORTS: &str = "/configurations/itemPorts";
 const ATTACHMENT_CONSTRAINTS: &str = "/configurations/itemAttachmentConstraints";
@@ -170,6 +171,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     LANGUAGE_SOURCES,
     ITEM_DEFINITIONS,
     LOADOUTS,
+    SHIP_BASE_FACTS,
     ITEM_PORTS,
     ATTACHMENT_CONSTRAINTS,
     ITEM_BOUNDS,

@@ -88,6 +88,24 @@ impl<'scope, 'read, 'source> RecordPaths<'_, '_, 'scope, 'read, 'source> {
 }
 
 impl LoadoutPathObserver for RecordPaths<'_, '_, '_, '_, '_> {
+    fn record_inventory_container(
+        &self,
+        component: Option<&StructValue<'_>>,
+        value: Option<&Value<'_>>,
+        guid: Option<p4kx_extraction::Guid>,
+    ) -> ControlFlow<()> {
+        if self.capture.kind != crate::Kind::Ships {
+            return ControlFlow::Continue(());
+        }
+        match self
+            .capture
+            .store_cargo_storage(&self.fields, component, value, guid)
+        {
+            Ok(()) => ControlFlow::Continue(()),
+            Err(error) => self.capture.fail(error),
+        }
+    }
+
     fn record_port_definition(
         &self,
         definition: &PortDefinition,

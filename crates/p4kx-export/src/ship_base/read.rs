@@ -12,10 +12,10 @@ use p4kx_assembly::{
 };
 use p4kx_extraction::{Record, RecordTree, TreeBuilder};
 
-use super::cargo::{CargoReader, rounded};
+use super::cargo::{CargoReader, Observation, rounded};
 use super::model::{
-    Hull, HullThreshold, Implementation, LoadoutPort, Mass, MassBasis, PartialPartValue, ShipBase,
-    ShipRead, Source, SourceKind, SourceShare, Sourced, UnreadablePartValue, VehicleKind,
+    Cargo, Hull, HullThreshold, Implementation, LoadoutPort, Mass, MassBasis, PartialPartValue,
+    ShipBase, ShipRead, Source, SourceKind, SourceShare, Sourced, UnreadablePartValue, VehicleKind,
 };
 use crate::Kind;
 use crate::digest::Digest;
@@ -85,13 +85,19 @@ impl<'f> ShipReader<'f> {
         record: &Record<'f>,
         tree: &RecordTree<'f>,
     ) -> Result<ShipRead, CatalogReadFailure<'f>> {
-        self.read_with_digest_using(record, tree, VehicleImplementation::totals, || {
-            let physics = structure(
-                component(tree, "SEntityPhysicsControllerParams"),
-                "PhysType",
-            );
-            number(physics, "Mass")
-        })
+        self.read_with_digest_using(
+            record,
+            tree,
+            VehicleImplementation::totals,
+            || {
+                let physics = structure(
+                    component(tree, "SEntityPhysicsControllerParams"),
+                    "PhysType",
+                );
+                number(physics, "Mass")
+            },
+            None,
+        )
     }
 
     pub(crate) fn read_with_digest_using(
@@ -100,6 +106,7 @@ impl<'f> ShipReader<'f> {
         tree: &RecordTree<'f>,
         mut totals_of: impl FnMut(&VehicleImplementation) -> VehicleTotals,
         physics_mass: impl FnOnce() -> Option<f32>,
+        cargo_observation: Option<&mut Observation<'_, 'f>>,
     ) -> Result<ShipRead, CatalogReadFailure<'f>> {
         let node = self
             .resolver
@@ -114,7 +121,11 @@ impl<'f> ShipReader<'f> {
                 .flat_map(|v| v.issues())
                 .map(ToString::to_string),
         );
-        let entries = node.loadout();
+        let entries = if cargo_observation.is_some() {
+            node.loadout_with_port_positions()
+        } else {
+            node.loadout()
+        };
         let digest = vehicle
             .filter(|v| v.issues().is_empty())
             .map(structure_digest);
@@ -129,7 +140,7 @@ impl<'f> ShipReader<'f> {
             hull: vehicle
                 .zip(totals.as_ref())
                 .and_then(|(vehicle, totals)| aggregate::hull(vehicle, totals)),
-            cargo: self.cargo.read(&entries, &mut self.trees),
+            cargo: self.read_cargo(record, &node, &entries, cargo_observation),
             loadout_source: node.loadout_file().map_or_else(
                 || record_source(tree.record_path(), LOADOUT_FIELD),
                 |path| Source {
@@ -153,6 +164,22 @@ impl<'f> ShipReader<'f> {
             implementation: digest,
             paint_ports,
         })
+    }
+
+    fn read_cargo(
+        &mut self,
+        record: &Record<'f>,
+        node: &EntityNode,
+        entries: &[LoadoutEntry<'_>],
+        observation: Option<&mut Observation<'_, 'f>>,
+    ) -> Cargo {
+        if let Some(observation) = observation {
+            observation.loadout(record, node, entries);
+            self.cargo
+                .read_observed(entries, &mut self.trees, observation)
+        } else {
+            self.cargo.read(entries, &mut self.trees)
+        }
     }
 }
 

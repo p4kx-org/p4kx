@@ -241,7 +241,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "publicNames": public_names(),
             "gameTexts": [reputation::mission_type_text(), spawns::location_name_text()]
         },
-        "projections": {"contracts": contracts::contracts(), "missionTitles": contracts::titles(), "blueprintPresentation": blueprints::presentation(), "blueprintPoolWeights": blueprints::pool_weights(), "qualityQuantizationResources": quality::inverse(), "commodityPresentation": commodities::presentation(), "tagPaths": tags::paths(), "resourceGroupParents": resource_groups::parents(), "weaponMagazineResolutions": absent_table(), "weaponProjectileAmmoSelections": absent_table(), "weaponPlayerAnimationCandidates": absent_table(), "weaponCombatBases": absent_table(), "jumpConnections": absent_table(), "crafterHosts": absent_table()},
+        "projections": {"shipBaseFacts": ships::base_facts(), "contracts": contracts::contracts(), "missionTitles": contracts::titles(), "blueprintPresentation": blueprints::presentation(), "blueprintPoolWeights": blueprints::pool_weights(), "qualityQuantizationResources": quality::inverse(), "commodityPresentation": commodities::presentation(), "tagPaths": tags::paths(), "resourceGroupParents": resource_groups::parents(), "weaponMagazineResolutions": absent_table(), "weaponProjectileAmmoSelections": absent_table(), "weaponPlayerAnimationCandidates": absent_table(), "weaponCombatBases": absent_table(), "jumpConnections": absent_table(), "crafterHosts": absent_table()},
         "provenance": {"sources": [], "uses": []},
 
         "paints": [{

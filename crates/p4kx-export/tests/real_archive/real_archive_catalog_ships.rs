@@ -106,6 +106,24 @@ fn catalog() -> Result<&'static Json, Box<dyn Error>> {
         .map_err(|reason| reason.clone().into())
 }
 
+fn cargo<'c>(catalog: &'c Json, ship: &Json) -> Result<&'c Json, Box<dyn Error>> {
+    let record = ship
+        .pointer("/recordIndex/value")
+        .and_then(Json::as_u64)
+        .ok_or("original physical Ship index")?;
+    let rows = catalog
+        .pointer("/projections/shipBaseFacts/rows")
+        .and_then(Json::as_array)
+        .ok_or("Ship base facts table")?;
+    let mut facts = rows
+        .iter()
+        .filter(|row| row.pointer("/shipRecordIndex/value").and_then(Json::as_u64) == Some(record));
+    let row = facts.next().ok_or("canonical physical Ship base facts")?;
+    assert!(facts.next().is_none(), "unique physical Ship base facts");
+    assert_eq!(row["shipGuid"], ship["guid"], "same original Ship GUID");
+    row.get("cargo").ok_or_else(|| "projected cargo".into())
+}
+
 fn ship<'c>(catalog: &'c Json, class_name: &str) -> Result<&'c Json, Box<dyn Error>> {
     catalog["ships"]
         .as_array()
@@ -123,13 +141,14 @@ fn the_known_ships_carry_their_mass_hull_and_cargo() -> TestResult {
     let catalog = catalog()?;
     for anchor in &ANCHORS {
         let ship = ship(catalog, anchor.class_name)?;
+        let cargo = cargo(catalog, ship)?;
         print_line(&format!(
             "{}: mass {} hull {} cargo {} (grids with issue {}) kind {} size {}",
             anchor.class_name,
             ship["mass"]["value"],
             ship["hullHealth"]["value"],
-            ship["cargoScu"],
-            ship["cargoGridsWithIssue"],
+            cargo["scu"]["value"],
+            cargo["gridsWithIssue"]["value"],
             ship["vehicleKind"]["value"],
             ship["size"]
         ));
@@ -146,7 +165,7 @@ fn the_known_ships_carry_their_mass_hull_and_cargo() -> TestResult {
             anchor.class_name
         );
         assert_eq!(
-            ship["cargoScu"].as_f64(),
+            cargo["scu"]["value"].as_f64(),
             Some(anchor.cargo),
             "{}",
             anchor.class_name
@@ -166,20 +185,23 @@ fn dangling_container_references_leave_the_cargo_unknown() -> TestResult {
     let catalog = catalog()?;
     for class_name in UNKNOWN_CARGO {
         let ship = ship(catalog, class_name)?;
+        let cargo = cargo(catalog, ship)?;
         assert!(
-            ship["cargoScu"].is_null(),
+            cargo["scu"]["value"].is_null(),
             "{class_name}: {}",
-            ship["cargoScu"]
+            cargo["scu"]
         );
         assert!(
-            ship["cargoGridsWithIssue"].as_u64().is_some_and(|n| n > 0),
+            cargo["gridsWithIssue"]["value"]
+                .as_u64()
+                .is_some_and(|n| n > 0),
             "{class_name}"
         );
     }
     Ok(())
 }
 
-fn assert_entry_equals_base(entry: &Json, base: &ShipBase) -> TestResult {
+fn assert_entry_equals_base(entry: &Json, cargo: &Json, base: &ShipBase) -> TestResult {
     let name = base.class_name.as_str();
     assert_eq!(
         entry
@@ -197,9 +219,14 @@ fn assert_entry_equals_base(entry: &Json, base: &ShipBase) -> TestResult {
         base.hull.as_ref().map(|hull| hull.health),
         "{name}"
     );
-    assert_eq!(entry["cargoScu"].as_f64(), base.cargo.scu, "{name}");
+    let amount = cargo
+        .pointer("/scu/value")
+        .ok_or("canonical cargo quantity")?;
+    assert_eq!(amount.as_f64(), base.cargo.scu, "{name}");
     assert_eq!(
-        entry["cargoGridsWithIssue"].as_u64(),
+        cargo
+            .pointer("/gridsWithIssue/value")
+            .and_then(serde_json::Value::as_u64),
         u64::try_from(base.cargo.grids_with_issue).ok(),
         "{name}"
     );
@@ -252,7 +279,7 @@ fn the_catalog_ships_equal_the_ship_base_export_and_the_kind_is_settled() -> Tes
             .iter()
             .find(|ship| ship["guid"]["value"] == base.guid.to_string().as_str())
             .ok_or_else(|| format!("{} is missing", base.class_name))?;
-        assert_entry_equals_base(entry, base)?;
+        assert_entry_equals_base(entry, cargo(catalog, entry)?, base)?;
     }
     let ground = ships
         .iter()

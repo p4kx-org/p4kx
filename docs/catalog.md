@@ -617,8 +617,6 @@ its key and has absent translation forms.
 | `mass` | Immediately sourced hull mass in kilograms; use `value` when `state` is present. A positive total rounding to zero stays present. See "Ship base data" below. |
 | `massBasis` | Sourced selection of `parts` or `physics`; present exactly when `mass` is present. |
 | `hullHealth` | Immediately sourced structural hull hit points; see "Ship base data" below. |
-| `cargoScu` | The cargo capacity in SCU: 0 without a cargo grid, `null` when unknown; see "Ship base data" below |
-| `cargoGridsWithIssue` | How many cargo grids have no readable capacity; above 0, `cargoScu` is a lower bound |
 | `insurance` | Sourced first `SEntityInsuranceProperties` declaration and its independent parameter state |
 | `playabilityInputs` | Selected original `crewManifestComponentOrdinal` and authored `crewManifest` Record link with target header state |
 
@@ -676,7 +674,8 @@ choice and the original Physics conversion. `massBasis` uses selection evidence.
 uses its own damage and structural-port eligibility inputs. Each physical Record retains its
 own DCB contributions, including when its XML is reused or its GUID or path is shared.
 
-`cargoScu`, `cargoGridsWithIssue` and `vehicleKind` are interpreted fields.
+Cargo is an interpreted projection in `projections.shipBaseFacts`. The Ship row carries
+the interpreted `vehicleKind`.
 The standalone `p4kx ships` output reports detailed sources, thresholds, Loadout and cells.
 The payloads of `vehicleKind` and `massBasis` are extensible strings in the schema.
 
@@ -684,18 +683,32 @@ The payloads of `vehicleKind` and `massBasis` are extensible strings in the sche
 |-------|-----------------|
 | `mass` | The sum of the `mass` of every part of the vehicle implementation (`vehicleDefinition`) after the ship's Modification is applied, rounded to four decimals; a sum too large to round to a finite number counts as unknown (so does `hullHealth`). Landing gear, Loadout items and docked vehicles are not part of it (#305). Without part masses, the mass of the rigid physics controller (`Components/SEntityPhysicsControllerParams/PhysType/Mass`, `massBasis` `physics`) |
 | `hullHealth` | The sum of the positive `damageMax` of the parts, except parts holding an item port flagged `uneditable` or `invisible`; `null` without a vehicle implementation or when no part states one |
-| `cargoScu` | The sum of the readable capacities of the `CargoGrid` Entities of the default Loadout, including grids flagged `miningOnly` or `invisible`. Docked vehicles and templates are excluded. Open capacity is `x * y * z / 1.953125` from `interiorDimensions`. Closed capacity is normalized to standard cargo units. Zero means the ship has no grid, or the readable grids sum to zero. `null` means the ship has grids and none is readable. See [cargo grid facilities](catalog-ship-facilities.md#cargo-grid-facilities) for capacities and flags per grid. |
-| `cargoGridsWithIssue` | The grids whose capacity cannot be read, e.g. a dangling Reference to the `InventoryContainer`. Above 0, `cargoScu` counts only the readable grids and is a lower bound |
 | `vehicleKind` | `groundVehicle` under `entities/groundvehicles` uses the original Record path. Under `entities/spaceships`, `spaceship` uses the same path and the effective vehicle Parts up to the first wheel (`SubPartWheel`), or the complete Part selection when checking for a tread (`Tread`) after ruling out wheels. The classification is absent for a wheeled or tracked spaceship or any other path. The existing spaceship fallback for unavailable implementations remains present with incomplete evidence. |
+
+#### Projected cargo
+
+Join `projections.shipBaseFacts.rows[].shipRecordIndex.value` to the original Ship Record
+index in the same Build. `shipGuid.value` carries the nominal identity. Different physical
+Ship Records can share a GUID and retain separate rows. Each mount's `position.value` uses the
+physical Loadout Record index and ordered nested port ordinals. Its attachment, authored
+storage Reference, first physical InventoryContainer Record and SCU operands have independent
+source origins. The projection retains every reached occurrence in Loadout order.
+
+`cargo.scu.value` sums the readable capacities of default Loadout `CargoGrid` Entities, including
+grids flagged `miningOnly` or `invisible`. It excludes docked descendants and templates. Open
+capacity uses `x * y * z / 1.953125` from `interiorDimensions`. Closed capacity is normalized to
+SCU. Each known mount and the final sum are rounded to four decimals. Zero can mean no reached
+grid or a readable sum of zero. The state is `unreadable` when every reached grid has unavailable
+capacity. `cargo.gridsWithIssue.value` counts those grids. A present sum with a positive count is
+a lower bound. `cargo.unresolvedLoadout` reports resolver gaps that can omit mounts from both
+values. Aggregate origins retain the observed contributors and flag incomplete exclusion
+evidence. Individual grid flags are in [facility configurations](catalog-ship-facilities.md#cargo-grid-facilities).
 
 LIVE anchors, read by the real-Archive test: Harbinger 230,404 kg, 48,490 hull, 0 SCU; Freelancer
 MAX 341,408 kg, 35,650 hull, 120 SCU; Carrack 3,275,858 kg, 88,000 hull, 456 SCU; Constellation
 Andromeda 386,857 kg, 180,844 hull, 96 SCU (without the docked snub craft). The Javelin and the
-Hornet F7C have `cargoScu` `null`: their cargo grids refer to `InventoryContainer` Records that do
-not exist.
-
-A ship with `cargoGridsWithIssue` above 0 and a `cargoScu` number may carry more than the number
-says.
+Hornet F7C have null SCU payloads because their cargo grids refer to unavailable
+`InventoryContainer` Records.
 
 On LIVE the 1,066 catalog ships split into 1,027 `spaceship` and 39 `groundVehicle`, none `null`:
 no Record under `entities/spaceships` has a wheel or tread. The folder `entities/groundvehicles`

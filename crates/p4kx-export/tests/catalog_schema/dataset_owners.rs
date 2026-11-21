@@ -297,6 +297,7 @@ const GROUPS: &[Group] = &[
             "missionTitles",
             "qualityQuantizationResources",
             "resourceGroupParents",
+            "shipBaseFacts",
             "tagPaths",
             "weaponCombatBases",
             "weaponMagazineResolutions",

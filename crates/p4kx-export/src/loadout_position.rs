@@ -29,6 +29,21 @@ impl LoadoutPosition {
         &self.port_ordinals
     }
 
+    pub(crate) fn from_port_ordinals(
+        loadout_record_index: u32,
+        indices: &[usize],
+    ) -> Result<Self, ExportAccountingError> {
+        let port_ordinals = indices
+            .iter()
+            .copied()
+            .map(ordinal)
+            .collect::<Result<_, _>>()?;
+        Ok(Self {
+            loadout_record_index,
+            port_ordinals,
+        })
+    }
+
     pub(super) const fn root(loadout_record_index: u32) -> Self {
         Self {
             loadout_record_index,

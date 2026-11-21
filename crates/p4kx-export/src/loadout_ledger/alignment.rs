@@ -12,7 +12,7 @@ use crate::record_header_field::RecordHeaderField;
 use crate::{CatalogError, ExportAccountingError};
 
 impl Capture<'_> {
-    pub(in crate::loadout) fn attachment_identity(
+    pub(crate) fn attachment_identity(
         &self,
         guid: Guid,
         record: u32,

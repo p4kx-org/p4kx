@@ -5,6 +5,7 @@ use p4kx_extraction::{RecordTree, StructValue, Value};
 
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
+use crate::catalog_projections::ship_base_facts::ShipBaseFacts;
 use crate::catalog_v3::authored_fields::ship_source_read::ShipSourceRead;
 use crate::contract::Ship;
 use crate::guid_text::CatalogGuid;
@@ -69,14 +70,14 @@ pub(crate) fn ship<'f>(
     input: &OriginalCatalogInput<'_, '_>,
     read: &ShipRead,
     aggregates: crate::loadout::ledger::ShipAggregateValues,
-) -> Result<(Ship<'f>, VehicleFacts), CatalogError> {
-    let base = &read.base;
+) -> Result<(Ship<'f>, VehicleFacts, ShipBaseFacts), CatalogError> {
     let identity = ShipIdentity::read(&source.header)?;
     let playability = source
         .playability_proof
         .decide(tree, source.vehicle, evidence, input)?;
     let source_numbers = std::mem::take(&mut source.numbers);
     let source = ShipSource::from_read(source, aggregates, playability);
+    let base_facts = source.base_facts;
     let guid = CatalogGuid(tree.guid());
     let ship = Ship {
         source_record_index: tree.record_index(),
@@ -97,8 +98,6 @@ pub(crate) fn ship<'f>(
         mass: source.mass,
         mass_basis: source.mass_basis,
         hull_health: source.hull_health,
-        cargo_scu: base.cargo.scu,
-        cargo_grids_with_issue: base.cargo.grids_with_issue,
         variant_of: None,
         insurance: source.insurance,
         playability_inputs: source.playability_inputs,
@@ -111,7 +110,7 @@ pub(crate) fn ship<'f>(
         implementation: read.paint_ports.clone(),
         variant_key: variant_key(tree, read),
     };
-    Ok((ship, facts))
+    Ok((ship, facts, base_facts))
 }
 
 /// Returns what the ship `tree` shares with the ships of its variant group: its vehicle
