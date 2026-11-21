@@ -281,7 +281,7 @@ pub use node_body::CharacterBody;
 pub use object_containers::{ContainerSource, ObjectContainerRef};
 pub use outfit::{Outfit, OutfitReport};
 pub use p4kx_character as character;
-pub use paint_port::{PaintPort, PaintTagIndex};
+pub use paint_port::{PaintPort, PaintPortMatch, PaintTagAncestry, PaintTagIndex};
 pub use paint_provenance::{PaintAppearanceValues, PaintProvenance, PaintProvenanceError};
 pub use palette::{
     ForgePalettes, PaletteFailure, PaletteProvider, PaletteRead, PaletteRecordSelection,

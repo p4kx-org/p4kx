@@ -292,6 +292,18 @@ impl<'t> Tag<'t> {
         self.node().map_or_default(|node| node.guid)
     }
 
+    /// Returns the position of the exact original Tag Record selected by the tree.
+    #[must_use]
+    pub fn record_index(&self) -> Option<u32> {
+        self.node().map(|node| node.record_index)
+    }
+
+    /// Returns this tag's selected occurrence in its parent's original children array.
+    #[must_use]
+    pub fn parent_child_ordinal(&self) -> Option<usize> {
+        self.node()?.parent_child_ordinal
+    }
+
     /// Returns the name of the tag alone, e.g. `Gun`.
     #[must_use]
     pub fn name(&self) -> &'t str {

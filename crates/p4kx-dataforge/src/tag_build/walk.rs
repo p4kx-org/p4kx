@@ -222,6 +222,10 @@ impl<'f> Walk<'_, 'f> {
             .or_insert_with(|| Arc::from(raw.name));
         self.nodes.push(Node {
             guid: raw.guid,
+            record_index: raw.record.index(),
+            parent_child_ordinal: incoming
+                .filter(|edge| edge.kind() == TagPathEdgeKind::Child)
+                .map(TagPathIncoming::ordinal),
             name: Arc::clone(name),
             path_bytes: path_len,
             joined: OnceLock::new(),

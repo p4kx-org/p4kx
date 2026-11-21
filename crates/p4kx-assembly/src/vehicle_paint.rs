@@ -7,13 +7,12 @@ use p4kx_dataforge::{StructValue, TagTree};
 
 use crate::cdf::is_character_definition;
 use crate::geometry_choice::GeometryChoice;
-use crate::paint_port::PaintOfferSources;
 use crate::paint_provenance::{PaintSelection, VariantSource};
 use crate::read;
 use crate::spec::{EntitySpec, VehicleSpec};
 use crate::{
     Attachment, EntityNode, Geometry, IssueKind, LoadoutResolver, MaterialVariant, PaintPort,
-    PaintTagIndex, PortNode, PortSource,
+    PaintPortMatch, PaintTagIndex, PortNode, PortSource,
 };
 
 #[path = "vehicle_paint_sources.rs"]
@@ -114,7 +113,7 @@ impl LoadoutResolver<'_> {
                             tag: selector.to_owned(),
                             variant: appearance.variant,
                             prefers_cdf_material: appearance.prefers_cdf_material,
-                            compatibility: sources::selected(spec, root, port, item, paint, offers),
+                            compatibility: sources::selected(spec, root, port, item, paint, offers.as_ref())?,
                         }),
                     ))
                 })
@@ -136,12 +135,12 @@ impl LoadoutResolver<'_> {
         item: &PaintItem,
         port: &PaintPort,
         vehicle_tags: &str,
-    ) -> Option<PaintOfferSources> {
+    ) -> Option<PaintPortMatch<'_>> {
         let tree = self
             .tag_tree
             .get_or_init(|| TagTree::build(self.entities.forge()));
         let tag_index = PaintTagIndex::new(tree);
-        port.accept_with_sources(
+        port.match_with_ancestry(
             &lowercase_tags(&item.tags),
             &lowercase_tags(&item.required_tags),
             &lowercase_tags(vehicle_tags),

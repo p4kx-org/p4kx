@@ -3,12 +3,12 @@
 
 use p4kx_extraction::SourceLocation;
 
-use crate::paint_port::PaintOfferSources;
 use crate::paint_provenance::PaintSelectionInput;
 use crate::spec::EntitySpec;
 use crate::target_spec::TargetSpec;
 use crate::{
-    EntityNode, PortDefinition, PortNode, PortSource, VehicleImplementation, VehicleItemPort,
+    EntityNode, PaintPortMatch, PaintTagAncestry, PortDefinition, PortNode, PortSource,
+    VehicleImplementation, VehicleItemPort,
 };
 
 use super::PaintItem;
@@ -19,8 +19,8 @@ pub(super) fn selected(
     port: &PortNode,
     item: &EntityNode,
     paint: &PaintItem,
-    offers: Option<PaintOfferSources>,
-) -> Vec<PaintSelectionInput> {
+    offers: Option<&PaintPortMatch<'_>>,
+) -> Result<Vec<PaintSelectionInput>, &'static str> {
     let mut sources = Vec::new();
     sources.extend(
         item.classification()
@@ -48,11 +48,14 @@ pub(super) fn selected(
             sources.extend(replacement_guid(item));
             if let Some(offers) = offers {
                 replacement_tags(&mut sources, root, port, item, paint, offers);
+                for ancestry in offers.ancestries() {
+                    append_ancestry(&mut sources, ancestry)?;
+                }
             }
         }
         _ => {}
     }
-    sources
+    Ok(sources)
 }
 
 fn default_item(
@@ -93,7 +96,7 @@ fn replacement_tags(
     port: &PortNode,
     item: &EntityNode,
     paint: &PaintItem,
-    offers: PaintOfferSources,
+    offers: &PaintPortMatch<'_>,
 ) {
     let vehicle = root.vehicle();
     let xml = vehicle.and_then(|vehicle| vehicle.item_port(port.name()));
@@ -108,7 +111,7 @@ fn replacement_tags(
     if !paint.required_tags.trim().is_empty() {
         sources.extend(attach_tags(item, "RequiredTags"));
     }
-    if offers.port {
+    if offers.uses_port_tags() {
         push_port_tags(
             sources,
             port,
@@ -118,10 +121,41 @@ fn replacement_tags(
             PortDefinition::port_tags,
         );
     }
-    if offers.vehicle {
+    if offers.uses_vehicle_tags() {
         sources.extend(attach_tags(root, "Tags"));
     }
 }
+
+fn append_ancestry(
+    sources: &mut Vec<PaintSelectionInput>,
+    ancestry: &PaintTagAncestry<'_>,
+) -> Result<(), &'static str> {
+    let required = ancestry.required();
+    for endpoint in [ancestry.offered(), required] {
+        let record_index = endpoint
+            .record_index()
+            .ok_or("the matched Tag has no original Record")?;
+        sources.push(PaintSelectionInput::DataForge(SourceLocation::DataForge {
+            record_index,
+            field: "tagName".to_owned(),
+        }));
+    }
+    for child in ancestry.tags().take_while(|tag| *tag != required) {
+        let record_index = child
+            .parent()
+            .and_then(|parent| parent.record_index())
+            .ok_or("the matched Tag ancestry has no original parent Record")?;
+        let ordinal = child
+            .parent_child_ordinal()
+            .ok_or("the selected Tag ancestry has no original children occurrence")?;
+        sources.push(PaintSelectionInput::DataForge(SourceLocation::DataForge {
+            record_index,
+            field: format!("children[{ordinal}]"),
+        }));
+    }
+    Ok(())
+}
+
 fn attach_tags(node: &EntityNode, field: &str) -> Option<PaintSelectionInput> {
     let (record_index, component) = node
         .record_index()
@@ -171,3 +205,7 @@ fn port_field(definition: &PortDefinition, field: &str) -> PaintSelectionInput {
         field: format!("Components[{component}].Ports[{port}].{field}"),
     })
 }
+
+#[cfg(test)]
+#[path = "paint_tag_ancestry_tests.rs"]
+mod tests;

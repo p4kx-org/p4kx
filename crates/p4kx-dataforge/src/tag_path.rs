@@ -12,6 +12,8 @@ use crate::tags::TAG_PATH_SEPARATOR;
 #[derive(Debug)]
 pub(crate) struct Node {
     pub(crate) guid: Guid,
+    pub(crate) record_index: u32,
+    pub(crate) parent_child_ordinal: Option<usize>,
     pub(crate) name: Arc<str>,
     pub(crate) path_bytes: u64,
     pub(crate) joined: OnceLock<Box<str>>,
