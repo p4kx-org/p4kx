@@ -422,46 +422,60 @@
       "description": "Original actor-state predicate labels of one authored setup.",
       "properties": {
         "filterByAimStanceState": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Authored aim stance."
         },
         "filterByAimingRestriction": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Authored aiming restriction."
         },
         "filterByCharacterType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Authored character type."
         },
         "filterByEquippedArmorClass": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Authored equipped armor class."
         },
         "filterByHeldItemType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Authored held-item type."
         },
         "filterByLeanState": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Authored lean state."
         },
         "filterByMotionSpeed": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Authored motion-speed state."
         },
         "filterByPlayerCamera": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Authored player-camera mode."
         },
         "filterByPoseState": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Authored pose state."
         },
         "filterByRestrainedState": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Authored restraint state."
         },
         "filterBySkeleton": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Authored skeleton selector."
         },
         "filterByStanceState": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Authored stance state."
         },
         "filterByState": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Authored actor state."
         },
         "filterName": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original filter name."
         }
       },
       "required": [

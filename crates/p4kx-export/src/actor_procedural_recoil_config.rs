@@ -14,11 +14,10 @@ use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::interaction_source::RecordLink;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
-use crate::source_value_catalog::SourceArenaOutput;
+use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
 
-pub(in crate::catalog_v3) const RECOIL_CONFIG_SOURCE_TYPE: &str = "ActorProceduralRecoilConfig";
-pub(in crate::catalog_v3) const RECOIL_MODIFIERS_SOURCE_TYPE: &str =
-    "ActorProceduralRecoilModifiers";
+pub(crate) const RECOIL_CONFIG_SOURCE_TYPE: &str = "ActorProceduralRecoilConfig";
+pub(crate) const RECOIL_MODIFIERS_SOURCE_TYPE: &str = "ActorProceduralRecoilModifiers";
 const SETUP_FIELD: &str = "actorProceduralRecoilSetup";
 const SETUP_TYPE: &str = "ActorProceduralRecoilSetup";
 const MODIFIERS_FIELD: &str = "actorProceduralRecoilModifiers";
@@ -27,7 +26,7 @@ const MODIFIERS_FIELD: &str = "actorProceduralRecoilModifiers";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ActorProceduralRecoilConfig<'source> {
+pub struct ActorProceduralRecoilConfig<'source> {
     source: CanonicalRecordHeader<'source>,
     actor_procedural_recoil_setup:
         SourcedValue<Vec<SourcedValue<ActorProceduralRecoilSetup<'source>>>>,
@@ -35,6 +34,26 @@ pub(crate) struct ActorProceduralRecoilConfig<'source> {
 }
 
 impl<'source> ActorProceduralRecoilConfig<'source> {
+    /// Borrows the physical Record and its original header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows the original setup slots in declaration order.
+    #[must_use]
+    pub const fn setups(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<ActorProceduralRecoilSetup<'source>>>> {
+        &self.actor_procedural_recoil_setup
+    }
+
+    /// Borrows original configuration members outside the typed setup array.
+    #[must_use]
+    pub const fn additional_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.additional_fields
+    }
+
     pub(in crate::catalog_v3) fn read(
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,
@@ -69,7 +88,7 @@ impl<'source> ActorProceduralRecoilConfig<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ActorProceduralRecoilSetup<'source> {
+pub struct ActorProceduralRecoilSetup<'source> {
     source_type: SourcedValue<&'source str>,
     filter: ActorStateFilter<'source>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
@@ -78,6 +97,30 @@ struct ActorProceduralRecoilSetup<'source> {
 }
 
 impl<'source> ActorProceduralRecoilSetup<'source> {
+    /// Borrows the original setup type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows the authored actor-state filter.
+    #[must_use]
+    pub const fn filter(&self) -> &ActorStateFilter<'source> {
+        &self.filter
+    }
+
+    /// Borrows the original modifier link and physical target state.
+    #[must_use]
+    pub const fn modifier(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.actor_procedural_recoil_modifiers
+    }
+
+    /// Borrows retained original setup members outside the typed fields.
+    #[must_use]
+    pub const fn additional_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.additional_fields
+    }
+
     fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

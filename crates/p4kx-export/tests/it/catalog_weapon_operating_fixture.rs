@@ -22,7 +22,11 @@ const ANIMATION_ID: u128 = 0x9af1;
 const MISSING_RECOIL_ID: u128 = 0x9af2;
 
 pub(super) fn database() -> DataForgeBuilder {
-    let types = item_types(operating_types(DataForgeBuilder::new().version(8)));
+    database_with_recoil(DataForgeBuilder::new().version(8), TestStruct::new(RECOIL))
+}
+
+fn database_with_recoil(types: DataForgeBuilder, recoil: TestStruct) -> DataForgeBuilder {
+    let types = item_types(operating_types(types, recoil));
     types
         .record(TestRecord::new(
             ANIMATION_ID,
@@ -34,10 +38,10 @@ pub(super) fn database() -> DataForgeBuilder {
         .record(item())
 }
 
-fn operating_types(types: DataForgeBuilder) -> DataForgeBuilder {
+fn operating_types(types: DataForgeBuilder, recoil: TestStruct) -> DataForgeBuilder {
     types
         .structure(TestStruct::new(ANIMATION))
-        .structure(TestStruct::new(RECOIL))
+        .structure(recoil)
         .structure(
             TestStruct::new(BEAM)
                 .parent(ACTION)
@@ -65,6 +69,65 @@ fn operating_types(types: DataForgeBuilder) -> DataForgeBuilder {
                 .field("overheatLockedStats", pointer(STATS))
                 .field("heatRateOnline", TestType::Single),
         )
+}
+
+pub(super) const ACTOR_RECOIL_GUID: u128 = 0x9af5;
+pub(super) const ACTOR_RECOIL_INDEX: u32 = 3;
+pub(super) const ACTOR_MODIFIER_INDEX: u32 = 4;
+pub(super) const ACTOR_RECOIL_ALIAS_INDEX: u32 = 5;
+const ACTOR_SETUP: &str = "ActorProceduralRecoilSetup";
+const ACTOR_MODIFIER: &str = "ActorProceduralRecoilModifiers";
+const ACTOR_MODIFIER_GUID: u128 = 0x9af6;
+const STANCE: &str = "ActorStateFilterByStanceState";
+
+pub(super) fn database_with_actor_recoil() -> DataForgeBuilder {
+    let original = DataForgeBuilder::new()
+        .version(8)
+        .enumeration(STANCE, ["FixtureStand"])
+        .structure(
+            TestStruct::new(ACTOR_SETUP)
+                .field("filterName", TestType::String)
+                .field("filterByStanceState", TestType::Enum(STANCE.to_owned()))
+                .field(
+                    "actorProceduralRecoilModifiers",
+                    TestType::ReferenceTo(ACTOR_MODIFIER.to_owned()),
+                )
+                .field("fixtureExtra", TestType::Bool),
+        )
+        .structure(TestStruct::new(ACTOR_MODIFIER).field("kickScale", TestType::Single));
+    let recoil = TestStruct::new(RECOIL).array("actorProceduralRecoilSetup", class(ACTOR_SETUP));
+    let setup = TestInstance::new(ACTOR_SETUP)
+        .value("filterName", TestValue::text("FixtureRecoil"))
+        .value("filterByStanceState", TestValue::text("FixtureStand"))
+        .value(
+            "actorProceduralRecoilModifiers",
+            TestValue::Reference(ACTOR_MODIFIER_GUID),
+        )
+        .value("fixtureExtra", TestValue::Bool(true));
+    database_with_recoil(original, recoil)
+        .record(actor_recoil_record("Fixture").value(
+            "actorProceduralRecoilSetup",
+            TestValue::Array(vec![node(setup.clone()), node(setup)]),
+        ))
+        .record(
+            TestRecord::new(
+                ACTOR_MODIFIER_GUID,
+                ACTOR_MODIFIER,
+                "ActorProceduralRecoilModifiers.Fixture",
+                "libs/foundry/records/fixture/actor_recoil_modifier.xml",
+            )
+            .value("kickScale", TestValue::Single(0.5)),
+        )
+        .record(actor_recoil_record("Alias"))
+}
+
+pub(super) fn actor_recoil_record(name: &str) -> TestRecord {
+    TestRecord::new(
+        ACTOR_RECOIL_GUID,
+        RECOIL,
+        format!("{RECOIL}.{name}"),
+        format!("libs/foundry/records/fixture/actor_recoil_{name}.xml"),
+    )
 }
 
 fn item_types(types: DataForgeBuilder) -> DataForgeBuilder {

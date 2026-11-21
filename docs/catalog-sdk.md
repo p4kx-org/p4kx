@@ -1638,6 +1638,22 @@ recoil blocks and nested field origins without generating a Catalog.
 cargo test --locked -p p4kx-export --test real_archive real_archive_weapon_recoil_sdk::weapon_recoil_sdk_matches_original_action_and_definition -- --ignored --exact --nocapture --test-threads=1
 ```
 
+## Actor procedural recoil definitions
+
+Use `equipment::actor_procedural_recoil::with_actor_procedural_recoil_configs` and
+`with_actor_procedural_recoil_modifiers` for the two actor recoil definition tables.
+The direct, decoded-Entry and session forms select all definitions, a GUID or one
+physical Record index. They retain all physical aliases in original definition
+order. Recoil configurations expose ordered setups, source-backed filters and
+original modifier links. Join a resolved modifier's physical target index with
+the modifier table. The modifier exposes its original field arena.
+
+Both queries share the producer's projection and retain the original evidence
+for each value. Weapon references are unnecessary for admission to these source
+families. The queries read neither Item bodies nor localization and leave modifier
+bodies unopened when reading a configuration. Check header, body and field
+coverage alongside the family's availability.
+
 ## Weapon combat bases
 
 Use `equipment::with_weapon_combat_bases`, its decoded-Entry form or the corresponding

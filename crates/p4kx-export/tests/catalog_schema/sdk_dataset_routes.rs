@@ -16,6 +16,8 @@ use super::{
     TestResult, WEAPON_RECOIL,
 };
 
+#[path = "sdk_actor_procedural_recoil_routes.rs"]
+mod actor_procedural_recoil;
 #[path = "sdk_archive_entry_routes.rs"]
 mod archive_entries;
 #[path = "sdk_reputation_definition_routes.rs"]
@@ -156,6 +158,8 @@ mod terrain;
 mod vehicle_armor;
 #[path = "sdk_weapon_animation_route.rs"]
 mod weapon_animation;
+#[path = "../it/catalog_weapon_operating_fixture.rs"]
+mod weapon_operating_fixture;
 #[path = "sdk_weapon_source_routes.rs"]
 mod weapon_sources;
 #[path = "sdk_worn_gear_routes.rs"]
@@ -269,6 +273,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.push(planet_audio::read()?);
     routes.push(archive_entries::read_particle_library(archive)?);
     routes.extend(weapon_animation::read()?);
+    routes.extend(actor_procedural_recoil::read()?);
     routes.extend(fuel::read()?);
     routes.extend(hacking::read()?);
     routes.push(inventory_containers::read()?);
@@ -278,11 +283,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(cargo::read_globals(archive)?);
     routes.push(cargo::read_manifests()?);
     routes.extend(quality::read()?);
-    routes.extend(read_entity_definitions(archive)?);
-    routes.extend(item_configurations::read()?);
-    routes.extend(item_durability::read()?);
-    routes.extend(item_recovery::read()?);
-    routes.push(loadout::read()?);
+    item_configurations::append_item_routes(routes, archive)?;
     routes.push(tag_routes::entities(archive)?);
     routes.extend(tag_routes::declarations(archive)?);
     routes.push(tag_routes::paths(archive)?);
@@ -376,6 +377,10 @@ fn read_weather(archive: &Archive) -> TestResult<Route> {
             "synthetic canonical parity available; complete installed producer parity open",
         )
     })?
+}
+
+pub(super) const fn actor_procedural_recoil_datasets() -> [&'static str; 2] {
+    actor_procedural_recoil::DATASETS
 }
 
 pub(super) const fn weapon_animation_datasets() -> [&'static str; 8] {

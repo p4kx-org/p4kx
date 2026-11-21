@@ -3,7 +3,7 @@
 
 use std::collections::BTreeSet;
 
-use p4kx_extraction::{CancelToken, DataForge, Filter};
+use p4kx_extraction::{CancelToken, DataForge, Filter, RecordTree};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -14,12 +14,14 @@ use super::{
 use crate::build::original_input::OriginalCatalogInput;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_number_capture::CapturedNumber;
+use crate::catalog_read::scoped_source_read::ScopedSourceRead;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::catalog_weapon_actions::WeaponActions;
 use crate::catalog_v3::referenced_definition_read::{self, Definitions, Projection, Selection};
 use crate::export_field_inspection::ConfigurationInspection;
 use crate::export_ledger::ExportLedger;
+use crate::record_observation::RecordObservation;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::source_value_catalog::SourceArenaOutput;
@@ -40,9 +42,23 @@ pub(crate) struct WeaponProceduralTables<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct WeaponProceduralTarget<'source> {
+pub struct WeaponProceduralTarget<'source> {
     source: CanonicalRecordHeader<'source>,
     fields: SourceArenaOutput<'source>,
+}
+
+impl<'source> WeaponProceduralTarget<'source> {
+    /// Borrows the original physical definition and its header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows the original ordered field arena and stored values.
+    #[must_use]
+    pub const fn fields(&self) -> &SourceArenaOutput<'source> {
+        &self.fields
+    }
 }
 
 #[derive(Default)]
@@ -98,7 +114,7 @@ pub(in crate::catalog_v3) fn read<'source>(
                 .iter()
                 .filter_map(WeaponActions::actor_recoil_index)
                 .collect(),
-            |_, source, fields, notes| ActorProceduralRecoilConfig::read(source, fields, notes),
+            recoil_config,
         )?,
     );
     let weapon_procedural_clips = reader.targets(
@@ -171,6 +187,47 @@ impl<'source> Reader<'_, 'source> {
             project,
         )
     }
+}
+
+pub(crate) fn read_recoil_config_selected<'source>(
+    tree: &RecordTree<'source>,
+    input: &OriginalCatalogInput<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<ActorProceduralRecoilConfig<'source>>, CatalogError> {
+    referenced_definition_read::read_selected(
+        tree,
+        input,
+        admission,
+        ConfigurationInspection::WeaponProceduralDefinition,
+        cancel,
+        recoil_config,
+    )
+}
+
+pub(crate) fn read_recoil_modifier_selected<'source>(
+    tree: &RecordTree<'source>,
+    input: &OriginalCatalogInput<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<WeaponProceduralTarget<'source>>, CatalogError> {
+    referenced_definition_read::read_selected(
+        tree,
+        input,
+        admission,
+        ConfigurationInspection::WeaponProceduralDefinition,
+        cancel,
+        original_target,
+    )
+}
+
+fn recoil_config<'source>(
+    _source_type: &'source str,
+    source: CanonicalRecordHeader<'source>,
+    fields: Observed<'_, '_, '_, 'source>,
+    notes: &mut Vec<FieldError>,
+) -> Result<ActorProceduralRecoilConfig<'source>, CatalogError> {
+    ActorProceduralRecoilConfig::read(source, fields, notes)
 }
 
 fn original_target<'source>(

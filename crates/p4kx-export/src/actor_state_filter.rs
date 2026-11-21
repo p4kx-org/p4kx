@@ -14,35 +14,50 @@ use crate::source_fields::FieldError;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ActorStateFilter<'source> {
+#[non_exhaustive]
+pub struct ActorStateFilter<'source> {
+    /// Original filter name.
     #[serde(rename = "filterName")]
-    name: SourcedValue<&'source str>,
+    pub name: SourcedValue<&'source str>,
+    /// Authored actor state.
     #[serde(rename = "filterByState")]
-    state: SourcedValue<&'source str>,
+    pub state: SourcedValue<&'source str>,
+    /// Authored motion-speed state.
     #[serde(rename = "filterByMotionSpeed")]
-    motion_speed: SourcedValue<&'source str>,
+    pub motion_speed: SourcedValue<&'source str>,
+    /// Authored pose state.
     #[serde(rename = "filterByPoseState")]
-    pose_state: SourcedValue<&'source str>,
+    pub pose_state: SourcedValue<&'source str>,
+    /// Authored stance state.
     #[serde(rename = "filterByStanceState")]
-    stance_state: SourcedValue<&'source str>,
+    pub stance_state: SourcedValue<&'source str>,
+    /// Authored aim stance.
     #[serde(rename = "filterByAimStanceState")]
-    aim_stance_state: SourcedValue<&'source str>,
+    pub aim_stance_state: SourcedValue<&'source str>,
+    /// Authored lean state.
     #[serde(rename = "filterByLeanState")]
-    lean_state: SourcedValue<&'source str>,
+    pub lean_state: SourcedValue<&'source str>,
+    /// Authored held-item type.
     #[serde(rename = "filterByHeldItemType")]
-    held_item_type: SourcedValue<&'source str>,
+    pub held_item_type: SourcedValue<&'source str>,
+    /// Authored equipped armor class.
     #[serde(rename = "filterByEquippedArmorClass")]
-    equipped_armor_class: SourcedValue<&'source str>,
+    pub equipped_armor_class: SourcedValue<&'source str>,
+    /// Authored skeleton selector.
     #[serde(rename = "filterBySkeleton")]
-    skeleton: SourcedValue<&'source str>,
+    pub skeleton: SourcedValue<&'source str>,
+    /// Authored character type.
     #[serde(rename = "filterByCharacterType")]
-    character_type: SourcedValue<&'source str>,
+    pub character_type: SourcedValue<&'source str>,
+    /// Authored restraint state.
     #[serde(rename = "filterByRestrainedState")]
-    restrained_state: SourcedValue<&'source str>,
+    pub restrained_state: SourcedValue<&'source str>,
+    /// Authored player-camera mode.
     #[serde(rename = "filterByPlayerCamera")]
-    player_camera: SourcedValue<&'source str>,
+    pub player_camera: SourcedValue<&'source str>,
+    /// Authored aiming restriction.
     #[serde(rename = "filterByAimingRestriction")]
-    aiming_restriction: SourcedValue<&'source str>,
+    pub aiming_restriction: SourcedValue<&'source str>,
 }
 
 impl<'source> ActorStateFilter<'source> {

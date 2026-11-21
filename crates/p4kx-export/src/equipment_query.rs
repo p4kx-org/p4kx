@@ -139,6 +139,8 @@ mod weapon;
 #[path = "equipment_weapon_animation_sources_query.rs"]
 pub mod weapon_animation_sources;
 
+#[path = "equipment_actor_procedural_recoil_query.rs"]
+pub mod actor_procedural_recoil;
 #[path = "equipment_weapon_animation_query.rs"]
 mod weapon_animation;
 #[path = "equipment_weapon_combat_query.rs"]

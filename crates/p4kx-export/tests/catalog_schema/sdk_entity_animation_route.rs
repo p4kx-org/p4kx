@@ -17,8 +17,7 @@ use serde_json::Value;
 use super::component_parity::parity;
 use super::{Route, TestResult};
 
-#[path = "../it/catalog_weapon_operating_fixture.rs"]
-mod fixture;
+use super::weapon_operating_fixture as fixture;
 
 pub(in super::super) const DATASET: &str = "/configurations/entityAnimationControllers";
 

@@ -17,6 +17,9 @@ use crate::health_origin_assertions as proof;
 
 use super::catalog_weapon_operating_fixture as fixture;
 
+#[path = "catalog_actor_procedural_recoil_sdk.rs"]
+mod actor;
+
 const WEAPON: u32 = 2;
 const RECOIL: u32 = 1;
 const RECOIL_GUID: u128 = 0x9af4;

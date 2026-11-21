@@ -31,6 +31,15 @@ const LANGUAGES: CatalogLanguageSelection = CatalogLanguageSelection::Selected(&
 const REMAINING: &str =
     "encrypted synthetic producer parity available; installed producer parity open";
 
+pub(super) fn append_item_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResult<()> {
+    routes.extend(super::read_entity_definitions(archive)?);
+    routes.extend(read()?);
+    routes.extend(super::item_durability::read()?);
+    routes.extend(super::item_recovery::read()?);
+    routes.push(super::loadout::read()?);
+    Ok(())
+}
+
 pub(super) fn read() -> TestResult<[Route; 3]> {
     let [ports, attachments] = alignment_routes()?;
     Ok([ports, attachments, bounds_route()?])
