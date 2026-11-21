@@ -246,6 +246,19 @@ pub(crate) fn catalog_selection_names() -> impl Iterator<Item = &'static str> {
         .chain(["shipStoreSlugs"])
 }
 
+#[test]
+fn selection_registry_agrees_with_catalog_contract() -> TestResult {
+    use std::collections::BTreeSet;
+
+    let schema = p4kx_export::catalog_schema();
+    let fields = schema
+        .pointer("/$defs/Completeness/properties")
+        .and_then(Value::as_object)
+        .ok_or("Catalog completeness contract")?;
+    let expected = fields.keys().map(String::as_str).collect::<BTreeSet<_>>();
+    assert_eq!(catalog_selection_names().collect::<BTreeSet<_>>(), expected);
+    Ok(())
+}
 fn check_complete_selection(completeness: &BTreeMap<String, Selection>) -> TestResult {
     let expected = catalog_selection_names().collect::<Vec<_>>();
     let missing: Vec<_> = expected

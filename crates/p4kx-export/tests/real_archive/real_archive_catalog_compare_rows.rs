@@ -120,13 +120,12 @@ fn incomplete_catalog_header_fails_before_the_bulk_payload() -> super::TestResul
     use serde_json::{Map, json};
 
     use crate::catalog_capture::CatalogCapture;
+    use crate::real_archive_catalog_size::replay::bindings::catalog_selection_names;
 
-    let omitted = Kind::SubsumptionEvents;
-    let completeness: Map<String, Value> = Kind::ALL
-        .iter()
-        .copied()
-        .filter(|kind| *kind != omitted)
-        .map(|kind| (kind.name().to_owned(), json!({"status": "complete"})))
+    let omitted = Kind::SubsumptionEvents.name();
+    let completeness: Map<String, Value> = catalog_selection_names()
+        .filter(|name| *name != omitted)
+        .map(|name| (name.to_owned(), json!({"status": "complete"})))
         .collect();
     let header = serde_json::to_string(&completeness)?;
     let input = format!(r#"{{"completeness":{header},"definitions":@}}"#);
@@ -137,9 +136,7 @@ fn incomplete_catalog_header_fails_before_the_bulk_payload() -> super::TestResul
         .read(input.as_bytes())
         .expect_err("ineligible header must fail before decoding the bulk payload");
     assert!(
-        error
-            .to_string()
-            .contains(&format!("missing: {})", omitted.name())),
+        error.to_string().contains(&format!("missing: {omitted})")),
         "{error}"
     );
     Ok(())
