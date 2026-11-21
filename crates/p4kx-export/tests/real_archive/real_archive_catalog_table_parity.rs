@@ -14,6 +14,7 @@ use serde_json::map::Entry;
 use serde_json::{Map, Value};
 
 use crate::catalog_capture::CatalogCapture;
+use crate::real_archive_catalog_preflight;
 use crate::real_archive_catalog_size::artifact;
 use crate::real_archive_catalog_size::replay::bindings::{Binding, Receipt};
 
@@ -61,6 +62,7 @@ pub(crate) fn with_bound_measurement<T>(
         .map(PathBuf::from)
         .ok_or("configure the completed Catalog measurement")?;
     let binding = Receipt::read(&directory)?.binding()?;
+    real_archive_catalog_preflight::check(&directory)?;
     let path = p4kx_testkit::real_archive_path().map_err(|_| "configure the matching Archive")?;
     let key = p4kx_testkit::real_archive_key().map_err(|_| "read the configured Archive key")?;
     let archive =

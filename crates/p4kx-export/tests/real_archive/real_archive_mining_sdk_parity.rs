@@ -15,15 +15,15 @@ use serde_json::{Value, json};
 
 use crate::catalog_capture::CatalogCapture;
 use crate::catalog_v3_consumer as consumer;
+use crate::real_archive_catalog_preflight;
 use crate::real_archive_catalog_size::artifact;
+use crate::real_archive_catalog_size::replay::bindings::check_catalog_selection;
 use crate::real_archive_catalog_table_parity::first_difference;
 use crate::real_archive_shop_inventory_v3::verify_build;
 use crate::real_archive_verification::print_line;
 
 #[path = "real_archive_mining_catalog_scope.rs"]
 mod occurrence_text;
-#[path = "real_archive_mining_catalog_preflight.rs"]
-mod preflight;
 #[path = "real_archive_mining_catalog_rows.rs"]
 mod rows;
 
@@ -39,7 +39,7 @@ fn installed_mining_sdk_matches_the_same_complete_catalog() -> TestResult {
     let directory = env::var_os("P4KX_CATALOG_MEASUREMENT_DIR")
         .map(PathBuf::from)
         .ok_or("configure the completed catalog measurement")?;
-    preflight::check(&directory)?;
+    real_archive_catalog_preflight::check(&directory)?;
     let path = p4kx_testkit::real_archive_path().map_err(|_| "configure the matching Archive")?;
     let key = p4kx_testkit::real_archive_key().map_err(|_| "read the configured Archive key")?;
     let archive =
@@ -142,7 +142,11 @@ fn require_same_build_and_complete_scope(
             "complete normal export health",
         )?;
     }
-    preflight::require_complete_selection(catalog.get("completeness"))?;
+    check_catalog_selection(
+        catalog
+            .get("completeness")
+            .ok_or("missing Catalog completeness")?,
+    )?;
     if !snapshot.coverage.language_available
         || snapshot.coverage.archive_inventory_incomplete
         || snapshot.coverage.placement_inventory_incomplete

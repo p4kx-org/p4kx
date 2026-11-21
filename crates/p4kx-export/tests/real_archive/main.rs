@@ -28,6 +28,7 @@ mod real_archive_cargo_globals;
 mod real_archive_cargo_grid_capacity;
 mod real_archive_catalog_links;
 mod real_archive_catalog_pipe;
+mod real_archive_catalog_preflight;
 mod real_archive_catalog_ships;
 mod real_archive_catalog_size;
 mod real_archive_catalog_table_parity;

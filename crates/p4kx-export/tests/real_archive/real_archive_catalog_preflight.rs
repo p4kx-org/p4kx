@@ -5,41 +5,20 @@ use std::fmt;
 use std::io::Read;
 use std::path::Path;
 
-use p4kx_export::Kind;
 use serde::Deserializer as _;
 use serde::de::{IgnoredAny, MapAccess, Visitor};
 use serde_json::Value;
 
 use crate::real_archive_catalog_size::artifact;
 
-use super::TestResult;
+use crate::real_archive_catalog_size::replay::bindings::check_catalog_selection;
 
-pub(super) fn check(directory: &Path) -> TestResult {
+type TestResult = Result<(), Box<dyn std::error::Error>>;
+
+pub(crate) fn check(directory: &Path) -> TestResult {
     let selection = artifact::read_completed_prefix(directory, |input| Ok(read_selection(input)?))?;
     if let Some(selection) = &selection {
-        require_complete_selection(Some(selection))?;
-    }
-    Ok(())
-}
-
-pub(super) fn require_complete_selection(selection: Option<&Value>) -> TestResult {
-    let mut issues = Vec::new();
-    for kind in Kind::ALL {
-        let name = kind.name();
-        match selection.and_then(|selection| selection.get(name)) {
-            None => issues.push(format!("{name}=missing")),
-            Some(row) if row.get("status").and_then(Value::as_str) != Some("complete") => {
-                issues.push(format!("{name}=incomplete"));
-            }
-            Some(_) => {}
-        }
-    }
-    if !issues.is_empty() {
-        return Err(format!(
-            "mining parity requires the complete unfiltered Catalog ({})",
-            issues.join(", ")
-        )
-        .into());
+        check_catalog_selection(selection)?;
     }
     Ok(())
 }
@@ -92,6 +71,7 @@ impl<'de> Visitor<'de> for SelectionPrefix<'_> {
 
 #[test]
 fn missing_required_kind_is_reported_from_the_prefix() -> TestResult {
+    use p4kx_export::Kind;
     use serde_json::json;
 
     let required = Kind::SubsumptionEvents.name();
@@ -105,14 +85,14 @@ fn missing_required_kind_is_reported_from_the_prefix() -> TestResult {
     let prefix = format!(
         r#"{{"schemaVersion":3,"source":{{}},"completeness":{selection},"items":<unparsed>"#,
     );
-    let selection = read_selection(prefix.as_bytes())?;
-    let Err(error) = require_complete_selection(selection.as_ref()) else {
+    let selection = read_selection(prefix.as_bytes())?.ok_or("present selection prefix")?;
+    let Err(error) = check_catalog_selection(&selection) else {
         return Err("a retained selection missing a current Kind must fail".into());
     };
     assert!(
         error
             .to_string()
-            .ends_with(&format!("({required}=missing)")),
+            .ends_with(&format!("(missing: {required})")),
         "only the missing current Kind is named in the preflight diagnostic"
     );
     Ok(())
