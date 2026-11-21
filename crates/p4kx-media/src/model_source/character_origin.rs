@@ -44,8 +44,23 @@ impl<'a, 'document> CharacterElement<'a, 'document> {
         let Some(attribute) = character_definition::attribute(self.element, name) else {
             return Ok((None, self.element_origin(name, writer)?));
         };
-        let evidence = self.attribute_origin(&attribute, writer)?;
+        let evidence = self.attribute_origin(&attribute, SourceUseRole::Payload, writer)?;
         Ok((Some(attribute.value()), evidence))
+    }
+
+    pub(super) fn selector_origin(
+        &self,
+        name: &str,
+        writer: &MediaWriter<'_>,
+    ) -> Result<OriginContributions, MediaError> {
+        character_definition::attribute(self.element, name).map_or_else(
+            || self.element_origin(name, writer),
+            |attribute| self.attribute_origin(&attribute, SourceUseRole::Selector, writer),
+        )
+    }
+
+    pub(super) fn has_attribute(&self, name: &str) -> bool {
+        character_definition::attribute(self.element, name).is_some()
     }
 
     pub(super) fn field(
@@ -90,10 +105,10 @@ impl<'a, 'document> CharacterElement<'a, 'document> {
     fn attribute_origin(
         &self,
         attribute: &SourceAttribute<'_>,
+        role: SourceUseRole,
         writer: &MediaWriter<'_>,
     ) -> Result<OriginContributions, MediaError> {
         let name = attribute.name();
-        let role = SourceUseRole::Payload;
         match attribute.position() {
             SourceAttributePosition::Text(range) => {
                 let indices = [range.start as u64, range.end as u64];

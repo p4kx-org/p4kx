@@ -15,6 +15,9 @@ use serde_json::{Value, json};
 
 use super::support::{self, TestResult};
 
+#[path = "model_cdf_model_pose.rs"]
+mod model_pose;
+
 const RIG_SOURCE: &str = "Rigs/SelectionRig.chr";
 const DECOY_SOURCE: &str = "Rigs/Unselected.chr";
 const ATTACHMENT: &str = "model-character-attachment";
@@ -29,6 +32,9 @@ const RIGGED_CDF: &str = r#"<CharacterDefinition>
         <Attachment AName="Invalid" Type="CA_BONE" BoneName="Joint" Binding="Rigs/Absent.cgf" RelRotation="0,0,0,0"/>
         <Attachment AName="Unnamed" Type="CA_BONE" Binding="Rigs/Absent.cgf"/>
         <Attachment AName="Face" Type="CA_FACE" BoneName="Joint"/>
+        <Attachment AName="Model" Type="CA_BONE" BoneName="Joint" Position="100,200,300" Rotation="1,0,0,0"/>
+        <Attachment AName="Mixed" Type="CA_BONE" BoneName="Joint" Position="2,3,4" RelRotation="1,0,0,0" Rotation="invalid shadowed"/>
+        <Attachment AName="Default" Type="CA_BONE" BoneName="Joint" RelRotation="1,0,0,0" Rotation="presence selects model default"/>
     </AttachmentList>
 </CharacterDefinition>"#;
 const UNSELECTED_CDF: &str = r#"<CharacterDefinition>
@@ -66,12 +72,9 @@ fn cdf_rig_placement_binds_only_the_selected_physical_skeleton_and_unique_bone()
     let (ordinal, bound) = attachment(&rows, 0, 0)?;
     assert_bound(bound)?;
     assert_unapplied(&rows)?;
-    check_frame_evidence(
-        &output.join(&index.artifact_base),
-        ordinal,
-        fixture.skeleton_offset,
-    )?;
-    Ok(())
+    let base = output.join(&index.artifact_base);
+    check_frame_evidence(&base, ordinal, fixture.skeleton_offset)?;
+    model_pose::check(&rows, &base)
 }
 
 struct Fixture {

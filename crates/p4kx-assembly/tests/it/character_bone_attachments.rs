@@ -6,6 +6,9 @@
 #[path = "character_drawable_body.rs"]
 mod drawable_body;
 
+#[path = "character_model_space.rs"]
+mod model_space;
+
 use crate::assembly_support::{TestResult, assemble, assemble_with, fixture};
 
 use p4kx_assembly::{ArchiveModels, Assembly, AssemblyOptions, IssueKind, ModelProvider};

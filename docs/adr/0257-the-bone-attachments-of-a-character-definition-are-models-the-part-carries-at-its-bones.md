@@ -10,11 +10,13 @@ main thruster of the M50 (`ORIG_M50_Main_Thruster_Nozzle.cdf`) and of the Gladia
   and `Binding` as a separate bone attachment. The attachment pass excludes the exact occurrence
   selected as the part's model. When the declared model provides a rig without drawable geometry
   and the first bound attachment is rigid, the Assembly uses the declared rig as the owner and
-  places that attachment with the other rigid attachments. `RelPosition` (`x,y,z`, metres) and `RelRotation`
-  (a quaternion `w,x,y,z`, `1,0,0,0` being none) default to no offset; a value that does not read as
-  numbers, a rotation without length or a binding that is another definition is listed as left
-  out. Every readable bone attachment is retained in source order; `left_out` retains every
-  original undrawn occurrence without a count prefix. The numbers are read with the tolerant
+  places that attachment with the other rigid attachments. `RelPosition` and `RelRotation`
+  independently take precedence over the model-space `Position` and `Rotation`. The translation
+  is in metres and quaternions are stored as WXYZ. Absent values default to zero translation and
+  identity orientation in the bone frame when neither model-space attribute is authored, or in the
+  model frame otherwise. A selected value that does not parse, a rotation without length or a
+  binding that is another definition is listed as left out. Attachment occurrences stay in source
+  order, with original undrawn occurrences in `left_out`. The numbers are read with the tolerant
   parser of ADR-0145. Source Entry admission and per-definition vertex admission are independent.
   See [ADR-0150](0150-assembly-lod-fallback-vehicle-only-ports-and-character-definitions.md).
 - **Providing.** `ProvidedModel::attachments` holds one `ProvidedAttachment` per bone attachment
@@ -25,10 +27,10 @@ main thruster of the M50 (`ORIG_M50_Main_Thruster_Nozzle.cdf`) and of the Gladia
   `attachments()`, each an `AttachedModel` with its own model and material library (the attachment's
   `Material` replaces the one the model names). For a rig without drawable geometry, the first
   rigid attachment also takes the Entity material override when one is present. Its transform to
-  the part is the bind pose of the
-  bone in the part's model, `bone_transform` as for the backpack and the item ports of a character
-  definition, then the attachment's own offset. A bone the model lacks is `helper_not_found`, and
-  the model sits at the part's origin with its offset.
+  the part combines the resolved relative components with the bind pose of the bone and keeps
+  authored model-space components in that space. A missing bone emits `helper_not_found` and
+  substitutes the identity frame for relative components. Observed placement cites only the
+  selected transform attributes and the bind data used by the projected frame.
 - **Writing.** The GLB, the Blender package and the viewer scene write each attachment as a child
   of its part's node, after all parts and before the Interior, in the order of
   `Assembly::attached_models`; the indices of the parts are their own. A viewer piece has the path

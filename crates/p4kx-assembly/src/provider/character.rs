@@ -165,6 +165,7 @@ impl ArchiveModels<'_> {
             bone: bone.bone.clone(),
             position: bone.position,
             rotation: bone.rotation,
+            pose_selection: bone.pose_selection,
             entry,
             model: read.model,
             archive_sources: read.sources,

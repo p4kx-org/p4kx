@@ -98,6 +98,10 @@ pub(super) struct Attachment {
     pub(super) relative_position: BoneOffset<[f32; 3]>,
     pub(super) relative_rotation_wxyz: BoneOffset<[f32; 4]>,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) model_position: Option<BoneOffset<[f32; 3]>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(super) model_rotation_wxyz: Option<BoneOffset<[f32; 4]>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub(super) rig_placement: Option<Box<AttachmentRig>>,
 }
 
@@ -140,13 +144,13 @@ pub(super) enum AttachmentRigDisposition {
     rename_all = "kebab-case",
     deny_unknown_fields
 )]
-pub(super) enum CharacterRecord {
+pub(super) enum CharacterRecord<'source> {
     #[serde(rename = "character-definition")]
-    Definition(Definition),
+    Definition(&'source Definition),
     #[serde(rename = "character-skeleton")]
-    Skeleton(Skeleton),
+    Skeleton(&'source Skeleton),
     #[serde(rename = "character-attachment")]
-    Attachment(Attachment),
+    Attachment(&'source Attachment),
 }
 
 pub(super) fn optional_reference(_: &mut SchemaGenerator) -> Schema {
@@ -164,6 +168,6 @@ pub(super) fn insert_schema(base: &mut serde_json::Value) -> Result<(), crate::M
     crate::schema_merge::insert_payload(
         base,
         SCHEMA_NAME,
-        crate::schema_merge::serialized_payload::<CharacterRecord>(),
+        crate::schema_merge::serialized_payload::<CharacterRecord<'_>>(),
     )
 }

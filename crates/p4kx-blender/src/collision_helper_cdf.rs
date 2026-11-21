@@ -28,24 +28,20 @@ pub(super) fn capture(
     let document = CharacterDefinition::read(bytes).map_err(error)?;
     let scope = input.observe(definition)?;
     let mut attachment_uses = Vec::new();
-    for field in attachment.cdf_sources() {
-        if field.field() == CdfAttachmentField::Material {
-            continue;
-        }
+    for (field, role) in attachment.placement_cdf_sources() {
         if let Some(location) = field.location() {
-            let role = if field.field().is_offset() {
-                SourceUseRole::Conversion
-            } else {
-                SourceUseRole::Selector
-            };
             attachment_uses.push(scope.at(location, role).map_err(error)?);
         }
     }
     let matched_rig = owner.verified_attachment_bone_placement_source(ordinal);
+    let mut rig_uses = Vec::new();
     let selected_rig = matched_rig
         .as_ref()
-        .map(|rig| bind_rig(rig, input, &mut attachment_uses))
+        .map(|rig| bind_rig(rig, input, &mut rig_uses))
         .transpose()?;
+    attachment_uses.extend(rig_uses.into_iter().filter(|used| {
+        attachment.placement_uses_bone_pose() || used.role() == SourceUseRole::Selector
+    }));
     let proven = selected_rig.is_some() && attachment.offset_used();
     let frame = if proven {
         attachment

@@ -18,12 +18,18 @@ pub(super) fn attachment(
     let Some(attachment) = owner.attachments().get(ordinal) else {
         return Ok(());
     };
-    let fields = attachment.cdf_sources().iter().filter(|source| {
-        let field = source.field();
-        field != CdfAttachmentField::Material && (!field.is_offset() || attachment.offset_used())
-    });
-    attachment_fields(projection, attachment, fields, uses)?;
-    if let Some(bone) = owner.attachment_bone_placement_source(ordinal) {
+    let fields = attachment
+        .placement_cdf_sources()
+        .filter_map(|(source, role)| Some((source.location()?, role)));
+    record(
+        projection,
+        attachment.model_definition_origin(),
+        fields,
+        uses,
+    )?;
+    if attachment.placement_uses_bone_pose()
+        && let Some(bone) = owner.attachment_bone_placement_source(ordinal)
+    {
         bone_origins::record(projection, &bone, uses)?;
     }
     Ok(())
@@ -97,14 +103,7 @@ fn attachment_fields<'a>(
     fields: impl Iterator<Item = &'a CdfAttachmentSite>,
     uses: &mut Vec<SourceUse>,
 ) -> Result<()> {
-    let fields = fields.filter_map(|source| {
-        let role = if source.field().is_offset() {
-            SourceUseRole::Conversion
-        } else {
-            SourceUseRole::Selector
-        };
-        Some((source.location()?, role))
-    });
+    let fields = fields.filter_map(|source| Some((source.location()?, SourceUseRole::Selector)));
     record(
         projection,
         attachment.model_definition_origin(),

@@ -67,6 +67,7 @@ impl Loaded {
                     bone: primary.bone,
                     position: primary.position,
                     rotation: primary.rotation,
+                    pose_selection: primary.pose_selection,
                     entry: mem::replace(&mut loaded.entry, entry),
                     model: mem::replace(&mut loaded.model, Arc::new(model)),
                     archive_sources: mem::replace(&mut loaded.archive_sources, sources),

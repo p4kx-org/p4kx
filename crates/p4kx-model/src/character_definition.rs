@@ -1,12 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Positioned declarations and bone-relative offsets in a character definition.
+//! Positioned declarations and attachment poses in a character definition.
 
 use p4kx_cryxml::{
     Format, SourceAttribute, SourceDocument, SourceElement, SourceReadError, SourceReadOptions,
 };
 use p4kx_foundation::read_text_number;
+
+#[path = "character_attachment_pose.rs"]
+mod attachment_pose;
+
+pub use attachment_pose::{AttachmentPose, AttachmentPoseField, AttachmentPoseSelection};
 
 /// A CDF source with original XML coordinates.
 #[derive(Debug)]

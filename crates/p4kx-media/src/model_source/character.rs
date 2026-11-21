@@ -3,14 +3,11 @@
 
 use p4kx_extraction::SourceUseRole;
 use p4kx_extraction::cryxml::{SourceElement, SourceReadError};
-use p4kx_extraction::model::character_definition::{
-    self, CharacterDefinition, relative_position, relative_rotation,
-};
+use p4kx_extraction::model::character_definition::{self, CharacterDefinition};
 
+use super::character_offsets::CharacterOffsets;
 use super::character_origin::CharacterElement;
-use super::character_payload::{
-    self as wire, Attachment, BoneOffset, CharacterRecord, Definition, Skeleton,
-};
+use super::character_payload::{self as wire, Attachment, CharacterRecord, Definition, Skeleton};
 use super::character_reference::CharacterReferences;
 use super::character_rig::CharacterRig;
 use super::character_rig_placement::{self, AttachmentPose};
@@ -124,7 +121,7 @@ fn write_definition(
         writer,
         &Subresource::new(wire::DOCUMENT, Vec::new()),
         status,
-        &CharacterRecord::Definition(Definition::new(parsed.as_ref().ok())),
+        &CharacterRecord::Definition(&Definition::new(parsed.as_ref().ok())),
         issue.as_slice(),
     )
 }
@@ -143,7 +140,7 @@ fn write_skeleton(
         writer,
         &Subresource::new(wire::SKELETON, vec![ordinal as u64]),
         Status::Complete,
-        &CharacterRecord::Skeleton(Skeleton { file }),
+        &CharacterRecord::Skeleton(&Skeleton { file }),
         &[],
     )
 }
@@ -163,7 +160,7 @@ fn write_attachment(
         writer,
         &Subresource::new(wire::ATTACHMENT, indices.map(|value| value as u64).to_vec()),
         Status::Complete,
-        &CharacterRecord::Attachment(payload),
+        &CharacterRecord::Attachment(&payload),
         &[],
     )
 }
@@ -190,17 +187,7 @@ fn attachment_payload(
         writer,
     )?;
     let is_bone = kind.is_some_and(character_rig_placement::is_bone);
-    let mut offset = |name, path| element.offset(name, path, &kind_origin, prepared, writer);
-    let position = offset("RelPosition", "/data/payload/relative_position")?;
-    let rotation = offset("RelRotation", "/data/payload/relative_rotation_wxyz")?;
-    let position = BoneOffset {
-        authored: position.map(str::to_owned),
-        value: is_bone.then(|| relative_position(position)).flatten(),
-    };
-    let rotation = BoneOffset {
-        authored: rotation.map(str::to_owned),
-        value: is_bone.then(|| relative_rotation(rotation)).flatten(),
-    };
+    let offsets = CharacterOffsets::read(element, is_bone, &kind_origin, prepared, writer)?;
     let links = references.attachment(element, prepared, writer)?;
     let rig_placement = if is_bone {
         let rig = rig.ok_or_else(|| {
@@ -210,8 +197,7 @@ fn attachment_payload(
             element,
             kind: &kind_origin,
             bone: bone.as_deref(),
-            position: position.value,
-            rotation: rotation.value,
+            decoded: offsets.decoded,
             strings_lossy: references.strings_lossy,
         };
         Some(rig.write(&authored, prepared, writer)?)
@@ -225,8 +211,10 @@ fn attachment_payload(
         material: links.material.map(str::to_owned),
         material_reference: links.material_reference,
         bone_name: bone,
-        relative_position: position,
-        relative_rotation_wxyz: rotation,
+        relative_position: offsets.relative_position,
+        relative_rotation_wxyz: offsets.relative_rotation,
+        model_position: offsets.model_position,
+        model_rotation_wxyz: offsets.model_rotation,
         rig_placement,
     })
 }

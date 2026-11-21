@@ -32,6 +32,8 @@ mod material_path;
 
 #[path = "model_source/character.rs"]
 mod character;
+#[path = "model_source/character_offsets.rs"]
+mod character_offsets;
 #[path = "model_source/character_origin.rs"]
 mod character_origin;
 #[path = "model_source/character_payload.rs"]

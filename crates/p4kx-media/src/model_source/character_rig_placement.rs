@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::model::character_definition::AttachmentPose as DecodedPose;
 use p4kx_extraction::model::{
     AttachmentBoneBinding, Transform, attachment_offset, resolve_attachment_bone,
 };
 use p4kx_extraction::{InputScope, SourceUseRole};
 
+use super::character_offsets::POSE_FIELDS;
 use super::character_origin::CharacterElement;
 use super::character_payload::{AttachmentRig, AttachmentRigDisposition};
 use super::character_rig_input::{RigRead, VerifiedRig};
@@ -23,8 +25,7 @@ pub(super) struct AttachmentPose<'a> {
     pub(super) element: &'a CharacterElement<'a, 'a>,
     pub(super) kind: &'a OriginContributions,
     pub(super) bone: Option<&'a str>,
-    pub(super) position: Option<[f32; 3]>,
-    pub(super) rotation: Option<[f32; 4]>,
+    pub(super) decoded: DecodedPose,
     pub(super) strings_lossy: bool,
 }
 
@@ -128,16 +129,17 @@ impl AttachmentPose<'_> {
         lineage: Vec<usize>,
         rig_from_bone: Transform,
     ) -> Placement {
-        let offset = self
-            .position
-            .zip(self.rotation)
-            .and_then(|(position, rotation)| attachment_offset(position, rotation));
-        let transform = offset
-            .as_ref()
-            .and_then(|offset| rig_from_bone.then(offset).finite());
+        let operands = self.decoded.position.zip(self.decoded.rotation_wxyz);
+        let selection = self.decoded.selection();
+        let transform = operands.and_then(|(position, rotation)| {
+            selection.in_model_space(position, rotation, &rig_from_bone)
+        });
         let disposition = if transform.is_some() {
             Disposition::Bound
-        } else if offset.is_some() {
+        } else if operands
+            .and_then(|(position, rotation)| attachment_offset(position, rotation))
+            .is_some()
+        {
             Disposition::UnavailableFrame
         } else {
             Disposition::InvalidOffset
@@ -196,15 +198,31 @@ impl AttachmentPose<'_> {
                     SourceUseRole::Conversion,
                 ),
             ] {
+                if role == SourceUseRole::Conversion
+                    && !self.decoded.selection().uses_bone()
+                    && placement.transform.is_some()
+                {
+                    continue;
+                }
                 let indices = [rig.ordinal as u64, ordinal as u64, range.start, range.end];
                 let site = OriginSite::new("model-skeleton-bone", &indices, field);
                 frame.add(&rig.input, InputScope::Payload, site, role, writer)?;
             }
         }
         if placement.uses_offset {
-            for field in ["RelPosition", "RelRotation"] {
-                frame.include_original(&self.element.value(field, writer)?.1)?;
+            let selection = self.decoded.selection();
+            for field in POSE_FIELDS {
+                if selection.uses(field) {
+                    frame.include_original(&self.element.value(field.name(), writer)?.1)?;
+                } else if selection.selects_default(field) {
+                    frame.include_original(&self.element.selector_origin(field.name(), writer)?)?;
+                }
             }
+            frame.include_original(
+                &self
+                    .element
+                    .element_origin("attachmentPoseSelection", writer)?,
+            )?;
         }
         Ok(frame.finish())
     }

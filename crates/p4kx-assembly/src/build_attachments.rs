@@ -4,7 +4,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use p4kx_model::{Transform, attachment_offset};
+use p4kx_model::Transform;
 
 use crate::attached::MaterialSelection;
 use crate::build::{Libraries, Library, SelectedLibrary, issue, library_key_of, materials_for};
@@ -14,8 +14,7 @@ use crate::placement;
 use crate::{AttachedModel, Geometry, Issue, IssueKind};
 
 /// Places the bone attachments of the model `loaded` of a part: each at its bone in the bind
-/// pose of the part's skeleton, offset by the attachment. A bone the skeleton lacks is an issue,
-/// and the model then sits at the part's origin.
+/// pose of the part's skeleton, or at the attachment's authored model-space coordinates.
 pub(crate) fn attached(
     draft: &Draft<'_>,
     loaded: Option<&Loaded>,
@@ -53,7 +52,12 @@ pub(crate) fn attached(
                 (materials, MaterialSelection::Attachment)
             };
             let bone = placement::bone_placement(&loaded.model, &attachment.bone);
-            let offset = attachment_offset(attachment.position, attachment.rotation);
+            let bind = bone.map_or(Transform::IDENTITY, |bone| bone.transform);
+            let transform = attachment.pose_selection.in_model_space(
+                attachment.position,
+                attachment.rotation,
+                &bind,
+            );
             if bone.is_none() {
                 let helper = attachment.bone.clone();
                 issues.push(issue(draft, IssueKind::HelperNotFound { helper }));
@@ -61,13 +65,11 @@ pub(crate) fn attached(
             AttachedModel {
                 name: attachment.name.clone(),
                 bone: attachment.bone.clone(),
-                local: bone
-                    .map_or(Transform::IDENTITY, |bone| bone.transform)
-                    .then(&offset.unwrap_or(Transform::IDENTITY)),
+                local: transform.unwrap_or(bind),
                 found: bone.is_some(),
                 bone_selection: bone.map(|bone| bone.selection),
                 cdf_sources: attachment.cdf_sources.clone(),
-                offset_used: offset.is_some(),
+                placed_pose: transform.map(|_| attachment.pose_selection),
                 entry: attachment.entry.clone(),
                 model: Arc::clone(&attachment.model),
                 archive_sources: Arc::clone(&attachment.archive_sources),

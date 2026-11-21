@@ -5936,6 +5936,26 @@
             }
           ]
         },
+        "model_position": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BoneOffset"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "model_rotation_wxyz": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BoneOffset2"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "name": {
           "type": [
             "string",

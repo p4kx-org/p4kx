@@ -4,6 +4,7 @@
 use std::error::Error;
 use std::sync::Arc;
 
+use p4kx_extraction::model::character_definition::AttachmentPoseSelection;
 use p4kx_extraction::model::{LayerBudget, LayerCache, MaterialStatus, Model};
 use p4kx_extraction::{
     AnimationChoice, AnimationSet, Archive, ArchiveDefaultMaterial, ArchiveMaterialRead,
@@ -60,9 +61,9 @@ pub struct ProvidedAttachment {
     pub name: String,
     /// The bone of the skeleton the model is bound to.
     pub bone: String,
-    /// The offset from the bone in metres.
+    /// The selected translation in metres, in the frame of [`Self::pose_selection`].
     pub position: [f32; 3],
-    /// The rotation from the bone as a quaternion `[w, x, y, z]`.
+    /// The selected quaternion in WXYZ order, in the frame of [`Self::pose_selection`].
     pub rotation: [f32; 4],
     /// The path of the model's file in the source.
     pub entry: String,
@@ -70,6 +71,15 @@ pub struct ProvidedAttachment {
     pub model: Arc<Model>,
     pub(crate) archive_sources: Arc<[ModelArchiveSource]>,
     pub(crate) cdf_sources: Option<Arc<[CdfAttachmentSite]>>,
+    pub(crate) pose_selection: AttachmentPoseSelection,
+}
+
+impl ProvidedAttachment {
+    /// Returns the original operands and their coordinate frames.
+    #[must_use]
+    pub const fn pose_selection(&self) -> AttachmentPoseSelection {
+        self.pose_selection
+    }
 }
 
 /// Why a [`ModelProvider`] cannot supply a model.

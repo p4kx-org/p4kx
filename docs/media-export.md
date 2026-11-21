@@ -176,11 +176,11 @@ This establishes only authored references and directory identity. Both target pa
 remain unread and neither claims that an attachment was used during assembly.
 
 Bone attachments carry the authored bone name, material override, relative position in metres
-and relative quaternion in WXYZ order. An absent position or rotation uses the CDF offset
-default for that bone attachment. Malformed values retain their original spelling with a null
-decoded value. Nonbone attachments retain any source strings for these offsets. Each field
-retains its original text attribute span or CryXml node and attribute table coordinates,
-including its source encryption state.
+and relative quaternion in WXYZ order. Authored `Position` and `Rotation` appear as
+`model_position` and `model_rotation_wxyz`, with the same units and order in the model frame.
+Malformed values retain their original spelling and have a null decoded value. Nonbone
+attachments retain their source strings without decoding them. Each field retains its original
+text attribute span or CryXml node and attribute table coordinates and its source encryption state.
 
 The optional `rig_placement` on a `CA_BONE` attachment connects the authored offsets to the
 declared rig. Its `rig` reference keeps the original Model File spelling and the resolution
@@ -194,14 +194,16 @@ match ignoring ASCII case, and multiple matching bones retain their ordinals in 
 `disposition` distinguishes declaration and archive lookup results, unavailable or unsupported
 rigs, missing or ambiguous bones, unavailable bind frames and invalid authored offsets.
 A `bound` result includes `rig_from_attachment`, a row-major 3 × 4 affine in the declared
-rig's Z-up space with translation in metres. It composes the bone's parent-relative bind pose
-chain with the authored attachment offset. Other dispositions leave the matrix null. An
-unselected rig retains its physical directory identity without reading its payload.
+rig's Z-up space with translation in metres. Each authored relative component takes precedence
+over its model-space counterpart. Relative components use the bone's bind pose. A missing
+component defaults to zero translation or identity orientation in the bone frame when both
+model-space attributes are absent, or in the model frame otherwise. Other dispositions leave
+the matrix null. An unselected rig retains its physical directory identity.
 
-Placement field origins name the actual CDF attributes and rig selection inputs. A composed
-frame cites each original bone's relative pose on the proven parent route, with its chunk and
-bone ordinal and half-open decoded byte range. The field's encryption marker reflects both
-the CDF and the selected rig contributors.
+Placement field origins cite the selected CDF transform attributes and the rig selection.
+When the projected frame uses the bone pose it cites each original relative pose on the
+parent route, with its chunk and bone ordinal and half-open decoded byte range. The encryption
+marker reflects the contributing CDF and rig inputs.
 
 The model provider reads vehicle physics-grid declarations when the physical DataForge Entry
 is selected. It uses the Archive's preferred DataForge Entry and the authored

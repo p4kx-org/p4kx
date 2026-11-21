@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use p4kx_cryxml::SourceAttributePosition;
 use p4kx_extraction::SourceLocation;
+use p4kx_extraction::model::character_definition::AttachmentPoseField;
 
 use crate::cdf_attribute_position::CdfCoordinateDomain;
 use crate::loadout_xml::{Node, Scope};
@@ -23,17 +24,23 @@ pub enum CdfAttachmentField {
     RelativePosition,
     /// The relative rotation.
     RelativeRotation,
+    /// The model-space translation.
+    ModelPosition,
+    /// The model-space rotation.
+    ModelRotation,
     /// The material override.
     Material,
 }
 
 impl CdfAttachmentField {
-    const FIELDS: [Self; 6] = [
+    const FIELDS: [Self; 8] = [
         Self::Type,
         Self::Binding,
         Self::BoneName,
         Self::RelativePosition,
         Self::RelativeRotation,
+        Self::ModelPosition,
+        Self::ModelRotation,
         Self::Material,
     ];
 
@@ -42,16 +49,28 @@ impl CdfAttachmentField {
             Self::Type => "Type",
             Self::Binding => "Binding",
             Self::BoneName => "BoneName",
-            Self::RelativePosition => "RelPosition",
-            Self::RelativeRotation => "RelRotation",
             Self::Material => "Material",
+            Self::RelativePosition => AttachmentPoseField::RelativePosition.name(),
+            Self::RelativeRotation => AttachmentPoseField::RelativeRotation.name(),
+            Self::ModelPosition => AttachmentPoseField::ModelPosition.name(),
+            Self::ModelRotation => AttachmentPoseField::ModelRotation.name(),
         }
     }
 
-    /// Returns whether this attribute supplies an attachment offset.
+    pub(crate) const fn pose_field(self) -> Option<AttachmentPoseField> {
+        match self {
+            Self::RelativePosition => Some(AttachmentPoseField::RelativePosition),
+            Self::RelativeRotation => Some(AttachmentPoseField::RelativeRotation),
+            Self::ModelPosition => Some(AttachmentPoseField::ModelPosition),
+            Self::ModelRotation => Some(AttachmentPoseField::ModelRotation),
+            Self::Type | Self::Binding | Self::BoneName | Self::Material => None,
+        }
+    }
+
+    /// Returns whether this attribute supplies a position or rotation.
     #[must_use]
     pub const fn is_offset(self) -> bool {
-        matches!(self, Self::RelativePosition | Self::RelativeRotation)
+        self.pose_field().is_some()
     }
 }
 

@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use p4kx_extraction::model::character_definition::{relative_position, relative_rotation};
+use p4kx_extraction::model::character_definition::{AttachmentPose, AttachmentPoseSelection};
 
 use crate::CdfAttachmentSite;
 use crate::cdf::slashes;
@@ -21,10 +21,9 @@ pub(crate) struct BoneAttachment {
     pub(crate) bone: String,
     /// The material library that replaces the one the model names.
     pub(crate) material: Option<String>,
-    /// The offset from the bone in metres (`RelPosition`).
     pub(crate) position: [f32; 3],
-    /// The rotation from the bone as a quaternion `[w, x, y, z]` (`RelRotation`).
     pub(crate) rotation: [f32; 4],
+    pub(crate) pose_selection: AttachmentPoseSelection,
     pub(crate) sources: Option<Arc<[CdfAttachmentSite]>>,
 }
 
@@ -41,8 +40,7 @@ impl BoneAttachment {
         let (true, Some(bone)) = (is_bone, bone) else {
             return None;
         };
-        let position = relative_position(element.attribute("RelPosition"))?;
-        let rotation = relative_rotation(element.attribute("RelRotation"))?;
+        let pose = AttachmentPose::read(|field| element.attribute(field.name()));
         let binding = slashes(binding);
         let name = element
             .attribute("AName")
@@ -53,8 +51,9 @@ impl BoneAttachment {
             bone: bone.to_owned(),
             material: element.attribute("Material").map(slashes),
             binding,
-            position,
-            rotation,
+            position: pose.position?,
+            rotation: pose.rotation_wxyz?,
+            pose_selection: pose.selection(),
             sources: None,
         })
     }
