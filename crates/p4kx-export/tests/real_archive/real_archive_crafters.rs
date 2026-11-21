@@ -1,13 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! The crafting stations of the P4KX catalog of a real Archive; runs with `--ignored` when
-//! `P4KX_DATA_P4K` names one.
-//!
-//! The anchors are the values of LIVE 4.10 and follow each patch; a failure after a patch means
-//! the value moved, to be checked against the Archive and updated here and in
-//! `docs/catalog.md`.
-
 use std::collections::HashSet;
 use std::error::Error;
 use std::time::SystemTime;
@@ -19,10 +12,11 @@ use serde_json::{Value, json};
 
 use crate::catalog_v3_consumer;
 
-type TestResult = Result<(), Box<dyn Error>>;
+type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const FABRICATOR_PATH: &str = "libs/foundry/records/entities/basebuilding/interactables/\
                                basebuilding_interactables_itemfabricator_standard";
+const STATIONS: &str = "/definitions/crafters/rows";
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
@@ -30,7 +24,10 @@ fn the_crafting_stations_of_a_real_archive_carry_their_limits() -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, real_archive_key().ok())?;
     let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
     let catalog: Value = serde_json::from_slice(built.json())?;
-    let crafters = catalog["crafters"].as_array().ok_or("the crafters")?;
+    let crafters = catalog
+        .pointer(STATIONS)
+        .and_then(Value::as_array)
+        .ok_or("the crafters")?;
     let kind = built
         .summary()
         .kind(Kind::Crafters)
@@ -38,18 +35,27 @@ fn the_crafting_stations_of_a_real_archive_carry_their_limits() -> TestResult {
     assert_eq!(
         (kind.count, kind.skipped),
         (2, 1),
-        "three stations on LIVE 4.10, one of them a template"
+        "LIVE 4.10 source baseline"
     );
     let fabricator = crafters
         .iter()
-        .find(|crafter| crafter["recordPath"] == FABRICATOR_PATH)
+        .find(|crafter| crafter["recordPath"]["value"] == FABRICATOR_PATH)
         .ok_or("the standard item fabricator")?;
-    assert_eq!(fabricator["maxJobsInHistory"], 10);
-    let limits: Vec<Value> = fabricator["queues"]
+    let component = &fabricator["component"]["value"];
+    assert_eq!(
+        component["maxJobsInHistory"]["value"]["value"], 10,
+        "the original history limit"
+    );
+    let limits: Vec<Value> = component["queues"]["value"]
         .as_array()
         .ok_or("the queues")?
         .iter()
-        .map(|queue| json!([queue["maxJobsInProgress"], queue["maxJobsWaiting"]]))
+        .map(|queue| {
+            json!([
+                queue.pointer("/value/maxJobsInProgress/value/value"),
+                queue.pointer("/value/maxJobsWaiting/value/value"),
+            ])
+        })
         .collect();
     assert_eq!(limits, [json!([2, 4]), json!([4, 4])], "queue limits");
     Ok(())
@@ -68,37 +74,61 @@ fn the_crafters_of_a_real_archive_resolve_their_categories_and_report_nothing_un
         .collect::<Result<HashSet<_>, _>>()?;
     let guids_resolve = |rule: &Value| {
         !matches!(
-            rule["kind"].as_str(),
+            rule.pointer("/value/kind").and_then(Value::as_str),
             Some("blueprintCategory" | "whitelist")
-        ) || rule["blueprintCategoryGuids"]
-            .as_array()
-            .is_some_and(|guids| {
-                guids
-                    .iter()
-                    .all(|guid| guid.as_str().is_some_and(|guid| categories.contains(guid)))
+        ) || rule
+            .pointer("/value/categories/value")
+            .and_then(Value::as_array)
+            .is_some_and(|slots| {
+                slots.iter().all(|slot| {
+                    slot.pointer("/value/guid/value")
+                        .and_then(Value::as_str)
+                        .is_some_and(|guid| categories.contains(guid))
+                })
             })
     };
-    for crafter in catalog["crafters"].as_array().ok_or("the crafters")? {
-        let name = &crafter["className"];
-        let issues = crafter["issues"].as_array().ok_or("the issues")?;
-        for issue in issues {
-            let code = issue.as_str().ok_or("an issue code")?;
-            assert!(!code.starts_with("unreadable_"), "{name}: {code}");
-        }
+    for crafter in catalog
+        .pointer(STATIONS)
+        .and_then(Value::as_array)
+        .ok_or("the crafters")?
+    {
+        let name = &crafter["className"]["value"];
+        let component = &crafter["component"]["value"];
+        let time = &component["baseCraftingTime"];
         assert!(
-            crafter["baseCraftingTime"].is_null() || crafter["baseCraftingTime"].is_number(),
-            "{name}: baseCraftingTime"
+            matches!(time["state"].as_str(), Some("present" | "absent" | "null")),
+            "{name}: baseCraftingTime state"
         );
-        for modifier in crafter["modifiers"].as_array().ok_or("the modifiers")? {
-            assert!(guids_resolve(&modifier["condition"]), "{name}: condition");
+        for modifier in retained_slots(&component["modifiers"])? {
+            assert!(
+                guids_resolve(&modifier["value"]["condition"]),
+                "{name}: condition"
+            );
         }
-        for queue in crafter["queues"].as_array().ok_or("the queues")? {
+        for queue in retained_slots(&component["queues"])? {
+            let queue = &queue["value"];
             assert!(
                 guids_resolve(&queue["blueprintCategoryAvailability"]),
                 "{name}: availability"
             );
-            assert!(queue["processTypeAvailability"].is_array(), "{name}");
+            let flags = &queue["processTypeAvailability"];
+            assert!(
+                matches!(flags["state"].as_str(), Some("absent" | "null"))
+                    || flags["value"].is_array(),
+                "{name}: authored process slots"
+            );
         }
     }
     Ok(())
+}
+
+fn retained_slots(cell: &Value) -> TestResult<&[Value]> {
+    match cell["state"].as_str() {
+        Some("absent" | "null") => Ok(&[]),
+        Some("present") => cell["value"]
+            .as_array()
+            .map(Vec::as_slice)
+            .ok_or_else(|| "the authored slots".into()),
+        _ => Err("unreadable authored array".into()),
+    }
 }

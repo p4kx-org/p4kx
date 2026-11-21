@@ -10,8 +10,14 @@ use crate::catalog_queries::{
     DatasetAvailability, ParsedCatalogQueries,
 };
 
+#[path = "equipment_crafter_host_query.rs"]
+mod crafter_host;
 #[path = "equipment_loadout_read.rs"]
 pub(super) mod read;
+pub use crafter_host::{
+    CrafterHost, CrafterHostSnapshot, read_crafter_hosts, read_crafter_hosts_from,
+};
+
 #[path = "equipment_loadout_scope.rs"]
 mod scope;
 

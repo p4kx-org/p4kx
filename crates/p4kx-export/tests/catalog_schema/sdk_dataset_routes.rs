@@ -50,6 +50,10 @@ mod contract_scopes;
 mod contracts;
 #[path = "sdk_countermeasure_emitter_route.rs"]
 mod countermeasure_emitters;
+#[path = "sdk_crafter_host_route.rs"]
+pub(super) mod crafter_hosts;
+#[path = "sdk_crafter_route.rs"]
+pub(super) mod crafters;
 #[path = "sdk_dismantle_process_route.rs"]
 pub(super) mod dismantle;
 #[path = "sdk_entity_animation_route.rs"]
@@ -222,6 +226,8 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         read_weapon_recoil(&archive)?,
         countermeasure_emitters::read()?,
         dismantle::read()?,
+        crafters::read()?,
+        crafter_hosts::read()?,
         archive_entries::read_language_sources(&archive)?,
         location_vocabulary::read_entities(&archive)?,
         mission_location::read()?,

@@ -16,6 +16,18 @@ pub use crate::catalog_v3::crafting_global::{
 pub use api::{with_global_params, with_global_params_from};
 pub use snapshot::CraftingGlobalSnapshot;
 
+#[path = "crafter_station_query.rs"]
+mod stations;
+pub use crate::catalog_queries::equipment::{
+    CrafterHost, CrafterHostSnapshot, read_crafter_hosts, read_crafter_hosts_from,
+};
+pub(in crate::build::catalog_queries) use stations::read_station;
+pub use stations::{
+    CrafterAttachment, CrafterAttachmentDefinition, CrafterCategoryRule, CrafterCategoryRuleKind,
+    CrafterComponent, CrafterDefinition, CrafterModifier, CrafterModifierKind, CrafterModifierType,
+    CrafterQueue, CrafterSnapshot, with_crafters, with_crafters_from,
+};
+
 #[path = "dismantle_process_query.rs"]
 mod dismantle;
 pub use dismantle::{

@@ -5679,6 +5679,9 @@
         "contractTemplates": {
           "$ref": "#/$defs/CatalogTableOfTemplateDefinition"
         },
+        "crafters": {
+          "$ref": "#/$defs/CatalogTableOfCrafterDefinition"
+        },
         "creatures": {
           "$ref": "#/$defs/CatalogTableOfPlanetCreature"
         },
@@ -5934,6 +5937,7 @@
         "contractGenerators",
         "contractScopes",
         "contractTemplates",
+        "crafters",
         "creatures",
         "damageResistanceMacros",
         "dismantleProcesses",
@@ -6171,6 +6175,9 @@
         "contracts": {
           "$ref": "#/$defs/CatalogTableOfContractEntry"
         },
+        "crafterHosts": {
+          "$ref": "#/$defs/CatalogTableOfCrafterHost"
+        },
         "jumpConnections": {
           "$ref": "#/$defs/CatalogTableOfJumpConnection"
         },
@@ -6204,6 +6211,7 @@
         "blueprintPresentation",
         "commodityPresentation",
         "contracts",
+        "crafterHosts",
         "jumpConnections",
         "missionTitles",
         "qualityQuantizationResources",
@@ -6839,6 +6847,44 @@
         "rows": {
           "items": {
             "$ref": "#/$defs/CountermeasureEmitter"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfCrafterDefinition": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/CrafterDefinition"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "availability",
+        "rows"
+      ],
+      "type": "object"
+    },
+    "CatalogTableOfCrafterHost": {
+      "description": "One named typed dataset with its measured source-family availability.",
+      "properties": {
+        "availability": {
+          "$ref": "#/$defs/DatasetAvailability"
+        },
+        "rows": {
+          "items": {
+            "$ref": "#/$defs/CrafterHost"
           },
           "type": "array"
         }
@@ -9692,35 +9738,6 @@
         "languagePolicy",
         "languageSources",
         "publicNames"
-      ],
-      "type": "object"
-    },
-    "CategoryRule": {
-      "description": "A polymorphic struct that names blueprint categories: the condition of a modifier or the\navailability of a queue.",
-      "properties": {
-        "blueprintCategoryGuids": {
-          "description": "Category Record GUIDs in `definitions.blueprintCategories.rows`, in stored order;\n`[]` for `none` and `unknown`.",
-          "items": {
-            "$ref": "#/$defs/Guid"
-          },
-          "type": "array"
-        },
-        "kind": {
-          "description": "Which struct it is, as the parent field documents; `unknown` keeps an unrecognised struct\nwithout values. A closed set the game may extend, so the schema keeps a string.",
-          "type": "string"
-        },
-        "structName": {
-          "description": "The name of the struct; `null` when the field holds none.",
-          "type": [
-            "string",
-            "null"
-          ]
-        }
-      },
-      "required": [
-        "blueprintCategoryGuids",
-        "kind",
-        "structName"
       ],
       "type": "object"
     },
@@ -13551,183 +13568,327 @@
       ],
       "type": "object"
     },
-    "Crafter": {
-      "description": "A crafting station: an entity whose `Components` hold a `CrafterComponentParams`.",
+    "CrafterAttachment": {
+      "description": "The selected attachable component used to match a station to a port.",
       "properties": {
-        "baseCraftingTime": {
-          "description": "`baseCraftingTime`; `null` when the Record stores no number.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
         },
-        "className": {
-          "description": "The Record name without its type.",
-          "type": "string"
+        "attachDef": {
+          "$ref": "#/$defs/SourcedValueOfCrafterAttachmentDefinition"
         },
-        "guid": {
-          "$ref": "#/$defs/Guid",
-          "description": "The GUID of the Record."
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
         },
-        "hostGuids": {
-          "description": "The GUIDs of the ships whose Default Loadout mounts the crafter in any port, ordered by\nGUID; empty for a crafter no ship mounts, e.g. a station.",
-          "items": {
-            "$ref": "#/$defs/Guid"
-          },
-          "type": "array"
-        },
-        "issues": {
-          "description": "The codes of the problems found in the modifiers and queues, e.g. `unknown_modifier_type`,\nsorted and without duplicates; empty when everything was understood.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
-        },
-        "maxJobsInHistory": {
-          "description": "`maxJobsInHistory`: how many finished jobs the station lists.",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "modifiers": {
-          "description": "The crafting modifiers, from `modifiers` in stored order; `[]` without any.",
-          "items": {
-            "$ref": "#/$defs/CrafterModifier"
-          },
-          "type": "array"
-        },
-        "queues": {
-          "description": "The job queues, from `queues` in stored order.",
-          "items": {
-            "$ref": "#/$defs/CrafterQueue"
-          },
-          "type": "array"
-        },
-        "recordPath": {
-          "description": "The record path, without `.xml`.",
-          "type": "string"
-        },
-        "size": {
-          "description": "`AttachDef.Size`, an integer.",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
-        },
-        "subType": {
-          "description": "`AttachDef.SubType`.",
-          "type": [
-            "string",
-            "null"
-          ]
-        },
-        "type": {
-          "description": "`AttachDef.Type` of the entity, e.g. `Crafter`; `null` without an `AttachDef`. With\n`subType` and `size` it is what a port's `types` and size range are matched against.",
-          "type": [
-            "string",
-            "null"
-          ]
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         }
       },
       "required": [
+        "additionalFields",
+        "attachDef",
+        "componentOrdinal",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "CrafterAttachmentDefinition": {
+      "description": "The authored attachment labels and size of a crafting station.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "itemSubtype": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "itemType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "size": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "itemSubtype",
+        "itemType",
+        "size",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "CrafterCategoryRule": {
+      "description": "Ordered category references of a queue whitelist or a modifier condition.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "categories": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogRecordReference"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "kind": {
+          "$ref": "#/$defs/CrafterCategoryRuleKind"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "categories",
+        "kind",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "CrafterCategoryRuleKind": {
+      "description": "The interpretation of a concrete authored category rule.",
+      "oneOf": [
+        {
+          "const": "whitelist",
+          "description": "A queue accepts its listed categories.",
+          "type": "string"
+        },
+        {
+          "const": "blueprintCategory",
+          "description": "A modifier applies to its listed categories.",
+          "type": "string"
+        },
+        {
+          "const": "original",
+          "description": "The concrete rule remains available in original form.",
+          "type": "string"
+        }
+      ],
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "CrafterComponent": {
+      "description": "The selected crafting component with its authored limits, queues and modifiers.",
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "baseCraftingTime": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "componentOrdinal": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "maxJobsInHistory": {
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
+        },
+        "modifiers": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCrafterModifier"
+        },
+        "queues": {
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCrafterQueue"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
         "baseCraftingTime",
-        "className",
-        "guid",
-        "hostGuids",
-        "issues",
+        "componentOrdinal",
         "maxJobsInHistory",
         "modifiers",
         "queues",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "CrafterDefinition": {
+      "description": "One physical Entity that declares a crafting component.",
+      "properties": {
+        "attachment": {
+          "$ref": "#/$defs/SourcedValueOfCrafterAttachment"
+        },
+        "className": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "component": {
+          "$ref": "#/$defs/SourcedValueOfCrafterComponent"
+        },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "metadataTag": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        },
+        "recordName": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "recordPath": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "attachment",
+        "className",
+        "component",
+        "fileName",
+        "guid",
+        "metadataTag",
+        "recordIndex",
+        "recordName",
         "recordPath",
-        "size",
-        "subType",
-        "type"
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "CrafterHost": {
+      "description": "A physical host ship and crafter linked by the ship's resolved default Loadout.",
+      "properties": {
+        "crafter": {
+          "$ref": "#/$defs/AttachmentIdentity"
+        },
+        "mountPositions": {
+          "items": {
+            "$ref": "#/$defs/SourcedValueOfLoadoutPosition"
+          },
+          "type": "array"
+        },
+        "shipGuid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "shipRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "crafter",
+        "mountPositions",
+        "shipGuid",
+        "shipRecordIndex"
       ],
       "type": "object"
     },
     "CrafterModifier": {
-      "description": "A crafting modifier of a [`Crafter`]: a `CraftingModifierParams`.",
+      "description": "One original crafting modifier and its independently authored condition.",
       "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
         "condition": {
-          "$ref": "#/$defs/CategoryRule",
-          "description": "When the modifier applies: the struct `modifierCondition` holds. `kind` is\n`blueprintCategory`, `none` (no condition stored) or `unknown`."
+          "$ref": "#/$defs/SourcedValueOfCrafterCategoryRule"
         },
-        "structName": {
-          "description": "The name of the struct `modifierType` holds; `null` for none.",
-          "type": [
-            "string",
-            "null"
-          ]
+        "modifierType": {
+          "$ref": "#/$defs/SourcedValueOfCrafterModifierType"
         },
-        "timeMultiplier": {
-          "description": "`timeMultiplier` of a `time` modifier: the factor on the crafting time (below 1 is\nfaster); `null` for any other type or when the Record stores no number.",
-          "format": "float",
-          "type": [
-            "number",
-            "null"
-          ]
-        },
-        "type": {
-          "description": "What the modifier changes: `time` (`CraftingModifierType_Time`), `none` (no\n`modifierType` stored) or `unknown` (a struct this export does not know, kept with its\n`structName` and no values). A closed set the game may extend, so the schema keeps a\nstring.",
-          "type": "string"
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         }
       },
       "required": [
+        "additionalFields",
         "condition",
-        "structName",
-        "timeMultiplier",
-        "type"
+        "modifierType",
+        "sourceType"
+      ],
+      "type": "object"
+    },
+    "CrafterModifierType": {
+      "description": "The concrete original modifier and its understood interpretation.",
+      "oneOf": [
+        {
+          "description": "Applies the authored time multiplier.",
+          "properties": {
+            "kind": {
+              "const": "time",
+              "type": "string"
+            },
+            "timeMultiplier": {
+              "$ref": "#/$defs/SourcedValueOfResourceNumber",
+              "description": "The authored multiplier in its original numeric encoding."
+            }
+          },
+          "required": [
+            "kind",
+            "timeMultiplier"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "A different concrete modifier retained in original form.",
+          "properties": {
+            "kind": {
+              "const": "original",
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind"
+          ],
+          "type": "object"
+        }
+      ],
+      "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        }
+      },
+      "required": [
+        "additionalFields",
+        "sourceType"
       ],
       "type": "object"
     },
     "CrafterQueue": {
-      "description": "One job queue of a [`Crafter`].",
+      "description": "One authored job queue at its original array position.",
       "properties": {
+        "additionalFields": {
+          "$ref": "#/$defs/SourceArenaOutput"
+        },
         "blueprintCategoryAvailability": {
-          "$ref": "#/$defs/CategoryRule",
-          "description": "The blueprint categories the queue accepts: the struct `blueprintCategoryAvailability`\nholds. `kind` is `whitelist`, `none` or `unknown`."
+          "$ref": "#/$defs/SourcedValueOfCrafterCategoryRule"
         },
         "maxJobsInProgress": {
-          "description": "`maxJobsInProgress`: how many jobs the queue crafts at once.",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "maxJobsWaiting": {
-          "description": "`maxJobsWaiting`: how many further jobs the queue holds.",
-          "format": "int64",
-          "type": [
-            "integer",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfResourceNumber"
         },
         "name": {
-          "description": "`debugName`.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfstring"
         },
         "processTypeAvailability": {
-          "description": "`processTypeAvailability` as stored: one boolean per process type, in the order of the\ngame's process types, which the Archive does not name; `[]` when the Record has none.",
-          "items": {
-            "type": "boolean"
-          },
-          "type": "array"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfboolean"
+        },
+        "sourceType": {
+          "$ref": "#/$defs/SourcedValueOfstring"
         }
       },
       "required": [
+        "additionalFields",
         "blueprintCategoryAvailability",
         "maxJobsInProgress",
         "maxJobsWaiting",
         "name",
-        "processTypeAvailability"
+        "processTypeAvailability",
+        "sourceType"
       ],
       "type": "object"
     },
@@ -57524,6 +57685,272 @@
       ],
       "type": "object"
     },
+    "SourcedValueOfArray_of_SourcedValueOfCrafterModifier": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfCrafterModifier"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_SourcedValueOfCrafterQueue": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/SourcedValueOfCrafterQueue"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
     "SourcedValueOfArray_of_SourcedValueOfCurvePoint": {
       "allOf": [
         {
@@ -81802,6 +82229,916 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/CountermeasureKind"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfCrafterAttachment": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CrafterAttachment"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfCrafterAttachmentDefinition": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CrafterAttachmentDefinition"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfCrafterCategoryRule": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CrafterCategoryRule"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfCrafterComponent": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CrafterComponent"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfCrafterModifier": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CrafterModifier"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfCrafterModifierType": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CrafterModifierType"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfCrafterQueue": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/CrafterQueue"
               }
             }
           }
@@ -144976,13 +146313,6 @@
       },
       "type": "array"
     },
-    "crafters": {
-      "description": "The crafting stations with the limits of their job queues, ordered by GUID.",
-      "items": {
-        "$ref": "#/$defs/Crafter"
-      },
-      "type": "array"
-    },
     "declarations": {
       "$ref": "#/$defs/CatalogDeclarations",
       "description": "Ordered authored declarations from selected physical Records."
@@ -145157,7 +146487,6 @@
     "contractNpcSpawns",
     "contractScenarios",
     "contractShipSpawns",
-    "crafters",
     "declarations",
     "definitions",
     "exportHealth",

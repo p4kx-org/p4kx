@@ -237,6 +237,7 @@ const fn uses_physical_row_identity(kind: Kind) -> bool {
                 | Kind::Ships
                 | Kind::BlueprintPools
                 | Kind::DismantleProcesses
+                | Kind::Crafters
                 | Kind::ExplosionDefinitions
                 | Kind::InventoryContainers
                 | Kind::MedicalItemTierConfigs

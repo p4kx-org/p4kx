@@ -95,9 +95,9 @@ pub use dependency_coverage::{
     EquipmentDependencyCoverage, EquipmentEntryFailure, EquipmentFailureStage,
 };
 pub use loadout_query::{
-    AlignmentDependency, AlignmentDependencyState, AlignmentRole, Loadout,
-    LoadoutDependencyCoverage, LoadoutOwnerKind, LoadoutPort, LoadoutSnapshot, PortType,
-    read_loadouts, read_loadouts_from,
+    AlignmentDependency, AlignmentDependencyState, AlignmentRole, CrafterHost, CrafterHostSnapshot,
+    Loadout, LoadoutDependencyCoverage, LoadoutOwnerKind, LoadoutPort, LoadoutSnapshot, PortType,
+    read_crafter_hosts, read_crafter_hosts_from, read_loadouts, read_loadouts_from,
 };
 
 #[path = "equipment_ammo_query.rs"]

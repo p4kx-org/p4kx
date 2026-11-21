@@ -122,6 +122,7 @@ const fn uses_authored_raw_number(kind: Kind) -> bool {
         Kind::Ships
             | Kind::BlueprintPools
             | Kind::DismantleProcesses
+            | Kind::Crafters
             | Kind::AmmoDefinitions
             | Kind::InventoryContainers
             | Kind::MedicalItemTierConfigs

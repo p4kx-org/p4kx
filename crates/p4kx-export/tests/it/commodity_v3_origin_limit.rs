@@ -48,11 +48,11 @@ fn a_crafted_commodity_keeps_its_resource_link_and_the_separate_backfill_proof()
             Some(true),
         )?;
     }
-    let [crafter] = health::rows(&catalog, "/crafters")? else {
+    let [crafter] = health::rows(&catalog, "/definitions/crafters/rows")? else {
         return Err("the dual-role entity contributes one Crafter".into());
     };
     assert_eq!(
-        crafter["guid"], entity_guid,
+        crafter["guid"]["value"], entity_guid,
         "the Crafter keeps its entity GUID"
     );
     assert_crafter_choices(&catalog, selection)?;

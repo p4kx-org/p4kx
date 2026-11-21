@@ -95,6 +95,7 @@ pub(crate) fn minimal_catalog() -> Value {
         "definitions": {"items": {"availability": "available", "rows": []}, "contractGenerators": absent_table(), "missionScenarios": absent_table(), "blueprints": blueprints::definitions(), "blueprintPools": blueprints::pools(), "contractTemplates": absent_table(), "missionBrokerEntries": absent_table(), "lootPoolFilters": loot::filters(), "blueprintCategories": blueprint_categories::definitions(), "gameplayProperties": gameplay_properties::definitions(), "qualityDistributions": quality::distributions(), "qualityQuantizations": quality::quantizations(), "resourceTypes": resources::table(), "resourceGroups": resource_groups::definitions(),
             "commodities": commodities::definitions(), "manufacturers": manufacturer(),
             "dismantleProcesses": blueprints::dismantle_processes(),
+            "crafters": crafters::crafters(),
             "missionTypes": reputation::mission_types(),
             "missionLocalities": reputation::localities(),
             "refiningProcesses": mining::refining(),
@@ -240,7 +241,7 @@ pub(crate) fn minimal_catalog() -> Value {
             "publicNames": public_names(),
             "gameTexts": [reputation::mission_type_text(), spawns::location_name_text()]
         },
-        "projections": {"contracts": contracts::contracts(), "missionTitles": contracts::titles(), "blueprintPresentation": blueprints::presentation(), "blueprintPoolWeights": blueprints::pool_weights(), "qualityQuantizationResources": quality::inverse(), "commodityPresentation": commodities::presentation(), "tagPaths": tags::paths(), "resourceGroupParents": resource_groups::parents(), "weaponMagazineResolutions": absent_table(), "weaponProjectileAmmoSelections": absent_table(), "weaponPlayerAnimationCandidates": absent_table(), "weaponCombatBases": absent_table(), "jumpConnections": absent_table()},
+        "projections": {"contracts": contracts::contracts(), "missionTitles": contracts::titles(), "blueprintPresentation": blueprints::presentation(), "blueprintPoolWeights": blueprints::pool_weights(), "qualityQuantizationResources": quality::inverse(), "commodityPresentation": commodities::presentation(), "tagPaths": tags::paths(), "resourceGroupParents": resource_groups::parents(), "weaponMagazineResolutions": absent_table(), "weaponProjectileAmmoSelections": absent_table(), "weaponPlayerAnimationCandidates": absent_table(), "weaponCombatBases": absent_table(), "jumpConnections": absent_table(), "crafterHosts": absent_table()},
         "provenance": {"sources": [], "uses": []},
 
         "paints": [{
@@ -266,7 +267,6 @@ pub(crate) fn minimal_catalog() -> Value {
         "legacyLootTables": loot::legacy_tables(),
         "legacyLootArchetypes": loot::legacy_archetypes(),
         "lootContainers": loot::containers(),
-        "crafters": crafters::crafters(),
         "shipStoreSlugs": slugs::ship_store_slugs()
     });
     dataset_availability::add_defaults(&mut catalog);

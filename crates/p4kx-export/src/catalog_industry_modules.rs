@@ -10,6 +10,10 @@ pub(crate) mod blueprint_pool_tables;
 #[path = "blueprint_reward_source.rs"]
 pub(crate) mod blueprint_reward_source;
 
+#[path = "crafter_definition.rs"]
+pub(crate) mod crafter_definition;
+#[path = "crafter_host_projection.rs"]
+pub(crate) mod crafter_host_projection;
 #[path = "crafting_global.rs"]
 pub(crate) mod crafting_global;
 #[path = "dismantle_process_definition.rs"]

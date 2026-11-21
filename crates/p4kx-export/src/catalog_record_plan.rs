@@ -59,6 +59,15 @@ impl<'source> Plan<'source> {
         Self::read_entities_matching(forge, selection, cancel, observer, may_match)
     }
 
+    pub(in crate::build::catalog_queries) fn read_crafters(
+        forge: &'source DataForge<'source>,
+        selection: CatalogRecordSelection,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Self, CatalogError> {
+        let admits = crafter_admission(forge, cancel)?;
+        Self::read_with(forge, selection, cancel, None, admits)
+    }
+
     pub(in crate::build::catalog_queries) fn read_item_components(
         forge: &'source DataForge<'source>,
         component_types: &[&str],
@@ -185,14 +194,9 @@ impl<'source> Plan<'source> {
                 return Ok(());
             }
             checkpoint(cancel)?;
-            match trees.build(record) {
-                Ok(tree) => result.owners.push(Owner {
-                    record: *record,
-                    tree,
-                }),
-                Err(DataForgeError::ObservationStopped) => return Err(CatalogError::Cancelled),
-                Err(_) => result.coverage.unreadable_bodies.push(record.index()),
-            }
+            result
+                .owners
+                .extend(read_owner(&mut trees, record, &mut result.coverage)?);
             Ok(())
         })?;
         Ok(result)
@@ -265,4 +269,76 @@ fn strong_component_array(forge: &DataForge<'_>, mut structure: Struct<'_>) -> b
         structure = parent;
     }
     false
+}
+
+pub(in crate::build::catalog_queries) fn crafter_admission<'source>(
+    forge: &'source DataForge<'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<
+    impl FnMut(
+        &Record<'source>,
+        &mut TreeBuilder<'source>,
+        &mut CatalogRecordCoverage,
+    ) -> Result<bool, CatalogError>
+    + use<'source>,
+    CatalogError,
+> {
+    let mut may_match = component_candidate(forge, &[CRAFTER_STRUCT], cancel)?;
+    let standalone = forge.pointer_probe(CRAFTER_FIELD, CRAFTER_STRUCT);
+    Ok(
+        move |record: &Record<'source>,
+              trees: &mut TreeBuilder<'source>,
+              coverage: &mut CatalogRecordCoverage| {
+            match record.type_name() {
+                Ok(p4kx_assembly::ENTITY_TYPE) => {}
+                Ok(_) => return Ok(false),
+                Err(_) => {
+                    coverage.unreadable_headers.push(record.index());
+                    return Ok(false);
+                }
+            }
+            match entity_selection::select(record, None) {
+                Ok(Some(
+                    selected @ (Selected::Entity(Kind::Crafters)
+                    | Selected::Leftover(Kind::Crafters)),
+                )) => {
+                    let leftover = matches!(selected, Selected::Leftover(Kind::Crafters));
+                    match standalone
+                        .as_ref()
+                        .map_or(Ok(false), |probe| trees.holds(probe, record))
+                    {
+                        Ok(true) if leftover => coverage.skipped_leftovers += 1,
+                        Ok(holds) => return Ok(holds),
+                        Err(_) => coverage.unreadable_bodies.push(record.index()),
+                    }
+                }
+                Ok(Some(Selected::Entity(kind)))
+                    if crate::catalog_v3::industry_modules::crafter_definition::candidate(kind) =>
+                {
+                    return Ok(may_match(record, trees));
+                }
+                Ok(_) => {}
+                Err(_) => coverage.unreadable_headers.push(record.index()),
+            }
+            Ok(false)
+        },
+    )
+}
+
+pub(in crate::build::catalog_queries) fn read_owner<'source>(
+    trees: &mut TreeBuilder<'source>,
+    record: &Record<'source>,
+    coverage: &mut CatalogRecordCoverage,
+) -> Result<Option<Owner<'source>>, CatalogError> {
+    match trees.build(record) {
+        Ok(tree) => Ok(Some(Owner {
+            record: *record,
+            tree,
+        })),
+        Err(DataForgeError::ObservationStopped) => Err(CatalogError::Cancelled),
+        Err(_) => {
+            coverage.unreadable_bodies.push(record.index());
+            Ok(None)
+        }
+    }
 }

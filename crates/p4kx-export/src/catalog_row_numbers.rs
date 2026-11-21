@@ -102,6 +102,9 @@ fn definition_number_groups<'rows>(
             )
             .map(|(kind, _, _, numbers)| (kind, numbers)),
         )
+        .chain(
+            crate::catalog_v3::industry_modules::crafter_definition::numbers(&collected.crafters),
+        )
         .chain(collected.mission_kinds.reputation_number_groups())
         .chain(collected.law.number_groups())
         .chain(collected.location_vocabulary.number_groups())

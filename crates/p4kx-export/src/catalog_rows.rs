@@ -47,6 +47,9 @@ pub(crate) fn snapshot(collected: &mut Collected<'_>, filter: Option<&Filter>) -
 
 fn append_definition_rows(emitted: &mut Vec<CatalogRow>, collected: &Collected<'_>) {
     emitted.extend(
+        crate::catalog_v3::industry_modules::crafter_definition::catalog_rows(&collected.crafters),
+    );
+    emitted.extend(
         crate::catalog_v3::industry_modules::dismantle_process_definition::catalog_rows(
             &collected.dismantle_processes,
         ),

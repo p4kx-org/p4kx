@@ -21,7 +21,6 @@ pub(crate) use crate::catalog_v3::mining_process_catalog::{
 pub(crate) use crate::catalog_v3::resource_group_catalog::ResourceGroup;
 pub(crate) use crate::commodity_contract::Commodity;
 pub(crate) use crate::contract_completeness::{Completeness, KindCompleteness};
-pub(crate) use crate::contract_crafter::Crafter;
 pub(crate) use crate::contract_entities::{Item, Paint, Ship};
 pub(crate) use crate::contract_harvest::HarvestableLocation;
 pub(crate) use crate::contract_harvest_config::SubHarvestableMultiConfig;
@@ -113,8 +112,6 @@ pub(crate) struct Catalog<'a> {
     pub(crate) legacy_loot_tables: Vec<LegacyLootTable<'a>>,
     /// The older loot archetypes the older tables draw from, ordered by GUID.
     pub(crate) legacy_loot_archetypes: Vec<LegacyLootArchetype<'a>>,
-    /// The crafting stations with the limits of their job queues, ordered by GUID.
-    pub(crate) crafters: Vec<Crafter<'a>>,
     /// The mission location templates, the places a location query matches by tags, ordered by
     /// GUID.
     pub(crate) mission_location_templates: Vec<MissionLocationTemplate<'a>>,

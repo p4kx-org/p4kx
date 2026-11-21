@@ -222,6 +222,8 @@ const REQUIRED_WITNESSES: &[&str] = &[
     RESOURCE_CONTAINERS,
     CARGO_MANIFESTS,
     routes::dismantle::DATASET,
+    routes::crafters::DATASET,
+    routes::crafter_hosts::DATASET,
     CARGO_LOADING_GLOBALS,
     SHOP_COMMODITY_GLOBALS,
     SHIELD_GENERATORS,

@@ -45,6 +45,8 @@ pub(crate) struct CatalogProjections<'source> {
     pub(crate) tag_paths: CatalogTable<super::tag_catalog::TagPath>,
     pub(crate) commodity_presentation: CatalogTable<CommodityPresentation>,
     pub(crate) jump_connections: CatalogTable<JumpConnection>,
+    pub(crate) crafter_hosts:
+        CatalogTable<super::industry_modules::crafter_host_projection::CrafterHost>,
     pub(crate) weapon_magazine_resolutions: CatalogTable<WeaponMagazineResolution>,
     pub(crate) weapon_projectile_ammo_selections: CatalogTable<WeaponProjectileAmmoSelection>,
     #[schemars(with = "CatalogTable<weapon_reload::WeaponPlayerAnimationCandidate>")]

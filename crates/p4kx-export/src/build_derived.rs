@@ -10,11 +10,12 @@ use p4kx_extraction::{CancelToken, DataForge, Guid};
 use crate::broker_entry_read::BrokerEntries;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_projection::CatalogProjection;
+use crate::catalog_table::CatalogTable;
+use crate::catalog_v3::industry_modules::crafter_host_projection::{self, CrafterHost};
 use crate::catalog_v3::tag_catalog::{CapturedTags, TagConsumers, TagDependencies};
 use crate::collected::Collected;
 use crate::contract_loadout::EntityKind;
 use crate::contract_template_read::ContractTemplates;
-use crate::crafter_hosts::link_hosts;
 use crate::crafting_warning::CraftingWarning;
 use crate::loadout::{Wanted, loadouts};
 use crate::mission_data::link_scenario_factions;
@@ -172,7 +173,7 @@ pub(crate) fn add_loadouts<'f>(
     collected: &mut Collected<'f>,
     input: &OriginalCatalogInput<'_, 'f>,
     cancel: Option<&CancelToken>,
-) -> Result<LoadoutSummary, CatalogError> {
+) -> Result<(LoadoutSummary, CatalogTable<CrafterHost>), CatalogError> {
     let port_items = std::mem::take(&mut collected.port_items);
     let wanted = collected
         .ships
@@ -201,11 +202,17 @@ pub(crate) fn add_loadouts<'f>(
         input,
         cancel,
     )?;
+    let crafter_hosts = crafter_host_projection::table(
+        input.forge(),
+        &collected.crafters,
+        &built.entries,
+        input.origins(),
+        cancel,
+    )?;
     collected.ledger.merge(built.ledger);
-    link_hosts(&mut collected.crafters, &built.entries);
     collected.loadouts = built.entries;
     collected.add_failures(built.failures);
-    Ok(built.summary)
+    Ok((built.summary, crafter_hosts))
 }
 
 #[path = "particle_library.rs"]

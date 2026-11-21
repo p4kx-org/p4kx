@@ -58,7 +58,7 @@ impl Query<'_> {
         })
     }
 
-    fn resolve(
+    pub(super) fn resolve(
         &self,
         origins: &CatalogOrigins,
         wanted: Vec<Wanted>,

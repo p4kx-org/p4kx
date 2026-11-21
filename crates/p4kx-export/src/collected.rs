@@ -26,6 +26,7 @@ use crate::catalog_v3::catalog_resource_network_read::resource_network_global::P
 use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
 use crate::catalog_v3::faction_definition::PreparedFaction;
 use crate::catalog_v3::gameplay_property_catalog::GameplayPropertyDefinition;
+use crate::catalog_v3::industry_modules::crafter_definition::PreparedCrafter;
 use crate::catalog_v3::industry_modules::dismantle_process_definition::PreparedDismantleProcess;
 use crate::catalog_v3::inventory_container_definition::PreparedInventoryContainer;
 use crate::catalog_v3::law_kinds::LawKinds;
@@ -37,8 +38,8 @@ use crate::catalog_v3::npc_spawn_definitions::NpcSpawnDefinitions;
 use crate::catalog_v3::procedural_planet_audio::PreparedPlanetAudio;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitions;
 use crate::contract::{
-    Commodity, ContractEntry, Crafter, HarvestableLocation, HarvestableProviderPreset, Item,
-    LootContainer, MineableComposition, MineableElement, MineableEntity, MiningGlobalParams, Paint,
+    Commodity, ContractEntry, HarvestableLocation, HarvestableProviderPreset, Item, LootContainer,
+    MineableComposition, MineableElement, MineableEntity, MiningGlobalParams, Paint,
     RefiningProcess, ResourceGroup, ResourceType, Ship, Shop, StarmapObject,
     SubHarvestableMultiConfig,
 };
@@ -151,7 +152,7 @@ pub(crate) struct Collected<'f> {
     pub(crate) radar_audio_count: usize,
     pub(crate) planet_tech: PlanetTechDefinitions,
     pub(crate) shop_inventory_resolution: CatalogTable<ShopInventoryResolution>,
-    pub(crate) crafters: Vec<Crafter<'f>>,
+    pub(crate) crafters: Vec<PreparedCrafter<'f>>,
     pub(crate) mission_kinds: MissionKinds<'f>,
     pub(crate) loot_kinds: LootKinds<'f>,
     pub(crate) vehicles: Vec<VehicleFacts>,
@@ -334,9 +335,9 @@ impl<'f> Collected<'f> {
             Picked::LocationVocabulary(entity) => self.location_vocabulary.push(entity),
             Picked::NpcSpawnDefinitions(entity) => self.npc_spawn_definitions.push(entity),
             Picked::Loot(entity) => self.loot_kinds.push(entity),
-            Picked::Crafter(entity) => self.crafters.push(entity),
+            Picked::Crafter(entity) => self.crafters.push(*entity),
             Picked::Crafted(pick, entity) => {
-                self.crafters.push(entity);
+                self.crafters.push(*entity);
                 self.take(*pick, definitions)?;
             }
             Picked::Skipped(kind, guid) => {

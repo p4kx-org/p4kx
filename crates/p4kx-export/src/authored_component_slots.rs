@@ -13,6 +13,28 @@ impl<'source> Observed<'_, '_, '_, 'source> {
         self.originals.sources()
     }
 
+    /// Binds a selected component to its original Components prefix.
+    pub(in crate::catalog_v3) fn selected_component<T>(
+        &self,
+        selected: Option<&Value<'_>>,
+        notes: &mut Vec<FieldError>,
+        decode: impl FnOnce(Self, &mut Vec<FieldError>) -> Result<T, CatalogError>,
+    ) -> Result<SourcedValue<T>, CatalogError> {
+        let selection = self.originals.component_selection(selected)?;
+        let value = if let Some(original) = selected {
+            let fact = self.originals.fact(original)?;
+            SourceValue::Present(decode(self.at_owner(fact), notes)?)
+        } else if selection.complete {
+            SourceValue::Absent
+        } else {
+            SourceValue::Unreadable
+        };
+        Ok(self
+            .originals
+            .sources()
+            .value(value, &selection.uses, selection.complete))
+    }
+
     /// Visits the readable component structs in physical slot order.
     pub(in crate::catalog_v3) fn visit_components(
         &self,

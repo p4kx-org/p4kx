@@ -348,7 +348,7 @@ pub(crate) fn entity_field<'a>(row: &'a Value, kind: &str, field: &str) -> Optio
         {
             row.get(field)?.get("value")
         }
-        "ships" | "crafters" => row.get(field),
+        "ships" => row.get(field),
         _ => None,
     }
 }

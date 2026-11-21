@@ -149,3 +149,10 @@ Ship `mass`, `massBasis` and `hullHealth` are immediate sourced cells in v3. Rea
 ShipBase export. Each metric includes the physical Record, the relevant XML selection and fields,
 and the original Physics operand when it supplies fallback mass. Coordinate loss affects
 `sourceSetComplete` independently of the value state.
+
+## Crafting stations
+
+`crafters` moves to `definitions.crafters.rows`. Read sourced station values under
+`component.value` and attachment restrictions under `attachment.value.attachDef`.
+`projections.crafterHosts.rows` replaces `hostGuids` with resolved physical ship and
+crafter identities plus each original mount position.

@@ -14,6 +14,7 @@ use crate::catalog_v3::catalog_item_components::resolution::MagazineDependency;
 use crate::catalog_v3::catalog_resource_network_read::resource_network_global::PreparedResourceNetworkGlobal;
 use crate::catalog_v3::explosion_definition::PreparedExplosionDefinition;
 use crate::catalog_v3::faction_definition::PreparedFaction;
+use crate::catalog_v3::industry_modules::crafter_definition::PreparedCrafter;
 use crate::catalog_v3::inventory_container_definition::PreparedInventoryContainer;
 use crate::catalog_v3::law_kinds::LawPick;
 use crate::catalog_v3::location_vocabulary::LocationVocabularyPick;
@@ -24,11 +25,10 @@ use crate::catalog_v3::procedural_planet_audio::PreparedPlanetAudio;
 use crate::catalog_v3::starmap_definition_kinds::StarmapDefinitionPick;
 use crate::catalog_v3::starmap_object_definition::StarmapObjectRead;
 use crate::contract::{
-    Commodity, Crafter, HarvestableProviderPreset, Item, MineableComposition, MineableElement,
+    Commodity, HarvestableProviderPreset, Item, MineableComposition, MineableElement,
     MineableEntity, MiningGlobalParams, RefiningProcess, ResourceGroup, ResourceType, Ship,
     SubHarvestableMultiConfig,
 };
-use crate::crafter::crafter;
 use crate::crafting_warning::CraftingWarning;
 use crate::item_class::ClassLine;
 use crate::loot_kinds::LootPick;
@@ -108,9 +108,9 @@ pub(crate) enum Picked<'f> {
     /// An entity of a loot kind.
     Loot(LootPick<'f>),
     /// A crafting station that is no item, ship or commodity.
-    Crafter(Crafter<'f>),
+    Crafter(Box<PreparedCrafter<'f>>),
     /// An item, ship or commodity that is also a crafting station.
-    Crafted(Box<Self>, Crafter<'f>),
+    Crafted(Box<Self>, Box<PreparedCrafter<'f>>),
     /// A development leftover of the kind, with the GUID of its Record.
     Skipped(Kind, Guid),
     /// A development leftover that is an item and a paint.
@@ -129,9 +129,9 @@ impl<'f> Picked<'f> {
     )]
     pub(crate) fn entity(kind: Kind, tree: &RecordTree<'f>) -> Option<Self> {
         match kind {
-            Kind::Crafters => crafter(tree).map(Self::Crafter),
             Kind::ContractScenarios => MissionPick::entity(kind, tree).map(Self::Mission),
             Kind::Items
+            | Kind::Crafters
             | Kind::LegacyLootTables
             | Kind::LegacyLootArchetypes
             | Kind::LootTables
@@ -239,21 +239,6 @@ impl<'f> Picked<'f> {
             | Kind::Soils
             | Kind::SoilTextureSets
             | Kind::ShadingClasses => None,
-        }
-    }
-
-    /// Returns `self` joined with the crafting station `tree` describes when `self` is an item,
-    /// ship or commodity and the entity has a `CrafterComponentParams`.
-    pub(crate) fn crafted(self, tree: &RecordTree<'f>) -> Self {
-        if !matches!(
-            self,
-            Self::Item(_) | Self::Ship(..) | Self::Commodity(_) | Self::MineableEntity(_)
-        ) {
-            return self;
-        }
-        match crafter(tree) {
-            Some(station) => Self::Crafted(Box::new(self), station),
-            None => self,
         }
     }
 

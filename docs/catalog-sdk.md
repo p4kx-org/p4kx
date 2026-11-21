@@ -1846,6 +1846,27 @@ target identities. Query the target's own dataset to read its body. This route r
 only admitted manifest bodies and the metadata needed to resolve reached references.
 Publish consumer-owned results after query success and after checking the required coverage.
 
+## Crafting stations
+
+Use `catalog_queries::crafting::with_crafters` to read `definitions.crafters`.
+The decoded-Entry form and the session methods support All, GUID and physical Record index
+selection. The query reads admitted Entity Records and their original authored crafting
+component, plus the selected attachable component. It does not read localization or Loadouts.
+Check record coverage and the snapshot's own source inventory before caching a result.
+
+Crafting station rows carry their exact original values and independently sourced array slots.
+Use `crafting::read_crafter_hosts` or the decoded-Entry, session or parsed-view form for
+`projections.crafterHosts` on one physical ship Record index. The same Loadout resolver
+and mount projector serve both the full Catalog and this query. The query reads the selected
+ship's Loadout plus relevant resolver dependencies and attached station candidates. Each physical
+target is checked once. Repeated mounts retain distinct sourced positions in their original order.
+
+A present host state with an empty row list means the selected Loadout resolved. Check
+`loadout_coverage`, `crafter_coverage` and the resolver dependencies before treating the list as
+complete. An absent host state means the physical selection has no admitted ship. An unreadable
+host state distinguishes an unreadable header or a selected ship whose Loadout could not be
+produced.
+
 ## Cargo loading and shop fees
 
 Use `equipment::cargo_globals::with_cargo_loading_globals` and

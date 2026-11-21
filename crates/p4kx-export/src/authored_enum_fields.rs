@@ -15,6 +15,19 @@ enum EnumShape {
 }
 
 impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
+    /// Reads an authored label as a declared Enum or String.
+    pub(in crate::catalog_v3) fn borrowed_label(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<&'source str>, CatalogError> {
+        if self.storage_type(name)? == Some(DataType::Enum) {
+            self.borrowed_declared_enum(name, notes)
+        } else {
+            self.borrowed_string(name, notes)
+        }
+    }
+
     /// Reads an open label from the original scalar Enum declaration.
     pub(in crate::catalog_v3) fn borrowed_declared_enum(
         &self,

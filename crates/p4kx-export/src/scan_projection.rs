@@ -28,6 +28,9 @@ use crate::{CatalogError, ExportAccountingError, Kind, item_stats, item_variant}
 #[path = "scan_loot_projection.rs"]
 mod loot_projection;
 
+#[path = "scan_crafter_projection.rs"]
+mod crafter;
+
 pub(super) struct SelectedProjection<'scan, 'options, 'parameters, 'source> {
     pub(super) scan: &'scan Scan<'options, 'parameters, 'source>,
     pub(super) projection: CatalogProjection<'options, 'source>,
@@ -48,6 +51,18 @@ impl<'scan, 'options, 'parameters, 'source>
 
 impl<'f> SelectedProjection<'_, '_, '_, 'f> {
     pub(super) fn project(
+        &self,
+        trees: &mut TreeBuilder<'f>,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+        ledger: &mut ExportLedger,
+    ) -> Result<Option<Picked<'f>>, ScanError> {
+        let primary = self.project_primary(trees, admission, tree, ledger)?;
+        self.with_crafter(primary, admission, tree, ledger)
+            .map_err(ScanError::from)
+    }
+
+    fn project_primary(
         &self,
         trees: &mut TreeBuilder<'f>,
         admission: &RecordObservation<'_, 'f>,
@@ -77,19 +92,16 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
                 notes,
                 ledger,
             )?;
-            return Ok(Some(Picked::MineableEntity(entity).crafted(tree)));
+            return Ok(Some(Picked::MineableEntity(entity)));
         }
         if kind == Kind::StarmapObjects {
             return Ok(Some(self.starmap(trees, admission, tree, ledger)?));
         }
         if kind == Kind::Ships {
-            return Ok(Some(self.ship(admission, tree, ledger)?.crafted(tree)));
+            return Ok(Some(self.ship(admission, tree, ledger)?));
         }
         if kind == Kind::Commodities {
-            return Ok(Some(
-                self.commodity(trees, admission, tree, ledger)?
-                    .crafted(tree),
-            ));
+            return Ok(Some(self.commodity(trees, admission, tree, ledger)?));
         }
         if kind == Kind::Items {
             let (definition, read, (item, line)) =
@@ -99,18 +111,15 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
                 kind: crate::contract_loadout::EntityKind::Item,
                 record_index: tree.record_index(),
             });
-            return Ok(Some(
-                Picked::Item(Box::new(PickedItem {
-                    entity: item,
-                    line,
-                    ports,
-                    components: read.rows,
-                    definition,
-                }))
-                .crafted(tree),
-            ));
+            return Ok(Some(Picked::Item(Box::new(PickedItem {
+                entity: item,
+                line,
+                ports,
+                components: read.rows,
+                definition,
+            }))));
         }
-        Ok(Picked::entity(kind, tree).map(|picked| picked.crafted(tree)))
+        Ok(Picked::entity(kind, tree))
     }
 
     fn provider(

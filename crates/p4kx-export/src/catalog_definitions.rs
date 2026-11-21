@@ -116,6 +116,8 @@ pub(crate) struct CatalogDefinitions<'source> {
     #[schemars(with = "CatalogTable<crate::blueprint_definition::BlueprintDefinition<'source>>")]
     pub(crate) blueprints: StagedCatalogTable,
     pub(crate) dismantle_processes: CatalogTable<DismantleProcessDefinition<'source>>,
+    pub(crate) crafters:
+        CatalogTable<super::industry_modules::crafter_definition::CrafterDefinition<'source>>,
     #[schemars(with = "CatalogTable<GeneratorDefinition<'source>>")]
     pub(crate) contract_generators: StagedCatalogTable,
     pub(crate) cargo_manifests: CatalogTable<CargoManifestDefinition<'source>>,

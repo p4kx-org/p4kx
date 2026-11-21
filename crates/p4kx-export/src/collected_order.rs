@@ -62,7 +62,7 @@ impl Collected<'_> {
                 row.source.record_index.value().copied(),
             )
         });
-        sort_by_guid(&mut self.crafters, |entity| entity.guid);
+        crate::catalog_v3::industry_modules::crafter_definition::order(&mut self.crafters);
         crate::contract::HarvestableProviderPreset::order(&mut self.harvestable_provider_presets);
         sort_by_guid(&mut self.sub_harvestable_multi_configs, |entity| {
             entity.guid

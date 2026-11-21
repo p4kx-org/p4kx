@@ -10,6 +10,35 @@ use crate::resource_float::ResourceFloat32;
 use crate::source_fields::FieldError;
 
 impl<'reader, 'scope, 'read, 'source> Observed<'reader, 'scope, 'read, 'source> {
+    /// Retains each authored Boolean slot with its own source evidence.
+    pub(in crate::catalog_v3) fn boolean_array(
+        &self,
+        name: &str,
+        notes: &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<Vec<SourcedValue<bool>>>, CatalogError> {
+        let Some((_, fact)) = self.originals.field(self.owner, name)? else {
+            return self.absent();
+        };
+        let storage = fact.field().storage();
+        let expected = "a nullable Bool array";
+        let state = if storage.data_type() == DataType::Bool && storage.is_array() {
+            self.array_elements(fact, name, expected, notes, |index, element, notes| {
+                let (state, role) = match element.value() {
+                    Value::Bool(value) => (SourceValue::Present(*value), SourceUseRole::Payload),
+                    Value::Null => (SourceValue::Null, SourceUseRole::Selector),
+                    other => (
+                        self.failure(&format!("{name}[{index}]"), other, "a nullable Bool", notes)?,
+                        SourceUseRole::Selector,
+                    ),
+                };
+                self.bind_field(element, OriginalValuePart::Value, state, role)
+            })?
+        } else {
+            self.failure(name, fact.value(), expected, notes)?
+        };
+        self.bind_storage(fact, state)
+    }
+
     pub(in crate::catalog_v3) fn single_array(
         &self,
         name: &str,

@@ -60,6 +60,27 @@ pub(super) fn read(
     })
 }
 
+pub(super) fn read_ship(
+    forge: &DataForge<'_>,
+    index: u32,
+    cancel: Option<&CancelToken>,
+) -> Result<Scope, CatalogError> {
+    checkpoint(cancel)?;
+    let mut coverage = CatalogRecordCoverage::default();
+    let wanted = forge
+        .record(index)
+        .and_then(|record| {
+            (classify(&record, &mut coverage) == Some(EntityKind::Ship)).then(|| Wanted {
+                record_index: record.index(),
+                guid: CatalogGuid(record.guid()),
+                kind: EntityKind::Ship,
+            })
+        })
+        .into_iter()
+        .collect();
+    Ok(Scope { wanted, coverage })
+}
+
 fn classify(record: &Record<'_>, coverage: &mut CatalogRecordCoverage) -> Option<EntityKind> {
     let selection = record.type_name().and_then(|kind| {
         if kind == p4kx_assembly::ENTITY_TYPE {

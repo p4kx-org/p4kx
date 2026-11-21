@@ -287,15 +287,15 @@ impl<'source> ItemAttachmentPresentation<'source> {
         projection: &CatalogProjection<'_, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
-        let item_type = label(source, "Type", notes)?;
-        let tags = label(source, "Tags", notes)?;
+        let item_type = source.borrowed_label("Type", notes)?;
+        let tags = source.borrowed_label("Tags", notes)?;
         let weapon_motion = WeaponAttachmentMotion::read(&item_type, &tags);
         Ok(Self {
             item_type,
-            item_subtype: label(source, "SubType", notes)?,
+            item_subtype: source.borrowed_label("SubType", notes)?,
             size: source.authored_number("Size", notes)?,
             tags,
-            required_tags: label(source, "RequiredTags", notes)?,
+            required_tags: source.borrowed_label("RequiredTags", notes)?,
             weapon_motion,
             grade: source.authored_number("Grade", notes)?,
             manufacturer: AuthoredManufacturer::read(source, "Manufacturer", notes)?,
@@ -327,17 +327,5 @@ impl<'source> WeaponAttachmentMotion<'source> {
                 item_type: item_type.clone(),
                 tags: tags.clone(),
             })
-    }
-}
-
-fn label<'source>(
-    source: Observed<'_, '_, '_, 'source>,
-    name: &str,
-    notes: &mut Vec<FieldError>,
-) -> Result<SourcedValue<&'source str>, CatalogError> {
-    if source.storage_type(name)? == Some(DataType::Enum) {
-        source.borrowed_declared_enum(name, notes)
-    } else {
-        source.borrowed_string(name, notes)
     }
 }

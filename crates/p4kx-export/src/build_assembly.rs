@@ -19,14 +19,12 @@ use crate::catalog_read::original::EntryCapture;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::catalog_independent_configurations;
 use crate::catalog_v3::catalog_resource_network_read::resource_network_global;
-use crate::catalog_v3::industry_modules::dismantle_process_definition as dismantle;
+use crate::catalog_v3::industry_modules::{self, dismantle_process_definition as dismantle};
 use crate::catalog_v3::inventory_container_definition::table as inventory_table;
 use crate::catalog_v3::medical::medical_tier_config;
-use crate::catalog_v3::procedural_planet_audio;
-use crate::catalog_v3::weapon_combat_base;
+use crate::catalog_v3::{procedural_planet_audio, weapon_combat_base};
 use crate::contract::{Catalog, Completeness, KindCompleteness, SCHEMA_VERSION};
-use crate::options::CatalogStage::FinalizeProjections;
-use crate::options::{CatalogRun, CatalogStage};
+use crate::options::{CatalogRun, CatalogStage, CatalogStage::FinalizeProjections};
 use crate::ship_store_slugs::StoreSlugs;
 use crate::shops::add_shops;
 use crate::texts::{TextSources, Texts};
@@ -78,7 +76,8 @@ pub(super) fn assemble<R>(
     let paint_summary = add_paints(paint_tags, &mut collected, options.cancel)?;
     let ship_variant_keys = collected.take_ship_variant_keys()?;
     run.begin(CatalogStage::ResolveLoadouts);
-    let loadout_summary = add_loadouts(&files, &entities, &mut collected, &input, options.cancel)?;
+    let (loadout_summary, crafter_hosts) =
+        add_loadouts(&files, &entities, &mut collected, &input, options.cancel)?;
     let variants = collected.group_variants(ship_variant_keys);
     let starmap_summary = scanning::project_locations(
         archive,
@@ -201,6 +200,7 @@ pub(super) fn assemble<R>(
             items: collected.item_definitions.table,
             blueprints: blueprint_definitions,
             dismantle_processes: dismantle::table(&forge, collected.dismantle_processes),
+            crafters: industry_modules::crafter_definition::table(&forge, collected.crafters),
             blueprint_pools: pool_tables.definitions,
             shop_inventories: collected.shop_inventories,
             particle_libraries: collected.particle_libraries,
@@ -281,6 +281,7 @@ pub(super) fn assemble<R>(
             starmap: collected.starmap_definitions.into_tables(&forge),
         },
         projections: CatalogProjections {
+            crafter_hosts,
             contracts: CatalogTable::new(&forge, &["ContractGenerator"], collected.contracts),
             mission_titles: CatalogTable::new(
                 &forge,
@@ -367,7 +368,6 @@ pub(super) fn assemble<R>(
         loot_archetypes: collected.loot_kinds.archetypes,
         legacy_loot_tables: collected.loot_kinds.legacy_tables,
         legacy_loot_archetypes: collected.loot_kinds.legacy_archetypes,
-        crafters: collected.crafters,
         mission_location_templates: collected.mission_location_templates,
         contract_ship_spawns: collected.contract_ship_spawns,
         contract_location_queries: collected.contract_location_queries,
