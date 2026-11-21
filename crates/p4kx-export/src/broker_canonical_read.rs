@@ -11,6 +11,7 @@ use crate::broker_flow_failure::BrokerProjectionFailure;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
+use crate::catalog_template_modules::template_prepared_owner::PreparedOwner;
 use crate::catalog_v3::tag_catalog::CapturedTags;
 use crate::export_ledger::ExportLedger;
 use crate::mission_flow_owner::FlowOwnerKind;
@@ -25,7 +26,6 @@ use crate::template_issues::Unknowns;
 use crate::template_meanings::{FlowMeanings, PreparedFlow};
 use crate::template_plan::TemplatePlan;
 use crate::template_reference_index::TemplateReferences;
-use crate::template_source_members::TemplateMembers;
 use crate::template_spawn_read::TemplateSpawns;
 use crate::template_tag_cache::TemplateTagCache;
 use crate::{CatalogError, CatalogReadFailure};
@@ -64,10 +64,11 @@ pub(crate) fn read<'source>(
     let fields = OriginalFlowFields::read(&scope, cancel)?;
     let admission = RecordObservation::capture(input, record)?;
     let capture = TemplateFieldCapture::new(&fields, input, &admission)?;
-    let mut references = RefCell::new(TemplateReferences::new(&fields));
-    let plan = TemplatePlan::read(&fields, references.get_mut(), FAMILY)?;
-    let members = TemplateMembers::new(&fields, plan.roots(), FAMILY)?
-        .with_warning_capture(capture.example_body());
+    let PreparedOwner {
+        plan,
+        members,
+        mut references,
+    } = PreparedOwner::read(&fields, &capture, FAMILY)?;
     let environment = ContextSources {
         tags: sources.tags,
         tree,

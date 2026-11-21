@@ -8,44 +8,117 @@ use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Serialize, Serializer};
 
 use crate::schema_fields::every_field_required;
-use crate::source_value_catalog::{SourceField, SourceNode};
+use crate::source_value_catalog::{SourceField, SourceNode, SourceValueRef};
 use crate::template_action_meaning::{ActionMeaning, RandomPhaseMeaning};
 use crate::template_source_meaning::{ConditionMeaning, TriggerMeaning};
+use crate::template_source_refs::SourceFieldRef;
 
 /// The single canonical raw inventory of one physical Template owner.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct TemplateSource<'source> {
+pub struct TemplateSource<'source> {
     pub(crate) roots: Vec<TemplateSourceRoot<'source>>,
     pub(crate) values: Vec<TemplateSourceValue<'source>>,
+}
+
+impl<'source> TemplateSource<'source> {
+    /// Borrows the original field roots in canonical arena order.
+    #[must_use]
+    pub fn roots(&self) -> &[TemplateSourceRoot<'source>] {
+        &self.roots
+    }
+
+    /// Borrows the original values in canonical arena order.
+    #[must_use]
+    pub fn values(&self) -> &[TemplateSourceValue<'source>] {
+        &self.values
+    }
+
+    /// Resolves a value linked by a row that belongs to this original owner.
+    #[must_use]
+    pub fn value(&self, reference: SourceValueRef) -> Option<&TemplateSourceValue<'source>> {
+        self.values
+            .get(usize::try_from(reference.value_index()).ok()?)
+    }
+
+    /// Resolves a field linked by a row that belongs to this original owner.
+    #[must_use]
+    pub fn field(&self, reference: SourceFieldRef) -> Option<&SourceField<'source>> {
+        reference.resolve_using(
+            |index| self.roots.get(index).map(TemplateSourceRoot::field),
+            |parent| self.value(parent).map(TemplateSourceValue::original),
+        )
+    }
 }
 
 /// One actual original Field root and its coordinates before selection into this arena.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct TemplateSourceRoot<'source> {
+pub struct TemplateSourceRoot<'source> {
     pub(crate) source_position: OriginalFieldPosition,
     #[serde(flatten)]
     pub(crate) field: SourceField<'source>,
+}
+
+impl<'source> TemplateSourceRoot<'source> {
+    /// Borrows this root's original position in the source Record.
+    #[must_use]
+    pub const fn source_position(&self) -> &OriginalFieldPosition {
+        &self.source_position
+    }
+
+    /// Borrows the original field and its value binding.
+    #[must_use]
+    pub const fn field(&self) -> &SourceField<'source> {
+        &self.field
+    }
 }
 
 /// Original position controls, including an owning Struct that is not itself emitted.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct OriginalFieldPosition {
+pub struct OriginalFieldPosition {
     pub(crate) parent_ordinal: Option<DecimalU64>,
     pub(crate) field_index: DecimalU64,
 }
 
+impl OriginalFieldPosition {
+    /// Returns the original containing value's ordinal, or none for a root of the Record.
+    #[must_use]
+    pub fn parent_ordinal(&self) -> Option<u64> {
+        self.parent_ordinal.map(DecimalU64::get)
+    }
+
+    /// Returns the original field ordinal within its container.
+    #[must_use]
+    pub const fn field_index(&self) -> u64 {
+        self.field_index.get()
+    }
+}
+
 /// One exact original occurrence and its selected interpretation.
 #[derive(Debug)]
-pub(crate) struct TemplateSourceValue<'source> {
+pub struct TemplateSourceValue<'source> {
     pub(crate) source_ordinal: DecimalU64,
     pub(crate) original: SourceNode<'source>,
     pub(crate) meaning: TemplateValueMeaning,
+}
+
+impl<'source> TemplateSourceValue<'source> {
+    /// Returns the original occurrence ordinal within the Record.
+    #[must_use]
+    pub const fn source_ordinal(&self) -> u64 {
+        self.source_ordinal.get()
+    }
+
+    /// Borrows the original typed value and its provenance.
+    #[must_use]
+    pub const fn original(&self) -> &SourceNode<'source> {
+        &self.original
+    }
 }
 
 /// The selected interpretation, if the original occurrence has a flow role.

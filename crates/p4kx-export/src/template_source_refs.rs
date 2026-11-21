@@ -85,21 +85,32 @@ impl SourceFieldRef {
         self,
         arena: &'arena crate::source_value_catalog::SourceArenaOutput<'source>,
     ) -> Option<&'arena crate::source_value_catalog::SourceField<'source>> {
+        self.resolve_using(
+            |index| arena.roots().get(index),
+            |parent| arena.value(parent),
+        )
+    }
+
+    pub(crate) fn resolve_using<'arena, 'source: 'arena>(
+        self,
+        root: impl FnOnce(usize) -> Option<&'arena crate::source_value_catalog::SourceField<'source>>,
+        value: impl FnOnce(
+            SourceValueRef,
+        ) -> Option<&'arena crate::source_value_catalog::SourceNode<'source>>,
+    ) -> Option<&'arena crate::source_value_catalog::SourceField<'source>> {
         use crate::source_value_catalog::SourcePayload;
 
-        let (fields, index) = match self {
-            Self::Root { root_field_index } => (arena.roots(), root_field_index),
+        match self {
+            Self::Root { root_field_index } => root(usize::try_from(root_field_index.get()).ok()?),
             Self::Field {
                 parent,
                 field_index,
             } => {
-                let SourcePayload::Struct { fields, .. } = arena.value(parent)?.value().value()?
-                else {
+                let SourcePayload::Struct { fields, .. } = value(parent)?.value().value()? else {
                     return None;
                 };
-                (fields.as_slice(), field_index)
+                fields.get(usize::try_from(field_index.get()).ok()?)
             }
-        };
-        fields.get(usize::try_from(index.get()).ok()?)
+        }
     }
 }

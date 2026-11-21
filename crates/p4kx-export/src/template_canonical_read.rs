@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::cell::RefCell;
-
 use p4kx_extraction::{CancelToken, Record, RecordTree};
 
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
+use crate::catalog_template_modules::template_prepared_owner::PreparedOwner;
 use crate::catalog_v3::tag_catalog::CapturedTags;
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
@@ -19,10 +18,7 @@ use crate::template_context_read::{ContextPlan, ContextSources};
 use crate::template_definition::TemplateDefinition;
 use crate::template_field_capture::TemplateFieldCapture;
 use crate::template_issues::Unknowns;
-use crate::template_plan::TemplatePlan;
 use crate::template_projection::TemplateProjection;
-use crate::template_reference_index::TemplateReferences;
-use crate::template_source_members::TemplateMembers;
 use crate::{CatalogError, CatalogReadFailure};
 
 /// One complete D owner and its separate required C interpretations.
@@ -49,11 +45,12 @@ pub(crate) fn read<'source>(
     let fields = OriginalFlowFields::read(&scope, cancel)?;
     let admission = RecordObservation::capture(input, record)?;
     let capture = TemplateFieldCapture::new(&fields, input, &admission)?;
-    let mut references = RefCell::new(TemplateReferences::new(&fields));
     let owner = FlowOwnerKind::ContractTemplate;
-    let plan = TemplatePlan::read(&fields, references.get_mut(), owner)?;
-    let members = TemplateMembers::new(&fields, plan.roots(), owner)?
-        .with_warning_capture(capture.example_body());
+    let PreparedOwner {
+        plan,
+        members,
+        mut references,
+    } = PreparedOwner::read(&fields, &capture, owner)?;
     let (flows, flow_links) =
         crate::template_flow_configuration_read::read(&members, &plan, owner)?;
     let (properties, property_links) =

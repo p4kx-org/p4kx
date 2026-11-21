@@ -17,6 +17,8 @@ use super::{Route, TestResult};
 
 #[path = "../it/catalog_contract_query_probe_fixture.rs"]
 mod fixture;
+#[path = "sdk_mission_property_route.rs"]
+mod mission_properties;
 
 const CONTRACTS: &str = "/projections/contracts";
 const TITLES: &str = "/projections/missionTitles";
@@ -25,9 +27,15 @@ const GENERATORS: &str = "/definitions/contractGenerators";
 const REMAINING: &str =
     "typed query and synthetic producer parity verified; complete installed producer parity open";
 
-pub(super) const DATASETS: &[&str] = &[CONTRACTS, TITLES, PROPERTY_SETS, GENERATORS];
+pub(super) const DATASETS: &[&str] = &[
+    CONTRACTS,
+    TITLES,
+    PROPERTY_SETS,
+    GENERATORS,
+    mission_properties::DATASET,
+];
 
-pub(super) fn read() -> TestResult<[Route; 4]> {
+pub(super) fn read() -> TestResult<[Route; 5]> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("contracts.p4k");
     ArchiveBuilder::new()
@@ -57,7 +65,13 @@ pub(super) fn read() -> TestResult<[Route; 4]> {
         parsed.with_contract_generators(CatalogRecordSelection::All, None, |snapshot| {
             compare(&catalog, GENERATORS, &snapshot.rows)
         })??;
-    Ok([contracts, titles, sets, generators])
+    Ok([
+        contracts,
+        titles,
+        sets,
+        generators,
+        mission_properties::read()?,
+    ])
 }
 
 fn compare<Row: Serialize + JsonSchema>(

@@ -32608,6 +32608,7 @@
       "oneOf": [
         {
           "$ref": "#/$defs/PhysicalFlowOwner",
+          "description": "An original Contract Template Record.",
           "properties": {
             "type": {
               "const": "contractTemplate",
@@ -32621,6 +32622,7 @@
         },
         {
           "$ref": "#/$defs/PhysicalFlowOwner",
+          "description": "An original Mission Broker Entry Record.",
           "properties": {
             "type": {
               "const": "missionBrokerEntry",
@@ -38082,6 +38084,7 @@
       "description": "The original declaration and objective selection independently of retained source facts.",
       "oneOf": [
         {
+          "description": "The owner has no property declaration at this location.",
           "properties": {
             "type": {
               "const": "absent",
@@ -38094,6 +38097,7 @@
           "type": "object"
         },
         {
+          "description": "A preceding declaration is selected.",
           "properties": {
             "type": {
               "const": "shadowedDeclaration",
@@ -38106,6 +38110,7 @@
           "type": "object"
         },
         {
+          "description": "The declaration belongs to an objective that was outside the original selection.",
           "properties": {
             "type": {
               "const": "shadowedObjective",
@@ -38118,6 +38123,7 @@
           "type": "object"
         },
         {
+          "description": "The selected declaration contains no property structure.",
           "properties": {
             "type": {
               "const": "noStruct",
@@ -38130,6 +38136,7 @@
           "type": "object"
         },
         {
+          "description": "The selected declaration contains one or more property structures.",
           "properties": {
             "type": {
               "const": "selected",

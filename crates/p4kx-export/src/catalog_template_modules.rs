@@ -135,6 +135,9 @@ pub(crate) mod template_output_read;
 #[path = "template_plan.rs"]
 pub(crate) mod template_plan;
 
+#[path = "template_prepared_owner.rs"]
+pub(crate) mod template_prepared_owner;
+
 #[path = "template_pool_binding_read.rs"]
 pub(crate) mod template_pool_binding_read;
 

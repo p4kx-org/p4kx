@@ -573,6 +573,17 @@ localization or contract pickup projections.
 
 ## Authored mission definitions
 
+Use `mission_properties::with_mission_properties` or its decoded-Entry and session
+forms for `configurations.missionProperties`. Select original Contract Template or
+Mission Broker Entry Records by physical index, GUID or the complete owner family.
+The query returns the canonical property rows plus the exact source arena of every
+selected owner. Join using the owner family, input reference, Record index and GUID.
+Resolve `declaration`, `ownerObjective` and property links with that arena's typed
+`field` and `value` methods. Shadowed declarations and objectives retain their
+physical positions and original values. The query reads no localization, mission
+dependency graphs or contextual projections. Use `with_contracts` for the separate
+Generator-authored `missionPropertySets`.
+
 Use `mission_definitions::with_mission_definitions` or its decoded-Entry and session forms
 to read `definitions.missionScenarios`, `definitions.missionModuleDeclarations` or
 `definitions.missionItems`. Choose a `MissionDefinitionFamily` and a physical Record selection

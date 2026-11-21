@@ -50,7 +50,7 @@ impl FlowOwnerKind {
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct PhysicalFlowOwner {
+pub struct PhysicalFlowOwner {
     input_ref: PhysicalSourceRef,
     record_index: u32,
     record_guid: CatalogGuid,
@@ -60,12 +60,43 @@ pub(crate) struct PhysicalFlowOwner {
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) enum MissionFlowOwnerRef {
+#[non_exhaustive]
+pub enum MissionFlowOwnerRef {
+    /// An original Contract Template Record.
     ContractTemplate(PhysicalFlowOwner),
+    /// An original Mission Broker Entry Record.
     MissionBrokerEntry(PhysicalFlowOwner),
 }
 
+impl PhysicalFlowOwner {
+    /// Borrows the original DataForge source identity.
+    #[must_use]
+    pub const fn input_ref(&self) -> &PhysicalSourceRef {
+        &self.input_ref
+    }
+
+    /// Returns the physical Record index within that input.
+    #[must_use]
+    pub const fn record_index(&self) -> u32 {
+        self.record_index
+    }
+
+    /// Returns the original Record GUID.
+    #[must_use]
+    pub const fn record_guid(&self) -> CatalogGuid {
+        self.record_guid
+    }
+}
+
 impl MissionFlowOwnerRef {
+    /// Borrows the exact physical header of this owner.
+    #[must_use]
+    pub const fn physical(&self) -> &PhysicalFlowOwner {
+        match self {
+            Self::ContractTemplate(owner) | Self::MissionBrokerEntry(owner) => owner,
+        }
+    }
+
     pub(crate) fn read(
         fields: &OriginalFlowFields<'_, '_, '_>,
         kind: FlowOwnerKind,

@@ -47,7 +47,7 @@ pub(crate) struct MissionFlowRef {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct MissionPropertyConfiguration {
+pub struct MissionPropertyConfiguration {
     pub(crate) owner: MissionFlowOwnerRef,
     pub(crate) owner_objective: Option<SourceValueRef>,
     pub(crate) declaration_index: Option<DecimalU64>,
@@ -56,15 +56,59 @@ pub(crate) struct MissionPropertyConfiguration {
     pub(crate) properties: Vec<SourceValueRef>,
 }
 
+impl MissionPropertyConfiguration {
+    /// Borrows the actual physical owner of the declaration.
+    #[must_use]
+    pub const fn owner(&self) -> &MissionFlowOwnerRef {
+        &self.owner
+    }
+
+    /// Returns the original objective's arena position, when there is one.
+    #[must_use]
+    pub const fn owner_objective(&self) -> Option<SourceValueRef> {
+        self.owner_objective
+    }
+
+    /// Returns the field ordinal of the actual declaration, when present.
+    #[must_use]
+    pub fn declaration_index(&self) -> Option<u64> {
+        self.declaration_index.map(DecimalU64::get)
+    }
+
+    /// Borrows the original declaration binding or proof of absence.
+    #[must_use]
+    pub const fn declaration(&self) -> &DeclarationBinding {
+        &self.declaration
+    }
+
+    /// Borrows the original declaration's selection outcome.
+    #[must_use]
+    pub const fn selection(&self) -> &PropertySelection {
+        &self.selection
+    }
+
+    /// Borrows the ordered original property occurrences in the owner's arena.
+    #[must_use]
+    pub fn properties(&self) -> &[SourceValueRef] {
+        &self.properties
+    }
+}
+
 /// The original declaration and objective selection independently of retained source facts.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) enum PropertySelection {
+#[non_exhaustive]
+pub enum PropertySelection {
+    /// The owner has no property declaration at this location.
     Absent,
+    /// A preceding declaration is selected.
     ShadowedDeclaration,
+    /// The declaration belongs to an objective that was outside the original selection.
     ShadowedObjective,
+    /// The selected declaration contains no property structure.
     NoStruct,
+    /// The selected declaration contains one or more property structures.
     Selected,
 }
 

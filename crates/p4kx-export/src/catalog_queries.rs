@@ -95,6 +95,8 @@ pub mod mission_definitions;
 mod mission_localities;
 #[path = "mission_location_query.rs"]
 mod mission_location_templates;
+#[path = "mission_property_query.rs"]
+pub mod mission_properties;
 #[path = "mission_type_query.rs"]
 mod mission_types;
 #[path = "npc_spawn_definition_query.rs"]
