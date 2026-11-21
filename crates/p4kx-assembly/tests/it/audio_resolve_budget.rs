@@ -9,8 +9,8 @@ use std::path::Path;
 
 use p4kx_assembly::audio::{
     ArchiveAudio, BreakReason, BrokenLink, ExportLoopOrigins, ExportOptions, ExportReport,
-    ExportState, ExportWatch, ExportedSound, IndexedSoundbank, LanguageChoice, ResolveOptions,
-    SoundFormat, SoundVariant, TriggerSounds, write_txtp, write_txtp_with_loop_origins,
+    ExportState, ExportWatch, IndexedSoundbank, LanguageChoice, ResolveOptions, SoundFormat,
+    SoundVariant, TriggerSounds, write_txtp, write_txtp_with_loop_origins,
 };
 use p4kx_extraction::{CancelToken, ConflictPolicy, ConversionError};
 use p4kx_testkit::{TestBank, TestHircObject, wwise_short_id};
@@ -119,7 +119,7 @@ fn a_caller_budget_stops_audio_before_planning_or_creating_outputs() -> TestResu
 #[test]
 fn a_caller_budget_stops_txtp_even_with_a_whole_audio_file() -> TestResult {
     with_export_cut(|audio, sounds, root| {
-        let report = kept_sound(root)?;
+        let report = kept_sound(audio, root)?;
         let txtp = root.join("Play_It.txtp");
         let receipt = root.join("Play_It.txtp.p4kx-origin.jsonl");
         fs::write(&txtp, b"previous TXTP")?;
@@ -166,24 +166,26 @@ fn a_caller_budget_stops_txtp_even_with_a_whole_audio_file() -> TestResult {
     })
 }
 
-fn kept_sound(root: &Path) -> Result<ExportReport, Box<dyn Error>> {
-    let path = root.join("Play_It.wem");
-    let bytes = pcm().bytes();
-    fs::write(&path, &bytes)?;
-    Ok(ExportReport {
-        sounds: vec![ExportedSound {
-            trigger: TRIGGER.to_owned(),
-            wem_id: 7,
-            path,
-            format: SoundFormat::Raw,
-            size: u64::try_from(bytes.len())?,
-            state: ExportState::Kept,
-            unconverted: None,
-            loop_points: None,
-            prefetch_only: false,
-        }],
-        ..ExportReport::default()
-    })
+fn kept_sound(audio: &ArchiveAudio<'_>, root: &Path) -> Result<ExportReport, Box<dyn Error>> {
+    let sounds = audio
+        .resolve_trigger(TRIGGER)
+        .ok_or("the trigger resolves")?;
+    let options = ExportOptions {
+        format: SoundFormat::Raw,
+        policy: ConflictPolicy::Skip,
+    };
+    let first = audio.export_sounds(&[&sounds], root, options)?;
+    let [sound] = first.sounds.as_slice() else {
+        return Err("one whole WEM is available".into());
+    };
+    assert_eq!(
+        sound.state,
+        ExportState::Written,
+        "the fixture file is written"
+    );
+    let report = audio.export_sounds(&[&sounds], root, options)?;
+    assert_eq!(report.kept_count(), 1, "the complete WEM was kept");
+    Ok(report)
 }
 
 #[test]

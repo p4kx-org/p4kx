@@ -32,10 +32,12 @@ use p4kx_extraction::{Archive, ArchiveWatch, ArchiveWriteProtection, CancelToken
 
 use self::origins::OriginInputs;
 use self::render::{RenderedTxtp, SoundFile, comment_text, render};
+use super::export::ResolvedMedia;
 use super::export::name::{StemSet, portable_stem};
 use super::export_preflight;
 use super::{
     ExportLoopOrigins, ExportReport, ExportState, ExportedSound, SoundVariant, TriggerSounds,
+    WemExportSource,
 };
 
 /// The extension of a TXTP file, without the dot.
@@ -244,10 +246,10 @@ fn write_files(
     folder: &Path,
     destination: &Destination<'_>,
 ) -> TxtpReport {
-    let sounds: HashMap<(&str, u32), &ExportedSound> = exported
+    let sounds: HashMap<(&str, u32, WemExportSource), &ExportedSound> = exported
         .sounds
         .iter()
-        .map(|sound| ((sound.trigger.as_str(), sound.wem_id), sound))
+        .map(|sound| ((sound.trigger.as_str(), sound.wem_id, sound.source), sound))
         .collect();
     let loop_origins = destination
         .origins
@@ -257,6 +259,7 @@ fn write_files(
     let mut stems = StemSet::default();
     for trigger in triggers {
         let name = trigger.trigger().name();
+        let resolved = ResolvedMedia::new(trigger.variants());
         for variants in trigger
             .variants()
             .chunk_by(|a, b| std::ptr::eq(a.event(), b.event()))
@@ -270,7 +273,7 @@ fn write_files(
                 .iter()
                 .filter(|broken| std::ptr::eq(broken.event(), event))
                 .count();
-            let files = files_of(name, variants, &sounds, loop_origins);
+            let files = files_of(name, variants, &resolved, &sounds, loop_origins);
             let written =
                 event_text(name, event.name(), variants, &files, breaks).and_then(|rendered| {
                     let path = folder.join(format!(
@@ -350,7 +353,7 @@ fn event_text<'a>(
     trigger: &str,
     event: &str,
     variants: &[SoundVariant<'_>],
-    files: &HashMap<u32, SoundFile<'a>>,
+    files: &[Option<SoundFile<'a>>],
     breaks: usize,
 ) -> Result<RenderedTxtp<'a>, String> {
     let tree = tree::build(variants).ok_or_else(|| "the event has no object path".to_owned())?;
@@ -363,29 +366,27 @@ fn event_text<'a>(
     render(&tree, &header, files)
 }
 
-/// Returns the usable files of the WEMs the variants play: those written whole.
-fn files_of<'a>(
+fn files_of<'a, 'archive>(
     trigger: &str,
-    variants: &[SoundVariant<'_>],
-    sounds: &HashMap<(&str, u32), &'a ExportedSound>,
+    variants: &[SoundVariant<'archive>],
+    resolved: &ResolvedMedia<'archive>,
+    sounds: &HashMap<(&str, u32, WemExportSource), &'a ExportedSound>,
     loop_origins: Option<&'a ExportLoopOrigins>,
-) -> HashMap<u32, SoundFile<'a>> {
+) -> Vec<Option<SoundFile<'a>>> {
     variants
         .iter()
-        .filter_map(SoundVariant::wem_id)
-        .filter_map(|wem_id| {
-            let sound = sounds.get(&(trigger, wem_id))?;
+        .map(|variant| {
+            let id = variant.wem_id()?;
+            let source = resolved.source(variant, id)?;
+            let sound = sounds.get(&(trigger, id, source))?;
             let name = sound.path.file_name()?.to_str()?;
-            Some((
-                wem_id,
-                SoundFile {
-                    name,
-                    loop_points: sound.loop_points,
-                    loop_origin: loop_origins.and_then(|origins| origins.for_sound(sound)),
-                    media_origin: loop_origins.and_then(|origins| origins.media_for_sound(sound)),
-                    prefetch_only: sound.prefetch_only,
-                },
-            ))
+            Some(SoundFile {
+                name,
+                loop_points: sound.loop_points,
+                loop_origin: loop_origins.and_then(|origins| origins.for_sound(sound)),
+                media_origin: loop_origins.and_then(|origins| origins.media_for_sound(sound)),
+                prefetch_only: sound.prefetch_only,
+            })
         })
         .collect()
 }

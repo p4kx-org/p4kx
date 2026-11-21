@@ -394,9 +394,13 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
 - `p4kx wwise extract <archive> <trigger> --out <folder>` writes the sounds of an audio trigger as
   `<trigger>[_<WEM ID>].ogg|wav` (`--format ogg|wav|raw`, `--conflict skip|overwrite|if-changed`,
   `--lang`); a sound that cannot be decoded is reported and written as `.wem`. Names follow the
-  portable file-name rule of ADR-0248 (forbidden characters, `#` and a leading space become `%`
-  and two hex digits, an empty name becomes `%`, a name taken under the case fold of the rule gets
-  `_2`, `_3`, Ã¢â‚¬Â¦), and a sound whose path exceeds its limit is reported as failed while the others
+  portable file-name rule of ADR-0248. A trigger can export multiple files with the same
+  short ID when the resolved paths use different physical WEMs. Repeated paths to the same
+  physical WEM share one file. An available same-language whole copy can replace an
+  embedded prefetch prefix when the resolved paths name exactly one such copy.
+  File names escape forbidden characters, `#` and a leading space as `%` and two hex digits.
+  An empty name becomes `%`. Names that collide under the case fold receive suffixes such as
+  `_2` and `_3`. A sound whose path exceeds its limit is reported as failed while the others
   are written. `--txtp` also writes one vgmstream `<event>.txtp` text file per Wwise event of the
   trigger next to the sounds (ADR-0254). It writes text for vgmstream. A generated choice of
   several alternatives reports `select-first-alternative` in its header and the JSON report.

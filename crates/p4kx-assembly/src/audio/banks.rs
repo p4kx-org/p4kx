@@ -18,6 +18,7 @@ pub struct IndexedSoundbank {
     event_count: u32,
     pub(crate) entry: usize,
     pub(super) media_data_body: Option<u64>,
+    prefetched_wems: Box<[u32]>,
 }
 
 impl IndexedSoundbank {
@@ -62,6 +63,10 @@ impl IndexedSoundbank {
     #[must_use]
     pub const fn event_count(&self) -> u32 {
         self.event_count
+    }
+
+    pub(super) fn has_prefetched_wem(&self, id: u32) -> bool {
+        self.prefetched_wems.binary_search(&id).is_ok()
     }
 }
 
@@ -118,12 +123,18 @@ pub(crate) fn read(path: &str, entry: usize, bytes: &[u8]) -> Result<BankContent
         .collect();
     let mut wems = bank.wems().peekable();
     let media_data_body = wems.peek().map(|wem| wem.source().data_body_offset());
+    let mut prefetched_wems = Vec::new();
     let media = wems
-        .map(|wem| EmbeddedMedia {
-            id: wem.id(),
-            offset: wem.offset(),
-            len: u64::try_from(wem.bytes().len()).unwrap_or(u64::MAX),
-            triplet_offset: wem.source().triplet_offset(),
+        .map(|wem| {
+            if wem.is_prefetch() {
+                prefetched_wems.push(wem.id());
+            }
+            EmbeddedMedia {
+                id: wem.id(),
+                offset: wem.offset(),
+                len: u64::try_from(wem.bytes().len()).unwrap_or(u64::MAX),
+                triplet_offset: wem.source().triplet_offset(),
+            }
         })
         .collect();
     let stingers = bank
@@ -154,6 +165,7 @@ pub(crate) fn read(path: &str, entry: usize, bytes: &[u8]) -> Result<BankContent
             event_count: u32::try_from(events.len()).unwrap_or(u32::MAX),
             entry,
             media_data_body,
+            prefetched_wems: prefetched_wems.into_boxed_slice(),
         },
         events,
         event_version: bank.version_byte_range(),

@@ -1,8 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashMap;
-
 use p4kx_audio::Loop;
 
 use super::super::tree::{GroupId, Leaf, Node, Tree};
@@ -14,19 +12,18 @@ use crate::audio::{NodeKind, PathStep, SourceKind};
 fn render_text(
     tree: &Tree,
     header: &[String],
-    files: &HashMap<u32, SoundFile<'_>>,
+    files: &[Option<SoundFile<'_>>],
 ) -> Result<String, String> {
     render(tree, header, files).map(|rendered| rendered.text)
 }
 
 fn sound(wem_id: u32) -> Leaf {
     Leaf {
-        wem_id: Some(wem_id),
         source_id: wem_id,
         kind: SourceKind::Embedded,
         music_clip_features: MusicClipFeatures::default(),
         playback_features: PlaybackFeatures::default(),
-        variant: 0,
+        variant: usize::try_from(wem_id).expect("a fixture position"),
     }
 }
 
@@ -53,29 +50,24 @@ fn tree(kind: NodeKind, id: u32, children: Vec<Node>) -> Tree {
     tree
 }
 
-fn files() -> HashMap<u32, SoundFile<'static>> {
-    HashMap::from([
-        (
-            1,
-            SoundFile {
-                name: "a.ogg",
-                loop_points: None,
-                loop_origin: None,
-                media_origin: None,
-                prefetch_only: false,
-            },
-        ),
-        (
-            2,
-            SoundFile {
-                name: "b.ogg",
-                loop_points: Some(Loop { start: 10, end: 90 }),
-                loop_origin: None,
-                media_origin: None,
-                prefetch_only: false,
-            },
-        ),
-    ])
+fn files() -> [Option<SoundFile<'static>>; 3] {
+    [
+        None,
+        Some(SoundFile {
+            name: "a.ogg",
+            loop_points: None,
+            loop_origin: None,
+            media_origin: None,
+            prefetch_only: false,
+        }),
+        Some(SoundFile {
+            name: "b.ogg",
+            loop_points: Some(Loop { start: 10, end: 90 }),
+            loop_origin: None,
+            media_origin: None,
+            prefetch_only: false,
+        }),
+    ]
 }
 
 #[test]

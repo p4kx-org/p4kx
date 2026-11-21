@@ -6,6 +6,7 @@
 mod loop_origins;
 pub(super) mod name;
 mod plan;
+mod source;
 mod write;
 
 use std::fs;
@@ -18,6 +19,8 @@ use p4kx_extraction::{ArchiveWriteProtection, CancelToken, ConflictPolicy, Conve
 use self::loop_origins::CaptureOrigins;
 pub(crate) use self::loop_origins::ExportedWemOrigin;
 pub use self::loop_origins::{ExportLoopOrigin, ExportLoopOrigins};
+pub(super) use self::source::ResolvedMedia;
+pub use self::source::WemExportSource;
 use self::write::Target;
 use super::export_preflight;
 use super::{ArchiveAudio, TriggerSounds};
@@ -124,11 +127,14 @@ pub enum ExportState {
 
 /// One sound file of an export.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
 pub struct ExportedSound {
     /// The audio trigger the sound belongs to.
     pub trigger: String,
     /// The WEM ID.
     pub wem_id: u32,
+    /// The selected source in the Archive used to plan this file.
+    pub source: WemExportSource,
     /// The file.
     pub path: PathBuf,
     /// The format the file is in.
@@ -207,8 +213,8 @@ impl ExportReport {
 
 impl ArchiveAudio<'_> {
     /// Writes the sounds of `triggers` into `folder` as `<trigger>.<ext>` for a trigger with one
-    /// sound and `<trigger>_<WEM ID>.<ext>` for one with several; a WEM several variants lead to
-    /// is written once.
+    /// sound and `<trigger>_<WEM ID>.<ext>` for one with several. Repeated references to the same
+    /// physical media share one file.
     ///
     /// Names follow the portable file-name rule of ADR-0248: a character it forbids becomes `%`
     /// and two hex digits, a name too long for a file becomes `sound`, and a name already taken

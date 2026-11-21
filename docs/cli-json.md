@@ -1012,7 +1012,9 @@ With `--txtp`, the object has a `txtp` member, absent without it:
 "event": "Play_Other", "reason": "plug-in source 9 has no file"}, …]}`. One `.txtp` file in
 vgmstream's TXTP syntax is written per Wwise event that leads to sounds, named after the event by
 the rule of the sound files (`event` for a name too long for a file) and holding the names of the exported files, which lie in the same
-folder. An Event's actions, blend containers, music segments and music tracks are layers (`group =
+folder. Commands use the physical WEM selected for each resolved path, so the same short ID
+can appear in multiple sound file rows and name different files in one TXTP.
+An Event's actions, blend containers, music segments and music tracks are layers (`group =
 -L<n> #@layer-v`), sequence containers and music playlists segments (`-S<n>`), and a random or
 switch container or music switch a choice that the file settles on the first child (`-R<n>>1`);
 the loop of a sound's WEM is written as `#I <start> <end>`. An event with a sound that has no

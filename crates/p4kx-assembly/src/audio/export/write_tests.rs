@@ -7,8 +7,8 @@ use p4kx_extraction::{
     ArchiveWriteProtection, ConflictPolicy, ConversionError, WriteProtectionError,
 };
 
-use super::super::plan::{Job, Origin};
-use super::super::{ExportOptions, ExportWatch, SoundFormat};
+use super::super::plan::Job;
+use super::super::{ExportOptions, ExportWatch, SoundFormat, WemExportSource};
 use super::{ExportState, emit};
 
 fn job() -> Job {
@@ -16,7 +16,7 @@ fn job() -> Job {
         trigger: "Play".to_owned(),
         stem: "Play".to_owned(),
         wem_id: 1,
-        origin: Origin::Loose(0),
+        source: WemExportSource::Loose { entry: 0 },
     }
 }
 

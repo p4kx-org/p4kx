@@ -33,8 +33,6 @@ impl Combine {
 /// A sound a group plays.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) struct Leaf {
-    /// The WEM ID, `None` for a source that has no file.
-    pub(super) wem_id: Option<u32>,
     /// The media ID the Sound object states.
     pub(super) source_id: u32,
     pub(super) kind: SourceKind,
@@ -171,7 +169,6 @@ fn build_holder(
             owners,
             variant.shared_path_prefix.saturating_sub(1),
             Leaf {
-                wem_id: variant.wem_id(),
                 source_id: variant.source().source_id,
                 kind: variant.source_kind(),
                 music_clip_features: variant.music_clip_features,

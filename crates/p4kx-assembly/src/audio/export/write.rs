@@ -20,7 +20,8 @@ mod input;
 
 use self::input::{GroupInput, SoundInput};
 use super::loop_origins::{CaptureOrigins, CapturedSoundOrigin};
-use super::plan::{Job, Origin};
+use super::plan::Job;
+use super::source::SourceEntry;
 use super::{ExportFailure, ExportOptions, ExportState, ExportWatch, ExportedSound, SoundFormat};
 use crate::audio::read::entry_bytes;
 use crate::audio::{ArchiveAudio, MAX_SOUNDBANK_LEN};
@@ -64,11 +65,12 @@ pub(super) fn run(
     watch: &ExportWatch,
     capture: CaptureOrigins,
 ) -> Vec<Outcome> {
-    let mut groups: Vec<(Origin, Vec<usize>)> = Vec::new();
-    let mut slots: HashMap<Origin, usize> = HashMap::new();
+    let mut groups: Vec<(SourceEntry, Vec<usize>)> = Vec::new();
+    let mut slots: HashMap<SourceEntry, usize> = HashMap::new();
     for (position, job) in jobs.iter().enumerate() {
-        let slot = *slots.entry(job.origin).or_insert_with(|| {
-            groups.push((job.origin, Vec::new()));
+        let entry = job.source.entry();
+        let slot = *slots.entry(entry).or_insert_with(|| {
+            groups.push((entry, Vec::new()));
             groups.len() - 1
         });
         if let Some((_, members)) = groups.get_mut(slot) {
@@ -95,7 +97,7 @@ pub(super) fn run(
 fn run_group(
     audio: &ArchiveAudio<'_>,
     jobs: &[Job],
-    (origin, members): (Origin, &[usize]),
+    (origin, members): (SourceEntry, &[usize]),
     (target, options): (Target<'_>, ExportOptions),
     watch: &ExportWatch,
     capture: CaptureOrigins,
@@ -113,8 +115,8 @@ fn run_group(
             .collect()
     };
     let (index, limit) = match origin {
-        Origin::Soundbank(index) => (index, MAX_SOUNDBANK_LEN),
-        Origin::Loose(index) => (index, MAX_SOUND_LEN),
+        SourceEntry::Soundbank(index) => (index, MAX_SOUNDBANK_LEN),
+        SourceEntry::Loose(index) => (index, MAX_SOUND_LEN),
     };
     let Some(entry) = audio.archive().entries().get(index) else {
         return failed_all("the Archive no longer holds the Entry".to_owned());
@@ -124,11 +126,11 @@ fn run_group(
         Err(error) => return failed_all(format!("{}: {error}", entry.path())),
     };
     let bank = match origin {
-        Origin::Soundbank(_) => match Soundbank::parse(bytes.as_slice()) {
+        SourceEntry::Soundbank(_) => match Soundbank::parse(bytes.as_slice()) {
             Ok(bank) => Some(bank),
             Err(error) => return failed_all(format!("{}: {error}", entry.path())),
         },
-        Origin::Loose(_) => None,
+        SourceEntry::Loose(_) => None,
     };
     let binding = match capture {
         CaptureOrigins::Omit => None,
@@ -166,7 +168,7 @@ fn run_members(
                 return None;
             }
             let job = jobs.get(position)?;
-            let outcome = match input.for_wem(job.wem_id) {
+            let outcome = match input.for_wem(job.wem_id, job.source) {
                 Some(wem) => write_sound(&wem, job, target, (options, watch))?,
                 None => Err(failure(
                     job,
@@ -231,6 +233,7 @@ fn write_sound(
             sound: ExportedSound {
                 trigger: job.trigger.clone(),
                 wem_id: job.wem_id,
+                source: job.source,
                 path: path.clone(),
                 format,
                 size: emitted.size,

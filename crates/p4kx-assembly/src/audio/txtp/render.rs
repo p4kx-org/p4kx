@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashMap;
 use std::fmt::Write;
 use std::ops::Range;
 use std::slice;
@@ -173,7 +172,7 @@ impl RenderedTxtp<'_> {
 pub(super) fn render<'a>(
     tree: &Tree,
     header: &[String],
-    files: &HashMap<u32, SoundFile<'a>>,
+    files: &[Option<SoundFile<'a>>],
 ) -> Result<RenderedTxtp<'a>, String> {
     let mut rendered = RenderedTxtp {
         text: String::new(),
@@ -217,7 +216,7 @@ impl<'a> GroupCursor<'a> {
 fn group_lines<'a>(
     rendered: &mut RenderedTxtp<'a>,
     tree: &Tree,
-    files: &HashMap<u32, SoundFile<'a>>,
+    files: &[Option<SoundFile<'a>>],
 ) -> Result<(), String> {
     let root = tree
         .group(Tree::ROOT)
@@ -246,11 +245,11 @@ fn leaf_line<'a>(
     rendered: &mut RenderedTxtp<'a>,
     leaf: &Leaf,
     depth: usize,
-    files: &HashMap<u32, SoundFile<'a>>,
+    files: &[Option<SoundFile<'a>>],
 ) -> Result<(), String> {
-    let file = leaf
-        .wem_id
-        .and_then(|id| files.get(&id))
+    let file = files
+        .get(leaf.variant)
+        .and_then(Option::as_ref)
         .ok_or_else(|| format!("{} {} has no file", leaf.kind.label(), leaf.source_id))?;
     if file.prefetch_only {
         return Err(format!(

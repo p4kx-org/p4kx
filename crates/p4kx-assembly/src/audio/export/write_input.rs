@@ -5,6 +5,7 @@ use p4kx_archive::ObservedEntryBinding;
 use p4kx_audio::{EmbeddedWemSource, Soundbank, Wem};
 
 use super::super::loop_origins::CapturedSoundOrigin;
+use super::super::source::WemExportSource;
 
 pub(super) struct GroupInput<'a> {
     pub(super) bytes: &'a [u8],
@@ -13,16 +14,20 @@ pub(super) struct GroupInput<'a> {
 }
 
 impl<'a> GroupInput<'a> {
-    pub(super) fn for_wem(&self, id: u32) -> Option<SoundInput<'a>> {
-        let (bytes, prefetch, embedded) = if let Some(bank) = self.bank {
-            let wem = bank.wem(id)?;
-            (
-                wem.bytes(),
-                wem.is_prefetch(),
-                self.binding.map(|_| wem.source()),
-            )
-        } else {
-            (self.bytes, false, None)
+    pub(super) fn for_wem(&self, id: u32, source: WemExportSource) -> Option<SoundInput<'a>> {
+        let (bytes, prefetch, embedded) = match source {
+            WemExportSource::Soundbank { offset, length, .. } => {
+                let wem = self.bank?.wem(id)?;
+                if wem.offset() != offset || wem.bytes().len() as u64 != length {
+                    return None;
+                }
+                (
+                    wem.bytes(),
+                    wem.is_prefetch(),
+                    self.binding.map(|_| wem.source()),
+                )
+            }
+            WemExportSource::Loose { .. } => (self.bytes, false, None),
         };
         Some(SoundInput {
             bytes,
