@@ -28,10 +28,18 @@ const PARAMETERS: &str = "explosionParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ExplosionDefinition<'source> {
+pub struct ExplosionDefinition<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     explosion_params: SourcedValue<ExplosionParameters<'source>>,
+}
+
+impl<'source> ExplosionDefinition<'source> {
+    /// Borrows the original physical Record identity.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
 }
 
 /// One emitted definition with actual accounting identities and numeric receipts.
@@ -41,6 +49,12 @@ pub(crate) struct PreparedExplosionDefinition<'source> {
     pub(crate) physical_index: u32,
     pub(crate) physical_path: &'source str,
     pub(crate) numbers: Vec<CapturedNumber>,
+}
+
+impl<'source> PreparedExplosionDefinition<'source> {
+    pub(crate) fn into_definition(self) -> ExplosionDefinition<'source> {
+        self.definition
+    }
 }
 
 pub(crate) struct ExplosionDefinitionRead<'source> {
@@ -100,6 +114,8 @@ pub(crate) fn table<'source>(
     CatalogTable::new(
         forge,
         &[SOURCE_TYPE],
-        rows.into_iter().map(|row| row.definition).collect(),
+        rows.into_iter()
+            .map(PreparedExplosionDefinition::into_definition)
+            .collect(),
     )
 }

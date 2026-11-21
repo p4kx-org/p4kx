@@ -102,6 +102,8 @@ mod mission_location;
 mod mission_type;
 #[path = "sdk_npc_spawn_definition_routes.rs"]
 mod npc_spawns;
+#[path = "sdk_ordnance_routes.rs"]
+mod ordnance;
 #[path = "sdk_planet_asset_routes.rs"]
 mod planet_assets;
 #[path = "sdk_planet_resource_route.rs"]
@@ -239,6 +241,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(ship_systems::read()?);
     routes.extend(jump_configurations::read()?);
     routes.extend(worn_gear::read()?);
+    routes.extend(ordnance::read()?);
     routes.push(vehicle_armor::read()?);
     routes.push(loot_generation::read()?);
     routes.push(entity_animation::read()?);

@@ -29,6 +29,16 @@ const ORDNANCE: &str = "SExplosiveOrdnanceParams";
 const BOMB: &str = "SCItemBombParams";
 const SPACE_MINE: &str = "SCItemSpaceMineParams";
 
+pub(super) const SOURCE_TYPES: &[&str] = &[
+    SENSOR_MINE,
+    ORDNANCE,
+    BOMB,
+    SPACE_MINE,
+    missile::SOURCE_TYPE,
+    triggerable_device::SOURCE_TYPE,
+    primeable::SOURCE_TYPE,
+];
+
 #[derive(Clone, Copy)]
 pub(super) enum ExplosiveComponent {
     SensorMine,
@@ -59,7 +69,7 @@ impl ExplosiveComponent {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct Explosive<'source> {
+pub struct Explosive<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     source_type: SourcedValue<&'source str>,
@@ -67,6 +77,18 @@ pub(crate) struct Explosive<'source> {
 }
 
 impl<'source> Explosive<'source> {
+    /// Borrows the original Item Record and physical Components slot.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    /// Borrows the concrete authored component type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
     pub(super) fn read(
         kind: ExplosiveComponent,
         owner: ComponentOwner,
@@ -161,17 +183,5 @@ pub(crate) fn table<'source>(
     mut rows: Vec<Explosive<'source>>,
 ) -> CatalogTable<Explosive<'source>> {
     rows.sort_by_key(|row| row.owner.key());
-    CatalogTable::new(
-        forge,
-        &[
-            SENSOR_MINE,
-            ORDNANCE,
-            BOMB,
-            SPACE_MINE,
-            missile::SOURCE_TYPE,
-            triggerable_device::SOURCE_TYPE,
-            primeable::SOURCE_TYPE,
-        ],
-        rows,
-    )
+    CatalogTable::new(forge, SOURCE_TYPES, rows)
 }

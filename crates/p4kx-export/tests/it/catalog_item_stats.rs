@@ -49,6 +49,8 @@ pub(crate) use inventory_containers::entities as inventory_entities;
 mod jump_drive;
 #[path = "catalog_missile_configuration.rs"]
 mod missile_configuration;
+#[path = "catalog_ordnance_sdk.rs"]
+mod ordnance_sdk;
 #[path = "catalog_quantum.rs"]
 mod quantum;
 #[path = "catalog_resource_components.rs"]

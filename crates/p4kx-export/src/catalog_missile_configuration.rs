@@ -30,7 +30,7 @@ pub(in crate::catalog_v3) const SOURCE_TYPE: &str = "SCItemMissileParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct MissileConfiguration<'source> {
+pub struct MissileConfiguration<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     #[serde(flatten)]
@@ -41,6 +41,12 @@ pub(crate) struct MissileConfiguration<'source> {
 }
 
 impl<'source> MissileConfiguration<'source> {
+    /// Borrows the original Item Record and physical Components slot.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
     pub(in crate::catalog_v3) fn read(
         owner: ComponentOwner,
         source: Observed<'_, '_, '_, 'source>,

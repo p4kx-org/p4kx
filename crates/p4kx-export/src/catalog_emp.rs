@@ -25,7 +25,7 @@ const TAG: &str = "Tag";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct Emp<'source> {
+pub struct Emp<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     #[serde(flatten)]
@@ -39,6 +39,18 @@ pub(crate) struct Emp<'source> {
 }
 
 impl<'source> Emp<'source> {
+    /// Borrows the original Item Record and physical Components slot.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    /// Borrows the original distortion damage.
+    #[must_use]
+    pub const fn distortion_damage(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.parameters.distortion_damage
+    }
+
     pub(super) fn read(
         owner: ComponentOwner,
         observed: Observed<'_, '_, '_, 'source>,

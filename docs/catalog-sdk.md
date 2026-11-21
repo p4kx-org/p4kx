@@ -1752,6 +1752,21 @@ resolve source references against the snapshot's own inventory.
 For the consumer convention on quantum acceleration, see the
 [quantum drive contract](catalog-quantum-drives.md).
 
+## Authored EMP and ordnance configurations
+
+Use `equipment::ordnance::with_emp`, `with_explosives` and
+`with_missile_configurations` for the original selected Item components. Each
+result retains physical Record and Components positions. The explosive and
+missile tables represent distinct projections of the same physical missile
+component. Missile configuration uses authored ordnance field states to retain
+only genuinely unmapped additional fields.
+
+Use `with_explosion_definitions` in the same module for independently selected
+`ExplosionRecord` definitions. A reference in another dataset can provide its
+physical Record index. The query preserves original null, unresolved and
+unreadable reference states without materializing foreign definition bodies or
+media. Every route has a decoded-Entry form and can reuse a parsed session.
+
 ## Jump drives and quantum interdiction
 
 Use `equipment::ship_systems::with_jump_drives` and

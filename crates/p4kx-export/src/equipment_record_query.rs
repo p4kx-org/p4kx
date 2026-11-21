@@ -92,3 +92,32 @@ macro_rules! unlocalized {
 }
 
 pub(super) use unlocalized;
+
+macro_rules! item_component {
+    ($name:ident, $source:lifetime, $row:ty, $family:expr, $read:ident) => {
+        struct $name;
+
+        impl super::rows::Projector for $name {
+            type Row<$source> = $row;
+            const FAMILY: super::rows::Family = super::rows::Family::ItemEquipment($family);
+
+            fn read<'source>(
+                _: &'source p4kx_extraction::DataForge<'source>,
+                tree: &p4kx_extraction::RecordTree<'source>,
+                projection: &crate::catalog_projection::CatalogProjection<'_, 'source>,
+                admission: &crate::record_observation::RecordObservation<'_, 'source>,
+                _: &super::rows::ReadOptions<'_>,
+                cancel: Option<&p4kx_extraction::CancelToken>,
+            ) -> Result<
+                crate::catalog_read::scoped_source_read::ScopedSourceRead<Vec<Self::Row<'source>>>,
+                crate::CatalogError,
+            > {
+                crate::catalog_v3::catalog_item_components::$read(
+                    tree, projection, admission, cancel,
+                )
+            }
+        }
+    };
+}
+
+pub(super) use item_component;

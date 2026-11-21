@@ -50,6 +50,10 @@ const CLIENT_PROFILE_DOCUMENTS: &str = "/configurations/clientProfileSettings/do
 const RADAR_AUDIO: &str = "/configurations/radarAudio";
 const ELECTRICAL_BEHAVIORS: &str = "/configurations/electricalBehaviors";
 const AMMUNITION: &str = "/definitions/ammoDefinitions";
+const EMP: &str = "/configurations/emp";
+const EXPLOSIVES: &str = "/configurations/explosives";
+const MISSILE_CONFIGURATIONS: &str = "/configurations/missileConfigurations";
+const EXPLOSION_DEFINITIONS: &str = "/definitions/explosionDefinitions";
 const AMMO_BINDINGS: &str = "/declarations/ammoBindings";
 const AMMO_CONTAINERS: &str = "/configurations/ammoContainers";
 const COUNTERMEASURE_EMITTERS: &str = "/configurations/countermeasureEmitters";
@@ -244,6 +248,10 @@ const REQUIRED_WITNESSES: &[&str] = &[
     RADAR_AUDIO,
     AMMUNITION,
     AMMO_BINDINGS,
+    EMP,
+    EXPLOSIVES,
+    MISSILE_CONFIGURATIONS,
+    EXPLOSION_DEFINITIONS,
     AMMO_CONTAINERS,
     COUNTERMEASURE_EMITTERS,
     REPUTATION_TRIGGER_CONFIGURATIONS,

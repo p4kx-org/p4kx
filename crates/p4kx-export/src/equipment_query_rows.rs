@@ -59,6 +59,7 @@ pub(super) enum Family {
     Configuration(ConfigurationFamily),
     ItemEquipment(ItemEquipmentFamily),
     AmmoDefinitions,
+    ExplosionDefinitions,
     WeaponSources,
     ProjectileAmmo,
     MagazineResolutions,
@@ -72,6 +73,7 @@ impl Family {
     pub(super) const fn kind(self) -> Kind {
         match self {
             Self::AmmoDefinitions => Kind::AmmoDefinitions,
+            Self::ExplosionDefinitions => Kind::ExplosionDefinitions,
             Self::InventoryContainers => Kind::InventoryContainers,
             Self::CargoLoadingGlobals => Kind::CargoLoadingGlobals,
             Self::ShopCommodityGlobals => Kind::ShopCommodityGlobals,
@@ -101,7 +103,10 @@ impl Family {
             Self::ItemEquipment(family) => family.source_types(),
             Self::CargoGrids => &[crate::catalog_v3::catalog_facility::CARGO_GRID_SOURCE_TYPE],
             Self::Facilities => crate::catalog_v3::catalog_facility::SOURCE_TYPES,
-            Self::InventoryContainers | Self::CargoLoadingGlobals | Self::ShopCommodityGlobals => {
+            Self::InventoryContainers
+            | Self::CargoLoadingGlobals
+            | Self::ShopCommodityGlobals
+            | Self::ExplosionDefinitions => {
                 return DatasetAvailability::from_source_declarations(forge, |name| {
                     name == self.kind().records().type_name
                 });

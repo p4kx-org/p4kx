@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use p4kx_extraction::{CancelToken, DataForge, DataType, RecordTree, TreeBuilder, Value};
 
 use super::item_definition::ItemDefinition;
-use super::{Component, ItemComponentsRead, ItemEquipmentFamily, resolution};
+use super::{Component, ItemComponentsRead, ItemEquipmentFamily, OrdnanceOutput, resolution};
 use crate::CatalogError;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
@@ -28,8 +28,9 @@ use crate::template_field_capture::TemplateFieldCapture;
 #[path = "catalog_item_equipment_read.rs"]
 mod equipment;
 pub(crate) use equipment::{
-    read_degradation, read_distortion, read_health, read_jump_drives, read_quantum_drives,
-    read_quantum_interdiction_generators, read_shield_generators,
+    read_degradation, read_distortion, read_emp, read_explosives, read_health, read_jump_drives,
+    read_missile_configurations, read_quantum_drives, read_quantum_interdiction_generators,
+    read_shield_generators,
 };
 
 /// Canonical authored weapon and ammunition components of one physical Item.
@@ -215,6 +216,16 @@ enum ComponentScope {
 }
 
 impl ComponentScope {
+    const fn ordnance(self) -> OrdnanceOutput {
+        match self {
+            Self::Equipment(ItemEquipmentFamily::Explosives) => OrdnanceOutput::Explosives,
+            Self::Equipment(ItemEquipmentFamily::MissileConfigurations) => {
+                OrdnanceOutput::MissileConfigurations
+            }
+            Self::All | Self::Weapon | Self::Equipment(_) => OrdnanceOutput::Both,
+        }
+    }
+
     fn includes(self, kind: Component) -> bool {
         match self {
             Self::All => true,
@@ -247,6 +258,7 @@ fn with_components<'source, T>(
         .with_cancel(cancel);
     let numbers = RefCell::new(Vec::new());
     let mut result = ItemComponentsRead::default();
+    let ordnance = selected.ordnance();
     for (value, kind) in components(tree).iter().filter_map(Component::of) {
         if !selected.includes(kind) {
             continue;
@@ -254,7 +266,7 @@ fn with_components<'source, T>(
         let component = originals.fact(value)?;
         let owner = ComponentOwner::read(tree, &context, &originals, component)?;
         let observed = Observed::new(&originals, input, component, &capture, &numbers);
-        result.push(kind, owner, observed)?;
+        result.push(kind, owner, observed, ordnance)?;
     }
     finish(result, &originals, &capture, numbers)
 }

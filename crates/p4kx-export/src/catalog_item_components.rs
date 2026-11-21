@@ -28,9 +28,10 @@ use crate::source_fields::FieldError;
 mod component_read;
 pub use component_read::WeaponSource;
 pub(crate) use component_read::{
-    read, read_degradation, read_distortion, read_health, read_jump_drives,
-    read_magazine_resolution, read_projectile_ammo, read_quantum_drives,
-    read_quantum_interdiction_generators, read_shield_generators, read_weapon_source,
+    read, read_degradation, read_distortion, read_emp, read_explosives, read_health,
+    read_jump_drives, read_magazine_resolution, read_missile_configurations, read_projectile_ammo,
+    read_quantum_drives, read_quantum_interdiction_generators, read_shield_generators,
+    read_weapon_source,
 };
 
 #[path = "equipment_item_definition_read.rs"]
@@ -149,6 +150,7 @@ impl<'source> ItemComponentsRead<'source> {
         kind: Component,
         owner: ComponentOwner,
         observed: Observed<'_, '_, '_, 'source>,
+        ordnance: OrdnanceOutput,
     ) -> Result<(), CatalogError> {
         match kind {
             Component::Durability(kind) => {
@@ -165,7 +167,7 @@ impl<'source> ItemComponentsRead<'source> {
                     .emp
                     .push(Emp::read(owner, observed, &mut self.notes)?);
             }
-            Component::Explosive(kind) => self.push_explosive(kind, owner, observed)?,
+            Component::Explosive(kind) => self.push_explosive(kind, owner, observed, ordnance)?,
             Component::AmmoContainer => {
                 self.rows.ammo_containers.push(AmmoContainer::read(
                     owner.clone(),
@@ -213,8 +215,11 @@ impl<'source> ItemComponentsRead<'source> {
         kind: ExplosiveComponent,
         owner: ComponentOwner,
         observed: Observed<'_, '_, '_, 'source>,
+        output: OrdnanceOutput,
     ) -> Result<(), CatalogError> {
-        let missile_owner = matches!(kind, ExplosiveComponent::Missile).then(|| owner.clone());
+        let missile_owner = (matches!(kind, ExplosiveComponent::Missile)
+            && !matches!(output, OrdnanceOutput::Explosives))
+        .then(|| owner.clone());
         let explosive = Explosive::read(kind, owner, observed, &mut self.notes)?;
         if let Some(owner) = missile_owner {
             let ordnance = explosive
@@ -229,7 +234,9 @@ impl<'source> ItemComponentsRead<'source> {
                     &mut self.notes,
                 )?);
         }
-        self.rows.explosives.push(explosive);
+        if !matches!(output, OrdnanceOutput::MissileConfigurations) {
+            self.rows.explosives.push(explosive);
+        }
         Ok(())
     }
 
@@ -267,7 +274,17 @@ enum Component {
 }
 
 #[derive(Clone, Copy)]
+pub(super) enum OrdnanceOutput {
+    Both,
+    Explosives,
+    MissileConfigurations,
+}
+
+#[derive(Clone, Copy)]
 pub(crate) enum ItemEquipmentFamily {
+    Emp,
+    Explosives,
+    MissileConfigurations,
     Durability(DurabilityComponent),
     ShieldGenerators,
     QuantumDrives,
@@ -278,6 +295,9 @@ pub(crate) enum ItemEquipmentFamily {
 impl ItemEquipmentFamily {
     pub(crate) const fn source_types(self) -> &'static [&'static str] {
         match self {
+            Self::Emp => &[catalog_emp::SOURCE_TYPE],
+            Self::Explosives => catalog_explosives::SOURCE_TYPES,
+            Self::MissileConfigurations => &[catalog_missile_configuration::SOURCE_TYPE],
             Self::Durability(component) => component.source_types(),
             Self::ShieldGenerators => &[catalog_shield_generator::SOURCE_TYPE],
             Self::QuantumDrives => &[catalog_quantum_drive::SOURCE_TYPE],
@@ -292,7 +312,13 @@ impl ItemEquipmentFamily {
         }
         matches!(
             (self, component),
-            (Self::ShieldGenerators, Component::ShieldGenerator)
+            (Self::Emp, Component::Emp)
+                | (Self::Explosives, Component::Explosive(_))
+                | (
+                    Self::MissileConfigurations,
+                    Component::Explosive(ExplosiveComponent::Missile)
+                )
+                | (Self::ShieldGenerators, Component::ShieldGenerator)
                 | (Self::QuantumDrives, Component::QuantumDrive)
                 | (Self::JumpDrives, Component::JumpDrive)
                 | (

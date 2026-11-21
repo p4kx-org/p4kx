@@ -34,6 +34,10 @@ mod loadout_query;
 #[path = "equipment_flight_query.rs"]
 pub mod flight;
 
+/// Selective reads of original EMP, ordnance, missile and explosion data.
+#[path = "equipment_ordnance_query.rs"]
+pub mod ordnance;
+
 /// Selective reads of original fuel tanks, intakes and resource containers.
 #[path = "equipment_fuel_query.rs"]
 pub mod fuel;

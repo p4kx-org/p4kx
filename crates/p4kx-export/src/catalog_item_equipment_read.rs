@@ -14,6 +14,9 @@ use crate::catalog_read::scoped_source_read::ScopedSourceRead;
 use crate::catalog_v3::catalog_durability::{
     Degradation, Distortion, Durability, DurabilityComponent,
 };
+use crate::catalog_v3::catalog_emp::Emp;
+use crate::catalog_v3::catalog_explosives::Explosive;
+use crate::catalog_v3::catalog_explosives::catalog_missile_configuration::MissileConfiguration;
 use crate::catalog_v3::catalog_jump_drive::JumpDrive;
 use crate::catalog_v3::catalog_quantum_drive::QuantumDrive;
 use crate::catalog_v3::catalog_quantum_interdiction::QuantumInterdictionGenerator;
@@ -21,6 +24,54 @@ use crate::catalog_v3::catalog_shield_generator::ShieldGenerator;
 use crate::record_observation::RecordObservation;
 use crate::source_value_catalog;
 use crate::{CatalogError, ExportAccountingError};
+
+pub(crate) fn read_emp<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<Vec<Emp<'source>>>, CatalogError> {
+    read(
+        tree,
+        projection,
+        admission,
+        cancel,
+        ItemEquipmentFamily::Emp,
+        |rows| rows.emp,
+    )
+}
+
+pub(crate) fn read_explosives<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<Vec<Explosive<'source>>>, CatalogError> {
+    read(
+        tree,
+        projection,
+        admission,
+        cancel,
+        ItemEquipmentFamily::Explosives,
+        |rows| rows.explosives,
+    )
+}
+
+pub(crate) fn read_missile_configurations<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<Vec<MissileConfiguration<'source>>>, CatalogError> {
+    read(
+        tree,
+        projection,
+        admission,
+        cancel,
+        ItemEquipmentFamily::MissileConfigurations,
+        |rows| rows.missile_configurations,
+    )
+}
 
 pub(crate) fn read_health<'source>(
     tree: &RecordTree<'source>,
