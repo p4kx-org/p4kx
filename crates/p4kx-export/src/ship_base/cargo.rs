@@ -4,11 +4,13 @@
 use std::collections::HashMap;
 
 use p4kx_assembly::{EntityNode, LoadoutEntry};
-use p4kx_extraction::{DataForge, Guid, RecordTree, StructValue, TreeBuilder, Value};
+use p4kx_extraction::{DataForge, DataForgeError, Guid, TreeBuilder};
 
 use super::model::{Cargo, CargoGrid, Source, SourceKind};
-use crate::catalog_v3::cargo_source::{self, CargoUnit, round_capacity};
-use crate::record_fields::{number, number_value, structure};
+use crate::catalog_v3::cargo_source::round_capacity;
+#[path = "cargo_container.rs"]
+mod cargo_container;
+use cargo_container::{ContainerInput, MeasuredCapacity};
 
 const GRID_TYPE: &str = "CargoGrid";
 const TEMPLATE_SUFFIX: &str = "_template";
@@ -18,25 +20,34 @@ const CELL_TOLERANCE: f64 = 1e-4;
 #[expect(clippy::cast_precision_loss, reason = "a power of two is exact in f64")]
 const CELL_COUNT_LIMIT: f64 = (1_u128 << u64::BITS) as f64;
 
-/// What an `InventoryContainer` Record states of its capacity.
-#[derive(Debug, Clone)]
-struct Container {
-    record_path: String,
-    shape: Shape,
+struct Container<'source> {
+    record_path: &'source str,
+    capacity: MeasuredCapacity<'source>,
 }
 
-#[derive(Debug, Clone)]
-enum Shape {
-    Open { dimensions: [f64; 3], scu: f64 },
-    Closed { scu: f64, unit: CargoUnit },
-    Unknown(String),
+enum ContainerReadError {
+    Missing,
+    Unreadable(DataForgeError),
+}
+
+impl ContainerReadError {
+    fn for_guid(&self, guid: Guid) -> String {
+        match self {
+            Self::Missing => format!(
+                "the inventory container {guid} does not exist: a dangling Reference in the game data"
+            ),
+            Self::Unreadable(error) => {
+                format!("cannot read the inventory container {guid}: {error}")
+            }
+        }
+    }
 }
 
 /// Finds the cargo grids of default Loadouts and reads their capacity, keeping each
 /// `InventoryContainer` Record it has read.
 pub(crate) struct CargoReader<'f> {
     forge: &'f DataForge<'f>,
-    containers: HashMap<Guid, Result<Container, String>>,
+    containers: HashMap<Guid, Result<Container<'f>, ContainerReadError>>,
 }
 
 impl<'f> CargoReader<'f> {
@@ -96,22 +107,30 @@ impl<'f> CargoReader<'f> {
             return grid;
         };
         match self.container(container, trees) {
-            Err(reason) => grid.issue = Some(reason.clone()),
+            Err(error) => grid.issue = Some(error.for_guid(container)),
             Ok(read) => fill(&mut grid, read),
         }
         grid
     }
 
-    fn container(&mut self, guid: Guid, trees: &mut TreeBuilder<'f>) -> &Result<Container, String> {
+    fn container(
+        &mut self,
+        guid: Guid,
+        trees: &mut TreeBuilder<'f>,
+    ) -> &Result<Container<'f>, ContainerReadError> {
         let forge = self.forge;
         self.containers.entry(guid).or_insert_with(|| {
             let record = forge
                 .record_by_guid(guid)
-                .ok_or_else(|| format!("the inventory container {guid} does not exist: a dangling Reference in the game data"))?;
+                .ok_or(ContainerReadError::Missing)?;
             let tree = trees
                 .build(&record)
-                .map_err(|error| format!("cannot read the inventory container {guid}: {error}"))?;
-            Ok(read_container(&tree))
+                .map_err(ContainerReadError::Unreadable)?;
+            let capacity = ContainerInput::select(tree.root()).measure();
+            Ok(Container {
+                record_path: tree.record_path(),
+                capacity,
+            })
         })
     }
 }
@@ -128,21 +147,21 @@ fn is_grid(node: &EntityNode) -> bool {
             .ends_with("_cargogrid_template")
 }
 
-fn fill(grid: &mut CargoGrid, container: &Container) {
+fn fill(grid: &mut CargoGrid, container: &Container<'_>) {
     let field = |path| Source {
         kind: SourceKind::Record,
-        file: container.record_path.clone(),
+        file: container.record_path.to_owned(),
         field: path,
     };
-    match &container.shape {
-        Shape::Open { dimensions, scu } => {
+    match &container.capacity {
+        MeasuredCapacity::Open { dimensions, scu } => {
             grid.shape = Some("open");
             grid.dimensions = Some(*dimensions);
             grid.scu = Some(round_capacity(*scu));
             grid.cells = cells(*dimensions);
             grid.source = Some(field("interiorDimensions".to_owned()));
         }
-        Shape::Closed { scu, unit } => {
+        MeasuredCapacity::Closed { scu, unit } => {
             grid.shape = Some("closed");
             grid.scu = Some(round_capacity(*scu));
             grid.source = Some(field(format!(
@@ -151,60 +170,7 @@ fn fill(grid: &mut CargoGrid, container: &Container) {
                 unit.amount_field()
             )));
         }
-        Shape::Unknown(reason) => grid.issue = Some(reason.clone()),
-    }
-}
-
-fn read_container(tree: &RecordTree<'_>) -> Container {
-    let root = tree.root();
-    let shape = match structure(Some(root), "inventoryType").map(StructValue::type_name) {
-        Some(cargo_source::OPEN) => structure(Some(root), "interiorDimensions")
-            .map(|size| ["x", "y", "z"].map(|axis| number(Some(size), axis).map(f64::from)))
-            .and_then(|[x, y, z]| Some([x?, y?, z?]))
-            .map_or_else(
-                || Shape::Unknown("the container states no interior dimensions".to_owned()),
-                open,
-            ),
-        Some(cargo_source::CLOSED) => closed(root),
-        Some(other) => Shape::Unknown(format!("the container type {other} states no capacity")),
-        None => Shape::Unknown("the container has no inventory type".to_owned()),
-    };
-    Container {
-        record_path: tree.record_path().to_owned(),
-        shape,
-    }
-}
-
-fn open(dimensions: [f64; 3]) -> Shape {
-    cargo_source::open_capacity(dimensions).map_or_else(
-        || {
-            Shape::Unknown(format!(
-                "the interior dimensions {dimensions:?} must be finite, positive lengths"
-            ))
-        },
-        |scu| Shape::Open { dimensions, scu },
-    )
-}
-
-fn closed(root: &StructValue<'_>) -> Shape {
-    let capacity = structure(structure(Some(root), "inventoryType"), "capacity");
-    let Some(unit) = capacity.and_then(|value| CargoUnit::from_source(value.type_name())) else {
-        return Shape::Unknown("the container states no capacity in cargo units".to_owned());
-    };
-    let name = unit.source_type();
-    let field = unit.amount_field();
-    let amount = match capacity.and_then(|capacity| capacity.field(field)) {
-        Some(Value::Int32(value)) => Some(f64::from(*value)),
-        Some(Value::UInt32(value)) => Some(f64::from(*value)),
-        Some(value) => number_value(value).map(f64::from),
-        None => None,
-    };
-    match amount.map(|value| unit.normalize(value)) {
-        Some(scu) if cargo_source::is_valid_closed_capacity(scu) => Shape::Closed { scu, unit },
-        Some(scu) => Shape::Unknown(format!(
-            "the capacity {scu} SCU of {name} must be finite and nonnegative"
-        )),
-        None => Shape::Unknown(format!("the capacity {name} states no {field}")),
+        MeasuredCapacity::Unavailable(reason) => grid.issue = Some(reason.to_string()),
     }
 }
 

@@ -9,6 +9,9 @@ mod physical_identity;
 #[path = "catalog_ship_aggregate_sources.rs"]
 mod aggregate_sources;
 
+#[path = "catalog_ship_cargo_resolution.rs"]
+mod cargo_resolution;
+
 use crate::ship_base_fixture::{
     ALPHA, BETA, BROKEN, CAR, DISPLAY, GROUND, GUN_DISPLAY, HUGE, MIXED, ROLLING, TEMP, UNKNOWN,
     write_archive,
