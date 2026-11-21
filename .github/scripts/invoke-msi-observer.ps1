@@ -1,16 +1,29 @@
 param(
-    [Parameter(Mandatory)][ValidateSet('Start','Snapshot','Finish')][string]$Stage,
+    [Parameter(Mandatory)][ValidateSet('Start','Delay','Snapshot','Finish')][string]$Stage,
     [Parameter(Mandatory)][string]$Directory,
     [string]$Invocation,
     [ValidateSet('Lifecycle','Control')][string]$Mode='Lifecycle',
     [ValidateRange(1,9)][int]$Sequence=1,
     [ValidateRange(0,75000)][int]$WaitMilliseconds=75000,
-    [ValidateRange(1,100000)][int]$ControlMilliseconds=10000
+    [ValidateRange(1,100000)][int]$ControlMilliseconds=10000,
+    [switch]$ScheduledDelay
 )
 $ErrorActionPreference = 'Stop'
+if ($ScheduledDelay -and ($Stage -cne 'Snapshot' -or $Sequence -ne 2 -or $WaitMilliseconds -ne 0)) {
+    throw 'The split wait applies only to the zero-wait checkpoint 2 snapshot.'
+}
+if ($Stage -ceq 'Delay') {
+    if ($Mode -cne 'Lifecycle' -or $Sequence -ne 2 -or $WaitMilliseconds -ne 75000) {
+        throw 'The split wait applies only to the original 75-second lifecycle checkpoint 2.'
+    }
+    . (Join-Path $PSScriptRoot 'msi-detached-control.ps1')
+    . (Join-Path $PSScriptRoot 'msi-observer-snapshot-delay.ps1')
+    Wait-P4kxMsiCheckpoint2Delay $Directory
+    return
+}
 if ($Stage -ceq 'Snapshot') {
     . (Join-Path $PSScriptRoot 'msi-observer-snapshot-caller.ps1')
-    Invoke-P4kxMsiObserverSnapshot $Directory $Sequence $WaitMilliseconds
+    Invoke-P4kxMsiObserverSnapshot $Directory $Sequence $WaitMilliseconds -ScheduledDelay:$ScheduledDelay
     return
 }
 . (Join-Path $PSScriptRoot 'msi-observer-evidence.ps1')

@@ -63,17 +63,33 @@ $expectedStartPaths=@(
 Assert-FeedbackWorkflow ([string]::Join([char]10,$startPaths) -ceq [string]::Join([char]10,$expectedStartPaths)) 'Original start upload must contain only the four explicit synthetic launch-evidence paths.'
 Assert-FeedbackWorkflow ($verify.IndexOf($installer,[StringComparison]::Ordinal) -lt $verify.IndexOf($observerStart,[StringComparison]::Ordinal) -and
     $verify.IndexOf($observerStart,[StringComparison]::Ordinal) -lt $verify.IndexOf($firstCheckpoint,[StringComparison]::Ordinal)) 'Original launch receipts must upload before the first snapshot.'
+$delay=Get-FeedbackWorkflowStep $verify 'Wait separately for original MSI phase checkpoint 2'
+$delayUpload=Get-FeedbackWorkflowStep $verify 'Upload original MSI phase checkpoint 2 delay'
+Assert-FeedbackWorkflow ($delay.Contains('id: msi-checkpoint-2-delay') -and
+    $delay.Contains('invoke-msi-observer.ps1 -Stage Delay') -and $delay.Contains('-Sequence 2 -WaitMilliseconds 75000') -and
+    $delay -cmatch '(?m)^        timeout-minutes: 2\r?$' -and
+    $delayUpload.Contains("always() && steps.msi-launch.outcome == 'success' && steps.msi-checkpoint-2-delay.outcome != 'skipped'") -and
+    $delayUpload.Contains('/installer-check/observer/delays/02/*.json') -and
+    $delayUpload -cmatch '(?m)^        timeout-minutes: 1\r?$' -and $delayUpload.Contains('if-no-files-found: error') -and
+    $verify.IndexOf($delay,[StringComparison]::Ordinal) -lt $verify.IndexOf($delayUpload,[StringComparison]::Ordinal)) 'Checkpoint 2 delay and its evidence must be bounded and independently observable.'
 $checkpoints=@([regex]::Matches($verify,'(?ms)^      - name: Preserve original MSI phase checkpoint [1-8]\r?\n.*?(?=^      - |\z)'))
 Assert-FeedbackWorkflow ($checkpoints.Count -eq 8) 'Expected eight bounded pre-terminal file checkpoints.'
 for($index=0;$index -lt $checkpoints.Count;$index++){
     $checkpoint=$checkpoints[$index].Value
     $ordinal=$index+1
-    $waitMilliseconds=if($ordinal -eq 1){0}else{75000}
+    $waitMilliseconds=if($ordinal -le 2){0}else{75000}
+    $runnerMinutes=if($ordinal -eq 2){1}else{2}
     $uploaded=Get-FeedbackWorkflowStep $verify "Upload original MSI phase checkpoint $ordinal"
     Assert-FeedbackWorkflow ($checkpoint.Contains('always() && !cancelled()') -and $checkpoint.Contains("steps.msi-launch.outcome == 'success'") -and
         $checkpoint.Contains("env.P4KX_MSI_OBSERVER_FINISHED != 'true'") -and $checkpoint.Contains('invoke-msi-observer.ps1 -Stage Snapshot') -and
-        $checkpoint.Contains("-Sequence $ordinal -WaitMilliseconds $waitMilliseconds") -and $checkpoint -cmatch '(?m)^        timeout-minutes: 2\r?$' -and
+        $checkpoint.Contains("-Sequence $ordinal -WaitMilliseconds $waitMilliseconds") -and
+        $checkpoint -cmatch ('(?m)^        timeout-minutes: {0}\r?$' -f $runnerMinutes) -and
         -not ($checkpoint -match '(?m)^        (continue-on-error|uses):')) 'Direct checkpoint can restart work, mask failure or bypass its bounded original observation.'
+    if ($ordinal -eq 2) {
+        Assert-FeedbackWorkflow ($checkpoint.Contains('-ScheduledDelay') -and
+            $checkpoint.Contains("steps.msi-checkpoint-2-delay.outcome == 'success'") -and
+            $verify.IndexOf($delayUpload,[StringComparison]::Ordinal) -lt $verify.IndexOf($checkpoint,[StringComparison]::Ordinal)) 'Checkpoint 2 must consume a recorded delay without resetting its budget.'
+    }
     Assert-FeedbackWorkflow ($uploaded.Contains('always() && !cancelled()') -and $uploaded.Contains("steps.msi-checkpoint-$ordinal.outcome != 'skipped'") -and
         $uploaded.Contains('actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9') -and
         $uploaded.Contains(('/observer/*/{0:d2}/*' -f $ordinal)) -and $uploaded -cmatch '(?m)^        timeout-minutes: 1\r?$' -and -not $uploaded.Contains('continue-on-error')) 'Checkpoint upload lost its separate existing transport budget or failure gate.'
