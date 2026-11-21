@@ -9,14 +9,16 @@ use crate::collect::{Collected, id_of as material_id};
 use crate::describe::settle_stencil;
 use crate::items::Item;
 use crate::manifest::{
-    Basis, ColourSpace, Coordinates, EntityRef, FORMAT_VERSION, Format, Generator, Issue,
-    IssueOrigin, MESHES_FOLDER, Manifest, MaterialTextures, Mesh, MeshMaterial, Node, Options,
-    PALETTE_DECAL_FORMAT_VERSION, Source, TEXTURES_FOLDER, Texture, Unit,
+    Basis, Coordinates, EntityRef, FORMAT_VERSION, Format, Generator, Issue, IssueOrigin,
+    MESHES_FOLDER, Manifest, MaterialTextures, Mesh, MeshMaterial, Node, Options,
+    PALETTE_DECAL_FORMAT_VERSION, Source, Unit,
 };
 use crate::manifest_light::Light;
 use crate::manifest_materials::{MaterialDescription, Palette, PaletteColours};
 use crate::plan::{MeshPlan, mesh_id};
 use crate::textures::{Outcome, id_of};
+
+mod texture_manifest;
 
 /// Everything the manifest is made of.
 pub(crate) struct Inputs<'a> {
@@ -64,7 +66,7 @@ pub(crate) fn manifest(inputs: &Inputs<'_>) -> Manifest {
         },
         nodes: nodes(inputs),
         meshes: meshes(inputs),
-        textures: textures(inputs),
+        textures: texture_manifest::textures(inputs.collected, inputs.outcomes),
         materials,
         material_libraries: inputs
             .collected
@@ -282,83 +284,6 @@ fn palettes(inputs: &Inputs<'_>) -> Vec<Palette> {
             decal_texture: palette.decal_texture.clone(),
         })
         .collect()
-}
-
-fn textures(inputs: &Inputs<'_>) -> Vec<Texture> {
-    inputs
-        .collected
-        .wanted
-        .iter()
-        .zip(inputs.outcomes)
-        .enumerate()
-        .filter_map(|(position, (wanted, outcome))| match outcome {
-            Outcome::Written {
-                width,
-                height,
-                colour_space,
-                encoding,
-                alpha,
-                source_metadata,
-                format,
-                dds_asset,
-                dds_fallback,
-                smoothness,
-                ..
-            } => {
-                let id = id_of(position);
-                Some(Texture {
-                    file: format!("{TEXTURES_FOLDER}/{id}.{}", format.extension()),
-                    id,
-                    source: wanted.path.clone(),
-                    source_rendition: Some(wanted.mode.rendition()),
-                    format: *format,
-                    bit_depth: 8,
-                    colour_space: *colour_space,
-                    encoding: Some(*encoding),
-                    alpha: *alpha,
-                    ddna_pair: smoothness
-                        .as_ref()
-                        .map(|value| Box::new(value.pairing.clone())),
-                    source_metadata: source_metadata.clone(),
-                    dds_asset: dds_asset.clone(),
-                    dds_fallback: *dds_fallback,
-                    width: *width,
-                    height: *height,
-                })
-            }
-            Outcome::Failed { .. } => None,
-        })
-        .chain(inputs.outcomes.iter().filter_map(companion_texture))
-        .collect()
-}
-
-fn companion_texture(outcome: &Outcome) -> Option<Texture> {
-    let Outcome::Written {
-        width,
-        height,
-        smoothness: Some(value),
-        ..
-    } = outcome
-    else {
-        return None;
-    };
-    Some(Texture {
-        id: value.id.clone(),
-        file: format!("{TEXTURES_FOLDER}/{}.dds", value.id),
-        source: value.source.clone(),
-        source_rendition: Some(crate::TextureRendition::SeparateSmoothness),
-        format: crate::TextureFormat::Dds,
-        bit_depth: 8,
-        colour_space: ColourSpace::Linear,
-        encoding: Some(crate::TextureEncoding::Data),
-        alpha: crate::AlphaMeaning::None,
-        ddna_pair: None,
-        source_metadata: None,
-        dds_asset: Some(Box::new(value.asset.clone())),
-        dds_fallback: None,
-        width: *width,
-        height: *height,
-    })
 }
 
 /// Returns the manifest's issue for an issue of the Assembly.
