@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_export::catalog_queries::equipment::resource_network::with_resource_network_globals;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
 };
@@ -13,7 +14,10 @@ use p4kx_testkit::{
 use super::super::{RESOURCE_COMPONENTS, RESOURCE_CONNECTIONS};
 use super::{Route, TestResult};
 
-pub(super) fn read() -> TestResult<[Route; 2]> {
+#[path = "../it/catalog_resource_network_global_fixture.rs"]
+mod global_fixture;
+
+pub(super) fn read() -> TestResult<[Route; 3]> {
     const COMPONENT: &str = "ItemResourceComponentParams";
     const POWER: &str = "EntityComponentPowerConnection";
     const HEAT: &str = "EntityComponentHeatConnection";
@@ -55,5 +59,25 @@ pub(super) fn read() -> TestResult<[Route; 2]> {
         parsed.with_resource_connections(CatalogRecordSelection::All, None, |snapshot| {
             Route::queried_rows(RESOURCE_CONNECTIONS, snapshot.rows(), REMAINING)
         })??,
+        global_route()?,
     ])
+}
+
+fn global_route() -> TestResult<Route> {
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("resource_network_globals.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored(
+            r"Data\Game2.dcb",
+            global_fixture::database(),
+        ))
+        .write_to(&path)?;
+    let archive = Archive::open(path)?;
+    with_resource_network_globals(&archive, CatalogRecordSelection::All, None, |snapshot| {
+        Route::queried_rows(
+            "/definitions/resourceNetworkGlobals",
+            snapshot.rows(),
+            "synthetic producer parity witnessed; same-build installed producer parity open",
+        )
+    })?
 }

@@ -36817,6 +36817,7 @@
       "type": "object"
     },
     "PowerModifier": {
+      "description": "One original entry in the global power modifier array.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"

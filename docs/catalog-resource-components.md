@@ -146,6 +146,13 @@ Each projected body also carries any unselected original members in its own
 arena. Typed values retain their original state and immediate source
 origins. The authored words do not determine runtime power allocation.
 
+Use `equipment::resource_network::with_resource_network_globals` for the
+original global definitions by physical Record index or GUID. The query
+uses the producer's projection and retains the authored modifier order,
+distribution values, additional fields and per-datum provenance. Use the
+`_from` form or a parsed session to reuse an already decoded DataForge Entry.
+No GameMode or localization data is needed.
+
 ## Authored GameMode radar options
 
 `configurations.radarOptions` contains one row per selected physical

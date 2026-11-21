@@ -77,15 +77,18 @@ impl ExportLedger {
 
     /// Reports whether the fields inspected since the given offsets are complete.
     pub(crate) fn field_projection_complete(&self, inspections: usize, diagnostics: usize) -> bool {
-        self.field_inspections
+        self.field_inspections.iter().skip(inspections).all(|row| {
+            row.complete
+                && row
+                    .findings
+                    .diagnostics()
+                    .iter()
+                    .all(|diagnostic| diagnostic.severity != ExportDiagnosticSeverity::Error)
+        }) && self
+            .field_diagnostics
             .iter()
-            .skip(inspections)
-            .all(|row| row.complete)
-            && self
-                .field_diagnostics
-                .iter()
-                .skip(diagnostics)
-                .all(|row| row.severity == ExportDiagnosticSeverity::Information)
+            .skip(diagnostics)
+            .all(|row| row.severity == ExportDiagnosticSeverity::Information)
     }
 
     /// Adds represented field states without inventing source-Record outcomes.

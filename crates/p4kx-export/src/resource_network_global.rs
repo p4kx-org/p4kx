@@ -8,9 +8,13 @@ use serde::Serialize;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
+use crate::catalog_read::scoped_source_read::ScopedSourceRead;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::authored_fields::Observed;
+use crate::catalog_v3::catalog_item_components::source_getters;
 use crate::catalog_v3::prepared_definition::PreparedDefinition;
+use crate::export_diagnostic::ExportSourceRole;
+use crate::export_field_walk;
 use crate::record_observation::RecordObservation;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
@@ -21,7 +25,7 @@ use crate::{CatalogError, ExportAccountingError, Kind};
 #[path = "resource_network_global_power.rs"]
 mod power;
 
-use power::{DefaultPowerDistribution, PowerParameters};
+pub use power::{DefaultPowerDistribution, PowerModifier, PowerParameters};
 
 pub(crate) const SOURCE_TYPE: &str = "ItemResourceNetworkGlobal";
 
@@ -36,7 +40,7 @@ const REPAIR_GRACE: &str = "misfireRepairGracePeriod";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ResourceNetworkGlobal<'source> {
+pub struct ResourceNetworkGlobal<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     power_params: SourcedValue<PowerParameters<'source>>,
@@ -49,6 +53,25 @@ pub(crate) struct ResourceNetworkGlobal<'source> {
 }
 
 impl<'source> ResourceNetworkGlobal<'source> {
+    source_getters! {
+        /// Borrows the physical global definition header.
+        source: CanonicalRecordHeader<'source>,
+        /// Borrows the original power parameter declaration.
+        power_params: SourcedValue<PowerParameters<'source>>,
+        /// Borrows the original defaults for allocating power.
+        default_power_distribution_params: SourcedValue<DefaultPowerDistribution<'source>>,
+        /// Borrows the authored maximum power-to-coolant ratio.
+        max_power_to_coolant_ratio: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored thruster coolant multiplier.
+        thruster_coolant_multiplier: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored power conversion rate.
+        power_base_conversion_rate: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored misfire repair grace period.
+        misfire_repair_grace_period: SourcedValue<ResourceFloat32>,
+        /// Borrows original members outside the modeled fields.
+        additional_fields: SourceArenaOutput<'source>,
+    }
+
     fn project(
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,
@@ -110,6 +133,29 @@ pub(crate) fn read<'source>(
         cancel,
         |source, fields, _, notes| ResourceNetworkGlobal::project(source, fields, notes),
     )
+}
+
+pub(crate) fn read_selected<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<ResourceNetworkGlobal<'source>>, CatalogError> {
+    let (row, notes) = read(tree, projection, admission, cancel)?;
+    let inspection = export_field_walk::inspect_observed(
+        Some(projection.original()),
+        tree,
+        admission,
+        Some(Kind::ResourceNetworkGlobals),
+        ExportSourceRole::Selected,
+        cancel,
+    )?;
+    let complete = inspection.field_projection_complete(0, 0);
+    Ok(ScopedSourceRead::new(
+        row.into_definition(),
+        notes,
+        complete,
+    ))
 }
 
 pub(crate) fn table<'source>(

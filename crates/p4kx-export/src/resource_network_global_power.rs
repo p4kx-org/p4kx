@@ -7,6 +7,7 @@ use serde::Serialize;
 
 use crate::CatalogError;
 use crate::catalog_v3::authored_fields::Observed;
+use crate::catalog_v3::catalog_item_components::source_getters;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
@@ -25,7 +26,7 @@ const ADDITIVE_MODIFIER: &str = "additiveModifier";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct DefaultPowerDistribution<'source> {
+pub struct DefaultPowerDistribution<'source> {
     power_dist_pools_fill_min: SourcedValue<bool>,
     power_dist_cooler_min: SourcedValue<ResourceFloat32>,
     power_dist_pools_proportion: SourcedValue<ResourceFloat32>,
@@ -36,6 +37,23 @@ pub(super) struct DefaultPowerDistribution<'source> {
 }
 
 impl<'source> DefaultPowerDistribution<'source> {
+    source_getters! {
+        /// Borrows the authored flag for filling pools to their minimum.
+        power_dist_pools_fill_min: SourcedValue<bool>,
+        /// Borrows the authored minimum cooler allocation.
+        power_dist_cooler_min: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored power distribution proportion.
+        power_dist_pools_proportion: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored weapons pool default.
+        pool_default_weapons: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored engines pool default.
+        pool_default_engines: SourcedValue<ResourceFloat32>,
+        /// Borrows the authored shields pool default.
+        pool_default_shields: SourcedValue<ResourceFloat32>,
+        /// Borrows original members outside the modeled fields.
+        additional_fields: SourceArenaOutput<'source>,
+    }
+
     pub(super) fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -70,12 +88,19 @@ impl<'source> DefaultPowerDistribution<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct PowerParameters<'source> {
+pub struct PowerParameters<'source> {
     modifiers: SourcedValue<Vec<SourcedValue<PowerModifier<'source>>>>,
     additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> PowerParameters<'source> {
+    source_getters! {
+        /// Borrows the modifiers in their exact original slot order.
+        modifiers: SourcedValue<Vec<SourcedValue<PowerModifier<'source>>>>,
+        /// Borrows original members outside the modeled modifiers.
+        additional_fields: SourceArenaOutput<'source>,
+    }
+
     pub(super) fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
@@ -94,16 +119,26 @@ impl<'source> PowerParameters<'source> {
     }
 }
 
+/// One original entry in the global power modifier array.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct PowerModifier<'source> {
+pub struct PowerModifier<'source> {
     source_type: SourcedValue<&'source str>,
     additive_modifier: SourcedValue<i32>,
     additional_fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> PowerModifier<'source> {
+    source_getters! {
+        /// Borrows the original concrete modifier class.
+        source_type: SourcedValue<&'source str>,
+        /// Borrows the authored additive modifier.
+        additive_modifier: SourcedValue<i32>,
+        /// Borrows original members outside the modeled modifier.
+        additional_fields: SourceArenaOutput<'source>,
+    }
+
     fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
