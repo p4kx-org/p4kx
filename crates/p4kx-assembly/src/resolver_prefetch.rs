@@ -108,20 +108,25 @@ impl<'f> LoadoutResolver<'f> {
         out: &mut Vec<Record<'f>>,
         deferred: &mut Vec<Deferred>,
     ) {
-        for entry in entries {
+        let mut pending = vec![entries.iter()];
+        while let Some(siblings) = pending.last_mut() {
+            let Some(entry) = siblings.next() else {
+                pending.pop();
+                continue;
+            };
             let record = self.record_of(&entry.target);
             out.extend(record);
             let Some(LoadoutSpec::Manual(nested)) = &entry.loadout else {
                 continue;
             };
             let Some(record) = record.filter(|_| self.stop_at_docked) else {
-                self.entry_records(nested, out, deferred);
+                pending.push(nested.iter());
                 continue;
             };
             match self.specs.get(&record.index()) {
                 None => deferred.push((record.guid(), Arc::clone(nested.shared()))),
                 Some(spec) if spec.as_ref().as_ref().is_ok_and(|s| s.docked_vehicle) => {}
-                Some(_) => self.entry_records(nested, out, deferred),
+                Some(_) => pending.push(nested.iter()),
             }
         }
     }
@@ -134,3 +139,7 @@ impl<'f> LoadoutResolver<'f> {
             .is_some_and(|spec| spec.as_ref().as_ref().is_ok_and(|s| s.docked_vehicle))
     }
 }
+
+#[cfg(test)]
+#[path = "resolver_prefetch_stack_tests.rs"]
+mod stack_tests;
