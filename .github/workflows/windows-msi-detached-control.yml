@@ -121,6 +121,14 @@ jobs:
         if: ${{ always() && !cancelled() && steps.successive-second.outcome == 'success' }}
         timeout-minutes: 1
         run: .github/scripts/invoke-msi-successive-control.ps1 -Stage Finish -Directory ($env:P4KX_CONTROL_TASK+'-successive')
+      - name: Prepare isolated harmless MSI split-delay binding
+        timeout-minutes: 1
+        run: |
+          $delayControl = $env:P4KX_CONTROL_TASK + '-split-delay'
+          $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC = [DateTimeOffset]::UtcNow.AddMinutes(3).ToString('o')
+          .github/scripts/invoke-msi-split-delay-control.ps1 -Stage Prepare -Directory $delayControl
+          "P4KX_SPLIT_DELAY_DEADLINE=$env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC" >> $env:GITHUB_ENV
+          "P4KX_MSI_DELAY_CONTROL=$delayControl" >> $env:GITHUB_ENV
       - name: Upload harmless control completion
         if: ${{ always() && !cancelled() && steps.successive-second.outcome == 'success' }}
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -130,4 +138,26 @@ jobs:
           path: |
             ${{ env.P4KX_CONTROL_TASK }}-successive/observer/observer-result.json
             ${{ env.P4KX_CONTROL_TASK }}-successive/observer/checkpoints/09/*
+          if-no-files-found: error
+      - name: Wait separately for harmless MSI split-delay control
+        id: harmless-split-delay
+        timeout-minutes: 2
+        env:
+          P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC: ${{ env.P4KX_SPLIT_DELAY_DEADLINE }}
+        run: .github/scripts/invoke-msi-observer.ps1 -Stage Delay -Directory $env:P4KX_MSI_DELAY_CONTROL -Sequence 2 -WaitMilliseconds 75000
+      - name: Verify harmless MSI split-delay control
+        timeout-minutes: 1
+        env:
+          P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC: ${{ env.P4KX_SPLIT_DELAY_DEADLINE }}
+        run: .github/scripts/invoke-msi-split-delay-control.ps1 -Stage Verify -Directory $env:P4KX_MSI_DELAY_CONTROL
+      - name: Upload harmless MSI split-delay control
+        if: ${{ always() && steps.harmless-split-delay.outcome != 'skipped' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        timeout-minutes: 1
+        with:
+          name: windows-msi-split-delay-control-${{ github.run_id }}-${{ github.run_attempt }}-${{ matrix.target }}
+          path: |
+            ${{ env.P4KX_MSI_DELAY_CONTROL }}/request.json
+            ${{ env.P4KX_MSI_DELAY_CONTROL }}/delays/02/*.json
+            ${{ env.P4KX_MSI_DELAY_CONTROL }}/split-delay-control-result.json
           if-no-files-found: error
