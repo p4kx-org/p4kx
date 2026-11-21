@@ -6,21 +6,27 @@
 use std::sync::Arc;
 
 use p4kx_extraction::{Archive, ArchiveWatch, Build, CancelToken, SourceInventory};
-use serde::Serialize;
 
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_read::original::{EntryCapture, with_entry_capture};
 use crate::export_archive_health;
-use crate::export_health_entries;
 use crate::export_ledger::ExportLedger;
-use crate::starmap_containers::{finish_route_coverage, unique_system_roots};
+use crate::starmap_containers::unique_system_roots;
 use crate::starmap_index::{self, Index};
 use crate::starmap_parse::{self, DescriptorScope, Read};
-use crate::starmap_walk::{PlacementRows, SelectedContainerRows, System, SystemRead};
-use crate::{CatalogError, Kind, StarmapTraversalBudget};
+use crate::starmap_walk::{
+    PlacementRows, PlacementTable, SelectedPlacementRows, System, SystemRead,
+};
+use crate::{CatalogError, StarmapTraversalBudget};
 
 #[path = "starmap_definition_query.rs"]
 mod definitions;
+
+#[path = "starmap_placement_coverage.rs"]
+mod coverage;
+
+#[path = "starmap_location_query.rs"]
+mod locations;
 
 pub use crate::catalog_read::original::{PhysicalEntryRef, SourcedXmlAttribute};
 pub use crate::catalog_table::DatasetAvailability;
@@ -35,6 +41,7 @@ pub use crate::starmap_containers::instance::{ContainerInstance, ContainerInstan
 pub use crate::starmap_containers::unresolved::{
     ContainerTargetReadStatus, ContainerTargetStatus, UnresolvedChild, UnresolvedContainerLink,
 };
+pub use coverage::{ContainerPlacementCoverage, ContainerRootStatus};
 pub use definitions::{
     DisplayFields, ObjectNavigation, ObjectText, RadarProperties, RadarRoomParams,
     StarmapAmenityDefinition, StarmapAssetManager, StarmapAsteroidRing, StarmapDefinitionFamily,
@@ -42,6 +49,12 @@ pub use definitions::{
     StarmapObjectDefinition, StarmapObjectLinks, StarmapObjectOwned, StarmapPresetDefinition,
     StarmapQuantumTravel, StarmapTypeDefinition, VisibilityFields, with_starmap_definitions,
     with_starmap_definitions_from,
+};
+
+pub use locations::{
+    AreaEntity, ChildLocation, EntXmlCandidate, EntXmlDocument, EntXmlLink, HarvestableComponent,
+    HcdAttribute, HcdDocument, HcdLink, HcdSelectionFailure, LocationAttribute, LocationInstance,
+    LocationMetadataElement, LocationPlacementSnapshot, LocationTag, read_location_instances,
 };
 
 /// A canonical physical system root or a Child route within it.
@@ -69,15 +82,15 @@ pub enum ContainerPlacementSelection<'route> {
 }
 
 impl ContainerPlacementSelection<'_> {
-    fn selected_rows(self) -> (u32, SelectedContainerRows) {
+    fn selected_rows(self, table: PlacementTable) -> (u32, SelectedPlacementRows) {
         match self {
-            Self::SystemRoot(root) => (root, SelectedContainerRows::new(None, None)),
+            Self::SystemRoot(root) => (root, SelectedPlacementRows::new(table, None, None)),
             Self::Occurrence {
                 root_entry_index,
                 child_node_indices,
             } => (
                 root_entry_index,
-                SelectedContainerRows::new(Some(child_node_indices.to_vec()), None),
+                SelectedPlacementRows::new(table, Some(child_node_indices.to_vec()), None),
             ),
             Self::ExactOccurrence {
                 root_entry_index,
@@ -85,110 +98,13 @@ impl ContainerPlacementSelection<'_> {
                 external_child_step_indices,
             } => (
                 root_entry_index,
-                SelectedContainerRows::new(
+                SelectedPlacementRows::new(
+                    table,
                     Some(child_node_indices.to_vec()),
                     Some(external_child_step_indices.to_vec()),
                 ),
             ),
         }
-    }
-}
-
-/// Outcome of selecting the requested physical Entry as the canonical system root.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub enum ContainerRootStatus {
-    /// The requested root is the unique canonical Entry.
-    Selected,
-    /// A complete Archive directory supplies no canonical root at the requested index.
-    Absent,
-    /// More than one physical Entry matches the canonical root path.
-    Ambiguous,
-    /// The directory cannot establish that the requested root is missing.
-    Unavailable,
-}
-
-/// Observed coverage of one system's container descriptor reads and placement traversal.
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-#[non_exhaustive]
-pub struct ContainerPlacementCoverage {
-    /// Outcome of selecting the requested root.
-    pub root: ContainerRootStatus,
-    /// Whether original descriptor enumeration could establish its full selected inventory.
-    pub source_inventory_complete: bool,
-    /// Whether every admitted descendant route was traversable within the requested budget.
-    pub routes_complete: bool,
-    /// True when the caller's Child occurrence budget stopped a route.
-    pub placement_budget_exhausted: bool,
-    /// Distinct physical descriptor body reads attempted from the selected root.
-    pub attempted_descriptors: usize,
-    /// Occurrences whose container body was unavailable or unparseable.
-    pub unreadable_containers: usize,
-    /// Occurrences whose declared target was missing.
-    pub missing_containers: usize,
-    /// Malformed or stopped Child placement operations.
-    pub malformed_children: usize,
-    /// Physical and authored Entry outcomes counted by the canonical Entry health compiler.
-    pub source_entries: ExportEntryCounts,
-}
-
-impl ContainerPlacementCoverage {
-    /// Whether the query can assert the absence of further matching occurrences.
-    #[must_use]
-    pub const fn is_complete(&self) -> bool {
-        matches!(
-            self.root,
-            ContainerRootStatus::Selected | ContainerRootStatus::Absent
-        ) && self.source_inventory_complete
-            && self.routes_complete
-            && self.unreadable_containers == 0
-            && self.missing_containers == 0
-            && self.malformed_children == 0
-            && self.source_entries.failed_required_reads == 0
-            && self.source_entries.failed_projections == 0
-            && self.source_entries.failed_dependencies == 0
-            && self.source_entries.failed_selection_candidates == 0
-    }
-}
-
-impl ContainerPlacementCoverage {
-    fn measure(
-        root: ContainerRootStatus,
-        directory_complete: bool,
-        attempted_descriptors: usize,
-        read: &SystemRead,
-        mut ledger: ExportLedger,
-    ) -> Result<Self, CatalogError> {
-        let routes_complete = matches!(
-            root,
-            ContainerRootStatus::Selected | ContainerRootStatus::Absent
-        ) && finish_route_coverage(std::slice::from_ref(read), &mut ledger)
-            && read.unreadable == 0
-            && read.missing == 0
-            && read.malformed == 0;
-        let source_inventory_complete = directory_complete
-            && !ledger
-                .incomplete_inventories
-                .contains(&Kind::StarmapObjects)
-            && !matches!(
-                root,
-                ContainerRootStatus::Ambiguous | ContainerRootStatus::Unavailable
-            );
-        let entries = export_health_entries::compile(ledger.entries)?;
-        let source_entries = export_health_entries::counts(Kind::StarmapObjects, &entries.sources)?;
-        Ok(Self {
-            root,
-            source_inventory_complete,
-            routes_complete,
-            placement_budget_exhausted: read.placement_budget_exhausted,
-            attempted_descriptors,
-            unreadable_containers: read.unreadable,
-            missing_containers: read.missing,
-            malformed_children: read.malformed,
-            source_entries,
-        })
     }
 }
 
@@ -229,9 +145,62 @@ pub fn read_container_placements(
     budget: StarmapTraversalBudget,
     cancel: Option<&CancelToken>,
 ) -> Result<ContainerPlacementSnapshot, CatalogError> {
+    let SelectedPlacementRead {
+        root_entry_index,
+        rows,
+        coverage,
+        source_inventory,
+    } = read_placements(
+        archive,
+        selection,
+        budget,
+        cancel,
+        PlacementTable::Containers,
+    )?;
+    let SelectedPlacementRows {
+        child_node_indices,
+        external_child_step_indices,
+        instances,
+        unresolved,
+        location_physics,
+        ..
+    } = rows;
+    let complete = coverage.is_complete() && !location_physics.unavailable;
+    let grids = location_physics.into_rows();
+    Ok(ContainerPlacementSnapshot {
+        build: archive.build().cloned(),
+        root_entry_index,
+        child_node_indices,
+        external_child_step_indices,
+        container_instances: instances,
+        unresolved_container_links: unresolved,
+        location_physics_availability: crate::location_physics::stage::availability(
+            complete,
+            !grids.is_empty(),
+        ),
+        location_physics_grids: grids,
+        coverage,
+        source_inventory,
+    })
+}
+
+pub(super) struct SelectedPlacementRead {
+    pub(super) root_entry_index: u32,
+    pub(super) rows: SelectedPlacementRows,
+    pub(super) coverage: ContainerPlacementCoverage,
+    pub(super) source_inventory: SourceInventory,
+}
+
+pub(super) fn read_placements(
+    archive: &Archive,
+    selection: ContainerPlacementSelection<'_>,
+    budget: StarmapTraversalBudget,
+    cancel: Option<&CancelToken>,
+    table: PlacementTable,
+) -> Result<SelectedPlacementRead, CatalogError> {
     checkpoint(cancel)?;
     let watch = ArchiveWatch::new(archive);
-    let (root_entry_index, mut rows) = selection.selected_rows();
+    let (root_entry_index, mut rows) = selection.selected_rows(table);
     with_entry_capture(archive, |capture| {
         let coverage = read_selected(
             archive,
@@ -244,27 +213,9 @@ pub fn read_container_placements(
         checkpoint(cancel)?;
         let source_inventory = capture.source_uses().freeze()?;
         watch.check()?;
-        let SelectedContainerRows {
-            child_node_indices,
-            external_child_step_indices,
-            instances,
-            unresolved,
-            location_physics,
-        } = rows;
-        let complete = coverage.is_complete() && !location_physics.unavailable;
-        let grids = location_physics.into_rows();
-        Ok(ContainerPlacementSnapshot {
-            build: archive.build().cloned(),
+        Ok(SelectedPlacementRead {
             root_entry_index,
-            child_node_indices,
-            external_child_step_indices,
-            container_instances: instances,
-            unresolved_container_links: unresolved,
-            location_physics_availability: crate::location_physics::stage::availability(
-                complete,
-                !grids.is_empty(),
-            ),
-            location_physics_grids: grids,
+            rows,
             coverage,
             source_inventory,
         })
@@ -277,7 +228,7 @@ fn read_selected(
     budget: StarmapTraversalBudget,
     cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
-    rows: &mut SelectedContainerRows,
+    rows: &mut SelectedPlacementRows,
 ) -> Result<ContainerPlacementCoverage, CatalogError> {
     let index = Index::new(archive);
     let directory_complete = export_archive_health::inventory(archive).is_none();
@@ -347,8 +298,12 @@ fn read_root(
     cancel: Option<&CancelToken>,
     budget: StarmapTraversalBudget,
     (name, position): (&Arc<str>, usize),
-    rows: &mut SelectedContainerRows,
+    rows: &mut SelectedPlacementRows,
 ) -> Result<RootRead, CatalogError> {
+    let scope = match rows.table {
+        PlacementTable::Containers => DescriptorScope::ContainerPlacements,
+        PlacementTable::Locations => DescriptorScope::LocationPlacements,
+    };
     let Read {
         bodies,
         ledger: observations,
@@ -358,7 +313,7 @@ fn read_root(
         index,
         &[position],
         cancel,
-        (budget.source_children, DescriptorScope::ContainerPlacements),
+        (budget.source_children, scope),
         capture,
     )?;
     checkpoint(cancel)?;
@@ -369,12 +324,7 @@ fn read_root(
         position,
         cancel,
         budget,
-        (
-            archive,
-            capture,
-            None,
-            PlacementRows::SelectedContainers(rows),
-        ),
+        (archive, capture, None, PlacementRows::Selected(rows)),
     )?;
     Ok(RootRead {
         attempted_descriptors: bodies.len(),

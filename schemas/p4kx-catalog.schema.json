@@ -1586,6 +1586,7 @@
       ]
     },
     "AreaEntity": {
+      "description": "One original entity declaration inside an area sphere.",
       "properties": {
         "guid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
@@ -9703,6 +9704,9 @@
     "ChildLocation": {
       "description": "The authored fields and component declarations of a typed location Child.",
       "properties": {
+        "class": {
+          "$ref": "#/$defs/SourcedValueOfstring"
+        },
         "classGuid": {
           "$ref": "#/$defs/SourcedValueOfGuid"
         },
@@ -9762,6 +9766,7 @@
         }
       },
       "required": [
+        "class",
         "classGuid",
         "entXml",
         "entityName",
@@ -15902,6 +15907,7 @@
       "type": "object"
     },
     "EntXmlCandidate": {
+      "description": "One physical member that contains the requested entity declaration.",
       "properties": {
         "document": {
           "$ref": "#/$defs/SourcedValueOfEntXmlDocument"
@@ -21114,6 +21120,7 @@
       "type": "object"
     },
     "HarvestableComponent": {
+      "description": "One authored harvestable component of a placed location entity.",
       "properties": {
         "nodeIndex": {
           "$ref": "#/$defs/SourcedValueOfuint32"
@@ -21603,6 +21610,7 @@
       "type": "object"
     },
     "HcdAttribute": {
+      "description": "An additional authored attribute of a hierarchical context header.",
       "properties": {
         "name": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -21619,6 +21627,7 @@
       "type": "object"
     },
     "HcdDocument": {
+      "description": "The original header of a hierarchical context member.",
       "properties": {
         "attributes": {
           "items": {
@@ -21678,11 +21687,19 @@
       "type": "object"
     },
     "HcdSelectionFailure": {
-      "enum": [
-        "dangling",
-        "ambiguous"
+      "description": "Why the original location context selector could not select one member.",
+      "oneOf": [
+        {
+          "const": "dangling",
+          "description": "The complete directory contains no matching member.",
+          "type": "string"
+        },
+        {
+          "const": "ambiguous",
+          "description": "Several physical members match the selector.",
+          "type": "string"
+        }
       ],
-      "type": "string",
       "x-p4kx-vocabularyClass": "control"
     },
     "HealthDamageState": {
@@ -28342,6 +28359,7 @@
       "x-p4kx-vocabularyClass": "control"
     },
     "LocationAttribute": {
+      "description": "An original location element attribute.",
       "properties": {
         "name": {
           "$ref": "#/$defs/SourcedValueOfstring"
@@ -29614,6 +29632,7 @@
       "type": "object"
     },
     "LocationTag": {
+      "description": "An original token in the Child location tags.",
       "properties": {
         "guid": {
           "$ref": "#/$defs/SourcedValueOfGuid"

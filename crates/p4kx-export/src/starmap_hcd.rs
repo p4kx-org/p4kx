@@ -24,7 +24,7 @@ use crate::{CatalogError, ExportAccountingError, Kind};
 
 #[path = "starmap_hcd_document.rs"]
 mod document;
-use document::HcdDocument;
+pub use document::{HcdAttribute, HcdDocument};
 
 const FLAG: &str = "hasHierarchicalContextData";
 const GUID: &str = "guid";
@@ -35,17 +35,41 @@ const PRESET: &str = "preset";
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct HcdLink {
+pub struct HcdLink {
     failure: Option<SourcedValue<HcdSelectionFailure>>,
     candidates: SourcedValue<Vec<SourcedValue<PhysicalEntryRef>>>,
     document: SourcedValue<HcdDocument>,
 }
 
+impl HcdLink {
+    /// Returns the typed context lookup failure.
+    #[must_use]
+    pub const fn failure(&self) -> Option<&SourcedValue<HcdSelectionFailure>> {
+        self.failure.as_ref()
+    }
+
+    /// Returns the candidate members in directory order.
+    #[must_use]
+    pub const fn candidates(&self) -> &SourcedValue<Vec<SourcedValue<PhysicalEntryRef>>> {
+        &self.candidates
+    }
+
+    /// Returns the selected context document.
+    #[must_use]
+    pub const fn document(&self) -> &SourcedValue<HcdDocument> {
+        &self.document
+    }
+}
+
+/// Why the original location context selector could not select one member.
 #[derive(Clone, Copy, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-enum HcdSelectionFailure {
+#[non_exhaustive]
+pub enum HcdSelectionFailure {
+    /// The complete directory contains no matching member.
     Dangling,
+    /// Several physical members match the selector.
     Ambiguous,
 }
 

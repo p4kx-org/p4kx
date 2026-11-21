@@ -23,34 +23,112 @@ const ENTITIES: &str = "Entities";
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct EntXmlDocument {
+pub struct EntXmlDocument {
     root_guid: SourcedValue<CatalogGuid>,
     class_guid: SourcedValue<CatalogGuid>,
     harvestable_components: SourcedValue<Vec<HarvestableComponent>>,
     area_entities: SourcedValue<Vec<AreaEntity>>,
 }
 
+/// One authored harvestable component of a placed location entity.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct HarvestableComponent {
+pub struct HarvestableComponent {
     node_index: SourcedValue<u32>,
     owner_guid: SourcedValue<CatalogGuid>,
     sub_config_guid: SourcedValue<CatalogGuid>,
     sub_config_text: SourcedValue<String>,
 }
 
+impl HarvestableComponent {
+    /// Returns the original component node index.
+    #[must_use]
+    pub const fn node_index(&self) -> &SourcedValue<u32> {
+        &self.node_index
+    }
+
+    /// Returns the owning entity GUID.
+    #[must_use]
+    pub const fn owner_guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.owner_guid
+    }
+
+    /// Returns the parsed sub-configuration GUID.
+    #[must_use]
+    pub const fn sub_config_guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.sub_config_guid
+    }
+
+    /// Returns the original sub-configuration text.
+    #[must_use]
+    pub const fn sub_config_text(&self) -> &SourcedValue<String> {
+        &self.sub_config_text
+    }
+}
+
+/// One original entity declaration inside an area sphere.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct AreaEntity {
+pub struct AreaEntity {
     node_index: SourcedValue<u32>,
     sphere_node_index: SourcedValue<u32>,
     guid: SourcedValue<CatalogGuid>,
     guid_text: SourcedValue<String>,
 }
 
+impl AreaEntity {
+    /// Returns the physical entity node index.
+    #[must_use]
+    pub const fn node_index(&self) -> &SourcedValue<u32> {
+        &self.node_index
+    }
+
+    /// Returns the index of the owning area sphere node.
+    #[must_use]
+    pub const fn sphere_node_index(&self) -> &SourcedValue<u32> {
+        &self.sphere_node_index
+    }
+
+    /// Returns the authored entity GUID.
+    #[must_use]
+    pub const fn guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.guid
+    }
+
+    /// Returns the original entity GUID text.
+    #[must_use]
+    pub const fn guid_text(&self) -> &SourcedValue<String> {
+        &self.guid_text
+    }
+}
+
 impl EntXmlDocument {
+    /// Returns the authored entity GUID.
+    #[must_use]
+    pub const fn root_guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.root_guid
+    }
+
+    /// Returns the authored entity class GUID.
+    #[must_use]
+    pub const fn class_guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.class_guid
+    }
+
+    /// Returns ordered root-owned harvestable components.
+    #[must_use]
+    pub const fn harvestable_components(&self) -> &SourcedValue<Vec<HarvestableComponent>> {
+        &self.harvestable_components
+    }
+
+    /// Returns ordered declared area entities.
+    #[must_use]
+    pub const fn area_entities(&self) -> &SourcedValue<Vec<AreaEntity>> {
+        &self.area_entities
+    }
+
     pub(super) fn project(xml: &EntryXml<'_, '_, '_>) -> Result<(Self, SourceUse), CatalogError> {
         let fields = Fields {
             xml,

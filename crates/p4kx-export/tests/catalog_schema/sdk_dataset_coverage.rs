@@ -109,6 +109,7 @@ const WEAPON_COMBAT: &str = "/projections/weaponCombatBases";
 const WEAPON_RECOIL: &str = "/definitions/weaponActionRecoilDefinitions";
 const WEAPON_ANIMATION: &str = "/projections/weaponPlayerAnimationCandidates";
 const CONTAINERS: &str = "/placements/containerInstances";
+const LOCATION_INSTANCES: &str = "/placements/locationInstances";
 const LOCATION_PHYSICS_GRIDS: &str = "/placements/locationPhysicsGrids";
 const LOOT_DOCUMENTS: &str = "/declarations/lootEntityContainerDocuments";
 const UNRESOLVED: &str = "/placements/unresolvedContainerLinks";
@@ -241,6 +242,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     WEAPON_ANIMATION,
     routes::entity_animation::DATASET,
     CONTAINERS,
+    LOCATION_INSTANCES,
     LOCATION_PHYSICS_GRIDS,
     LOOT_DOCUMENTS,
     UNRESOLVED,

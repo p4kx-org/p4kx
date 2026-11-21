@@ -67,7 +67,7 @@ impl System<'_> {
                 self.read.unresolved.push(row);
                 Ok(())
             }
-            PlacementRows::SelectedContainers(rows) => {
+            PlacementRows::Selected(rows) => {
                 rows.unresolved.push(row);
                 Ok(())
             }

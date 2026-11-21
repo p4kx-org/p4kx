@@ -15,7 +15,7 @@ pub(super) const FLARE_LIBRARY: &str = r"Data\Libs\Flares\fixture.xml";
 pub(super) const SUBSUMPTION_FIXTURE: &str = "Data/Libs/Subsumption/Events/synthetic.xml";
 const TILE: &str = r"Data\ObjectContainers\PU\fixture\tile.socpak";
 const ROOT_XML: &[u8] = br#"<ObjectContainer version="14" gridRadius="2"><PhysicsGrid/><ChildObjectContainers>
-    <Child external="true" name="Data\ObjectContainers\PU\fixture\tile.socpak" pos="0,0,0" rot="1,0,0,0"/>
+    <Child external="true" name="Data\ObjectContainers\PU\fixture\tile.socpak" pos="0,0,0" rot="1,0,0,0" locationType="3" class="FixtureLocation"/>
     <Child external="true" name="Data\ObjectContainers\PU\fixture\missing.socpak" pos="1,0,0" rot="1,0,0,0"/>
 </ChildObjectContainers></ObjectContainer>"#;
 

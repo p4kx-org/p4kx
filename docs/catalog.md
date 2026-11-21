@@ -2065,8 +2065,8 @@ enclosing physical SOCpak occurrence. The original Child's GUID is a declaration
 repeat across uses of one container. The local transform and composed system transform use
 the same conventions as container instances.
 
-The `declaration` preserves the stored numeric `locationType`, `streamingRoot`, GUIDs,
-label, entity name, tag text and ordered GUID tokens. Invalid typed attributes retain the
+The `declaration` preserves the stored numeric `locationType`, `streamingRoot`, original
+`class` string, independently sourced GUIDs, label, entity name, tag text and ordered GUID tokens. Invalid typed attributes retain the
 original text with its source. `instanceMetadata` retains ordered component element
 occurrences, original node/parent positions and attributes. A component element records its
 authored occurrence. A Harvestable preset link requires a separately authored binding.

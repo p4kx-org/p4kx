@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use super::{PlacementRows, System, WalkPath};
+use super::{PlacementRows, PlacementTable, System, WalkPath};
 use crate::starmap_containers::instance::{ContainerFile, ContainerOccurrence};
 use crate::starmap_containers::location_instance::LocationOccurrence;
 use crate::starmap_parse::Child;
@@ -42,7 +42,7 @@ impl System<'_> {
                 self.read.instances.push(row);
                 Ok(())
             }
-            PlacementRows::SelectedContainers(rows) => {
+            PlacementRows::Selected(rows) => {
                 rows.instances.push(row);
                 Ok(())
             }
@@ -86,9 +86,20 @@ impl System<'_> {
                     .locations
                     .push(occurrence.project(location, file, self.capture)?);
             }
+            PlacementRows::Selected(rows) if matches!(rows.table, PlacementTable::Locations) => {
+                if rows.matches(Some(route)) {
+                    rows.location_instances.push(occurrence.project(
+                        location,
+                        file,
+                        self.capture,
+                    )?);
+                }
+            }
             PlacementRows::Harvest(_)
-            | PlacementRows::SelectedContainers(_)
-            | PlacementRows::OpenedContainers => return Ok(()),
+            | PlacementRows::Selected(_)
+            | PlacementRows::OpenedContainers => {
+                return Ok(());
+            }
         }
         path.parent_location = Some(Arc::clone(route));
         Ok(())

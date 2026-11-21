@@ -22,7 +22,8 @@ use crate::{CatalogError, ExportAccountingError, Kind};
 
 #[path = "starmap_entxml_document.rs"]
 mod document;
-use document::{ENTITY, ENTITY_GUID, EntXmlDocument, parse_guid};
+pub use document::{AreaEntity, EntXmlDocument, HarvestableComponent};
+use document::{ENTITY, ENTITY_GUID, parse_guid};
 
 const CHILD_GUID: &str = "guid";
 
@@ -30,17 +31,52 @@ const CHILD_GUID: &str = "guid";
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct EntXmlLink {
+pub struct EntXmlLink {
     candidates: SourcedValue<Vec<EntXmlCandidate>>,
     inventory_complete: bool,
     selected: SourcedValue<PhysicalEntryRef>,
 }
 
+impl EntXmlLink {
+    /// Returns matched entity candidates in directory order.
+    #[must_use]
+    pub const fn candidates(&self) -> &SourcedValue<Vec<EntXmlCandidate>> {
+        &self.candidates
+    }
+
+    /// Reports whether the same-container lookup completed.
+    #[must_use]
+    pub const fn inventory_complete(&self) -> bool {
+        self.inventory_complete
+    }
+
+    /// Returns the uniquely selected physical member.
+    #[must_use]
+    pub const fn selected(&self) -> &SourcedValue<PhysicalEntryRef> {
+        &self.selected
+    }
+}
+
+/// One physical member that contains the requested entity declaration.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-struct EntXmlCandidate {
+pub struct EntXmlCandidate {
     entry: SourcedValue<PhysicalEntryRef>,
     document: SourcedValue<EntXmlDocument>,
+}
+
+impl EntXmlCandidate {
+    /// Returns the physical member identity.
+    #[must_use]
+    pub const fn entry(&self) -> &SourcedValue<PhysicalEntryRef> {
+        &self.entry
+    }
+
+    /// Returns the authored entity document.
+    #[must_use]
+    pub const fn document(&self) -> &SourcedValue<EntXmlDocument> {
+        &self.document
+    }
 }
 /// The original Child selector and the identity bucket it may select.
 #[derive(Clone, Debug)]

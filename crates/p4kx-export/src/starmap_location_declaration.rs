@@ -7,26 +7,31 @@ use p4kx_extraction::{
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::catalog_read::original::{EntryCapture, EntryXml, XmlNodeSource};
+use crate::CatalogError;
+use crate::catalog_read::original::{EntryCapture, EntryXml};
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
 use crate::schema_fields::every_field_required;
 use crate::starmap_parse::entxml::{EntXmlIndex, EntXmlLink, EntXmlRequest};
 use crate::starmap_parse::hcd::{HcdLink, HcdLookup, HcdReader};
 use crate::starmap_xml::{Node, Root, attribute};
-use crate::{CatalogError, ExportAccountingError};
 
 const LOCATION_TYPE: &str = "locationType";
-const METADATA: &str = "InstanceMetadata";
+
+#[path = "starmap_location_metadata.rs"]
+mod metadata;
+
+pub use metadata::LocationMetadataElement;
 
 /// The authored fields and component declarations of a typed location Child.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ChildLocation {
+pub struct ChildLocation {
     location_type: SourcedValue<u32>,
     streaming_root: SourcedValue<bool>,
     guid: SourcedValue<CatalogGuid>,
+    class: SourcedValue<String>,
     class_guid: SourcedValue<CatalogGuid>,
     #[schemars(extend("x-gameText" = true))]
     label: SourcedValue<String>,
@@ -44,6 +49,90 @@ pub(crate) struct ChildLocation {
 }
 
 impl ChildLocation {
+    /// Returns the authored numeric location type.
+    #[must_use]
+    pub const fn location_type(&self) -> &SourcedValue<u32> {
+        &self.location_type
+    }
+
+    /// Returns the authored streaming root flag.
+    #[must_use]
+    pub const fn streaming_root(&self) -> &SourcedValue<bool> {
+        &self.streaming_root
+    }
+
+    /// Returns the authored Child GUID.
+    #[must_use]
+    pub const fn guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.guid
+    }
+
+    /// Returns the authored Child class name.
+    #[must_use]
+    pub const fn class(&self) -> &SourcedValue<String> {
+        &self.class
+    }
+
+    /// Returns the independently authored class GUID.
+    #[must_use]
+    pub const fn class_guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.class_guid
+    }
+
+    /// Returns the authored display label.
+    #[must_use]
+    pub const fn label(&self) -> &SourcedValue<String> {
+        &self.label
+    }
+
+    /// Returns the authored entity name.
+    #[must_use]
+    pub const fn entity_name(&self) -> &SourcedValue<String> {
+        &self.entity_name
+    }
+
+    /// Returns the original tag text.
+    #[must_use]
+    pub const fn tags_text(&self) -> &SourcedValue<String> {
+        &self.tags_text
+    }
+
+    /// Returns the ordered original tag tokens.
+    #[must_use]
+    pub const fn tags(&self) -> &SourcedValue<Vec<SourcedValue<LocationTag>>> {
+        &self.tags
+    }
+
+    /// Returns the authored hierarchical context flag.
+    #[must_use]
+    pub const fn has_hierarchical_context_data(&self) -> &SourcedValue<bool> {
+        &self.has_hierarchical_context_data
+    }
+
+    /// Returns the same-container hierarchical context lookup.
+    #[must_use]
+    pub const fn hierarchical_context(&self) -> Option<&HcdLink> {
+        self.hierarchical_context.as_ref()
+    }
+
+    /// Returns the same-container entity lookup.
+    #[must_use]
+    pub const fn ent_xml(&self) -> Option<&EntXmlLink> {
+        self.ent_xml.as_ref()
+    }
+
+    /// Returns the original text of invalid typed attributes.
+    #[must_use]
+    pub const fn invalid_attributes(&self) -> &[LocationAttribute] {
+        self.invalid_attributes.as_slice()
+    }
+
+    /// Returns the ordered instance metadata elements.
+    #[must_use]
+    pub const fn instance_metadata(&self) -> &SourcedValue<Vec<LocationMetadataElement>> {
+        &self.instance_metadata
+    }
+
     /// Retains a location declaration and its exact source uses from its owning Child.
     pub(crate) fn read(
         xml: &EntryXml<'_, '_, '_>,
@@ -63,6 +152,7 @@ impl ChildLocation {
         let location_type = fields.typed(LOCATION_TYPE, |raw| raw.trim().parse().ok())?;
         let streaming_root = fields.typed("streamingRoot", boolean)?;
         let guid = fields.typed("guid", parse_guid)?;
+        let class = fields.text("class")?;
         let class_guid = fields.typed("classGuid", parse_guid)?;
         let has_hierarchical_context_data = fields.typed("hasHierarchicalContextData", boolean)?;
         let tags = fields.tags()?;
@@ -70,6 +160,7 @@ impl ChildLocation {
             location_type,
             streaming_root,
             guid,
+            class,
             class_guid,
             label: fields.text("label")?,
             entity_name: fields.text("entityName")?,
@@ -79,7 +170,7 @@ impl ChildLocation {
             hierarchical_context: None,
             entity_request: None,
             ent_xml: None,
-            instance_metadata: read_metadata(xml, child, capture)?,
+            instance_metadata: metadata::read(xml, child, capture)?,
             invalid_attributes: fields.invalid_attributes,
         }))
     }
@@ -229,22 +320,50 @@ fn boolean(raw: &str) -> Option<bool> {
     }
 }
 
+/// An original token in the Child location tags.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-struct LocationTag {
+pub struct LocationTag {
     raw: SourcedValue<String>,
     guid: SourcedValue<CatalogGuid>,
 }
 
+impl LocationTag {
+    /// Returns the authored tag token.
+    #[must_use]
+    pub const fn raw(&self) -> &SourcedValue<String> {
+        &self.raw
+    }
+
+    /// Returns the parsed tag GUID.
+    #[must_use]
+    pub const fn guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.guid
+    }
+}
+
+/// An original location element attribute.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-struct LocationAttribute {
+pub struct LocationAttribute {
     name: SourcedValue<String>,
     #[schemars(extend("x-gameText" = true))]
     value: SourcedValue<String>,
 }
 
 impl LocationAttribute {
+    /// Returns the authored attribute name.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<String> {
+        &self.name
+    }
+
+    /// Returns the authored attribute value.
+    #[must_use]
+    pub const fn value(&self) -> &SourcedValue<String> {
+        &self.value
+    }
+
     fn new(
         sources: &SourceUses,
         name: &str,
@@ -258,117 +377,4 @@ impl LocationAttribute {
             value: sources.value(SourceValue::Present(value), &[value_use], complete),
         }
     }
-}
-
-/// One original metadata element with its physical node and direct parent.
-#[derive(Clone, Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-struct LocationMetadataElement {
-    node_index: SourcedValue<u32>,
-    parent_node_index: SourcedValue<u32>,
-    name: SourcedValue<String>,
-    attributes: Vec<LocationAttribute>,
-}
-
-fn read_metadata(
-    xml: &EntryXml<'_, '_, '_>,
-    child: Root<'_>,
-    capture: &EntryCapture<'_>,
-) -> Result<SourcedValue<Vec<LocationMetadataElement>>, CatalogError> {
-    let sources = capture.source_uses();
-    let mut elements = Vec::new();
-    let mut selected = vec![xml.node_source(child)?.selected()?];
-    for scope in child
-        .children()
-        .filter(|node| node.name().eq_ignore_ascii_case(METADATA))
-    {
-        let source = xml.node_source(scope)?;
-        selected.push(source.selected()?);
-        append_metadata(xml, scope, capture, &mut elements)?;
-    }
-    Ok(sources.value(
-        if elements.is_empty() {
-            SourceValue::Absent
-        } else {
-            SourceValue::Present(elements)
-        },
-        &selected,
-        !xml.is_lossy(),
-    ))
-}
-
-fn append_metadata(
-    xml: &EntryXml<'_, '_, '_>,
-    scope: Root<'_>,
-    capture: &EntryCapture<'_>,
-    elements: &mut Vec<LocationMetadataElement>,
-) -> Result<(), CatalogError> {
-    let mut pending: Vec<(Root<'_>, Option<XmlNodeSource>)> = vec![(scope, None)];
-    let sources = capture.source_uses();
-    let complete = !xml.is_lossy();
-    while let Some((node, parent)) = pending.pop() {
-        let source = xml.node_source(node)?;
-        let index = source.index();
-        let selected = source.selected()?;
-        let mut parent_uses = vec![selected.clone()];
-        if let Some(parent) = &parent {
-            parent_uses.push(parent.selected()?);
-        }
-        elements.push(LocationMetadataElement {
-            node_index: sources.value(
-                SourceValue::Present(index),
-                std::slice::from_ref(&selected),
-                complete,
-            ),
-            parent_node_index: sources.value(
-                state(parent.as_ref().map(XmlNodeSource::index)),
-                &parent_uses,
-                complete,
-            ),
-            name: sources.value(
-                SourceValue::Present(node.name().to_owned()),
-                std::slice::from_ref(&selected),
-                complete,
-            ),
-            attributes: metadata_attributes(xml, node, capture)?,
-        });
-        let first = pending.len();
-        pending.extend(node.children().map(|child| (child, Some(source.clone()))));
-        if let Some(children) = pending.get_mut(first..) {
-            children.reverse();
-        }
-    }
-    Ok(())
-}
-
-fn metadata_attributes(
-    xml: &EntryXml<'_, '_, '_>,
-    node: Root<'_>,
-    capture: &EntryCapture<'_>,
-) -> Result<Vec<LocationAttribute>, CatalogError> {
-    let sources = capture.source_uses();
-    node.attributes()
-        .enumerate()
-        .map(|(ordinal, (name, _))| {
-            let observed = xml
-                .attribute_at(node, ordinal)?
-                .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-            let (name_uses, name_complete) = observed.selector_inputs()?;
-            let datum = observed.retain_in(capture)?;
-            let (value_uses, value_complete) = datum.contributions();
-            Ok(LocationAttribute {
-                name: sources.value(
-                    SourceValue::Present(name.to_owned()),
-                    &name_uses,
-                    name_complete && !xml.is_lossy(),
-                ),
-                value: sources.value(
-                    SourceValue::Present(observed.as_str().to_owned()),
-                    value_uses,
-                    value_complete && !xml.is_lossy(),
-                ),
-            })
-        })
-        .collect()
 }

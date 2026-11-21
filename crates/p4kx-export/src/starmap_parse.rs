@@ -135,13 +135,14 @@ pub(crate) enum Body {
 pub(crate) enum DescriptorScope {
     Catalog { jump_endpoints: bool },
     ContainerPlacements,
+    LocationPlacements,
     Harvest,
     OpenedContainers,
 }
 
 impl DescriptorScope {
     const fn enriches_locations(self) -> bool {
-        matches!(self, Self::Catalog { .. })
+        matches!(self, Self::Catalog { .. } | Self::LocationPlacements)
     }
 
     const fn resolves_placements(self) -> bool {

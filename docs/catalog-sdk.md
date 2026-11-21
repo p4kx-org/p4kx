@@ -1596,6 +1596,19 @@ The result carries Build, original provenance and selected-scope coverage. Check
 Entry failures, malformed or blocked routes and caller-selected traversal allowances remain visible
 even if the query could emit some rows.
 
+## Typed location occurrences
+
+Use `starmap::read_location_instances` for the canonical `placements.locationInstances`
+rows of one physical system root. `ContainerPlacementSelection` selects the root, an
+ordered Child route, or an exact route with its external descriptor steps.
+
+The query checks the reachable descriptor graph and same-container HCD and EntXML
+companions for that root. An exact occurrence limits the materialized rows. Source
+coverage still describes the selected root. Input payloads are scoped to those
+descriptors and companions. Route keys, authored class names, transforms, metadata and
+the companion lookup states match the producer. Inspect `coverage.is_complete()`
+before interpreting empty results and retain the snapshot's own source inventory.
+
 ## Authored facilities
 
 Use `equipment::with_facilities`, its decoded-Entry form or the equivalent session methods.

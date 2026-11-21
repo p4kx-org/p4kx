@@ -13,10 +13,11 @@ use crate::schema_fields::every_field_required;
 use crate::starmap_xml::{Node, Root, attribute};
 use crate::{CatalogError, ExportAccountingError};
 
+/// The original header of a hierarchical context member.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct HcdDocument {
+pub struct HcdDocument {
     version: SourcedValue<String>,
     /// The authored key for joining the physical context-preset definition by GUID.
     preset_guid: SourcedValue<CatalogGuid>,
@@ -26,15 +27,60 @@ pub(super) struct HcdDocument {
     attributes: Vec<HcdAttribute>,
 }
 
+/// An additional authored attribute of a hierarchical context header.
 #[derive(Clone, Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-struct HcdAttribute {
+pub struct HcdAttribute {
     name: SourcedValue<String>,
     #[schemars(extend("x-gameText" = true))]
     value: SourcedValue<String>,
 }
 
+impl HcdAttribute {
+    /// Returns the authored attribute name.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<String> {
+        &self.name
+    }
+
+    /// Returns the authored attribute value.
+    #[must_use]
+    pub const fn value(&self) -> &SourcedValue<String> {
+        &self.value
+    }
+}
+
 impl HcdDocument {
+    /// Returns the authored document version.
+    #[must_use]
+    pub const fn version(&self) -> &SourcedValue<String> {
+        &self.version
+    }
+
+    /// Returns the parsed context preset GUID.
+    #[must_use]
+    pub const fn preset_guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.preset_guid
+    }
+
+    /// Returns the original preset text.
+    #[must_use]
+    pub const fn preset_text(&self) -> &SourcedValue<String> {
+        &self.preset_text
+    }
+
+    /// Returns the authored preset Record name.
+    #[must_use]
+    pub const fn preset_record_name(&self) -> &SourcedValue<String> {
+        &self.preset_record_name
+    }
+
+    /// Returns additional attributes in original order.
+    #[must_use]
+    pub const fn attributes(&self) -> &[HcdAttribute] {
+        self.attributes.as_slice()
+    }
+
     pub(super) fn read(
         xml: &EntryXml<'_, '_, '_>,
         capture: &EntryCapture<'_>,

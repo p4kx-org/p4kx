@@ -13,7 +13,6 @@ use crate::starmap_containers::Limits;
 use crate::starmap_containers::instance::ContainerInstance;
 use crate::starmap_containers::jump_class::JumpEndpointRecords;
 use crate::starmap_containers::jump_endpoint::JumpEndpoint;
-#[cfg(test)]
 use crate::starmap_containers::location_instance::LocationInstance;
 use crate::starmap_containers::proof::{PlacementProof, PlacementStep};
 use crate::starmap_containers::unresolved::UnresolvedContainerLink;
@@ -148,29 +147,40 @@ impl WalkPath {
     }
 }
 
-pub(crate) struct SelectedContainerRows {
+#[derive(Clone, Copy)]
+pub(crate) enum PlacementTable {
+    Containers,
+    Locations,
+}
+
+pub(crate) struct SelectedPlacementRows {
+    pub(crate) table: PlacementTable,
     pub(crate) child_node_indices: Option<Vec<u32>>,
     pub(crate) external_child_step_indices: Option<Vec<usize>>,
     pub(crate) instances: Vec<ContainerInstance>,
     pub(crate) unresolved: Vec<UnresolvedContainerLink>,
+    pub(crate) location_instances: Vec<LocationInstance>,
     pub(crate) location_physics: crate::location_physics::GridObservations,
 }
 
-impl SelectedContainerRows {
+impl SelectedPlacementRows {
     pub(crate) fn new(
+        table: PlacementTable,
         child_node_indices: Option<Vec<u32>>,
         external_child_step_indices: Option<Vec<usize>>,
     ) -> Self {
         Self {
             child_node_indices,
+            table,
             external_child_step_indices,
             instances: Vec::new(),
             unresolved: Vec::new(),
+            location_instances: Vec::new(),
             location_physics: crate::location_physics::GridObservations::default(),
         }
     }
 
-    fn matches(&self, route: Option<&PlacementStep>) -> bool {
+    pub(super) fn matches(&self, route: Option<&PlacementStep>) -> bool {
         let Some(indices) = &self.child_node_indices else {
             return true;
         };
@@ -200,14 +210,16 @@ pub(crate) enum PlacementRows<'writer> {
     #[cfg(test)]
     Typed,
     Harvest(&'writer HarvestSurvey<'writer>),
-    SelectedContainers(&'writer mut SelectedContainerRows),
+    Selected(&'writer mut SelectedPlacementRows),
     OpenedContainers,
 }
 
 impl PlacementRows<'_> {
     fn includes_container(&self, route: Option<&PlacementStep>) -> bool {
         match self {
-            Self::SelectedContainers(rows) => rows.matches(route),
+            Self::Selected(rows) => {
+                matches!(rows.table, PlacementTable::Containers) && rows.matches(route)
+            }
             Self::Harvest(_) | Self::OpenedContainers => false,
             Self::Spool { .. } => true,
             #[cfg(test)]
@@ -216,7 +228,7 @@ impl PlacementRows<'_> {
     }
 
     const fn records_objects(&self) -> bool {
-        !matches!(self, Self::SelectedContainers(_) | Self::OpenedContainers)
+        !matches!(self, Self::Selected(_) | Self::OpenedContainers)
     }
 }
 
@@ -283,7 +295,7 @@ impl System<'_> {
                 });
                 self.read.containers.push(opened);
             }
-        } else if !matches!(&self.rows, PlacementRows::SelectedContainers(_)) {
+        } else if !matches!(&self.rows, PlacementRows::Selected(_)) {
             self.read.containers.push(opened);
         }
         self.read.deepest = self.read.deepest.max(path.external);

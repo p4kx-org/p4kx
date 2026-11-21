@@ -14,6 +14,9 @@ use serde_json::{Map, Value, json};
 #[path = "starmap_location_physics_query.rs"]
 mod location_physics;
 
+#[path = "starmap_location_instance_query.rs"]
+mod location_instances;
+
 use crate::health_origin_assertions as proof;
 use crate::health_origin_fixture::{self as fixture, Fixture, Input, TestResult};
 

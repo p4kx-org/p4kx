@@ -5,23 +5,18 @@ use p4kx_export::catalog_queries::equipment::{
     with_ammo_definitions, with_weapon_recoil_definitions,
 };
 use p4kx_export::catalog_queries::faction_identities::with_faction_identities;
-use p4kx_export::catalog_queries::flares::{FlareLibrarySelection, read_flare_libraries};
-use p4kx_export::catalog_queries::localization::with_language_sources;
-use p4kx_export::catalog_queries::radar_audio::{RadarAudioSelection, read_radar_audio};
-use p4kx_export::catalog_queries::shops::{ShopInventorySelection, read_shop_inventories};
-use p4kx_export::catalog_queries::subsumption_events::{
-    SubsumptionEventSelection, read_subsumption_events,
-};
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
 };
 use p4kx_extraction::Archive;
 
 use super::{
-    AMMUNITION, FACTION_IDENTITIES, FLARE_LIBRARIES, ITEM_DEFINITIONS, LANGUAGE_SOURCES,
-    MANUFACTURERS, RADAR_AUDIO, Route, SHOP_INVENTORIES, TestResult, WEAPON_RECOIL,
+    AMMUNITION, FACTION_IDENTITIES, ITEM_DEFINITIONS, MANUFACTURERS, Route, TestResult,
+    WEAPON_RECOIL,
 };
 
+#[path = "sdk_archive_entry_routes.rs"]
+mod archive_entries;
 #[path = "sdk_reputation_definition_routes.rs"]
 mod authored_reputation;
 #[path = "sdk_blueprint_physical_routes.rs"]
@@ -181,8 +176,13 @@ pub(super) fn world_datasets() -> impl Iterator<Item = &'static str> {
 
 pub(super) fn read() -> TestResult<Vec<Route>> {
     let (_directory, archive) = fixtures::open()?;
-    let [containers, location_physics, loot_documents, unresolved] =
-        container_placements::read(&archive, fixtures::ROOT)?;
+    let [
+        containers,
+        location_instances,
+        location_physics,
+        loot_documents,
+        unresolved,
+    ] = container_placements::read(&archive, fixtures::ROOT)?;
     let independent_ammo = read_ammunition(&archive)?;
     let [projectile, reached_ammo, combat, magazine] = projectile_ammo::read()?;
     if independent_ammo.schema != reached_ammo.schema {
@@ -197,18 +197,19 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         countermeasure_emitters::read()?,
         dismantle::read()?,
         weapon_animation::read()?,
-        read_language_sources(&archive)?,
+        archive_entries::read_language_sources(&archive)?,
         location_vocabulary::read_entities(&archive)?,
         mission_location::read()?,
         mission_type::read()?,
         mission_locality::read()?,
-        read_shop_inventory(&archive)?,
-        read_flare_library(&archive)?,
+        archive_entries::read_shop_inventory(&archive)?,
+        archive_entries::read_flare_library(&archive)?,
         read_faction_identities(&archive)?,
         faction_trigger_configuration::read()?,
-        read_subsumption_event(&archive)?,
-        read_radar_configuration(&archive)?,
+        archive_entries::read_subsumption_event(&archive)?,
+        archive_entries::read_radar_configuration(&archive)?,
         containers,
+        location_instances,
         location_physics,
         loot_documents,
         unresolved,
@@ -307,15 +308,6 @@ fn read_faction_identities(archive: &Archive) -> TestResult<Route> {
     )?
 }
 
-fn read_radar_configuration(archive: &Archive) -> TestResult<Route> {
-    let snapshot = read_radar_audio(archive, RadarAudioSelection::All, None)?;
-    Route::queried_rows(
-        RADAR_AUDIO,
-        &snapshot.rows,
-        "physical configuration query available; installed producer parity open",
-    )
-}
-
 fn read_entity_definitions(archive: &Archive) -> TestResult<[Route; 2]> {
     const REMAINING: &str =
         "typed definitions and synthetic producer parity available; installed producer parity open";
@@ -332,29 +324,6 @@ fn read_entity_definitions(archive: &Archive) -> TestResult<[Route; 2]> {
     ])
 }
 
-fn read_language_sources(archive: &Archive) -> TestResult<Route> {
-    with_language_sources(
-        archive,
-        CatalogLanguageSelection::AllAvailable,
-        None,
-        |snapshot| {
-            if snapshot
-                .sources
-                .get("de")
-                .and_then(|source| source.value())
-                .is_none()
-            {
-                return Err("the language metadata query must return a present source".into());
-            }
-            Route::queried_value(
-                LANGUAGE_SOURCES,
-                &snapshot.sources,
-                "selective language Entry metadata available; installed producer parity open",
-            )
-        },
-    )?
-}
-
 fn read_weapon_recoil(archive: &Archive) -> TestResult<Route> {
     with_weapon_recoil_definitions(archive, CatalogRecordSelection::All, None, |snapshot| {
         Route::queried_rows(
@@ -363,37 +332,4 @@ fn read_weapon_recoil(archive: &Archive) -> TestResult<Route> {
             "physical definition selection available; installed and complete producer parity open",
         )
     })?
-}
-
-fn read_flare_library(archive: &Archive) -> TestResult<Route> {
-    let selection = FlareLibrarySelection::ArchivePath(fixtures::FLARE_LIBRARY);
-    let snapshot = read_flare_libraries(archive, selection, None)?;
-    Route::queried_rows(
-        FLARE_LIBRARIES,
-        &snapshot.rows,
-        "synthetic canonical parity and installed source witness available; installed producer parity open",
-    )
-}
-
-fn read_subsumption_event(archive: &Archive) -> TestResult<Route> {
-    let snapshot = read_subsumption_events(
-        archive,
-        SubsumptionEventSelection::ArchivePath(fixtures::SUBSUMPTION_FIXTURE),
-        None,
-    )?;
-    Route::queried_rows(
-        super::SUBSUMPTION_EVENTS,
-        &snapshot.rows,
-        "synthetic producer parity available; installed Event-ID and producer parity open",
-    )
-}
-
-fn read_shop_inventory(archive: &Archive) -> TestResult<Route> {
-    let selection = ShopInventorySelection::ArchivePath(fixtures::OFFLINE_SHOP);
-    let snapshot = read_shop_inventories(archive, selection, None)?;
-    Route::queried_rows(
-        SHOP_INVENTORIES,
-        &snapshot.rows,
-        "physical Entry and path query available; installed producer parity open",
-    )
 }

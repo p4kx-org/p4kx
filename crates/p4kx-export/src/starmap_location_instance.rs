@@ -21,7 +21,7 @@ use crate::starmap_xml::AuthoredPose;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct LocationInstance {
+pub struct LocationInstance {
     instance_id: SourcedValue<ContainerInstanceKey>,
     parent_location_id: SourcedValue<ContainerInstanceKey>,
     container_instance_id: SourcedValue<ContainerInstanceKey>,
@@ -36,6 +36,60 @@ pub(crate) struct LocationInstance {
 }
 
 impl LocationInstance {
+    /// Returns this occurrence's key in the system root.
+    #[must_use]
+    pub const fn instance_id(&self) -> &SourcedValue<ContainerInstanceKey> {
+        &self.instance_id
+    }
+
+    /// Returns the nearest authored location ancestor.
+    #[must_use]
+    pub const fn parent_location_id(&self) -> &SourcedValue<ContainerInstanceKey> {
+        &self.parent_location_id
+    }
+
+    /// Returns the enclosing container occurrence.
+    #[must_use]
+    pub const fn container_instance_id(&self) -> &SourcedValue<ContainerInstanceKey> {
+        &self.container_instance_id
+    }
+
+    /// Returns the physical container holding the declaration.
+    #[must_use]
+    pub const fn container(&self) -> &SourcedValue<PhysicalEntryRef> {
+        &self.container
+    }
+
+    /// Returns the authored position in metres.
+    #[must_use]
+    pub const fn local_position(&self) -> &SourcedValue<[f64; 3]> {
+        &self.local_position
+    }
+
+    /// Returns the authored quaternion in W, X, Y, Z order.
+    #[must_use]
+    pub const fn local_rotation(&self) -> &SourcedValue<[f64; 4]> {
+        &self.local_rotation
+    }
+
+    /// Returns the composed system position in metres.
+    #[must_use]
+    pub const fn world_position(&self) -> &SourcedValue<[f64; 3]> {
+        &self.world_position
+    }
+
+    /// Returns the composed system quaternion in W, X, Y, Z order.
+    #[must_use]
+    pub const fn world_rotation(&self) -> &SourcedValue<[f64; 4]> {
+        &self.world_rotation
+    }
+
+    /// Returns the original Child declaration and same-container companions.
+    #[must_use]
+    pub fn declaration(&self) -> &ChildLocation {
+        &self.declaration
+    }
+
     #[cfg(test)]
     pub(crate) const fn declaration_for_test(&self) -> &Arc<ChildLocation> {
         &self.declaration

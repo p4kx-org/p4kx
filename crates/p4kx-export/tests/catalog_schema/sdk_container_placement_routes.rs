@@ -5,18 +5,21 @@ use p4kx_export::StarmapTraversalBudget;
 use p4kx_export::catalog_queries::loot::{
     LootDocumentQuery, LootDocumentSelection, read_loot_documents,
 };
+use p4kx_export::catalog_queries::starmap;
 use p4kx_export::catalog_queries::starmap::{
     ContainerPlacementSelection, read_container_placements,
 };
 use p4kx_extraction::Archive;
 
-use super::super::{CONTAINERS, LOCATION_PHYSICS_GRIDS, LOOT_DOCUMENTS, UNRESOLVED};
+use super::super::{
+    CONTAINERS, LOCATION_INSTANCES, LOCATION_PHYSICS_GRIDS, LOOT_DOCUMENTS, UNRESOLVED,
+};
 use super::{Route, TestResult};
 
 const REMAINING: &str =
     "system-root and occurrence query available; root enumeration and installed parity open";
 
-pub(super) fn read(archive: &Archive, root_path: &str) -> TestResult<[Route; 4]> {
+pub(super) fn read(archive: &Archive, root_path: &str) -> TestResult<[Route; 5]> {
     let root = archive
         .entries()
         .iter()
@@ -39,8 +42,20 @@ pub(super) fn read(archive: &Archive, root_path: &str) -> TestResult<[Route; 4]>
     let [grid] = starmap.location_physics_grids.as_slice() else {
         return Err("one synthetic grid descriptor".into());
     };
+
+    let locations = starmap::read_location_instances(
+        archive,
+        ContainerPlacementSelection::SystemRoot(root_index),
+        StarmapTraversalBudget::new(),
+        None,
+    )?;
     Ok([
         Route::queried_rows(CONTAINERS, &starmap.container_instances, REMAINING)?,
+        Route::queried_rows(
+            LOCATION_INSTANCES,
+            &locations.location_instances,
+            "system-root and exact occurrence query with synthetic Catalog parity; installed parity open",
+        )?,
         Route::queried_value(
             LOCATION_PHYSICS_GRIDS,
             grid.as_ref(),
