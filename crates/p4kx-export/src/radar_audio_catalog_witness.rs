@@ -8,16 +8,18 @@ use p4kx_extraction::cryxml::{
     SourceReadOptions, SourceSyntax,
 };
 use p4kx_extraction::{
-    Archive, ArchiveWatch, Checksum, FieldOrigin, SourceInventory, SourceLocation,
+    Archive, ArchiveWatch, Checksum, FieldOrigin, InputScope, PhysicalSourceKind, SourceEncryption,
+    SourceEncryptionState, SourceInventory, SourceLocation,
 };
 use p4kx_testkit::{real_archive_key, real_archive_path};
 
 use super::TestResult;
 use crate::catalog_queries::radar_audio::{
     AuthoredXmlElement, AuthoredXmlText, RadarAudioBindingStatus, RadarAudioDatum, RadarAudioField,
-    RadarAudioNode, RadarAudioSelection, read_radar_audio,
+    RadarAudioNode, RadarAudioSelection, RadarAudioSnapshot, read_radar_audio,
 };
 use crate::catalog_v3::radar_audio_configuration::includes;
+use crate::export_entry_counts::ExportEntryCounts;
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
@@ -57,19 +59,81 @@ fn installed_radar_audio_reconciles_ordered_sound_slots_and_selector_coverage() 
         "installed source is the unqualified radar root"
     );
 
-    let snapshot = read_radar_audio(
-        &archive,
-        RadarAudioSelection::EntryIndex(u32::try_from(entry.index())?),
-        None,
-    )?;
+    let index = u32::try_from(entry.index())?;
+    let snapshot = read_radar_audio(&archive, RadarAudioSelection::EntryIndex(index), None)?;
+    check_payload_scope(&archive, index, &snapshot)?;
     let [row] = snapshot.rows.as_slice() else {
         return Err("one projected installed source".into());
     };
-    assert_eq!(row.identity().entry_index(), u32::try_from(entry.index())?);
+
     check_tree(row.elements(), original.root(), &snapshot.source_inventory)?;
     check_slots(row.elements(), original.root())?;
     watch.check()?;
     report(build.change_number());
+    Ok(())
+}
+
+pub(super) fn check_payload_scope(
+    archive: &Archive,
+    index: u32,
+    snapshot: &RadarAudioSnapshot,
+) -> TestResult {
+    assert_eq!(
+        snapshot.entries,
+        ExportEntryCounts {
+            selected: 1,
+            read_successful: 1,
+            projected: 1,
+            ..ExportEntryCounts::default()
+        },
+        "the selected query consumes only its one physical configuration"
+    );
+    let [row] = snapshot.rows.as_slice() else {
+        return Err("one projected source for the exact query".into());
+    };
+    assert_eq!(
+        row.identity().entry_index(),
+        index,
+        "the exact query projects its requested Entry"
+    );
+    let index = usize::try_from(index)?;
+    let entry = archive
+        .entries()
+        .get(index)
+        .ok_or("selected physical Entry")?;
+    let observed = archive.entry_origin(entry).ok_or("original Entry origin")?;
+    let encryption = match observed.encryption() {
+        SourceEncryption::Encrypted => SourceEncryptionState::Encrypted,
+        SourceEncryption::Unencrypted => SourceEncryptionState::Unencrypted,
+        _ => SourceEncryptionState::Unknown,
+    };
+
+    let inventory = &snapshot.source_inventory;
+    let mut uses = inventory
+        .iter_uses()
+        .filter(|usage| usage.scope() == InputScope::Payload);
+    let first = uses.next().ok_or("selected configuration payload use")?;
+    let source = inventory
+        .iter_sources()
+        .find(|source| source.id() == first.source())
+        .ok_or("physical source supplying the configuration")?;
+    let original_entry = match source.kind() {
+        PhysicalSourceKind::ArchiveEntry(source) => source.entry_index() == index,
+        PhysicalSourceKind::ArchiveEntryProof(source) => {
+            source.entry_index().get() == u64::from(observed.entry().ordinal())
+        }
+        _ => false,
+    };
+    assert!(
+        original_entry,
+        "payload belongs to the selected physical Entry"
+    );
+    assert!(
+        std::iter::once(first).chain(uses).all(|usage| {
+            usage.source() == source.id() && usage.effective_encryption() == encryption
+        }),
+        "every payload use belongs to the same Entry and retains its observed encryption"
+    );
     Ok(())
 }
 
@@ -243,6 +307,20 @@ fn check_use(
     assert!(
         use_row.location() == position,
         "source use retains the exact original coordinates"
+    );
+    let encrypted = match use_row.effective_encryption() {
+        SourceEncryptionState::Encrypted => Some(true),
+        SourceEncryptionState::Unencrypted => Some(false),
+        _ => None,
+    };
+    assert_eq!(
+        origin.contains_encrypted_source(),
+        encrypted,
+        "the datum retains the exact payload encryption state"
+    );
+    assert!(
+        origin.source_set_complete(),
+        "the datum has complete original proof"
     );
     Ok(())
 }

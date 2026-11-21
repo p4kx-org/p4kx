@@ -51,13 +51,9 @@ fn original_slot_states_and_exact_numeric_declarations_match_catalog() -> TestRe
     };
     check_text(text)?;
     check_binary(binary)?;
-    let selected = read_radar_audio(
-        &archive,
-        RadarAudioSelection::EntryIndex(binary.identity().entry_index()),
-        None,
-    )?;
-    assert_eq!(selected.rows.len(), 1);
-    assert_eq!(selected.entries.selected, 1);
+    let index = binary.identity().entry_index();
+    let selected = read_radar_audio(&archive, RadarAudioSelection::EntryIndex(index), None)?;
+    witness::check_payload_scope(&archive, index, &selected)?;
     check_catalog(&archive, &sdk.rows)
 }
 
