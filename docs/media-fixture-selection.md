@@ -274,6 +274,21 @@ when `P4KX_SYNTHETIC_LAYER_TINT_MASK_PACKAGE` names a fresh directory in the iso
 Use `blender_addon/tests/blender_layer_tint_mask_package.py -- <package>/scene.json` for the
 one-thread native EXR probe.
 
+### Installed factory-painted bow comparison
+
+For LIVE 13220821 and PTU 13248297, the default Assembly resolution selects the factory palette
+from root geometry while the paint port is empty. The verified original-subset witness above
+covers one starboard-bow submesh with 6,744 triangles and four original UV samples in both Builds.
+Blender 5.3.0 measures a maximum linear roughness difference of 0.001796 within the 2/255 tolerance.
+The largest linear Base Color difference between the ordinary package and GLB paths is 0.046595.
+
+At the most affected UV and colour channel, disabling the package detail overlay in the probe
+changes the difference to 0.056655. Neutralizing the first layer's authored tint as well reduces
+it to 0.001214 in both Builds. These results reproduce the authored factor difference in the
+masked-layer fixture and the package's detail overlay. The matched-build game comparison is
+required for acceptance of the factory-panel appearance. The original material receipts and
+diagnostic imports remain private.
+
 ## Forward Illum and explicit Emittance
 
 This fixture exports a textured GLB and a Blender package for absent, zero and positive
