@@ -9903,27 +9903,35 @@
       "type": "object"
     },
     "ClimateAppearance": {
+      "description": "Authored visual selectors and shading classes.",
       "properties": {
         "debrisPath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored debris path."
         },
         "excludeFromSnow": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "The authored snow exclusion flag."
         },
         "farLutPath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored far lookup table path."
         },
         "shadingClass": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The authored default shading-class GUID."
         },
         "shadingClassClose": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The authored close shading-class GUID."
         },
         "shadingClassFar": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The authored far shading-class GUID."
         },
         "shadingClassMid": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The authored mid-range shading-class GUID."
         },
         "shadingLinks": {
           "anyOf": [
@@ -9933,7 +9941,8 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Candidate evidence for each authored shading-class selector."
         }
       },
       "required": [
@@ -9949,75 +9958,99 @@
       "type": "object"
     },
     "ClimateEnvelope": {
+      "description": "Authored placement ranges, masks and climate curve settings.",
       "properties": {
         "aggregateSizeRange": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored aggregate size range."
         },
         "bedrockCurveImpact": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored bedrock curve impact."
         },
         "biomeMask": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored biome mask."
         },
         "elevationCurveImpact": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored elevation curve impact."
         },
         "elevationHighCurveImpact": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored high-elevation curve impact."
         },
         "humidityCurveImpact": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored humidity curve impact."
         },
         "luminosityCurveImpact": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored luminosity curve impact."
         },
         "luminosityRange": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored luminosity range."
         },
         "maxAnnualRainfall": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored upper annual rainfall bound."
         },
         "maxElevation": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored upper elevation bound."
         },
         "maxTemperature": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored upper temperature bound."
         },
         "minAnnualRainfall": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored lower annual rainfall bound."
         },
         "minElevation": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored lower elevation bound."
         },
         "minTemperature": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored lower temperature bound."
         },
         "optimalAggregateSize": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored optimal aggregate size."
         },
         "optimalLuminosity": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored optimal luminosity."
         },
         "seedExclusionMask": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored seed exclusion mask."
         },
         "slopeRangeDeg": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The authored slope range in degrees."
         },
         "soilDepthCurve": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored soil depth curve."
         },
         "soilDepthMax": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored maximum soil depth."
         },
         "soilDepthMin": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored minimum soil depth."
         },
         "soilExclusionMask": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored soil exclusion mask."
         },
         "temperatureCurveImpact": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored temperature curve impact."
         }
       },
       "required": [
@@ -10048,39 +10081,51 @@
       "type": "object"
     },
     "ClimateGrowth": {
+      "description": "Authored growth, density and seasonal settings.",
       "properties": {
         "buckets": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfClimateGrowthBucket"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfClimateGrowthBucket",
+          "description": "The original growth buckets in source slot order."
         },
         "dominance": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored dominance setting."
         },
         "historicGrowthFactorsSize0": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The authored historic growth factors for size 0."
         },
         "historicGrowthFactorsSize1": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The authored historic growth factors for size 1."
         },
         "historicGrowthFactorsSize2": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The authored historic growth factors for size 2."
         },
         "historicGrowthModeA": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored historic growth mode A."
         },
         "historicGrowthModeB": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored historic growth mode B."
         },
         "historicGrowthModeC": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored historic growth mode C."
         },
         "seasonOffsetRange": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored season offset range."
         },
         "sparsity": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored sparsity setting."
         },
         "vitalityFactor": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored vitality factor."
         }
       },
       "required": [
@@ -10099,15 +10144,18 @@
       "type": "object"
     },
     "ClimateGrowthBucket": {
+      "description": "An original climate growth bucket.",
       "properties": {
         "additionalFields": {
+          "description": "Additional unprojected original fields.",
           "items": {
             "$ref": "#/$defs/RawPlanetAssetMember"
           },
           "type": "array"
         },
         "shadeDensity": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored shade density."
         }
       },
       "required": [
@@ -10117,18 +10165,23 @@
       "type": "object"
     },
     "ClimateShadingLinks": {
+      "description": "Original resolution evidence for each shading-class distance role.",
       "properties": {
         "close": {
-          "$ref": "#/$defs/TerrainGuidLink"
+          "$ref": "#/$defs/TerrainGuidLink",
+          "description": "The close shading-class link."
         },
         "default": {
-          "$ref": "#/$defs/TerrainGuidLink"
+          "$ref": "#/$defs/TerrainGuidLink",
+          "description": "The default shading-class link."
         },
         "far": {
-          "$ref": "#/$defs/TerrainGuidLink"
+          "$ref": "#/$defs/TerrainGuidLink",
+          "description": "The far shading-class link."
         },
         "mid": {
-          "$ref": "#/$defs/TerrainGuidLink"
+          "$ref": "#/$defs/TerrainGuidLink",
+          "description": "The mid-range shading-class link."
         }
       },
       "required": [
@@ -10140,48 +10193,62 @@
       "type": "object"
     },
     "ClimateSubAsset": {
+      "description": "One original occurrence in a climate asset’s sub-asset array.",
       "properties": {
         "additionalFields": {
+          "description": "Additional unprojected original fields.",
           "items": {
             "$ref": "#/$defs/RawPlanetAssetMember"
           },
           "type": "array"
         },
         "assetSize": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored asset size."
         },
         "assetSizeY": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored asset size along the Y axis."
         },
         "biomeTag": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored biome tag."
         },
         "entity": {
-          "$ref": "#/$defs/LooseRecordLink"
+          "$ref": "#/$defs/LooseRecordLink",
+          "description": "Candidate header evidence for the entity class Record."
         },
         "entityClass": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The authored entity class Record GUID."
         },
         "entityClassRaw": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original entity class Record GUID text."
         },
         "fallbackPromotionType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored fallback promotion type."
         },
         "geometryPath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored geometry path."
         },
         "gravityAligned": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "The authored gravity alignment flag."
         },
         "groundCover": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "The authored ground cover flag."
         },
         "growthStageBucket": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The authored growth bucket slots."
         },
         "harvestableResource": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The authored loose planet-resource GUID."
         },
         "harvestableResourceLink": {
           "anyOf": [
@@ -10191,76 +10258,99 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Candidate evidence for the authored planet resource."
         },
         "harvestableResourceRaw": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original planet-resource GUID text."
         },
         "harvestableSetup": {
-          "$ref": "#/$defs/LooseRecordLink"
+          "$ref": "#/$defs/LooseRecordLink",
+          "description": "Candidate header evidence for the harvestable setup Record."
         },
         "harvestableSetupRecord": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The authored harvestable setup Record GUID."
         },
         "harvestableSetupRecordRaw": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original harvestable setup Record GUID text."
         },
         "issues": {
+          "description": "Source issues observed for this occurrence.",
           "items": {
             "$ref": "#/$defs/DefinitionIssue"
           },
           "type": "array"
         },
         "lodRatio": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored level-of-detail ratio."
         },
         "materialPath": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored material path."
         },
         "opacity": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored opacity."
         },
         "promotionType": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored promotion type."
         },
         "randomRotationMax": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The authored upper random rotation."
         },
         "randomRotationMin": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The authored lower random rotation."
         },
         "randomRotationQuantization": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The authored random rotation quantization."
         },
         "randomScale": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The authored random scale."
         },
         "randomZOffsetMax": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored upper random Z offset."
         },
         "randomZOffsetMin": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored lower random Z offset."
         },
         "slopeAlignmentAmount": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored slope alignment amount."
         },
         "spawnOceanSurface": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "The authored ocean-surface spawn flag."
         },
         "sunShadowMode": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored sun shadow mode."
         },
         "useGroundCoverCoverage": {
-          "$ref": "#/$defs/SourcedValueOfboolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "The authored ground-cover coverage flag."
         },
         "variantProportion": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored variant proportion."
         },
         "wheeledCollisionMode": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored wheeled collision mode."
         },
         "widthFromBaseToTopMultiplier": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The authored width multipliers from base to top."
         }
       },
       "required": [
@@ -19468,12 +19558,15 @@
       "type": "object"
     },
     "GeologyAssetSlot": {
+      "description": "A positioned asset GUID relation in a geology set.",
       "properties": {
         "link": {
-          "$ref": "#/$defs/TerrainGuidLink"
+          "$ref": "#/$defs/TerrainGuidLink",
+          "description": "The GUID resolution outcome for this slot."
         },
         "ordinal": {
-          "$ref": "#/$defs/DecimalU64"
+          "$ref": "#/$defs/DecimalU64",
+          "description": "The physical position in the original array."
         }
       },
       "required": [
@@ -19616,36 +19709,46 @@
       "description": "Original geology asset selections, probabilities and texture-set declaration.",
       "properties": {
         "additionalFields": {
+          "description": "Additional unprojected original fields.",
           "items": {
             "$ref": "#/$defs/RawPlanetAssetMember"
           },
           "type": "array"
         },
         "cliffAssets": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfGuid",
+          "description": "The ordered authored cliff asset GUID slots."
         },
         "cliffAssetsRaw": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfstring",
+          "description": "The original cliff asset GUID text at each slot."
         },
         "cliffProbability": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored cliff probability."
         },
         "geologyTextureSetGuid": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The authored geology texture-set GUID."
         },
         "geologyTextureSetGuidRaw": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original geology texture-set GUID text."
         },
         "guid": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The parsed owner GUID."
         },
         "guidRaw": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original owner GUID text."
         },
         "identity": {
-          "$ref": "#/$defs/PhysicalEntryIdentity"
+          "$ref": "#/$defs/PhysicalEntryIdentity",
+          "description": "The physical Entry that owns this definition."
         },
         "issues": {
+          "description": "Source issues observed in this owner selection.",
           "items": {
             "$ref": "#/$defs/DefinitionIssue"
           },
@@ -19659,19 +19762,24 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "The selected terrain GUID links in the original slot order."
         },
         "scatteredAssets": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfGuid",
+          "description": "The ordered authored scattered asset GUID slots."
         },
         "scatteredAssetsRaw": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfstring",
+          "description": "The original scattered asset GUID text at each slot."
         },
         "sizeNumberOfAssets": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The authored asset counts by size slot."
         },
         "sizeProbabilities": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The authored probabilities by size slot."
         }
       },
       "required": [
@@ -19694,8 +19802,10 @@
       "type": "object"
     },
     "GeologySetLinks": {
+      "description": "Original asset and texture-set GUID relations declared by a geology set.",
       "properties": {
         "cliffAssets": {
+          "description": "Candidate evidence for the authored cliff asset slots.",
           "items": {
             "$ref": "#/$defs/GeologyAssetSlot"
           },
@@ -19705,9 +19815,11 @@
           ]
         },
         "geologyTextureSet": {
-          "$ref": "#/$defs/TerrainGuidLink"
+          "$ref": "#/$defs/TerrainGuidLink",
+          "description": "Candidate evidence for the authored geology texture set."
         },
         "scatteredAssets": {
+          "description": "Candidate evidence for the authored scattered asset slots.",
           "items": {
             "$ref": "#/$defs/GeologyAssetSlot"
           },
@@ -19756,21 +19868,26 @@
       "type": "object"
     },
     "GeologyTextureSet": {
+      "description": "Original material layers, texture selectors and geology surface parameters.",
       "properties": {
         "additionalFields": {
+          "description": "Additional unprojected original fields.",
           "items": {
             "$ref": "#/$defs/RawPlanetAssetMember"
           },
           "type": "array"
         },
         "aggregateBleed": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored aggregate bleed."
         },
         "aggregateSubstrateSpread": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored aggregate substrate spread."
         },
         "biplanarLayers": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfTextureLayer"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfTextureLayer",
+          "description": "The authored biplanar layers in source slot order."
         },
         "biplanarTextures": {
           "anyOf": [
@@ -19780,16 +19897,20 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Directory lookup receipts for the biplanar textures."
         },
         "gradientMidPoint": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored gradient midpoint."
         },
         "gradientNoiseRange": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored gradient noise range."
         },
         "groundLayers": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfGroundLayer"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfGroundLayer",
+          "description": "The authored ground material layers in source slot order."
         },
         "groundTextures": {
           "anyOf": [
@@ -19799,40 +19920,51 @@
             {
               "type": "null"
             }
-          ]
+          ],
+          "description": "Directory lookup receipts for the ground textures."
         },
         "guid": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The parsed owner GUID."
         },
         "guidRaw": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original owner GUID text."
         },
         "identity": {
-          "$ref": "#/$defs/PhysicalEntryIdentity"
+          "$ref": "#/$defs/PhysicalEntryIdentity",
+          "description": "The physical Entry that owns this definition."
         },
         "issues": {
+          "description": "Source issues observed in this owner selection.",
           "items": {
             "$ref": "#/$defs/DefinitionIssue"
           },
           "type": "array"
         },
         "maxRoughness": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored maximum roughness."
         },
         "minRoughness": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored minimum roughness."
         },
         "screeContentPerLayer": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The authored scree content by layer slot."
         },
         "screeMaxRoughness": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored maximum scree roughness."
         },
         "screeMinRoughness": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored minimum scree roughness."
         },
         "screeSpread": {
-          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfCatalogJsonNumber",
+          "description": "The authored scree spread."
         }
       },
       "required": [
@@ -35836,33 +35968,42 @@
       "description": "Original physical climate-asset definitions and ordered declarations.",
       "properties": {
         "additionalFields": {
+          "description": "Additional unprojected original fields.",
           "items": {
             "$ref": "#/$defs/RawPlanetAssetMember"
           },
           "type": "array"
         },
         "appearance": {
-          "$ref": "#/$defs/ClimateAppearance"
+          "$ref": "#/$defs/ClimateAppearance",
+          "description": "Authored visual selectors and their shading-class links."
         },
         "audioOffset": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfCatalogJsonNumber",
+          "description": "The original procedural audio offset."
         },
         "envelope": {
-          "$ref": "#/$defs/ClimateEnvelope"
+          "$ref": "#/$defs/ClimateEnvelope",
+          "description": "Authored climate and placement limits."
         },
         "growth": {
-          "$ref": "#/$defs/ClimateGrowth"
+          "$ref": "#/$defs/ClimateGrowth",
+          "description": "Authored density and growth settings."
         },
         "guid": {
-          "$ref": "#/$defs/SourcedValueOfGuid"
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The parsed climate-asset GUID."
         },
         "guidRaw": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The original climate-asset GUID text."
         },
         "identity": {
-          "$ref": "#/$defs/PhysicalEntryIdentity"
+          "$ref": "#/$defs/PhysicalEntryIdentity",
+          "description": "The physical Entry that owns the definition."
         },
         "issues": {
+          "description": "Source issues observed in this owner selection.",
           "items": {
             "$ref": "#/$defs/DefinitionIssue"
           },
@@ -35870,10 +36011,12 @@
         },
         "proceduralAudio": {
           "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The authored procedural audio selector.",
           "x-gameText": true
         },
         "subAssets": {
-          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfClimateSubAsset"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfClimateSubAsset",
+          "description": "Authored sub-assets in original slot order."
         }
       },
       "required": [

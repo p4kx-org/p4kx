@@ -13,7 +13,7 @@ use super::terrain_layers::{
 use crate::catalog_read::entry_json_object::{self, EntryJsonObject};
 use crate::catalog_read::loose_archive_path;
 use crate::catalog_read::loose_definition::{
-    self, DefinitionFamily, DefinitionIssue, LooseDefinition,
+    self, DefinitionFamily, DefinitionIssue, LooseDefinition, Selection,
 };
 use crate::catalog_read::original::{EntryCapture, PhysicalEntryIdentity};
 use crate::catalog_table::CatalogTable;
@@ -47,26 +47,47 @@ pub(crate) type GeologyTextureSetTable = CatalogTable<GeologyTextureSet>;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct GeologyTextureSet {
-    identity: PhysicalEntryIdentity,
-    guid: SourcedValue<CatalogGuid>,
-    guid_raw: SourcedValue<String>,
-    ground_layers: GroundLayers,
-    biplanar_layers: TextureLayers,
-    ground_textures: Option<LayerTextureLinks>,
-    biplanar_textures: Option<LayerTextureLinks>,
-    scree_content_per_layer: NumericSlots,
-    min_roughness: Number,
-    max_roughness: Number,
-    aggregate_bleed: Number,
-    aggregate_substrate_spread: Number,
-    scree_min_roughness: Number,
-    scree_max_roughness: Number,
-    scree_spread: Number,
-    gradient_mid_point: Number,
-    gradient_noise_range: Number,
-    additional_fields: Vec<RawPlanetAssetMember>,
-    issues: Vec<DefinitionIssue>,
+/// Original material layers, texture selectors and geology surface parameters.
+#[non_exhaustive]
+pub struct GeologyTextureSet {
+    /// The physical Entry that owns this definition.
+    pub identity: PhysicalEntryIdentity,
+    /// The parsed owner GUID.
+    pub guid: SourcedValue<CatalogGuid>,
+    /// The original owner GUID text.
+    pub guid_raw: SourcedValue<String>,
+    /// The authored ground material layers in source slot order.
+    pub ground_layers: GroundLayers,
+    /// The authored biplanar layers in source slot order.
+    pub biplanar_layers: TextureLayers,
+    /// Directory lookup receipts for the ground textures.
+    pub ground_textures: Option<LayerTextureLinks>,
+    /// Directory lookup receipts for the biplanar textures.
+    pub biplanar_textures: Option<LayerTextureLinks>,
+    /// The authored scree content by layer slot.
+    pub scree_content_per_layer: NumericSlots,
+    /// The authored minimum roughness.
+    pub min_roughness: Number,
+    /// The authored maximum roughness.
+    pub max_roughness: Number,
+    /// The authored aggregate bleed.
+    pub aggregate_bleed: Number,
+    /// The authored aggregate substrate spread.
+    pub aggregate_substrate_spread: Number,
+    /// The authored minimum scree roughness.
+    pub scree_min_roughness: Number,
+    /// The authored maximum scree roughness.
+    pub scree_max_roughness: Number,
+    /// The authored scree spread.
+    pub scree_spread: Number,
+    /// The authored gradient midpoint.
+    pub gradient_mid_point: Number,
+    /// The authored gradient noise range.
+    pub gradient_noise_range: Number,
+    /// Additional unprojected original fields.
+    pub additional_fields: Vec<RawPlanetAssetMember>,
+    /// Source issues observed in this owner selection.
+    pub issues: Vec<DefinitionIssue>,
 }
 
 impl LooseDefinition for GeologyTextureSet {
@@ -86,13 +107,25 @@ pub(crate) fn read(
     options: &CatalogOptions<'_>,
     paths: &mut loose_archive_path::Resolver<'_, '_, '_>,
 ) -> Result<GeologyTextureSetTable, CatalogError> {
+    read_selected(archive, capture, ledger, options, paths, Selection::All)
+}
+
+pub(crate) fn read_selected(
+    archive: &Archive,
+    capture: &EntryCapture<'_>,
+    ledger: &mut ExportLedger,
+    options: &CatalogOptions<'_>,
+    paths: &mut loose_archive_path::Resolver<'_, '_, '_>,
+    selection: Selection<'_>,
+) -> Result<GeologyTextureSetTable, CatalogError> {
     let mut resolver = LayerResolver::new(paths, options.cancel);
-    loose_definition::read(
+    loose_definition::read_selected(
         archive,
         capture,
         ledger,
         options,
         FAMILY,
+        selection,
         |identity, object| GeologyTextureSet::project(identity, object, &mut resolver),
     )
 }

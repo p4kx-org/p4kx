@@ -1,22 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataForge, SourcedValue};
+use p4kx_extraction::{SourceUses, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::planet_asset_raw_fields::{self, RawPlanetAssetMember};
 use super::terrain_guid_link::{self, TerrainGuidIndex, TerrainGuidLink};
-use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::catalog_json_number::CatalogJsonNumber;
 use crate::catalog_read::entry_json_object::{self, EntryJsonObject};
 use crate::catalog_read::loose_definition::{self, DefinitionIssue};
-use crate::catalog_read::loose_record_link::{self, LooseRecordLink};
+use crate::catalog_read::loose_record_link::{self, GuidRecordLookup, LooseRecordLink};
 use crate::catalog_read::original::EntryCapture;
 use crate::catalog_read::parsed_entry_json;
 use crate::guid_text::CatalogGuid;
 use crate::schema_fields::every_field_required;
-use crate::{CatalogError, CatalogOptions, Kind};
+use crate::{CatalogError, Kind};
 
 type Number = SourcedValue<CatalogJsonNumber>;
 type Vector = SourcedValue<Vec<Number>>;
@@ -24,43 +23,81 @@ type Vector = SourcedValue<Vec<Number>>;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ClimateSubAsset {
-    asset_size: Number,
-    asset_size_y: Number,
-    gravity_aligned: SourcedValue<bool>,
-    ground_cover: SourcedValue<bool>,
-    biome_tag: Number,
-    spawn_ocean_surface: SourcedValue<bool>,
-    use_ground_cover_coverage: SourcedValue<bool>,
-    fallback_promotion_type: SourcedValue<String>,
-    entity_class: SourcedValue<CatalogGuid>,
-    entity_class_raw: SourcedValue<String>,
-    entity: LooseRecordLink,
-    promotion_type: SourcedValue<String>,
-    random_z_offset_max: Number,
-    random_z_offset_min: Number,
-    slope_alignment_amount: Number,
-    geometry_path: SourcedValue<String>,
-    harvestable_resource: SourcedValue<CatalogGuid>,
-    harvestable_resource_raw: SourcedValue<String>,
-    harvestable_resource_link: Option<TerrainGuidLink>,
-    harvestable_setup_record: SourcedValue<CatalogGuid>,
-    harvestable_setup_record_raw: SourcedValue<String>,
-    harvestable_setup: LooseRecordLink,
-    lod_ratio: Number,
-    material_path: SourcedValue<String>,
-    growth_stage_bucket: Vector,
-    opacity: Number,
-    sun_shadow_mode: SourcedValue<String>,
-    variant_proportion: Number,
-    random_rotation_max: Vector,
-    random_rotation_min: Vector,
-    random_rotation_quantization: Vector,
-    random_scale: Vector,
-    width_from_base_to_top_multiplier: Vector,
-    wheeled_collision_mode: SourcedValue<String>,
-    additional_fields: Vec<RawPlanetAssetMember>,
-    issues: Vec<DefinitionIssue>,
+/// One original occurrence in a climate asset’s sub-asset array.
+#[non_exhaustive]
+pub struct ClimateSubAsset {
+    /// The authored asset size.
+    pub asset_size: Number,
+    /// The authored asset size along the Y axis.
+    pub asset_size_y: Number,
+    /// The authored gravity alignment flag.
+    pub gravity_aligned: SourcedValue<bool>,
+    /// The authored ground cover flag.
+    pub ground_cover: SourcedValue<bool>,
+    /// The authored biome tag.
+    pub biome_tag: Number,
+    /// The authored ocean-surface spawn flag.
+    pub spawn_ocean_surface: SourcedValue<bool>,
+    /// The authored ground-cover coverage flag.
+    pub use_ground_cover_coverage: SourcedValue<bool>,
+    /// The authored fallback promotion type.
+    pub fallback_promotion_type: SourcedValue<String>,
+    /// The authored entity class Record GUID.
+    pub entity_class: SourcedValue<CatalogGuid>,
+    /// The original entity class Record GUID text.
+    pub entity_class_raw: SourcedValue<String>,
+    /// Candidate header evidence for the entity class Record.
+    pub entity: LooseRecordLink,
+    /// The authored promotion type.
+    pub promotion_type: SourcedValue<String>,
+    /// The authored upper random Z offset.
+    pub random_z_offset_max: Number,
+    /// The authored lower random Z offset.
+    pub random_z_offset_min: Number,
+    /// The authored slope alignment amount.
+    pub slope_alignment_amount: Number,
+    /// The authored geometry path.
+    pub geometry_path: SourcedValue<String>,
+    /// The authored loose planet-resource GUID.
+    pub harvestable_resource: SourcedValue<CatalogGuid>,
+    /// The original planet-resource GUID text.
+    pub harvestable_resource_raw: SourcedValue<String>,
+    /// Candidate evidence for the authored planet resource.
+    pub harvestable_resource_link: Option<TerrainGuidLink>,
+    /// The authored harvestable setup Record GUID.
+    pub harvestable_setup_record: SourcedValue<CatalogGuid>,
+    /// The original harvestable setup Record GUID text.
+    pub harvestable_setup_record_raw: SourcedValue<String>,
+    /// Candidate header evidence for the harvestable setup Record.
+    pub harvestable_setup: LooseRecordLink,
+    /// The authored level-of-detail ratio.
+    pub lod_ratio: Number,
+    /// The authored material path.
+    pub material_path: SourcedValue<String>,
+    /// The authored growth bucket slots.
+    pub growth_stage_bucket: Vector,
+    /// The authored opacity.
+    pub opacity: Number,
+    /// The authored sun shadow mode.
+    pub sun_shadow_mode: SourcedValue<String>,
+    /// The authored variant proportion.
+    pub variant_proportion: Number,
+    /// The authored upper random rotation.
+    pub random_rotation_max: Vector,
+    /// The authored lower random rotation.
+    pub random_rotation_min: Vector,
+    /// The authored random rotation quantization.
+    pub random_rotation_quantization: Vector,
+    /// The authored random scale.
+    pub random_scale: Vector,
+    /// The authored width multipliers from base to top.
+    pub width_from_base_to_top_multiplier: Vector,
+    /// The authored wheeled collision mode.
+    pub wheeled_collision_mode: SourcedValue<String>,
+    /// Additional unprojected original fields.
+    pub additional_fields: Vec<RawPlanetAssetMember>,
+    /// Source issues observed for this occurrence.
+    pub issues: Vec<DefinitionIssue>,
 }
 
 struct RecordLinks {
@@ -76,9 +113,8 @@ struct RecordLinks {
 impl RecordLinks {
     fn read(
         o: &EntryJsonObject<'_, '_>,
-        forge: &DataForge<'_>,
-        original: &OriginalCatalogInput<'_, '_>,
-        options: &CatalogOptions<'_>,
+        sources: &SourceUses,
+        lookup: &mut GuidRecordLookup<'_>,
     ) -> Result<Self, CatalogError> {
         let entity_class = o.field("entityClass", entry_json_object::guid)?;
         let entity_class_raw = o.field("entityClass", entry_json_object::text)?;
@@ -86,21 +122,19 @@ impl RecordLinks {
             o.field("harvestableSetupRecord", entry_json_object::guid)?;
         let harvestable_setup_record_raw =
             o.field("harvestableSetupRecord", entry_json_object::text)?;
-        let entity = loose_record_link::by_guid(
-            forge,
-            original,
-            options,
+        let entity = loose_record_link::by_guid_using(
+            sources,
             &entity_class,
             &entity_class_raw,
             "EntityClassDefinition",
+            lookup,
         )?;
-        let harvestable_setup = loose_record_link::by_guid(
-            forge,
-            original,
-            options,
+        let harvestable_setup = loose_record_link::by_guid_using(
+            sources,
             &harvestable_setup_record,
             &harvestable_setup_record_raw,
             "HarvestableSetup",
+            lookup,
         )?;
         let mut issues = Vec::new();
         for (field, state) in [
@@ -156,11 +190,10 @@ impl ClimateSubAsset {
 
     pub(crate) fn read(
         o: &EntryJsonObject<'_, '_>,
-        forge: &DataForge<'_>,
-        original: &OriginalCatalogInput<'_, '_>,
-        options: &CatalogOptions<'_>,
+        sources: &SourceUses,
+        lookup: &mut GuidRecordLookup<'_>,
     ) -> Result<Self, CatalogError> {
-        let links = RecordLinks::read(o, forge, original, options)?;
+        let links = RecordLinks::read(o, sources, lookup)?;
         Ok(Self {
             asset_size: o.field("assetSize", entry_json_object::number)?,
             asset_size_y: o.field("assetSizeY", entry_json_object::number)?,

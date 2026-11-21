@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    CancelToken, DataForge, Filter, Guid, Record, SourceValue, SourceValueState, SourcedValue,
+    CancelToken, DataForge, Filter, Guid, Record, SourceUses, SourceValue, SourceValueState,
+    SourcedValue,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -19,7 +20,8 @@ use crate::{CatalogError, CatalogOptions};
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct LooseRecordLink {
+#[non_exhaustive]
+pub struct LooseRecordLink {
     pub(crate) state: SourcedValue<LooseArchivePathState>,
     pub(crate) candidates: Vec<LooseRecordCandidate>,
 }
@@ -64,6 +66,23 @@ impl LooseRecordCandidate {
     }
 }
 
+impl LooseRecordLink {
+    /// Borrows the sourced resolution state of the original Record reference.
+    #[must_use]
+    pub const fn state(&self) -> &SourcedValue<LooseArchivePathState> {
+        &self.state
+    }
+
+    /// Borrows the original physical Record header candidates.
+    #[must_use]
+    pub const fn candidates(&self) -> &[LooseRecordCandidate] {
+        self.candidates.as_slice()
+    }
+}
+
+pub(crate) type GuidRecordLookup<'query> = dyn FnMut(Guid, &SourcedValue<CatalogGuid>, &str) -> Result<LooseRecordLink, CatalogError>
+    + 'query;
+
 pub(crate) fn by_guid(
     forge: &DataForge<'_>,
     original: &OriginalCatalogInput<'_, '_>,
@@ -72,15 +91,33 @@ pub(crate) fn by_guid(
     raw: &SourcedValue<String>,
     expected_type: &str,
 ) -> Result<LooseRecordLink, CatalogError> {
+    by_guid_using(
+        &original.origins().uses,
+        selector,
+        raw,
+        expected_type,
+        &mut |guid, selector, expected_type| {
+            resolve(
+                selector,
+                original,
+                forge.records_by_guid(guid),
+                expected_type,
+                options.filter,
+                options.cancel,
+            )
+        },
+    )
+}
+
+pub(crate) fn by_guid_using(
+    sources: &SourceUses,
+    selector: &SourcedValue<CatalogGuid>,
+    raw: &SourcedValue<String>,
+    expected_type: &str,
+    lookup: &mut GuidRecordLookup<'_>,
+) -> Result<LooseRecordLink, CatalogError> {
     if let Some(guid) = selector.value().filter(|guid| guid.0 != Guid::default()) {
-        return resolve(
-            selector,
-            original,
-            forge.records_by_guid(guid.0),
-            expected_type,
-            options.filter,
-            options.cancel,
-        );
+        return lookup(guid.0, selector, expected_type);
     }
     let state = match (selector.state(), raw.value()) {
         (SourceValueState::Absent, _) => LooseArchivePathState::Absent,
@@ -90,12 +127,27 @@ pub(crate) fn by_guid(
         _ => LooseArchivePathState::Invalid,
     };
     Ok(LooseRecordLink {
-        state: original
-            .origins()
-            .uses
-            .value_with_origins(SourceValue::Present(state), &[selector.origin()])?,
+        state: sources.value_with_origins(SourceValue::Present(state), &[selector.origin()])?,
         candidates: Vec::new(),
     })
+}
+
+pub(crate) fn resolve_guid(
+    guid: Guid,
+    selector: &SourcedValue<CatalogGuid>,
+    original: &OriginalCatalogInput<'_, '_>,
+    expected_type: &str,
+    filter: Option<&Filter>,
+    cancel: Option<&CancelToken>,
+) -> Result<LooseRecordLink, CatalogError> {
+    resolve(
+        selector,
+        original,
+        original.forge().records_by_guid(guid),
+        expected_type,
+        filter,
+        cancel,
+    )
 }
 
 pub(crate) fn resolve<'record, T>(

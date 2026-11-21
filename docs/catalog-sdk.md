@@ -92,6 +92,18 @@ their own origins. Texture paths consult directory Entries and never open
 texture payloads. These queries require no DataForge or localization. The
 returned data describes the selected original definitions.
 
+## Original geology definitions
+
+`catalog_queries::terrain::read_geology_sets` and
+`read_geology_texture_sets` expose the canonical `/definitions/geologySets` and
+`/definitions/geologyTextureSets` rows. Both accept all, GUID, Archive path or
+physical Entry index selection and return field origins and scoped diagnostics.
+
+Geology sets retain the original asset order, numeric tokens and candidate evidence.
+Nonzero linked GUIDs use the canonical four terrain families. Texture sets retain
+the ground and biplanar layers and use the Archive directory to resolve texture
+selectors. Both queries work without DataForge and leave texture payloads unopened.
+
 ## Original soil definitions
 
 Use `soils::read_soils` or `soils::read_soil_texture_sets` for `definitions.soils`
@@ -141,6 +153,20 @@ when the path identifies one Entry. Use `installed_planet_resource_sdk_proves_ex
 when the path is absent. Run either filter with
 `cargo test -p p4kx-export --lib <test-filter> -- --ignored --nocapture`. The tests verify the
 archived source or the complete directory lookup and report only the Build and definition count.
+
+## Original climate assets
+
+`catalog_queries::climate::read_climate_assets` reads `/definitions/climateAssets`
+by owner GUID, Archive path, physical Entry index or all owners. The typed rows
+include authored growth buckets, climate ranges, shading roles and original
+sub-asset slots. The matching loose resource and shading GUIDs use the same
+candidate evidence as the Catalog.
+
+The standalone query opens DataForge when a selected sub-asset declares a nonzero
+Record GUID. The SDK correlates the GUID with the original Record headers.
+Applications that already have a query session can reuse its parsed DataForge.
+Geometry, material and audio fields retain their authored values. Media payloads
+stay unopened.
 
 ## Radar audio configuration
 

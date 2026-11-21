@@ -77,9 +77,7 @@ pub(crate) fn read(
             archive, forge, original, capture, ledger, options,
         )?,
         creatures: planet_creature::read(archive, forge, original, capture, ledger, options)?,
-        climate_assets: planet_climate_asset::read(
-            archive, forge, original, capture, ledger, options,
-        )?,
+        climate_assets: planet_climate_asset::read(archive, original, capture, ledger, options)?,
         geology_assets: planet_geology_asset::read(
             archive, forge, original, capture, ledger, options,
         )?,
@@ -104,26 +102,20 @@ impl PlanetTechDefinitions {
         ledger: &mut ExportLedger,
         options: &CatalogOptions<'_>,
     ) -> Result<(), CatalogError> {
-        let mut wanted = HashSet::<CatalogGuid>::new();
-        for guid in self
-            .geology_sets
-            .rows
-            .iter()
-            .flat_map(geology_set::GeologySet::required_guids)
-            .chain(self.soils.rows.iter().flat_map(soil::Soil::required_guids))
-            .chain(
-                self.climate_assets
-                    .rows
-                    .iter()
-                    .flat_map(PlanetClimateAsset::required_shading_guids),
-            )
-        {
-            parsed_entry_json::check_cancel(options.cancel)?;
-            wanted
-                .try_reserve(1)
-                .map_err(CatalogError::JsonSourceAllocation)?;
-            wanted.insert(guid);
-        }
+        let wanted = requested_terrain_guids(
+            self.geology_sets
+                .rows
+                .iter()
+                .flat_map(geology_set::GeologySet::required_guids)
+                .chain(self.soils.rows.iter().flat_map(soil::Soil::required_guids))
+                .chain(
+                    self.climate_assets
+                        .rows
+                        .iter()
+                        .flat_map(PlanetClimateAsset::required_shading_guids),
+                ),
+            options.cancel,
+        )?;
         let index = TerrainGuidIndex::read(
             archive,
             capture,
@@ -146,6 +138,21 @@ impl PlanetTechDefinitions {
         }
         Ok(())
     }
+}
+
+pub(crate) fn requested_terrain_guids(
+    guids: impl IntoIterator<Item = CatalogGuid>,
+    cancel: Option<&p4kx_extraction::CancelToken>,
+) -> Result<HashSet<CatalogGuid>, CatalogError> {
+    let mut wanted = HashSet::new();
+    for guid in guids {
+        parsed_entry_json::check_cancel(cancel)?;
+        wanted
+            .try_reserve(1)
+            .map_err(CatalogError::JsonSourceAllocation)?;
+        wanted.insert(guid);
+    }
+    Ok(wanted)
 }
 
 /// Original definition families that can contribute terrain GUID candidates.

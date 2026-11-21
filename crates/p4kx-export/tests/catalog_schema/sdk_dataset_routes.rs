@@ -34,6 +34,8 @@ mod blueprint_taxonomy;
 mod cargo;
 #[path = "sdk_client_profile_route.rs"]
 mod client_profiles;
+#[path = "sdk_climate_asset_route.rs"]
+mod climate_assets;
 #[path = "sdk_commodity_routes.rs"]
 mod commodities;
 #[path = "sdk_component_definition_routes.rs"]
@@ -169,6 +171,7 @@ pub(super) fn world_datasets() -> impl Iterator<Item = &'static str> {
         .into_iter()
         .chain(soils::DATASETS)
         .chain(terrain::DATASETS)
+        .chain([climate_assets::DATASET])
 }
 
 pub(super) fn read() -> TestResult<Vec<Route>> {
@@ -250,6 +253,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.push(mineable_entity::read()?);
     routes.extend(mining_families::read()?);
     routes.push(planet_resource::read()?);
+    routes.push(climate_assets::read()?);
     routes.extend(component_tools::read()?);
     routes.extend(authored_reputation::read()?);
     routes.extend(weapon_sources::read()?);

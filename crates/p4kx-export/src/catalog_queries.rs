@@ -120,6 +120,8 @@ pub mod localization;
 #[path = "shop_inventory_query.rs"]
 pub mod shops;
 
+#[path = "lazy_loose_records.rs"]
+mod lazy_loose_records;
 #[path = "loose_definition_query.rs"]
 mod loose_definitions;
 pub use crate::catalog_read::loose_definition::LooseDefinitionSelection;
@@ -130,6 +132,9 @@ pub mod soils;
 
 #[path = "terrain_query.rs"]
 pub mod terrain;
+
+#[path = "climate_asset_query.rs"]
+pub mod climate;
 
 #[path = "planet_resource_query.rs"]
 pub mod planet_resources;

@@ -3,8 +3,6 @@
 
 //! Selective access to original loose soil definitions.
 
-use std::collections::HashSet;
-
 use p4kx_extraction::{Archive, CancelToken};
 
 use super::loose_definitions::{self, LooseDefinitionSnapshot};
@@ -49,7 +47,10 @@ pub fn read_soils(
         Kind::Soils,
         |capture, ledger, options| {
             let mut table = soil::read_selected(archive, capture, ledger, options, selection)?;
-            let wanted = wanted_texture_sets(&table.rows, cancel)?;
+            let wanted = planet_tech_definitions::requested_terrain_guids(
+                table.rows.iter().flat_map(Soil::required_guids),
+                cancel,
+            )?;
             let index = planet_tech_definitions::TerrainGuidIndex::read(
                 archive,
                 capture,
@@ -90,19 +91,4 @@ pub fn read_soil_texture_sets(
             )
         },
     )
-}
-
-fn wanted_texture_sets(
-    rows: &[Soil],
-    cancel: Option<&CancelToken>,
-) -> Result<HashSet<CatalogGuid>, CatalogError> {
-    let mut wanted = HashSet::new();
-    for guid in rows.iter().flat_map(Soil::required_guids) {
-        checkpoint(cancel)?;
-        wanted
-            .try_reserve(1)
-            .map_err(CatalogError::JsonSourceAllocation)?;
-        wanted.insert(guid);
-    }
-    Ok(wanted)
 }

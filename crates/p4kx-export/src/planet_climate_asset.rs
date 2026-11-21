@@ -3,7 +3,7 @@
 
 use std::collections::HashSet;
 
-use p4kx_extraction::{Archive, DataForge, Guid, SourcedValue};
+use p4kx_extraction::{Archive, Guid, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -16,8 +16,9 @@ use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::catalog_json_number::CatalogJsonNumber;
 use crate::catalog_read::entry_json_object;
 use crate::catalog_read::loose_definition::{
-    self, DefinitionFamily, DefinitionIssue, LooseDefinition,
+    self, DefinitionFamily, DefinitionIssue, LooseDefinition, Selection,
 };
+use crate::catalog_read::loose_record_link::{self, GuidRecordLookup};
 use crate::catalog_read::original::{EntryCapture, PhysicalEntryIdentity};
 use crate::catalog_read::parsed_entry_json;
 use crate::catalog_table::CatalogTable;
@@ -38,27 +39,39 @@ pub(super) const FAMILY: DefinitionFamily = DefinitionFamily::new(
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct PlanetClimateAsset {
-    identity: PhysicalEntryIdentity,
-    guid: SourcedValue<CatalogGuid>,
-    guid_raw: SourcedValue<String>,
-    appearance: ClimateAppearance,
-    envelope: ClimateEnvelope,
-    growth: ClimateGrowth,
-    sub_assets: SourcedValue<Vec<SourcedValue<ClimateSubAsset>>>,
-    audio_offset: SourcedValue<Vec<SourcedValue<CatalogJsonNumber>>>,
+#[non_exhaustive]
+pub struct PlanetClimateAsset {
+    /// The physical Entry that owns the definition.
+    pub identity: PhysicalEntryIdentity,
+    /// The parsed climate-asset GUID.
+    pub guid: SourcedValue<CatalogGuid>,
+    /// The original climate-asset GUID text.
+    pub guid_raw: SourcedValue<String>,
+    /// Authored visual selectors and their shading-class links.
+    pub appearance: ClimateAppearance,
+    /// Authored climate and placement limits.
+    pub envelope: ClimateEnvelope,
+    /// Authored density and growth settings.
+    pub growth: ClimateGrowth,
+    /// Authored sub-assets in original slot order.
+    pub sub_assets: SourcedValue<Vec<SourcedValue<ClimateSubAsset>>>,
+    /// The original procedural audio offset.
+    pub audio_offset: SourcedValue<Vec<SourcedValue<CatalogJsonNumber>>>,
     #[schemars(extend("x-gameText" = true))]
-    procedural_audio: SourcedValue<String>,
-    additional_fields: Vec<RawPlanetAssetMember>,
-    issues: Vec<DefinitionIssue>,
+    /// The authored procedural audio selector.
+    pub procedural_audio: SourcedValue<String>,
+    /// Additional unprojected original fields.
+    pub additional_fields: Vec<RawPlanetAssetMember>,
+    /// Source issues observed in this owner selection.
+    pub issues: Vec<DefinitionIssue>,
 }
 
 impl PlanetClimateAsset {
-    pub(super) fn required_shading_guids(&self) -> impl Iterator<Item = CatalogGuid> + '_ {
+    pub(crate) fn required_shading_guids(&self) -> impl Iterator<Item = CatalogGuid> + '_ {
         self.appearance.shading_guids()
     }
 
-    pub(super) fn link_shading(
+    pub(crate) fn link_shading(
         &mut self,
         index: &TerrainGuidIndex,
         capture: &EntryCapture<'_>,
@@ -97,18 +110,45 @@ impl LooseDefinition for PlanetClimateAsset {
 
 pub(crate) fn read(
     archive: &Archive,
-    forge: &DataForge<'_>,
     original: &OriginalCatalogInput<'_, '_>,
     capture: &EntryCapture<'_>,
     ledger: &mut ExportLedger,
     options: &CatalogOptions<'_>,
 ) -> Result<CatalogTable<PlanetClimateAsset>, CatalogError> {
-    let table = loose_definition::read(
+    read_selected(
+        archive,
+        capture,
+        ledger,
+        options,
+        Selection::All,
+        &mut |guid, selector, expected_type| {
+            loose_record_link::resolve_guid(
+                guid,
+                selector,
+                original,
+                expected_type,
+                options.filter,
+                options.cancel,
+            )
+        },
+    )
+}
+
+pub(crate) fn read_selected(
+    archive: &Archive,
+    capture: &EntryCapture<'_>,
+    ledger: &mut ExportLedger,
+    options: &CatalogOptions<'_>,
+    selection: Selection<'_>,
+    lookup: &mut GuidRecordLookup<'_>,
+) -> Result<CatalogTable<PlanetClimateAsset>, CatalogError> {
+    let table = loose_definition::read_selected(
         archive,
         capture,
         ledger,
         options,
         FAMILY,
+        selection,
         |identity, input| {
             let o = &input.retaining_unprojected();
             let guid = o.field("GUID", entry_json_object::guid)?;
@@ -123,7 +163,7 @@ pub(crate) fn read(
                 envelope: ClimateEnvelope::read(o)?,
                 growth: ClimateGrowth::read(o)?,
                 sub_assets: o.object_array("subAssets", |asset| {
-                    ClimateSubAsset::read(asset, forge, original, options)
+                    ClimateSubAsset::read(asset, capture.source_uses(), lookup)
                 })?,
                 audio_offset: o.array("vAudioOffset", entry_json_object::number)?,
                 procedural_audio: o.field("sProceduralAudio", entry_json_object::text)?,

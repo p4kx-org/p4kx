@@ -49,7 +49,7 @@ fn installed_planet_asset_projection_pairs_original_and_output() -> TestResult {
         let mut options = CatalogOptions::new(UNIX_EPOCH);
         options.filter = Some(&climate_filter);
         let climate =
-            planet_climate_asset::read(&archive, forge, original, &capture, &mut ledger, &options)?;
+            planet_climate_asset::read(&archive, original, &capture, &mut ledger, &options)?;
         let geology_filter = Filter::parse(geology_path)?;
         options.filter = Some(&geology_filter);
         let geology =

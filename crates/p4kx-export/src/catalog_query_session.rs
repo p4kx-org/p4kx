@@ -198,7 +198,7 @@ pub(crate) fn checkpoint(cancel: Option<&CancelToken>) -> Result<(), CatalogErro
     }
 }
 
-fn load_error(error: DataForgeLoadError) -> CatalogError {
+pub(crate) fn load_error(error: DataForgeLoadError) -> CatalogError {
     match error {
         DataForgeLoadError::Cancelled => CatalogError::Cancelled,
         other => CatalogError::Load(other),

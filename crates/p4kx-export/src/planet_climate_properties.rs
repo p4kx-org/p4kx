@@ -22,30 +22,55 @@ type GuidField = SourcedValue<CatalogGuid>;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ClimateEnvelope {
-    min_elevation: Number,
-    max_elevation: Number,
-    elevation_curve_impact: Number,
-    elevation_high_curve_impact: Number,
-    min_annual_rainfall: Number,
-    max_annual_rainfall: Number,
-    humidity_curve_impact: Number,
-    min_temperature: Number,
-    max_temperature: Number,
-    temperature_curve_impact: Number,
-    optimal_aggregate_size: Number,
-    aggregate_size_range: Number,
-    bedrock_curve_impact: Number,
-    optimal_luminosity: Number,
-    luminosity_range: Number,
-    luminosity_curve_impact: Number,
-    soil_depth_min: Number,
-    soil_depth_max: Number,
-    soil_depth_curve: Number,
-    biome_mask: Number,
-    soil_exclusion_mask: Number,
-    seed_exclusion_mask: Number,
-    slope_range_deg: Vector,
+/// Authored placement ranges, masks and climate curve settings.
+#[non_exhaustive]
+pub struct ClimateEnvelope {
+    /// The authored lower elevation bound.
+    pub min_elevation: Number,
+    /// The authored upper elevation bound.
+    pub max_elevation: Number,
+    /// The authored elevation curve impact.
+    pub elevation_curve_impact: Number,
+    /// The authored high-elevation curve impact.
+    pub elevation_high_curve_impact: Number,
+    /// The authored lower annual rainfall bound.
+    pub min_annual_rainfall: Number,
+    /// The authored upper annual rainfall bound.
+    pub max_annual_rainfall: Number,
+    /// The authored humidity curve impact.
+    pub humidity_curve_impact: Number,
+    /// The authored lower temperature bound.
+    pub min_temperature: Number,
+    /// The authored upper temperature bound.
+    pub max_temperature: Number,
+    /// The authored temperature curve impact.
+    pub temperature_curve_impact: Number,
+    /// The authored optimal aggregate size.
+    pub optimal_aggregate_size: Number,
+    /// The authored aggregate size range.
+    pub aggregate_size_range: Number,
+    /// The authored bedrock curve impact.
+    pub bedrock_curve_impact: Number,
+    /// The authored optimal luminosity.
+    pub optimal_luminosity: Number,
+    /// The authored luminosity range.
+    pub luminosity_range: Number,
+    /// The authored luminosity curve impact.
+    pub luminosity_curve_impact: Number,
+    /// The authored minimum soil depth.
+    pub soil_depth_min: Number,
+    /// The authored maximum soil depth.
+    pub soil_depth_max: Number,
+    /// The authored soil depth curve.
+    pub soil_depth_curve: Number,
+    /// The authored biome mask.
+    pub biome_mask: Number,
+    /// The authored soil exclusion mask.
+    pub soil_exclusion_mask: Number,
+    /// The authored seed exclusion mask.
+    pub seed_exclusion_mask: Number,
+    /// The authored slope range in degrees.
+    pub slope_range_deg: Vector,
 }
 
 impl ClimateEnvelope {
@@ -83,25 +108,41 @@ impl ClimateEnvelope {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ClimateAppearance {
-    shading_class: GuidField,
-    shading_class_close: GuidField,
-    shading_class_mid: GuidField,
-    shading_class_far: GuidField,
-    shading_links: Option<ClimateShadingLinks>,
-    debris_path: SourcedValue<String>,
-    far_lut_path: SourcedValue<String>,
-    exclude_from_snow: SourcedValue<bool>,
+/// Authored visual selectors and shading classes.
+#[non_exhaustive]
+pub struct ClimateAppearance {
+    /// The authored default shading-class GUID.
+    pub shading_class: GuidField,
+    /// The authored close shading-class GUID.
+    pub shading_class_close: GuidField,
+    /// The authored mid-range shading-class GUID.
+    pub shading_class_mid: GuidField,
+    /// The authored far shading-class GUID.
+    pub shading_class_far: GuidField,
+    /// Candidate evidence for each authored shading-class selector.
+    pub shading_links: Option<ClimateShadingLinks>,
+    /// The authored debris path.
+    pub debris_path: SourcedValue<String>,
+    /// The authored far lookup table path.
+    pub far_lut_path: SourcedValue<String>,
+    /// The authored snow exclusion flag.
+    pub exclude_from_snow: SourcedValue<bool>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ClimateShadingLinks {
-    pub(super) default: TerrainGuidLink,
-    pub(super) close: TerrainGuidLink,
-    pub(super) mid: TerrainGuidLink,
-    pub(super) far: TerrainGuidLink,
+/// Original resolution evidence for each shading-class distance role.
+#[non_exhaustive]
+pub struct ClimateShadingLinks {
+    /// The default shading-class link.
+    pub default: TerrainGuidLink,
+    /// The close shading-class link.
+    pub close: TerrainGuidLink,
+    /// The mid-range shading-class link.
+    pub mid: TerrainGuidLink,
+    /// The far shading-class link.
+    pub far: TerrainGuidLink,
 }
 
 impl ClimateAppearance {
@@ -147,26 +188,43 @@ impl ClimateAppearance {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ClimateGrowthBucket {
-    shade_density: Number,
-    additional_fields: Vec<RawPlanetAssetMember>,
+/// An original climate growth bucket.
+#[non_exhaustive]
+pub struct ClimateGrowthBucket {
+    /// The authored shade density.
+    pub shade_density: Number,
+    /// Additional unprojected original fields.
+    pub additional_fields: Vec<RawPlanetAssetMember>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ClimateGrowth {
-    dominance: Number,
-    sparsity: Number,
-    vitality_factor: Number,
-    season_offset_range: Number,
-    buckets: SourcedValue<Vec<SourcedValue<ClimateGrowthBucket>>>,
-    historic_growth_factors_size0: Vector,
-    historic_growth_factors_size1: Vector,
-    historic_growth_factors_size2: Vector,
-    historic_growth_mode_a: SourcedValue<String>,
-    historic_growth_mode_b: SourcedValue<String>,
-    historic_growth_mode_c: SourcedValue<String>,
+/// Authored growth, density and seasonal settings.
+#[non_exhaustive]
+pub struct ClimateGrowth {
+    /// The authored dominance setting.
+    pub dominance: Number,
+    /// The authored sparsity setting.
+    pub sparsity: Number,
+    /// The authored vitality factor.
+    pub vitality_factor: Number,
+    /// The authored season offset range.
+    pub season_offset_range: Number,
+    /// The original growth buckets in source slot order.
+    pub buckets: SourcedValue<Vec<SourcedValue<ClimateGrowthBucket>>>,
+    /// The authored historic growth factors for size 0.
+    pub historic_growth_factors_size0: Vector,
+    /// The authored historic growth factors for size 1.
+    pub historic_growth_factors_size1: Vector,
+    /// The authored historic growth factors for size 2.
+    pub historic_growth_factors_size2: Vector,
+    /// The authored historic growth mode A.
+    pub historic_growth_mode_a: SourcedValue<String>,
+    /// The authored historic growth mode B.
+    pub historic_growth_mode_b: SourcedValue<String>,
+    /// The authored historic growth mode C.
+    pub historic_growth_mode_c: SourcedValue<String>,
 }
 
 impl ClimateGrowth {

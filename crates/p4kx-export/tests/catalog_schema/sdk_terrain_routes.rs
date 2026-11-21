@@ -16,9 +16,12 @@ use serde_json::{Value, json};
 
 use super::{Route, TestResult};
 
+#[path = "sdk_geology_routes.rs"]
+mod geology;
+
 const ECOSYSTEMS: &str = "/definitions/ecosystems";
 const SHADING: &str = "/definitions/shadingClasses";
-pub(super) const DATASETS: [&str; 2] = [ECOSYSTEMS, SHADING];
+pub(super) const DATASETS: [&str; 4] = [ECOSYSTEMS, SHADING, geology::SETS, geology::TEXTURE_SETS];
 
 const ECO: &str = "Data/Libs/EcoSystems/fixture.eco";
 const DAMAGED: &str = "Data/Libs/EcoSystems/damaged.eco";
@@ -28,17 +31,21 @@ const ECO_GUID: &str = "cccccccc-0000-0000-0000-000000000101";
 const SHADE_GUID: &str = "cccccccc-0000-0000-0000-000000000102";
 const RAW: &str = r#"{"slots":[1.00,null]}"#;
 
-pub(super) fn read() -> TestResult<[Route; 2]> {
-    let (_folder, archive) = open([
-        TestEntry::stored("Data/Game2.dcb", DataForgeBuilder::new().version(8).build()),
-        TestEntry::stored(
-            "Data/Libs/CosmoTools/LayerRecovery/LayerBackups.xml",
-            b"<LayerBackups/>",
-        ),
-        TestEntry::stored(ECO, ecosystem()).encrypted(),
-        TestEntry::stored(SHADE, shading_class()),
-        media(),
-    ])?;
+pub(super) fn read() -> TestResult<[Route; 4]> {
+    let (_folder, archive) = open(
+        [
+            TestEntry::stored("Data/Game2.dcb", DataForgeBuilder::new().version(8).build()),
+            TestEntry::stored(
+                "Data/Libs/CosmoTools/LayerRecovery/LayerBackups.xml",
+                b"<LayerBackups/>",
+            ),
+            TestEntry::stored(ECO, ecosystem()).encrypted(),
+            TestEntry::stored(SHADE, shading_class()),
+            media(),
+        ]
+        .into_iter()
+        .chain(geology::definitions()),
+    )?;
     let catalog: Value =
         serde_json::from_slice(build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?.json())?;
     let ecosystem = read_ecosystems(&archive, Selection::ArchivePath(ECO), None)?;
@@ -55,6 +62,7 @@ pub(super) fn read() -> TestResult<[Route; 2]> {
         return Err("one scoped shading class".into());
     };
     verify_layer(row)?;
+    let [geology_sets, geology_texture_sets] = geology::read(&archive, &catalog)?;
     Ok([
         parity(
             &catalog,
@@ -63,6 +71,8 @@ pub(super) fn read() -> TestResult<[Route; 2]> {
             &ecosystem.rows,
         )?,
         parity(&catalog, SHADING, shading.availability, &shading.rows)?,
+        geology_sets,
+        geology_texture_sets,
     ])
 }
 
@@ -175,11 +185,15 @@ fn verify_layer(row: &ShadingClass) -> TestResult {
 
 #[test]
 fn exact_ecosystem_scope_ignores_damaged_sibling_and_requires_no_dataforge() -> TestResult {
-    let (_folder, archive) = open([
-        TestEntry::stored(ECO, ecosystem()).encrypted(),
-        TestEntry::stored(DAMAGED, ecosystem()).with_crc32c(0),
-        media(),
-    ])?;
+    let (_folder, archive) = open(
+        [
+            TestEntry::stored(ECO, ecosystem()).encrypted(),
+            TestEntry::stored(DAMAGED, ecosystem()).with_crc32c(0),
+            media(),
+        ]
+        .into_iter()
+        .chain(geology::definitions()),
+    )?;
     let stored_path = ECO.replace('/', "\\");
     let index = archive
         .entries()

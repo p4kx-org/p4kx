@@ -7,9 +7,10 @@ use std::cell::OnceCell;
 use std::time::UNIX_EPOCH;
 
 use p4kx_extraction::{
-    Archive, ArchiveWatch, CancelToken, DataForge, DataForgeEntry, DataForgeLoadError, SourcedValue,
+    Archive, ArchiveWatch, CancelToken, DataForge, DataForgeEntry, SourcedValue,
 };
 
+use super::lazy_loose_records::LazyLooseRecords;
 use super::loose_definitions::{self, LooseDefinitionSnapshot};
 use super::{CatalogLanguageSelection, CatalogQuerySession, ParsedCatalogQueries};
 use crate::build::original_input::OriginalCatalogInput;
@@ -55,29 +56,18 @@ pub fn read_planet_resources(
     watch.check()?;
     let snapshot = with_entry_capture(archive, |capture| {
         let loaded = OnceCell::new();
-        let records = OnceCell::new();
+        let records = LazyLooseRecords::new(archive, capture.source_uses(), cancel, &loaded);
         read(archive, capture, selection, cancel, |path, authored| {
-            let (forge, origins) = if let Some(records) = records.get() {
-                records
-            } else {
-                let entry = DataForgeEntry::read_until(archive, &|| {
-                    cancel.is_some_and(CancelToken::is_cancelled)
-                })
-                .map_err(|error| match error {
-                    DataForgeLoadError::Cancelled => CatalogError::Cancelled,
-                    other => CatalogError::Load(other),
-                })?;
-                let entry = loaded.get_or_init(|| entry);
-                let forge = entry.open().map_err(CatalogError::DataForge)?;
-                let origins = CatalogOrigins::for_archive_records_with_uses(
-                    archive,
-                    entry,
-                    capture.source_uses().clone(),
-                )?;
-                records.get_or_init(|| (forge, origins))
-            };
-            let original = OriginalCatalogInput::new(forge, origins);
-            planet_resource::resolve_tint_record(path, authored, forge, &original, None, cancel)
+            records.with_input(|original| {
+                planet_resource::resolve_tint_record(
+                    path,
+                    authored,
+                    original.forge(),
+                    original,
+                    None,
+                    cancel,
+                )
+            })
         })
     });
     watch.check()?;

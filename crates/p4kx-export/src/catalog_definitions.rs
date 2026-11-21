@@ -49,20 +49,20 @@ use planet_tech_definitions::PlanetTechDefinitions;
 #[path = "ecosystem.rs"]
 pub(crate) mod ecosystem;
 #[path = "geology_set.rs"]
-mod geology_set;
+pub(crate) mod geology_set;
 #[path = "geology_texture_set.rs"]
-mod geology_texture_set;
+pub(crate) mod geology_texture_set;
 #[path = "planet_asset_raw_fields.rs"]
 pub(crate) mod planet_asset_raw_fields;
 #[cfg(test)]
 #[path = "planet_asset_tests.rs"]
 mod planet_asset_tests;
 #[path = "planet_climate_asset.rs"]
-mod planet_climate_asset;
+pub(crate) mod planet_climate_asset;
 #[path = "planet_climate_properties.rs"]
-mod planet_climate_properties;
+pub(crate) mod planet_climate_properties;
 #[path = "planet_climate_subasset.rs"]
-mod planet_climate_subasset;
+pub(crate) mod planet_climate_subasset;
 #[path = "planet_creature.rs"]
 pub(crate) mod planet_creature;
 #[path = "planet_geology_asset.rs"]
@@ -87,7 +87,7 @@ pub(crate) mod soil_texture_set;
 #[path = "terrain_definition_witness.rs"]
 mod terrain_definition_witness;
 #[path = "terrain_guid_link.rs"]
-mod terrain_guid_link;
+pub(crate) mod terrain_guid_link;
 #[cfg(test)]
 #[path = "terrain_guid_link_tests.rs"]
 mod terrain_guid_link_tests;
