@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::ENTITY_TYPE;
-use p4kx_extraction::{CancelToken, DataForgeError, Record, TreeBuilder};
+use p4kx_extraction::{CancelToken, DataForgeError, Record, RecordTree, TreeBuilder};
 
 use super::{AlignmentDependencyState, AlignmentRole, Prepared, Rows};
 use crate::catalog_projection::CatalogProjection;
@@ -38,38 +38,17 @@ impl<'source> DemandReader<'source> {
         index: u32,
         role: AlignmentRole,
     ) -> Result<Prepared<'source>, CatalogError> {
+        let (record, tree) = match self.read_owner(index)? {
+            Ok(owner) => owner,
+            Err(state) => return Ok(Prepared::unavailable(state)),
+        };
         let projection = self.projection;
-        let input = projection.original();
-        let forge = input.forge();
-        let Some(record) = forge.record(index) else {
-            return Ok(Prepared::unavailable(
-                AlignmentDependencyState::MissingRecord,
-            ));
-        };
-        match self.admitted(&record) {
-            Ok(true) => {}
-            Ok(false) => {
-                return Ok(Prepared::unavailable(AlignmentDependencyState::NotAdmitted));
-            }
-            Err(DataForgeError::ObservationStopped) => return Err(CatalogError::Cancelled),
-            Err(_) => {
-                return Ok(Prepared::unavailable(
-                    AlignmentDependencyState::UnreadableHeader,
-                ));
-            }
-        }
-        let tree = match self.trees.build(&record) {
-            Ok(tree) => tree,
-            Err(DataForgeError::ObservationStopped) => return Err(CatalogError::Cancelled),
-            Err(_) => {
-                return Ok(Prepared::unavailable(
-                    AlignmentDependencyState::UnreadableBody,
-                ));
-            }
-        };
-        let admission = RecordObservation::capture(input, &record)?;
+        let admission = RecordObservation::capture(projection.original(), &record)?;
         if self.options.is_none() {
-            self.options = Some(AlignmentOptions::read(forge, self.cancel)?);
+            self.options = Some(AlignmentOptions::read(
+                projection.original().forge(),
+                self.cancel,
+            )?);
         }
         let options = self
             .options
@@ -87,6 +66,47 @@ impl<'source> DemandReader<'source> {
                 )
                 .map(|read| Prepared::read(read, Rows::Attachments))
             }
+        }
+    }
+
+    pub(super) fn read_configuration<T>(
+        &mut self,
+        index: u32,
+        read: impl FnOnce(
+            &RecordTree<'source>,
+            &CatalogProjection<'_, 'source>,
+            &RecordObservation<'_, 'source>,
+            Option<&CancelToken>,
+        ) -> Result<T, CatalogError>,
+    ) -> Result<Result<T, AlignmentDependencyState>, CatalogError> {
+        let (record, tree) = match self.read_owner(index)? {
+            Ok(owner) => owner,
+            Err(state) => return Ok(Err(state)),
+        };
+        let admission = RecordObservation::capture(self.projection.original(), &record)?;
+        read(&tree, self.projection, &admission, self.cancel).map(Ok)
+    }
+
+    fn read_owner(
+        &mut self,
+        index: u32,
+    ) -> Result<
+        Result<(Record<'source>, RecordTree<'source>), AlignmentDependencyState>,
+        CatalogError,
+    > {
+        let Some(record) = self.projection.original().forge().record(index) else {
+            return Ok(Err(AlignmentDependencyState::MissingRecord));
+        };
+        match self.admitted(&record) {
+            Ok(true) => {}
+            Ok(false) => return Ok(Err(AlignmentDependencyState::NotAdmitted)),
+            Err(DataForgeError::ObservationStopped) => return Err(CatalogError::Cancelled),
+            Err(_) => return Ok(Err(AlignmentDependencyState::UnreadableHeader)),
+        }
+        match self.trees.build(&record) {
+            Ok(tree) => Ok(Ok((record, tree))),
+            Err(DataForgeError::ObservationStopped) => Err(CatalogError::Cancelled),
+            Err(_) => Ok(Err(AlignmentDependencyState::UnreadableBody)),
         }
     }
 

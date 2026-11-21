@@ -5,7 +5,8 @@ use std::collections::HashSet;
 
 use p4kx_extraction::{CancelToken, DataForge, SourceUses, SourceValue, SourcedValue};
 
-use super::catalog_entity_configurations::EntityConfigurationRows;
+use super::catalog_entity_configurations::{EntityConfigurationRows, ResourceComponent};
+use super::catalog_item_alignment::ScopedTopologyAlignment;
 use super::loadout_position::{self, LoadoutPosition};
 use super::network_endpoint::{LocalPorts, NetworkEndpoint};
 use super::resource_network_placements::{
@@ -13,10 +14,11 @@ use super::resource_network_placements::{
     ResourceNetworkNode, ResourceNetworkPlacementTables, ResourceNetworkPlacements,
     RoomAssociationBinding,
 };
+use super::resource_topology_declarations::ResourceTopologyDeclarations;
 use super::resource_topology_index::{TopologyIndex, TopologySource};
 use crate::CatalogError;
 use crate::collected::Collected;
-use crate::contract_loadout::LoadoutPort;
+use crate::contract_loadout::{Loadout, LoadoutPort};
 use crate::loadout::alignment::AttachmentIdentity;
 use crate::loadout::staging::StagedLoadouts;
 
@@ -67,13 +69,43 @@ fn project(
     let index = TopologyIndex::new(selected)?;
     let mut graph = ResourceNetworkPlacements::default();
     for ship in loadouts.ships() {
+        graph.add_loadout(&ship.loadout, &index, sources, cancel)?;
+    }
+    Ok(graph)
+}
+
+pub(crate) fn project_scoped(
+    forge: &DataForge<'_>,
+    loadout: Option<&Loadout>,
+    declarations: &ResourceTopologyDeclarations<'_>,
+    resources: &[ResourceComponent<'_>],
+    alignment: &ScopedTopologyAlignment<'_>,
+    sources: &SourceUses,
+    cancel: Option<&CancelToken>,
+) -> Result<ResourceNetworkPlacementTables, CatalogError> {
+    let mut graph = ResourceNetworkPlacements::default();
+    if let Some(loadout) = loadout {
+        let index =
+            TopologyIndex::with_facts(declarations, resources, &alignment.topology_facts())?;
+        graph.add_loadout(loadout, &index, sources, cancel)?;
+    }
+    Ok(graph.into_tables(forge))
+}
+
+impl ResourceNetworkPlacements {
+    fn add_loadout(
+        &mut self,
+        loadout: &Loadout,
+        index: &TopologyIndex<'_, '_>,
+        sources: &SourceUses,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(), CatalogError> {
         check_cancel(cancel)?;
-        let loadout = &ship.loadout;
         let record = loadout.root_record_index;
         let position = LoadoutPosition::root(record);
-        let root_resources = components(&index, Some(record));
+        let root_resources = components(index, Some(record));
         if !root_resources.is_empty() {
-            graph.nodes.push(ResourceNetworkNode {
+            self.nodes.push(ResourceNetworkNode {
                 position: position.clone(),
                 original_port: None,
                 attached_item: None,
@@ -90,9 +122,9 @@ fn project(
         }];
         while let Some(context) = stack.pop() {
             check_cancel(cancel)?;
-            graph.add_context(&context, &index, sources, cancel)?;
+            self.add_context(&context, index, sources, cancel)?;
             for (ordinal, port) in context.ports.iter().enumerate().rev() {
-                let record = target_record(port.source_constraints.attachment());
+                let record = attachment_record(port);
                 let has_declarations = record
                     .and_then(|record| index.get(record))
                     .is_some_and(TopologySource::has_declarations);
@@ -107,11 +139,9 @@ fn project(
                 });
             }
         }
+        Ok(())
     }
-    Ok(graph)
-}
 
-impl ResourceNetworkPlacements {
     fn add_context(
         &mut self,
         context: &Context<'_>,
@@ -233,6 +263,10 @@ fn boundary(
         &inputs,
         attachment.source_set_complete && type_use.is_some(),
     )))
+}
+
+pub(crate) fn attachment_record(port: &LoadoutPort) -> Option<u32> {
+    target_record(port.source_constraints.attachment())
 }
 
 fn target_record(attachment: Option<&AttachmentIdentity>) -> Option<u32> {

@@ -75,7 +75,7 @@ pub(super) struct PortSlotFacts<'source> {
 }
 
 impl<'source> PortContainerFacts<'source> {
-    fn retain(row: ItemPortContainer<'source>) -> Self {
+    pub(super) fn retain(row: ItemPortContainer<'source>) -> Self {
         let mut incomplete_names = unreadable(row.ports.state());
         let mut ports = Vec::new();
         for cell in row.ports.value().into_iter().flatten() {

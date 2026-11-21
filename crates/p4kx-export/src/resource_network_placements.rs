@@ -5,13 +5,17 @@ use p4kx_extraction::{DataForge, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use super::catalog_item_alignment::PhysicalPort;
-use super::loadout_position::LoadoutPosition;
-use super::network_endpoint::NetworkEndpoint;
+pub use super::catalog_item_alignment::PhysicalPort;
+pub use super::loadout_position::LoadoutPosition;
+pub use super::network_endpoint::{EndpointCandidate, NetworkEndpoint};
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::item_component_owner::ComponentOwner;
 use crate::loadout::alignment::AttachmentIdentity;
 use crate::schema_fields::every_field_required;
+
+#[path = "resource_network_placement_api.rs"]
+mod api;
+pub use api::PlacementTable;
 
 #[derive(Default)]
 pub(crate) struct ResourceNetworkPlacements {
@@ -50,7 +54,7 @@ impl ResourceNetworkPlacements {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ResourceNetworkPlacementTables {
+pub struct ResourceNetworkPlacementTables {
     resource_network_nodes: CatalogTable<ResourceNetworkNode>,
     resource_network_link_bindings: CatalogTable<ResourceNetworkLinkBinding>,
     room_association_bindings: CatalogTable<RoomAssociationBinding>,
@@ -60,7 +64,7 @@ pub(crate) struct ResourceNetworkPlacementTables {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ResourceNetworkNode {
+pub struct ResourceNetworkNode {
     pub(super) position: LoadoutPosition,
     pub(super) original_port: Option<PhysicalPort>,
     pub(super) attached_item: Option<AttachmentIdentity>,
@@ -71,8 +75,14 @@ pub(super) struct ResourceNetworkNode {
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(super) enum FuseEvidence {
+#[schemars(description = "", extend("x-p4kx-vocabularyClass" = "control"))]
+#[expect(
+    missing_docs,
+    reason = "variant docs would change the shared schema representation"
+)]
+#[non_exhaustive]
+/// The evidence that establishes an installed node's fuse behavior.
+pub enum FuseEvidence {
     Unestablished,
 }
 
@@ -80,7 +90,7 @@ pub(super) enum FuseEvidence {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct InstalledResourceComponent {
+pub struct InstalledResourceComponent {
     #[serde(flatten)]
     pub(super) owner: ComponentOwner,
     pub(super) is_relay: SourcedValue<bool>,
@@ -88,8 +98,14 @@ pub(super) struct InstalledResourceComponent {
 
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(super) enum LinkFamily {
+#[schemars(description = "", extend("x-p4kx-vocabularyClass" = "control"))]
+#[expect(
+    missing_docs,
+    reason = "variant docs would change the shared schema representation"
+)]
+#[non_exhaustive]
+/// The original named-hardpoint or weak resource link family.
+pub enum LinkFamily {
     Hardpoint,
     Resource,
 }
@@ -98,7 +114,7 @@ pub(super) enum LinkFamily {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct ResourceNetworkLinkBinding {
+pub struct ResourceNetworkLinkBinding {
     pub(super) context: LoadoutPosition,
     pub(super) family: LinkFamily,
     #[serde(flatten)]
@@ -112,7 +128,7 @@ pub(super) struct ResourceNetworkLinkBinding {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct RoomAssociationBinding {
+pub struct RoomAssociationBinding {
     pub(super) context: LoadoutPosition,
     #[serde(flatten)]
     pub(super) owner: ComponentOwner,

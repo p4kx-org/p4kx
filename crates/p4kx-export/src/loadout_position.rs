@@ -11,12 +11,24 @@ use crate::schema_fields::every_field_required;
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct LoadoutPosition {
+pub struct LoadoutPosition {
     loadout_record_index: u32,
     pub(super) port_ordinals: Vec<u32>,
 }
 
 impl LoadoutPosition {
+    /// Returns the original owning Loadout Record index.
+    #[must_use]
+    pub const fn loadout_record_index(&self) -> u32 {
+        self.loadout_record_index
+    }
+
+    /// Borrows the nested port ordinals in traversal order.
+    #[must_use]
+    pub fn port_ordinals(&self) -> &[u32] {
+        &self.port_ordinals
+    }
+
     pub(super) const fn root(loadout_record_index: u32) -> Self {
         Self {
             loadout_record_index,

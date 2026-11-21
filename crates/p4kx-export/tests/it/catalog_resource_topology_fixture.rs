@@ -78,7 +78,7 @@ fn twin_ship(name: &str, path: &str, first_port: &str) -> TestRecord {
     .record()
 }
 
-fn entity_schema() -> DataForgeBuilder {
+pub(super) fn entity_schema() -> DataForgeBuilder {
     let builder = DataForgeBuilder::new()
         .version(8)
         .structure(TestStruct::new(ENTITY).array("Components", pointer(COMPONENT)))

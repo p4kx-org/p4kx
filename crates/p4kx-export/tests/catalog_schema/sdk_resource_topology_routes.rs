@@ -12,7 +12,7 @@ use super::{Route, TestResult};
 #[path = "../it/catalog_topology_declarations_fixture.rs"]
 mod fixture;
 
-pub(super) fn read() -> TestResult<[Route; 3]> {
+pub(super) fn read() -> TestResult<[Route; 6]> {
     const REMAINING: &str = "synthetic producer parity witnessed; installed producer parity open";
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("resource_topology.p4k");
@@ -27,6 +27,8 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
         CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
     let parsed = session.parsed(None)?;
     let selection = CatalogRecordSelection::All;
+    let projected = parsed.read_resource_topology_placements(0, None)?;
+    let placements = projected.placements;
     Ok([
         parsed.with_resource_network_links(selection, None, |snapshot| {
             Route::queried_rows(
@@ -45,5 +47,20 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
                 REMAINING,
             )
         })??,
+        Route::queried_rows(
+            "/placements/resourceNetworkNodes",
+            placements.resource_network_nodes().rows,
+            REMAINING,
+        )?,
+        Route::queried_rows(
+            "/placements/resourceNetworkLinkBindings",
+            placements.resource_network_link_bindings().rows,
+            REMAINING,
+        )?,
+        Route::queried_rows(
+            "/placements/roomAssociationBindings",
+            placements.room_association_bindings().rows,
+            REMAINING,
+        )?,
     ])
 }

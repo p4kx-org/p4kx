@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::equipment::EquipmentSnapshot;
 use p4kx_export::catalog_queries::equipment::resource_topology::{
-    ItemRoomAssociationsSnapshot, ResourceNetworkLinksSnapshot, RoomAssociationsSnapshot,
+    ItemRoomAssociationsSnapshot, NetworkEndpoint, ResourceNetworkLinksSnapshot,
+    ResourceTopologyDependencyRole, RoomAssociationsSnapshot, read_resource_topology_placements,
     with_item_room_associations, with_resource_network_links,
 };
+use p4kx_export::catalog_queries::equipment::{AlignmentDependencyState, EquipmentSnapshot};
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, SourceWeakTarget,
 };
@@ -81,6 +82,40 @@ fn topology_sdk_reports_unreadable_owned_room_extensions() -> TestResult {
             Ok(())
         },
     )??;
+    Ok(())
+}
+
+#[test]
+fn topology_placement_sdk_distinguishes_unknown_declarations_from_empty_scope() -> TestResult {
+    let database =
+        fixture::database_with_link_endpoint(fixture::bad_string(), fixture::bad_string());
+    let (_directory, archive) = common::open(&database, DcbOrigin::Encrypted)?;
+    let snapshot = read_resource_topology_placements(&archive, 0, None)?;
+    assert!(
+        snapshot.declaration_dependencies.iter().any(|source| {
+            source.record_index == 0
+                && source.role == ResourceTopologyDependencyRole::LinkDeclarations
+                && source.state == AlignmentDependencyState::IncompleteProjection
+        }),
+        "an unreadable selected link makes the declaring role incomplete"
+    );
+    assert!(
+        snapshot
+            .declaration_dependencies
+            .iter()
+            .all(|source| source.record_index == 0),
+        "the unrelated malformed Item Record is outside the topology scope"
+    );
+    let bindings = snapshot.placements.resource_network_link_bindings();
+    assert!(
+        bindings.rows.iter().any(|row| {
+            matches!(
+                row.port2().value(),
+                Some(NetworkEndpoint::Unavailable { .. })
+            )
+        }),
+        "unreadable authored endpoint evidence cannot become a missing endpoint"
+    );
     Ok(())
 }
 

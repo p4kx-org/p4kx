@@ -18,6 +18,20 @@ pub use crate::catalog_v3::catalog_entity_configurations::{
     RoomAssociations,
 };
 
+#[path = "equipment_topology_placements_query.rs"]
+mod placements;
+
+pub use crate::catalog_v3::resource_network_placements::{
+    EndpointCandidate, FuseEvidence, InstalledResourceComponent, LinkFamily, LoadoutPosition,
+    NetworkEndpoint, PhysicalPort, PlacementTable, ResourceNetworkLinkBinding, ResourceNetworkNode,
+    ResourceNetworkPlacementTables, RoomAssociationBinding,
+};
+pub use placements::{
+    ResourceTopologyDependency, ResourceTopologyDependencyRole, ResourceTopologyPlacementSnapshot,
+    ResourceTopologyRootState, read_resource_topology_placements,
+    read_resource_topology_placements_from,
+};
+
 macro_rules! topology_projector {
     ($type:ident, $row:ident, $kind:ident, $rows:ident) => {
         struct $type;

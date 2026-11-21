@@ -21,12 +21,12 @@ use crate::loadout::resolution::{self, ResolverEvidence};
 use crate::texts::{TextSources, Texts};
 use crate::{CatalogError, Kind};
 
-pub(super) struct Query<'query> {
-    pub(super) archive: &'query Archive,
-    pub(super) entry: &'query DataForgeEntry,
-    pub(super) forge: &'query DataForge<'query>,
-    pub(super) selection: CatalogRecordSelection,
-    pub(super) cancel: Option<&'query CancelToken>,
+pub(in crate::build::catalog_queries::equipment) struct Query<'query> {
+    pub(in crate::build::catalog_queries::equipment) archive: &'query Archive,
+    pub(in crate::build::catalog_queries::equipment) entry: &'query DataForgeEntry,
+    pub(in crate::build::catalog_queries::equipment) forge: &'query DataForge<'query>,
+    pub(in crate::build::catalog_queries::equipment) selection: CatalogRecordSelection,
+    pub(in crate::build::catalog_queries::equipment) cancel: Option<&'query CancelToken>,
 }
 
 impl Query<'_> {
@@ -64,6 +64,23 @@ impl Query<'_> {
         wanted: Vec<Wanted>,
         coverage: &mut CatalogRecordCoverage,
     ) -> Result<(Vec<Loadout>, LoadoutDependencyCoverage), CatalogError> {
+        checkpoint(self.cancel)?;
+        let input = OriginalCatalogInput::new(self.forge, origins);
+        let locale = TextSources::read_languages(self.archive, &[])?;
+        let texts = Texts::parse(&locale)?;
+        let registry = CatalogTextRegistry::default();
+        let projection = CatalogProjection::new(&texts, &input, &registry).for_kind(Kind::Loadouts);
+        let mut alignment = DirectAlignment::new(&projection, self.cancel);
+        self.resolve_rows(&input, wanted, coverage, &mut alignment)
+    }
+
+    pub(in crate::build::catalog_queries::equipment) fn resolve_rows(
+        &self,
+        input: &OriginalCatalogInput<'_, '_>,
+        wanted: Vec<Wanted>,
+        coverage: &mut CatalogRecordCoverage,
+        alignment: &mut DirectAlignment<'_>,
+    ) -> Result<(Vec<Loadout>, LoadoutDependencyCoverage), CatalogError> {
         let mut resolver = EquipmentDependencyCoverage::default();
         let seed = ExportLedger::default();
         if wanted.is_empty() {
@@ -76,13 +93,6 @@ impl Query<'_> {
                 },
             ));
         }
-        checkpoint(self.cancel)?;
-        let input = OriginalCatalogInput::new(self.forge, origins);
-        let locale = TextSources::read_languages(self.archive, &[])?;
-        let texts = Texts::parse(&locale)?;
-        let registry = CatalogTextRegistry::default();
-        let projection = CatalogProjection::new(&texts, &input, &registry).for_kind(Kind::Loadouts);
-        let mut alignment = DirectAlignment::new(&projection, self.cancel);
         let files = ArchiveFiles::new(self.archive);
         let entities = Arc::new(Entities::new(self.forge));
         let mut rows = Vec::new();
@@ -92,9 +102,9 @@ impl Query<'_> {
             wanted.into_iter(),
             ResolverEvidence {
                 seed: &seed,
-                alignment: &mut alignment,
+                alignment,
             },
-            &input,
+            input,
             self.cancel,
             |row| {
                 if !row.port_inventory_complete || !row.issues.is_empty() {

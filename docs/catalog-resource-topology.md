@@ -19,6 +19,10 @@ The two endpoint positions retain their ordering in the source pair.
 Each stored value retains its source state, exact contributors and encryption
 marker. A room association describes the authored attachment context.
 
+The Equipment SDK can read the three placement tables for one original physical
+Ship Record. It returns the scoped Loadout, typed dependency coverage and shared
+source inventory. See [resource topology placements](catalog-sdk.md#resource-topology-placements).
+
 ## Installed loadout contexts
 
 A `placements` position uses `loadoutRecordIndex` to match

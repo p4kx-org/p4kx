@@ -27,11 +27,17 @@ mod index;
 #[path = "item_port_staging.rs"]
 mod staging;
 
-pub(crate) use index::{AlignmentIndex, PhysicalPort};
+pub(crate) use index::AlignmentIndex;
+pub use index::PhysicalPort;
 pub use index::{AttachmentDefinitionLink, PortDefinitionLink};
 pub(crate) use staging::ItemPortStaging;
 
 use self::staging::{PortContainerFacts, StagedItemPorts};
+pub(crate) use self::topology::ScopedTopologyAlignment;
+pub(super) use self::topology::TopologyAlignment;
+
+#[path = "item_alignment_topology.rs"]
+mod topology;
 
 pub(crate) const CONTAINER: &str = "SItemPortContainerComponentParams";
 pub(crate) const ATTACHABLE: &str = "SAttachableComponentParams";
@@ -117,44 +123,8 @@ impl<'source> ItemAlignmentRows<'source> {
         Ok(())
     }
 
-    pub(super) fn topology_ports(
-        &self,
-    ) -> impl Iterator<Item = Result<TopologyPortDefinition<'_>, CatalogError>> + '_ {
-        self.port_facts().iter().flat_map(|row| {
-            row.ports.iter().filter_map(move |port| {
-                let name = port.name?;
-                Some(
-                    PhysicalPort::read(&row.owner, &port.port_ordinal).map(|position| {
-                        TopologyPortDefinition {
-                            name,
-                            position,
-                            name_use: port.name_use.as_ref(),
-                        }
-                    }),
-                )
-            })
-        })
-    }
-
-    pub(super) fn attachment_type_uses(&self) -> impl Iterator<Item = ((u32, u32), &SourceUse)> {
-        self.attachments.iter().filter_map(|row| {
-            let (record, component) = row.owner.key();
-            let original = row.definition.value()?.type_use.as_ref()?;
-            Some(((record?, component?), original))
-        })
-    }
-
-    pub(super) fn port_inventory_uses(&self) -> impl Iterator<Item = (u32, &SourceUse)> {
-        self.port_facts()
-            .iter()
-            .filter_map(|row| Some((row.owner.key().0?, row.ports_use.as_ref()?)))
-    }
-
-    pub(super) fn incomplete_port_records(&self) -> impl Iterator<Item = u32> + '_ {
-        self.port_facts()
-            .iter()
-            .filter(|row| row.incomplete_names)
-            .filter_map(|row| row.owner.key().0)
+    pub(super) fn topology_facts(&self) -> TopologyAlignment<'_, 'source> {
+        TopologyAlignment::new(self.port_facts(), &self.attachments)
     }
 
     pub(crate) fn into_tables(

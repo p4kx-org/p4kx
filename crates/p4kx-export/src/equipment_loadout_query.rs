@@ -11,7 +11,7 @@ use crate::catalog_queries::{
 };
 
 #[path = "equipment_loadout_read.rs"]
-mod read;
+pub(super) mod read;
 #[path = "equipment_loadout_scope.rs"]
 mod scope;
 

@@ -5,15 +5,17 @@ use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 
 use p4kx_assembly::PortDefinitionPosition;
-use p4kx_extraction::CancelToken;
+use p4kx_extraction::{CancelToken, RecordTree};
 
 use super::AlignmentLookup;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::scoped_source_read::ScopedSourceRead;
 use crate::catalog_v3::catalog_item_alignment::{
     AttachmentDefinitionLink, ItemAttachmentComponent, ItemPortContainer, PortDefinitionLink,
+    ScopedTopologyAlignment,
 };
-use crate::source_fields::FieldError;
+use crate::record_observation::RecordObservation;
+
 use crate::{CatalogError, ExportAccountingError};
 
 #[path = "loadout_alignment_read.rs"]
@@ -76,20 +78,26 @@ impl<'source> Prepared<'source> {
     }
 
     fn read<T>(read: ScopedSourceRead<T>, wrap: impl FnOnce(T) -> Rows<'source>) -> Self {
-        let complete = read.selection_complete && !read.notes.iter().any(blocking);
         Self {
-            state: if complete {
-                AlignmentDependencyState::Complete
-            } else {
-                AlignmentDependencyState::IncompleteProjection
-            },
+            state: AlignmentDependencyState::from_scoped_read(&read),
             rows: Some(wrap(read.value)),
         }
     }
 }
 
-fn blocking(note: &FieldError) -> bool {
-    note.description().issue.blocks_projection()
+impl AlignmentDependencyState {
+    pub(crate) fn from_scoped_read<T>(read: &ScopedSourceRead<T>) -> Self {
+        if read.selection_complete
+            && !read
+                .notes
+                .iter()
+                .any(|note| note.description().issue.blocks_projection())
+        {
+            Self::Complete
+        } else {
+            Self::IncompleteProjection
+        }
+    }
 }
 
 /// Resolves Loadout configuration links from reached physical Records and roles.
@@ -119,6 +127,37 @@ impl<'source> DirectAlignment<'source> {
                 role,
                 state: prepared.state,
             })
+    }
+
+    pub(crate) fn read_configuration<T>(
+        &mut self,
+        record: u32,
+        read: impl FnOnce(
+            &RecordTree<'source>,
+            &CatalogProjection<'_, 'source>,
+            &RecordObservation<'_, 'source>,
+            Option<&CancelToken>,
+        ) -> Result<T, CatalogError>,
+    ) -> Result<Result<T, AlignmentDependencyState>, CatalogError> {
+        crate::catalog_query_session::checkpoint(self.reader.cancel)?;
+        self.reader.read_configuration(record, read)
+    }
+
+    pub(crate) fn include_port_inventory(&mut self, record: u32) -> Result<(), CatalogError> {
+        self.reach(record, AlignmentRole::Port)?;
+        Ok(())
+    }
+
+    pub(crate) fn into_topology(self) -> ScopedTopologyAlignment<'source> {
+        let mut facts = ScopedTopologyAlignment::default();
+        for prepared in self.rows.into_values() {
+            match prepared.rows {
+                Some(Rows::Ports(rows)) => facts.append_ports(rows),
+                Some(Rows::Attachments(rows)) => facts.append_attachments(rows),
+                None => {}
+            }
+        }
+        facts
     }
 
     fn reach(

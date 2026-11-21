@@ -57,13 +57,31 @@ pub enum AttachmentDefinitionLink {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct PhysicalPort {
+pub struct PhysicalPort {
     pub(crate) owner_record_index: u32,
     pub(crate) component_ordinal: u32,
     pub(crate) port_ordinal: u32,
 }
 
 impl PhysicalPort {
+    /// Returns the Record containing the physical port.
+    #[must_use]
+    pub const fn owner_record_index(&self) -> u32 {
+        self.owner_record_index
+    }
+
+    /// Returns the ordinal of the original port-container component.
+    #[must_use]
+    pub const fn component_ordinal(&self) -> u32 {
+        self.component_ordinal
+    }
+
+    /// Returns the ordinal of the port within its original component.
+    #[must_use]
+    pub const fn port_ordinal(&self) -> u32 {
+        self.port_ordinal
+    }
+
     pub(super) fn read(
         owner: &ComponentOwner,
         port: &SourcedValue<u32>,

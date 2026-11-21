@@ -19,7 +19,7 @@ use crate::{CatalogError, ExportAccountingError};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct EndpointCandidate {
+pub struct EndpointCandidate {
     loadout_port_ordinal: Option<u32>,
     physical_port: Option<PhysicalPort>,
 }
@@ -30,15 +30,61 @@ pub(super) struct EndpointCandidate {
     rename_all = "camelCase",
     rename_all_fields = "camelCase"
 )]
-#[schemars(transform = every_field_required)]
-pub(super) enum NetworkEndpoint {
-    Resolved { candidate: EndpointCandidate },
-    Ambiguous { candidates: Vec<EndpointCandidate> },
-    Unplaced { candidate: EndpointCandidate },
+#[schemars(description = "", transform = every_field_required)]
+#[non_exhaustive]
+/// Contextual resolution of one authored network endpoint.
+pub enum NetworkEndpoint {
+    #[schemars(description = "")]
+    /// One matching occurrence is placed in the declaring context.
+    Resolved {
+        #[schemars(description = "")]
+        /// The selected port occurrence and its original definition.
+        candidate: EndpointCandidate,
+    },
+    #[schemars(description = "")]
+    /// Multiple original declarations or resolved ports match.
+    Ambiguous {
+        #[schemars(description = "")]
+        /// Every observed matching candidate.
+        candidates: Vec<EndpointCandidate>,
+    },
+    #[schemars(description = "")]
+    /// One physical definition matches without an occurrence in the Loadout.
+    Unplaced {
+        #[schemars(description = "")]
+        /// The matched physical declaration.
+        candidate: EndpointCandidate,
+    },
+    #[schemars(description = "")]
+    /// A complete declaring context has no matching candidate.
     Missing,
-    Unavailable { candidates: Vec<EndpointCandidate> },
+    #[schemars(description = "")]
+    /// Evidence is insufficient for a complete contextual resolution.
+    Unavailable {
+        #[schemars(description = "")]
+        /// The candidates observed before resolution could be completed.
+        candidates: Vec<EndpointCandidate>,
+    },
+    #[schemars(description = "")]
+    /// The original link has no usable endpoint selector.
     Unspecified,
+    #[schemars(description = "")]
+    /// The original weak target lies outside the declaring port context.
     OutsideDeclaringContext,
+}
+
+impl EndpointCandidate {
+    /// Returns the selected direct port ordinal in the declaring Loadout context.
+    #[must_use]
+    pub const fn loadout_port_ordinal(&self) -> Option<u32> {
+        self.loadout_port_ordinal
+    }
+
+    /// Returns the original physical port definition, when observed.
+    #[must_use]
+    pub const fn physical_port(&self) -> Option<PhysicalPort> {
+        self.physical_port
+    }
 }
 
 impl NetworkEndpoint {

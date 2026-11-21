@@ -21,6 +21,13 @@ pub(super) fn database() -> DataForgeBuilder {
 }
 
 pub(super) fn database_with_room_extension(extension: TestValue) -> DataForgeBuilder {
+    database_with_link_endpoint(extension, TestValue::text("unbound"))
+}
+
+pub(super) fn database_with_link_endpoint(
+    extension: TestValue,
+    endpoint: TestValue,
+) -> DataForgeBuilder {
     schema()
         .record(
             TestRecord::new(
@@ -29,7 +36,10 @@ pub(super) fn database_with_room_extension(extension: TestValue) -> DataForgeBui
                 "EntityClassDefinition.FixtureTopology",
                 "libs/foundry/records/entities/spaceships/fixture_topology_sdk.xml",
             )
-            .value("Components", TestValue::Array(vec![ports(), vehicle()])),
+            .value(
+                "Components",
+                TestValue::Array(vec![ports(endpoint), vehicle()]),
+            ),
         )
         .record(
             TestRecord::new(
@@ -97,7 +107,7 @@ fn schema() -> DataForgeBuilder {
         )
 }
 
-fn ports() -> TestValue {
+fn ports(endpoint: TestValue) -> TestValue {
     TestValue::Struct(
         TestInstance::new(PORT_CONTAINER)
             .value(
@@ -114,7 +124,7 @@ fn ports() -> TestValue {
                 slots(
                     TestInstance::new(HARDPOINT)
                         .value("port1", TestValue::text("mount"))
-                        .value("port2", TestValue::text("unbound")),
+                        .value("port2", endpoint),
                 ),
             )
             .value(

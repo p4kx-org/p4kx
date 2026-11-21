@@ -75,7 +75,7 @@ mod record_query;
 /// Direct queries for original resource components and their power and heat connections.
 #[path = "equipment_resource_network_query.rs"]
 pub mod resource_network;
-/// Selective reads of original resource links and room declarations.
+/// Selective reads of resource declarations and their contextual placements.
 #[path = "equipment_resource_topology_query.rs"]
 pub mod resource_topology;
 

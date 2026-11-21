@@ -11,6 +11,8 @@ use crate::health_origin_assertions as proof;
 mod fixture;
 #[path = "catalog_resource_topology_physical_loadout.rs"]
 mod physical_loadout;
+#[path = "catalog_resource_topology_placements_sdk.rs"]
+mod placements_sdk;
 #[path = "catalog_resource_topology_port_attributes.rs"]
 mod port_attributes;
 #[path = "catalog_topology_declarations_sdk.rs"]

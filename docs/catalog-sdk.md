@@ -1440,6 +1440,28 @@ cargo test --locked -p p4kx-export --lib -- `
   --ignored --exact
 ```
 
+## Resource topology placements
+
+Use `equipment::resource_topology::read_resource_topology_placements` or its
+`_from`, session and parsed variants. Give the physical Ship Record index in
+the queried DataForge. The result contains the resolved root `loadout`, the
+canonical `resourceNetworkNodes`, `resourceNetworkLinkBindings` and
+`roomAssociationBindings` tables, and their shared source inventory.
+
+Use `loadoutRecordIndex` to identify the root. Follow `portOrdinals` through
+that root's resolved ports. The source inventory resolves the immediate uses
+of endpoint selectors, candidates, resource components and vehicle boundaries.
+For full original declaration bodies, use the existing resource-link and room
+declaration queries by physical Record index.
+
+Check `root_state`, `coverage`, `loadout_dependencies` and
+`declaration_dependencies` before replacing a cached result. Table availability
+describes original declaration types. A resolved Ship can have zero rows, and
+failed or incomplete dependency reads stay visible independently of row counts.
+The query checks structures and only resolves the selected root and its reached
+configuration roles. Docked ships can be queried independently. The host keeps
+the docking occurrence and any attached resource components it uses.
+
 ## Resolved Loadouts
 
 Use `equipment::read_loadouts`, `equipment::read_loadouts_from`, or the

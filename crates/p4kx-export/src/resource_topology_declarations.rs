@@ -96,7 +96,11 @@ impl<'source> ResourceTopologyDeclarations<'source> {
         self.item_rooms
     }
 
-    pub(super) fn extend(&mut self, other: Self) {
+    pub(crate) const fn has_context_rows(&self) -> bool {
+        !self.links.is_empty() || !self.rooms.is_empty()
+    }
+
+    pub(crate) fn extend(&mut self, other: Self) {
         self.links.extend(other.links);
         self.rooms.extend(other.rooms);
         self.item_rooms.extend(other.item_rooms);

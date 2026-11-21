@@ -6,10 +6,11 @@ use std::collections::HashMap;
 use p4kx_extraction::SourceUse;
 
 use super::catalog_entity_configurations::EntityConfigurationRows;
-use super::catalog_item_alignment::TopologyPortDefinition;
+use super::catalog_item_alignment::{TopologyAlignment, TopologyPortDefinition};
 use super::catalog_resource_component::ResourceComponent;
 use super::item_component_owner::ComponentOwner;
 use super::resource_network_links::ResourceNetworkLinks;
+use super::resource_topology_declarations::ResourceTopologyDeclarations;
 use super::room_associations::RoomAssociations;
 use crate::{CatalogError, ExportAccountingError};
 
@@ -37,20 +38,32 @@ impl TopologySource<'_, '_> {
 
 impl<'rows, 'source> TopologyIndex<'rows, 'source> {
     pub(super) fn new(rows: &'rows EntityConfigurationRows<'source>) -> Result<Self, CatalogError> {
+        Self::with_facts(
+            &rows.topology,
+            rows.resources(),
+            &rows.alignment.topology_facts(),
+        )
+    }
+
+    pub(super) fn with_facts(
+        declarations: &'rows ResourceTopologyDeclarations<'source>,
+        resources: &'rows [ResourceComponent<'source>],
+        alignment: &TopologyAlignment<'rows, 'source>,
+    ) -> Result<Self, CatalogError> {
         let mut index = Self {
             records: HashMap::new(),
-            attachment_types: rows.alignment.attachment_type_uses().collect(),
+            attachment_types: alignment.attachment_type_uses().collect(),
         };
-        for row in &rows.topology.links {
+        for row in &declarations.links {
             index.record(row.owner())?.links.push(row);
         }
-        for row in &rows.topology.rooms {
+        for row in &declarations.rooms {
             index.record(row.owner())?.rooms.push(row);
         }
-        for row in rows.resources() {
+        for row in resources {
             index.record(row.owner())?.resources.push(row);
         }
-        for definition in rows.alignment.topology_ports() {
+        for definition in alignment.topology_ports() {
             let definition = definition?;
             index
                 .records
@@ -59,7 +72,7 @@ impl<'rows, 'source> TopologyIndex<'rows, 'source> {
                 .ports
                 .push(definition);
         }
-        for (record, original) in rows.alignment.port_inventory_uses() {
+        for (record, original) in alignment.port_inventory_uses() {
             index
                 .records
                 .entry(record)
@@ -67,7 +80,7 @@ impl<'rows, 'source> TopologyIndex<'rows, 'source> {
                 .port_inventory_uses
                 .push(original);
         }
-        for record in rows.alignment.incomplete_port_records() {
+        for record in alignment.incomplete_port_records() {
             index.records.entry(record).or_default().incomplete_ports = true;
         }
         for source in index.records.values_mut() {

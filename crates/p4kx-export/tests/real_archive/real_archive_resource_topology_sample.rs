@@ -21,6 +21,8 @@ use crate::real_archive_verification::print_line;
 
 #[path = "real_archive_topology_bindings.rs"]
 mod bindings;
+#[path = "real_archive_topology_sdk.rs"]
+mod sdk;
 
 const PORT_CONTAINER: &str = "SItemPortContainerComponentParams";
 const RESOURCE_COMPONENT: &str = "ItemResourceComponentParams";

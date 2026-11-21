@@ -163,6 +163,10 @@ impl Route {
 }
 
 const REQUIRED_WITNESSES: &[&str] = &[
+    "/definitions/radarSystemSharedParams",
+    "/placements/resourceNetworkNodes",
+    "/placements/resourceNetworkLinkBindings",
+    "/placements/roomAssociationBindings",
     LANGUAGE_SOURCES,
     ITEM_DEFINITIONS,
     LOADOUTS,
