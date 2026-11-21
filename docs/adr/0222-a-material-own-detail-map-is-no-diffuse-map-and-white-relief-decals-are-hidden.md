@@ -38,8 +38,9 @@ packages, compared against the owner's in-game screenshot of the Hammerhead.
   It counts as a colourless decal, so `Material::hidden`, the GLB writer, the viewer and the add-on
   (`_relief_decal`) skip it. A decal with a colour of its own, a tint mode, no displacement map or
   no parallax mapping is drawn as before.
-- **Livery decal and hull number.** Not decided: the data names no switch, so `Custom_decal` and the
-  number stay drawn as the material file has them.
+- **Livery decal and hull number.** Issue #775 keeps the authored presentation in 0.5.0. The
+  export draws the selected material's authored emblem texture and the hull glyph from its
+  original UVs. A paint name alone does not hide the emblem or select another glyph.
 
 ## Consequences
 
@@ -47,5 +48,10 @@ packages, compared against the owner's in-game screenshot of the Hammerhead.
   material runs before any texture is read. A white, untinted parallax decal whose map holds
   colour would be hidden too. None of the parallax decal maps of the two ships has colour.
 - The relief itself (normal and displacement map) is not drawn, as for any colourless decal.
-- A later change may find where the game chooses the livery decal, for example in a Record we have
-  not read.
+- The selected installed LIVE and PTU comparison checked physical material entries and related
+  DataForge declarations. Both Builds retained the same emblem-bearing material set in scope.
+  Empty observed decal ports and paint palette changes establish no separate visibility rule.
+  The surveyed source also supplies no rule for selecting an alternative hull number. The
+  authored presentation is the release contract. A comparison with the game's runtime choices
+  would require independently verified selection evidence.
+- Issue #1181 covers the light grey panel shading and roughness comparison.
