@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::ArchiveFiles;
+use p4kx_export::catalog_queries::equipment::AlignmentDependencyState;
 use p4kx_export::catalog_queries::equipment::resource_topology::{
     ResourceTopologyPlacementSnapshot, ResourceTopologyRootState,
 };
@@ -62,7 +63,7 @@ fn installed_topology_sdk_matches_source_selected_roots() -> TestResult {
         .map_err(|_| "Archive changed during topology verification")?;
     receipt::Report::new(stamp, samples).publish(&destination)?;
     print_line(
-        "Scoped topology SDK: two independently selected roots passed direct producer and original dependency checks",
+        "Scoped topology SDK: two independently selected roots passed direct producer, original dependency and Loadout issue checks",
     );
     Ok(())
 }
@@ -132,14 +133,41 @@ fn check_selection(
     if loadout.record_index() != root || loadout.source_record_index().value() != Some(&root) {
         return Err("the returned Loadout differs from the requested physical Record".into());
     }
+    let expected_incomplete: &[u32] = if loadout.issues().is_empty() {
+        &[]
+    } else {
+        std::slice::from_ref(&root)
+    };
     if !snapshot.coverage.unreadable_headers.is_empty()
         || !snapshot.coverage.unreadable_bodies.is_empty()
-        || !snapshot.coverage.incomplete_fields.is_empty()
+        || snapshot.coverage.incomplete_fields != expected_incomplete
         || !snapshot.loadout_dependencies.is_complete()
     {
-        return Err(
-            "selected Loadout or reached resolver and alignment sources are incomplete".into(),
-        );
+        let resolver = &snapshot.loadout_dependencies.resolver;
+        let unavailable_alignment = snapshot
+            .loadout_dependencies
+            .alignment
+            .iter()
+            .filter(|dependency| {
+                !matches!(
+                    dependency.state,
+                    AlignmentDependencyState::Complete | AlignmentDependencyState::NotAdmitted
+                )
+            })
+            .count();
+        return Err(format!(
+            "selected topology inputs incomplete: unreadable headers {}, unreadable bodies {}, incomplete owner projections {}, resolver directory {}, failed Records {}, failed Entries {:?}, incomplete resolver records {}, incomplete resolver fields {}, unavailable alignment {}",
+            snapshot.coverage.unreadable_headers.len(),
+            snapshot.coverage.unreadable_bodies.len(),
+            snapshot.coverage.incomplete_fields.len(),
+            resolver.directory_complete(),
+            resolver.failed_records().len(),
+            resolver.failed_entries().iter().map(|entry| (entry.operation(), entry.stage())).collect::<Vec<_>>(),
+            resolver.incomplete_records().len(),
+            resolver.incomplete_fields(),
+            unavailable_alignment,
+        )
+        .into());
     }
     routes::check_declaration_reads(snapshot, root)
 }

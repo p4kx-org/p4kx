@@ -6,6 +6,7 @@ use std::io::{Read as _, Write as _};
 use std::path::PathBuf;
 use std::time::UNIX_EPOCH;
 
+use p4kx_export::catalog_queries::equipment::Loadout;
 use p4kx_export::catalog_queries::equipment::resource_topology::ResourceTopologyPlacementSnapshot;
 use p4kx_extraction::Archive;
 use serde::{Deserialize, Serialize};
@@ -15,7 +16,7 @@ use super::TestResult;
 
 const RECEIPT_VAR: &str = "P4KX_SDK_WITNESS_FILE";
 const MAX_BYTES: u64 = 4 * 1024;
-const RECEIPT_SCHEMA: u8 = 1;
+const RECEIPT_SCHEMA: u8 = 2;
 
 #[derive(Deserialize, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -80,6 +81,7 @@ pub(super) struct Report {
 pub(super) struct Sample {
     pub(super) record_index: u32,
     rows: [usize; 3],
+    loadout_issue_codes: Vec<String>,
     hardpoint_bindings: usize,
     room_bindings: usize,
     direct_relay_ports: usize,
@@ -152,6 +154,10 @@ impl Sample {
         Self {
             record_index,
             rows: rows(snapshot),
+            loadout_issue_codes: issues(snapshot)
+                .iter()
+                .map(|code| (*code).to_owned())
+                .collect(),
             hardpoint_bindings: direct.hardpoints,
             room_bindings: direct.rooms,
             direct_relay_ports,
@@ -164,6 +170,11 @@ impl Sample {
 
     pub(super) fn verify(&self, snapshot: &ResourceTopologyPlacementSnapshot) -> TestResult {
         if self.rows != rows(snapshot)
+            || !self
+                .loadout_issue_codes
+                .iter()
+                .map(String::as_str)
+                .eq(issues(snapshot).iter().copied())
             || self.declaration_roles != snapshot.declaration_dependencies.len()
             || self.alignment_roles != snapshot.loadout_dependencies.alignment.len()
             || self.source_uses != snapshot.source_inventory.use_count()
@@ -175,6 +186,10 @@ impl Sample {
         }
         Ok(())
     }
+}
+
+fn issues(snapshot: &ResourceTopologyPlacementSnapshot) -> &[&'static str] {
+    snapshot.loadout.as_ref().map_or(&[], Loadout::issues)
 }
 
 fn rows(snapshot: &ResourceTopologyPlacementSnapshot) -> [usize; 3] {

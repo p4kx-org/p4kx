@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
-use p4kx_assembly::{Attachment, EntityNode, PortNode};
+use p4kx_assembly::{Attachment, EntityNode, LoadoutError, PortNode};
 use p4kx_export::catalog_queries::equipment::AlignmentDependencyState;
 use p4kx_export::catalog_queries::equipment::resource_topology::{
     LoadoutPosition, ResourceNetworkNode, ResourceTopologyDependencyRole as Role,
@@ -118,17 +118,41 @@ fn check_roles(ship: &Ship<'_>, snapshot: &ResourceTopologyPlacementSnapshot) ->
         .entry(ship.tree.record_index())
         .or_insert_with(Roles::default)
         .attach(false);
+    let mut issues: BTreeSet<_> = ship
+        .assembly
+        .issues()
+        .iter()
+        .map(LoadoutError::kind)
+        .collect();
     ship.assembly.visit_ports(|_, route| {
-        if let Some(port) = route.last()
-            && let Attachment::Entity(entity) = port.attachment()
-            && let Some(record) = entity.record_index()
-        {
-            roots
-                .entry(record)
-                .or_default()
-                .attach(entity.is_docked_vehicle());
+        let Some(port) = route.last() else {
+            return;
+        };
+        match port.attachment() {
+            Attachment::Entity(entity) => {
+                if let Some(record) = entity.record_index() {
+                    roots
+                        .entry(record)
+                        .or_default()
+                        .attach(entity.is_docked_vehicle());
+                }
+                if entity.is_expanded() {
+                    issues.extend(entity.issues().iter().map(LoadoutError::kind));
+                }
+            }
+            Attachment::Unresolved(unresolved) => {
+                issues.insert(unresolved.error().kind());
+            }
+            Attachment::Empty => {}
         }
     });
+    let loadout = snapshot
+        .loadout
+        .as_ref()
+        .ok_or("resolved topology lacks its Loadout issue evidence")?;
+    if !loadout.issues().iter().copied().eq(issues.iter().copied()) {
+        return Err("SDK Loadout issues differ from the original Assembly observations".into());
+    }
     let mut actual = BTreeMap::new();
     for dependency in &snapshot.declaration_dependencies {
         actual
