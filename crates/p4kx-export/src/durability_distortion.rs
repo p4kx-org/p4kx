@@ -18,7 +18,7 @@ use crate::source_fields::FieldError;
 pub(crate) struct DistortionFields {
     decay_delay: SourcedValue<ResourceFloat32>,
     decay_rate: SourcedValue<ResourceFloat32>,
-    maximum: SourcedValue<ResourceFloat32>,
+    pub(super) maximum: SourcedValue<ResourceFloat32>,
     warning_ratio: SourcedValue<ResourceFloat32>,
     recovery_ratio: SourcedValue<ResourceFloat32>,
     power_ratio_at_max_distortion: SourcedValue<ResourceFloat32>,

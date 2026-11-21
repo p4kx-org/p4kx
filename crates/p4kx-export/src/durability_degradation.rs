@@ -24,7 +24,7 @@ const ACCUMULATORS: &[&str] = &[
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct DegradationFields {
-    stop_degrading_if_destroyed: SourcedValue<bool>,
+    pub(super) stop_degrading_if_destroyed: SourcedValue<bool>,
     accumulators: SourcedValue<Vec<SourcedValue<Accumulator>>>,
 }
 

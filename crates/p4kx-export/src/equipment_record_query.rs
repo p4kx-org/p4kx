@@ -5,6 +5,14 @@ macro_rules! unlocalized {
     ($projector:ty, $row:ident, $(#[$doc:meta])+ $snapshot:ident, $with:ident, $from:ident) => {
         $(#[$doc])+
         pub type $snapshot<'source> = super::EquipmentSnapshot<'source, $row<'source>>;
+        super::record_query::unlocalized!(@functions $projector, $snapshot, $with, $from);
+    };
+    (owned $projector:ty, $row:ident, $(#[$doc:meta])+ $snapshot:ident, $with:ident, $from:ident) => {
+        $(#[$doc])+
+        pub type $snapshot<'source> = super::EquipmentSnapshot<'source, $row>;
+        super::record_query::unlocalized!(@functions $projector, $snapshot, $with, $from);
+    };
+    (@functions $projector:ty, $snapshot:ident, $with:ident, $from:ident) => {
 
         /// Reads canonical rows by physical owner.
         ///

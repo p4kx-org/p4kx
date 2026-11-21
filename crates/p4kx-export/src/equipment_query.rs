@@ -16,6 +16,10 @@ pub mod cargo_globals;
 #[path = "equipment_component_definitions.rs"]
 pub mod component_definitions;
 
+/// Selective reads of authored Health, degradation and distortion components.
+#[path = "equipment_durability_query.rs"]
+pub mod durability;
+
 /// Selective reads of authored consumable components and contents slots.
 #[path = "equipment_consumable_query.rs"]
 pub mod consumables;

@@ -28,8 +28,8 @@ use crate::template_field_capture::TemplateFieldCapture;
 #[path = "catalog_item_equipment_read.rs"]
 mod equipment;
 pub(crate) use equipment::{
-    read_jump_drives, read_quantum_drives, read_quantum_interdiction_generators,
-    read_shield_generators,
+    read_degradation, read_distortion, read_health, read_jump_drives, read_quantum_drives,
+    read_quantum_interdiction_generators, read_shield_generators,
 };
 
 /// Canonical authored weapon and ammunition components of one physical Item.
@@ -215,7 +215,7 @@ enum ComponentScope {
 }
 
 impl ComponentScope {
-    const fn includes(self, kind: Component) -> bool {
+    fn includes(self, kind: Component) -> bool {
         match self {
             Self::All => true,
             Self::Weapon => matches!(kind, Component::Weapon | Component::AmmoContainer),

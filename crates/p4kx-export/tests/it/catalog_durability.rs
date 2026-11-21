@@ -19,6 +19,8 @@ mod nested;
 mod number_controls;
 #[path = "catalog_durability_resistance_reference.rs"]
 mod resistance_reference;
+#[path = "catalog_durability_sdk.rs"]
+mod sdk;
 #[path = "catalog_turret_health.rs"]
 mod turret_health;
 

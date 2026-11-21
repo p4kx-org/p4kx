@@ -11,6 +11,9 @@ use super::{
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_read::scoped_source_read::ScopedSourceRead;
+use crate::catalog_v3::catalog_durability::{
+    Degradation, Distortion, Durability, DurabilityComponent,
+};
 use crate::catalog_v3::catalog_jump_drive::JumpDrive;
 use crate::catalog_v3::catalog_quantum_drive::QuantumDrive;
 use crate::catalog_v3::catalog_quantum_interdiction::QuantumInterdictionGenerator;
@@ -18,6 +21,54 @@ use crate::catalog_v3::catalog_shield_generator::ShieldGenerator;
 use crate::record_observation::RecordObservation;
 use crate::source_value_catalog;
 use crate::{CatalogError, ExportAccountingError};
+
+pub(crate) fn read_health<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<Vec<Durability<'source>>>, CatalogError> {
+    read(
+        tree,
+        projection,
+        admission,
+        cancel,
+        ItemEquipmentFamily::Durability(DurabilityComponent::Health),
+        |rows| rows.durability.health,
+    )
+}
+
+pub(crate) fn read_degradation<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<Vec<Degradation>>, CatalogError> {
+    read(
+        tree,
+        projection,
+        admission,
+        cancel,
+        ItemEquipmentFamily::Durability(DurabilityComponent::Degradation),
+        |rows| rows.durability.degradation,
+    )
+}
+
+pub(crate) fn read_distortion<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<Vec<Distortion>>, CatalogError> {
+    read(
+        tree,
+        projection,
+        admission,
+        cancel,
+        ItemEquipmentFamily::Durability(DurabilityComponent::Distortion),
+        |rows| rows.durability.distortion,
+    )
+}
 
 pub(crate) fn read_shield_generators<'source>(
     tree: &RecordTree<'source>,

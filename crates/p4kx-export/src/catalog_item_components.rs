@@ -28,7 +28,8 @@ use crate::source_fields::FieldError;
 mod component_read;
 pub use component_read::WeaponSource;
 pub(crate) use component_read::{
-    read, read_jump_drives, read_magazine_resolution, read_projectile_ammo, read_quantum_drives,
+    read, read_degradation, read_distortion, read_health, read_jump_drives,
+    read_magazine_resolution, read_projectile_ammo, read_quantum_drives,
     read_quantum_interdiction_generators, read_shield_generators, read_weapon_source,
 };
 
@@ -267,6 +268,7 @@ enum Component {
 
 #[derive(Clone, Copy)]
 pub(crate) enum ItemEquipmentFamily {
+    Durability(DurabilityComponent),
     ShieldGenerators,
     QuantumDrives,
     JumpDrives,
@@ -276,6 +278,7 @@ pub(crate) enum ItemEquipmentFamily {
 impl ItemEquipmentFamily {
     pub(crate) const fn source_types(self) -> &'static [&'static str] {
         match self {
+            Self::Durability(component) => component.source_types(),
             Self::ShieldGenerators => &[catalog_shield_generator::SOURCE_TYPE],
             Self::QuantumDrives => &[catalog_quantum_drive::SOURCE_TYPE],
             Self::JumpDrives => &[catalog_jump_drive::SOURCE_TYPE],
@@ -283,7 +286,10 @@ impl ItemEquipmentFamily {
         }
     }
 
-    const fn contains(self, component: Component) -> bool {
+    fn contains(self, component: Component) -> bool {
+        if let (Self::Durability(selected), Component::Durability(found)) = (self, component) {
+            return selected == found;
+        }
         matches!(
             (self, component),
             (Self::ShieldGenerators, Component::ShieldGenerator)

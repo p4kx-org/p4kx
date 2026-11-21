@@ -1031,6 +1031,20 @@ bodies and requested locales and reports unreadable candidates through
 `coverage`. Copy any values needed beyond the callback, and publish changes
 after the query succeeds.
 
+## Authored item durability
+
+Use `equipment::durability::with_durability`, `with_degradation` or
+`with_distortion` for the three canonical item configuration tables. The
+Archive, decoded-Entry and parsed-session forms accept a physical Record index,
+GUID or all eligible Item owners. A GUID can select more than one physical
+Record. Rows preserve each original Components slot, including repeated Health
+components. The Health query supplies the same rows as the staged Catalog table.
+
+These queries project the selected component family on eligible Items.
+They require no localization or other Asset reads. The snapshot includes
+source-family availability, read coverage and per-value origin evidence. Use
+an exact physical index when the caller already knows which Item to inspect.
+
 ## Vehicle armor
 
 Use `catalog_queries::equipment::vehicle_armor::with_vehicle_armor` for

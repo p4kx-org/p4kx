@@ -68,6 +68,8 @@ mod generator_facets;
 mod inventory_containers;
 #[path = "sdk_item_configuration_routes.rs"]
 mod item_configurations;
+#[path = "sdk_item_durability_routes.rs"]
+mod item_durability;
 #[path = "sdk_item_recovery_routes.rs"]
 mod item_recovery;
 #[path = "sdk_law_route.rs"]
@@ -253,6 +255,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(quality::read()?);
     routes.extend(read_entity_definitions(archive)?);
     routes.extend(item_configurations::read()?);
+    routes.extend(item_durability::read()?);
     routes.extend(item_recovery::read()?);
     routes.push(loadout::read()?);
     routes.push(tag_routes::entities(archive)?);
@@ -348,4 +351,8 @@ fn read_weather(archive: &Archive) -> TestResult<Route> {
             "synthetic canonical parity available; complete installed producer parity open",
         )
     })?
+}
+
+pub(super) const fn durability_datasets() -> [&'static str; 3] {
+    item_durability::datasets()
 }

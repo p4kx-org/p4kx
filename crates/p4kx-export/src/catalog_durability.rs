@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataForge, RecordTree, Value};
+use p4kx_extraction::{DataForge, RecordTree, SourcedValue, Value};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -9,6 +9,7 @@ use super::item_component_owner::ComponentOwner;
 use crate::catalog_rows::staged::{OrderedComponentRows, StagedCatalogTable};
 use crate::catalog_table::CatalogTable;
 use crate::record_fields::number_value;
+use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::{CatalogError, ExportAccountingError};
@@ -44,7 +45,7 @@ const DISTORTION: &str = "SDistortionParams";
 /// One original Health component on a selected item.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-pub(crate) struct Durability<'source> {
+pub struct Durability<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     #[serde(flatten)]
@@ -54,7 +55,7 @@ pub(crate) struct Durability<'source> {
 /// One original degradation component on a selected item.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-pub(crate) struct Degradation {
+pub struct Degradation {
     #[serde(flatten)]
     owner: ComponentOwner,
     #[serde(flatten)]
@@ -64,18 +65,60 @@ pub(crate) struct Degradation {
 /// One original distortion component on a selected item.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-pub(crate) struct Distortion {
+pub struct Distortion {
     #[serde(flatten)]
     owner: ComponentOwner,
     #[serde(flatten)]
     fields: DistortionFields,
 }
 
+impl Durability<'_> {
+    /// Borrows the physical Item and Components position.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    /// Borrows the authored Health value.
+    #[must_use]
+    pub const fn health(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.fields.health
+    }
+}
+
+impl Degradation {
+    /// Borrows the physical Item and Components position.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    /// Borrows the authored flag for stopping degradation on destruction.
+    #[must_use]
+    pub const fn stop_degrading_if_destroyed(&self) -> &SourcedValue<bool> {
+        &self.fields.stop_degrading_if_destroyed
+    }
+}
+
+impl Distortion {
+    /// Borrows the physical Item and Components position.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    /// Borrows the authored maximum distortion.
+    #[must_use]
+    pub const fn maximum(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.fields.maximum
+    }
+}
+
 #[derive(Default)]
 pub(crate) struct DurabilityRows<'source> {
-    health: Vec<Durability<'source>>,
-    degradation: Vec<Degradation>,
-    distortion: Vec<Distortion>,
+    pub(super) health: Vec<Durability<'source>>,
+    pub(super) degradation: Vec<Degradation>,
+    pub(super) distortion: Vec<Distortion>,
 }
 
 impl<'source> DurabilityRows<'source> {
@@ -139,14 +182,22 @@ pub(crate) fn legacy_health(tree: &RecordTree<'_>) -> Option<f32> {
     source.field("Health").and_then(number_value)
 }
 
-#[derive(Clone, Copy)]
-pub(super) enum DurabilityComponent {
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DurabilityComponent {
     Health,
     Degradation,
     Distortion,
 }
 
 impl DurabilityComponent {
+    pub(crate) const fn source_types(self) -> &'static [&'static str] {
+        match self {
+            Self::Health => &[HEALTH],
+            Self::Degradation => &[DEGRADATION],
+            Self::Distortion => &[DISTORTION],
+        }
+    }
+
     pub(super) fn of(source_type: &str) -> Option<Self> {
         match source_type {
             HEALTH => Some(Self::Health),
@@ -167,7 +218,7 @@ pub(crate) fn finish_health(
     staging: OrderedComponentRows<'_>,
     forge: &DataForge<'_>,
 ) -> Result<StagedCatalogTable, CatalogError> {
-    staging.finish(forge, &[HEALTH])
+    staging.finish(forge, DurabilityComponent::Health.source_types())
 }
 
 /// Orders the resident component families by physical Record and slot.
@@ -181,8 +232,16 @@ pub(crate) fn tables(
     rows.degradation.sort_by_key(|row| row.owner.key());
     rows.distortion.sort_by_key(|row| row.owner.key());
     Ok(DurabilityTables {
-        degradation: CatalogTable::new(forge, &[DEGRADATION], rows.degradation),
-        distortion: CatalogTable::new(forge, &[DISTORTION], rows.distortion),
+        degradation: CatalogTable::new(
+            forge,
+            DurabilityComponent::Degradation.source_types(),
+            rows.degradation,
+        ),
+        distortion: CatalogTable::new(
+            forge,
+            DurabilityComponent::Distortion.source_types(),
+            rows.distortion,
+        ),
     })
 }
 

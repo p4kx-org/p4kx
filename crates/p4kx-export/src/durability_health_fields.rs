@@ -18,7 +18,7 @@ use crate::source_fields::FieldError;
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct HealthFields<'source> {
-    health: SourcedValue<ResourceFloat32>,
+    pub(super) health: SourcedValue<ResourceFloat32>,
     damage_cap: SourcedValue<ResourceFloat32>,
     client_only: SourcedValue<bool>,
     unlock_interactions_on_death: SourcedValue<bool>,
