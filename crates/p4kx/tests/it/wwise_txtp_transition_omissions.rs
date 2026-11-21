@@ -203,7 +203,7 @@ fn txtp_preserves_playback_for_inactive_and_unknown_transition_selectors() -> Te
     Ok(())
 }
 
-fn check_selector_bytes(
+pub(super) fn check_selector_bytes(
     report: &Value,
     field: &str,
     original: &[u8],

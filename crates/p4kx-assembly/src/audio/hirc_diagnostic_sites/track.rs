@@ -11,6 +11,19 @@ use super::{DiagnosticSite, DiagnosticWord, TxtpApproximation};
 const TRACK: &str = "bnkHircMusicTrack";
 
 pub(super) fn append(sites: &mut Vec<DiagnosticSite>, track: &MusicTrack) {
+    if let Some(selection) = track.subtrack_selection_evidence() {
+        sites.push(
+            DiagnosticSite::one(
+                TxtpApproximation::OmitMusicSubtrackSelection,
+                DiagnosticWord::new(TRACK, "musicTrackKind", &selection.kind.range),
+            )
+            .with_word(DiagnosticWord::new(
+                TRACK,
+                "musicTrackSubtrackCount",
+                &selection.subtrack_count.range,
+            )),
+        );
+    }
     let automation = track
         .automation_point_count_evidence()
         .map(|word| DiagnosticWord::new(TRACK, "musicTrackAutomationPointCount", &word.range));

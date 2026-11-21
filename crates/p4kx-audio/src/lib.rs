@@ -230,8 +230,8 @@ pub use hirc_music_switch::{BankMusicSwitchFields, BankMusicSwitchGroup, BankMus
 pub use hirc_music_switch_traversal::{BankMusicSwitchBranch, BankMusicSwitchTarget};
 pub use hirc_music_track::{
     BankMusicTrackClip, BankMusicTrackFields, BankMusicTrackRow, BankMusicTrackSource,
-    BankMusicTrackSwitchFields, MusicTrackClipTimingKind, MusicTrackClipTimingWord,
-    MusicTrackEvidenceKind, MusicTrackEvidenceWord,
+    BankMusicTrackSwitchFields, MusicSubtrackSelection, MusicTrackClipTimingKind,
+    MusicTrackClipTimingWord, MusicTrackEvidenceKind, MusicTrackEvidenceWord,
 };
 pub use hirc_music_track_automation::{
     BankTrackAutomationExtent, BankTrackAutomationFields, BankTrackAutomationPoints,

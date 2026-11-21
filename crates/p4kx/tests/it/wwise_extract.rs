@@ -33,6 +33,8 @@ mod txtp_origin_assertions;
 mod txtp_origins;
 #[path = "wwise_txtp_stinger_scheduling.rs"]
 mod txtp_stinger_scheduling;
+#[path = "wwise_txtp_subtrack_selection.rs"]
+mod txtp_subtrack_selection;
 #[path = "wwise_txtp_transition_omissions.rs"]
 mod txtp_transition_omissions;
 

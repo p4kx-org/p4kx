@@ -15,6 +15,7 @@ pub(super) enum PlaybackFeature {
     BlendCurves = 1 << 6,
     MusicTransitionScheduling = 1 << 7,
     MusicStingerScheduling = 1 << 8,
+    MusicSubtrackSelection = 1 << 9,
 }
 
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
@@ -47,6 +48,10 @@ impl PlaybackFeatures {
                 });
                 features.observe_flag(PlaybackFeature::Conditions, has_conditions);
                 features.observe_flag(PlaybackFeature::Automation, track.has_automation);
+                features.observe_flag(
+                    PlaybackFeature::MusicSubtrackSelection,
+                    track.subtrack_selection_evidence().is_some(),
+                );
                 features.observe_flag(PlaybackFeature::MusicFades, track.has_switch_fades);
                 features.observe_flag(
                     PlaybackFeature::MusicTransitionScheduling,

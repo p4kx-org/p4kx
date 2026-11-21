@@ -27,6 +27,8 @@ pub enum TxtpApproximation {
     OmitContainerConditions,
     /// The rendered path omits authored `MusicTrack` automation points.
     OmitMusicTrackAutomation,
+    /// The rendered path omits Random or Sequence selection among declared music subtracks.
+    OmitMusicSubtrackSelection,
     /// The rendered path omits a declared Random/Sequence transition mode.
     OmitContainerTransitions,
     /// The rendered path omits authored Blend crossfade curves.
@@ -49,6 +51,7 @@ impl TxtpApproximation {
             Self::OmitContainerLoops => "omit-container-loops",
             Self::OmitContainerConditions => "omit-container-conditions",
             Self::OmitMusicTrackAutomation => "omit-music-track-automation",
+            Self::OmitMusicSubtrackSelection => "omit-music-track-subtrack-selection",
             Self::OmitContainerTransitions => "omit-container-transitions",
             Self::OmitBlendCurves => "omit-blend-curves",
         }

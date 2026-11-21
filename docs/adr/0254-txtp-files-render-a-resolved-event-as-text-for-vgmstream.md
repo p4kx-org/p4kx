@@ -110,6 +110,9 @@ the count differs from one or an authored range bound is nonzero.
 `omit-container-conditions` covers checked Switch membership, a default
 selection, MusicSwitch decision data and MusicTrack switch membership or default.
 `omit-music-track-automation` reports a nonempty original point table.
+`omit-music-track-subtrack-selection` reports an original Random or Sequence track kind
+with more than one declared subtrack. The diagnostic uses the original kind byte and
+subtrack count. The TXTP continues to layer the files the source list supplies.
 Playlist loop and automation evidence is scoped to the owning playlist or
 track along that path. An automation clip index remains an authored field.
 The codes are emitted once per generated file in JSON and the TXTP header.

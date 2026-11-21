@@ -58,8 +58,19 @@ pub enum MusicTrackClipTimingKind {
     EndTrim,
 }
 
+/// The original fields that declare selection among several music subtracks.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct MusicSubtrackSelection {
+    /// The original Random or Sequence track kind byte.
+    pub kind: BankHircField<u8>,
+    /// The original count of declared subtracks.
+    pub subtrack_count: BankHircField<u32>,
+}
+
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
 pub(crate) struct MusicTrackEvidence {
+    pub(super) subtrack_selection: Option<MusicSubtrackSelection>,
     pub(super) automation_point_count: Option<BankHircField<u32>>,
     pub(super) switch_fade: Option<MusicTrackEvidenceWord>,
     switch_sync: Option<BankHircField<u32>>,
@@ -70,6 +81,12 @@ pub(crate) struct MusicTrackEvidence {
 }
 
 impl MusicTrack {
+    /// Returns the original Random or Sequence selector when several subtracks are declared.
+    #[must_use]
+    pub const fn subtrack_selection_evidence(&self) -> Option<&MusicSubtrackSelection> {
+        self.evidence.subtrack_selection.as_ref()
+    }
+
     /// Returns the first positive point count in the checked automation table.
     #[must_use]
     pub const fn automation_point_count_evidence(&self) -> Option<&BankHircField<u32>> {

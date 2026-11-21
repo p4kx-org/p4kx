@@ -1045,6 +1045,9 @@ The same rendered paths can add
 `omit-container-loops` for authored Random/Sequence or MusicPlaylist loop controls
 beyond a single play, `omit-container-conditions` for checked switch, state or music
 decision data, and `omit-music-track-automation` for original track automation points.
+`omit-music-track-subtrack-selection` reports the omission of Random or Sequence selection
+when the authored track declares more than one subtrack. The origins identify the track kind
+byte and count word.
 Playlist loop and automation evidence describe the owning playlist or track along the path.
 These codes appear in both the JSON report and the TXTP header, including on
 single-child paths. The WEM's own loop marker remains part of the file command.

@@ -214,7 +214,7 @@ fn music_track_with_default_switch(
     Ok(TestHircObject::raw(11, id, payload))
 }
 
-fn music_track_with_empty_automation(
+pub(super) fn music_track_with_empty_automation(
     id: u32,
     sources: &[u32],
 ) -> Result<TestHircObject, Box<dyn std::error::Error>> {
@@ -238,13 +238,13 @@ fn music_track_with_empty_automation(
     Ok(TestHircObject::raw(11, id, body))
 }
 
-fn clip_words(
+pub(super) fn clip_words(
     bytes: &mut [u8],
     track_id: u32,
     source: u32,
     posted: u32,
     timing: [f64; 4],
-) -> TestResult {
+) -> Result<usize, Box<dyn std::error::Error>> {
     let authored_header = [
         track_id.to_le_bytes(),
         source.to_le_bytes(),
@@ -252,11 +252,11 @@ fn clip_words(
         0_u32.to_le_bytes(),
     ];
     let header = authored_header.as_flattened();
-    let start = bytes
+    let clip_start = bytes
         .windows(header.len())
         .position(|candidate| candidate == header)
         .ok_or("original clip header")?;
-    let start = start + header.len() - ID_BYTES;
+    let start = clip_start + header.len() - ID_BYTES;
     let fields = bytes
         .get_mut(start..start + ID_BYTES + TIMING_BYTES)
         .ok_or("original clip timing")?;
@@ -268,5 +268,5 @@ fn clip_words(
     for (word, value) in words.iter_mut().zip(timing) {
         *word = value.to_le_bytes();
     }
-    Ok(())
+    Ok(clip_start)
 }

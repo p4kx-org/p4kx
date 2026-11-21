@@ -129,6 +129,10 @@ impl RenderedTxtp<'_> {
                 TxtpApproximation::OmitMusicTrackAutomation,
             ),
             (
+                PlaybackFeature::MusicSubtrackSelection,
+                TxtpApproximation::OmitMusicSubtrackSelection,
+            ),
+            (
                 PlaybackFeature::ContainerTransitions,
                 TxtpApproximation::OmitContainerTransitions,
             ),

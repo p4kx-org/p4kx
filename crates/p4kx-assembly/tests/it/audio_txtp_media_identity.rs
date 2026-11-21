@@ -5,7 +5,7 @@ use std::fs;
 
 use p4kx_assembly::audio::{
     ArchiveAudio, ExportLoopOrigins, ExportOptions, ExportWatch, ExportedSound, SoundFormat,
-    WemExportSource, write_txtp_with_loop_origins,
+    TxtpFile, WemExportSource, write_txtp_with_loop_origins,
 };
 use p4kx_extraction::{Archive, CancelToken, ConflictPolicy};
 use p4kx_testkit::{ArchiveBuilder, TestAtl, TestBank, TestEntry, TestHircObject, wwise_short_id};
@@ -82,6 +82,13 @@ fn same_short_id_keeps_both_physical_media_and_binds_each_txtp_loop() -> TestRes
     let [file] = report.files.as_slice() else {
         return Err("one TXTP for the logical event".into());
     };
+    assert_txtp_commands(file, [first_file, second_file])
+}
+
+fn assert_txtp_commands(
+    file: &TxtpFile,
+    [first_file, second_file]: [&ExportedSound; 2],
+) -> TestResult {
     let text = fs::read_to_string(&file.path)?;
     let commands: Vec<_> = text
         .lines()

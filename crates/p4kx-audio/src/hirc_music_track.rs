@@ -19,8 +19,8 @@ mod rows;
 
 pub(crate) use evidence::MusicTrackEvidence;
 pub use evidence::{
-    MusicTrackClipTimingKind, MusicTrackClipTimingWord, MusicTrackEvidenceKind,
-    MusicTrackEvidenceWord,
+    MusicSubtrackSelection, MusicTrackClipTimingKind, MusicTrackClipTimingWord,
+    MusicTrackEvidenceKind, MusicTrackEvidenceWord,
 };
 pub use rows::{BankMusicTrackClip, BankMusicTrackSource};
 pub(crate) use rows::{clip, source};
@@ -150,6 +150,19 @@ pub(crate) fn track(
         .map(|count| count.with_bank_offset(bank_offset));
     if let Some(switch) = &fields.switch {
         evidence.observe_switch(switch, bank_offset);
+    }
+    if matches!(
+        header.kind,
+        MusicTrackKind::Random | MusicTrackKind::Sequence
+    ) {
+        evidence.subtrack_selection = fields
+            .kind_code
+            .zip(fields.subtrack_count)
+            .filter(|(_, count)| count.value > 1)
+            .map(|(kind, count)| MusicSubtrackSelection {
+                kind: kind.with_bank_offset(bank_offset),
+                subtrack_count: count.with_bank_offset(bank_offset),
+            });
     }
     Ok(MusicTrack {
         parent_id: header.parent,
