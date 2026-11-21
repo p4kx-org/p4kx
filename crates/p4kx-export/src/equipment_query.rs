@@ -114,6 +114,8 @@ mod facilities;
 mod inventory;
 #[path = "equipment_item_source_query.rs"]
 mod item_sources;
+#[path = "equipment_planet_audio_query.rs"]
+pub mod planet_audio;
 #[path = "equipment_projectile_ammo_query.rs"]
 mod projectile_ammo;
 #[path = "equipment_projectile_ammo_read.rs"]

@@ -1,22 +1,23 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 use serde_json::{Value, json};
 
 use crate::health_origin_assertions as origin;
 use crate::health_origin_fixture::{Fixture, Input, TestResult};
 
-const SOURCE_TYPE: &str = "ProceduralPlanetAudioData";
-const EXISTING: &str = "firstRoomIsPlanetRoomRtpc";
-const ADDED: &str = "firstRoomIsPlanetRoomNotIncludingShipsRtpc";
-const OTHER: &str = "firstRoomIsPlanetRoomOrVehicleRoomRtpc";
+#[path = "catalog_procedural_planet_audio_fixture.rs"]
+mod fixture;
+#[path = "catalog_procedural_planet_audio_sdk.rs"]
+mod sdk;
+
+use fixture::{ADDED, EXISTING, Layout, OTHER, SOURCE_TYPE, database};
 
 #[test]
 fn original_planet_rtpc_occurrences_and_additional_fields_survive() -> TestResult {
     for input in [Input::Plain, Input::Encrypted, Input::Standalone] {
         let marker = input.marker();
-        let fixture = Fixture::open(&database(true), input, Vec::new())?;
+        let fixture = Fixture::open(&database(Layout::Extended), input, Vec::new())?;
         let (_, catalog) = fixture.diagnostic()?;
         let row = row(&catalog)?;
         origin::present(row, "sourceType", &json!(SOURCE_TYPE), marker)?;
@@ -67,7 +68,7 @@ fn original_planet_rtpc_occurrences_and_additional_fields_survive() -> TestResul
 
 #[test]
 fn older_planet_rtpc_declarations_keep_absence_distinct_from_unreadable_text() -> TestResult {
-    let fixture = Fixture::open(&database(false), Input::Encrypted, Vec::new())?;
+    let fixture = Fixture::open(&database(Layout::Unreadable), Input::Encrypted, Vec::new())?;
     let (_, catalog) = fixture.diagnostic()?;
     let row = row(&catalog)?;
     for field in [ADDED, OTHER] {
@@ -116,58 +117,4 @@ fn row(catalog: &Value) -> TestResult<&Value> {
         return Err("expected one retained physical planet audio record".into());
     };
     Ok(row)
-}
-
-fn database(extended: bool) -> Vec<u8> {
-    let class = || TestType::Class("AudioRtpc".to_owned());
-    let mut definition = TestStruct::new(SOURCE_TYPE)
-        .field(EXISTING, class())
-        .array("entries", TestType::String)
-        .array("disturbanceLists", TestType::Reference)
-        .array("effectTagMovementRtpcs", TestType::UInt32)
-        .field("futureRoot", TestType::Double);
-    let existing = if extended {
-        TestValue::text("synthetic_existing")
-    } else {
-        TestValue::Raw(u32::MAX.to_le_bytes().to_vec())
-    };
-    let mut record = TestRecord::new(
-        0x1149,
-        SOURCE_TYPE,
-        "ProceduralPlanetAudioData.Test",
-        "synthetic/dev/planet.xml",
-    )
-    .value(EXISTING, rtpc(existing, 1.25))
-    .value("entries", TestValue::Array(vec![TestValue::text("tone")]))
-    .value("disturbanceLists", TestValue::Array(vec![TestValue::Null]))
-    .value("effectTagMovementRtpcs", TestValue::Array(Vec::new()))
-    .value("futureRoot", TestValue::Double(1.000_000_000_25));
-    if extended {
-        definition = definition
-            .field(ADDED, class())
-            .field(OTHER, TestType::Class("SyntheticOtherClass".to_owned()));
-        record = record.value(ADDED, rtpc(TestValue::text(""), 2.5)).value(
-            OTHER,
-            TestValue::Struct(TestInstance::new("SyntheticOtherClass")),
-        );
-    }
-    DataForgeBuilder::new()
-        .version(8)
-        .structure(definition)
-        .structure(
-            TestStruct::new("AudioRtpc")
-                .field("rtpc", TestType::String)
-                .field("extraScale", TestType::Single),
-        )
-        .structure(TestStruct::new("SyntheticOtherClass"))
-        .record(record)
-        .build()
-}
-
-fn rtpc(name: TestValue, extra_scale: f32) -> TestValue {
-    TestValue::Struct(
-        TestInstance::new("AudioRtpc")
-            .value("rtpc", name)
-            .value("extraScale", TestValue::Single(extra_scale)),
-    )
 }

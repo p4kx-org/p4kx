@@ -63,6 +63,7 @@ pub(super) enum Family {
     AmmoDefinitions,
     ExplosionDefinitions,
     ResourceNetworkGlobals,
+    ProceduralPlanetAudio,
     WeaponSources,
     ProjectileAmmo,
     MagazineResolutions,
@@ -78,6 +79,7 @@ impl Family {
             Self::AmmoDefinitions => Kind::AmmoDefinitions,
             Self::ExplosionDefinitions => Kind::ExplosionDefinitions,
             Self::ResourceNetworkGlobals => Kind::ResourceNetworkGlobals,
+            Self::ProceduralPlanetAudio => Kind::ProceduralPlanetAudio,
             Self::InventoryContainers => Kind::InventoryContainers,
             Self::CargoLoadingGlobals => Kind::CargoLoadingGlobals,
             Self::ShopCommodityGlobals => Kind::ShopCommodityGlobals,
@@ -111,7 +113,8 @@ impl Family {
             | Self::CargoLoadingGlobals
             | Self::ShopCommodityGlobals
             | Self::ExplosionDefinitions
-            | Self::ResourceNetworkGlobals => {
+            | Self::ResourceNetworkGlobals
+            | Self::ProceduralPlanetAudio => {
                 return DatasetAvailability::from_source_declarations(forge, |name| {
                     name == self.kind().records().type_name
                 });

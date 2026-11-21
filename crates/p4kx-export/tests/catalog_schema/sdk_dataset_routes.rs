@@ -108,6 +108,8 @@ mod npc_spawns;
 mod ordnance;
 #[path = "sdk_planet_asset_routes.rs"]
 mod planet_assets;
+#[path = "sdk_planet_audio_route.rs"]
+mod planet_audio;
 #[path = "sdk_planet_resource_route.rs"]
 mod planet_resource;
 #[path = "sdk_projectile_ammo_route.rs"]
@@ -259,6 +261,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.push(reputation_rewards::read()?);
     routes.extend(resource_network::read()?);
     routes.extend(radar_options::read()?);
+    routes.push(planet_audio::read()?);
     routes.extend(fuel::read()?);
     routes.extend(hacking::read()?);
     routes.push(inventory_containers::read()?);

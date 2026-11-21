@@ -167,6 +167,8 @@ pub mod weather {
     };
 }
 
+pub use self::equipment::planet_audio;
+
 #[path = "planet_resource_query.rs"]
 pub mod planet_resources;
 

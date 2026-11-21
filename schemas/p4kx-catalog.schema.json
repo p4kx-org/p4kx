@@ -36286,7 +36286,7 @@
       "type": "object"
     },
     "PlanetAudioRtpc": {
-      "description": "The authored audio RTPC identifier.\nAn authored real-time parameter control identifier.",
+      "description": "An original planet audio control with its authored identifier and extensions.",
       "properties": {
         "additionalFields": {
           "$ref": "#/$defs/SourceArenaOutput"

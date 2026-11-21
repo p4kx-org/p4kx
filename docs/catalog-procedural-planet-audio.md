@@ -26,3 +26,9 @@ The shared five-field [source carrier](catalog.md#per-value-source-origin-for-ca
 state, encrypted origin and source-use references. These values are the authored DataForge
 identifiers. Audio bank objects and loose ecosystem sound declarations have their own source
 families. The catalog makes no inference about runtime ranges or binding targets from RTPC names.
+
+Use `catalog_queries::planet_audio::with_procedural_planet_audio`, its decoded-Entry
+variant or a parsed session to read those rows by GUID, physical Record index or all declared
+owners. The query reports per-source coverage, returns partial rows with their unreadable fields
+and uses the selected DataForge definitions. Referenced records keep their original identity and
+source evidence.
