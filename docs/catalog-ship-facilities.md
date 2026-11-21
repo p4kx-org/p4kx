@@ -118,9 +118,10 @@ capability. Physical port counts come from the authored port slots.
 
 `placements.facilityInstances` links physical facility and inventory configurations to their
 resolved ship contexts. Each row carries the root ship GUID and physical Record index.
-The `loadout` source uses `position.value.loadoutOrdinal` and ordered
-`position.value.portOrdinals` to navigate the same published Loadout. An empty port path
-addresses the root. Attached rows carry the selected physical Entity Record and the original
+For a `loadout` source, match `position.value.loadoutRecordIndex` to
+`loadouts[].sourceRecordIndex.value`, then follow the ordered
+`position.value.portOrdinals` through the nested `ports` arrays. An empty path addresses
+the root. Attached rows carry the selected physical Entity Record and the original
 port coordinates when a port definition is available. Each path retains the observed port
 and attachment contributors from the root to the component's owner.
 
@@ -146,8 +147,8 @@ For a `vehicle` room, join `source.room.owner` and `objectContainerOrdinal` to t
 physical component and array slot in `declarations.roomAssociations`. For an `item`
 room, the owner identifies the scalar `objectContainer` in
 `declarations.itemRoomAssociations`. That declaration appears once per original
-component. `source.room.loadoutPosition` identifies the resolved attachment path
-for each occurrence and is null for a room declared directly on the ship.
+component. `source.room.loadoutPosition` uses the same physical root and ordered port path
+for each item-room occurrence. Its value is null for a room declared directly on the ship.
 The sourced `source.position` identifies the
 actual containing SOCpak, descriptor and SOC Entry, the descriptor's original OC
 node, the CrCh chunk-table index and the Entity's original direct element slot.

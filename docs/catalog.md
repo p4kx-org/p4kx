@@ -1163,8 +1163,18 @@ racks, weapons with attachment ports. With a `--filter` the ships and items are 
 so a loadout exists only for the entries the filter selected and the kind is partial.
 
 `sourceRecordIndex` identifies the original physical DataForge Record with its immediate header
-origin. Use it alongside `entityGuid` to distinguish physical Loadout rows with the same nominal
-GUID in one Build.
+origin. Use `sourceRecordIndex.value` to distinguish Loadout rows that share an `entityGuid`.
+
+**Placement paths.** A placement address refers to a physical root and an ordered path through
+the resolved Loadout for the same input.
+
+| Field | Join |
+|-------|------|
+| `loadoutRecordIndex` | Match `loadouts[].sourceRecordIndex.value` from the same DataForge input. The physical index is scoped to that input and survives catalog filtering. |
+| `portOrdinals` | Start with the root's `ports` array. At each step, select the zero-based index and use that port's `ports` array for the next step. An empty array addresses the root. |
+
+The address is used for resource-network contexts and nodes, installed configurations,
+Loadout facility sources, and facilities reached through item rooms.
 
 **Ports.** Each port has:
 

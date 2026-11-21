@@ -33,22 +33,25 @@ pub(super) fn compare(
     relays: &BTreeMap<usize, u32>,
 ) -> TestResult<Counts> {
     let loadouts = proof::rows(catalog, "/loadouts")?;
-    let guid = tree.guid().to_string();
-    let mut matches = loadouts.iter().enumerate().filter(|(_, row)| {
-        row.pointer("/entityGuid/value").and_then(Value::as_str) == Some(guid.as_str())
+    let owner = tree.record_index();
+    let mut matches = loadouts.iter().filter(|row| {
+        row.pointer("/sourceRecordIndex/value")
+            .and_then(Value::as_u64)
+            == Some(u64::from(owner))
     });
-    let (root, loadout) = matches.next().ok_or("selected original ship loadout")?;
-    assert!(
-        matches.next().is_none(),
-        "the ship has a single selected loadout"
+    let loadout = matches.next().ok_or("selected original ship loadout")?;
+    assert!(matches.next().is_none(), "one Loadout per physical Record");
+    assert_eq!(
+        proof::text(loadout, "/entityGuid/value")?,
+        tree.guid().to_string(),
+        "the original root header retains its GUID"
     );
     let scope = Scope {
         catalog,
         origins,
-        owner: tree.record_index(),
+        owner,
         locations: Locations::read(tree.root()),
         source_uses: proof::indexed(catalog, "/provenance/uses", "id")?,
-        root,
         ports: assembly.ports(),
     };
     compare_relays(loadout, relays, scope.ports)?;
@@ -97,7 +100,6 @@ struct Scope<'read, 'catalog, 'source> {
     owner: u32,
     locations: Locations<'source>,
     source_uses: HashMap<&'catalog str, &'catalog Value>,
-    root: usize,
     ports: &'read [PortNode],
 }
 
@@ -148,7 +150,7 @@ impl<'source> Scope<'_, '_, 'source> {
         let mut bindings = BTreeMap::new();
         for row in proof::rows(self.catalog, table)? {
             let context = field(row, "context")?;
-            if context["loadoutOrdinal"] != self.root
+            if context["loadoutRecordIndex"] != self.owner
                 || !proof::rows(context, "/portOrdinals")?.is_empty()
                 || table == LINK_BINDINGS && row["family"] != "hardpoint"
             {
@@ -340,7 +342,7 @@ impl<'source> Scope<'_, '_, 'source> {
 
     fn node(&self, ordinal: usize, candidate: &Value) -> TestResult {
         let matches = proof::rows(self.catalog, NODES)?.iter().filter(|row| {
-            row.pointer("/position/loadoutOrdinal") == Some(&Value::from(self.root))
+            row.pointer("/position/loadoutRecordIndex") == Some(&Value::from(self.owner))
                 && row
                     .pointer("/position/portOrdinals")
                     .is_some_and(|route| route == &json!([ordinal]))

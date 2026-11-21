@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog};
+use p4kx_export::{CatalogOptions, CatalogPublicationMode, Filter, build_catalog};
 use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
@@ -9,6 +9,8 @@ use crate::health_origin_assertions as proof;
 
 #[path = "catalog_resource_topology_fixture.rs"]
 mod fixture;
+#[path = "catalog_resource_topology_physical_loadout.rs"]
+mod physical_loadout;
 #[path = "catalog_resource_topology_port_attributes.rs"]
 mod port_attributes;
 #[path = "catalog_topology_declarations_sdk.rs"]
@@ -86,8 +88,16 @@ fn catalog() -> TestResult<Value> {
 }
 
 fn catalog_from(archive: &p4kx_extraction::Archive) -> TestResult<Value> {
+    catalog_with_filter(archive, None)
+}
+
+fn catalog_with_filter(
+    archive: &p4kx_extraction::Archive,
+    filter: Option<&Filter>,
+) -> TestResult<Value> {
     let options = CatalogOptions {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
+        filter,
         ..common::options()
     };
     Ok(serde_json::from_slice(
@@ -170,7 +180,7 @@ fn unread_vehicle_inputs_leave_observed_candidates_without_claiming_absence() ->
     Ok(())
 }
 
-fn check_links(catalog: &Value, root: usize, ship: &Value) -> TestResult {
+fn check_links(catalog: &Value, root: u64, ship: &Value) -> TestResult {
     let root_links = bindings(catalog, root)?;
     let hardpoints: Vec<_> = root_links
         .iter()
@@ -248,7 +258,7 @@ fn check_context_boundaries(catalog: &Value, ship: &Value, hardpoints: &[&Value]
     Ok(())
 }
 
-fn check_nodes(catalog: &Value, root: usize, ship: &Value) -> TestResult {
+fn check_nodes(catalog: &Value, root: u64, ship: &Value) -> TestResult {
     let nodes = proof::rows(catalog, "/placements/resourceNetworkNodes/rows")?;
     for (name, item, relay) in [
         ("mount_a", fixture::RELAY, true),
@@ -280,11 +290,11 @@ fn check_nodes(catalog: &Value, root: usize, ship: &Value) -> TestResult {
     Ok(())
 }
 
-fn check_rooms(catalog: &Value, root: usize) -> TestResult {
+fn check_rooms(catalog: &Value, root: u64) -> TestResult {
     let rooms = proof::rows(catalog, "/placements/roomAssociationBindings/rows")?;
     let root_rooms: Vec<_> = rooms
         .iter()
-        .filter(|row| row.pointer("/context/loadoutOrdinal") == Some(&json!(root)))
+        .filter(|row| row.pointer("/context/loadoutRecordIndex") == Some(&json!(root)))
         .collect();
     let [matched, unmatched] = root_rooms.as_slice() else {
         return Err("both authored room associations remain".into());
@@ -335,20 +345,19 @@ fn check_restrictions(catalog: &Value) -> TestResult {
     Ok(())
 }
 
-fn loadout(catalog: &Value, guid: u128) -> TestResult<(usize, &Value)> {
+fn loadout(catalog: &Value, guid: u128) -> TestResult<(u64, &Value)> {
     let entry = crate::loadouts_support::loadout(catalog, guid)?;
-    let ordinal = proof::rows(catalog, "/loadouts")?
-        .iter()
-        .position(|row| std::ptr::eq(row, entry))
-        .ok_or("ship Loadout position")?;
-    Ok((ordinal, entry))
+    let record = proof::at(entry, "/sourceRecordIndex/value")?
+        .as_u64()
+        .ok_or("physical ship Loadout Record")?;
+    Ok((record, entry))
 }
 
-fn bindings(catalog: &Value, loadout: usize) -> TestResult<Vec<&Value>> {
+fn bindings(catalog: &Value, loadout: u64) -> TestResult<Vec<&Value>> {
     Ok(
         proof::rows(catalog, "/placements/resourceNetworkLinkBindings/rows")?
             .iter()
-            .filter(|row| row.pointer("/context/loadoutOrdinal") == Some(&json!(loadout)))
+            .filter(|row| row.pointer("/context/loadoutRecordIndex") == Some(&json!(loadout)))
             .collect(),
     )
 }
@@ -362,13 +371,13 @@ fn named_port_ordinal(ship: &Value, name: &str) -> TestResult<usize> {
 
 fn placed_node<'rows>(
     nodes: &'rows [Value],
-    loadout: usize,
+    loadout: u64,
     ordinals: &[usize],
 ) -> TestResult<&'rows Value> {
     nodes
         .iter()
         .find(|node| {
-            node.pointer("/position/loadoutOrdinal") == Some(&json!(loadout))
+            node.pointer("/position/loadoutRecordIndex") == Some(&json!(loadout))
                 && node.pointer("/position/portOrdinals") == Some(&json!(ordinals))
         })
         .ok_or_else(|| format!("no topology node for {loadout}/{ordinals:?}").into())

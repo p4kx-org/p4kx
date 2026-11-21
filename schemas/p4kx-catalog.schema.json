@@ -28582,9 +28582,9 @@
       "type": "object"
     },
     "LoadoutPosition": {
-      "description": "A position in the published ship Loadout and its nested port arrays.",
+      "description": "A physical ship Loadout and a route through its nested port arrays.",
       "properties": {
-        "loadoutOrdinal": {
+        "loadoutRecordIndex": {
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
@@ -28599,7 +28599,7 @@
         }
       },
       "required": [
-        "loadoutOrdinal",
+        "loadoutRecordIndex",
         "portOrdinals"
       ],
       "type": "object"

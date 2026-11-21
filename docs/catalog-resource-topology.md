@@ -21,11 +21,12 @@ marker. A room association describes the authored attachment context.
 
 ## Installed loadout contexts
 
-The `placements` tables refer to the same `loadouts` array emitted by the
-catalog. A position uses a zero-based `loadoutOrdinal` and ordered
-`portOrdinals` into its nested `ports` arrays. An empty port route denotes
-the ship root. A binding records the declaring context route, and an endpoint
-candidate's `loadoutPortOrdinal` selects a direct port in that context.
+A `placements` position uses `loadoutRecordIndex` to match
+`loadouts[].sourceRecordIndex.value` in the same catalog. Apply the ordered
+`portOrdinals` to the root's `ports` array and each selected port's child
+`ports` array. An empty path denotes the ship root. A binding records the
+declaring context path. An endpoint candidate's `loadoutPortOrdinal` selects a
+direct port in that context.
 
 - `resourceNetworkNodes` contains authored endpoint placements and installed
   resource components, including disconnected and invisible placements. A

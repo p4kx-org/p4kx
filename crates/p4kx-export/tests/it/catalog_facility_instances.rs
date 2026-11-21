@@ -39,7 +39,10 @@ fn ship_facility_instances_preserve_repeated_nested_and_docked_loadout_positions
     let instances = proof::rows(&catalog, "/placements/facilityInstances/rows")?;
     check_ship_instances(instances)?;
     check_docked_instances(instances)?;
-    check_installed_flight(&catalog)?;
+    check_root_positions(instances, ship, docked)?;
+    let installed = proof::rows(&catalog, "/placements/installedConfigurations/rows")?;
+    check_root_positions(installed, ship, docked)?;
+    check_installed_flight(installed)?;
     validate(&catalog)
 }
 
@@ -88,8 +91,36 @@ fn facility_path_keeps_encrypted_ancestor_separate_from_clear_child_and_definiti
     validate(&catalog)
 }
 
-fn check_installed_flight(catalog: &Value) -> TestResult {
-    let rows = proof::rows(catalog, "/placements/installedConfigurations/rows")?;
+fn check_root_positions(rows: &[Value], ship: &Value, docked: &Value) -> TestResult {
+    for (guid, loadout) in [(fixture::SHIP, ship), (fixture::DOCKED, docked)] {
+        let index = proof::at(loadout, "/sourceRecordIndex/value")?;
+        for row in instances_of(rows, guid) {
+            let position = proof::at(row, "/source/position")?;
+            let root = proof::at(row, "/shipRecordIndex")?;
+            assert_eq!(
+                proof::at(position, "/value/loadoutRecordIndex")?,
+                index,
+                "each placement addresses its physical Loadout root"
+            );
+            assert_eq!(
+                proof::at(root, "/value")?,
+                index,
+                "the position and root ship share the original Record index"
+            );
+            let uses = proof::rows(position, "/sourceUsesRefs")?;
+            let [selector] = proof::rows(root, "/sourceUsesRefs")? else {
+                return Err("one original root Record index selector".into());
+            };
+            assert!(
+                uses.contains(selector),
+                "the position retains the physical root origin"
+            );
+        }
+    }
+    Ok(())
+}
+
+fn check_installed_flight(rows: &[Value]) -> TestResult {
     let host = instances_of(rows, fixture::SHIP);
     let docked = instances_of(rows, fixture::DOCKED);
     let [root, attachment] = docked.as_slice() else {

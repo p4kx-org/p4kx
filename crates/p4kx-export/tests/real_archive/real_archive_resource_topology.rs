@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::time::SystemTime;
 
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog_from};
@@ -52,13 +52,11 @@ fn avenger_and_multi_relay_topology_match_the_authored_source() -> TestResult {
         }
     }
     let avenger = avenger.ok_or("configured build contains no readable target Avenger Record")?;
-    let avenger = catalog_v3_consumer::present(&avenger["guid"])?
-        .as_str()
-        .ok_or("Avenger GUID")?;
+    let avenger = u32::try_from(proof::number(avenger, "/recordIndex/value")?)?;
     let multi = multi_relay(&catalog, avenger)?;
-    for guid in [avenger, multi] {
-        trace(&forge, &catalog, guid, Declaration::Hardpoint)?;
-        trace(&forge, &catalog, guid, Declaration::Room)?;
+    for record in [avenger, multi] {
+        trace(&forge, &catalog, record, Declaration::Hardpoint)?;
+        trace(&forge, &catalog, record, Declaration::Room)?;
     }
     watch
         .check()
@@ -69,25 +67,33 @@ fn avenger_and_multi_relay_topology_match_the_authored_source() -> TestResult {
     Ok(())
 }
 
-fn multi_relay<'catalog>(catalog: &'catalog Value, avenger: &str) -> TestResult<&'catalog str> {
-    let nodes = proof::rows(catalog, "/placements/resourceNetworkNodes/rows")?;
-    let loadouts = proof::rows(catalog, "/loadouts")?;
+fn multi_relay(catalog: &Value, avenger: u32) -> TestResult<u32> {
+    let mut loadouts = BTreeSet::new();
+    for row in proof::rows(catalog, "/loadouts")? {
+        let index = u32::try_from(proof::number(row, "/sourceRecordIndex/value")?)?;
+        assert!(
+            loadouts.insert(index),
+            "published Loadout Records are unique"
+        );
+    }
     let mut relay_counts = BTreeMap::new();
-    for node in nodes {
+    for node in proof::rows(catalog, "/placements/resourceNetworkNodes/rows")? {
+        let index = u32::try_from(proof::number(node, "/position/loadoutRecordIndex")?)?;
+        assert!(
+            loadouts.contains(&index),
+            "physical node Loadout is published"
+        );
         let evidence = proof::rows(node, "/resourceComponents")?;
         if evidence
             .iter()
             .any(|source| source.pointer("/isRelay/value") == Some(&Value::Bool(true)))
         {
-            let ordinal = usize::try_from(proof::number(node, "/position/loadoutOrdinal")?)?;
-            *relay_counts.entry(ordinal).or_insert(0) += 1;
+            *relay_counts.entry(index).or_insert(0) += 1;
         }
     }
-    for (ordinal, count) in relay_counts {
-        let loadout = loadouts.get(ordinal).ok_or("published Loadout ordinal")?;
-        let guid = proof::text(loadout, "/entityGuid/value")?;
-        if guid != avenger && count >= 2 {
-            return Ok(guid);
+    for (index, count) in relay_counts {
+        if index != avenger && count >= 2 {
+            return Ok(index);
         }
     }
     Err("configured build contains no independent multi-relay ship scope".into())
@@ -133,14 +139,14 @@ impl Declaration {
 fn trace(
     forge: &DataForge<'_>,
     catalog: &Value,
-    guid: &str,
+    record_index: u32,
     declaration: Declaration,
 ) -> TestResult {
     let (table, type_name, source_field, published_field) = declaration.fields();
     let mut trees = TreeBuilder::new();
     let mut visited = 0;
     for ((owner, ordinal), row) in components::component_rows(catalog, table)? {
-        if proof::text(row, "/ownerGuid/value")? != guid {
+        if owner != record_index {
             continue;
         }
         let record = forge.record(owner).ok_or("original topology Record")?;
@@ -151,7 +157,9 @@ fn trace(
         let Some(Original::Struct(source)) = parts.get(ordinal) else {
             return Err("original topology Components slot".into());
         };
-        if source.type_name() != type_name || tree.guid().to_string() != guid {
+        if source.type_name() != type_name
+            || proof::text(row, "/ownerGuid/value")? != tree.guid().to_string()
+        {
             return Err("original topology owner differs".into());
         }
         let cell = components::cell(row, published_field)?;

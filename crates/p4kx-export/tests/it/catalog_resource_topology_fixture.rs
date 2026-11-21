@@ -48,6 +48,36 @@ fn database_for(source: GraphSource) -> DataForgeBuilder {
         .record(docked())
 }
 
+pub(super) const SELECTED_TWIN: &str = "fixture_twin_kept";
+
+pub(super) fn physical_identity_database() -> DataForgeBuilder {
+    entity_schema()
+        .record(item(SHIP - 1, "FixtureEarlierItem", false, true))
+        .record(twin_ship(
+            "FixtureFirstTwin",
+            "fixture_twin_removed",
+            "removed",
+        ))
+        .record(twin_ship("FixtureSecondTwin", SELECTED_TWIN, "kept"))
+}
+
+fn twin_ship(name: &str, path: &str, first_port: &str) -> TestRecord {
+    TestEntity::new(
+        SHIP,
+        name,
+        format!("libs/foundry/records/entities/spaceships/{path}.xml"),
+    )
+    .vehicle("", "")
+    .component(node(container(
+        vec![
+            port(first_port, &format!("{path}-first"), false),
+            port("second", &format!("{path}-second"), false),
+        ],
+        vec![hardpoint(first_port, "second")],
+    )))
+    .record()
+}
+
 fn entity_schema() -> DataForgeBuilder {
     let builder = DataForgeBuilder::new()
         .version(8)

@@ -198,8 +198,11 @@ order, counts, the origin protocol union and standalone Record serialization sta
 ## Contextual resource-network placements
 
 Original link and room rows use the physical owner Record, component ordinal
-and authored slot. Contextual bindings use the published Loadout array
-position and nested port ordinals. The root or nested owner determines the
+and authored slot. Loadout placement addresses identify the physical DataForge
+Record of the root and retain the ordered path through nested `ports` arrays.
+Join `loadoutRecordIndex` to `loadouts[].sourceRecordIndex.value` from the same
+input. This keeps a Loadout address stable when a filter omits earlier rows or
+several roots share a GUID. A binding's root or nested owner determines its
 admissible direct endpoints. Original weak targets match their admitted
 physical port coordinates. Each physical name candidate survives if Loadout
 selection collapses a duplicate. Nodes reference selected resource components
@@ -209,6 +212,14 @@ uses in their immediate source cell. Physical pointer matches retain their
 own selected candidate evidence.
 [Declared resource-network topology](../catalog-resource-topology.md) defines
 the placement and resolution states.
+
+The 0.5.0 schema v3 preview used `loadoutOrdinal` as the root's array position.
+Regenerate preview catalogs and join placements by `loadoutRecordIndex`. A reader
+migrating a preview address can resolve the ordinal in that same preview
+document and read the matched row's `sourceRecordIndex.value` when available.
+The ordered port path and context-local endpoint ordinal keep their meanings.
+The released v2 migration is a separate contract.
+
 ## Ship facility configurations
 
 A facility definition is identified by the original Entity Record index and

@@ -69,11 +69,8 @@ fn project(
     for ship in loadouts.ships() {
         check_cancel(cancel)?;
         let loadout = &ship.loadout;
-        let position = LoadoutPosition {
-            loadout_ordinal: loadout_position::ordinal(ship.ordinal)?,
-            port_ordinals: Vec::new(),
-        };
         let record = loadout.root_record_index;
+        let position = LoadoutPosition::root(record);
         let root_resources = components(&index, Some(record));
         if !root_resources.is_empty() {
             graph.nodes.push(ResourceNetworkNode {

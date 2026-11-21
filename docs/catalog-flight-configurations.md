@@ -28,9 +28,11 @@ without converting units, evaluating curves or selecting between separate
 legacy and current values. Fuel members with a stored resource-unit type
 retain that unit identity and unconverted numeric payload.
 
-`placements.installedConfigurations` links the exact physical configurations
-to the existing resolved Loadout position. Empty `portOrdinals` refers to the
-vehicle itself. The same component placed twice yields two rows. An invisible
+`placements.installedConfigurations` links physical configurations to their
+resolved Loadout positions. Match `source.position.value.loadoutRecordIndex` to
+`loadouts[].sourceRecordIndex.value` and follow `source.position.value.portOrdinals`
+through the nested `ports` arrays. An empty path addresses the vehicle itself.
+The same component placed twice yields two rows. An invisible
 port can carry a row. A docked vehicle has its own root and does not contribute
 its child configurations to the host. Missing or ambiguous selected port
 targets do not fabricate placements. Positions are scoped to the exported

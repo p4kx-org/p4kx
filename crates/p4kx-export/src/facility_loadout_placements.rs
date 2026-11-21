@@ -96,7 +96,6 @@ pub(super) fn table(
                 project.check_cancel()?;
                 project.loadout(
                     &ship.loadout,
-                    loadout_position::ordinal(ship.ordinal)?,
                     &rooms,
                     &mut attachments,
                     &mut flight_instances,
@@ -198,7 +197,6 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
     fn loadout(
         &mut self,
         loadout: &Loadout,
-        ordinal: u32,
         rooms: &RoomOwners<'_, '_>,
         room_attachments: &mut Vec<RoomAttachment>,
         flight: &mut InstalledConfigurations<'_>,
@@ -209,7 +207,7 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
             .origins
             .record(root)
             .observe_header(RecordHeaderField::RecordIndex, SourceUseRole::Selector)?;
-        let walk = Path::new(ordinal, selector);
+        let walk = Path::new(root, selector);
         self.emit(&ship, root, &walk, None)?;
         flight.emit(&ship, root, || walk.position_cell(&self.origins.uses), None)?;
         self.walk_ports(loadout, &ship, walk, rooms, room_attachments, flight)

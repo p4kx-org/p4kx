@@ -61,12 +61,9 @@ impl Path {
         )
     }
 
-    pub(super) fn new(loadout_ordinal: u32, root: SourceUse) -> Self {
+    pub(super) fn new(loadout_record_index: u32, root: SourceUse) -> Self {
         Self {
-            position: LoadoutPosition {
-                loadout_ordinal,
-                port_ordinals: Vec::new(),
-            },
+            position: LoadoutPosition::root(loadout_record_index),
             uses: vec![root],
             complete: true,
         }

@@ -57,7 +57,7 @@ fn assert_attachment(room: &Value, slot: usize, port: u32) -> TestResult {
     proof::present(
         room,
         "loadoutPosition",
-        &json!({"loadoutOrdinal": 0, "portOrdinals": [port]}),
+        &json!({"loadoutRecordIndex": 0, "portOrdinals": [port]}),
         Some(false),
     )?;
     Ok(())
