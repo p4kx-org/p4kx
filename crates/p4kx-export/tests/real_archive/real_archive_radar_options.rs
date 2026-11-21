@@ -3,6 +3,8 @@
 
 use std::time::UNIX_EPOCH;
 
+use p4kx_export::catalog_queries::CatalogRecordSelection;
+use p4kx_export::catalog_queries::game_modes::with_radar_options_from;
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, Filter, build_catalog_from};
 use p4kx_extraction::{
     Archive, ArchiveWatch, DataForge, DataForgeEntry, RecordTree, StructValue, TreeBuilder,
@@ -11,6 +13,7 @@ use p4kx_extraction::{
 use p4kx_testkit::{real_archive_key, real_archive_pair};
 use serde_json::Value;
 
+use crate::component_sdk_parity::ComponentSdkParity;
 use crate::real_archive_auto_spawns::{original::Locations, provenance::Origins};
 use crate::real_archive_item_components::{cell, require_state};
 use crate::real_archive_shop_inventory_v3;
@@ -18,6 +21,7 @@ use crate::real_archive_verification;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
+const DATASET: &str = "/configurations/radarOptions/rows";
 const OPTIONS: &str = "radarOptionParams";
 const PING: &str = "allowFPSPingWave";
 const FLAGS: [&str; 7] = [
@@ -55,6 +59,7 @@ fn game_mode_radar_options_match_original_value_and_origin_in_both_builds() -> T
         let catalog: Value = serde_json::from_slice(built.json())?;
         real_archive_shop_inventory_v3::verify_build(&archive, &catalog)?;
         verify(&catalog, &owner, &Origins::read(&catalog, entry.origin())?)?;
+        verify_sdk(&archive, &entry, &catalog, owner.record_index())?;
         watch
             .check()
             .map_err(|_| "Archive changed during verification")?;
@@ -62,6 +67,26 @@ fn game_mode_radar_options_match_original_value_and_origin_in_both_builds() -> T
             "radar options witness {sample}: original physical owner and declared Boolean source states verified"
         ));
     }
+    Ok(())
+}
+
+fn verify_sdk(
+    archive: &Archive,
+    entry: &DataForgeEntry,
+    catalog: &Value,
+    owner: u32,
+) -> TestResult {
+    let comparison = ComponentSdkParity::new(archive, entry, catalog)?;
+    let [row] = super::real_archive_item_durability::rows(catalog, DATASET)? else {
+        return Err("expected one filtered radar option row".into());
+    };
+    with_radar_options_from(
+        archive,
+        entry,
+        CatalogRecordSelection::RecordIndex(owner),
+        None,
+        |snapshot| comparison.compare_rows(DATASET, &[row], &snapshot),
+    )??;
     Ok(())
 }
 
@@ -103,7 +128,7 @@ fn radar<'read, 'source>(
 fn verify(catalog: &Value, tree: &RecordTree<'_>, origins: &Origins<'_>) -> TestResult {
     let owner = tree.record_index();
     let rows = catalog
-        .pointer("/configurations/radarOptions/rows")
+        .pointer(DATASET)
         .and_then(Value::as_array)
         .ok_or("typed radar options table")?;
     let [row] = rows.as_slice() else {

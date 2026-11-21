@@ -4,6 +4,8 @@
 use std::error::Error;
 use std::time::UNIX_EPOCH;
 
+use p4kx_export::catalog_queries::CatalogRecordSelection;
+use p4kx_export::catalog_queries::equipment::resource_network::with_resource_network_globals_from;
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, Filter, build_catalog_from};
 use p4kx_extraction::{
     Archive, ArchiveWatch, DataForgeEntry, DataForgeOrigin, InputScope, RecordTree,
@@ -12,11 +14,13 @@ use p4kx_extraction::{
 use p4kx_testkit::{real_archive_key, real_archive_pair};
 use serde_json::Value as Json;
 
+use crate::component_sdk_parity::ComponentSdkParity;
 use crate::real_archive_item_components::single;
 use crate::real_archive_item_durability::{self as proof, Trace};
 use crate::real_archive_shop_inventory_v3::verify_build;
 use crate::real_archive_verification::print_line;
 
+const DATASET: &str = "/definitions/resourceNetworkGlobals/rows";
 const SOURCE_TYPE: &str = "ItemResourceNetworkGlobal";
 const ROOT_NUMBERS: &[&str] = &[
     "maxPowerToCoolantRatio",
@@ -84,7 +88,7 @@ fn verify_record(
     let built = build_catalog_from(archive, entry, &options)?;
     let catalog: Json = serde_json::from_slice(built.json())?;
     verify_build(archive, &catalog)?;
-    let rows = proof::rows(&catalog, "/definitions/resourceNetworkGlobals/rows")?;
+    let rows = proof::rows(&catalog, DATASET)?;
     let [row] = rows else {
         return Err("one filtered global resource definition".into());
     };
@@ -98,6 +102,14 @@ fn verify_record(
         Some(SOURCE_TYPE),
         "the definition preserves the original Record type",
     );
+    let comparison = ComponentSdkParity::new(archive, entry, &catalog)?;
+    with_resource_network_globals_from(
+        archive,
+        entry,
+        CatalogRecordSelection::RecordIndex(tree.record_index()),
+        None,
+        |snapshot| comparison.compare_rows(DATASET, &[row], &snapshot),
+    )??;
     let DataForgeOrigin::Archive(source) = entry.origin() else {
         return Err("expected an observed Archive DataForge".into());
     };

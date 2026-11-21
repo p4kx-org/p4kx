@@ -46,6 +46,15 @@ impl<'source> ComponentSdkParity<'source> {
             .iter()
             .filter_map(|((index, _), row)| (*index == owner).then_some(*row))
             .collect();
+        self.compare_rows(dataset, &expected, sdk)
+    }
+
+    pub(super) fn compare_rows<Row: Serialize, Dependencies>(
+        &self,
+        dataset: &str,
+        expected: &[&Value],
+        sdk: &EquipmentSnapshot<'_, Row, Dependencies>,
+    ) -> TestResult {
         if expected.is_empty()
             || sdk.build() != self.archive.build()
             || !matches!(sdk.availability(), DatasetAvailability::Available)
