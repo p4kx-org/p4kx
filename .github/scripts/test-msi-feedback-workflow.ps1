@@ -11,6 +11,12 @@ function Get-FeedbackWorkflowStep([string]$Text,[string]$Name) {
     return $matches[0].Value
 }
 
+$release=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/workflows/release.yml')
+$control=[regex]::Match($release,'(?ms)^  windows-observation-control:\r?\n.*?(?=^  \w)').Value
+Assert-FeedbackWorkflow ($control.Contains("github.event_name == 'pull_request'") -and
+    $control.Contains("github.event_name == 'workflow_dispatch' && inputs.windows-observation-control-only") -and
+    $control.Contains('uses: ./.github/workflows/windows-msi-detached-control.yml')) 'Native observation control must exercise release pull requests and remain selectable on its own.'
+
 $workflow=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/workflows/release-windows-execute.yml')
 $verify=[regex]::Match($workflow,'(?ms)^  verify:\r?\n.*\z').Value
 Assert-FeedbackWorkflow ($verify.Length -gt 0) 'Native Windows consumer job is missing.'

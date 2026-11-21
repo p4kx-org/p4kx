@@ -96,6 +96,7 @@ CPUs and package formats for that OS without external scans or publication. The 
 mutually exclusive. These scoped checks do not replace the final full release matrix from one
 source commit.
 
+Release validation on a pull request includes the native Windows observation control.
 The manual Release option `windows-observation-control-only` runs a small process-lifetime
 control on both native Windows CPUs. Set `$releaseCandidateRef` to the candidate branch:
 
