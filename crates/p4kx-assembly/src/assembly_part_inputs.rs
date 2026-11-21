@@ -11,8 +11,9 @@ use p4kx_extraction::{
 use p4kx_model::{Model, ModelFile};
 
 use super::Part;
+use crate::build_library_name::LibrarySource;
 use crate::build_models::Loaded;
-use crate::cdf_model_sources::CdfModelSources;
+use crate::cdf_model_sources::{CdfMaterial, CdfModelSources};
 use crate::{GearPlacementSource, GearPoseInput, GearPoseSources, PortPlacementSource};
 
 #[derive(Debug, Clone, Default)]
@@ -20,12 +21,17 @@ pub(crate) struct ModelDefinition {
     origin: Option<EntryOrigin>,
     cdf: Option<Arc<CdfModelSources>>,
     gear_pose: Option<Arc<GearPoseSources>>,
-    material_from_model: bool,
+    material_source: Option<LibrarySource>,
+    cdf_material: Option<CdfMaterial>,
     rig_only: bool,
 }
 
 impl ModelDefinition {
-    pub(crate) fn of(loaded: &Loaded, rendered: &Arc<Model>) -> Self {
+    pub(crate) fn of(
+        loaded: &Loaded,
+        rendered: &Arc<Model>,
+        material_source: Option<LibrarySource>,
+    ) -> Self {
         Self {
             origin: loaded.definition_origin.clone(),
             cdf: loaded.cdf_model_sources.clone(),
@@ -34,14 +40,12 @@ impl ModelDefinition {
                 .as_ref()
                 .filter(|_| Arc::ptr_eq(&loaded.model, rendered))
                 .map(Arc::clone),
-            material_from_model: false,
+            material_source,
+            cdf_material: (material_source == Some(LibrarySource::CharacterDefinition))
+                .then(|| loaded.cdf_material.clone())
+                .flatten(),
             rig_only: loaded.rig_only,
         }
-    }
-
-    pub(crate) const fn with_model_material(mut self, from_model: bool) -> Self {
-        self.material_from_model = from_model;
-        self
     }
 }
 
@@ -65,7 +69,7 @@ impl Part {
     }
 
     pub(crate) fn embedded_material_selector(&self) -> Option<(&EntryOrigin, SourceLocation)> {
-        if !self.model_definition.material_from_model {
+        if self.model_definition.material_source != Some(LibrarySource::Model) {
             return None;
         }
         let (model, files) = if self.is_cdf_rig_only() {
@@ -118,11 +122,22 @@ impl Part {
     /// Returns the original CDF material selector when the part uses that override.
     #[must_use]
     pub fn cdf_material_selector(&self) -> Option<SourceLocation> {
-        if self.model_definition.material_from_model {
-            self.model_definition.cdf.as_ref()?.material()
-        } else {
-            None
-        }
+        self.model_definition
+            .cdf_material
+            .as_ref()?
+            .sources
+            .as_deref()?
+            .material()
+    }
+
+    pub(crate) fn cdf_material_sources(&self) -> Option<(&EntryOrigin, &CdfModelSources)> {
+        let sources = self
+            .model_definition
+            .cdf_material
+            .as_ref()?
+            .sources
+            .as_deref()?;
+        Some((self.model_definition_origin()?, sources))
     }
 
     /// Returns the actual character definition that selected the model, if observed.

@@ -11,7 +11,7 @@ use rayon::iter::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::GearPoseSources;
 use crate::build::{file_key, issue};
-use crate::cdf_model_sources::CdfModelSources;
+use crate::cdf_model_sources::{CdfMaterial, CdfModelSources};
 use crate::flatten::Draft;
 use crate::geometry_choice::GeometryChoice;
 use crate::provider::DeclaredRig;
@@ -31,6 +31,7 @@ pub(crate) struct Loaded {
     pub(crate) archive_sources: Arc<[ModelArchiveSource]>,
     pub(crate) rig_only: bool,
     pub(crate) cdf_model_sources: Option<Arc<CdfModelSources>>,
+    pub(crate) cdf_material: Option<CdfMaterial>,
     pub(crate) gear_pose: Option<Arc<GearPoseSources>>,
     pub(crate) definition_origin: Option<EntryOrigin>,
     pub(crate) left_out: Vec<String>,
@@ -46,6 +47,7 @@ impl Loaded {
             archive_sources: provided.archive_sources,
             rig_only: provided.declared_rig.is_some(),
             cdf_model_sources: provided.cdf_model_sources,
+            cdf_material: provided.cdf_material,
             gear_pose: None,
             definition_origin: provided.definition_origin,
             left_out: provided.left_out,

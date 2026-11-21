@@ -12,7 +12,7 @@ use crate::assembly::ModelDefinition;
 use crate::build_attachments::attached;
 use crate::build_gear::load_models;
 use crate::build_hidden::hide_worn;
-use crate::build_library_name::{self, LibraryName};
+use crate::build_library_name::{self, LibrarySource};
 use crate::build_models::{Loaded, choose_models};
 use crate::build_palettes::Palettes;
 use crate::build_place::{place, under_skin};
@@ -111,13 +111,20 @@ impl Assembly {
             let prop = is_prop(draft, *model, options.lod);
             let placement = place(draft, &parts, *model, rig, prop, &mut issues);
             let world = world_of(draft, &parts, &placement.local);
-            let geometry = rendered_geometry(cut.as_ref(), index, draft, *model, &mut issues);
+            let geometry = rendered_geometry(
+                cut.as_ref(),
+                index,
+                draft,
+                *model,
+                library.source,
+                &mut issues,
+            );
             parts.push(build_part(
                 draft,
                 placement,
                 world,
                 geometry,
-                (library.materials, library.from_model),
+                library,
                 palette,
                 attachments,
             ));
@@ -154,6 +161,7 @@ fn rendered_geometry(
     index: usize,
     draft: &Draft<'_>,
     model: Option<&Loaded>,
+    material_source: Option<LibrarySource>,
     issues: &mut Vec<Issue>,
 ) -> RenderedGeometry {
     let Some(loaded) = model else {
@@ -167,10 +175,10 @@ fn rendered_geometry(
     let selectors = draft
         .geometry
         .map_or_else(GeometrySelectors::default, |geometry| {
-            geometry.selectors(draft.library.is_none())
+            geometry.selectors(material_source == Some(LibrarySource::Geometry))
         });
     RenderedGeometry {
-        definition: ModelDefinition::of(loaded, &rendered),
+        definition: ModelDefinition::of(loaded, &rendered, material_source),
         model: Some(rendered),
         sources,
         selectors,
@@ -207,7 +215,7 @@ fn world_of(draft: &Draft<'_>, parts: &[Part], local: &Transform) -> Transform {
 
 pub(crate) struct SelectedLibrary {
     pub(crate) materials: Library,
-    pub(crate) from_model: bool,
+    pub(crate) source: Option<LibrarySource>,
 }
 
 /// Returns the materials a part draws with, noting a library that has a problem once.
@@ -219,15 +227,10 @@ fn materials_of(
     issues: &mut Vec<Issue>,
 ) -> SelectedLibrary {
     let selected = model.and_then(|loaded| build_library_name::choose(draft, loaded));
-    let from_model = selected
-        .as_ref()
-        .is_some_and(|selected| matches!(selected.name, LibraryName::Model(_)));
-    let key = selected.map(|selected| library_key_of(selected.name.path(), selected.entry));
+    let source = selected.as_ref().map(|selected| selected.source);
+    let key = selected.map(|selected| library_key_of(selected.name, selected.entry));
     let materials = materials_for(draft, key, libraries, reported, issues);
-    SelectedLibrary {
-        materials,
-        from_model,
-    }
+    SelectedLibrary { materials, source }
 }
 
 /// Returns the materials of the library cached under `key`, noting a problem of it once.
@@ -351,7 +354,7 @@ fn read_libraries(
         .filter_map(|(draft, loaded)| Some((draft, (*loaded)?)))
         .flat_map(|(draft, loaded)| {
             let part = build_library_name::choose(draft, loaded).map(|selected| {
-                let name = selected.name.path();
+                let name = selected.name;
                 (library_key_of(name, selected.entry), selected.entry, name)
             });
             let attached = loaded

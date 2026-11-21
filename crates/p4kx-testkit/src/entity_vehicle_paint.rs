@@ -15,6 +15,18 @@ const RED_PALETTE: u128 = 0x5613;
 const BLUE_PALETTE: u128 = 0x5614;
 const BASE_MODEL: &str = "Objects/Test/hull.cgf";
 const EMBEDDED_MODEL: &str = "Objects/Test/hull_painted.cgf";
+const CDF_MODEL: &str = "Objects/Test/hull_finish.cdf";
+const CDF_BODY: &str = "Objects/Test/hull_finish.skin";
+
+/// Authored material override of the selected synthetic finish CDF.
+pub const FITTED_CDF_MATERIAL: &str = r#"Material="blue.mtl""#;
+
+/// Source document of the synthetic fitted finish.
+pub const FITTED_CDF_DOCUMENT: &str = concat!(
+    r#"<CharacterDefinition><AttachmentList><Attachment Type="CA_SKIN" Binding="Objects/Test/hull_finish.skin" "#,
+    r#"Material="blue.mtl""#,
+    r#"/></AttachmentList></CharacterDefinition>"#,
+);
 const BASE_MATERIAL: &str = "Objects/Test/base";
 const RED_MATERIAL: &str = "Objects/Test/red";
 const BLUE_MATERIAL: &str = "Objects/Test/blue";
@@ -39,10 +51,44 @@ const IMPLEMENTATION: &str = r#"<Vehicle name="TEST_Paint">
 /// The two selected variants name separate palettes and material libraries.
 #[must_use]
 pub fn fitted_paint_vehicle_entries() -> Vec<TestEntry> {
+    entries(&database())
+}
+
+/// Returns fitted finish CDFs and the competing DataForge and model material declarations.
+#[must_use]
+pub fn fitted_cdf_paint_vehicle_entries() -> Vec<TestEntry> {
+    let inherited = hull(0x5627, "TEST_Hull_Cdf_Finish", "", BLUE)
+        .geometry(BASE_MODEL, Some(BASE_MATERIAL))
+        .geometry_variant("Blue", CDF_MODEL, None);
+    let explicit = hull(0x5628, "TEST_Hull_Cdf_Explicit", "", BLUE)
+        .geometry(BASE_MODEL, Some(BASE_MATERIAL))
+        .geometry_variant("Blue", CDF_MODEL, Some(RED_MATERIAL));
+    let same_file = hull(0x5629, "TEST_Hull_Cdf_Same", "", BLUE)
+        .geometry(CDF_MODEL, Some(BASE_MATERIAL))
+        .geometry_variant("Blue", r"objects\TEST\HULL_FINISH.CDF", None);
+    let plain = hull(0x5630, "TEST_Hull_Plain_Finish", "", BLUE)
+        .geometry(BASE_MODEL, Some(BASE_MATERIAL))
+        .geometry_variant("Blue", EMBEDDED_MODEL, None);
+    let database = database()
+        .record(inherited.record())
+        .record(explicit.record())
+        .record(same_file.record())
+        .record(plain.record());
+    let mut output = entries(&database);
+    let body = TestModel::two_bone_skin().with_material_library("red");
+    output.extend([
+        TestEntry::stored(format!("Data/{CDF_MODEL}"), FITTED_CDF_DOCUMENT).encrypted(),
+        TestEntry::stored(format!("Data/{CDF_BODY}"), body.cgf()),
+        TestEntry::stored(format!("Data/{CDF_BODY}m"), body.cgfm()),
+    ]);
+    output
+}
+
+fn entries(database: &DataForgeBuilder) -> Vec<TestEntry> {
     let cube = TestModel::cube();
     let painted = TestModel::cube().with_material_library("blue");
     let mut entries = vec![
-        TestEntry::zstd("Data\\Game2.dcb", database().build()),
+        TestEntry::zstd("Data\\Game2.dcb", database.build()),
         TestEntry::stored(format!("Data/{DEFINITION}"), IMPLEMENTATION.as_bytes()),
         TestEntry::stored(format!("Data/{BASE_MODEL}"), cube.cgf()),
         TestEntry::stored(format!("Data/{BASE_MODEL}m"), cube.cgfm()),

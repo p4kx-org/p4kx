@@ -3,7 +3,7 @@
 
 use p4kx_model::Transform;
 
-use super::{Library, RenderedGeometry};
+use super::{RenderedGeometry, SelectedLibrary};
 use crate::build_place::PlacedPart;
 use crate::flatten::Draft;
 use crate::palette::ChosenPalette;
@@ -14,7 +14,7 @@ pub(super) fn build_part(
     placement: PlacedPart,
     world: Transform,
     geometry: RenderedGeometry,
-    (materials, from_model): (Library, bool),
+    library: SelectedLibrary,
     palette: Option<ChosenPalette>,
     attachments: Vec<AttachedModel>,
 ) -> Part {
@@ -42,9 +42,9 @@ pub(super) fn build_part(
         geometry: draft.geometry_path().map(str::to_owned),
         model: geometry.model,
         model_archive_sources: geometry.sources,
-        model_definition: geometry.definition.with_model_material(from_model),
+        model_definition: geometry.definition,
         geometry_selectors: geometry.selectors,
-        materials,
+        materials: library.materials,
         palette,
         attachments,
         hidden: draft.hidden,

@@ -57,7 +57,7 @@ pub(crate) enum DeclaredModel<T> {
 /// Projects the CDF and returns the declared model when it supplies the body or rigid rig.
 pub(crate) fn read_drawing<T, E>(
     bytes: &[u8],
-    observe: bool,
+    observe_attachments: bool,
     read_body: impl FnOnce(&str) -> Result<Option<DeclaredModel<T>>, E>,
 ) -> Result<(Character, Option<T>), DrawError<E>> {
     let mut budget = Budget::new(bytes.len());
@@ -75,11 +75,8 @@ pub(crate) fn read_drawing<T, E>(
             ),
             None => (Selection::Bound, None),
         };
-        let character = if observe {
-            project_observed(&drawing, selection, original, scope)?
-        } else {
-            drawing.project(selection, |_| None, |_| None)?
-        };
+        let character =
+            project_observed(&drawing, selection, original, scope, observe_attachments)?;
         Ok(Ok((character, body)))
     })
     .map_err(DrawError::Definition)?;
@@ -91,6 +88,7 @@ fn project_observed(
     selection: Selection,
     original: Node<'_, '_>,
     scope: &Scope<'_, '_>,
+    observe_attachments: bool,
 ) -> Result<Character, String> {
     let children = original.children();
     let attachments = children
@@ -105,7 +103,12 @@ fn project_observed(
         .find(|child| child.name().eq_ignore_ascii_case("Model"));
     drawing.project(
         selection,
-        |ordinal| Some(cdf_attachment_source::capture(attachment(ordinal)?, scope)),
+        |ordinal| {
+            if !observe_attachments {
+                return None;
+            }
+            Some(cdf_attachment_source::capture(attachment(ordinal)?, scope))
+        },
         |selected| match selected {
             MainSelector::Attachment {
                 ordinal,

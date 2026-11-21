@@ -1,11 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_cryxml::SourceAttributePosition;
 use p4kx_extraction::SourceLocation;
 
 use crate::cdf_attribute_position::CdfCoordinateDomain;
 use crate::loadout_xml::{Node, Scope};
+
+#[derive(Debug, Clone)]
+pub(crate) struct CdfMaterial {
+    pub(crate) sources: Option<Arc<CdfModelSources>>,
+}
 
 #[derive(Debug, PartialEq)]
 enum Selection {

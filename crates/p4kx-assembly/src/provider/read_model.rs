@@ -80,6 +80,7 @@ impl ArchiveModels<'_> {
             archive_sources: sources.into(),
             declared_rig: None,
             cdf_model_sources: None,
+            cdf_material: None,
             definition_origin: None,
         })
     }

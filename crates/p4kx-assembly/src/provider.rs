@@ -17,7 +17,7 @@ use thiserror::Error;
 mod file;
 pub use file::archive_entry_candidates;
 
-use crate::cdf_model_sources::CdfModelSources;
+use crate::cdf_model_sources::{CdfMaterial, CdfModelSources};
 use crate::path_match::starts_with_path;
 use crate::skeleton::SkeletonProblem;
 use crate::{CdfAttachmentSite, DeployedGear, MAX_ASSEMBLY_VERTICES};
@@ -50,6 +50,7 @@ pub struct ProvidedModel {
     pub(crate) archive_sources: Arc<[ModelArchiveSource]>,
     pub(crate) declared_rig: Option<Box<DeclaredRig>>,
     pub(crate) cdf_model_sources: Option<Arc<CdfModelSources>>,
+    pub(crate) cdf_material: Option<CdfMaterial>,
     pub(crate) definition_origin: Option<EntryOrigin>,
 }
 

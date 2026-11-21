@@ -167,12 +167,19 @@ impl Capture<'_> {
             },
             SourceUseRole::Selector,
         )?);
-        if let Some((model, location)) = part.embedded_material_selector() {
-            sources.push(archive_scope(self.uses, model)?.at(location, SourceUseRole::Selector)?);
-            if let Some(location) = part.geometry_selector() {
-                sources.push(self.forge.at(location, SourceUseRole::Selector)?);
+        let authored = if let Some((definition, selection)) = part.cdf_material_sources() {
+            let scope = archive_scope(self.uses, definition)?;
+            for location in selection.model().chain(selection.material()) {
+                sources.push(scope.at(location, SourceUseRole::Selector)?);
             }
-        } else if let Some(location) = part.material_selector() {
+            part.geometry_selector()
+        } else if let Some((model, location)) = part.embedded_material_selector() {
+            sources.push(archive_scope(self.uses, model)?.at(location, SourceUseRole::Selector)?);
+            part.geometry_selector()
+        } else {
+            part.material_selector()
+        };
+        if let Some(location) = authored {
             sources.push(self.forge.at(location, SourceUseRole::Selector)?);
         }
         Ok(Some(MaterialChoice {

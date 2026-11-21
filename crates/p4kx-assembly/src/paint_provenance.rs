@@ -64,6 +64,7 @@ pub(crate) struct PaintSelection {
     pub(crate) attachable: Option<usize>,
     pub(crate) tag: String,
     pub(crate) variant: VariantSource,
+    pub(crate) prefers_cdf_material: bool,
     pub(crate) compatibility: Vec<PaintSelectionInput>,
 }
 

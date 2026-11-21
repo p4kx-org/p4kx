@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use p4kx_dataforge::{StructValue, TagTree};
 
+use crate::cdf::is_character_definition;
 use crate::geometry_choice::GeometryChoice;
 use crate::paint_port::PaintOfferSources;
 use crate::paint_provenance::{PaintSelection, VariantSource};
@@ -103,15 +104,16 @@ impl LoadoutResolver<'_> {
                         None
                     };
                     let selector = paint.selector()?;
-                    let (geometry, variant) = choose_hull(spec, vehicle, selector)?;
+                    let appearance = choose_hull(spec, vehicle, selector)?;
                     Ok((
-                        geometry,
+                        appearance.geometry,
                         Arc::new(PaintSelection {
                             guid: item.guid(),
                             record: item.record_index(),
                             attachable: item.attachable_component_ordinal(),
                             tag: selector.to_owned(),
-                            variant,
+                            variant: appearance.variant,
+                            prefers_cdf_material: appearance.prefers_cdf_material,
                             compatibility: sources::selected(spec, root, port, item, paint, offers),
                         }),
                     ))
@@ -181,11 +183,17 @@ fn equipped<'node>(
     })
 }
 
+struct HullAppearance {
+    geometry: Geometry,
+    variant: VariantSource,
+    prefers_cdf_material: bool,
+}
+
 fn choose_hull(
     spec: &EntitySpec,
     vehicle: &VehicleSpec,
     selector: &str,
-) -> Result<(Geometry, VariantSource), &'static str> {
+) -> Result<HullAppearance, &'static str> {
     const AMBIGUOUS: &str = "the appearance tag selects more than one source variant";
     let model_variants = spec.variants.iter().map(|variant| {
         (
@@ -217,16 +225,21 @@ fn choose_hull(
     }
     if let Some((geometry, position, tag_locations)) = geometry {
         let mut draw = geometry.clone();
+        let mut prefers_cdf_material = false;
         if let Some(base) = &spec.geometry {
             if draw.material().is_none() {
                 draw.inherit_material(base);
+                prefers_cdf_material = is_character_definition(draw.path())
+                    && draw.material().is_some()
+                    && crate::build::file_key(draw.path()) != crate::build::file_key(base.path());
             }
             draw.inherit_palette(Some(base));
         }
-        return Ok((
-            draw,
-            VariantSource::geometry(position, tag_locations.into()),
-        ));
+        return Ok(HullAppearance {
+            geometry: draw,
+            variant: VariantSource::geometry(position, tag_locations.into()),
+            prefers_cdf_material,
+        });
     }
     if let Some(variant) = material {
         let mut draw = spec
@@ -234,10 +247,11 @@ fn choose_hull(
             .clone()
             .ok_or("the material variant has no base geometry")?;
         draw.apply_material_variant(&variant);
-        return Ok((
-            draw,
-            VariantSource::material(variant.location(), variant.tag_locations()),
-        ));
+        return Ok(HullAppearance {
+            geometry: draw,
+            variant: VariantSource::material(variant.location(), variant.tag_locations()),
+            prefers_cdf_material: false,
+        });
     }
     Err("the appearance tag selects no source variant")
 }

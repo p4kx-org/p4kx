@@ -12,7 +12,7 @@ use super::{ArchiveModels, ModelFailure, ProvidedAttachment, ProvidedModel, with
 use crate::build_models::vertices;
 use crate::cdf::{self, DeclaredModel, MAX_CDF_BYTES};
 use crate::cdf_bone::BoneAttachment;
-use crate::cdf_model_sources::CdfModelSources;
+use crate::cdf_model_sources::{CdfMaterial, CdfModelSources};
 use crate::placement::PlacementSkeleton;
 
 type AttachmentModels<'bone> = HashMap<String, HashMap<Option<&'bone str>, ReadAttachment>>;
@@ -79,8 +79,15 @@ impl ArchiveModels<'_> {
             .skeleton
             .as_deref()
             .map_or(Ok(None), |path| self.skeleton_problem(path))?;
-        if let Some(material) = &character.material {
+        if let Some(material) = character
+            .material
+            .as_deref()
+            .filter(|material| !material.trim().is_empty())
+        {
             provided.model.material_library = Some(without_mtl(material).to_owned());
+            provided.cdf_material = Some(CdfMaterial {
+                sources: provided.cdf_model_sources.clone(),
+            });
         }
         Ok(provided)
     }

@@ -8,6 +8,7 @@ use p4kx_model::Transform;
 
 use crate::attached::MaterialSelection;
 use crate::build::{Libraries, Library, SelectedLibrary, issue, library_key_of, materials_for};
+use crate::build_library_name::LibrarySource;
 use crate::build_models::Loaded;
 use crate::flatten::Draft;
 use crate::placement;
@@ -32,7 +33,10 @@ pub(crate) fn attached(
         .enumerate()
         .map(|(index, attachment)| {
             let (materials, material_selection) = if loaded.rig_only && index == 0 {
-                let selection = if primary.from_model {
+                let selection = if primary
+                    .source
+                    .is_some_and(LibrarySource::uses_model_material)
+                {
                     MaterialSelection::Attachment
                 } else {
                     let authored = draft

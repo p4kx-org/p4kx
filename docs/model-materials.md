@@ -105,6 +105,12 @@ descendant takes precedence over its ancestor. Competing matches within SubGeome
 material tree, or across the two families, produce a
 `paint_appearance` diagnostic and use the base appearance.
 
+A fitted variant can select a distinct character definition. Its explicit DataForge material
+takes precedence. When that field is absent and the CDF's selected primary binding specifies a
+material, the binding overrides the inherited base material. Missing material files retain
+the standard material-library diagnostic. The material and its default palette can cite the
+original CDF attribute.
+
 For a selected paint used by the rendered hull, the entity GLB records the observed paint GUID,
 tag, variant kind, model, material library and palette Record GUID in `asset.extras.p4kxPaintAppearance`.
 The digest-bound companion addresses those exact fields. Package `scene.json` keeps the same
