@@ -50,6 +50,10 @@ pub mod mining_tools;
 #[path = "equipment_mission_board_query.rs"]
 pub mod mission_boards;
 
+/// Selective reads of authored jump-point configurations on physical world Entities.
+#[path = "equipment_jump_point_query.rs"]
+pub mod jump_points;
+
 /// Selective reads of authored ship shield-generator and quantum-drive configurations.
 #[path = "equipment_ship_system_query.rs"]
 pub mod ship_systems;

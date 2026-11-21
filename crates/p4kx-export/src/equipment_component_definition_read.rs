@@ -36,7 +36,7 @@ impl Query<'_> {
         } else {
             &[]
         };
-        let has_owner = !requested_languages.is_empty() && self.has_owner(F::SOURCE_TYPE)?;
+        let has_owner = !requested_languages.is_empty() && self.has_owner(F::SOURCE_TYPES)?;
         let selected_languages = if has_owner { requested_languages } else { &[] };
         let sources = TextSources::read_languages(self.archive, selected_languages)?;
         let origins = CatalogOrigins::new(self.archive, self.entry, &sources)?;
@@ -76,10 +76,12 @@ impl Query<'_> {
         }))
     }
 
-    fn has_owner(&self, wanted_type: &str) -> Result<bool, CatalogError> {
+    fn has_owner(&self, wanted_types: &[&str]) -> Result<bool, CatalogError> {
         let mut found = false;
         self.selection.for_each(self.forge, self.cancel, |record| {
-            found |= record.type_name().ok() == Some(wanted_type);
+            found |= record
+                .type_name()
+                .is_ok_and(|name| wanted_types.contains(&name));
             Ok(())
         })?;
         Ok(found)

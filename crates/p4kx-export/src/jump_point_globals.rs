@@ -20,20 +20,32 @@ use crate::source_value_catalog::SourceArenaOutput;
 
 const POINT: &str = "GlobalJumpPointParams";
 const TUNNEL: &str = "GlobalJumpTunnelHostParams";
-const SOURCE_TYPES: &[&str] = &[POINT, TUNNEL];
+pub(crate) const SOURCE_TYPES: &[&str] = &[POINT, TUNNEL];
 
 /// An original global jump configuration and its authored field graph.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct GlobalJumpConfiguration<'source> {
+pub struct GlobalJumpConfiguration<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     fields: SourceArenaOutput<'source>,
 }
 
 impl<'source> GlobalJumpConfiguration<'source> {
-    fn read(
+    /// Borrows the original global configuration Record identity.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows the authored fields in original order.
+    #[must_use]
+    pub const fn fields(&self) -> &SourceArenaOutput<'source> {
+        &self.fields
+    }
+
+    pub(in crate::catalog_v3) fn read(
         _kind: &'source str,
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,

@@ -14,6 +14,7 @@ use super::catalog_mission_board::{KIND as MISSION_BOARDS, MissionBoard};
 use super::catalog_radar_options::RadarOptionsConfiguration;
 use super::catalog_resource_network_configuration::ResourceNetworkConfiguration;
 use super::catalog_resource_network_read::{self, GameModeRead};
+use super::component_sources::physical_component;
 use super::jump_drive_definitions::{self, JumpDriveDefinitions};
 use super::referenced_definition_read::Definitions;
 use super::weapon_action_recoil_definitions::{self, WeaponActionRecoilDefinition};
@@ -66,8 +67,9 @@ pub use consumables::{AuthoredList, ConsumableEffect, EffectParameters, GasMass,
 use electrical_behavior::ElectricalBehavior;
 use flight_configuration_tables::FlightConfigurationTables;
 use hackable_configuration::HackableConfiguration;
-use jump_point::JumpPointConfiguration;
-use jump_point_globals::GlobalJumpConfiguration;
+pub use jump_point::JumpPointConfiguration;
+pub use jump_point_globals::GlobalJumpConfiguration;
+pub(crate) use jump_point_globals::SOURCE_TYPES as GLOBAL_JUMP_TYPES;
 pub(crate) use mining_configurations::GLOBAL as MINING_LASER_GLOBAL;
 use mining_configurations::MiningConfigurationTables;
 pub use mining_configurations::MiningLaserGlobalDefinition;
@@ -264,6 +266,8 @@ const JUMP_POINTS: ComponentKind = ComponentKind {
     source_type: jump_point::COMPONENT,
     inspection: ConfigurationInspection::JumpPoint,
 };
+physical_component!(JumpPointComponents, JumpPointConfiguration, JUMP_POINTS);
+
 const HACKABLE_DEVICES: ComponentKind = ComponentKind {
     source_type: hackable_configuration::COMPONENT,
     inspection: ConfigurationInspection::HackableDevice,

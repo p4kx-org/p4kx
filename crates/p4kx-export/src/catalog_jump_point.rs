@@ -26,7 +26,7 @@ pub(super) const COMPONENT: &str = "SJumpPointParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct JumpPointConfiguration<'source> {
+pub struct JumpPointConfiguration<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     #[serde(flatten)]
@@ -42,6 +42,24 @@ pub(super) struct JumpPointConfiguration<'source> {
 }
 
 impl<'source> JumpPointConfiguration<'source> {
+    /// Borrows the original Entity and Components position.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    /// Borrows the authored fuel requirement.
+    #[must_use]
+    pub const fn required_fuel(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.required_fuel
+    }
+
+    /// Borrows the authored linking range.
+    #[must_use]
+    pub const fn linking_range(&self) -> &SourcedValue<ResourceFloat32> {
+        &self.linking_range
+    }
+
     pub(super) fn read(
         owner: ComponentOwner,
         fields: Observed<'_, '_, '_, 'source>,

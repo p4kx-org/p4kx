@@ -9,16 +9,16 @@ use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ParsedCatalogQueries,
 };
 use crate::catalog_v3::component_definition_sources::{
-    ArmorMacros, ConsumableSubtypes, ConsumableTypes, JumpDriveFlightTuning, MiningLaserGlobals,
-    TurretModifiers,
+    ArmorMacros, ConsumableSubtypes, ConsumableTypes, GlobalJumpConfigurations,
+    JumpDriveFlightTuning, JumpTunnelForces, MiningLaserGlobals, TurretModifiers,
 };
 
 pub use crate::catalog_v3::catalog_independent_configurations::{
     AuthoredList as ConsumableList, ConsumableEffect, ConsumableSubtype, ConsumableType,
     DamageResistanceMacro, DurabilityResistanceEntry,
     EffectParameters as ConsumableEffectParameters, GasMass as ConsumableGasMass,
-    MacroBody as DamageResistanceMacroBody, MiningLaserGlobalDefinition, OrderedCurve,
-    Override as ConsumableBuffOverride, ResistanceSet, Rtpc, TurretHealthModifier,
+    GlobalJumpConfiguration, MacroBody as DamageResistanceMacroBody, MiningLaserGlobalDefinition,
+    OrderedCurve, Override as ConsumableBuffOverride, ResistanceSet, Rtpc, TurretHealthModifier,
 };
 
 pub use crate::catalog_v3::component_definition_sources::JumpDriveDefinition;
@@ -112,6 +112,16 @@ macro_rules! definition_query {
 definition_query!(
     JumpDriveFlightTuning, JumpDriveDefinition, JumpDriveFlightTuningSnapshot,
     with_jump_drive_flight_tuning, with_jump_drive_flight_tuning_from,
+    CatalogLanguageSelection::Selected(&[]);
+);
+definition_query!(
+    JumpTunnelForces, JumpDriveDefinition, JumpTunnelForceSnapshot,
+    with_jump_tunnel_forces, with_jump_tunnel_forces_from,
+    CatalogLanguageSelection::Selected(&[]);
+);
+definition_query!(
+    GlobalJumpConfigurations, GlobalJumpConfiguration, GlobalJumpConfigurationSnapshot,
+    with_global_jump_point_configurations, with_global_jump_point_configurations_from,
     CatalogLanguageSelection::Selected(&[]);
 );
 definition_query!(

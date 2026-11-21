@@ -72,6 +72,8 @@ mod item_configurations;
 mod item_durability;
 #[path = "sdk_item_recovery_routes.rs"]
 mod item_recovery;
+#[path = "sdk_jump_configuration_routes.rs"]
+mod jump_configurations;
 #[path = "sdk_law_route.rs"]
 mod law;
 #[path = "sdk_loadout_route.rs"]
@@ -235,6 +237,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(component_definitions::read()?);
     routes.extend(flight_configurations::read()?);
     routes.extend(ship_systems::read()?);
+    routes.extend(jump_configurations::read()?);
     routes.extend(worn_gear::read()?);
     routes.push(vehicle_armor::read()?);
     routes.push(loot_generation::read()?);

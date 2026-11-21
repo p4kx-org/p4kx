@@ -1770,6 +1770,21 @@ and are also available on the query session and parsed view. Each result has its
 source inventory and coverage. [Jump-drive definitions](catalog-jump-drives.md).
 [Quantum interdiction](catalog-quantum-interdiction.md).
 
+## Authored jump-travel configurations
+
+Use `equipment::jump_points::with_jump_point_configurations` for the
+`configurations.jumpPointConfigurations` table. It selects original Entity
+Records and returns each authored `SJumpPointParams` component with its
+physical Components slot and original values.
+
+Use `equipment::component_definitions::with_global_jump_point_configurations`
+for the union of global point and global tunnel-host Records, and
+`with_jump_tunnel_forces` for the tunnel-force definition linked by a jump drive.
+These two queries return the selected definition's original field arena.
+Choose an exact physical Record index from a reference when it is available.
+The Archive, decoded-Entry and parsed-session forms use the original DataForge
+and report availability, selection coverage and per-value source evidence.
+
 ## Verify dataset coverage
 
 The SDK coverage audit checks canonical dataset boundaries against calls to the public typed

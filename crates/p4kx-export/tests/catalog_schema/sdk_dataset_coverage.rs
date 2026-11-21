@@ -93,6 +93,9 @@ const QUANTUM_DRIVES: &str = "/configurations/quantumDrives";
 const QUANTUM_INTERDICTION: &str = "/configurations/quantumInterdiction";
 const JUMP_DRIVES: &str = "/configurations/jumpDrives";
 const JUMP_DRIVE_FLIGHT_TUNING: &str = "/configurations/jumpDriveFlightTuning";
+const JUMP_POINT_CONFIGURATIONS: &str = "/configurations/jumpPointConfigurations";
+const GLOBAL_JUMP_POINT_CONFIGURATIONS: &str = "/configurations/globalJumpPointConfigurations";
+const JUMP_TUNNEL_FORCES: &str = "/configurations/jumpTunnelForces";
 const CLOTHING: &str = "/configurations/clothing";
 const ITEM_RADARS: &str = "/configurations/itemRadars";
 const REPUTATION_CONTEXTS: &str = "/definitions/reputationContexts";
@@ -217,6 +220,9 @@ const REQUIRED_WITNESSES: &[&str] = &[
     QUANTUM_INTERDICTION,
     JUMP_DRIVES,
     JUMP_DRIVE_FLIGHT_TUNING,
+    JUMP_POINT_CONFIGURATIONS,
+    GLOBAL_JUMP_POINT_CONFIGURATIONS,
+    JUMP_TUNNEL_FORCES,
     CLOTHING,
     ITEM_RADARS,
     MINEABLE_ENTITIES,

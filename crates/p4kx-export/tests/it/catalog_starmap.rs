@@ -3,6 +3,8 @@
 
 //! Starmap objects and their world positions in the P4KX catalog, through the public API.
 
+#[path = "catalog_jump_configuration_sdk.rs"]
+mod jump_configuration_sdk;
 #[path = "catalog_jump_endpoints.rs"]
 mod jump_endpoints;
 #[path = "catalog_jump_point.rs"]

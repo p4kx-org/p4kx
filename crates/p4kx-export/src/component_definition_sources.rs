@@ -8,10 +8,11 @@ use super::catalog_independent_configurations::electrical_behavior::{
 };
 use super::catalog_independent_configurations::{
     CONSUMABLE_SUBTYPE, CONSUMABLE_TYPE, ConsumableSubtype, ConsumableType,
-    DAMAGE_RESISTANCE_MACRO, DamageResistanceMacro, HEALTH_MODIFIER, MINING_LASER_GLOBAL,
-    MiningLaserGlobalDefinition, TurretHealthModifier, observe_modifier_types,
+    DAMAGE_RESISTANCE_MACRO, DamageResistanceMacro, GLOBAL_JUMP_TYPES, GlobalJumpConfiguration,
+    HEALTH_MODIFIER, MINING_LASER_GLOBAL, MiningLaserGlobalDefinition, TurretHealthModifier,
+    observe_modifier_types,
 };
-use super::catalog_jump_drive::FLIGHT_PARAMS;
+use super::catalog_jump_drive::{FLIGHT_PARAMS, TUNNEL_FORCES};
 pub use super::jump_drive_definitions::JumpDriveDefinition;
 use super::referenced_definition_read;
 use crate::CatalogError;
@@ -24,7 +25,7 @@ use crate::record_observation::RecordObservation;
 
 pub(crate) trait Definition {
     type Row<'source>;
-    const SOURCE_TYPE: &'static str;
+    const SOURCE_TYPES: &'static [&'static str];
     const TEXT_OWNER: Option<TextOwner> = None;
 
     fn observe_types<'source>(
@@ -33,7 +34,7 @@ pub(crate) trait Definition {
         _selection: CatalogRecordSelection,
         _cancel: Option<&CancelToken>,
     ) -> Result<(Vec<&'source str>, ExportLedger), CatalogError> {
-        Ok((vec![Self::SOURCE_TYPE], ExportLedger::default()))
+        Ok((Self::SOURCE_TYPES.to_vec(), ExportLedger::default()))
     }
 
     fn project<'source>(
@@ -45,12 +46,12 @@ pub(crate) trait Definition {
 }
 
 macro_rules! direct_definition {
-    ($marker:ident, $row:ident, $source:ident, $inspection:ident) => {
+    ($marker:ident, $row:ident, $source:expr, $inspection:ident) => {
         pub(crate) struct $marker;
 
         impl Definition for $marker {
             type Row<'source> = $row<'source>;
-            const SOURCE_TYPE: &'static str = $source;
+            const SOURCE_TYPES: &'static [&'static str] = $source;
 
             fn project<'source>(
                 tree: &RecordTree<'source>,
@@ -74,39 +75,52 @@ macro_rules! direct_definition {
 direct_definition!(
     ElectricalBehaviors,
     ElectricalBehavior,
-    ELECTRICAL_BEHAVIOR,
+    &[ELECTRICAL_BEHAVIOR],
     ElectricalBehavior
 );
 direct_definition!(
     JumpDriveFlightTuning,
     JumpDriveDefinition,
-    FLIGHT_PARAMS,
+    &[FLIGHT_PARAMS],
     JumpDriveDefinition
 );
 direct_definition!(
     ArmorMacros,
     DamageResistanceMacro,
-    DAMAGE_RESISTANCE_MACRO,
+    &[DAMAGE_RESISTANCE_MACRO],
     DamageResistanceMacro
 );
 direct_definition!(
     MiningLaserGlobals,
     MiningLaserGlobalDefinition,
-    MINING_LASER_GLOBAL,
+    &[MINING_LASER_GLOBAL],
     MiningLaserGlobal
 );
 direct_definition!(
     ConsumableTypes,
     ConsumableType,
-    CONSUMABLE_TYPE,
+    &[CONSUMABLE_TYPE],
     ConsumableDefinition
+);
+
+direct_definition!(
+    JumpTunnelForces,
+    JumpDriveDefinition,
+    &[TUNNEL_FORCES],
+    JumpDriveDefinition
+);
+direct_definition!(
+    GlobalJumpConfigurations,
+    GlobalJumpConfiguration,
+    GLOBAL_JUMP_TYPES,
+    JumpPointGlobal
 );
 
 pub(crate) struct ConsumableSubtypes;
 
 impl Definition for ConsumableSubtypes {
     type Row<'source> = ConsumableSubtype<'source>;
-    const SOURCE_TYPE: &'static str = CONSUMABLE_SUBTYPE;
+    const SOURCE_TYPES: &'static [&'static str] = &[CONSUMABLE_SUBTYPE];
     const TEXT_OWNER: Option<TextOwner> = Some(TextOwner::ConsumableSubtypes);
 
     fn project<'source>(
@@ -130,7 +144,7 @@ pub(crate) struct TurretModifiers;
 
 impl Definition for TurretModifiers {
     type Row<'source> = TurretHealthModifier<'source>;
-    const SOURCE_TYPE: &'static str = HEALTH_MODIFIER;
+    const SOURCE_TYPES: &'static [&'static str] = &[HEALTH_MODIFIER];
 
     fn observe_types<'source>(
         forge: &'source DataForge<'source>,
