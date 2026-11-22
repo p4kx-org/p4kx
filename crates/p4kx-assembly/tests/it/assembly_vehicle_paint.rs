@@ -11,6 +11,8 @@ use serde_json::Value;
 
 use crate::assembly_support::{TestResult, fixture};
 
+#[path = "assembly_vehicle_paint_cdf.rs"]
+mod cdf;
 #[path = "assembly_vehicle_paint_material.rs"]
 mod material;
 #[path = "assembly_vehicle_paint_patch.rs"]
@@ -353,3 +355,8 @@ fn assemble_entries(
 
 #[path = "assembly_vehicle_paint_factory_xml.rs"]
 mod factory_xml;
+
+fn is_model_material_name(source: &Value) -> bool {
+    string_at(source, "/location/namespace") == Some("modelChunk")
+        && string_at(source, "/location/field") == Some("materialLibrary")
+}
