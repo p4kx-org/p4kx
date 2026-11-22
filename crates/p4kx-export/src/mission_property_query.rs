@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Scoped reads of original Template and Broker mission property declarations.
+//! Scoped reads of original Template and Broker property and flow declarations.
 
 use p4kx_extraction::{
     Archive, Build, CancelToken, DataForge, DataForgeEntry, Record, RecordTree, SourceInventory,
@@ -23,7 +23,9 @@ use crate::template_field_capture::TemplateFieldCapture;
 
 pub use crate::mission_flow_owner::{MissionFlowOwnerRef, PhysicalFlowOwner};
 pub use crate::source_value_catalog::{SourceField, SourceNode, SourcePayload, SourceValueRef};
-pub use crate::template_configuration::{MissionPropertyConfiguration, PropertySelection};
+pub use crate::template_configuration::{
+    FlowSelection, MissionFlowConfiguration, MissionPropertyConfiguration, PropertySelection,
+};
 pub use crate::template_source::{
     OriginalFieldPosition, TemplateSource, TemplateSourceRoot, TemplateSourceValue,
 };
@@ -66,7 +68,7 @@ impl MissionPropertySelection {
     }
 }
 
-/// The one original source arena referenced by a physical owner's property rows.
+/// The original source arena referenced by an owner's property and flow rows.
 #[derive(Debug)]
 #[non_exhaustive]
 pub struct MissionPropertySource<'source> {
@@ -76,7 +78,7 @@ pub struct MissionPropertySource<'source> {
     pub arena: TemplateSource<'source>,
 }
 
-/// Canonical property rows and their original source closure.
+/// Canonical property and flow rows and their original source closure.
 #[derive(Debug)]
 #[non_exhaustive]
 #[must_use]
@@ -87,6 +89,8 @@ pub struct MissionPropertySnapshot<'source> {
     pub availability: DatasetAvailability,
     /// Selected rows in canonical owner GUID and physical declaration order.
     pub rows: Vec<MissionPropertyConfiguration>,
+    /// Selected flow rows in canonical owner GUID and physical declaration order.
+    pub flows: Vec<MissionFlowConfiguration>,
     /// The selected owners' canonical source arenas in matching order.
     pub sources: Vec<MissionPropertySource<'source>>,
     /// Original DataForge inputs and the uses backing the returned values.
@@ -95,7 +99,7 @@ pub struct MissionPropertySnapshot<'source> {
     pub coverage: CatalogRecordCoverage,
 }
 
-/// Supplies canonical mission property declarations and each selected owner's original arena.
+/// Supplies canonical mission property and flow declarations with each owner's original arena.
 /// Publish consumer-owned changes after this function returns successfully.
 ///
 /// # Errors
@@ -186,6 +190,7 @@ fn read<'source>(
     let input = OriginalCatalogInput::new(forge, &origins);
     let mut sources = Vec::with_capacity(owners.len());
     let mut rows = Vec::new();
+    let mut flows = Vec::new();
     for Owner { record, tree } in owners {
         checkpoint(cancel)?;
         let scoped = read_owner(&input, family, &record, &tree, cancel)?;
@@ -193,6 +198,7 @@ fn read<'source>(
             coverage.incomplete_fields.push(record.index());
         }
         rows.extend(scoped.rows);
+        flows.extend(scoped.flows);
         sources.push(scoped.source);
     }
     Ok(MissionPropertySnapshot {
@@ -201,6 +207,7 @@ fn read<'source>(
             matches!(name, "ContractTemplate" | "MissionBrokerEntry")
         }),
         rows,
+        flows,
         sources,
         source_inventory: origins.uses.finish_with(|| checkpoint(cancel))?,
         coverage,
@@ -209,6 +216,7 @@ fn read<'source>(
 
 struct OwnerRows<'source> {
     rows: Vec<MissionPropertyConfiguration>,
+    flows: Vec<MissionFlowConfiguration>,
     source: MissionPropertySource<'source>,
     complete: bool,
 }
@@ -231,6 +239,7 @@ fn read_owner<'source>(
     } = PreparedOwner::read(&fields, &capture, family)?;
     let (rows, _) =
         crate::template_property_configuration_read::read(&members, &plan.objectives, family)?;
+    let (flows, _) = crate::template_flow_configuration_read::read(&members, &plan, family)?;
     let (arena, failure) =
         crate::template_meanings::read(&members, &plan.flow, references.get_mut(), None, &capture)?;
     let complete = failure.is_none()
@@ -240,6 +249,7 @@ fn read_owner<'source>(
             .all(|value| value.original().original_error().is_none());
     Ok(OwnerRows {
         rows,
+        flows,
         source: MissionPropertySource {
             owner: MissionFlowOwnerRef::read(&fields, family)?,
             arena,

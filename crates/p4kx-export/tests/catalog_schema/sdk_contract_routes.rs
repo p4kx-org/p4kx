@@ -17,6 +17,8 @@ use super::{Route, TestResult};
 
 #[path = "../it/catalog_contract_query_probe_fixture.rs"]
 mod fixture;
+#[path = "sdk_mission_flow_route.rs"]
+mod mission_flows;
 #[path = "sdk_mission_property_route.rs"]
 mod mission_properties;
 
@@ -33,9 +35,10 @@ pub(super) const DATASETS: &[&str] = &[
     PROPERTY_SETS,
     GENERATORS,
     mission_properties::DATASET,
+    mission_flows::DATASET,
 ];
 
-pub(super) fn read() -> TestResult<[Route; 5]> {
+pub(super) fn read() -> TestResult<[Route; 6]> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("contracts.p4k");
     ArchiveBuilder::new()
@@ -71,6 +74,7 @@ pub(super) fn read() -> TestResult<[Route; 5]> {
         sets,
         generators,
         mission_properties::read()?,
+        mission_flows::read()?,
     ])
 }
 

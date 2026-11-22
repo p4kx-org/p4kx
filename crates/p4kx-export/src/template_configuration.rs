@@ -14,7 +14,7 @@ use crate::template_source_refs::{DeclarationBinding, SourceFieldRef};
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct MissionFlowConfiguration {
+pub struct MissionFlowConfiguration {
     pub(crate) owner: MissionFlowOwnerRef,
     pub(crate) declaration_index: Option<DecimalU64>,
     pub(crate) declaration: DeclarationBinding,
@@ -23,15 +23,66 @@ pub(crate) struct MissionFlowConfiguration {
     pub(crate) referenced_fields: Vec<SourceFieldRef>,
 }
 
+impl MissionFlowConfiguration {
+    /// Borrows the physical owner of the original declaration.
+    #[must_use]
+    pub const fn owner(&self) -> &MissionFlowOwnerRef {
+        &self.owner
+    }
+
+    /// Returns the original field ordinal of a present declaration.
+    #[must_use]
+    pub fn declaration_index(&self) -> Option<u64> {
+        self.declaration_index.map(DecimalU64::get)
+    }
+
+    /// Borrows the field binding or its original absence evidence.
+    #[must_use]
+    pub const fn declaration(&self) -> &DeclarationBinding {
+        &self.declaration
+    }
+
+    /// Borrows the original declaration's selection outcome.
+    #[must_use]
+    pub const fn selection(&self) -> &FlowSelection {
+        &self.selection
+    }
+
+    /// Borrows the trigger links in their original order.
+    #[must_use]
+    pub fn triggers(&self) -> &[SourceValueRef] {
+        &self.triggers
+    }
+
+    /// Borrows field links reached by this declaration's source selectors.
+    #[must_use]
+    pub fn referenced_fields(&self) -> &[SourceFieldRef] {
+        &self.referenced_fields
+    }
+}
+
 /// The preserved first-declaration/first-Struct source selection recipe.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(tag = "type", rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) enum FlowSelection {
+#[non_exhaustive]
+pub enum FlowSelection {
+    #[schemars(description = "")]
+    /// The owner has no `missionFlow` declaration.
     Absent,
+    #[schemars(description = "")]
+    /// A preceding declaration takes precedence.
     ShadowedDeclaration,
+    #[schemars(description = "")]
+    /// The selected declaration contains no original Struct.
     NoStruct,
-    Selected { value: SourceValueRef },
+    #[schemars(description = "")]
+    /// The first Struct of the selected declaration.
+    Selected {
+        #[schemars(description = "")]
+        /// The selected Struct's link in its original owner's arena.
+        value: SourceValueRef,
+    },
 }
 
 /// A typed link to one Flow declaration of its physical mission owner.
