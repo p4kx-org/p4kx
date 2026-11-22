@@ -6,6 +6,7 @@ use p4kx_extraction::{CancelToken, DataForge, Filter};
 use crate::broker_canonical_read::{self, BrokerEmission, CanonicalBroker, Sources};
 use crate::broker_entry::BrokerProjection;
 use crate::catalog_projection::CatalogProjection;
+use crate::catalog_read::original::OriginalReferenceObservation;
 use crate::catalog_rows::mission_definitions::{MissionDefinitionOutput, MissionDefinitionWriter};
 use crate::catalog_v3::tag_catalog::CapturedTags;
 use crate::export_field_inspection::WholeInspectionFold;
@@ -16,6 +17,7 @@ use crate::selection::Kind;
 use crate::spawn_pools::SpawnPools;
 use crate::template_configuration::{MissionFlowConfiguration, MissionPropertyConfiguration};
 use crate::template_issues::Unknowns;
+use crate::template_tag_cache::TemplateTagInput;
 use crate::{CatalogError, CatalogReadFailure};
 
 /// Source definitions, contextual rows, and the associated mission content.
@@ -50,12 +52,6 @@ pub(crate) fn read<'source>(
     cancel: Option<&CancelToken>,
     inspections: &mut WholeInspectionFold<'_>,
 ) -> Result<BrokerEntries<'source>, CatalogError> {
-    let sources = Sources {
-        projection,
-        tags,
-        index,
-        unknowns,
-    };
     let scratch = std::env::temp_dir();
     let mut rows = BrokerRows {
         definitions: MissionDefinitionWriter::new(Kind::MissionBrokerEntries, &scratch, cancel),
@@ -72,7 +68,16 @@ pub(crate) fn read<'source>(
         Kind::MissionBrokerEntries,
         (filter, cancel, Some(inspections)),
         |record, tree| {
-            broker_canonical_read::read(&sources, record, tree, cancel)
+            let mut rewards = |reference: &OriginalReferenceObservation<'_, '_, '_, 'source>| {
+                index.reward_observed(projection.original(), reference)
+            };
+            let mut sources = Sources {
+                projection,
+                tags: TemplateTagInput::Prepared(tags),
+                rewards: &mut rewards,
+                unknowns,
+            };
+            broker_canonical_read::read(&mut sources, record, tree, cancel)
                 .map_err(|error| Box::new(error) as crate::record_read::ReadError)
         },
         |piece| rows.append(piece),

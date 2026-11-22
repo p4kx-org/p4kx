@@ -8,15 +8,14 @@ use p4kx_extraction::{CancelToken, Record, RecordTree};
 use crate::broker_definition::BrokerDefinition;
 use crate::broker_entry::BrokerProjection;
 use crate::broker_flow_failure::BrokerProjectionFailure;
+use crate::broker_reputation_read::BrokerRewardLookup;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_rows::mission_definitions::DefinitionSource;
 use crate::catalog_template_modules::template_prepared_owner::PreparedOwner;
-use crate::catalog_v3::tag_catalog::CapturedTags;
 use crate::export_ledger::ExportLedger;
 use crate::mission_flow_owner::FlowOwnerKind;
-use crate::mission_index::MissionIndex;
 use crate::record_observation::RecordObservation;
 use crate::record_read::ReadError;
 use crate::spawn_pools::SpawnPools;
@@ -35,8 +34,8 @@ const FAMILY: FlowOwnerKind = FlowOwnerKind::MissionBrokerEntry;
 
 pub(crate) struct Sources<'read, 'catalog, 'source> {
     pub(crate) projection: &'read CatalogProjection<'catalog, 'source>,
-    pub(crate) tags: &'read CapturedTags<'catalog, 'source>,
-    pub(crate) index: &'read MissionIndex<'source>,
+    pub(crate) tags: TemplateTagInput<'read, 'source>,
+    pub(crate) rewards: &'read mut BrokerRewardLookup<'read, 'source>,
     pub(crate) unknowns: &'read Unknowns,
 }
 
@@ -56,7 +55,7 @@ pub(crate) struct CanonicalBroker<'source> {
 }
 
 pub(crate) fn read<'source>(
-    sources: &Sources<'_, '_, 'source>,
+    sources: &mut Sources<'_, '_, 'source>,
     record: &Record<'source>,
     tree: &RecordTree<'source>,
     cancel: Option<&CancelToken>,
@@ -78,7 +77,7 @@ pub(crate) fn read<'source>(
         capture: &capture,
     };
     let context = ContextPlan::from_plan(&plan);
-    let tags = TemplateTagCache::new(&fields, TemplateTagInput::Prepared(sources.tags));
+    let tags = TemplateTagCache::new(&fields, sources.tags);
     let mut spawns = TemplateSpawns::new(&fields);
     let root = root_spawns(&mut spawns, &references, &tags, &environment, &context)
         .err()
@@ -104,7 +103,7 @@ pub(crate) fn read<'source>(
             &environment,
             &context,
             spawns,
-            sources.index,
+            sources.rewards,
         ) {
             Ok(projection) => Ok(projection),
             Err(error) => Err(failed(&admission, error)?),

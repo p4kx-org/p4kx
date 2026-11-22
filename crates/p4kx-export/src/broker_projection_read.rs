@@ -9,8 +9,8 @@ use p4kx_extraction::Value;
 use crate::CatalogError;
 use crate::broker_canonical_read::BrokerEmission;
 use crate::broker_entry::BrokerProjection;
+use crate::broker_reputation_read::BrokerRewardLookup;
 use crate::mission_flow_owner::{FlowOwnerKind, MissionFlowOwnerRef};
-use crate::mission_index::MissionIndex;
 use crate::record_read::ReadError;
 use crate::source_value_catalog::SourceValueRef;
 use crate::template_context_read::{
@@ -33,7 +33,7 @@ pub(crate) fn read<'fields, 'scope, 'read, 'source>(
     sources: &ContextSources<'_, '_, 'source>,
     plan: &ContextPlan<'_, 'fields, 'scope, 'read, 'source>,
     spawns: TemplateSpawns<'fields, 'scope, 'read, 'source>,
-    index: &MissionIndex<'source>,
+    rewards: &mut BrokerRewardLookup<'_, 'source>,
 ) -> Result<BrokerEmission<'source>, ReadError> {
     let mut vocabularies =
         crate::template_vocabulary_read::broker_prefix(members, sources.unknowns)?;
@@ -66,12 +66,8 @@ pub(crate) fn read<'fields, 'scope, 'read, 'source>(
     )?;
     vocabularies.append(&mut context.vocabularies);
     context.vocabularies = vocabularies;
-    let reputation_results = crate::broker_reputation_read::read(
-        members,
-        references.get_mut(),
-        sources.projection.original(),
-        index,
-    )?;
+    let reputation_results =
+        crate::broker_reputation_read::read(members, references.get_mut(), rewards)?;
     let title = title(members)?;
     let projection = BrokerProjection {
         broker: MissionFlowOwnerRef::read(members.fields(), FAMILY)?,

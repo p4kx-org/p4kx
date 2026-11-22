@@ -689,7 +689,14 @@ the original source arena and links to that owner's flow and property declaratio
 Read those linked declarations with `mission_properties::with_mission_properties`.
 The Broker arena also retains authored title keys, reward references, standing
 requirements and spawn data. The catalog's `configurations.missionBrokerEntries`
-table gives the separately interpreted Broker context.
+table gives the separately interpreted Broker context. Use
+`mission_broker_context::with_mission_broker_context` or its decoded-Entry and
+session forms to read those rows. The query retains each original Broker owner
+and returns its contextual row only when required context interpretation succeeds.
+A reached unreadable Reward body remains an unreadable amount with its original
+source evidence. The query binds the authored target's exact physical Record and
+reports Reward read failures separately. Use `snapshot.owner()` to resolve
+contextual links into the original source arena.
 
 Use `contract_template_context::with_contract_template_context` or its decoded-Entry
 and session forms for `configurations.contractTemplates`. Select by physical Record

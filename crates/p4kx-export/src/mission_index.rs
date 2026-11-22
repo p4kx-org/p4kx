@@ -17,6 +17,10 @@ use crate::spawn_layers::Level;
 use crate::spawn_pools::SpawnPools;
 use crate::{CatalogError, CatalogReadFailure};
 
+#[path = "mission_index_read/broker_reward_reads.rs"]
+mod broker_reward_reads;
+pub(crate) use broker_reward_reads::BrokerRewardReads;
+
 #[path = "mission_dependency_demand.rs"]
 pub(crate) mod demand;
 #[path = "mission_dependency_lookup.rs"]

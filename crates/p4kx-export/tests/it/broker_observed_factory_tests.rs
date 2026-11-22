@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_export::catalog_queries::mission_broker_context::with_mission_broker_context_from;
+use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_export::{CatalogError, ExportDiagnosticStage, ExportHealthStatus, HealthText, Kind};
 
 use crate::health_origin_fixture::{self, Fixture, Input, TestResult};
@@ -53,6 +55,9 @@ fn run(checked: &Checked) -> TestResult {
     let example = example(&built, checked.case)?;
     body(example, checked);
     retained(&document, &built)?;
+    if matches!(checked.case, Case::Investigation) && matches!(checked.kind, Input::Encrypted) {
+        check_query_refusal(checked, &document)?;
+    }
     mission_property_remaining_origins::check(&document, example, &checked.actual)?;
     assert!(
         crate::broker_flow_graph::projections(&document)?.is_empty(),
@@ -70,6 +75,36 @@ fn run(checked: &Checked) -> TestResult {
         "same required Broker failure refuses Normal"
     );
     Ok(())
+}
+
+fn check_query_refusal(checked: &Checked, document: &serde_json::Value) -> TestResult {
+    with_mission_broker_context_from(
+        &checked.input.archive,
+        &checked.input.entry,
+        CatalogRecordSelection::All,
+        CatalogLanguageSelection::AllAvailable,
+        None,
+        |snapshot| -> TestResult {
+            assert!(
+                snapshot.rows.is_empty(),
+                "required guard failure produces no contextual Broker row"
+            );
+            assert_eq!(
+                Some(&serde_json::to_value(&snapshot.owners)?),
+                document.pointer("/definitions/missionBrokerEntries/rows"),
+                "the independently readable Broker owner and its source evidence survive"
+            );
+            let [failure] = snapshot.contextual_failures.as_slice() else {
+                return Err("one actual contextual failure".into());
+            };
+            assert_eq!(
+                snapshot.coverage.incomplete_fields,
+                [failure.record().index()],
+                "the omitted context reports the original owner index"
+            );
+            Ok(())
+        },
+    )?
 }
 
 fn example(

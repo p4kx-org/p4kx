@@ -15,6 +15,8 @@ use serde_json::Value;
 
 use super::{Route, TestResult};
 
+#[path = "sdk_mission_broker_context_route.rs"]
+mod broker_context;
 #[path = "../it/catalog_contract_query_probe_fixture.rs"]
 mod fixture;
 #[path = "sdk_mission_flow_route.rs"]
@@ -39,9 +41,10 @@ pub(super) const DATASETS: &[&str] = &[
     mission_flows::TEMPLATE_DEFINITIONS,
     mission_flows::TEMPLATE_CONTEXTS,
     mission_flows::BROKER_DEFINITIONS,
+    broker_context::DATASET,
 ];
 
-pub(super) fn read() -> TestResult<[Route; 9]> {
+pub(super) fn read() -> TestResult<[Route; 10]> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("contracts.p4k");
     ArchiveBuilder::new()
@@ -82,6 +85,7 @@ pub(super) fn read() -> TestResult<[Route; 9]> {
         templates,
         brokers,
         template_contexts,
+        broker_context::read()?,
     ])
 }
 

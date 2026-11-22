@@ -91,6 +91,8 @@ pub mod contract_template_context;
 mod location_entity_declarations;
 #[path = "location_vocabulary_query.rs"]
 pub mod location_vocabulary;
+#[path = "mission_broker_context_query.rs"]
+pub mod mission_broker_context;
 #[path = "mission_definition_query.rs"]
 pub mod mission_definitions;
 #[path = "mission_locality_query.rs"]
