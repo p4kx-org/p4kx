@@ -35,6 +35,24 @@ impl CatalogGuid {
     }
 }
 
+pub(crate) fn serialize_guid<S: Serializer>(
+    value: &Guid,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    serializer.collect_str(value)
+}
+
+#[expect(clippy::ref_option, reason = "serde passes the field by reference")]
+pub(crate) fn serialize_optional_guid<S: Serializer>(
+    value: &Option<Guid>,
+    serializer: S,
+) -> Result<S::Ok, S::Error> {
+    match value {
+        Some(value) => serializer.collect_str(value),
+        None => serializer.serialize_none(),
+    }
+}
+
 /// Orders `entities` by the text of the GUID `guid` returns.
 pub(crate) fn sort_by_guid<T>(entities: &mut [T], guid: impl Fn(&T) -> CatalogGuid) {
     entities.sort_by_cached_key(|entity| guid(entity).text());

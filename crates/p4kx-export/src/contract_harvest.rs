@@ -28,21 +28,3 @@ pub(crate) struct HarvestableLink<'a> {
     /// The GUID of the `MiningGlobalParams` Record the entity's `MineableParams` link to.
     pub(crate) mining_global_params_guid: Option<CatalogGuid>,
 }
-
-/// A place a harvestable provider preset is used: a container whose `.soc` names the preset, with
-/// the starmap object it hangs below.
-#[derive(Debug, Serialize, JsonSchema)]
-#[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct HarvestableLocation {
-    /// The GUID of the `HarvestableProviderPreset` Record.
-    pub(crate) preset_guid: CatalogGuid,
-    /// The GUID of the `StarMapObject` the container hangs below: the nearest object at or above
-    /// the container's Child element, a mining claim marker left out; `null` when none.
-    pub(crate) starmap_object_guid: Option<CatalogGuid>,
-    /// The folder of the star system below `Data/ObjectContainers/PU/system` that reaches the
-    /// container.
-    pub(crate) system: String,
-    /// The Archive path of the container (`.socpak`).
-    pub(crate) container: String,
-}

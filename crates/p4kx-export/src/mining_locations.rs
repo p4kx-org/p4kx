@@ -5,6 +5,7 @@
 
 use std::collections::BTreeMap;
 
+use schemars::JsonSchema;
 use serde::Serialize;
 
 pub use crate::build::mining_locations::{read_mining_locations, read_mining_locations_from};
@@ -36,6 +37,8 @@ pub use crate::starmap_containers::instance::ContainerInstanceKey;
 use p4kx_extraction::{Build, CancelToken, Guid, Language, SourceInventory, SourcedValue};
 
 use crate::StarmapTraversalBudget;
+use crate::guid_text::CatalogGuid;
+use crate::schema_fields::every_field_required;
 
 /// Selects a language, cancellation and optional container traversal allowances.
 #[derive(Debug, Clone, Copy)]
@@ -202,17 +205,26 @@ pub struct MiningTextForms {
     pub display_text: SourcedValue<String>,
 }
 
-/// One logical Catalog location for a provider preset.
-#[derive(Debug)]
+/// A place a harvestable provider preset is used: a container whose `.soc` names the preset, with
+/// the starmap object it hangs below.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
 #[non_exhaustive]
 pub struct HarvestableLocation {
-    /// The provider GUID.
+    /// The GUID of the `HarvestableProviderPreset` Record.
+    #[serde(serialize_with = "crate::guid_text::serialize_guid")]
+    #[schemars(with = "CatalogGuid")]
     pub preset_guid: Guid,
-    /// The associated non-claim Starmap object, when one is known.
+    /// The GUID of the `StarMapObject` the container hangs below: the nearest object at or above
+    /// the container's Child element, a mining claim marker left out; `null` when none.
+    #[serde(serialize_with = "crate::guid_text::serialize_optional_guid")]
+    #[schemars(with = "Option<CatalogGuid>")]
     pub starmap_object_guid: Option<Guid>,
-    /// The owning system folder name.
+    /// The folder of the star system below `Data/ObjectContainers/PU/system` that reaches the
+    /// container.
     pub system: String,
-    /// The archive path of the selected physical container.
+    /// The Archive path of the container (`.socpak`).
     pub container: String,
 }
 

@@ -9,15 +9,12 @@ mod assertions;
 #[path = "mining_location_reader_fixture.rs"]
 mod fixture;
 
-use fixture::archive;
+use fixture::{PLANET, archive};
 
 use crate::mining_locations::{
     MiningLocationOptions, read_mining_locations, read_mining_locations_from,
 };
 use crate::{CatalogError, StarmapTraversalBudget};
-
-const PLANET: &str = "10000000-0000-4000-8000-000000000001";
-const PRESET: &str = "10000000-0000-4000-8000-000000000004";
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 

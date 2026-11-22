@@ -15,14 +15,14 @@ use crate::catalog_v3::starmap_object_definition;
 use crate::catalog_v3::starmap_placement::PlacementBinding;
 use crate::contract_starmap::StarmapObject;
 use crate::mining_locations::{
-    HarvestableLocation, MiningGameText, MiningLocationCoverage, MiningRecordSource,
-    MiningStarmapObject, MiningTextForms,
+    MiningGameText, MiningLocationCoverage, MiningRecordSource, MiningStarmapObject,
+    MiningTextForms,
 };
 use crate::record_observation::RecordObservation;
 use crate::starmap::{self, TypeNames};
 use crate::starmap_containers::Placements;
 use crate::starmap_containers::proof::PlacementField;
-use crate::{CatalogError, Kind, contract_harvest};
+use crate::{CatalogError, Kind};
 
 pub(super) struct PlacedObject<'source> {
     source: MiningRecordSource,
@@ -109,17 +109,6 @@ impl From<TextForms<'_>> for MiningTextForms {
         Self {
             source_text: forms.source_text.map(Cow::into_owned),
             display_text: forms.display_text.map(Cow::into_owned),
-        }
-    }
-}
-
-impl From<contract_harvest::HarvestableLocation> for HarvestableLocation {
-    fn from(row: contract_harvest::HarvestableLocation) -> Self {
-        Self {
-            preset_guid: row.preset_guid.0,
-            starmap_object_guid: row.starmap_object_guid.map(|guid| guid.0),
-            system: row.system,
-            container: row.container,
         }
     }
 }

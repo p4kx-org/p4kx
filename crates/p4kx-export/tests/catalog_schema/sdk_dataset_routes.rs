@@ -102,6 +102,8 @@ mod medical_tier;
 mod mineable_entity;
 #[path = "sdk_mining_family_routes.rs"]
 mod mining_families;
+#[path = "sdk_mining_harvest_location_route.rs"]
+mod mining_harvest_location;
 #[path = "sdk_mission_board_route.rs"]
 mod mission_board;
 #[path = "sdk_mission_definition_routes.rs"]
@@ -305,6 +307,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.push(medical_tier::read()?);
     routes.push(mineable_entity::read()?);
     routes.extend(mining_families::read()?);
+    routes.push(mining_harvest_location::read()?);
     routes.push(planet_resource::read()?);
     routes.extend(planet_assets::read()?);
     routes.push(climate_assets::read()?);

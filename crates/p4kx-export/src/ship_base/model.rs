@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::Guid;
-use serde::{Serialize, Serializer};
+use serde::Serialize;
 
 use crate::digest::Digest;
 use crate::paint_port::VehiclePorts;
@@ -14,18 +14,6 @@ pub(crate) struct ShipRead {
     pub(crate) base: ShipBase,
     pub(crate) implementation: Option<Digest>,
     pub(crate) paint_ports: VehiclePorts,
-}
-
-fn guid<S: Serializer>(value: &Guid, serializer: S) -> Result<S::Ok, S::Error> {
-    serializer.collect_str(value)
-}
-
-#[expect(clippy::ref_option, reason = "serde passes the field by reference")]
-fn optional_guid<S: Serializer>(value: &Option<Guid>, serializer: S) -> Result<S::Ok, S::Error> {
-    match value {
-        Some(value) => serializer.collect_str(value),
-        None => serializer.serialize_none(),
-    }
 }
 
 /// What kind of file a value was read from.
@@ -177,10 +165,10 @@ pub struct CargoGrid {
     /// The class name of the grid's Entity.
     pub class_name: String,
     /// The GUID of the grid's Entity.
-    #[serde(serialize_with = "guid")]
+    #[serde(serialize_with = "crate::guid_text::serialize_guid")]
     pub guid: Guid,
     /// The GUID of the `InventoryContainer` Record, `null` when the Entity names none.
-    #[serde(serialize_with = "optional_guid")]
+    #[serde(serialize_with = "crate::guid_text::serialize_optional_guid")]
     pub container: Option<Guid>,
     /// `open` for a grid of cells, `closed` for a capacity in cargo units, `null` when unknown.
     pub shape: Option<&'static str>,
@@ -221,7 +209,7 @@ pub struct LoadoutPort {
     pub class_name: Option<String>,
     /// The GUID of the attached Entity's Record, or of the Record the Loadout names when the
     /// attachment cannot be resolved; `null` for a class name only.
-    #[serde(serialize_with = "optional_guid")]
+    #[serde(serialize_with = "crate::guid_text::serialize_optional_guid")]
     pub guid: Option<Guid>,
     /// The Record or XML Loadout file that supplied the attachment, `null` for a port nothing
     /// names. For `port_default` it is the Entity Record that defines the port.
@@ -274,7 +262,7 @@ impl VehicleKind {
 #[serde(rename_all = "camelCase")]
 pub struct ShipBase {
     /// The GUID of the ship's Record.
-    #[serde(serialize_with = "guid")]
+    #[serde(serialize_with = "crate::guid_text::serialize_guid")]
     pub guid: Guid,
     /// The class name, the Record name after `EntityClassDefinition.`.
     pub class_name: String,

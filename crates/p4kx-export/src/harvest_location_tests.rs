@@ -4,8 +4,8 @@
 use p4kx_extraction::Guid;
 
 use super::{NoObject, Objects, losses};
-use crate::contract_harvest::HarvestableLocation;
 use crate::guid_text::CatalogGuid;
+use crate::mining_locations::HarvestableLocation;
 
 fn guid(number: u8) -> Guid {
     format!("00000000-0000-0000-0000-0000000000{number:02x}")
@@ -82,7 +82,7 @@ fn the_losses_count_every_reason_but_none_above() {
     let row = |reason| {
         (
             HarvestableLocation {
-                preset_guid: CatalogGuid(guid(1)),
+                preset_guid: guid(1),
                 starmap_object_guid: None,
                 system: String::new(),
                 container: String::new(),

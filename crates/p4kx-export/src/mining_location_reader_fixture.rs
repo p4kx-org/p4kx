@@ -9,7 +9,8 @@ use p4kx_testkit::{
     TestRecord, TestStruct, TestType, TestValue,
 };
 
-use super::{PLANET, PRESET};
+pub(super) const PLANET: &str = "10000000-0000-4000-8000-000000000001";
+pub(super) const PRESET: &str = "10000000-0000-4000-8000-000000000004";
 
 const PLANET_RECORD: u128 = 0x1000_0000_0000_4000_8000_0000_0000_0001;
 const PRESET_RECORD: u128 = 0x1000_0000_0000_4000_8000_0000_0000_0004;
@@ -44,6 +45,10 @@ pub(super) fn archive_with_external_targets(
     };
     ArchiveBuilder::new()
         .entry(TestEntry::stored("Data/Game2.dcb", dataforge()))
+        .entry(TestEntry::stored(
+            "Data/Libs/CosmoTools/LayerRecovery/LayerBackups.xml",
+            b"<LayerBackups/>",
+        ))
         .entry(TestEntry::stored(
             "Data/Localization/english/global.ini",
             b"planetoid_name=Synthetic planet\ndeposit_name=Synthetic deposit\n",

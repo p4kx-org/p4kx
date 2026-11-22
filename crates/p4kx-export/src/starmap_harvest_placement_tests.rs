@@ -131,7 +131,7 @@ fn assert_retained_locations(
         harvest_locations
             .locations
             .iter()
-            .any(|row| row.starmap_object_guid == Some(CatalogGuid(planet))),
+            .any(|row| row.starmap_object_guid == Some(planet)),
         "the mining marker resolves through its actual parent"
     );
     assert_eq!(

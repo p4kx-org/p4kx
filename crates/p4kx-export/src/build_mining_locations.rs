@@ -336,7 +336,7 @@ fn harvest_locations(
         archive, capture, cancel, &routed, &opened, &positives, &objects,
     )?;
     Ok(HarvestLocationsRead {
-        logical: located.locations.into_iter().map(Into::into).collect(),
+        logical: located.locations,
         physical,
     })
 }

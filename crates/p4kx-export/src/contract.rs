@@ -22,7 +22,6 @@ pub(crate) use crate::catalog_v3::resource_group_catalog::ResourceGroup;
 pub(crate) use crate::commodity_contract::Commodity;
 pub(crate) use crate::contract_completeness::{Completeness, KindCompleteness};
 pub(crate) use crate::contract_entities::{Item, Paint, Ship};
-pub(crate) use crate::contract_harvest::HarvestableLocation;
 pub(crate) use crate::contract_harvest_config::SubHarvestableMultiConfig;
 pub(crate) use crate::contract_loadout::Loadout;
 pub(crate) use crate::contract_loot::{LootArchetype, LootContainer, LootTable};
@@ -36,6 +35,7 @@ pub(crate) use crate::contract_starmap::StarmapObject;
 pub(crate) use crate::contract_store_slugs::ShipStoreSlug;
 pub(crate) use crate::entity_spawn_model::EntitySpawnPool;
 pub(crate) use crate::location_template::MissionLocationTemplate;
+pub(crate) use crate::mining_locations::HarvestableLocation;
 pub(crate) use crate::mission_property_set::MissionPropertySet;
 pub(crate) use crate::npc_spawn_model::PublishedNpcPool;
 

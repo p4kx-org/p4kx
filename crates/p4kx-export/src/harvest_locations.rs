@@ -10,9 +10,9 @@ use rayon::prelude::*;
 
 use crate::catalog_read::original::EntryCapture;
 use crate::contract::StarmapObject;
-use crate::contract_harvest::HarvestableLocation;
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
+use crate::mining_locations::HarvestableLocation;
 use crate::starmap_walk::Opened;
 use crate::{CatalogError, Kind};
 
@@ -170,8 +170,8 @@ fn locate_from_sources(
             presets.contains(preset).then(|| {
                 (
                     HarvestableLocation {
-                        preset_guid: CatalogGuid(*preset),
-                        starmap_object_guid: object.ok(),
+                        preset_guid: *preset,
+                        starmap_object_guid: object.ok().map(CatalogGuid::get),
                         system: container.system.to_string(),
                         container: path_of(archive, container.entry).to_owned(),
                     },
@@ -308,14 +308,17 @@ type Row = (HarvestableLocation, Option<NoObject>);
 /// Orders `rows` by preset, container, system and object, and drops the repeats.
 fn sort_unique(rows: &mut Vec<Row>) {
     rows.sort_by(|(a, _), (b, _)| {
-        a.preset_guid
+        CatalogGuid(a.preset_guid)
             .text()
-            .cmp(&b.preset_guid.text())
+            .cmp(&CatalogGuid(b.preset_guid).text())
             .then_with(|| a.container.cmp(&b.container))
             .then_with(|| a.system.cmp(&b.system))
             .then_with(|| {
                 let text = |location: &HarvestableLocation| {
-                    location.starmap_object_guid.map(CatalogGuid::text)
+                    location
+                        .starmap_object_guid
+                        .map(CatalogGuid)
+                        .map(CatalogGuid::text)
                 };
                 text(a).cmp(&text(b))
             })
