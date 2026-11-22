@@ -10,19 +10,19 @@ use self::installed::InstalledConfigurations;
 
 use super::catalog_independent_configurations::flight_configuration_tables::FlightConfigurationTables;
 
-use super::catalog_entity_configurations::EntityConfigurationRows;
-use super::catalog_facility;
+use super::catalog_entity_configurations::{
+    EntityConfigurationRows, loadout_facility_owner_source_type,
+};
 use super::facility_instance::{
     FacilityConfiguration, FacilityInstance, FacilityPlacementSource, LoadoutFacilityPlacement,
     ShipContext,
 };
-use super::inventory_owner_storage;
 use super::item_component_owner::ComponentOwner;
 use super::loadout_position;
 use super::resource_topology_declarations;
-use super::room_associations;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
+use crate::catalog_query_session::checkpoint;
 use crate::catalog_read::original::EntryCapture;
 use crate::catalog_table::CatalogTable;
 use crate::contract_entities::Ship;
@@ -87,42 +87,39 @@ pub(super) fn table(
     let mut project = Projection::new(configurations.entities, input.origins(), cancel)?;
     let mut flight_instances = InstalledConfigurations::new(configurations.flight)?;
     let rooms = RoomOwners::new(configurations.entities)?;
-    let coverage =
-        if project.definitions.is_empty() && rooms.is_empty() && flight_instances.is_empty() {
-            Vec::new()
-        } else {
-            let mut attachments = Vec::new();
-            for ship in loadouts.ships() {
-                project.check_cancel()?;
-                project.loadout(
-                    &ship.loadout,
-                    &rooms,
-                    &mut attachments,
-                    &mut flight_instances,
-                )?;
-            }
-            run.begin(CatalogStage::ProjectFacilityInteriors);
-            let capture = EntryCapture::for_input(input);
-            interior::project(
-                &mut project,
-                archive,
-                forge,
-                ships,
+    let coverage = if project.indexed_definitions()?.is_empty()
+        && rooms.is_empty()
+        && flight_instances.is_empty()
+    {
+        Vec::new()
+    } else {
+        let mut attachments = Vec::new();
+        for ship in loadouts.ships() {
+            project.check_cancel()?;
+            project.loadout(
+                &ship.loadout,
                 &rooms,
-                attachments,
-                &capture,
-            )?
-        };
+                &mut attachments,
+                &mut flight_instances,
+            )?;
+        }
+        run.begin(CatalogStage::ProjectFacilityInteriors);
+        let capture = EntryCapture::for_input(input);
+        interior::project(
+            &mut project,
+            archive,
+            forge,
+            ships,
+            &rooms,
+            attachments,
+            &capture,
+        )?
+    };
     let instances = CatalogTable::matching_source_types(
         forge,
         |name| {
-            catalog_facility::SOURCE_TYPES.contains(&name)
-                || matches!(
-                    name,
-                    inventory_owner_storage::ITEM_COMPONENT
-                        | room_associations::VEHICLE
-                        | resource_topology_declarations::ITEM_ROOM
-                )
+            loadout_facility_owner_source_type(name)
+                || name == resource_topology_declarations::ITEM_ROOM
         },
         project.rows,
     );
@@ -131,6 +128,44 @@ pub(super) fn table(
         rooms: coverage,
         flight: FlightConfigurationTables::installed_table(forge, flight_instances.rows),
     })
+}
+
+pub(crate) fn project_loadout<'lookup>(
+    loadout: &Loadout,
+    origins: &CatalogOrigins,
+    cancel: Option<&CancelToken>,
+    lookup: &'lookup mut ConfigurationLookup<'lookup>,
+) -> Result<Vec<FacilityInstance>, CatalogError> {
+    let mut projection = Projection {
+        definitions: Definitions::Scoped(lookup),
+        origins,
+        cancel,
+        rows: Vec::new(),
+    };
+    projection.loadout(
+        loadout,
+        &RoomOwners::default(),
+        &mut Vec::new(),
+        &mut InstalledConfigurations::default(),
+    )?;
+    Ok(projection.rows)
+}
+
+pub(crate) fn loadout_configuration_links(
+    record: u32,
+    declarations: &EntityConfigurationRows<'_>,
+    cancel: Option<&CancelToken>,
+) -> Result<Vec<FacilityConfiguration>, CatalogError> {
+    let mut definitions = Vec::new();
+    for definition in owner_definitions(declarations) {
+        checkpoint(cancel)?;
+        match definition.owner().key() {
+            (Some(index), Some(_)) if index == record => definitions.push(definition),
+            _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
+        }
+    }
+    sort_definitions(&mut definitions);
+    link_definitions(&definitions, cancel)
 }
 
 #[derive(Clone, Copy)]
@@ -154,8 +189,44 @@ impl<'rows> Definition<'rows> {
     }
 }
 
+fn owner_definitions<'rows>(
+    declarations: &'rows EntityConfigurationRows<'_>,
+) -> impl Iterator<Item = Definition<'rows>> {
+    declarations
+        .facility_owners()
+        .map(Definition::Facility)
+        .chain(declarations.storage_owners().map(Definition::Inventory))
+}
+
+fn sort_definitions(definitions: &mut [Definition<'_>]) {
+    definitions.sort_by_key(|definition| definition.owner().key().1);
+}
+
+fn link_definitions(
+    definitions: &[Definition<'_>],
+    cancel: Option<&CancelToken>,
+) -> Result<Vec<FacilityConfiguration>, CatalogError> {
+    definitions
+        .iter()
+        .map(|definition| {
+            checkpoint(cancel)?;
+            Ok(definition.link())
+        })
+        .collect()
+}
+
+pub(crate) type ConfigurationLookup<'lookup> =
+    dyn FnMut(u32) -> Result<Vec<FacilityConfiguration>, CatalogError> + 'lookup;
+
+type IndexedDefinitions<'rows> = HashMap<u32, Vec<Definition<'rows>>>;
+
+enum Definitions<'rows> {
+    Indexed(IndexedDefinitions<'rows>),
+    Scoped(&'rows mut ConfigurationLookup<'rows>),
+}
+
 struct Projection<'rows, 'origin> {
-    definitions: HashMap<u32, Vec<Definition<'rows>>>,
+    definitions: Definitions<'rows>,
     origins: &'origin CatalogOrigins,
     cancel: Option<&'origin CancelToken>,
     rows: Vec<FacilityInstance>,
@@ -167,31 +238,30 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
         origins: &'origin CatalogOrigins,
         cancel: Option<&'origin CancelToken>,
     ) -> Result<Self, CatalogError> {
-        let mut projection = Self {
-            definitions: HashMap::new(),
-            origins,
-            cancel,
-            rows: Vec::new(),
-        };
-        for definition in declarations
-            .facility_owners()
-            .map(Definition::Facility)
-            .chain(declarations.storage_owners().map(Definition::Inventory))
-        {
-            projection.check_cancel()?;
+        let mut index = IndexedDefinitions::new();
+        for definition in owner_definitions(declarations) {
+            checkpoint(cancel)?;
             let (Some(record), Some(_)) = definition.owner().key() else {
                 return Err(ExportAccountingError::ConflictingSourceDatum.into());
             };
-            projection
-                .definitions
-                .entry(record)
-                .or_default()
-                .push(definition);
+            index.entry(record).or_default().push(definition);
         }
-        for definitions in projection.definitions.values_mut() {
-            definitions.sort_by_key(|definition| definition.owner().key().1);
+        for definitions in index.values_mut() {
+            sort_definitions(definitions);
         }
-        Ok(projection)
+        Ok(Self {
+            definitions: Definitions::Indexed(index),
+            origins,
+            cancel,
+            rows: Vec::new(),
+        })
+    }
+
+    fn indexed_definitions(&self) -> Result<&IndexedDefinitions<'rows>, CatalogError> {
+        match &self.definitions {
+            Definitions::Indexed(definitions) => Ok(definitions),
+            Definitions::Scoped(_) => Err(ExportAccountingError::ConflictingSourceDatum.into()),
+        }
     }
 
     fn loadout(
@@ -208,7 +278,8 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
             .record(root)
             .observe_header(RecordHeaderField::RecordIndex, SourceUseRole::Selector)?;
         let walk = Path::new(root, selector);
-        self.emit(&ship, root, &walk, None)?;
+        let configurations = self.configuration_links(root)?;
+        self.emit(&ship, &walk, None, configurations)?;
         flight.emit(&ship, root, || walk.position_cell(&self.origins.uses), None)?;
         self.walk_ports(loadout, &ship, walk, rooms, room_attachments, flight)
     }
@@ -240,9 +311,10 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
                 continue;
             };
             let has_rooms = rooms.contains(record);
+            let configurations = self.configuration_links(record)?;
             if port.ports.is_empty()
                 && !has_rooms
-                && !self.definitions.contains_key(&record)
+                && configurations.is_empty()
                 && !flight.contains(record)
             {
                 continue;
@@ -255,7 +327,7 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
             let name_complete = port.append_name_uses(&mut walk.uses)?;
             walk.complete &= proof.source_set_complete && name_complete;
             let attached = Some((port, attachment));
-            self.emit(ship, record, &walk, attached)?;
+            self.emit(ship, &walk, attached, configurations)?;
             flight.emit(
                 ship,
                 record,
@@ -280,13 +352,13 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
     fn emit(
         &mut self,
         ship: &ShipContext,
-        record: u32,
         path: &Path,
         attachment: Option<(&LoadoutPort, &AttachmentIdentity)>,
+        configurations: Vec<FacilityConfiguration>,
     ) -> Result<(), CatalogError> {
-        let Some(configurations) = self.configuration_links(record)? else {
+        if configurations.is_empty() {
             return Ok(());
-        };
+        }
         let (original_port, attached_item) = if let Some((port, attachment)) = attachment {
             (
                 port.source_constraints.physical_port()?,
@@ -309,18 +381,16 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
     }
 
     fn configuration_links(
-        &self,
+        &mut self,
         record: u32,
-    ) -> Result<Option<Vec<FacilityConfiguration>>, CatalogError> {
-        let Some(definitions) = self.definitions.get(&record) else {
-            return Ok(None);
-        };
-        let mut configurations = Vec::with_capacity(definitions.len());
-        for definition in definitions {
-            self.check_cancel()?;
-            configurations.push(definition.link());
+    ) -> Result<Vec<FacilityConfiguration>, CatalogError> {
+        match &mut self.definitions {
+            Definitions::Indexed(index) => match index.get(&record) {
+                Some(definitions) => link_definitions(definitions, self.cancel),
+                None => Ok(Vec::new()),
+            },
+            Definitions::Scoped(lookup) => lookup(record),
         }
-        Ok(Some(configurations))
     }
 
     fn check_cancel(&self) -> Result<(), CatalogError> {

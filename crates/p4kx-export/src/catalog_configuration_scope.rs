@@ -32,6 +32,7 @@ pub(super) enum Scope {
     CargoGrids,
     Facilities,
     FacilitiesWithCargoStorage,
+    LoadoutFacilityOwners,
     InventoryConfigurations,
     VehicleArmor,
     ResourceComponents,
@@ -111,6 +112,12 @@ impl Scope {
             Self::FacilitiesWithCargoStorage => matches!(
                 kind,
                 ConfigurationKind::Facility(_) | ConfigurationKind::InventoryStorage
+            ),
+            Self::LoadoutFacilityOwners => matches!(
+                kind,
+                ConfigurationKind::Facility(_)
+                    | ConfigurationKind::InventoryStorage
+                    | ConfigurationKind::RoomAssociations
             ),
             Self::VehicleArmor => matches!(kind, ConfigurationKind::VehicleArmor),
             Self::ResourceComponents => matches!(kind, ConfigurationKind::Resource),
@@ -211,6 +218,7 @@ impl Scope {
                     Self::CargoGrids
                         | Self::Facilities
                         | Self::FacilitiesWithCargoStorage
+                        | Self::LoadoutFacilityOwners
                         | Self::InventoryConfigurations
                 ),
             };
@@ -253,10 +261,16 @@ impl Scope {
             owner,
         } = selected;
         match self {
+            Self::LoadoutFacilityOwners
+                if matches!(configuration, ConfigurationKind::RoomAssociations) =>
+            {
+                rows.inventory.vehicle_storage(&owner, source, notes)
+            }
             Self::All
             | Self::CargoGrids
             | Self::Facilities
             | Self::FacilitiesWithCargoStorage
+            | Self::LoadoutFacilityOwners
             | Self::VehicleArmor
             | Self::ResourceComponents
             | Self::ResourceConnections

@@ -1453,6 +1453,15 @@ and nested port ordinals. The aggregate origin lists observed contributors and h
 coverage of exclusion decisions. This state is independent of the result's owner and
 dependency coverage and the marker can still be true when a known contributor is encrypted.
 
+`with_ship_store_slugs` and `with_ship_store_slugs_from` supply the same curated
+`shipStoreSlugs` rows as the Catalog. Session and parsed views provide the same selection.
+The optional `Filter` selects original Ship paths using Catalog matching. Unfiltered
+queries include retired mappings whose original Ship GUID is absent from the admitted
+Ship rows. Filtered queries publish only active mappings to selected, readable Ships.
+The snapshot retains the exact Filter text, curated counts and read coverage of demanded
+physical Ship candidates. Check that coverage before treating a missing row as absence.
+The query resolves candidates for curated GUIDs, including all admitted physical aliases.
+
 The Catalog's `mass`, `massBasis` and `hullHealth` are immediate sourced aggregate cells.
 Their input sets bind the current physical Record to the original Vehicle XML, the selected
 Modification, patch and overrides, and the fields consulted for each metric. A Physics fallback
@@ -1885,7 +1894,18 @@ completeness as well as coverage. The original Reference and capacity status des
 rejected before a dependency body read.
 
 This query covers authored configuration and the reached inventory definition. Installed ship
-totals and `placements.facilityInstances` use the global Loadout order and a separate projection.
+totals have their own projection.
+
+## Facility placements from a Loadout
+
+Use `equipment::read_loadout_facility_placements`, its decoded-Entry form or the equivalent
+session methods with a physical Ship Record index from the same DataForge. The snapshot returns
+the Loadout-kind rows of `placements.facilityInstances` for that ship, including authored Facility
+and Inventory storage owners. Use each position's physical root and ordered port ordinals.
+The same component can contribute an instance at several distinct positions.
+Check the selected Loadout state, its coverage, and the reached configuration dependencies
+before interpreting an empty result. Retain the snapshot's own source inventory.
+Interior-kind instances and `placements.facilityInteriorCoverage` require the full Catalog.
 
 ## Original cargo manifests
 

@@ -98,7 +98,7 @@ fn class_targets(
     forge: &DataForge<'_>,
 ) -> Result<HashMap<Guid, ClassTarget>, CatalogError> {
     let configured: HashSet<_> = project
-        .definitions
+        .indexed_definitions()?
         .keys()
         .map(|&index| {
             forge
@@ -149,9 +149,10 @@ impl RoomReader<'_> {
             route.note(coverage, InteriorFindingKind::AmbiguousClass);
             return Ok(());
         };
-        let Some(configurations) = project.configuration_links(index)? else {
+        let configurations = project.configuration_links(index)?;
+        if configurations.is_empty() {
             return Ok(());
-        };
+        }
         let source = route.placement(project, coverage.room.clone(), entity.fields()?, index)?;
         project.rows.push(super::FacilityInstance {
             ship: ship.clone(),

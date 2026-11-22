@@ -21,6 +21,7 @@ use dataset_audit::{NO_WITNESS, audit};
 const LANGUAGE_SOURCES: &str = "/texts/languageSources";
 const ITEM_DEFINITIONS: &str = "/definitions/items";
 const SHIP_BASE_FACTS: &str = "/projections/shipBaseFacts";
+const SHIP_STORE_SLUGS: &str = "/shipStoreSlugs";
 const LOADOUTS: &str = "/loadouts";
 const ITEM_PORTS: &str = "/configurations/itemPorts";
 const ATTACHMENT_CONSTRAINTS: &str = "/configurations/itemAttachmentConstraints";
@@ -35,6 +36,7 @@ const ITEM_RECOVERY_POLICY: &str = "/configurations/itemRecoveryPolicy";
 const INVENTORY_CONTAINERS: &str = "/definitions/inventoryContainers";
 const INVENTORY_CONFIGURATIONS: &str = "/configurations/inventoryConfigurations";
 const FACILITIES: &str = "/configurations/facilities";
+const FACILITY_INSTANCES: &str = "/placements/facilityInstances";
 const MEDICAL_ITEM_TIER_CONFIGS: &str = "/definitions/medicalItemTierConfigs";
 const MANUFACTURERS: &str = "/definitions/manufacturers";
 const FACTION_IDENTITIES: &str = "/definitions/factionIdentities";
@@ -172,6 +174,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     ITEM_DEFINITIONS,
     LOADOUTS,
     SHIP_BASE_FACTS,
+    SHIP_STORE_SLUGS,
     ITEM_PORTS,
     ATTACHMENT_CONSTRAINTS,
     ITEM_BOUNDS,
@@ -185,6 +188,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     ITEM_RECOVERY_POLICY,
     INVENTORY_CONFIGURATIONS,
     FACILITIES,
+    FACILITY_INSTANCES,
     MEDICAL_ITEM_TIER_CONFIGS,
     MANUFACTURERS,
     FACTION_IDENTITIES,

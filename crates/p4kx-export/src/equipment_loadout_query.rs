@@ -18,6 +18,14 @@ pub use crafter_host::{
     CrafterHost, CrafterHostSnapshot, read_crafter_hosts, read_crafter_hosts_from,
 };
 
+#[path = "equipment_loadout_facility_query.rs"]
+mod facility_placements;
+pub use facility_placements::{
+    FacilityConfigurationKind, FacilityInstance, FacilityPlacementDependency,
+    LoadoutFacilityPlacementSnapshot, read_loadout_facility_placements,
+    read_loadout_facility_placements_from,
+};
+
 #[path = "equipment_loadout_scope.rs"]
 mod scope;
 

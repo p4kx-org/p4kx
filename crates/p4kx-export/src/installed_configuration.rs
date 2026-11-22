@@ -37,6 +37,7 @@ struct FlightConfigurationLink {
     owner: ComponentOwner,
 }
 
+#[derive(Default)]
 pub(super) struct InstalledConfigurations<'rows> {
     definitions: HashMap<u32, Vec<FlightOwner<'rows>>>,
     pub(super) rows: Vec<InstalledConfiguration>,

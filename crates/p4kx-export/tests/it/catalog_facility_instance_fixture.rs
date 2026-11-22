@@ -7,7 +7,7 @@ use p4kx_testkit::{
     TestLoadoutEntry, TestPort, TestRecord, TestStruct, TestType, TestValue,
 };
 
-use crate::commodity_v3_fixture::TestResult;
+type TestResult<T> = Result<T, Box<dyn std::error::Error>>;
 
 pub(super) const SHIP: u128 = 0x1063_0200;
 pub(super) const SEAT: u128 = 0x1063_0201;

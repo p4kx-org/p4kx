@@ -14,7 +14,7 @@ pub(crate) struct ShipIdentity<'source> {
 }
 
 impl<'source> ShipIdentity<'source> {
-    pub(super) fn read(header: &CanonicalRecordHeader<'source>) -> Result<Self, CatalogError> {
+    pub(crate) fn read(header: &CanonicalRecordHeader<'source>) -> Result<Self, CatalogError> {
         Ok(Self {
             guid: header
                 .guid

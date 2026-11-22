@@ -62,6 +62,8 @@ pub(super) mod entity_animation;
 mod facilities;
 #[path = "../it/catalog_facility_medbed_fixture.rs"]
 mod facility_medbed_fixture;
+#[path = "sdk_facility_placement_route.rs"]
+mod facility_placements;
 #[path = "sdk_faction_definition_route.rs"]
 mod faction_definitions;
 #[path = "sdk_faction_trigger_configuration_route.rs"]
@@ -285,6 +287,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.push(inventory_containers::read()?);
     routes.push(inventory_containers::read_configurations()?);
     routes.push(facilities::read()?);
+    routes.push(facility_placements::read()?);
     routes.push(client_profiles::read()?);
     routes.extend(cargo::read_globals(archive)?);
     routes.push(cargo::read_manifests()?);

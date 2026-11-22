@@ -14,6 +14,8 @@ use crate::catalog_queries::{
 mod complete;
 #[path = "equipment_ship_source_read.rs"]
 mod read;
+#[path = "equipment_ship_store_slug_query.rs"]
+pub(super) mod store_slugs;
 
 pub use super::dependency_coverage::{
     EquipmentDependencyCoverage as ShipSourceDependencyCoverage,

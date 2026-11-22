@@ -96,8 +96,11 @@ pub use dependency_coverage::{
 };
 pub use loadout_query::{
     AlignmentDependency, AlignmentDependencyState, AlignmentRole, CrafterHost, CrafterHostSnapshot,
-    Loadout, LoadoutDependencyCoverage, LoadoutOwnerKind, LoadoutPort, LoadoutSnapshot, PortType,
-    read_crafter_hosts, read_crafter_hosts_from, read_loadouts, read_loadouts_from,
+    FacilityConfigurationKind, FacilityInstance, FacilityPlacementDependency, Loadout,
+    LoadoutDependencyCoverage, LoadoutFacilityPlacementSnapshot, LoadoutOwnerKind, LoadoutPort,
+    LoadoutSnapshot, PortType, read_crafter_hosts, read_crafter_hosts_from,
+    read_loadout_facility_placements, read_loadout_facility_placements_from, read_loadouts,
+    read_loadouts_from,
 };
 
 #[path = "equipment_ammo_query.rs"]
@@ -243,6 +246,9 @@ pub use crate::catalog_v3::authored_fields::ship_source_read::ShipPlayabilityInp
 pub use crate::contract_insurance::{ShipInsurance, ShipInsuranceParams};
 pub use crate::ship::ShipSource;
 pub use crate::ship_base::{ShipCargoMountSource, ShipCargoSource};
+pub use ship_sources::store_slugs::{
+    ShipStoreSlug, ShipStoreSlugSnapshot, with_ship_store_slugs, with_ship_store_slugs_from,
+};
 pub use ship_sources::{
     ShipSourceDependencyCoverage, ShipSourceEntryFailure, ShipSourceFailureStage,
     ShipSourceSnapshot, with_ship_sources, with_ship_sources_from,

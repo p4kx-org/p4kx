@@ -113,6 +113,22 @@ pub(crate) fn read_inventory_configurations<'source>(
     Ok(read.map(|rows| rows.inventory.into_storage()))
 }
 
+pub(crate) fn read_loadout_facility_owners<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<EntityConfigurationRows<'source>>, CatalogError> {
+    read_scope(
+        tree,
+        projection,
+        admission,
+        &AlignmentOptions::default(),
+        cancel,
+        Scope::LoadoutFacilityOwners,
+    )
+}
+
 #[derive(Clone, Copy)]
 pub(crate) enum FacilitySelection {
     CargoGrids,

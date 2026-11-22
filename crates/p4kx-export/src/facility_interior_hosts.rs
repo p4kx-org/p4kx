@@ -18,6 +18,7 @@ use super::types::{InteriorRoomCoverage, InteriorRoomDeclaration, InteriorRoomRe
 use super::walk::RoomReader;
 use crate::{CatalogError, ExportAccountingError};
 
+#[derive(Default)]
 pub(super) struct RoomOwners<'rows, 'source> {
     by_record: HashMap<u32, Vec<RoomDefinition<'rows, 'source>>>,
 }

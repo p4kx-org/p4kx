@@ -41,13 +41,27 @@ struct SelectedShips<'source> {
     dependencies: ShipSourceDependencyCoverage,
 }
 
-impl Query<'_> {
+impl<'query> Query<'query> {
     pub(super) fn run<T>(
         self,
         inspect: impl FnOnce(ShipSourceSnapshot<'_>) -> T,
     ) -> Result<T, CatalogError> {
         checkpoint(self.cancel)?;
         let plan = self.plan()?;
+        self.run_plan(plan, inspect)
+    }
+
+    pub(super) fn run_plan<T>(
+        &self,
+        mut plan: Plan<'query>,
+        inspect: impl FnOnce(ShipSourceSnapshot<'_>) -> T,
+    ) -> Result<T, CatalogError> {
+        plan.owners.sort_by_key(|owner| {
+            (
+                CatalogGuid(owner.record.guid()).text(),
+                owner.record.index(),
+            )
+        });
         if plan.owners.is_empty() {
             return self.empty(plan.coverage, inspect);
         }
@@ -118,15 +132,8 @@ impl Query<'_> {
         })
     }
 
-    fn plan(&self) -> Result<Plan<'_>, CatalogError> {
-        let mut plan = Plan::read(self.forge, Kind::Ships, self.selection, self.cancel, None)?;
-        plan.owners.sort_by_key(|owner| {
-            (
-                CatalogGuid(owner.record.guid()).text(),
-                owner.record.index(),
-            )
-        });
-        Ok(plan)
+    fn plan(&self) -> Result<Plan<'query>, CatalogError> {
+        Plan::read(self.forge, Kind::Ships, self.selection, self.cancel, None)
     }
 }
 

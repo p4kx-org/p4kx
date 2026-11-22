@@ -31,13 +31,22 @@ use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::{CatalogError, ExportAccountingError};
 
+pub(crate) fn loadout_facility_owner_source_type(name: &str) -> bool {
+    catalog_facility::SOURCE_TYPES.contains(&name)
+        || matches!(
+            name,
+            inventory_owner_storage::ITEM_COMPONENT | room_associations::VEHICLE
+        )
+}
+
 #[path = "catalog_configuration_record_read.rs"]
 mod record_read;
 pub(crate) use record_read::{
     FacilitySelection, read, read_attachment_constraints, read_facility_configurations,
     read_fuel_intakes, read_fuel_tanks, read_inventory_configurations, read_item_bounds,
-    read_item_ports, read_item_ports_scoped, read_resource_components, read_resource_connections,
-    read_resource_containers, read_resource_topology, read_vehicle_armor,
+    read_item_ports, read_item_ports_scoped, read_loadout_facility_owners,
+    read_resource_components, read_resource_connections, read_resource_containers,
+    read_resource_topology, read_vehicle_armor,
 };
 
 pub use super::authored_damage::{DamageChannels, DamageParameters};

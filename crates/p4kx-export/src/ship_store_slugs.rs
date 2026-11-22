@@ -120,6 +120,14 @@ impl StoreSlugs {
         Ok(Self { slugs })
     }
 
+    pub(crate) fn ship_guids(&self, filtered: bool) -> HashSet<Guid> {
+        self.slugs
+            .iter()
+            .filter(|slug| !filtered || !slug.retired)
+            .filter_map(|slug| slug.mapped.as_ref().map(|mapped| mapped.guid))
+            .collect()
+    }
+
     /// Resolves every mapped slug against `ships` and returns what the catalog exports.
     ///
     /// A slug resolves when a ship has its GUID and its class name. A mapped slug that does not

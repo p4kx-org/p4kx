@@ -67,9 +67,9 @@ pub(crate) mod catalog_placements;
 #[path = "explosion_definition.rs"]
 pub(crate) mod explosion_definition;
 #[path = "facility_instance.rs"]
-mod facility_instance;
+pub(crate) mod facility_instance;
 #[path = "facility_loadout_placements.rs"]
-mod facility_loadout_placements;
+pub(crate) mod facility_loadout_placements;
 #[path = "flare_library.rs"]
 pub(crate) mod flare_library;
 #[path = "infraction_definition.rs"]
