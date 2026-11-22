@@ -1517,15 +1517,19 @@ test module in a separate process with that verified receipt. This path
 opens the same Archive and reads one physical Ship through the SDK. It does
 not generate a Catalog.
 
-On Windows AMD64, the native Debug test against production code `bfa0d9740`
+On Windows AMD64, the native Debug test against production code `170144907`
 confirmed the scoped producer and original Loadout comparison in LIVE
-`13220821` and PTU `13248297`. A new process with no SDK cache measured
-these peaks for the same selected rows.
+`13220821` and PTU `13248297`. This revision includes original CargoGrid
+admission inputs and consumed port comparisons. A new process with no SDK
+cache measured these peaks for the same selected rows.
 
 | Build | Peak private bytes | Peak working set bytes | Elapsed |
 | --- | ---: | ---: | ---: |
-| LIVE `13220821` | 1,091,887,104 | 1,024,430,080 | 9.915 s |
-| PTU `13248297` | 1,116,168,192 | 1,034,645,504 | 10.974 s |
+| LIVE `13220821` | 1,091,833,856 | 1,024,466,944 | 10.777 s |
+| PTU `13248297` | 1,116,164,096 | 1,034,682,368 | 10.397 s |
+
+Each cold process wrote 304 bytes. Available host memory stayed above
+61.19 GB during the two SDK processes.
 
 The observed page-file counters were stable across both SDK processes.
 On a 16 GiB machine the higher process peak leaves an estimated 16.06 GB
