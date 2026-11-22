@@ -119,15 +119,20 @@ foreach ($evidenceUpload in @($firstUpload,$passiveUpload,$finalUpload)) {
 $finalPaths=@([regex]::Matches($finalUpload,'(?m)^            ([^\r\n]+)\r?$') | ForEach-Object { $_.Groups[1].Value })
 $expectedFinalPaths=@(
     '${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/09/*',
+    '${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/snapshots/09/*',
     '${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/observer-result.json'
 )
-Assert-FeedbackWorkflow ([string]::Join([char]10,$finalPaths) -ceq [string]::Join([char]10,$expectedFinalPaths)) 'Final compact proof must contain the original checkpoint and observer verdict.'
+Assert-FeedbackWorkflow ([string]::Join([char]10,$finalPaths) -ceq [string]::Join([char]10,$expectedFinalPaths)) 'Final compact proof must contain the original checkpoint, bounded Finish progress and observer verdict.'
 Assert-FeedbackWorkflow ($verify.IndexOf($firstCheckpoint,[StringComparison]::Ordinal) -lt $verify.IndexOf($firstUpload,[StringComparison]::Ordinal) -and
     $verify.IndexOf($firstUpload,[StringComparison]::Ordinal) -lt $verify.IndexOf($observerFinish,[StringComparison]::Ordinal) -and
     $verify.IndexOf($observerFinish,[StringComparison]::Ordinal) -lt $verify.IndexOf($finalUpload,[StringComparison]::Ordinal) -and
     $verify.IndexOf($finalUpload,[StringComparison]::Ordinal) -lt $verify.IndexOf('      - name: Record executed release payload evidence',[StringComparison]::Ordinal)) 'Original lifecycle acceptance must follow the immediate observation and precede final runtime publication.'
 Assert-FeedbackWorkflow (([regex]::Matches($verify,'invoke-msi-observer\.ps1 -Stage Snapshot').Count -eq 2) -and
     -not ($verify -match 'invoke-msi-observer\.ps1 -Stage Delay|\s-WaitMilliseconds [1-9]|-ScheduledDelay')) 'The installer must not depend on a fixed observation wait.'
+$observerEntry=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/scripts/invoke-msi-observer.ps1')
+Assert-FeedbackWorkflow ($observerEntry.Contains('Invoke-P4kxMsiObserverSnapshot $Directory 9 0 -Finish') -and
+    $snapshotWorker.Contains('Assert-P4kxMsiObserverOriginalResult $request $handle $snapshot') -and
+    $snapshotWorker.Contains('Write-P4kxMsiObserverProgress writeResult end')) 'Finish must use fixed sequence 09, bounded capture and original-result validation.'
 $harmless=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/workflows/windows-msi-detached-control.yml')
 $harmlessDelay=Get-FeedbackWorkflowStep $harmless 'Wait separately for harmless MSI split-delay control'
 $harmlessVerify=Get-FeedbackWorkflowStep $harmless 'Verify harmless MSI split-delay control'

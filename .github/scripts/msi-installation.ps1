@@ -1,5 +1,6 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'msi-database.ps1')
+. (Join-Path $PSScriptRoot 'msi-diagnostic-phase.ps1')
 . (Join-Path $PSScriptRoot 'msi-invocation.ps1')
 . (Join-Path $PSScriptRoot 'msi-path.ps1')
 
@@ -12,26 +13,51 @@ function Start-P4kxMsiProcess {
     return [Diagnostics.Process]::Start($StartInfo)
 }
 
+function Start-P4kxMsiInvocationPhase {
+    param([hashtable]$Diagnostics, [string]$Name)
+    if ($null -eq $Diagnostics) { return }
+    return Start-P4kxMsiPhase $Diagnostics "msiexec/$Name" -RequiredCleanup
+}
+
 function Invoke-P4kxMsiexec {
-    param([string[]]$Arguments, [string]$Log, [int]$ExpectedCode = 0, $RawFixture = $null)
-    if ($null -ne $RawFixture) { Assert-P4kxMsiMutationReady $RawFixture }
-    $start = New-P4kxMsiexecStartInfo -Arguments $Arguments -Log $Log
-    $pathBefore = Get-P4kxUserPathState
-    $rawBefore = if ($null -ne $RawFixture) { Get-P4kxRawMsiImage $RawFixture } else { $null }
+    param([string[]]$Arguments, [string]$Log, [int]$ExpectedCode = 0, $RawFixture = $null, [hashtable]$Diagnostics)
+    $phase = Start-P4kxMsiInvocationPhase $Diagnostics 'pre-capture'
+    try {
+        if ($null -ne $RawFixture) { Assert-P4kxMsiMutationReady $RawFixture }
+        $start = New-P4kxMsiexecStartInfo -Arguments $Arguments -Log $Log
+        $pathBefore = Get-P4kxUserPathState
+        $rawBefore = if ($null -ne $RawFixture) { Get-P4kxRawMsiImage $RawFixture } else { $null }
+    } catch {
+        Stop-P4kxMsiPhase $Diagnostics $phase -Failure $_.Exception -RequiredCleanup
+        throw
+    }
+    Stop-P4kxMsiPhase $Diagnostics $phase -RequiredCleanup
+
     $process = $null; $completed = $false; $failure = $null
     try {
+        $phase = Start-P4kxMsiInvocationPhase $Diagnostics 'start'
         $process = Start-P4kxMsiProcess $start
+        if ($null -eq $process) { throw 'MSI process launch returned no handle.' }
+        Stop-P4kxMsiPhase $Diagnostics $phase -RequiredCleanup
+
+        $phase = Start-P4kxMsiInvocationPhase $Diagnostics 'wait'
         if (-not $process.WaitForExit(300000)) { if ($null -ne $RawFixture) { $RawFixture.interrupted=$true }; $process.Kill($false); if (-not $process.WaitForExit(5000)) { throw 'MSI process did not stop after its deadline.' }; throw "MSI operation timed out: $Log" }
         $completed = $true
+        Stop-P4kxMsiPhase $Diagnostics $phase -RequiredCleanup
+
+        $phase = Start-P4kxMsiInvocationPhase $Diagnostics 'post-capture'
         Write-P4kxPathTransition $pathBefore (Get-P4kxUserPathState) "$Log.path.json"
         $rawAfter = if ($null -ne $RawFixture) { Get-P4kxRawMsiImage $RawFixture } else { $null }
+        Stop-P4kxMsiPhase $Diagnostics $phase -RequiredCleanup
+        $phase = $null
         if ($process.ExitCode -ne $ExpectedCode) {
             if (Test-Path -LiteralPath $Log) { Get-Content -LiteralPath $Log -Tail 50 | Write-Host }
             throw "MSI exited $($process.ExitCode), expected $ExpectedCode ($Log)"
         }
     } catch {
-        if (-not $completed -and $null -ne $RawFixture) { $RawFixture.interrupted=$true }
         $failure = $_.Exception
+        if (-not $completed -and $null -ne $RawFixture) { $RawFixture.interrupted=$true }
+        Stop-P4kxMsiPhase $Diagnostics $phase -Failure $failure -RequiredCleanup
     }
     if ($null -ne $process) {
         try { $process.Dispose() } catch {

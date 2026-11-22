@@ -12,7 +12,7 @@ function Write-P4kxMsiSnapshotConsoleMarker {
     param([hashtable]$State, [string]$Stage, [ValidateSet('begin','end')][string]$Status)
     $stages=@('caller','callerReturn','portalStart','portalInputClose','portalCapture','portalCleanup',
         'worker.readRequest','worker.binding','worker.readHandle','worker.parentState','worker.wait',
-        'worker.stopExpiredParent','worker.saveCheckpoint','worker.workflowOutput')
+        'worker.stopExpiredParent','worker.saveCheckpoint','worker.workflowOutput','worker.validateResult','worker.writeResult')
     if ($Stage -cnotin $stages) { throw 'Snapshot console stage is not predefined.' }
     if (-not $State.seen.Add($Stage+'.'+$Status)) { return }
     $marker=@{schema=1;role='native-msi-snapshot-console';sequence=$State.sequence;stage=$Stage;status=$Status;
@@ -28,7 +28,7 @@ function Read-P4kxMsiSnapshotConsoleRecord {
     catch { return $null }
     $fields=@('schema','role','stage','status','revision','run','attempt','target','observed_utc','request_sha256',
         'binding_unproven','completed_success','native_completion_unproven','mutation_authority')
-    $stages=@('readRequest','binding','readHandle','parentState','wait','stopExpiredParent','saveCheckpoint','workflowOutput')
+    $stages=@('readRequest','binding','readHandle','parentState','wait','stopExpiredParent','saveCheckpoint','workflowOutput','validateResult','writeResult')
     if ($row -isnot [Collections.IDictionary] -or $row.Count -ne $fields.Count -or
         @($row.Keys | Where-Object { $_ -cnotin $fields }).Count -ne 0 -or
         $row.schema -isnot [long] -and $row.schema -isnot [int]) { return $null }

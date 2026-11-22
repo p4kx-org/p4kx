@@ -230,6 +230,7 @@ jobs:
           name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-final
           path: |
             ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/09/*
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/snapshots/09/*
             ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/observer-result.json
           if-no-files-found: error
       - name: Record executed release payload evidence

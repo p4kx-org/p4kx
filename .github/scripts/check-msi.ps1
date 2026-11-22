@@ -129,7 +129,7 @@ function Test-InstalledPayload([string]$Name) {
 function Invoke-LifecycleMsi([string[]]$Arguments,[string]$Name,[int]$Code=0) {
     $lifecyclePhase=Start-P4kxMsiPhase $diagnostics ('lifecycle/'+$Name)
     try {
-    $result=Invoke-P4kxMsiexec $Arguments (Join-Path $logs ($Name+'.log')) $Code -RawFixture $fixture
+    $result=Invoke-P4kxMsiexec $Arguments (Join-Path $logs ($Name+'.log')) $Code -RawFixture $fixture -Diagnostics $diagnostics
     $steps.Add(@{name=$Name;exit_code=$result.exit_code;before=$result.raw_before;after=$result.raw_after})
     Stop-P4kxMsiPhase $diagnostics $lifecyclePhase
     return $result

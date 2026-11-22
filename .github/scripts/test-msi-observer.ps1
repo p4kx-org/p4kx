@@ -61,6 +61,12 @@ try {
     } else {
         Assert-ObserverRefused {& $entry -Stage Finish -Directory $observer -WaitMilliseconds 0} 'Failed or admission-only worker became complete lifecycle evidence.'
     }
+    $finish=Read-P4kxDetachedReceipt (Join-Path $observer 'snapshots/09/caller-result.json')
+    $finishedWrite=Read-P4kxDetachedReceipt (Join-Path $observer 'snapshots/09/writeResult-end.json')
+    Assert-Observer ($finish.role -ceq 'native-msi-finish-return' -and $finish.sequence -eq 9 -and
+        $finish.finish_returned -eq ($Case -ceq 'Complete') -and $finish.worker.exited -eq $true -and
+        $finish.worker.pid -ne $handle.pid -and $finish.worker.signal_contract -ceq 'direct-process-only' -and
+        $finishedWrite.request_sha256 -ceq $handle.request_sha256 -and $finishedWrite.mutation_authority -eq $false) 'The actual Finish worker lost its separate result and original request binding.'
     $receipt=Read-P4kxDetachedReceipt (Join-Path $observer 'observer-result.json')
     Assert-Observer ($receipt.completed_success -eq $false -and $receipt.native_completion_unproven -eq $true -and
         $receipt.mutation_authority -eq $false -and $receipt.control_passed -eq ($Case -ceq 'Complete')) 'Harmless observer invented a native MSI verdict.'

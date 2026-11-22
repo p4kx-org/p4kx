@@ -57,6 +57,12 @@ try {
     & (Join-Path $scripts 'invoke-msi-observer.ps1') -Stage Start -Directory $observer -Invocation $invocation -Mode Control -ControlMilliseconds $controlMilliseconds
     $request=Read-P4kxDetachedReceipt (Join-Path $observer 'request.json')
     $handle=Read-P4kxDetachedReceipt (Join-Path $observer 'handle.json')
+    $originalEnd=ConvertFrom-P4kxMsiBudgetTimestamp $request.observer_deadline_utc
+    $cleanupBudget=Get-P4kxMsiFinishBudget $request 2000 ($originalEnd.AddSeconds(1))
+    Assert-Snapshot ($cleanupBudget.capture_ms -eq 2000 -and $cleanupBudget.cleanup_ms -le 5000) 'An expired original observer lost its bounded evidence and teardown reserve.'
+    $refused=$false
+    try { Get-P4kxMsiFinishBudget $request 2000 ($originalEnd.AddMinutes(1)) | Out-Null } catch { $refused=$true }
+    Assert-Snapshot $refused 'Finish admitted a capture beyond the original observer cleanup reserve.'
     $startup=[Diagnostics.Stopwatch]::StartNew()
     while (-not [IO.File]::Exists((Join-Path $output 'observer-control-active.json'))) {
         Assert-Snapshot ($startup.ElapsedMilliseconds -lt 4000) 'The harmless original parent did not become active.'
@@ -107,6 +113,34 @@ try {
     Assert-Snapshot ($positive.snapshot_returned -eq $true -and $positive.completed_success -eq $false -and
         $positive.native_completion_unproven -eq $true -and $checkpoint.request_sha256 -ceq $handle.request_sha256 -and
         $checkpoint.journal.events -eq 2 -and $checkpoint.journal.active.Count -eq 2) 'Unblocked snapshot failed to preserve the active original journal without a native verdict.'
+    $checkpointPath=Join-Path $observer 'checkpoints/02/checkpoint.json'
+    $checkpointHash=Get-P4kxDetachedDigest $checkpointPath
+    [IO.File]::Delete((Join-Path $observer 'controlled-leaf.json'))
+    $finishFailed=$false;$finishTimer=[Diagnostics.Stopwatch]::StartNew()
+    $env:P4KX_SNAPSHOT_FIXTURE_BLOCK='owned-state'
+    try {
+        & (Join-Path $scripts 'invoke-msi-observer.ps1') -Stage Finish -Directory $observer -WaitMilliseconds 0 -FinishMaximumMilliseconds 2000
+    } catch { $finishFailed=$true }
+    finally { $env:P4KX_SNAPSHOT_FIXTURE_BLOCK=$saved.block }
+    $finishElapsed=$finishTimer.ElapsedMilliseconds
+    $finish=Join-Path $observer 'snapshots/09'
+    $finishStart=Read-P4kxDetachedReceipt (Join-Path $finish 'caller-start.json')
+    $finishResult=Read-P4kxDetachedReceipt (Join-Path $finish 'caller-result.json')
+    $finishLeaf=Read-P4kxDetachedReceipt (Join-Path $observer 'controlled-leaf.json')
+    $finishStage=Read-P4kxDetachedReceipt (Join-Path $finish 'parentState-begin.json')
+    Assert-Snapshot ($finishFailed -and $finishElapsed -ge 1900 -and $finishElapsed -lt 7000 -and
+        $finishStart.role -ceq 'native-msi-finish-caller' -and $finishResult.role -ceq 'native-msi-finish-return' -and
+        $finishResult.sequence -eq 9 -and $finishResult.finish_returned -eq $false -and $finishResult.capture_ms -eq 2000 -and
+        $finishResult.worker.exited -eq $true -and $finishResult.worker.pid -eq $finishLeaf.pid -and $finishLeaf.pid -ne $handle.pid -and
+        $finishResult.worker.signal_contract -ceq 'direct-process-only' -and $finishResult.mutation_authority -eq $false -and
+        $finishLeaf.request_sha256 -ceq $handle.request_sha256 -and $finishStage.request_sha256 -ceq $handle.request_sha256 -and
+        $finishStage.completed_success -eq $false -and $finishStage.native_completion_unproven -eq $true -and
+        $finishStage.mutation_authority -eq $false -and -not [IO.File]::Exists((Join-Path $finish 'parentState-end.json')) -and
+        -not [IO.File]::Exists((Join-Path $observer 'checkpoints/09/checkpoint.json')) -and
+        -not [IO.File]::Exists((Join-Path $observer 'observer-result.json')) -and
+        -not [IO.File]::Exists((Join-Path $observer 'deadline-stop.json'))) 'Blocked Finish did not preserve its bounded owned-only refusal and last bound stage.'
+    Assert-Snapshot ((Get-P4kxDetachedDigest $checkpointPath) -ceq $checkpointHash -and $checkpoint.request_sha256 -ceq $handle.request_sha256 -and
+        -not (Get-P4kxMsiObserverParentState $request $handle).lifetime_ended) 'Finish watchdog changed the prior checkpoint or signaled the original parent.'
     Write-P4kxDetachedReceipt (Join-Path $output 'observer-control-release.json') @{schema=1;role='harmless-msi-observer-release'}
     $closed=[Diagnostics.Stopwatch]::StartNew()
     while (-not (Get-P4kxMsiObserverParentState $request $handle).lifetime_ended) {
@@ -115,7 +149,7 @@ try {
     }
     $journal=Read-P4kxMsiPhaseJournal (Join-Path $output 'diagnostics/phase-journal.jsonl')
     Assert-Snapshot ($journal.events -eq 4 -and $journal.active.Count -eq 0 -and $journal.terminal -ceq 'end') 'Original harmless journal did not close after explicit release.'
-    @{role='harmless-snapshot-budget-control';blocked_elapsed_ms=$elapsed;only_snapshot_stopped=$true;unblocked_capture_returned=$true;
+    @{role='harmless-snapshot-budget-control';blocked_elapsed_ms=$elapsed;only_snapshot_stopped=$true;finish_blocked_elapsed_ms=$finishElapsed;only_finish_stopped=$true;unblocked_capture_returned=$true;
         original_closed_after_release=$true;live_parent_state_begin_before_worker_return=$live.received;live_original_parent_alive=$live.original_alive;completed_success=$false;native_completion_unproven=$true;mutation_authority=$false} | ConvertTo-Json -Compress
 } finally {
     $env:P4KX_SNAPSHOT_FIXTURE_BLOCK=$saved.block

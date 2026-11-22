@@ -5,15 +5,22 @@ Checks native-completion uncertainty using actual source functions and mocked ad
 [CmdletBinding()]
 param(
     [string]$SourceDirectory=$PSScriptRoot,
-    [ValidateSet('Red','Green')][string]$Expectation='Green'
+    [ValidateSet('Red','Green')][string]$Expectation='Green',
+    [string]$JournalDirectory=[IO.Path]::GetTempPath()
 )
 $ErrorActionPreference='Stop'
 $script:checks=0;$script:defects=0
-if($Expectation -ceq 'Green'){ . (Join-Path $SourceDirectory 'msi-diagnostic-budget.ps1') }
+if($Expectation -ceq 'Green'){
+    . (Join-Path $SourceDirectory 'msi-diagnostic-budget.ps1')
+    . (Join-Path $SourceDirectory 'msi-diagnostic-phase.ps1')
+}
 $definitions=@{
     'msi-raw-fixture.ps1'=@('Assert-P4kxMsiMutationReady','New-P4kxRawMsiName','Invoke-P4kxRawMsiFixture','Assert-P4kxRawMsiEnvelope','Get-P4kxRawMsiImage','Test-P4kxRawMsiValueEqual','Set-P4kxRawMsiPath','Restore-P4kxRawMsiImage')
     'msi-path-verification.ps1'=@('ConvertTo-P4kxRawPathFixture','Restore-P4kxMsiVerificationBaseline','Invoke-P4kxMsiRawPathCases','Invoke-P4kxMsiPathHelper','Invoke-P4kxMsiForeignEditProbe')
     'msi-installation.ps1'=@('Invoke-P4kxMsiexec')
+}
+if($Expectation -ceq 'Green'){
+    $definitions['msi-installation.ps1']+='Start-P4kxMsiInvocationPhase'
 }
 foreach($file in $definitions.Keys){
     $tokens=$null;$errors=$null
@@ -57,7 +64,7 @@ function Record-TestCommand([string]$Role,[string]$Phase){
 }
 function Get-FileHash {param($LiteralPath,$Algorithm) return @{Hash=('a'*64)}}
 function Get-Item {param($LiteralPath) return @{Length=128}}
-function Test-Path {return $false}
+function Test-Path {param($LiteralPath) return [IO.File]::Exists($LiteralPath)}
 function Get-Content {param($LiteralPath,[switch]$Raw,$Tail) if(-not $script:outputs.ContainsKey($LiteralPath)){throw 'Unmocked file read.'};return $script:outputs[$LiteralPath]}
 function Write-P4kxRawMsiJson {param($Path,$Value) $script:jsonWrites++;$script:inputs[$Path]=Copy-TestValue $Value}
 function Assert-P4kxInstallationOwnershipAbsent {}
@@ -67,7 +74,9 @@ function Assert-P4kxRawMsiInstalled {}
 function Assert-P4kxRawMsiPathEqual {}
 function Get-P4kxInstalledProducts {return @()}
 function Get-P4kxUserPathState {return @{exists=$false}}
-function Write-P4kxPathTransition {}
+function Write-P4kxPathTransition {
+    if($script:faultPhase -ceq 'post-capture'){throw $script:original}
+}
 function New-P4kxMsiexecStartInfo {param($Arguments,$Log) return @{arguments=$Arguments;log=$Log}}
 function Get-P4kxPathFixtureCases {return @(@{name='first';state=@{exists=$false}},@{name='second';state=@{exists=$false}},@{name='third';state=@{exists=$false}})}
 function New-Object {throw 'NATIVE SENTINEL: COM construction is forbidden.'}
@@ -210,5 +219,42 @@ if($Expectation -ceq 'Green'){
     Assert-Test (Test-ContainsIdentity $caught $script:original) 'Disposal hid the original incomplete-process aggregate.'
     Assert-Test ($script:fixture.interrupted -and $script:disposed -eq 1) 'Disposal skipped the uncertainty latch or ran twice.'
 }
+if($Expectation -ceq 'Green'){
+    $target=if([Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture -eq 'Arm64'){'aarch64-pc-windows-msvc'}else{'x86_64-pc-windows-msvc'}
+    $casePrefix=@('pre-capture:begin','pre-capture:end')
+    $launched=$casePrefix+@('start:begin','start:end')
+    $exited=$launched+@('wait:begin','wait:end')
+    $cases=@(
+        @{role='fixture'; fault='capture'; started=0; interrupted=$true; events=@('pre-capture:begin','pre-capture:error')}
+        @{role='msi'; fault='start'; started=1; interrupted=$true; events=$casePrefix+@('start:begin','start:error')}
+        @{role='msi'; fault='timeout'; started=1; interrupted=$true; events=$launched+@('wait:begin','wait:error')}
+        @{role='msi'; fault='post-capture'; started=1; interrupted=$false; events=$exited+@('post-capture:begin','post-capture:error')}
+        @{role='msi'; fault='none'; started=1; interrupted=$false; events=$exited+@('post-capture:begin','post-capture:end')}
+    )
+    $directory=Join-Path $JournalDirectory ('p4kx-msi-invocation-'+[Guid]::NewGuid().ToString('N'))
+    [void][IO.Directory]::CreateDirectory($directory)
+    try{
+        foreach($case in $cases){
+            Reset-Test $case.role $case.fault
+            $diagnostics=New-P4kxMsiPhaseContext $directory $target
+            $invocation=Start-P4kxMsiPhase $diagnostics 'lifecycle/install'
+            $caught=$null
+            try{
+                Invoke-P4kxMsiexec @('/i','not-executed') 'not-written.log' -RawFixture $script:fixture -Diagnostics $diagnostics | Out-Null
+            }catch{$caught=$_.Exception}
+            Stop-P4kxMsiPhase $diagnostics $invocation -Failure $caught
+            $events=[Collections.Generic.List[hashtable]]::new()
+            $journal=Read-P4kxMsiPhaseJournal $diagnostics.journal -ObservedEvents $events
+            $observed=@($events | Where-Object {$_.phase.StartsWith('msiexec/')} | ForEach-Object {$_.phase.Substring('msiexec/'.Length)+':'+$_.status})
+            Assert-Test ($journal.complete -and $journal.active.Count -eq 0 -and ($observed -join ',') -ceq ($case.events -join ',')) "Incorrect invocation phase order for $($case.fault)."
+            Assert-Test (@($events | Where-Object {$_.phase.StartsWith('msiexec/') -and $_.parent -ne $invocation.id}).Count -eq 0) 'Invocation phases lost the original lifecycle parent.'
+            Assert-Test ($script:starts -eq $case.started -and $script:fixture.interrupted -eq $case.interrupted -and ($null -eq $caught) -eq ($case.fault -ceq 'none')) "Invocation phase capture changed process or recovery behavior for $($case.fault)."
+            [IO.File]::Delete($diagnostics.journal)
+        }
+    }finally{
+        [IO.File]::Delete((Join-Path $directory 'phase-journal.jsonl'))
+        [IO.Directory]::Delete($directory)
+    }
+}
 if($Expectation -ceq 'Red'){Assert-Test ($script:defects -eq 8) 'Not all eight uncertain-completion defects reproduced.'}
-"$Expectation checks passed: $script:checks; reproduced defects: $script:defects. Actual source functions, mocked processes only; no native calls or files."
+"$Expectation checks passed: $script:checks; reproduced defects: $script:defects. Actual source functions, mocked processes, and synthetic phase journals only."
