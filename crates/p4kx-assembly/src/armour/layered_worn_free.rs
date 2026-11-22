@@ -3,8 +3,9 @@
 
 use std::collections::HashMap;
 
-use super::layered_worn::{MountProblem, Placement, check_mount_type, mount_at};
+use super::layered_worn::{self, Placement};
 use super::piece::Mount;
+use super::worn_mount_failure::{MountFailure, MountProblem};
 use crate::spec::EntitySpec;
 use crate::{Attachment, EntityNode, PortDefinitionPosition, PortNode, PortVisibility};
 
@@ -45,7 +46,7 @@ pub(super) fn select(
     claims: &HashMap<BoundPort, usize>,
     item: &EntitySpec,
     item_index: usize,
-) -> Result<Placement, MountProblem> {
+) -> Result<Placement, MountFailure> {
     let mut search = Search::default();
     for holder in holders {
         if holder
@@ -91,7 +92,7 @@ impl<'node> Search<'node> {
             || definition
                 .transform()
                 .is_none_or(|transform| transform.helper().is_empty())
-            || check_mount_type(definition, item).is_err()
+            || layered_worn::check_mount_type(definition, item).is_err()
         {
             return Ok(());
         }
@@ -124,9 +125,9 @@ impl<'node> Search<'node> {
         Ok(())
     }
 
-    fn finish(self, item: &EntitySpec) -> Result<Placement, MountProblem> {
+    fn finish(self, item: &EntitySpec) -> Result<Placement, MountFailure> {
         if let Some(reason) = self.unknown {
-            return Err(reason);
+            return Err(reason.into());
         }
         let candidate = self.candidate.ok_or(if self.occupied {
             MountProblem::OccupiedPort
@@ -140,7 +141,7 @@ impl<'node> Search<'node> {
         let holder = candidate
             .identity
             .map(|(index, label)| (index, label.to_owned()));
-        let mount = mount_at(holder, definition, item)?;
+        let mount = layered_worn::mount_at(holder, definition, item)?;
         Ok(Placement {
             mount,
             label: candidate.port.name().to_owned(),

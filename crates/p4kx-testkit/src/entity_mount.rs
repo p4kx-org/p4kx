@@ -15,6 +15,9 @@ pub const MOUNT_COURIER: &str = "Mount_Courier";
 /// The class name of the character whose backpack port names a bone its armour lacks.
 pub const MOUNT_DRIFTER: &str = "Mount_Drifter";
 
+/// The replacement carrier whose tagged pack port has no root transform.
+pub const MOUNT_REPLACEMENT_WITHOUT_ROOT: &str = "Mount_NoRoot_Carrier";
+
 /// The bone below which the satchel of [`MOUNT_COURIER`] hangs: the nearest bone of the body
 /// skeleton above the bone `cloth` of its armour.
 pub const MOUNT_BONE: &str = "spine";
@@ -123,7 +126,24 @@ pub fn mounted_unresolved_helper_without_root_entries() -> Vec<TestEntry> {
     mounted_unresolved_helper_fixture(rigid_satchel_port())
 }
 
+/// Returns a mounted item whose replacement carrier has only an unresolved tagged helper.
+#[must_use]
+pub fn mounted_unresolved_replacement_entries() -> Vec<TestEntry> {
+    let port = unresolved_helper_port(rigid_satchel_port());
+    let database = database().record(
+        overlay_carrier(0x51, MOUNT_REPLACEMENT_WITHOUT_ROOT)
+            .port(port)
+            .record(),
+    );
+    mounted_entries(&add_port_subhelper_fields(database))
+}
+
 fn mounted_unresolved_helper_fixture(port: TestPort) -> Vec<TestEntry> {
+    let database = database_with_carrier(unresolved_helper_port(port));
+    mounted_entries(&add_port_subhelper_fields(database))
+}
+
+fn unresolved_helper_port(port: TestPort) -> TestPort {
     let node_type = "SItemPortDefHelperNode";
     let alternative = helper_node("pelvis", "satchel", [0.0, 0.1, 0.8], [0.0; 3])
         .value("Tags", TestValue::text("FixtureUnresolvedTag"));
@@ -133,8 +153,7 @@ fn mounted_unresolved_helper_fixture(port: TestPort) -> Vec<TestEntry> {
             "SubHelpers",
             TestValue::Array(vec![TestValue::Struct(alternative)]),
         );
-    let port = port.sub_helpers(vec![TestValue::Null, TestValue::Struct(group)]);
-    mounted_entries(&add_port_subhelper_fields(database_with_carrier(port)))
+    port.sub_helpers(vec![TestValue::Null, TestValue::Struct(group)])
 }
 
 fn mounted_entries(database: &DataForgeBuilder) -> Vec<TestEntry> {

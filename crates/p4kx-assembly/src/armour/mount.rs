@@ -80,6 +80,12 @@ pub(super) fn omit_unbound(
         if let OverlayMount::Unresolved(reason) = job.overlay_mount
             && model.is_some_and(|model| is_unskinned(&model.model, level))
         {
+            if let Some(diagnostic) = &job.unresolved_mount_helper {
+                issues.push(issue(
+                    job,
+                    IssueKind::PortHelperUnresolved(diagnostic.clone()),
+                ));
+            }
             issues.push(issue(job, IssueKind::WornMountUnresolved(reason.message())));
             *model = None;
         }

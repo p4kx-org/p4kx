@@ -49,6 +49,7 @@ mod uncover;
 pub(crate) mod unused;
 mod vec3;
 mod wearable;
+mod worn_mount_failure;
 mod zones;
 
 use std::collections::BTreeMap;

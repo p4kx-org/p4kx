@@ -9,6 +9,7 @@ use super::Replaced;
 use super::layered_worn_free::{self, BoundPort, Holder};
 use super::loadout::{is_worn_type, replacement_index};
 use super::piece::{Mount, Piece, Source};
+use super::worn_mount_failure::{MountFailure, MountProblem};
 use crate::resolved_port_helper;
 use crate::resolver::SpecResult;
 use crate::{EntityNode, LoadoutResolver, PortConstraints, PortDefinition};
@@ -26,46 +27,11 @@ impl OverlayMount {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(super) enum MountProblem {
-    NoSlot,
-    MissingRecord,
-    MissingHolder,
-    MissingPort,
-    AmbiguousPort,
-    IncompatibleItem,
-    UnprovenRequirements,
-    NoHelper,
-    OccupiedPort,
-    SelfMount,
-    OccupancyUnproven,
-}
-
-impl MountProblem {
-    pub(super) const fn message(self) -> &'static str {
-        match self {
-            Self::NoSlot => "the loadout supplies no compatible free attachment port",
-            Self::MissingRecord => "the selected item's original Record is unavailable",
-            Self::MissingHolder => "the current holder's original Record is unavailable",
-            Self::MissingPort => "the current holder does not declare the original port",
-            Self::AmbiguousPort => "the loadout supplies competing original or current ports",
-            Self::IncompatibleItem => "the current port's item type, subtype or size rules fail",
-            Self::UnprovenRequirements => "the current port or item has unproven tag requirements",
-            Self::NoHelper => "the current port does not declare a rigid attachment helper",
-            Self::OccupiedPort => "the physical port is occupied or claimed more than once",
-            Self::SelfMount => "the selected piece would hold itself",
-            Self::OccupancyUnproven => {
-                "the original occupancy of a compatible port could not be established"
-            }
-        }
-    }
-}
-
 enum Decision {
     Original,
     NeedsFreePort,
     Bound(Placement),
-    Unresolved(MountProblem),
+    Unresolved(MountFailure),
 }
 
 pub(super) struct Placement {
@@ -115,14 +81,17 @@ impl<'forge> LoadoutResolver<'forge> {
                     piece.overlay_mount = OverlayMount::Bound;
                     piece.port = Some(placed.label);
                     piece.mount = Some(placed.mount);
+                    piece.unresolved_mount_helper = None;
                 }
                 Decision::NeedsFreePort => {
                     piece.overlay_mount = OverlayMount::Unresolved(MountProblem::NoSlot);
                     piece.mount = None;
+                    piece.unresolved_mount_helper = None;
                 }
-                Decision::Unresolved(reason) => {
-                    piece.overlay_mount = OverlayMount::Unresolved(reason);
+                Decision::Unresolved(failure) => {
+                    piece.overlay_mount = OverlayMount::Unresolved(failure.problem);
                     piece.mount = None;
+                    piece.unresolved_mount_helper = failure.helper;
                 }
             }
         }
@@ -180,7 +149,7 @@ impl Layers<'_> {
                     finish(self.bind(resolver, previous, piece, self.base.len() + index))
                 }
                 (None, _) => Decision::NeedsFreePort,
-                _ => Decision::Unresolved(MountProblem::AmbiguousPort),
+                _ => Decision::Unresolved(MountProblem::AmbiguousPort.into()),
             });
         }
         self.bind_free(resolver, &mut decisions);
@@ -198,7 +167,7 @@ impl Layers<'_> {
         previous: &Piece,
         item: &Piece,
         item_index: usize,
-    ) -> Result<Placement, MountProblem> {
+    ) -> Result<Placement, MountFailure> {
         let old = previous.mount.as_ref().ok_or(MountProblem::NoSlot)?;
         let label = previous.port().ok_or(MountProblem::NoSlot)?;
         let item_spec = resolver
@@ -228,7 +197,7 @@ impl Layers<'_> {
             |index| (self.base.len() + index, self.over.get(index)),
         );
         if holder_index == item_index {
-            return Err(MountProblem::SelfMount);
+            return Err(MountProblem::SelfMount.into());
         }
         let holder = holder.ok_or(MountProblem::MissingHolder)?;
         let holder_spec = resolver
@@ -247,7 +216,7 @@ impl Layers<'_> {
         });
         let port = ports.next().ok_or(MountProblem::MissingPort)?;
         if ports.next().is_some() {
-            return Err(MountProblem::AmbiguousPort);
+            return Err(MountProblem::AmbiguousPort.into());
         }
         let mount = mount_at(
             Some((holder_index, holder.name().to_owned())),
@@ -317,7 +286,7 @@ impl Layers<'_> {
                             )
                         })
                     })
-                    .unwrap_or(Err(MountProblem::MissingRecord));
+                    .unwrap_or_else(|| Err(MountProblem::MissingRecord.into()));
                 *decision = finish(result);
             }
         }
@@ -348,13 +317,13 @@ impl Layers<'_> {
                     .get(&BoundPort::of_mount(&placed.mount))
                     .is_some_and(|count| *count > 1)
             {
-                *decision = Decision::Unresolved(MountProblem::OccupiedPort);
+                *decision = Decision::Unresolved(MountProblem::OccupiedPort.into());
             }
         }
     }
 }
 
-fn finish(result: Result<Placement, MountProblem>) -> Decision {
+fn finish(result: Result<Placement, MountFailure>) -> Decision {
     match result {
         Ok(mount) => Decision::Bound(mount),
         Err(reason) => Decision::Unresolved(reason),
@@ -377,19 +346,21 @@ pub(super) fn mount_at(
     holder: Option<(usize, String)>,
     definition: &PortDefinition,
     item: &crate::spec::EntitySpec,
-) -> Result<Mount, MountProblem> {
+) -> Result<Mount, MountFailure> {
     if definition.requires_attachment_tags || item.requires_attachment_tags {
-        return Err(MountProblem::UnprovenRequirements);
+        return Err(MountProblem::UnprovenRequirements.into());
     }
     check_mount_type(definition, item)?;
+    if definition.is_skin() {
+        return Err(MountProblem::NoHelper.into());
+    }
     let resolved = resolved_port_helper::resolve(definition, item.record_index);
-    let transform = resolved
+    let Some(transform) = resolved
         .transform
         .filter(|transform| !transform.helper().is_empty())
-        .ok_or(MountProblem::NoHelper)?;
-    if definition.is_skin() {
-        return Err(MountProblem::NoHelper);
-    }
+    else {
+        return Err(MountFailure::without_helper(resolved.diagnostic));
+    };
     Ok(Mount::new(
         holder,
         definition,
