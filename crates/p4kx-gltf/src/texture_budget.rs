@@ -147,20 +147,19 @@ impl Tally {
             return Verdict::Unknown;
         };
         let maps = job.layer_maps();
-        let role = match maps {
-            crate::layer_plan::LayerMaps::Normal => TextureRole::Normal,
-            crate::layer_plan::LayerMaps::Smoothness => TextureRole::Gloss,
-            crate::layer_plan::LayerMaps::Diffuse => TextureRole::Diffuse,
-        };
         let mut failure = None;
-        for source in layered.size_sources(maps) {
+        for (role, source) in layered.size_sources(maps) {
             match store.dimensions(&source.path) {
                 Ok(Some(size)) => return self.reserve(size, Verdict::Refused),
                 Ok(None) => return Verdict::Unknown,
                 Err(error) => {
                     failure.get_or_insert_with(|| Failure {
                         role,
-                        file: job.file_of(source),
+                        file: if role == TextureRole::Specular {
+                            source.file.clone()
+                        } else {
+                            job.file_of(source)
+                        },
                         reason: error.to_string(),
                     });
                 }
@@ -176,7 +175,7 @@ fn sized_by(job: &Job) -> Option<(TextureRole, &Source)> {
     let normal = job.normal.as_ref().map(|s| (TextureRole::Normal, s));
     let specular = job.specular.as_ref().map(|s| (TextureRole::Specular, s));
     match &job.key {
-        Key::LayerBase { .. } | Key::LayerNormal { .. } | Key::LayerRoughness { .. } => None,
+        Key::LayerBase { .. } | Key::LayerNormal { .. } | Key::LayerFinish { .. } => None,
         Key::Base { .. } => diffuse,
         Key::Normal { .. } => normal,
         Key::MetallicRoughness { .. } => {

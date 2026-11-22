@@ -8,7 +8,7 @@ use rayon::prelude::*;
 
 use crate::layer_make::{make_base as make_base_layers, make_normal as make_normal_layers};
 use crate::texture_budget::{Tally, Verdict};
-use crate::texture_cache::{Decoded, MAX_HELD_PIXELS, SourceStore};
+use crate::texture_cache::{Decoded, MAX_HELD_PIXELS, PreparedTextureJob, SourceStore};
 use crate::texture_loader::{LoadedTexture, TextureLoadError, TextureLoader};
 use crate::texture_origins::{TexturePaletteUse, TextureReadUse};
 use crate::texture_plan::{EncodedImage, Failure, Job, Key, MAX_TEXTURE_IMAGES};
@@ -145,21 +145,25 @@ fn run_with_guards(
 ) -> Vec<Outcome> {
     let mut tally = Tally::new(budget);
     let mut outcomes: Vec<Outcome> = Vec::with_capacity(jobs.len());
-    let mut rest = jobs;
+    let mut jobs: Vec<_> = jobs
+        .iter()
+        .map(|job| store.admit_layer_specular(job))
+        .collect();
+    let mut rest = jobs.as_mut_slice();
     while !rest.is_empty() {
         let start = outcomes.len();
-        let len = guarded_len(guards, start, store.group_len(rest, PARALLEL_IMAGES));
-        let (chunk, after) = rest.split_at(len);
+        let group_len = store.group_len(rest.iter().map(PreparedTextureJob::job), PARALLEL_IMAGES);
+        let len = guarded_len(guards, start, group_len);
+        let (chunk, after) = rest.split_at_mut(len);
         let next = after.get(..PARALLEL_IMAGES).unwrap_or(after);
-        rest = after;
         let verdicts: Vec<Verdict> = chunk
             .iter()
             .enumerate()
             .map(|(at, job)| {
-                if unneeded(guards.get(start + at), &outcomes) {
-                    Verdict::Skipped
+                if job.needs_image() && !unneeded(guards.get(start + at), &outcomes) {
+                    tally.plan(job.job(), &mut store)
                 } else {
-                    tally.plan(job, &mut store)
+                    Verdict::Skipped
                 }
             })
             .collect();
@@ -168,35 +172,43 @@ fn run_with_guards(
                 .iter()
                 .zip(&verdicts)
                 .filter(|(_, verdict)| verdict.runs())
-                .map(|(job, _)| job),
+                .map(|(job, _)| job.job()),
         );
         let made: Vec<Option<Outcome>> = chunk
             .par_iter()
             .zip(&verdicts)
-            .map(|(job, verdict)| verdict.runs().then(|| make(job, &decoded)))
+            .map(|(job, verdict)| verdict.runs().then(|| make(job.job(), &decoded)))
             .collect();
-        store.keep(decoded, next);
+        store.keep(decoded, next.iter().map(PreparedTextureJob::job));
+        rest = after;
         for verdict in &verdicts {
             if let Verdict::Reserved(size) = verdict {
                 tally.give_back(*size);
             }
         }
-        for ((job, verdict), outcome) in chunk.iter().zip(verdicts).zip(made) {
-            let outcome = match (outcome, verdict) {
-                (Some(outcome), _) => outcome,
-                (None, Verdict::Failed(failure)) => Outcome {
-                    failures: vec![failure],
-                    ..Outcome::default()
-                },
-                (None, Verdict::Skipped) => Outcome::default(),
-                (None, Verdict::Spent) => refused(job, spent_reason()),
-                (None, Verdict::TooLarge) => refused(job, TOO_LARGE.to_owned()),
-                (None, _) => refused(job, OVER_BUDGET.to_owned()),
-            };
-            outcomes.push(settle(job, outcome, &mut tally));
+        for ((prepared, verdict), outcome) in chunk.iter_mut().zip(verdicts).zip(made) {
+            let job = prepared.job();
+            let outcome = job_outcome(job, outcome, verdict);
+            let mut outcome = settle(job, outcome, &mut tally);
+            outcome.failures.append(&mut prepared.failures);
+            outcomes.push(outcome);
         }
     }
     outcomes
+}
+
+fn job_outcome(job: &Job, outcome: Option<Outcome>, verdict: Verdict) -> Outcome {
+    match (outcome, verdict) {
+        (Some(outcome), _) => outcome,
+        (None, Verdict::Failed(failure)) => Outcome {
+            failures: vec![failure],
+            ..Outcome::default()
+        },
+        (None, Verdict::Skipped) => Outcome::default(),
+        (None, Verdict::Spent) => refused(job, spent_reason()),
+        (None, Verdict::TooLarge) => refused(job, TOO_LARGE.to_owned()),
+        (None, _) => refused(job, OVER_BUDGET.to_owned()),
+    }
 }
 
 fn spent_reason() -> String {
@@ -313,7 +325,7 @@ fn make(job: &Job, decoded: &Decoded) -> Outcome {
         Key::MetallicRoughness { .. } => make_packed(job, decoded, &mut outcome, &mut failures),
         Key::LayerBase { .. } => make_base_layers(job, decoded, &mut outcome, &mut failures),
         Key::LayerNormal { .. } => make_normal_layers(job, decoded, &mut outcome, &mut failures),
-        Key::LayerRoughness { .. } => {
+        Key::LayerFinish { .. } => {
             crate::layer_finish::make(job, decoded, &mut outcome, &mut failures)
         }
     };

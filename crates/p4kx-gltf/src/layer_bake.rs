@@ -6,17 +6,20 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use p4kx_texture::{DdsTransfer, RgbaImage, TextureError};
 
-use crate::layer_plan::{LayerPlan, Layered, MAX_BAKED_LAYERS};
+use crate::layer_plan::{LayerMap, LayerPlan, Layered, MAX_BAKED_LAYERS};
 use crate::layer_sampling::{self, Tile, TileChannels, round_byte};
 #[cfg(test)]
 use crate::layer_sampling::{axis, minify_rgb as minify, tile_len};
 use crate::texture_loader::LoadedTexture;
-use crate::texture_pixels::{OPAQUE, RGBA, colour_decoder, encode, fill, sampled, texel};
+use crate::texture_pixels::{
+    OPAQUE, RGBA, colour_decoder, encode, fill, metal_share, sampled, texel,
+};
 
 const BYTE_UNIT: f32 = 1.0 / 255.0;
 const HALF_BYTE: f32 = 127.5;
 
 /// What a layer is blended from: the map of one layer in the form it is sampled from.
+#[derive(Default)]
 pub(crate) struct Maps<'a> {
     tiles: Vec<Option<Tile<'a>>>,
 }
@@ -27,39 +30,55 @@ fn byte(value: u8) -> f32 {
 
 impl<'a> Maps<'a> {
     /// Prepares the maps of the layers for an output of `size` texels: `images` has the loaded map
-    /// of each layer, in the order of the layers, and `normal` says whether they are normal maps.
+    /// of each layer in its authored order.
     pub(crate) fn new(
         layered: &Layered,
-        images: &[Option<&'a LoadedTexture>],
+        images: impl IntoIterator<Item = Option<&'a LoadedTexture>>,
         size: (usize, usize),
-        normal: bool,
+        kind: LayerMap,
     ) -> Result<Self, TextureError> {
         let tiles = layered
             .layers
             .iter()
             .zip(images)
-            .map(|(layer, image)| {
-                let map = if normal {
-                    &layer.normal
-                } else {
-                    &layer.diffuse
-                };
-                match (image, map) {
-                    (Some(image), Some((_, repeats))) => {
-                        let colour = (!normal).then(|| image.decoded_transfer());
-                        let pixels = if normal {
-                            Cow::Borrowed(&image.image)
-                        } else {
-                            image.colour_image()?
-                        };
-                        layer_sampling::tile_of(pixels, *repeats, size, colour, TileChannels::Rgb)
-                            .map(Some)
-                    }
-                    _ => Ok(None),
+            .map(|(layer, image)| match (image, kind.source(layer)) {
+                (Some(image), Some((_, repeats))) => {
+                    let colour = (kind != LayerMap::Normal).then(|| image.decoded_transfer());
+                    let pixels = if colour.is_some() {
+                        image.colour_image()?
+                    } else {
+                        Cow::Borrowed(&image.image)
+                    };
+                    layer_sampling::tile_of(pixels, *repeats, size, colour, TileChannels::Rgb)
+                        .map(Some)
                 }
+                _ => Ok(None),
             })
             .collect::<Result<Vec<_>, _>>()?;
         Ok(Self { tiles })
+    }
+
+    fn tile(&self, index: usize) -> Option<&Tile<'_>> {
+        self.tiles.get(index)?.as_ref()
+    }
+
+    pub(crate) fn specular(
+        &self,
+        layer: &LayerPlan,
+        index: usize,
+        uv: (f32, f32),
+    ) -> Option<Reflectance> {
+        let tile = self.tile(index)?;
+        let (_, repeats) = layer.specular_map.as_ref()?;
+        let colour = tinted_tile(tile, *repeats, uv, layer.specular);
+        Some(Reflectance {
+            colour,
+            metallic: metal_share(colour),
+        })
+    }
+
+    pub(crate) fn has_tiles(&self) -> bool {
+        self.tiles.iter().any(Option::is_some)
     }
 }
 
@@ -74,20 +93,35 @@ fn centre(position: usize, length: usize) -> f32 {
     at
 }
 
-fn layer_colour(layer: &LayerPlan, tile: Option<&Tile<'_>>, uv: (f32, f32)) -> [f32; 3] {
-    let own = match (tile, &layer.diffuse) {
-        (Some(tile), Some((_, repeats))) => {
-            let transfer = tile.colour().unwrap_or(DdsTransfer::Unknown);
-            let [red, green, blue] =
-                layer_sampling::sample(tile.image(), *repeats, uv, colour_decoder(transfer));
-            let [tint_red, tint_green, tint_blue] = layer.colour;
-            [red * tint_red, green * tint_green, blue * tint_blue]
-        }
+fn tinted_tile(tile: &Tile<'_>, repeats: [f32; 2], uv: (f32, f32), tint: [f32; 3]) -> [f32; 3] {
+    let transfer = tile.colour().unwrap_or(DdsTransfer::Unknown);
+    let [red, green, blue] =
+        layer_sampling::sample(tile.image(), repeats, uv, colour_decoder(transfer));
+    let [tint_red, tint_green, tint_blue] = tint;
+    [red * tint_red, green * tint_green, blue * tint_blue]
+}
+
+pub(crate) struct Reflectance {
+    colour: [f32; 3],
+    pub(crate) metallic: f32,
+}
+
+fn layer_colour(
+    layer: &LayerPlan,
+    tile: Option<&Tile<'_>>,
+    uv: (f32, f32),
+    reflected: Option<Reflectance>,
+) -> [f32; 3] {
+    let mut mixed = match (tile, &layer.diffuse) {
+        (Some(tile), Some((_, repeats))) => tinted_tile(tile, *repeats, uv, layer.colour),
         _ => layer.colour,
     };
-    let mut mixed = own;
-    for (value, specular) in mixed.iter_mut().zip(layer.specular) {
-        *value = (specular - *value).mul_add(layer.metal, *value);
+    let reflectance = reflected.unwrap_or(Reflectance {
+        colour: layer.specular,
+        metallic: layer.metal,
+    });
+    for (value, specular) in mixed.iter_mut().zip(reflectance.colour) {
+        *value = (specular - *value).mul_add(reflectance.metallic, *value);
     }
     mixed
 }
@@ -95,24 +129,25 @@ fn layer_colour(layer: &LayerPlan, tile: Option<&Tile<'_>>, uv: (f32, f32)) -> [
 pub(crate) struct LayerPixels {
     pub(crate) image: RgbaImage,
     pub(crate) sampled_maps: usize,
+    pub(crate) sampled_specular: usize,
     pub(crate) used_layers: usize,
 }
 
-/// Returns the base colour image of `layered` of `size` texels: the layers' diffuse maps, tiled,
-/// multiplied by the layers' colours, moved towards their specular colour by their metalness
-/// and blended by the layers' shares, which `mask` (of that size) gives where the material has
-/// one. A layer without a loaded map keeps its plain colour.
+/// Blends tiled diffuse and specular colour at the layers' masked or positional shares.
 pub(crate) fn base_colour(
     layered: &Layered,
     maps: &Maps<'_>,
+    specular: &Maps<'_>,
     mask: Option<&RgbaImage>,
     (width, height): (u32, u32),
 ) -> Result<LayerPixels, TextureError> {
     let size = (width as usize, height as usize);
     let sampled_maps = AtomicUsize::new(0);
+    let sampled_specular = AtomicUsize::new(0);
     let used_layers = AtomicUsize::new(0);
     let image = fill(width, height, |y, out| {
         let mut sampled_row = 0;
+        let mut specular_row = 0;
         let mut layer_row = 0;
         let mut shares = [0.0_f32; MAX_BAKED_LAYERS];
         for (x, target) in out.as_chunks_mut::<RGBA>().0.iter_mut().enumerate() {
@@ -133,7 +168,11 @@ pub(crate) fn base_colour(
                 if tile.is_some() {
                     sampled_row |= 1 << index;
                 }
-                let colour = layer_colour(layer, tile.as_ref(), uv);
+                let reflected = specular.specular(layer, index, uv);
+                if reflected.is_some() {
+                    specular_row |= 1 << index;
+                }
+                let colour = layer_colour(layer, tile.as_ref(), uv, reflected);
                 for (total, value) in sum.iter_mut().zip(colour) {
                     *total = value.mul_add(share, *total);
                 }
@@ -142,11 +181,13 @@ pub(crate) fn base_colour(
             *target = [encode(red), encode(green), encode(blue), OPAQUE];
         }
         sampled_maps.fetch_or(sampled_row, Ordering::Relaxed);
+        sampled_specular.fetch_or(specular_row, Ordering::Relaxed);
         used_layers.fetch_or(layer_row, Ordering::Relaxed);
     })?;
     Ok(LayerPixels {
         image,
         sampled_maps: sampled_maps.into_inner(),
+        sampled_specular: sampled_specular.into_inner(),
         used_layers: used_layers.into_inner(),
     })
 }
@@ -226,6 +267,7 @@ pub(crate) fn normal_colour(
     Ok(LayerPixels {
         image,
         sampled_maps,
+        sampled_specular: 0,
         used_layers: sampled_maps,
     })
 }

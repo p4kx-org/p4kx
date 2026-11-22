@@ -124,8 +124,7 @@ pub(crate) type LayerJobs = (
     Vec<(TextureRole, String)>,
 );
 
-/// Returns the jobs of the base colour and the normal image that the layers of `material` give
-/// when it has no diffuse map of its own and a layer has a diffuse or a normal map.
+/// Plans the base colour, normal and packed finish images for a material without its own diffuse map.
 pub(crate) fn layer_jobs(material: &Material, found: &Sources, tints: Tints) -> LayerJobs {
     let Some(layered) = found
         .diffuse
@@ -142,8 +141,8 @@ pub(crate) fn layer_jobs(material: &Material, found: &Sources, tints: Tints) -> 
         layered
             .has_normal()
             .then(|| layer_job(&layered, true, found.normal.as_ref(), tints)),
-        layered.has_sampled_finish().then(|| Job {
-            key: Key::LayerRoughness {
+        (layered.has_sampled_finish() || layered.has_specular_map()).then(|| Job {
+            key: Key::LayerFinish {
                 blend: layered.finish_fingerprint(),
             },
             diffuse: None,

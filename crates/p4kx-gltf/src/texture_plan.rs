@@ -57,7 +57,7 @@ pub(crate) enum Key {
     LayerBase {
         blend: String,
     },
-    LayerRoughness {
+    LayerFinish {
         blend: String,
     },
     LayerNormal {
@@ -82,7 +82,7 @@ impl Job {
     pub(crate) const fn layer_maps(&self) -> LayerMaps {
         match self.key {
             Key::LayerNormal { .. } => LayerMaps::Normal,
-            Key::LayerRoughness { .. } => LayerMaps::Smoothness,
+            Key::LayerFinish { .. } => LayerMaps::Finish,
             _ => LayerMaps::Diffuse,
         }
     }
@@ -101,8 +101,8 @@ impl Job {
                     source.file
                 )
             }
-            Key::LayerRoughness { .. } => format!(
-                "{} (layered roughness image of {count} layers)",
+            Key::LayerFinish { .. } => format!(
+                "{} (layered metallic-roughness image of {count} layers)",
                 source.file
             ),
             Key::LayerNormal { .. } => {
@@ -128,11 +128,10 @@ impl Job {
                 .and_then(|layered| layered.sizing(true))
                 .or(self.normal.as_ref())
                 .map(|s| (TextureRole::Normal, s)),
-            Key::LayerRoughness { .. } => self
+            Key::LayerFinish { .. } => self
                 .layered
                 .as_ref()
-                .and_then(|layered| layered.size_sources(LayerMaps::Smoothness).next())
-                .map(|source| (TextureRole::Gloss, source)),
+                .and_then(|layered| layered.size_sources(LayerMaps::Finish).next()),
             Key::MetallicRoughness { .. } => self
                 .normal
                 .as_ref()

@@ -105,6 +105,12 @@ descendant takes precedence over its ancestor. Competing matches within SubGeome
 material tree, or across the two families, produce a
 `paint_appearance` diagnostic and use the base appearance.
 
+A fitted `SubGeometry` with its own palette can name the same direct model as the base, or reuse
+that model implicitly. Its explicit material takes precedence. Otherwise the model's embedded
+`MtlName` selects the library when present, and the inherited base material supplies the library
+when the model names none. A named library that is missing or invalid keeps its ordinary material
+diagnostic. A palette-only `Material.materialVariants` entry continues to use the base material.
+
 A fitted variant can select a distinct character definition. Its explicit DataForge material
 takes precedence. When that field is absent and the CDF's selected primary binding specifies a
 material, the binding overrides the inherited base material. Missing material files retain
@@ -179,6 +185,11 @@ normal map of the shader families that use layers), so the role comes from the s
 | normal | `TexSlot2`, else `TexSlot3` | `_ddna` (smoothness in the alpha tail) or `_ddn` | 39,267 + 16,021 `Illum`, 17,626 + 13,907 `LayerBlend_V2` |
 | specular | `TexSlot4` | `_spec` | 18,499 `Illum`, 997 `LayerBlend_V2` |
 | explicit gloss | authored gloss role | `_gloss` on unlayered `HardSurface` | |
+
+A textured HardSurface material with the authored `USE_SPECULAR_MAPS` flag can use `TexSlot6`
+`_spec` from its resolved unpainted Layer materials with diffuse maps. The shared layer bake
+uses the sampled RGB reflectance for base colour and GLB metalness. Palette finish and
+LayerBlend_V2 follow their existing texture selection.
 
 For unlayered `HardSurface` materials, smoothness comes from usable `_ddna` alpha, then
 from the first readable authored `_gloss` texture. The explicit map uses Linear Rec.709

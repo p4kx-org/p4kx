@@ -7,6 +7,7 @@ mod animation;
 mod animation_checker;
 mod cube_glb;
 mod layer_limits;
+mod layer_specular;
 mod layer_textures;
 mod lods_attributes;
 mod material_emission;

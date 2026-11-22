@@ -16,13 +16,21 @@ const WHITE: [f32; 3] = [1.0; 3];
 #[derive(Debug, Clone, PartialEq)]
 #[non_exhaustive]
 pub struct LayerSurface {
+    pub(crate) layer_shader: bool,
     /// The layer's diffuse colour, which its tint multiplies.
     pub diffuse: [f32; 3],
     /// The layer's specular colour.
     pub specular: [f32; 3],
-    /// The texture slots of the layer's own file, in file order: its diffuse map in `TexSlot1`
-    /// and its normal map in `TexSlot2`, with their `TexMod` tiling.
+    /// The child material's texture slots and modifiers in authored order.
     pub textures: Vec<TextureSlot>,
+}
+
+impl LayerSurface {
+    /// Whether the selected child material uses the Layer shader.
+    #[must_use]
+    pub const fn is_layer_shader(&self) -> bool {
+        self.layer_shader
+    }
 }
 
 impl MaterialLayer {

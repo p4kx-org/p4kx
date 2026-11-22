@@ -51,7 +51,31 @@ const IMPLEMENTATION: &str = r#"<Vehicle name="TEST_Paint">
 /// The two selected variants name separate palettes and material libraries.
 #[must_use]
 pub fn fitted_paint_vehicle_entries() -> Vec<TestEntry> {
-    entries(&database())
+    entries(&database(), &TestModel::cube())
+}
+
+/// Returns fitted palette variants and the shared model's competing material library.
+#[must_use]
+pub fn fitted_same_model_paint_vehicle_entries(model_material: &str) -> Vec<TestEntry> {
+    let named = hull(0x5631, "TEST_Hull_Palette_Only_Same", "", BLUE)
+        .geometry(BASE_MODEL, Some(BASE_MATERIAL))
+        .geometry_variant("Blue", r"objects\TEST\HULL.CGF", None)
+        .variant_palette(BLUE_PALETTE, "");
+    let reused = hull(0x5632, "TEST_Hull_Palette_Only_Reused", "", BLUE)
+        .geometry(BASE_MODEL, Some(BASE_MATERIAL))
+        .geometry_variant("Blue", "", None)
+        .variant_palette(BLUE_PALETTE, "");
+    let material = material_hull(
+        0x5633,
+        "TEST_Hull_Palette_Only_Material_Node",
+        vec![material_node_with_palette("Red", "", RED_PALETTE)],
+    );
+    let database = database()
+        .record(named.record())
+        .record(reused.record())
+        .record(material.record());
+    let cube = TestModel::cube().with_material_library(model_material);
+    entries(&database, &cube)
 }
 
 /// Returns fitted finish CDFs and the competing DataForge and model material declarations.
@@ -74,7 +98,7 @@ pub fn fitted_cdf_paint_vehicle_entries() -> Vec<TestEntry> {
         .record(explicit.record())
         .record(same_file.record())
         .record(plain.record());
-    let mut output = entries(&database);
+    let mut output = entries(&database, &TestModel::cube());
     let body = TestModel::two_bone_skin().with_material_library("red");
     output.extend([
         TestEntry::stored(format!("Data/{CDF_MODEL}"), FITTED_CDF_DOCUMENT).encrypted(),
@@ -84,8 +108,7 @@ pub fn fitted_cdf_paint_vehicle_entries() -> Vec<TestEntry> {
     output
 }
 
-fn entries(database: &DataForgeBuilder) -> Vec<TestEntry> {
-    let cube = TestModel::cube();
+fn entries(database: &DataForgeBuilder, cube: &TestModel) -> Vec<TestEntry> {
     let painted = TestModel::cube().with_material_library("blue");
     let mut entries = vec![
         TestEntry::zstd("Data\\Game2.dcb", database.build()),
@@ -129,16 +152,7 @@ fn database() -> DataForgeBuilder {
         0x5621,
         "TEST_Hull_Red",
         vec![
-            TestValue::Struct(
-                material_node("Red", RED_MATERIAL, Vec::new()).value(
-                    "Palette",
-                    TestValue::Struct(
-                        TestInstance::new("TintPaletteRef")
-                            .value("ChildPath", TestValue::text(""))
-                            .value("RootRecord", TestValue::Reference(RED_PALETTE)),
-                    ),
-                ),
-            ),
+            material_node_with_palette("Red", RED_MATERIAL, RED_PALETTE),
             TestValue::Struct(material_node("Orphan", BASE_MATERIAL, Vec::new())),
         ],
     );
@@ -252,6 +266,19 @@ fn material_hull(guid: u128, name: &str, variants: Vec<TestValue>) -> TestEntity
             None,
             Some("FixtureHullOffer"),
         ))
+}
+
+fn material_node_with_palette(tags: &str, path: &str, palette: u128) -> TestValue {
+    TestValue::Struct(
+        material_node(tags, path, Vec::new()).value(
+            "Palette",
+            TestValue::Struct(
+                TestInstance::new("TintPaletteRef")
+                    .value("ChildPath", TestValue::text(""))
+                    .value("RootRecord", TestValue::Reference(palette)),
+            ),
+        ),
+    )
 }
 
 fn material_node(tags: &str, path: &str, children: Vec<TestValue>) -> TestInstance {

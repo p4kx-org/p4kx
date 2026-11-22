@@ -142,6 +142,7 @@ impl MaterialLibrary {
 impl LayerSurface {
     pub(crate) fn of(material: &Material) -> Self {
         Self {
+            layer_shader: material.shader.eq_ignore_ascii_case("Layer"),
             diffuse: material.diffuse,
             specular: material.specular,
             textures: material.textures.clone(),

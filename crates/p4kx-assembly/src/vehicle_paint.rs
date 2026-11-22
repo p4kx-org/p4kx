@@ -7,7 +7,7 @@ use p4kx_dataforge::{StructValue, TagTree};
 
 use crate::cdf::is_character_definition;
 use crate::geometry_choice::GeometryChoice;
-use crate::paint_provenance::{PaintSelection, VariantSource};
+use crate::paint_provenance::{MaterialPreference, PaintSelection, VariantSource};
 use crate::read;
 use crate::spec::{EntitySpec, VehicleSpec};
 use crate::{
@@ -112,7 +112,7 @@ impl LoadoutResolver<'_> {
                             attachable: item.attachable_component_ordinal(),
                             tag: selector.to_owned(),
                             variant: appearance.variant,
-                            prefers_cdf_material: appearance.prefers_cdf_material,
+                            material_preference: appearance.material_preference,
                             compatibility: sources::selected(spec, root, port, item, paint, offers.as_ref())?,
                         }),
                     ))
@@ -185,7 +185,7 @@ fn equipped<'node>(
 struct HullAppearance {
     geometry: Geometry,
     variant: VariantSource,
-    prefers_cdf_material: bool,
+    material_preference: MaterialPreference,
 }
 
 fn choose_hull(
@@ -223,21 +223,11 @@ fn choose_hull(
         return Err(AMBIGUOUS);
     }
     if let Some((geometry, position, tag_locations)) = geometry {
-        let mut draw = geometry.clone();
-        let mut prefers_cdf_material = false;
-        if let Some(base) = &spec.geometry {
-            if draw.material().is_none() {
-                draw.inherit_material(base);
-                prefers_cdf_material = is_character_definition(draw.path())
-                    && draw.material().is_some()
-                    && crate::build::file_key(draw.path()) != crate::build::file_key(base.path());
-            }
-            draw.inherit_palette(Some(base));
-        }
+        let (draw, material_preference) = prepare_fitted_geometry(geometry, spec.geometry.as_ref());
         return Ok(HullAppearance {
             geometry: draw,
             variant: VariantSource::geometry(position, tag_locations.into()),
-            prefers_cdf_material,
+            material_preference,
         });
     }
     if let Some(variant) = material {
@@ -249,10 +239,36 @@ fn choose_hull(
         return Ok(HullAppearance {
             geometry: draw,
             variant: VariantSource::material(variant.location(), variant.tag_locations()),
-            prefers_cdf_material: false,
+            material_preference: MaterialPreference::Geometry,
         });
     }
     Err("the appearance tag selects no source variant")
+}
+
+fn prepare_fitted_geometry(
+    geometry: &Geometry,
+    base: Option<&Geometry>,
+) -> (Geometry, MaterialPreference) {
+    let mut draw = geometry.clone();
+    let Some(base) = base else {
+        return (draw, MaterialPreference::Geometry);
+    };
+    let preference = if draw.material().is_some() {
+        MaterialPreference::Geometry
+    } else {
+        let is_cdf = is_character_definition(draw.path());
+        let same_model = crate::build::file_key(draw.path()) == crate::build::file_key(base.path());
+        draw.inherit_material(base);
+        if is_cdf && !same_model {
+            MaterialPreference::CharacterDefinition
+        } else if !is_cdf && same_model && draw.palette().is_some() {
+            MaterialPreference::Model
+        } else {
+            MaterialPreference::Geometry
+        }
+    };
+    draw.inherit_palette(Some(base));
+    (draw, preference)
 }
 
 impl EntityNode {

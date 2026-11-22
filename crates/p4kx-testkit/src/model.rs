@@ -187,7 +187,7 @@ impl TestModel {
         self
     }
 
-    /// Names `library` as the material library, instead of [`CUBE_MATERIAL_LIBRARY`].
+    /// Names `library` as the material library, with an empty name omitting the chunk.
     #[must_use]
     pub fn with_material_library(mut self, library: impl Into<String>) -> Self {
         self.material_library = library.into();
@@ -294,9 +294,10 @@ impl TestModel {
     /// Returns the bytes of the `.cgf` file.
     #[must_use]
     pub fn cgf(&self) -> Vec<u8> {
-        let mut file = TestChunkFile::ivo()
-            .chunk(EXPORT_FLAGS, IVO_VERSION, [0; 128])
-            .chunk(MTL_NAME_320, IVO_VERSION, self.material_name_chunk());
+        let mut file = TestChunkFile::ivo().chunk(EXPORT_FLAGS, IVO_VERSION, [0; 128]);
+        if !self.material_library.is_empty() {
+            file = file.chunk(MTL_NAME_320, IVO_VERSION, self.material_name_chunk());
+        }
         if !self.nodes.is_empty() {
             file = file.chunk(NODE_MESH_COMBO, IVO_VERSION, nmc_chunk(self));
         }

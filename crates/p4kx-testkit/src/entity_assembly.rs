@@ -125,7 +125,42 @@ fn database() -> DataForgeBuilder {
 /// Every library holds the sub-materials 0 to 2 and the cubes use 1 and 2.
 #[must_use]
 pub fn assembly_entries() -> Vec<TestEntry> {
-    let mut entries = vec![TestEntry::zstd("Data\\Game2.dcb", database().build())];
+    entries_for(&database())
+}
+
+/// Returns a ship with two instances of the same gimbal and nested weapon at distinct placements.
+#[must_use]
+pub fn repeated_gimbal_assembly_entries() -> Vec<TestEntry> {
+    let gimbal = |port| {
+        TestLoadoutEntry::class(port, "TEST_Mount").loadout(TestLoadout::Manual(vec![
+            TestLoadoutEntry::class("hardpoint_class_2", "TEST_Gun"),
+        ]))
+    };
+    let ship = TestEntity::new(
+        0x7,
+        "TEST_Dual_Gimbal_Ship",
+        "entities/spaceships/test_dual_gimbal_ship.xml",
+    )
+    .geometry("Objects/Test/ship.cgf", None)
+    .port(TestPort::new("hardpoint_gimbal_left").helper(
+        "hp_nose",
+        [0.0, 0.0, 1.0],
+        [0.0, 0.0, 90.0],
+    ))
+    .port(TestPort::new("hardpoint_gimbal_right").helper(
+        "hardpoint_relay",
+        [0.0, 0.0, 2.0],
+        [0.0; 3],
+    ))
+    .loadout(TestLoadout::Manual(vec![
+        gimbal("hardpoint_gimbal_left"),
+        gimbal("hardpoint_gimbal_right"),
+    ]));
+    entries_for(&database().record(ship.record()))
+}
+
+fn entries_for(database: &DataForgeBuilder) -> Vec<TestEntry> {
+    let mut entries = vec![TestEntry::zstd("Data\\Game2.dcb", database.build())];
     entries.extend(model_entries("ship", &ship_model()));
     entries.extend(model_entries("mount", &mount_model()));
     entries.extend(model_entries("gun", &TestModel::cube().scaled(0.1)));

@@ -57,6 +57,13 @@ impl VariantSource {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum MaterialPreference {
+    Geometry,
+    CharacterDefinition,
+    Model,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct PaintSelection {
     pub(crate) guid: Guid,
@@ -64,7 +71,7 @@ pub(crate) struct PaintSelection {
     pub(crate) attachable: Option<usize>,
     pub(crate) tag: String,
     pub(crate) variant: VariantSource,
-    pub(crate) prefers_cdf_material: bool,
+    pub(crate) material_preference: MaterialPreference,
     pub(crate) compatibility: Vec<PaintSelectionInput>,
 }
 

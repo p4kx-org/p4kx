@@ -3,6 +3,7 @@
 
 use crate::build_models::Loaded;
 use crate::flatten::Draft;
+use crate::paint_provenance::MaterialPreference;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LibrarySource {
@@ -34,18 +35,23 @@ pub(crate) fn choose<'a>(draft: &'a Draft<'_>, loaded: &'a Loaded) -> Option<Sel
     let geometry = || draft.geometry.and_then(|geometry| geometry.material());
     let model = model.material_library.as_deref();
     let definition = loaded.cdf_material.as_ref().and(model);
-    let prefers_definition = draft
+    let preference = draft
         .node
         .rendered_paint(draft.geometry)
-        .is_some_and(|paint| paint.prefers_cdf_material);
+        .map_or(MaterialPreference::Geometry, |paint| {
+            paint.material_preference
+        });
+    let preferred = match preference {
+        MaterialPreference::Geometry => None,
+        MaterialPreference::CharacterDefinition => {
+            definition.map(|name| (name, LibrarySource::CharacterDefinition))
+        }
+        MaterialPreference::Model => model.map(|name| (name, LibrarySource::Model)),
+    };
     let (name, source) = draft
         .library
         .map(|name| (name, LibrarySource::Override))
-        .or_else(|| {
-            definition
-                .filter(|_| prefers_definition)
-                .map(|name| (name, LibrarySource::CharacterDefinition))
-        })
+        .or(preferred)
         .or_else(|| geometry().map(|name| (name, LibrarySource::Geometry)))
         .or_else(|| definition.map(|name| (name, LibrarySource::CharacterDefinition)))
         .or_else(|| model.map(|name| (name, LibrarySource::Model)))?;

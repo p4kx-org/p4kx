@@ -9,6 +9,9 @@ use rayon::prelude::*;
 use crate::texture_loader::{LoadedTexture, TextureLoadError, TextureLoader};
 use crate::texture_plan::Job;
 
+mod layer_options;
+pub(crate) use self::layer_options::PreparedTextureJob;
+
 /// The most pixels the decoded sources kept for the next group of jobs may hold together.
 pub(crate) const MAX_HELD_PIXELS: u64 = 1 << 27;
 
@@ -36,7 +39,8 @@ fn primary_paths(job: &Job) -> impl Iterator<Item = &str> {
         .chain(
             job.layered
                 .iter()
-                .flat_map(move |layered| layered.paths(maps)),
+                .flat_map(move |layered| layered.size_sources(maps))
+                .map(|(_, source)| source.path.as_str()),
         )
 }
 
@@ -189,11 +193,15 @@ impl<'l> SourceStore<'l> {
     /// Returns how many of the leading `jobs`, at most `most`, may be made together: the
     /// distinct sources they decode stay within the decode limit, but the first job always counts.
     /// A source whose size is unknown or cannot be read counts for the whole limit.
-    pub(crate) fn group_len(&mut self, jobs: &[Job], most: usize) -> usize {
+    pub(crate) fn group_len<'job>(
+        &mut self,
+        jobs: impl IntoIterator<Item = &'job Job>,
+        most: usize,
+    ) -> usize {
         let mut seen: HashSet<&str> = HashSet::new();
         let mut total = 0u64;
         let mut count = 0;
-        for job in jobs.iter().take(most) {
+        for job in jobs.into_iter().take(most) {
             let mut added = 0u64;
             let mut fresh: Vec<&str> = Vec::new();
             for path in paths(job) {

@@ -1,11 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_texture::RgbaImage;
 
 use super::{Budget, Outcome, Squares, TINTS, normal_jobs, run, run_guarded, source};
+use crate::layer_finish;
+use crate::layer_make;
 use crate::layer_plan::{LayerPlan, Layered};
+use crate::surface_finish::SurfaceFinish;
+use crate::texture_cache::{Decoded, MAX_DECODE_PIXELS, SourceStore};
 use crate::texture_loader::{LoadedTexture, TextureLoadError, TextureLoader};
+use crate::texture_origins::{TextureComponents, TextureReadId, TextureReadUse};
 use crate::texture_plan::{Job, Key};
 
 struct Odd {
@@ -63,6 +70,7 @@ fn layered_job_of(prefix: &str, with_mask: bool) -> Job {
             [1.0; 2],
         )),
         normal: None,
+        specular_map: None,
         colour: [1.0; 3],
         specular: [0.0; 3],
         metal: 0.0,
@@ -192,3 +200,154 @@ fn a_map_without_pixels_counts_as_not_loaded() {
     assert_eq!(outcomes.len(), 1);
     assert!(outcomes.iter().all(|outcome| outcome.image.is_none()));
 }
+
+fn provenance_image(
+    id: usize,
+    rgba: [u8; 4],
+) -> Result<Arc<LoadedTexture>, p4kx_texture::TextureError> {
+    let image = RgbaImage::new(1, 1, rgba.to_vec())?;
+    Ok(Arc::new(
+        LoadedTexture::new(image, true).with_read(TextureReadId::new(id)),
+    ))
+}
+
+fn has_colour_read(uses: &[TextureReadUse], id: usize) -> bool {
+    uses.iter().any(|read| {
+        read.read == Some(TextureReadId::new(id)) && read.components == TextureComponents::Color
+    })
+}
+
+#[test]
+fn layered_outputs_retain_sampled_specular_and_exclude_fully_masked_sources()
+-> Result<(), Box<dyn std::error::Error>> {
+    let mut job = layered_job(true);
+    let layered = job.layered.as_mut().ok_or("the layered job")?;
+    for layer in &mut layered.layers {
+        let file = format!("objects/l{}_spec.dds", layer.at);
+        layer.specular_map = Some((source(file, false), [1.0; 2]));
+        layer.specular = [1.0; 3];
+        layer.metal = 1.0;
+    }
+    let decoded = provenance_sources()?;
+    let mut base = Outcome::default();
+    let mut packed = Outcome::default();
+    let mut failures = Vec::new();
+    layer_make::make_base(&job, &decoded, &mut base, &mut failures).ok_or("base image")??;
+    layer_finish::make(&job, &decoded, &mut packed, &mut failures).ok_or("packed image")??;
+    assert!(failures.is_empty(), "both selected source paths decode");
+    for outcome in [&base, &packed] {
+        assert!(
+            has_colour_read(&outcome.texture_sources, 4),
+            "the visible layer supplies specular RGB"
+        );
+        assert!(
+            !has_colour_read(&outcome.texture_sources, 5),
+            "the masked layer supplies no specular RGB"
+        );
+        assert_eq!(
+            outcome.material_layers,
+            [0],
+            "the selected original layer is preserved"
+        );
+    }
+    assert!(
+        has_colour_read(&base.texture_sources, 2),
+        "base diffuse is still sampled"
+    );
+    assert!(
+        packed.metallic && !packed.roughness,
+        "the packed job enables the metallic channel alone"
+    );
+    Ok(())
+}
+
+fn provenance_sources() -> Result<Decoded, p4kx_texture::TextureError> {
+    [
+        ("objects/m_blend.dds", 1, [255, 0, 0, 255]),
+        ("objects/l0_diff.dds", 2, [160, 100, 33, 255]),
+        ("objects/l1_diff.dds", 3, [99, 101, 205, 255]),
+        ("objects/l0_spec.dds", 4, [102, 255, 135, 108]),
+        ("objects/l1_spec.dds", 5, [25, 240, 81, 78]),
+    ]
+    .into_iter()
+    .map(|(path, id, pixel)| Ok((path.to_owned(), Ok(provenance_image(id, pixel)?))))
+    .collect()
+}
+
+struct LayerBudgetHeaders;
+
+impl TextureLoader for LayerBudgetHeaders {
+    fn dimensions(&self, path: &str, _: u32) -> Result<Option<(u32, u32)>, TextureLoadError> {
+        let dimensions = if matches!(
+            path,
+            "objects/large_diff.dds" | "objects/large_ddna.dds" | "objects/large_spec.dds"
+        ) {
+            let width = u32::try_from(MAX_DECODE_PIXELS - 1)
+                .map_err(|error| TextureLoadError::Unreadable(error.to_string()))?;
+            (width, 1)
+        } else {
+            (2, 2)
+        };
+        Ok(Some(dimensions))
+    }
+
+    fn load(&self, _: &str, _: u32) -> Result<LoadedTexture, TextureLoadError> {
+        Err(TextureLoadError::Unreadable(
+            "header-only fixture".to_owned(),
+        ))
+    }
+}
+
+#[test]
+fn an_oversized_finish_dependency_demotes_specular_for_both_jobs()
+-> Result<(), Box<dyn std::error::Error>> {
+    let mut base = layered_job(false);
+    let layered = base.layered.as_mut().ok_or("a layered base job")?;
+    let owner = layered.layers.first_mut().ok_or("a first layer")?;
+    owner.specular_map = Some((source("objects/l0_spec.dds".to_owned(), false), [1.0; 2]));
+    let no_gloss_base = layered.fingerprint(false);
+    let owner = layered.layers.first_mut().ok_or("a first layer")?;
+    owner.normal = Some((source("objects/large_ddna.dds".to_owned(), true), [1.0; 2]));
+    owner.finish = Some(SurfaceFinish::new(0.5, Some(0.8)));
+    let with_gloss_base = layered.fingerprint(false);
+    let pack_key = layered.finish_fingerprint();
+    assert_ne!(
+        no_gloss_base, with_gloss_base,
+        "the base identity includes its finish budget dependencies"
+    );
+    base.key = Key::LayerBase {
+        blend: with_gloss_base,
+    };
+    let pack = Job {
+        key: Key::LayerFinish { blend: pack_key },
+        ..base.clone()
+    };
+    let mut store = SourceStore::new(&LayerBudgetHeaders, 0, 0);
+    for original in [&base, &pack] {
+        let prepared = store.admit_layer_specular(original);
+        let expected = prepared
+            .job()
+            .layered
+            .as_ref()
+            .ok_or("retained mandatory inputs")?;
+        assert!(
+            expected.has_sampled_finish() && !expected.has_specular_map(),
+            "only the optional map exceeds the finish decode budget"
+        );
+        assert_eq!(
+            prepared.job().key,
+            original.key,
+            "original job identity is retained"
+        );
+        let [refusal] = prepared.failures.as_slice() else {
+            return Err("one optional source failed the combined admission".into());
+        };
+        assert!(
+            refusal.reason.contains("exceed the texture decode budget"),
+            "the original reason is explicit"
+        );
+    }
+    Ok(())
+}
+
+mod case_budget;

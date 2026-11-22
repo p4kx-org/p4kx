@@ -12,6 +12,7 @@ fn layer(at: usize, share: f32) -> LayerPlan {
         share,
         diffuse: None,
         normal: None,
+        specular_map: None,
         colour: [1.0; 3],
         specular: [0.0; 3],
         metal: 0.0,

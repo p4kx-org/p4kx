@@ -161,6 +161,7 @@ pub use entity_armour::{armour_entries, armour_female_skeleton, armour_male_skel
 pub use entity_armour_loadout::{ARMOUR_XML_LOADOUT, armour_xml_loadout};
 pub use entity_assembly::{
     ASSEMBLY_GUN_PAINT, assembly_entries, hologram_entries, hologram_suppression_entries,
+    repeated_gimbal_assembly_entries,
 };
 pub use entity_assortment::{TestGroup, assortment_record, assortment_record_requiring};
 pub use entity_bone::{
@@ -247,7 +248,7 @@ pub use entity_static_relay::static_relay_entries;
 pub use entity_vehicle::landing_system_record;
 pub use entity_vehicle_paint::{
     FITTED_CDF_DOCUMENT, FITTED_CDF_MATERIAL, fitted_cdf_paint_vehicle_entries,
-    fitted_paint_vehicle_entries,
+    fitted_paint_vehicle_entries, fitted_same_model_paint_vehicle_entries,
 };
 pub use entity_zones::{
     ZONE_JACKET, ZONE_SHIRT, jacketed_entries, zone_entries, zone_entries_with_layer_textures,

@@ -3,7 +3,7 @@
 
 //! The textures held in memory, the cube model and the helpers that read a GLB back.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::error::Error;
 use std::sync::{Mutex, PoisonError};
 
@@ -26,6 +26,7 @@ pub(crate) struct Stub {
     calls: Mutex<Vec<(String, u32)>>,
     sized: bool,
     sizes: HashMap<String, (u32, u32)>,
+    unknown_sizes: HashSet<String>,
 }
 
 impl Stub {
@@ -44,6 +45,11 @@ impl Stub {
     /// Makes the stub tell `size` for the texture at `path`, whatever it holds.
     pub(crate) fn sized_as(mut self, path: &str, size: (u32, u32)) -> Self {
         self.sizes.insert(path.to_ascii_lowercase(), size);
+        self
+    }
+
+    pub(crate) fn unknown_size(mut self, path: &str) -> Self {
+        self.unknown_sizes.insert(path.to_ascii_lowercase());
         self
     }
 
@@ -66,7 +72,7 @@ impl TextureLoader for Stub {
         if let Some(size) = self.sizes.get(&key) {
             return Ok(Some(*size));
         }
-        if !self.sized {
+        if !self.sized || self.unknown_sizes.contains(&key) {
             return Ok(None);
         }
         match self.textures.get(&key) {

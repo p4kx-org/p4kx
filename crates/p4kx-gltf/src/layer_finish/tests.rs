@@ -20,6 +20,7 @@ fn layer(at: usize, share: f32) -> LayerPlan {
         gloss: Vec::new(),
         diffuse: None,
         normal: None,
+        specular_map: None,
         finish: Some(SurfaceFinish::new(0.5, Some(0.8))),
         roughness: 0.6,
         colour: [1.0; 3],
@@ -50,12 +51,12 @@ fn mask_selects_exact_sampled_layer_and_preserves_alpha_read_authority()
     };
     let mask = RgbaImage::new(1, 1, vec![255, 0, 0, 255])?;
     let maps = maps(&inputs, (1, 1))?;
-    let pixels = bake(&layered, &maps, Some(&mask), (1, 1))?;
+    let pixels = bake(&layered, &maps, &Maps::default(), true, Some(&mask), (1, 1))?;
     assert_eq!((pixels.sampled, pixels.used), (1, 1));
     let expected = ((128.0_f32 / 255.0) * 0.5).mul_add(-0.8, 1.0);
     let green = texture_pixels::texel(&pixels.image, 0, 0)[1];
     assert!((f32::from(green) / 255.0 - expected).abs() <= 0.5 / 255.0);
-    let uses = sources(&inputs, None, &texture, &pixels);
+    let uses = sources(&inputs, &[], None, &texture, &pixels);
     assert_eq!(uses.len(), 1);
     assert_eq!(uses[0].read, Some(TextureReadId::new(7)));
     assert_eq!(uses[0].components, TextureComponents::Alpha);
@@ -72,7 +73,14 @@ fn sampled_and_constant_layers_blend_finished_roughness_by_existing_shares()
         mask: None,
         refused: Vec::new(),
     };
-    let pixels = bake(&layered, &[Some(map), None], None, (1, 1))?;
+    let pixels = bake(
+        &layered,
+        &[Some(map), None],
+        &Maps::default(),
+        true,
+        None,
+        (1, 1),
+    )?;
     assert_eq!((pixels.sampled, pixels.used), (1, 3));
     let sampled = ((128.0_f32 / 255.0) * 0.5).mul_add(-0.8, 1.0);
     let expected = sampled.mul_add(0.25, 0.6 * 0.75);
@@ -100,7 +108,7 @@ fn red_and_alpha_reach_distinct_finished_layer_pixels_after_minification()
         (SmoothnessChannel::Alpha, 112.0),
     ] {
         let map = SmoothnessMap::new(&texture, [1.0; 2], (1, 1), channel)?;
-        let pixels = bake(&layered, &[Some(map)], None, (1, 1))?;
+        let pixels = bake(&layered, &[Some(map)], &Maps::default(), true, None, (1, 1))?;
         let green = texture_pixels::texel(&pixels.image, 0, 0)[1];
         let expected = (scalar / 255.0_f32 * 0.5).mul_add(-0.8, 1.0);
         assert!((texture_pixels::unit(green) - expected).abs() <= 0.5 / 255.0);
