@@ -172,6 +172,10 @@ impl Binding {
         )
     }
 
+    pub(crate) fn check_source_value(&self, value: &Value) -> TestResult {
+        self.check_source(&CatalogSource::deserialize(value)?)
+    }
+
     pub(crate) fn check_archive(&self, archive: &Archive) -> TestResult {
         let build = archive.build().ok_or("missing installed Build identity")?;
         let expected = &self.archive.build.build;
@@ -212,14 +216,7 @@ impl Binding {
         if schema_version != SCHEMA_VERSION {
             return Err("replay requires catalog schema v3".into());
         }
-        if source.channel.as_deref() != Some(self.channel.as_str())
-            || source.build.as_ref() != Some(&self.archive.build.build)
-            || source.archive_size != self.archive.archive_bytes
-            || source.archive_modified.as_deref()
-                != Some(stamp_seconds(&self.archive.archive_modified_utc)?.as_str())
-        {
-            return Err("catalog source identity differs from the measurement".into());
-        }
+        self.check_source(source)?;
         if publication.mode != "normal"
             || [
                 &publication.status,
@@ -232,6 +229,18 @@ impl Binding {
             return Err("replay requires a complete normal publication".into());
         }
         check_complete_selection(completeness)
+    }
+
+    fn check_source(&self, source: &CatalogSource) -> TestResult {
+        if source.channel.as_deref() != Some(self.channel.as_str())
+            || source.build.as_ref() != Some(&self.archive.build.build)
+            || source.archive_size != self.archive.archive_bytes
+            || source.archive_modified.as_deref()
+                != Some(stamp_seconds(&self.archive.archive_modified_utc)?.as_str())
+        {
+            return Err("catalog source identity differs from the measurement".into());
+        }
+        Ok(())
     }
 }
 

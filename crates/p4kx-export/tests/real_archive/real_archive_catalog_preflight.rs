@@ -13,22 +13,33 @@ use crate::real_archive_catalog_size::artifact;
 
 use crate::real_archive_catalog_size::replay::bindings::check_catalog_selection;
 
-type TestResult = Result<(), Box<dyn std::error::Error>>;
+type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 pub(crate) fn check(directory: &Path) -> TestResult {
-    let selection = artifact::read_completed_prefix(directory, |input| Ok(read_selection(input)?))?;
+    let selection = artifact::read_completed_prefix(directory, |input| {
+        Ok(read_member(input, "completeness")?)
+    })?;
     if let Some(selection) = &selection {
         check_catalog_selection(selection)?;
     }
     Ok(())
 }
 
-fn read_selection(input: impl Read) -> serde_json::Result<Option<Value>> {
+pub(crate) fn source(directory: &Path) -> TestResult<Value> {
+    artifact::read_completed_prefix(directory, |input| {
+        read_member(input, "source")?.ok_or_else(|| "missing leading Catalog source".into())
+    })
+}
+
+fn read_member(input: impl Read, field: &'static str) -> serde_json::Result<Option<Value>> {
     let mut prefix = Prefix::Reading;
     let mut decoder = serde_json::Deserializer::from_reader(input);
-    let result = decoder.deserialize_map(SelectionPrefix(&mut prefix));
+    let result = decoder.deserialize_map(MetadataPrefix {
+        field,
+        found: &mut prefix,
+    });
     match prefix {
-        Prefix::Selection(selection) => Ok(Some(selection)),
+        Prefix::Found(value) => Ok(Some(value)),
         Prefix::Payload => Ok(None),
         Prefix::Reading => result.map(|()| None),
     }
@@ -36,13 +47,16 @@ fn read_selection(input: impl Read) -> serde_json::Result<Option<Value>> {
 
 enum Prefix {
     Reading,
-    Selection(Value),
+    Found(Value),
     Payload,
 }
 
-struct SelectionPrefix<'a>(&'a mut Prefix);
+struct MetadataPrefix<'a> {
+    field: &'static str,
+    found: &'a mut Prefix,
+}
 
-impl<'de> Visitor<'de> for SelectionPrefix<'_> {
+impl<'de> Visitor<'de> for MetadataPrefix<'_> {
     type Value = ();
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -52,15 +66,15 @@ impl<'de> Visitor<'de> for SelectionPrefix<'_> {
     fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<(), A::Error> {
         while let Some(field) = map.next_key::<String>()? {
             match field.as_str() {
-                "schemaVersion" | "source" | "exportHealth" => {
+                name if name == self.field => {
+                    *self.found = Prefix::Found(map.next_value()?);
+                    return Err(serde::de::Error::custom("Catalog metadata member read"));
+                }
+                "schemaVersion" | "source" | "exportHealth" | "completeness" => {
                     map.next_value::<IgnoredAny>()?;
                 }
-                "completeness" => {
-                    *self.0 = Prefix::Selection(map.next_value()?);
-                    return Err(serde::de::Error::custom("Catalog selection prefix read"));
-                }
                 _ => {
-                    *self.0 = Prefix::Payload;
+                    *self.found = Prefix::Payload;
                     return Err(serde::de::Error::custom("Catalog payload starts"));
                 }
             }
@@ -86,7 +100,8 @@ fn missing_required_kind_is_reported_from_the_prefix() -> TestResult {
     let prefix = format!(
         r#"{{"schemaVersion":3,"source":{{}},"completeness":{selection},"items":<unparsed>"#,
     );
-    let selection = read_selection(prefix.as_bytes())?.ok_or("present selection prefix")?;
+    let selection =
+        read_member(prefix.as_bytes(), "completeness")?.ok_or("present selection prefix")?;
     let Err(error) = check_catalog_selection(&selection) else {
         return Err("a retained selection missing a current Kind must fail".into());
     };
@@ -103,7 +118,7 @@ fn missing_required_kind_is_reported_from_the_prefix() -> TestResult {
 fn prefix_stops_before_a_payload_that_precedes_completeness() -> TestResult {
     let prefix = br#"{"schemaVersion":3,"items":<unparsed>"#;
     assert!(
-        read_selection(prefix.as_slice())?.is_none(),
+        read_member(prefix.as_slice(), "completeness")?.is_none(),
         "non-leading completeness is left for full Catalog validation"
     );
     Ok(())

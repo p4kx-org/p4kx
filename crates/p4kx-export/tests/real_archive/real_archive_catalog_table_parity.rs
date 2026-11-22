@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::path::PathBuf;
 
+use p4kx_channels::PublicPatches;
 use p4kx_export::catalog_queries::DatasetAvailability;
 use p4kx_export::catalog_queries::equipment::EquipmentSnapshot;
 use p4kx_extraction::{Archive, ArchiveWatch, SourceInventory, SourceUseRole};
@@ -79,6 +80,34 @@ pub(crate) fn with_bound_measurement<T>(
     let result = verify(&archive, &measurement);
     measurement.watch.check()?;
     result
+}
+
+#[test]
+#[ignore = "same Build: set P4KX_DATA_P4K, P4KX_CATALOG_MEASUREMENT_DIR and P4KX_LAUNCHER_LOGS"]
+fn installed_public_patch_matches_the_same_catalog_build() -> TestResult {
+    let logs = std::env::var_os("P4KX_LAUNCHER_LOGS")
+        .map(PathBuf::from)
+        .ok_or("configure the launcher log directory")?;
+    if !["log.log", "log.old.log"]
+        .iter()
+        .any(|name| logs.join(name).is_file())
+    {
+        return Err("the snapshot contains no launcher log".into());
+    }
+    with_bound_measurement(|archive, measurement| {
+        let build = archive.build().ok_or("missing installed Build identity")?;
+        let patches = PublicPatches::standard_report();
+        if !patches.is_complete() {
+            return Err("the launcher log scan was incomplete".into());
+        }
+        let source = real_archive_catalog_preflight::source(&measurement.directory)?;
+        measurement.binding.check_source_value(&source)?;
+        let expected = serde_json::to_value(patches.value().of(build))?;
+        if source.pointer("/build/publicPatch") != Some(&expected) {
+            return Err("the Catalog public patch differs from the exact launcher lookup".into());
+        }
+        Ok(())
+    })
 }
 
 impl BoundMeasurement {

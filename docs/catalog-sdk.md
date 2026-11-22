@@ -47,9 +47,17 @@ This lookup requires the same change number.
 
 The complete Catalog replay on LIVE 13220821 and PTU 13248297 verifies the
 channel, size, modification time and four manifest Build fields against the
-same receipt and the installed Archive. The launcher patch lookup has
-synthetic exact-match and no-match tests. A same-Build installed launcher-log
-comparison remains open.
+same receipt and the installed Archive. The installed Launcher logs had no
+entry for either exact change number. Both catalogs carried `publicPatch: null`.
+Synthetic tests cover a matching Launcher entry and an entry for a different
+change number.
+
+To repeat the installed Launcher comparison, set `P4KX_DATA_P4K`,
+`P4KX_CATALOG_MEASUREMENT_DIR` and `P4KX_LAUNCHER_LOGS`.
+
+```text
+cargo test --locked -p p4kx-export --test real_archive real_archive_catalog_table_parity::installed_public_patch_matches_the_same_catalog_build -- --ignored --exact --test-threads=1
+```
 
 The catalog's writer version, timestamp and Archive-key usage describe its export.
 Each selective result carries its own `SourceInventory` for resolving per-value
