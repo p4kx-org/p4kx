@@ -20,7 +20,7 @@ use crate::{CatalogError, ExportAccountingError};
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct CatalogLanguagePolicy {
+pub struct CatalogLanguagePolicy {
     selection: LanguageSelection,
     fallback: LanguageFallback,
 }
@@ -30,6 +30,18 @@ impl CatalogLanguagePolicy {
         selection: LanguageSelection::AvailableSupported,
         fallback: LanguageFallback::None,
     };
+
+    /// Reports whether the complete Catalog includes available supported languages.
+    #[must_use]
+    pub const fn selects_available_supported_languages(&self) -> bool {
+        matches!(self.selection, LanguageSelection::AvailableSupported)
+    }
+
+    /// Reports whether a missing translation may be filled from another language.
+    #[must_use]
+    pub const fn uses_translation_fallback(&self) -> bool {
+        !matches!(self.fallback, LanguageFallback::None)
+    }
 }
 
 #[derive(Debug, Serialize, JsonSchema)]

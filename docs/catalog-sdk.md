@@ -217,6 +217,13 @@ Archive Build and the source inventory for their field origins.
 
 ## Localization Entry metadata
 
+Use `catalog_queries::localization::catalog_language_policy` for the static
+`texts.languagePolicy` object. The function requires no Archive or session.
+Use `selects_available_supported_languages()` to check whether the Catalog selects the
+supported languages with localization Entries available. `uses_translation_fallback()`
+returns false because a missing translation stays absent in its language. Individual SDK
+queries can request an explicit language subset.
+
 Use catalog_queries::localization::with_language_sources for the canonical
 texts.languageSources map. It reads and indexes the requested localization Entries directly
 from the Archive and supplies each Entry's path, encoding, lossy-decoding flag, malformed-line

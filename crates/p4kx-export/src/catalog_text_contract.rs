@@ -13,8 +13,10 @@ use crate::schema_fields::every_field_required;
 #[path = "catalog_language_sources.rs"]
 mod language_sources;
 
-pub(crate) use language_sources::{CatalogLanguagePolicy, language_sources};
-pub use language_sources::{CatalogLanguageSource, CatalogLanguageSources, SourceIniEncoding};
+pub(crate) use language_sources::language_sources;
+pub use language_sources::{
+    CatalogLanguagePolicy, CatalogLanguageSource, CatalogLanguageSources, SourceIniEncoding,
+};
 
 /// A reference into the public short-name domain.
 #[derive(Debug, Clone, Serialize, JsonSchema)]

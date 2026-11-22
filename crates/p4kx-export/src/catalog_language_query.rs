@@ -12,9 +12,15 @@ use crate::catalog_origins::CatalogLocaleOrigins;
 use crate::catalog_query_session::{CatalogLanguageSelection, checkpoint};
 use crate::catalog_text_contract::language_sources;
 pub use crate::catalog_text_contract::{
-    CatalogLanguageSource, CatalogLanguageSources, SourceIniEncoding,
+    CatalogLanguagePolicy, CatalogLanguageSource, CatalogLanguageSources, SourceIniEncoding,
 };
 use crate::texts::{TextSources, Texts};
+
+/// Returns the language policy shared by complete schema-v3 Catalogs.
+#[must_use]
+pub const fn catalog_language_policy() -> CatalogLanguagePolicy {
+    CatalogLanguagePolicy::AVAILABLE_SUPPORTED
+}
 
 /// Observed localization Entries, including expected languages absent from the Archive.
 #[non_exhaustive]

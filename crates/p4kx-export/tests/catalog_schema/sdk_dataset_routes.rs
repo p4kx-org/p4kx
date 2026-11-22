@@ -230,6 +230,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         dismantle::read()?,
         crafters::read()?,
         crafter_hosts::read()?,
+        archive_entries::read_language_policy()?,
         archive_entries::read_language_sources(&archive)?,
         location_vocabulary::read_entities(&archive)?,
         mission_location::read()?,

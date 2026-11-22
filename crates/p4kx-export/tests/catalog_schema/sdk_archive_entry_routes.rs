@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::time::UNIX_EPOCH;
+
 use p4kx_export::catalog_queries::CatalogLanguageSelection;
 use p4kx_export::catalog_queries::flares::{FlareLibrarySelection, read_flare_libraries};
-use p4kx_export::catalog_queries::localization::with_language_sources;
+use p4kx_export::catalog_queries::localization::{catalog_language_policy, with_language_sources};
 use p4kx_export::catalog_queries::particle_libraries::{
     ParticleLibrarySelection, read_particle_libraries,
 };
@@ -12,11 +14,14 @@ use p4kx_export::catalog_queries::shops::{ShopInventorySelection, read_shop_inve
 use p4kx_export::catalog_queries::subsumption_events::{
     SubsumptionEventSelection, read_subsumption_events,
 };
-use p4kx_extraction::Archive;
+use p4kx_export::{CatalogOptions, build_catalog};
+use p4kx_extraction::{Archive, Language};
+use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry};
+use serde_json::{Value, json};
 
 use super::super::{
-    FLARE_LIBRARIES, LANGUAGE_SOURCES, PARTICLE_LIBRARIES, RADAR_AUDIO, SHOP_INVENTORIES,
-    SUBSUMPTION_EVENTS,
+    FLARE_LIBRARIES, LANGUAGE_POLICY, LANGUAGE_SOURCES, PARTICLE_LIBRARIES, RADAR_AUDIO,
+    SHOP_INVENTORIES, SUBSUMPTION_EVENTS,
 };
 use super::{Route, TestResult, fixtures};
 
@@ -27,6 +32,45 @@ pub(super) fn read_radar_configuration(archive: &Archive) -> TestResult<Route> {
         &snapshot.rows,
         "physical configuration query available; installed producer parity open",
     )
+}
+
+pub(super) fn read_language_policy() -> TestResult<Route> {
+    let policy = catalog_language_policy();
+    assert!(
+        policy.selects_available_supported_languages(),
+        "the Catalog selects the supported languages available in the Archive"
+    );
+    assert!(
+        !policy.uses_translation_fallback(),
+        "the Catalog leaves missing translations absent"
+    );
+    let encoded = serde_json::to_value(&policy)?;
+    assert_eq!(
+        encoded,
+        json!({"selection": "availableSupported", "fallback": "none"}),
+        "both typed rules retain their canonical control vocabulary"
+    );
+    let folder = tempfile::tempdir()?;
+    let path = folder.path().join("language_policy.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored(
+            "Data/Game2.dcb",
+            DataForgeBuilder::new().version(8).build(),
+        ))
+        .entry(TestEntry::stored(
+            Language::German.global_ini_path(),
+            b"fixture=Original text\n",
+        ))
+        .write_to(&path)?;
+    let archive = Archive::open(path)?;
+    let built = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;
+    let full: Value = serde_json::from_slice(built.json())?;
+    assert_eq!(
+        full.pointer(LANGUAGE_POLICY),
+        Some(&encoded),
+        "the full normal Catalog writes the same archive-independent policy"
+    );
+    Route::queried_rows(LANGUAGE_POLICY, std::slice::from_ref(&policy), None)
 }
 
 pub(super) fn read_language_sources(archive: &Archive) -> TestResult<Route> {

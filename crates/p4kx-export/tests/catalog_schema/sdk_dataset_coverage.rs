@@ -18,6 +18,7 @@ mod row_schema;
 
 use dataset_audit::{NO_WITNESS, audit};
 
+const LANGUAGE_POLICY: &str = "/texts/languagePolicy";
 const LANGUAGE_SOURCES: &str = "/texts/languageSources";
 const ITEM_DEFINITIONS: &str = "/definitions/items";
 const SHIP_BASE_FACTS: &str = "/projections/shipBaseFacts";
@@ -170,6 +171,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     "/placements/resourceNetworkNodes",
     "/placements/resourceNetworkLinkBindings",
     "/placements/roomAssociationBindings",
+    LANGUAGE_POLICY,
     LANGUAGE_SOURCES,
     ITEM_DEFINITIONS,
     LOADOUTS,
