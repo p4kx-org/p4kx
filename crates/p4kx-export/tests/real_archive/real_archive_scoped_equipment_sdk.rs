@@ -13,16 +13,20 @@ use p4kx_export::catalog_queries::equipment::{
     with_ship_store_slugs_from,
 };
 use p4kx_export::{BuiltCatalog, CatalogOptions, SCHEMA_VERSION, build_catalog_from};
-use p4kx_extraction::{
-    Archive, ArchiveWatch, Checksum, DataForge, DataForgeEntry, Filter, SourceValueState,
-};
-use p4kx_testkit::{real_archive_key, real_archive_path};
+use p4kx_extraction::{Archive, Checksum, DataForge, DataForgeEntry, Filter, SourceValueState};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
 use crate::real_archive_catalog_table_parity::{Origins, TestResult, wire_row};
 use crate::real_archive_shop_inventory_v3::verify_build;
 use crate::real_archive_verification::print_line;
+
+#[path = "real_archive_equipment_input.rs"]
+mod equipment_input;
+use equipment_input::{dataforge, record_index, with_archive};
+
+#[path = "real_archive_installed_configuration_sdk.rs"]
+mod installed_configuration;
 
 const STORE: &str = "/shipStoreSlugs";
 const FACILITY: &str = "/placements/facilityInstances/rows";
@@ -124,7 +128,7 @@ fn installed_loadout_facilities_match_exact_scoped_normal_producer() -> TestResu
         let mut origins = Origins::default();
         origins.extend(&snapshot.source_inventory, &rows)?;
         origins.verify_in_document(&document)?;
-        report_facilities("parity", &rows)
+        report_scoped_rows("Facility", "parity", &rows)
     })
 }
 
@@ -138,14 +142,14 @@ fn installed_loadout_facility_cold_query() -> TestResult {
         let rows = facility_rows(archive, index, &snapshot)?;
         let mut origins = Origins::default();
         origins.extend(&snapshot.source_inventory, &rows)?;
-        report_facilities("cold", &rows)
+        report_scoped_rows("Facility", "cold", &rows)
     })
 }
 
-fn report_facilities(phase: &str, rows: &[Value]) -> TestResult {
+fn report_scoped_rows(kind: &str, phase: &str, rows: &[Value]) -> TestResult {
     let digest = Checksum::Sha256(Sha256::digest(serde_json::to_vec(rows)?).into()).hex();
     print_line(&format!(
-        "Facility {phase} rows={} digest={digest}",
+        "{kind} {phase} rows={} digest={digest}",
         rows.len()
     ));
     Ok(())
@@ -209,47 +213,6 @@ fn store_selection(
     Ok(())
 }
 
-fn with_archive(check: impl FnOnce(&Archive) -> TestResult) -> TestResult {
-    let path = real_archive_path().map_err(|_| "configure the installed Archive path")?;
-    let key = real_archive_key().map_err(|_| "configure the trusted installed Archive key")?;
-    let archive =
-        Archive::open_with_key(path, Some(key)).map_err(|_| "open the installed Archive")?;
-    let expected =
-        env::var("P4KX_NEW_SDK_BUILD").map_err(|_| "configure the expected Build change number")?;
-    let build = archive
-        .build()
-        .ok_or("the installed Archive lacks a Build")?;
-    if build.change_number() != expected
-        || expected.is_empty()
-        || !expected.bytes().all(|byte| byte.is_ascii_digit())
-        || [build.branch(), build.version(), build.build_id()]
-            .iter()
-            .any(|value| value.trim().is_empty())
-    {
-        return Err("the installed Archive differs from the configured Build".into());
-    }
-    let watch = ArchiveWatch::new(&archive);
-    watch
-        .check()
-        .map_err(|_| "verify the original Archive stamp")?;
-    let result = check(&archive);
-    watch
-        .check()
-        .map_err(|_| "the original Archive changed during proof")?;
-    result
-}
-
-fn dataforge(archive: &Archive) -> TestResult<DataForgeEntry> {
-    DataForgeEntry::read(archive).map_err(|_| "read the bound DataForge Entry".into())
-}
-
-fn record_index(variable: &str) -> TestResult<u32> {
-    env::var(variable)
-        .ok()
-        .and_then(|value| value.parse().ok())
-        .ok_or_else(|| "configure a private physical Ship Record index".into())
-}
-
 fn literal_filter(input: &DataForgeEntry, index: u32) -> TestResult<Filter> {
     let forge = input.open().map_err(|_| "parse the original DataForge")?;
     let record = forge
@@ -282,10 +245,24 @@ fn facility_filter(
     index: u32,
     snapshot: &LoadoutFacilityPlacementSnapshot,
 ) -> TestResult<Filter> {
-    let literal = env::var("P4KX_FACILITY_SDK_FILTER")
+    physical_filter(
+        input,
+        "P4KX_FACILITY_SDK_FILTER",
+        "P4KX_FACILITY_SDK_SELECTED_RECORDS",
+        &facility_dependencies(index, snapshot)?,
+    )
+}
+
+fn physical_filter(
+    input: &DataForgeEntry,
+    filter_variable: &str,
+    records_variable: &str,
+    required: &BTreeSet<u32>,
+) -> TestResult<Filter> {
+    let literal = env::var(filter_variable)
         .map_err(|_| "configure the private structurally anchored producer glob")?;
     let filter = Filter::parse(&literal)?;
-    let declared = env::var("P4KX_FACILITY_SDK_SELECTED_RECORDS")
+    let declared = env::var(records_variable)
         .map_err(|_| "configure the exact approved producer Record inventory")?;
     let admitted = declared
         .split(',')
@@ -293,7 +270,6 @@ fn facility_filter(
         .collect::<Result<BTreeSet<u32>, _>>()
         .map_err(|_| "the approved Record inventory is invalid")?;
     let forge = input.open().map_err(|_| "parse the original DataForge")?;
-    let required = facility_dependencies(index, snapshot)?;
     if !filter.is_glob() || !required.is_subset(&admitted) || matching(&forge, &filter) != admitted
     {
         return Err("the glob admits a different physical scope or omits a reached owner".into());

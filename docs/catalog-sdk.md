@@ -2131,6 +2131,18 @@ Ship with the rows for its physical Record in the complete producer or an equiva
 scope whose Record selection includes all reached flight owners. Installed Build
 parity and cold peak memory for this route still require their own acceptance runs.
 
+For the installed checks, set `P4KX_DATA_P4K` for the original Archive,
+`P4KX_NEW_SDK_BUILD` for its exact change number and
+`P4KX_FLIGHT_SDK_RECORD` for the physical Ship. Choose a Ship with a complete
+Loadout and at least one flight component attached at an original port.
+The parity check also uses `P4KX_FLIGHT_SDK_FILTER` and
+`P4KX_FLIGHT_SDK_SELECTED_RECORDS` to bind the exact producer scope.
+
+```text
+cargo test --locked -p p4kx-export --test real_archive real_archive_scoped_equipment_sdk::installed_configuration::installed_flight_cold_query -- --ignored --exact --test-threads=1
+cargo test --locked -p p4kx-export --test real_archive real_archive_scoped_equipment_sdk::installed_configuration::installed_flight_matches_exact_scoped_normal_producer -- --ignored --exact --test-threads=1
+```
+
 ## Original cargo manifests
 
 Use `catalog_queries::cargo_manifests::with_cargo_manifests` for
