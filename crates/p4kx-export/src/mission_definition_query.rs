@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Selective access to authored mission scenarios, modules and items.
+//! Selective access to authored mission scenarios, modules, items and Templates.
 
 use p4kx_extraction::{
     Archive, Build, CancelToken, DataForge, DataForgeEntry, Language, LocalizationNote, RecordTree,
@@ -19,14 +19,18 @@ use crate::catalog_text_contract::{CanonicalText, GameTextRef};
 use crate::catalog_v3::mission_scenario_definition;
 use crate::catalog_v3::mission_sources::{item_definition, module_declaration};
 use crate::catalog_v3::prepared_definition::PreparedDefinition;
+use crate::guid_text::{CatalogGuid, sort_by_guid};
 use crate::record_observation::RecordObservation;
 use crate::source_fields::FieldError;
+use crate::template_definition;
 use crate::texts::{TextSources, Texts};
 use crate::{CatalogError, Kind};
 
 pub use crate::catalog_v3::mission_sources::module_property::{
     ModuleMissionProperty, ModuleMissionPropertyValue,
 };
+pub use crate::template_configuration::{MissionFlowRef, MissionPropertyRef};
+pub use crate::template_definition::TemplateDefinition;
 pub use item_definition::{MissionItemDefinition, MissionStringVariant, MissionStringVariants};
 pub use mission_scenario_definition::MissionScenarioDefinition;
 pub use module_declaration::{
@@ -44,6 +48,8 @@ pub enum MissionDefinitionFamily {
     Modules,
     /// Declared `MissionItem` Records.
     Items,
+    /// Declared `ContractTemplate` Records.
+    ContractTemplates,
 }
 
 impl MissionDefinitionFamily {
@@ -52,6 +58,24 @@ impl MissionDefinitionFamily {
             Self::Scenarios => Kind::MissionScenarios,
             Self::Modules => Kind::MissionModuleDeclarations,
             Self::Items => Kind::MissionItems,
+            Self::ContractTemplates => Kind::ContractTemplates,
+        }
+    }
+
+    fn plan<'source>(
+        self,
+        forge: &'source DataForge<'source>,
+        selection: CatalogRecordSelection,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Plan<'source>, CatalogError> {
+        let kind = self.kind();
+        match self {
+            Self::ContractTemplates => {
+                Plan::read_rule(forge, kind.records(), selection, cancel, None)
+            }
+            Self::Scenarios | Self::Modules | Self::Items => {
+                Plan::read(forge, kind, selection, cancel, None)
+            }
         }
     }
 }
@@ -84,6 +108,8 @@ pub enum MissionDefinitionRows<'source> {
     Modules(Vec<MissionModuleDeclaration<'source>>),
     /// Selected physical mission item definitions.
     Items(Vec<MissionItemDefinition<'source>>),
+    /// Selected physical Contract Template definitions.
+    ContractTemplates(Vec<TemplateDefinition<'source>>),
 }
 
 /// Selected mission definitions and the original evidence referenced by those rows.
@@ -210,7 +236,7 @@ fn project<T>(
     let Plan {
         owners,
         mut coverage,
-    } = Plan::read(forge, kind, selection.records, cancel, None)?;
+    } = selection.family.plan(forge, selection.records, cancel)?;
     let languages =
         if matches!(selection.family, MissionDefinitionFamily::Items) && !owners.is_empty() {
             requested_languages
@@ -295,8 +321,35 @@ fn read_rows<'source>(
                 MissionDefinitionRows::Items,
             )
         }
+        MissionDefinitionFamily::ContractTemplates => split(
+            CatalogTable::new(
+                forge,
+                &["ContractTemplate"],
+                read_templates(owners, projection.original(), coverage, cancel)?,
+            ),
+            MissionDefinitionRows::ContractTemplates,
+        ),
     };
     Ok(result)
+}
+
+fn read_templates<'source>(
+    mut owners: Vec<Owner<'source>>,
+    input: &OriginalCatalogInput<'_, 'source>,
+    coverage: &mut CatalogRecordCoverage,
+    cancel: Option<&CancelToken>,
+) -> Result<Vec<TemplateDefinition<'source>>, CatalogError> {
+    sort_by_guid(&mut owners, |owner| CatalogGuid(owner.record.guid()));
+    let mut rows = Vec::with_capacity(owners.len());
+    for Owner { record, tree } in owners {
+        checkpoint(cancel)?;
+        let read = template_definition::read_selected(input, &record, &tree, cancel)?;
+        if !read.selection_complete {
+            coverage.incomplete_fields.push(record.index());
+        }
+        rows.push(read.value);
+    }
+    Ok(rows)
 }
 
 fn split<Row, Selected>(

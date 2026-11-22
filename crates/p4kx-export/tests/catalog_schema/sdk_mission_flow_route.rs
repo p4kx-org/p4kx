@@ -20,6 +20,10 @@ use serde_json::{Value, json};
 
 use super::{Route, TestResult};
 
+#[path = "sdk_contract_template_definition_route.rs"]
+mod template_definitions;
+pub(super) use template_definitions::DATASET as TEMPLATE_DEFINITIONS;
+
 pub(super) const DATASET: &str = "/configurations/missionFlows";
 
 const TEMPLATE: MissionPropertyOwnerFamily = MissionPropertyOwnerFamily::ContractTemplates;
@@ -36,7 +40,7 @@ const NULL_TEMPLATE_GUID: u128 = 3;
 const TEMPLATE_RECORD: u32 = 1;
 const TEMPLATE_ALIAS: u32 = 2;
 
-pub(super) fn read() -> TestResult<Route> {
+pub(super) fn read() -> TestResult<[Route; 2]> {
     let (_folder, archive) = open(NULL_TEMPLATE_GUID)?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog: Value = serde_json::from_slice(
@@ -62,11 +66,13 @@ pub(super) fn read() -> TestResult<Route> {
         catalog.pointer(DATASET),
         "the same declarations retain Template-first order, original arena links and origins",
     );
-    Route::queried_rows(
+    let flows = Route::queried_rows(
         DATASET,
         &rows,
         "both owner families have normal synthetic producer parity; installed parity open",
-    )
+    )?;
+    let templates = template_definitions::read(&parsed, &catalog)?;
+    Ok([flows, templates])
 }
 
 fn check_owner_graphs(
@@ -220,7 +226,7 @@ fn check_alias(
 }
 
 #[test]
-fn mission_flows_match_the_normal_catalog_for_both_owner_families() -> TestResult {
+fn mission_flows_and_template_definitions_match_the_normal_catalog() -> TestResult {
     read().map(|_| ())
 }
 
@@ -236,7 +242,8 @@ fn a_physical_template_selection_retains_the_explicitly_null_alias() -> TestResu
         TEMPLATE,
         CatalogRecordSelection::RecordIndex(TEMPLATE_ALIAS),
     );
-    parsed.with_mission_properties(alias, None, |snapshot| check_alias(&snapshot, &rows))?
+    parsed.with_mission_properties(alias, None, |snapshot| check_alias(&snapshot, &rows))??;
+    template_definitions::check_alias(&parsed)
 }
 
 fn open(null_template_guid: u128) -> TestResult<(tempfile::TempDir, Archive)> {

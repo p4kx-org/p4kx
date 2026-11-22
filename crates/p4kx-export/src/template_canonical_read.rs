@@ -3,13 +3,12 @@
 
 use p4kx_extraction::{CancelToken, Record, RecordTree};
 
-use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
+use crate::catalog_rows::mission_definitions::DefinitionSource;
 use crate::catalog_template_modules::template_prepared_owner::PreparedOwner;
 use crate::catalog_v3::tag_catalog::CapturedTags;
 use crate::export_ledger::ExportLedger;
-use crate::guid_text::CatalogGuid;
 use crate::mission_flow_owner::FlowOwnerKind;
 use crate::record_observation::RecordObservation;
 use crate::spawn_pools::SpawnPools;
@@ -24,6 +23,7 @@ use crate::{CatalogError, CatalogReadFailure};
 /// One complete D owner and its separate required C interpretations.
 pub(crate) struct CanonicalTemplate<'source> {
     pub(crate) definition: TemplateDefinition<'source>,
+    pub(crate) definition_source: DefinitionSource<'source>,
     pub(crate) projection: TemplateProjection<'source>,
     pub(crate) flows: Vec<MissionFlowConfiguration>,
     pub(crate) properties: Vec<MissionPropertyConfiguration>,
@@ -81,18 +81,16 @@ pub(crate) fn read<'source>(
         &mut context.ledger,
         &mut context.failures,
     )?;
-    let definition = TemplateDefinition {
-        physical_guid: CatalogGuid(tree.guid()),
-        physical_path: tree.record_path(),
+    let definition_source = DefinitionSource {
+        guid: tree.guid(),
+        path: tree.record_path(),
         numbers: crate::template_number_capture::TemplateNumbers::read(&members, input)?,
-        input_ref: fields.input_ref().clone(),
-        header: CanonicalRecordHeader::read(tree, projection.origins())?,
-        source,
-        mission_flows: flow_links,
-        mission_properties: property_links,
     };
+    let definition =
+        TemplateDefinition::emit(input, &fields, tree, source, (flow_links, property_links))?;
     Ok(CanonicalTemplate {
         definition,
+        definition_source,
         projection: context.projection,
         flows,
         properties,

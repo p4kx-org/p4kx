@@ -89,9 +89,23 @@ pub enum FlowSelection {
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct MissionFlowRef {
+pub struct MissionFlowRef {
     pub(crate) owner: MissionFlowOwnerRef,
     pub(crate) declaration_index: Option<DecimalU64>,
+}
+
+impl MissionFlowRef {
+    /// Borrows the physical owner of the linked flow declaration.
+    #[must_use]
+    pub const fn owner(&self) -> &MissionFlowOwnerRef {
+        &self.owner
+    }
+
+    /// Returns the original field ordinal of a present declaration.
+    #[must_use]
+    pub fn declaration_index(&self) -> Option<u64> {
+        self.declaration_index.map(DecimalU64::get)
+    }
 }
 
 /// One original mission or objective property declaration without a second raw arena.
@@ -167,8 +181,28 @@ pub enum PropertySelection {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct MissionPropertyRef {
+pub struct MissionPropertyRef {
     pub(crate) owner: MissionFlowOwnerRef,
     pub(crate) owner_objective: Option<SourceValueRef>,
     pub(crate) declaration_index: Option<DecimalU64>,
+}
+
+impl MissionPropertyRef {
+    /// Borrows the physical owner of the linked property declaration.
+    #[must_use]
+    pub const fn owner(&self) -> &MissionFlowOwnerRef {
+        &self.owner
+    }
+
+    /// Returns the original objective's position in the owner's arena, when present.
+    #[must_use]
+    pub const fn owner_objective(&self) -> Option<SourceValueRef> {
+        self.owner_objective
+    }
+
+    /// Returns the original field ordinal of a present declaration.
+    #[must_use]
+    pub fn declaration_index(&self) -> Option<u64> {
+        self.declaration_index.map(DecimalU64::get)
+    }
 }

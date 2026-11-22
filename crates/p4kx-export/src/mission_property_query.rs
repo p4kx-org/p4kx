@@ -242,11 +242,7 @@ fn read_owner<'source>(
     let (flows, _) = crate::template_flow_configuration_read::read(&members, &plan, family)?;
     let (arena, failure) =
         crate::template_meanings::read(&members, &plan.flow, references.get_mut(), None, &capture)?;
-    let complete = failure.is_none()
-        && arena
-            .values()
-            .iter()
-            .all(|value| value.original().original_error().is_none());
+    let complete = failure.is_none() && arena.values_are_readable();
     Ok(OwnerRows {
         rows,
         flows,

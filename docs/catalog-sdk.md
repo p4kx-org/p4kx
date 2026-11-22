@@ -632,10 +632,15 @@ dependency graphs or contextual projections. Use `with_contracts` for the separa
 Generator-authored `missionPropertySets`.
 
 Use `mission_definitions::with_mission_definitions` or its decoded-Entry and session forms
-to read `definitions.missionScenarios`, `definitions.missionModuleDeclarations` or
-`definitions.missionItems`. Choose a `MissionDefinitionFamily` and a physical Record selection
-in `MissionDefinitionSelection`. The result preserves canonical row order, original source
+to read `definitions.missionScenarios`, `definitions.missionModuleDeclarations`,
+`definitions.missionItems` or `definitions.contractTemplates`. Choose a
+`MissionDefinitionFamily` and a physical Record selection in `MissionDefinitionSelection`. The result preserves canonical row order, original source
 coordinates and the field and coverage states of the selected family.
+
+Contract Template definitions expose the physical header, the original source
+arena and the links to that owner's flow and property declarations. Read those
+linked declarations with `mission_properties::with_mission_properties`. This
+definition query reads the selected Template Records and their original references.
 
 Scenario rows expose the original field arena. Module rows expose exact module type, property,
 location acquisition, spawn and variable declarations. The typed views preserve original slot
