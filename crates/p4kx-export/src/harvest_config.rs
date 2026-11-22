@@ -17,16 +17,19 @@ pub(crate) fn is_slotpreset_path(path: &str) -> bool {
     crate::selection::starts_with_folder(path, "libs/foundry/records/harvestable/slotpresets/")
 }
 
-/// Returns the multi config the Record tree `tree` describes; what its sub harvestables spawn is
-/// followed through `links`.
-pub(crate) fn multi_config<'f>(
+/// Projects an admitted slot preset and follows its selected harvestable dependencies.
+pub(crate) fn slotpreset_config<'f>(
     trees: &mut TreeBuilder<'f>,
     tree: &RecordTree<'f>,
     forge: &'f DataForge<'f>,
     links: &Links<'f>,
-) -> SubHarvestableMultiConfig<'f> {
+) -> Option<SubHarvestableMultiConfig<'f>> {
+    let path = tree.record_path();
+    if !is_slotpreset_path(path) || crate::selection::is_leftover(path, tree.name()) {
+        return None;
+    }
     let multi = structure(Some(tree.root()), "multiConfig");
-    SubHarvestableMultiConfig {
+    Some(SubHarvestableMultiConfig {
         guid: CatalogGuid(tree.guid()),
         class_name: class_name(tree),
         record_path: tree.record_path(),
@@ -35,7 +38,7 @@ pub(crate) fn multi_config<'f>(
         tagged_configs: structs(multi, "taggedConfigs")
             .map(|tagged| tagged_of(trees, tagged, forge, links))
             .collect(),
-    }
+    })
 }
 
 fn tagged_of<'f>(

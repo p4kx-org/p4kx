@@ -10,6 +10,9 @@ use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, Test
 
 use super::{Route, TestResult};
 
+#[path = "sdk_sub_harvestable_multi_config_route.rs"]
+mod multi_configs;
+
 const TABLES: &str = "/lootTables";
 const ARCHETYPES: &str = "/lootArchetypes";
 const LEGACY_TABLES: &str = "/legacyLootTables";
@@ -99,6 +102,7 @@ pub(super) fn datasets() -> impl Iterator<Item = &'static str> {
         ARCHETYPES,
         LEGACY_TABLES,
         LEGACY_ARCHETYPES,
+        multi_configs::DATASET,
     ])
 }
 
@@ -158,6 +162,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
             Route::queried_rows(LEGACY_ARCHETYPES, &snapshot.rows, REMAINING)
         })??,
     );
+    routes.push(multi_configs::read()?);
     Ok(routes)
 }
 

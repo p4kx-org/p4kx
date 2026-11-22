@@ -186,19 +186,20 @@ pub(crate) struct TagCount {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct LootConfig {
+#[non_exhaustive]
+pub struct LootConfig {
     /// The `LootTable` Record the config links to, an entry of `legacyLootTables`.
-    pub(crate) loot_table_guid: Option<CatalogGuid>,
+    pub loot_table_guid: Option<CatalogGuid>,
     /// The `LootTableV3Record` the config links to, an entry of `lootTables`.
-    pub(crate) loot_table_v3_guid: Option<CatalogGuid>,
+    pub loot_table_v3_guid: Option<CatalogGuid>,
     /// The `PoolFilterRecord` of the constraints, an entry of `definitions.lootPoolFilters.rows`.
-    pub(crate) pool_filter_guid: Option<CatalogGuid>,
+    pub pool_filter_guid: Option<CatalogGuid>,
     /// `totalResultsLimit`.
-    pub(crate) total_results_limit: Option<i64>,
+    pub total_results_limit: Option<i64>,
     /// `chanceToGenerate`, from 0 to 1.
-    pub(crate) chance_to_generate: Option<f32>,
+    pub chance_to_generate: Option<f32>,
     /// `chanceToGenerateAdditionalAttachedInventories`, from 0 to 1.
-    pub(crate) chance_to_generate_additional_inventories: Option<f32>,
+    pub chance_to_generate_additional_inventories: Option<f32>,
     /// The `fullnessFactorRange` of the constraints: how full the container is filled.
-    pub(crate) fullness: Option<QuantityRange>,
+    pub fullness: Option<QuantityRange>,
 }

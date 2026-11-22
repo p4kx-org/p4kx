@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, CancelToken, DataForge, DataForgeEntry};
+use p4kx_extraction::{Archive, CancelToken, DataForge, DataForgeEntry, TreeBuilder};
 
 use super::{LootDefinitionKind, LootDefinitionSnapshot};
-use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::unlocalized_record_query::plan::{Owner, Plan};
@@ -13,6 +12,9 @@ use crate::catalog_query_session::checkpoint;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::loot_definition_catalog;
 use crate::guid_text::sort_by_guid;
+use crate::harvest_config;
+use crate::harvest_link::Links;
+use crate::{CatalogError, CraftingWarning};
 
 pub(super) struct Query<'query> {
     pub(super) archive: &'query Archive,
@@ -23,7 +25,7 @@ pub(super) struct Query<'query> {
     pub(super) cancel: Option<&'query CancelToken>,
 }
 
-impl Query<'_> {
+impl<'source> Query<'source> {
     pub(super) fn run<T>(
         self,
         inspect: impl FnOnce(LootDefinitionSnapshot<'_>) -> T,
@@ -51,18 +53,22 @@ impl Query<'_> {
             rows: table.rows,
             tables: rows.tables,
             archetypes: rows.archetypes,
+            sub_harvestable_multi_configs: rows.sub_harvestable_multi_configs,
+            harvest_dependency_warning: rows.harvest_dependency_warning,
             source_inventory,
             coverage: plan.coverage,
         }))
     }
 
-    fn read<'source>(
+    fn read(
         &self,
         owners: Vec<Owner<'source>>,
         input: &OriginalCatalogInput<'_, 'source>,
         coverage: &mut CatalogRecordCoverage,
     ) -> Result<Rows<'source>, CatalogError> {
         let mut rows = Rows::default();
+        let mut harvest_trees = TreeBuilder::new();
+        let harvest_links = Links::default();
         for owner in owners {
             checkpoint(self.cancel)?;
             let definition = match self.family {
@@ -88,6 +94,15 @@ impl Query<'_> {
                 }
                 _ => loot_definition_catalog::read(&owner.record, &owner.tree, input, self.cancel)?,
             };
+            if self.family == LootDefinitionKind::SubHarvestableMultiConfig {
+                rows.sub_harvestable_multi_configs
+                    .extend(harvest_config::slotpreset_config(
+                        &mut harvest_trees,
+                        &owner.tree,
+                        self.forge,
+                        &harvest_links,
+                    ));
+            }
             if definition.incomplete_fields {
                 coverage.incomplete_fields.push(owner.record.index());
             }
@@ -96,6 +111,8 @@ impl Query<'_> {
         sort_by_guid(&mut rows.definitions, |row| row.physical_guid);
         sort_by_guid(&mut rows.tables, |row| row.guid);
         sort_by_guid(&mut rows.archetypes, |row| row.guid);
+        sort_by_guid(&mut rows.sub_harvestable_multi_configs, |row| row.guid);
+        rows.harvest_dependency_warning = harvest_links.warning();
         Ok(rows)
     }
 }
@@ -105,4 +122,6 @@ struct Rows<'source> {
     definitions: Vec<super::LootDefinition<'source>>,
     tables: Vec<super::LootTable<'source>>,
     archetypes: Vec<super::LootArchetype<'source>>,
+    sub_harvestable_multi_configs: Vec<super::SubHarvestableMultiConfig<'source>>,
+    harvest_dependency_warning: Option<CraftingWarning>,
 }

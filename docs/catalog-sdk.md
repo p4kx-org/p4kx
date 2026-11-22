@@ -845,6 +845,21 @@ Neither query opens linked target bodies, reads placement files, nor creates a C
 Use each datum's `containsEncryptedSource` and resolve its source-use references through the
 snapshot's inventory. The row's original arena is local to that physical owner.
 
+## Harvestable slot-preset queries
+
+Use `catalog_queries::loot::with_loot_definitions` with
+`LootDefinitionKind::SubHarvestableMultiConfig` to read by physical Record
+index, GUID or family. The snapshot's `rows` match the original definitions
+under `definitions.subHarvestableMultiConfigs`. Its
+`sub_harvestable_multi_configs` contains the Catalog's slot-preset
+projection in the same order. A source outside the slot-preset selection
+can return its original definition with no projected row.
+
+The convenience rows follow the selected harvestable presets and Entities.
+`harvest_dependency_warning` carries failed dependency reads from that
+projection. Use the original definitions for authored values, reference
+dispositions and field-level provenance.
+
 ## Loot container-document source scope
 
 Catalog v3 `declarations.lootEntityContainerDocuments` retains original attribute sites only from

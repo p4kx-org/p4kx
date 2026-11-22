@@ -5,7 +5,7 @@ use p4kx_extraction::{RecordTree, TreeBuilder};
 
 use super::SelectedProjection;
 use crate::catalog_v3::loot_definition_catalog::{self, LootDefinitionKind};
-use crate::harvest_config::{is_slotpreset_path, multi_config};
+use crate::harvest_config;
 use crate::loot_kinds::LootPick;
 use crate::picked::Picked;
 use crate::record_observation::RecordObservation;
@@ -46,13 +46,14 @@ impl<'source> SelectedProjection<'_, '_, '_, 'source> {
             )?;
             let definition = Box::new(value);
             let picked = if kind == Kind::SubHarvestableMultiConfigs {
-                let path = tree.record_path();
-                let projection = (is_slotpreset_path(path)
-                    && !crate::selection::is_leftover(path, tree.name()))
-                .then(|| multi_config(trees, tree, self.scan.forge, &self.scan.links));
                 Picked::MultiConfig {
                     definition,
-                    projection,
+                    projection: harvest_config::slotpreset_config(
+                        trees,
+                        tree,
+                        self.scan.forge,
+                        &self.scan.links,
+                    ),
                 }
             } else {
                 Picked::Loot(LootPick::Definition(loot, definition))

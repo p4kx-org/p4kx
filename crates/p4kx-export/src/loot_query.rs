@@ -5,16 +5,18 @@
 
 use p4kx_extraction::{Archive, Build, CancelToken, DataForgeEntry, SourceInventory};
 
-use crate::CatalogError;
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
     DatasetAvailability, ParsedCatalogQueries,
 };
+use crate::{CatalogError, CraftingWarning};
 
 pub use crate::catalog_v3::loot_definition_catalog::{LootDefinition, LootDefinitionKind};
+pub use crate::contract_harvest::HarvestableLink;
+pub use crate::contract_harvest_config::{SubHarvestable, SubHarvestableMultiConfig, TaggedConfig};
 pub use crate::contract_loot::{
-    LootArchetype, LootArchetypeEntry, LootSelector, LootTable, LootTableEntry, QuantityRange,
-    SpawnWith,
+    LootArchetype, LootArchetypeEntry, LootConfig, LootSelector, LootTable, LootTableEntry,
+    QuantityRange, SpawnWith,
 };
 pub use crate::contract_loot_legacy::{
     LegacyLootArchetype, LegacyLootEntry, LegacyLootQuantity, LegacyLootTable,
@@ -56,6 +58,10 @@ pub struct LootDefinitionSnapshot<'source> {
     pub tables: Vec<LootTable<'source>>,
     /// The weighted archetype views when the selected family is an archetype.
     pub archetypes: Vec<LootArchetype<'source>>,
+    /// The slot-preset views for the selected multi-config family, in Catalog order.
+    pub sub_harvestable_multi_configs: Vec<SubHarvestableMultiConfig<'source>>,
+    /// Unavailable harvestable dependencies reached by the multi-config projection.
+    pub harvest_dependency_warning: Option<CraftingWarning>,
     /// The physical sources and uses backing the returned values.
     pub source_inventory: SourceInventory,
     /// Coverage of the selected physical owners.
