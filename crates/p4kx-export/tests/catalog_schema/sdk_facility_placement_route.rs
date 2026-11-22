@@ -18,13 +18,20 @@ use super::{Route, TestResult};
 #[path = "../it/catalog_facility_instance_fixture.rs"]
 mod fixture;
 
+#[path = "sdk_installed_configuration_route.rs"]
+mod installed;
+
 const SHIP_RECORD: u32 = 0;
 const SEAT_RECORD: u32 = 1;
 const DECK_RECORD: u32 = 2;
 const DOCKED_RECORD: u32 = 3;
 const UNSELECTED_RECORD: u32 = 4;
 
-pub(super) fn read() -> TestResult<Route> {
+pub(super) fn read() -> TestResult<Vec<Route>> {
+    Ok(vec![read_facilities()?, installed::read()?])
+}
+
+fn read_facilities() -> TestResult<Route> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("facility-placements.p4k");
     ArchiveBuilder::new()

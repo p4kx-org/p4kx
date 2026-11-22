@@ -118,6 +118,29 @@ pub(super) fn read_selected<'source, Row>(
     Ok((read.rows, coverage))
 }
 
+/// Reads one physical owner with strict coverage and retains canonical partial rows.
+pub(super) fn read_selected_with_partials<'source, Row>(
+    forge: &'source DataForge<'source>,
+    input: &OriginalCatalogInput<'_, 'source>,
+    record_index: u32,
+    cancel: Option<&CancelToken>,
+    kind: &ComponentKind,
+    project: Projection<'source, Row>,
+) -> Result<(Vec<Row>, CatalogRecordCoverage), CatalogError> {
+    let physical = CatalogRecordSelection::RecordIndex(record_index);
+    let (rows, coverage) = read_selected(forge, input, physical, cancel, kind, project)?;
+    if !rows.is_empty() || coverage.unreadable_bodies.is_empty() {
+        return Ok((rows, coverage));
+    }
+    checkpoint(cancel)?;
+    let selection = ComponentSelection {
+        physical,
+        ..ComponentSelection::export(None, None)
+    };
+    let canonical = read(forge, input, &selection, cancel, kind, project)?;
+    Ok((canonical.rows, coverage))
+}
+
 fn read_in<'source, Row>(
     forge: &'source DataForge<'source>,
     input: &OriginalCatalogInput<'_, 'source>,

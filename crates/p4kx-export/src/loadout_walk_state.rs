@@ -133,10 +133,11 @@ impl Projection<'_, '_> {
                 };
                 let has_rooms = rooms.contains(record);
                 let configurations = self.configuration_links(record)?;
+                let flight_links = flight.links(record)?;
                 if port.ports.is_empty()
                     && !has_rooms
                     && configurations.is_empty()
-                    && !flight.contains(record)
+                    && flight_links.is_empty()
                 {
                     continue;
                 }
@@ -145,7 +146,7 @@ impl Projection<'_, '_> {
                 self.emit(ship, &path, attached, configurations)?;
                 flight.emit(
                     ship,
-                    record,
+                    flight_links,
                     || path.position_cell(&self.origins.uses),
                     attached,
                 )?;

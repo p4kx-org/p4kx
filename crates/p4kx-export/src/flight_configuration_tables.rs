@@ -86,7 +86,14 @@ impl<'source> FlightConfigurationTables<'source> {
 #[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(in crate::catalog_v3) enum FlightConfigurationKind {
+#[non_exhaustive]
+#[expect(
+    missing_docs,
+    reason = "variant descriptions would change the catalog schema representation"
+)]
+/// The original component family represented by the configuration.
+#[schemars(description = "")]
+pub enum FlightConfigurationKind {
     FlightController,
     Ifcs,
     Thruster,

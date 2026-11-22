@@ -293,7 +293,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(inventory_containers::read()?);
     routes.push(inventory_containers::read_configurations()?);
     routes.push(facilities::read()?);
-    routes.push(facility_placements::read()?);
+    routes.extend(facility_placements::read()?);
     routes.push(client_profiles::read()?);
     routes.extend(cargo::read_globals(archive)?);
     routes.push(cargo::read_manifests()?);

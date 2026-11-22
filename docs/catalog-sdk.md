@@ -2091,6 +2091,25 @@ for the operating system and other applications on a 16 GiB host. Installed
 producer parity for the complete Facility scope and the integrated
 consumer's memory measurements are separate checks.
 
+## Installed flight configurations
+
+Use `equipment::read_installed_configurations`, its decoded-Entry form or the equivalent
+session methods with one physical Ship Record index. The query returns that vehicle's
+`placements.installedConfigurations` rows for Flight Controller, IFCS and Thruster
+components. The same Loadout resolver selects each original attachment and its physical
+Record. Occurrences retain their distinct root and port-ordinal coordinates. The query
+reads the flight configuration owners reached by that resolver and reuses a physical
+owner across repeated ports. A partially readable component list retains its valid rows
+and reports the unresolved original member in configuration dependency coverage.
+
+Read `loadout_state`, `loadout_coverage`, `loadout_dependencies` and the per-owner
+`configuration_dependencies` before interpreting omitted or empty rows. The
+`availability` field describes the declared flight component families. Preserve the
+same Build and source inventory when interpreting source references. Compare a selected
+Ship with the rows for its physical Record in the complete producer or an equivalent
+scope whose Record selection includes all reached flight owners. Installed Build
+parity and cold peak memory for this route still require their own acceptance runs.
+
 ## Original cargo manifests
 
 Use `catalog_queries::cargo_manifests::with_cargo_manifests` for

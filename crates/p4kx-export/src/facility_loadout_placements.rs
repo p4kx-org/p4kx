@@ -40,7 +40,12 @@ mod hosts;
 mod installed;
 #[path = "loadout_walk_state.rs"]
 mod loadout_walk_state;
-pub(in crate::catalog_v3) use installed::InstalledConfiguration;
+use installed::InstalledFlightLookup;
+pub use installed::{
+    FlightConfigurationKind, FlightConfigurationLink, InstalledConfiguration,
+    InstalledConfigurationDependency,
+};
+pub(crate) use installed::{ScopedFlightLinks, read_owner_links, scoped_table};
 use loadout_walk_state::Path;
 #[path = "facility_interior_placements.rs"]
 mod interior;
@@ -148,6 +153,28 @@ pub(crate) fn project_loadout<'lookup>(
         &mut InstalledConfigurations::default(),
     )?;
     Ok(projection.rows)
+}
+
+pub(crate) fn project_installed_configurations<'lookup>(
+    loadout: &Loadout,
+    origins: &CatalogOrigins,
+    cancel: Option<&CancelToken>,
+    lookup: &'lookup mut InstalledFlightLookup<'lookup>,
+) -> Result<Vec<InstalledConfiguration>, CatalogError> {
+    let mut projection = Projection {
+        definitions: Definitions::Indexed(IndexedDefinitions::new()),
+        origins,
+        cancel,
+        rows: Vec::new(),
+    };
+    let mut flight = InstalledConfigurations::scoped(lookup);
+    projection.loadout(
+        loadout,
+        &RoomOwners::default(),
+        &mut Vec::new(),
+        &mut flight,
+    )?;
+    Ok(flight.rows)
 }
 
 pub(crate) fn loadout_configuration_links(
@@ -279,7 +306,13 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
         let walk = Path::new(root, selector);
         let configurations = self.configuration_links(root)?;
         self.emit(&ship, &walk, None, configurations)?;
-        flight.emit(&ship, root, || walk.position_cell(&self.origins.uses), None)?;
+        let flight_links = flight.links(root)?;
+        flight.emit(
+            &ship,
+            flight_links,
+            || walk.position_cell(&self.origins.uses),
+            None,
+        )?;
         self.walk_ports(loadout, &ship, walk, rooms, room_attachments, flight)
     }
 

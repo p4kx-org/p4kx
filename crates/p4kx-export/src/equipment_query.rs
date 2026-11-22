@@ -100,9 +100,12 @@ pub use dependency_coverage::{
 };
 pub use loadout_query::{
     AlignmentDependency, AlignmentDependencyState, AlignmentRole, CrafterHost, CrafterHostSnapshot,
-    FacilityConfigurationKind, FacilityInstance, FacilityPlacementDependency, Loadout,
+    FacilityConfigurationKind, FacilityInstance, FacilityPlacementDependency,
+    FlightConfigurationKind, FlightConfigurationLink, InstalledConfiguration,
+    InstalledConfigurationDependency, InstalledConfigurationSnapshot, Loadout,
     LoadoutDependencyCoverage, LoadoutFacilityPlacementSnapshot, LoadoutOwnerKind, LoadoutPort,
     LoadoutSnapshot, PortType, read_crafter_hosts, read_crafter_hosts_from,
+    read_installed_configurations, read_installed_configurations_from,
     read_loadout_facility_placements, read_loadout_facility_placements_from, read_loadouts,
     read_loadouts_from,
 };
