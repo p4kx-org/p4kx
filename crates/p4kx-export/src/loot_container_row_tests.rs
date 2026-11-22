@@ -3,9 +3,10 @@
 
 use std::collections::HashMap;
 
-use p4kx_extraction::{Guid, SourceUses, SourceValueState};
+use p4kx_extraction::{Guid, SourceUses, SourceValue, SourceValueState, SourcedValue};
 
 use super::{Tags, row, rows};
+use crate::contract_loot::LootContainer;
 use crate::guid_text::CatalogGuid;
 use crate::harvest_locations::Objects;
 use crate::loot_soc::EntityTags;
@@ -57,6 +58,7 @@ fn placement_summaries(first_config: Guid, sources: &SourceUses) -> HashMap<usiz
 fn opened(entry: usize, system: &str) -> Opened {
     Opened {
         system: system.into(),
+        system_entry: entry,
         entry,
         under: None,
     }
@@ -104,14 +106,21 @@ fn duplicate_rows_keep_the_first_placement_with_canonical_order()
         opened(20, "nyx"),
     ];
     let tags = fixture_tags(first_config, second_config, sources);
-    let result = rows(&roots, &Objects::new(&[]), &summaries, &tags, sources)?;
+    let result = rows(
+        &roots,
+        &Objects::new(&[]),
+        &summaries,
+        &tags,
+        sources,
+        |root| Ok(system(sources, &root.system)),
+    )?;
     let signatures: Vec<_> = result
         .iter()
         .map(|row| {
             (
                 row.multi_config_guid.value().map(|guid| guid.0),
                 row.container.value().map(String::as_str),
-                row.system.as_str(),
+                system_name(row),
                 row.entity_count.value().copied(),
             )
         })
@@ -130,7 +139,8 @@ fn duplicate_rows_keep_the_first_placement_with_canonical_order()
     let stanton = result
         .iter()
         .find(|row| {
-            row.system == "stanton" && row.container.value().map(String::as_str) == Some("a.socpak")
+            system_name(row) == "stanton"
+                && row.container.value().map(String::as_str) == Some("a.socpak")
         })
         .ok_or("deduplicated Stanton placement")?;
     let [count] = stanton.tag_counts.as_slice() else {
@@ -144,6 +154,14 @@ fn duplicate_rows_keep_the_first_placement_with_canonical_order()
     Ok(())
 }
 
+fn system_name(row: &LootContainer) -> &str {
+    row.system.value().expect("a resolved system")
+}
+
+fn system(sources: &SourceUses, system: &str) -> SourcedValue<String> {
+    sources.value(SourceValue::Present(system.to_owned()), &[], false)
+}
+
 #[test]
 fn a_container_that_could_not_be_counted_has_no_entity_count() -> Result<(), crate::CatalogError> {
     let sources = &SourceUses::with_compact_use_refs();
@@ -153,7 +171,7 @@ fn a_container_that_could_not_be_counted_has_no_entity_count() -> Result<(), cra
     };
     let row = row(
         &placed("a.socpak", sources),
-        "stanton",
+        system(sources, "stanton"),
         None,
         Some(&failed),
         sources,
@@ -176,7 +194,7 @@ fn a_container_without_a_soc_has_zero_entities() -> Result<(), crate::CatalogErr
     };
     let row = row(
         &placed("a.socpak", sources),
-        "stanton",
+        system(sources, "stanton"),
         None,
         Some(&none),
         sources,
@@ -196,7 +214,7 @@ fn a_container_the_archive_lacks_has_no_entity_count() -> Result<(), crate::Cata
         target: PlacedTarget::VerifiedMissing,
         ..placed("a.socpak", sources)
     };
-    let row = row(&absent, "stanton", None, None, sources)?;
+    let row = row(&absent, system(sources, "stanton"), None, None, sources)?;
     assert_eq!(
         row.entity_count.state(),
         SourceValueState::Absent,

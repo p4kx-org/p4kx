@@ -19,6 +19,11 @@ use crate::starmap_index::Index;
 use crate::starmap_walk::Opened;
 use crate::{CatalogError, Kind};
 
+#[path = "loot_system_origin.rs"]
+mod system_origin;
+
+use system_origin::SystemOrigins;
+
 /// The loot containers found and what could not be read or used while looking for them.
 pub(crate) struct Located {
     pub(crate) ledger: ExportLedger,
@@ -51,7 +56,15 @@ pub(crate) fn locate(
     } = explore(archive, &index, opened, cancel, capture)?;
     let (tags, observed) = read_tags(archive, &summaries, cancel, capture)?;
     ledger.merge(observed);
-    let containers = rows(opened, objects, &summaries, &tags, capture.source_uses())?;
+    let mut systems = SystemOrigins::try_new(archive, capture)?;
+    let containers = rows(
+        opened,
+        objects,
+        &summaries,
+        &tags,
+        capture.source_uses(),
+        |root| systems.project(root),
+    )?;
     if !cancel.is_some_and(CancelToken::is_cancelled) {
         ledger.inventory(Kind::LootContainers);
     }
@@ -78,6 +91,7 @@ fn rows(
     summaries: &HashMap<usize, Summary>,
     tags: &HashMap<usize, Tags>,
     sources: &SourceUses,
+    mut system: impl FnMut(&Opened) -> Result<SourcedValue<String>, CatalogError>,
 ) -> Result<Vec<LootContainer>, CatalogError> {
     let mut reached: HashMap<usize, Vec<&Placed>> = HashMap::new();
     let mut selected = BTreeMap::new();
@@ -94,16 +108,16 @@ fn rows(
                 system: &root.system,
                 object,
             };
-            selected.entry(key).or_insert((placed, location));
+            selected.entry(key).or_insert((root, placed, location));
         }
     }
     drop(reached);
     selected
-        .into_iter()
-        .map(|(key, (placed, location))| {
+        .into_values()
+        .map(|(root, placed, location)| {
             row(
                 placed,
-                key.system,
+                system(root)?,
                 location,
                 placed.target.entry().and_then(|entry| tags.get(&entry)),
                 sources,
@@ -166,7 +180,7 @@ fn several(archive: &Archive, summaries: &HashMap<usize, Summary>) -> Vec<String
 
 fn row(
     placed: &Placed,
-    system: &str,
+    system: SourcedValue<String>,
     location: Option<CatalogGuid>,
     tags: Option<&Tags>,
     sources: &SourceUses,
@@ -192,7 +206,7 @@ fn row(
             SourceValue::Present(placed.path.clone()),
             &[&placed.path_origin],
         )?,
-        system: system.to_owned(),
+        system,
         starmap_object_guid: location,
         entity_count: count_value(placed, tags, sources)?,
         tag_counts,

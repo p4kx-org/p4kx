@@ -70,6 +70,8 @@ pub(crate) struct SystemRead {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Opened {
     pub(crate) system: Arc<str>,
+    /// The original root directory slot that supplied the system folder.
+    pub(crate) system_entry: usize,
     pub(crate) entry: usize,
     pub(crate) under: Option<Guid>,
 }
@@ -241,6 +243,7 @@ pub(crate) struct System<'a> {
     name: Arc<str>,
     name_cell: SourcedValue<HealthText>,
     root: Arc<[SourceUse]>,
+    root_slot: usize,
     root_entry: u32,
     root_reference: PhysicalEntryRef,
     capture: &'a EntryCapture<'a>,
@@ -275,6 +278,7 @@ impl System<'_> {
     fn opened(&mut self, entry: usize, path: &WalkPath) -> Result<(), CatalogError> {
         let opened = Opened {
             system: Arc::clone(&self.name),
+            system_entry: self.root_slot,
             entry,
             under: path.under,
         };

@@ -12,7 +12,7 @@ use crate::health_origin_fixture::{self as fixture, Fixture, TestResult};
 
 const CONFIG: &str = "687af3db-4c0d-4e8d-9261-102274f8b6ed";
 const ALIAS: &str = "R:/authoring/Data/ObjectContainers/PU/synthetic/alias-target.socpak";
-const LITERAL: &str = "ObjectContainers/PU/synthetic/alias-target.socpak";
+pub(super) const LITERAL: &str = "ObjectContainers/PU/synthetic/alias-target.socpak";
 const COMPETING: &str = "Data/ObjectContainers/PU/system/synthetic/competing.socpak";
 
 #[test]
@@ -201,7 +201,7 @@ fn target_with_soc(damaged: bool) -> TestEntry {
     if damaged { outer } else { outer.encrypted() }
 }
 
-fn source(
+pub(super) fn source(
     systems: impl IntoIterator<Item = TestEntry>,
     targets: impl IntoIterator<Item = TestEntry>,
 ) -> TestResult<Fixture> {
@@ -211,11 +211,11 @@ fn source(
     entries::with_starmap(members)
 }
 
-fn main_system(selector: &str) -> TestEntry {
+pub(super) fn main_system(selector: &str) -> TestEntry {
     system(ROOT, "syntheticsystem.xml", selector)
 }
 
-fn system(path: &str, descriptor: &str, selector: &str) -> TestEntry {
+pub(super) fn system(path: &str, descriptor: &str, selector: &str) -> TestEntry {
     let container = ArchiveBuilder::v2()
         .entry(TestEntry::stored(
             descriptor,
@@ -231,7 +231,7 @@ fn system(path: &str, descriptor: &str, selector: &str) -> TestEntry {
     TestEntry::stored(path, container.build())
 }
 
-fn target() -> TestEntry {
+pub(super) fn target() -> TestEntry {
     let container = TestContainer::new().entry(TestEntry::stored(
         "alias-target.xml",
         r#"<ObjectContainer version="14"/>"#,
@@ -239,7 +239,7 @@ fn target() -> TestEntry {
     TestEntry::stored(ALIAS_TARGET, container.build())
 }
 
-fn normal_catalog(source: &Fixture) -> TestResult<Value> {
+pub(super) fn normal_catalog(source: &Fixture) -> TestResult<Value> {
     let built = build_catalog_from(&source.archive, &source.entry, &fixture::options())?;
     assert!(
         built.summary().export_health().is_complete(),

@@ -76,6 +76,7 @@ impl<'a> System<'a> {
                 true,
             ),
             root: Arc::from(directory.contributions().0),
+            root_slot: entry,
             root_entry: reference.entry_index,
             root_reference: reference.clone(),
             capture,

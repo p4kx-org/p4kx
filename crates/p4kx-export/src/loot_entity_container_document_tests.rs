@@ -43,6 +43,7 @@ fn open(xmls: &[&str], targets: &[&str]) -> TestResult<(tempfile::TempDir, Archi
 fn roots() -> Vec<Opened> {
     (0..2)
         .map(|_| Opened {
+            system_entry: 0,
             system: Arc::from("synthetic"),
             entry: 0,
             under: None,

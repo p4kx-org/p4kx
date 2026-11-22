@@ -2493,6 +2493,9 @@ entity XML ranges of the selected SOC files. Failed inputs appear in export heal
 remain empty when the entity count is unavailable.
 
 `multiConfigGuid.value` retains the first valid original configuration attribute.
+`system.value` is the normalized folder of the physical main system container or the
+physical fallback container. Its origin describes the selected directory path and folder
+conversion independently from the original XML and SOC payloads.
 `container.value` retains the path of the selected Archive Entry or the original authored text.
 Each field carries its own contributing source references and encryption marker. A repaired
 path also cites the actual authored selector conversion. The declaration table retains each

@@ -129,9 +129,11 @@ fn open(dir: &Path, entries: Vec<TestEntry>) -> Archive {
 
 fn root_of(archive: &Archive, name: &str) -> Opened {
     let index = Index::new(archive);
+    let entry = index.find(&written(name)).expect("a container");
     Opened {
         system: Arc::from("t"),
-        entry: index.find(&written(name)).expect("a container"),
+        system_entry: entry,
+        entry,
         under: None,
     }
 }

@@ -30578,8 +30578,8 @@
           "description": "The `guid` of the `starmapObjects` entry the walk's root container hangs below; `null` for\nnone or an object the catalog lacks."
         },
         "system": {
-          "description": "The star system folder of the system container the walk started in.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The star system folder of the system container the walk started in."
         },
         "tagCounts": {
           "description": "How many entities of the placed container carry each tag, summed over its `.soc` files and\nordered by GUID; empty when `entityCount` is unavailable. The tags of `tagGuids` of the tagged\nconfigs select the slots.",

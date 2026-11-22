@@ -91,10 +91,7 @@ impl<'a> Index<'a> {
     pub(crate) fn systems(&self) -> Vec<(Arc<str>, usize)> {
         let mut folders: BTreeMap<&str, BTreeMap<&str, usize>> = BTreeMap::new();
         for (path, at) in &self.by_path {
-            let Some(rest) = path.strip_prefix(SYSTEM_FOLDER) else {
-                continue;
-            };
-            if let Some((folder, file)) = rest.split_once('\\')
+            if let Some((folder, file)) = system_path_parts(path)
                 && !file.contains('\\')
                 && file.ends_with(SYSTEM_SUFFIX)
             {
@@ -121,8 +118,7 @@ impl<'a> Index<'a> {
             .by_path
             .iter()
             .filter_map(|(path, at)| {
-                let rest = path.strip_prefix(SYSTEM_FOLDER)?;
-                let (folder, _) = rest.split_once('\\')?;
+                let (folder, _) = system_path_parts(path)?;
                 Some((path.as_str(), folder, *at))
             })
             .collect();
@@ -140,6 +136,11 @@ fn is_socpak(path: &str) -> bool {
         .checked_sub(SOCPAK.len())
         .and_then(|from| path.as_bytes().get(from..))
         .is_some_and(|tail| tail.eq_ignore_ascii_case(SOCPAK.as_bytes()))
+}
+
+/// Splits a normalized system directory key into its folder and relative file.
+pub(crate) fn system_path_parts(key: &str) -> Option<(&str, &str)> {
+    key.strip_prefix(SYSTEM_FOLDER)?.split_once('\\')
 }
 
 /// Returns `path` in lower case with `\` as separator and no leading separator.

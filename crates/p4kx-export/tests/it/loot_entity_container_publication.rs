@@ -20,6 +20,8 @@ mod assertions;
 mod field_origin;
 #[path = "loot_entity_container_sdk.rs"]
 mod sdk;
+#[path = "loot_container_system_origin.rs"]
+mod system_origin;
 
 const ROOT: &str = "Data/ObjectContainers/PU/system/synthetic/syntheticsystem.socpak";
 const TARGET: &str = "Data/ObjectContainers/PU/synthetic/missing.socpak";

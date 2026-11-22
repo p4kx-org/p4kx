@@ -245,7 +245,7 @@ fn loot_container_facts(catalog: &Value) -> TestResult<Vec<Value>> {
         .iter()
         .map(|row| {
             let mut facts = row.clone();
-            for field in ["multiConfigGuid", "container"] {
+            for field in ["multiConfigGuid", "container", "system"] {
                 let value = proof::at(proof::cell(row, field, "present")?, "/value")?;
                 facts
                     .get_mut(field)

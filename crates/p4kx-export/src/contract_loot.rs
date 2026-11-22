@@ -158,7 +158,7 @@ pub(crate) struct LootContainer {
     /// The path of the object container the entity places.
     pub(crate) container: SourcedValue<String>,
     /// The star system folder of the system container the walk started in.
-    pub(crate) system: String,
+    pub(crate) system: SourcedValue<String>,
     /// The `guid` of the `starmapObjects` entry the walk's root container hangs below; `null` for
     /// none or an object the catalog lacks.
     pub(crate) starmap_object_guid: Option<CatalogGuid>,

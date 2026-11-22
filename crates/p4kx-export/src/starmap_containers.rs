@@ -321,6 +321,7 @@ impl Placements {
             match index.candidates(entry.path()) {
                 [entry] => self.opened.push(Opened {
                     system,
+                    system_entry: *entry,
                     entry: *entry,
                     under: None,
                 }),
