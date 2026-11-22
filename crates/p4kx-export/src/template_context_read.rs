@@ -7,7 +7,6 @@ use std::collections::HashMap;
 use p4kx_extraction::RecordTree;
 
 use crate::catalog_projection::CatalogProjection;
-use crate::catalog_v3::tag_catalog::CapturedTags;
 use crate::export_ledger::ExportLedger;
 use crate::mission_flow_owner::FlowOwnerKind;
 use crate::source_fields::FieldCapture;
@@ -22,7 +21,7 @@ use crate::template_reference_index::TemplateReferences;
 use crate::template_source_members::TemplateMembers;
 use crate::template_spawn_projection::{TemplatePoolBinding, TemplateSpawnProjection};
 use crate::template_spawn_read::SpawnEmission;
-use crate::template_tag_cache::TemplateTagCache;
+use crate::template_tag_cache::{TemplateTagCache, TemplateTagInput};
 use crate::template_value_meaning::TemplateValueMeaning;
 use crate::template_weak_plan::TemplateWeakSelection;
 use crate::{CatalogError, CatalogReadFailure};
@@ -59,7 +58,6 @@ impl<'plan, 'fields, 'scope, 'read, 'source> ContextPlan<'plan, 'fields, 'scope,
 }
 
 pub(crate) struct ContextSources<'context, 'catalog, 'source> {
-    pub(crate) tags: &'context CapturedTags<'catalog, 'source>,
     pub(crate) tree: &'context RecordTree<'source>,
     pub(crate) projection: &'context CatalogProjection<'catalog, 'source>,
     pub(crate) unknowns: &'context crate::template_issues::Unknowns,
@@ -225,10 +223,11 @@ pub(crate) fn read<'fields, 'scope, 'read, 'source>(
     members: &TemplateMembers<'fields, 'scope, 'read, 'source>,
     references: &mut RefCell<TemplateReferences<'fields, 'scope, 'read, 'source>>,
     sources: &ContextSources<'_, '_, 'source>,
+    tags: TemplateTagInput<'_, 'source>,
     plan: &ContextPlan<'_, 'fields, 'scope, 'read, 'source>,
 ) -> Result<TemplateContext<'source>, CatalogError> {
     let kind = FlowOwnerKind::ContractTemplate;
-    let tags = TemplateTagCache::new(members.fields(), sources.tags);
+    let tags = TemplateTagCache::new(members.fields(), tags);
     let SpawnPreparation {
         spawns,
         failures: mut errors,

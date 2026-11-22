@@ -99,8 +99,7 @@ impl<'fields, 'scope, 'read, 'source> TemplateSpawns<'fields, 'scope, 'read, 'so
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         };
         let context = TemplateSpawnContext::new(fields, references, tags, Some(fact), capture)?;
-        let parsed = Reader::for_context(tags.tree(), tree, &context)
-            .and_then(|reader| reader.spawn(source));
+        let parsed = Reader::for_context(tree, &context).and_then(|reader| reader.spawn(source));
         let parsed = match parsed {
             Ok(Some(spawn)) => Ok(self.pools.register(spawn)),
             Ok(None) => return Err(ExportAccountingError::ConflictingSourceDatum.into()),

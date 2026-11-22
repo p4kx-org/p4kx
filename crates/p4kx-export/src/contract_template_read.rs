@@ -13,6 +13,7 @@ use crate::spawn_pools::SpawnPools;
 use crate::template_canonical_read;
 use crate::template_issues::Unknowns;
 use crate::template_rows::TemplateConfigurations;
+use crate::template_tag_cache::TemplateTagInput;
 use crate::{CatalogError, Kind};
 
 /// Physical Template definitions and their required context rows from the same original reads.
@@ -49,8 +50,15 @@ pub(crate) fn read<'source>(
         Kind::ContractTemplates,
         (filter, cancel, Some(inspections)),
         |record, tree| {
-            template_canonical_read::read(projection, tags, record, tree, cancel, &unknowns)
-                .map_err(|error| Box::new(error) as crate::record_read::ReadError)
+            template_canonical_read::read(
+                projection,
+                TemplateTagInput::Prepared(tags),
+                record,
+                tree,
+                cancel,
+                &unknowns,
+            )
+            .map_err(|error| Box::new(error) as crate::record_read::ReadError)
         },
         |built| {
             definitions.append(built.definition, |_| built.definition_source)?;

@@ -40,7 +40,7 @@ impl<'x, 'f> Reader<'x, 'f> {
     pub(super) fn path(&self, value: &Value<'f>) -> Option<String> {
         match value {
             Value::Reference(target) if target.location().is_none() => Some(
-                self.tags
+                self.tags?
                     .path_of(target.guid())
                     .map_or_else(|| target.guid().to_string(), str::to_owned),
             ),

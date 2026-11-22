@@ -11,14 +11,14 @@ use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
 };
 use p4kx_export::{CatalogOptions, build_catalog_from};
-use p4kx_extraction::{Archive, DataForgeEntry, Language};
-use p4kx_testkit::{
-    ArchiveBuilder, DataForgeBuilder, TestEntry, TestInstance, TestRecord, TestStruct, TestType,
-    TestValue,
-};
+use p4kx_extraction::DataForgeEntry;
 use serde_json::{Value, json};
 
 use super::{Route, TestResult};
+
+#[path = "sdk_mission_flow_fixture.rs"]
+mod fixture;
+use fixture::open;
 
 #[path = "sdk_broker_definition_route.rs"]
 mod broker_definitions;
@@ -28,23 +28,20 @@ pub(super) use broker_definitions::DATASET as BROKER_DEFINITIONS;
 mod template_definitions;
 pub(super) use template_definitions::DATASET as TEMPLATE_DEFINITIONS;
 
+#[path = "sdk_contract_template_context_route.rs"]
+mod template_contexts;
+pub(super) use template_contexts::DATASET as TEMPLATE_CONTEXTS;
+
 pub(super) const DATASET: &str = "/configurations/missionFlows";
 
 const TEMPLATE: MissionPropertyOwnerFamily = MissionPropertyOwnerFamily::ContractTemplates;
 const BROKER: MissionPropertyOwnerFamily = MissionPropertyOwnerFamily::MissionBrokerEntries;
-const TEMPLATE_TYPE: &str = "ContractTemplate";
-const BROKER_TYPE: &str = "MissionBrokerEntry";
-const FLOW: &str = "MissionFlow";
-const TRIGGER: &str = "FlowTrigger";
-const CONDITION: &str = "MissionFlowCondition";
-const PROPERTY_IS_SET: &str = "MissionFlowCondition_PropertyIsSet";
-const TARGET: &str = "FlowTarget";
 const TEMPLATE_GUID: u128 = 2;
 const NULL_TEMPLATE_GUID: u128 = 3;
 const TEMPLATE_RECORD: u32 = 1;
 const TEMPLATE_ALIAS: u32 = 2;
 
-pub(super) fn read() -> TestResult<[Route; 3]> {
+pub(super) fn read() -> TestResult<[Route; 4]> {
     let (_folder, archive) = open(NULL_TEMPLATE_GUID)?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog: Value = serde_json::from_slice(
@@ -77,7 +74,8 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
     )?;
     let templates = template_definitions::read(&parsed, &catalog)?;
     let brokers = broker_definitions::read(&parsed, &catalog)?;
-    Ok([flows, templates, brokers])
+    let contexts = template_contexts::read(&parsed, &catalog)?;
+    Ok([flows, templates, brokers, contexts])
 }
 
 fn check_owner_graphs(
@@ -248,89 +246,28 @@ fn a_physical_template_selection_retains_the_explicitly_null_alias() -> TestResu
         CatalogRecordSelection::RecordIndex(TEMPLATE_ALIAS),
     );
     parsed.with_mission_properties(alias, None, |snapshot| check_alias(&snapshot, &rows))??;
-    template_definitions::check_alias(&parsed)
-}
-
-fn open(null_template_guid: u128) -> TestResult<(tempfile::TempDir, Archive)> {
-    let folder = tempfile::tempdir()?;
-    let path = folder.path().join("mission-flow-sdk.p4k");
-    ArchiveBuilder::new()
-        .entry(TestEntry::stored("Data/Game2.dcb", database(null_template_guid)).encrypted())
-        .entry(TestEntry::stored(
-            Language::English.global_ini_path(),
-            b"fixture_broker_title=Fixture Broker title\n",
-        ))
-        .write_to(&path)?;
-    Ok((
-        folder,
-        Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?,
-    ))
-}
-
-fn database(null_template_guid: u128) -> Vec<u8> {
-    DataForgeBuilder::new()
-        .version(8)
-        .structure(TestStruct::new(TEMPLATE_TYPE).field("missionFlow", strong(FLOW)))
-        .structure(
-            TestStruct::new(BROKER_TYPE)
-                .field("missionFlow", strong(FLOW))
-                .field("title", TestType::Locale),
-        )
-        .structure(
-            TestStruct::new(FLOW)
-                .field("target", strong(TARGET))
-                .array("triggers", TestType::Class(TRIGGER.to_owned())),
-        )
-        .structure(TestStruct::new(TRIGGER).field("condition", strong(CONDITION)))
-        .structure(TestStruct::new(CONDITION))
-        .structure(
-            TestStruct::new(PROPERTY_IS_SET)
-                .parent(CONDITION)
-                .field("property", TestType::WeakPointer(TARGET.to_owned())),
-        )
-        .structure(TestStruct::new(TARGET).field("missionVariableName", TestType::String))
-        .record(
-            TestRecord::new(
-                1,
-                BROKER_TYPE,
-                "MissionBrokerEntry.Flow",
-                "libs/foundry/records/missionbroker/sdk_flow.xml",
-            )
-            .value("missionFlow", authored("broker-target"))
-            .value("title", TestValue::text("@fixture_broker_title")),
-        )
-        .record(template(TEMPLATE_GUID, "Flow", authored("template-target")))
-        .record(template(null_template_guid, "NullFlow", TestValue::Null))
-        .build()
-}
-
-fn template(guid: u128, name: &str, flow: TestValue) -> TestRecord {
-    TestRecord::new(
-        guid,
-        TEMPLATE_TYPE,
-        format!("ContractTemplate.{name}"),
-        format!("libs/foundry/records/contracts/contracttemplates/{name}.xml"),
-    )
-    .value("missionFlow", flow)
-}
-
-fn authored(target: &str) -> TestValue {
-    let property = TestInstance::new(TARGET)
-        .named(target)
-        .value("missionVariableName", TestValue::text(target));
-    let condition =
-        TestInstance::new(PROPERTY_IS_SET).value("property", TestValue::pointer(target));
-    let trigger = TestInstance::new(TRIGGER).value("condition", TestValue::Struct(condition));
-    TestValue::Struct(
-        TestInstance::new(FLOW)
-            .value("target", TestValue::Struct(property))
-            .value(
-                "triggers",
-                TestValue::Array(vec![TestValue::Struct(trigger)]),
-            ),
-    )
-}
-
-fn strong(target: &str) -> TestType {
-    TestType::StrongPointer(target.to_owned())
+    template_definitions::check_alias(&parsed)?;
+    parsed.with_contract_template_context(
+        CatalogRecordSelection::RecordIndex(TEMPLATE_ALIAS),
+        None,
+        |snapshot| -> TestResult {
+            let [row] = snapshot.rows.as_slice() else {
+                return Err("one exact context row for the shared-GUID alias".into());
+            };
+            assert_eq!(
+                row.template().record_index(),
+                TEMPLATE_ALIAS,
+                "context preserves the selected alias, despite a duplicate GUID"
+            );
+            assert!(
+                snapshot.owner(row.template()).is_some(),
+                "the query links the same physical owner"
+            );
+            assert!(
+                !snapshot.tag_ancestry_surveyed,
+                "the null alias does not visit the other Template's Tag dependency"
+            );
+            Ok(())
+        },
+    )?
 }

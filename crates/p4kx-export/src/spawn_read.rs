@@ -33,7 +33,7 @@ pub(crate) enum Spawn<'source> {
 
 /// The existing content algorithms and their optional actual-source access context.
 pub(crate) struct Reader<'tree, 'source> {
-    tags: &'tree TagTree,
+    tags: Option<&'tree TagTree>,
     root: &'tree StructValue<'source>,
     owner: u32,
     owner_guid: Guid,
@@ -45,7 +45,7 @@ impl<'tree, 'source> Reader<'tree, 'source> {
     /// Creates the interpreted reader of an existing canonical tree.
     pub(crate) const fn for_record(tags: &'tree TagTree, tree: &'tree RecordTree<'source>) -> Self {
         Self {
-            tags,
+            tags: Some(tags),
             root: tree.root(),
             owner: tree.record_index(),
             owner_guid: tree.guid(),
@@ -69,14 +69,17 @@ impl<'tree, 'source> Reader<'tree, 'source> {
 
     /// Binds actual content accesses to the checked original frame.
     pub(crate) fn for_context(
-        tags: &'tree TagTree,
         tree: &'tree RecordTree<'source>,
         context: &'tree dyn ReadContext<'source>,
     ) -> Result<Self, ReadError> {
         context.check_tree(tree)?;
         Ok(Self {
+            tags: None,
+            root: tree.root(),
+            owner: tree.record_index(),
+            owner_guid: tree.guid(),
             context: Some(context),
-            ..Self::for_record(tags, tree)
+            guard_capture: None,
         })
     }
 

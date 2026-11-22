@@ -37,10 +37,11 @@ pub(super) const DATASETS: &[&str] = &[
     mission_properties::DATASET,
     mission_flows::DATASET,
     mission_flows::TEMPLATE_DEFINITIONS,
+    mission_flows::TEMPLATE_CONTEXTS,
     mission_flows::BROKER_DEFINITIONS,
 ];
 
-pub(super) fn read() -> TestResult<[Route; 8]> {
+pub(super) fn read() -> TestResult<[Route; 9]> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("contracts.p4k");
     ArchiveBuilder::new()
@@ -70,7 +71,7 @@ pub(super) fn read() -> TestResult<[Route; 8]> {
         parsed.with_contract_generators(CatalogRecordSelection::All, None, |snapshot| {
             compare(&catalog, GENERATORS, &snapshot.rows)
         })??;
-    let [flows, templates, brokers] = mission_flows::read()?;
+    let [flows, templates, brokers, template_contexts] = mission_flows::read()?;
     Ok([
         contracts,
         titles,
@@ -80,6 +81,7 @@ pub(super) fn read() -> TestResult<[Route; 8]> {
         flows,
         templates,
         brokers,
+        template_contexts,
     ])
 }
 

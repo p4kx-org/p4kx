@@ -17,13 +17,29 @@ use crate::template_objective::{CommsTiming, ObjectiveCategory, ObjectiveState};
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(crate) enum LocalizationMeaning {
+#[schemars(transform = crate::schema_fields::compact_string_enum)]
+#[non_exhaustive]
+pub enum LocalizationMeaning {
+    /// An authored localization key was recognized.
+    #[schemars(description = "")]
     Lookup,
+    /// The original key is empty.
+    #[schemars(description = "")]
     Empty,
+    /// The original key is a placeholder.
+    #[schemars(description = "")]
     Placeholder,
+    /// The original text is not a localization key.
+    #[schemars(description = "")]
     NotKey,
+    /// The original occurrence is null.
+    #[schemars(description = "")]
     Null,
+    /// The original occurrence is another value shape.
+    #[schemars(description = "")]
     WrongShape,
+    /// The original occurrence cannot be decoded.
+    #[schemars(description = "")]
     Unreadable,
 }
 
@@ -31,11 +47,31 @@ pub(crate) enum LocalizationMeaning {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct TemplateLocalization {
+pub struct TemplateLocalization {
     pub(crate) source: SourceValueRef,
     pub(crate) interpretation: LocalizationMeaning,
     #[schemars(extend("x-gameText" = true))]
     pub(crate) text: SourcedValue<GameTextRef>,
+}
+
+impl TemplateLocalization {
+    /// Links the original value describing this localization.
+    #[must_use]
+    pub const fn source(&self) -> SourceValueRef {
+        self.source
+    }
+
+    /// Borrows the interpretation of the authored source value.
+    #[must_use]
+    pub const fn interpretation(&self) -> &LocalizationMeaning {
+        &self.interpretation
+    }
+
+    /// Borrows the protected localized text link and its source evidence.
+    #[must_use]
+    pub const fn text(&self) -> &SourcedValue<GameTextRef> {
+        &self.text
+    }
 }
 
 /// Recognized control meanings; the original label remains in its one D cell.

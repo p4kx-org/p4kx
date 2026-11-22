@@ -12,9 +12,23 @@ use crate::source_value_catalog::SourceValueRef;
 #[derive(Debug, Clone, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct PhysicalTemplateRef {
+pub struct PhysicalTemplateRef {
     pub(crate) input_ref: PhysicalSourceRef,
     pub(crate) record_index: u32,
+}
+
+impl PhysicalTemplateRef {
+    /// Identifies the decoded DataForge Entry that owns this Template.
+    #[must_use]
+    pub const fn input_ref(&self) -> &PhysicalSourceRef {
+        &self.input_ref
+    }
+
+    /// Returns the original Record position in the owning DataForge Entry.
+    #[must_use]
+    pub const fn record_index(&self) -> u32 {
+        self.record_index
+    }
 }
 
 /// A source field stored once at an arena root or in an original Struct.

@@ -19,12 +19,44 @@ use crate::template_source_refs::{PhysicalTemplateRef, SourceFieldRef};
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct TemplateProjection<'source> {
+pub struct TemplateProjection<'source> {
     pub(crate) template: PhysicalTemplateRef,
     pub(crate) inputs: TemplateInputs,
     pub(crate) title: Option<SourceValueRef>,
     #[serde(flatten)]
     pub(crate) context: MissionContext<'source>,
+}
+
+impl TemplateProjection<'_> {
+    /// Links the original physical Template and its shared arena.
+    #[must_use]
+    pub const fn template(&self) -> &PhysicalTemplateRef {
+        &self.template
+    }
+
+    /// Links the original title source value, when present.
+    #[must_use]
+    pub const fn title(&self) -> Option<SourceValueRef> {
+        self.title
+    }
+
+    /// Borrows the canonical contextual objective selection.
+    #[must_use]
+    pub fn objectives(&self) -> &[TemplateObjectiveProjection] {
+        &self.context.objectives
+    }
+
+    /// Borrows contextual selections that interpret original Tag references.
+    #[must_use]
+    pub fn tag_paths(&self) -> &[TemplateTagProjection] {
+        &self.context.tag_paths
+    }
+
+    /// Borrows the original localization links and their lookup states.
+    #[must_use]
+    pub fn localizations(&self) -> &[TemplateLocalization] {
+        &self.context.localizations
+    }
 }
 
 /// Contextual bindings and meaning shared by physical Template and Broker owners.
@@ -53,34 +85,100 @@ pub(crate) struct MissionContext<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct TemplateObjectiveProjection {
+pub struct TemplateObjectiveProjection {
     pub(crate) source: SourceValueRef,
     pub(crate) parent: Option<SourceValueRef>,
     pub(crate) id: SourceFieldRef,
+}
+
+impl TemplateObjectiveProjection {
+    /// Links this original objective into the owner arena.
+    #[must_use]
+    pub const fn source(&self) -> SourceValueRef {
+        self.source
+    }
+
+    /// Links the containing objective when nested.
+    #[must_use]
+    pub const fn parent(&self) -> Option<SourceValueRef> {
+        self.parent
+    }
+
+    /// Links the original objective ID declaration.
+    #[must_use]
+    pub const fn id(&self) -> SourceFieldRef {
+        self.id
+    }
 }
 
 /// The actual lookup decision independently of the original reference cell's state.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-pub(crate) enum TemplateTagInterpretation {
+#[schemars(transform = crate::schema_fields::compact_string_enum)]
+#[non_exhaustive]
+pub enum TemplateTagInterpretation {
+    /// The original reference resolves to a selected Tag path.
+    #[schemars(description = "")]
     Path,
+    /// The Tag is absent from a complete inventory and the GUID is retained.
+    #[schemars(description = "")]
     GuidFallback,
+    /// The original reference is an owner-local location.
+    #[schemars(description = "")]
     Inapplicable,
+    /// The original Tag reference is dangling.
+    #[schemars(description = "")]
     Unresolved,
+    /// The original occurrence is null.
+    #[schemars(description = "")]
     Null,
+    /// The original occurrence is another value shape.
+    #[schemars(description = "")]
     WrongShape,
+    /// The original occurrence cannot be decoded.
+    #[schemars(description = "")]
     Unreadable,
+    /// The Tag inventory cannot prove the requested absence.
+    #[schemars(description = "")]
     Unavailable,
 }
 
+/// A contextual interpretation of an original Template Tag reference.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(transform = every_field_required)]
-pub(crate) struct TemplateTagProjection {
+#[schemars(description = "", transform = every_field_required)]
+pub struct TemplateTagProjection {
     pub(crate) source: SourceValueRef,
     pub(crate) interpretation: TemplateTagInterpretation,
     pub(crate) path: ContextualTagPath,
+}
+
+impl TemplateTagProjection {
+    /// Links the owning Template's original Tag operand.
+    #[must_use]
+    pub const fn source(&self) -> SourceValueRef {
+        self.source
+    }
+
+    /// Borrows the result of interpreting that operand.
+    #[must_use]
+    pub const fn interpretation(&self) -> &TemplateTagInterpretation {
+        &self.interpretation
+    }
+
+    /// Returns the sourced path and its actual original ancestry.
+    ///
+    /// # Errors
+    /// Returns a source accounting error if the lineage cannot be reconstructed.
+    pub fn path(
+        &self,
+    ) -> Result<
+        std::borrow::Cow<'_, SourcedValue<crate::catalog_v3::tag_catalog::OriginalTagPath>>,
+        crate::CatalogError,
+    > {
+        self.path.sourced()
+    }
 }
 
 #[derive(Debug, Serialize, JsonSchema)]

@@ -32,6 +32,40 @@ pub(crate) fn read_declaration<'source>(
     relations: Option<&mut TagRelationReceipts>,
     cancel: Option<&CancelToken>,
 ) -> Result<Read<'source>, CatalogError> {
+    let result = read_parts(tree, input, admission, relations, cancel, true)?;
+    Ok(Read {
+        row: result
+            .row
+            .ok_or(crate::ExportAccountingError::ConflictingTagTrace)?,
+        notes: result.notes,
+        path_name: result.path_name,
+    })
+}
+
+pub(super) fn read_path_name<'source>(
+    tree: &RecordTree<'source>,
+    input: &OriginalCatalogInput<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    relations: &mut TagRelationReceipts,
+    cancel: Option<&CancelToken>,
+) -> Result<Option<NameEvidence>, CatalogError> {
+    Ok(read_parts(tree, input, admission, Some(relations), cancel, false)?.path_name)
+}
+
+struct Parts<'source> {
+    row: Option<Declaration<'source>>,
+    notes: Vec<FieldError>,
+    path_name: Option<NameEvidence>,
+}
+
+fn read_parts<'source>(
+    tree: &RecordTree<'source>,
+    input: &OriginalCatalogInput<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    relations: Option<&mut TagRelationReceipts>,
+    cancel: Option<&CancelToken>,
+    project_rows: bool,
+) -> Result<Parts<'source>, CatalogError> {
     let context = input.origins().record(tree.record_index());
     let scope = input.record_scope(admission.record(), tree)?;
     let original = OriginalFlowFields::read(&scope, cancel)?;
@@ -46,23 +80,56 @@ pub(crate) fn read_declaration<'source>(
         };
         relations.capture(edge, tree, &original, capture.example_body())?;
     }
+    if !project_rows {
+        let mut notes = Vec::new();
+        let path_name = if is_database {
+            None
+        } else {
+            Some(fields::name(&fields, &original, &mut notes)?.1)
+        };
+        return Ok(Parts {
+            row: None,
+            notes,
+            path_name,
+        });
+    }
+    project(
+        tree,
+        input,
+        admission,
+        &fields,
+        &original,
+        is_database,
+        cancel,
+    )
+}
+
+fn project<'source>(
+    tree: &RecordTree<'source>,
+    input: &OriginalCatalogInput<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    fields: &CatalogFields<'_, 'source, '_>,
+    original: &OriginalFlowFields<'_, '_, 'source>,
+    is_database: bool,
+    cancel: Option<&CancelToken>,
+) -> Result<Parts<'source>, CatalogError> {
     let mut notes = Vec::new();
     let (row, path_name) = if is_database {
         fields.check_observed(&["tags"], &mut notes)?;
         let row = TagRoots {
             source: header::read(tree, input.origins())?,
-            tags: fields::references(&fields, "tags", &mut notes, cancel)?,
+            tags: fields::references(fields, "tags", &mut notes, cancel)?,
         };
         (Declaration::Roots(row), None)
     } else {
         fields.check_observed(&["tagName", "legacyGUID", "children"], &mut notes)?;
-        let (tag_name, name) = fields::name(&fields, &original, &mut notes)?;
-        let legacy_guid = fields::legacy_guid(&fields, &mut notes)?;
+        let (tag_name, name) = fields::name(fields, original, &mut notes)?;
+        let legacy_guid = fields::legacy_guid(fields, &mut notes)?;
         let row = TagDefinition {
             source: header::read(tree, input.origins())?,
             tag_name,
             legacy_guid,
-            children: fields::references(&fields, "children", &mut notes, cancel)?,
+            children: fields::references(fields, "children", &mut notes, cancel)?,
         };
         (Declaration::Definition(row), Some(name))
     };
@@ -80,8 +147,8 @@ pub(crate) fn read_declaration<'source>(
             )?),
         );
     }
-    Ok(Read {
-        row,
+    Ok(Parts {
+        row: Some(row),
         notes,
         path_name,
     })

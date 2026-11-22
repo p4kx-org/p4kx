@@ -17,7 +17,7 @@ use crate::spawn_read::Reader;
 use crate::template_field_capture::TemplateFieldCapture;
 use crate::template_reference_index::TemplateReferences;
 use crate::template_spawn_context::TemplateSpawnContext;
-use crate::template_tag_cache::TemplateTagCache;
+use crate::template_tag_cache::{TemplateTagCache, TemplateTagInput};
 
 /// Runs the existing template dependency recipe against its genuine original positions.
 pub(crate) fn read<'source>(
@@ -30,9 +30,9 @@ pub(crate) fn read<'source>(
 ) -> Result<Level, ReadError> {
     let capture = TemplateFieldCapture::new(fields, input, admission)?;
     let references = RefCell::new(TemplateReferences::new(fields));
-    let tag_cache = TemplateTagCache::new(fields, tags);
+    let tag_cache = TemplateTagCache::new(fields, TemplateTagInput::Prepared(tags));
     let context = TemplateSpawnContext::new(fields, &references, &tag_cache, None, &capture)?;
-    let reader = Reader::for_context(tags.tree(), tree, &context)?;
+    let reader = Reader::for_context(tree, &context)?;
     Level::read(
         SpawnLevel::Template,
         &reader,

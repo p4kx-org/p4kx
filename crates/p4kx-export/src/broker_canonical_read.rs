@@ -28,7 +28,7 @@ use crate::template_meanings::{FlowMeanings, PreparedFlow};
 use crate::template_plan::TemplatePlan;
 use crate::template_reference_index::TemplateReferences;
 use crate::template_spawn_read::TemplateSpawns;
-use crate::template_tag_cache::TemplateTagCache;
+use crate::template_tag_cache::{TemplateTagCache, TemplateTagInput};
 use crate::{CatalogError, CatalogReadFailure};
 
 const FAMILY: FlowOwnerKind = FlowOwnerKind::MissionBrokerEntry;
@@ -72,14 +72,13 @@ pub(crate) fn read<'source>(
         mut references,
     } = PreparedOwner::read(&fields, &capture, FAMILY)?;
     let environment = ContextSources {
-        tags: sources.tags,
         tree,
         projection: sources.projection,
         unknowns: sources.unknowns,
         capture: &capture,
     };
     let context = ContextPlan::from_plan(&plan);
-    let tags = TemplateTagCache::new(&fields, sources.tags);
+    let tags = TemplateTagCache::new(&fields, TemplateTagInput::Prepared(sources.tags));
     let mut spawns = TemplateSpawns::new(&fields);
     let root = root_spawns(&mut spawns, &references, &tags, &environment, &context)
         .err()

@@ -15,7 +15,20 @@ impl<'source> OriginalReferenceObservation<'_, '_, '_, 'source> {
         &self,
         tags: &CapturedTags<'_, 'source>,
     ) -> Result<TagPathLookup, CatalogError> {
-        let mut lookup = tags.lookup(self)?;
+        self.finish_tag_path(tags.lookup(self)?)
+    }
+
+    pub(crate) fn local_tag_path(&self) -> Result<TagPathLookup, CatalogError> {
+        if self.reference().location().is_none() {
+            return Err(crate::ExportAccountingError::ConflictingTagTrace.into());
+        }
+        self.finish_tag_path(TagPathLookup::Ready {
+            meaning: TagPathMeaning::Inapplicable,
+            value: TagDatum::local(SourceValue::Absent, Vec::new(), true),
+        })
+    }
+
+    fn finish_tag_path(&self, mut lookup: TagPathLookup) -> Result<TagPathLookup, CatalogError> {
         let (meaning, datum) = match &mut lookup {
             TagPathLookup::Ready { meaning, value } => (*meaning, value),
             TagPathLookup::Unavailable { value } => (TagPathMeaning::Path, value),

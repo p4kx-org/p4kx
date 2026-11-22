@@ -9,7 +9,6 @@ use crate::catalog_rows::mission_definitions::DefinitionSource;
 use crate::catalog_template_modules::{
     mission_owner_definition::MissionOwnerDefinition, template_prepared_owner::PreparedOwner,
 };
-use crate::catalog_v3::tag_catalog::CapturedTags;
 use crate::export_ledger::ExportLedger;
 use crate::mission_flow_owner::FlowOwnerKind;
 use crate::record_observation::RecordObservation;
@@ -21,6 +20,7 @@ use crate::template_field_capture::TemplateFieldCapture;
 use crate::template_issues::Unknowns;
 use crate::template_number_capture::TemplateNumbers;
 use crate::template_projection::TemplateProjection;
+use crate::template_tag_cache::TemplateTagInput;
 use crate::{CatalogError, CatalogReadFailure};
 
 /// One complete D owner and its separate required C interpretations.
@@ -37,7 +37,7 @@ pub(crate) struct CanonicalTemplate<'source> {
 
 pub(crate) fn read<'source>(
     projection: &CatalogProjection<'_, 'source>,
-    tags: &CapturedTags<'_, 'source>,
+    tags: TemplateTagInput<'_, 'source>,
     record: &Record<'source>,
     tree: &RecordTree<'source>,
     cancel: Option<&CancelToken>,
@@ -62,12 +62,12 @@ pub(crate) fn read<'source>(
         &members,
         &mut references,
         &ContextSources {
-            tags,
             tree,
             projection,
             unknowns,
             capture: &capture,
         },
+        tags,
         &ContextPlan::from_plan(&plan),
     )?;
     let (source, flow_failure) = crate::template_meanings::read(

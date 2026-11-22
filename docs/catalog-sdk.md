@@ -691,6 +691,20 @@ The Broker arena also retains authored title keys, reward references, standing
 requirements and spawn data. The catalog's `configurations.missionBrokerEntries`
 table gives the separately interpreted Broker context.
 
+Use `contract_template_context::with_contract_template_context` or its decoded-Entry
+and session forms for `configurations.contractTemplates`. Select by physical Record
+index, GUID, or the complete Template family. The context row's `template()` points
+to the original owner returned by `snapshot.owner()`. Resolve its title, objective,
+Tag and localization bindings against that owner's source arena.
+
+This query interprets the selected Templates and their reached Record dependencies.
+It reads the requested available locales for admitted owners and returns the protected
+text rows registered by those owners. An actual external Tag reference starts one
+canonical Tag-domain ancestry survey. Local, null and dangling references preserve
+their original states. Check selection omissions and partial reads in `coverage` and
+the separate contextual and Tag failure lists. A readable owner can retain a partial
+context row in the query and in a diagnostic Catalog.
+
 Scenario rows expose the original field arena. Module rows expose exact module type, property,
 location acquisition, spawn and variable declarations. The typed views preserve original slot
 order and reference states. References use target header evidence and leave target bodies

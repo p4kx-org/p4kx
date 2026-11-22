@@ -85,6 +85,8 @@ pub mod tags;
 
 /// Canonical mining globals and refining processes without world discovery.
 pub use mining_definitions::process_api as mining;
+#[path = "contract_template_context_query.rs"]
+pub mod contract_template_context;
 #[path = "location_entity_query.rs"]
 mod location_entity_declarations;
 #[path = "location_vocabulary_query.rs"]

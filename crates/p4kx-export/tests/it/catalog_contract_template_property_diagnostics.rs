@@ -5,8 +5,11 @@
 
 use std::time::{Duration, UNIX_EPOCH};
 
+use p4kx_export::catalog_queries::contract_template_context::with_contract_template_context;
+use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_export::{
-    BuiltCatalog, CatalogOptions, CatalogPublicationMode, CraftingWarning, build_catalog,
+    BuiltCatalog, CatalogError, CatalogOptions, CatalogPublicationMode, CraftingWarning,
+    build_catalog,
 };
 use p4kx_extraction::Archive;
 use serde_json::Value;
@@ -45,7 +48,73 @@ fn readable_phases_and_flow_survive_while_unknown_struct_failures_stay_explicit(
     );
     crate::template_phase_legacy::output(&catalog, &phases)?;
     crate::template_fixture_deep_flow::check(&catalog)?;
+    check_partial_context(&archive, &catalog)?;
+    assert!(
+        matches!(
+            build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH)),
+            Err(CatalogError::IncompleteExport(_))
+        ),
+        "normal publication still refuses a failed required contextual interpretation"
+    );
     Ok(())
+}
+
+fn check_partial_context(archive: &Archive, catalog: &Value) -> TestResult {
+    let path = "/definitions/contractTemplates/rows";
+    let rows = catalog
+        .pointer(path)
+        .and_then(Value::as_array)
+        .ok_or("original Template rows")?;
+    let owner = rows
+        .iter()
+        .find(|row| {
+            row.pointer("/recordPath/value")
+                .and_then(Value::as_str)
+                .is_some_and(|name| name.ends_with("/unknown_flow"))
+        })
+        .ok_or("the physical failed contextual owner")?;
+    let index = owner
+        .pointer("/recordIndex/value")
+        .and_then(Value::as_u64)
+        .ok_or("original Record index")?;
+    let contexts = catalog
+        .pointer("/configurations/contractTemplates/rows")
+        .and_then(Value::as_array)
+        .ok_or("diagnostic contextual rows")?;
+    let expected = contexts
+        .iter()
+        .find(|row| row.pointer("/template/recordIndex").and_then(Value::as_u64) == Some(index))
+        .ok_or("retained contextual row")?;
+    with_contract_template_context(
+        archive,
+        CatalogRecordSelection::RecordIndex(u32::try_from(index)?),
+        CatalogLanguageSelection::AllAvailable,
+        None,
+        |snapshot| -> TestResult {
+            let [row] = snapshot.rows.as_slice() else {
+                return Err("one retained contextual row".into());
+            };
+            assert_eq!(
+                &serde_json::to_value(row)?,
+                expected,
+                "partial SDK context matches its diagnostic producer row"
+            );
+            assert!(
+                snapshot.owner(row.template()).is_some(),
+                "original owner remains available"
+            );
+            assert_eq!(
+                snapshot.coverage.incomplete_fields,
+                [row.template().record_index()],
+                "the retained row reports failed required interpretation"
+            );
+            assert!(
+                !snapshot.contextual_failures.is_empty(),
+                "the actual read failure remains visible"
+            );
+            Ok(())
+        },
+    )?
 }
 
 const ORGANIZATION: &str =
