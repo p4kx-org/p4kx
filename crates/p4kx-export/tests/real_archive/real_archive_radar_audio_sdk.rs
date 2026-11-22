@@ -11,12 +11,12 @@ use crate::real_archive_catalog_table_parity::{
 };
 use crate::real_archive_verification::print_line;
 
-const RADAR: &str = "/configurations/radarAudio";
+pub(crate) const TABLES: [&str; 1] = ["/configurations/radarAudio"];
 
 #[test]
 #[ignore = "same Build: set P4KX_DATA_P4K and P4KX_CATALOG_MEASUREMENT_DIR"]
 fn installed_radar_audio_sdk_matches_the_same_complete_catalog() -> TestResult {
-    let counts = verify_tables([RADAR], read_sdk)?;
+    let counts = verify_tables(TABLES, read_sdk)?;
     let [radar] = counts.rows;
     print_line(&format!(
         "radar audio SDK parity: rows={radar} sourceUses={} physicalSources={}",
@@ -25,7 +25,7 @@ fn installed_radar_audio_sdk_matches_the_same_complete_catalog() -> TestResult {
     Ok(())
 }
 
-fn read_sdk(archive: &Archive, origins: &mut Origins) -> TestResult<[Table; 1]> {
+pub(crate) fn read_sdk(archive: &Archive, origins: &mut Origins) -> TestResult<[Table; 1]> {
     let sdk = read_radar_audio(archive, RadarAudioSelection::All, None)?;
     let rows = sdk.rows.len();
     let entries = sdk.entries;
