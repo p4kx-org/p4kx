@@ -202,6 +202,21 @@ jobs:
           name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-1
           path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/*/01/*
           if-no-files-found: error
+      - name: Observe the original ARM64 MSI Registry capture
+        id: msi-passive-checkpoint
+        if: ${{ always() && !cancelled() && matrix.arch == 'arm64' && steps.msi-launch.outcome == 'success' && env.P4KX_MSI_OBSERVER_FINISHED != 'true' }}
+        timeout-minutes: 1
+        continue-on-error: true
+        run: .github/scripts/invoke-msi-observer.ps1 -Stage Snapshot -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -Sequence 2 -WaitMilliseconds 0 -OriginalRawBoundary
+      - name: Upload the original ARM64 MSI Registry capture checkpoint
+        if: ${{ always() && !cancelled() && steps.msi-passive-checkpoint.outcome != 'skipped' }}
+        timeout-minutes: 1
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-2
+          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/*/02/*
+          if-no-files-found: error
       - name: Finish the original native MSI lifecycle
         id: msi-finish
         if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' }}

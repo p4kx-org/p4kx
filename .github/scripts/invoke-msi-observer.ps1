@@ -6,9 +6,10 @@ param(
     [ValidateRange(1,9)][int]$Sequence=1,
     [ValidateRange(0,75000)][int]$WaitMilliseconds=75000,
     [ValidateRange(1,100000)][int]$ControlMilliseconds=10000,
-    [switch]$ScheduledDelay
+    [switch]$ScheduledDelay, [switch]$OriginalRawBoundary
 )
 $ErrorActionPreference = 'Stop'
+if ($OriginalRawBoundary -and $Stage -cne 'Snapshot') { throw 'Original raw capture requires a passive snapshot.' }
 if ($ScheduledDelay -and ($Stage -cne 'Snapshot' -or $Sequence -ne 2 -or $WaitMilliseconds -ne 0)) {
     throw 'The split wait applies only to the zero-wait checkpoint 2 snapshot.'
 }
@@ -27,7 +28,7 @@ if ($Stage -ceq 'Delay') {
 }
 if ($Stage -ceq 'Snapshot') {
     . (Join-Path $PSScriptRoot 'msi-observer-snapshot-caller.ps1')
-    Invoke-P4kxMsiObserverSnapshot $Directory $Sequence $WaitMilliseconds -ScheduledDelay:$ScheduledDelay
+    Invoke-P4kxMsiObserverSnapshot $Directory $Sequence $WaitMilliseconds -ScheduledDelay:$ScheduledDelay -OriginalRawBoundary:$OriginalRawBoundary
     return
 }
 . (Join-Path $PSScriptRoot 'msi-observer-evidence.ps1')

@@ -3,7 +3,7 @@ param(
     [string]$SourceDirectory=$PSScriptRoot
 )
 $ErrorActionPreference='Stop'
-. (Join-Path $SourceDirectory 'msi-diagnostic-phase.ps1')
+. (Join-Path $SourceDirectory 'msi-observer-evidence.ps1')
 if(Test-Path -LiteralPath $Directory){throw 'Journal encoding fixture directory must be new.'}
 New-Item -ItemType Directory -Path $Directory -Force | Out-Null
 $utf8=[Text.UTF8Encoding]::new($false,$true)
@@ -64,6 +64,38 @@ $cases=@(
         Assert-JournalEncoding ($actual.present -and -not $actual.complete -and $actual.events -eq 2 -and $actual.active.Count -eq 2 -and $actual.active -ccontains 'worker' -and $actual.active -ccontains 'fixture/read' -and $null -eq $actual.terminal) 'Incomplete trailing UTF8 changed the actual open-scope contract.'
         $missing=Read-P4kxMsiPhaseJournal (Join-Path $Directory 'missing.jsonl')
         Assert-JournalEncoding (-not $missing.present -and -not $missing.complete -and $missing.events -eq 0) 'Missing journal changed its original observation.'
+    }},
+    @{name='passive-original-raw-checkpoint';action={
+        $root=Join-Path $Directory 'passive-checkpoint'
+        $diagnostics=Join-Path $root 'original/diagnostics'
+        New-Item -ItemType Directory -Force -Path $diagnostics | Out-Null
+        $context=New-P4kxMsiPhaseContext $diagnostics $target
+        $worker=Start-P4kxMsiPhase $context 'worker'
+        $capture=Start-P4kxMsiPhase $context 'preamble/original-raw'
+        $before=Read-P4kxMsiOriginalRawBoundary $context.journal $target
+        Assert-JournalEncoding ($before.status -ceq 'notObserved') 'Opening the registry capture must not be counted as reaching its boundary.'
+        Stop-P4kxMsiPhase $context $capture
+        $prefix=[IO.File]::ReadAllText($context.journal,$utf8)
+        [IO.File]::WriteAllText($context.journal,$prefix.TrimEnd([char]10),$utf8)
+        $partial=Read-P4kxMsiOriginalRawBoundary $context.journal $target
+        Assert-JournalEncoding ($partial.status -ceq 'notObserved' -and -not $partial.journal.complete) 'An uncommitted last line must not prove the raw capture.'
+        [IO.File]::WriteAllText($context.journal,$prefix,$utf8)
+        $request=@{directory=$root;output_directory=(Join-Path $root 'original');target=$target;mode='Lifecycle'}
+        $handle=@{request_sha256='synthetic-journal-fixture'}
+        $state=@{state='running';lifetime_ended=$false}
+        $writer=[IO.File]::Open($context.journal,[IO.FileMode]::Append,[IO.FileAccess]::Write,[IO.FileShare]::Read)
+        try {
+            $checkpoint=Save-P4kxMsiObserverCheckpoint $request $handle 2 $state -OriginalRawBoundary
+        } finally { $writer.Dispose() }
+        Stop-P4kxMsiPhase $context $worker
+        $actual=Read-P4kxDetachedReceipt (Join-Path $checkpoint 'checkpoint.json')
+        Assert-JournalEncoding ($actual.original_raw_capture -ceq 'reached' -and $actual.journal.events -eq 3 -and
+            $actual.journal.active -ccontains 'worker' -and $actual.completed_success -eq $false -and
+            $actual.native_completion_unproven -eq $true -and $actual.mutation_authority -eq $false) 'The shared writer checkpoint must retain the copied boundary without claiming lifecycle proof.'
+        $other=if($target -ceq 'x86_64-pc-windows-msvc'){'aarch64-pc-windows-msvc'}else{'x86_64-pc-windows-msvc'}
+        $refused=$false
+        try{Read-P4kxMsiOriginalRawBoundary (Join-Path $checkpoint 'phase-journal.jsonl') $other | Out-Null}catch{$refused=$true}
+        Assert-JournalEncoding $refused 'A foreign target must not prove the original capture boundary.'
     }},
     @{name='exact-one-mib-cap';action={
         $source=New-JournalEncodingFixture 'cap-original' 1023

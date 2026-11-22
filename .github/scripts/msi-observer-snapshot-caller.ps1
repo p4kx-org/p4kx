@@ -27,7 +27,7 @@ function Invoke-P4kxMsiObserverSnapshot {
         [ValidateRange(1,9)][int]$Sequence,
         [ValidateRange(0,75000)][int]$WaitMilliseconds,
         [ValidateRange(1,100000)][int]$MaximumMilliseconds=100000,
-        [switch]$ScheduledDelay
+        [switch]$ScheduledDelay, [switch]$OriginalRawBoundary
     )
     $console=New-P4kxMsiSnapshotConsole -Sequence $Sequence
     Write-P4kxMsiSnapshotConsoleMarker $console 'caller' 'begin'
@@ -35,6 +35,12 @@ function Invoke-P4kxMsiObserverSnapshot {
     $progress={param([string]$Stream,[string]$Chunk); & $receive $console $Stream $Chunk}.GetNewClosure()
     if ($ScheduledDelay -and ($Sequence -ne 2 -or $WaitMilliseconds -ne 0)) {
         throw 'Scheduled capture only supports a zero-wait checkpoint 2.'
+    }
+    if ($OriginalRawBoundary) {
+        if ($Sequence -ne 2 -or $WaitMilliseconds -ne 0 -or $ScheduledDelay) {
+            throw 'Original raw capture requires the zero-wait passive checkpoint 2.'
+        }
+        $MaximumMilliseconds = [Math]::Min($MaximumMilliseconds, 15000)
     }
     $window=$null;$budget=$null
     if (-not $ScheduledDelay) { $budget=Get-P4kxMsiSnapshotBudget $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC $MaximumMilliseconds }
@@ -50,6 +56,10 @@ function Invoke-P4kxMsiObserverSnapshot {
     if ($ScheduledDelay) { $record.scheduled_delay=$true;$record.refusal=$null }
     $worker=Join-Path $PSScriptRoot 'msi-observer-snapshot-worker.ps1'
     $arguments=@('-NoLogo','-NoProfile','-NonInteractive','-File',$worker,'-Directory',$root,'-Sequence',[string]$Sequence,'-WaitMilliseconds',[string]$WaitMilliseconds)
+    if ($OriginalRawBoundary) {
+        $record.original_raw_boundary = $true
+        $arguments += '-OriginalRawBoundary'
+    }
     $observation=@{};$result=$null;$failure=$null
     $timer=[Diagnostics.Stopwatch]::StartNew()
     $admitted=$false

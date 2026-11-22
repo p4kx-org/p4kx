@@ -77,7 +77,26 @@ Assert-FeedbackWorkflow ([string]::Join([char]10,$startPaths) -ceq [string]::Joi
 Assert-FeedbackWorkflow ($verify.IndexOf($installer,[StringComparison]::Ordinal) -lt $verify.IndexOf($observerStart,[StringComparison]::Ordinal) -and
     $verify.IndexOf($observerStart,[StringComparison]::Ordinal) -lt $verify.IndexOf($firstCheckpoint,[StringComparison]::Ordinal)) 'Original launch receipts must upload before the first snapshot.'
 $firstUpload=Get-FeedbackWorkflowStep $verify 'Upload original MSI phase checkpoint 1'
+$passive=Get-FeedbackWorkflowStep $verify 'Observe the original ARM64 MSI Registry capture'
+$passiveUpload=Get-FeedbackWorkflowStep $verify 'Upload the original ARM64 MSI Registry capture checkpoint'
 $finalUpload=Get-FeedbackWorkflowStep $verify 'Upload final original MSI lifecycle evidence'
+Assert-FeedbackWorkflow ($passive.Contains('id: msi-passive-checkpoint') -and
+    $passive.Contains("matrix.arch == 'arm64' && steps.msi-launch.outcome == 'success'") -and
+    $passive.Contains('invoke-msi-observer.ps1 -Stage Snapshot') -and
+    $passive.Contains('-Sequence 2 -WaitMilliseconds 0 -OriginalRawBoundary') -and
+    $passive -cmatch '(?m)^        timeout-minutes: 1\r?$' -and
+    $passive -cmatch '(?m)^        continue-on-error: true\r?$') 'The original Registry observation must stay optional, ARM64-only and bound to the already admitted lifecycle.'
+Assert-FeedbackWorkflow ($passiveUpload.Contains("always() && !cancelled() && steps.msi-passive-checkpoint.outcome != 'skipped'") -and
+    $passiveUpload.Contains('name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-2') -and
+    $passiveUpload -cmatch '(?m)^          path: \$\{\{ env.P4KX_PACKAGE_TASK \}\}/installer-check/observer/\*/02/\*\r?$' -and
+    $passiveUpload -cmatch '(?m)^        timeout-minutes: 1\r?$' -and
+    $passiveUpload -cmatch '(?m)^        continue-on-error: true\r?$') 'An optional unique upload must preserve the bounded passive evidence even if its observation fails.'
+Assert-FeedbackWorkflow ($verify.IndexOf($firstUpload,[StringComparison]::Ordinal) -lt $verify.IndexOf($passive,[StringComparison]::Ordinal) -and
+    $verify.IndexOf($passive,[StringComparison]::Ordinal) -lt $verify.IndexOf($passiveUpload,[StringComparison]::Ordinal) -and
+    $verify.IndexOf($passiveUpload,[StringComparison]::Ordinal) -lt $verify.IndexOf($observerFinish,[StringComparison]::Ordinal)) 'The durable passive observation belongs between the unchanged immediate upload and final lifecycle gate.'
+$snapshotWorker=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/scripts/msi-observer-snapshot-worker.ps1')
+Assert-FeedbackWorkflow ($snapshotWorker -cmatch 'if \(-not \$OriginalRawBoundary -and -not \$state\.lifetime_ended[^\r\n]+\) \{\r?\n[^\r\n]+\r?\n\s+\$state=Stop-P4kxMsiObserverExpiredParent' -and
+    $snapshotWorker -cmatch 'if \(-not \$OriginalRawBoundary -and \$state\.lifetime_ended -and \$env:GITHUB_ENV\)') 'The passive observer must never signal the original parent or change its workflow state.'
 Assert-FeedbackWorkflow ($firstCheckpoint.Contains('id: msi-checkpoint-1') -and
     $firstCheckpoint.Contains("always() && !cancelled() && steps.msi-launch.outcome == 'success'") -and
     $firstCheckpoint.Contains("env.P4KX_MSI_OBSERVER_FINISHED != 'true'") -and
@@ -93,7 +112,7 @@ Assert-FeedbackWorkflow ($observerFinish.Contains('id: msi-finish') -and
     $finalUpload.Contains('name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-final') -and
     $finalUpload.Contains('if-no-files-found: error') -and $finalUpload -cmatch '(?m)^        timeout-minutes: 1\r?$' -and
     -not $finalUpload.Contains('continue-on-error')) 'Final original lifecycle evidence requires a bounded upload after the original Finish.'
-foreach ($evidenceUpload in @($firstUpload,$finalUpload)) {
+foreach ($evidenceUpload in @($firstUpload,$passiveUpload,$finalUpload)) {
     Assert-FeedbackWorkflow ($evidenceUpload.Contains('actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9') -and
         -not ($evidenceUpload -match '(?m)^        (run|env):')) 'Observer evidence must use the pinned upload action.'
 }
@@ -107,7 +126,7 @@ Assert-FeedbackWorkflow ($verify.IndexOf($firstCheckpoint,[StringComparison]::Or
     $verify.IndexOf($firstUpload,[StringComparison]::Ordinal) -lt $verify.IndexOf($observerFinish,[StringComparison]::Ordinal) -and
     $verify.IndexOf($observerFinish,[StringComparison]::Ordinal) -lt $verify.IndexOf($finalUpload,[StringComparison]::Ordinal) -and
     $verify.IndexOf($finalUpload,[StringComparison]::Ordinal) -lt $verify.IndexOf('      - name: Record executed release payload evidence',[StringComparison]::Ordinal)) 'Original lifecycle acceptance must follow the immediate observation and precede final runtime publication.'
-Assert-FeedbackWorkflow (([regex]::Matches($verify,'invoke-msi-observer\.ps1 -Stage Snapshot').Count -eq 1) -and
+Assert-FeedbackWorkflow (([regex]::Matches($verify,'invoke-msi-observer\.ps1 -Stage Snapshot').Count -eq 2) -and
     -not ($verify -match 'invoke-msi-observer\.ps1 -Stage Delay|\s-WaitMilliseconds [1-9]|-ScheduledDelay')) 'The installer must not depend on a fixed observation wait.'
 $harmless=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/workflows/windows-msi-detached-control.yml')
 $harmlessDelay=Get-FeedbackWorkflowStep $harmless 'Wait separately for harmless MSI split-delay control'
