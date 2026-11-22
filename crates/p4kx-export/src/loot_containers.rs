@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use p4kx_extraction::{Archive, CancelToken, SourceUses, SourceValue};
+use p4kx_extraction::{Archive, CancelToken, SourceUses, SourceValue, SourcedValue};
 use rayon::prelude::*;
 
 use crate::catalog_read::original::EntryCapture;
@@ -12,15 +12,12 @@ use crate::contract_loot::{LootContainer, TagCount};
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::{CatalogGuid, GuidText};
 use crate::harvest_locations::Objects;
-use crate::loot_soc::EntityTags;
+use crate::loot_soc_source::Counted as Tags;
 use crate::loot_unreadable::{Unreadable, UnreadableContainer};
 use crate::loot_walk::{Explored, Placed, PlacedTarget, Summary, below, explore, path_of};
 use crate::starmap_index::Index;
 use crate::starmap_walk::Opened;
 use crate::{CatalogError, Kind};
-
-/// The tag counts of a placed container, or why they cannot be counted.
-type Tags = Result<EntityTags, Unreadable>;
 
 /// The loot containers found and what could not be read or used while looking for them.
 pub(crate) struct Located {
@@ -128,7 +125,7 @@ fn unreadable(
         })
     });
     let counted = tags.iter().filter_map(|(&entry, read)| {
-        read.as_ref().err().map(|&reason| UnreadableContainer {
+        read.tags.as_ref().err().map(|&reason| UnreadableContainer {
             path: path_of(archive, entry).to_owned(),
             reason,
         })
@@ -174,7 +171,7 @@ fn row(
     tags: Option<&Tags>,
     sources: &SourceUses,
 ) -> Result<LootContainer, CatalogError> {
-    let counts = tags.and_then(|read| read.as_ref().ok());
+    let counts = tags.and_then(|read| read.tags.as_ref().ok());
     let mut tag_counts: Vec<TagCount> = counts.map_or_default(|counts| {
         counts
             .by_tag
@@ -197,9 +194,27 @@ fn row(
         )?,
         system: system.to_owned(),
         starmap_object_guid: location,
-        entity_count: counts.map(|counts| counts.entities),
+        entity_count: count_value(placed, tags, sources)?,
         tag_counts,
     })
+}
+
+fn count_value(
+    placed: &Placed,
+    tags: Option<&Tags>,
+    sources: &SourceUses,
+) -> Result<SourcedValue<u32>, CatalogError> {
+    if let Some(read) = tags {
+        let value = read.tags.as_ref().map_or(SourceValue::Unreadable, |tags| {
+            SourceValue::Present(tags.entities)
+        });
+        return Ok(sources.value_with_origins(value, &[&placed.path_origin, &read.origin])?);
+    }
+    if matches!(placed.target, PlacedTarget::VerifiedMissing) {
+        return Ok(sources.value_with_origins(SourceValue::Absent, &[&placed.path_origin])?);
+    }
+    let incomplete = sources.origin(&[], false);
+    Ok(sources.value_with_origins(SourceValue::Unreadable, &[&placed.path_origin, &incomplete])?)
 }
 
 /// Counts the entities and tags of all `.soc` files of every container a config is placed with,

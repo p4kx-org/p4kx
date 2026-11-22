@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::{CatalogError, build_catalog_from, catalog_schema};
-use p4kx_testkit::{ArchiveBuilder, TestContainer, TestEntry};
+use p4kx_testkit::{ArchiveBuilder, TestChunkFile, TestContainer, TestEntry};
 use serde_json::{Value, json};
 
 use super::{ALIAS_TARGET, ENTITY_DOCUMENT, ROOT, TARGET};
@@ -67,6 +67,15 @@ fn a_direct_loot_link_keeps_its_own_clear_source() -> TestResult {
         "only the discarded duplicate required authoring-path repair"
     );
     verify_target_path(&catalog, path)?;
+    let count = proof::present(row, "entityCount", &json!(0), Some(false))?;
+    let uses = proof::uses(&catalog, count)?;
+    assert!(
+        uses.iter().any(|used| used.pointer("/location/namespace")
+            == Some(&json!("socArchiveDirectory"))
+            && used.pointer("/location/indices") == Some(&json!(["0", "1"]))
+            && used["role"] == "selector"),
+        "the count includes the exact selected container directory"
+    );
     proof::closure(&catalog)
 }
 
@@ -77,11 +86,8 @@ fn a_verified_absent_loot_target_keeps_the_authored_path() -> TestResult {
     let row = only_row(&catalog)?;
     let path = proof::present(row, "container", &json!(TARGET), Some(true))?;
     verify_attribute(&catalog, path, "@objectContainer")?;
-    assert_eq!(
-        row["entityCount"],
-        Value::Null,
-        "absent target has no counts"
-    );
+    let count = proof::cell(row, "entityCount", "absent")?;
+    verify_attribute(&catalog, count, "@objectContainer")?;
     assert_eq!(
         proof::at(
             &catalog,
@@ -102,10 +108,11 @@ fn ambiguous_loot_targets_keep_the_authored_path_without_a_candidate() -> TestRe
     let path = proof::present(row, "container", &json!(LITERAL), Some(true))?;
     verify_attribute(&catalog, path, "@objectContainer")?;
     verify_fallback(&catalog, path)?;
+    let count = proof::cell(row, "entityCount", "unreadable")?;
     assert_eq!(
-        row["entityCount"],
-        Value::Null,
-        "ambiguous target has no counts"
+        count.get("sourceSetComplete"),
+        Some(&json!(false)),
+        "ambiguous targets do not prove a complete count",
     );
     assert!(
         matches!(
@@ -115,6 +122,83 @@ fn ambiguous_loot_targets_keep_the_authored_path_without_a_candidate() -> TestRe
         "ambiguous target remains a refusal in Normal"
     );
     proof::closure(&catalog)
+}
+
+#[test]
+fn a_normal_count_reports_the_actual_encrypted_entity_xml() -> TestResult {
+    let source = source([main_system(LITERAL)], [target_with_soc(false)])?;
+    let catalog = normal_catalog(&source)?;
+    let count = proof::present(only_row(&catalog)?, "entityCount", &json!(2), Some(true))?;
+    let uses = proof::uses(&catalog, count)?;
+    let payloads: Vec<_> = uses
+        .into_iter()
+        .filter(|used| used.pointer("/location/namespace") == Some(&json!("socEntityChunk")))
+        .collect();
+    let [payload] = payloads.as_slice() else {
+        return Err("one verified original entity XML range".into());
+    };
+    assert_eq!(
+        proof::source(&catalog, payload)?.pointer("/path/value"),
+        Some(&json!("entities.soc")),
+        "the entity count cites the exact selected SOC member"
+    );
+    assert_eq!(
+        payload.get("role"),
+        Some(&json!("payload")),
+        "the counted XML is a payload input"
+    );
+    proof::closure(&catalog)
+}
+
+#[test]
+fn a_bad_soc_checksum_refuses_normal_and_has_no_count_payload() -> TestResult {
+    let source = source([main_system(LITERAL)], [target_with_soc(true)])?;
+    assert!(
+        matches!(
+            build_catalog_from(&source.archive, &source.entry, &fixture::options()),
+            Err(CatalogError::IncompleteExport(_))
+        ),
+        "Normal refuses a damaged SOC required by the placement"
+    );
+    let (_, catalog) = source.diagnostic()?;
+    let row = only_row(&catalog)?;
+    let count = proof::cell(row, "entityCount", "unreadable")?;
+    assert_eq!(
+        count.get("sourceSetComplete"),
+        Some(&json!(false)),
+        "the failed SOC leaves an incomplete count"
+    );
+    assert!(
+        proof::uses(&catalog, count)?
+            .iter()
+            .all(|used| { used.pointer("/location/namespace") != Some(&json!("socEntityChunk")) }),
+        "a member that fails CRC provides no entity contribution"
+    );
+    proof::closure(&catalog)
+}
+
+fn target_with_soc(damaged: bool) -> TestEntry {
+    let bytes = TestChunkFile::crch()
+        .chunk(
+            0x0004,
+            1,
+            b"<Entities><Entity/><Entity/></Entities>".to_vec(),
+        )
+        .bytes();
+    let member = TestEntry::stored("entities.soc", bytes);
+    let member = if damaged {
+        member.with_crc32(0)
+    } else {
+        member
+    };
+    let container = TestContainer::new()
+        .entry(TestEntry::stored(
+            "alias-target.xml",
+            r#"<ObjectContainer version="14"/>"#,
+        ))
+        .entry(member);
+    let outer = TestEntry::stored(ALIAS_TARGET, container.build());
+    if damaged { outer } else { outer.encrypted() }
 }
 
 fn source(

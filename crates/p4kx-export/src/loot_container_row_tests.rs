@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use p4kx_extraction::{Guid, SourceUses};
+use p4kx_extraction::{Guid, SourceUses, SourceValueState};
 
 use super::{Tags, row, rows};
 use crate::guid_text::CatalogGuid;
@@ -62,21 +62,31 @@ fn opened(entry: usize, system: &str) -> Opened {
     }
 }
 
-fn fixture_tags(first_config: Guid, second_config: Guid) -> HashMap<usize, Tags> {
+fn fixture_tags(
+    first_config: Guid,
+    second_config: Guid,
+    sources: &SourceUses,
+) -> HashMap<usize, Tags> {
     HashMap::from([
         (
             1,
-            Ok(EntityTags {
-                entities: 3,
-                by_tag: HashMap::from([(first_config, 2)]),
-            }),
+            Tags {
+                tags: Ok(EntityTags {
+                    entities: 3,
+                    by_tag: HashMap::from([(first_config, 2)]),
+                }),
+                origin: sources.origin(&[], true),
+            },
         ),
         (
             2,
-            Ok(EntityTags {
-                entities: 5,
-                by_tag: HashMap::from([(second_config, 4)]),
-            }),
+            Tags {
+                tags: Ok(EntityTags {
+                    entities: 5,
+                    by_tag: HashMap::from([(second_config, 4)]),
+                }),
+                origin: sources.origin(&[], true),
+            },
         ),
     ])
 }
@@ -93,7 +103,7 @@ fn duplicate_rows_keep_the_first_placement_with_canonical_order()
         opened(20, "stanton"),
         opened(20, "nyx"),
     ];
-    let tags = fixture_tags(first_config, second_config);
+    let tags = fixture_tags(first_config, second_config, sources);
     let result = rows(&roots, &Objects::new(&[]), &summaries, &tags, sources)?;
     let signatures: Vec<_> = result
         .iter()
@@ -102,7 +112,7 @@ fn duplicate_rows_keep_the_first_placement_with_canonical_order()
                 row.multi_config_guid.value().map(|guid| guid.0),
                 row.container.value().map(String::as_str),
                 row.system.as_str(),
-                row.entity_count,
+                row.entity_count.value().copied(),
             )
         })
         .collect();
@@ -137,7 +147,10 @@ fn duplicate_rows_keep_the_first_placement_with_canonical_order()
 #[test]
 fn a_container_that_could_not_be_counted_has_no_entity_count() -> Result<(), crate::CatalogError> {
     let sources = &SourceUses::with_compact_use_refs();
-    let failed: Tags = Err(Unreadable::SocFile);
+    let failed = Tags {
+        tags: Err(Unreadable::SocFile),
+        origin: sources.origin(&[], false),
+    };
     let row = row(
         &placed("a.socpak", sources),
         "stanton",
@@ -145,7 +158,11 @@ fn a_container_that_could_not_be_counted_has_no_entity_count() -> Result<(), cra
         Some(&failed),
         sources,
     )?;
-    assert_eq!(row.entity_count, None, "failed counts remain unavailable");
+    assert_eq!(
+        row.entity_count.state(),
+        SourceValueState::Unreadable,
+        "failed counts remain unavailable"
+    );
     assert!(row.tag_counts.is_empty(), "no partial tag counts survive");
     Ok(())
 }
@@ -153,7 +170,10 @@ fn a_container_that_could_not_be_counted_has_no_entity_count() -> Result<(), cra
 #[test]
 fn a_container_without_a_soc_has_zero_entities() -> Result<(), crate::CatalogError> {
     let sources = &SourceUses::with_compact_use_refs();
-    let none: Tags = Ok(EntityTags::default());
+    let none = Tags {
+        tags: Ok(EntityTags::default()),
+        origin: sources.origin(&[], true),
+    };
     let row = row(
         &placed("a.socpak", sources),
         "stanton",
@@ -162,7 +182,7 @@ fn a_container_without_a_soc_has_zero_entities() -> Result<(), crate::CatalogErr
         sources,
     )?;
     assert_eq!(
-        row.entity_count,
+        row.entity_count.value().copied(),
         Some(0),
         "an empty SOC selection has zero entities"
     );
@@ -172,10 +192,15 @@ fn a_container_without_a_soc_has_zero_entities() -> Result<(), crate::CatalogErr
 #[test]
 fn a_container_the_archive_lacks_has_no_entity_count() -> Result<(), crate::CatalogError> {
     let sources = &SourceUses::with_compact_use_refs();
-    let row = row(&placed("a.socpak", sources), "stanton", None, None, sources)?;
+    let absent = Placed {
+        target: PlacedTarget::VerifiedMissing,
+        ..placed("a.socpak", sources)
+    };
+    let row = row(&absent, "stanton", None, None, sources)?;
     assert_eq!(
-        row.entity_count, None,
-        "there are no counts without a physical target"
+        row.entity_count.state(),
+        SourceValueState::Absent,
+        "proved absence is distinct from an unreadable target"
     );
     Ok(())
 }

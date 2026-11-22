@@ -4,12 +4,13 @@
 use p4kx_assembly::{SocGeometryTarget, resolve_soc_geometry_path};
 use p4kx_extraction::model::{SocPhysicsField, SocSourceValue};
 use p4kx_extraction::{
-    Archive, CancelToken, EntryOrigin, InputScope, PathIndex, SourceInput, SourceLocation,
-    SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue, directory_path_uses,
+    CancelToken, EntryOrigin, InputScope, PathIndex, SourceInput, SourceUse, SourceUses,
+    SourceValue, SourcedValue, directory_path_uses,
 };
 
 use super::LocationVoxelTarget;
 use crate::catalog_read::original::{EntrySourceXml, PhysicalEntryRef};
+pub(super) use crate::container_read::observe_container_directory;
 use crate::{CatalogError, ExportAccountingError};
 
 pub(super) struct Directories<'index, 'archive> {
@@ -58,29 +59,6 @@ impl Directories<'_, '_> {
             .sources()
             .value(SourceValue::Present(state), &uses, complete))
     }
-}
-
-pub(super) fn observe_container_directory(
-    archive: &Archive,
-    sources: &SourceUses,
-) -> Result<Option<SourceUse>, CatalogError> {
-    if crate::export_archive_health::inventory(archive).is_some() {
-        return Ok(None);
-    }
-    let entry = archive
-        .container_input_origin()
-        .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-    let count = u64::try_from(archive.entries().len())
-        .map_err(|_| ExportAccountingError::CounterOverflow)?;
-    let scope = sources.observe(SourceInput::Archive(&entry), InputScope::Payload)?;
-    Ok(Some(scope.at(
-        SourceLocation::Subresource {
-            namespace: "socArchiveDirectory".to_owned(),
-            indices: vec![0, count],
-            field: "entryPaths".to_owned(),
-        },
-        SourceUseRole::Selector,
-    )?))
 }
 
 fn target(

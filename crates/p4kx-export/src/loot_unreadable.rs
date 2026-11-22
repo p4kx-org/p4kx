@@ -15,6 +15,9 @@ pub(crate) enum Unreadable {
     /// The entry is no container.
     #[error("cannot be opened as a container")]
     NotAContainer,
+    /// The nested directory cannot establish all admitted sources.
+    #[error("its nested directory inventory is incomplete")]
+    IncompleteDirectory,
     /// An entity file cannot be read in full.
     #[error("an entity file cannot be read")]
     EntityFile,

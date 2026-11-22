@@ -9,7 +9,7 @@ use p4kx_extraction::chunks::{ChunkFile, ChunkType, Container};
 use crate::starmap_xml::{Document, Node, XmlError, attribute};
 
 /// The chunk of a `.soc` file that holds its entities as `CryXmlB`.
-const ENTITIES: ChunkType = ChunkType::new(Container::CrCh, 0x0004);
+pub(crate) const ENTITIES: ChunkType = ChunkType::new(Container::CrCh, 0x0004);
 
 /// Why a `.soc` file cannot be counted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -39,18 +39,26 @@ pub(crate) struct EntityTags {
 }
 
 impl EntityTags {
-    /// Adds each entity and its distinct tags from the `.soc` file.
+    /// Adds the entities and their tags and retains the original parsed chunk table.
     ///
     /// # Errors
     ///
     /// Returns why the file cannot be read; the counts then hold a part of the file.
-    pub(crate) fn add_soc(&mut self, bytes: &[u8]) -> Result<(), SocError> {
+    pub(crate) fn count_soc<'bytes>(
+        &mut self,
+        bytes: &'bytes [u8],
+    ) -> Result<ChunkFile<&'bytes [u8]>, SocError> {
         let file = ChunkFile::parse(bytes).map_err(|_| SocError::NotChunkFile)?;
         for (index, _) in file.chunks_of(ENTITIES) {
             let data = file.chunk_data(index).ok_or(SocError::ChunkOutOfRange)?;
             self.add_xml(data)?;
         }
-        Ok(())
+        Ok(file)
+    }
+
+    #[cfg(test)]
+    fn add_soc(&mut self, bytes: &[u8]) -> Result<(), SocError> {
+        self.count_soc(bytes).map(|_| ())
     }
 
     /// Adds the entities of the XML document `bytes`, `CryXml` or text.

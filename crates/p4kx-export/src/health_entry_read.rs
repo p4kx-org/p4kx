@@ -2,14 +2,16 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::io::{self, Read};
+use std::ops::Range;
 
 use p4kx_assembly::LoadoutFileRead;
-use p4kx_extraction::{Archive, ArchiveError, CancelToken, Entry};
+use p4kx_extraction::{
+    Archive, ArchiveError, CancelToken, Entry, SourceLocation, SourceUse, SourceUseRole,
+};
 
 use super::health_entry_frame::EntryCapture;
 use super::health_entry_receipt::EntryReceipt;
 use crate::{CatalogError, ExportAccountingError};
-use p4kx_extraction::{SourceLocation, SourceUse, SourceUseRole};
 
 use super::entry_selection_input::{EntrySelectionUse, SelectionSource};
 use super::health_entry_selection::AuthoredEntryPath;
@@ -220,6 +222,32 @@ impl EntryRead {
             .payload_entry()?
             .payload_read(SourceUseRole::Conversion)
             .map(Some)
+    }
+
+    pub(crate) fn observe_payload_range(
+        &self,
+        capture: &EntryCapture<'_>,
+        range: Range<u64>,
+        namespace: &str,
+        field: &str,
+        role: SourceUseRole,
+    ) -> Result<SourceUse, CatalogError> {
+        self.receipt.check_capture(capture)?;
+        let start = usize::try_from(range.start)
+            .map_err(|_| ExportAccountingError::ConflictingSourceDatum)?;
+        let end = usize::try_from(range.end)
+            .map_err(|_| ExportAccountingError::ConflictingSourceDatum)?;
+        self.complete_bytes()?
+            .get(start..end)
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        self.receipt.payload_entry()?.payload_at(
+            SourceLocation::Subresource {
+                namespace: namespace.to_owned(),
+                indices: vec![range.start, range.end],
+                field: field.to_owned(),
+            },
+            role,
+        )
     }
 
     pub(crate) fn bytes(&self) -> &[u8] {

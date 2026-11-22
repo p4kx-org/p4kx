@@ -162,11 +162,10 @@ pub(crate) struct LootContainer {
     /// The `guid` of the `starmapObjects` entry the walk's root container hangs below; `null` for
     /// none or an object the catalog lacks.
     pub(crate) starmap_object_guid: Option<CatalogGuid>,
-    /// The number of entities in all `.soc` files of the placed container, 0 for none; `null`
-    /// when a file cannot be read or the Archive lacks the container.
-    pub(crate) entity_count: Option<u32>,
+    /// The total entities from the verified `.soc` files of the placed container, including zero.
+    pub(crate) entity_count: SourcedValue<u32>,
     /// How many entities of the placed container carry each tag, summed over its `.soc` files and
-    /// ordered by GUID; empty when `entityCount` is `null`. The tags of `tagGuids` of the tagged
+    /// ordered by GUID; empty when `entityCount` is unavailable. The tags of `tagGuids` of the tagged
     /// configs select the slots.
     pub(crate) tag_counts: Vec<TagCount>,
 }

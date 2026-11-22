@@ -252,6 +252,11 @@ fn loot_container_facts(catalog: &Value) -> TestResult<Vec<Value>> {
                     .ok_or("canonical loot container cell")?
                     .clone_from(value);
             }
+            let value = proof::at(row, "/entityCount/value")?;
+            facts
+                .get_mut("entityCount")
+                .ok_or("canonical entity count cell")?
+                .clone_from(value);
             Ok(facts)
         })
         .collect()

@@ -30559,13 +30559,8 @@
           "description": "The path of the object container the entity places."
         },
         "entityCount": {
-          "description": "The number of entities in all `.soc` files of the placed container, 0 for none; `null`\nwhen a file cannot be read or the Archive lacks the container.",
-          "format": "uint32",
-          "minimum": 0,
-          "type": [
-            "integer",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfuint32",
+          "description": "The total entities from the verified `.soc` files of the placed container, including zero."
         },
         "multiConfigGuid": {
           "$ref": "#/$defs/SourcedValueOfGuid",
@@ -30587,7 +30582,7 @@
           "type": "string"
         },
         "tagCounts": {
-          "description": "How many entities of the placed container carry each tag, summed over its `.soc` files and\nordered by GUID; empty when `entityCount` is `null`. The tags of `tagGuids` of the tagged\nconfigs select the slots.",
+          "description": "How many entities of the placed container carry each tag, summed over its `.soc` files and\nordered by GUID; empty when `entityCount` is unavailable. The tags of `tagGuids` of the tagged\nconfigs select the slots.",
           "items": {
             "$ref": "#/$defs/TagCount"
           },

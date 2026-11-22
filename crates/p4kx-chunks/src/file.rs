@@ -67,6 +67,12 @@ impl<B: AsRef<[u8]>> ChunkFile<B> {
         &self.chunks
     }
 
+    /// Returns the byte interval occupied by the validated header.
+    #[must_use]
+    pub const fn header_range(&self) -> Range<u64> {
+        0..HEADER_LEN as u64
+    }
+
     /// Returns the byte interval occupied by the validated table.
     #[must_use]
     pub fn table_range(&self) -> Range<u64> {
