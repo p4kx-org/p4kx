@@ -13,6 +13,8 @@ use super::{AMMUNITION, ELECTRICAL_BEHAVIORS, FACTION_IDENTITIES, Route, TestRes
 mod actor_procedural_recoil;
 #[path = "sdk_archive_entry_routes.rs"]
 mod archive_entries;
+#[path = "sdk_archive_source_route.rs"]
+pub(super) mod archive_source;
 #[path = "sdk_reputation_definition_routes.rs"]
 mod authored_reputation;
 #[path = "sdk_blueprint_physical_routes.rs"]
@@ -252,6 +254,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         loot_documents,
         unresolved,
     ];
+    routes.extend(archive_source::read()?);
     append_domain_routes(&mut routes, &archive)?;
     Ok(routes)
 }

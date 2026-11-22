@@ -299,6 +299,7 @@ fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
         .copied()
         .chain(routes::loot_datasets())
         .chain(routes::contract_datasets())
+        .chain(routes::archive_source::DATASETS.iter().copied())
         .chain(routes::law_datasets())
         .chain(routes::mission_datasets())
         .chain(routes::world_datasets())

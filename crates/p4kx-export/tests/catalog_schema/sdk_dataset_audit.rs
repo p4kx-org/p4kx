@@ -11,7 +11,15 @@ use super::super::super::schema_navigation::{resolve, schema_at};
 use super::{Entry, Route, Shape, TestResult, row_schema};
 
 pub(super) const NO_WITNESS: &str = "no query witness recorded by the audit";
-const EXPORT_ATTEMPT_FIELDS: &[&str] = &["/schemaVersion", "/completeness", "/exportHealth"];
+const EXPORT_ATTEMPT_FIELDS: &[&str] = &[
+    "/schemaVersion",
+    "/completeness",
+    "/exportHealth",
+    "/source/archiveKey",
+    "/source/encryptedEntriesUnread",
+    "/source/exportedAt",
+    "/source/toolVersion",
+];
 
 pub(super) fn audit(
     schema: Value,
@@ -85,3 +93,27 @@ impl fmt::Debug for CoverageGaps {
 }
 
 impl std::error::Error for CoverageGaps {}
+
+#[test]
+fn an_unclassified_source_member_still_fails_the_coverage_audit() -> TestResult {
+    let mut schema = p4kx_export::catalog_schema();
+    let fields = schema
+        .pointer_mut("/$defs/BuildSource/properties")
+        .and_then(Value::as_object_mut)
+        .ok_or("catalog build metadata")?;
+    fields.insert(
+        "fixtureNewSourceField".to_owned(),
+        serde_json::json!({"type": "string"}),
+    );
+    let registered = super::super::dataset_owners::entries();
+    let error = audit(schema, &registered, &[])
+        .err()
+        .ok_or("a new source member requires an ownership decision")?;
+    assert!(
+        error
+            .to_string()
+            .contains("/source/build/fixtureNewSourceField"),
+        "the audit reports the exact new member without an export-metadata wildcard",
+    );
+    Ok(())
+}

@@ -32,6 +32,23 @@ with no admitted gameplay-property Record opens no localization payloads and ret
 available list. Compare physical Record indices only within the same DataForge input and resolve
 source uses through each result's own inventory.
 
+## Archive source metadata
+
+Read `source.channel` with `p4kx_channels::channel_name(archive.path())`. Use
+`Archive::file_len` and `Archive::file_modified` for `source.archiveSize` and
+`source.archiveModified`. Format the optional modification time with
+`p4kx_extraction::utc_rfc3339` for the catalog wire value.
+
+`Archive::build` and `CatalogQuerySession::build` return the optional manifest
+Build. Its `branch`, `version`, `change_number` and `build_id` methods supply the
+corresponding catalog fields. For `source.build.publicPatch`, call
+`PublicPatches::of(build)` on the launcher-log snapshot supplied to the exporter.
+This lookup requires the same change number.
+
+The catalog's writer version, timestamp and Archive-key usage describe its export.
+Each selective result carries its own `SourceInventory` for resolving per-value
+origins.
+
 ## Original location vocabulary
 
 Use `catalog_queries::location_vocabulary::with_location_vocabulary` or its `_from` form

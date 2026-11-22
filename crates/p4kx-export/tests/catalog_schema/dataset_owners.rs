@@ -40,6 +40,9 @@ struct Group {
     members: &'static [&'static str],
 }
 
+#[path = "dataset_metadata_owners.rs"]
+mod metadata;
+
 const GROUPS: &[Group] = &[
     Group {
         owner: Owner::Definition,
@@ -352,23 +355,11 @@ const GROUPS: &[Group] = &[
         shape: Shape::Array,
         members: &["shipStoreSlugs"],
     },
-    Group {
-        owner: Owner::DocumentMetadata,
-        prefix: "",
-        shape: Shape::Object,
-        members: &["completeness", "exportHealth", "provenance", "source"],
-    },
-    Group {
-        owner: Owner::DocumentMetadata,
-        prefix: "",
-        shape: Shape::Scalar,
-        members: &["schemaVersion"],
-    },
 ];
 
 pub(super) fn entries() -> BTreeMap<String, Entry> {
     let mut registered = BTreeMap::new();
-    for group in GROUPS {
+    for group in GROUPS.iter().chain(metadata::GROUPS) {
         for member in group.members {
             let path = format!("{}/{member}", group.prefix);
             let previous = registered.insert(
