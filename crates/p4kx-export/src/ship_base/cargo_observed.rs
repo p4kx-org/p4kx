@@ -6,6 +6,7 @@ use p4kx_extraction::{FieldOrigin, Record, RecordTree, SourceUseRole, SourceValu
 use schemars::JsonSchema;
 use serde::Serialize;
 
+use super::cargo_admission::CargoAdmission;
 use super::cargo_capacity_origin::{self, CapacitySource};
 use super::cargo_container::MeasuredCapacity;
 use crate::catalog_v3::resource_network_placements::LoadoutPosition;
@@ -110,6 +111,7 @@ impl ShipCargoMountSource {
 pub(crate) struct Observation<'read, 'source> {
     capture: &'read Capture<'source>,
     mounts: Vec<ShipCargoMountSource>,
+    admissions: Vec<FieldOrigin>,
     error: Option<CatalogError>,
     root: Option<SourcedValue<u32>>,
     unresolved_loadout: bool,
@@ -120,6 +122,7 @@ impl<'read, 'source> Observation<'read, 'source> {
         Self {
             capture,
             mounts: Vec::new(),
+            admissions: Vec::new(),
             error: None,
             root: None,
             unresolved_loadout: false,
@@ -162,6 +165,14 @@ impl<'read, 'source> Observation<'read, 'source> {
         self.capture
     }
 
+    pub(super) fn admission(&mut self, node: &EntityNode, admission: CargoAdmission) {
+        if self.error.is_none()
+            && let Err(error) = admission.observe(self.capture, node, &mut self.admissions)
+        {
+            self.error = Some(error);
+        }
+    }
+
     pub(super) fn mount(
         &mut self,
         entry: &LoadoutEntry<'_>,
@@ -198,6 +209,7 @@ impl<'read, 'source> Observation<'read, 'source> {
         let (input, _) = self.capture.cargo_context()?;
         let uses = &input.origins().uses;
         let mut origins = vec![membership];
+        origins.extend(&self.admissions);
         for mount in &self.mounts {
             origins.extend([
                 mount.attachment.target_record_index().origin(),

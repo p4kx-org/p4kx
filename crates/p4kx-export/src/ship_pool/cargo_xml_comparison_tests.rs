@@ -296,7 +296,7 @@ fn entries() -> Vec<TestEntry> {
         xml(MERGE, r#"<Loadout><Loadouts><File loadout="synthetic/cargo-base.xml"/><File loadout="synthetic/cargo-winner.xml"/></Loadouts></Loadout>"#),
         xml(BASE, r#"<Loadout><Items><Item portName="CargoPad" itemName="Fixture_CargoGrid"/><Item portName="Spare" itemName="Fixture_Inert"/></Items></Loadout>"#).encrypted(),
         xml(WINNER, r#"<Loadout><Items><Item portName="cARGOpAD"/></Items></Loadout>"#),
-        xml(BYSTANDER, r#"<Loadout><Items><Item portName="Bystander" itemName="Fixture_Inert"/></Items></Loadout>"#).encrypted(),
+        xml(BYSTANDER, r#"<Loadout><Items><Item portName="Bystander"/></Items></Loadout>"#).encrypted(),
     ]
 }
 

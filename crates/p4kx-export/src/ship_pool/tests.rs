@@ -10,6 +10,8 @@ use super::ShipPool;
 use p4kx_extraction::Archive;
 use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestRecord, TestStruct};
 
+#[path = "cargo_admission_tests.rs"]
+mod cargo_admission;
 #[path = "cargo_xml_comparison_tests.rs"]
 mod cargo_xml_comparison;
 

@@ -21,7 +21,10 @@ An unresolved Loadout can leave additional grids unaccounted for. Aggregate
 origins retain observed contributors. Applied Record overrides and suppressed
 defaults contribute the original port names the resolver compared. Applied
 XML port replacements retain both original names and the actual Include route
-from the current Record request to each file that supplied a name. The
+from the current Record request to each file that supplied a name. Each
+reached attachment contributes its selected type, including the type of a
+docked vehicle where traversal stops. Grid candidates contribute the class
+name and, if that check admits them, the normalized Record path. The
 aggregate remains incomplete while other exclusion decisions lack evidence.
 A proven encrypted input sets the encryption marker to true even with
 incomplete coverage.

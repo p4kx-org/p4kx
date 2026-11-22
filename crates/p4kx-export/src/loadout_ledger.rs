@@ -7,6 +7,8 @@ mod alignment;
 mod cargo_record_effect;
 #[path = "loadout_ledger/cargo_storage.rs"]
 mod cargo_storage;
+#[path = "loadout_ledger/cargo_type.rs"]
+mod cargo_type;
 #[path = "loadout_ledger/cargo_xml_effect.rs"]
 mod cargo_xml_effect;
 #[path = "loadout_ledger/file_dependencies.rs"]
@@ -64,6 +66,7 @@ struct State {
     ledger: ExportLedger,
     inspections: BTreeMap<u32, FieldInspection>,
     files: FileProofs,
+    cargo_type_origins: BTreeMap<u32, p4kx_extraction::FieldOrigin>,
     cargo_storage_origins:
         BTreeMap<u32, p4kx_extraction::SourcedValue<crate::guid_text::CatalogGuid>>,
     paths: path_proofs::PathProofs,
@@ -84,6 +87,7 @@ impl State {
             ledger: ExportLedger::default(),
             inspections: BTreeMap::new(),
             files: FileProofs::default(),
+            cargo_type_origins: BTreeMap::new(),
             cargo_storage_origins: BTreeMap::new(),
             paths: path_proofs::PathProofs::default(),
             port_attributes: port_attributes::RecordPortAttributes::default(),

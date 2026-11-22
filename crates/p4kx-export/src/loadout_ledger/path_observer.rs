@@ -4,8 +4,8 @@
 use std::ops::ControlFlow;
 
 use p4kx_assembly::{
-    LoadoutClassSelection, LoadoutPathObserver, LoadoutPathOperation, LoadoutReferenceSelection,
-    LoadoutSelection, PortDefinition,
+    ItemClassification, LoadoutClassSelection, LoadoutPathObserver, LoadoutPathOperation,
+    LoadoutReferenceSelection, LoadoutSelection, PortDefinition,
 };
 use p4kx_extraction::{RecordTree, StructValue, Value};
 
@@ -88,6 +88,20 @@ impl<'scope, 'read, 'source> RecordPaths<'_, '_, 'scope, 'read, 'source> {
 }
 
 impl LoadoutPathObserver for RecordPaths<'_, '_, '_, '_, '_> {
+    fn record_item_type(
+        &self,
+        component: Option<(usize, &StructValue<'_>)>,
+        classification: &ItemClassification,
+    ) -> ControlFlow<()> {
+        match self
+            .capture
+            .store_cargo_type(&self.fields, component, classification)
+        {
+            Ok(()) => ControlFlow::Continue(()),
+            Err(error) => self.capture.fail(error),
+        }
+    }
+
     fn record_inventory_container(
         &self,
         component: Option<&StructValue<'_>>,

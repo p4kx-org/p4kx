@@ -10,6 +10,10 @@ use crate::loadout::ledger::Capture;
 
 use super::model::{Cargo, CargoGrid, Source, SourceKind};
 use crate::catalog_v3::cargo_source::round_capacity;
+#[path = "cargo_admission.rs"]
+mod cargo_admission;
+use cargo_admission::CargoAdmission;
+
 #[path = "cargo_container.rs"]
 mod cargo_container;
 use cargo_container::{ContainerInput, MeasuredCapacity};
@@ -23,8 +27,6 @@ use cargo_capacity_origin::CapacitySource;
 pub(crate) use cargo_observed::Observation;
 pub use cargo_observed::{ShipCargoMountSource, ShipCargoSource};
 
-const GRID_TYPE: &str = "CargoGrid";
-const TEMPLATE_SUFFIX: &str = "_template";
 const CELL_METRES_NUMERATOR: u32 = 5;
 const CELL_METRES_DENOMINATOR: f64 = 4.0;
 const CELL_TOLERANCE: f64 = 1e-4;
@@ -107,9 +109,14 @@ impl<'f> CargoReader<'f> {
     ) -> Cargo {
         let mut grids = Vec::new();
         for entry in entries {
-            if let Some(node) = entry.entity()
-                && is_grid(node)
-            {
+            let Some(node) = entry.entity() else {
+                continue;
+            };
+            let admission = CargoAdmission::of(node);
+            if let Some(observation) = observation.as_deref_mut() {
+                observation.admission(node, admission);
+            }
+            if matches!(admission, CargoAdmission::Grid) {
                 grids.push(self.grid(entry, node, trees, observation.as_deref_mut()));
             }
         }
@@ -203,18 +210,6 @@ impl<'f> CargoReader<'f> {
             })
         })
     }
-}
-
-fn is_grid(node: &EntityNode) -> bool {
-    node.attach_type().eq_ignore_ascii_case(GRID_TYPE)
-        && !node
-            .class_name()
-            .to_ascii_lowercase()
-            .ends_with(TEMPLATE_SUFFIX)
-        && !node
-            .record_path()
-            .to_ascii_lowercase()
-            .ends_with("_cargogrid_template")
 }
 
 fn fill(grid: &mut CargoGrid, container: &Container<'_>) {

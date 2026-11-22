@@ -6,7 +6,7 @@ use std::ops::ControlFlow;
 use p4kx_dataforge::{RecordTree, StructValue, Value};
 
 use super::LoadoutSelection;
-use crate::{LoadoutClassSelection, LoadoutReferenceSelection, PortDefinition};
+use crate::{ItemClassification, LoadoutClassSelection, LoadoutReferenceSelection, PortDefinition};
 
 /// Receives actual Record path getters while their original tree remains borrowed.
 pub trait LoadoutPathObserver {
@@ -43,6 +43,15 @@ pub trait LoadoutPathObserver {
         &self,
         _definition: &PortDefinition,
         _original: &StructValue<'_>,
+    ) -> ControlFlow<()> {
+        ControlFlow::Continue(())
+    }
+
+    /// Captures the selected item type while its original attachable component is borrowed.
+    fn record_item_type(
+        &self,
+        _component: Option<(usize, &StructValue<'_>)>,
+        _classification: &ItemClassification,
     ) -> ControlFlow<()> {
         ControlFlow::Continue(())
     }

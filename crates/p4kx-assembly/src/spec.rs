@@ -166,7 +166,7 @@ impl EntitySpec {
         if let Some(vehicle) = &mut vehicle {
             vehicle.appearance_only = variants.appearance_only;
         }
-        let classification = ItemClassification::read(tree, attachable);
+        let classification = paths.item_classification(tree, attachable);
         let container = inventory_container(&components, paths, classification.item_type_text());
         Self {
             attach_tags: tag_words(attach_tags),

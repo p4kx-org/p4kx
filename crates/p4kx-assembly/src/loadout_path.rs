@@ -331,6 +331,26 @@ impl<'scope> PathRead<'scope> {
         }
     }
 
+    pub(crate) fn item_classification(
+        &self,
+        tree: &RecordTree<'_>,
+        component: Option<(usize, &StructValue<'_>)>,
+    ) -> crate::ItemClassification {
+        let classification = crate::ItemClassification::read(tree, component);
+        if !self.stopped()
+            && self
+                .observation
+                .is_some_and(Observation::observes_record_loadout_effects)
+            && let Some(observer) = self.observer
+            && observer
+                .record_item_type(component, &classification)
+                .is_break()
+        {
+            self.stop();
+        }
+        classification
+    }
+
     pub(crate) fn inventory_container(
         &self,
         component: Option<&StructValue<'_>>,
