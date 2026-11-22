@@ -11,9 +11,13 @@ use crate::loadout_xml_use::{XmlInclude, XmlRoute};
 use crate::merge::PortMergeIndex;
 use crate::resolver_observation::{self, LoadoutReadEvent, Observation};
 use crate::spec::EntrySpec;
-use crate::{LoadoutError, LoadoutFiles, LoadoutPath, LoadoutRequest, XmlPortReplacement};
+use crate::{
+    LoadoutError, LoadoutFileObservation, LoadoutFiles, LoadoutPath, LoadoutRequest,
+    XmlPortReplacement,
+};
 
 type EntriesResult = Result<Arc<[EntrySpec]>, LoadoutError>;
+type ReplacementCapture<'a> = (&'a LoadoutFileObservation, &'a mut Vec<XmlPortReplacement>);
 
 pub(crate) fn load_observed(
     files: &dyn LoadoutFiles,
@@ -99,9 +103,9 @@ impl Frame {
     fn merge(
         &mut self,
         entries: impl IntoIterator<Item = EntrySpec>,
-        replacements: Option<&mut Vec<XmlPortReplacement>>,
+        capture: Option<ReplacementCapture<'_>>,
     ) {
-        if let Some(replacements) = replacements {
+        if let Some((operation, replacements)) = capture {
             let document = &self.path;
             self.ports.merge_observed(
                 &mut self.merged,
@@ -109,7 +113,7 @@ impl Frame {
                 |entry| &entry.port,
                 |ordinal, displaced, winner| {
                     replacements.push(XmlPortReplacement::new(
-                        document, ordinal, displaced, winner,
+                        document, operation, ordinal, displaced, winner,
                     ));
                 },
             );
@@ -119,9 +123,9 @@ impl Frame {
         }
     }
 
-    fn finish(&mut self, replacements: Option<&mut Vec<XmlPortReplacement>>) -> Arc<[EntrySpec]> {
+    fn finish(&mut self, capture: Option<ReplacementCapture<'_>>) -> Arc<[EntrySpec]> {
         let own = mem::take(&mut self.own);
-        self.merge(own, replacements);
+        self.merge(own, capture);
         Arc::from(mem::take(&mut self.merged))
     }
 }
@@ -161,7 +165,8 @@ impl Loader<'_> {
                 }
                 continue;
             }
-            let entries = current.finish(self.replacements.as_mut());
+            let capture = self.replacement_capture(current.operation)?;
+            let entries = current.finish(capture);
             let path = current.path.clone();
             let complete = self.finish(current, Ok(entries));
             let Some(mut parent) = parents.pop() else {
@@ -257,7 +262,8 @@ impl Loader<'_> {
         };
         match completed.result {
             Ok(entries) => {
-                parent.merge(through_include(&entries, edge), self.replacements.as_mut());
+                let capture = self.replacement_capture(parent.operation)?;
+                parent.merge(through_include(&entries, edge), capture);
             }
             Err(error @ LoadoutError::XmlIncludeReadBudgetExceeded { .. }) => return Err(error),
             Err(mut error) => {
@@ -277,6 +283,23 @@ impl Loader<'_> {
             }
         }
         Ok(())
+    }
+
+    fn replacement_capture(
+        &mut self,
+        position: Option<usize>,
+    ) -> Result<Option<ReplacementCapture<'_>>, LoadoutError> {
+        let Some(replacements) = self.replacements.as_mut() else {
+            return Ok(None);
+        };
+        let Some(operation) = position.and_then(|position| self.trace.xml_operation(position))
+        else {
+            if let Some(observation) = self.observation {
+                observation.stop();
+            }
+            return Err(LoadoutError::ObservationStopped);
+        };
+        Ok(Some((operation, replacements)))
     }
 
     fn finish(&mut self, frame: Frame, result: EntriesResult) -> Completed {

@@ -164,6 +164,10 @@ fn inspect_replacements(
                 ROOT,
                 "the merge is in the owning XML"
             );
+            assert!(
+                replacement.merge_document().is_same_operation(root),
+                "the replacement names the actual merge operation"
+            );
             assert_port(observations, root_key, replacement.displaced(), Some(BASE))?;
             let include = (replacement.ordinal() == 0).then_some(OVERRIDE);
             assert_port(observations, root_key, replacement.winner(), include)?;

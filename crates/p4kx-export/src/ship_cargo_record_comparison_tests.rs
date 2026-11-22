@@ -10,7 +10,7 @@ use p4kx_testkit::{
     closed_container_record, entity_schema,
 };
 
-use super::ShipPool;
+use super::{CatalogRead, ShipPool};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::build::original_input::ship_pool_test_input;
 use crate::build::original_input::test_support::TestResult;
@@ -75,7 +75,17 @@ fn read<'input>(
     pool: &ShipPool<'input>,
     input: &'input OriginalCatalogInput<'input, 'input>,
     index: u32,
-) -> Result<ShipAggregateValues, Box<dyn std::error::Error>> {
+) -> TestResult<ShipAggregateValues> {
+    Ok(read_catalog_index(pool, input, index)?
+        .aggregates
+        .ok_or("a resolved Ship aggregate")?)
+}
+
+pub(super) fn read_catalog_index<'input>(
+    pool: &ShipPool<'input>,
+    input: &'input OriginalCatalogInput<'input, 'input>,
+    index: u32,
+) -> TestResult<CatalogRead<'input>> {
     let record = input
         .forge()
         .record(index)
@@ -93,10 +103,7 @@ fn read<'input>(
         input,
         &RecordObservation::capture(input, &record)?,
     )?;
-    Ok(pool
-        .read_catalog(&operands, &record, &tree, &source, input, None)?
-        .aggregates
-        .ok_or("a resolved Ship aggregate")?)
+    Ok(pool.read_catalog(&operands, &record, &tree, &source, input, None)?)
 }
 
 fn verify_comparisons(

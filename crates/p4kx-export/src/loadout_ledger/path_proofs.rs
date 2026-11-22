@@ -34,7 +34,10 @@ impl PathProofs {
         self.lookup(path).cloned()
     }
 
-    fn lookup(&self, path: &LoadoutPath) -> Result<&AuthoredEntryPath, ExportAccountingError> {
+    pub(super) fn lookup(
+        &self,
+        path: &LoadoutPath,
+    ) -> Result<&AuthoredEntryPath, ExportAccountingError> {
         let recipe = path
             .selection()
             .and_then(|selection| self.selections.get(selection))

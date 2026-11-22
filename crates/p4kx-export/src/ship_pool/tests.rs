@@ -10,6 +10,9 @@ use super::ShipPool;
 use p4kx_extraction::Archive;
 use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestRecord, TestStruct};
 
+#[path = "cargo_xml_comparison_tests.rs"]
+mod cargo_xml_comparison;
+
 #[test]
 fn a_poisoned_observed_pool_cannot_supply_a_ship_reader() -> Result<(), Box<dyn std::error::Error>>
 {

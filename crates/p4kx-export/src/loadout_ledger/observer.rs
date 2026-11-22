@@ -4,8 +4,9 @@
 use std::ops::ControlFlow;
 
 use p4kx_assembly::{
-    LoadoutClassSelection, LoadoutPath, LoadoutPathObserver, LoadoutReadEvent, LoadoutReadObserver,
-    LoadoutSelection, XmlLoadoutClassSite, XmlLoadoutPathSite,
+    LoadoutClassSelection, LoadoutFileObservation, LoadoutPath, LoadoutPathObserver,
+    LoadoutReadEvent, LoadoutReadObserver, LoadoutSelection, XmlLoadoutClassSite,
+    XmlLoadoutPathSite, XmlPortReplacement,
 };
 use p4kx_extraction::{DataForgeError, Record, RecordTree};
 
@@ -159,6 +160,19 @@ impl LoadoutReadObserver for Capture<'_> {
     ) -> ControlFlow<()> {
         self.observe_cargo_record_effect(effect)
     }
+    fn observes_xml_port_replacements(&self) -> bool {
+        self.input.is_some() && self.kind == crate::Kind::Ships
+    }
+
+    fn xml_port_replacements_used(
+        &self,
+        root: &LoadoutFileObservation,
+        caller: &LoadoutPath,
+        replacements: &[XmlPortReplacement],
+    ) -> ControlFlow<()> {
+        self.observe_cargo_xml_replacements(root, caller, replacements)
+    }
+
     fn observes_vehicle_port_attributes(&self) -> bool {
         self.input.is_some() && self.kind == crate::Kind::Loadouts
     }

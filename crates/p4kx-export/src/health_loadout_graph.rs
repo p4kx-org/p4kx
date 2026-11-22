@@ -13,6 +13,8 @@ use super::AuthoredEntryPath;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::{CatalogError, ExportAccountingError};
 
+#[path = "health_loadout_graph_replacements.rs"]
+mod replacements;
 #[path = "health_loadout_graph_state.rs"]
 mod state;
 #[path = "health_loadout_vehicle.rs"]
@@ -255,14 +257,10 @@ impl FileGraph {
             let token = path
                 .selection()
                 .ok_or(ExportAccountingError::UnboundHealthSubject)?;
-            let edge = state
-                .edges
-                .get(token)
-                .ok_or(ExportAccountingError::UnobservedFailure)?;
-            if parent != current || edge.parent != parent || edge.child != child {
+            if parent != current {
                 return Err(ExportAccountingError::ConflictingSourceDatum);
             }
-            paths.push(edge.selection.clone());
+            paths.push(state.xml_edge(parent, child, token)?.clone());
             current = child;
         }
         if current != index(getter)? {

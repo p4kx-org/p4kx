@@ -28,7 +28,7 @@ pub(crate) fn with_input(
         builder = builder.entry(entry);
     }
     builder.write_to(&path)?;
-    let archive = Archive::open(path)?;
+    let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
     let files = ArchiveFiles::new(&archive);
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;

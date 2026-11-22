@@ -11,6 +11,7 @@ use crate::{LoadoutFileObservation, LoadoutPath};
 #[derive(Debug)]
 pub struct XmlPortReplacement {
     document: Arc<str>,
+    operation: LoadoutFileObservation,
     ordinal: usize,
     displaced: XmlPortSelection,
     winner: XmlPortSelection,
@@ -19,12 +20,14 @@ pub struct XmlPortReplacement {
 impl XmlPortReplacement {
     pub(crate) fn new(
         document: &LoadoutPath,
+        operation: &LoadoutFileObservation,
         ordinal: usize,
         displaced: &EntrySpec,
         winner: &EntrySpec,
     ) -> Self {
         Self {
             document: Arc::clone(document.text()),
+            operation: operation.clone(),
             ordinal,
             displaced: XmlPortSelection::of(displaced),
             winner: XmlPortSelection::of(winner),
@@ -35,6 +38,12 @@ impl XmlPortReplacement {
     #[must_use]
     pub fn document(&self) -> &str {
         &self.document
+    }
+
+    /// Borrows the original XML operation whose port list was merged.
+    #[must_use]
+    pub const fn merge_document(&self) -> &LoadoutFileObservation {
+        &self.operation
     }
 
     /// Returns the replaced sibling position in the merge document's port list.

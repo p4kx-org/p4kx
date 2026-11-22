@@ -7,6 +7,8 @@ mod alignment;
 mod cargo_record_effect;
 #[path = "loadout_ledger/cargo_storage.rs"]
 mod cargo_storage;
+#[path = "loadout_ledger/cargo_xml_effect.rs"]
+mod cargo_xml_effect;
 #[path = "loadout_ledger/file_dependencies.rs"]
 mod file_dependencies;
 #[path = "loadout_ledger/file_proofs.rs"]

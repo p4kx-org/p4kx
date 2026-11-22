@@ -65,10 +65,14 @@ impl FileTrace {
         self.documents.get(position).map(|_| position)
     }
 
-    pub(crate) fn xml_root(&self) -> Option<&LoadoutFileObservation> {
-        self.xml
-            .and_then(|index| self.documents.get(index))
+    pub(crate) fn xml_operation(&self, position: usize) -> Option<&LoadoutFileObservation> {
+        self.documents
+            .get(position)
             .map(|document| &document.observation)
+    }
+
+    pub(crate) fn xml_root(&self) -> Option<&LoadoutFileObservation> {
+        self.xml.and_then(|index| self.xml_operation(index))
     }
 
     pub(crate) const fn set_xml(&mut self, operation: Option<usize>) {
