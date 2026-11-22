@@ -25,6 +25,8 @@ mod empty_source;
 mod jsonn;
 #[path = "shop_inventory_rejected_path.rs"]
 mod rejected_path;
+#[path = "shop_inventory_resolution_sdk.rs"]
+mod resolution_sdk;
 #[path = "shop_inventory_sdk.rs"]
 mod sdk;
 #[path = "shop_inventory_resolution_sources.rs"]
@@ -102,6 +104,12 @@ fn registry() -> String {
                 .attribute("ShopName", case.status),
         );
     }
+    rows = rows.child(
+        TestElement::new("ShopBackup")
+            .attribute("ID", key(0).to_ascii_uppercase())
+            .attribute("SuperName", "Root,IgnoredDuplicate")
+            .attribute("ShopName", "IgnoredDuplicate"),
+    );
     TestElement::new("BackupData")
         .child(
             TestElement::new("LayerBackups").child(

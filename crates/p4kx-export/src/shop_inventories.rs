@@ -23,6 +23,9 @@ use crate::shop_inventory_source_read as source;
 use crate::starmap_index;
 use crate::{CatalogError, Kind};
 
+#[path = "shop_inventory_resolution_directory.rs"]
+mod resolution_directory;
+
 const PLACEHOLDERS: [&str; 2] = ["temp_outpost_shopinventory", "inv_cryastro_dummy"];
 
 pub(crate) fn is_placeholder(stem: &str) -> bool {

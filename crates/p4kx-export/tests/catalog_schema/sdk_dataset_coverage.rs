@@ -48,6 +48,7 @@ const REPUTATION_REWARD_AMOUNTS: &str = "/definitions/reputationRewardAmounts";
 const COMMODITY_DEFINITIONS: &str = "/definitions/commodities";
 const COMMODITY_PRESENTATIONS: &str = "/projections/commodityPresentation";
 const SHOP_INVENTORIES: &str = "/definitions/shopInventories";
+const SHOP_RESOLUTION: &str = "/declarations/shopInventoryResolution";
 const FLARE_LIBRARIES: &str = "/definitions/flareLibraries";
 const PARTICLE_LIBRARIES: &str = "/definitions/particleLibraries";
 const SUBSUMPTION_EVENTS: &str = "/definitions/subsumptionEvents";
@@ -258,6 +259,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     ATTACHABLE_MODIFIERS,
     CONSUMABLE_CONFIGURATIONS,
     SHOP_INVENTORIES,
+    SHOP_RESOLUTION,
     FLARE_LIBRARIES,
     PARTICLE_LIBRARIES,
     SUBSUMPTION_EVENTS,

@@ -34,11 +34,79 @@ pub(super) fn with_resolutions(
         .try_reserve_exact(registry.len())
         .map_err(CatalogError::SourceUseAllocation)?;
     let listed = read(registry, containers, links, lists, summary, |raw, shop| {
-        resolutions.push(resolver.row(raw, shop)?);
+        resolutions.push(resolver.row(raw, &shop.key, &shop.entity_guid)?);
         Ok(())
     })?;
-    resolutions.sort_unstable_by(|left, right| left.shop_key.value().cmp(&right.shop_key.value()));
+    sort_resolutions(&mut resolutions);
     Ok((listed, resolutions))
+}
+
+pub(super) fn sort_resolutions(rows: &mut [ShopInventoryResolution]) {
+    rows.sort_unstable_by(|left, right| left.shop_key.value().cmp(&right.shop_key.value()));
+}
+
+pub(super) struct ShopPlacement {
+    pub(super) key: String,
+    pub(super) entity_guid: String,
+    entity_name: String,
+    path: Vec<String>,
+}
+
+pub(super) fn visit_registry<'registry>(
+    registry: &'registry [RegistryShop],
+    summary: &mut ShopSummary,
+    mut emit: impl FnMut(
+        &'registry RegistryShop,
+        ShopPlacement,
+        &mut ShopSummary,
+    ) -> Result<(), CatalogError>,
+) -> Result<SourceDisposition, CatalogError> {
+    let mut seen = HashSet::new();
+    let mut disposition = SourceDisposition::Projected;
+    for raw in registry {
+        let Some(placement) = ShopPlacement::read(raw) else {
+            summary.malformed += 1;
+            disposition = SourceDisposition::ProjectionFailed;
+            continue;
+        };
+        if seen.contains(&placement.key) {
+            summary.duplicate += 1;
+            continue;
+        }
+        seen.try_reserve(1)
+            .map_err(CatalogError::SourceUseAllocation)?;
+        seen.insert(placement.key.clone());
+        emit(raw, placement, summary)?;
+    }
+    Ok(disposition)
+}
+
+impl ShopPlacement {
+    fn read(raw: &RegistryShop) -> Option<Self> {
+        let ids: Vec<String> = raw
+            .id
+            .text()
+            .split(',')
+            .map(|id| id.trim().to_ascii_lowercase())
+            .collect();
+        let names: Vec<&str> = raw.super_name.split(',').collect();
+        if ids.len() != names.len() || ids.len() < 2 || ids.iter().any(|id| !is_guid(id)) {
+            return None;
+        }
+        let (entity, parents) = names.split_last()?;
+        let entity_name = clean(entity).to_owned();
+        let path: Vec<String> = parents.iter().map(|name| clean(name).to_owned()).collect();
+        if entity_name.is_empty() || path.iter().any(String::is_empty) {
+            return None;
+        }
+        let entity_guid = ids.last()?.clone();
+        Some(Self {
+            key: ids.join(","),
+            entity_guid,
+            entity_name,
+            path,
+        })
+    }
 }
 
 pub(super) struct Listed {
@@ -55,22 +123,12 @@ pub(super) fn read(
     summary: &mut ShopSummary,
     mut emit: impl FnMut(&RegistryShop, &Shop) -> Result<(), CatalogError>,
 ) -> Result<Listed, CatalogError> {
-    let mut seen: HashSet<String> = HashSet::new();
     let mut built = Vec::with_capacity(registry.len());
     let mut unlinked: BTreeSet<String> = BTreeSet::new();
     let mut systems: BTreeMap<String, usize> = BTreeMap::new();
     let mut kinds: BTreeMap<String, usize> = BTreeMap::new();
-    let mut disposition = SourceDisposition::Projected;
-    for raw in registry {
-        let Some(shop) = shop(raw, containers, links, lists) else {
-            summary.malformed += 1;
-            disposition = SourceDisposition::ProjectionFailed;
-            continue;
-        };
-        if !seen.insert(shop.key.clone()) {
-            summary.duplicate += 1;
-            continue;
-        }
+    let disposition = visit_registry(registry, summary, |raw, placement, summary| {
+        let shop = shop(raw, placement, containers, links, lists);
         emit(raw, &shop)?;
         match (&shop.starmap_object_guid, &shop.location) {
             (Some(_), _) => summary.linked += 1,
@@ -96,7 +154,8 @@ pub(super) fn read(
             *kinds.entry(kind.clone()).or_default() += 1;
         }
         built.push(shop);
-    }
+        Ok(())
+    })?;
     built.sort_by(|a, b| a.key.cmp(&b.key));
     summary.shops = built.len();
     summary.systems = systems.into_iter().collect();
@@ -138,27 +197,17 @@ fn count_inventory(
 
 fn shop(
     raw: &RegistryShop,
+    placement: ShopPlacement,
     containers: &Containers,
     links: &Links,
     lists: &Lists<'_>,
-) -> Option<Shop> {
-    let ids: Vec<String> = raw
-        .id
-        .text()
-        .split(',')
-        .map(|id| id.trim().to_ascii_lowercase())
-        .collect();
-    let names: Vec<&str> = raw.super_name.split(',').collect();
-    if ids.len() != names.len() || ids.len() < 2 || ids.iter().any(|id| !is_guid(id)) {
-        return None;
-    }
-    let (entity, parents) = names.split_last()?;
-    let entity_name = clean(entity).to_owned();
-    let path: Vec<String> = parents.iter().map(|name| clean(name).to_owned()).collect();
-    if entity_name.is_empty() || path.iter().any(String::is_empty) {
-        return None;
-    }
-    let entity_guid = ids.last()?.clone();
+) -> Shop {
+    let ShopPlacement {
+        key,
+        entity_guid,
+        entity_name,
+        path,
+    } = placement;
     let location = path.get(2).cloned();
     let starmap_object_guid = location.as_deref().and_then(|name| links.find(name));
     let class = match containers.find(&entity_guid) {
@@ -177,8 +226,8 @@ fn shop(
     };
     let non_empty = |text: &str| (!text.trim().is_empty()).then(|| text.trim().to_owned());
     let platform = raw.platform.to_ascii_lowercase();
-    Some(Shop {
-        key: ids.join(","),
+    Shop {
+        key,
         entity_guid,
         system: platform
             .strip_suffix(SYSTEM_SUFFIX)
@@ -196,5 +245,5 @@ fn shop(
         commodity_exchange,
         inventory,
         item_guids,
-    })
+    }
 }

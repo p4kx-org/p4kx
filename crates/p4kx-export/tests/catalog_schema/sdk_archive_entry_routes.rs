@@ -10,7 +10,10 @@ use p4kx_export::catalog_queries::particle_libraries::{
     ParticleLibrarySelection, read_particle_libraries,
 };
 use p4kx_export::catalog_queries::radar_audio::{RadarAudioSelection, read_radar_audio};
-use p4kx_export::catalog_queries::shops::{ShopInventorySelection, read_shop_inventories};
+use p4kx_export::catalog_queries::shops::{
+    ResolutionStatus, ShopInventorySelection, ShopResolutionSelection, read_shop_inventories,
+    read_shop_inventory_resolutions,
+};
 use p4kx_export::catalog_queries::subsumption_events::{
     SubsumptionEventSelection, read_subsumption_events,
 };
@@ -21,7 +24,7 @@ use serde_json::{Value, json};
 
 use super::super::{
     FLARE_LIBRARIES, LANGUAGE_POLICY, LANGUAGE_SOURCES, PARTICLE_LIBRARIES, RADAR_AUDIO,
-    SHOP_INVENTORIES, SUBSUMPTION_EVENTS,
+    SHOP_INVENTORIES, SHOP_RESOLUTION, SUBSUMPTION_EVENTS,
 };
 use super::{Route, TestResult, fixtures};
 
@@ -135,5 +138,33 @@ pub(super) fn read_shop_inventory(archive: &Archive) -> TestResult<Route> {
         SHOP_INVENTORIES,
         &snapshot.rows,
         "physical Entry and path query available; installed producer parity open",
+    )
+}
+
+pub(super) fn read_shop_resolution() -> TestResult<Route> {
+    let folder = tempfile::tempdir()?;
+    let path = folder.path().join("shop-resolution.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored(
+            "Data/Libs/CosmoTools/LayerRecovery/LayerBackups.xml",
+            r#"<BackupData><LayerBackups><LayerBackup><ShopBackups>
+                <ShopBackup ID="00000000-0000-4000-8000-000000000001,00000000-0000-4000-8000-000000000002" SuperName="Fixture,Shop" />
+                </ShopBackups></LayerBackup></LayerBackups></BackupData>"#,
+        ))
+        .write_to(&path)?;
+    let archive = Archive::open(path)?;
+    let snapshot = read_shop_inventory_resolutions(&archive, ShopResolutionSelection::All, None)?;
+    let [row] = snapshot.rows.as_slice() else {
+        return Err("the registry-only query must return its admitted shop".into());
+    };
+    assert_eq!(
+        row.status().value(),
+        Some(&ResolutionStatus::Unscanned),
+        "no declaration source grants a physical target"
+    );
+    Route::queried_rows(
+        SHOP_RESOLUTION,
+        &snapshot.rows,
+        "archive-only canonical source parity available; installed producer parity and memory evidence open",
     )
 }

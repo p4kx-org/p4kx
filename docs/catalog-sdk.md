@@ -279,6 +279,26 @@ original inventory from each Build and an index outside each admitted directory.
 cargo test --locked -p p4kx-export --test real_archive real_archive_shop_inventory_v3::sdk::selective_shop_inventories_match_an_original_inventory_and_missing_index -- --ignored --exact --nocapture --test-threads=1
 ```
 
+## Offline shop inventory resolution
+
+Use `catalog_queries::shops::read_shop_inventory_resolutions` to read the canonical
+`declarations.shopInventoryResolution` rows. `All` returns all admitted registry rows.
+`Key` matches the exact canonical `shopKey` value, which contains the full normalized registry
+ID chain. Rows sharing a normalized key use the first valid registry occurrence. The snapshot's
+availability describes the source table. A missing key in an available registry returns no rows.
+
+For a selected shop, the query searches all admitted shop container and prefab declaration
+sources. An unreadable or unattributable declaration can leave any dependent result incomplete.
+The query surveys the original inventory directory, then reads only uniquely targeted
+non-placeholder inventory bodies. Duplicate physical targets stay ambiguous and retain their
+individual identities. Per-value origins, including encryption and completeness, use the
+snapshot's own `SourceInventory`. Query coverage reports registry admission, declaration
+discovery and required read outcomes. A lookup with no matching registry row skips declaration
+discovery.
+
+This query reads the Archive directly without loading DataForge or resolving starmap links.
+Use `read_shop_inventories` for the original contents of a specific inventory file.
+
 ## Resolve field origins
 
 Use each query's own `SourceInventory`. `SourcedValue::origin` supplies the encryption filter,

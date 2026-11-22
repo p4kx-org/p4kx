@@ -83,6 +83,17 @@ pub(crate) struct InventoryFileEvidence {
 }
 
 impl InventoryFileEvidence {
+    pub(super) fn directory(
+        archive: &Archive,
+        entry: &Entry,
+        capture: &EntryCapture<'_>,
+    ) -> Result<Self, CatalogError> {
+        Ok(Self {
+            receipt: EntryReceipt::outer(capture, archive, entry)?,
+            content: None,
+        })
+    }
+
     pub(crate) fn reference(
         &self,
         capture: &EntryCapture<'_>,

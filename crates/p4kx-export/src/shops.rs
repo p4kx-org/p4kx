@@ -29,6 +29,8 @@ use crate::{CatalogError, CatalogOptions, Kind};
 /// The shop registry of the layer recovery data.
 pub(crate) const REGISTRY: &str = "Data\\Libs\\CosmoTools\\LayerRecovery\\LayerBackups.xml";
 
+#[path = "shop_resolution_scope.rs"]
+pub(crate) mod resolution_scope;
 #[path = "shop_list.rs"]
 mod shop_list;
 #[cfg(test)]
@@ -61,6 +63,7 @@ impl Built {
 }
 
 struct ShopDeclarations {
+    directory_complete: bool,
     containers: Containers,
     prefabs: Prefabs,
 }
@@ -84,17 +87,19 @@ impl ShopDeclarations {
         summary.prefab_ambiguous =
             containers.add_prefabs(std::mem::take(&mut prefabs.by_entity))?;
         Ok(Self {
+            directory_complete: crate::export_archive_health::inventory(archive).is_none(),
             containers,
             prefabs,
         })
     }
 
     fn complete(&self) -> bool {
-        !self
-            .containers
-            .ledger
-            .incomplete_inventories
-            .contains(&Kind::Shops)
+        self.directory_complete
+            && !self
+                .containers
+                .ledger
+                .incomplete_inventories
+                .contains(&Kind::Shops)
             && !self
                 .prefabs
                 .ledger
@@ -203,6 +208,7 @@ pub(crate) fn shops(
     let ShopDeclarations {
         containers,
         prefabs,
+        ..
     } = declarations;
     summary.registry_entries = registry.len();
     let links = Links::new(starmap);

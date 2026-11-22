@@ -24836,12 +24836,15 @@
       "description": "One original occurrence consulted for the shop inventory declaration.",
       "oneOf": [
         {
+          "description": "An authored inventory path and its normalized lookup stem.",
           "properties": {
             "sourcePath": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "The authored path text."
             },
             "stem": {
-              "$ref": "#/$defs/SourcedValueOfstring"
+              "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "The normalized offline inventory stem."
             },
             "type": {
               "const": "file",
@@ -24856,6 +24859,7 @@
           "type": "object"
         },
         {
+          "description": "An observed component without an inventory path.",
           "properties": {
             "type": {
               "const": "noDeclaredFile",
@@ -24868,6 +24872,7 @@
           "type": "object"
         },
         {
+          "description": "An observation that could not supply a declaration outcome.",
           "properties": {
             "type": {
               "const": "unscanned",
@@ -24880,9 +24885,11 @@
           "type": "object"
         },
         {
+          "description": "Authored path text that was excluded from the admitted inventory namespace.",
           "properties": {
             "sourcePath": {
               "$ref": "#/$defs/SourcedValueOfstring",
+              "description": "The original rejected path text.",
               "x-gameText": true
             },
             "type": {
@@ -42001,6 +42008,7 @@
       "type": "object"
     },
     "ResolutionStatus": {
+      "description": "Resolution of an offline inventory declaration against observed source Entries.",
       "enum": [
         "resolved",
         "placeholder",

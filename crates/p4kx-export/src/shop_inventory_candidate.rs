@@ -20,14 +20,22 @@ use crate::{CatalogError, ExportAccountingError, HealthText};
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-pub(super) enum InventoryCandidate {
+#[non_exhaustive]
+pub enum InventoryCandidate {
+    /// An authored inventory path and its normalized lookup stem.
     File {
+        /// The authored path text.
         source_path: SourcedValue<String>,
+        /// The normalized offline inventory stem.
         stem: SourcedValue<String>,
     },
+    /// An observed component without an inventory path.
     NoDeclaredFile,
+    /// An observation that could not supply a declaration outcome.
     Unscanned,
+    /// Authored path text that was excluded from the admitted inventory namespace.
     Rejected {
+        /// The original rejected path text.
         #[schemars(extend("x-gameText" = true))]
         source_path: SourcedValue<String>,
     },

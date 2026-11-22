@@ -8,8 +8,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, PhysicalEntryRef};
-use crate::contract::Shop;
-use crate::schema_fields::every_field_required;
+use crate::schema_fields::{compact_string_enum, every_field_required};
 use crate::shop_containers::{Component, Containers, Inventory};
 use crate::shop_inventories::{self, Inventories, ItemList};
 #[path = "shop_inventory_candidate.rs"]
@@ -19,30 +18,67 @@ use crate::shop_inventory_file::InventoryFileEvidence;
 use crate::shop_prefabs::Prefabs;
 use crate::shop_registry::RegistryShop;
 use crate::{CatalogError, ExportAccountingError};
-use candidates::{CapturedCandidates, InventoryCandidate};
+use candidates::CapturedCandidates;
+pub use candidates::InventoryCandidate;
 
 /// One actual shop's inventory declaration and resolution.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct ShopInventoryResolution {
+pub struct ShopInventoryResolution {
     pub(crate) shop_key: SourcedValue<String>,
     status: SourcedValue<ResolutionStatus>,
     candidates: SourcedValue<Vec<SourcedValue<InventoryCandidate>>>,
     physical_targets: SourcedValue<Vec<SourcedValue<PhysicalEntryRef>>>,
 }
 
+impl ShopInventoryResolution {
+    /// Borrows the normalized full registry ID chain.
+    #[must_use]
+    pub const fn shop_key(&self) -> &SourcedValue<String> {
+        &self.shop_key
+    }
+
+    /// Borrows the resolution outcome and its observed source evidence.
+    #[must_use]
+    pub const fn status(&self) -> &SourcedValue<ResolutionStatus> {
+        &self.status
+    }
+
+    /// Borrows the original declaration occurrences contributing to resolution.
+    #[must_use]
+    pub const fn candidates(&self) -> &SourcedValue<Vec<SourcedValue<InventoryCandidate>>> {
+        &self.candidates
+    }
+
+    /// Borrows the physical Archive candidates contributing to resolution.
+    #[must_use]
+    pub const fn physical_targets(&self) -> &SourcedValue<Vec<SourcedValue<PhysicalEntryRef>>> {
+        &self.physical_targets
+    }
+}
+
+/// Resolution of an offline inventory declaration against observed source Entries.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
-#[schemars(extend("x-p4kx-vocabularyClass" = "control"))]
-enum ResolutionStatus {
+#[schemars(transform = compact_string_enum, extend("x-p4kx-vocabularyClass" = "control"))]
+#[non_exhaustive]
+pub enum ResolutionStatus {
+    /// The unique target supplied a usable offline list.
     Resolved,
+    /// The original declaration names a recognized placeholder.
     Placeholder,
+    /// Multiple declarations or physical targets could resolve the inventory.
     Ambiguous,
+    /// The target was absent from a complete directory.
     Missing,
+    /// The selected target could not supply a readable offline list.
     Unreadable,
+    /// The unique physical target had an empty payload.
     EmptySource,
+    /// The observations did not establish a determination.
     Unscanned,
+    /// A shop component was observed without an inventory declaration.
     NoDeclaredFile,
 }
 
@@ -116,28 +152,26 @@ impl<'read, 'input> InventoryResolver<'read, 'input> {
     pub(crate) fn row(
         &self,
         registry: &RegistryShop,
-        shop: &Shop,
+        shop_key: &str,
+        entity_guid: &str,
     ) -> Result<ShopInventoryResolution, CatalogError> {
         let authored = registry
             .id
             .authored()
             .ok_or(ExportAccountingError::UnboundHealthSubject)?;
-        let key = AuthoredEntryPath::derived(self.capture, &[authored], &shop.key)?
+        let key = AuthoredEntryPath::derived(self.capture, &[authored], shop_key)?
             .retain_in(self.capture)?;
         let sources = self.capture.source_uses();
-        let observation = self.containers.inventory_observations(&shop.entity_guid);
+        let observation = self.containers.inventory_observations(entity_guid);
         let mut captured =
             CapturedCandidates::read(observation, self.capture, self.declaration_complete)?;
-        if let Some(rejected) = self.prefabs.rejected.get(&shop.entity_guid) {
+        if let Some(rejected) = self.prefabs.rejected.get(entity_guid) {
             captured.rejected(rejected, self.capture)?;
         }
         let (key_uses, key_complete) = key.contributions();
         candidates::extend(&mut captured.uses, key_uses)?;
         let basis = sources.shared_origin(&captured.uses, captured.complete && key_complete);
-        let decision = self.decide(
-            &shop.entity_guid,
-            observation.map(|(components, _)| components),
-        );
+        let decision = self.decide(entity_guid, observation.map(|(components, _)| components));
         let Targets {
             references,
             mut uses,

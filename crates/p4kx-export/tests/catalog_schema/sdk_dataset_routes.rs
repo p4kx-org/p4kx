@@ -239,6 +239,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         mission_type::read()?,
         mission_locality::read()?,
         archive_entries::read_shop_inventory(&archive)?,
+        archive_entries::read_shop_resolution()?,
         archive_entries::read_flare_library(&archive)?,
         read_faction_identities(&archive)?,
         faction_definitions::read()?,

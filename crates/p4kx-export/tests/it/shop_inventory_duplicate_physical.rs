@@ -193,5 +193,6 @@ fn equivalent_inventory_paths_are_ambiguous_without_changing_legacy_shop_links()
         &json!(DECLARED_PATH),
         None,
     )?;
-    assert_targets(&catalog, row, originals)
+    assert_targets(&catalog, row, originals)?;
+    super::resolution_sdk::assert_physical_duplicate_scope(&archive, &catalog, row, key)
 }

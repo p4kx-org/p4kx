@@ -1,24 +1,31 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Selective access to original offline shop inventory definitions.
+//! Selective access to offline inventory definitions and shop resolution declarations.
 
 use std::slice;
 
 use p4kx_extraction::{Archive, ArchiveWatch, Build, CancelToken, FieldOrigin, SourceInventory};
 
 use crate::catalog_query_session::checkpoint;
-pub use crate::catalog_read::original::PhysicalEntryIdentity;
 use crate::catalog_read::original::{EntryCapture, EntryReceipt, with_entry_capture};
+pub use crate::catalog_read::original::{PhysicalEntryIdentity, PhysicalEntryRef};
 use crate::catalog_table::DatasetAvailability;
 pub use crate::export_entry_counts::ExportEntryCounts;
 pub use crate::shop_inventory_fields::{
     InventoryCollection, InventoryId, InventoryLine, InventoryLines, ShopInventoryFields,
 };
 pub use crate::shop_inventory_file::{ShopInventoryDefinition, ShopInventoryDocument};
+pub use crate::shop_inventory_resolution::{
+    InventoryCandidate, ResolutionStatus, ShopInventoryResolution,
+};
 pub use crate::shop_inventory_source::{
     JsonMember as ShopInventoryMember, JsonString as ShopInventoryString,
     JsonValue as ShopInventoryToken, ShopInventorySource,
+};
+pub use crate::shops::resolution_scope::{
+    ShopInventoryResolutionCoverage, ShopInventoryResolutionSnapshot, ShopResolutionDiscovery,
+    ShopResolutionSelection, read_shop_inventory_resolutions,
 };
 use crate::{CatalogError, Kind, export_health_entries, shop_inventories, starmap_index};
 
