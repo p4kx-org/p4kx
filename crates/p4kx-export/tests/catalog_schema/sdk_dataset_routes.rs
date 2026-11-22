@@ -155,6 +155,8 @@ mod ship_systems;
 mod soils;
 #[path = "sdk_starmap_definition_routes.rs"]
 pub(super) mod starmap_definitions;
+#[path = "sdk_starmap_object_placement_route.rs"]
+mod starmap_object_placement;
 #[path = "sdk_tag_routes.rs"]
 mod tag_routes;
 #[path = "sdk_terrain_routes.rs"]
@@ -253,6 +255,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         location_physics,
         loot_documents,
         unresolved,
+        starmap_object_placement::read()?,
     ];
     routes.extend(archive_source::read()?);
     append_domain_routes(&mut routes, &archive)?;

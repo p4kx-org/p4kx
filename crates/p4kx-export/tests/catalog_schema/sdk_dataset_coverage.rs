@@ -286,6 +286,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     LOCATION_PHYSICS_GRIDS,
     LOOT_DOCUMENTS,
     UNRESOLVED,
+    "/placements/starmapPlacements",
 ];
 
 #[test]

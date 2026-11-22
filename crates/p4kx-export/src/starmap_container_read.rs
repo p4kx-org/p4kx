@@ -5,7 +5,7 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 
-use p4kx_extraction::{Archive, CancelToken};
+use p4kx_extraction::{Archive, CancelToken, Guid};
 
 use super::jump_class::JumpEndpointRecords;
 use super::{Limits, PlacementScope, PlacementSpools, Placements};
@@ -29,13 +29,14 @@ enum PlacementStorage<'directory> {
     Typed,
     Harvest(&'directory HarvestSurvey<'directory>),
     OpenedContainers,
+    Object(Guid),
 }
 
 impl PlacementStorage<'_> {
     const fn descriptor_scope(self, jump_endpoints: bool) -> DescriptorScope {
         match self {
             Self::Harvest(_) => DescriptorScope::Harvest,
-            Self::OpenedContainers => DescriptorScope::OpenedContainers,
+            Self::OpenedContainers | Self::Object(_) => DescriptorScope::OpenedContainers,
             Self::Spool(_) => DescriptorScope::Catalog { jump_endpoints },
             #[cfg(test)]
             Self::Typed => DescriptorScope::Catalog { jump_endpoints },
@@ -126,6 +127,24 @@ impl Placements {
             scope,
             None,
             PlacementStorage::OpenedContainers,
+        )
+    }
+
+    pub(crate) fn read_for_object(
+        archive: &Archive,
+        cancel: Option<&CancelToken>,
+        limits: Limits,
+        capture: &EntryCapture<'_>,
+        guid: Guid,
+    ) -> Result<Self, CatalogError> {
+        Self::read_scoped(
+            archive,
+            cancel,
+            limits,
+            capture,
+            PlacementScope::ArchiveInventory,
+            None,
+            PlacementStorage::Object(guid),
         )
     }
 

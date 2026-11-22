@@ -57,6 +57,15 @@ pub(super) fn walk_systems(
             (archive, capture),
             || PlacementRows::OpenedContainers,
         ),
+        PlacementStorage::Object(guid) => walk_descriptor_systems(
+            index,
+            bodies,
+            systems,
+            cancel,
+            limits,
+            (archive, capture),
+            || PlacementRows::Object(guid),
+        ),
         #[cfg(test)]
         PlacementStorage::Typed => {
             let reads = systems

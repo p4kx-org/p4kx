@@ -46,7 +46,9 @@ impl System<'_> {
                 rows.instances.push(row);
                 Ok(())
             }
-            PlacementRows::Harvest(_) | PlacementRows::OpenedContainers => Ok(()),
+            PlacementRows::Harvest(_)
+            | PlacementRows::OpenedContainers
+            | PlacementRows::Object(_) => Ok(()),
         }
     }
 
@@ -97,7 +99,8 @@ impl System<'_> {
             }
             PlacementRows::Harvest(_)
             | PlacementRows::Selected(_)
-            | PlacementRows::OpenedContainers => {
+            | PlacementRows::OpenedContainers
+            | PlacementRows::Object(_) => {
                 return Ok(());
             }
         }

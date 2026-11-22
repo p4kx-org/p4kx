@@ -28,9 +28,14 @@ mod coverage;
 #[path = "starmap_location_query.rs"]
 mod locations;
 
+#[path = "starmap_object_placement_query.rs"]
+mod object_placements;
+
 pub use crate::catalog_read::original::{PhysicalEntryRef, SourcedXmlAttribute};
 pub use crate::catalog_table::DatasetAvailability;
+pub use crate::catalog_v3::starmap_placement::StarmapPlacement;
 pub use crate::export_entry_counts::ExportEntryCounts;
+pub use crate::guid_text::CatalogGuid;
 pub use crate::location_physics::{
     LocationPhysicsDeclaration, LocationPhysicsDescriptorSelection,
     LocationPhysicsDescriptorSnapshot, LocationPhysicsDescriptorStatus, LocationPhysicsFields,
@@ -55,6 +60,10 @@ pub use locations::{
     AreaEntity, ChildLocation, EntXmlCandidate, EntXmlDocument, EntXmlLink, HarvestableComponent,
     HcdAttribute, HcdDocument, HcdLink, HcdSelectionFailure, LocationAttribute, LocationInstance,
     LocationMetadataElement, LocationPlacementSnapshot, LocationTag, read_location_instances,
+};
+pub use object_placements::{
+    StarmapObjectPlacementCoverage, StarmapObjectPlacementSnapshot, StarmapObjectPlacementStatus,
+    read_starmap_object_placement,
 };
 
 /// A canonical physical system root or a Child route within it.

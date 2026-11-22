@@ -50,27 +50,49 @@ pub(crate) fn starmap_object<'f>(
 ) -> StarmapObject<'f> {
     let root = Some(tree.root());
     let type_guid = reference(root, "type");
-    let placement = placements.get(tree.guid());
+    let guid = CatalogGuid(tree.guid());
+    let placement = ObjectPlacement::select(guid, placements);
     StarmapObject {
-        guid: CatalogGuid(tree.guid()),
+        guid,
         record_index: tree.record_index(),
         class_name: class_name(tree),
         name,
         r#type: type_guid.and_then(|guid| types.get(trees, forge, guid)),
-        system: placement.map(|placement| placement.system.to_string()),
-        entity_name: placement
-            .map(|placement| placement.entity_name.as_str())
-            .filter(|name| !name.is_empty())
-            .map(str::to_owned),
-        placed_under_guid: placement
-            .and_then(|placement| placement.placed_under)
-            .map(CatalogGuid),
-        position: placement.map(|placement| placement.position.map(millimetres)),
-        placement_proof: placement
-            .map(|placement| PlacementEvidence::Selected(placement.proof.clone()))
-            .or_else(|| placements.ambiguity_proof(tree.guid())),
+        system: placement.system,
+        entity_name: placement.entity_name,
+        placed_under_guid: placement.placed_under_guid,
+        position: placement.position,
+        placement_proof: placement.proof,
         mining_claim: tree.field("description").is_some_and(is_mining_claim),
         location_origin: None,
+    }
+}
+
+pub(crate) struct ObjectPlacement {
+    pub(crate) system: Option<String>,
+    pub(crate) entity_name: Option<String>,
+    pub(crate) placed_under_guid: Option<CatalogGuid>,
+    pub(crate) position: Option<[f64; 3]>,
+    pub(crate) proof: Option<PlacementEvidence>,
+}
+
+impl ObjectPlacement {
+    pub(crate) fn select(guid: CatalogGuid, placements: &Placements) -> Self {
+        let placement = placements.get(guid.0);
+        Self {
+            system: placement.map(|placement| placement.system.to_string()),
+            entity_name: placement
+                .map(|placement| placement.entity_name.as_str())
+                .filter(|name| !name.is_empty())
+                .map(str::to_owned),
+            placed_under_guid: placement
+                .and_then(|placement| placement.placed_under)
+                .map(CatalogGuid),
+            position: placement.map(|placement| placement.position.map(millimetres)),
+            proof: placement
+                .map(|placement| PlacementEvidence::Selected(placement.proof.clone()))
+                .or_else(|| placements.ambiguity_proof(guid.0)),
+        }
     }
 }
 

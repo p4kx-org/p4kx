@@ -18,7 +18,10 @@ impl System<'_> {
         placed: Option<&WalkPath>,
         file: &ContainerFile,
     ) -> Result<(), CatalogError> {
-        if matches!(&self.rows, PlacementRows::Harvest(_)) {
+        if matches!(
+            &self.rows,
+            PlacementRows::Harvest(_) | PlacementRows::Object(_)
+        ) {
             return Ok(());
         }
         let Some(declaration) = &child.unresolved_external else {
@@ -71,7 +74,9 @@ impl System<'_> {
                 rows.unresolved.push(row);
                 Ok(())
             }
-            PlacementRows::Harvest(_) | PlacementRows::OpenedContainers => Ok(()),
+            PlacementRows::Harvest(_)
+            | PlacementRows::OpenedContainers
+            | PlacementRows::Object(_) => Ok(()),
         }
     }
 }

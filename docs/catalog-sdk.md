@@ -1982,6 +1982,22 @@ session's language policy. It reports family availability, selected Record cover
 and a separate source inventory. References can consult the original target headers.
 The only payloads read are the selected Record bodies and the requested localization. A parsed session reuses the opened DataForge across repeated selections.
 
+## Starmap object placement
+
+Use `starmap::read_starmap_object_placement` with a physical DataForge Record index
+from the queried Build. It returns the canonical `placements.starmapPlacements` row for
+that Record. Records with the same GUID have separate physical indices and share the
+world placement selected by that GUID.
+
+The query checks the selected Record and all canonical system roots in catalog order.
+It reads the reachable placement descriptors without building the complete catalog or
+reading localization, location grid, or jump endpoint payloads. The returned status
+distinguishes a Record outside the dataset, a complete traversal with no placement,
+a selected placement, conflicting placements, and unresolved input. An admitted Record
+with a conclusive result has one canonical row, including any absent placement fields.
+An unresolved input has no row and keeps its Record or traversal coverage. The caller
+may provide a `StarmapTraversalBudget`; exhausted allowances require an unresolved result.
+
 ## Starmap container placements
 
 Use `starmap::read_container_placements` to read the canonical `placements.containerInstances` and

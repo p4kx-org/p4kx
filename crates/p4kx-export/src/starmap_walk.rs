@@ -226,6 +226,7 @@ pub(crate) enum PlacementRows<'writer> {
     Harvest(&'writer HarvestSurvey<'writer>),
     Selected(&'writer mut SelectedPlacementRows),
     OpenedContainers,
+    Object(Guid),
 }
 
 impl PlacementRows<'_> {
@@ -234,15 +235,21 @@ impl PlacementRows<'_> {
             Self::Selected(rows) => {
                 matches!(rows.table, PlacementTable::Containers) && rows.matches(route)
             }
-            Self::Harvest(_) | Self::OpenedContainers => false,
+            Self::Harvest(_) | Self::OpenedContainers | Self::Object(_) => false,
             Self::Spool { .. } => true,
             #[cfg(test)]
             Self::Typed => true,
         }
     }
 
-    const fn records_objects(&self) -> bool {
-        !matches!(self, Self::Selected(_) | Self::OpenedContainers)
+    fn records_object(&self, guid: Guid) -> bool {
+        match self {
+            Self::Object(selected) => *selected == guid,
+            Self::Selected(_) | Self::OpenedContainers => false,
+            Self::Spool { .. } | Self::Harvest(_) => true,
+            #[cfg(test)]
+            Self::Typed => true,
+        }
     }
 }
 
@@ -329,12 +336,12 @@ impl System<'_> {
         path: &WalkPath,
         under: Option<Guid>,
     ) -> Result<(), CatalogError> {
-        if !self.rows.records_objects() {
-            return Ok(());
-        }
         let Some(record) = child.record else {
             return Ok(());
         };
+        if !self.rows.records_object(record) {
+            return Ok(());
+        }
         let last = path
             .route
             .as_ref()
