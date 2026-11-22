@@ -127,6 +127,7 @@ mod real_archive_resource_components;
 mod real_archive_resource_configurations_sdk;
 mod real_archive_resource_network;
 mod real_archive_resource_network_global;
+mod real_archive_scoped_equipment_sdk;
 mod real_archive_security_manifests;
 mod real_archive_ship_b2;
 mod real_archive_ship_base;

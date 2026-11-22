@@ -39,7 +39,7 @@ pub(super) fn read() -> TestResult<Route> {
         Route::queried_rows(
             SHIP_STORE_SLUGS,
             scope.rows(),
-            "full and Filter-scoped synthetic producer parity with physical aliases available; installed SDK parity open",
+            "synthetic parity, installed scoped producer parity and unfiltered query memory verified; complete producer parity open",
         )
     })
     .map(|(_, route)| route)

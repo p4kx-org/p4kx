@@ -1469,6 +1469,12 @@ The snapshot retains the exact Filter text, curated counts and read coverage of 
 physical Ship candidates. Check that coverage before treating a missing row as absence.
 The query resolves candidates for curated GUIDs, including all admitted physical aliases.
 
+A scoped normal Catalog comparison matched the selected physical Ship, Store
+rows and curated summary on installed LIVE `13220821` and PTU `13248297`.
+The literal Record path was anchored and its full physical cohort was
+checked before generation. Complete unfiltered Catalog parity remains separate
+from the cold unfiltered API measurements below.
+
 The Catalog's `mass`, `massBasis` and `hullHealth` are immediate sourced aggregate cells.
 Their input sets bind the current physical Record to the original Vehicle XML, the selected
 Modification, patch and overrides, and the fields consulted for each metric. A Physics fallback
@@ -1913,6 +1919,38 @@ The same component can contribute an instance at several distinct positions.
 Check the selected Loadout state, its coverage, and the reached configuration dependencies
 before interpreting an empty result. Retain the snapshot's own source inventory.
 Interior-kind instances and `placements.facilityInteriorCoverage` require the full Catalog.
+
+### Installed memory measurements for Store mappings and Loadout placements
+
+Run the ignored tests under `real_archive_scoped_equipment_sdk` in the
+`p4kx-export` real-archive test target. Set `P4KX_DATA_P4K` and
+`P4KX_NEW_SDK_BUILD` for the installed Archive and its expected change
+number. Use the configured archive key. Set `P4KX_STORE_SLUG_SDK_RECORD`
+for the selected Store parity test or `P4KX_FACILITY_SDK_RECORD` for the
+physical facility Ship. The Facility producer comparison also requires an
+anchored `P4KX_FACILITY_SDK_FILTER` and its complete original Record set in
+`P4KX_FACILITY_SDK_SELECTED_RECORDS`. Its preflight checks that the selection
+includes all reached configuration and alignment owners.
+
+A Windows AMD64 Debug test driver built with production code `5c775c446`
+opened the installed Archive in a fresh process for each query. The Store
+queries were unfiltered. Each Facility query returned 13 placements for its
+selected physical Ship and resolved the row origins through its scoped
+source inventory.
+
+| Build | SDK query | Peak private bytes | Peak working set bytes | Elapsed |
+| --- | --- | ---: | ---: | ---: |
+| LIVE `13220821` | Store mappings | 1,459,482,624 | 1,456,234,496 | 44.03 s |
+| PTU `13248297` | Store mappings | 1,482,338,304 | 1,478,729,728 | 45.47 s |
+| LIVE `13220821` | One Ship's Facility placements | 1,091,895,296 | 1,024,172,032 | 14.46 s |
+| PTU `13248297` | One Ship's Facility placements | 1,116,172,288 | 1,034,334,208 | 14.53 s |
+
+The host had 100,573,523,968 bytes of physical memory. Available memory
+started between 62.23 and 62.31 GB and stayed above 60.75 GB. All four
+processes remained below 2 GB. The largest peak leaves an estimated 15.70 GB
+for the operating system and other applications on a 16 GiB host. Installed
+producer parity for the complete Facility scope and the integrated
+consumer's memory measurements are separate checks.
 
 ## Original cargo manifests
 

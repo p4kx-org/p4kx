@@ -79,7 +79,7 @@ pub(super) fn read() -> TestResult<Route> {
     Route::queried_rows(
         FACILITY_INSTANCES,
         &snapshot.rows,
-        "Loadout-kind synthetic producer parity; Interior admission and installed producer parity open",
+        "Loadout-kind synthetic parity and installed scoped memory verified; Interior admission and installed producer parity open",
     )
 }
 
