@@ -164,21 +164,19 @@ pub(crate) struct LootContainer {
     pub(crate) starmap_object_guid: Option<CatalogGuid>,
     /// The total entities from the verified `.soc` files of the placed container, including zero.
     pub(crate) entity_count: SourcedValue<u32>,
-    /// How many entities of the placed container carry each tag, summed over its `.soc` files and
-    /// ordered by GUID; empty when `entityCount` is unavailable. The tags of `tagGuids` of the tagged
-    /// configs select the slots.
-    pub(crate) tag_counts: Vec<TagCount>,
+    /// Entity counts by GUID from the verified SOC survey, ordered by GUID.
+    pub(crate) tag_counts: SourcedValue<Vec<TagCount>>,
 }
 
 /// How many entities carry one tag.
-#[derive(Debug, Clone, Copy, Serialize, JsonSchema)]
+#[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct TagCount {
-    /// The `Tag` Record.
-    pub(crate) tag_guid: CatalogGuid,
-    /// The number of entities that carry the tag.
-    pub(crate) entities: u32,
+    /// The GUID from the first accepted original `TagId` attribute.
+    pub(crate) tag_guid: SourcedValue<CatalogGuid>,
+    /// The number of distinct entities that carry the tag in the complete SOC survey.
+    pub(crate) entities: SourcedValue<u32>,
 }
 
 /// The loot a slot of a harvestable generates (`lootConfig`).

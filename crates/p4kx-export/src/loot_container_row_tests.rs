@@ -4,6 +4,7 @@
 use std::collections::HashMap;
 
 use p4kx_extraction::{Guid, SourceUses, SourceValue, SourceValueState, SourcedValue};
+use p4kx_extraction::{InputScope, SourceInput, SourceLocation, SourceUseRole};
 
 use super::{Tags, row, rows};
 use crate::contract_loot::LootContainer;
@@ -68,8 +69,16 @@ fn fixture_tags(
     first_config: Guid,
     second_config: Guid,
     sources: &SourceUses,
-) -> HashMap<usize, Tags> {
-    HashMap::from([
+) -> Result<HashMap<usize, Tags>, crate::CatalogError> {
+    let unbound = sources
+        .observe(SourceInput::Unknown, InputScope::Payload)?
+        .at(
+            SourceLocation::Metadata {
+                field: "fixtureTagId".to_owned(),
+            },
+            SourceUseRole::Payload,
+        )?;
+    Ok(HashMap::from([
         (
             1,
             Tags {
@@ -78,6 +87,7 @@ fn fixture_tags(
                     by_tag: HashMap::from([(first_config, 2)]),
                 }),
                 origin: sources.origin(&[], true),
+                first_tag_uses: HashMap::from([(first_config, unbound.clone())]),
             },
         ),
         (
@@ -88,9 +98,10 @@ fn fixture_tags(
                     by_tag: HashMap::from([(second_config, 4)]),
                 }),
                 origin: sources.origin(&[], true),
+                first_tag_uses: HashMap::from([(second_config, unbound)]),
             },
         ),
-    ])
+    ]))
 }
 
 #[test]
@@ -105,7 +116,7 @@ fn duplicate_rows_keep_the_first_placement_with_canonical_order()
         opened(20, "stanton"),
         opened(20, "nyx"),
     ];
-    let tags = fixture_tags(first_config, second_config, sources);
+    let tags = fixture_tags(first_config, second_config, sources)?;
     let result = rows(
         &roots,
         &Objects::new(&[]),
@@ -143,12 +154,12 @@ fn duplicate_rows_keep_the_first_placement_with_canonical_order()
                 && row.container.value().map(String::as_str) == Some("a.socpak")
         })
         .ok_or("deduplicated Stanton placement")?;
-    let [count] = stanton.tag_counts.as_slice() else {
+    let Some([count]) = stanton.tag_counts.value().map(Vec::as_slice) else {
         return Err("expected one tag from the first placement".into());
     };
     assert_eq!(
-        (count.tag_guid, count.entities),
-        (CatalogGuid(first_config), 2),
+        (count.tag_guid.value(), count.entities.value()),
+        (Some(&CatalogGuid(first_config)), Some(&2)),
         "the first physical placement supplies the selected tag counts"
     );
     Ok(())
@@ -168,6 +179,7 @@ fn a_container_that_could_not_be_counted_has_no_entity_count() -> Result<(), cra
     let failed = Tags {
         tags: Err(Unreadable::SocFile),
         origin: sources.origin(&[], false),
+        first_tag_uses: HashMap::new(),
     };
     let row = row(
         &placed("a.socpak", sources),
@@ -181,7 +193,11 @@ fn a_container_that_could_not_be_counted_has_no_entity_count() -> Result<(), cra
         SourceValueState::Unreadable,
         "failed counts remain unavailable"
     );
-    assert!(row.tag_counts.is_empty(), "no partial tag counts survive");
+    assert_eq!(
+        row.tag_counts.state(),
+        SourceValueState::Unreadable,
+        "no partial tag counts survive"
+    );
     Ok(())
 }
 
@@ -191,6 +207,7 @@ fn a_container_without_a_soc_has_zero_entities() -> Result<(), crate::CatalogErr
     let none = Tags {
         tags: Ok(EntityTags::default()),
         origin: sources.origin(&[], true),
+        first_tag_uses: HashMap::new(),
     };
     let row = row(
         &placed("a.socpak", sources),

@@ -5,13 +5,14 @@ use std::sync::Arc;
 
 use p4kx_assembly::{LoadoutFileError, LoadoutFileRead};
 use p4kx_extraction::{
-    Archive, Entry, Guid, SourceLocation, SourceUseRole, SourceValue, SourcedValue,
+    Archive, Entry, Guid, SourceLocation, SourceUse, SourceUseRole, SourceValue, SourcedValue,
 };
 
 use super::health_entry_frame::{EntryCapture, EntryFrame};
 use super::health_entry_metadata::{self, EntryMetadata};
 use super::{AuthoredEntryPath, LoadoutBodyReceipt, OriginalDatum};
 use crate::build::original_input::OriginalCatalogInput;
+use crate::loot_soc::TagSite;
 use crate::soc_preset::PresetMatch;
 use crate::{CatalogError, ExportAccountingError, HealthText};
 
@@ -327,6 +328,18 @@ impl EntryReceipt {
         Ok(capture
             .source_uses()
             .value(SourceValue::Present(matched.guid), &uses, true))
+    }
+
+    pub(crate) fn soc_tag_id(
+        &self,
+        capture: &EntryCapture<'_>,
+        site: TagSite,
+    ) -> Result<SourceUse, CatalogError> {
+        self.check_capture(capture)?;
+        self.inner
+            .as_ref()
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?
+            .payload_at(site.location(), SourceUseRole::Payload)
     }
 
     pub(crate) fn attempted_payload(&self) -> Result<(), CatalogError> {

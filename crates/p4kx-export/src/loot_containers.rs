@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::{BTreeMap, HashMap};
+use std::slice::from_ref;
 
 use p4kx_extraction::{Archive, CancelToken, SourceUses, SourceValue, SourcedValue};
 use rayon::prelude::*;
@@ -17,7 +18,7 @@ use crate::loot_unreadable::{Unreadable, UnreadableContainer};
 use crate::loot_walk::{Explored, Placed, PlacedTarget, Summary, below, explore, path_of};
 use crate::starmap_index::Index;
 use crate::starmap_walk::Opened;
-use crate::{CatalogError, Kind};
+use crate::{CatalogError, ExportAccountingError, Kind};
 
 #[path = "loot_system_origin.rs"]
 mod system_origin;
@@ -185,18 +186,8 @@ fn row(
     tags: Option<&Tags>,
     sources: &SourceUses,
 ) -> Result<LootContainer, CatalogError> {
-    let counts = tags.and_then(|read| read.tags.as_ref().ok());
-    let mut tag_counts: Vec<TagCount> = counts.map_or_default(|counts| {
-        counts
-            .by_tag
-            .iter()
-            .map(|(&tag, &entities)| TagCount {
-                tag_guid: CatalogGuid(tag),
-                entities,
-            })
-            .collect()
-    });
-    tag_counts.sort_by_cached_key(|count| count.tag_guid.text());
+    let entity_count = count_value(placed, tags, sources)?;
+    let tag_counts = project_tag_counts(&entity_count, tags, sources)?;
     Ok(LootContainer {
         multi_config_guid: sources.value_with_origins(
             SourceValue::Present(CatalogGuid(placed.config)),
@@ -208,9 +199,39 @@ fn row(
         )?,
         system,
         starmap_object_guid: location,
-        entity_count: count_value(placed, tags, sources)?,
+        entity_count,
         tag_counts,
     })
+}
+
+fn project_tag_counts(
+    survey: &SourcedValue<u32>,
+    tags: Option<&Tags>,
+    sources: &SourceUses,
+) -> Result<SourcedValue<Vec<TagCount>>, CatalogError> {
+    let mut rows = Vec::new();
+    if let Some(read) = tags
+        && let Ok(counts) = &read.tags
+    {
+        rows.try_reserve(counts.by_tag.len())
+            .map_err(CatalogError::SourceUseAllocation)?;
+        for (&guid, &count) in &counts.by_tag {
+            let use_ref = read
+                .first_tag_uses
+                .get(&guid)
+                .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+            rows.push(TagCount {
+                tag_guid: sources.value(
+                    SourceValue::Present(CatalogGuid(guid)),
+                    from_ref(use_ref),
+                    true,
+                ),
+                entities: survey.map_ref(|_| count),
+            });
+        }
+        rows.sort_by_cached_key(|row| row.tag_guid.value().copied().map(CatalogGuid::text));
+    }
+    Ok(survey.map_ref(|_| rows))
 }
 
 fn count_value(

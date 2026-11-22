@@ -2489,8 +2489,15 @@ the placed container's `.soc` files.
 establish an empty result. `absent` means the original placement lookup proved the container is
 missing. `unreadable` means the target or a required input could not be read or validated. A
 completed count cites the placement selector, the nested path directory, and the layouts and
-entity XML ranges of the selected SOC files. Failed inputs appear in export health. The tag counts
-remain empty when the entity count is unavailable.
+entity XML ranges of the selected SOC files. Failed inputs appear in export health.
+
+`tagCounts` uses the same survey and source states. A verified survey without any valid tag GUID
+has `state: present` and an empty array. Rows are ordered by GUID. Each `tagGuid` cites the first
+accepted `TagId` in physical SOC member order, then chunk and XML order. The `socEntityTag.cryXml`
+and `socEntityTag.text` coordinates are zero-based chunk ordinal, decoded chunk start and exclusive
+end, XML node ordinal and attribute ordinal. The field records the original attribute spelling.
+The numeric `entities` counts each physical entity once per tag and cites the full verified survey,
+including members without a match. Its encryption marker can differ from the tag GUID's marker.
 
 `multiConfigGuid.value` retains the first valid original configuration attribute.
 `system.value` is the normalized folder of the physical main system container or the

@@ -10,6 +10,9 @@ use crate::health_origin_assertions as proof;
 use crate::health_origin_entry_source as entries;
 use crate::health_origin_fixture::{self as fixture, Fixture, TestResult};
 
+#[path = "loot_container_tag_count_origin.rs"]
+mod tag_count_origin;
+
 const CONFIG: &str = "687af3db-4c0d-4e8d-9261-102274f8b6ed";
 const ALIAS: &str = "R:/authoring/Data/ObjectContainers/PU/synthetic/alias-target.socpak";
 pub(super) const LITERAL: &str = "ObjectContainers/PU/synthetic/alias-target.socpak";
@@ -68,6 +71,7 @@ fn a_direct_loot_link_keeps_its_own_clear_source() -> TestResult {
     );
     verify_target_path(&catalog, path)?;
     let count = proof::present(row, "entityCount", &json!(0), Some(false))?;
+    proof::present(row, "tagCounts", &json!([]), Some(false))?;
     let uses = proof::uses(&catalog, count)?;
     assert!(
         uses.iter().any(|used| used.pointer("/location/namespace")
@@ -87,6 +91,7 @@ fn a_verified_absent_loot_target_keeps_the_authored_path() -> TestResult {
     let path = proof::present(row, "container", &json!(TARGET), Some(true))?;
     verify_attribute(&catalog, path, "@objectContainer")?;
     let count = proof::cell(row, "entityCount", "absent")?;
+    proof::cell(row, "tagCounts", "absent")?;
     verify_attribute(&catalog, count, "@objectContainer")?;
     assert_eq!(
         proof::at(
@@ -163,6 +168,7 @@ fn a_bad_soc_checksum_refuses_normal_and_has_no_count_payload() -> TestResult {
     let (_, catalog) = source.diagnostic()?;
     let row = only_row(&catalog)?;
     let count = proof::cell(row, "entityCount", "unreadable")?;
+    proof::cell(row, "tagCounts", "unreadable")?;
     assert_eq!(
         count.get("sourceSetComplete"),
         Some(&json!(false)),

@@ -1,33 +1,47 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::HashMap;
+
 use p4kx_extraction::chunks::ChunkFile;
-use p4kx_extraction::{Archive, CancelToken, Entry, FieldOrigin, SourceUse, SourceUseRole};
+use p4kx_extraction::{Archive, CancelToken, Entry, FieldOrigin, Guid, SourceUse, SourceUseRole};
 
 use crate::catalog_read::original::{EntryCapture, EntryRead};
 use crate::container_read;
 use crate::entry_source::EntrySource;
 use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
-use crate::loot_soc::{ENTITIES, EntityTags};
+use crate::loot_soc::{CountedSoc, ENTITIES, EntityTags};
 use crate::loot_unreadable::Unreadable;
 use crate::{CatalogError, ExportAccountingError, Kind};
+
+mod tag_evidence;
+
+use self::tag_evidence::TagEvidence;
 
 pub(crate) struct Counted {
     pub(crate) tags: Result<EntityTags, Unreadable>,
     pub(crate) origin: FieldOrigin,
+    pub(crate) first_tag_uses: HashMap<Guid, SourceUse>,
 }
 
 impl Counted {
     fn new(
         tags: Result<EntityTags, Unreadable>,
         uses: &[SourceUse],
+        evidence: TagEvidence,
         capture: &EntryCapture<'_>,
-    ) -> Self {
-        Self {
+    ) -> Result<Self, CatalogError> {
+        let first_tag_uses = if tags.is_ok() {
+            evidence.bind(capture)?
+        } else {
+            HashMap::new()
+        };
+        Ok(Self {
             origin: capture.source_uses().origin(uses, tags.is_ok()),
             tags,
-        }
+            first_tag_uses,
+        })
     }
 }
 
@@ -44,7 +58,12 @@ pub(crate) fn read(
     let mut ledger = ExportLedger::default();
     let Some(socpak) = archive.entries().get(entry) else {
         return Ok((
-            Counted::new(Err(Unreadable::NoSuchEntry), &[], capture),
+            Counted::new(
+                Err(Unreadable::NoSuchEntry),
+                &[],
+                TagEvidence::default(),
+                capture,
+            )?,
             ledger,
         ));
     };
@@ -57,7 +76,12 @@ pub(crate) fn read(
             SourceDisposition::ReadFailed,
         );
         return Ok((
-            Counted::new(Err(Unreadable::NotAContainer), &[], capture),
+            Counted::new(
+                Err(Unreadable::NotAContainer),
+                &[],
+                TagEvidence::default(),
+                capture,
+            )?,
             ledger,
         ));
     };
@@ -79,9 +103,9 @@ fn read_members(
     ledger: &mut ExportLedger,
 ) -> Result<Counted, CatalogError> {
     let directory = container_read::observe_container_directory(container, capture.source_uses())?;
-    let mut uses = Vec::new();
+    let mut evidence = ReadEvidence::default();
     let mut failure = if let Some(directory) = directory {
-        push_use(&mut uses, directory)?;
+        push_use(&mut evidence.survey, directory)?;
         None
     } else {
         ledger.incomplete_inventory(Kind::LootContainers);
@@ -98,7 +122,7 @@ fn read_members(
             cancel,
             capture,
             &mut counts,
-            &mut uses,
+            &mut evidence,
         )?;
         let disposition = match observed {
             Ok(()) => SourceDisposition::Projected,
@@ -113,11 +137,18 @@ fn read_members(
         };
         original.record(ledger, Kind::LootContainers, disposition);
     }
-    Ok(Counted::new(
+    Counted::new(
         failure.map_or(Ok(counts), Err),
-        &uses,
+        &evidence.survey,
+        evidence.tags,
         capture,
-    ))
+    )
+}
+
+#[derive(Default)]
+struct ReadEvidence {
+    survey: Vec<SourceUse>,
+    tags: TagEvidence,
 }
 
 fn read_soc(
@@ -127,17 +158,18 @@ fn read_soc(
     cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
     counts: &mut EntityTags,
-    uses: &mut Vec<SourceUse>,
+    evidence: &mut ReadEvidence,
 ) -> Result<Result<(), Unreadable>, CatalogError> {
     let Ok(bytes) = EntryRead::read_verified(source.receipt().clone(), container, soc, cancel)?
     else {
         return Ok(Err(Unreadable::SocFile));
     };
-    let file = match counts.count_soc(bytes.bytes()) {
+    let CountedSoc { file, first_tags } = match counts.count_soc(bytes.bytes()) {
         Ok(file) => file,
         Err(error) => return Ok(Err(Unreadable::Soc(error))),
     };
-    retain_inputs(&bytes, &file, capture, uses)?;
+    retain_inputs(&bytes, &file, capture, &mut evidence.survey)?;
+    evidence.tags.retain_member(bytes.receipt(), first_tags)?;
     Ok(Ok(()))
 }
 

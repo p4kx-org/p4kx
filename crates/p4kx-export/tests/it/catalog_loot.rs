@@ -257,7 +257,30 @@ fn loot_container_facts(catalog: &Value) -> TestResult<Vec<Value>> {
                 .get_mut("entityCount")
                 .ok_or("canonical entity count cell")?
                 .clone_from(value);
+            let tag_facts = loot_tag_facts(row)?;
+            *facts
+                .get_mut("tagCounts")
+                .ok_or("canonical tag count cells")? = json!(tag_facts);
             Ok(facts)
+        })
+        .collect()
+}
+
+fn loot_tag_facts(row: &Value) -> TestResult<Vec<Value>> {
+    use crate::health_origin_assertions as proof;
+
+    if proof::at(row, "/tagCounts/state")? == "absent" {
+        proof::cell(row, "tagCounts", "absent")?;
+        return Ok(Vec::new());
+    }
+    let carrier = proof::cell(row, "tagCounts", "present")?;
+    proof::rows(carrier, "/value")?
+        .iter()
+        .map(|tag| {
+            Ok(json!({
+                "tagGuid": proof::at(proof::cell(tag, "tagGuid", "present")?, "/value")?,
+                "entities": proof::at(proof::cell(tag, "entities", "present")?, "/value")?,
+            }))
         })
         .collect()
 }

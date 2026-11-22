@@ -2,11 +2,12 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::{HashMap, HashSet};
+use std::ops::Range;
 
-use p4kx_extraction::Guid;
 use p4kx_extraction::chunks::{ChunkFile, ChunkType, Container};
+use p4kx_extraction::{Guid, SourceLocation};
 
-use crate::starmap_xml::{Document, Node, XmlError, attribute};
+use crate::starmap_xml::{Document, Node, Root, XmlError};
 
 /// The chunk of a `.soc` file that holds its entities as `CryXmlB`.
 pub(crate) const ENTITIES: ChunkType = ChunkType::new(Container::CrCh, 0x0004);
@@ -29,6 +30,8 @@ pub(crate) enum SocError {
     /// A tag collection could not allocate space for a new tag.
     #[error("its .soc tag counts could not be allocated")]
     TagAllocation,
+    #[error("its .soc TagId has no position in the parsed XML")]
+    UnboundTag,
 }
 
 /// How many entities there are and how many carry each tag.
@@ -36,6 +39,52 @@ pub(crate) enum SocError {
 pub(crate) struct EntityTags {
     pub(crate) entities: u32,
     pub(crate) by_tag: HashMap<Guid, u32>,
+}
+
+pub(crate) struct CountedSoc<'bytes> {
+    pub(crate) file: ChunkFile<&'bytes [u8]>,
+    pub(crate) first_tags: HashMap<Guid, TagSite>,
+}
+
+pub(crate) struct TagSite {
+    chunk: u64,
+    bytes: Range<u64>,
+    node: u32,
+    attribute: u64,
+    name: Box<str>,
+    format: TagXmlFormat,
+}
+
+#[derive(Clone, Copy)]
+enum TagXmlFormat {
+    CryXml,
+    Text,
+}
+
+impl TagSite {
+    pub(crate) fn location(self) -> SourceLocation {
+        let namespace = match self.format {
+            TagXmlFormat::CryXml => "socEntityTag.cryXml",
+            TagXmlFormat::Text => "socEntityTag.text",
+        };
+        SourceLocation::Subresource {
+            namespace: namespace.to_owned(),
+            indices: vec![
+                self.chunk,
+                self.bytes.start,
+                self.bytes.end,
+                u64::from(self.node),
+                self.attribute,
+            ],
+            field: format!("@{}", self.name),
+        }
+    }
+}
+
+struct TagChunk<'doc, 'bytes> {
+    index: u64,
+    bytes: Range<u64>,
+    document: &'doc Document<'bytes>,
 }
 
 impl EntityTags {
@@ -47,13 +96,27 @@ impl EntityTags {
     pub(crate) fn count_soc<'bytes>(
         &mut self,
         bytes: &'bytes [u8],
-    ) -> Result<ChunkFile<&'bytes [u8]>, SocError> {
+    ) -> Result<CountedSoc<'bytes>, SocError> {
         let file = ChunkFile::parse(bytes).map_err(|_| SocError::NotChunkFile)?;
-        for (index, _) in file.chunks_of(ENTITIES) {
+        let mut first_tags = HashMap::new();
+        for (index, chunk) in file.chunks_of(ENTITIES) {
             let data = file.chunk_data(index).ok_or(SocError::ChunkOutOfRange)?;
-            self.add_xml(data)?;
+            let end = chunk
+                .offset()
+                .checked_add(chunk.size())
+                .ok_or(SocError::ChunkOutOfRange)?;
+            let document = Document::parse(data)?;
+            let index = u64::try_from(index).map_err(|_| SocError::UnboundTag)?;
+            let input = TagChunk {
+                index,
+                bytes: chunk.offset()..end,
+                document: &document,
+            };
+            self.add_entities(document.root(), |id, node, attribute, name| {
+                record_first(&mut first_tags, id, &input, node, attribute, name)
+            })?;
         }
-        Ok(file)
+        Ok(CountedSoc { file, first_tags })
     }
 
     #[cfg(test)]
@@ -61,12 +124,16 @@ impl EntityTags {
         self.count_soc(bytes).map(|_| ())
     }
 
-    /// Adds the entities of the XML document `bytes`, `CryXml` or text.
+    #[cfg(test)]
     fn add_xml(&mut self, bytes: &[u8]) -> Result<(), SocError> {
-        self.add_entities(Document::parse(bytes)?.root())
+        self.add_entities(Document::parse(bytes)?.root(), |_, _, _, _| Ok(()))
     }
 
-    fn add_entities<'d, N: Node<'d>>(&mut self, root: N) -> Result<(), SocError> {
+    fn add_entities<'xml>(
+        &mut self,
+        root: Root<'xml>,
+        mut observe: impl FnMut(Guid, Root<'xml>, usize, &'xml str) -> Result<(), SocError>,
+    ) -> Result<(), SocError> {
         let mut entity_tags = HashSet::new();
         for entity in root
             .children()
@@ -74,14 +141,22 @@ impl EntityTags {
         {
             increment(&mut self.entities)?;
             entity_tags.clear();
-            for id in entity
+            for tag in entity
                 .children()
                 .filter(|child| child.name().eq_ignore_ascii_case("Tags"))
                 .flat_map(Node::children)
                 .filter(|child| child.name().eq_ignore_ascii_case("Tag"))
-                .filter_map(|tag| attribute(tag, "TagId"))
-                .filter_map(|id| id.trim().parse::<Guid>().ok())
             {
+                let Some((ordinal, (name, authored))) = tag
+                    .attributes()
+                    .enumerate()
+                    .find(|(_, (name, _))| name.eq_ignore_ascii_case("TagId"))
+                else {
+                    continue;
+                };
+                let Ok(id) = authored.trim().parse::<Guid>() else {
+                    continue;
+                };
                 if entity_tags.contains(&id) {
                     continue;
                 }
@@ -90,6 +165,7 @@ impl EntityTags {
                     .map_err(|_| SocError::TagAllocation)?;
                 entity_tags.insert(id);
                 self.count_tag(id)?;
+                observe(id, tag, ordinal, name)?;
             }
         }
         Ok(())
@@ -105,6 +181,41 @@ impl EntityTags {
         self.by_tag.insert(tag, 1);
         Ok(())
     }
+}
+
+fn record_first(
+    sites: &mut HashMap<Guid, TagSite>,
+    guid: Guid,
+    input: &TagChunk<'_, '_>,
+    tag: Root<'_>,
+    attribute: usize,
+    name: &str,
+) -> Result<(), SocError> {
+    if sites.contains_key(&guid) {
+        return Ok(());
+    }
+    let attribute = u64::try_from(attribute).map_err(|_| SocError::UnboundTag)?;
+    let node = input
+        .document
+        .original_index(tag)
+        .ok_or(SocError::UnboundTag)?;
+    let format = match tag {
+        Root::Cry(_) => TagXmlFormat::CryXml,
+        Root::Text(_) => TagXmlFormat::Text,
+    };
+    sites.try_reserve(1).map_err(|_| SocError::TagAllocation)?;
+    sites.insert(
+        guid,
+        TagSite {
+            chunk: input.index,
+            bytes: input.bytes.clone(),
+            node,
+            attribute,
+            name: name.into(),
+            format,
+        },
+    );
+    Ok(())
 }
 
 fn increment(count: &mut u32) -> Result<(), SocError> {
