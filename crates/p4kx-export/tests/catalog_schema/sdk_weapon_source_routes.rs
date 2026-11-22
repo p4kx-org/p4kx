@@ -1,13 +1,28 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::equipment::{WeaponSourceSnapshot, with_weapon_sources_from};
+use p4kx_export::catalog_queries::CatalogRecordSelection;
+use p4kx_export::catalog_queries::equipment::{
+    WeaponSourceSnapshot, with_weapon_recoil_definitions, with_weapon_sources_from,
+};
 use p4kx_extraction::{Archive, DataForgeEntry, InputScope};
 use p4kx_testkit::{ArchiveBuilder, TestEntry, test_key};
 
-use super::super::{AMMO_BINDINGS, AMMO_CONTAINERS, Route, TestResult, WEAPON_ACTIONS};
+use super::super::{
+    AMMO_BINDINGS, AMMO_CONTAINERS, Route, TestResult, WEAPON_ACTIONS, WEAPON_RECOIL,
+};
 
 use super::projectile_ammo_fixture as fixture;
+
+pub(super) fn read_recoil(archive: &Archive) -> TestResult<Route> {
+    with_weapon_recoil_definitions(archive, CatalogRecordSelection::All, None, |snapshot| {
+        Route::queried_rows(
+            WEAPON_RECOIL,
+            snapshot.rows(),
+            "physical definition selection available; installed and complete producer parity open",
+        )
+    })?
+}
 
 pub(super) fn read() -> TestResult<[Route; 3]> {
     let folder = tempfile::tempdir()?;

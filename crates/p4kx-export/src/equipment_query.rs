@@ -125,6 +125,8 @@ mod inventory;
 mod item_sources;
 #[path = "equipment_planet_audio_query.rs"]
 pub mod planet_audio;
+#[path = "equipment_procedural_definitions_query.rs"]
+mod procedural_definitions;
 #[path = "equipment_projectile_ammo_query.rs"]
 mod projectile_ammo;
 #[path = "equipment_projectile_ammo_read.rs"]
@@ -154,6 +156,9 @@ mod weapon_combat_read;
 mod weapon_magazine;
 #[path = "equipment_weapon_magazine_dependency_read.rs"]
 mod weapon_magazine_dependency_read;
+/// Scoped reads of original procedural animation and clip definitions.
+#[path = "equipment_weapon_procedural_query.rs"]
+pub mod weapon_procedural;
 #[path = "equipment_weapon_recoil_query.rs"]
 mod weapon_recoil;
 #[path = "equipment_weapon_query_rows.rs"]

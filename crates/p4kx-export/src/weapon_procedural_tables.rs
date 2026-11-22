@@ -104,7 +104,7 @@ pub(in crate::catalog_v3) fn read<'source>(
                 .iter()
                 .filter_map(WeaponActions::animation_index)
                 .collect(),
-            |_, source, fields, notes| WeaponProceduralAnimation::read(source, fields, notes),
+            animation_definition,
         )?,
     );
     let recoil = evidence.rows(
@@ -205,7 +205,23 @@ pub(crate) fn read_recoil_config_selected<'source>(
     )
 }
 
-pub(crate) fn read_recoil_modifier_selected<'source>(
+pub(crate) fn read_animation_selected<'source>(
+    tree: &RecordTree<'source>,
+    input: &OriginalCatalogInput<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<WeaponProceduralAnimation<'source>>, CatalogError> {
+    referenced_definition_read::read_selected(
+        tree,
+        input,
+        admission,
+        ConfigurationInspection::WeaponProceduralDefinition,
+        cancel,
+        animation_definition,
+    )
+}
+
+pub(crate) fn read_procedural_target_selected<'source>(
     tree: &RecordTree<'source>,
     input: &OriginalCatalogInput<'_, 'source>,
     admission: &RecordObservation<'_, 'source>,
@@ -219,6 +235,15 @@ pub(crate) fn read_recoil_modifier_selected<'source>(
         cancel,
         original_target,
     )
+}
+
+fn animation_definition<'source>(
+    _source_type: &'source str,
+    source: CanonicalRecordHeader<'source>,
+    fields: Observed<'_, '_, '_, 'source>,
+    notes: &mut Vec<FieldError>,
+) -> Result<WeaponProceduralAnimation<'source>, CatalogError> {
+    WeaponProceduralAnimation::read(source, fields, notes)
 }
 
 fn recoil_config<'source>(

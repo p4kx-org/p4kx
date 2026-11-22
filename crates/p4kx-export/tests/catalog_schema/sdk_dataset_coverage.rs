@@ -302,6 +302,7 @@ fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
         .chain(routes::durability_datasets())
         .chain(routes::weapon_animation_datasets())
         .chain(routes::actor_procedural_recoil_datasets())
+        .chain(routes::weapon_procedural_datasets())
     {
         assert_ne!(
             gaps.get(path),

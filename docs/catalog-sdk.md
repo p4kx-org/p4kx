@@ -1781,6 +1781,21 @@ recoil blocks and nested field origins without generating a Catalog.
 cargo test --locked -p p4kx-export --test real_archive real_archive_weapon_recoil_sdk::weapon_recoil_sdk_matches_original_action_and_definition -- --ignored --exact --nocapture --test-threads=1
 ```
 
+## Weapon procedural definitions
+
+Use `equipment::weapon_procedural::with_weapon_procedural_animations` and
+`with_weapon_procedural_clips` to read the corresponding `definitions` tables.
+Direct, decoded-Entry and session methods select all physical definitions,
+a GUID or one physical Record index. The animation row exposes ordered
+setup slots, actor-state filters, and original clip References. Pass a resolved
+clip's physical Record index to the clip query for its original field arena.
+
+Both queries use the canonical producer row types and preserve the original
+source evidence. An animation query reads original definition bodies only for
+its selected type. Clip References retain their header evidence and state.
+Join through the separate clip query to read a clip Record body. Neither
+query reads animation media or localized texts.
+
 ## Actor procedural recoil definitions
 
 Use `equipment::actor_procedural_recoil::with_actor_procedural_recoil_configs` and

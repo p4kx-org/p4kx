@@ -17,11 +17,12 @@ pub(crate) use actor_procedural_recoil_config::{
     RECOIL_CONFIG_SOURCE_TYPE, RECOIL_MODIFIERS_SOURCE_TYPE,
 };
 pub use actor_state_filter::ActorStateFilter;
-pub(in crate::catalog_v3) use weapon_procedural_animation::{
-    ANIMATION_SOURCE_TYPE, CLIP_SOURCE_TYPE, WeaponProceduralAnimation,
-};
+pub(crate) use weapon_procedural_animation::{ANIMATION_SOURCE_TYPE, CLIP_SOURCE_TYPE};
+pub use weapon_procedural_animation::{WeaponProceduralAnimation, WeaponProceduralClipSetup};
 pub use weapon_procedural_tables::WeaponProceduralTarget as ActorProceduralRecoilModifier;
+pub use weapon_procedural_tables::WeaponProceduralTarget as WeaponProceduralClip;
 pub(in crate::catalog_v3) use weapon_procedural_tables::read;
 pub(crate) use weapon_procedural_tables::{
-    WeaponProceduralTables, read_recoil_config_selected, read_recoil_modifier_selected,
+    WeaponProceduralTables, read_animation_selected, read_procedural_target_selected,
+    read_recoil_config_selected,
 };

@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::equipment::{
-    with_ammo_definitions, with_weapon_recoil_definitions,
-};
+use p4kx_export::catalog_queries::equipment::with_ammo_definitions;
 use p4kx_export::catalog_queries::faction_identities::with_faction_identities;
 use p4kx_export::catalog_queries::weather::with_electrical_behaviors;
 use p4kx_export::catalog_queries::{
@@ -13,7 +11,7 @@ use p4kx_extraction::Archive;
 
 use super::{
     AMMUNITION, ELECTRICAL_BEHAVIORS, FACTION_IDENTITIES, ITEM_DEFINITIONS, MANUFACTURERS, Route,
-    TestResult, WEAPON_RECOIL,
+    TestResult,
 };
 
 #[path = "sdk_actor_procedural_recoil_routes.rs"]
@@ -166,6 +164,8 @@ mod vehicle_armor;
 mod weapon_animation;
 #[path = "../it/catalog_weapon_operating_fixture.rs"]
 mod weapon_operating_fixture;
+#[path = "sdk_weapon_procedural_routes.rs"]
+mod weapon_procedural;
 #[path = "sdk_weapon_source_routes.rs"]
 mod weapon_sources;
 #[path = "sdk_worn_gear_routes.rs"]
@@ -225,7 +225,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         projectile,
         combat,
         magazine,
-        read_weapon_recoil(&archive)?,
+        weapon_sources::read_recoil(&archive)?,
         countermeasure_emitters::read()?,
         dismantle::read()?,
         crafters::read()?,
@@ -283,6 +283,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.push(archive_entries::read_particle_library(archive)?);
     routes.extend(weapon_animation::read()?);
     routes.extend(actor_procedural_recoil::read()?);
+    routes.extend(weapon_procedural::read()?);
     routes.extend(fuel::read()?);
     routes.extend(hacking::read()?);
     routes.push(inventory_containers::read()?);
@@ -369,16 +370,6 @@ fn read_entity_definitions(archive: &Archive) -> TestResult<[Route; 2]> {
     ])
 }
 
-fn read_weapon_recoil(archive: &Archive) -> TestResult<Route> {
-    with_weapon_recoil_definitions(archive, CatalogRecordSelection::All, None, |snapshot| {
-        Route::queried_rows(
-            WEAPON_RECOIL,
-            snapshot.rows(),
-            "physical definition selection available; installed and complete producer parity open",
-        )
-    })?
-}
-
 fn read_weather(archive: &Archive) -> TestResult<Route> {
     with_electrical_behaviors(archive, CatalogRecordSelection::All, None, |snapshot| {
         Route::queried_rows(
@@ -391,6 +382,10 @@ fn read_weather(archive: &Archive) -> TestResult<Route> {
 
 pub(super) const fn actor_procedural_recoil_datasets() -> [&'static str; 2] {
     actor_procedural_recoil::DATASETS
+}
+
+pub(super) const fn weapon_procedural_datasets() -> [&'static str; 2] {
+    weapon_procedural::DATASETS
 }
 
 pub(super) const fn weapon_animation_datasets() -> [&'static str; 8] {

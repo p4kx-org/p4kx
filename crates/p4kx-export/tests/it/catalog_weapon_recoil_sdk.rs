@@ -19,6 +19,8 @@ use super::catalog_weapon_operating_fixture as fixture;
 
 #[path = "catalog_actor_procedural_recoil_sdk.rs"]
 mod actor;
+#[path = "catalog_weapon_procedural_sdk.rs"]
+mod weapon_procedural;
 
 const WEAPON: u32 = 2;
 const RECOIL: u32 = 1;

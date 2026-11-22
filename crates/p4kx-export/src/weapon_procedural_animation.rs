@@ -14,10 +14,10 @@ use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::interaction_source::RecordLinks;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
-use crate::source_value_catalog::SourceArenaOutput;
+use crate::source_value_catalog::{SourceArenaOutput, SourceRecordReference};
 
-pub(in crate::catalog_v3) const ANIMATION_SOURCE_TYPE: &str = "WeaponProceduralAnimation";
-pub(in crate::catalog_v3) const CLIP_SOURCE_TYPE: &str = "WeaponProceduralClip";
+pub(crate) const ANIMATION_SOURCE_TYPE: &str = "WeaponProceduralAnimation";
+pub(crate) const CLIP_SOURCE_TYPE: &str = "WeaponProceduralClip";
 const SETUP_FIELD: &str = "weaponProceduralClipsSetUp";
 const SETUP_TYPE: &str = "WeaponProceduralClipsSetUp";
 const CLIPS_FIELD: &str = "weaponProceduralClips";
@@ -26,7 +26,7 @@ const CLIPS_FIELD: &str = "weaponProceduralClips";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct WeaponProceduralAnimation<'source> {
+pub struct WeaponProceduralAnimation<'source> {
     source: CanonicalRecordHeader<'source>,
     weapon_procedural_clips_set_up:
         SourcedValue<Vec<SourcedValue<WeaponProceduralClipSetup<'source>>>>,
@@ -34,6 +34,26 @@ pub(crate) struct WeaponProceduralAnimation<'source> {
 }
 
 impl<'source> WeaponProceduralAnimation<'source> {
+    /// Borrows the original physical definition and its header.
+    #[must_use]
+    pub const fn source(&self) -> &CanonicalRecordHeader<'source> {
+        &self.source
+    }
+
+    /// Borrows the original setup slots in declaration order.
+    #[must_use]
+    pub const fn setups(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<WeaponProceduralClipSetup<'source>>>> {
+        &self.weapon_procedural_clips_set_up
+    }
+
+    /// Borrows the authored members outside the typed setup array.
+    #[must_use]
+    pub const fn additional_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.additional_fields
+    }
+
     pub(in crate::catalog_v3) fn read(
         source: CanonicalRecordHeader<'source>,
         fields: Observed<'_, '_, '_, 'source>,
@@ -68,7 +88,7 @@ impl<'source> WeaponProceduralAnimation<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct WeaponProceduralClipSetup<'source> {
+pub struct WeaponProceduralClipSetup<'source> {
     source_type: SourcedValue<&'source str>,
     filter: ActorStateFilter<'source>,
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
@@ -77,6 +97,32 @@ struct WeaponProceduralClipSetup<'source> {
 }
 
 impl<'source> WeaponProceduralClipSetup<'source> {
+    /// Borrows the original setup type.
+    #[must_use]
+    pub const fn source_type(&self) -> &SourcedValue<&'source str> {
+        &self.source_type
+    }
+
+    /// Borrows the authored actor-state filter.
+    #[must_use]
+    pub const fn filter(&self) -> &ActorStateFilter<'source> {
+        &self.filter
+    }
+
+    /// Borrows the ordered original clip References and physical target states.
+    #[must_use]
+    pub const fn clips(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>> {
+        &self.weapon_procedural_clips
+    }
+
+    /// Borrows the authored members outside the typed fields.
+    #[must_use]
+    pub const fn additional_fields(&self) -> &SourceArenaOutput<'source> {
+        &self.additional_fields
+    }
+
     fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
