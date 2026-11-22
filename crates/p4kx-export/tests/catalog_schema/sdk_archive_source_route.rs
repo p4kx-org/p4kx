@@ -66,18 +66,24 @@ pub(super) fn read() -> TestResult<[Route; 8]> {
     check_mismatched_patch(&archive, folder.path())?;
     let catalog = catalog(&archive, Some(&patches))?;
     Ok([
-        verify(&catalog, CHANNEL, &channel_name(archive.path()))?,
-        verify(&catalog, SIZE, &archive.file_len())?,
+        verify(&catalog, CHANNEL, &channel_name(archive.path()), None)?,
+        verify(&catalog, SIZE, &archive.file_len(), None)?,
         verify(
             &catalog,
             MODIFIED,
             &archive.file_modified().map(utc_rfc3339),
+            None,
         )?,
-        verify(&catalog, BRANCH, &build.branch())?,
-        verify(&catalog, VERSION, &build.version())?,
-        verify(&catalog, CHANGE, &build.change_number())?,
-        verify(&catalog, BUILD_ID, &build.build_id())?,
-        verify(&catalog, PUBLIC_PATCH, &public_patch)?,
+        verify(&catalog, BRANCH, &build.branch(), None)?,
+        verify(&catalog, VERSION, &build.version(), None)?,
+        verify(&catalog, CHANGE, &build.change_number(), None)?,
+        verify(&catalog, BUILD_ID, &build.build_id(), None)?,
+        verify(
+            &catalog,
+            PUBLIC_PATCH,
+            &public_patch,
+            Some("exact launcher matching verified synthetically; installed parity open"),
+        )?,
     ])
 }
 
@@ -140,17 +146,14 @@ fn verify<T: JsonSchema + Serialize>(
     catalog: &Value,
     path: &'static str,
     value: &T,
+    remaining: Option<&'static str>,
 ) -> TestResult<Route> {
     assert_eq!(
         catalog.pointer(path),
         Some(&serde_json::to_value(value)?),
         "the Archive selector and normal producer agree at {path}",
     );
-    Route::queried_value(
-        path,
-        value,
-        "static Archive selectors match synthetic source metadata; installed parity open",
-    )
+    Route::queried_rows(path, std::slice::from_ref(value), remaining)
 }
 
 #[test]

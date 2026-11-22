@@ -45,6 +45,12 @@ corresponding catalog fields. For `source.build.publicPatch`, call
 `PublicPatches::of(build)` on the launcher-log snapshot supplied to the exporter.
 This lookup requires the same change number.
 
+The complete Catalog replay on LIVE 13220821 and PTU 13248297 verifies the
+channel, size, modification time and four manifest Build fields against the
+same receipt and the installed Archive. The launcher patch lookup has
+synthetic exact-match and no-match tests. A same-Build installed launcher-log
+comparison remains open.
+
 The catalog's writer version, timestamp and Archive-key usage describe its export.
 Each selective result carries its own `SourceInventory` for resolving per-value
 origins.
