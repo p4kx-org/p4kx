@@ -12,13 +12,17 @@ use crate::catalog_rows::staged::StagedCatalogTable;
 use crate::contract_loot::{LootContainer, TagCount};
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::{CatalogGuid, GuidText};
-use crate::harvest_locations::Objects;
+use crate::harvest_locations::{NoObject, Objects};
 use crate::loot_soc_source::Counted as Tags;
 use crate::loot_unreadable::{Unreadable, UnreadableContainer};
 use crate::loot_walk::{Explored, Placed, PlacedTarget, Summary, below, explore, path_of};
 use crate::starmap_index::Index;
 use crate::starmap_walk::Opened;
 use crate::{CatalogError, ExportAccountingError, Kind};
+
+#[path = "loot_parent_origin.rs"]
+mod parent_origin;
+use parent_origin::ParentOrigins;
 
 #[path = "loot_system_origin.rs"]
 mod system_origin;
@@ -45,7 +49,7 @@ pub(crate) struct Located {
 pub(crate) fn locate(
     archive: &Archive,
     opened: &[Opened],
-    objects: &Objects,
+    objects: &Objects<'_>,
     cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
 ) -> Result<Located, CatalogError> {
@@ -58,13 +62,18 @@ pub(crate) fn locate(
     let (tags, observed) = read_tags(archive, &summaries, cancel, capture)?;
     ledger.merge(observed);
     let mut systems = SystemOrigins::try_new(archive, capture)?;
+    let mut parents = ParentOrigins::new(objects, capture.source_uses());
     let containers = rows(
         opened,
         objects,
         &summaries,
         &tags,
         capture.source_uses(),
-        |root| systems.project(root),
+        |root, location| {
+            let system = systems.project(root)?;
+            let object = parents.project(root, location, &system)?;
+            Ok(PlacementValues { system, object })
+        },
     )?;
     if !cancel.is_some_and(CancelToken::is_cancelled) {
         ledger.inventory(Kind::LootContainers);
@@ -86,19 +95,27 @@ struct ContainerKey<'source> {
     object: Option<GuidText>,
 }
 
+struct PlacementValues {
+    system: SourcedValue<String>,
+    object: SourcedValue<CatalogGuid>,
+}
+
 fn rows(
     opened: &[Opened],
-    objects: &Objects,
+    objects: &Objects<'_>,
     summaries: &HashMap<usize, Summary>,
     tags: &HashMap<usize, Tags>,
     sources: &SourceUses,
-    mut system: impl FnMut(&Opened) -> Result<SourcedValue<String>, CatalogError>,
+    mut placement: impl FnMut(
+        &Opened,
+        Result<CatalogGuid, NoObject>,
+    ) -> Result<PlacementValues, CatalogError>,
 ) -> Result<Vec<LootContainer>, CatalogError> {
     let mut reached: HashMap<usize, Vec<&Placed>> = HashMap::new();
     let mut selected = BTreeMap::new();
     for root in opened {
-        let location = objects.location(root.under).ok();
-        let object = location.map(CatalogGuid::text);
+        let location = objects.location(root.under);
+        let object = location.ok().map(CatalogGuid::text);
         let reached_placements = reached
             .entry(root.entry)
             .or_insert_with(|| below(root.entry, summaries));
@@ -118,8 +135,7 @@ fn rows(
         .map(|(root, placed, location)| {
             row(
                 placed,
-                system(root)?,
-                location,
+                placement(root, location)?,
                 placed.target.entry().and_then(|entry| tags.get(&entry)),
                 sources,
             )
@@ -181,8 +197,7 @@ fn several(archive: &Archive, summaries: &HashMap<usize, Summary>) -> Vec<String
 
 fn row(
     placed: &Placed,
-    system: SourcedValue<String>,
-    location: Option<CatalogGuid>,
+    placement: PlacementValues,
     tags: Option<&Tags>,
     sources: &SourceUses,
 ) -> Result<LootContainer, CatalogError> {
@@ -197,8 +212,8 @@ fn row(
             SourceValue::Present(placed.path.clone()),
             &[&placed.path_origin],
         )?,
-        system,
-        starmap_object_guid: location,
+        system: placement.system,
+        starmap_object_guid: placement.object,
         entity_count,
         tag_counts,
     })

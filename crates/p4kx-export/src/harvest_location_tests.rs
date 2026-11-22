@@ -3,7 +3,7 @@
 
 use p4kx_extraction::Guid;
 
-use super::{NoObject, Objects, losses};
+use super::{LocationObject, NoObject, Objects, losses};
 use crate::guid_text::CatalogGuid;
 use crate::mining_locations::HarvestableLocation;
 
@@ -13,11 +13,16 @@ fn guid(number: u8) -> Guid {
         .expect("a GUID")
 }
 
-fn objects(entries: &[(u8, bool, Option<u8>)]) -> Objects {
+fn objects(entries: &[(u8, bool, Option<u8>)]) -> Objects<'static> {
     Objects {
         by_guid: entries
             .iter()
-            .map(|&(own, claim, above)| (guid(own), (claim, above.map(guid))))
+            .map(|&(own, claim, above)| {
+                (
+                    guid(own),
+                    LocationObject::unobserved(claim, above.map(guid)),
+                )
+            })
             .collect(),
     }
 }
@@ -46,7 +51,7 @@ fn each_missing_object_says_why() {
 }
 
 /// `count` markers, each hanging below the next, then a plain object.
-fn markers_then_plain(count: u8) -> Objects {
+fn markers_then_plain(count: u8) -> Objects<'static> {
     let entries: Vec<(u8, bool, Option<u8>)> = (1..=count)
         .map(|number| (number, true, Some(number + 1)))
         .chain([(count + 1, false, None)])

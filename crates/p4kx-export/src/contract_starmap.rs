@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::SourcedValue;
+use p4kx_extraction::{FieldOrigin, SourcedValue};
 
 use crate::catalog_text_contract::GameTextRef;
 use crate::guid_text::CatalogGuid;
@@ -21,4 +21,5 @@ pub(crate) struct StarmapObject<'source> {
     pub(crate) position: Option<[f64; 3]>,
     pub(crate) placement_proof: Option<PlacementEvidence>,
     pub(crate) mining_claim: bool,
+    pub(crate) location_origin: Option<FieldOrigin>,
 }

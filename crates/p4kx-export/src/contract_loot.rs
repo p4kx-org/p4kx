@@ -161,7 +161,7 @@ pub(crate) struct LootContainer {
     pub(crate) system: SourcedValue<String>,
     /// The `guid` of the `starmapObjects` entry the walk's root container hangs below; `null` for
     /// none or an object the catalog lacks.
-    pub(crate) starmap_object_guid: Option<CatalogGuid>,
+    pub(crate) starmap_object_guid: SourcedValue<CatalogGuid>,
     /// The total entities from the verified `.soc` files of the placed container, including zero.
     pub(crate) entity_count: SourcedValue<u32>,
     /// Entity counts by GUID from the verified SOC survey, ordered by GUID.

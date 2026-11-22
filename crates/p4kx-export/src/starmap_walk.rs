@@ -66,14 +66,26 @@ pub(crate) struct SystemRead {
     pub(crate) location_physics: crate::location_physics::GridObservations,
 }
 
+#[path = "starmap_opened_parent.rs"]
+mod opened_parent;
+pub(crate) use opened_parent::OpenedParent;
+
 /// A container the walk opened and the starmap record it hangs below.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone)]
 pub(crate) struct Opened {
     pub(crate) system: Arc<str>,
     /// The original root directory slot that supplied the system folder.
     pub(crate) system_entry: usize,
     pub(crate) entry: usize,
     pub(crate) under: Option<Guid>,
+    pub(crate) parent: OpenedParent,
+}
+
+#[cfg(test)]
+impl Opened {
+    pub(crate) fn key(&self) -> (&str, usize, usize, Option<Guid>) {
+        (&self.system, self.system_entry, self.entry, self.under)
+    }
 }
 
 /// A reached container and its detached original route.
@@ -281,6 +293,11 @@ impl System<'_> {
             system_entry: self.root_slot,
             entry,
             under: path.under,
+            parent: if matches!(self.rows, PlacementRows::Spool { .. }) {
+                OpenedParent::from_path(path)
+            } else {
+                OpenedParent::Unobserved
+            },
         };
         if let PlacementRows::Harvest(harvest) = &self.rows {
             self.read.harvest_reached.insert(entry);

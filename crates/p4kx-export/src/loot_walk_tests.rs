@@ -135,6 +135,7 @@ fn root_of(archive: &Archive, name: &str) -> Opened {
         system_entry: entry,
         entry,
         under: None,
+        parent: crate::starmap_walk::OpenedParent::Unobserved,
     }
 }
 

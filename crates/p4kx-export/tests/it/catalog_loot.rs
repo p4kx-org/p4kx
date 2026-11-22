@@ -252,6 +252,11 @@ fn loot_container_facts(catalog: &Value) -> TestResult<Vec<Value>> {
                     .ok_or("canonical loot container cell")?
                     .clone_from(value);
             }
+            let parent = proof::at(row, "/starmapObjectGuid/value")?;
+            facts
+                .as_object_mut()
+                .ok_or("Loot placement row")?
+                .insert("starmapObjectGuid".to_owned(), parent.clone());
             let value = proof::at(row, "/entityCount/value")?;
             facts
                 .get_mut("entityCount")

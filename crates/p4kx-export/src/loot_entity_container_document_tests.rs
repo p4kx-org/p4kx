@@ -47,6 +47,7 @@ fn roots() -> Vec<Opened> {
             system: Arc::from("synthetic"),
             entry: 0,
             under: None,
+            parent: crate::starmap_walk::OpenedParent::Unobserved,
         })
         .collect()
 }

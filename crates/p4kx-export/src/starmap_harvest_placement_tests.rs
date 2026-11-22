@@ -44,7 +44,8 @@ fn harvest_walk_keeps_location_parity_without_general_placement_outputs()
                 capture,
                 &survey,
             )?;
-            let objects = objects(planet, claim, &harvest, capture);
+            let records = objects(planet, claim, &harvest, capture);
+            let objects = Objects::new(&records);
             let (located, _) = survey.finish(&archive, &harvest.opened, &objects, None, capture)?;
             Ok((
                 harvest,
@@ -80,7 +81,11 @@ fn assert_harvest_route_parity(
     claim: Guid,
 ) {
     assert_eq!(
-        harvest.opened,
+        harvest
+            .opened
+            .iter()
+            .map(crate::starmap_walk::Opened::key)
+            .collect::<Vec<_>>(),
         full.opened
             .iter()
             .filter(|opened| {
@@ -90,7 +95,7 @@ fn assert_harvest_route_parity(
                         || entry.path().ends_with("unreadable-detached.socpak")
                 })
             })
-            .cloned()
+            .map(crate::starmap_walk::Opened::key)
             .collect::<Vec<_>>(),
         "only reached positives plus the same eligible unreached inventory"
     );
@@ -229,7 +234,16 @@ fn assert_deterministic(
         "physical routes keep their order"
     );
     assert_eq!(
-        serial.opened, parallel.opened,
+        serial
+            .opened
+            .iter()
+            .map(crate::starmap_walk::Opened::key)
+            .collect::<Vec<_>>(),
+        parallel
+            .opened
+            .iter()
+            .map(crate::starmap_walk::Opened::key)
+            .collect::<Vec<_>>(),
         "candidate membership is stable"
     );
     assert_eq!(
@@ -293,7 +307,8 @@ fn assert_routes(
         "two physical occurrences of the same Entry"
     );
     assert_eq!(
-        first.opened, second.opened,
+        first.opened.key(),
+        second.opened.key(),
         "ordinary logical lookup coordinates are equal"
     );
     assert_eq!(
@@ -333,7 +348,8 @@ fn locate(
     presets: &HashSet<Guid>,
     capture: &EntryCapture<'_>,
 ) -> Result<Located, CatalogError> {
-    let objects = objects(planet, claim, placements, capture);
+    let records = objects(planet, claim, placements, capture);
+    let objects = Objects::new(&records);
     harvest_locations::locate(
         archive,
         &placements.opened,
@@ -349,11 +365,11 @@ fn objects(
     claim: Guid,
     placements: &Placements,
     capture: &EntryCapture<'_>,
-) -> Objects {
-    Objects::new(&[
+) -> [StarmapObject<'static>; 2] {
+    [
         object(planet, false, placements, capture),
         object(claim, true, placements, capture),
-    ])
+    ]
 }
 
 fn object(
@@ -375,5 +391,6 @@ fn object(
         position: placement.map(|row| row.position),
         placement_proof: None,
         mining_claim,
+        location_origin: None,
     }
 }

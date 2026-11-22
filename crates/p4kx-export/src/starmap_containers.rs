@@ -324,6 +324,7 @@ impl Placements {
                     system_entry: *entry,
                     entry: *entry,
                     under: None,
+                    parent: crate::starmap_walk::OpenedParent::Unobserved,
                 }),
                 [] => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
                 candidates => entry_source::record_ambiguous_outer_entries(

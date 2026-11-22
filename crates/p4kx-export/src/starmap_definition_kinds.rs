@@ -45,7 +45,7 @@ impl<'source> StarmapDefinitionPick<'source> {
         cancel: Option<&CancelToken>,
     ) -> Result<(Self, Vec<FieldError>), CatalogError> {
         if kind == Kind::StarmapObjects {
-            return starmap_object_definition::prepare(tree, projection, admission, cancel)
+            return starmap_object_definition::prepare(tree, projection, admission, cancel, None)
                 .map(|(row, notes)| (Self::Object(Box::new(row)), notes));
         }
         if kind_for_type(tree.type_name()) != Some(kind) {

@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataForge, RecordTree, SourcedValue, TreeBuilder};
+use p4kx_extraction::{DataForge, RecordTree, SourcedValue, TreeBuilder, Value};
 
 use crate::catalog_text_contract::GameTextRef;
 
 use crate::contract::StarmapObject;
 use crate::guid_text::CatalogGuid;
 use crate::memo::Memo;
-use crate::record_fields::{class_name, locale_key, reference, text};
+use crate::record_fields::{class_name, reference, text};
 use crate::starmap_containers::Placements;
 use crate::starmap_containers::proof::PlacementEvidence;
 
@@ -69,9 +69,17 @@ pub(crate) fn starmap_object<'f>(
         placement_proof: placement
             .map(|placement| PlacementEvidence::Selected(placement.proof.clone()))
             .or_else(|| placements.ambiguity_proof(tree.guid())),
-        mining_claim: locale_key(root, "description").or_else(|| text(root, "description"))
-            == Some(MINING_CLAIM_DESCRIPTION),
+        mining_claim: tree.field("description").is_some_and(is_mining_claim),
+        location_origin: None,
     }
+}
+
+pub(crate) fn is_mining_claim(description: &Value<'_>) -> bool {
+    matches!(
+        description,
+        Value::Locale(text) | Value::String(text) | Value::Enum(text)
+            if *text == MINING_CLAIM_DESCRIPTION
+    )
 }
 
 fn type_of<'f>(

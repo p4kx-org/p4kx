@@ -257,7 +257,7 @@ pub(super) fn containers() -> Value {
         "multiConfigGuid": values::present(json!("a7000000-0000-4000-8000-000000000001")),
         "container": values::present(json!("Data\\ObjectContainers\\PU\\loc\\mod\\drlct\\loot_area.socpak")),
         "system": values::present(json!("stanton")),
-        "starmapObjectGuid": "a2000000-0000-4000-8000-000000000001",
+        "starmapObjectGuid": values::present(json!("a2000000-0000-4000-8000-000000000001")),
         "entityCount": values::present(json!(13)),
         "tagCounts": values::present(json!([{
             "tagGuid": values::present(json!("a7000000-0000-4000-8000-000000000002")),
@@ -267,7 +267,7 @@ pub(super) fn containers() -> Value {
         "multiConfigGuid": values::present(json!("a7000000-0000-4000-8000-000000000001")),
         "container": values::present(json!("ObjectContainers/PU/loc/missing.socpak")),
         "system": values::present(json!("pyro")),
-        "starmapObjectGuid": null,
+        "starmapObjectGuid": values::source(SourceValue::Absent),
         "entityCount": values::source(SourceValue::Absent),
         "tagCounts": values::source(SourceValue::Absent)
     }])

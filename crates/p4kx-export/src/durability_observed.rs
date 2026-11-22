@@ -34,6 +34,8 @@ mod links;
 mod number_fields;
 #[path = "authored_owned_fields.rs"]
 mod owned_fields;
+#[path = "authored_predicate.rs"]
+mod predicate;
 #[path = "authored_room_offset.rs"]
 mod room_offset;
 pub(super) use room_offset::{RoomOffset, RoomTransformUnavailable};

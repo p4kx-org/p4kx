@@ -30,8 +30,12 @@ fn descriptor_only_loot_dependencies_preserve_canonical_documents_and_physical_o
     let (expected, document_rows) = read(&archive, false)?;
     let (actual, selected_rows) = read(&archive, true)?;
 
-    assert_eq!(
-        actual.opened, expected.opened,
+    assert!(
+        actual
+            .opened
+            .iter()
+            .map(crate::starmap_walk::Opened::key)
+            .eq(expected.opened.iter().map(crate::starmap_walk::Opened::key)),
         "descriptor and fallback seed order"
     );
     assert_eq!(

@@ -30567,14 +30567,7 @@
           "description": "The `SubHarvestableMultiConfigRecord` the placing entity carries (`multiConfigRef`), an\nentry of `subHarvestableMultiConfigs`."
         },
         "starmapObjectGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
+          "$ref": "#/$defs/SourcedValueOfGuid",
           "description": "The `guid` of the `starmapObjects` entry the walk's root container hangs below; `null` for\nnone or an object the catalog lacks."
         },
         "system": {

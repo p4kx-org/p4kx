@@ -28,7 +28,7 @@ pub(super) fn project(
     reached: &[HarvestOccurrence],
     opened: &[Opened],
     positives: &HashMap<usize, SourcedValue<Guid>>,
-    objects: &Objects,
+    objects: &Objects<'_>,
 ) -> Result<Vec<HarvestableOccurrence>, CatalogError> {
     let mut routes = Vec::with_capacity(reached.len());
     let mut reached_entries = HashSet::new();
@@ -95,7 +95,7 @@ fn project_row(
     receipt: &EntryReceipt,
     reference: OriginalDatum<PhysicalEntryRef>,
     route: HarvestableOccurrenceRoute,
-    objects: &Objects,
+    objects: &Objects<'_>,
     capture: &EntryCapture<'_>,
 ) -> Result<HarvestableOccurrence, CatalogError> {
     let sources = capture.source_uses();

@@ -18,6 +18,7 @@ use crate::starmap_xml::{Root, attribute};
 
 #[derive(Debug)]
 pub(crate) struct ChildOrigins {
+    complete: bool,
     node: XmlNodeSource,
     list: XmlNodeSource,
     position: XmlAttributeSource,
@@ -35,6 +36,7 @@ impl ChildOrigins {
         child: Root<'_>,
     ) -> Result<Self, CatalogError> {
         Ok(Self {
+            complete: !xml.is_lossy(),
             node: xml.node_source(child)?,
             list: list.clone(),
             position: xml.attribute_source(child, "pos")?,
@@ -196,6 +198,17 @@ impl PlacementStep {
         Ok(true)
     }
 
+    pub(crate) fn original_complete(&self) -> bool {
+        self.child.complete
+    }
+
+    pub(crate) fn record_ancestor_uses(
+        &self,
+        uses: &mut Vec<SourceUse>,
+    ) -> Result<(), CatalogError> {
+        append_record_ancestors(self.steps(), uses)
+    }
+
     pub(crate) fn position(&self, role: SourceUseRole) -> Result<SourceUse, CatalogError> {
         self.child.position.observe(role)
     }
@@ -263,6 +276,27 @@ impl PlacementEvidence {
         Ok(sources.shared_origin(&uses, complete))
     }
 
+    pub(crate) fn parent_selection_inputs(&self) -> Result<Vec<SourceUse>, CatalogError> {
+        let Self::Selected(proof) = self else {
+            return Ok(Vec::new());
+        };
+        let mut uses = Vec::new();
+        for step in proof.last.steps() {
+            uses.push(step.position(SourceUseRole::Selector)?);
+            uses.push(step.rotation(SourceUseRole::Selector)?);
+        }
+        Ok(uses)
+    }
+
+    pub(crate) fn parent_complete(&self) -> bool {
+        let complete =
+            |proof: &PlacementProof| proof.last.steps().all(PlacementStep::original_complete);
+        match self {
+            Self::Selected(proof) => complete(proof),
+            Self::Ambiguous(pair) => pair.iter().all(complete),
+        }
+    }
+
     pub(crate) fn uses(&self, field: PlacementField) -> Result<Vec<SourceUse>, CatalogError> {
         match self {
             Self::Selected(proof) => proof.uses(field),
@@ -307,21 +341,29 @@ impl PlacementProof {
 
     fn parent_uses(&self) -> Result<Vec<SourceUse>, CatalogError> {
         let mut uses = Vec::new();
-        for step in self.last.steps().skip(1) {
-            let role = if step.has_record {
-                SourceUseRole::Conversion
-            } else {
-                SourceUseRole::Selector
-            };
-            uses.push(step.child.record.observe(role)?);
-            if step.has_record {
-                break;
-            }
-        }
+        append_record_ancestors(self.last.steps().skip(1), &mut uses)?;
         Ok(uses)
     }
 
     fn position_uses(&self) -> Result<Vec<SourceUse>, CatalogError> {
         self.last.position_uses()
     }
+}
+
+fn append_record_ancestors<'route>(
+    steps: impl Iterator<Item = &'route PlacementStep>,
+    uses: &mut Vec<SourceUse>,
+) -> Result<(), CatalogError> {
+    for step in steps {
+        let role = if step.has_record {
+            SourceUseRole::Conversion
+        } else {
+            SourceUseRole::Selector
+        };
+        uses.push(step.child.record.observe(role)?);
+        if step.has_record {
+            break;
+        }
+    }
+    Ok(())
 }

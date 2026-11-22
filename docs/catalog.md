@@ -2508,6 +2508,13 @@ Each field carries its own contributing source references and encryption marker.
 path also cites the actual authored selector conversion. The declaration table retains each
 original occurrence and its lookup status.
 
+`starmapObjectGuid.value` identifies the final admitted non-marker Record. Its source
+references retain the selected Child route, the actual Record admission and each mining-claim
+marker decision. A known root without a parent is absent. An unreached fallback or a GUID
+outside the admitted Records remains absent with an incomplete source set. Cycles and
+known ambiguous marker placements are invalid. A preserved GUID with an unreadable marker
+predicate carries an incomplete source set.
+
 The walk starts at every container below `ObjectContainers/PU/system` and follows the containers
 the entity files place, each container read once. Entity XML and SOC reads consume the complete
 declared payload with cancellation checks. An Entry that ends early or exceeds its declared

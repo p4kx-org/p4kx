@@ -28,6 +28,7 @@ fn object(id: u8, class_name: &'static str, entity_name: Option<&str>) -> Starma
         position: None,
         placement_proof: None,
         mining_claim: false,
+        location_origin: None,
     }
 }
 

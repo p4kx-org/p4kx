@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::collections::{BTreeMap, HashMap, HashSet};
 
-use p4kx_extraction::{Archive, CancelToken, Guid, SourcedValue};
+use p4kx_extraction::{Archive, CancelToken, FieldOrigin, Guid, SourcedValue};
 use rayon::prelude::*;
 
 use crate::catalog_read::original::EntryCapture;
@@ -13,7 +13,11 @@ use crate::contract::StarmapObject;
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
 use crate::mining_locations::HarvestableLocation;
+use crate::starmap_containers::proof::PlacementEvidence;
 use crate::starmap_walk::Opened;
+
+#[path = "harvest_object_origin.rs"]
+mod object_origin;
 use crate::{CatalogError, Kind};
 
 /// What the first `.soc` of a container says.
@@ -70,55 +74,89 @@ pub(crate) struct Located {
 
 /// The starmap objects a container can hang below, by GUID: whether the object is a mining claim
 /// marker and the object above it.
-pub(crate) struct Objects {
-    by_guid: HashMap<Guid, (bool, Option<Guid>)>,
+pub(crate) struct Objects<'object> {
+    by_guid: HashMap<Guid, LocationObject<'object>>,
 }
 
-impl Objects {
-    pub(crate) fn new<'object, 'source: 'object>(
-        objects: impl IntoIterator<Item = &'object StarmapObject<'source>>,
-    ) -> Self {
+#[derive(Clone, Copy)]
+struct LocationObject<'object> {
+    mining_claim: bool,
+    above: Option<Guid>,
+    origin: Option<&'object FieldOrigin>,
+    placement: Option<&'object PlacementEvidence>,
+    unique: bool,
+}
+
+#[cfg(test)]
+impl LocationObject<'static> {
+    const fn unobserved(mining_claim: bool, above: Option<Guid>) -> Self {
         Self {
-            by_guid: objects
-                .into_iter()
-                .map(|object| {
-                    (
-                        object.guid.0,
-                        (
-                            object.mining_claim,
-                            object.placed_under_guid.map(|guid| guid.0),
-                        ),
-                    )
-                })
-                .collect(),
+            mining_claim,
+            above,
+            origin: None,
+            placement: None,
+            unique: true,
         }
     }
+}
 
-    /// Returns the object a container hangs below: `under`, else the object above it while it is
-    /// a mining claim marker; the reason when there is none.
+impl<'object> Objects<'object> {
+    pub(crate) fn new<'source: 'object>(
+        objects: impl IntoIterator<Item = &'object StarmapObject<'source>>,
+    ) -> Self {
+        let mut by_guid = HashMap::new();
+        for object in objects {
+            let unique = !by_guid.contains_key(&object.guid.0);
+            by_guid.insert(
+                object.guid.0,
+                LocationObject {
+                    mining_claim: object.mining_claim,
+                    above: object.placed_under_guid.map(CatalogGuid::get),
+                    origin: object.location_origin.as_ref(),
+                    placement: object.placement_proof.as_ref(),
+                    unique,
+                },
+            );
+        }
+        Self { by_guid }
+    }
+
+    /// Returns the first non-marker object above the container or the actual terminal cause.
     pub(crate) fn location(&self, under: Option<Guid>) -> Result<CatalogGuid, NoObject> {
+        self.visit_location(under, |_| {})
+    }
+
+    fn visit_location(
+        &self,
+        under: Option<Guid>,
+        mut observe: impl FnMut(Guid),
+    ) -> Result<CatalogGuid, NoObject> {
         let mut at = under.ok_or(NoObject::NoneAbove)?;
         let mut fast = Some(at);
         loop {
-            let &(mining_claim, above) = self.by_guid.get(&at).ok_or(NoObject::NotInCatalog)?;
-            if !mining_claim {
+            let object = self.by_guid.get(&at).ok_or(NoObject::NotInCatalog)?;
+            observe(at);
+            if !object.mining_claim {
                 return Ok(CatalogGuid(at));
             }
-            at = above.ok_or(NoObject::MarkerWithoutParent)?;
+            at = object.above.ok_or(NoObject::MarkerWithoutParent)?;
             // The fast cursor detects cycles; the main cursor classifies terminal failures.
             fast = fast
-                .and_then(|node| self.marker_parent(node))
-                .and_then(|node| self.marker_parent(node));
+                .and_then(|node| self.marker_parent(node, &mut observe))
+                .and_then(|node| self.marker_parent(node, &mut observe));
             if fast == Some(at) {
                 return Err(NoObject::MarkerCycle);
             }
         }
     }
 
-    fn marker_parent(&self, at: Guid) -> Option<Guid> {
-        match self.by_guid.get(&at) {
-            Some(&(true, above)) => above,
-            _ => None,
+    fn marker_parent(&self, at: Guid, observe: &mut impl FnMut(Guid)) -> Option<Guid> {
+        let object = self.by_guid.get(&at)?;
+        observe(at);
+        if object.mining_claim {
+            object.above
+        } else {
+            None
         }
     }
 }
@@ -130,7 +168,7 @@ pub(crate) fn locate(
     archive: &Archive,
     opened: &[Opened],
     presets: &HashSet<Guid>,
-    objects: &Objects,
+    objects: &Objects<'_>,
     cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
 ) -> Result<Located, CatalogError> {
@@ -147,7 +185,7 @@ fn locate_from_sources(
     archive: &Archive,
     opened: &[Opened],
     presets: &HashSet<Guid>,
-    objects: &Objects,
+    objects: &Objects<'_>,
     cancel: Option<&CancelToken>,
     read: &HashMap<usize, Soc>,
     mut ledger: ExportLedger,
@@ -277,7 +315,7 @@ impl<'providers> HarvestSurvey<'providers> {
         self,
         archive: &Archive,
         opened: &[Opened],
-        objects: &Objects,
+        objects: &Objects<'_>,
         cancel: Option<&CancelToken>,
         capture: &EntryCapture<'_>,
     ) -> Result<(Located, HashMap<usize, SourcedValue<Guid>>), CatalogError> {

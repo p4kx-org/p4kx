@@ -3,10 +3,10 @@
 
 use std::collections::HashMap;
 
-use p4kx_extraction::{Guid, SourceUses, SourceValue, SourceValueState, SourcedValue};
+use p4kx_extraction::{Guid, SourceUses, SourceValue, SourceValueState};
 use p4kx_extraction::{InputScope, SourceInput, SourceLocation, SourceUseRole};
 
-use super::{Tags, row, rows};
+use super::{PlacementValues, Tags, row, rows};
 use crate::contract_loot::LootContainer;
 use crate::guid_text::CatalogGuid;
 use crate::harvest_locations::Objects;
@@ -61,6 +61,7 @@ fn opened(entry: usize, system: &str) -> Opened {
         system: system.into(),
         system_entry: entry,
         entry,
+        parent: crate::starmap_walk::OpenedParent::Unobserved,
         under: None,
     }
 }
@@ -123,7 +124,7 @@ fn duplicate_rows_keep_the_first_placement_with_canonical_order()
         &summaries,
         &tags,
         sources,
-        |root| Ok(system(sources, &root.system)),
+        |root, _| Ok(placement(sources, &root.system)),
     )?;
     let signatures: Vec<_> = result
         .iter()
@@ -169,8 +170,11 @@ fn system_name(row: &LootContainer) -> &str {
     row.system.value().expect("a resolved system")
 }
 
-fn system(sources: &SourceUses, system: &str) -> SourcedValue<String> {
-    sources.value(SourceValue::Present(system.to_owned()), &[], false)
+fn placement(sources: &SourceUses, system: &str) -> PlacementValues {
+    PlacementValues {
+        system: sources.value(SourceValue::Present(system.to_owned()), &[], false),
+        object: sources.value(SourceValue::Absent, &[], false),
+    }
 }
 
 #[test]
@@ -183,8 +187,7 @@ fn a_container_that_could_not_be_counted_has_no_entity_count() -> Result<(), cra
     };
     let row = row(
         &placed("a.socpak", sources),
-        system(sources, "stanton"),
-        None,
+        placement(sources, "stanton"),
         Some(&failed),
         sources,
     )?;
@@ -211,8 +214,7 @@ fn a_container_without_a_soc_has_zero_entities() -> Result<(), crate::CatalogErr
     };
     let row = row(
         &placed("a.socpak", sources),
-        system(sources, "stanton"),
-        None,
+        placement(sources, "stanton"),
         Some(&none),
         sources,
     )?;
@@ -231,7 +233,7 @@ fn a_container_the_archive_lacks_has_no_entity_count() -> Result<(), crate::Cata
         target: PlacedTarget::VerifiedMissing,
         ..placed("a.socpak", sources)
     };
-    let row = row(&absent, system(sources, "stanton"), None, None, sources)?;
+    let row = row(&absent, placement(sources, "stanton"), None, sources)?;
     assert_eq!(
         row.entity_count.state(),
         SourceValueState::Absent,
