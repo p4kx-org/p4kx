@@ -97,12 +97,12 @@ impl GeometryVariants {
             self.models.push(GeometryVariant {
                 tags: tags.to_vec(),
                 tag_locations: tag_locations.into(),
-                geometry: Geometry::from_data(data, owner, slots, path),
+                geometry: Geometry::from_data(data, owner, slots, path, None),
             });
         } else if let Some(base) =
             hull_base.filter(|_| !tags.is_empty() && permits_base_model(data))
         {
-            let mut geometry = Geometry::from_data(data, owner, slots, base.path());
+            let mut geometry = Geometry::from_data(data, owner, slots, base.path(), None);
             if geometry.material().is_some() || geometry.palette().is_some() {
                 let position = geometry.variant_position();
                 geometry.origins.model.clone_from(&base.origins.model);

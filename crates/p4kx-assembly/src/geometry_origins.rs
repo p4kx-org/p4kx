@@ -36,6 +36,7 @@ impl Position {
 
 #[derive(Debug, Clone)]
 pub(super) enum MaterialPosition {
+    Component(GeometryComponent),
     Geometry(Arc<Position>),
     Authored(Arc<SourceLocation>),
 }
@@ -64,6 +65,10 @@ impl GeometrySelectors {
 
     pub(crate) fn material_field(&self) -> Option<SourceLocation> {
         Some(match self.material.as_ref()? {
+            MaterialPosition::Component(owner) => SourceLocation::DataForge {
+                record_index: owner.record,
+                field: format!("Components[{}].Material.Material.path", owner.ordinal),
+            },
             MaterialPosition::Geometry(position) => position.at(".Geometry.Material.path"),
             MaterialPosition::Authored(location) => location.as_ref().clone(),
         })

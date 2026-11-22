@@ -54,9 +54,13 @@ example `m_cds_legacy_medium_helmet_01_01_hd_sec`). Of the static models with a 
 (`Objects_default_grid_blue`, `kbar_s1-3_bas_1`). A library that is missing is a status of the
 model, not an error: the model reads and exports with the default material.
 
-In an Assembly the library comes from the Entity: the Material of the Record's
-`SGeometryResourceParams` geometry replaces the library the model names, and the model's own
-library applies only when the Record names none (ADR-0040).
+For an Entity's main geometry, a nonempty `SGeometryResourceParams.Material.Material.path`
+selects the material library. If that path is absent or empty, the reader uses
+`SGeometryResourceParams.Geometry.Geometry.Material.path`. When the Entity supplies no library,
+the Assembly can use the character definition's binding or the model's embedded library.
+Explicit Assembly and fitted appearance choices follow their own precedence. The Assembly
+records the source field of the selected path. `Geometry::material_field()` returns the same Entity
+selector. See ADR-0040.
 
 The Archive adapter also accepts one leading forward slash as the virtual `Data` root:
 `/Objects/Test/paint.mtl` maps to `Data/Objects/Test/paint.mtl`. An optional

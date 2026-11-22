@@ -184,7 +184,10 @@ impl Geometry {
 
     /// Reads the main geometry of a `SGeometryResourceParams` component.
     pub(crate) fn read(component: &StructValue<'_>, owner: GeometryComponent) -> Option<Self> {
-        Self::of_node(struct_field(component, "Geometry")?, owner, &[])
+        let data = struct_field(struct_field(component, "Geometry")?, "Geometry")?;
+        let path = model_path(data)?;
+        let component_material = struct_field(component, "Material").and_then(material_path);
+        Some(Self::from_data(data, owner, &[], path, component_material))
     }
 
     /// Returns the physical Record field that names this geometry.
@@ -197,7 +200,9 @@ impl Geometry {
         self.origins.model.as_ref().map(|position| position.at(""))
     }
 
-    pub(crate) fn material_field(&self) -> Option<SourceLocation> {
+    /// Returns the physical Record field that names this geometry's selected material.
+    #[must_use]
+    pub fn material_field(&self) -> Option<SourceLocation> {
         self.origins.material_field()
     }
 
@@ -242,22 +247,22 @@ impl Geometry {
         }
     }
 
-    fn of_node(node: &StructValue<'_>, owner: GeometryComponent, slots: &[usize]) -> Option<Self> {
-        let data = struct_field(node, "Geometry")?;
-        let path = model_path(data)?;
-        Some(Self::from_data(data, owner, slots, path))
-    }
-
     fn from_data(
         data: &StructValue<'_>,
         owner: GeometryComponent,
         slots: &[usize],
         path: &str,
+        component_material: Option<&str>,
     ) -> Self {
-        let material = struct_field(data, "Material")
-            .map(|resource| text(resource, "path"))
-            .filter(|path| !path.is_empty());
-        let origins = GeometrySelectors::of(owner, slots, material.is_some());
+        let material = component_material.or_else(|| material_path(data));
+        let mut origins = GeometrySelectors::of(
+            owner,
+            slots,
+            material.is_some() && component_material.is_none(),
+        );
+        if component_material.is_some() {
+            origins.material = Some(MaterialPosition::Component(owner));
+        }
         let mut palette = PaletteRef::read(data);
         if let Some(palette) = &mut palette {
             palette.selector = PaletteReferenceSource::Named(
@@ -274,6 +279,12 @@ impl Geometry {
             origins,
         }
     }
+}
+
+/// Returns the nonempty material path named by this original node or geometry.
+pub(crate) fn material_path<'source>(data: &StructValue<'source>) -> Option<&'source str> {
+    let path = text(struct_field(data, "Material")?, "path");
+    (!path.is_empty()).then_some(path)
 }
 
 fn model_path<'source>(data: &StructValue<'source>) -> Option<&'source str> {
@@ -325,3 +336,7 @@ mod tests {
 #[cfg(test)]
 #[path = "geometry_source_variants_tests.rs"]
 mod source_variants_tests;
+
+#[cfg(test)]
+#[path = "geometry_primary_material_tests.rs"]
+mod primary_material_tests;

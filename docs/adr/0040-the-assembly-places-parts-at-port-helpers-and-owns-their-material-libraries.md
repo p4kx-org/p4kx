@@ -41,9 +41,10 @@ is the Loadout tree (`<port>/<entity>` below the parent) and a part can be hidde
 
 ## Material libraries
 
-The Entity's geometry (`SGeometryResourceParams`) names the model and, usually, a material
-library. That library **replaces** the one the model's `MtlName` chunk names: 46 of 150 sampled
-skins find no library of their own. A named library that is missing is an issue and the part is
+The Entity's `SGeometryResourceParams` names the model and can select its material library.
+The main geometry uses the nonempty path in the component's Material node, then the path in
+the geometry data. The Assembly can use a character definition binding or the model's
+`MtlName` when the Entity supplies no library. A named library that is missing is an issue and the part is
 drawn with the default material; the model's own library does not take over. Models are read
 without their library (`Model::read_without_materials`, `MaterialStatus::Skipped`), and each
 distinct library is read once per Assembly, a bare name relative to the model's folder, and shared

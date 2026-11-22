@@ -7,7 +7,7 @@ use std::slice;
 use p4kx_dataforge::StructValue;
 use p4kx_extraction::SourceLocation;
 
-use crate::geometry::{GeometryComponent, PaletteRef, PaletteReferenceSource};
+use crate::geometry::{self, GeometryComponent, PaletteRef, PaletteReferenceSource};
 use crate::read;
 
 /// An authored material choice and its ordered child choices.
@@ -259,10 +259,7 @@ impl MaterialVariant {
     }
 
     fn of_node(node: &StructValue<'_>, owner: GeometryComponent, slot: usize) -> Self {
-        let material = read::struct_field(node, "Material")
-            .map(|resource| read::text(resource, "path"))
-            .filter(|path| !path.is_empty())
-            .map(str::to_owned);
+        let material = geometry::material_path(node).map(str::to_owned);
         Self {
             tags: read::text(node, "Tags")
                 .split_whitespace()
