@@ -4,15 +4,10 @@
 use p4kx_export::catalog_queries::equipment::with_ammo_definitions;
 use p4kx_export::catalog_queries::faction_identities::with_faction_identities;
 use p4kx_export::catalog_queries::weather::with_electrical_behaviors;
-use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
-};
+use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_extraction::Archive;
 
-use super::{
-    AMMUNITION, ELECTRICAL_BEHAVIORS, FACTION_IDENTITIES, ITEM_DEFINITIONS, MANUFACTURERS, Route,
-    TestResult,
-};
+use super::{AMMUNITION, ELECTRICAL_BEHAVIORS, FACTION_IDENTITIES, Route, TestResult};
 
 #[path = "sdk_actor_procedural_recoil_routes.rs"]
 mod actor_procedural_recoil;
@@ -76,6 +71,8 @@ mod fuel;
 mod generator_facets;
 #[path = "sdk_hacking_routes.rs"]
 mod hacking;
+#[path = "sdk_interaction_route.rs"]
+pub(super) mod interactions;
 #[path = "sdk_inventory_container_route.rs"]
 mod inventory_containers;
 #[path = "sdk_item_configuration_routes.rs"]
@@ -245,6 +242,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         faction_definitions::read()?,
         contract_scopes::read()?,
         faction_trigger_configuration::read()?,
+        interactions::read()?,
         archive_entries::read_subsumption_event(&archive)?,
         archive_entries::read_radar_configuration(&archive)?,
         read_weather(&archive)?,
@@ -356,22 +354,6 @@ fn read_faction_identities(archive: &Archive) -> TestResult<Route> {
             )
         },
     )?
-}
-
-fn read_entity_definitions(archive: &Archive) -> TestResult<[Route; 2]> {
-    const REMAINING: &str =
-        "typed definitions and synthetic producer parity available; installed producer parity open";
-    let session = CatalogQuerySession::open(archive, CatalogLanguageSelection::AllAvailable, None)?;
-    let parsed = session.parsed(None)?;
-    let selection = CatalogRecordSelection::All;
-    Ok([
-        parsed.with_item_definitions(selection, None, |snapshot| {
-            Route::queried_rows(ITEM_DEFINITIONS, snapshot.rows(), REMAINING)
-        })??,
-        parsed.with_manufacturers(selection, None, |snapshot| {
-            Route::queried_rows(MANUFACTURERS, &snapshot.rows, REMAINING)
-        })??,
-    ])
 }
 
 fn read_weather(archive: &Archive) -> TestResult<Route> {

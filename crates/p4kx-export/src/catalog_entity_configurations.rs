@@ -43,8 +43,8 @@ pub(crate) fn loadout_facility_owner_source_type(name: &str) -> bool {
 mod record_read;
 pub(crate) use record_read::{
     FacilitySelection, read, read_attachment_constraints, read_facility_configurations,
-    read_fuel_intakes, read_fuel_tanks, read_inventory_configurations, read_item_bounds,
-    read_item_ports, read_item_ports_scoped, read_loadout_facility_owners,
+    read_fuel_intakes, read_fuel_tanks, read_interactions, read_inventory_configurations,
+    read_item_bounds, read_item_ports, read_item_ports_scoped, read_loadout_facility_owners,
     read_resource_components, read_resource_connections, read_resource_containers,
     read_resource_topology, read_vehicle_armor,
 };

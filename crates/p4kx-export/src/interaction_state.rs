@@ -18,12 +18,13 @@ use crate::CatalogError;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
+use crate::source_value_catalog::SourceRecordReference;
 
 /// One physical interaction state and its authored effects and graph edges.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct InteractionState<'source> {
+pub struct InteractionState<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     #[serde(flatten)]
@@ -33,6 +34,30 @@ pub(super) struct InteractionState<'source> {
 }
 
 impl<'source> InteractionState<'source> {
+    /// Borrows the original state name.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<&'source str> {
+        &self.state.state_name
+    }
+
+    /// Borrows the original UI bindings Tag reference.
+    #[must_use]
+    pub const fn ui_bindings_tag(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.state.ui_bindings_tag
+    }
+
+    /// Borrows the authored state Tag list.
+    #[must_use]
+    pub const fn state_tags(&self) -> &SourcedValue<InteractionTagList<'source>> {
+        &self.state.state_tags
+    }
+
+    /// Borrows the authored Entity Tag list.
+    #[must_use]
+    pub const fn entity_tags(&self) -> &SourcedValue<InteractionTagList<'source>> {
+        &self.state.entity_tags
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

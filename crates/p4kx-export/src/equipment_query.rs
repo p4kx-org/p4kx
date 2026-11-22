@@ -50,6 +50,10 @@ pub mod fuel;
 #[path = "equipment_hacking_query.rs"]
 pub mod hacking;
 
+/// Selective reads of authored interaction components and their original links.
+#[path = "equipment_interaction_query.rs"]
+pub mod interactions;
+
 /// Selective reads of authored loot-generation components and their original values.
 #[path = "equipment_loot_generation_query.rs"]
 pub mod loot_generation;

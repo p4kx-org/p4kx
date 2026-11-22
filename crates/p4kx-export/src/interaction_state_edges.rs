@@ -14,6 +14,7 @@ use crate::catalog_record_reference::CatalogRecordReference;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
+use crate::source_value_catalog::SourceRecordReference;
 
 pub(super) const STATE: &str = "SInteractionState";
 pub(super) const TRANSITION: &str = "SInteractionStateTransition";
@@ -93,7 +94,7 @@ impl<'source> StateAutoChange<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct InteractionTagList<'source> {
+pub struct InteractionTagList<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     #[schemars(with = "SourcedValue<Vec<SourcedValue<CatalogRecordReference>>>")]
@@ -101,6 +102,14 @@ pub(super) struct InteractionTagList<'source> {
 }
 
 impl<'source> InteractionTagList<'source> {
+    /// Borrows the ordered original Tag references.
+    #[must_use]
+    pub const fn tags(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>> {
+        &self.tags
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

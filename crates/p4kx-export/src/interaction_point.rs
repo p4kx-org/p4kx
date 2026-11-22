@@ -15,6 +15,7 @@ use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_text_contract::GameTextRef;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
+use crate::source_value_catalog::SourceRecordReference;
 
 pub(super) const SOURCE_TYPE: &str = "SInteractionPointParams";
 
@@ -22,7 +23,7 @@ pub(super) const SOURCE_TYPE: &str = "SInteractionPointParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct InteractionPoint<'source> {
+pub struct InteractionPoint<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     #[serde(flatten)]
@@ -32,6 +33,14 @@ pub(super) struct InteractionPoint<'source> {
 }
 
 impl<'source> InteractionPoint<'source> {
+    /// Borrows the ordered Tag references for this point.
+    #[must_use]
+    pub const fn tags(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>> {
+        &self.links.tags
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         projection: &CatalogProjection<'_, 'source>,

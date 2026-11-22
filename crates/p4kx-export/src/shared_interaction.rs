@@ -15,6 +15,7 @@ use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_text_contract::GameTextRef;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
+use crate::source_value_catalog::SourceRecordReference;
 
 pub(super) const SOURCE_TYPE: &str = "SSharedInteractionParams";
 
@@ -22,7 +23,7 @@ pub(super) const SOURCE_TYPE: &str = "SSharedInteractionParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct SharedInteraction<'source> {
+pub struct SharedInteraction<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     #[serde(flatten)]
@@ -34,6 +35,44 @@ pub(super) struct SharedInteraction<'source> {
 }
 
 impl<'source> SharedInteraction<'source> {
+    /// Borrows the original shared interaction name.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<&'source str> {
+        &self.identity.name
+    }
+
+    /// Borrows the protected display-name reference.
+    #[must_use]
+    pub const fn display_name(&self) -> &SourcedValue<GameTextRef> {
+        &self.identity.display_name
+    }
+
+    /// Borrows the ordered query Tag references.
+    #[must_use]
+    pub const fn query_tags(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<Box<SourceRecordReference<'source>>>>> {
+        &self.identity.query_tags
+    }
+
+    /// Borrows the original room Tag reference.
+    #[must_use]
+    pub const fn room_tag(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.identity.room_tag
+    }
+
+    /// Borrows the original usable Tag reference.
+    #[must_use]
+    pub const fn usable_tag(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.identity.usable_tag
+    }
+
+    /// Borrows the original linking Tag reference.
+    #[must_use]
+    pub const fn linking_tag(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.identity.linking_tag
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         projection: &CatalogProjection<'_, 'source>,

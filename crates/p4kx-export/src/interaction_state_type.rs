@@ -25,7 +25,7 @@ pub(super) const SOURCE_TYPE: &str = "SInteractionStateType";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct InteractionStateType<'source> {
+pub struct InteractionStateType<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     state_type_name: SourcedValue<&'source str>,
@@ -38,6 +38,18 @@ pub(super) struct InteractionStateType<'source> {
 }
 
 impl<'source> InteractionStateType<'source> {
+    /// Borrows the original state-type name.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<&'source str> {
+        &self.state_type_name
+    }
+
+    /// Borrows the ordered original state slots.
+    #[must_use]
+    pub const fn states(&self) -> &SourcedValue<Vec<SourcedValue<InteractionState<'source>>>> {
+        &self.states
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

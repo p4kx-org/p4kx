@@ -179,7 +179,7 @@ pub(crate) mod catalog_hacking_chips;
 #[path = "catalog_independent_configurations.rs"]
 pub(crate) mod catalog_independent_configurations;
 #[path = "catalog_interactions.rs"]
-mod catalog_interactions;
+pub(crate) mod catalog_interactions;
 #[path = "catalog_item_alignment.rs"]
 pub(crate) mod catalog_item_alignment;
 #[path = "catalog_item_components.rs"]
@@ -246,19 +246,19 @@ pub(crate) mod catalog_weapon_projectile_ammo;
 #[path = "component_definition_sources.rs"]
 pub(crate) mod component_definition_sources;
 #[path = "interactable_configuration.rs"]
-mod interactable_configuration;
+pub(crate) mod interactable_configuration;
 #[path = "interaction_conditions.rs"]
 mod interaction_conditions;
 #[path = "interaction_point.rs"]
-mod interaction_point;
+pub(crate) mod interaction_point;
 #[path = "interaction_source.rs"]
 mod interaction_source;
 #[path = "interaction_state.rs"]
-mod interaction_state;
+pub(crate) mod interaction_state;
 #[path = "interaction_state_edges.rs"]
-mod interaction_state_edges;
+pub(crate) mod interaction_state_edges;
 #[path = "interaction_state_type.rs"]
-mod interaction_state_type;
+pub(crate) mod interaction_state_type;
 #[path = "interaction_task.rs"]
 mod interaction_task;
 #[path = "inventory_container_definition.rs"]
@@ -324,7 +324,7 @@ mod room_associations;
 #[path = "sensor_mine.rs"]
 mod sensor_mine;
 #[path = "shared_interaction.rs"]
-mod shared_interaction;
+pub(crate) mod shared_interaction;
 #[path = "weapon_action_recoil_definitions.rs"]
 pub(crate) mod weapon_action_recoil_definitions;
 

@@ -26,6 +26,7 @@ use crate::{CatalogError, Kind};
 
 #[derive(Clone, Copy)]
 pub(super) enum ConfigurationFamily {
+    Interactions,
     InventoryConfigurations,
     VehicleArmor,
     ResourceComponents,
@@ -37,6 +38,7 @@ pub(super) enum ConfigurationFamily {
 impl ConfigurationFamily {
     pub(super) const fn source_types(self) -> &'static [&'static str] {
         match self {
+            Self::Interactions => crate::catalog_v3::catalog_interactions::SOURCE_TYPES,
             Self::InventoryConfigurations => STORAGE_SOURCE_TYPES,
             Self::VehicleArmor => VEHICLE_ARMOR_TYPES,
             Self::ResourceComponents => RESOURCE_COMPONENT_TYPES,
@@ -75,7 +77,11 @@ impl Family {
     pub(super) const fn localized(self) -> bool {
         matches!(
             self,
-            Self::Definitions | Self::AmmoDefinitions | Self::Factions | Self::ContractScopes
+            Self::Definitions
+                | Self::AmmoDefinitions
+                | Self::Factions
+                | Self::ContractScopes
+                | Self::Configuration(ConfigurationFamily::Interactions)
         )
     }
 

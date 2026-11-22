@@ -1963,6 +1963,22 @@ Use `item_container_params` or `vehicle_container_params` for the typed original
 and `with_inventory_containers` to read the linked inventory definition. The storage query
 projects its own component fields. Bounds and room associations have their own datasets.
 
+## Authored interactions
+
+Use `equipment::interactions::with_interactions`, its decoded-Entry form or the
+equivalent session methods for the canonical `configurations.interactions` table.
+Select a physical Entity Record index, a GUID with all its admitted occurrences,
+or the entire component family. Each row retains its original Components slot.
+The typed accessors distinguish interactable declarations and state machines
+and expose the authored Tag references. Serialize the row for the complete
+canonical component, including tasks, conditions, transitions and additional
+original fields.
+
+Use the snapshot's protected-text lookup for reached display names and keep its
+source inventory with the result. References retain the authored target and
+resolution state. Use the target's physical Record index with the Tag declaration
+query to read a linked Tag definition.
+
 ## Cargo Grid configurations
 
 Use `equipment::with_cargo_grids`, its decoded-Entry form or the equivalent session methods with one

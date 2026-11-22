@@ -10,6 +10,7 @@ use crate::hackable_device_fixture as hackable_device;
 pub(super) const OWNER: u128 = 0x1057_0400;
 pub(super) const PRESET: u128 = 0x1057_0401;
 pub(super) const MISSING_PRESET: u128 = 0x1057_0402;
+const QUERY_TAG: u128 = 0x1057_0403;
 pub(super) const DELAY_BITS: u32 = 0x7fc0_1057;
 const BASE: &str = "DataForgeComponentParams";
 const COMPONENT: &str = "SEntityInteractableParams";
@@ -63,6 +64,17 @@ pub(super) fn database() -> DataForgeBuilder {
             "FixtureConditionPreset",
             "libs/foundry/records/fixture/interaction_preset.xml",
         ))
+        .record(
+            TestRecord::new(
+                QUERY_TAG,
+                "Tag",
+                "Tag.FixtureInteraction",
+                "libs/foundry/records/fixture/interaction_tag.xml",
+            )
+            .value("tagName", TestValue::text("FixtureInteraction"))
+            .value("legacyGUID", TestValue::UInt32(u32::MAX))
+            .value("children", TestValue::Array(Vec::new())),
+        )
 }
 
 fn interaction_schema(builder: DataForgeBuilder) -> DataForgeBuilder {
@@ -86,6 +98,7 @@ fn interaction_schema(builder: DataForgeBuilder) -> DataForgeBuilder {
             TestStruct::new(SHARED)
                 .field("Name", TestType::String)
                 .field("DisplayName", TestType::Locale)
+                .array("QueryTags", TestType::ReferenceTo("Tag".to_owned()))
                 .field("available", TestType::Bool)
                 .field("conditionList", strong(CONDITIONS)),
         )
@@ -109,6 +122,12 @@ fn interaction_schema(builder: DataForgeBuilder) -> DataForgeBuilder {
         .structure(TestStruct::new(ACTOR_TASK))
         .structure(TestStruct::new(ITEM_TASK))
         .structure(TestStruct::new(MENU_TITLE))
+        .structure(
+            TestStruct::new("Tag")
+                .field("tagName", TestType::String)
+                .field("legacyGUID", TestType::UInt32)
+                .array("children", TestType::ReferenceTo("Tag".to_owned())),
+        )
 }
 
 fn condition_schema(builder: DataForgeBuilder) -> DataForgeBuilder {
@@ -248,6 +267,10 @@ fn interaction(identity: &str, priority: u16) -> TestValue {
             .named(identity)
             .value("Name", TestValue::text("FixtureShared"))
             .value("DisplayName", TestValue::text("@fixture_interaction"))
+            .value(
+                "QueryTags",
+                TestValue::Array(vec![TestValue::Reference(QUERY_TAG), TestValue::Null]),
+            )
             .value("available", TestValue::Bool(false))
             .value("conditionList", condition_list())
             .value("fixturePriority", TestValue::UInt16(priority)),

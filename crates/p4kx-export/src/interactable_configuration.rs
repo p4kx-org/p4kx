@@ -23,7 +23,7 @@ pub(super) const SOURCE_TYPE: &str = "SInteractableParams";
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct InteractableConfiguration<'source> {
+pub struct InteractableConfiguration<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     shared_interactions: InteractionList<SharedInteraction<'source>>,
@@ -35,6 +35,22 @@ pub(super) struct InteractableConfiguration<'source> {
 }
 
 impl<'source> InteractableConfiguration<'source> {
+    /// Borrows the ordered original shared interactions.
+    #[must_use]
+    pub const fn shared_interactions(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<SharedInteraction<'source>>>> {
+        &self.shared_interactions
+    }
+
+    /// Borrows the ordered original interaction points.
+    #[must_use]
+    pub const fn interaction_points(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<InteractionPoint<'source>>>> {
+        &self.interaction_points
+    }
+
     pub(super) fn read(
         source: Observed<'_, '_, '_, 'source>,
         projection: &CatalogProjection<'_, 'source>,

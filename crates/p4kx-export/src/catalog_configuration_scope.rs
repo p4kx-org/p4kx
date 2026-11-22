@@ -8,11 +8,14 @@ use p4kx_extraction::{CancelToken, RecordTree, StructValue, Value};
 use super::super::{
     ConfigurationKind, EntityConfigurationRows, FuelConfigurationKind, ResourceTopologyKind,
 };
+use super::read_scope;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::{OriginalFlowFields, OriginalValueFact};
+use crate::catalog_read::scoped_source_read::ScopedSourceRead;
 use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::catalog_facility::{CARGO_GRID_SOURCE_TYPE, FacilityKind};
+use crate::catalog_v3::catalog_interactions::{InteractionConfiguration, InteractionKind};
 use crate::catalog_v3::catalog_item_alignment::{
     ATTACHABLE, AttachmentTarget, CONTAINER, ItemAlignmentKind, attachment_target,
 };
@@ -20,12 +23,14 @@ use crate::catalog_v3::item_alignment_options::AlignmentOptions;
 use crate::catalog_v3::item_component_owner::ComponentOwner;
 use crate::catalog_v3::{inventory_owner_storage, room_associations};
 use crate::export_field_inspection::ConfigurationInspection;
+use crate::record_observation::RecordObservation;
 use crate::source_fields::FieldError;
 use crate::{CatalogError, ExportAccountingError};
 
 #[derive(Clone, Copy)]
 pub(super) enum Scope {
     All,
+    Interactions,
     Ports,
     Attachments,
     Bounds,
@@ -44,6 +49,24 @@ pub(super) enum Scope {
 pub(super) struct ConfigurationOwner {
     pub(super) configuration: ConfigurationKind,
     pub(super) owner: ComponentOwner,
+}
+
+pub(crate) fn read_interactions<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    options: &AlignmentOptions<'_>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<Vec<InteractionConfiguration<'source>>>, CatalogError> {
+    let read = read_scope(
+        tree,
+        projection,
+        admission,
+        options,
+        cancel,
+        Scope::Interactions,
+    )?;
+    Ok(read.map(|rows| rows.interactions))
 }
 
 impl Scope {
@@ -66,6 +89,9 @@ impl Scope {
                 room_associations::VEHICLE => Some(ConfigurationKind::RoomAssociations),
                 _ => None,
             };
+        }
+        if matches!(self, Self::Interactions) {
+            return InteractionKind::of(value.type_name()).map(ConfigurationKind::Interaction);
         }
         let kind = ConfigurationKind::of(value, input)?;
         self.accepts(kind).then_some(kind)
@@ -141,7 +167,7 @@ impl Scope {
             Self::Fuel(requested) => {
                 matches!(kind, ConfigurationKind::Fuel(actual) if actual == requested)
             }
-            Self::Ports | Self::InventoryConfigurations => false,
+            Self::Interactions | Self::Ports | Self::InventoryConfigurations => false,
         }
     }
 
@@ -267,6 +293,7 @@ impl Scope {
                 rows.inventory.vehicle_storage(&owner, source, notes)
             }
             Self::All
+            | Self::Interactions
             | Self::CargoGrids
             | Self::Facilities
             | Self::FacilitiesWithCargoStorage

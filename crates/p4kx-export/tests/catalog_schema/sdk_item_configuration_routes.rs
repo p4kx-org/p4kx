@@ -13,7 +13,9 @@ use p4kx_extraction::{
 use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry};
 use serde_json::Value;
 
-use super::super::{ATTACHMENT_CONSTRAINTS, ITEM_BOUNDS, ITEM_PORTS};
+use super::super::{
+    ATTACHMENT_CONSTRAINTS, ITEM_BOUNDS, ITEM_DEFINITIONS, ITEM_PORTS, MANUFACTURERS,
+};
 use super::component_parity::parity;
 use super::{Route, TestResult};
 
@@ -32,12 +34,28 @@ const REMAINING: &str =
     "encrypted synthetic producer parity available; installed producer parity open";
 
 pub(super) fn append_item_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResult<()> {
-    routes.extend(super::read_entity_definitions(archive)?);
+    routes.extend(read_entity_definitions(archive)?);
     routes.extend(read()?);
     routes.extend(super::item_durability::read()?);
     routes.extend(super::item_recovery::read()?);
     routes.push(super::loadout::read()?);
     Ok(())
+}
+
+fn read_entity_definitions(archive: &Archive) -> TestResult<[Route; 2]> {
+    const REMAINING: &str =
+        "typed definitions and synthetic producer parity available; installed producer parity open";
+    let session = CatalogQuerySession::open(archive, CatalogLanguageSelection::AllAvailable, None)?;
+    let parsed = session.parsed(None)?;
+    let selection = CatalogRecordSelection::All;
+    Ok([
+        parsed.with_item_definitions(selection, None, |snapshot| {
+            Route::queried_rows(ITEM_DEFINITIONS, snapshot.rows(), REMAINING)
+        })??,
+        parsed.with_manufacturers(selection, None, |snapshot| {
+            Route::queried_rows(MANUFACTURERS, &snapshot.rows, REMAINING)
+        })??,
+    ])
 }
 
 pub(super) fn read() -> TestResult<[Route; 3]> {

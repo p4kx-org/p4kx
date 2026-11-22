@@ -20,7 +20,7 @@ use crate::source_fields::FieldError;
 
 const INTERACTABLE: &str = "SEntityInteractableParams";
 const STATE_MACHINE: &str = "SInteractionStateMachineParams";
-pub(super) const SOURCE_TYPES: &[&str] = &[INTERACTABLE, STATE_MACHINE];
+pub(crate) const SOURCE_TYPES: &[&str] = &[INTERACTABLE, STATE_MACHINE];
 
 #[derive(Clone, Copy)]
 pub(super) enum InteractionKind {
@@ -42,7 +42,7 @@ impl InteractionKind {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct InteractionConfiguration<'source> {
+pub struct InteractionConfiguration<'source> {
     #[serde(flatten)]
     owner: ComponentOwner,
     #[serde(flatten)]
@@ -67,6 +67,38 @@ enum InteractionFields<'source> {
 }
 
 impl<'source> InteractionConfiguration<'source> {
+    /// Borrows the physical owner and original Components position.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.owner
+    }
+
+    /// Borrows the concrete interaction component's original fields.
+    #[must_use]
+    pub const fn source(&self) -> &UnitSource<'source> {
+        &self.source
+    }
+
+    /// Borrows the authored interactable cell for an interactable component.
+    #[must_use]
+    pub fn interactable(&self) -> Option<&SourcedValue<InteractableConfiguration<'source>>> {
+        match &self.fields {
+            InteractionFields::Interactable { interactable } => Some(interactable.as_ref()),
+            InteractionFields::StateMachine { .. } => None,
+        }
+    }
+
+    /// Borrows the ordered state-type cell for a state machine.
+    #[must_use]
+    pub const fn state_types(
+        &self,
+    ) -> Option<&SourcedValue<Vec<SourcedValue<InteractionStateType<'source>>>>> {
+        match &self.fields {
+            InteractionFields::Interactable { .. } => None,
+            InteractionFields::StateMachine { state_types } => Some(state_types),
+        }
+    }
+
     pub(super) fn read(
         kind: InteractionKind,
         owner: ComponentOwner,
