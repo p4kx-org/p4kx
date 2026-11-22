@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use p4kx_extraction::Guid;
 use p4kx_extraction::chunks::{ChunkFile, ChunkType, Container};
@@ -10,12 +10,6 @@ use crate::starmap_xml::{Document, Node, XmlError, attribute};
 
 /// The chunk of a `.soc` file that holds its entities as `CryXmlB`.
 const ENTITIES: ChunkType = ChunkType::new(Container::CrCh, 0x0004);
-
-/// The most entities that are counted over all `.soc` files of one container.
-const MAX_ENTITIES: u32 = 1 << 20;
-
-/// The most distinct tags that are counted over all `.soc` files of one container.
-const MAX_TAGS: usize = 1 << 16;
 
 /// Why a `.soc` file cannot be counted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, thiserror::Error)]
@@ -29,12 +23,12 @@ pub(crate) enum SocError {
     /// An entity chunk is no XML document.
     #[error("an entity chunk of its .soc {0}")]
     Xml(#[from] XmlError),
-    /// The container lists more entities than [`MAX_ENTITIES`].
-    #[error("its .soc files list too many entities")]
-    TooManyEntities,
-    /// The container carries more distinct tags than [`MAX_TAGS`].
-    #[error("its .soc files carry too many distinct tags")]
-    TooManyTags,
+    /// A count exceeds the catalog's unsigned 32-bit representation.
+    #[error("its .soc entity or tag count exceeds the catalog representation")]
+    CountOverflow,
+    /// A tag collection could not allocate space for a new tag.
+    #[error("its .soc tag counts could not be allocated")]
+    TagAllocation,
 }
 
 /// How many entities there are and how many carry each tag.
@@ -45,8 +39,7 @@ pub(crate) struct EntityTags {
 }
 
 impl EntityTags {
-    /// Adds the entities of the `.soc` file `bytes` and the tags they carry: the `TagId` of every
-    /// `Tag` below the `Tags` of an `Entity`. The limits apply to the sum over all files added.
+    /// Adds each entity and its distinct tags from the `.soc` file.
     ///
     /// # Errors
     ///
@@ -66,14 +59,13 @@ impl EntityTags {
     }
 
     fn add_entities<'d, N: Node<'d>>(&mut self, root: N) -> Result<(), SocError> {
+        let mut entity_tags = HashSet::new();
         for entity in root
             .children()
             .filter(|child| child.name().eq_ignore_ascii_case("Entity"))
         {
-            if self.entities >= MAX_ENTITIES {
-                return Err(SocError::TooManyEntities);
-            }
-            self.entities += 1;
+            increment(&mut self.entities)?;
+            entity_tags.clear();
             for id in entity
                 .children()
                 .filter(|child| child.name().eq_ignore_ascii_case("Tags"))
@@ -82,15 +74,34 @@ impl EntityTags {
                 .filter_map(|tag| attribute(tag, "TagId"))
                 .filter_map(|id| id.trim().parse::<Guid>().ok())
             {
-                if self.by_tag.len() >= MAX_TAGS && !self.by_tag.contains_key(&id) {
-                    return Err(SocError::TooManyTags);
+                if entity_tags.contains(&id) {
+                    continue;
                 }
-                let count = self.by_tag.entry(id).or_default();
-                *count = count.saturating_add(1);
+                entity_tags
+                    .try_reserve(1)
+                    .map_err(|_| SocError::TagAllocation)?;
+                entity_tags.insert(id);
+                self.count_tag(id)?;
             }
         }
         Ok(())
     }
+
+    fn count_tag(&mut self, tag: Guid) -> Result<(), SocError> {
+        if let Some(count) = self.by_tag.get_mut(&tag) {
+            return increment(count);
+        }
+        self.by_tag
+            .try_reserve(1)
+            .map_err(|_| SocError::TagAllocation)?;
+        self.by_tag.insert(tag, 1);
+        Ok(())
+    }
+}
+
+fn increment(count: &mut u32) -> Result<(), SocError> {
+    *count = count.checked_add(1).ok_or(SocError::CountOverflow)?;
+    Ok(())
 }
 
 #[cfg(test)]
@@ -114,7 +125,10 @@ mod tests {
     fn each_tag_is_counted_once_per_entity_that_carries_it() {
         let counts = counted(&format!(
             r#"<Entities>
-              <Entity Name="a"><Tags><Tag TagId="{TAG_A}"/><Tag TagId="{TAG_B}"/></Tags></Entity>
+              <Entity Name="a">
+                <Tags><Tag TagId="{TAG_A}"/><Tag TagId="{TAG_A}"/><Tag TagId="{TAG_B}"/></Tags>
+                <Tags><Tag TagId="{TAG_A}"/></Tags>
+              </Entity>
               <Entity Name="b"><Tags><Tag TagId="{TAG_A}"/></Tags></Entity>
               <Entity Name="c"/>
               <Other/>
@@ -177,30 +191,34 @@ mod tests {
     }
 
     #[test]
-    fn the_entity_limit_holds_over_everything_added() {
+    fn entity_counts_preserve_every_representable_value() {
         let mut counts = EntityTags {
-            entities: MAX_ENTITIES,
+            entities: u32::MAX - 1,
             ..EntityTags::default()
         };
+        let entity = b"<Entities><Entity/></Entities>";
+        assert_eq!(counts.add_xml(entity), Ok(()), "the largest count fits");
+        assert_eq!(counts.entities, u32::MAX);
         assert_eq!(
-            counts.add_xml(b"<Entities><Entity/></Entities>"),
-            Err(SocError::TooManyEntities)
+            counts.add_xml(entity),
+            Err(SocError::CountOverflow),
+            "the next entity would exceed the catalog count"
         );
+        assert_eq!(counts.entities, u32::MAX);
     }
 
     #[test]
-    fn the_tag_limit_holds_over_everything_added() {
+    fn a_container_can_count_more_than_sixty_five_thousand_distinct_tags() {
         let mut counts = EntityTags::default();
-        for at in 1..=MAX_TAGS {
-            let bytes = u128::try_from(at).expect("fits").to_le_bytes();
-            counts.by_tag.insert(Guid::from_stored(bytes), 1);
+        for index in 1..=65_536_u128 {
+            counts
+                .by_tag
+                .insert(Guid::from_stored(index.to_le_bytes()), 1);
         }
-        let known = counts.by_tag.keys().next().copied().expect("a tag");
-        let known =
-            format!(r#"<Entities><Entity><Tags><Tag TagId="{known}"/></Tags></Entity></Entities>"#);
-        counts.add_xml(known.as_bytes()).expect("a known tag fits");
-        let new =
+        let entity =
             format!(r#"<Entities><Entity><Tags><Tag TagId="{TAG_A}"/></Tags></Entity></Entities>"#);
-        assert_eq!(counts.add_xml(new.as_bytes()), Err(SocError::TooManyTags));
+        counts.add_xml(entity.as_bytes()).expect("another tag fits");
+        assert_eq!(counts.by_tag.len(), 65_537);
+        assert_eq!(counts.by_tag.get(&guid(TAG_A)), Some(&1));
     }
 }

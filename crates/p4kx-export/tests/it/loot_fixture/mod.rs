@@ -230,7 +230,12 @@ pub(crate) fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
                 CONFIG,
             )],
             vec![
-                soc(&[&[TAG_COMMON, TAG_RARE], &[TAG_COMMON], &[TAG_COMMON], &[]]),
+                soc(&[
+                    &[TAG_COMMON, TAG_RARE, TAG_COMMON],
+                    &[TAG_COMMON],
+                    &[TAG_COMMON],
+                    &[],
+                ]),
                 soc(&[&[TAG_RARE]]),
             ],
         ))
