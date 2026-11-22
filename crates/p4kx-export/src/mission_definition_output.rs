@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use p4kx_extraction::{CancelToken, DataForge, Guid};
+use p4kx_extraction::{CancelToken, DataForge, Guid, RecordTree};
 use serde::Serialize;
 
 use crate::catalog_row::CatalogRow;
@@ -16,7 +16,17 @@ use crate::{CatalogError, Kind};
 pub(crate) struct DefinitionSource<'source> {
     pub(crate) guid: Guid,
     pub(crate) path: &'source str,
-    pub(crate) numbers: TemplateNumbers,
+    numbers: TemplateNumbers,
+}
+
+impl<'source> DefinitionSource<'source> {
+    pub(crate) const fn new(tree: &RecordTree<'source>, numbers: TemplateNumbers) -> Self {
+        Self {
+            guid: tree.guid(),
+            path: tree.record_path(),
+            numbers,
+        }
+    }
 }
 
 /// The accounting proof obtained from one serialized canonical definition.

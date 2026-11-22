@@ -11,6 +11,7 @@ use crate::broker_flow_failure::BrokerProjectionFailure;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
+use crate::catalog_rows::mission_definitions::DefinitionSource;
 use crate::catalog_template_modules::template_prepared_owner::PreparedOwner;
 use crate::catalog_v3::tag_catalog::CapturedTags;
 use crate::export_ledger::ExportLedger;
@@ -48,6 +49,7 @@ pub(crate) struct BrokerEmission<'source> {
 
 pub(crate) struct CanonicalBroker<'source> {
     pub(crate) definition: BrokerDefinition<'source>,
+    pub(crate) definition_source: DefinitionSource<'source>,
     pub(crate) flows: Vec<MissionFlowConfiguration>,
     pub(crate) properties: Vec<MissionPropertyConfiguration>,
     pub(crate) projection: Result<BrokerEmission<'source>, Box<BrokerProjectionFailure<'source>>>,
@@ -132,7 +134,7 @@ fn emit<'fields, 'scope, 'read, 'source>(
         crate::template_flow_configuration_read::read(members, plan, FAMILY)?;
     let (properties, mission_properties) =
         crate::template_property_configuration_read::read(members, &plan.objectives, FAMILY)?;
-    let definition = BrokerDefinition::emit(
+    let (definition, definition_source) = BrokerDefinition::emit(
         input,
         tree,
         references,
@@ -141,6 +143,7 @@ fn emit<'fields, 'scope, 'read, 'source>(
     )?;
     Ok(CanonicalBroker {
         definition,
+        definition_source,
         flows,
         properties,
         projection: projected,

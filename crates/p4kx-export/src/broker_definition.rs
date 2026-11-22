@@ -8,7 +8,8 @@ use serde::Serialize;
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::canonical_record_header::CanonicalRecordHeader;
-use crate::guid_text::CatalogGuid;
+use crate::catalog_rows::mission_definitions::DefinitionSource;
+use crate::catalog_template_modules::mission_owner_definition::MissionOwnerDefinition;
 use crate::schema_fields::every_field_required;
 use crate::template_configuration::{MissionFlowRef, MissionPropertyRef};
 use crate::template_meanings::FlowMeanings;
@@ -20,41 +21,78 @@ use crate::template_source::TemplateSource;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct BrokerDefinition<'source> {
-    #[serde(skip)]
-    pub(crate) physical_guid: CatalogGuid,
-    #[serde(skip)]
-    pub(crate) physical_path: &'source str,
-    #[serde(skip)]
-    pub(crate) numbers: TemplateNumbers,
-    pub(crate) input_ref: PhysicalSourceRef,
+pub struct BrokerDefinition<'source> {
+    input_ref: PhysicalSourceRef,
     #[serde(flatten)]
-    pub(crate) header: CanonicalRecordHeader<'source>,
-    pub(crate) source: TemplateSource<'source>,
-    pub(crate) mission_flows: Vec<MissionFlowRef>,
-    pub(crate) mission_properties: Vec<MissionPropertyRef>,
+    header: CanonicalRecordHeader<'source>,
+    source: TemplateSource<'source>,
+    mission_flows: Vec<MissionFlowRef>,
+    mission_properties: Vec<MissionPropertyRef>,
 }
 
 impl<'source> BrokerDefinition<'source> {
+    /// Borrows the original DataForge source identity.
+    #[must_use]
+    pub const fn input_ref(&self) -> &PhysicalSourceRef {
+        &self.input_ref
+    }
+
+    /// Borrows the physical Broker header with its field origins.
+    #[must_use]
+    pub const fn header(&self) -> &CanonicalRecordHeader<'source> {
+        &self.header
+    }
+
+    /// Borrows the original source arena shared by the declaration links.
+    #[must_use]
+    pub const fn source(&self) -> &TemplateSource<'source> {
+        &self.source
+    }
+
+    /// Borrows the links to this owner's canonical flow declarations.
+    #[must_use]
+    pub fn mission_flows(&self) -> &[MissionFlowRef] {
+        &self.mission_flows
+    }
+
+    /// Borrows the links to this owner's canonical property declarations.
+    #[must_use]
+    pub fn mission_properties(&self) -> &[MissionPropertyRef] {
+        &self.mission_properties
+    }
+
     pub(crate) fn emit<'fields, 'scope, 'read>(
         input: &OriginalCatalogInput<'_, '_>,
         tree: &RecordTree<'source>,
         references: &mut TemplateReferences<'fields, 'scope, 'read, 'source>,
         meanings: FlowMeanings<'_, 'fields, 'scope, 'read, 'source>,
-        (mission_flows, mission_properties): (Vec<MissionFlowRef>, Vec<MissionPropertyRef>),
-    ) -> Result<Self, CatalogError> {
+        links: (Vec<MissionFlowRef>, Vec<MissionPropertyRef>),
+    ) -> Result<(Self, DefinitionSource<'source>), CatalogError> {
         let members = meanings.members();
-        members.fields().check_tree(tree)?;
+        let fields = members.fields();
+        fields.check_tree(tree)?;
         let source = meanings.emit(references)?;
-        Ok(Self {
-            physical_guid: CatalogGuid(tree.guid()),
-            physical_path: tree.record_path(),
-            numbers: TemplateNumbers::broker(members, input)?,
-            input_ref: members.fields().input_ref().clone(),
-            header: CanonicalRecordHeader::read(tree, input.origins())?,
+        let proof = DefinitionSource::new(tree, TemplateNumbers::broker(members, input)?);
+        let definition = MissionOwnerDefinition::read(input, fields, tree, source, links)?;
+        Ok((Self::from(definition), proof))
+    }
+}
+
+impl<'source> From<MissionOwnerDefinition<'source>> for BrokerDefinition<'source> {
+    fn from(definition: MissionOwnerDefinition<'source>) -> Self {
+        let MissionOwnerDefinition {
+            input_ref,
+            header,
             source,
             mission_flows,
             mission_properties,
-        })
+        } = definition;
+        Self {
+            input_ref,
+            header,
+            source,
+            mission_flows,
+            mission_properties,
+        }
     }
 }

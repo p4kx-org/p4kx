@@ -20,6 +20,10 @@ use serde_json::{Value, json};
 
 use super::{Route, TestResult};
 
+#[path = "sdk_broker_definition_route.rs"]
+mod broker_definitions;
+pub(super) use broker_definitions::DATASET as BROKER_DEFINITIONS;
+
 #[path = "sdk_contract_template_definition_route.rs"]
 mod template_definitions;
 pub(super) use template_definitions::DATASET as TEMPLATE_DEFINITIONS;
@@ -40,7 +44,7 @@ const NULL_TEMPLATE_GUID: u128 = 3;
 const TEMPLATE_RECORD: u32 = 1;
 const TEMPLATE_ALIAS: u32 = 2;
 
-pub(super) fn read() -> TestResult<[Route; 2]> {
+pub(super) fn read() -> TestResult<[Route; 3]> {
     let (_folder, archive) = open(NULL_TEMPLATE_GUID)?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog: Value = serde_json::from_slice(
@@ -72,7 +76,8 @@ pub(super) fn read() -> TestResult<[Route; 2]> {
         "both owner families have normal synthetic producer parity; installed parity open",
     )?;
     let templates = template_definitions::read(&parsed, &catalog)?;
-    Ok([flows, templates])
+    let brokers = broker_definitions::read(&parsed, &catalog)?;
+    Ok([flows, templates, brokers])
 }
 
 fn check_owner_graphs(
@@ -226,7 +231,7 @@ fn check_alias(
 }
 
 #[test]
-fn mission_flows_and_template_definitions_match_the_normal_catalog() -> TestResult {
+fn mission_flows_and_owner_definitions_match_the_normal_catalog() -> TestResult {
     read().map(|_| ())
 }
 
@@ -253,7 +258,7 @@ fn open(null_template_guid: u128) -> TestResult<(tempfile::TempDir, Archive)> {
         .entry(TestEntry::stored("Data/Game2.dcb", database(null_template_guid)).encrypted())
         .entry(TestEntry::stored(
             Language::English.global_ini_path(),
-            b"unused=Fixture locale\n",
+            b"fixture_broker_title=Fixture Broker title\n",
         ))
         .write_to(&path)?;
     Ok((
@@ -266,7 +271,11 @@ fn database(null_template_guid: u128) -> Vec<u8> {
     DataForgeBuilder::new()
         .version(8)
         .structure(TestStruct::new(TEMPLATE_TYPE).field("missionFlow", strong(FLOW)))
-        .structure(TestStruct::new(BROKER_TYPE).field("missionFlow", strong(FLOW)))
+        .structure(
+            TestStruct::new(BROKER_TYPE)
+                .field("missionFlow", strong(FLOW))
+                .field("title", TestType::Locale),
+        )
         .structure(
             TestStruct::new(FLOW)
                 .field("target", strong(TARGET))
@@ -287,7 +296,8 @@ fn database(null_template_guid: u128) -> Vec<u8> {
                 "MissionBrokerEntry.Flow",
                 "libs/foundry/records/missionbroker/sdk_flow.xml",
             )
-            .value("missionFlow", authored("broker-target")),
+            .value("missionFlow", authored("broker-target"))
+            .value("title", TestValue::text("@fixture_broker_title")),
         )
         .record(template(TEMPLATE_GUID, "Flow", authored("template-target")))
         .record(template(null_template_guid, "NullFlow", TestValue::Null))

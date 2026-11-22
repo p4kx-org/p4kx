@@ -66,6 +66,8 @@ pub(crate) mod template_context_weak_read;
 #[path = "template_declaration_binding.rs"]
 pub(crate) mod template_declaration_binding;
 
+#[path = "mission_owner_definition.rs"]
+pub(crate) mod mission_owner_definition;
 #[path = "template_definition.rs"]
 pub(crate) mod template_definition;
 

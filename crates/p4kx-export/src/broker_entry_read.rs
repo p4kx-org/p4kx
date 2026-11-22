@@ -6,9 +6,7 @@ use p4kx_extraction::{CancelToken, DataForge, Filter};
 use crate::broker_canonical_read::{self, BrokerEmission, CanonicalBroker, Sources};
 use crate::broker_entry::BrokerProjection;
 use crate::catalog_projection::CatalogProjection;
-use crate::catalog_rows::mission_definitions::{
-    DefinitionSource, MissionDefinitionOutput, MissionDefinitionWriter,
-};
+use crate::catalog_rows::mission_definitions::{MissionDefinitionOutput, MissionDefinitionWriter};
 use crate::catalog_v3::tag_catalog::CapturedTags;
 use crate::export_field_inspection::WholeInspectionFold;
 use crate::export_ledger::ExportLedger;
@@ -85,11 +83,7 @@ pub(crate) fn read<'source>(
 impl<'source> BrokerRows<'_, 'source> {
     fn append(&mut self, piece: CanonicalBroker<'source>) -> Result<(), CatalogError> {
         self.definitions
-            .append(piece.definition, |definition| DefinitionSource {
-                guid: definition.physical_guid.0,
-                path: definition.physical_path,
-                numbers: definition.numbers,
-            })?;
+            .append(piece.definition, |_| piece.definition_source)?;
         self.flows.extend(piece.flows);
         self.properties.extend(piece.properties);
         match piece.projection {

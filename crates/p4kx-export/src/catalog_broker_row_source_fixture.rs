@@ -11,6 +11,7 @@ use crate::broker_definition::BrokerDefinition;
 use crate::build::original_input::test_support::{self, TestResult};
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_row::CatalogRow;
+use crate::catalog_rows::mission_definitions::DefinitionSource;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_field_inspection::FieldInspection;
 use crate::export_ledger::{SourceDisposition, SourceObservation};
@@ -43,8 +44,8 @@ pub(super) fn with_actual(check: impl FnOnce(Actual) -> TestResult) -> TestResul
         let fields = OriginalFlowFields::read(&scope, None)?;
         let admission = RecordObservation::capture(input, &record)?;
         let capture = TemplateFieldCapture::new(&fields, input, &admission)?;
-        let emitted = definition(input, &fields, &tree, &capture)?;
-        let row = emitted_row(&emitted, &record, &tree);
+        let (emitted, evidence) = definition(input, &fields, &tree, &capture)?;
+        let row = emitted_row(&emitted, &evidence, &record, &tree);
         let source = admission.source(
             Some(Kind::MissionBrokerEntries),
             ExportSourceRole::Selected,
@@ -80,18 +81,19 @@ pub(super) fn with_actual(check: impl FnOnce(Actual) -> TestResult) -> TestResul
 
 fn emitted_row(
     emitted: &BrokerDefinition<'_>,
+    evidence: &DefinitionSource<'_>,
     record: &Record<'_>,
     tree: &RecordTree<'_>,
 ) -> CatalogRow {
     assert_eq!(
-        emitted.source.values.len(),
+        emitted.source().values().len(),
         2,
         "the real D source retains its Struct and genuine empty Array occurrences"
     );
     let row = CatalogRow {
         kind: Kind::MissionBrokerEntries,
-        guid: emitted.physical_guid.0,
-        record_path: emitted.physical_path.to_owned(),
+        guid: evidence.guid,
+        record_path: evidence.path.to_owned(),
         record_index: None,
     };
     assert_eq!(
@@ -112,7 +114,7 @@ fn definition<'source>(
     fields: &OriginalFlowFields<'_, '_, 'source>,
     tree: &RecordTree<'source>,
     capture: &dyn crate::source_fields::FieldCapture<'source>,
-) -> Result<BrokerDefinition<'source>, crate::CatalogError> {
+) -> Result<(BrokerDefinition<'source>, DefinitionSource<'source>), crate::CatalogError> {
     let kind = FlowOwnerKind::MissionBrokerEntry;
     let mut references = TemplateReferences::new(fields);
     let plan = TemplatePlan::read(fields, &mut references, kind)?;

@@ -6,7 +6,9 @@ use p4kx_extraction::{CancelToken, Record, RecordTree};
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_rows::mission_definitions::DefinitionSource;
-use crate::catalog_template_modules::template_prepared_owner::PreparedOwner;
+use crate::catalog_template_modules::{
+    mission_owner_definition::MissionOwnerDefinition, template_prepared_owner::PreparedOwner,
+};
 use crate::catalog_v3::tag_catalog::CapturedTags;
 use crate::export_ledger::ExportLedger;
 use crate::mission_flow_owner::FlowOwnerKind;
@@ -17,6 +19,7 @@ use crate::template_context_read::{ContextPlan, ContextSources};
 use crate::template_definition::TemplateDefinition;
 use crate::template_field_capture::TemplateFieldCapture;
 use crate::template_issues::Unknowns;
+use crate::template_number_capture::TemplateNumbers;
 use crate::template_projection::TemplateProjection;
 use crate::{CatalogError, CatalogReadFailure};
 
@@ -81,13 +84,14 @@ pub(crate) fn read<'source>(
         &mut context.ledger,
         &mut context.failures,
     )?;
-    let definition_source = DefinitionSource {
-        guid: tree.guid(),
-        path: tree.record_path(),
-        numbers: crate::template_number_capture::TemplateNumbers::read(&members, input)?,
-    };
-    let definition =
-        TemplateDefinition::emit(input, &fields, tree, source, (flow_links, property_links))?;
+    let definition_source = DefinitionSource::new(tree, TemplateNumbers::read(&members, input)?);
+    let definition = TemplateDefinition::from(MissionOwnerDefinition::read(
+        input,
+        &fields,
+        tree,
+        source,
+        (flow_links, property_links),
+    )?);
     Ok(CanonicalTemplate {
         definition,
         definition_source,
