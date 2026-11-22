@@ -12,15 +12,15 @@ use p4kx_export::catalog_queries::{
 };
 use p4kx_export::{CatalogError, CatalogOptions, build_catalog_from};
 use p4kx_extraction::{
-    Archive, CancelToken, DataForgeEntry, FieldOrigin, InputScope, Language, SourceInventory,
-    SourceUseRole,
+    Archive, CancelToken, DataForgeEntry, FieldOrigin, InputScope, Language, SourceEncryptionState,
+    SourceInventory, SourceUseRole,
 };
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, TestStruct, TestType, TestValue,
 };
 use serde_json::{Value, json};
 
-use super::super::INVENTORY_CONTAINERS;
+use super::super::{INVENTORY_CONTAINERS, PROVENANCE};
 use super::{Route, TestResult};
 
 #[path = "sdk_inventory_configuration_route.rs"]
@@ -43,7 +43,7 @@ enum DataForgeStorage {
     Encrypted,
 }
 
-pub(super) fn read() -> TestResult<Route> {
+pub(super) fn read() -> TestResult<[Route; 2]> {
     let (_folder, archive) = open(&fixture::database(), DataForgeStorage::Encrypted)?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog: Value = serde_json::from_slice(
@@ -56,11 +56,18 @@ pub(super) fn read() -> TestResult<Route> {
         None,
         |snapshot| {
             check_catalog(&snapshot, &catalog)?;
-            Route::queried_rows(
-                INVENTORY_CONTAINERS,
-                snapshot.rows(),
-                "synthetic source and producer parity witnessed; installed producer parity open",
-            )
+            Ok([
+                Route::queried_rows(
+                    INVENTORY_CONTAINERS,
+                    snapshot.rows(),
+                    "synthetic source and producer parity witnessed; installed producer parity open",
+                )?,
+                Route::queried_value(
+                    PROVENANCE,
+                    snapshot.source_inventory(),
+                    "reachable source and use parity verified on an encrypted fixture; broader installed parity open",
+                )?,
+            ])
         },
     )?
 }
@@ -87,6 +94,10 @@ fn check_catalog(snapshot: &InventoryContainerSnapshot<'_>, catalog: &Value) -> 
         .pointer("/provenance/uses")
         .and_then(Value::as_array)
         .ok_or("Catalog source uses")?;
+    let catalog_sources = catalog
+        .pointer("/provenance/sources")
+        .and_then(Value::as_array)
+        .ok_or("Catalog physical sources")?;
     for row in snapshot.rows() {
         let dimensions = row.interior_dimensions();
         let first_axis = dimensions
@@ -98,7 +109,13 @@ fn check_catalog(snapshot: &InventoryContainerSnapshot<'_>, catalog: &Value) -> 
             (dimensions.origin(), SourceUseRole::Selector),
             (first_axis.origin(), SourceUseRole::Payload),
         ] {
-            check_origin(origin, role, snapshot.source_inventory(), catalog_uses)?;
+            check_origin(
+                origin,
+                role,
+                snapshot.source_inventory(),
+                catalog_uses,
+                catalog_sources,
+            )?;
         }
     }
     Ok(())
@@ -109,6 +126,7 @@ fn check_origin(
     role: SourceUseRole,
     inventory: &SourceInventory,
     catalog_uses: &[Value],
+    catalog_sources: &[Value],
 ) -> TestResult {
     assert_eq!(
         origin.contains_encrypted_source(),
@@ -125,13 +143,26 @@ fn check_origin(
             .iter_uses()
             .find(|used| used.id() == reference)
             .ok_or("SDK field contributor")?;
-        contributor |= used.scope() == InputScope::Payload && used.role() == role;
+        contributor |= used.scope() == InputScope::Payload
+            && used.role() == role
+            && used.effective_encryption() == SourceEncryptionState::Encrypted;
         assert!(
             catalog_uses.contains(&serde_json::to_value(used)?),
             "the Catalog records the same original role and coordinate"
         );
+        let physical = inventory
+            .iter_sources()
+            .find(|source| source.id() == used.source())
+            .ok_or("the SDK contributor's physical source")?;
+        assert!(
+            catalog_sources.contains(&serde_json::to_value(physical)?),
+            "the Catalog records the same physical source, ancestry and encryption facts",
+        );
     }
-    assert!(contributor, "original field lacks its {role:?} contributor");
+    assert!(
+        contributor,
+        "original field lacks its encrypted {role:?} payload contributor"
+    );
     Ok(())
 }
 

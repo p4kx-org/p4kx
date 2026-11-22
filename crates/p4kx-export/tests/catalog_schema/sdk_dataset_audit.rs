@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::fmt;
 
 use schemars::Schema;
 use serde_json::Value;
@@ -64,3 +65,23 @@ fn canonical_value<'s>(schema: &'s Value, dataset: &str, shape: Shape) -> TestRe
     };
     schema_at(schema, &path)
 }
+
+pub(super) struct CoverageGaps(pub(super) BTreeMap<String, &'static str>);
+
+impl fmt::Display for CoverageGaps {
+    fn fmt(&self, output: &mut fmt::Formatter<'_>) -> fmt::Result {
+        writeln!(output, "{} unfinished SDK dataset routes", self.0.len())?;
+        for (path, reason) in &self.0 {
+            writeln!(output, "{path} {reason}")?;
+        }
+        Ok(())
+    }
+}
+
+impl fmt::Debug for CoverageGaps {
+    fn fmt(&self, output: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(self, output)
+    }
+}
+
+impl std::error::Error for CoverageGaps {}

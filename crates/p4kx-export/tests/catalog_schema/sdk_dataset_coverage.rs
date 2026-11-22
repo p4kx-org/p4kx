@@ -1,9 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::BTreeMap;
-use std::fmt;
-
 use schemars::JsonSchema;
 use serde_json::{Value, json};
 
@@ -16,7 +13,7 @@ mod routes;
 #[path = "sdk_row_schema.rs"]
 mod row_schema;
 
-use dataset_audit::{NO_WITNESS, audit};
+use dataset_audit::{CoverageGaps, NO_WITNESS, audit};
 
 const LANGUAGE_POLICY: &str = "/texts/languagePolicy";
 const LANGUAGE_SOURCES: &str = "/texts/languageSources";
@@ -35,6 +32,7 @@ const ITEM_RECOVERY_ECONOMY: &str = "/configurations/itemRecoveryEconomy";
 const ITEM_RECOVERY_OVERRIDES: &str = "/configurations/itemRecoveryOverrides";
 const ITEM_RECOVERY_POLICY: &str = "/configurations/itemRecoveryPolicy";
 const INVENTORY_CONTAINERS: &str = "/definitions/inventoryContainers";
+const PROVENANCE: &str = "/provenance";
 const INVENTORY_CONFIGURATIONS: &str = "/configurations/inventoryConfigurations";
 const FACILITIES: &str = "/configurations/facilities";
 const FACILITY_INSTANCES: &str = "/placements/facilityInstances";
@@ -186,6 +184,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     TAG_ROOTS,
     TAG_PATHS,
     INVENTORY_CONTAINERS,
+    PROVENANCE,
     ITEM_RECOVERY_ECONOMY,
     ITEM_RECOVERY_OVERRIDES,
     ITEM_RECOVERY_POLICY,
@@ -381,23 +380,3 @@ fn every_catalog_v3_dataset_has_a_verified_sdk_query() -> TestResult {
     }
     Err(CoverageGaps(gaps).into())
 }
-
-struct CoverageGaps(BTreeMap<String, &'static str>);
-
-impl fmt::Display for CoverageGaps {
-    fn fmt(&self, output: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(output, "{} unfinished SDK dataset routes", self.0.len())?;
-        for (path, reason) in &self.0 {
-            writeln!(output, "{path} {reason}")?;
-        }
-        Ok(())
-    }
-}
-
-impl fmt::Debug for CoverageGaps {
-    fn fmt(&self, output: &mut fmt::Formatter<'_>) -> fmt::Result {
-        fmt::Display::fmt(self, output)
-    }
-}
-
-impl std::error::Error for CoverageGaps {}
