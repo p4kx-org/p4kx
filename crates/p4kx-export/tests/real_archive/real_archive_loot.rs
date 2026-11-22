@@ -222,9 +222,10 @@ fn the_loot_kinds_and_the_containers_of_a_real_archive_are_linked() -> TestResul
     assert!(!containers.is_empty(), "no loot container is placed");
     assert_resolve(
         "the config of a container",
-        containers
-            .iter()
-            .filter_map(|row| row["multiConfigGuid"].as_str()),
+        containers.iter().filter_map(|row| {
+            row.pointer("/multiConfigGuid/value")
+                .and_then(Value::as_str)
+        }),
         &configs,
     );
     Ok(())

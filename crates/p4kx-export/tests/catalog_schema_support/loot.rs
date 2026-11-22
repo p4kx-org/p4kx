@@ -254,15 +254,15 @@ fn legacy_spawn(tag: &str) -> Value {
 
 pub(super) fn containers() -> Value {
     json!([{
-        "multiConfigGuid": "a7000000-0000-4000-8000-000000000001",
-        "container": "Data\\ObjectContainers\\PU\\loc\\mod\\drlct\\loot_area.socpak",
+        "multiConfigGuid": values::present(json!("a7000000-0000-4000-8000-000000000001")),
+        "container": values::present(json!("Data\\ObjectContainers\\PU\\loc\\mod\\drlct\\loot_area.socpak")),
         "system": "stanton",
         "starmapObjectGuid": "a2000000-0000-4000-8000-000000000001",
         "entityCount": 13,
         "tagCounts": [{"tagGuid": "a7000000-0000-4000-8000-000000000002", "entities": 4}]
     }, {
-        "multiConfigGuid": "a7000000-0000-4000-8000-000000000001",
-        "container": "ObjectContainers/PU/loc/missing.socpak",
+        "multiConfigGuid": values::present(json!("a7000000-0000-4000-8000-000000000001")),
+        "container": values::present(json!("ObjectContainers/PU/loc/missing.socpak")),
         "system": "pyro",
         "starmapObjectGuid": null,
         "entityCount": null,

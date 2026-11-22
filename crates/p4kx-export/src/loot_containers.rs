@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use p4kx_extraction::{Archive, CancelToken};
+use p4kx_extraction::{Archive, CancelToken, SourceUses, SourceValue};
 use rayon::prelude::*;
 
 use crate::catalog_read::original::EntryCapture;
@@ -54,7 +54,7 @@ pub(crate) fn locate(
     } = explore(archive, &index, opened, cancel, capture)?;
     let (tags, observed) = read_tags(archive, &summaries, cancel, capture)?;
     ledger.merge(observed);
-    let containers = rows(opened, objects, &summaries, &tags);
+    let containers = rows(opened, objects, &summaries, &tags, capture.source_uses())?;
     if !cancel.is_some_and(CancelToken::is_cancelled) {
         ledger.inventory(Kind::LootContainers);
     }
@@ -80,7 +80,8 @@ fn rows(
     objects: &Objects,
     summaries: &HashMap<usize, Summary>,
     tags: &HashMap<usize, Tags>,
-) -> Vec<LootContainer> {
+    sources: &SourceUses,
+) -> Result<Vec<LootContainer>, CatalogError> {
     let mut reached: HashMap<usize, Vec<&Placed>> = HashMap::new();
     let mut selected = BTreeMap::new();
     for root in opened {
@@ -108,6 +109,7 @@ fn rows(
                 key.system,
                 location,
                 placed.target.entry().and_then(|entry| tags.get(&entry)),
+                sources,
             )
         })
         .collect()
@@ -170,7 +172,8 @@ fn row(
     system: &str,
     location: Option<CatalogGuid>,
     tags: Option<&Tags>,
-) -> LootContainer {
+    sources: &SourceUses,
+) -> Result<LootContainer, CatalogError> {
     let counts = tags.and_then(|read| read.as_ref().ok());
     let mut tag_counts: Vec<TagCount> = counts.map_or_default(|counts| {
         counts
@@ -183,14 +186,20 @@ fn row(
             .collect()
     });
     tag_counts.sort_by_cached_key(|count| count.tag_guid.text());
-    LootContainer {
-        multi_config_guid: CatalogGuid(placed.config),
-        container: placed.path.clone(),
+    Ok(LootContainer {
+        multi_config_guid: sources.value_with_origins(
+            SourceValue::Present(CatalogGuid(placed.config)),
+            &[&placed.config_origin],
+        )?,
+        container: sources.value_with_origins(
+            SourceValue::Present(placed.path.clone()),
+            &[&placed.path_origin],
+        )?,
         system: system.to_owned(),
         starmap_object_guid: location,
         entity_count: counts.map(|counts| counts.entities),
         tag_counts,
-    }
+    })
 }
 
 /// Counts the entities and tags of all `.soc` files of every container a config is placed with,
@@ -229,147 +238,5 @@ fn read_tags(
 }
 
 #[cfg(test)]
-mod tests {
-    use std::collections::HashMap;
-
-    use p4kx_extraction::Guid;
-
-    use super::{Tags, row, rows};
-    use crate::guid_text::CatalogGuid;
-    use crate::harvest_locations::Objects;
-    use crate::loot_soc::EntityTags;
-    use crate::loot_unreadable::Unreadable;
-    use crate::loot_walk::{Placed, PlacedTarget, Summary};
-    use crate::starmap_walk::Opened;
-
-    const CONFIG: &str = "687af3db-4c0d-4e8d-9261-102274f8b6ed";
-
-    fn placed(path: &str) -> Placed {
-        Placed {
-            config: CONFIG.parse::<Guid>().expect("a GUID"),
-            path: path.to_owned(),
-            target: PlacedTarget::Resolved(1),
-        }
-    }
-
-    fn placement_summaries(first_config: Guid) -> HashMap<usize, Summary> {
-        let alternate = Placed {
-            target: PlacedTarget::Resolved(2),
-            ..placed("a.socpak")
-        };
-        HashMap::from([
-            (
-                10,
-                Summary {
-                    placed: vec![placed("b.socpak"), placed("a.socpak")],
-                    ..Summary::default()
-                },
-            ),
-            (
-                20,
-                Summary {
-                    placed: vec![
-                        alternate,
-                        Placed {
-                            config: first_config,
-                            ..placed("z.socpak")
-                        },
-                    ],
-                    ..Summary::default()
-                },
-            ),
-        ])
-    }
-
-    fn opened(entry: usize, system: &str) -> Opened {
-        Opened {
-            system: system.into(),
-            entry,
-            under: None,
-        }
-    }
-
-    #[test]
-    fn duplicate_rows_keep_the_first_placement_with_canonical_order()
-    -> Result<(), Box<dyn std::error::Error>> {
-        let first_config: Guid = "67000000-0000-00ff-0000-000000000000".parse()?;
-        let second_config: Guid = CONFIG.parse()?;
-        let summaries = placement_summaries(first_config);
-        let roots = [
-            opened(10, "stanton"),
-            opened(20, "stanton"),
-            opened(20, "nyx"),
-        ];
-        let tags = HashMap::from([
-            (
-                1,
-                Ok(EntityTags {
-                    entities: 3,
-                    by_tag: HashMap::from([(first_config, 2)]),
-                }),
-            ),
-            (
-                2,
-                Ok(EntityTags {
-                    entities: 5,
-                    by_tag: HashMap::from([(second_config, 4)]),
-                }),
-            ),
-        ]);
-        let result = rows(&roots, &Objects::new(&[]), &summaries, &tags);
-        let signatures: Vec<_> = result
-            .iter()
-            .map(|row| {
-                (
-                    row.multi_config_guid.0,
-                    row.container.as_str(),
-                    row.system.as_str(),
-                    row.entity_count,
-                )
-            })
-            .collect();
-        assert_eq!(
-            signatures,
-            [
-                (first_config, "z.socpak", "nyx", Some(3)),
-                (first_config, "z.socpak", "stanton", Some(3)),
-                (second_config, "a.socpak", "nyx", Some(5)),
-                (second_config, "a.socpak", "stanton", Some(3)),
-                (second_config, "b.socpak", "stanton", Some(3)),
-            ]
-        );
-        let stanton = result
-            .iter()
-            .find(|row| row.system == "stanton" && row.container == "a.socpak")
-            .ok_or("deduplicated Stanton placement")?;
-        let [count] = stanton.tag_counts.as_slice() else {
-            return Err("expected one tag from the first placement".into());
-        };
-        assert_eq!(
-            (count.tag_guid, count.entities),
-            (CatalogGuid(first_config), 2)
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn a_container_that_could_not_be_counted_has_no_entity_count() {
-        let failed: Tags = Err(Unreadable::SocFile);
-        let row = row(&placed("a.socpak"), "stanton", None, Some(&failed));
-        assert_eq!(row.entity_count, None);
-        assert!(row.tag_counts.is_empty());
-    }
-
-    #[test]
-    fn a_container_without_a_soc_has_zero_entities() {
-        let none: Tags = Ok(EntityTags::default());
-        let row = row(&placed("a.socpak"), "stanton", None, Some(&none));
-        assert_eq!(row.entity_count, Some(0));
-    }
-
-    #[test]
-    fn a_container_the_archive_lacks_has_no_entity_count() {
-        let row = row(&placed("a.socpak"), "stanton", None, None);
-        assert_eq!(row.entity_count, None);
-    }
-}
+#[path = "loot_container_row_tests.rs"]
+mod tests;

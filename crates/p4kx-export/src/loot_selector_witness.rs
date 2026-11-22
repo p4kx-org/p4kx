@@ -222,13 +222,14 @@ fn read_member(
     if xml.is_lossy() {
         return Ok((State::ParseUnavailable, false));
     }
-    let (_, Some(admitted)) = super::read_document(&xml, None)?.into_parts() else {
+    let link = super::read_document(&xml, None)?;
+    let Some(admitted) = link.selected_container() else {
         return Ok((State::DifferentSelection, false));
     };
     if !expected.contains(admitted.as_str()) {
         return Ok((State::DifferentSelection, false));
     }
-    let Some(shape) = selector_shape::inspect(owner.index, &xml, &admitted)? else {
+    let Some(shape) = selector_shape::inspect(owner.index, &xml, admitted)? else {
         return Ok((State::UnboundSelection, true));
     };
     Ok((

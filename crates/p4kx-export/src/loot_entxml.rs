@@ -4,7 +4,7 @@
 #[cfg(test)]
 use std::convert::Infallible;
 
-use p4kx_extraction::{CancelToken, Guid};
+use p4kx_extraction::{CancelToken, FieldOrigin, Guid, SourceUse};
 
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, EntryRead, EntryXml};
@@ -37,10 +37,13 @@ pub(crate) struct EntityLink {
     pub(crate) malformed_config: bool,
 }
 
-/// An entity link paired privately to its actual selected authored container token.
+/// An entity link paired privately to its selected original attributes.
 pub(crate) struct CapturedEntityLink {
     value: EntityLink,
     selected: Option<AuthoredEntryPath>,
+    selected_config: Option<AuthoredEntryPath>,
+    has_container_attribute: bool,
+    survey: Option<SourceUse>,
     original: Option<documents::CapturedDocument>,
     original_complete: bool,
 }
@@ -62,8 +65,26 @@ impl CapturedEntityLink {
         self.original.take()
     }
 
-    pub(crate) fn into_parts(self) -> (EntityLink, Option<AuthoredEntryPath>) {
-        (self.value, self.selected)
+    pub(crate) fn placement_survey(&self) -> Result<&SourceUse, ExportAccountingError> {
+        self.survey
+            .as_ref()
+            .ok_or(ExportAccountingError::UnboundHealthSubject)
+    }
+
+    pub(crate) fn config_origin(
+        &self,
+        capture: &EntryCapture<'_>,
+    ) -> Result<FieldOrigin, CatalogError> {
+        let original = self
+            .selected_config
+            .as_ref()
+            .ok_or(ExportAccountingError::UnboundHealthSubject)?
+            .retain_in(capture)?;
+        let (_, mut inputs, complete) = original.into_parts();
+        inputs.push(self.placement_survey()?.clone());
+        Ok(capture
+            .source_uses()
+            .origin(&inputs, complete && self.original_complete))
     }
 }
 
@@ -95,20 +116,21 @@ fn read_document(
     document: &EntryXml<'_, '_, '_>,
     cancel: Option<&CancelToken>,
 ) -> Result<CapturedEntityLink, CatalogError> {
-    let mut has_container_attribute = false;
     let mut link = link_below(
         document.root(),
         || checkpoint(cancel),
-        |node, ordinal| {
-            has_container_attribute = true;
-            document.attribute_at(node, ordinal)
-        },
+        |node, ordinal| document.attribute_at(node, ordinal),
     )?;
-    if link.value.container.is_some() && link.selected.is_none() {
+    if (link.value.container.is_some() && link.selected.is_none())
+        || (link.value.config.is_some() && link.selected_config.is_none())
+    {
         return Err(ExportAccountingError::UnboundHealthSubject.into());
     }
-    if has_container_attribute {
+    if link.has_container_attribute {
         link.original = documents::capture(document, cancel)?;
+    }
+    if link.value.config.is_some() {
+        link.survey = Some(document.document_source()?);
     }
     link.original_complete = !document.is_lossy();
     Ok(link)
@@ -126,11 +148,14 @@ fn container_attribute<'document>(node: impl Node<'document>) -> Option<(usize, 
 fn link_below<'document, N: Node<'document>, E>(
     root: N,
     mut checkpoint: impl FnMut() -> Result<(), E>,
-    mut select_container: impl FnMut(N, usize) -> Result<Option<AuthoredEntryPath>, E>,
+    mut capture_attribute: impl FnMut(N, usize) -> Result<Option<AuthoredEntryPath>, E>,
 ) -> Result<CapturedEntityLink, E> {
     let mut link = CapturedEntityLink {
         value: EntityLink::default(),
         selected: None,
+        selected_config: None,
+        has_container_attribute: false,
+        survey: None,
         original: None,
         original_complete: true,
     };
@@ -138,31 +163,18 @@ fn link_below<'document, N: Node<'document>, E>(
     while let Some(node) = pending.pop() {
         checkpoint()?;
         if let Some((ordinal, path)) = container_attribute(node) {
-            let selected = select_container(node, ordinal)?;
+            link.has_container_attribute = true;
             if !path.is_empty() {
                 match link.value.container.as_deref() {
                     None => {
                         link.value.container = Some(path.to_owned());
-                        link.selected = selected;
+                        link.selected = capture_attribute(node, ordinal)?;
                     }
                     Some(first) => link.value.several |= first != path,
                 }
             }
         }
-        let configs = node.attributes().filter_map(|(name, text)| {
-            let text = text.trim();
-            (name.eq_ignore_ascii_case(CONFIG_ATTRIBUTE) && !text.is_empty()).then_some(text)
-        });
-        for text in configs {
-            if let Ok(guid) = text.parse() {
-                match link.value.config {
-                    None => link.value.config = Some(guid),
-                    Some(first) => link.value.several |= first != guid,
-                }
-            } else {
-                link.value.malformed_config = true;
-            }
-        }
+        read_configs(&mut link, node, |ordinal| capture_attribute(node, ordinal))?;
         let mark = pending.len();
         pending.extend(node.children());
         if let Some(added) = pending.get_mut(mark..) {
@@ -170,6 +182,31 @@ fn link_below<'document, N: Node<'document>, E>(
         }
     }
     Ok(link)
+}
+
+fn read_configs<'document, N: Node<'document>, E>(
+    link: &mut CapturedEntityLink,
+    node: N,
+    mut capture_attribute: impl FnMut(usize) -> Result<Option<AuthoredEntryPath>, E>,
+) -> Result<(), E> {
+    for (ordinal, (name, text)) in node.attributes().enumerate() {
+        let text = text.trim();
+        if !name.eq_ignore_ascii_case(CONFIG_ATTRIBUTE) || text.is_empty() {
+            continue;
+        }
+        let Ok(guid) = text.parse() else {
+            link.value.malformed_config = true;
+            continue;
+        };
+        match link.value.config {
+            None => {
+                link.value.config = Some(guid);
+                link.selected_config = capture_attribute(ordinal)?;
+            }
+            Some(first) => link.value.several |= first != guid,
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

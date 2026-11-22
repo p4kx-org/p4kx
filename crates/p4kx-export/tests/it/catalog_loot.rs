@@ -30,7 +30,7 @@ use p4kx_export::{BuiltCatalog, CatalogOptions, CatalogPublicationMode, Kind, bu
 use p4kx_extraction::Archive;
 use serde_json::{Value, json};
 
-type TestResult = Result<(), Box<dyn Error>>;
+type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 pub(crate) fn build() -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
@@ -238,6 +238,25 @@ fn a_slot_names_the_tables_and_the_constraints_of_its_loot() -> TestResult {
     Ok(())
 }
 
+fn loot_container_facts(catalog: &Value) -> TestResult<Vec<Value>> {
+    use crate::health_origin_assertions as proof;
+
+    proof::rows(catalog, "/lootContainers")?
+        .iter()
+        .map(|row| {
+            let mut facts = row.clone();
+            for field in ["multiConfigGuid", "container"] {
+                let value = proof::at(proof::cell(row, field, "present")?, "/value")?;
+                facts
+                    .get_mut(field)
+                    .ok_or("canonical loot container cell")?
+                    .clone_from(value);
+            }
+            Ok(facts)
+        })
+        .collect()
+}
+
 #[test]
 fn a_container_placed_with_a_config_is_listed_for_each_root_it_hangs_below() -> TestResult {
     let (built, catalog) = build()?;
@@ -266,22 +285,24 @@ fn a_container_placed_with_a_config_is_listed_for_each_root_it_hangs_below() -> 
         {"tagGuid": starmap_fixture::guid_text(TAG_COMMON), "entities": 3}
     ]);
     let planet = json!(starmap_fixture::guid_text(PLANET));
+    let actual = loot_container_facts(&catalog)?;
     assert_eq!(
-        catalog["lootContainers"],
-        json!([
+        actual,
+        vec![
             area(Value::Null, json!(5), tags.clone()),
             area(planet.clone(), json!(5), tags),
             nested(Value::Null),
             nested(planet.clone()),
-            {
+            json!({
                 "multiConfigGuid": starmap_fixture::guid_text(CONFIG),
                 "container": GHOST,
                 "system": "stanton",
                 "starmapObjectGuid": planet,
                 "entityCount": null,
                 "tagCounts": []
-            }
-        ])
+            })
+        ],
+        "the sourced carrier preserves the placement keys, order and counts"
     );
     assert_eq!(
         built

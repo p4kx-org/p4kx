@@ -154,9 +154,9 @@ pub struct SpawnWith<'a> {
 pub(crate) struct LootContainer {
     /// The `SubHarvestableMultiConfigRecord` the placing entity carries (`multiConfigRef`), an
     /// entry of `subHarvestableMultiConfigs`.
-    pub(crate) multi_config_guid: CatalogGuid,
+    pub(crate) multi_config_guid: SourcedValue<CatalogGuid>,
     /// The path of the object container the entity places.
-    pub(crate) container: String,
+    pub(crate) container: SourcedValue<String>,
     /// The star system folder of the system container the walk started in.
     pub(crate) system: String,
     /// The `guid` of the `starmapObjects` entry the walk's root container hangs below; `null` for

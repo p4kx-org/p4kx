@@ -192,7 +192,7 @@ fn a_placed_container_the_archive_lacks_is_warned_about() -> TestResult {
         .as_array()
         .into_iter()
         .flatten()
-        .find(|row| row["container"] == GHOST)
+        .find(|row| row.pointer("/container/value") == Some(&json!(GHOST)))
         .ok_or("the missing container has a row")?;
     assert_eq!(ghost["entityCount"], Value::Null);
     Ok(())

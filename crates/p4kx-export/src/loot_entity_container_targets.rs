@@ -79,21 +79,25 @@ pub(crate) struct SelectedTarget<'index> {
 pub(super) struct ResolvedTargets<'index> {
     pub(super) targets: LootContainerTargets,
     candidates: &'index [usize],
+    pub(super) literal: &'index [usize],
 }
 
 impl<'index> ResolvedTargets<'index> {
-    pub(super) fn selected_target(&self, selector: &[SourceUse]) -> Option<SelectedTarget<'index>> {
-        let origin = self.targets.target_status.origin();
-        if !origin.source_set_complete()
+    pub(super) fn cites_selector(&self, selector: &[SourceUse]) -> bool {
+        let references = self.targets.target_status.origin();
+        !selector.is_empty()
+            && selector
+                .iter()
+                .all(|used| references.source_uses_refs().contains(used.reference()))
+    }
+
+    pub(super) fn selected_target(&self) -> Option<SelectedTarget<'index>> {
+        if !self.targets.target_status.origin().source_set_complete()
             || !self
                 .targets
                 .target_candidates
                 .origin()
                 .source_set_complete()
-            || selector.is_empty()
-            || !selector
-                .iter()
-                .all(|used| origin.source_uses_refs().contains(used.reference()))
         {
             return None;
         }
@@ -183,6 +187,7 @@ pub(super) fn resolve<'index>(
             lookup_repair: repair,
         },
         candidates: entries,
+        literal: literal.unwrap_or_default(),
     })
 }
 

@@ -16,6 +16,8 @@ use crate::health_origin_fixture::{self as fixture, Fixture, TestResult};
 
 #[path = "loot_entity_container_publication_assertions.rs"]
 mod assertions;
+#[path = "loot_container_field_origin.rs"]
+mod field_origin;
 #[path = "loot_entity_container_sdk.rs"]
 mod sdk;
 

@@ -4,6 +4,7 @@
 use std::path::Path;
 use std::sync::Arc;
 
+use p4kx_extraction::SourceUses;
 use p4kx_testkit::{
     ArchiveBuilder, CryXmlByteOrder, CryXmlSignature, TestContainer, TestElement, TestEntry,
     test_key,
@@ -33,9 +34,12 @@ fn guid() -> Guid {
 }
 
 fn placed(path: &str, entry: Option<usize>) -> Placed {
+    let source = SourceUses::with_compact_use_refs();
     Placed {
         config: guid(),
+        config_origin: source.origin(&[], false),
         path: path.to_owned(),
+        path_origin: source.origin(&[], false),
         target: entry.map_or(PlacedTarget::Missing, PlacedTarget::Resolved),
     }
 }
@@ -201,13 +205,17 @@ fn a_proved_missing_loot_target_keeps_the_selected_placement_without_an_entry() 
     let root = root_of(&archive, "a");
     let explored = explore(&archive, &index, std::slice::from_ref(&root), None);
     let a = explored.summaries.get(&root.entry).expect("a");
+    let [placed] = a.placed.as_slice() else {
+        panic!("one original configured placement");
+    };
     assert_eq!(
-        a.placed,
-        [Placed {
-            config: guid(),
-            path: written("ghost"),
-            target: PlacedTarget::VerifiedMissing,
-        }]
+        (placed.config, placed.path.as_str(), placed.target),
+        (
+            guid(),
+            written("ghost").as_str(),
+            PlacedTarget::VerifiedMissing
+        ),
+        "the configured authored path survives the verified-absence lookup"
     );
     assert_eq!(a.nested.len(), 0);
     let missing = explored

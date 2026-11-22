@@ -30555,8 +30555,8 @@
       "description": "A container placed with a multi config: an entity that places an object container and carries\na `SubHarvestableMultiConfigRecord`, whose tag points the config fills with harvestables and\ntheir loot. One entry per container, system and starmap object it hangs below.",
       "properties": {
         "container": {
-          "description": "The path of the object container the entity places.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The path of the object container the entity places."
         },
         "entityCount": {
           "description": "The number of entities in all `.soc` files of the placed container, 0 for none; `null`\nwhen a file cannot be read or the Archive lacks the container.",
@@ -30568,7 +30568,7 @@
           ]
         },
         "multiConfigGuid": {
-          "$ref": "#/$defs/Guid",
+          "$ref": "#/$defs/SourcedValueOfGuid",
           "description": "The `SubHarvestableMultiConfigRecord` the placing entity carries (`multiConfigRef`), an\nentry of `subHarvestableMultiConfigs`."
         },
         "starmapObjectGuid": {

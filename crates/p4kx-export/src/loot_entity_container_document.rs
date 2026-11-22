@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, CancelToken, SourceUse, SourceValue, SourcedValue};
+use p4kx_extraction::{Archive, CancelToken, FieldOrigin, SourceUse, SourceValue, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -18,10 +18,10 @@ mod targets;
 
 pub use nodes::LootEntityLinkNode;
 use targets::LootContainerTargets;
+use targets::SelectedTarget;
 pub use targets::{
     LootContainerLookupRepair, LootContainerLookupRepairKind, LootContainerTargetStatus,
 };
-pub(crate) use targets::{SelectedTarget, literal_candidates};
 
 /// One original `EntXML` document with container-link attributes reached by the Loot walk.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -109,7 +109,28 @@ pub(crate) fn capture(
 
 pub(crate) struct ProjectedDocument<'index> {
     pub(crate) document: LootEntityContainerDocument,
-    pub(crate) selected_target: Option<SelectedTarget<'index>>,
+    pub(crate) selection: Option<SelectedLookup<'index>>,
+}
+
+pub(crate) struct SelectedLookup<'index> {
+    pub(crate) target: Option<SelectedTarget<'index>>,
+    pub(crate) literal: &'index [usize],
+    pub(crate) origin: FieldOrigin,
+}
+
+pub(crate) struct SelectedContainer<'document> {
+    pub(crate) selector: &'document AuthoredEntryPath,
+    pub(crate) permit_repair: bool,
+}
+
+impl SelectedContainer<'_> {
+    fn permits_repair(&self, links: &[CapturedLink]) -> bool {
+        self.permit_repair
+            && links.iter().all(|link| {
+                link.selector.as_str().is_empty()
+                    || link.selector.as_str() == self.selector.as_str()
+            })
+    }
 }
 
 impl CapturedDocument {
@@ -120,21 +141,17 @@ impl CapturedDocument {
         directory: Option<&SourceUse>,
         capture: &EntryCapture<'_>,
         cancel: Option<&CancelToken>,
-        selected: Option<&AuthoredEntryPath>,
+        selected: Option<SelectedContainer<'_>>,
     ) -> Result<ProjectedDocument<'index>, CatalogError> {
-        let selected = selected
-            .filter(|selected| {
-                self.links.iter().all(|link| {
-                    link.selector.as_str().is_empty() || link.selector.as_str() == selected.as_str()
-                })
-            })
-            .map(AuthoredEntryPath::selector_inputs)
-            .transpose()?;
-        let selected = selected
+        let selected_inputs = selected
             .as_ref()
-            .filter(|(uses, complete)| *complete && !uses.is_empty())
-            .map(|(uses, _)| uses.as_slice());
-        let mut selected_target = None;
+            .map(|selection| selection.selector.selector_inputs())
+            .transpose()?;
+        let permit_repair = selected.is_some_and(|selection| selection.permits_repair(&self.links))
+            && selected_inputs
+                .as_ref()
+                .is_some_and(|(uses, complete)| *complete && !uses.is_empty());
+        let mut selection = None;
         let mut links = Vec::with_capacity(self.links.len());
         for original in self.links {
             checkpoint(cancel)?;
@@ -145,10 +162,21 @@ impl CapturedDocument {
                 capture,
                 &original.selector,
                 self.complete,
-                selected.is_some(),
+                permit_repair,
             )?;
-            if let Some(current) = selected.and_then(|uses| resolved.selected_target(uses)) {
-                selected_target = Some(current);
+            if selected_inputs
+                .as_ref()
+                .is_some_and(|(uses, _)| resolved.cites_selector(uses))
+            {
+                selection = Some(SelectedLookup {
+                    target: if permit_repair {
+                        resolved.selected_target()
+                    } else {
+                        None
+                    },
+                    literal: resolved.literal,
+                    origin: resolved.targets.target_status.origin().clone(),
+                });
             }
             links.push(LootEntityContainerLink {
                 node_index: original.node_index,
@@ -169,7 +197,7 @@ impl CapturedDocument {
                 ),
                 config_references: self.config_references,
             },
-            selected_target,
+            selection,
         })
     }
 }

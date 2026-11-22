@@ -5,7 +5,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use p4kx_extraction::{Archive, CancelToken, Guid};
+use p4kx_extraction::{Archive, CancelToken, FieldOrigin, Guid};
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
 use crate::CatalogError;
@@ -27,8 +27,10 @@ use container::ContainerRead;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Placed {
     pub(crate) config: Guid,
+    pub(crate) config_origin: FieldOrigin,
     /// The path of the placed container: the Archive's when it has it, else as written.
     pub(crate) path: String,
+    pub(crate) path_origin: FieldOrigin,
     pub(crate) target: PlacedTarget,
 }
 
