@@ -24,9 +24,21 @@ const INFRACTIONS: &str = "/definitions/infractions";
 const INFRACTION_SETS: &str = "/definitions/infractionSets";
 const JURISDICTIONS: &str = "/definitions/jurisdictions";
 const SECURITY: &str = "/definitions/securityNetworkManifests";
-pub(super) const PATHS: [&str; 4] = [INFRACTIONS, INFRACTION_SETS, JURISDICTIONS, SECURITY];
+const PUBLIC_NAMES: &str = "/texts/publicNames";
+const GAME_TEXTS: &str = "/texts/gameTexts";
+pub(super) const PATHS: [&str; 6] = [
+    INFRACTIONS,
+    INFRACTION_SETS,
+    JURISDICTIONS,
+    SECURITY,
+    PUBLIC_NAMES,
+    GAME_TEXTS,
+];
 
-pub(super) fn read() -> TestResult<[Route; 4]> {
+const TEXTS_REMAINING: &str =
+    "owner-scoped synthetic producer parity witnessed; installed and full cross-owner parity open";
+
+pub(super) fn read() -> TestResult<[Route; 6]> {
     let (_dir, archive) = archive(FixtureMode::Canonical)?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog = serde_json::from_slice(
@@ -46,6 +58,8 @@ pub(super) fn read() -> TestResult<[Route; 4]> {
                 witness(INFRACTION_SETS, snapshot.infraction_sets, &catalog)?,
                 witness(JURISDICTIONS, snapshot.jurisdictions, &catalog)?,
                 witness(SECURITY, snapshot.security_network_manifests, &catalog)?,
+                Route::queried_rows(PUBLIC_NAMES, &snapshot.public_names, TEXTS_REMAINING)?,
+                Route::queried_rows(GAME_TEXTS, &snapshot.game_texts, TEXTS_REMAINING)?,
             ])
         },
     )?
@@ -91,12 +105,12 @@ fn check_text_and_payload(snapshot: &LawSnapshot<'_>, catalog: &Value) -> TestRe
         "the authored description resolves to protected text"
     );
     assert_eq!(
-        catalog.pointer("/texts/publicNames"),
+        catalog.pointer(PUBLIC_NAMES),
         Some(&serde_json::to_value(&snapshot.public_names)?),
         "canonical public-name rows"
     );
     assert_eq!(
-        catalog.pointer("/texts/gameTexts"),
+        catalog.pointer(GAME_TEXTS),
         Some(&serde_json::to_value(&snapshot.game_texts)?),
         "canonical protected text and translations"
     );

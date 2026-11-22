@@ -243,6 +243,20 @@ The witness checks the original physical Entries and their independently read me
 cargo test --locked -p p4kx-export --test real_archive real_archive_language_sources_sdk::language_source_sdk_matches_original_archive_entries -- --ignored --exact --nocapture --test-threads=1
 ~~~
 
+### Texts referenced by selected records
+
+Localized owner queries supply the typed `texts.publicNames` and `texts.gameTexts` rows
+referenced by their selected records. For example, use the query for manufacturer definitions
+or `catalog_queries::law::with_law` for the original infraction records and their texts.
+Follow a `PublicNameRef` or `GameTextRef` to the corresponding row's `id().value()` and
+retain that query's source inventory. The text domain is set by the original owner field.
+The encryption marker describes the contributing inputs independently of that domain.
+
+Each row's provenance covers the authored key occurrences in the selected scope. The same
+identifier in a complete Catalog can cite additional occurrences from other owners. Use
+`CatalogLanguageSelection::AllAvailable` for all available supported locales or `Selected`
+for a language subset. Missing translations stay absent in their language.
+
 ## Offline shop inventory definitions
 
 Use `catalog_queries::shops::read_shop_inventories` to read original offline inventory
