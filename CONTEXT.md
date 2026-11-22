@@ -314,6 +314,10 @@ A Loadout stored as an XML or CryXml Entry, e.g. `Scripts/Loadouts/…`, that a 
 path instead of listing its entries; it may include further XML Loadouts.
 _Avoid_: loadout file, script loadout
 
+**Exosuit**
+
+A powered suit that its operator boards and controls as a vehicle.
+
 **Vehicle implementation**:
 The XML file a ship's `VehicleComponentParams.vehicleDefinition` names, with the parts of the
 hull, their item ports and flags such as `invisible`, treads and wheels. Its **Modification**

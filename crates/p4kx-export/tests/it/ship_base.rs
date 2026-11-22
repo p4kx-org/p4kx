@@ -112,9 +112,14 @@ fn the_vehicle_kind_follows_the_folder_and_the_wheels_of_the_implementation() ->
 
 #[test]
 fn the_code_of_a_vehicle_kind_is_its_serialised_name() -> TestResult {
-    for kind in [VehicleKind::Spaceship, VehicleKind::GroundVehicle] {
+    for kind in [
+        VehicleKind::Spaceship,
+        VehicleKind::GroundVehicle,
+        VehicleKind::Exosuit,
+    ] {
         assert_eq!(serde_json::to_value(kind)?, kind.code());
     }
+    assert_eq!(VehicleKind::Exosuit.code(), "exosuit");
     Ok(())
 }
 

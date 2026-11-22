@@ -235,7 +235,7 @@ pub struct Implementation {
     pub patch_file: Option<String>,
 }
 
-/// Whether a vehicle is a spaceship or a ground vehicle.
+/// The kind of a vehicle.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -244,6 +244,8 @@ pub enum VehicleKind {
     Spaceship,
     /// A vehicle of the folder `entities/groundvehicles`.
     GroundVehicle,
+    /// A powered exosuit.
+    Exosuit,
 }
 
 impl VehicleKind {
@@ -253,6 +255,7 @@ impl VehicleKind {
         match self {
             Self::Spaceship => "spaceship",
             Self::GroundVehicle => "groundVehicle",
+            Self::Exosuit => "exosuit",
         }
     }
 }
@@ -270,8 +273,7 @@ pub struct ShipBase {
     pub record_path: String,
     /// The vehicle implementation file, `null` when the ship names none or it cannot be read.
     pub implementation: Option<Implementation>,
-    /// Spaceship or ground vehicle, `null` when the record path and the vehicle implementation
-    /// disagree or the path names neither folder.
+    /// The resolved vehicle kind, `null` when the original sources do not establish it.
     pub vehicle_kind: Option<VehicleKind>,
     /// The item size from `AttachDef.Size`.
     pub size: Option<Sourced<i64>>,
