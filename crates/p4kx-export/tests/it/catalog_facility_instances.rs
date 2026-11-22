@@ -56,9 +56,20 @@ fn facility_path_keeps_encrypted_ancestor_separate_from_clear_child_and_definiti
     let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
     let rows = proof::rows(&catalog, "/placements/facilityInstances/rows")?;
     let ship_rows = instances_of(rows, fixture::SHIP);
-    let [storage, nested] = ship_rows.as_slice() else {
-        return Err("the selected XML deck and its nested seat".into());
+    let [storage, nested, rack_seat] = ship_rows.as_slice() else {
+        return Err("the XML deck, its seat and the seat below the empty rack".into());
     };
+    assert_eq!(
+        proof::at(rack_seat, "/source/position/value/portOrdinals")?,
+        &json!([1, 0]),
+        "the original empty intermediate port retains its ordinal"
+    );
+    proof::present(
+        proof::at(rack_seat, "/configurations/0/owner")?,
+        "ownerRecordIndex",
+        &json!(1),
+        Some(false),
+    )?;
     let storage_source = proof::at(storage, "/source")?;
     let nested_source = proof::at(nested, "/source")?;
     let parent_uses = proof::rows(storage_source, "/position/sourceUsesRefs")?;

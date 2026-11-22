@@ -4,11 +4,11 @@
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::equipment::{
-    AlignmentDependencyState, FacilityConfigurationKind, LoadoutFacilityPlacementSnapshot,
-    read_loadout_facility_placements_from,
+    AlignmentDependencyState, FacilityConfigurationKind, FacilityInstance,
+    LoadoutFacilityPlacementSnapshot, read_loadout_facility_placements_from,
 };
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog_from};
-use p4kx_extraction::{Archive, DataForgeEntry, SourceValueState};
+use p4kx_extraction::{Archive, DataForgeEntry, SourceLocation, SourceUseRole, SourceValueState};
 use p4kx_testkit::{ArchiveBuilder, TestEntry, test_key};
 use serde_json::Value;
 
@@ -184,13 +184,15 @@ fn check_encrypted_ancestor() -> TestResult {
     let entry = DataForgeEntry::read(&archive)?;
     let catalog = normal_placements(&archive, &entry)?;
     let snapshot = read_loadout_facility_placements_from(&archive, &entry, SHIP_RECORD, None)?;
-    compare(&snapshot, &catalog, SHIP_RECORD, &[&[0], &[0, 0]])?;
-    let [deck, seat] = snapshot.rows.as_slice() else {
-        return Err("the deck and its nested seat".into());
+    compare(&snapshot, &catalog, SHIP_RECORD, &[&[0], &[0, 0], &[1, 0]])?;
+    let [deck, seat, rack_seat] = snapshot.rows.as_slice() else {
+        return Err("the deck, its seat and the seat below the empty rack".into());
     };
+    check_empty_parent_selector(&snapshot, rack_seat)?;
     for (row, kind, record) in [
         (deck, FacilityConfigurationKind::Inventory, DECK_RECORD),
         (seat, FacilityConfigurationKind::Facility, SEAT_RECORD),
+        (rack_seat, FacilityConfigurationKind::Facility, SEAT_RECORD),
     ] {
         let position = row
             .loadout_position()
@@ -222,5 +224,37 @@ fn check_encrypted_ancestor() -> TestResult {
             "the configuration owner comes from the clear DataForge",
         );
     }
+    Ok(())
+}
+
+fn check_empty_parent_selector(
+    snapshot: &LoadoutFacilityPlacementSnapshot,
+    seat: &FacilityInstance,
+) -> TestResult {
+    let xml = roxmltree::Document::parse(fixture::LOADOUT_XML_SOURCE)?;
+    let rack = xml
+        .descendants()
+        .find(|node| node.attribute("portName") == Some("rack"))
+        .ok_or("the original empty XML rack")?;
+    let attribute = rack
+        .attributes()
+        .position(|attribute| attribute.name() == "portName")
+        .ok_or("the exact original port name attribute")?;
+    let expected = [u64::from(rack.id().get()), u64::try_from(attribute)?];
+    let position = seat.loadout_position().ok_or("the seat's resolved path")?;
+    let used = position.origin().source_uses_refs();
+    assert!(
+        snapshot.source_inventory.iter_uses().any(|source| {
+            used.contains(source.id())
+                && source.role() == SourceUseRole::Selector
+                && matches!(
+                    source.location(),
+                    SourceLocation::Subresource { namespace, indices, field }
+                    if namespace == "xmlAttribute" && indices.as_slice() == expected
+                        && field == "@portName"
+                )
+        }),
+        "the child placement uses the empty parent port's exact XML selector"
+    );
     Ok(())
 }

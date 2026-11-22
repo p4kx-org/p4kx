@@ -21,8 +21,12 @@ const SEAT_COMPONENT: &str = "SCItemSeatParams";
 const STORAGE_COMPONENT: &str = "SCItemInventoryContainerComponentParams";
 const CONTAINER_DEFINITION: &str = "InventoryContainer";
 const LOADOUT_XML: &str = "Scripts/Entities/Vehicles/Loadouts/fixture_facility.xml";
-const LOADOUT_BYTES: &[u8] =
-    br#"<Loadout><Items><Item portName="deck" itemName="FixtureFacilityDeck"/></Items></Loadout>"#;
+pub(super) const LOADOUT_XML_SOURCE: &str = r#"<Loadout><Items>
+    <Item portName="deck" itemName="FixtureFacilityDeck"/>
+    <Item portName="rack" itemName=""><Items>
+        <Item portName="rack_seat" itemName="FixtureSeat"/>
+    </Items></Item>
+</Items></Loadout>"#;
 const MOUNTS: [(&str, u128); 5] = [
     ("seat_left", SEAT),
     ("seat_right", SEAT),
@@ -41,7 +45,10 @@ pub(super) fn encrypted_xml_archive() -> TestResult<(tempfile::TempDir, Archive)
     let database = with_loadout(TestLoadout::Xml(LOADOUT_XML.to_owned()));
     ArchiveBuilder::new()
         .entry(TestEntry::stored(r"Data\Game2.dcb", database.build()))
-        .entry(TestEntry::stored(format!("Data/{LOADOUT_XML}"), LOADOUT_BYTES).encrypted())
+        .entry(
+            TestEntry::stored(format!("Data/{LOADOUT_XML}"), LOADOUT_XML_SOURCE.as_bytes())
+                .encrypted(),
+        )
         .write_to(&path)?;
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
     Ok((directory, archive))

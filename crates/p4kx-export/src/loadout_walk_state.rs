@@ -6,33 +6,37 @@ use std::slice::Iter;
 
 use p4kx_extraction::{SourceUse, SourceUses, SourceValue, SourcedValue};
 
-use super::hosts::RoomAttachment;
+use super::Projection;
+use super::hosts::{RoomAttachment, RoomOwners};
+use super::installed::InstalledConfigurations;
+use crate::CatalogError;
 use crate::catalog_v3::facility_instance::ShipContext;
-use crate::catalog_v3::loadout_position::LoadoutPosition;
-use crate::contract_loadout::LoadoutPort;
+use crate::catalog_v3::loadout_position::{self, LoadoutPosition};
+use crate::contract_loadout::{Loadout, LoadoutPort};
+use crate::loadout::alignment::AttachmentProof;
 
-pub(super) struct Frame<'loadout> {
-    pub(super) ports: Enumerate<Iter<'loadout, LoadoutPort>>,
-    pub(super) parent: Checkpoint,
+struct Frame<'loadout> {
+    ports: Enumerate<Iter<'loadout, LoadoutPort>>,
+    parent: Checkpoint,
 }
 
 impl<'loadout> Frame<'loadout> {
-    pub(super) fn new(ports: &'loadout [LoadoutPort], path: &Path) -> Self {
+    fn new(ports: &'loadout [LoadoutPort], parent: Checkpoint) -> Self {
         Self {
             ports: ports.iter().enumerate(),
-            parent: path.checkpoint(),
+            parent,
         }
     }
 }
 
 pub(super) struct Path {
-    pub(super) position: LoadoutPosition,
-    pub(super) uses: Vec<SourceUse>,
-    pub(super) complete: bool,
+    position: LoadoutPosition,
+    uses: Vec<SourceUse>,
+    complete: bool,
 }
 
 #[derive(Clone, Copy)]
-pub(super) struct Checkpoint {
+struct Checkpoint {
     ports: usize,
     uses: usize,
     complete: bool,
@@ -69,7 +73,24 @@ impl Path {
         }
     }
 
-    pub(super) const fn checkpoint(&self) -> Checkpoint {
+    fn enter(
+        &mut self,
+        ordinal: usize,
+        port: &LoadoutPort,
+        proof: Option<&AttachmentProof>,
+    ) -> Result<(), CatalogError> {
+        self.position
+            .port_ordinals
+            .push(loadout_position::ordinal(ordinal)?);
+        if let Some(proof) = proof {
+            self.uses.extend_from_slice(&proof.source_uses);
+            self.complete &= proof.source_set_complete;
+        }
+        self.complete &= port.append_name_uses(&mut self.uses)?;
+        Ok(())
+    }
+
+    const fn checkpoint(&self) -> Checkpoint {
         Checkpoint {
             ports: self.position.port_ordinals.len(),
             uses: self.uses.len(),
@@ -77,9 +98,74 @@ impl Path {
         }
     }
 
-    pub(super) fn restore(&mut self, checkpoint: Checkpoint) {
+    fn restore(&mut self, checkpoint: Checkpoint) {
         self.position.port_ordinals.truncate(checkpoint.ports);
         self.uses.truncate(checkpoint.uses);
         self.complete = checkpoint.complete;
+    }
+}
+
+impl Projection<'_, '_> {
+    pub(super) fn walk_ports(
+        &mut self,
+        loadout: &Loadout,
+        ship: &ShipContext,
+        mut path: Path,
+        rooms: &RoomOwners<'_, '_>,
+        room_attachments: &mut Vec<RoomAttachment>,
+        flight: &mut InstalledConfigurations<'_>,
+    ) -> Result<(), CatalogError> {
+        let mut stack = vec![Frame::new(&loadout.ports, path.checkpoint())];
+        while let Some(frame) = stack.last_mut() {
+            self.check_cancel()?;
+            let Some((ordinal, port)) = frame.ports.next() else {
+                path.restore(frame.parent);
+                stack.pop();
+                continue;
+            };
+            if port.docked_vehicle || port.unresolved.is_some() {
+                continue;
+            }
+            let parent = path.checkpoint();
+            if let Some((attachment, proof)) = port.source_constraints.placement_attachment() {
+                let Some(record) = attachment.target_record_index.value().copied() else {
+                    continue;
+                };
+                let has_rooms = rooms.contains(record);
+                let configurations = self.configuration_links(record)?;
+                if port.ports.is_empty()
+                    && !has_rooms
+                    && configurations.is_empty()
+                    && !flight.contains(record)
+                {
+                    continue;
+                }
+                path.enter(ordinal, port, Some(proof))?;
+                let attached = Some((port, attachment));
+                self.emit(ship, &path, attached, configurations)?;
+                flight.emit(
+                    ship,
+                    record,
+                    || path.position_cell(&self.origins.uses),
+                    attached,
+                )?;
+                if has_rooms {
+                    room_attachments.push(path.room_attachment(record, ship, &self.origins.uses));
+                }
+            } else if !port.ports.is_empty()
+                && port.item_guid.is_none()
+                && port.item_class_name.is_none()
+            {
+                path.enter(ordinal, port, None)?;
+            } else {
+                continue;
+            }
+            if port.ports.is_empty() {
+                path.restore(parent);
+            } else {
+                stack.push(Frame::new(&port.ports, parent));
+            }
+        }
+        Ok(())
     }
 }

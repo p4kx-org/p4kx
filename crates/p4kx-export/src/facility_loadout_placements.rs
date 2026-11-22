@@ -18,7 +18,6 @@ use super::facility_instance::{
     ShipContext,
 };
 use super::item_component_owner::ComponentOwner;
-use super::loadout_position;
 use super::resource_topology_declarations;
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
@@ -42,7 +41,7 @@ mod installed;
 #[path = "loadout_walk_state.rs"]
 mod loadout_walk_state;
 pub(in crate::catalog_v3) use installed::InstalledConfiguration;
-use loadout_walk_state::{Frame, Path};
+use loadout_walk_state::Path;
 #[path = "facility_interior_placements.rs"]
 mod interior;
 #[path = "facility_model_helper.rs"]
@@ -282,71 +281,6 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
         self.emit(&ship, &walk, None, configurations)?;
         flight.emit(&ship, root, || walk.position_cell(&self.origins.uses), None)?;
         self.walk_ports(loadout, &ship, walk, rooms, room_attachments, flight)
-    }
-
-    fn walk_ports(
-        &mut self,
-        loadout: &Loadout,
-        ship: &ShipContext,
-        mut walk: Path,
-        rooms: &RoomOwners<'_, '_>,
-        room_attachments: &mut Vec<RoomAttachment>,
-        flight: &mut InstalledConfigurations<'_>,
-    ) -> Result<(), CatalogError> {
-        let mut stack = vec![Frame::new(&loadout.ports, &walk)];
-        while let Some(frame) = stack.last_mut() {
-            self.check_cancel()?;
-            let Some((ordinal, port)) = frame.ports.next() else {
-                walk.restore(frame.parent);
-                stack.pop();
-                continue;
-            };
-            if port.docked_vehicle || port.unresolved.is_some() {
-                continue;
-            }
-            let Some((attachment, proof)) = port.source_constraints.placement_attachment() else {
-                continue;
-            };
-            let Some(record) = attachment.target_record_index.value().copied() else {
-                continue;
-            };
-            let has_rooms = rooms.contains(record);
-            let configurations = self.configuration_links(record)?;
-            if port.ports.is_empty()
-                && !has_rooms
-                && configurations.is_empty()
-                && !flight.contains(record)
-            {
-                continue;
-            }
-            let parent = walk.checkpoint();
-            walk.position
-                .port_ordinals
-                .push(loadout_position::ordinal(ordinal)?);
-            walk.uses.extend_from_slice(&proof.source_uses);
-            let name_complete = port.append_name_uses(&mut walk.uses)?;
-            walk.complete &= proof.source_set_complete && name_complete;
-            let attached = Some((port, attachment));
-            self.emit(ship, &walk, attached, configurations)?;
-            flight.emit(
-                ship,
-                record,
-                || walk.position_cell(&self.origins.uses),
-                attached,
-            )?;
-            if has_rooms {
-                room_attachments.push(walk.room_attachment(record, ship, &self.origins.uses));
-            }
-            if port.ports.is_empty() {
-                walk.restore(parent);
-            } else {
-                stack.push(Frame {
-                    ports: port.ports.iter().enumerate(),
-                    parent,
-                });
-            }
-        }
-        Ok(())
     }
 
     fn emit(
