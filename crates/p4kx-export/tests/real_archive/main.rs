@@ -136,6 +136,7 @@ mod real_archive_ship_systems_sdk;
 mod real_archive_ship_text_source_witness;
 mod real_archive_shop_inventory_v3;
 mod real_archive_shop_items;
+mod real_archive_shop_resolution_sdk;
 mod real_archive_shops;
 mod real_archive_spawns;
 mod real_archive_starmap;
