@@ -162,9 +162,5 @@ pub(super) fn read_shop_resolution() -> TestResult<Route> {
         Some(&ResolutionStatus::Unscanned),
         "no declaration source grants a physical target"
     );
-    Route::queried_rows(
-        SHOP_RESOLUTION,
-        &snapshot.rows,
-        "archive-only canonical source parity available; installed producer parity and memory evidence open",
-    )
+    Route::queried_rows(SHOP_RESOLUTION, &snapshot.rows, None)
 }

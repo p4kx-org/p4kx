@@ -322,6 +322,21 @@ discovery.
 This query reads the Archive directly without loading DataForge or resolving starmap links.
 Use `read_shop_inventories` for the original contents of a specific inventory file.
 
+On LIVE 13220821 and PTU 13248297, the complete table and one exact key per Build
+matched the same-Build Catalog, including the reachable source inventory.
+A separate cold `All` query on each Build stayed below one billion bytes for
+both working set and private commit.
+
+To repeat the parity check, set `P4KX_DATA_P4K` and
+`P4KX_CATALOG_MEASUREMENT_DIR` to the Archive and its complete Catalog measurement
+directory. For a cold query, set the Archive path;
+`P4KX_SHOP_RESOLUTION_KEY` optionally selects a single key.
+
+```text
+cargo test --locked -p p4kx-export --test real_archive real_archive_shop_resolution_sdk::installed_shop_resolution_matches_the_same_complete_catalog_and_exact_key -- --ignored --exact --nocapture --test-threads=1
+cargo test --locked -p p4kx-export --test real_archive real_archive_shop_resolution_sdk::installed_shop_resolution_cold_query -- --ignored --exact --nocapture --test-threads=1
+```
+
 ## Resolve field origins
 
 Use each query's own `SourceInventory`. `SourcedValue::origin` supplies the encryption filter,
