@@ -28,7 +28,7 @@ pub(crate) use self::variants::AppearanceOnlyVariant;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PaletteRef {
     preferred: PaletteCandidate,
-    fallback: Option<PaletteCandidate>,
+    fallback: Option<Box<PaletteCandidate>>,
 }
 
 #[derive(Debug, Clone)]
@@ -66,7 +66,11 @@ impl PaletteRef {
         &self.preferred.child_path
     }
 
-    pub(crate) fn new(guid: Guid, child_path: String, selector: PaletteReferenceSource) -> Self {
+    pub(crate) const fn new(
+        guid: Guid,
+        child_path: String,
+        selector: PaletteReferenceSource,
+    ) -> Self {
         Self {
             preferred: PaletteCandidate {
                 guid,
@@ -85,12 +89,13 @@ impl PaletteRef {
     fn with_geometry_fallback(mut self, geometry: Option<Self>) -> Self {
         self.fallback = geometry
             .map(|palette| palette.preferred)
-            .filter(|candidate| *candidate != self.preferred);
+            .filter(|candidate| *candidate != self.preferred)
+            .map(Box::new);
         self
     }
 
     pub(crate) fn candidates(&self) -> impl Iterator<Item = &PaletteCandidate> {
-        std::iter::once(&self.preferred).chain(&self.fallback)
+        std::iter::once(&self.preferred).chain(self.fallback.as_deref())
     }
 
     pub(crate) fn read(data: &StructValue<'_>) -> Option<Self> {
