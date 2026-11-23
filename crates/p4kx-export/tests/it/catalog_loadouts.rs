@@ -181,11 +181,15 @@ fn a_port_the_record_lacks_takes_its_definition_from_the_vehicle_file() -> TestR
         }),
         "vehicle fallback retains the actual minSize attribute",
     );
-    assert_eq!(
-        size.get("sourceSetComplete"),
-        Some(&json!(false)),
-        "the attribute does not prove the preceding Part search",
+    assert!(
+        uses.iter().any(|usage| {
+            usage["location"]["namespace"] == "textXmlElement"
+                && usage["location"]["field"] == "$children"
+                && usage["role"] == "selector"
+        }),
+        "the original Part search supplies its structural selector"
     );
+    assert_eq!(size["sourceSetComplete"], json!(true));
     let key = crate::health_origin_assertions::cell(gun, "displayNameKey", "present")?;
     let uses = crate::health_origin_assertions::uses(&catalog, key)?;
     assert!(

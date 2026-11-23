@@ -2205,8 +2205,21 @@ physical Ship positions in the same order, and the referenced source inventory.
 
 A `Found` row has complete observed inputs for this scope. A `Partial` row
 contains the matches supported by the inputs read so far. The snapshot reports
-incomplete owner, Ship and vehicle dependencies separately. Installed Normal
-parity, cold memory and Paint enumeration remain unverified.
+incomplete owner, Ship and vehicle dependencies separately. A vehicle Record that
+authors an empty modification string retains that original selector for the base
+implementation.
+
+An isolated Windows debug query selected one physical Paint and matched its
+one observed fitting Ship in both installed Builds. The test resolved the
+attachment and vehicle definition selectors to their original DataForge Entry.
+
+| Build | Matching ships | Incomplete vehicle Records | Peak private commit (bytes) | Peak working set (bytes) | Seconds |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| LIVE 13220821 | 1 | 3 | 1,204,817,920 | 1,178,042,368 | 82.230 |
+| PTU 13260598 | 1 | 3 | 1,229,987,840 | 1,202,024,448 | 78.350 |
+
+Both snapshots reported `Partial`. Full Normal parity, fleet source closure
+and Paint enumeration remain open.
 
 ## Cargo Grid configurations
 

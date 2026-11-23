@@ -239,24 +239,22 @@ impl<'scope> PathRead<'scope> {
         operation: LoadoutPathOperation,
         xml_record_paths: Option<&XmlRecordPaths>,
     ) -> LoadoutPath {
+        use LoadoutPathOperation::{PortName, Trim};
         let raw = value.map_or("", read::value_text);
-        let text = match operation {
-            LoadoutPathOperation::Trim => raw.trim(),
-            _ => raw,
-        };
+        let text = if operation == Trim { raw.trim() } else { raw };
         let observer = self.observer.filter(|_| {
-            operation != LoadoutPathOperation::PortName
+            operation != PortName
                 || self.observation.is_some_and(|observation| {
                     observation.observes_port_names()
                         || observation.observes_record_loadout_effects()
                 })
         });
         let selection = value.and_then(|value| {
+            let retain_empty_text = matches!(operation, PortName | Trim)
+                && matches!(value, Value::String(_) | Value::Locale(_) | Value::Enum(_));
             if (observer.is_none() && xml_record_paths.is_none())
                 || self.stopped()
-                || (raw.is_empty()
-                    && !(operation == LoadoutPathOperation::PortName
-                        && matches!(value, Value::String(_) | Value::Locale(_) | Value::Enum(_))))
+                || (raw.is_empty() && !retain_empty_text)
             {
                 return None;
             }

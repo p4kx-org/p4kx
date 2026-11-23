@@ -72,7 +72,7 @@ pub(super) fn read() -> TestResult<Route> {
     Route::queried_value(
         PAINTS,
         row,
-        "installed Normal parity, source closure, cold memory and Paint enumeration are unverified",
+        "installed matching Ship and cold memory witnessed, with full Normal parity, fleet source closure and Paint enumeration open",
     )
 }
 

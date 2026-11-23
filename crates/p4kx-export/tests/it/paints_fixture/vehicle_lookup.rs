@@ -11,6 +11,7 @@ use super::{PAINT_ALPHA_RED, SHIP_MISSING, XML_DIR, builder, paint, port, ship, 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum VehicleLookupInput {
     Missing,
+    Present { modification: &'static str },
     Malformed,
     Encrypted,
     Recovered,
@@ -20,13 +21,17 @@ pub(crate) fn write_vehicle_lookup_archive(
     directory: &Path,
     input: VehicleLookupInput,
 ) -> Result<PathBuf, Box<dyn Error>> {
+    let modification = match input {
+        VehicleLookupInput::Present { modification } => modification,
+        _ => "ExampleModification",
+    };
     let forge = builder()
         .record(paint(PAINT_ALPHA_RED, "FixturePaint", "DirectAlpha", ""))
         .record(ship(
             SHIP_MISSING,
             "ACAS_Missing",
             "scripts/entities/vehicles/implementations/xml/acas_missing.xml",
-            "ExampleModification",
+            modification,
             vec![port("", "DirectAlpha", "Paints")],
         ))
         .build();
@@ -36,6 +41,7 @@ pub(crate) fn write_vehicle_lookup_archive(
         VehicleLookupInput::Missing | VehicleLookupInput::Recovered => {
             TestEntry::stored("Data/Unrelated.xml", b"<Unrelated/>")
         }
+        VehicleLookupInput::Present { .. } => TestEntry::stored(xml, b"<Vehicle/>"),
         VehicleLookupInput::Malformed => TestEntry::stored(xml, b"CryXmlB\0not really"),
         VehicleLookupInput::Encrypted => TestEntry::stored(xml, vehicle_xml()).encrypted(),
     };

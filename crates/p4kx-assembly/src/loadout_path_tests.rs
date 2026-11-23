@@ -156,6 +156,51 @@ fn string_locale_and_enum_follow_the_actual_value_text_contract() -> TestResult 
     }
     Ok(())
 }
+
+#[test]
+fn unsupported_null_and_missing_vehicle_fields_do_not_supply_trim_inputs() -> TestResult {
+    let bytes = DataForgeBuilder::new()
+        .structure(
+            TestStruct::new("Vehicle")
+                .field("numeric", TestType::UInt32)
+                .field("null", TestType::StrongPointer("Vehicle".to_owned())),
+        )
+        .record(
+            TestRecord::new(1, "Vehicle", "vehicle", "synthetic/vehicle.xml")
+                .value("numeric", TestValue::UInt32(0))
+                .value("null", TestValue::Null),
+        )
+        .build();
+    let forge = DataForge::open(&bytes)?;
+    let tree = forge
+        .record(0)
+        .ok_or("the source Record is absent")?
+        .tree()?;
+    assert!(
+        tree.field("numeric").is_some(),
+        "the numeric field is authored"
+    );
+    assert!(matches!(tree.field("null"), Some(Value::Null)));
+    assert!(
+        tree.field("missing").is_none(),
+        "the missing field is absent"
+    );
+    let probe = Probe::default();
+    let reader = PathRead::new(Some(&probe), None);
+    for name in ["numeric", "null", "missing"] {
+        let path = reader.field(tree.root(), name, LoadoutPathOperation::Trim);
+        assert!(
+            path.selection().is_none(),
+            "{name} is not observed as empty text"
+        );
+    }
+    assert!(
+        probe.0.borrow().is_empty(),
+        "no textual selector was observed"
+    );
+    Ok(())
+}
+
 #[test]
 fn vehicle_value_equality_does_not_depend_on_record_name_authorship() -> TestResult {
     let bytes = p4kx_testkit::entity_schema(DataForgeBuilder::new())
