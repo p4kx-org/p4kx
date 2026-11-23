@@ -126,9 +126,15 @@ AppImage runtime source builds and fresh native package consumers. Run
 `test-linux-package-contract.ps1` and the source-collector tests when changing their boundaries;
 the [Linux package guide](docs/linux-packages.md) describes the complete evidence and source contract.
 
-On native Linux AMD64 and ARM64, install the ALSA headers with
-`sudo apt-get install libasound2-dev`. Audio preview needs a working ALSA `default` device,
-which can use `pipewire-alsa` or `pulseaudio-alsa` on those desktops.
+On native Ubuntu 24.04 AMD64 and ARM64, install the C toolchain, `pkg-config` and ALSA headers.
+
+```sh
+sudo apt-get install build-essential pkgconf libasound2-dev
+```
+
+Audio preview needs a working ALSA `default` device. On Ubuntu 24.04, `pipewire-alsa`
+provides the ALSA plug-in for PipeWire and `libasound2-plugins` provides the ALSA plug-in
+for PulseAudio.
 The Ubuntu 24.04 software-rendered GUI smoke uses `xvfb`, `mesa-vulkan-drivers`,
 `libvulkan1`, `libasound2t64` and the X11/EGL libraries listed in
 [the native test workflow](.github/workflows/tests.yml).
