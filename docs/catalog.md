@@ -683,6 +683,12 @@ It requires the matching physical class, authored control components and the veh
 driver seat in the original default loadout. [ADR-0417](adr/0417-exosuits-share-the-vehicle-catalog.md)
 defines the admission rule.
 
+A scoped verification at revision `54d5e8d00` matched all four owners on LIVE `13220821`
+and PTU `13248297`. The SDK ship-source reader and scoped Normal Catalog agreed on
+Record index, GUID, class name, Record path, vehicle kind and playability. The
+comparison included physical source references and encryption states for the
+classifications. The standalone vehicle output returned the same owners and kind.
+
 | Field | Rule and source |
 |-------|-----------------|
 | `mass` | The sum of the `mass` of every part of the vehicle implementation (`vehicleDefinition`) after the ship's Modification is applied, rounded to four decimals; a sum too large to round to a finite number counts as unknown (so does `hullHealth`). Landing gear, Loadout items and docked vehicles are not part of it (#305). Without part masses, the mass of the rigid physics controller (`Components/SEntityPhysicsControllerParams/PhysType/Mass`, `massBasis` `physics`) |
@@ -714,8 +720,9 @@ Andromeda 386,857 kg, 180,844 hull, 96 SCU (without the docked snub craft). The 
 Hornet F7C have null SCU payloads because their cargo grids refer to unavailable
 `InventoryContainer` Records.
 
-On LIVE the 1,066 catalog ships split into 1,027 `spaceship` and 39 `groundVehicle`, none `null`:
-no Record under `entities/spaceships` has a wheel or tread. The folder `entities/groundvehicles`
+In the LIVE survey before exosuit admission, the 1,066 rows split into 1,027 `spaceship` and 39
+`groundVehicle` rows, with no `null` value. The survey found no wheel or tread in Records under
+`entities/spaceships`. The folder `entities/groundvehicles`
 holds 40 Records; the 40th, `RSI_Ursa_Rover_Unmanned_Template`, is left out of the catalog as a
 development leftover (the whole word `template`, see "Selection").
 
@@ -1140,8 +1147,9 @@ game selects the Military paints elsewhere.
 have at least one paint and the ships whose vehicle implementation cannot be read, or whose patch file or Modification is
 not applied as it names, except that a patch file the Archive lacks is a fact of the game data; `CatalogSummary::paints()` returns them, and an unreadable vehicle file is also a warning of
 `CatalogSummary::warnings()`. Measured on LIVE (4.7): 1,064 paints, 1,039 assigned, 25 not
-assigned, 1,025 ships with paints (1,046 before ADR-0167). Of the 25, 16 are paints of the ARGO ATLS, an actor rather than
-a ship, 2 are weapon skins and 7 are the default livery of a ship (`Paint_Ballista_Base`,
+assigned, 1,025 ships with paints (1,046 before ADR-0167). This survey predates admission of the
+four exosuit owners. Of the 25, 16 are ARGO ATLS paints, 2 are weapon skins and 7 are the
+default liveries of ships (`Paint_Ballista_Base`,
 `Paint_Gladius_Default`, `Paint_Carrack_Default`, `Paint_Hurricane_Default`, the Vanguard
 Harbinger, Sentinel and Hoplite) whose tags no port requires. With a `--filter` the paints and the ships are
 both filtered, so a paint lists only ships the filter selected; both kinds are partial.
