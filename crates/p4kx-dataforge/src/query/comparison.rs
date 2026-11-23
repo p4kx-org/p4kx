@@ -53,6 +53,10 @@ impl<'f> Sink<'f> for Matching<'_, 'f> {
         }
     }
 
+    fn predicate_observer(&self) -> Option<&(dyn Fn(QuerySource) + Sync)> {
+        self.observer
+    }
+
     fn unresolved(&mut self, _link: &'f [u8]) {}
 
     fn reached(&mut self, reached: Reached<'f>) -> ControlFlow<()> {

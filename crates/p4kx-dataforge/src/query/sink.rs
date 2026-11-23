@@ -52,6 +52,19 @@ pub(crate) trait Sink<'f> {
 
     fn route(&mut self, _source: QuerySource) {}
 
+    /// Observes original bounds and failed reads used to evaluate a predicate.
+    fn predicate_observer(&self) -> Option<&(dyn Fn(QuerySource) + Sync)> {
+        None
+    }
+
+    fn predicate_bytes(&self, forge: &DataForge<'_>, bytes: &[u8], kind: QueryByteUse) {
+        if let Some(observe) = self.predicate_observer()
+            && let Some(source) = QuerySource::bytes(forge, bytes, kind)
+        {
+            observe(source);
+        }
+    }
+
     fn follow_decision(&mut self, _step: usize) {}
 
     fn route_bytes(&mut self, forge: &DataForge<'_>, bytes: &[u8], kind: QueryByteUse) {

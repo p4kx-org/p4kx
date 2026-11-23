@@ -245,26 +245,25 @@ fn follow<'f>(
         return unresolved(sink, bytes);
     };
     let record = forge.record_by_guid(guid);
-    if sink.source_depth().is_some() {
-        sink.route(QuerySource::RecordLookup {
+    if let Some(observe) = sink.predicate_observer() {
+        observe(QuerySource::RecordLookup {
             kind: RecordNameKind::Guid,
             end: forge.record_count() as u64,
         });
     }
     let Some(record) = record else {
-        sink.route_bytes(forge, bytes, QueryByteUse::DanglingReference);
+        sink.predicate_bytes(forge, bytes, QueryByteUse::DanglingReference);
         return unresolved(sink, bytes);
     };
-    sink.route(QuerySource::ReferenceTarget {
-        index: record.index(),
-        kind: RecordNameKind::Guid,
-    });
-    sink.route(QuerySource::Record {
-        index: record.index(),
-    });
-    sink.route(QuerySource::RecordType {
-        index: record.index(),
-    });
+    let index = record.index();
+    if let Some(observe) = sink.predicate_observer() {
+        observe(QuerySource::ReferenceTarget {
+            index,
+            kind: RecordNameKind::Guid,
+        });
+        observe(QuerySource::RecordType { index });
+    }
+    sink.route(QuerySource::Record { index });
     let struct_index = record.def.struct_index;
     let reached = instance(
         forge,
@@ -333,11 +332,12 @@ fn instance<'f>(
     mismatch: impl FnOnce(u32) -> ValueError,
     sink: &mut impl Sink<'f>,
 ) -> Reached<'f> {
-    let observe = sink
-        .source_depth()
-        .is_some()
-        .then_some(|source| sink.route(source));
-    let target = instance_source::read(forge, struct_index, instance_index, observe);
+    let target = instance_source::read(
+        forge,
+        struct_index,
+        instance_index,
+        sink.predicate_observer(),
+    );
     let Some(target) = target else {
         return Reached::Value(Value::Error(ValueError::InvalidPointer {
             struct_index,
@@ -367,16 +367,16 @@ pub(super) fn derives<'source>(
     forge: &'source DataForge<'source>,
     struct_index: u32,
     targets: &[usize],
-    sink: &mut impl Sink<'source>,
+    sink: &impl Sink<'source>,
 ) -> bool {
     let Ok(index) = usize::try_from(struct_index) else {
         return false;
     };
-    if sink.source_depth().is_none() {
+    let Some(observe) = sink.predicate_observer() else {
         return ancestors_include(forge, index, targets);
-    }
+    };
     ancestors_include_observed(forge, index, targets, |step| {
-        sink.route(match step {
+        observe(match step {
             AncestorStep::Parent {
                 index,
                 stored_parent,

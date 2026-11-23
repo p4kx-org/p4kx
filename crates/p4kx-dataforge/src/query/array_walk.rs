@@ -38,7 +38,7 @@ impl Walk {
         sink.follow_decision(index);
         let [count, first] = words(bytes);
         if let Err(error) = check_range(forge, elements, first, count, sink) {
-            sink.route_bytes(
+            sink.predicate_bytes(
                 forge,
                 bytes,
                 QueryByteUse::AttemptedTraversal(TraversalInput::Array),
@@ -105,13 +105,15 @@ fn check_range<'source>(
     elements: &Elements,
     first: u32,
     count: u32,
-    sink: &mut impl Sink<'source>,
+    sink: &impl Sink<'source>,
 ) -> Result<(), ValueError> {
     let (len, pool) = match elements {
         Elements::Values(kind) => value_pool_bound(forge, *kind, sink),
         Elements::Pointers(_) => value_pool_bound(forge, ValueKind::StrongPointer, sink),
         Elements::Instances(target) => {
-            sink.route(QuerySource::InstanceBlockBound { structure: *target });
+            if let Some(observe) = sink.predicate_observer() {
+                observe(QuerySource::InstanceBlockBound { structure: *target });
+            }
             let Some(&count) = forge.instance_counts.get(*target as usize) else {
                 return Err(ValueError::UnknownStruct {
                     index: u16::try_from(*target).unwrap_or(u16::MAX),
@@ -134,12 +136,12 @@ fn check_range<'source>(
 fn value_pool_bound<'source>(
     forge: &DataForge<'_>,
     kind: ValueKind,
-    sink: &mut impl Sink<'source>,
+    sink: &impl Sink<'source>,
 ) -> (u64, &'static str) {
-    if sink.source_depth().is_some()
+    if let Some(observe) = sink.predicate_observer()
         && let Some(span) = header::value_pool_count_span(kind)
     {
-        sink.route(QuerySource::Bytes {
+        observe(QuerySource::Bytes {
             start: span.start,
             end: span.end,
             kind: QueryByteUse::PoolBound,
@@ -172,11 +174,8 @@ fn element_of<'f>(
             if wanted.is_some_and(|wanted| !derives(forge, *target, wanted, sink)) {
                 return None;
             }
-            let observe = sink
-                .source_depth()
-                .is_some()
-                .then_some(|source| sink.route(source));
-            let instance = instance_source::read(forge, *target, element, observe);
+            let instance =
+                instance_source::read(forge, *target, element, sink.predicate_observer());
             instance.map_or_else(
                 || {
                     Reached::Value(Value::Error(ValueError::InvalidPointer {
@@ -207,9 +206,9 @@ fn element_of<'f>(
                 if forge.instance(struct_index, instance_index).is_some()
                     && !derives(forge, struct_index, wanted, sink)
                 {
-                    instance_source::extent(struct_index, instance_index, true, |source| {
-                        sink.route(source);
-                    });
+                    if let Some(observe) = sink.predicate_observer() {
+                        instance_source::extent(struct_index, instance_index, true, observe);
+                    }
                     return None;
                 }
             }
