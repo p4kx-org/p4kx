@@ -18,6 +18,28 @@ The installed-PTU raw/XML/DataForge comparisons found no unexplained P4KX discre
 New defects concern differential-verification trust and synthetic supported-v2 Archive reading.
 The installed PTU uses v1; no actual PTU v2 data loss is claimed.
 
+## Assembly geometry and material findings
+
+The source review covers the P4KX assembly and package paths at
+[`1adde3b0b`](https://github.com/p4kx-org/p4kx/tree/1adde3b0b3efd5946c627811d06b8dafc8684d36).
+
+| Case | P4KX behavior and evidence |
+| --- | --- |
+| Shared `SubGeometry` model | An unselected Entity needs a drawable root path. A proven shared model path among its physical variants can supply geometry when that root path is empty. A projection needs complete original occurrences and canonical path agreement. Variants retain independent material and palette selection. [Entity geometry](../crates/p4kx-assembly/src/geometry.rs) · [Model selection](../crates/p4kx-assembly/src/build_models.rs) |
+| Palette stencil | Packages retain the original `decalTexture` string and source positions. For a `$TintPaletteDecal` placeholder, a drawable motif requires the selected palette's concrete, readable texture and its source binding. Where that binding is unavailable, the stencil stays hidden. [Stencil classifier](../crates/p4kx-model/src/mtl_stencil.rs) · [Palette texture provenance](blender-package.md) |
+| Package finish selection | Assembly already supports one physically selected fitted finish with its own model and CDF material. A package with switchable finish geometry needs an explicit variant-to-Record identity and ordered CDF attachment positions. Shared model, maker and size can nominate candidate Records for verification. [Fitted CDF test](../crates/p4kx-assembly/tests/it/assembly_vehicle_paint_cdf.rs) · [Item identity evidence](../crates/p4kx-export/src/item_variant.rs) |
+
+Existing paths handle model-space and bone-relative CDF positions, body-matched
+wearable meshes, palettes from the selected geometry or material library, and
+the bind frame of the actual holder on worn bone ports. Paint matching consults
+the effective vehicle XML after modifications. Original DataForge reference
+links do not materialize the targets when reading the owner. Material effects
+retain their ordered authored modifiers and actual draw-subset bindings.
+[CDF pose tests](../crates/p4kx-assembly/tests/it/character_model_space.rs)
+· [Worn mounts](../crates/p4kx-assembly/src/armour/mount.rs)
+· [Paint-port source](../crates/p4kx-export/src/paint_port.rs)
+· [Original effects](../crates/p4kx-extraction/tests/it/entity_material_effects.rs)
+
 ## Sources and exact scope
 
 Detailed pinned evidence, source seams, licences and capability matrices are in:
