@@ -14,3 +14,6 @@ pub(crate) mod module_property;
 
 #[path = "mission_item_definition.rs"]
 pub(crate) mod item_definition;
+
+#[path = "scenario_progress.rs"]
+pub(crate) mod scenario_progress;

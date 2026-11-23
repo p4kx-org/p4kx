@@ -18,6 +18,7 @@ pub(crate) use crate::catalog_v3::mineable_element_definition::MineableElement;
 pub(crate) use crate::catalog_v3::mining_process_catalog::{
     PreparedMiningGlobal as MiningGlobalParams, PreparedRefining as RefiningProcess,
 };
+pub(crate) use crate::catalog_v3::mission_sources::scenario_progress::ContractScenario;
 pub(crate) use crate::catalog_v3::resource_group_catalog::ResourceGroup;
 pub(crate) use crate::commodity_contract::Commodity;
 pub(crate) use crate::contract_completeness::{Completeness, KindCompleteness};
@@ -27,7 +28,6 @@ pub(crate) use crate::contract_loadout::Loadout;
 pub(crate) use crate::contract_loot::{LootArchetype, LootContainer, LootTable};
 pub(crate) use crate::contract_loot_legacy::{LegacyLootArchetype, LegacyLootTable};
 pub(crate) use crate::contract_mining::MineableEntity;
-pub(crate) use crate::contract_mission_data::ContractScenario;
 pub(crate) use crate::contract_missions::ContractEntry;
 pub(crate) use crate::contract_shops::Shop;
 pub(crate) use crate::contract_source::{BuildSource, Source};

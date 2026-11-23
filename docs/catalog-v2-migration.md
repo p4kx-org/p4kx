@@ -166,3 +166,15 @@ and the original Physics operand when it supplies fallback mass. Coordinate loss
 `component.value` and attachment restrictions under `attachment.value.attachDef`.
 `projections.crafterHosts.rows` replaces `hostGuids` with resolved physical ship and
 crafter identities plus each original mount position.
+
+## Contract scenario progressions
+
+`contractScenarios` retains its root array. The former flat record fields are now sourced
+header cells with a physical `recordIndex`. The faction, progression, reward and blueprint pool
+arrays are sourced with one sourced cell per original slot. Read the value of each present slot.
+
+`factionGuid`, `factionReputationGuid`, `periodScenarioGuid` and `blueprintPoolGuids` are represented
+by `faction`, `factionReputation`, `periodMissionScenario` and `blueprintPools` References.
+Read their sourced GUID and resolution status. Numeric fields retain their original storage.
+The authored `None` badge label denotes no badge. Completion structure and references can be
+read from the progression's `authoredFields` arena.

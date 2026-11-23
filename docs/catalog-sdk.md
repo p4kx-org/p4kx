@@ -2134,6 +2134,20 @@ rejected before a dependency body read.
 This query covers authored configuration and the reached inventory definition. Installed ship
 totals have their own projection.
 
+## Contract scenario progressions
+
+Use `catalog_queries::contract_scenarios::with_contract_scenarios`, the decoded-Entry form or
+the session and parsed-view methods to read the `contractScenarios` rows. Select all applicable
+Records, the original Record index, or all physical owners of one GUID. The query shares the
+normal Catalog projection and does not need a complete Catalog or localized strings.
+
+The rows borrow the original DataForge and include the selected Faction's physical reputation
+Reference when available. Resolve their original-use references against the snapshot's own
+inventory. A scoped query opens only the selected scenario bodies and their reached compatible
+Faction bodies. Completion pointers, BlueprintPool targets and periodic scenario References
+retain their authored structure or target headers without opening target Records for those links.
+Check selection and field coverage before interpreting an empty response.
+
 ## Facility placements from a Loadout
 
 Use `equipment::read_loadout_facility_placements`, its decoded-Entry form or the equivalent

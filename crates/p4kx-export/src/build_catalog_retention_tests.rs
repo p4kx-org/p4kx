@@ -23,7 +23,6 @@ const RETENTION_STAGES: &[CatalogStage] = &[
     CatalogStage::ProjectMissionBrokerEntries,
     CatalogStage::ProjectMissionLocationTemplates,
     CatalogStage::ProjectContractGenerators,
-    CatalogStage::LinkMissionFactions,
     CatalogStage::ProjectParticleLibraries,
     CatalogStage::ProjectFlareLibraries,
     CatalogStage::ProjectSubsumptionEvents,

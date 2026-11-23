@@ -12,11 +12,13 @@ use crate::catalog_v3::catalog_weapon_projectile_ammo::{
     self, LinkedAmmunitionReader, WeaponProjectileAmmoSelection,
 };
 use crate::catalog_v3::mineable_entity_definition;
+use crate::catalog_v3::mission_sources::scenario_progress;
 use crate::catalog_v3::starmap_object_definition;
 use crate::contract::Item;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::ExportLedger;
 use crate::item_class::ClassLine;
+use crate::mission_kinds::MissionPick;
 use crate::picked::{Picked, PickedItem};
 use crate::record_observation::RecordObservation;
 use crate::scan_health::ScanError;
@@ -69,6 +71,9 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
         ledger: &mut ExportLedger,
     ) -> Result<Option<Picked<'f>>, ScanError> {
         let kind = self.kind;
+        if kind == Kind::ContractScenarios {
+            return Ok(Some(self.scenario(admission, tree, ledger)?));
+        }
         if let Some(picked) = self.definition_kind(kind, trees, admission, tree, ledger)? {
             return Ok(Some(picked));
         }
@@ -118,7 +123,33 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
                 definition,
             }))));
         }
-        Ok(Picked::entity(kind, tree))
+        Ok(None)
+    }
+
+    fn scenario(
+        &self,
+        admission: &RecordObservation<'_, 'f>,
+        tree: &RecordTree<'f>,
+        ledger: &mut ExportLedger,
+    ) -> Result<Picked<'f>, CatalogError> {
+        let read = scenario_progress::read(
+            tree,
+            self.scan.original,
+            admission,
+            self.scan.options.cancel,
+        )?;
+        ledger.merge(read.dependencies);
+        crate::source_projection_notes::record(
+            Kind::ContractScenarios,
+            ExportSourceRole::Selected,
+            admission,
+            tree,
+            read.notes,
+            ledger,
+        )?;
+        Ok(Picked::Mission(MissionPick::Scenario(Box::new(
+            read.scenario,
+        ))))
     }
 
     fn provider(

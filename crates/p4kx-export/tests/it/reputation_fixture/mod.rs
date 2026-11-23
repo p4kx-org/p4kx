@@ -191,7 +191,11 @@ fn scenario() -> TestRecord {
         .value("minMultiplierThreshold", TestValue::Single(1.0))
         .value(
             "completionType",
-            TestValue::Struct(TestInstance::new("CompletionType_GlobalProgression")),
+            TestValue::Struct(
+                TestInstance::new("CompletionType_CompletionTag")
+                    .value("completionTags", TestValue::Reference(PLAIN_A))
+                    .value("fixtureExtra", TestValue::Int32(42)),
+            ),
         )
         .value(
             "tierRewards",

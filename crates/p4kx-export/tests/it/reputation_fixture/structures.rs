@@ -112,7 +112,10 @@ fn mission_structs() -> Vec<TestStruct> {
             .field("periodMissionScenario", TestType::Reference)
             .array("tierRewards", class("STierReward")),
         TestStruct::new("CompletionType"),
-        TestStruct::new("CompletionType_GlobalProgression").parent("CompletionType"),
+        TestStruct::new("CompletionType_CompletionTag")
+            .parent("CompletionType")
+            .field("completionTags", TestType::Reference)
+            .field("fixtureExtra", TestType::Int32),
         TestStruct::new("STierReward")
             .field("minPoints", TestType::Int32)
             .field("badgeToAward", TestType::String)

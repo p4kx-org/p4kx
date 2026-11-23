@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataForge, Guid, RecordTree};
+use p4kx_extraction::{DataForge, Guid};
 
 use crate::Kind;
 use crate::catalog_number_capture::CapturedNumber;
@@ -19,6 +19,7 @@ use crate::catalog_v3::mission_sources::item_definition::{
 use crate::catalog_v3::mission_sources::module_declaration::{
     self, MissionModuleDeclaration, PreparedModuleDeclaration,
 };
+use crate::catalog_v3::mission_sources::scenario_progress::PreparedContractScenario;
 use crate::catalog_v3::reputation_context_definition::{self, ContextDefinition, PreparedContext};
 use crate::catalog_v3::reputation_faction_definition::{
     self, FactionReputationTables, PreparedFactionReputation,
@@ -34,10 +35,8 @@ use crate::catalog_v3::reputation_standing_definition::{
 use crate::catalog_v3::sandbox_trigger_record_definition::{
     self, PreparedSandboxTriggerRecord, SandboxTriggerRecordDefinition,
 };
-use crate::contract::ContractScenario;
 use crate::contract_mission_data::MissionType;
-use crate::guid_text::{CatalogGuid, sort_by_guid};
-use crate::mission_data::contract_scenario;
+use crate::guid_text::CatalogGuid;
 
 /// An entity of one of the mission and reputation kinds.
 pub(crate) enum MissionPick<'f> {
@@ -60,7 +59,7 @@ pub(crate) enum MissionPick<'f> {
     /// A mission locality.
     Locality(Box<PreparedMissionLocality<'f>>),
     /// A contract scenario.
-    Scenario(ContractScenario<'f>),
+    Scenario(Box<PreparedContractScenario<'f>>),
     /// A physical mission module declaration.
     ModuleDeclaration(Box<PreparedModuleDeclaration<'f>>),
     /// A physical mission item definition.
@@ -69,17 +68,6 @@ pub(crate) enum MissionPick<'f> {
     ScenarioDefinition(Box<PreparedMissionScenario<'f>>),
     /// A cargo manifest.
     Manifest(Box<PreparedCargoManifest<'f>>),
-}
-
-impl<'f> MissionPick<'f> {
-    /// Returns the entity of `kind` the Record tree `tree` describes, `None` for a kind that is
-    /// not a mission or reputation kind.
-    pub(crate) fn entity(kind: Kind, tree: &RecordTree<'f>) -> Option<Self> {
-        Some(match kind {
-            Kind::ContractScenarios => Self::Scenario(contract_scenario(tree)),
-            _ => return None,
-        })
-    }
 }
 
 /// The entities of the mission and reputation kinds, each ordered by the text of the GUID.
@@ -94,7 +82,7 @@ pub(crate) struct MissionKinds<'f> {
     pub(crate) contexts: Vec<PreparedContext<'f>>,
     types: Vec<MissionType<'f>>,
     pub(crate) localities: Vec<PreparedMissionLocality<'f>>,
-    pub(crate) scenarios: Vec<ContractScenario<'f>>,
+    pub(crate) scenarios: Vec<PreparedContractScenario<'f>>,
     pub(crate) scenario_definitions: Vec<PreparedMissionScenario<'f>>,
     module_declarations: Vec<PreparedModuleDeclaration<'f>>,
     items: Vec<PreparedMissionItem<'f>>,
@@ -124,7 +112,7 @@ impl<'f> MissionKinds<'f> {
             MissionPick::Context(entity) => self.contexts.push(*entity),
             MissionPick::Type(entity) => self.types.push(*entity),
             MissionPick::Locality(entity) => self.localities.push(*entity),
-            MissionPick::Scenario(entity) => self.scenarios.push(entity),
+            MissionPick::Scenario(entity) => self.scenarios.push(*entity),
             MissionPick::ScenarioDefinition(entity) => self.scenario_definitions.push(*entity),
             MissionPick::ModuleDeclaration(entity) => self.module_declarations.push(*entity),
             MissionPick::Item(entity) => self.items.push(*entity),
@@ -147,7 +135,6 @@ impl<'f> MissionKinds<'f> {
         self.trigger_records
             .sort_by_cached_key(|row| (CatalogGuid(row.physical_guid).text(), row.physical_index));
         reputation_reward_amount_definition::order(&mut self.reward_amounts);
-        sort_by_guid(&mut self.scenarios, |entity| entity.guid);
     }
 
     /// Takes the physical mission types into their catalog table.
@@ -194,7 +181,7 @@ impl<'f> MissionKinds<'f> {
         cargo_manifest::table(forge, std::mem::take(&mut self.manifests))
     }
 
-    /// Returns sources for mission scenarios, module declarations and mission items.
+    /// Returns original number receipts for mission definitions.
     pub(crate) fn definition_sources(
         &self,
     ) -> impl Iterator<Item = (Kind, Guid, &'f str, &[CapturedNumber])> {

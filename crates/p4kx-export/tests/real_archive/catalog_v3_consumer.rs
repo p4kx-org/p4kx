@@ -191,6 +191,17 @@ pub(crate) fn field<'row>(row: &'row Value, kind: Kind, name: &str) -> TestResul
     let sourced = match kind {
         Kind::Contracts => name == "guid",
         Kind::Items => item_source_field(name),
+        Kind::ContractScenarios => matches!(
+            name,
+            "guid"
+                | "recordName"
+                | "className"
+                | "recordPath"
+                | "recordIndex"
+                | "sourceType"
+                | "fileName"
+                | "metadataTag"
+        ),
         Kind::Loadouts => matches!(name, "entityGuid" | "entityKind" | "sourceRecordIndex"),
         Kind::Ships => matches!(
             name,

@@ -212,6 +212,7 @@ const fn uses_physical_row_identity(kind: Kind) -> bool {
                 | Kind::Jurisdictions
                 | Kind::SecurityNetworkManifests
                 | Kind::MissionScenarios
+                | Kind::ContractScenarios
                 | Kind::CargoManifests
                 | Kind::MissionLocalities
                 | Kind::MissionModuleDeclarations

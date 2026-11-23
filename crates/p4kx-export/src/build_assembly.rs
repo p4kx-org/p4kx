@@ -8,9 +8,7 @@ use p4kx_assembly::{ArchiveFiles, Entities};
 use p4kx_extraction::{Archive, DataForgeEntry};
 
 use crate::archive_key_use::ArchiveKeyUse;
-use crate::build_derived::{
-    add_contracts, add_loadouts, add_paints, add_scenario_factions, add_tags,
-};
+use crate::build_derived::{add_contracts, add_loadouts, add_paints, add_tags};
 use crate::catalog_definitions::CatalogDefinitions;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
@@ -88,7 +86,6 @@ pub(super) fn assemble<R>(
     )?;
     run.begin(CatalogStage::ProjectMissions);
     add_contracts(&forge, &projection, tags, run, &mut collected)?;
-    add_scenario_factions(&input, run, &mut collected)?;
     let (client_profile_settings, radar_audio) =
         parts::client_configurations(archive, &entry_capture, &mut collected, run)?;
     run.begin(CatalogStage::ProjectShops);
@@ -361,7 +358,9 @@ pub(super) fn assemble<R>(
         harvestable_locations: collected.harvestable_locations,
         loot_containers: collected.loot_containers,
         shops: collected.shops,
-        contract_scenarios: collected.mission_kinds.scenarios,
+        contract_scenarios: crate::catalog_v3::mission_sources::scenario_progress::ordered_rows(
+            collected.mission_kinds.scenarios,
+        ),
         loot_tables: collected.loot_kinds.tables,
         loot_archetypes: collected.loot_kinds.archetypes,
         legacy_loot_tables: collected.loot_kinds.legacy_tables,

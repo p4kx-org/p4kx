@@ -146,9 +146,12 @@ fn verify_scenarios(
     let mut count = 0;
     let mut trees = TreeBuilder::new();
     for row in consumer::rows(catalog, Kind::ContractScenarios)? {
-        let guid: Guid = consumer::identity(row, Kind::ContractScenarios)?.parse()?;
+        let index = row
+            .pointer("/recordIndex/value")
+            .and_then(Value::as_u64)
+            .ok_or("physical ScenarioProgress position")?;
         let record = forge
-            .record_by_guid(guid)
+            .record(u32::try_from(index)?)
             .ok_or("original ScenarioProgress Record")?;
         let tree = trees
             .build(&record)
@@ -158,19 +161,23 @@ fn verify_scenarios(
             _ => &[],
         };
         let tiers = row
-            .get("factionRewardTiers")
+            .pointer("/factionRewardTiers/value")
             .and_then(Value::as_array)
             .ok_or("projected faction reward tiers")?;
-        let original_tiers = originals.iter().filter_map(|item| match item {
-            Original::Struct(body) => Some(body),
-            _ => None,
-        });
         assert_eq!(
             tiers.len(),
-            original_tiers.clone().count(),
+            originals.len(),
             "scenario tier order and cardinality"
         );
-        for (tier, original) in tiers.iter().zip(original_tiers) {
+        for (tier, original) in tiers.iter().zip(originals) {
+            let Original::Struct(original) = original else {
+                assert_eq!(
+                    tier.get("state").and_then(Value::as_str),
+                    Some(non_struct_tier_state(original)),
+                    "failed source slot retains its state"
+                );
+                continue;
+            };
             let expected = match original.field("faction") {
                 Some(Original::Reference(target)) if target.location().is_none() => {
                     assert!(
@@ -183,8 +190,8 @@ fn verify_scenarios(
                 _ => None,
             };
             let exported = tier
-                .get("factionGuid")
-                .ok_or("required incoming Faction GUID")?
+                .pointer("/value/faction/value/guid/value")
+                .unwrap_or(&Value::Null)
                 .as_str()
                 .map(str::parse::<Guid>)
                 .transpose()?;
@@ -193,4 +200,12 @@ fn verify_scenarios(
         }
     }
     Ok(count)
+}
+
+const fn non_struct_tier_state(original: &Original<'_>) -> &'static str {
+    match original {
+        Original::Null => "null",
+        Original::Error(_) => "unreadable",
+        _ => "invalid",
+    }
 }

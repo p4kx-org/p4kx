@@ -18,9 +18,8 @@ use crate::contract_loadout::EntityKind;
 use crate::contract_template_read::ContractTemplates;
 use crate::crafting_warning::CraftingWarning;
 use crate::loadout::{Wanted, loadouts};
-use crate::mission_data::link_scenario_factions;
 use crate::missions;
-use crate::options::{CatalogRun, CatalogStage};
+use crate::options::CatalogRun;
 use crate::paint::{is_paint, paints};
 use crate::{CatalogError, CatalogOptions, Kind, LoadoutSummary, PaintSummary};
 
@@ -114,26 +113,6 @@ pub(crate) fn add_contracts<'f>(
     configurations.flows.extend(broker_flows);
     configurations.properties.extend(broker_properties);
     collected.add_contract_templates(read, definitions, configurations, unknowns)
-}
-
-/// Resolves the reputation links of the collected scenario factions.
-pub(crate) fn add_scenario_factions<'source>(
-    input: &'source OriginalCatalogInput<'source, 'source>,
-    run: CatalogRun<'_, '_>,
-    collected: &mut Collected<'source>,
-) -> Result<(), CatalogError> {
-    run.begin_compacted(
-        CatalogStage::LinkMissionFactions,
-        &input.origins().uses,
-        &collected.ledger,
-    )?;
-    collected.ledger.merge(link_scenario_factions(
-        input.forge(),
-        &mut collected.mission_kinds.scenarios,
-        input,
-        run.options.cancel,
-    )?);
-    Ok(())
 }
 
 /// Derives the paints of `collected`, warns about unreadable vehicle files and returns the counts.

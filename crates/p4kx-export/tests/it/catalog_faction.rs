@@ -237,19 +237,19 @@ fn faction_text_domains_and_inherited_absence_keep_exact_origins() -> TestResult
 fn scenario_keeps_original_faction_guid_when_its_target_is_filtered() -> TestResult {
     let database = fixture::complete();
     let (_, full) = build(&database, DcbOrigin::Plain, None)?;
-    let tier = "/contractScenarios/0/factionRewardTiers/0";
+    let tier = "/contractScenarios/0/factionRewardTiers/value/0/value";
     let unfiltered = at(&full, tier)?;
     assert_eq!(
-        at(unfiltered, "/factionGuid")?,
+        at(unfiltered, "/faction/value/guid/value")?,
         &json!(guid(fixture::SECURITY))
     );
     assert_eq!(
-        at(unfiltered, "/factionReputationGuid")?,
+        at(unfiltered, "/factionReputation/value/guid/value")?,
         &json!(guid(fixture::REPUTATION))
     );
     assert_eq!(
         at(rows(&full)?.first().ok_or("joined Faction")?, "/guid/value")?,
-        at(unfiltered, "/factionGuid")?
+        at(unfiltered, "/faction/value/guid/value")?
     );
     let filter = Filter::new("contractscenarios");
     let (_, filtered) = build(&database, DcbOrigin::Plain, Some(&filter))?;
@@ -266,9 +266,19 @@ fn scenario_keeps_original_faction_guid_when_its_target_is_filtered() -> TestRes
     assert_eq!(at(&filtered, "/completeness/factions/status")?, "partial");
     assert_eq!(at(&filtered, tier)?, unfiltered);
     for catalog in [&full, &filtered] {
-        let missing = at(catalog, "/contractScenarios/0/factionRewardTiers/1")?;
-        assert_eq!(at(missing, "/factionGuid")?, &json!(guid(fixture::MISSING)));
-        assert!(at(missing, "/factionReputationGuid")?.is_null());
+        let missing = at(
+            catalog,
+            "/contractScenarios/0/factionRewardTiers/value/1/value",
+        )?;
+        assert_eq!(
+            at(missing, "/faction/value/guid/value")?,
+            &json!(guid(fixture::MISSING))
+        );
+        assert_eq!(
+            at(missing, "/factionReputation/state")?,
+            "absent",
+            "the dangling Faction cannot supply an authored reputation field"
+        );
     }
     Ok(())
 }

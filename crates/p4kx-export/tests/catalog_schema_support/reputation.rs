@@ -175,26 +175,46 @@ pub(super) fn localities() -> serde_json::Value {
 }
 
 pub(super) fn scenarios() -> serde_json::Value {
+    let present = values::present;
+    let link = |guid, index, path, source_type| {
+        present(json!({
+            "guid": present(json!(guid)),
+            "targetRecordIndex": present(json!(index)),
+            "recordPath": present(json!(path)),
+            "targetType": present(json!(source_type)),
+            "status": "present"
+        }))
+    };
+    let path = "libs/foundry/records/contracts/contractscenarios/ors_scenarioprogress";
+    let reward = present(json!({
+        "minPoints": present(json!({"type":"int32","value":10800})),
+        "badgeToAward": present(json!("ORS_Pistol")),
+        "globalPointsMultiplier": present(json!({"type":"f32","rawBits":"3f800000","finite":1.0})),
+        "blueprintPools": present(json!([]))
+    }));
+    let progression = present(json!({
+        "minMultiplierThreshold": present(json!({"type":"f32","rawBits":"3f800000","finite":1.0})),
+        "completionType": values::source(SourceValue::Absent),
+        "periodMissionScenario": values::source(SourceValue::Null),
+        "tiers": present(json!([reward])),
+        "authoredFields": {"roots":[],"values":[]}
+    }));
+    let faction = present(json!({
+        "faction": link("66000000-0000-4000-8000-000000000001", 1, "factions/faction", "Faction"),
+        "factionName": present(json!("faction")),
+        "factionReputation": link("60000000-0000-4000-8000-000000000001", 2, "factions/reputation", "FactionReputation"),
+        "pointsAsPercent": present(json!(false)),
+        "progressions": present(json!([progression]))
+    }));
     json!([{
-        "guid": "65000000-0000-4000-8000-000000000001",
-        "className": "ORS_ScenarioProgress",
-        "recordPath": "libs/foundry/records/contracts/contractscenarios/ors_scenarioprogress",
-        "factionRewardTiers": [{
-            "factionGuid": "66000000-0000-4000-8000-000000000001",
-            "factionReputationGuid": "60000000-0000-4000-8000-000000000001",
-            "factionName": "faction_lawful_crusaderindustries",
-            "pointsAsPercent": false,
-            "progressions": [{
-                "minMultiplierThreshold": 1.0,
-                "completionType": "CompletionType_GlobalProgression",
-                "periodScenarioGuid": null,
-                "tiers": [{
-                    "minPoints": 10800,
-                    "badgeToAward": "ORS_Pistol",
-                    "globalPointsMultiplier": 1.0,
-                    "blueprintPoolGuids": ["e4000000-0000-4000-8000-000000000001"]
-                }]
-            }]
-        }]
+        "guid": present(json!("65000000-0000-4000-8000-000000000001")),
+        "recordName": present(json!("ScenarioProgress.ORS_ScenarioProgress")),
+        "className": present(json!("ORS_ScenarioProgress")),
+        "recordPath": present(json!(path)),
+        "recordIndex": present(json!(0)),
+        "sourceType": present(json!("ScenarioProgress")),
+        "fileName": present(json!(format!("{path}.xml"))),
+        "metadataTag": values::source(SourceValue::Absent),
+        "factionRewardTiers": present(json!([faction]))
     }])
 }

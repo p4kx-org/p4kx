@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Guid, RecordTree};
+use p4kx_extraction::Guid;
 
 use crate::blueprint_category::BlueprintCategory;
 use crate::catalog_projections::ship_base_facts::ShipBaseFacts;
@@ -123,126 +123,6 @@ pub(crate) enum Picked<'f> {
 }
 
 impl<'f> Picked<'f> {
-    /// Returns the entity of `kind` the Record tree describes when no dedicated reader owns it.
-    #[expect(
-        clippy::too_many_lines,
-        reason = "one exhaustive dispatch for the catalog kinds"
-    )]
-    pub(crate) fn entity(kind: Kind, tree: &RecordTree<'f>) -> Option<Self> {
-        match kind {
-            Kind::ContractScenarios => MissionPick::entity(kind, tree).map(Self::Mission),
-            Kind::Items
-            | Kind::Crafters
-            | Kind::LegacyLootTables
-            | Kind::LegacyLootArchetypes
-            | Kind::LootTables
-            | Kind::LootArchetypes
-            | Kind::RefiningProcesses
-            | Kind::MiningGlobalParams
-            | Kind::MineableElements
-            | Kind::MineableCompositions
-            | Kind::LootPoolFilters
-            | Kind::LootSecondaryChoiceSingleLayers
-            | Kind::LootSecondaryChoiceMultiLayers
-            | Kind::LootThemes
-            | Kind::HierarchicalContextualDataPresets
-            | Kind::LootGenerationGlobalParams
-            | Kind::SubHarvestableConfigs
-            | Kind::Tags
-            | Kind::Manufacturers
-            | Kind::Ships
-            | Kind::Commodities
-            | Kind::ResourceGroups
-            | Kind::ResourceTypes
-            | Kind::Blueprints
-            | Kind::BlueprintCategories
-            | Kind::BlueprintCategoryLists
-            | Kind::ReputationContexts
-            | Kind::FactionReputations
-            | Kind::ReputationScopes
-            | Kind::ReputationStandings
-            | Kind::ExplosionDefinitions
-            | Kind::AmmoDefinitions
-            | Kind::InventoryContainers
-            | Kind::MedicalItemTierConfigs
-            | Kind::ProceduralPlanetAudio
-            | Kind::ResourceNetworkGlobals
-            | Kind::CargoLoadingGlobals
-            | Kind::ShopCommodityGlobals
-            | Kind::Factions
-            | Kind::FactionIdentities
-            | Kind::ReputationPerks
-            | Kind::ReputationTriggerRecords
-            | Kind::ReputationRewardAmounts
-            | Kind::Infractions
-            | Kind::InfractionSets
-            | Kind::Jurisdictions
-            | Kind::SecurityNetworkManifests
-            | Kind::MissionScenarios
-            | Kind::CargoManifests
-            | Kind::MissionLocalities
-            | Kind::MissionTypes
-            | Kind::MissionModuleDeclarations
-            | Kind::MissionItems
-            | Kind::LocationClasses
-            | Kind::LocationFunctions
-            | Kind::LocationSizes
-            | Kind::LocationResourceSlots
-            | Kind::LocationEntityDeclarations
-            | Kind::LocationClassRegistries
-            | Kind::LocationFunctionRegistries
-            | Kind::LocationSizeRegistries
-            | Kind::ContractScopes
-            | Kind::NpcArchetypes
-            | Kind::NpcClassPools
-            | Kind::AutoSpawns
-            | Kind::AutoSpawnSets
-            | Kind::EncounterIndices
-            | Kind::StarmapTypes
-            | Kind::StarmapPresets
-            | Kind::StarmapAmenities
-            | Kind::GameplayProperties
-            | Kind::QualityDistributions
-            | Kind::QualityQuantizations
-            | Kind::BlueprintPools
-            | Kind::DismantleProcesses
-            | Kind::Paints
-            | Kind::Loadouts
-            | Kind::StarmapObjects
-            | Kind::Contracts
-            | Kind::MissionLocationTemplates
-            | Kind::ContractShipSpawns
-            | Kind::ContractLocationQueries
-            | Kind::ContractNpcSpawns
-            | Kind::ContractEntitySpawns
-            | Kind::MissionPropertySets
-            | Kind::ContractTemplates
-            | Kind::MissionBrokerEntries
-            | Kind::HarvestableProviderPresets
-            | Kind::SubHarvestableMultiConfigs
-            | Kind::HarvestableLocations
-            | Kind::LootContainers
-            | Kind::MineableEntities
-            | Kind::Shops
-            | Kind::ShopInventories
-            | Kind::ParticleLibraries
-            | Kind::FlareLibraries
-            | Kind::SubsumptionEvents
-            | Kind::ClientProfileSettings
-            | Kind::RadarAudio
-            | Kind::PlanetResources
-            | Kind::Creatures
-            | Kind::ClimateAssets
-            | Kind::GeologyAssets
-            | Kind::Ecosystems
-            | Kind::GeologySets
-            | Kind::GeologyTextureSets
-            | Kind::Soils
-            | Kind::SoilTextureSets
-            | Kind::ShadingClasses => None,
-        }
-    }
-
     /// Returns the ship `build` makes of the base data `read`, or the failure when the base data
     /// could not be read: a ship is never left out without a trace.
     pub(crate) fn of_ship(

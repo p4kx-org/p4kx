@@ -143,6 +143,7 @@ fn mission_definition_number_groups<'rows>(
         .chain(crate::catalog_v3::cargo_manifest::sources(
             &missions.manifests,
         ))
+        .chain(crate::catalog_v3::mission_sources::scenario_progress::sources(&missions.scenarios))
         .map(|(kind, _, _, numbers)| (kind, numbers))
 }
 

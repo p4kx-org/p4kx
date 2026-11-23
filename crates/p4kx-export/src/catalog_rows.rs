@@ -129,6 +129,11 @@ fn append_indexed_gameplay_rows(emitted: &mut Vec<CatalogRow>, collected: &Colle
             .chain(
                 crate::catalog_v3::mission_locality_definition::catalog_rows(&missions.localities),
             )
+            .chain(
+                crate::catalog_v3::mission_sources::scenario_progress::catalog_rows(
+                    &missions.scenarios,
+                ),
+            )
             .chain(collected.location_vocabulary.catalog_rows())
             .chain(collected.npc_spawn_definitions.catalog_rows())
             .chain(collected.starmap_definitions.catalog_rows()),

@@ -25,12 +25,14 @@ mod reputation_perks;
 mod reputation_sandbox;
 #[path = "catalog_reputation_scope.rs"]
 mod reputation_scope;
+#[path = "catalog_scenario_progression.rs"]
+mod scenario_progression;
 #[path = "catalog_reputation_sdk.rs"]
 mod sdk;
 
 use crate::reputation_fixture::{
-    CONTEXT, FACTION, LEGACY_FACTION, LOCALITY, MISSING, MISSION_TYPE, PLAIN_A, PLAIN_B, SCENARIO,
-    SCOPE, STANDING_HIGH, STANDING_LOW, write_archive, write_archive_with_drift,
+    CONTEXT, LOCALITY, MISSING, MISSION_TYPE, PLAIN_A, PLAIN_B, SCOPE, STANDING_HIGH, STANDING_LOW,
+    write_archive, write_archive_with_drift,
 };
 
 use crate::health_origin_assertions as proof;
@@ -72,15 +74,6 @@ fn guid(value: u128) -> String {
         &text[16..20],
         &text[20..32]
     )
-}
-
-fn entry<'a>(catalog: &'a Value, kind: &str, record: u128) -> Result<&'a Value, Box<dyn Error>> {
-    catalog[kind]
-        .as_array()
-        .into_iter()
-        .flatten()
-        .find(|entry| entry["guid"] == guid(record).as_str())
-        .ok_or_else(|| format!("{kind} has no {}", guid(record)).into())
 }
 
 fn counts(built: &BuiltCatalog, kind: Kind) -> Option<(usize, usize)> {
@@ -320,45 +313,6 @@ fn check_locality(catalog: &Value) -> TestResult {
         }
     }
     proof::closure(catalog)
-}
-
-#[test]
-fn a_scenario_lists_the_tiers_of_each_faction() -> TestResult {
-    let (_, catalog) = build(None)?;
-    assert_eq!(
-        *entry(&catalog, "contractScenarios", SCENARIO)?,
-        json!({
-            "guid": guid(SCENARIO),
-            "className": "ORS_ScenarioProgress",
-            "recordPath": "libs/foundry/records/contracts/contractscenarios/ors_scenarioprogress",
-            "factionRewardTiers": [{
-                "factionGuid": guid(LEGACY_FACTION),
-                "factionReputationGuid": guid(FACTION),
-                "factionName": "faction_lawful_crusaderindustries",
-                "pointsAsPercent": false,
-                "progressions": [{
-                    "minMultiplierThreshold": 1.0,
-                    "completionType": "CompletionType_GlobalProgression",
-                    "periodScenarioGuid": null,
-                    "tiers": [
-                        {
-                            "minPoints": 10_800,
-                            "badgeToAward": "ORS_Pistol",
-                            "globalPointsMultiplier": 1.0,
-                            "blueprintPoolGuids": []
-                        },
-                        {
-                            "minPoints": 18_000,
-                            "badgeToAward": null,
-                            "globalPointsMultiplier": 1.0,
-                            "blueprintPoolGuids": [guid(PLAIN_B)]
-                        }
-                    ]
-                }]
-            }]
-        })
-    );
-    Ok(())
 }
 
 #[test]

@@ -31,6 +31,8 @@ mod fixture;
 mod mission_flows;
 #[path = "sdk_mission_property_route.rs"]
 mod mission_properties;
+#[path = "sdk_contract_scenario_route.rs"]
+mod scenario_progress;
 
 const CONTRACTS: &str = "/projections/contracts";
 const TITLES: &str = "/projections/missionTitles";
@@ -44,6 +46,7 @@ pub(super) const DATASETS: &[&str] = &[
     TITLES,
     PROPERTY_SETS,
     GENERATORS,
+    scenario_progress::DATASET,
     mission_properties::DATASET,
     mission_flows::DATASET,
     mission_flows::TEMPLATE_DEFINITIONS,
@@ -56,7 +59,7 @@ pub(super) const DATASETS: &[&str] = &[
     spawns::NPCS,
 ];
 
-pub(super) fn read() -> TestResult<[Route; 14]> {
+pub(super) fn read() -> TestResult<[Route; 15]> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("contracts.p4k");
     ArchiveBuilder::new()
@@ -93,6 +96,7 @@ pub(super) fn read() -> TestResult<[Route; 14]> {
         titles,
         sets,
         generators,
+        scenario_progress::read()?,
         mission_properties::read()?,
         flows,
         templates,

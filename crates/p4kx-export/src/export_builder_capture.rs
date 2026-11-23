@@ -36,7 +36,6 @@ pub(crate) struct BuilderCapture<'f> {
     context: Mutex<Context>,
     state: Mutex<State>,
     cancel: Option<CancelToken>,
-    root_field: Option<&'static str>,
 }
 
 impl<'f> BuilderCapture<'f> {
@@ -81,6 +80,7 @@ impl<'f> BuilderCapture<'f> {
         .with_input(input))
     }
 
+    #[cfg(test)]
     pub(crate) fn for_input_kind(
         input: &'f OriginalCatalogInput<'f, 'f>,
         kind: Kind,
@@ -97,17 +97,6 @@ impl<'f> BuilderCapture<'f> {
         .with_input(input)
     }
 
-    pub(crate) fn for_input_record_field(
-        input: &'f OriginalCatalogInput<'f, 'f>,
-        kind: Kind,
-        field: &'static str,
-        cancel: Option<&CancelToken>,
-    ) -> Self {
-        let mut capture = Self::for_input_kind(input, kind, cancel);
-        capture.root_field = Some(field);
-        capture
-    }
-
     const fn with_input(mut self, input: &'f OriginalCatalogInput<'f, 'f>) -> Self {
         self.input = Some(input);
         self
@@ -119,7 +108,6 @@ impl<'f> BuilderCapture<'f> {
             context: Mutex::new(context),
             state: Mutex::new(State::default()),
             cancel: cancel.cloned(),
-            root_field: None,
         }
     }
 
@@ -148,20 +136,14 @@ impl<'f> BuilderCapture<'f> {
         admission: &RecordObservation<'_, 'source>,
     ) -> Result<ExportLedger, CatalogError> {
         let cancel = self.cancel.as_ref();
-        match (self.input, kind, self.root_field) {
-            (Some(input), Some(kind), Some(field)) => {
-                export_field_walk::inspect_record_field(input, tree, admission, kind, field, cancel)
-            }
-            (input, kind, None) => export_field_walk::inspect_observed(
-                input,
-                tree,
-                admission,
-                kind,
-                ExportSourceRole::Dependency,
-                cancel,
-            ),
-            _ => Err(crate::ExportAccountingError::ConflictingSourceDatum.into()),
-        }
+        export_field_walk::inspect_observed(
+            self.input,
+            tree,
+            admission,
+            kind,
+            ExportSourceRole::Dependency,
+            cancel,
+        )
     }
 
     fn record(

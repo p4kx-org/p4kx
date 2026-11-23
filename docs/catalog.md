@@ -1692,15 +1692,24 @@ and separate target-header evidence. A dangling slot retains its GUID and resolu
 The game's name for the locality is its sourced `className`. Contract pickup places continue to
 use the resolved original members.
 
-**Contract scenarios (`contractScenarios`).** A `ScenarioProgress` Record. `factionRewardTiers`
-hold the authored `factionGuid`, which joins to `definitions.factions` when the row is present.
-`factionName` is the last part of the source Record path when resolved. `factionReputationGuid`
-is the independent link to `factionReputations` from that Record's `factionReputationRef`.
-The tiers also hold `pointsAsPercent` and the `progressions` (`minMultiplierThreshold`, `completionType` the name of
-the struct, `periodScenarioGuid`), each with `tiers`: `minPoints`, `badgeToAward` (an identifier;
-`null` for a tier without a badge, which the game stores as the text `None`), `globalPointsMultiplier` and
-`blueprintPoolGuids`, nominal GUIDs in `definitions.blueprintPools`. The progression texts and the multiplier rewards
-(empty on LIVE) are not exported.
+**Contract scenarios (`contractScenarios`).** Each `ScenarioProgress` Record carries the canonical
+physical header. Rows use GUID order with Record index as the tie-breaker. Read
+`factionRewardTiers.value`, `progressions.value` and `tiers.value` as ordered arrays of sourced
+slots. A null or failed slot retains its position and source state.
+
+A faction slot keeps the original `faction` Reference, including its GUID, physical target and
+resolution status. `factionName` is the last segment of the selected compatible Faction path.
+`factionReputation` is the original `factionReputationRef` of that physical Faction. Its field
+and the selecting Reference supply its origin. A missing compatible target leaves the derived
+facts absent. A wrong-family target makes those facts invalid. A failed body read is unreadable.
+
+A progression retains its sourced multiplier, `periodMissionScenario` Reference and concrete
+`completionType` from the declared scalar StrongPointer. Its `authoredFields` arena also keeps the
+original completion pointer declaration, ordered contents and references, including
+`completionTags` and additional or unrecognized members. Unsupported storage does not produce
+a scalar completion type and remains available in that arena. A reward tier keeps its original
+numeric storage and ordered `blueprintPools` References, including dangling and null slots.
+The original badge label `None` denotes no awarded badge.
 
 Contract templates are described in "Contract templates", mission broker entries in "Mission broker
 entries", ship spawns and the locations of contracts in "Ship spawns and location queries" and NPC

@@ -132,8 +132,6 @@ pub enum CatalogStage {
     ProjectMissionLocationTemplates,
     /// Reads contract generators and assembles their output rows.
     ProjectContractGenerators,
-    /// Resolves original references between mission scenarios and factions.
-    LinkMissionFactions,
     /// Projects shops and the remaining configuration tables.
     ProjectConfigurations,
     /// Projects shop definitions and inventory.
@@ -194,7 +192,6 @@ impl CatalogStage {
             Self::ProjectMissionBrokerEntries => "project-mission-broker-entries",
             Self::ProjectMissionLocationTemplates => "project-mission-location-templates",
             Self::ProjectContractGenerators => "project-contract-generators",
-            Self::LinkMissionFactions => "link-mission-factions",
             Self::ProjectConfigurations => "project-configurations",
             Self::ProjectShops => "project-shops",
             Self::ResolveJumpOperators => "resolve-jump-operators",
