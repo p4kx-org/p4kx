@@ -967,10 +967,17 @@ complete selected headers, bodies and fields, and successful dependency reads.
 | --- | ---: | ---: | ---: | ---: |
 | LIVE 13220821 | 104 | 1,091,567,616 | 1,156,431,872 | 19.399 |
 | PTU 13248297 | 106 | 1,115,308,032 | 1,077,690,368 | 21.151 |
+| PTU 13260598 | 106 | 1,114,275,840 | 1,072,050,176 | 17.566 |
 
-Both peaks were under the 2 GB query ceiling. Each worker wrote zero scratch bytes. Star
-Citizen was running during the measurements, and the operating-system file cache stayed in
-normal use. The complete same-Build Catalog is the comparison input for ordered row parity.
+Each cold query stayed below the 2 GB ceiling and wrote zero scratch bytes.
+Star Citizen was running during the measurements, and the operating-system
+file cache stayed in normal use.
+
+The ordered replay for LIVE 13220821 matched all 104 rows in the complete
+Normal Catalog from producer `300226ceeeaf522b7d9af790e8fa3698752cf575`.
+The combined SDK query and replay took 730.014 s, with peaks of 1,091,502,080
+bytes of private commit and 1,023,156,224 bytes of working set. The full
+Catalog comparison for PTU 13260598 is pending.
 
 ## Loot container-document source scope
 
