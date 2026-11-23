@@ -2,7 +2,7 @@ param(
     [Parameter(Mandatory)][string]$Directory,
     [ValidateSet('Complete','Timeout','Admission')][string]$Case='Complete',
     [ValidateRange(1000,10000)][int]$Milliseconds=3000,
-    [ValidateRange(0,1000)][int]$SnapshotWaitMilliseconds=0
+    [ValidateRange(0,1000)][int]$SnapshotWaitMilliseconds=0,[switch]$DetachedFinish
 )
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'msi-observer-evidence.ps1')
@@ -19,6 +19,28 @@ if ($Case -ceq 'Admission') { $parameters.AdmissionOnly=$true }
 Write-P4kxDetachedReceipt $invocation $parameters
 $saved = @{deadline=$env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC;actions=$env:GITHUB_ACTIONS;runner=$env:RUNNER_ENVIRONMENT;tracking=$env:RUNNER_TRACKING_ID;target=$env:P4KX_TARGET}
 $request=$null;$handle=$null
+function Invoke-ObserverFinish {
+    if ($DetachedFinish) {
+        $arguments=@('-NoLogo','-NoProfile','-NonInteractive','-File',$entry,'-Stage','StartFinish','-Directory',$observer)
+        $launched=Invoke-P4kxPortalProcess ([Environment]::ProcessPath) $arguments $root 'detached-finish-launch' -Milliseconds 4000
+        Assert-Observer ($launched.exit_code -eq 0) 'The Finish launcher or its redirected streams did not close.'
+        if ($Case -ceq 'Complete') {
+            $launch=Read-P4kxDetachedReceipt (Join-Path $observer 'finish-supervision/launch.json')
+            $supervisor=Get-Process -Id $launch.supervisor_pid
+            try {
+                Assert-Observer (-not $supervisor.HasExited -and $launch.request_sha256 -ceq $handle.request_sha256 -and
+                    $supervisor.StartTime.ToUniversalTime().Ticks -eq $launch.supervisor_started_utc_ticks -and
+                    [string]::Equals($supervisor.Path,[Environment]::ProcessPath,[StringComparison]::OrdinalIgnoreCase) -and
+                    -not [IO.File]::Exists((Join-Path $observer 'finish-supervision/result.json'))) 'The exact supervisor did not outlive the launcher and its redirected streams.'
+            } finally { $supervisor.Dispose() }
+            Write-P4kxDetachedReceipt (Join-Path $output 'observer-control-release.json') @{schema=1;role='harmless-msi-observer-release'}
+        }
+        & $entry -Stage CollectFinish -Directory $observer
+        return
+    }
+    & $entry -Stage Finish -Directory $observer -WaitMilliseconds 0
+}
+
 function Assert-Observer([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
 }
@@ -56,10 +78,28 @@ try {
         Assert-Observer (-not $checkpoint.parent.lifetime_ended -and $checkpoint.request_sha256 -ceq $handle.request_sha256 -and
             $checkpoint.journal.events -eq 2 -and $checkpoint.journal.active.Count -eq 2 -and $null -eq $checkpoint.journal.terminal -and
             $checkpoint.completed_success -eq $false -and $checkpoint.native_completion_unproven -eq $true -and $checkpoint.mutation_authority -eq $false) 'Active original journal lost identity or invented completion.'
-        Write-P4kxDetachedReceipt (Join-Path $output 'observer-control-release.json') @{schema=1;role='harmless-msi-observer-release'}
-        & $entry -Stage Finish -Directory $observer -WaitMilliseconds 0
+        if (-not $DetachedFinish) {
+            Write-P4kxDetachedReceipt (Join-Path $output 'observer-control-release.json') @{schema=1;role='harmless-msi-observer-release'}
+        }
+        Invoke-ObserverFinish
     } else {
-        Assert-ObserverRefused {& $entry -Stage Finish -Directory $observer -WaitMilliseconds 0} 'Failed or admission-only worker became complete lifecycle evidence.'
+        Assert-ObserverRefused {Invoke-ObserverFinish} 'Failed or admission-only worker became complete lifecycle evidence.'
+    }
+    if ($DetachedFinish -and $Case -ceq 'Complete') {
+        $supervision=Join-Path $observer 'finish-supervision/result.json'
+        $valid=[IO.File]::ReadAllText($supervision)
+        try {
+            foreach ($mutation in @(
+                { param($proof) $proof.supervisor_pid++ },
+                { param($proof) $proof.caller_result_sha256='f' * 64 },
+                { param($proof) $proof.observed_exit_utc=[DateTimeOffset]::UtcNow.AddMinutes(2).ToString('o') }
+            )) {
+                $changed=$valid | ConvertFrom-Json -AsHashtable -DateKind String
+                & $mutation $changed
+                [IO.File]::WriteAllText($supervision,($changed | ConvertTo-Json -Compress))
+                Assert-ObserverRefused { & $entry -Stage CollectFinish -Directory $observer } 'Wrong owner, receipt or deadline passed detached Finish.'
+            }
+        } finally { [IO.File]::WriteAllText($supervision,$valid) }
     }
     $finish=Read-P4kxDetachedReceipt (Join-Path $observer 'snapshots/09/caller-result.json')
     $finishedWrite=Read-P4kxDetachedReceipt (Join-Path $observer 'snapshots/09/writeResult-end.json')

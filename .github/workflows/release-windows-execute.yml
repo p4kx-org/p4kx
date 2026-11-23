@@ -83,7 +83,7 @@ jobs:
           .github/scripts/test-msi-snapshot-delay.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-snapshot-delay')
           .github/scripts/test-msi-snapshot-budget.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-snapshot-budget')
           foreach ($case in @('Complete','Timeout','Admission')) {
-            .github/scripts/test-msi-observer.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK ('contracts/msi-observer-'+$case.ToLowerInvariant())) -Case $case -Milliseconds 10000 -SnapshotWaitMilliseconds 250
+            .github/scripts/test-msi-observer.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK ('contracts/msi-observer-'+$case.ToLowerInvariant())) -Case $case -Milliseconds 10000 -SnapshotWaitMilliseconds 250 -DetachedFinish
           }
           .github/scripts/test-msi-diagnostics.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-diagnostics')
           .github/scripts/test-msi-diagnostic-failures.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-diagnostic-failures')
@@ -232,11 +232,25 @@ jobs:
           name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-3
           path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/*/03/*
           if-no-files-found: error
+      - name: Start the isolated original MSI Finish supervisor
+        id: msi-finish-start
+        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' }}
+        timeout-minutes: 1
+        run: .github/scripts/invoke-msi-observer.ps1 -Stage StartFinish -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer')
+      - name: Preserve original MSI Finish supervisor launch
+        if: ${{ always() && !cancelled() && steps.msi-finish-start.outcome == 'success' }}
+        timeout-minutes: 1
+        continue-on-error: true
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-finish-start
+          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/finish-supervision/launch.json
+          if-no-files-found: error
       - name: Finish the original native MSI lifecycle
         id: msi-finish
-        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' }}
+        if: ${{ always() && !cancelled() && steps.msi-finish-start.outcome == 'success' }}
         timeout-minutes: ${{ fromJSON(steps.msi-budget.outputs.observer_finish_minutes) }}
-        run: .github/scripts/invoke-msi-observer.ps1 -Stage Finish -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -WaitMilliseconds 0
+        run: .github/scripts/invoke-msi-observer.ps1 -Stage CollectFinish -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer')
       - name: Upload final original MSI lifecycle evidence
         if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' && steps.msi-finish.outcome != 'skipped' }}
         timeout-minutes: 1
@@ -246,6 +260,7 @@ jobs:
           path: |
             ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/09/*
             ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/snapshots/09/*
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/finish-supervision/*
             ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/observer-result.json
           if-no-files-found: error
       - name: Record executed release payload evidence

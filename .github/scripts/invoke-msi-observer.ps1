@@ -1,5 +1,5 @@
 param(
-    [Parameter(Mandatory)][ValidateSet('Start','Delay','Snapshot','Finish')][string]$Stage,
+    [Parameter(Mandatory)][ValidateSet('Start','Delay','Snapshot','Finish','StartFinish','CollectFinish')][string]$Stage,
     [Parameter(Mandatory)][string]$Directory,
     [string]$Invocation,
     [ValidateSet('Lifecycle','Control')][string]$Mode='Lifecycle',
@@ -27,6 +27,12 @@ if ($Stage -ceq 'Delay') {
         . (Join-Path $PSScriptRoot 'msi-observer-snapshot-delay.ps1')
         Wait-P4kxMsiCheckpoint2Delay $Directory
     } finally { Write-P4kxMsiObserverProgress delayCaller end }
+    return
+}
+if ($Stage -cin @('StartFinish','CollectFinish')) {
+    . (Join-Path $PSScriptRoot 'msi-observer-finish-control.ps1')
+    if ($Stage -ceq 'StartFinish') { Start-P4kxMsiFinishSupervision $Directory }
+    else { Read-P4kxMsiSupervisedFinish $Directory }
     return
 }
 if ($Stage -ceq 'Finish') {

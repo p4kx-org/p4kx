@@ -4,7 +4,7 @@ $ErrorActionPreference = 'Stop'
 
 function Get-P4kxMsiObserverSources {
     Get-P4kxMsiDiagnosticSources $PSScriptRoot
-    foreach ($name in @('msi-observer-request.ps1','msi-observer-process.ps1','msi-observer-evidence.ps1','msi-observer-parent.ps1','invoke-msi-observer.ps1','msi-observer-progress.ps1','msi-observer-snapshot-caller.ps1','msi-observer-snapshot-delay.ps1','msi-observer-snapshot-worker.ps1','msi-snapshot-console.ps1','msi-detached-control.ps1','msi-feedback-worker-fixture.ps1','platform-contract.ps1')) {
+    foreach ($name in @('msi-observer-request.ps1','msi-observer-process.ps1','msi-observer-finish-control.ps1','msi-observer-finish-supervisor.ps1','msi-observer-evidence.ps1','msi-observer-parent.ps1','invoke-msi-observer.ps1','msi-observer-progress.ps1','msi-observer-snapshot-caller.ps1','msi-observer-snapshot-delay.ps1','msi-observer-snapshot-worker.ps1','msi-snapshot-console.ps1','msi-detached-control.ps1','msi-feedback-worker-fixture.ps1','platform-contract.ps1')) {
         @{name=$name;sha256=(Get-P4kxDetachedDigest (Join-Path $PSScriptRoot $name))}
     }
 }

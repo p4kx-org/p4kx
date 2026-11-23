@@ -21,8 +21,8 @@ function Get-P4kxMsiCheckpoint2CaptureBudget {
     return Get-P4kxMsiSnapshotBudget $Window.sequence_deadline_utc ([int][Math]::Min($remaining,$MaximumMilliseconds)) $Now
 }
 
-function Get-P4kxMsiFinishBudget {
-    param($Request, [int]$MaximumMilliseconds, [DateTimeOffset]$Now=[DateTimeOffset]::UtcNow)
+function Get-P4kxMsiFinishCutoff {
+    param($Request, [DateTimeOffset]$Now=[DateTimeOffset]::UtcNow)
     $observer=ConvertFrom-P4kxMsiBudgetTimestamp $Request.observer_deadline_utc
     $diagnostic=ConvertFrom-P4kxMsiBudgetTimestamp $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC
     $prepared=ConvertFrom-P4kxMsiBudgetTimestamp $Request.prepared_at_utc
@@ -32,7 +32,12 @@ function Get-P4kxMsiFinishBudget {
         throw 'MSI Finish watchdog differs from the original observer allowance.'
     }
     # Leave five seconds of the existing hosted cleanup minute for caller completion.
-    $cutoff=$observer.AddSeconds(55)
+    return $observer.AddSeconds(55)
+}
+
+function Get-P4kxMsiFinishBudget {
+    param($Request, [int]$MaximumMilliseconds, [DateTimeOffset]$Now=[DateTimeOffset]::UtcNow)
+    $cutoff=Get-P4kxMsiFinishCutoff $Request $Now
     Get-P4kxMsiSnapshotBudget $cutoff.ToString('o') $MaximumMilliseconds $Now
 }
 
