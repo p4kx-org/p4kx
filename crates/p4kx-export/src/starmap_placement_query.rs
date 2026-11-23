@@ -28,9 +28,13 @@ mod coverage;
 #[path = "starmap_location_query.rs"]
 mod locations;
 
+#[path = "starmap_jump_inventory_query.rs"]
+mod jump_inventory;
+
 #[path = "starmap_object_placement_query.rs"]
 mod object_placements;
 
+pub use crate::catalog_projections::JumpConnection;
 pub use crate::catalog_read::original::{PhysicalEntryRef, SourcedXmlAttribute};
 pub use crate::catalog_table::DatasetAvailability;
 pub use crate::catalog_v3::starmap_placement::StarmapPlacement;
@@ -43,6 +47,7 @@ pub use crate::location_physics::{
     read_location_physics_descriptor,
 };
 pub use crate::starmap_containers::instance::{ContainerInstance, ContainerInstanceKey};
+pub use crate::starmap_containers::jump_endpoint::JumpEndpoint;
 pub use crate::starmap_containers::unresolved::{
     ContainerTargetReadStatus, ContainerTargetStatus, UnresolvedChild, UnresolvedContainerLink,
 };
@@ -56,6 +61,9 @@ pub use definitions::{
     with_starmap_definitions_from,
 };
 
+pub use jump_inventory::{
+    JumpConnectionInventory, JumpInventoryCoverage, JumpInventorySnapshot, read_jump_inventory,
+};
 pub use locations::{
     AreaEntity, ChildLocation, EntXmlCandidate, EntXmlDocument, EntXmlLink, HarvestableComponent,
     HcdAttribute, HcdDocument, HcdLink, HcdSelectionFailure, LocationAttribute, LocationInstance,

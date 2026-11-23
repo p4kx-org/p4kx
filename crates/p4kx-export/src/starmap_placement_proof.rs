@@ -4,6 +4,7 @@
 use std::iter;
 use std::sync::Arc;
 
+use p4kx_assembly::is_external_child_value;
 use p4kx_extraction::{
     Guid, SharedFieldOrigin, SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue,
 };
@@ -49,6 +50,11 @@ impl ChildOrigins {
                     guid: ChildText::read(xml, child, "guid")?,
                     class_guid: ChildText::read(xml, child, "classGuid")?,
                     external: xml.attribute_source(child, "external")?,
+                    unusable_external_name: (attribute(child, "external")
+                        .is_some_and(is_external_child_value)
+                        && attribute(child, "name").is_none_or(str::is_empty))
+                    .then(|| xml.attribute_source(child, "name"))
+                    .transpose()?,
                 }))
             } else {
                 None
@@ -61,6 +67,14 @@ impl ChildOrigins {
             return Err(crate::ExportAccountingError::ConflictingSourceDatum.into());
         };
         fields.external.observe(SourceUseRole::Selector)
+    }
+
+    pub(crate) fn unusable_external_name(&self) -> Result<Option<SourceUse>, CatalogError> {
+        self.jump_fields
+            .as_ref()
+            .and_then(|fields| fields.unusable_external_name.as_ref())
+            .map(|name| name.observe(SourceUseRole::Selector))
+            .transpose()
     }
 
     pub(crate) fn record_selector(&self) -> Result<SourceUse, CatalogError> {
@@ -88,6 +102,7 @@ struct JumpFields {
     guid: ChildText,
     class_guid: ChildText,
     external: XmlAttributeSource,
+    unusable_external_name: Option<XmlAttributeSource>,
 }
 
 #[derive(Debug)]

@@ -26806,7 +26806,10 @@
       ],
       "type": "object"
     },
-    "JumpConnection": false,
+    "JumpConnection": {
+      "description": "The row type of the authored relationship inventory.",
+      "not": {}
+    },
     "JumpDrive": {
       "description": "Stored settings of one item-side jump drive component.",
       "properties": {
@@ -27032,6 +27035,7 @@
       "type": "object"
     },
     "JumpEndpoint": {
+      "description": "One physical Child occurrence of an original jump endpoint.",
       "properties": {
         "container": {
           "$ref": "#/$defs/SourcedValueOfPhysicalEntryRef"

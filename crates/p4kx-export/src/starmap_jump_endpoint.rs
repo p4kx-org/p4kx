@@ -20,10 +20,11 @@ use crate::starmap_containers::proof::{ChildOrigins, PlacementStep};
 use crate::starmap_transform::Transform;
 use crate::starmap_xml::AuthoredPose;
 
+/// One physical Child occurrence of an original jump endpoint.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct JumpEndpoint {
+pub struct JumpEndpoint {
     #[serde(flatten)]
     route: EndpointRoute,
     #[serde(flatten)]
@@ -88,6 +89,24 @@ pub(crate) struct GateResolution {
 }
 
 impl JumpEndpoint {
+    /// Physical system root and complete Child route of this endpoint.
+    #[must_use]
+    pub const fn instance_id(&self) -> &SourcedValue<ContainerInstanceKey> {
+        &self.route.instance_id
+    }
+
+    /// Physical DataForge index of the Starmap object classifying this endpoint.
+    #[must_use]
+    pub const fn starmap_record_index(&self) -> &SourcedValue<u32> {
+        &self.route.starmap_record_index
+    }
+
+    /// Original annotation of the inspected partner declaration scope.
+    #[must_use]
+    pub const fn declared_partner(&self) -> &SourcedValue<CatalogGuid> {
+        &self.declared_partner
+    }
+
     pub(super) fn with_operating(
         mut self,
         resolver: &mut OperatingResolver<'_, '_, '_>,
@@ -96,7 +115,7 @@ impl JumpEndpoint {
         Ok(self)
     }
 
-    pub(super) fn partner_scope_complete(&self) -> bool {
+    pub(crate) fn partner_scope_complete(&self) -> bool {
         self.declared_partner.origin().source_set_complete()
     }
 }
@@ -169,7 +188,14 @@ impl JumpOccurrence<'_> {
                 .retain_in(capture)?
                 .into_cell(sources)
                 .map(|value| value.as_str().to_owned()),
-            None => sources.value(SourceValue::Absent, inputs, complete),
+            None => match self.child.unusable_external_name()? {
+                Some(name) => sources.value(
+                    SourceValue::Invalid,
+                    &[self.child.external_selector()?, name],
+                    complete,
+                ),
+                None => sources.value(SourceValue::Absent, inputs, complete),
+            },
         };
         Ok(EndpointRoute {
             instance_id: sources.value_with_shared_origin(

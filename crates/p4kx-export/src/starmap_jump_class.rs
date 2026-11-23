@@ -40,6 +40,7 @@ impl JumpEndpointRecords {
         };
         let mut tree_builder = TreeBuilder::new();
         let mut types = HashMap::new();
+        let rule = Kind::StarmapObjects.records();
         for record in forge.records() {
             if options.cancel.is_some_and(CancelToken::is_cancelled) {
                 return Err(CatalogError::Cancelled);
@@ -48,11 +49,16 @@ impl JumpEndpointRecords {
                 endpoints.complete = false;
                 continue;
             };
-            if !Kind::StarmapObjects
-                .records()
-                .selects(path, record.type_name().unwrap_or_default())
+            if !rule.matches_path(path)
                 || options.filter.is_some_and(|filter| !filter.matches(path))
             {
+                continue;
+            }
+            let Ok(source_type) = record.type_name() else {
+                endpoints.complete = false;
+                continue;
+            };
+            if source_type != rule.type_name {
                 continue;
             }
             let Ok(tree) = tree_builder.build(&record) else {
@@ -71,28 +77,39 @@ impl JumpEndpointRecords {
                         endpoint_class(forge, input, key, &mut tree_builder, options.cancel)?,
                     ),
                 };
-            match class {
-                SourceValue::Present((name, type_source)) => {
-                    if forge.records_by_guid(record.guid()).nth(1).is_some() {
-                        endpoints.complete = false;
-                        continue;
-                    }
-                    endpoints.records.insert(
-                        record.guid(),
-                        EndpointClass::read(
-                            input,
-                            &record,
-                            &tree,
-                            (name, type_source),
-                            options.cancel,
-                        )?,
-                    );
-                }
-                SourceValue::Invalid | SourceValue::Unreadable => endpoints.complete = false,
-                _ => {}
-            }
+            endpoints.remember_record(forge, input, &record, &tree, class, options.cancel)?;
         }
         Ok(endpoints)
+    }
+
+    fn remember_record(
+        &mut self,
+        forge: &DataForge<'_>,
+        input: &OriginalCatalogInput<'_, '_>,
+        record: &Record<'_>,
+        tree: &RecordTree<'_>,
+        class: &SourceValue<(&'static str, SourceUse)>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(), CatalogError> {
+        match class {
+            SourceValue::Present((name, type_source)) => {
+                if forge.records_by_guid(record.guid()).nth(1).is_some() {
+                    self.complete = false;
+                    return Ok(());
+                }
+                self.records.insert(
+                    record.guid(),
+                    EndpointClass::read(input, record, tree, (name, type_source), cancel)?,
+                );
+            }
+            SourceValue::Invalid | SourceValue::Unreadable => self.complete = false,
+            _ => {}
+        }
+        Ok(())
+    }
+
+    pub(crate) const fn is_complete(&self) -> bool {
+        self.complete
     }
 
     pub(crate) fn get(&self, guid: Guid) -> Option<&EndpointClass> {

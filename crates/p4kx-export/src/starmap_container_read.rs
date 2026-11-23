@@ -30,6 +30,7 @@ enum PlacementStorage<'directory> {
     Harvest(&'directory HarvestSurvey<'directory>),
     OpenedContainers,
     Object(Guid),
+    JumpEndpoints,
 }
 
 impl PlacementStorage<'_> {
@@ -38,6 +39,9 @@ impl PlacementStorage<'_> {
             Self::Harvest(_) => DescriptorScope::Harvest,
             Self::OpenedContainers | Self::Object(_) => DescriptorScope::OpenedContainers,
             Self::Spool(_) => DescriptorScope::Catalog { jump_endpoints },
+            Self::JumpEndpoints => DescriptorScope::Catalog {
+                jump_endpoints: true,
+            },
             #[cfg(test)]
             Self::Typed => DescriptorScope::Catalog { jump_endpoints },
         }
@@ -148,19 +152,49 @@ impl Placements {
         )
     }
 
-    fn empty_inventory(archive: &Archive, endpoint_inventory_complete: bool) -> Self {
-        Self {
+    pub(crate) fn read_for_jump_endpoints(
+        archive: &Archive,
+        cancel: Option<&CancelToken>,
+        limits: Limits,
+        capture: &EntryCapture<'_>,
+        scope: PlacementScope,
+        endpoints: &JumpEndpointRecords,
+    ) -> Result<Self, CatalogError> {
+        Self::read_scoped(
+            archive,
+            cancel,
+            limits,
+            capture,
+            scope,
+            Some(endpoints),
+            PlacementStorage::JumpEndpoints,
+        )
+    }
+
+    fn empty_inventory(
+        archive: &Archive,
+        capture: &EntryCapture<'_>,
+        endpoints: Option<&JumpEndpointRecords>,
+        directory_complete: bool,
+    ) -> Result<Self, CatalogError> {
+        if endpoints.is_some() {
+            capture
+                .source_uses()
+                .observe_root_directory_paths(archive)?;
+        }
+        Ok(Self {
             instance_availability: Some(DatasetAvailability::Absent),
             spools: PlacementSpools {
                 location_physics_availability: Some(crate::location_physics::stage::availability(
-                    grid_directory_complete(archive),
+                    directory_complete,
                     false,
                 )),
                 ..PlacementSpools::default()
             },
-            endpoint_inventory_complete,
+            endpoint_inventory_complete: directory_complete
+                && endpoints.is_some_and(|records| records.complete),
             ..Self::default()
-        }
+        })
     }
 
     fn read_scoped(
@@ -176,11 +210,9 @@ impl Placements {
         let started = Instant::now();
         let index = Index::new(archive);
         let systems = index.systems();
+        let directory_complete = grid_directory_complete(archive);
         if systems.is_empty() && matches!(scope, PlacementScope::ArchiveInventory) {
-            return Ok(Self::empty_inventory(
-                archive,
-                endpoints.is_some_and(|records| records.complete),
-            ));
+            return Self::empty_inventory(archive, capture, endpoints, directory_complete);
         }
         let system_count = systems.len();
         let mut root_ledger = ExportLedger::default();
@@ -226,7 +258,7 @@ impl Placements {
         };
         placements.finish(&index, system_count, read, scope, (archive, capture))?;
         placements.endpoint_inventory_complete =
-            placements.has_complete_endpoints(routes_complete, endpoints);
+            directory_complete && placements.has_complete_endpoints(routes_complete, endpoints);
         placements.report.elapsed = started.elapsed();
         Ok(placements)
     }

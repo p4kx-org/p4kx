@@ -85,6 +85,8 @@ mod item_durability;
 mod item_recovery;
 #[path = "sdk_jump_configuration_routes.rs"]
 mod jump_configurations;
+#[path = "sdk_jump_inventory_routes.rs"]
+mod jump_inventory;
 #[path = "sdk_law_route.rs"]
 mod law;
 #[path = "sdk_loadout_route.rs"]
@@ -258,6 +260,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         starmap_object_placement::read()?,
     ];
     routes.extend(archive_source::read()?);
+    routes.extend(jump_inventory::read()?);
     append_domain_routes(&mut routes, &archive)?;
     Ok(routes)
 }

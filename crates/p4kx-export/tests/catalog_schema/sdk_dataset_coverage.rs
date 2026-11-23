@@ -154,7 +154,30 @@ impl Route {
         if rows.is_empty() {
             return Err(format!("SDK witness returned no row for {dataset}").into());
         }
-        Ok(Self {
+        Ok(Self::with_row_schema::<Row>(dataset, remaining.into()))
+    }
+
+    fn queried_uninhabited_rows<Row: JsonSchema + serde::Serialize>(
+        dataset: &'static str,
+        rows: &[Row],
+        remaining: &'static str,
+    ) -> TestResult<Self> {
+        let route = Self::with_row_schema::<Row>(dataset, Some(remaining));
+        let row = super::super::schema_navigation::schema_at(&route.schema, "/[]")?;
+        if !rows.is_empty() || (row != &Value::Bool(false) && row != &json!({"not": {}})) {
+            return Err(format!(
+                "SDK availability witness requires an uninhabited row schema for {dataset}"
+            )
+            .into());
+        }
+        Ok(route)
+    }
+
+    fn with_row_schema<Row: JsonSchema + serde::Serialize>(
+        dataset: &'static str,
+        remaining: Option<&'static str>,
+    ) -> Self {
+        Self {
             dataset,
             schema: schemars::generate::SchemaSettings::draft2020_12()
                 .for_serialize()
@@ -162,8 +185,8 @@ impl Route {
                 .into_generator()
                 .into_root_schema_for::<Vec<Row>>()
                 .to_value(),
-            remaining: remaining.into(),
-        })
+            remaining,
+        }
     }
 }
 
@@ -291,6 +314,8 @@ const REQUIRED_WITNESSES: &[&str] = &[
     LOOT_DOCUMENTS,
     UNRESOLVED,
     "/placements/starmapPlacements",
+    "/placements/jumpEndpoints",
+    "/projections/jumpConnections",
 ];
 
 #[test]

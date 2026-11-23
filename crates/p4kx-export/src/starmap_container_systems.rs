@@ -45,46 +45,65 @@ pub(super) fn walk_systems(
             systems,
             cancel,
             limits,
-            (archive, capture),
+            (archive, capture, None),
             || PlacementRows::Harvest(harvest),
         ),
-        PlacementStorage::OpenedContainers => walk_descriptor_systems(
-            index,
-            bodies,
-            systems,
-            cancel,
-            limits,
-            (archive, capture),
-            || PlacementRows::OpenedContainers,
-        ),
+        PlacementStorage::OpenedContainers | PlacementStorage::JumpEndpoints => {
+            walk_descriptor_systems(
+                index,
+                bodies,
+                systems,
+                cancel,
+                limits,
+                (archive, capture, endpoints),
+                || PlacementRows::OpenedContainers,
+            )
+        }
         PlacementStorage::Object(guid) => walk_descriptor_systems(
             index,
             bodies,
             systems,
             cancel,
             limits,
-            (archive, capture),
+            (archive, capture, None),
             || PlacementRows::Object(guid),
         ),
         #[cfg(test)]
-        PlacementStorage::Typed => {
-            let reads = systems
-                .par_iter()
-                .map(|(name, entry)| {
-                    System::run(
-                        index,
-                        bodies,
-                        name,
-                        *entry,
-                        cancel,
-                        limits,
-                        (archive, capture, endpoints),
-                    )
-                })
-                .collect::<Result<_, _>>()?;
-            Ok((reads, PlacementSpools::default()))
-        }
+        PlacementStorage::Typed => walk_typed_systems(
+            index,
+            bodies,
+            systems,
+            cancel,
+            limits,
+            (archive, capture, endpoints),
+        ),
     }
+}
+
+#[cfg(test)]
+fn walk_typed_systems(
+    index: &Index<'_>,
+    bodies: &HashMap<usize, Body>,
+    systems: &[(Arc<str>, usize)],
+    cancel: Option<&CancelToken>,
+    limits: Limits,
+    (archive, capture, endpoints): (&Archive, &EntryCapture<'_>, Option<&JumpEndpointRecords>),
+) -> Result<(Vec<SystemRead>, PlacementSpools), CatalogError> {
+    let reads = systems
+        .par_iter()
+        .map(|(name, entry)| {
+            System::run(
+                index,
+                bodies,
+                name,
+                *entry,
+                cancel,
+                limits,
+                (archive, capture, endpoints),
+            )
+        })
+        .collect::<Result<_, _>>()?;
+    Ok((reads, PlacementSpools::default()))
 }
 
 fn walk_descriptor_systems<'a>(
@@ -93,7 +112,11 @@ fn walk_descriptor_systems<'a>(
     systems: &[(Arc<str>, usize)],
     cancel: Option<&'a CancelToken>,
     limits: Limits,
-    (archive, capture): (&'a Archive, &'a EntryCapture<'a>),
+    (archive, capture, endpoints): (
+        &'a Archive,
+        &'a EntryCapture<'a>,
+        Option<&'a JumpEndpointRecords>,
+    ),
     rows: impl Fn() -> PlacementRows<'a>,
 ) -> Result<(Vec<SystemRead>, PlacementSpools), CatalogError> {
     let reads = systems
@@ -106,7 +129,7 @@ fn walk_descriptor_systems<'a>(
                 *entry,
                 cancel,
                 limits,
-                (archive, capture, None, rows()),
+                (archive, capture, endpoints, rows()),
             )
         })
         .collect::<Result<_, _>>()?;

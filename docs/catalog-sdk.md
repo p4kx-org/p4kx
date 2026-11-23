@@ -2032,6 +2032,21 @@ with a conclusive result has one canonical row, including any absent placement f
 An unresolved input has no row and keeps its Record or traversal coverage. The caller
 may provide a `StarmapTraversalBudget`; exhausted allowances require an unresolved result.
 
+## Jump endpoint inventory
+
+Use `starmap::read_jump_inventory` for `placements.jumpEndpoints` and
+`projections.jumpConnections`. It keeps each physical endpoint in canonical system and
+Child order. Use the root Entry index, Child ordinals, and external-step positions from
+`JumpEndpoint::instance_id` to identify an occurrence, including repeated placements
+that share a Record and world position.
+
+The query checks every admitted system root and reads the Starmap classification,
+container descriptors, and original operating Entity dependencies. The snapshot
+keeps observed endpoints and coverage when some sources are unavailable. Both tables
+share the returned source inventory. The relationship table currently has an
+uninhabited row type. Its availability reports surveyed absence of authored partners
+or an unavailable result when the required endpoint or partner scope is incomplete.
+
 ## Starmap container placements
 
 Use `starmap::read_container_placements` to read the canonical `placements.containerInstances` and

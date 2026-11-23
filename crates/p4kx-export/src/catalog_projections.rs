@@ -22,12 +22,14 @@ pub(crate) mod ship_base_facts;
 #[path = "weapon_reload.rs"]
 pub(crate) mod weapon_reload;
 
+/// The row type of the authored relationship inventory.
 #[derive(Debug, Serialize, JsonSchema)]
+#[non_exhaustive]
 #[expect(
     clippy::empty_enums,
     reason = "the scoped relationship inventory has no proven authored row format"
 )]
-pub(crate) enum JumpConnection {}
+pub enum JumpConnection {}
 
 /// Explicit choices and derived values, separate from authored definitions.
 #[derive(Debug, Serialize, JsonSchema)]

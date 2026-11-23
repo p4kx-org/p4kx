@@ -67,14 +67,21 @@ impl System<'_> {
         origins: &ChildOrigins,
     ) -> Result<GateResolution, CatalogError> {
         let Some(target) = &child.external else {
+            let mut proof = vec![origins.external_selector()?];
+            let (gate, candidates, complete) = origins.unusable_external_name()?.map_or_else(
+                || (SourceValue::Absent, SourceValue::Absent, true),
+                |name| {
+                    proof.push(name);
+                    (SourceValue::Invalid, SourceValue::Invalid, false)
+                },
+            );
             return Ok(GateResolution {
-                gate: SourceValue::Absent,
-                candidates: self.capture.source_uses().value(
-                    SourceValue::Absent,
-                    &[origins.external_selector()?],
-                    true,
-                ),
-                proof: vec![origins.external_selector()?],
+                gate,
+                candidates: self
+                    .capture
+                    .source_uses()
+                    .value(candidates, &proof, complete),
+                proof,
             });
         };
         let (mut proof, complete) = target.selector_inputs()?;
