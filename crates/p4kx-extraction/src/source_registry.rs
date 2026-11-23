@@ -22,7 +22,7 @@ use crate::source_use::{
     InputScope, LocationView, SourceLocation, SourceUse, SourceUseDescription, SourceUseRef,
     SourceUseRole,
 };
-use crate::source_use_ref_encoding::{self, CoordinateEncoding};
+use crate::source_use_ref_encoding::{CoordinateEncoding, UseReferences};
 use crate::source_value::{SourceValue, SourcedValue};
 
 #[path = "source_registered_uses.rs"]
@@ -52,60 +52,6 @@ pub(crate) struct SourceRegistry {
     pub(crate) uses: RegisteredUses,
     use_references: UseReferences,
     sealed: bool,
-}
-
-enum UseReferences {
-    Full,
-    CompactOrdinals(CompactUseRefs),
-    CompactCoordinates(CoordinateEncoding),
-}
-
-#[derive(Default)]
-struct CompactUseRefs {
-    aliases: HashMap<SourceUseRef, SourceUseRef>,
-    batch: Option<u64>,
-}
-
-impl UseReferences {
-    fn reference(
-        &mut self,
-        source: &PhysicalSourceRef,
-        scope: InputScope,
-        role: SourceUseRole,
-        location: LocationView<'_>,
-    ) -> (SourceUseRef, Option<usize>) {
-        if let Self::CompactCoordinates(encoding) = self {
-            return (
-                source_use_ref_encoding::encode_with(*encoding, source, scope, role, location),
-                None,
-            );
-        }
-        let source = source.as_str();
-        let location = location.key();
-        let id = SourceUseRef::registered(format!(
-            "u{}:{source}:{}:{}:{location}",
-            source.len(),
-            scope.key(),
-            role.key()
-        ));
-        let Self::CompactOrdinals(compact) = self else {
-            let location_start = id.as_str().len() - location.len();
-            return (id, Some(location_start));
-        };
-        let ordinal = compact.aliases.len();
-        let batch = compact.batch;
-        let id = compact
-            .aliases
-            .entry(id)
-            .or_insert_with(|| {
-                SourceUseRef::registered(batch.map_or_else(
-                    || format!("u{ordinal}"),
-                    |batch| format!("u{batch}.{ordinal}"),
-                ))
-            })
-            .clone();
-        (id, None)
-    }
 }
 
 impl SourceRegistry {
@@ -138,10 +84,7 @@ impl SourceRegistry {
     }
 
     pub(crate) fn with_compact_use_refs(identity: Arc<()>) -> Self {
-        Self::with_references(
-            identity,
-            UseReferences::CompactOrdinals(CompactUseRefs::default()),
-        )
+        Self::with_references(identity, UseReferences::ordinal())
     }
 
     pub(crate) const fn with_compact_coordinates(identity: Arc<()>) -> Self {
@@ -159,28 +102,11 @@ impl SourceRegistry {
     }
 
     pub(crate) fn with_batched_use_refs(identity: Arc<()>) -> Self {
-        Self::with_references(
-            identity,
-            UseReferences::CompactOrdinals(CompactUseRefs {
-                batch: Some(0),
-                ..CompactUseRefs::default()
-            }),
-        )
+        Self::with_references(identity, UseReferences::batched())
     }
 
     pub(crate) fn take_use_batch(&mut self) -> std::io::Result<RegisteredUses> {
-        let UseReferences::CompactOrdinals(compact) = &mut self.use_references else {
-            return Err(std::io::Error::other(
-                "source inventory does not support batches",
-            ));
-        };
-        compact.batch = Some(
-            compact
-                .batch
-                .and_then(|batch| batch.checked_add(1))
-                .ok_or_else(|| std::io::Error::other("origin batch index exceeds u64"))?,
-        );
-        compact.aliases.clear();
+        self.use_references.advance_batch()?;
         Ok(std::mem::take(&mut self.uses))
     }
 
