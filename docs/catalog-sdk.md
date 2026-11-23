@@ -956,6 +956,22 @@ The convenience rows follow the selected harvestable presets and Entities.
 projection. Use the original definitions for authored values, reference
 dispositions and field-level provenance.
 
+### Installed query memory
+
+On Windows AMD64, a separate fresh process queried all admitted slot presets for each
+Build using one Rayon worker and a clean profile. The harness at source revision
+`fb86aff58bd10574cb9429acf016cd66399511e4` checked Build identity, available projection,
+complete selected headers, bodies and fields, and successful dependency reads.
+
+| Build | Projected rows | Peak private commit (bytes) | Peak working set (bytes) | Elapsed (s) |
+| --- | ---: | ---: | ---: | ---: |
+| LIVE 13220821 | 104 | 1,091,567,616 | 1,156,431,872 | 19.399 |
+| PTU 13248297 | 106 | 1,115,308,032 | 1,077,690,368 | 21.151 |
+
+Both peaks were under the 2 GB query ceiling. Each worker wrote zero scratch bytes. Star
+Citizen was running during the measurements, and the operating-system file cache stayed in
+normal use. The complete same-Build Catalog is the comparison input for ordered row parity.
+
 ## Loot container-document source scope
 
 Catalog v3 `declarations.lootEntityContainerDocuments` retains original attribute sites only from
