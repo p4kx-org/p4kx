@@ -8,9 +8,27 @@ use std::marker::PhantomData;
 use serde::de::{self, DeserializeSeed, IgnoredAny, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer};
 
+#[path = "real_archive_catalog_replay_references.rs"]
+mod references;
+
+pub(super) use references::{Observed, References};
+
 pub(super) struct Inventory {
     sources: u64,
     uses: HashMap<Box<str>, UseFacts>,
+    variant_sets: HashMap<u32, VariantSet>,
+}
+
+struct VariantSet {
+    references: Vec<Box<str>>,
+    observed: Observed,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct VariantSetRow {
+    id: u32,
+    source_uses_refs: Vec<Box<str>>,
 }
 
 #[derive(Clone, Copy)]
@@ -66,8 +84,36 @@ enum Location {
 }
 
 impl Inventory {
-    pub(super) fn get(&self, id: &str) -> Option<UseFacts> {
-        self.uses.get(id).copied()
+    pub(super) fn variant_contributors(
+        &self,
+        shared: Option<u32>,
+        local: &[Box<str>],
+    ) -> Result<Observed, &'static str> {
+        let observed = references::contributors(&self.uses, local)?;
+        let Some(id) = shared else {
+            return Ok(observed);
+        };
+        let shared = self
+            .variant_sets
+            .get(&id)
+            .ok_or("missing variant source-use set")?;
+        for reference in local {
+            if shared.references.binary_search(reference).is_ok() {
+                return Err("variant local and pooled source-use references overlap");
+            }
+        }
+        Ok(observed.merge(shared.observed))
+    }
+
+    pub(super) fn check_variant_attempts(
+        &self,
+        references: &[Box<str>],
+    ) -> Result<(), &'static str> {
+        references::check_attempts(&self.uses, references)
+    }
+
+    pub(super) fn variant_set_count(&self) -> usize {
+        self.variant_sets.len()
     }
 
     pub(super) fn counts(&self) -> (u64, u64) {
@@ -117,6 +163,7 @@ impl<'de> Visitor<'de> for InventoryVisitor {
     fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<Inventory, A::Error> {
         let mut sources = None;
         let mut uses = None;
+        let mut variant_sets = None;
         while let Some(field) = map.next_key::<String>()? {
             match field.as_str() {
                 "sources" if sources.is_none() => {
@@ -133,7 +180,25 @@ impl<'de> Visitor<'de> for InventoryVisitor {
                     map.next_value_seed(FoldRows::new(|row: UseRow| builder.insert(index, row)))?;
                     uses = Some(builder.finish().map_err(de::Error::custom)?);
                 }
-                "sources" | "uses" => {
+                "variantSourceUseSets" if variant_sets.is_none() => {
+                    let uses = uses.as_ref().ok_or_else(|| {
+                        de::Error::custom("source uses must precede variant sets")
+                    })?;
+                    let mut sets = HashMap::new();
+                    map.next_value_seed(FoldRows::new(|row: VariantSetRow| {
+                        let observed = references::contributors(uses, &row.source_uses_refs)?;
+                        let set = VariantSet {
+                            references: row.source_uses_refs,
+                            observed,
+                        };
+                        if sets.insert(row.id, set).is_some() {
+                            return Err("duplicate variant source-use set ID");
+                        }
+                        Ok(())
+                    }))?;
+                    variant_sets = Some(sets);
+                }
+                "sources" | "uses" | "variantSourceUseSets" => {
                     return Err(de::Error::custom("duplicate provenance inventory"));
                 }
                 _ => {
@@ -147,6 +212,7 @@ impl<'de> Visitor<'de> for InventoryVisitor {
                 .0
                 .len() as u64,
             uses: uses.ok_or_else(|| de::Error::missing_field("uses"))?,
+            variant_sets: variant_sets.unwrap_or_default(),
         })
     }
 }

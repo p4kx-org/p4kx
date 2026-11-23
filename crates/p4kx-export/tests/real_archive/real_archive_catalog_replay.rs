@@ -5,6 +5,7 @@ use std::env;
 use std::io::{self, BufReader, Read};
 use std::path::PathBuf;
 
+use p4kx_extraction::Checksum;
 use sha2::{Digest, Sha256};
 
 use super::artifact;
@@ -35,10 +36,12 @@ fn replay_completed_catalog_provenance_and_sections() -> TestResult {
     let first = artifact::read_completed(&directory, |input| index(input))?;
     let second = artifact::read_completed(&directory, |input| verify(input, &first, &binding))?;
     support::print_line(&format!(
-        "catalog replay decodedBytes={} physicalSources={} sourceUses={} rows={} sections={}",
+        "catalog replay decodedBytes={} decodedSha256={} physicalSources={} sourceUses={} variantSourceUseSets={} rows={} sections={}",
         first.sections.decoded_bytes,
+        Checksum::Sha256(first.digest).hex(),
         first.sections.physical_sources,
         first.sections.source_uses,
+        first.pass.inventory.variant_set_count(),
         serde_json::to_string(&second)?,
         serde_json::to_string(&first.sections.sections)?
     ));

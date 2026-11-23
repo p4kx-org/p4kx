@@ -4,10 +4,10 @@
 use std::fmt;
 use std::io::Read;
 
-use serde::de::{self, DeserializeSeed, MapAccess, SeqAccess, Visitor};
+use serde::de::{self, DeserializeSeed, IgnoredAny, MapAccess, SeqAccess, Visitor};
 use serde::{Deserialize, Deserializer, Serialize};
 
-use super::inventory::{Encryption, Inventory};
+use super::inventory::{Encryption, Inventory, Observed, References};
 
 #[derive(Debug, Default, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -67,6 +67,8 @@ enum Shape {
     Document,
     Definitions,
     Placements,
+    Provenance,
+    Variant,
     Table(Table),
     Rows(Table),
     Value,
@@ -78,6 +80,8 @@ impl Shape {
             (Self::Document, "items") => Self::Rows(Table::Items),
             (Self::Document, "definitions") => Self::Definitions,
             (Self::Document, "placements") => Self::Placements,
+            (Self::Document, "provenance") => Self::Provenance,
+            (_, "variantOf") => Self::Variant,
             (Self::Definitions, "items") => Self::Table(Table::ItemDefinitions),
             (Self::Definitions, "blueprints") => Self::Table(Table::BlueprintDefinitions),
             (Self::Placements, "containerInstances") => Self::Table(Table::ContainerInstances),
@@ -106,7 +110,7 @@ impl<'de> DeserializeSeed<'de> for Node<'_> {
 
     fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<(), D::Error> {
         match self.shape {
-            Shape::Value => deserializer.deserialize_any(self),
+            Shape::Value | Shape::Variant => deserializer.deserialize_any(self),
             Shape::Rows(_) => deserializer.deserialize_seq(self),
             _ => deserializer.deserialize_map(self),
         }
@@ -122,6 +126,7 @@ impl<'de> Visitor<'de> for Node<'_> {
 
     fn visit_map<A: MapAccess<'de>>(self, mut map: A) -> Result<(), A::Error> {
         let mut cell = Cell::default();
+        let mut variant = VariantReferences::default();
         let mut availability = None;
         let mut rows = false;
         while let Some(field) = map.next_key::<String>()? {
@@ -134,9 +139,25 @@ impl<'de> Visitor<'de> for Node<'_> {
                 "sourceSetComplete" => {
                     set(&mut cell.complete, map.next_value()?, "sourceSetComplete")?;
                 }
+                "sourceUsesRefs" if matches!(self.shape, Shape::Variant) => {
+                    set(&mut variant.local, map.next_value()?, "sourceUsesRefs")?;
+                }
+                "sourceUseSetRef" if matches!(self.shape, Shape::Variant) => {
+                    set(&mut variant.shared, map.next_value()?, "sourceUseSetRef")?;
+                }
+                "failedSourceUseRefs" if matches!(self.shape, Shape::Variant) => {
+                    set(
+                        &mut variant.attempts,
+                        map.next_value()?,
+                        "failedSourceUseRefs",
+                    )?;
+                }
+                "variantSourceUseSets" if matches!(self.shape, Shape::Provenance) => {
+                    map.next_value::<IgnoredAny>()?;
+                }
                 "sourceUsesRefs" => set(
                     &mut cell.references,
-                    map.next_value_seed(References(self.inventory))?,
+                    map.next_value_seed(References::new(self.inventory))?,
                     "sourceUsesRefs",
                 )?,
                 "availability" if matches!(self.shape, Shape::Table(_)) => {
@@ -161,6 +182,9 @@ impl<'de> Visitor<'de> for Node<'_> {
             if !rows {
                 return Err(de::Error::missing_field("rows"));
             }
+        }
+        if matches!(self.shape, Shape::Variant) {
+            cell.references = variant.resolve(self.inventory).map_err(de::Error::custom)?;
         }
         if cell.check().map_err(de::Error::custom)? {
             increment(&mut self.counts.sourced_cells)?;
@@ -223,7 +247,7 @@ impl Cell {
         let complete = match (self.encrypted, self.complete, self.references) {
             (None, None, None) => return Ok(false),
             (Some(encrypted), Some(complete), Some(references)) => {
-                if complete && references.opaque {
+                if complete && references.has_opaque() {
                     return Err("complete source set contains an opaque coordinate");
                 }
                 if encrypted != references.marker(complete) {
@@ -238,66 +262,28 @@ impl Cell {
 }
 
 #[derive(Default)]
-struct Observed {
-    encrypted: bool,
-    unknown: bool,
-    opaque: bool,
+struct VariantReferences {
+    local: Option<Vec<Box<str>>>,
+    shared: Option<SharedSetRef>,
+    attempts: Option<Vec<Box<str>>>,
 }
 
-impl Observed {
-    const fn marker(&self, complete: bool) -> Encryption {
-        if self.encrypted {
-            Encryption::Encrypted
-        } else if complete && !self.unknown {
-            Encryption::Unencrypted
-        } else {
-            Encryption::Unknown
+#[derive(Deserialize)]
+#[serde(transparent)]
+struct SharedSetRef(Option<u32>);
+
+impl VariantReferences {
+    fn resolve(self, inventory: &Inventory) -> Result<Option<Observed>, &'static str> {
+        if let Some(attempts) = self.attempts {
+            inventory.check_variant_attempts(&attempts)?;
         }
-    }
-}
-
-struct References<'inventory>(&'inventory Inventory);
-
-impl<'de> DeserializeSeed<'de> for References<'_> {
-    type Value = Observed;
-
-    fn deserialize<D: Deserializer<'de>>(self, deserializer: D) -> Result<Observed, D::Error> {
-        deserializer.deserialize_seq(self)
-    }
-}
-
-impl<'de> Visitor<'de> for References<'_> {
-    type Value = Observed;
-
-    fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("a sorted source-use reference array")
-    }
-
-    fn visit_seq<A: SeqAccess<'de>>(self, mut sequence: A) -> Result<Observed, A::Error> {
-        let mut observed = Observed::default();
-        let mut previous: Option<Box<str>> = None;
-        while let Some(id) = sequence.next_element::<Box<str>>()? {
-            if previous
-                .as_deref()
-                .is_some_and(|previous| previous >= id.as_ref())
-            {
-                return Err(de::Error::custom(
-                    "source-use references must be sorted and unique",
-                ));
-            }
-            let facts = self
-                .0
-                .get(&id)
-                .ok_or_else(|| de::Error::custom("missing contributing source use"))?;
-            if !facts.contributes() {
-                return Err(de::Error::custom("noncontributing use in a sourced value"));
-            }
-            observed.encrypted |= facts.encryption() == Encryption::Encrypted;
-            observed.unknown |= facts.encryption() == Encryption::Unknown;
-            observed.opaque |= facts.opaque();
-            previous = Some(id);
+        match self.local {
+            Some(local) => inventory
+                .variant_contributors(self.shared.and_then(|shared| shared.0), &local)
+                .map(Some),
+            None if self.shared.is_some() => Err("variant source-use set lacks local references"),
+            None => Ok(None),
         }
-        Ok(observed)
     }
 }
 

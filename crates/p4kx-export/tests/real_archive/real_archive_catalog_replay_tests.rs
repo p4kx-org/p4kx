@@ -12,6 +12,9 @@ use super::{Receipt, TestResult, artifact, index, verify};
 #[path = "real_archive_catalog_replay_health_tests.rs"]
 mod health_tests;
 
+#[path = "real_archive_catalog_replay_variant_tests.rs"]
+mod variant_tests;
+
 const FRAME: &str = "p4kx-catalog.json.zst";
 
 #[test]
@@ -148,7 +151,7 @@ fn bad_markers_dangling_fields_and_duplicate_use_refs_fail_in_stream() -> TestRe
         (
             "sourceUsesRefs",
             json!(["u-missing"]),
-            "missing contributing source use",
+            "missing referenced source use",
         ),
         (
             "sourceUsesRefs",
