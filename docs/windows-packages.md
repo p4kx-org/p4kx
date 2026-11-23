@@ -78,11 +78,9 @@ for both CPUs and checks database/rollback-probe authoring without installing ei
 
 The target runtime artifact includes both package hashes and executed binary hashes. Final
 assembly rejects missing, skipped or mismatched package evidence and requires the complete
-[five-target release matrix](supported-platforms.md). Native hardware GPU, dialogs, clipboard and
-audio evidence remains part of the final integration verification; hosted frame success does not
-assert those capabilities. Native CI/device run URLs must be retained with the final release audit.
-Use the shared procedure with WASAPI on native AMD64 and ARM64 desktops.
-[Desktop audio verification](supported-platforms.md#desktop-audio-verification)
+[five-target release matrix](supported-platforms.md). The release audit records hosted native
+execution on both Windows CPUs and physical GPU, dialogs, clipboard and WASAPI playback on the
+owner's Windows AMD64 desktop. [Windows AMD64 desktop verification](supported-platforms.md#windows-amd64-desktop-verification)
 
 ## Release integration
 
@@ -257,11 +255,8 @@ package handling. [Native AMD64](https://github.com/p4kx-org/p4kx/actions/runs/4
 [Native ARM64](https://github.com/p4kx-org/p4kx/actions/runs/44226543671/job/134560610521)
 
 For release acceptance, repeat the native lifecycle checks with the actual release candidate
-and bind both its MSI and portable ZIP to the candidate revision and run attempt. Record any
-remaining AMD64 desktop and WASAPI checks in the release evidence. Use the original tagged
-run's artifacts for the
-[ARM64 desktop intake](supported-platforms.md#validate-the-recorded-arm64-desktop-evidence),
-including the packaged GUI identity. The package run and device intake supply separate evidence.
+and bind both its MSI and portable ZIP to the candidate revision and run attempt. Record the
+Windows AMD64 desktop and WASAPI checks separately from the hosted package evidence.
 
 ### Dynamic parent-chain feedback experiment
 

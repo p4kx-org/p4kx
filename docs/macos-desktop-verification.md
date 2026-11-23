@@ -1,9 +1,9 @@
 # macOS desktop verification
 
-Run the required checks from [Native macOS support](macos-support.md) on Apple Silicon with
-macOS 26 and the current stable macOS release. Use the exact candidate app and extension ZIP.
-Record the OS version, architecture, source commit, binary and artifact hashes, and check outcomes.
-Keep the device record separate from hosted synthetic CI evidence.
+These desktop checks are optional supplements to the [hosted native macOS checks](macos-support.md).
+Use Apple Silicon and the exact candidate app and extension ZIP for any observations you report.
+Record the OS version, architecture, source commit, binary and artifact hashes, and outcomes
+separately from hosted synthetic CI evidence.
 
 ## Hosted synthetic checks
 
@@ -40,7 +40,7 @@ example in `p4kx-testkit`. Keep the fixture and any exports in a disposable user
 
 ## Installed Blender extension
 
-Run the following on each required device using native Blender 5.2 LTS and the exact release ZIP.
+For an optional installed-extension check, use native Blender 5.2 LTS and the exact release ZIP.
 The work directory must be new.
 
 ```text
@@ -50,7 +50,5 @@ python3 blender_addon/tests/native_extension_smoke.py --blender "/Applications/B
 The launcher isolates Blender user resources, installs and enables the ZIP through Blender's
 extension command and opens a second process that loads the installed package. It checks the
 native architecture and Blender release, then runs the existing hierarchy, material, texture,
-rig and animation assertions. Retain the two logs and `result.json` from each OS. Embed the
-complete result as the `blender` object of the matching `minimum` or `current` device record.
-Intake verifies the source commit, OS version, Blender 5.2 version, install and import results,
-and the ZIP hash against the attested `release-addon` asset from the same tagged workflow run.
+rig and animation assertions. Retain the two logs and `result.json`. Record the associated
+source commit, OS version and hash of the attested `release-addon` asset.

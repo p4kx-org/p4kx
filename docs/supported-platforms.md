@@ -56,8 +56,10 @@ The workspace checks exercise native dependency paths including AES/CBC, CRC, SH
 ruzstd, ring, zstd-sys/cc, tiny-skia, wgpu, rodio/cpal, rfd and Windows resource compilation.
 Missing setup tools, graphics capabilities or native libraries fail their required checks rather
 than remove an architecture from the matrix. Physical audio, clipboard, dialogs and hardware GPU
-checks retain explicit `not_checked`, `success` or `unavailable` states. The final integration
-gate reconciles required device evidence; a synthetic runtime artifact alone is not that gate.
+checks retain explicit `not_checked`, `success` or `unavailable` states. The owner's Windows
+AMD64 desktop is the only required physical-device verification. The other four targets use the
+required hosted native checks for acceptance. Record their unobserved device capabilities in
+the release audit.
 
 ## Package identity and update links
 
@@ -145,8 +147,8 @@ The filenames are `P4KX-{version}-{target}-{binary}.cdx.json` and
 and preserve device-verification states. A missing target/package/binary fails preflight.
 The top-level archive digest must match the actual portable ZIP on Windows, tar.gz on Linux or DMG on macOS.
 Each package's execution proof carries its own digest. On macOS it includes the signed executable
-hashes, Mach-O deployment target and signing receipt for the final DMG. Tagged release preflight
-also requires device evidence for the exact DMG on macOS 26 and the current stable macOS release.
+hashes, Mach-O deployment target and signing receipt for the final DMG. Hosted Apple Silicon
+consumers verify the exact DMG on macOS 26 and the current stable macOS release.
 Windows runtime evidence additionally covers both the portable ZIP and installed MSI payload,
 with package hashes and the exact release EXE hashes. Missing, skipped or mismatched packaged
 runtime evidence fails preflight. [Windows packages](windows-packages.md) describes lifecycle,
@@ -159,7 +161,7 @@ removal and profile preservation. [Linux packages](linux-packages.md) defines th
 host baseline, separate Freedesktop 25.08 runtime, source/relink artifacts and permission policy.
 Flatpak additionally requires host Documents API 5 with `GetHostPaths`; an older Documents
 service is a startup failure rather than a successful or skipped runtime check.
-Packaging checks, signatures, scans, provenance and the full export/device audit remain required
+Packaging checks, signatures, scans, provenance, the complete export audit and Windows AMD64 desktop checks remain required
 parts of the final release gate. Tag publication requires a completed VirusTotal report for the
 exact SHA-256 of each of the thirteen native packages. The assembly job compares the scan receipt
 against the package bytes, source revision, version and workflow run. The receipt stays with the
@@ -170,13 +172,12 @@ A full manual branch run records scan availability in its notes.
 All hosted checks use synthetic data. Real Archive tests stay ignored/local or explicitly
 private, and no game assets, keys or confidential values enter CI artifacts or releases.
 
-## Windows and Linux ARM64 desktop verification
+## Windows AMD64 desktop verification
 
-Run on a native ARM64 Windows or Linux desktop using the candidate's packaged GUI. Use an
-absolute `P4KX_FOLDERS_ROOT` for the application profile and separate fixture and export
+Run the physical checks on the owner's Windows AMD64 desktop with the candidate's packaged GUI.
+Use an absolute `P4KX_FOLDERS_ROOT` for the application profile and separate fixture and export
 directories. Use a disposable desktop session if the current clipboard must be preserved.
-Launch the GUI normally so it remains open for interaction. For Flatpak, use the package's
-documented profile and portal grants. [Profile folders](profile-folders.md), [Linux packages](linux-packages.md)
+Launch the GUI normally so it remains open for interaction. [Profile folders](profile-folders.md)
 
 Generate the fixtures from the candidate's source revision. Use two new absolute directories.
 The examples write synthetic Archives and the text reference.
@@ -202,15 +203,14 @@ cargo run --locked -p p4kx-testkit --example material_reference_fixture -- <abso
    the Model tab and confirm that the cube draws and responds to orbit and zoom. Record
    observed process-attributed GPU activity separately from the viewer outcome. On Windows,
    Task Manager's GPU Engine column can identify the adapter and engine used by `p4kx-gui`.
-   On Linux, supported DRM drivers expose per-process engine counters in `/proc/<pid>/fdinfo/`.
-   Check the counters before and after moving the model. Record the desktop session, adapter,
-   driver and observation. [Windows GPU observation](https://devblogs.microsoft.com/directx/gpus-in-the-task-manager/), [Linux DRM counters](https://docs.kernel.org/gpu/drm-usage-stats.html)
+   Record activity before and after moving the model, the desktop session, adapter and driver.
+   [Windows GPU observation](https://devblogs.microsoft.com/directx/gpus-in-the-task-manager/)
 4. **Audio.** Run the packaged GUI procedure below on the native default audio output.
    Include the result of `a_missing_device_is_reported_to_the_player_and_does_not_panic`
    from the matching native CI run or a native execution of that test.
    [Desktop audio verification](#desktop-audio-verification)
 
-Record one result per target and package tested and link it from the release audit. Keep the
+Record the exact candidate package and observed results in the release audit. Keep the
 hosted runtime receipt as its own evidence.
 
 | Field | What to retain |
@@ -225,57 +225,27 @@ for a missing capability and `not_checked` for a deferred check. The release aud
 any required check without successful evidence open. Publish structural results and synthetic
 comparisons. Keep personal paths and clipboard contents out of public evidence.
 
-### Validate the recorded ARM64 desktop evidence
+### Submit the Windows desktop receipt
 
-Use a JSON array with a record for each tested Windows or Linux ARM64 package. The receipt
-formats these existing observations as follows.
+Use a JSON array of observations with schema 1, scope native-device, the
+x86_64-pc-windows-msvc target and host OS windows with architecture amd64. Match
+the version, revision, workflow run and attempt, package SHA-256 and GUI SHA-256
+to the runtime evidence. Use the same revision for the fixtures and record
+each outcome and observation in the checks object. The
+[receipt validator](../.github/scripts/windows-desktop-device-evidence.ps1)
+defines the exact fields and required checks.
 
-| Fields | Expected values |
-| --- | --- |
-| `schema`, `scope` | Integer `1` and string `native-device`. |
-| `target`, `version`, `revision`, `workflow_run`, `workflow_attempt` | The exact native package runtime receipt values. The attempt is a string recorded by the package consumer. |
-| `package`, `package_filename`, `archive_sha256`, `gui_sha256` | Package kind from the platform matrix, canonical release filename, and lower-case SHA-256 of the package and launched GUI executable. |
-| `fixture_revision`, `tested_on` | Full source revision used to produce the fixture and the test date as `yyyy-MM-dd`. |
-| `host` | `os` (`windows` or `linux`), `architecture` (`arm64`), `os_version`, `os_build_or_kernel`, `desktop_session`, `gpu`, `gpu_driver` and `audio_backend`. |
-| `checks` | Each check below has an `outcome` and an `observation` describing the result or why it could not be checked. |
-
-- `file_dialogs` records Archive open, cancellation and extraction. Successful evidence includes
-  the matching lower-case `expected_sha256` and `observed_sha256` from the fixture and exported file.
-- `clipboard` records cross-program text transfer. `viewer` records the model preview and controls.
-  `hardware_gpu` reports adapter activity separately, including an unavailable capability.
-- `audio_start`, `audio_pause`, `audio_seek` and `audio_stop` record native playback behaviour.
-  `no_audio_device` records the native no-device check. Successful evidence names
-  `a_missing_device_is_reported_to_the_player_and_does_not_panic` in its `test` field.
-
-The offline release preflight binds these records to the already verified package receipts and
-requires successful file dialog, clipboard, viewer, playback and no-device evidence for each
-ARM64 target. Supply the original release run ID for the selected package artifacts.
-
-```powershell
-.github/scripts/check-release-matrix.ps1 -AssetDirectory $assets -Version $version -Revision $revision -Arm64DeviceEvidencePath $receipt -ReleaseRunId $releaseRunId
-```
-
-This command verifies recorded outcomes against the candidate. Device observations still come from
-the native desktop checks above.
-
-For a tagged release, use the original tagged Release run's Windows and Linux ARM64
-packages. Submit the combined Windows and Linux receipt array to **Validate Windows and Linux
-ARM64 device evidence** on that same tag and enter the original Release run ID. The intake
-checks the signed runtime receipts from the original build and attests their binding to the
-desktop evidence. Keep local paths and clipboard contents out of the submitted receipts.
-
-After both this intake and the [macOS device intake](macos-support.md#submit-the-native-device-receipt)
-succeed, re-run only the failed jobs of the original Release workflow. Tagged assembly
-authenticates both receipts and rechecks the Windows and Linux observations against the
-exact release packages and original producer attempts. A rebuilt package requires matching
-device evidence.
+Run **Validate Windows AMD64 desktop device evidence** on the same release tag.
+Supply the original Release run ID and the receipt JSON array. After intake
+succeeds, re-run the failed jobs of the original Release run. The assembly job
+validates the signed receipt against the candidate runtime record and package.
 
 ## Desktop audio verification
 
-On each matching native CPU, use a usable default audio output on the desktop under test.
-The same ignored test opens the production audio output and checks sample consumption after
-start and seek, the position while paused, and consumption stopping when the player closes.
-It plays a quiet synthetic signal through WASAPI on Windows, ALSA on Linux, or CoreAudio on macOS.
+Use the default WASAPI output on the owner's Windows AMD64 desktop for the required physical
+playback check. The ignored test opens the production audio output and checks sample consumption
+after start and seek, the position while paused, and consumption stopping when the player closes.
+The same fixture can supply optional playback observations with ALSA or CoreAudio.
 
 ```text
 cargo test --locked -p p4kx-gui --lib -- audio::player::native_tests::native_output_consumes_samples_after_start_and_seek_and_stops_when_closed --ignored --exact

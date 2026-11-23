@@ -329,7 +329,7 @@ The native package consumers for merge revision `0e1da3f4a7cd5a46fb2594dd6a5fafa
 and PR #1117 head `b27bdac875` passed all four package formats on both CPUs. The successful jobs
 include real CLI, GUI and MCP launchers, the separate Documents API 4 and API 5 sessions and
 deb and Flatpak lifecycle checks. These results apply to the packages built in that run.
-The final release candidate requires its own matching package and desktop-device evidence.
+The final release candidate requires its own hosted native package evidence on both CPUs.
 [AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/43813424470/job/133132805619) ·
 [ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/43813424470/job/133132805539)
 

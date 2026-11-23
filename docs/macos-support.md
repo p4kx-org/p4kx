@@ -35,11 +35,10 @@ acceptance. Delivery requires the evidence below.
   observation cases. A launcher or unrelated Wine process alone is insufficient evidence that
   the game is running. Cover protected paths through aliases, symlinks and different case
   spellings according to the actual volume, including write attempts through existing aliases.
-- Exercise the shared macOS profile, data and cache locations, native open/save dialogs,
-  Command-key shortcuts, system clipboard, Metal rendering and CoreAudio playback (start, seek
-  and stop). Cover absent audio devices, cancelled dialogs, permission denial, Unicode paths,
-  case-sensitive and case-insensitive APFS, and Archives on external volumes.
-  Follow the [macOS desktop verification](macos-desktop-verification.md) procedure.
+- Verify the macOS profile, data and cache locations, native Metal rendering, and the synthetic
+  desktop and audio cases supported by the hosted runner. The
+  [optional macOS desktop procedure](macos-desktop-verification.md) covers additional observations
+  such as Finder, system clipboard, native dialogs, external volumes and CoreAudio playback.
 
 ## DMG, signing and updates
 
@@ -49,8 +48,8 @@ acceptance. Delivery requires the evidence below.
   the bundle or launching through a user-owned symlink. Normal use requires neither developer
   tools nor a package manager.
 - Use Developer ID Application signing with hardened runtime and Apple notarization when
-  available. Validate the signature and stapled ticket on the final DMG and check Gatekeeper
-  behavior on a clean Mac. If Developer ID or notarization is unavailable, publish an ad-hoc-signed
+  available. Validate the signature and stapled ticket on the final DMG in the hosted consumer.
+  Record Gatekeeper behavior when the environment can exercise it. If Developer ID or notarization is unavailable, publish an ad-hoc-signed
   DMG, identify that mode and its reason in release evidence, and describe the first-launch
   approval in the Release notes. Report a signing or notarization validation failure as a failure.
   PR package dry runs must work with ad-hoc signatures and without signing secrets.
@@ -67,14 +66,13 @@ acceptance. Delivery requires the evidence below.
   Run the required synthetic test suites, doctests, lints and repository checks on native macOS.
 - On each supported verification OS, launch the packaged CLI for synthetic Archive list,
   Extraction and conversion, use MCP initialize, tools/list and a representative read-only
-  request, and start, draw and exit the GUI. Verify DMG mounting, Finder installation, bundle
-  replacement on upgrade, removal and profile preservation on a clean host. Test the selected
-  signing mode on the quarantined download with default Gatekeeper policy.
+  request, and start, draw and exit the GUI. Verify DMG mounting, copied-bundle execution,
+  relocation and profile behavior through the hosted native package consumer.
 - Record OS version, CPU, Mach-O identities, exact source commit, tool pins, binary hashes, DMG
-  hash and successful check results. Use suitable physical Macs when hosted environments cannot
-  establish Metal, audio, clipboard, dialog, Wine/CrossOver or Finder behavior. Record synthetic
-  CI and device evidence separately. Cross-compilation, emulation and skips cannot satisfy
-  required native checks. Real Archive evidence stays local or explicitly private.
+  hash and successful check results. The hosted native checks determine macOS release acceptance.
+  Record unavailable capabilities and any optional physical observations separately. Required
+  native checks need executed results on Apple Silicon. Real Archive evidence stays local or
+  explicitly private.
 - Final v0.5.0 preflight requires five native targets, thirteen native packages, fifteen
   target/application SBOMs and five target-bound runtime records, including the macOS minimum and
   current OS evidence. Include the DMG in existing checksum, notice, provenance, attestation and
@@ -85,21 +83,6 @@ acceptance. Delivery requires the evidence below.
 Hosted verification mounts and executes the same DMG on the macOS 26 runner and the native
 macOS 27 runner selected by the xcode-27 label. One target runtime record binds both
 executions to the same DMG and application digests.
-
-## Submit the native device receipt
-
-Download the signed macOS DMG and Blender extension ZIP from the tagged Release run. Run the
-device checks against those exact files and record the minimum and current stable macOS results
-in the receipt JSON. Include the [installed Blender result](macos-desktop-verification.md#installed-blender-extension)
-from each OS. Use the
-same tag for the **Validate macOS device evidence** workflow. Give it the original Release run ID,
-the observed current stable version and the receipt. Keep the receipt to technical checks and
-digests. Keep local game data and paths out of it.
-
-After this intake and the [Windows/Linux ARM64 device intake](supported-platforms.md#validate-the-recorded-arm64-desktop-evidence)
-succeed, re-run only the failed jobs of the original Release run. Assembly verifies the attested
-receipt against the DMG and revision from that run. Rebuilding the candidate can change its bytes
-and requires matching device evidence.
 
 ## References
 

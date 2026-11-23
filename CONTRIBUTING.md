@@ -120,7 +120,7 @@ from pin consistency.
 The [native platform contract](docs/supported-platforms.md) drives the target matrix, target-bound
 test archives and release preflight. Run the PowerShell platform/evidence regression scripts when
 changing their contracts, and preserve the recorded distinction between native synthetic checks
-and physical device verification.
+and physical verification on the owner's Windows AMD64 desktop.
 Linux packaging additionally uses the declared Ubuntu 24.04 / glibc 2.39 baseline, native
 AppImage runtime source builds and fresh native package consumers. Run
 `test-linux-package-contract.ps1` and the source-collector tests when changing their boundaries;
@@ -139,7 +139,7 @@ The Ubuntu 24.04 software-rendered GUI smoke uses `xvfb`, `mesa-vulkan-drivers`,
 `libvulkan1`, `libasound2t64` and the X11/EGL libraries listed in
 [the native test workflow](.github/workflows/tests.yml).
 The [platform guide](docs/supported-platforms.md#build-and-test-contract) explains how
-CI records those results and the separate device checks.
+CI records those results and reports unavailable device capabilities.
 
 ```powershell
 cargo build --release
@@ -170,9 +170,8 @@ The tests against a real Archive are ignored by default; see
 The [Wine-prefix fixtures](crates/p4kx-channels/tests/wine_prefix.rs) share test logic across
 Windows and Linux. Unix symlink checks use the host filesystem, and the Linux profile fixtures exercise
 XDG and stored-key lookup. Both native Linux rows use the common synthetic Nextest suite and
-execute X11 and HiDPI Wayland software-rendered GUI checks. The separate #1113 device gate
-requires native desktop and audio observations. [Native test workflow](.github/workflows/tests.yml)
-[Desktop verification](docs/supported-platforms.md#windows-and-linux-arm64-desktop-verification)
+execute X11 and HiDPI Wayland software-rendered GUI checks. The hosted native checks determine
+Linux release acceptance. [Native test workflow](.github/workflows/tests.yml)
 
 ### Real-Archive suite
 
@@ -340,8 +339,9 @@ everything; nobody uploads assets by hand.
    release EXEs, upgrades, blocked downgrades, rollback, explicit CPU replacement and profile
    preservation. Linux AMD64 and ARM64 ship tar.gz, AppImage, deb and Flatpak packages. Native
    consumers exercise all three applications in each format, deb and Flatpak upgrades, profile
-   preservation and Flatpak Documents portal grants. macOS 26 and later use the Apple Silicon DMG and require
-   [matching device evidence](docs/macos-support.md#submit-the-native-device-receipt).
+   preservation and Flatpak Documents portal grants. Hosted Apple Silicon consumers verify the
+   exact DMG on macOS 26 and the current stable macOS release. Record physical verification on
+   the [owner's Windows AMD64 desktop](docs/supported-platforms.md#windows-amd64-desktop-verification).
    CycloneDX SBOMs identify each target and shipped binary (`p4kx-gui`, `p4kx`, `p4kx-mcp`).
    The architecture-neutral Python add-on has its own provenance bundle.
 4. Tag publication requires a completed VirusTotal report for every native package digest.

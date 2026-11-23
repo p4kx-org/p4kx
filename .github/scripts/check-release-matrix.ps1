@@ -2,10 +2,7 @@ param(
     [Parameter(Mandatory)][string]$AssetDirectory,
     [Parameter(Mandatory)][string]$Version,
     [Parameter(Mandatory)][string]$Revision,
-    [switch]$RequireMacosDeviceEvidence,
-    [string]$MacosCurrentVersion,
-    [string]$MacosDeviceEvidencePath,
-    [string]$Arm64DeviceEvidencePath,
+    [string]$WindowsDesktopEvidencePath,
     [string]$ReleaseRunId
 )
 
@@ -14,14 +11,14 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'native-evidence.ps1')
 . (Join-Path $PSScriptRoot 'package-release-evidence.ps1')
 $contract = Get-P4kxPlatformContract
-$deviceRuns = $null
-if ($Arm64DeviceEvidencePath -or $ReleaseRunId) {
-    if (-not $Arm64DeviceEvidencePath -or $ReleaseRunId -cnotmatch '\A[1-9][0-9]*\z') {
-        throw 'ARM64 desktop validation requires both a receipt file and the original release run ID.'
+$desktopReceipts = $null
+if ($WindowsDesktopEvidencePath -or $ReleaseRunId) {
+    if (-not $WindowsDesktopEvidencePath -or $ReleaseRunId -cnotmatch '\A[1-9][0-9]*\z') {
+        throw 'Windows AMD64 desktop validation requires its receipt file and the original release run ID.'
     }
-    . (Join-Path $PSScriptRoot 'arm64-device-evidence.ps1')
-    $deviceRuns = Get-Content -LiteralPath $Arm64DeviceEvidencePath -Raw | ConvertFrom-Json -NoEnumerate
-    Assert-P4kxArm64ReceiptRows -Rows $deviceRuns -Contract $contract
+    . (Join-Path $PSScriptRoot 'windows-desktop-device-evidence.ps1')
+    $desktopReceipts = Get-Content -LiteralPath $WindowsDesktopEvidencePath -Raw | ConvertFrom-Json -NoEnumerate
+    Assert-P4kxWindowsDesktopReceiptRows $desktopReceipts $contract
 }
 if ($Revision -cnotmatch '^(?:[0-9a-f]{40}|[0-9a-f]{64})$') { throw 'Release revision must be a full Git commit digest.' }
 $pinLines = & (Join-Path $PSScriptRoot 'check-build-tools.ps1')
@@ -52,21 +49,12 @@ foreach ($row in $contract.targets) {
     Assert-P4kxArchiveEvidence -Metadata $runtime -Platform $row -Revision $Revision -Compiler $compiler -Nextest $nextest
     Assert-P4kxRuntimeEvidence -Metadata $runtime -Platform $row -Version $Version -Revision $Revision
     Assert-P4kxPackageRuntime $runtime $row $AssetDirectory $Version
-    if ($null -ne $deviceRuns -and (Test-P4kxArm64DesktopTarget $row)) {
-        $records = @($deviceRuns | Where-Object target -CEQ $row.target)
-        Assert-P4kxArm64DeviceEvidence -Runtime $runtime -Platform $row -Version $Version -Revision $Revision -ReleaseRunId $ReleaseRunId -Records $records
-    }
-    if ($row.os -ceq 'macos' -and $RequireMacosDeviceEvidence) {
-        if (-not $MacosDeviceEvidencePath) { throw 'Native macOS device evidence is required for publication.' }
-        $macosRuns = Get-Content -LiteralPath $MacosDeviceEvidencePath -Raw | ConvertFrom-Json -NoEnumerate
-        if ($macosRuns -isnot [array]) { throw 'Native macOS device evidence must be a JSON array.' }
-        $extension = Get-P4kxReleaseBlenderExtension $AssetDirectory $Version
-        $extensionHash = (Get-FileHash -LiteralPath $extension -Algorithm SHA256).Hash.ToLowerInvariant()
-        Assert-P4kxMacosReleaseDevices $runtime $row $MacosCurrentVersion $macosRuns $extensionHash
+    if ($null -ne $desktopReceipts -and (Test-P4kxWindowsDesktopTarget $row)) {
+        Assert-P4kxWindowsDesktopEvidence -Runtime $runtime -Platform $row -Version $Version -Revision $Revision -ReleaseRunId $ReleaseRunId -Records $desktopReceipts
     }
 }
 $targetCount = @($contract.targets).Count
-if ($null -ne $deviceRuns) { Write-Output 'ARM64 desktop receipts match the verified Windows and Linux release candidate.' }
+if ($null -ne $desktopReceipts) { Write-Output 'The Windows AMD64 desktop receipt matches the verified release candidate.' }
 $packageCount = @($contract.targets | ForEach-Object packages).Count
 $applicationCount = $targetCount * 3
 Write-Output "Complete release matrix verified: $packageCount packages, $applicationCount target/binary SBOMs and $targetCount native runtime proofs."

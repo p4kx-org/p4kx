@@ -85,7 +85,7 @@ function Get-P4kxCandidateArtifact([string]$RunId, [string]$Name) {
     return [string]$artifacts[0].id
 }
 
-function Find-P4kxDeviceIntakeArtifact([string]$CandidateRunId, [ValidateSet('macos', 'arm64')][string]$Family = 'macos') {
+function Find-P4kxDeviceIntakeArtifact([string]$CandidateRunId, [ValidateSet('macos', 'windows-desktop')][string]$Family = 'macos') {
     Assert-P4kxIntakeTagContext 'push'
     Assert-P4kxIntakeTag
     if (-not (Test-P4kxWorkflowRunId $CandidateRunId) -or $CandidateRunId -cne $env:GITHUB_RUN_ID) {

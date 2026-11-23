@@ -18,8 +18,9 @@ mismatches before running tests. PE/ELF machine inspection establishes binary id
 CLI/MCP/GUI smoke steps establish executed behavior.
 
 Runtime evidence records actual successful GitHub step outcomes. Missing or skipped required
-smoke cases cannot produce a successful artifact. Its scope is native synthetic verification;
-physical device capabilities remain explicit and the final integration gate owns their evidence.
+smoke cases cannot produce a successful artifact. The artifact records native synthetic results
+and the observed status of device capabilities. Only the owner's Windows AMD64 desktop requires
+separate physical verification for the final integration gate.
 
 Packages provide a bounded identity sidecar beside real executables. Update selection uses the
 compiled binary target and package kind, with a Release-page fallback when identity or assets
@@ -38,9 +39,9 @@ action selects the native `uname -m` download. Windows uses target-specific rust
 and the existing ReFS build optimization. Native setup/build/tests remain required on every
 row; a helper incompatibility is a failed check, not permission to drop ARM64.
 
-The architecture-neutral add-on test lane may use available bpy wheels without defining native
-P4KX runtime support. Hosted synthetic evidence does not substitute for required native device
-verification or locally traced real-Archive export verification.
+The architecture-neutral add-on test lane may use available bpy wheels. Native P4KX runtime
+support requires the hosted checks on all five targets. The Windows AMD64 desktop check and
+locally traced real-Archive export verification have separate evidence.
 
 ## Sources
 

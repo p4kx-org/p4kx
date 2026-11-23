@@ -1,4 +1,4 @@
-name: Validate Windows and Linux ARM64 device evidence
+name: Validate Windows AMD64 desktop device evidence
 
 on:
   workflow_dispatch:
@@ -7,8 +7,8 @@ on:
         description: Tag-triggered Release workflow run ID
         required: true
         type: string
-      arm64-device-evidence:
-        description: Native Windows and Linux ARM64 device receipt JSON array
+      windows-desktop-device-evidence:
+        description: Native Windows AMD64 desktop device receipt JSON array
         required: true
         type: string
 
@@ -16,7 +16,7 @@ permissions: {}
 
 jobs:
   intake:
-    name: Verify and retain native ARM64 device evidence
+    name: Verify and retain native Windows AMD64 desktop device evidence
     if: github.repository == 'p4kx-org/p4kx' && github.ref_type == 'tag'
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -33,25 +33,24 @@ jobs:
         with:
           ref: ${{ github.sha }}
           persist-credentials: false
-      - name: Resolve the original ARM64 package runtime receipts
+      - name: Resolve the original Windows AMD64 package runtime receipt
         id: candidate
         env:
           GH_TOKEN: ${{ github.token }}
           CANDIDATE_RUN_ID: ${{ inputs.candidate-run-id }}
         run: |
-          . .github/scripts/arm64-device-evidence-intake.ps1
-          $candidate = Resolve-P4kxArm64IntakeCandidate $env:CANDIDATE_RUN_ID
+          . .github/scripts/windows-desktop-device-evidence-intake.ps1
+          $candidate = Resolve-P4kxWindowsDesktopIntakeCandidate $env:CANDIDATE_RUN_ID
           foreach ($key in $candidate.Keys) {
             Add-Content -LiteralPath $env:GITHUB_OUTPUT -Value "$key=$($candidate[$key])" -Encoding utf8
           }
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
-          artifact-ids: ${{ steps.candidate.outputs.runtime-ids }}
+          artifact-ids: ${{ steps.candidate.outputs.runtime-id }}
           github-token: ${{ github.token }}
           repository: ${{ github.repository }}
           run-id: ${{ steps.candidate.outputs.run-id }}
           path: candidate/runtime
-          merge-multiple: true
           digest-mismatch: error
       - name: Validate the native observations against the candidate
         env:
@@ -59,10 +58,10 @@ jobs:
           VERSION: ${{ steps.candidate.outputs.version }}
           CANDIDATE_RUN_ID: ${{ steps.candidate.outputs.run-id }}
         run: |
-          . .github/scripts/arm64-device-evidence-intake.ps1
+          . .github/scripts/windows-desktop-device-evidence-intake.ps1
           New-Item -ItemType Directory -Path 'device-intake' | Out-Null
-          Save-P4kxArm64DeviceIntake 'candidate/runtime' 'device-intake' $env:VERSION $env:CANDIDATE_RUN_ID
-      - name: Attest the binding between the runtime receipts and native observations
+          Save-P4kxWindowsDesktopDeviceIntake 'candidate/runtime' 'device-intake' $env:VERSION $env:CANDIDATE_RUN_ID
+      - name: Attest the binding between the runtime receipt and native observations
         id: attestation
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:

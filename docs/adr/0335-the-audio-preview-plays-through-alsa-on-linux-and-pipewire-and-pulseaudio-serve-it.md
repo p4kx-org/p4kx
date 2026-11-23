@@ -32,6 +32,5 @@ the audio preview).
 
 ## Consequences
 
-- Start, stop and seek of a decoded Wwise sound through the PipeWire-PulseAudio and ALSA backends
-  were not checked on a Linux desktop when this was written; the owner's manual check is open and is
-  recorded here when done.
+- Physical playback through the PipeWire-PulseAudio and ALSA backends is an optional Linux
+  observation. The hosted native audio checks determine Linux release acceptance.

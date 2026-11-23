@@ -21,4 +21,4 @@ grants for selected inputs/outputs, with no host process execution or broad host
 An unobserved host game process remains unknown inside its PID namespace. Real FUSE grants must
 also establish installation-alias write refusal; a failing or unavailable required check cannot
 produce a successful native proof. [Linux packages](../linux-packages.md) defines the complete
-consumer, licensing and evidence contract, including the separate physical-device audit.
+consumer, licensing and hosted evidence contract.

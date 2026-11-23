@@ -38,10 +38,10 @@ jobs:
         id: subjects
         run: |
           . .github/scripts/platform-contract.ps1
-          . .github/scripts/arm64-device-evidence.ps1
+          . .github/scripts/windows-desktop-device-evidence.ps1
           $row = Get-P4kxPlatform -Target $env:P4KX_TARGET
-          $arm64Desktop = (Test-P4kxArm64DesktopTarget $row).ToString().ToLowerInvariant()
-          "arm64-desktop=$arm64Desktop" >> $env:GITHUB_OUTPUT
+          $windowsDesktop = (Test-P4kxWindowsDesktopTarget $row).ToString().ToLowerInvariant()
+          "windows-desktop=$windowsDesktop" >> $env:GITHUB_OUTPUT
           $paths = @(foreach ($package in $row.packages) {
             $name = Get-P4kxAssetName -Target $row.target -Version $env:VERSION -Package $package
             (Get-Item -LiteralPath "assets/$name").FullName
@@ -91,15 +91,15 @@ jobs:
           path: bundles/*.sigstore.json
           if-no-files-found: error
 
-      - name: Stage the signed runtime receipt for ARM64 device intake
-        if: steps.subjects.outputs.arm64-desktop == 'true'
+      - name: Stage the signed runtime receipt for Windows AMD64 desktop device intake
+        if: steps.subjects.outputs.windows-desktop == 'true'
         run: |
-          New-Item -ItemType Directory arm64-device-runtime | Out-Null
+          New-Item -ItemType Directory windows-desktop-device-runtime | Out-Null
           $prefix = "P4KX-$env:VERSION-$env:P4KX_TARGET"
-          Copy-Item -LiteralPath @("assets/$prefix-runtime.json", "bundles/$prefix-provenance.sigstore.json") -Destination arm64-device-runtime
+          Copy-Item -LiteralPath @("assets/$prefix-runtime.json", "bundles/$prefix-provenance.sigstore.json") -Destination windows-desktop-device-runtime
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        if: steps.subjects.outputs.arm64-desktop == 'true'
+        if: steps.subjects.outputs.windows-desktop == 'true'
         with:
-          name: arm64-device-runtime-${{ inputs.target }}
-          path: arm64-device-runtime/*
+          name: windows-desktop-device-runtime-${{ inputs.target }}
+          path: windows-desktop-device-runtime/*
           if-no-files-found: error

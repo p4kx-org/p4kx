@@ -36,8 +36,8 @@ actual application paths, including on Windows; see [profile folders](profile-fo
 
 Cancel the Extraction dialog after testing its multiline field. There is no need to write an
 export. Record the OS/CPU, source revision/worktree identity, GUI executable digest, editor,
-actual observations and any inconclusive case. Windows ARM64 requires its own matching native
-runtime evidence.
+actual observations and any inconclusive case on the owner's Windows AMD64 desktop. Windows
+ARM64 retains its hosted native runtime and package checks.
 
 ## Failure and empty-text semantics
 

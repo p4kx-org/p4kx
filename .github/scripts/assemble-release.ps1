@@ -48,16 +48,13 @@ param(
     [string]$Version,
     [string]$Revision,
     [switch]$TagAttestations,
-    [switch]$RequireMacosDeviceEvidence,
-    [string]$MacosCurrentVersion,
-    [string]$MacosDeviceEvidencePath,
-    [string]$Arm64DeviceEvidencePath,
+    [string]$WindowsDesktopEvidencePath,
     [string]$ReleaseRunId
 )
 
 $ErrorActionPreference = 'Stop'
-if ($TagAttestations -and (-not $Arm64DeviceEvidencePath -or -not $ReleaseRunId)) {
-    throw 'Tagged release assembly requires signed Windows and Linux ARM64 device evidence for its candidate run.'
+if ($TagAttestations -and (-not $WindowsDesktopEvidencePath -or -not $ReleaseRunId)) {
+    throw 'Tagged release assembly requires signed Windows AMD64 desktop evidence for its candidate run.'
 }
 if (-not $Version) {
     $workspace = & cargo metadata --no-deps --format-version 1 --locked | ConvertFrom-Json
@@ -67,11 +64,14 @@ if (-not $Version) {
 if (-not $Revision) {
     $Revision = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else { (& git rev-parse HEAD).Trim() }
 }
-& (Join-Path $PSScriptRoot 'check-release-matrix.ps1') -AssetDirectory $AssetDirectory -Version $Version -Revision $Revision -RequireMacosDeviceEvidence:$RequireMacosDeviceEvidence -MacosCurrentVersion $MacosCurrentVersion -MacosDeviceEvidencePath $MacosDeviceEvidencePath -Arm64DeviceEvidencePath $Arm64DeviceEvidencePath -ReleaseRunId $ReleaseRunId
+& (Join-Path $PSScriptRoot 'check-release-matrix.ps1') -AssetDirectory $AssetDirectory -Version $Version -Revision $Revision -WindowsDesktopEvidencePath $WindowsDesktopEvidencePath -ReleaseRunId $ReleaseRunId
 
 $macosRuntimePath = Join-Path $AssetDirectory "P4KX-$Version-aarch64-apple-darwin-runtime.json"
 $macosRuntime = Get-Content -LiteralPath $macosRuntimePath -Raw | ConvertFrom-Json
 $signing = @($macosRuntime.package_smokes)[0].signing
+if ($TagAttestations -and $signing.reason -ceq 'package-dry-run') {
+    throw 'A dry-run DMG cannot be published.'
+}
 $macosDistribution = if ($signing.mode -ceq 'developer-id') {
     "## macOS distribution" + [char]10 + [char]10 +
         'The Apple Silicon DMG uses Developer ID signing and a validated stapled Apple notarization ticket.'

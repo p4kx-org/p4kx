@@ -5,8 +5,10 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'package-release-evidence.ps1')
 $current = '27.2.1'
 $target = 'aarch64-apple-darwin'
+$platform = Get-P4kxPlatform -Target $target
 $proofPath = Join-Path $AssetDirectory "P4KX-$Version-$target-runtime.json"
 $validator = Join-Path $PSScriptRoot 'check-release-matrix.ps1'
 $devicePath = Join-Path $AssetDirectory 'native-device-fixture.json'
@@ -14,13 +16,22 @@ $extensionPath = Join-Path $AssetDirectory "p4kx_importer-$Version.zip"
 if (Test-Path -LiteralPath $extensionPath) { throw 'The fixture needs its own Blender extension ZIP path.' }
 $nativeValidation = @{
     AssetDirectory=$AssetDirectory; Version=$Version; Revision=$Revision
-    RequireMacosDeviceEvidence=$true; MacosCurrentVersion=$current; MacosDeviceEvidencePath=$devicePath
 }
 $original = Get-Content -LiteralPath $proofPath -Raw
 
+function Invoke-MacosEvidenceFixture {
+    param([hashtable]$Arguments)
+    & $validator @Arguments | Out-Null
+    $runtime = Get-Content -LiteralPath $proofPath -Raw | ConvertFrom-Json
+    $records = Get-Content -LiteralPath $devicePath -Raw | ConvertFrom-Json -NoEnumerate
+    $extension = Get-P4kxReleaseBlenderExtension $AssetDirectory $Version
+    $extensionHash = (Get-FileHash -LiteralPath $extension -Algorithm SHA256).Hash.ToLowerInvariant()
+    Assert-P4kxMacosReleaseDevices $runtime $platform $current $records $extensionHash
+}
+
 function Assert-RejectedMacosEvidence {
     param([hashtable]$Arguments, [string]$ExpectedError)
-    try { & $validator @Arguments | Out-Null } catch {
+    try { Invoke-MacosEvidenceFixture $Arguments } catch {
         if ($_.Exception.Message -cnotmatch $ExpectedError) { throw }
         return
     }
@@ -81,7 +92,7 @@ try {
     )
     $complete = $proof | ConvertTo-Json -Depth 24
     Write-MacosFixture $complete
-    & $validator @nativeValidation | Out-Null
+    Invoke-MacosEvidenceFixture $nativeValidation
     foreach ($case in @(
         @{ edit={ param($p) $p.package_smokes[0].signing.signature='skipped' }; error='signature evidence' },
         @{ edit={ param($p) $p.package_smokes[0].signing.mode='developer-id' }; error='stapled notarization' },
@@ -127,7 +138,7 @@ try {
     Write-MacosFixture $complete
     'different Blender extension' | Set-Content -LiteralPath $extensionPath -Encoding utf8NoBOM
     Assert-RejectedMacosEvidence $nativeValidation 'native Blender 5.2'
-    'PASS: macOS release preflight rejects mismatched package, signing, native-device and Blender evidence.'
+    'PASS: hosted macOS package evidence and optional native device and Blender receipt validation.'
 } finally {
     $original | Set-Content -LiteralPath $proofPath -Encoding utf8NoBOM
     Remove-Item -LiteralPath $devicePath, $extensionPath -ErrorAction SilentlyContinue

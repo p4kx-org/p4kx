@@ -4,6 +4,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'native-test-fixtures.ps1')
 . (Join-Path $PSScriptRoot 'native-evidence.ps1')
 . (Join-Path $PSScriptRoot 'macos-package-evidence.ps1')
+. (Join-Path $PSScriptRoot 'windows-desktop-device-evidence.ps1')
 . (Join-Path $PSScriptRoot 'test-documents-evidence-fixture.ps1')
 . (Join-Path $PSScriptRoot 'linux-package-lifecycle-evidence.ps1')
 New-Item -ItemType Directory -Path $Directory -Force | Out-Null
@@ -34,6 +35,9 @@ foreach ($row in $contract.targets) {
         $sbom | ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $Directory $name) -Encoding utf8NoBOM
     }
     $proof = New-P4kxTestEvidence -Platform $row -Version $version -Revision $revision -Compiler $compiler -Nextest $nextest
+    if (Test-P4kxWindowsDesktopTarget $row) {
+        $proof | Add-Member -NotePropertyName workflow_attempt -NotePropertyValue '1'
+    }
     if ($row.os -cin @('windows', 'linux', 'macos')) {
         $smokes = @(foreach ($package in $row.packages) {
             $asset = Get-P4kxAssetName -Target $row.target -Version $version -Package $package
@@ -143,15 +147,18 @@ $assembly = @{
     Repository = 'p4kx-org/p4kx'; Version = $version; Revision = $revision
 }
 & $assembler @assembly
-$failure = try { & $assembler @assembly -TagAttestations } catch { $_.Exception.Message }
-if ($failure -cnotmatch 'requires signed Windows and Linux ARM64 device evidence') {
-    throw 'Tagged assembly accepted an absent ARM64 device receipt.'
+$failure = try { & $assembler @assembly -TagAttestations | Out-Null } catch { $_.Exception.Message }
+if ($failure -cnotmatch 'requires signed Windows AMD64 desktop evidence') {
+    throw 'Tagged assembly accepted an absent Windows AMD64 desktop receipt.'
 }
-$emptyReceipt = Join-Path $notesFixture 'arm64-device-evidence.json'
-Set-Content -LiteralPath $emptyReceipt -Value '[]' -Encoding utf8NoBOM
-$failure = try { & $assembler @assembly -TagAttestations -Arm64DeviceEvidencePath $emptyReceipt -ReleaseRunId 1 } catch { $_.Exception.Message }
-if ($failure -cnotmatch 'verified package receipt does not identify the required release revision, target, run and attempt') {
-    throw 'Tagged assembly failed to forward ARM64 evidence into the native receipt gate.'
+$receipt = Join-Path $notesFixture 'windows-desktop-evidence.json'
+$desktop = @{
+    TagAttestations=$true; WindowsDesktopEvidencePath=$receipt; ReleaseRunId='1'
+}
+Set-Content -LiteralPath $receipt -Value '[]' -Encoding utf8NoBOM
+$failure = try { & $assembler @assembly @desktop | Out-Null } catch { $_.Exception.Message }
+if ($failure -cnotmatch 'Missing Windows AMD64 desktop evidence') {
+    throw 'Tagged assembly did not forward the desktop receipt into the native gate.'
 }
 $notes = Get-Content -LiteralPath $notesOutput -Raw
 if ($notes -cnotmatch 'ad-hoc signed because Developer ID was unavailable' -or $notes -cnotmatch 'Open Anyway') {
@@ -160,6 +167,39 @@ if ($notes -cnotmatch 'ad-hoc signed because Developer ID was unavailable' -or $
 if ($notes -cmatch 'gh attestation verify' -or
     $notes -cnotmatch '(?m)^This validation run did not generate Sigstore attestations\.\r?$') {
     throw 'Validation-only release notes claimed attestations that this run did not generate.'
+}
+$desktopRow = $contract.targets | Where-Object { Test-P4kxWindowsDesktopTarget $_ }
+$desktopRuntime = Get-Content -LiteralPath (Join-Path $notesAssets "P4KX-$version-$($desktopRow.target)-runtime.json") -Raw | ConvertFrom-Json
+$portable = $desktopRuntime.package_smokes | Where-Object package -CEQ 'portable-zip'
+$checks = @{}
+foreach ($name in (Get-P4kxWindowsDesktopRequiredChecks)) {
+    $checks[$name] = @{outcome='success'; observation='Synthetic desktop check'}
+}
+$checks.file_dialogs.expected_sha256 = 'c' * 64
+$checks.file_dialogs.observed_sha256 = 'c' * 64
+$checks.no_audio_device.test = 'a_missing_device_is_reported_to_the_player_and_does_not_panic'
+$checks.hardware_gpu = @{outcome='unavailable'; observation='Synthetic GPU attribution unavailable'}
+$record = @{
+    schema=1; scope='native-device'; target=$desktopRow.target; version=$version; revision=$revision
+    workflow_run=$desktopRuntime.workflow_run; workflow_attempt=$desktopRuntime.workflow_attempt
+    package=$portable.package; package_filename=(Get-P4kxAssetName -Target $desktopRow.target -Version $version -Package $portable.package)
+    archive_sha256=$portable.archive_sha256; gui_sha256=($portable.binaries | Where-Object name -CEQ 'p4kx-gui').sha256
+    fixture_revision=$revision; tested_on='2026-11-23'
+    host=@{os='windows'; architecture='amd64'; os_version='Windows 11'; os_build_or_kernel='synthetic'
+        desktop_session='interactive'; gpu='synthetic adapter'; gpu_driver='synthetic driver'; audio_backend='WASAPI'}
+    checks=$checks
+}
+ConvertTo-Json -InputObject @($record) -Depth 15 | Set-Content -LiteralPath $receipt -Encoding utf8NoBOM
+Remove-Item -LiteralPath (Join-Path $notesAssets 'SHA256SUMS.txt'),(Join-Path $notesAssets 'SHA3-512SUMS.txt')
+& $assembler @assembly @desktop
+$macosProofPath = Join-Path $notesAssets "P4KX-$version-aarch64-apple-darwin-runtime.json"
+$macosRuntime = Get-Content -LiteralPath $macosProofPath -Raw | ConvertFrom-Json
+$macosRuntime.package_smokes[0].signing.reason = 'package-dry-run'
+$macosRuntime.package_smokes[0].current_hosted_smoke.signing.reason = 'package-dry-run'
+$macosRuntime | ConvertTo-Json -Depth 24 | Set-Content -LiteralPath $macosProofPath -Encoding utf8NoBOM
+$failure = try { & $assembler @assembly @desktop | Out-Null } catch { $_.Exception.Message }
+if ($failure -cnotmatch 'A dry-run DMG cannot be published') {
+    throw 'Tagged assembly accepted a dry-run DMG with a valid Windows desktop receipt.'
 }
 foreach ($row in $contract.targets) {
     $proofPath = Join-Path $Directory "P4KX-$version-$($row.target)-runtime.json"
