@@ -81,3 +81,16 @@ The base colour images of `LayerBlend_V2` materials change, also in the viewer, 
 bake. Clothing whose masks are pure red, green and blue now takes the layers one place earlier
 than before: red the first (it took the second), green the second, blue the third, and the
 texels with no channel the fourth (they took the first).
+
+## Corbel worn geometry reference
+
+A bounded LIVE 13220821 check followed the original worn geometry root and its level-0 companion.
+The directory and payload checks bound both entries independently. The stock model reader
+consumed each entry once through the verified end of the stream. Together they held 545,441
+stored bytes and 1,036,960 decoded bytes.
+
+The normal geometry-only GLB writer emitted one mesh, three primitives and 23,399 triangles.
+One nondegenerate triangle was traced from its original IVO index and UV streams to the emitted
+accessors. It retained all three indices in order and all six UV0 components exactly after
+half-float expansion. The check establishes a source-to-GLB geometry reference. Assigning
+the faceplate and frame to material layers still requires independent material binding.
