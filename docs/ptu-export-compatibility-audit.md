@@ -46,6 +46,13 @@ item and animation component projections select other blocks.
 | Reputation and crafting | One reputation scope changes its standing map and ceiling. Two crafting blueprints change existing cost data. The active PTU payout multiplier requires separate runtime evidence. |
 | Arclight | The compared authoring has stable default-loadout Entries and the named weapon and magazine Records. The archived default loadout uses a sidearm port and a separate spare magazine port. First-spawn loading remains a game-side observation. |
 
+The two Corbel Records matched by physical path each lose three alternative
+or nested `SubGeometry` branches. The recorded worn selection uses the direct
+branch at position 2. Its direct model, material and palette references
+compare equal. The Archive directory delta reports zero changes for the
+matched geometry and material paths. A same-draw runtime witness is still
+required for the shader flag semantics.
+
 The selected Mannequin tag-definition XML adds a `Group` and `Tag` that the
 existing reader recognizes. Both sampled Subsumption XML documents add the
 existing integer `Event.BeingLookedAtCondition` attribute. A selected changed
