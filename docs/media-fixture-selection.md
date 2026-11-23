@@ -340,6 +340,16 @@ Blender 5.3 checks the expected positions of both rigid pieces and their locator
 their spine parent and one drawn vertex following a pose while the pelvis stays fixed.
 The original fixture uses a 0.2 m port offset. The replacement uses its own 0.8 m offset.
 
+A Windows AMD64 check on Blender 5.3.0 (`02f0899d78e3`) also used a synthetic tagged
+tree and a fixture-only selector evaluator. The normal exporter retained the root
+on `spine` and reported the unresolved selector. With the fixture's explicit matches,
+the same tree selected helper ordinals `[1, 0]`, preserved the source positions of the
+selected helper fields, and attached the satchel to `head` using its authored item
+locator. The fallback locator rested at `(0.00, -0.20, 1.60)` m and the nested
+locator at `(0.00, -0.60, 2.30)` m in Blender. Both followed a pose on their
+respective bones. The root and explicit torso replacement packages also passed.
+The selector interpretation for an installed game Record still requires its own evidence.
+
 The [static relay fixture](static-relay-blender-verification.md) checks full helper rotation
 in an ordinary entity package imported by native Blender.
 
