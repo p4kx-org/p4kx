@@ -97,6 +97,12 @@ tokens and port values. The export keeps repeated edges and does not resolve end
 or infer a Wwise binding. Every field receipt points to its original CryXml table position
 or XML byte range. The audio-control stream and Media envelope retain their format versions.
 
+On installed PTU Build 13248297, a bounded read of the original CRC-verified Entry
+matched all 1,949 projected roles to independent authored routes and immediate source
+uses. That included 52 input links and 51 output links. The fixed graph Entry was
+absent from the complete LIVE Build 13220821 directory. The encrypted synthetic
+fixture also checks the emitted roles and provenance in the serialized Media stream.
+
 ## Installed ATL checks
 
 Both checks use `P4KX_DATA_P4K` and the configured Archive key. The census also
