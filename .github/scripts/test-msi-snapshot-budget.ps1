@@ -117,13 +117,18 @@ try {
     $checkpointHash=Get-P4kxDetachedDigest $checkpointPath
     [IO.File]::Delete((Join-Path $observer 'controlled-leaf.json'))
     $finishFailed=$false;$finishTimer=[Diagnostics.Stopwatch]::StartNew()
+    $finishOutput=[Collections.Generic.List[string]]::new()
     $env:P4KX_SNAPSHOT_FIXTURE_BLOCK='owned-state'
     try {
-        & (Join-Path $scripts 'invoke-msi-observer.ps1') -Stage Finish -Directory $observer -WaitMilliseconds 0 -FinishMaximumMilliseconds 2000
+        & (Join-Path $scripts 'invoke-msi-observer.ps1') -Stage Finish -Directory $observer -WaitMilliseconds 0 -FinishMaximumMilliseconds 2000 6>&1 |
+            ForEach-Object { $finishOutput.Add([string]$_) }
     } catch { $finishFailed=$true }
     finally { $env:P4KX_SNAPSHOT_FIXTURE_BLOCK=$saved.block }
     $finishElapsed=$finishTimer.ElapsedMilliseconds
+    Assert-Snapshot ($finishOutput.Count -eq 0) 'Finish forwarded output to the caller during its bounded evidence capture.'
     $finish=Join-Path $observer 'snapshots/09'
+    $stdout=Get-Content -LiteralPath (Join-Path $finish 'finish-stdout.log') -Raw
+    Assert-Snapshot ($stdout.Contains('[P4KX-MSI-OBSERVER]') -and [IO.File]::Exists((Join-Path $finish 'finish-stderr.log'))) 'Finish lost its durable diagnostic streams.'
     $finishStart=Read-P4kxDetachedReceipt (Join-Path $finish 'caller-start.json')
     $finishResult=Read-P4kxDetachedReceipt (Join-Path $finish 'caller-result.json')
     $finishLeaf=Read-P4kxDetachedReceipt (Join-Path $observer 'controlled-leaf.json')

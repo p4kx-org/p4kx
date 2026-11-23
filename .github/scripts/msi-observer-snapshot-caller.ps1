@@ -50,10 +50,13 @@ function Invoke-P4kxMsiObserverSnapshot {
     if (-not $Finish -and ($Sequence -eq 9 -or $MaximumMilliseconds -gt 100000)) {
         throw 'MSI snapshot cannot use the Finish checkpoint or exceed its capture bound.'
     }
-    $console=New-P4kxMsiSnapshotConsole -Sequence $Sequence
-    Write-P4kxMsiSnapshotConsoleMarker $console 'caller' 'begin'
-    $receive=(Get-Item 'Function:Receive-P4kxMsiSnapshotConsole').ScriptBlock
-    $progress={param([string]$Stream,[string]$Chunk); & $receive $console $Stream $Chunk}.GetNewClosure()
+    $console=$null;$progress=$null
+    if (-not $Finish) {
+        $console=New-P4kxMsiSnapshotConsole -Sequence $Sequence
+        Write-P4kxMsiSnapshotConsoleMarker $console 'caller' 'begin'
+        $receive=(Get-Item 'Function:Receive-P4kxMsiSnapshotConsole').ScriptBlock
+        $progress={param([string]$Stream,[string]$Chunk); & $receive $console $Stream $Chunk}.GetNewClosure()
+    }
     if ($ScheduledDelay -and ($Sequence -ne 2 -or $WaitMilliseconds -ne 0)) {
         throw 'Scheduled capture only supports a zero-wait checkpoint 2.'
     }
@@ -105,7 +108,7 @@ function Invoke-P4kxMsiObserverSnapshot {
             $record.capture_ms=$budget.capture_ms;$record.cleanup_ms=$budget.cleanup_ms
         }
         if (-not $Finish) { Write-P4kxDetachedReceipt (Join-Path $capture 'caller-start.json') $record }
-        Write-P4kxMsiSnapshotConsoleMarker $console 'caller' 'end'
+        if ($null -ne $console) { Write-P4kxMsiSnapshotConsoleMarker $console 'caller' 'end' }
         $budget=if ($ScheduledDelay) { Get-P4kxMsiCheckpoint2CaptureBudget $window $budget.capture_ms }
             elseif ($Finish) { Get-P4kxMsiFinishBudget $finishRequest $budget.capture_ms }
             else { Get-P4kxMsiSnapshotBudget $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC $budget.capture_ms }
@@ -119,7 +122,7 @@ function Invoke-P4kxMsiObserverSnapshot {
             throw 'MSI snapshot worker did not return a successful capture.'
         }
     } catch { $failure=$_.Exception }
-    Write-P4kxMsiSnapshotConsoleMarker $console 'callerReturn' 'begin'
+    if ($null -ne $console) { Write-P4kxMsiSnapshotConsoleMarker $console 'callerReturn' 'begin' }
     $record.role=if($Finish){'native-msi-finish-return'}else{'native-msi-snapshot-return'}
     $record.elapsed_ms=$timer.ElapsedMilliseconds
     $record.worker=$observation
@@ -129,6 +132,6 @@ function Invoke-P4kxMsiObserverSnapshot {
     else { $record.snapshot_returned=$returned }
     $record.failure_type=$(if($null -ne $failure){$failure.GetType().FullName}else{$null})
     Write-P4kxDetachedReceipt (Join-Path $capture 'caller-result.json') $record
-    Write-P4kxMsiSnapshotConsoleMarker $console 'callerReturn' 'end'
+    if ($null -ne $console) { Write-P4kxMsiSnapshotConsoleMarker $console 'callerReturn' 'end' }
     if ($null -ne $failure) { throw $failure }
 }
