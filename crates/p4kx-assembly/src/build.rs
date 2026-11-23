@@ -57,14 +57,10 @@ impl Assembly {
             .map(|built| built.with_default_material(models))
     }
 
-    /// Builds the Assembly like [`Self::build`] and resolves the tint palette of each part with
-    /// `palettes`: the one its Entity's geometry names, else the one of its nearest ancestor, else
-    /// the default of its material library. Each distinct palette is read once and shared by the
-    /// parts that use it.
+    /// Builds the Assembly and resolves each part's tint palette with `palettes`.
     ///
-    /// A palette that cannot be resolved is an [`Issue`] of the first part that names it; the
-    /// part falls back to the palette of its nearest ancestor, else the library's default
-    /// palette, else it keeps the colours of its library.
+    /// Tries the material node, geometry, nearest ancestor and library default in that order.
+    /// Reports unreadable references on first use and shares each resolved palette by Record.
     ///
     /// # Errors
     ///

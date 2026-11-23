@@ -236,10 +236,10 @@ impl Walker<'_> {
             self.note(&todo.path, file, IssueKind::Palette { reason });
             return None;
         };
-        Some(PaletteRef {
+        Some(PaletteRef::new(
             guid,
-            child_path: palette.child.clone(),
-            selector: crate::geometry::PaletteReferenceSource::SocEntity,
-        })
+            palette.child.clone(),
+            crate::geometry::PaletteReferenceSource::SocEntity,
+        ))
     }
 }

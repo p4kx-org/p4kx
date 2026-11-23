@@ -143,7 +143,8 @@ fn a_palette_only_variant_retains_its_original_sparse_position() -> TestResult {
     let original = forge.record(1).ok_or("the palette Record")?;
     assert_eq!(palette.guid(), original.guid());
     assert_eq!(palette.child_path(), "synthetic/finish");
-    let PaletteReferenceSource::Named(palette_location) = &palette.selector else {
+    let preferred = palette.candidates().next().ok_or("the preferred palette")?;
+    let PaletteReferenceSource::Named(palette_location) = &preferred.selector else {
         return Err("the expected named palette selector".into());
     };
     assert_eq!(

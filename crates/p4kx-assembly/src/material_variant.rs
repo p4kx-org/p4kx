@@ -44,10 +44,11 @@ impl<'variant> MaterialVariantSelection<'variant> {
     /// Returns the selected variant's palette reference bound to its original field.
     #[must_use]
     pub fn palette(&self) -> Option<PaletteRef> {
-        let mut palette = self.variant.palette.clone()?;
-        palette.selector =
-            PaletteReferenceSource::Named(Some(self.field_location(".Palette.RootRecord")));
-        Some(palette)
+        let location = self.field_location(".Palette.RootRecord");
+        self.variant
+            .palette
+            .clone()
+            .map(|palette| palette.with_selector(PaletteReferenceSource::Named(Some(location))))
     }
 
     /// Returns the original field address of the selected variant.

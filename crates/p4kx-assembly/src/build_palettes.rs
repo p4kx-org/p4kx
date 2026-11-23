@@ -10,7 +10,7 @@ use p4kx_model::MaterialStatus;
 
 use crate::build_models::Loaded;
 use crate::flatten::Draft;
-use crate::geometry::PaletteReferenceSource;
+use crate::geometry::{PaletteCandidate, PaletteReferenceSource};
 use crate::palette::{ChosenPalette, material_default_location};
 use crate::{
     Geometry, IssueKind, PaletteFailure, PaletteProvider, PaletteRecords, PaletteSelection,
@@ -28,10 +28,8 @@ struct Resolved {
 
 /// Resolves the tint palette of each part, reading every distinct palette Record once.
 ///
-/// A part takes the palette its Entity's geometry names; when that cannot be resolved, or the
-/// Entity names none, the palette of its nearest ancestor, else the default palette of its
-/// material library. Palettes are cached by the GUID of the Record, however it was named, so one
-/// Record is one palette. Each failure message is reported for the first part that meets it.
+/// Reads the material node and geometry palettes before ancestor and library defaults.
+/// Palettes are cached by Record GUID. Each failure is reported on its first occurrence.
 pub(crate) struct Palettes<'p> {
     provider: Option<&'p dyn PaletteProvider>,
     forge_origin: Option<Arc<DataForgeOrigin>>,
@@ -87,9 +85,7 @@ impl<'p> Palettes<'p> {
     /// Returns the palette of a part drawn with `library` and the one its attachments inherit,
     /// and what could not be resolved on the way.
     ///
-    /// The part takes the palette its Entity's geometry names; else `inherited`, the one of its
-    /// nearest ancestor; else the default palette of `library`. Only the first two are handed
-    /// down: a library default is no palette of the part's own.
+    /// Entity and inherited palettes are passed to attachments.
     fn of(
         &mut self,
         index: usize,
@@ -151,13 +147,23 @@ impl<'p> Palettes<'p> {
         named: &crate::PaletteRef,
         issues: &mut Vec<IssueKind>,
     ) -> Option<ChosenPalette> {
-        let guid = named.guid();
-        let what = format!("the tint palette {guid}");
-        let found = if named.child_path().is_empty() {
+        named
+            .candidates()
+            .find_map(|candidate| self.read_named(provider, candidate, issues))
+    }
+
+    fn read_named(
+        &mut self,
+        provider: &dyn PaletteProvider,
+        named: &PaletteCandidate,
+        issues: &mut Vec<IssueKind>,
+    ) -> Option<ChosenPalette> {
+        let guid = named.guid;
+        let found = if named.child_path.is_empty() {
             self.read(provider, guid)
         } else {
             Err(PaletteFailure::Unreadable {
-                reason: format!("the child {} is not supported", named.child_path()),
+                reason: format!("the child {} is not supported", named.child_path),
             })
         };
         match found {
@@ -178,7 +184,7 @@ impl<'p> Palettes<'p> {
                 Some(palette)
             }
             Err(failure) => {
-                self.note(issues, &what, &failure);
+                self.note(issues, &format!("the tint palette {guid}"), &failure);
                 None
             }
         }

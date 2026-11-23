@@ -12,6 +12,15 @@ pub(crate) struct GeometryComponent {
     pub(crate) ordinal: usize,
 }
 
+impl GeometryComponent {
+    pub(super) fn at(self, field: &str) -> SourceLocation {
+        SourceLocation::DataForge {
+            record_index: self.record,
+            field: format!("Components[{}]{field}", self.ordinal),
+        }
+    }
+}
+
 #[derive(Debug)]
 pub(super) struct Position {
     pub(super) owner: GeometryComponent,
@@ -65,10 +74,7 @@ impl GeometrySelectors {
 
     pub(crate) fn material_field(&self) -> Option<SourceLocation> {
         Some(match self.material.as_ref()? {
-            MaterialPosition::Component(owner) => SourceLocation::DataForge {
-                record_index: owner.record,
-                field: format!("Components[{}].Material.Material.path", owner.ordinal),
-            },
+            MaterialPosition::Component(owner) => owner.at(".Material.Material.path"),
             MaterialPosition::Geometry(position) => position.at(".Geometry.Material.path"),
             MaterialPosition::Authored(location) => location.as_ref().clone(),
         })

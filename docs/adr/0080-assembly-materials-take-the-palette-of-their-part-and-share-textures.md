@@ -4,13 +4,12 @@ Decided for issue #127, which builds on ADR-0040 (the Assembly) and ADR-0077 (sh
 
 ## Decision
 
-**Which palette a part has.** A part takes the tint palette its Entity's geometry names
-(`SGeometryDataParams.Palette`, a `TintPaletteRef` whose `RootRecord` is a `TintPaletteTree`
-Record). When the Entity names none, or the Record cannot be used, the part takes the
-`DefaultPalette` its material library names. There is no fallback by name or family. A
-`ChildPath` below the root palette is not supported yet: such a palette is reported and the part
-falls back as for a missing one. Paint items attached to a Paint port, which choose a
-sub-geometry and its palette, are chosen by the flags of their port (ADR-0208).
+**Which palette a part has.** For the selected Entity component, resolve
+`Material.Palette.RootRecord` before `Geometry.Geometry.Palette.RootRecord`. Both refer to a
+`TintPaletteTree` Record. An unreadable reference, including an unsupported `ChildPath`,
+produces a diagnostic and resolution continues. Assembly parts then try the nearest ancestor
+palette and the material library's `DefaultPalette`. Paint items attached to a Paint port
+choose their authored variant by the flags of that port (ADR-0208).
 
 **Which materials take it.** A material takes the palette entry of its first `MatLayers` layer
 with a `PaletteTint` of 1, 2 or 3 (primary, secondary, tertiary), and a `GlassPBR` material whose

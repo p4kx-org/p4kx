@@ -64,7 +64,8 @@ fn geometry_structs() -> Vec<TestStruct> {
         TestStruct::new("SMaterialNodeParams")
             .field("Tags", TestType::String)
             .field("Material", class("GlobalResourceMaterial"))
-            .array("materialVariants", class("SMaterialNodeParams")),
+            .array("materialVariants", class("SMaterialNodeParams"))
+            .field("Palette", class("TintPaletteRef")),
         TestStruct::new("SGeometryNodeParams")
             .field("Tags", TestType::String)
             .field("Geometry", class("SGeometryDataParams"))

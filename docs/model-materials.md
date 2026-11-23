@@ -96,6 +96,14 @@ The shared layer cache retains its separate relative layer-path contract.
 Synthetic and optional local consumer verification is documented in
 [material-reference-verification.md](material-reference-verification.md).
 
+## Entity tint palettes
+
+The selected Entity geometry component can name a tint palette on its Material node or
+its main geometry. Assembly, armour and interior class exports try the Material node
+first. When the Material node omits the reference or that palette cannot be read, the
+same component's geometry palette can supply it. Source evidence identifies the winning
+`RootRecord` field and the palette Record. An unreadable reference produces a diagnostic.
+
 ## Fitted vehicle paints
 
 Entity GLB and Blender package exports resolve the root vehicle's fitted item on its effective

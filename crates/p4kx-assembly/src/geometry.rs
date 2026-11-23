@@ -24,10 +24,15 @@ mod variants;
 
 pub(crate) use self::variants::AppearanceOnlyVariant;
 
-/// The tint palette an Entity's geometry names (`Palette.TintPaletteRef`): the `TintPaletteTree`
-/// Record and the child of its tree.
-#[derive(Debug, Clone)]
+/// The authored tint palette selection, with geometry fallback when the material node names one.
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PaletteRef {
+    preferred: PaletteCandidate,
+    fallback: Option<PaletteCandidate>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct PaletteCandidate {
     pub(crate) guid: Guid,
     pub(crate) child_path: String,
     pub(crate) selector: PaletteReferenceSource,
@@ -40,26 +45,52 @@ pub(crate) enum PaletteReferenceSource {
     SocEntity,
 }
 
-impl PartialEq for PaletteRef {
+impl PartialEq for PaletteCandidate {
     fn eq(&self, other: &Self) -> bool {
         self.guid == other.guid && self.child_path == other.child_path
     }
 }
 
-impl Eq for PaletteRef {}
+impl Eq for PaletteCandidate {}
 
 impl PaletteRef {
     /// Returns the GUID of the `TintPaletteTree` Record.
     #[must_use]
     pub const fn guid(&self) -> Guid {
-        self.guid
+        self.preferred.guid
     }
 
-    /// Returns the path of the child palette below the Record's root, or an empty string for the
-    /// root.
+    /// Returns the preferred palette's child path, or an empty string for the root.
     #[must_use]
     pub fn child_path(&self) -> &str {
-        &self.child_path
+        &self.preferred.child_path
+    }
+
+    pub(crate) fn new(guid: Guid, child_path: String, selector: PaletteReferenceSource) -> Self {
+        Self {
+            preferred: PaletteCandidate {
+                guid,
+                child_path,
+                selector,
+            },
+            fallback: None,
+        }
+    }
+
+    pub(crate) fn with_selector(mut self, selector: PaletteReferenceSource) -> Self {
+        self.preferred.selector = selector;
+        self
+    }
+
+    fn with_geometry_fallback(mut self, geometry: Option<Self>) -> Self {
+        self.fallback = geometry
+            .map(|palette| palette.preferred)
+            .filter(|candidate| *candidate != self.preferred);
+        self
+    }
+
+    pub(crate) fn candidates(&self) -> impl Iterator<Item = &PaletteCandidate> {
+        std::iter::once(&self.preferred).chain(&self.fallback)
     }
 
     pub(crate) fn read(data: &StructValue<'_>) -> Option<Self> {
@@ -69,11 +100,11 @@ impl PaletteRef {
             Value::Error(ValueError::DanglingReference { guid }) => *guid,
             _ => return None,
         };
-        Some(Self {
+        Some(Self::new(
             guid,
-            child_path: text(reference, "ChildPath").trim().to_owned(),
-            selector: PaletteReferenceSource::Named(None),
-        })
+            text(reference, "ChildPath").trim().to_owned(),
+            PaletteReferenceSource::Named(None),
+        ))
     }
 }
 
@@ -186,8 +217,19 @@ impl Geometry {
     pub(crate) fn read(component: &StructValue<'_>, owner: GeometryComponent) -> Option<Self> {
         let data = struct_field(struct_field(component, "Geometry")?, "Geometry")?;
         let path = model_path(data)?;
-        let component_material = struct_field(component, "Material").and_then(material_path);
-        Some(Self::from_data(data, owner, &[], path, component_material))
+        let material_node = struct_field(component, "Material");
+        let component_material = material_node.and_then(material_path);
+        let mut geometry = Self::from_data(data, owner, &[], path, component_material);
+        if let Some(palette) = material_node.and_then(PaletteRef::read) {
+            let source =
+                PaletteReferenceSource::Named(Some(owner.at(".Material.Palette.RootRecord")));
+            geometry.palette = Some(
+                palette
+                    .with_selector(source)
+                    .with_geometry_fallback(geometry.palette.take()),
+            );
+        }
+        Some(geometry)
     }
 
     /// Returns the physical Record field that names this geometry.
@@ -263,15 +305,13 @@ impl Geometry {
         if component_material.is_some() {
             origins.material = Some(MaterialPosition::Component(owner));
         }
-        let mut palette = PaletteRef::read(data);
-        if let Some(palette) = &mut palette {
-            palette.selector = PaletteReferenceSource::Named(
-                origins
-                    .model
-                    .as_ref()
-                    .map(|position| position.at(".Geometry.Palette.RootRecord")),
-            );
-        }
+        let palette = PaletteRef::read(data).map(|palette| {
+            let location = origins
+                .model
+                .as_ref()
+                .map(|position| position.at(".Geometry.Palette.RootRecord"));
+            palette.with_selector(PaletteReferenceSource::Named(location))
+        });
         Self {
             path: path.to_owned(),
             material: material.map(str::to_owned),

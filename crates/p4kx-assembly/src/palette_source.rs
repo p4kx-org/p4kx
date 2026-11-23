@@ -56,7 +56,7 @@ pub struct PaletteRecords {
 #[derive(Debug, Clone)]
 #[non_exhaustive]
 pub enum PaletteSelection {
-    /// A named palette chosen through the placement's authored geometry.
+    /// A palette chosen through an authored material node or geometry.
     Named {
         /// The original Record and field, when the named choice was read with a coordinate.
         location: Option<SourceLocation>,
@@ -96,7 +96,7 @@ impl PaletteSource {
         self.forge_origin.as_deref()
     }
 
-    /// Returns the DataForge supplying a named geometry selector, independently of the palette payload.
+    /// Returns the DataForge supplying the authored palette selector.
     #[must_use]
     pub fn named_origin(&self) -> Option<&DataForgeOrigin> {
         self.named_origin.as_deref()

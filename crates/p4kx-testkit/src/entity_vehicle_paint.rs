@@ -214,9 +214,6 @@ fn schema() -> DataForgeBuilder {
         .structs
         .into_iter()
         .map(|structure| match structure.name.as_str() {
-            "SMaterialNodeParams" => {
-                structure.field("Palette", TestType::Class("TintPaletteRef".to_owned()))
-            }
             "SItemDefinition" => structure.field("RequiredTags", TestType::String),
             _ => structure,
         })

@@ -31,11 +31,11 @@ impl Walker<'_> {
             return found.clone();
         }
         let found = match lookup.palettes().guid_at_observed(path) {
-            Ok(read) => Some(PaletteRef {
-                guid: read.value,
-                child_path: String::new(),
-                selector: crate::geometry::PaletteReferenceSource::IncludedPath(read.record),
-            }),
+            Ok(read) => Some(PaletteRef::new(
+                read.value,
+                String::new(),
+                crate::geometry::PaletteReferenceSource::IncludedPath(read.record),
+            )),
             Err(failure) => {
                 let reason = format!("the tint palette {path} cannot be used: {failure}");
                 self.note(&todo.path, file, IssueKind::Palette { reason });
