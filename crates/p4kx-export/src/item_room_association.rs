@@ -57,8 +57,4 @@ impl<'source> ItemRoomAssociation<'source> {
     pub const fn owner(&self) -> &ComponentOwner {
         &self.owner
     }
-
-    pub(in crate::catalog_v3) const fn file_name(&self) -> Option<&'source str> {
-        self.object_container.value().copied()
-    }
 }

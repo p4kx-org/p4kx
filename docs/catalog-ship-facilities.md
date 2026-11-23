@@ -161,8 +161,12 @@ decoded SOC Entry. `localTransform` is a row-major 3x4 transform in the containi
 room's coordinates, with a distinct invalid state for malformed or ambiguous inputs.
 The original attributes are available in either case.
 
-`placements.facilityInteriorCoverage` records opened `containers` and findings
-for each inspected room slot. A facility joins its containing occurrence using
+`placements.facilityInteriorCoverage` records each admitted room slot with its
+sourced `fileName`, opened `containers` and findings. The filename retains the
+original vehicle `fileName` or item `objectContainer` value, including authored
+whitespace and non-present source states. `containers` and `findings` stay empty
+when there is no readable, nonblank filename to look up. A failed Archive lookup
+for a readable filename records its own finding. A facility joins its containing occurrence using
 the `source.room` key and `source.position.value.containerOccurrenceOrdinal`.
 The root occurrence has a null `parentOrdinal` and `child`. Each nested occurrence
 references its parent and retains the original Child descriptor node, raw

@@ -24727,6 +24727,10 @@
           },
           "type": "array"
         },
+        "fileName": {
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The filename from the original vehicle slot or item declaration."
+        },
         "findings": {
           "items": {
             "$ref": "#/$defs/InteriorFinding"
@@ -24739,6 +24743,7 @@
       },
       "required": [
         "containers",
+        "fileName",
         "findings",
         "room"
       ],

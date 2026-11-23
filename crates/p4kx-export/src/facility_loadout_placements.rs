@@ -34,6 +34,9 @@ use crate::{CatalogError, ExportAccountingError};
 
 #[path = "facility_interior_child.rs"]
 mod child;
+#[path = "facility_interior_class_targets.rs"]
+mod classes;
+pub(crate) use classes::{ClassLookup, ClassMembership};
 #[path = "facility_interior_hosts.rs"]
 mod hosts;
 #[path = "installed_configuration.rs"]
@@ -49,6 +52,9 @@ pub(crate) use installed::{ScopedFlightLinks, read_owner_links, scoped_table};
 use loadout_walk_state::Path;
 #[path = "facility_interior_placements.rs"]
 mod interior;
+#[path = "facility_interior_scoped.rs"]
+mod scoped_rooms;
+pub(crate) use scoped_rooms::{collect_room_attachments, project_room_coverage};
 #[path = "facility_model_helper.rs"]
 mod model_helper;
 #[path = "facility_model_node_inputs.rs"]
@@ -62,7 +68,8 @@ mod types;
 #[path = "facility_interior_walk.rs"]
 mod walk;
 
-pub(super) use types::{InteriorFacilityPlacement, InteriorRoomCoverage};
+pub(super) use types::InteriorFacilityPlacement;
+pub use types::InteriorRoomCoverage;
 
 pub(super) struct LoadoutPlacements {
     pub(super) facilities: CatalogTable<FacilityInstance>,
@@ -90,7 +97,7 @@ pub(super) fn table(
     input.check_forge(forge)?;
     let mut project = Projection::new(configurations.entities, input.origins(), cancel)?;
     let mut flight_instances = InstalledConfigurations::new(configurations.flight)?;
-    let rooms = RoomOwners::new(configurations.entities)?;
+    let rooms = RoomOwners::new(&configurations.entities.topology)?;
     let coverage = if project.indexed_definitions()?.is_empty()
         && rooms.is_empty()
         && flight_instances.is_empty()
@@ -98,11 +105,12 @@ pub(super) fn table(
         Vec::new()
     } else {
         let mut attachments = Vec::new();
+        let mut room_lookup = |record| Ok(rooms.contains(record));
         for ship in loadouts.ships() {
             project.check_cancel()?;
             project.loadout(
                 &ship.loadout,
-                &rooms,
+                &mut room_lookup,
                 &mut attachments,
                 &mut flight_instances,
             )?;
@@ -148,7 +156,7 @@ pub(crate) fn project_loadout<'lookup>(
     };
     projection.loadout(
         loadout,
-        &RoomOwners::default(),
+        &mut |_| Ok(false),
         &mut Vec::new(),
         &mut InstalledConfigurations::default(),
     )?;
@@ -168,12 +176,7 @@ pub(crate) fn project_installed_configurations<'lookup>(
         rows: Vec::new(),
     };
     let mut flight = InstalledConfigurations::scoped(lookup);
-    projection.loadout(
-        loadout,
-        &RoomOwners::default(),
-        &mut Vec::new(),
-        &mut flight,
-    )?;
+    projection.loadout(loadout, &mut |_| Ok(false), &mut Vec::new(), &mut flight)?;
     Ok(flight.rows)
 }
 
@@ -244,6 +247,8 @@ fn link_definitions(
 pub(crate) type ConfigurationLookup<'lookup> =
     dyn FnMut(u32) -> Result<Vec<FacilityConfiguration>, CatalogError> + 'lookup;
 
+pub(crate) type RoomLookup<'lookup> = dyn FnMut(u32) -> Result<bool, CatalogError> + 'lookup;
+
 type IndexedDefinitions<'rows> = HashMap<u32, Vec<Definition<'rows>>>;
 
 enum Definitions<'rows> {
@@ -293,7 +298,7 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
     fn loadout(
         &mut self,
         loadout: &Loadout,
-        rooms: &RoomOwners<'_, '_>,
+        rooms: &mut RoomLookup<'_>,
         room_attachments: &mut Vec<RoomAttachment>,
         flight: &mut InstalledConfigurations<'_>,
     ) -> Result<(), CatalogError> {

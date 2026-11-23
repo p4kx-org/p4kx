@@ -19,6 +19,10 @@ mod item_rooms;
 mod model_helper;
 #[path = "catalog_facility_nested_interior.rs"]
 mod nested;
+#[path = "catalog_facility_room_declarations.rs"]
+mod room_declarations;
+#[path = "catalog_facility_interior_coverage_sdk.rs"]
+mod scoped_coverage;
 #[path = "catalog_facility_ship_frame.rs"]
 mod ship_frame;
 

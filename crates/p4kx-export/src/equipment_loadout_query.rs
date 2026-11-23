@@ -26,6 +26,13 @@ pub use facility_placements::{
     read_loadout_facility_placements_from,
 };
 
+#[path = "equipment_facility_interior_query.rs"]
+mod facility_interiors;
+pub use facility_interiors::{
+    FacilityInteriorCoverageSnapshot, InteriorCoverageDependency, InteriorRoomCoverage,
+    read_facility_interior_coverage, read_facility_interior_coverage_from,
+};
+
 #[path = "equipment_installed_configuration_query.rs"]
 mod installed_configurations;
 pub use installed_configurations::{

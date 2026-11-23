@@ -55,6 +55,8 @@ pub(super) mod dismantle;
 pub(super) mod entity_animation;
 #[path = "sdk_facility_route.rs"]
 mod facilities;
+#[path = "sdk_facility_interior_coverage_route.rs"]
+mod facility_interior_coverage;
 #[path = "../it/catalog_facility_medbed_fixture.rs"]
 mod facility_medbed_fixture;
 #[path = "sdk_facility_placement_route.rs"]
@@ -298,8 +300,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(hacking::read()?);
     routes.push(inventory_containers::read()?);
     routes.push(inventory_containers::read_configurations()?);
-    routes.push(facilities::read()?);
-    routes.extend(facility_placements::read()?);
+    append_facility_routes(routes)?;
     routes.push(client_profiles::read()?);
     routes.extend(cargo::read_globals(archive)?);
     routes.push(cargo::read_manifests()?);
@@ -325,6 +326,13 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(starmap_definitions::read()?);
     routes.extend(soils::read()?);
     routes.extend(terrain::read()?);
+    Ok(())
+}
+
+fn append_facility_routes(routes: &mut Vec<Route>) -> TestResult<()> {
+    routes.push(facilities::read()?);
+    routes.extend(facility_placements::read()?);
+    routes.push(facility_interior_coverage::read()?);
     Ok(())
 }
 

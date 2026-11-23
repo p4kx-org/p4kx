@@ -38,6 +38,7 @@ const PROVENANCE: &str = "/provenance";
 const INVENTORY_CONFIGURATIONS: &str = "/configurations/inventoryConfigurations";
 const FACILITIES: &str = "/configurations/facilities";
 const FACILITY_INSTANCES: &str = "/placements/facilityInstances";
+const FACILITY_INTERIOR_COVERAGE: &str = "/placements/facilityInteriorCoverage";
 const MEDICAL_ITEM_TIER_CONFIGS: &str = "/definitions/medicalItemTierConfigs";
 const MANUFACTURERS: &str = "/definitions/manufacturers";
 const FACTION_IDENTITIES: &str = "/definitions/factionIdentities";
@@ -219,6 +220,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     routes::interactions::DATASET,
     FACILITIES,
     FACILITY_INSTANCES,
+    FACILITY_INTERIOR_COVERAGE,
     MEDICAL_ITEM_TIER_CONFIGS,
     MANUFACTURERS,
     FACTION_IDENTITIES,

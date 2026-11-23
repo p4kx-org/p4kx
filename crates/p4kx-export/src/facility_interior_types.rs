@@ -70,9 +70,12 @@ pub(super) struct SocAttribute {
 
 /// Scope and findings for one original ship-room declaration.
 #[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(in crate::catalog_v3) struct InteriorRoomCoverage {
+pub struct InteriorRoomCoverage {
     pub(super) room: InteriorRoomRef,
+    /// The filename from the original vehicle slot or item declaration.
+    file_name: SourcedValue<String>,
     pub(super) containers: Vec<InteriorRoomContainer>,
     pub(super) findings: Vec<InteriorFinding>,
 }
@@ -97,6 +100,52 @@ pub(super) struct InteriorFinding {
 }
 
 impl InteriorRoomCoverage {
+    /// Borrows the original filename and its source state.
+    #[must_use]
+    pub const fn file_name(&self) -> &SourcedValue<String> {
+        &self.file_name
+    }
+
+    /// Borrows the physical declaration owner.
+    #[must_use]
+    pub const fn owner(&self) -> &ComponentOwner {
+        &self.room.owner
+    }
+
+    /// Borrows the ordered Loadout path of an attached room.
+    #[must_use]
+    pub const fn loadout_position(&self) -> Option<&SourcedValue<LoadoutPosition>> {
+        self.room.loadout_position.as_ref()
+    }
+
+    pub(crate) fn is_complete(&self) -> bool {
+        use p4kx_extraction::SourceValueState;
+        let file = self.file_name.state();
+        matches!(
+            file,
+            SourceValueState::Present | SourceValueState::Absent | SourceValueState::Null
+        ) && self.file_name.origin().source_set_complete()
+            && self
+                .room
+                .loadout_position
+                .as_ref()
+                .is_none_or(|path| path.origin().source_set_complete())
+            && self
+                .containers
+                .iter()
+                .all(|container| container.container.origin().source_set_complete())
+            && self.findings.is_empty()
+    }
+
+    pub(super) fn declared(room: InteriorRoomRef, file_name: &SourcedValue<&str>) -> Self {
+        Self {
+            room,
+            file_name: file_name.map_ref(|name| (*name).to_owned()),
+            containers: Vec::new(),
+            findings: Vec::new(),
+        }
+    }
+
     pub(super) fn note(
         &mut self,
         kind: InteriorFindingKind,

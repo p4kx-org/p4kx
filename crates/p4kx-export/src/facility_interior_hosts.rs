@@ -5,11 +5,12 @@ use std::collections::HashMap;
 
 use p4kx_extraction::{SourceUse, SourcedValue};
 
-use super::super::catalog_entity_configurations::EntityConfigurationRows;
 use super::super::facility_instance::ShipContext;
 use super::super::item_component_owner::ComponentOwner;
 use super::super::loadout_position::LoadoutPosition;
-use super::super::resource_topology_declarations::ItemRoomAssociation;
+use super::super::resource_topology_declarations::{
+    ItemRoomAssociation, ResourceTopologyDeclarations,
+};
 use super::super::room_associations::{RoomAssociation, RoomAssociations};
 use super::Projection;
 use super::model_helper::RoomHelperModels;
@@ -18,7 +19,6 @@ use super::types::{InteriorRoomCoverage, InteriorRoomDeclaration, InteriorRoomRe
 use super::walk::RoomReader;
 use crate::{CatalogError, ExportAccountingError};
 
-#[derive(Default)]
 pub(super) struct RoomOwners<'rows, 'source> {
     by_record: HashMap<u32, Vec<RoomDefinition<'rows, 'source>>>,
 }
@@ -40,21 +40,14 @@ impl RoomDefinition<'_, '_> {
 
 impl<'rows, 'source> RoomOwners<'rows, 'source> {
     pub(super) fn new(
-        declarations: &'rows EntityConfigurationRows<'source>,
+        declarations: &'rows ResourceTopologyDeclarations<'source>,
     ) -> Result<Self, CatalogError> {
         let mut by_record = HashMap::<u32, Vec<RoomDefinition<'_, '_>>>::new();
         let definitions = declarations
-            .topology
             .rooms
             .iter()
             .map(RoomDefinition::Vehicle)
-            .chain(
-                declarations
-                    .topology
-                    .item_rooms
-                    .iter()
-                    .map(RoomDefinition::Item),
-            );
+            .chain(declarations.item_rooms.iter().map(RoomDefinition::Item));
         for definition in definitions {
             let (record, _) = definition.owner().key();
             by_record
@@ -84,7 +77,7 @@ impl<'rows, 'source> RoomOwners<'rows, 'source> {
     }
 }
 
-pub(super) struct RoomAttachment {
+pub(crate) struct RoomAttachment {
     pub(super) record: u32,
     pub(super) ship: ShipContext,
     pub(super) position: SourcedValue<LoadoutPosition>,
@@ -101,7 +94,7 @@ pub(super) struct RoomHost<'host> {
 pub(super) struct RoomSelection<'source> {
     file: &'source SourceUse,
     attachment: Option<&'source RoomAttachment>,
-    pub(super) frame: RoomFrame<'source>,
+    pub(super) frame: Option<RoomFrame<'source>>,
 }
 
 impl RoomSelection<'_> {
@@ -121,19 +114,19 @@ impl RoomSelection<'_> {
 struct RoomSlot<'row> {
     owner: &'row ComponentOwner,
     declaration: InteriorRoomDeclaration,
-    file: Option<&'row str>,
+    file: &'row SourcedValue<&'row str>,
     selector: Option<&'row SourceUse>,
     vehicle: Option<&'row RoomAssociation<'row>>,
 }
 
-impl RoomReader<'_> {
+impl RoomReader<'_, '_> {
     pub(super) fn project_host(
-        &self,
+        &mut self,
         project: &mut Projection<'_, '_>,
         coverage: &mut Vec<InteriorRoomCoverage>,
         rooms: &RoomOwners<'_, '_>,
         host: &RoomHost<'_>,
-        models: &mut RoomHelperModels<'_, '_, '_>,
+        mut models: Option<&mut RoomHelperModels<'_, '_, '_>>,
     ) -> Result<(), CatalogError> {
         for declaration in rooms.definitions(host.record) {
             project.check_cancel()?;
@@ -145,22 +138,22 @@ impl RoomReader<'_> {
                             declaration: InteriorRoomDeclaration::Vehicle {
                                 object_container_ordinal: room.container_ordinal.clone(),
                             },
-                            file: room.file_name().value().copied(),
+                            file: room.file_name(),
                             selector: room.file_use.as_ref(),
                             vehicle: Some(room),
                         };
-                        slot.project(self, project, coverage, host, models)?;
+                        slot.project(self, project, coverage, host, models.as_deref_mut())?;
                     }
                 }
                 RoomDefinition::Item(room) => {
                     let slot = RoomSlot {
                         owner: room.owner(),
                         declaration: InteriorRoomDeclaration::Item,
-                        file: room.file_name(),
+                        file: room.object_container(),
                         selector: room.file_use.as_ref(),
                         vehicle: None,
                     };
-                    slot.project(self, project, coverage, host, models)?;
+                    slot.project(self, project, coverage, host, models.as_deref_mut())?;
                 }
             }
         }
@@ -171,26 +164,13 @@ impl RoomReader<'_> {
 impl RoomSlot<'_> {
     fn project(
         self,
-        reader: &RoomReader<'_>,
+        reader: &mut RoomReader<'_, '_>,
         project: &mut Projection<'_, '_>,
         coverage: &mut Vec<InteriorRoomCoverage>,
         host: &RoomHost<'_>,
-        models: &mut RoomHelperModels<'_, '_, '_>,
+        models: Option<&mut RoomHelperModels<'_, '_, '_>>,
     ) -> Result<(), CatalogError> {
         project.check_cancel()?;
-        let Some(path) = self.file.filter(|path| !path.trim().is_empty()) else {
-            return Ok(());
-        };
-        let file = self
-            .selector
-            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-        let attached = host.attachment.is_some();
-        let helper = RoomFrame::read_helper(attached, self.vehicle, models, host.record)?;
-        let selection = RoomSelection {
-            file,
-            attachment: host.attachment,
-            frame: RoomFrame::read(attached, self.vehicle, helper.as_ref()),
-        };
         let identity = InteriorRoomRef {
             owner: self.owner.clone(),
             declaration: self.declaration,
@@ -198,7 +178,26 @@ impl RoomSlot<'_> {
                 .attachment
                 .map(|attachment| attachment.position.clone()),
         };
-        coverage.push(reader.room(project, host.ship, identity, &selection, path)?);
+        let mut observed = InteriorRoomCoverage::declared(identity, self.file);
+        if let Some(&path) = self.file.value().filter(|path| !path.trim().is_empty()) {
+            let file = self
+                .selector
+                .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+            let attached = host.attachment.is_some();
+            let emits_facilities = models.is_some();
+            let helper = models
+                .map(|models| RoomFrame::read_helper(attached, self.vehicle, models, host.record))
+                .transpose()?
+                .flatten();
+            let selection = RoomSelection {
+                file,
+                attachment: host.attachment,
+                frame: emits_facilities
+                    .then(|| RoomFrame::read(attached, self.vehicle, helper.as_ref())),
+            };
+            reader.room(project, host.ship, &mut observed, &selection, path)?;
+        }
+        coverage.push(observed);
         Ok(())
     }
 }

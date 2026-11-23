@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{HashMap, HashSet};
-
 use p4kx_extraction::{
     Archive, DataForge, Guid, PathKeys, SourceUse, SourceUseRole, SourceUses, SourceValue,
     SourcedValue,
 };
 
 use super::super::facility_instance::{FacilityPlacementSource, ShipContext};
+use super::classes::{ClassTarget, ClassTargets};
 use super::hosts::{RoomAttachment, RoomHost, RoomOwners};
 use super::model_helper::RoomHelperModels;
 use p4kx_extraction::model::Transform;
@@ -28,12 +27,6 @@ use crate::contract_entities::Ship;
 use crate::record_header_field::RecordHeaderField;
 use crate::{CatalogError, ExportAccountingError};
 
-#[derive(Clone, Copy)]
-pub(super) enum ClassTarget {
-    One(u32),
-    Ambiguous,
-}
-
 pub(super) fn project(
     project: &mut Projection<'_, '_>,
     archive: &Archive,
@@ -51,14 +44,15 @@ pub(super) fn project(
     if ship_hosts.is_empty() && attachments.is_empty() {
         return Ok(Vec::new());
     }
-    let targets = class_targets(project, forge)?;
+    let configured = project.indexed_definitions()?.keys().copied();
+    let targets = ClassTargets::new(forge, configured, project.cancel)?;
     let keys = PathKeys::new(archive);
     let index = keys.index(archive);
-    let reader = RoomReader {
+    let mut reader = RoomReader {
         archive,
         index: &index,
         capture,
-        targets: &targets,
+        targets,
         cancel: project.cancel,
     };
     let mut coverage = Vec::new();
@@ -79,7 +73,7 @@ pub(super) fn project(
             ship: &ship,
             attachment: None,
         };
-        reader.project_host(project, &mut coverage, rooms, &host, &mut models)?;
+        reader.project_host(project, &mut coverage, rooms, &host, Some(&mut models))?;
     }
     for attachment in attachments {
         project.check_cancel()?;
@@ -88,42 +82,55 @@ pub(super) fn project(
             ship: &attachment.ship,
             attachment: Some(&attachment),
         };
-        reader.project_host(project, &mut coverage, rooms, &host, &mut models)?;
+        reader.project_host(project, &mut coverage, rooms, &host, Some(&mut models))?;
     }
     Ok(coverage)
 }
 
-fn class_targets(
-    project: &Projection<'_, '_>,
-    forge: &DataForge<'_>,
-) -> Result<HashMap<Guid, ClassTarget>, CatalogError> {
-    let configured: HashSet<_> = project
-        .indexed_definitions()?
-        .keys()
-        .map(|&index| {
-            forge
-                .record(index)
-                .map(|record| record.guid())
-                .ok_or(ExportAccountingError::ConflictingSourceDatum)
-        })
-        .collect::<Result<_, _>>()?;
-    let mut targets = HashMap::new();
-    for record in forge.records() {
+pub(super) fn coverage(
+    project: &mut Projection<'_, '_>,
+    archive: &Archive,
+    root: &ShipContext,
+    rooms: &RoomOwners<'_, '_>,
+    attachments: &[RoomAttachment],
+    capture: &EntryCapture<'_>,
+    targets: ClassTargets<'_, '_>,
+) -> Result<Vec<InteriorRoomCoverage>, CatalogError> {
+    let keys = PathKeys::new(archive);
+    let index = keys.index(archive);
+    let mut reader = RoomReader {
+        archive,
+        index: &index,
+        capture,
+        targets,
+        cancel: project.cancel,
+    };
+    let mut coverage = Vec::new();
+    let record = *root
+        .ship_record_index
+        .value()
+        .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+    let host = RoomHost {
+        record,
+        ship: root,
+        attachment: None,
+    };
+    reader.project_host(project, &mut coverage, rooms, &host, None)?;
+    for attachment in attachments {
         project.check_cancel()?;
-        let guid = record.guid();
-        if configured.contains(&guid) {
-            targets
-                .entry(guid)
-                .and_modify(|found| *found = ClassTarget::Ambiguous)
-                .or_insert_with(|| ClassTarget::One(record.index()));
-        }
+        let host = RoomHost {
+            record: attachment.record,
+            ship: &attachment.ship,
+            attachment: Some(attachment),
+        };
+        reader.project_host(project, &mut coverage, rooms, &host, None)?;
     }
-    Ok(targets)
+    Ok(coverage)
 }
 
-impl RoomReader<'_> {
+impl RoomReader<'_, '_> {
     pub(super) fn entity(
-        &self,
+        &mut self,
         project: &mut Projection<'_, '_>,
         coverage: &mut InteriorRoomCoverage,
         ship: &ShipContext,
@@ -142,18 +149,27 @@ impl RoomReader<'_> {
             route.note(coverage, InteriorFindingKind::InvalidClass);
             return Ok(());
         };
-        let Some(target) = self.targets.get(&guid) else {
+        let Some(target) = self.targets.resolve(guid)? else {
             return Ok(());
         };
-        let ClassTarget::One(index) = *target else {
+        let ClassTarget::One(index) = target else {
             route.note(coverage, InteriorFindingKind::AmbiguousClass);
+            return Ok(());
+        };
+        let Some(frame) = route.ship_frame else {
             return Ok(());
         };
         let configurations = project.configuration_links(index)?;
         if configurations.is_empty() {
             return Ok(());
         }
-        let source = route.placement(project, coverage.room.clone(), entity.fields()?, index)?;
+        let source = route.placement(
+            project,
+            coverage.room.clone(),
+            entity.fields()?,
+            index,
+            frame,
+        )?;
         project.rows.push(super::FacilityInstance {
             ship: ship.clone(),
             source: FacilityPlacementSource::Interior(Box::new(source)),
@@ -167,7 +183,7 @@ pub(super) struct StreamRoute<'room> {
     name: SourcedValue<String>,
     ordinal: u32,
     root_transform: Option<&'room RootRoomTransform>,
-    ship_frame: RoomFrame<'room>,
+    ship_frame: Option<RoomFrame<'room>>,
     container: PhysicalEntryRef,
     descriptor: PhysicalEntryRef,
     descriptor_node_index: u32,
@@ -216,6 +232,7 @@ impl<'room> StreamRoute<'room> {
         room: InteriorRoomRef,
         fields: SocSourceFields,
         index: u32,
+        frame: RoomFrame<'_>,
     ) -> Result<InteriorFacilityPlacement, CatalogError> {
         let sources = &project.origins.uses;
         let mut route = self.uses.clone();
@@ -247,7 +264,7 @@ impl<'room> StreamRoute<'room> {
             root_room_transform: self
                 .root_transform
                 .map(|root| root.for_entity(sources, &fields.local_transform)),
-            ship_frame_transform: self.ship_frame.for_entity(
+            ship_frame_transform: frame.for_entity(
                 sources,
                 self.root_transform,
                 &fields.local_transform,

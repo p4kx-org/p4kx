@@ -1,34 +1,33 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 use std::vec::IntoIter;
 
 use p4kx_extraction::model::Transform;
-use p4kx_extraction::{Archive, CancelToken, Guid, PathIndex, SourceUse, SourceUses, SourceValue};
+use p4kx_extraction::{Archive, CancelToken, PathIndex, SourceUse, SourceUses, SourceValue};
 
 use super::super::facility_instance::ShipContext;
 use super::super::loadout_position;
 use super::Projection;
 use super::child::{self, ChildDeclaration, InteriorChild};
+use super::classes::ClassTargets;
 use super::hosts::RoomSelection;
-use super::interior::{ClassTarget, StreamRoute};
+use super::interior::StreamRoute;
 use super::room_frame::RoomFrame;
 use super::routes::{self, ContainerOwner, OpenedRoom, StreamDeclaration};
-use super::types::{
-    InteriorFindingKind, InteriorRoomContainer, InteriorRoomCoverage, InteriorRoomRef,
-};
+use super::types::{InteriorFindingKind, InteriorRoomContainer, InteriorRoomCoverage};
 use crate::catalog_read::original::{
     EntryCapture, EntrySoc, EntryXml, OriginalDatum, PhysicalEntryRef,
 };
 use crate::starmap_xml::Node;
 use crate::{CatalogError, ExportAccountingError};
 
-pub(super) struct RoomReader<'input> {
+pub(super) struct RoomReader<'input, 'lookup> {
     pub(super) archive: &'input Archive,
     pub(super) index: &'input PathIndex<'input>,
     pub(super) capture: &'input EntryCapture<'input>,
-    pub(super) targets: &'input HashMap<Guid, ClassTarget>,
+    pub(super) targets: ClassTargets<'input, 'lookup>,
     pub(super) cancel: Option<&'input CancelToken>,
 }
 
@@ -55,41 +54,30 @@ struct Edge {
     transform: Option<Transform>,
 }
 
-impl RoomReader<'_> {
+impl RoomReader<'_, '_> {
     pub(super) fn room(
-        &self,
+        &mut self,
         project: &mut Projection<'_, '_>,
         ship: &ShipContext,
-        identity: InteriorRoomRef,
+        coverage: &mut InteriorRoomCoverage,
         room_selector: &RoomSelection<'_>,
         path: &str,
-    ) -> Result<InteriorRoomCoverage, CatalogError> {
-        let mut coverage = InteriorRoomCoverage {
-            room: identity,
-            containers: Vec::new(),
-            findings: Vec::new(),
-        };
+    ) -> Result<(), CatalogError> {
         let opened =
             match routes::open_room(self.archive, self.index, self.capture, path, self.cancel)? {
                 Ok(opened) => opened,
                 Err(kind) => {
                     coverage.note(kind, None, None, None);
-                    return Ok(coverage);
+                    return Ok(());
                 }
             };
-        let root = Occurrence::record(
-            &mut coverage,
-            &project.origins.uses,
-            opened,
-            room_selector,
-            None,
-        )?;
-        self.walk(project, ship, &mut coverage, room_selector, root)?;
-        Ok(coverage)
+        let root =
+            Occurrence::record(coverage, &project.origins.uses, opened, room_selector, None)?;
+        self.walk(project, ship, coverage, room_selector, root)
     }
 
     fn walk(
-        &self,
+        &mut self,
         project: &mut Projection<'_, '_>,
         ship: &ShipContext,
         coverage: &mut InteriorRoomCoverage,
@@ -189,11 +177,11 @@ impl RoomReader<'_> {
     }
 
     fn inspect(
-        &self,
+        &mut self,
         project: &mut Projection<'_, '_>,
         ship: &ShipContext,
         coverage: &mut InteriorRoomCoverage,
-        frame: RoomFrame<'_>,
+        frame: Option<RoomFrame<'_>>,
         ancestors: &[ActiveRoom],
         occurrence: Occurrence,
     ) -> Result<ActiveRoom, CatalogError> {
@@ -239,7 +227,7 @@ impl RoomReader<'_> {
     }
 
     fn stream(
-        &self,
+        &mut self,
         project: &mut Projection<'_, '_>,
         ship: &ShipContext,
         coverage: &mut InteriorRoomCoverage,
@@ -393,5 +381,5 @@ pub(super) struct StreamContext<'read> {
     index: &'read PathIndex<'read>,
     pub(super) descriptor: &'read OriginalDatum<PhysicalEntryRef>,
     pub(super) route: &'read ContainerRoute,
-    pub(super) frame: RoomFrame<'read>,
+    pub(super) frame: Option<RoomFrame<'read>>,
 }

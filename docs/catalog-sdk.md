@@ -2157,7 +2157,7 @@ and Inventory storage owners. Use each position's physical root and ordered port
 The same component can contribute an instance at several distinct positions.
 Check the selected Loadout state, its coverage, and the reached configuration dependencies
 before interpreting an empty result. Retain the snapshot's own source inventory.
-Interior-kind instances and `placements.facilityInteriorCoverage` require the full Catalog.
+Interior-kind facility instances are available through the full Catalog.
 
 ### Installed memory measurements for Store mappings and Loadout placements
 
@@ -2190,6 +2190,20 @@ processes remained below 2 GB. The largest peak leaves an estimated 15.70 GB
 for the operating system and other applications on a 16 GiB host. Installed
 producer parity for the complete Facility scope and the integrated
 consumer's memory measurements are separate checks.
+
+### Interior room coverage
+
+`read_facility_interior_coverage(archive, physicalShipIndex, cancel)` reads the
+selected ship's `placements.facilityInteriorCoverage` rows. The direct ship
+room declarations are read independently of the Loadout. Attached rows keep
+their original ordered port path. The query reads both declaration families,
+the reached room descriptor and SOC streams, and the physical DCB aliases
+of observed classes. It uses no room model geometries.
+
+The result includes Loadout, declaration and class dependency coverage.
+`complete` describes the selected scope and is conservative about traversal
+findings, unreadable declarations and unresolved operations. Known rows
+and findings remain available with their original field sources.
 
 ## Installed flight configurations
 

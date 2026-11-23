@@ -96,6 +96,10 @@ impl<'source> ResourceTopologyDeclarations<'source> {
         self.item_rooms
     }
 
+    pub(crate) const fn has_room_declarations(&self) -> bool {
+        !self.rooms.is_empty() || !self.item_rooms.is_empty()
+    }
+
     pub(crate) const fn has_context_rows(&self) -> bool {
         !self.links.is_empty() || !self.rooms.is_empty()
     }

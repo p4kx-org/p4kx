@@ -7,7 +7,8 @@ use std::slice::Iter;
 use p4kx_extraction::{SourceUse, SourceUses, SourceValue, SourcedValue};
 
 use super::Projection;
-use super::hosts::{RoomAttachment, RoomOwners};
+use super::RoomLookup;
+use super::hosts::RoomAttachment;
 use super::installed::InstalledConfigurations;
 use crate::CatalogError;
 use crate::catalog_v3::facility_instance::ShipContext;
@@ -111,7 +112,7 @@ impl Projection<'_, '_> {
         loadout: &Loadout,
         ship: &ShipContext,
         mut path: Path,
-        rooms: &RoomOwners<'_, '_>,
+        rooms: &mut RoomLookup<'_>,
         room_attachments: &mut Vec<RoomAttachment>,
         flight: &mut InstalledConfigurations<'_>,
     ) -> Result<(), CatalogError> {
@@ -131,7 +132,7 @@ impl Projection<'_, '_> {
                 let Some(record) = attachment.target_record_index.value().copied() else {
                     continue;
                 };
-                let has_rooms = rooms.contains(record);
+                let has_rooms = rooms(record)?;
                 let configurations = self.configuration_links(record)?;
                 let flight_links = flight.links(record)?;
                 if port.ports.is_empty()
