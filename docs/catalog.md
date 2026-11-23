@@ -689,6 +689,11 @@ Record index, GUID, class name, Record path, vehicle kind and playability. The
 comparison included physical source references and encryption states for the
 classifications. The standalone vehicle output returned the same owners and kind.
 
+A header census of older EPTU `13025019` and TECH-PREVIEW `13040440` found all four original
+owners by GUID and Record path. It visited 117,952 and 120,857 headers respectively, with every
+path classifiable and zero Record bodies opened. Playability on the older Builds requires
+their authored control and driver-seat evidence.
+
 | Field | Rule and source |
 |-------|-----------------|
 | `mass` | The sum of the `mass` of every part of the vehicle implementation (`vehicleDefinition`) after the ship's Modification is applied, rounded to four decimals; a sum too large to round to a finite number counts as unknown (so does `hullHealth`). Landing gear, Loadout items and docked vehicles are not part of it (#305). Without part masses, the mass of the rigid physics controller (`Components/SEntityPhysicsControllerParams/PhysType/Mass`, `massBasis` `physics`) |
