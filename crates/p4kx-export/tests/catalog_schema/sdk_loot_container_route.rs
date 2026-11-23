@@ -36,7 +36,7 @@ pub(super) fn read() -> TestResult<Route> {
     Route::queried_rows(
         LOOT_CONTAINERS,
         std::slice::from_ref(&row),
-        "installed Normal parity, cold memory, source closure and scope enumeration remain open",
+        "one installed row and its sources match the focused Normal producer on LIVE and PTU, with full scope enumeration and final package verification open",
     )
 }
 

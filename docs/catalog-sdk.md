@@ -1035,6 +1035,18 @@ placement and link survey inputs and the references for failed reads.
 Starmap identity. `Unavailable` can carry an observed row when coverage is
 incomplete. A result stays scoped to the requested key.
 
+A focused Normal producer compiled from `c7a033bd5` nominated one original
+container occurrence per installed Build. A fresh SDK process matched the whole
+row, the original EntXML coordinates and the resolved source-use closure.
+
+| Build | Rows | Peak private commit (bytes) | Peak working set (bytes) | Seconds |
+| --- | ---: | ---: | ---: | ---: |
+| LIVE 13220821 | 1 | 1,095,925,760 | 1,084,387,328 | 18.812 |
+| PTU 13260598 | 1 | 1,479,503,872 | 1,463,521,280 | 27.827 |
+
+The timings and peaks are from isolated Windows debug SDK processes.
+Full installed scope enumeration and final package verification remain open.
+
 ## Loot container-document source scope
 
 Catalog v3 `declarations.lootEntityContainerDocuments` retains original attribute sites only from
