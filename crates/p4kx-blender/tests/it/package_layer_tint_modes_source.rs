@@ -25,12 +25,28 @@ pub(super) struct Case {
     pub(super) name: &'static str,
     pub(super) parameters: &'static [(&'static str, &'static str)],
     pub(super) selected: bool,
+    crossed_reflectance: bool,
+}
+
+impl Case {
+    const fn with_crossed_reflectance(mut self) -> Self {
+        self.crossed_reflectance = true;
+        self
+    }
+
+    pub(super) const fn authored_reflectance(self, lane: Lane) -> [f32; 3] {
+        let authored_lane = match (lane, self.crossed_reflectance) {
+            (Lane::Dielectric, false) | (Lane::Metal, true) => Lane::Dielectric,
+            (Lane::Metal, false) | (Lane::Dielectric, true) => Lane::Metal,
+        };
+        authored_lane.authored_reflectance()
+    }
 }
 
 pub(super) const CASES: [Case; 10] = [
     case("Zero", &[("TintMode", "0")]),
-    case("One", &[("TintMode", "1")]),
-    case("Two", &[("TintMode", "2")]),
+    case("One", &[("TintMode", "1")]).with_crossed_reflectance(),
+    case("Two", &[("TintMode", "2")]).with_crossed_reflectance(),
     case("Three", &[("TintMode", "3")]),
     case("Absent", &[]),
     case("Malformed", &[("TintMode", "2x")]),
@@ -41,6 +57,7 @@ pub(super) const CASES: [Case; 10] = [
         name: "Unselected",
         parameters: &[("TintMode", "2")],
         selected: false,
+        crossed_reflectance: false,
     },
 ];
 
@@ -49,6 +66,7 @@ const fn case(name: &'static str, parameters: &'static [(&'static str, &'static 
         name,
         parameters,
         selected: true,
+        crossed_reflectance: false,
     }
 }
 
@@ -80,7 +98,7 @@ impl Lane {
         }
     }
 
-    pub(super) const fn authored_reflectance(self) -> [f32; 3] {
+    const fn authored_reflectance(self) -> [f32; 3] {
         match self {
             Self::Dielectric => AUTHORED_DIELECTRIC,
             Self::Metal => AUTHORED_METAL,
@@ -171,7 +189,7 @@ fn child(case: Case, lane: Lane) -> TestMtlMaterial {
     let mut child = TestMtlMaterial::new(lane.source_name(case))
         .shader("Layer")
         .diffuse([1.0; 3])
-        .specular(lane.authored_reflectance())
+        .specular(case.authored_reflectance(lane))
         .public_param("LayerTiling", "1");
     for &(name, value) in case.parameters {
         child = child.public_param(name, value);

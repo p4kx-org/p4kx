@@ -118,7 +118,7 @@ fn verify_glb(glb: &CheckedGlb) -> TestResult {
 fn expected_colour(lane: Lane, case: Case) -> [f32; 3] {
     match (lane, case.selected) {
         (Lane::Dielectric, false) => [1.0; 3],
-        (Lane::Metal, false) => lane.authored_reflectance(),
+        (Lane::Metal, false) => case.authored_reflectance(lane),
         (Lane::Dielectric, true) => PALETTE_DIFFUSE.map(srgb),
         (Lane::Metal, true) => PALETTE_METAL.map(srgb),
     }
@@ -175,7 +175,7 @@ fn verify_layer(manifest: &Manifest, package: &Path, case: Case, lane: Lane) -> 
     assert_eq!(child.shader, "Layer", "{name}: authored layer shader");
     assert_eq!(
         child.specular.map(f32::to_bits),
-        lane.authored_reflectance().map(f32::to_bits),
+        case.authored_reflectance(lane).map(f32::to_bits),
         "{name}: original specular remains independent of palette"
     );
     let raw: Vec<_> = child
