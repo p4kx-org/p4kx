@@ -169,6 +169,8 @@ fn project(
             base: physical,
             patch: modified.patch_origin,
             patch_route: modified.patch_route,
+            structure_base: root.origins.element().map(|site| site.file().clone()),
+            structure_patch: modified.patch_file,
         },
         path,
         patch_path: modified.patch_path,

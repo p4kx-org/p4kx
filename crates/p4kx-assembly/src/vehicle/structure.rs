@@ -4,6 +4,7 @@
 use sha2::{Digest, Sha256};
 
 use super::VehicleImplementation;
+use crate::LoadoutError;
 use crate::markup::Element;
 
 const COSMETIC_ATTRIBUTES: [&str; 4] = ["material", "materials", "filename", "geometry"];
@@ -30,6 +31,18 @@ impl VehicleImplementation {
     pub const fn structure_digest(&self) -> [u8; 16] {
         self.structure
     }
+
+    /// Returns the structural comparison digest for a complete vehicle implementation.
+    ///
+    /// # Errors
+    /// Returns the retained issues if the effective implementation is incomplete.
+    pub fn complete_structure_digest(&self) -> Result<[u8; 16], &[LoadoutError]> {
+        if self.issues().is_empty() {
+            Ok(self.structure_digest())
+        } else {
+            Err(self.issues())
+        }
+    }
 }
 
 /// Returns the digest of the patched `Vehicle` element `root`.
@@ -53,7 +66,7 @@ fn write_text(sha: &mut Sha256, text: &str) {
     sha.update(text.as_bytes());
 }
 
-fn is_compared(name: &str, root: bool) -> bool {
+pub(super) fn is_compared(name: &str, root: bool) -> bool {
     if root && name.eq_ignore_ascii_case(VEHICLE_NAME) {
         return false;
     }

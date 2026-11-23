@@ -28,6 +28,7 @@ pub(super) struct AppliedModification {
     pub(super) patch_path: Option<String>,
     pub(super) patch_origin: Option<p4kx_extraction::EntryOrigin>,
     pub(super) patch_route: Option<PatchRoute>,
+    pub(super) patch_file: Option<crate::LoadoutFileObservation>,
     pub(super) report: Option<ModificationReport>,
     pub(super) elems: Vec<ElemOverride>,
 }
@@ -123,6 +124,7 @@ fn apply_read_patch(
     match read {
         Ok(Some((path, bytes))) => {
             let physical = bytes.entry_origin();
+            let file = bytes.observation().cloned();
             budget.grow(bytes.len());
             if let Some(done) = apply_patch(
                 root,
@@ -135,6 +137,7 @@ fn apply_read_patch(
             )? {
                 modified.patch_path = Some(path);
                 modified.patch_origin = physical;
+                modified.patch_file = file;
                 modified.report = Some(done);
             }
         }

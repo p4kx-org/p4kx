@@ -8,6 +8,7 @@ use std::sync::OnceLock;
 use p4kx_archive::{Archive, Entry};
 use thiserror::Error;
 
+use crate::loadout_file_read;
 use crate::{LoadoutFileIdentity, LoadoutFileRead, LoadoutFileSource};
 
 /// The largest XML Loadout file that is read, 16 MiB.
@@ -79,6 +80,7 @@ pub enum LoadoutFileError {
 pub struct ArchiveFiles<'a> {
     archive: &'a Archive,
     index: OnceLock<HashMap<String, usize>>,
+    verify_entries: bool,
 }
 
 impl<'a> ArchiveFiles<'a> {
@@ -88,7 +90,21 @@ impl<'a> ArchiveFiles<'a> {
         Self {
             archive,
             index: OnceLock::new(),
+            verify_entries: false,
         }
+    }
+
+    /// Verifies each selected document's checksums and decoded extent while reading it once.
+    #[must_use]
+    pub const fn with_verified_entries(mut self) -> Self {
+        self.verify_entries = true;
+        self
+    }
+
+    /// Reports whether selected documents are verified as they are read.
+    #[must_use]
+    pub const fn verifies_entries(&self) -> bool {
+        self.verify_entries
     }
 
     /// Borrows the Archive supplying these files.
@@ -163,6 +179,9 @@ impl LoadoutFiles for ArchiveFiles<'_> {
 
 impl ArchiveFiles<'_> {
     fn read_entry(&self, entry: &Entry) -> Result<Vec<u8>, LoadoutFileError> {
+        if self.verify_entries {
+            return loadout_file_read::verified_bytes(self.archive, entry, &|| false);
+        }
         let size = entry.uncompressed_size();
         if size > MAX_XML_LOADOUT_LEN {
             return Err(LoadoutFileError::TooLarge { size });

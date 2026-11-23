@@ -17,6 +17,7 @@ mod port_selection;
 mod read;
 mod request;
 mod structure;
+mod structure_evidence;
 mod totals;
 mod xml_evidence;
 
@@ -37,6 +38,7 @@ pub(crate) use locate::{load, load_observed};
 pub use origin::ValueOrigin;
 pub use patch::ModificationReport;
 pub use port_selection::VehiclePortSelection;
+pub use structure_evidence::VehicleStructureEvidence;
 pub use totals::{OriginTally, PartThreshold, PartialValue, UnreadableValue, VehicleTotals};
 pub use totals::{VehicleTotalFieldPresence, VehicleTotalFieldUse, VehicleTotalMetric};
 pub use xml_evidence::{VehicleAttributeEvidence, VehicleXmlSite};

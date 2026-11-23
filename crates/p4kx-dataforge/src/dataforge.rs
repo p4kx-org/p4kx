@@ -161,6 +161,12 @@ impl<'a> DataForge<'a> {
         self.byte_span(self.records.bytes())
     }
 
+    /// Returns the original storage range addressed by Record filename offsets.
+    #[must_use]
+    pub fn text_table_span(&self) -> Option<Range<u64>> {
+        self.byte_span(self.text.bytes())
+    }
+
     /// Returns the number of Records.
     #[must_use]
     pub const fn record_count(&self) -> usize {

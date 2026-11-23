@@ -113,7 +113,7 @@ impl LoadoutFileRead {
     }
 }
 
-fn verified_bytes(
+pub(crate) fn verified_bytes(
     archive: &Archive,
     entry: &Entry,
     stopped: &dyn Fn() -> bool,

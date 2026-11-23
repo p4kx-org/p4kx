@@ -18,6 +18,10 @@ impl<'a> StringTable<'a> {
         Self { bytes, name }
     }
 
+    pub(crate) const fn bytes(&self) -> &'a [u8] {
+        self.bytes
+    }
+
     /// Returns the string starting at `offset`.
     pub(crate) fn get(&self, offset: u32) -> Result<&'a str, DataForgeError> {
         usize::try_from(offset)

@@ -5,11 +5,44 @@ use std::sync::Arc;
 
 use crate::field_origin::OriginAccumulator;
 use crate::source_evidence_error::{self, SourceEvidenceError};
-use crate::{FieldOrigin, SourceValue, SourcedValue};
+use crate::{FieldOrigin, SourceUseRef, SourceUseRole, SourceValue, SourcedValue};
 
 use super::SourceUses;
 
 impl SourceUses {
+    /// Verifies that references identify attempted observations in this capture.
+    ///
+    /// # Errors
+    /// Returns an error for a foreign reference, unexpected role or unavailable registry.
+    pub fn verify_attempted_uses(
+        &self,
+        references: &[SourceUseRef],
+    ) -> Result<(), SourceEvidenceError> {
+        if references.is_empty() {
+            return Ok(());
+        }
+        let registry = source_evidence_error::lock(&self.registry)?;
+        for reference in references {
+            let registered = registry
+                .uses
+                .contribution(reference)
+                .ok_or(SourceEvidenceError::ForeignEvidence)?;
+            let original = registered.id.retain();
+            let same_observation = original
+                .registered_text()
+                .zip(reference.registered_text())
+                .is_some_and(|(original, supplied)| Arc::ptr_eq(original, supplied));
+            if !same_observation {
+                return Err(SourceEvidenceError::ForeignEvidence);
+            }
+            if registered.role != SourceUseRole::Attempted {
+                return Err(SourceEvidenceError::UnexpectedUseRole);
+            }
+        }
+        drop(registry);
+        Ok(())
+    }
+
     /// Combines observed origins through this capture's physical source registry.
     ///
     /// # Errors
@@ -71,6 +104,44 @@ mod tests {
     use crate::{InputScope, SourceEvidenceError, SourceInput, SourceLocation, SourceUseRole};
 
     use super::SourceUses;
+
+    #[test]
+    fn attempted_refs_require_original_inventory_and_attempt_role()
+    -> Result<(), SourceEvidenceError> {
+        let local = SourceUses::with_compact_use_refs();
+        let other = SourceUses::with_compact_use_refs();
+        let observe = |sources: &SourceUses, role| {
+            sources
+                .observe(SourceInput::Unknown, InputScope::Payload)?
+                .at(
+                    SourceLocation::DataForge {
+                        record_index: 0,
+                        field: String::new(),
+                    },
+                    role,
+                )
+        };
+        let local_attempt = observe(&local, SourceUseRole::Attempted)?;
+        let foreign_attempt = observe(&other, SourceUseRole::Attempted)?;
+        let local_payload = observe(&local, SourceUseRole::Payload)?;
+        assert_eq!(
+            local_attempt.reference(),
+            foreign_attempt.reference(),
+            "identical compact references can be minted by separate captures"
+        );
+        local.verify_attempted_uses(std::slice::from_ref(local_attempt.reference()))?;
+        assert_eq!(
+            local.verify_attempted_uses(std::slice::from_ref(foreign_attempt.reference())),
+            Err(SourceEvidenceError::ForeignEvidence),
+            "the same wire string does not prove actual capture identity"
+        );
+        assert_eq!(
+            local.verify_attempted_uses(std::slice::from_ref(local_payload.reference())),
+            Err(SourceEvidenceError::UnexpectedUseRole),
+            "a successful payload cannot be relabeled as an attempted read"
+        );
+        Ok(())
+    }
 
     #[test]
     fn combined_origins_require_original_inventory_identity() -> Result<(), SourceEvidenceError> {

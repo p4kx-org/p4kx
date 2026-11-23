@@ -231,3 +231,7 @@ mod presence_tests;
 #[cfg(test)]
 #[path = "aggregate_test_support.rs"]
 pub(crate) mod support;
+
+#[cfg(test)]
+#[path = "structure_evidence_tests.rs"]
+mod structure_tests;

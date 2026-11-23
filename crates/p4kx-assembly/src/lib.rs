@@ -316,6 +316,7 @@ pub use record_loadout_effect::{RecordLoadoutEffect, RecordPortSelection, Record
 pub use resolved_port_helper::PortHelperDiagnostic;
 pub use resolver::LoadoutResolver;
 pub use resolver_observation::{LoadoutReadEvent, LoadoutReadObserver};
+pub use resolver_vehicle::read_observed_vehicle_tree;
 pub use room_model_helper::RoomModelHelper;
 pub use skeleton::{MAX_SKELETON_LEN, SkeletonProblem};
 pub use soc_container_capture::{
@@ -339,8 +340,8 @@ pub use vehicle::{
     PartialValue, PortVisibility, UnreadableValue, ValueOrigin, VehicleAggregateEvidence,
     VehicleAggregateIssue, VehicleAttributeEvidence, VehicleImplementation, VehicleItemPort,
     VehicleItemType, VehicleLightAttachment, VehicleLightPort, VehiclePart, VehiclePortSelection,
-    VehicleTotalFieldPresence, VehicleTotalFieldUse, VehicleTotalMetric, VehicleTotals,
-    VehicleXmlSite,
+    VehicleStructureEvidence, VehicleTotalFieldPresence, VehicleTotalFieldUse, VehicleTotalMetric,
+    VehicleTotals, VehicleXmlSite,
 };
 pub use xml_port_replacement::{XmlPortReplacement, XmlPortSelection};
 

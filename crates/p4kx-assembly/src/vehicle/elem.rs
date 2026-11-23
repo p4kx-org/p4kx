@@ -92,12 +92,18 @@ fn read_elems(
                 }
                 _ => None,
             };
+            let evidence = assignment_evidence(node, scope, name, modification);
             elems.push(ElemOverride {
                 id_ref: id_ref.to_owned(),
                 name: name.to_owned(),
                 value: value.map_or("", |(_, value)| value).to_owned(),
                 port_name,
-                evidence: assignment_evidence(node, scope, name, modification),
+                structure_value: (aggregate.is_some()
+                    && evidence.is_none()
+                    && super::structure::is_compared(name, false))
+                .then(|| scope.vehicle_site(node, "value", MissingAttribute::Element))
+                .flatten(),
+                evidence,
                 light_bone: value
                     .filter(|_| name.eq_ignore_ascii_case("bone"))
                     .and_then(|(attribute, _)| scope.attribute_ascii_position(node, attribute)),
@@ -207,6 +213,7 @@ pub struct ElemOverride {
     pub(super) port_name: Option<LoadoutPath>,
     pub(super) light_bone: Option<p4kx_cryxml::SourceAttributePosition>,
     pub(super) evidence: Option<Arc<VehicleAttributeEvidence>>,
+    pub(super) structure_value: Option<VehicleXmlSite>,
 }
 
 impl PartialEq for ElemOverride {

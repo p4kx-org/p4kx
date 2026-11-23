@@ -213,3 +213,42 @@ fn record_metadata_baseline_keeps_layout_admission_before_metadata_errors() -> T
     );
     Ok(())
 }
+
+#[test]
+fn text_table_span_contains_the_original_filename_storage() -> TestResult {
+    const PATH: &str = "synthetic/Original.Case.XML";
+    for version in [6, 8] {
+        let bytes = source(version, record(PATH));
+        let forge = DataForge::open(&bytes)?;
+        let record = forge.record(0).ok_or("original Record")?;
+        let raw = record.stored_file_name()?;
+        let filename = forge
+            .original_text_span(raw)
+            .ok_or("original filename range")?;
+        let table = forge.text_table_span().ok_or("original text table range")?;
+        let records = forge
+            .record_table_span()
+            .ok_or("original Record table range")?;
+        assert!(
+            table.start <= filename.start && filename.end < table.end,
+            "the text table includes the filename and its terminator in v{version}"
+        );
+        assert!(
+            records.end <= table.start || table.end <= records.start,
+            "Record offsets and filename bytes occupy separate sections in v{version}"
+        );
+        let begin = usize::try_from(filename.start)?;
+        let end = usize::try_from(filename.end)?;
+        assert_eq!(
+            bytes.get(begin..end),
+            Some(PATH.as_bytes()),
+            "original filename bytes and spelling in v{version}"
+        );
+        assert_eq!(
+            bytes.get(end),
+            Some(&0),
+            "the original terminator in v{version}"
+        );
+    }
+    Ok(())
+}

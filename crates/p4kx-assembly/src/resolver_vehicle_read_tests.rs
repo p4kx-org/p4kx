@@ -5,12 +5,12 @@ use std::ops::ControlFlow;
 use std::sync::{Arc, Mutex};
 
 use p4kx_archive::{Archive, SourceEncryption};
-use p4kx_dataforge::{DataForge, TreeBuilder};
+use p4kx_dataforge::{DataForge, Record, RecordTree, TreeBuilder};
 use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntity, TestEntry, TestLoadout};
 
 use crate::{
     ArchiveFiles, Entities, LoadoutDocumentKind, LoadoutError, LoadoutReadEvent,
-    LoadoutReadObserver, LoadoutRequest, LoadoutResolver, VehicleImplementation,
+    LoadoutReadObserver, LoadoutRequest, LoadoutResolver, ValueOrigin, VehicleImplementation,
 };
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -66,7 +66,7 @@ impl LoadoutReadObserver for Observer {
 
 #[test]
 fn exact_tree_reads_vehicle_evidence_without_loading_an_authored_loadout() -> TestResult {
-    let (_dir, archive) = archive()?;
+    let (_dir, archive) = archive(Some(PATCH_DOCUMENT))?;
     let files = ArchiveFiles::new(&archive);
     let data = database();
     let forge = DataForge::open(&data)?;
@@ -89,6 +89,7 @@ fn exact_tree_reads_vehicle_evidence_without_loading_an_authored_loadout() -> Te
         .read_vehicle_tree(&record, &tree)?
         .ok_or("the exact vehicle implementation")?;
     verify_selected_port(&read)?;
+    verify_normal_resolution(&archive, &files, &forge, &record, &tree, &read)?;
     let reads = observer.reads.lock().map_err(|_| "the file witness lock")?;
     assert_eq!(
         *reads,
@@ -108,6 +109,130 @@ fn exact_tree_reads_vehicle_evidence_without_loading_an_authored_loadout() -> Te
         "a single physical vehicle caller is observed"
     );
     Ok(())
+}
+
+fn verify_normal_resolution<'f>(
+    archive: &Archive,
+    files: &'f ArchiveFiles<'_>,
+    forge: &'f DataForge<'f>,
+    record: &Record<'f>,
+    tree: &RecordTree<'f>,
+    scoped: &VehicleImplementation,
+) -> TestResult {
+    let mut resolver = LoadoutResolver::new(forge).with_files(files);
+    let node = resolver.resolve_tree(record, tree)?;
+    assert!(
+        node.issues()
+            .iter()
+            .any(|issue| matches!(issue, LoadoutError::XmlLoadout { path, .. } if path == LOADOUT)),
+        "normal resolution encounters the malformed unrelated loadout"
+    );
+    let normal = node.vehicle().ok_or("the normally resolved vehicle")?;
+    let digest = scoped
+        .complete_structure_digest()
+        .map_err(|_| "the scoped implementation is complete")?;
+    assert_eq!(
+        normal.complete_structure_digest(),
+        Ok(digest),
+        "both routes compare the same effective vehicle despite the unrelated loadout issue"
+    );
+    verify_declaration(
+        archive,
+        scoped,
+        normal,
+        BASE,
+        ValueOrigin::Base,
+        SourceEncryption::Unencrypted,
+    )?;
+    verify_declaration(
+        archive,
+        scoped,
+        normal,
+        PATCH,
+        ValueOrigin::Patch,
+        SourceEncryption::Encrypted,
+    )
+}
+
+fn verify_declaration(
+    archive: &Archive,
+    scoped: &VehicleImplementation,
+    normal: &VehicleImplementation,
+    path: &str,
+    origin: ValueOrigin,
+    encryption: SourceEncryption,
+) -> TestResult {
+    let path = format!("Data/{path}").replace('/', "\\");
+    let entry = archive
+        .entries()
+        .iter()
+        .find(|entry| entry.path() == path)
+        .ok_or("the fixture declaration Entry")?;
+    let expected = archive
+        .entry_origin(entry)
+        .ok_or("the original Entry origin")?;
+    for vehicle in [scoped, normal] {
+        let actual = vehicle
+            .declaration_origin(origin)
+            .ok_or("the applied declaration origin")?;
+        assert_eq!(
+            actual.binding(),
+            expected.binding(),
+            "both readers bind the original Entry"
+        );
+        assert_eq!(
+            actual.encryption(),
+            encryption,
+            "the selected Entry retains its encryption"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn exact_tree_refuses_the_comparison_digest_for_a_missing_patch() -> TestResult {
+    let (_dir, archive) = archive(None)?;
+    let files = ArchiveFiles::new(&archive);
+    let data = database();
+    let forge = DataForge::open(&data)?;
+    let record = forge.record(0).ok_or("the physical ship Record")?;
+    let tree = TreeBuilder::new().build(&record)?;
+    let mut resolver = LoadoutResolver::new(&forge).with_files(&files);
+    let scoped = resolver
+        .read_vehicle_tree(&record, &tree)?
+        .ok_or("the readable base implementation")?;
+    let node = LoadoutResolver::new(&forge)
+        .with_files(&files)
+        .resolve_tree(&record, &tree)?;
+    let normal = node.vehicle().ok_or("the normally resolved base")?;
+    for vehicle in [scoped.as_ref(), normal] {
+        let Err(issues) = vehicle.complete_structure_digest() else {
+            return Err("an unresolved selected patch cannot yield a comparison digest".into());
+        };
+        assert!(
+            issues
+                .iter()
+                .any(|issue| matches!(issue, LoadoutError::MissingVehicleImplementation { .. })),
+            "both readers retain the missing selected patch"
+        );
+        assert!(
+            vehicle.declaration_origin(ValueOrigin::Patch).is_none(),
+            "an unavailable patch has no successful declaration origin"
+        );
+    }
+    assert_eq!(
+        scoped.structure_digest(),
+        normal.structure_digest(),
+        "the raw digest remains readable without establishing comparison eligibility"
+    );
+    verify_declaration(
+        &archive,
+        &scoped,
+        normal,
+        BASE,
+        ValueOrigin::Base,
+        SourceEncryption::Unencrypted,
+    )
 }
 
 fn verify_selected_port(vehicle: &VehicleImplementation) -> TestResult {
@@ -135,17 +260,20 @@ fn verify_selected_port(vehicle: &VehicleImplementation) -> TestResult {
     Ok(())
 }
 
-fn archive() -> TestResult<(tempfile::TempDir, Archive)> {
+fn archive(override_xml: Option<&[u8]>) -> TestResult<(tempfile::TempDir, Archive)> {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("Data.p4k");
-    ArchiveBuilder::new()
+    let mut builder = ArchiveBuilder::v2()
         .entry(TestEntry::stored(format!("Data/{BASE}"), DEFINITION))
-        .entry(TestEntry::stored(format!("Data/{PATCH}"), PATCH_DOCUMENT).encrypted())
         .entry(TestEntry::stored(
             format!("Data/{LOADOUT}"),
             b"<broken>".as_slice(),
-        ))
-        .write_to(&path)?;
+        ));
+    if let Some(patch_contents) = override_xml {
+        builder =
+            builder.entry(TestEntry::stored(format!("Data/{PATCH}"), patch_contents).encrypted());
+    }
+    builder.write_to(&path)?;
     Ok((
         dir,
         Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?,

@@ -43,6 +43,8 @@ pub(super) struct DeclarationOrigins {
     pub(super) base: Option<EntryOrigin>,
     pub(super) patch: Option<EntryOrigin>,
     pub(super) patch_route: Option<PatchRoute>,
+    pub(super) structure_base: Option<LoadoutFileObservation>,
+    pub(super) structure_patch: Option<LoadoutFileObservation>,
 }
 
 #[derive(Debug, Clone)]

@@ -14,6 +14,9 @@ pub enum SourceEvidenceError {
     /// A runtime use does not belong to this original evidence authority.
     #[error("source evidence belongs to another authority")]
     ForeignEvidence,
+    /// A registered observation has the wrong role for the evidence contract.
+    #[error("source evidence has an unexpected use role")]
+    UnexpectedUseRole,
     /// A directory path range falls outside its original parsed Entry positions.
     #[error("directory path range exceeds its owning Archive")]
     InvalidDirectoryRange,
