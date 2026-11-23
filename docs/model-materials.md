@@ -117,6 +117,11 @@ Primitives without that attribute use the same material factors without bindings
 When two primitives use the same source material slot with different UV availability,
 the exported material variants keep their own texture bindings and source evidence.
 
+The synthetic mixed-UV fixture validates with zero errors and zero warnings in the pinned
+Khronos validator. Blender 5.3.0 imports two meshes and four materials. Only the UV mesh
+has Base Color, Metallic, Roughness and Normal texture connections. A Cycles render of
+that imported fixture draws both meshes.
+
 ## Fitted vehicle paints
 
 Entity GLB and Blender package exports resolve the root vehicle's fitted item on its effective
