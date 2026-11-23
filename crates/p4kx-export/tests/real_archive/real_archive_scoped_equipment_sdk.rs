@@ -28,6 +28,8 @@ use equipment_input::{dataforge, record_index, with_archive};
 #[path = "real_archive_installed_configuration_sdk.rs"]
 mod installed_configuration;
 
+#[path = "real_archive_store_slug_retained_parity.rs"]
+mod store_slug_retained_parity;
 const STORE: &str = "/shipStoreSlugs";
 const FACILITY: &str = "/placements/facilityInstances/rows";
 const STORE_RECORD: &str = "P4KX_STORE_SLUG_SDK_RECORD";

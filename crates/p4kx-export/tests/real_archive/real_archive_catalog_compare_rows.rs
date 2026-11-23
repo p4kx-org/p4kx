@@ -34,14 +34,39 @@ impl<'de> DeserializeSeed<'de> for Projection<'_> {
 }
 
 #[derive(Clone, Copy)]
+enum RowAddress<'scope> {
+    Table(&'scope str),
+    BareArray(&'scope str),
+}
+
+impl fmt::Display for RowAddress<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Table(path) => write!(formatter, "{path}/rows"),
+            Self::BareArray(path) => formatter.write_str(path),
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
 pub(super) struct ComparedRows<'scope> {
-    dataset: &'scope str,
+    address: RowAddress<'scope>,
     expected: &'scope [Value],
 }
 
 impl<'scope> ComparedRows<'scope> {
     pub(super) const fn new(dataset: &'scope str, expected: &'scope [Value]) -> Self {
-        Self { dataset, expected }
+        Self {
+            address: RowAddress::Table(dataset),
+            expected,
+        }
+    }
+
+    pub(super) const fn bare_array(dataset: &'scope str, expected: &'scope [Value]) -> Self {
+        Self {
+            address: RowAddress::BareArray(dataset),
+            expected,
+        }
     }
 }
 
@@ -63,22 +88,20 @@ impl<'de> Visitor<'de> for ComparedRows<'_> {
     fn visit_seq<A: SeqAccess<'de>>(self, mut sequence: A) -> Result<Value, A::Error> {
         for (index, expected) in self.expected.iter().enumerate() {
             let row = sequence.next_element::<Value>()?.ok_or_else(|| {
-                A::Error::custom(format!(
-                    "missing compared row at {}/rows/{index}",
-                    self.dataset
-                ))
+                A::Error::custom(format!("missing compared row at {}/{index}", self.address))
             })?;
             if &row != expected {
                 return Err(A::Error::custom(format!(
-                    "Catalog and SDK payload or provenance differ at {}/rows/{index}",
-                    self.dataset,
+                    "Catalog and SDK payload or provenance differ at {}/{index}",
+                    self.address,
                 )));
             }
         }
         if sequence.next_element::<IgnoredAny>()?.is_some() {
             return Err(A::Error::custom(format!(
-                "extra compared row at {}",
-                self.dataset
+                "extra compared row at {}/{}",
+                self.address,
+                self.expected.len()
             )));
         }
         Ok(Value::from(self.expected.len()))
@@ -111,6 +134,70 @@ fn row_stream_reports_only_counts_and_structural_mismatches() -> super::TestResu
             "shape, count and exact original row order are all checked"
         );
     }
+    Ok(())
+}
+
+#[test]
+fn bare_array_capture_requires_every_ordered_row_at_the_actual_member() -> super::TestResult {
+    use serde_json::json;
+
+    use super::check_row_array_count;
+    use crate::catalog_capture::CatalogCapture;
+
+    const PATH: &str = "/shipStoreSlugs";
+    let expected = [
+        json!({"slug": "a", "retired": false}),
+        json!({"slug": "b", "retired": true}),
+    ];
+    let mut capture = CatalogCapture::default();
+    capture.project(
+        PATH,
+        Projection::Rows(ComparedRows::bare_array(PATH, &expected)),
+    );
+
+    let value = capture.read(
+        br#"{"shipStoreSlugs":[{"slug":"a","retired":false},{"slug":"b","retired":true}]}"#
+            .as_slice(),
+    )?;
+    check_row_array_count(&value, PATH, expected.len())?;
+
+    let missing_member = capture.read(br#"{"other":[]}"#.as_slice())?;
+    assert!(
+        check_row_array_count(&missing_member, PATH, expected.len()).is_err(),
+        "an absent array cannot be reported as an exact match"
+    );
+    for (source, position) in [
+        (
+            r#"{"shipStoreSlugs":[{"slug":"b","retired":true},{"slug":"a","retired":false}]}"#,
+            "/shipStoreSlugs/0",
+        ),
+        (
+            r#"{"shipStoreSlugs":[{"slug":"a","retired":false}]}"#,
+            "/shipStoreSlugs/1",
+        ),
+        (
+            r#"{"shipStoreSlugs":[{"slug":"a","retired":false},{"slug":"b","retired":true},{"slug":"c","retired":true}]}"#,
+            "/shipStoreSlugs/2",
+        ),
+        (
+            r#"{"shipStoreSlugs":[{"slug":"a","retired":true},{"slug":"b","retired":true}]}"#,
+            "/shipStoreSlugs/0",
+        ),
+    ] {
+        let error = capture
+            .read(source.as_bytes())
+            .expect_err("an incomplete or different array");
+        assert!(
+            error.to_string().contains(position),
+            "the rejection reports the structural bare-array position"
+        );
+    }
+    assert!(
+        capture
+            .read(br#"{"shipStoreSlugs":{"rows":[]}}"#.as_slice())
+            .is_err(),
+        "a wrapped table cannot substitute for the bare array"
+    );
     Ok(())
 }
 

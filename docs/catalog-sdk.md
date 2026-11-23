@@ -2346,6 +2346,22 @@ physical sources referenced by the compared rows.
 Each run used one worker. The timing and peaks cover the combined verifier and Catalog replay.
 For the separate 2 GB SDK acceptance, measure each nominated query in its own cold process.
 
+### Store slug comparison
+
+The installed Store slug test ran with one worker on Windows AMD64 against the matching
+LIVE and PTU Archives. It queried every `/shipStoreSlugs` row, streamed the complete Normal
+Catalog from producer `300226ceeeaf522b7d9af790e8fa3698752cf575`, and verified that every
+ordered row agreed. The verifier was built from `65f8caf1c2d435c31242dde85d7b16367cfb6fa2`
+with the comparator tests. The two executables used different build profiles.
+
+| Build | Rows compared | Elapsed ms | Peak private bytes | Peak working set bytes |
+| --- | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 205 | 3,641,070 | 1,511,899,136 | 1,500,471,296 |
+| PTU `13248297` | 203 | 1,838,634 | 1,532,948,480 | 1,532,145,664 |
+
+The measurements include SDK execution and complete Catalog replay. Cold standalone
+query time and memory are measured separately.
+
 ### Radar Audio in a separate process
 
 On Windows AMD64, `installed_radar_audio_cold_query` ran the all-Entries Radar Audio

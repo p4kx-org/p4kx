@@ -59,10 +59,28 @@ pub(crate) struct BoundMeasurement {
 pub(crate) fn with_bound_measurement<T>(
     verify: impl FnOnce(&Archive, &BoundMeasurement) -> TestResult<T>,
 ) -> TestResult<T> {
+    with_measurement(None, verify)
+}
+
+pub(crate) fn with_bound_measurement_from_producer<T>(
+    producer_revision: &str,
+    verify: impl FnOnce(&Archive, &BoundMeasurement) -> TestResult<T>,
+) -> TestResult<T> {
+    with_measurement(Some(producer_revision), verify)
+}
+
+fn with_measurement<T>(
+    producer_revision: Option<&str>,
+    verify: impl FnOnce(&Archive, &BoundMeasurement) -> TestResult<T>,
+) -> TestResult<T> {
     let directory = std::env::var_os("P4KX_CATALOG_MEASUREMENT_DIR")
         .map(PathBuf::from)
         .ok_or("configure the completed Catalog measurement")?;
-    let binding = Receipt::read(&directory)?.binding()?;
+    let receipt = Receipt::read(&directory)?;
+    if let Some(producer_revision) = producer_revision {
+        receipt.require_producer_revision(producer_revision)?;
+    }
+    let binding = receipt.binding()?;
     real_archive_catalog_preflight::check(&directory)?;
     let path = p4kx_testkit::real_archive_path().map_err(|_| "configure the matching Archive")?;
     let key = p4kx_testkit::real_archive_key().map_err(|_| "read the configured Archive key")?;
@@ -111,6 +129,20 @@ fn installed_public_patch_matches_the_same_catalog_build() -> TestResult {
 }
 
 impl BoundMeasurement {
+    pub(crate) fn verify_row_array(&self, path: &str, expected: &[Value]) -> TestResult {
+        self.watch.check()?;
+        let mut capture = normal_capture();
+        capture.project(
+            path,
+            Projection::Rows(ComparedRows::bare_array(path, expected)),
+        );
+        let catalog = artifact::read_completed(&self.directory, |input| Ok(capture.read(input)?))?;
+        self.binding.check_catalog(&catalog)?;
+        check_row_array_count(&catalog, path, expected.len())?;
+        self.watch.check()?;
+        Ok(())
+    }
+
     pub(crate) fn verify_tables<const TABLES: usize>(
         &self,
         paths: [&str; TABLES],
@@ -118,18 +150,7 @@ impl BoundMeasurement {
         origins: &Origins,
     ) -> TestResult<Counts<TABLES>> {
         self.watch.check()?;
-        let mut capture = CatalogCapture::default();
-        for path in [
-            "/schemaVersion",
-            "/source",
-            "/exportHealth/status",
-            "/exportHealth/read",
-            "/exportHealth/projection",
-            "/exportHealth/publicationMode",
-        ] {
-            capture.keep(path);
-        }
-        capture.project("/completeness", Projection::CompleteSelection);
+        let mut capture = normal_capture();
         for (path, table) in paths.iter().zip(tables) {
             capture.keep(&format!("{path}/availability"));
             capture.project(
@@ -155,6 +176,29 @@ impl BoundMeasurement {
             physical_sources: origins.sources.len(),
         })
     }
+}
+
+fn normal_capture<'scope>() -> CatalogCapture<Projection<'scope>> {
+    let mut capture = CatalogCapture::default();
+    for path in [
+        "/schemaVersion",
+        "/source",
+        "/exportHealth/status",
+        "/exportHealth/read",
+        "/exportHealth/projection",
+        "/exportHealth/publicationMode",
+    ] {
+        capture.keep(path);
+    }
+    capture.project("/completeness", Projection::CompleteSelection);
+    capture
+}
+
+fn check_row_array_count(catalog: &Value, path: &str, expected: usize) -> TestResult {
+    if catalog.pointer(path) != Some(&Value::from(expected)) {
+        return Err(format!("missing or incomplete Catalog row array at {path}").into());
+    }
+    Ok(())
 }
 
 pub(crate) struct Table {

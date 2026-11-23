@@ -24,6 +24,7 @@ mod health;
 #[serde(rename_all = "camelCase")]
 pub(crate) struct Receipt {
     channel: String,
+    nominated_revision: Option<String>,
     archive_before: ArchiveStamp,
     archive_after: ArchiveStamp,
 }
@@ -64,6 +65,10 @@ impl Receipt {
     pub(crate) fn read(directory: &Path) -> TestResult<Self> {
         let input = BufReader::new(File::open(directory.join("receipt.private.json"))?);
         Ok(serde_json::from_reader(input)?)
+    }
+
+    pub(crate) fn require_producer_revision(&self, expected: &str) -> TestResult {
+        check_producer_revision(self.nominated_revision.as_deref(), expected)
     }
 
     pub(crate) fn binding(self) -> TestResult<Binding> {
@@ -318,6 +323,42 @@ impl<'de> Visitor<'de> for UniqueKindSelection {
         }
         Ok(selection)
     }
+}
+
+fn check_producer_revision(measured: Option<&str>, expected: &str) -> TestResult {
+    if expected.len() != 40
+        || !expected
+            .bytes()
+            .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
+    {
+        return Err("configure the full lowercase Catalog producer revision".into());
+    }
+    if measured != Some(expected) {
+        return Err(
+            "the measurement has no receipt for the required Catalog producer revision".into(),
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn retained_parity_requires_the_nominated_producer_before_reading_the_artifact() -> TestResult {
+    let expected = "0123456789abcdef0123456789abcdef01234567";
+    check_producer_revision(Some(expected), expected)?;
+    assert!(
+        check_producer_revision(None, expected).is_err(),
+        "a receipt must identify the nominated producer"
+    );
+    assert!(
+        check_producer_revision(Some("abcdef0123456789abcdef0123456789abcdef01"), expected)
+            .is_err(),
+        "a different complete producer has a different parity scope"
+    );
+    assert!(
+        check_producer_revision(Some(expected), "0123456").is_err(),
+        "an abbreviated revision is not an exact producer nomination"
+    );
+    Ok(())
 }
 
 fn stamp_seconds(stamp: &str) -> TestResult<String> {
