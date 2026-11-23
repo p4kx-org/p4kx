@@ -96,7 +96,16 @@ impl Resolver<'_, '_, '_> {
     fn enter(&mut self, field: &FieldDef<'_>) {
         let data_type = field.slot.data_type();
         let target = field.slot.target();
-        self.structs.observe_property_target(field);
+        if matches!(
+            data_type,
+            DataType::Enum
+                | DataType::Class
+                | DataType::StrongPointer
+                | DataType::WeakPointer
+                | DataType::Reference
+        ) {
+            self.structs.observe_property_target(field);
+        }
         self.at = if field.slot.is_array() {
             At::Array { data_type, target }
         } else {

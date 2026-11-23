@@ -88,15 +88,7 @@ impl<'source, 'observer> StructFields<'source, 'observer> {
     }
 
     pub(super) fn observe_property_target(&self, field: &FieldDef<'_>) {
-        if matches!(
-            field.slot.data_type(),
-            DataType::Enum
-                | DataType::Class
-                | DataType::StrongPointer
-                | DataType::WeakPointer
-                | DataType::Reference
-        ) && let Some(observe) = self.observe
-        {
+        if let Some(observe) = self.observe {
             observe(LayoutSource::PropertyTarget {
                 property_index: field.slot.property_index(),
             });

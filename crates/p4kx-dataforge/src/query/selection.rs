@@ -5,7 +5,10 @@ use std::sync::{Mutex, PoisonError};
 
 use rayon::prelude::*;
 
+use crate::DataType;
 use crate::query::compile::Plan;
+use crate::query::predicate::Predicate;
+use crate::query::reader::Reader;
 use crate::query::selection_control::{Control, EvaluationError};
 use crate::query::source::QuerySource;
 use crate::query::{CompiledQuery, QueryRun, SelectionError};
@@ -16,6 +19,33 @@ impl<'f> CompiledQuery<'f> {
     #[must_use]
     pub const fn has_header_only_selection(&self) -> bool {
         self.predicate.is_none() && self.referrers.is_none()
+    }
+
+    /// Reports whether the Record's only predicate test reads a fixed numeric or Boolean slot.
+    #[must_use]
+    pub fn has_direct_scalar_predicate(&self, record: u32) -> bool {
+        let (Some(Predicate::Test(index, _)), Some(Plan::Read { tests, .. })) =
+            (&self.predicate, self.plan_of(record))
+        else {
+            return false;
+        };
+        let Some(test) = tests.get(*index).and_then(Option::as_ref) else {
+            return false;
+        };
+        matches!(&test.reader, Reader::Column(column) if matches!(
+            column.data_type,
+            DataType::Bool
+                | DataType::Int8
+                | DataType::Int16
+                | DataType::Int32
+                | DataType::Int64
+                | DataType::UInt8
+                | DataType::UInt16
+                | DataType::UInt32
+                | DataType::UInt64
+                | DataType::Single
+                | DataType::Double
+        ))
     }
 
     /// Selects Records in path order, retaining failed rows for unreadable Record layouts.

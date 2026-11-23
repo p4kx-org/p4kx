@@ -146,8 +146,8 @@ fn selection_retains_where_operands_from_admitted_and_rejected_candidates() -> T
         "one physical candidate is rejected by WHERE"
     );
     assert!(
-        !selected.selection_origin.source_set_complete(),
-        "the remaining selector proof is explicit without qualifying the computed values"
+        selected.selection_origin.source_set_complete(),
+        "the original numeric comparison and candidate census prove selection"
     );
     let unfiltered = numeric(&all, 0)?;
     let nested = numeric(&selected, 11)?;
@@ -175,6 +175,17 @@ fn selection_retains_where_operands_from_admitted_and_rejected_candidates() -> T
         nested.minimum_uses, nested.maximum_uses,
         "the surviving record is the sole numeric operand"
     );
+    assert!(
+        nested.extrema.source_set_complete(),
+        "the surviving field has a complete direct selection and metric basis"
+    );
+    for winner in &nested.minimum_uses {
+        assert_eq!(
+            describe(&selected, winner)?.role(),
+            SourceUseRole::Payload,
+            "winning numeric operands are original payload reads"
+        );
+    }
     Ok(())
 }
 

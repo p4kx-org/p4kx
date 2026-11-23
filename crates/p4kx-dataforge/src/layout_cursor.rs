@@ -9,7 +9,7 @@ use crate::slot::Slot;
 use crate::source_layout_allocation;
 use crate::source_layout_index::SourceLayout;
 use crate::source_layout_properties::SourceField;
-use crate::{DataForge, DataForgeError};
+use crate::{DataForge, DataForgeError, DataType};
 
 /// A logical field occurrence at its original inherited-first position and byte coordinates.
 #[derive(Debug, Clone, Copy)]
@@ -149,6 +149,12 @@ impl<'source> LayoutCursor<'source> {
                 let name = field.slot.name(self.forge);
                 if let Some(observe) = observe {
                     let index = field.slot.property_index();
+                    if !field.slot.is_array() && field.slot.data_type() == DataType::Class {
+                        observe(LayoutSource::InlineClassWidth {
+                            property_index: index,
+                            struct_index: usize::from(field.slot.target()),
+                        });
+                    }
                     observe(match &name {
                         Ok(name) => LayoutSource::Property {
                             index,

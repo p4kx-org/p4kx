@@ -11,58 +11,57 @@ use crate::{SourceEvidenceError, SourceLocation, SourceScope, SourceUse, SourceU
 
 /// Returns the physical declaration sites actually examined for a layout.
 pub(crate) fn sites(source: &LayoutSource) -> impl Iterator<Item = QuerySourceSite> {
-    let mut sites = [None, None, None, None];
-    match source {
+    let sites = match source {
         LayoutSource::Structure { index, .. } => {
-            sites = ["parent", "firstProperty", "propertyCount", "size"]
-                .map(|field| Some(structure(*index, field, SourceUseRole::Selector)));
+            ["parent", "firstProperty", "propertyCount", "size"]
+                .map(|field| Some(structure(*index, field, SourceUseRole::Selector)))
         }
-        LayoutSource::Property { index, name, .. } => {
-            sites = [
-                Some(property(*index, "name", SourceUseRole::Selector)),
-                Some(property(*index, "instanceLayout", SourceUseRole::Selector)),
-                name.as_ref().and_then(text),
-                None,
-            ];
-        }
+        LayoutSource::Property { index, name, .. } => [
+            Some(property(*index, "name", SourceUseRole::Selector)),
+            Some(property(*index, "instanceLayout", SourceUseRole::Selector)),
+            name.as_ref().and_then(text),
+            None,
+        ],
         LayoutSource::TypeName { index, name, .. } => {
             let [header, text] = type_name(*index, name.as_ref());
-            sites = [header, text, None, None];
+            [header, text, None, None]
         }
-        LayoutSource::TypeParent { index, .. } => {
-            sites = [
-                Some(structure(*index, "parent", SourceUseRole::Selector)),
-                None,
-                None,
-                None,
-            ];
-        }
-        LayoutSource::PropertyTarget { property_index, .. } => {
-            sites = [
-                Some(property(*property_index, "target", SourceUseRole::Selector)),
-                None,
-                None,
-                None,
-            ];
-        }
-        LayoutSource::UnreadablePropertyName { index, .. } => {
-            sites = [
-                Some(property(*index, "name", SourceUseRole::Attempted)),
-                None,
-                None,
-                None,
-            ];
-        }
-        LayoutSource::UnavailableLayout { index, .. } => {
-            sites = [
-                Some(structure(*index, "layout", SourceUseRole::Attempted)),
-                None,
-                None,
-                None,
-            ];
-        }
-        _ => {}
-    }
+        LayoutSource::TypeParent { index, .. } => [
+            Some(structure(*index, "parent", SourceUseRole::Selector)),
+            None,
+            None,
+            None,
+        ],
+        LayoutSource::InlineClassWidth {
+            property_index,
+            struct_index,
+            ..
+        } => [
+            Some(property(*property_index, "target", SourceUseRole::Selector)),
+            Some(structure(*struct_index, "size", SourceUseRole::Selector)),
+            None,
+            None,
+        ],
+        LayoutSource::PropertyTarget { property_index, .. } => [
+            Some(property(*property_index, "target", SourceUseRole::Selector)),
+            None,
+            None,
+            None,
+        ],
+        LayoutSource::UnreadablePropertyName { index, .. } => [
+            Some(property(*index, "name", SourceUseRole::Attempted)),
+            None,
+            None,
+            None,
+        ],
+        LayoutSource::UnavailableLayout { index, .. } => [
+            Some(structure(*index, "layout", SourceUseRole::Attempted)),
+            None,
+            None,
+            None,
+        ],
+        _ => [None, None, None, None],
+    };
     sites.into_iter().flatten()
 }
 

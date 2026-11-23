@@ -31,7 +31,15 @@ pub enum LayoutSource {
         /// Original decoded name bytes when the span is nonempty.
         name: Option<Range<u64>>,
     },
-    /// The original target word consulted by the predicate's property resolver.
+    /// A class property and target size used to advance the original inline layout.
+    #[non_exhaustive]
+    InlineClassWidth {
+        /// Physical Property definition containing the target word.
+        property_index: usize,
+        /// Physical Struct definition containing the consumed size.
+        struct_index: usize,
+    },
+    /// The original target word consulted by Query property resolution.
     #[non_exhaustive]
     PropertyTarget {
         /// Physical Property definition position.

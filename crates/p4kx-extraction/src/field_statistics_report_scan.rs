@@ -4,7 +4,10 @@
 use std::collections::BTreeSet;
 use std::sync::Mutex;
 
-use p4kx_dataforge::query::{QueryRecordAdmission, QuerySource, QueryTypeSource, QueryUnavailable};
+use p4kx_dataforge::query::{
+    QueryAdmissionOutcome, QueryRecordAdmission, QuerySource, QueryTypeSource, QueryUnavailable,
+    ReferenceCoverage,
+};
 use p4kx_dataforge::{
     DataForge, FieldStatisticsObservation, FieldStatisticsReduction, LayoutSource,
     RecordPathObservation,
@@ -33,11 +36,34 @@ pub(super) struct BoundCapture {
     pub(super) root_attempts: Vec<SourceUseRef>,
 }
 
+#[derive(Clone, Copy, Default)]
+enum ScalarPredicateCoverage {
+    #[default]
+    Unobserved,
+    Observed,
+    Incomplete,
+}
+
+impl ScalarPredicateCoverage {
+    const fn include(&mut self, outcome: QueryAdmissionOutcome, direct_scalar: bool) {
+        use QueryAdmissionOutcome::{Admitted, NoTypePlan, PathRejected, PredicateRejected};
+        *self = match (*self, outcome, direct_scalar) {
+            (Self::Incomplete, _, _) => Self::Incomplete,
+            (Self::Observed | Self::Unobserved, Admitted | PredicateRejected, true) => {
+                Self::Observed
+            }
+            (coverage, NoTypePlan | PathRejected, _) => coverage,
+            _ => Self::Incomplete,
+        };
+    }
+}
+
 #[derive(Default)]
 pub(super) struct Capture {
     selection: Uses,
     headers: HeaderCensus,
     query_candidates: usize,
+    scalar_predicates: ScalarPredicateCoverage,
     selection_attempts: Uses,
     ancestry_gaps: BTreeSet<usize>,
     instance_bounds: InstanceBounds,
@@ -52,7 +78,7 @@ pub(super) trait Observe {
     fn query_type(&self, scope: &SourceScope, input: &QueryTypeSource);
     fn query_layout(&self, scope: &SourceScope, input: &LayoutSource);
     fn query_source(&self, scope: &SourceScope, input: QuerySource);
-    fn query_record(&self, scope: &SourceScope, entry: &QueryRecordAdmission);
+    fn query_record(&self, scope: &SourceScope, entry: &QueryRecordAdmission, direct_scalar: bool);
     fn field(&self, scope: &SourceScope, event: &FieldStatisticsObservation<'_>);
 }
 
@@ -112,9 +138,12 @@ impl Observe for Mutex<Capture> {
         });
     }
 
-    fn query_record(&self, scope: &SourceScope, entry: &QueryRecordAdmission) {
+    fn query_record(&self, scope: &SourceScope, entry: &QueryRecordAdmission, direct_scalar: bool) {
         collect(self, |capture| {
             capture.query_candidates += 1;
+            capture
+                .scalar_predicates
+                .include(entry.outcome, direct_scalar);
 
             capture.observe_header(scope, |headers| headers.record(entry))
         });
@@ -143,13 +172,26 @@ fn collect(
 }
 
 impl Capture {
-    pub(super) fn selection_complete(&self, proof: FieldStatisticsSelectionProof) -> bool {
+    pub(super) fn selection_complete(
+        &self,
+        proof: FieldStatisticsSelectionProof,
+        physical_record_count: usize,
+    ) -> bool {
         match proof {
             FieldStatisticsSelectionProof::AllRecords => true,
             FieldStatisticsSelectionProof::QueryHeaders { record_count } => {
                 self.query_candidates == record_count
                     && self.selection_attempts.iter().next().is_none()
                     && self.ancestry_gaps.is_empty()
+            }
+            FieldStatisticsSelectionProof::QueryRuntime {
+                reference_coverage: ReferenceCoverage::Complete,
+            } => {
+                matches!(self.scalar_predicates, ScalarPredicateCoverage::Observed)
+                    && self.query_candidates == physical_record_count
+                    && self.selection_attempts.iter().next().is_none()
+                    && self.ancestry_gaps.is_empty()
+                    && self.unavailable_traversals.is_empty()
             }
             _ => false,
         }

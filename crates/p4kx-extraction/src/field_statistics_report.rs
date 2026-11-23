@@ -6,7 +6,7 @@
 use std::sync::Mutex;
 
 use p4kx_dataforge::query::{
-    Query, QueryError, QueryUnavailable, ReferenceCoverage, SelectionError,
+    Query, QueryAdmissionOutcome, QueryError, QueryUnavailable, ReferenceCoverage, SelectionError,
 };
 use p4kx_dataforge::{
     DataForge, FieldStatistics, FieldStatisticsError, FieldStatisticsReduction,
@@ -156,11 +156,21 @@ impl<'source> FieldStatisticsReport<'source> {
                 |input| capture.query_layout(scope, &input),
                 |input| capture.query_source(scope, input),
             )?;
+            let allows_scalar_proof = query.referencing().is_none();
             let records = compiled
                 .run_observing_records(
                     || true,
                     |input| capture.query_source(scope, input),
-                    |entry| capture.query_record(scope, &entry),
+                    |entry| {
+                        let direct_scalar = allows_scalar_proof
+                            && matches!(
+                                entry.outcome,
+                                QueryAdmissionOutcome::Admitted
+                                    | QueryAdmissionOutcome::PredicateRejected
+                            )
+                            && compiled.has_direct_scalar_predicate(entry.record_index);
+                        capture.query_record(scope, &entry, direct_scalar);
+                    },
                 )?
                 .ok_or(FieldStatisticsReportError::UnboundSelection)?;
             let reduction =
@@ -200,7 +210,7 @@ fn observed<'source>(
     let capture = capture
         .into_inner()
         .map_err(|_| SourceEvidenceError::PoisonedEvidence)?;
-    let complete = capture.selection_complete(selection_proof);
+    let complete = capture.selection_complete(selection_proof, forge.record_count());
     let capture = capture.finish(&sources, &scope, forge, &reduction, complete)?;
     Ok(FieldStatisticsReport {
         reduction,
@@ -237,6 +247,9 @@ mod instance_tests;
 #[cfg(test)]
 #[path = "field_statistics_row_scalar_tests.rs"]
 mod row_scalar_tests;
+#[cfg(test)]
+#[path = "field_statistics_scalar_selection_tests.rs"]
+mod scalar_selection_tests;
 #[cfg(test)]
 #[path = "field_statistics_selection_tests.rs"]
 mod selection_tests;
