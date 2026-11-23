@@ -6,6 +6,7 @@
 
 mod broker;
 mod broker_structures;
+pub(crate) mod generator_query;
 mod npc;
 mod structures;
 mod template;
@@ -318,11 +319,7 @@ fn location_template(guid: u128, name: &str, disabled: bool) -> TestRecord {
     )
 }
 
-pub(crate) fn database() -> DataForgeBuilder {
-    let builder = structures::structures(DataForgeBuilder::new().version(8)).instance(
-        "outside",
-        TestInstance::new("ObjectiveToken").value("id", TestValue::Guid(OBJECTIVE_C)),
-    );
+fn tag_records() -> [TestRecord; 5] {
     [
         TestRecord::new(DATABASE, "TagDatabase", "TagDatabase.TagDatabase", TAG_PATH).value(
             "tags",
@@ -336,35 +333,45 @@ pub(crate) fn database() -> DataForgeBuilder {
         tag(TAG_HIJACKED, "Hijacked", vec![]),
         tag(TAG_SHIP, "ShipModel", vec![]),
         tag(TAG_KILL, "Kill", vec![]),
-        generator(),
-        template::template(),
-        template::leftover(),
-        template_parts::owner(),
-        template::elsewhere(),
-        template_deep::deep_phases(),
-        template_deep::deep_flow(),
-        template_deep::unknown_flow(),
-        template_deep::unknown_modifier(),
-        template_deep::unknown_value(),
-        template_deep::unknown_condition(),
-        template_deep::unknown_contract_property(),
-        template_deep::unknown_item_condition(),
-        unknown_conditions::template(),
-        unknown_conditions::template_after_known(),
-        unknown_conditions::generator(),
-        broker::bad_location_condition(),
-        broker::broker(),
-        broker::elsewhere(),
-        broker::leftover(),
-        broker::bad(),
-        broker::bad_property(),
-        broker::reward_record(),
-        location_template(LOCATION_A, "a_hijacked", false),
-        location_template(LOCATION_B, "b_hijacked", true),
-        location_template(LOCATION_DEV, "dev_temp_hijacked", false),
     ]
-    .into_iter()
-    .fold(builder, DataForgeBuilder::record)
+}
+
+pub(crate) fn database() -> DataForgeBuilder {
+    let builder = structures::structures(DataForgeBuilder::new().version(8)).instance(
+        "outside",
+        TestInstance::new("ObjectiveToken").value("id", TestValue::Guid(OBJECTIVE_C)),
+    );
+    tag_records()
+        .into_iter()
+        .chain([
+            generator(),
+            template::template(),
+            template::leftover(),
+            template_parts::owner(),
+            template::elsewhere(),
+            template_deep::deep_phases(),
+            template_deep::deep_flow(),
+            template_deep::unknown_flow(),
+            template_deep::unknown_modifier(),
+            template_deep::unknown_value(),
+            template_deep::unknown_condition(),
+            template_deep::unknown_contract_property(),
+            template_deep::unknown_item_condition(),
+            unknown_conditions::template(),
+            unknown_conditions::template_after_known(),
+            unknown_conditions::generator(),
+            broker::bad_location_condition(),
+            broker::broker(),
+            broker::elsewhere(),
+            broker::leftover(),
+            broker::bad(),
+            broker::bad_property(),
+            broker::reward_record(),
+            location_template(LOCATION_A, "a_hijacked", false),
+            location_template(LOCATION_B, "b_hijacked", true),
+            location_template(LOCATION_DEV, "dev_temp_hijacked", false),
+        ])
+        .fold(builder, DataForgeBuilder::record)
 }
 
 fn english() -> TestEntry {

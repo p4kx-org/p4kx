@@ -59,6 +59,11 @@ uses that row's own effective set links and requirements, so another row's intro
 become a validation dependency. Canonical conflicting aliases stay quarantined with explicit diagnostics.
 Spawn tables may include other declarations in an admitted complete source transaction. Consumers
 join them using the ordinary pool and query GUIDs; they need not recompute stable identifiers.
+The SDK pool arrays are scoped to reached Generator transactions and their admitted dependencies.
+The complete Catalog also includes independently admitted Template and Broker property pools.
+Use the selected Generator's original arena and source inventory for per-value evidence on its
+authored operands. The content-addressed ship and entity descriptions and location queries carry
+their normalized values directly.
 
 All exported nested data has a public typed view: layered facts, cooldowns, rewards, hauling
 alternatives, scoped-location filters, investigation clues and names, owner-local references,

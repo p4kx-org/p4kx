@@ -15,6 +15,14 @@ use serde_json::Value;
 
 use super::{Route, TestResult};
 
+#[expect(
+    dead_code,
+    reason = "The parity witness uses only the generator scope of the shared spawn fixture."
+)]
+#[path = "../it/spawns_fixture/mod.rs"]
+mod spawns_fixture;
+use spawns_fixture::generator_query as spawns;
+
 #[path = "sdk_mission_broker_context_route.rs"]
 mod broker_context;
 #[path = "../it/catalog_contract_query_probe_fixture.rs"]
@@ -42,9 +50,13 @@ pub(super) const DATASETS: &[&str] = &[
     mission_flows::TEMPLATE_CONTEXTS,
     mission_flows::BROKER_DEFINITIONS,
     broker_context::DATASET,
+    spawns::SHIPS,
+    spawns::ENTITIES,
+    spawns::LOCATIONS,
+    spawns::NPCS,
 ];
 
-pub(super) fn read() -> TestResult<[Route; 10]> {
+pub(super) fn read() -> TestResult<[Route; 14]> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("contracts.p4k");
     ArchiveBuilder::new()
@@ -75,6 +87,7 @@ pub(super) fn read() -> TestResult<[Route; 10]> {
             compare(&catalog, GENERATORS, &snapshot.rows)
         })??;
     let [flows, templates, brokers, template_contexts] = mission_flows::read()?;
+    let [ships, entities, locations, npcs] = read_spawn_rows()?;
     Ok([
         contracts,
         titles,
@@ -86,7 +99,23 @@ pub(super) fn read() -> TestResult<[Route; 10]> {
         brokers,
         template_contexts,
         broker_context::read()?,
+        ships,
+        entities,
+        locations,
+        npcs,
     ])
+}
+
+fn read_spawn_rows() -> TestResult<[Route; 4]> {
+    const REMAINING: &str = "Generator-scope producer parity verified; independent Template and Broker enumeration, installed parity and memory acceptance open";
+    spawns::with_catalog_parity(|_, snapshot| {
+        Ok([
+            Route::queried_rows(spawns::SHIPS, &snapshot.ship_spawns, REMAINING)?,
+            Route::queried_rows(spawns::ENTITIES, &snapshot.entity_spawns, REMAINING)?,
+            Route::queried_rows(spawns::LOCATIONS, &snapshot.location_queries, REMAINING)?,
+            Route::queried_rows(spawns::NPCS, &snapshot.npc_spawns, REMAINING)?,
+        ])
+    })
 }
 
 fn compare<Row: Serialize + JsonSchema>(
