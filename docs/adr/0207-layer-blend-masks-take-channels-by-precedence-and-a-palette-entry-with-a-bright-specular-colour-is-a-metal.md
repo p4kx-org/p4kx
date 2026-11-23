@@ -100,5 +100,11 @@ totalling 1,048,292 decoded bytes. The three draws retained eight, eight and one
 material-layer occurrences. Two occurrences contain explicitly blank paths. The probe
 took 9.4 seconds and peaked at 960,950,272 bytes of working set.
 
-The faceplate and frame still need spatial identification. A link from the authored
-layer mode to the renderer flags is also needed to establish the tint mapping.
+A private colour-ID replay of the same GLB checked frontal and opposing elevated
+35-degree views. Slot 0 contains the upper exterior shell and the circular side-mount
+centres. Slot 1 contains their surrounds and the lower front panel and neck skirt.
+Both slots contribute to the front. Slot 2 forms a separate angular insert in isolation
+and is occluded in all three combined views with opaque ID materials.
+
+These landmarks identify physical regions of the worn model. The tint rule still
+requires a link from the authored layer mode to the renderer flags.
