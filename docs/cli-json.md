@@ -1407,11 +1407,12 @@ decoded DataForge offsets. The ranges are sorted and disjoint. Adjacent strings 
 a range through their verified NUL terminators.
 A Query using only `FROM` or `AT` has complete selection evidence after a full physical
 Record census with readable path, name and type decisions. A failing admitted Record
-body affects its field metrics separately from that selection proof. A single `WHERE`
-comparison can establish complete selection when at least one candidate evaluates the test,
-every evaluated test reads a fixed numeric or Boolean slot, and the original census and
-runtime reads have no unresolved inputs. Its actual selection contributors include the
-operands of rejected candidates. Other runtime selection, including `REFERENCING`, retains
+body affects its field metrics separately from that selection proof. A `WHERE` condition
+can establish complete selection when at least one candidate evaluates it, all its comparisons
+on candidates use fixed numeric, Boolean, GUID, string or locale slots, and the original
+census and runtime reads have no unresolved inputs. Its actual selection contributors
+include the demanded operands of
+admitted and rejected candidates. Other runtime selection, including `REFERENCING`, retains
 its observed uses with incomplete selection coverage.
 
 `selectionAttempts`, `rootAttempts`, and `valueAttempts` retain failed original uses separately

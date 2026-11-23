@@ -7,7 +7,6 @@ use rayon::prelude::*;
 
 use crate::DataType;
 use crate::query::compile::Plan;
-use crate::query::predicate::Predicate;
 use crate::query::reader::Reader;
 use crate::query::selection_control::{Control, EvaluationError};
 use crate::query::source::QuerySource;
@@ -21,31 +20,35 @@ impl<'f> CompiledQuery<'f> {
         self.predicate.is_none() && self.referrers.is_none()
     }
 
-    /// Reports whether the Record's only predicate test reads a fixed numeric or Boolean slot.
+    /// Reports whether the Record's condition uses only fixed scalar slots with observable inputs.
     #[must_use]
     pub fn has_direct_scalar_predicate(&self, record: u32) -> bool {
-        let (Some(Predicate::Test(index, _)), Some(Plan::Read { tests, .. })) =
-            (&self.predicate, self.plan_of(record))
-        else {
+        let Some(Plan::Read { tests, .. }) = self.plan_of(record) else {
             return false;
         };
-        let Some(test) = tests.get(*index).and_then(Option::as_ref) else {
-            return false;
-        };
-        matches!(&test.reader, Reader::Column(column) if matches!(
-            column.data_type,
-            DataType::Bool
-                | DataType::Int8
-                | DataType::Int16
-                | DataType::Int32
-                | DataType::Int64
-                | DataType::UInt8
-                | DataType::UInt16
-                | DataType::UInt32
-                | DataType::UInt64
-                | DataType::Single
-                | DataType::Double
-        ))
+        !tests.is_empty()
+            && tests.iter().all(|test| {
+                let Some(Reader::Column(column)) = test.as_ref().map(|test| &test.reader) else {
+                    return false;
+                };
+                matches!(
+                    column.data_type,
+                    DataType::Bool
+                        | DataType::Int8
+                        | DataType::Int16
+                        | DataType::Int32
+                        | DataType::Int64
+                        | DataType::UInt8
+                        | DataType::UInt16
+                        | DataType::UInt32
+                        | DataType::UInt64
+                        | DataType::Single
+                        | DataType::Double
+                        | DataType::Guid
+                        | DataType::String
+                        | DataType::Locale
+                )
+            })
     }
 
     /// Selects Records in path order, retaining failed rows for unreadable Record layouts.

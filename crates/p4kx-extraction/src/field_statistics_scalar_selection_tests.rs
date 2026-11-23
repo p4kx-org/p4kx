@@ -66,6 +66,75 @@ fn boolean_by_head_keeps_its_original_physical_dispatch_key() -> TestResult {
 }
 
 #[test]
+fn compound_fixed_comparisons_bind_only_demanded_operand_bytes() -> TestResult {
+    let bytes = inline_fixture();
+    let forge = DataForge::open(&bytes)?;
+    let query = Query::parse(
+        "from Owner where not ((score < 10 and enabled = false) or aux.unrelated = 999)",
+    )?;
+    let report = FieldStatisticsReport::query(&forge, SourceInput::Unknown, &query)?;
+    assert_eq!(report.reduction.statistics().records(), 0);
+    assert!(report.selection_origin.source_set_complete());
+
+    let mut operands = selection_bytes(&report, &bytes, "slot");
+    operands.sort_by_key(|bytes| bytes.len());
+    assert_eq!(operands, [&[0][..], &[7, 0, 0, 0][..]]);
+    Ok(())
+}
+
+#[test]
+fn fixed_text_selection_binds_the_original_bytes_and_terminator() -> TestResult {
+    let bytes = text_fixture();
+    let forge = DataForge::open(&bytes)?;
+    let query = Query::parse(r#"from Owner where label = "Other""#)?;
+    let report = FieldStatisticsReport::query(&forge, SourceInput::Unknown, &query)?;
+    assert_eq!(report.reduction.statistics().records(), 0);
+    assert!(report.selection_origin.source_set_complete());
+    assert!(selection_bytes(&report, &bytes, "text").contains(&b"Verdigris".as_slice()));
+    assert_eq!(selection_bytes(&report, &bytes, "textTerminator"), &[b"\0"]);
+    assert!(matches!(
+        selection_bytes(&report, &bytes, "slot").as_slice(),
+        [slot] if slot.len() == 4
+    ));
+    assert!(report.inventory.iter_uses().any(|entry| {
+        report
+            .selection_origin
+            .source_uses_refs()
+            .contains(entry.id())
+            && matches!(entry.location(), SourceLocation::Subresource { namespace, field, .. }
+                if namespace == "dataforgeHeader" && field == "textLength")
+    }));
+    Ok(())
+}
+
+#[test]
+fn an_unreadable_fixed_text_operand_keeps_a_recovered_selection_incomplete() -> TestResult {
+    let mut bytes = text_fixture();
+    let start = bytes
+        .windows(b"Verdigris\0".len())
+        .position(|slice| slice == b"Verdigris\0")
+        .ok_or("original fixture label")?;
+    *bytes.get_mut(start).ok_or("first fixture label byte")? = 0xff;
+    let forge = DataForge::open(&bytes)?;
+    let query = Query::parse(r#"from Owner where label = "Other" or enabled = true"#)?;
+    let report = FieldStatisticsReport::query(&forge, SourceInput::Unknown, &query)?;
+    assert_eq!(report.reduction.statistics().records(), 1);
+    assert!(!report.selection_origin.source_set_complete());
+    assert!(
+        selection_bytes(&report, &bytes, "text")
+            .iter()
+            .all(|text| !text.contains(&0xff))
+    );
+    assert!(report.inventory.iter_uses().any(|entry| {
+        report.selection_attempts.contains(entry.id())
+            && entry.role() == SourceUseRole::Attempted
+            && matches!(entry.location(), SourceLocation::Subresource { namespace, field, .. }
+                if namespace == "dataforgeDecodedBytes" && field == "text")
+    }));
+    Ok(())
+}
+
+#[test]
 fn a_retained_unreadable_predicate_root_keeps_selection_incomplete() -> TestResult {
     let bytes = DataForgeBuilder::new()
         .structure(TestStruct::new("Owner").field("score", TestType::Int32))
@@ -126,6 +195,47 @@ fn numeric_where_behind_a_pointer_keeps_selection_incomplete() -> TestResult {
         "a pointer path is outside the fixed scalar proof"
     );
     Ok(())
+}
+
+fn selection_bytes<'a>(
+    report: &FieldStatisticsReport<'_>,
+    bytes: &'a [u8],
+    expected_field: &str,
+) -> Vec<&'a [u8]> {
+    let selected = report.selection_origin.source_uses_refs();
+    report
+        .inventory
+        .iter_uses()
+        .filter(|entry| selected.contains(entry.id()))
+        .filter_map(|entry| match entry.location() {
+            SourceLocation::Subresource {
+                namespace,
+                indices,
+                field,
+            } if namespace == "dataforgeDecodedBytes" && field == expected_field => {
+                let [start, end] = indices.as_slice() else {
+                    return None;
+                };
+                bytes.get(usize::try_from(*start).ok()?..usize::try_from(*end).ok()?)
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+fn text_fixture() -> Vec<u8> {
+    DataForgeBuilder::new()
+        .structure(
+            TestStruct::new("Owner")
+                .field("label", TestType::String)
+                .field("enabled", TestType::Bool),
+        )
+        .record(
+            TestRecord::new(1, "Owner", "Known", "synthetic/known.xml")
+                .value("label", TestValue::Text("Verdigris".into()))
+                .value("enabled", TestValue::Bool(true)),
+        )
+        .build()
 }
 
 fn declaration(
