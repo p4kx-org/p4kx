@@ -2120,6 +2120,19 @@ source inventory with the result. References retain the authored target and
 resolution state. Use the target's physical Record index with the Tag declaration
 query to read a linked Tag definition.
 
+## Paint compatibility
+
+Use `equipment::paints::read_paint_compatibility` with a physical Paint
+Record index, or with a GUID when the original Paint owner is unique. The
+query compares that owner with the eligible Ship Records and their effective
+Record and vehicle XML ports. The result keeps the canonical `paints` row,
+physical Ship positions in the same order, and the referenced source inventory.
+
+A `Found` row has complete observed inputs for this scope. A `Partial` row
+contains the matches supported by the inputs read so far. The snapshot reports
+incomplete owner, Ship and vehicle dependencies separately. Installed Normal
+parity, cold memory and Paint enumeration remain unverified.
+
 ## Cargo Grid configurations
 
 Use `equipment::with_cargo_grids`, its decoded-Entry form or the equivalent session methods with one

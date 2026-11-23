@@ -15,42 +15,57 @@ mod tests;
 
 /// Identity of a physical participant in one paint compatibility decision.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub(super) struct PaintOwner {
-    pub(super) record_index: u32,
-    pub(super) guid: CatalogGuid,
+pub(crate) struct PaintOwner {
+    pub(crate) record_index: u32,
+    pub(crate) guid: CatalogGuid,
 }
 
 /// Ships grouped by their effective ports and tags.
+#[derive(Default)]
 pub(super) struct ShipPaintMatches {
     groups: HashMap<ShipPorts, Vec<PaintOwner>>,
 }
 
 impl ShipPaintMatches {
     pub(super) fn read(vehicles: &[VehicleFacts]) -> Result<Self, ExportAccountingError> {
-        let mut groups = HashMap::<ShipPorts, Vec<PaintOwner>>::new();
+        let mut matches = Self::default();
         for vehicle in vehicles {
             let record_index = vehicle
                 .source_record_index
                 .ok_or(ExportAccountingError::MissingFieldInspection)?;
             let mut ports = vehicle.paint_ports.clone();
             ports.extend(vehicle.implementation.ports.iter().cloned());
-            if ports.is_empty() {
-                continue;
-            }
-            ports.sort_unstable();
-            ports.dedup();
-            let mut tags = vehicle.tags.clone();
-            tags.sort_unstable();
-            tags.dedup();
-            groups
-                .entry(ShipPorts { ports, tags })
-                .or_default()
-                .push(PaintOwner {
+            matches.add(
+                PaintOwner {
                     record_index,
                     guid: vehicle.ship,
-                });
+                },
+                ports,
+                || vehicle.tags.clone(),
+            );
         }
-        Ok(Self { groups })
+        Ok(matches)
+    }
+
+    /// Retains one physical ship after folding its effective Record and XML ports.
+    pub(super) fn add(
+        &mut self,
+        owner: PaintOwner,
+        mut ports: Vec<PaintPort>,
+        tags: impl FnOnce() -> Vec<String>,
+    ) {
+        if ports.is_empty() {
+            return;
+        }
+        ports.sort_unstable();
+        ports.dedup();
+        let mut tags = tags();
+        tags.sort_unstable();
+        tags.dedup();
+        self.groups
+            .entry(ShipPorts { ports, tags })
+            .or_default()
+            .push(owner);
     }
 
     /// Iterates the physical ships whose effective ports accept the paint.
@@ -60,11 +75,10 @@ impl ShipPaintMatches {
         required_tags: &[&str],
         index: &'scope PaintTagIndex<'_>,
     ) -> impl Iterator<Item = PaintOwner> + 'scope {
-        let have = lower_tags(tags);
-        let required = lower_tags(required_tags);
+        let paint = PaintRequirements::new(tags, required_tags);
         self.groups
             .iter()
-            .filter(move |(group, _)| group.accepts(&have, &required, index))
+            .filter(move |(group, _)| paint.accepts(&group.ports, &group.tags, index))
             .flat_map(|(_, ships)| ships.iter().copied())
     }
 }
@@ -76,11 +90,28 @@ struct ShipPorts {
     tags: Vec<String>,
 }
 
-impl ShipPorts {
-    fn accepts(&self, have: &[String], required: &[String], index: &PaintTagIndex<'_>) -> bool {
-        self.ports
+pub(crate) struct PaintRequirements {
+    offered: Vec<String>,
+    required: Vec<String>,
+}
+
+impl PaintRequirements {
+    pub(crate) fn new(tags: &[&str], required_tags: &[&str]) -> Self {
+        Self {
+            offered: lower_tags(tags),
+            required: lower_tags(required_tags),
+        }
+    }
+
+    pub(crate) fn accepts(
+        &self,
+        ports: &[PaintPort],
+        ship_tags: &[String],
+        index: &PaintTagIndex<'_>,
+    ) -> bool {
+        ports
             .iter()
-            .any(|port| port.accepts(have, required, &self.tags, index))
+            .any(|port| port.accepts(&self.offered, &self.required, ship_tags, index))
     }
 }
 

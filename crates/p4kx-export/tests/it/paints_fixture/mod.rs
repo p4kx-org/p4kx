@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 //! A synthetic Archive with paints, ships with paint ports and a tag tree.
+pub(crate) mod vehicle_lookup;
 
 use std::error::Error;
 use std::path::{Path, PathBuf};

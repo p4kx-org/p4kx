@@ -25,12 +25,26 @@ pub(crate) use crate::item::Item;
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct Paint {
+#[non_exhaustive]
+pub struct Paint {
     /// The `guid` of the paint's entry in `items`, which holds its name and record.
     pub(crate) item_guid: CatalogGuid,
     /// The GUIDs of the ships the paint fits, ordered by GUID; empty when it fits none. Each
     /// is the `guid` of an entry of `ships`.
     pub(crate) ship_guids: Vec<CatalogGuid>,
+}
+
+impl Paint {
+    /// Returns the GUID of the physical Paint owner.
+    #[must_use]
+    pub const fn item_guid(&self) -> p4kx_extraction::Guid {
+        self.item_guid.get()
+    }
+
+    /// Returns compatible Ship GUIDs in canonical order.
+    pub fn ship_guids(&self) -> impl ExactSizeIterator<Item = p4kx_extraction::Guid> + '_ {
+        self.ship_guids.iter().copied().map(CatalogGuid::get)
+    }
 }
 
 /// A ship or ground vehicle: an `EntityClassDefinition` Record under `entities/spaceships` or

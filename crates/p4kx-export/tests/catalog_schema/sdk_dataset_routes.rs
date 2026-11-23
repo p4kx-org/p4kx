@@ -121,6 +121,8 @@ mod mission_type;
 mod npc_spawns;
 #[path = "sdk_ordnance_routes.rs"]
 mod ordnance;
+#[path = "sdk_paint_compatibility_route.rs"]
+mod paint_compatibility;
 #[path = "sdk_planet_asset_routes.rs"]
 mod planet_assets;
 #[path = "sdk_planet_audio_route.rs"]
@@ -292,6 +294,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(resource_network::read()?);
     routes.extend(radar_options::read()?);
     routes.push(planet_audio::read()?);
+    routes.push(paint_compatibility::read()?);
     routes.push(archive_entries::read_particle_library(archive)?);
     routes.extend(weapon_animation::read()?);
     routes.extend(actor_procedural_recoil::read()?);

@@ -128,6 +128,19 @@ impl<'context, 'source> CapturedTags<'context, 'source> {
         TagPath::rows(&self.paths, cancel)
     }
 
+    pub(crate) fn paint_scope(&self) -> Result<p4kx_extraction::FieldOrigin, CatalogError> {
+        let mut uses = self.absence.clone();
+        self.paths
+            .append_path_union(0..self.paths.len(), &mut uses)?;
+        let complete = self.negative_complete
+            && (0..self.paths.len()).all(|position| {
+                self.paths
+                    .get(position)
+                    .is_some_and(|node| node.path_complete)
+            });
+        Ok(self.paths.uses.origin(&uses, complete))
+    }
+
     pub(crate) fn lookup(
         &self,
         observed: &OriginalReferenceObservation<'_, '_, '_, 'source>,

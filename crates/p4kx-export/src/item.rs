@@ -20,6 +20,9 @@ mod classification;
 mod inputs;
 #[path = "item_paint_facts.rs"]
 mod paint_facts;
+#[path = "paint_compatibility_input.rs"]
+pub(crate) mod paint_input;
+pub(crate) use paint_input::PaintInput;
 #[path = "item_playability_projection.rs"]
 pub(crate) mod playability_projection;
 #[path = "item_projection.rs"]

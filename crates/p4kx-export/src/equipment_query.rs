@@ -133,6 +133,9 @@ mod inventory;
 mod item_sources;
 #[path = "equipment_catalog_item_query.rs"]
 mod items;
+/// Scoped canonical Paint compatibility.
+#[path = "equipment_paint_compatibility_query.rs"]
+pub mod paints;
 #[path = "equipment_planet_audio_query.rs"]
 pub mod planet_audio;
 #[path = "equipment_procedural_definitions_query.rs"]

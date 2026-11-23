@@ -3,6 +3,9 @@
 
 //! Paints and the ships they fit in the P4KX catalog, through the public API.
 
+#[path = "catalog_paints_vehicle_lookup.rs"]
+mod vehicle_lookup;
+
 use crate::paints_fixture;
 
 use std::collections::BTreeSet;

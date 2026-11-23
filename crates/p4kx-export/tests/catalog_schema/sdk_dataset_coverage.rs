@@ -1,19 +1,21 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use schemars::JsonSchema;
 use serde_json::{Value, json};
 
 use super::{Entry, Owner, Shape, TestResult, dataset_owners};
 
 #[path = "sdk_dataset_audit.rs"]
 mod dataset_audit;
+#[path = "sdk_route_contract.rs"]
+mod route_contract;
 #[path = "sdk_dataset_routes.rs"]
 mod routes;
 #[path = "sdk_row_schema.rs"]
 mod row_schema;
 
 use dataset_audit::{CoverageGaps, NO_WITNESS, audit};
+use route_contract::Route;
 
 const LANGUAGE_POLICY: &str = "/texts/languagePolicy";
 const LANGUAGE_SOURCES: &str = "/texts/languageSources";
@@ -35,6 +37,7 @@ const ITEM_RECOVERY_OVERRIDES: &str = "/configurations/itemRecoveryOverrides";
 const ITEM_RECOVERY_POLICY: &str = "/configurations/itemRecoveryPolicy";
 const INVENTORY_CONTAINERS: &str = "/definitions/inventoryContainers";
 const PROVENANCE: &str = "/provenance";
+const PAINTS: &str = "/paints";
 const INVENTORY_CONFIGURATIONS: &str = "/configurations/inventoryConfigurations";
 const FACILITIES: &str = "/configurations/facilities";
 const FACILITY_INSTANCES: &str = "/placements/facilityInstances";
@@ -132,65 +135,6 @@ const LOCATION_PHYSICS_GRIDS: &str = "/placements/locationPhysicsGrids";
 const LOOT_DOCUMENTS: &str = "/declarations/lootEntityContainerDocuments";
 const UNRESOLVED: &str = "/placements/unresolvedContainerLinks";
 
-struct Route {
-    dataset: &'static str,
-    schema: Value,
-    remaining: Option<&'static str>,
-}
-
-impl Route {
-    fn queried_value<Item: JsonSchema + serde::Serialize>(
-        dataset: &'static str,
-        value: &Item,
-        remaining: &'static str,
-    ) -> TestResult<Self> {
-        Self::queried_rows(dataset, std::slice::from_ref(value), remaining)
-    }
-
-    fn queried_rows<Row: JsonSchema + serde::Serialize>(
-        dataset: &'static str,
-        rows: &[Row],
-        remaining: impl Into<Option<&'static str>>,
-    ) -> TestResult<Self> {
-        if rows.is_empty() {
-            return Err(format!("SDK witness returned no row for {dataset}").into());
-        }
-        Ok(Self::with_row_schema::<Row>(dataset, remaining.into()))
-    }
-
-    fn queried_uninhabited_rows<Row: JsonSchema + serde::Serialize>(
-        dataset: &'static str,
-        rows: &[Row],
-        remaining: &'static str,
-    ) -> TestResult<Self> {
-        let route = Self::with_row_schema::<Row>(dataset, Some(remaining));
-        let row = super::super::schema_navigation::schema_at(&route.schema, "/[]")?;
-        if !rows.is_empty() || (row != &Value::Bool(false) && row != &json!({"not": {}})) {
-            return Err(format!(
-                "SDK availability witness requires an uninhabited row schema for {dataset}"
-            )
-            .into());
-        }
-        Ok(route)
-    }
-
-    fn with_row_schema<Row: JsonSchema + serde::Serialize>(
-        dataset: &'static str,
-        remaining: Option<&'static str>,
-    ) -> Self {
-        Self {
-            dataset,
-            schema: schemars::generate::SchemaSettings::draft2020_12()
-                .for_serialize()
-                .with_transform(row_schema::remove_descriptions)
-                .into_generator()
-                .into_root_schema_for::<Vec<Row>>()
-                .to_value(),
-            remaining,
-        }
-    }
-}
-
 const REQUIRED_WITNESSES: &[&str] = &[
     "/definitions/radarSystemSharedParams",
     "/placements/resourceNetworkNodes",
@@ -213,6 +157,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     TAG_PATHS,
     INVENTORY_CONTAINERS,
     PROVENANCE,
+    PAINTS,
     ITEM_RECOVERY_ECONOMY,
     ITEM_RECOVERY_OVERRIDES,
     ITEM_RECOVERY_POLICY,

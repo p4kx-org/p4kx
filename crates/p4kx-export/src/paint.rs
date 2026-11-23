@@ -15,7 +15,8 @@ use crate::{CatalogError, ExportAccountingError, PaintSummary};
 #[path = "paint_matching.rs"]
 mod matching;
 
-use matching::{PaintOwner, ShipPaintMatches};
+use matching::ShipPaintMatches;
+pub(crate) use matching::{PaintOwner, PaintRequirements};
 
 const PAINT_TYPE: &str = "Paints";
 
@@ -106,9 +107,10 @@ pub(crate) fn paints<'f>(
     })
 }
 
-struct PaintCandidate<'item, 'source> {
+pub(crate) struct PaintCandidate<'item, 'source> {
     owner: PaintOwner,
-    item: &'item Item<'source>,
+    tags: &'item [&'source str],
+    required_tags: &'item [&'source str],
 }
 
 impl<'item, 'source> PaintCandidate<'item, 'source> {
@@ -120,13 +122,25 @@ impl<'item, 'source> PaintCandidate<'item, 'source> {
             .value()
             .copied()
             .ok_or(ExportAccountingError::MissingFieldInspection)?;
-        Ok(Self {
-            owner: PaintOwner {
-                record_index,
-                guid: item.identity.guid,
-            },
-            item,
-        })
+        Ok(Self::from_authored(
+            record_index,
+            item.identity.guid,
+            &item.paint.tags,
+            &item.paint.required_tags,
+        ))
+    }
+
+    pub(crate) const fn from_authored(
+        record_index: u32,
+        guid: crate::guid_text::CatalogGuid,
+        tags: &'item [&'source str],
+        required_tags: &'item [&'source str],
+    ) -> Self {
+        Self {
+            owner: PaintOwner { record_index, guid },
+            tags,
+            required_tags,
+        }
     }
 
     fn project(
@@ -135,19 +149,27 @@ impl<'item, 'source> PaintCandidate<'item, 'source> {
         index: &PaintTagIndex<'_>,
         cancel: Option<&CancelToken>,
     ) -> Result<Paint, CatalogError> {
+        self.project_accepted(
+            matches.fit(self.tags, self.required_tags, index).collect(),
+            cancel,
+        )
+        .map(|(row, _)| row)
+    }
+
+    pub(crate) fn project_accepted(
+        &self,
+        mut accepted: Vec<PaintOwner>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(Paint, Vec<PaintOwner>), CatalogError> {
         if cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
-        let paint = &self.item.paint;
-        let mut ship_guids: Vec<_> = matches
-            .fit(&paint.tags, &paint.required_tags, index)
-            .map(|ship| ship.guid)
-            .collect();
-        ship_guids.sort_by_cached_key(|guid| guid.text());
-        Ok(Paint {
+        accepted.sort_by_cached_key(|ship| (ship.guid.text(), ship.record_index));
+        let row = Paint {
             item_guid: self.owner.guid,
-            ship_guids,
-        })
+            ship_guids: accepted.iter().map(|ship| ship.guid).collect(),
+        };
+        Ok((row, accepted))
     }
 }
 
