@@ -17,7 +17,7 @@ pub(in super::super) struct Observed {
 }
 
 impl Observed {
-    pub(in super::super) const fn marker(&self, complete: bool) -> Encryption {
+    pub(in super::super) const fn marker(self, complete: bool) -> Encryption {
         if self.encrypted {
             Encryption::Encrypted
         } else if complete && !self.unknown {

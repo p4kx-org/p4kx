@@ -117,6 +117,32 @@ impl<'de> DeserializeSeed<'de> for Node<'_> {
     }
 }
 
+impl Node<'_> {
+    fn finish_map<E: de::Error>(
+        self,
+        mut cell: Cell,
+        variant: VariantReferences,
+        has_availability: bool,
+        rows: bool,
+    ) -> Result<(), E> {
+        if matches!(self.shape, Shape::Table(_)) {
+            if !has_availability {
+                return Err(de::Error::missing_field("availability"));
+            }
+            if !rows {
+                return Err(de::Error::missing_field("rows"));
+            }
+        }
+        if matches!(self.shape, Shape::Variant) {
+            cell.references = variant.resolve(self.inventory).map_err(de::Error::custom)?;
+        }
+        if cell.check().map_err(de::Error::custom)? {
+            increment(&mut self.counts.sourced_cells)?;
+        }
+        Ok(())
+    }
+}
+
 impl<'de> Visitor<'de> for Node<'_> {
     type Value = ();
 
@@ -175,21 +201,7 @@ impl<'de> Visitor<'de> for Node<'_> {
                 }
             }
         }
-        if matches!(self.shape, Shape::Table(_)) {
-            if availability.is_none() {
-                return Err(de::Error::missing_field("availability"));
-            }
-            if !rows {
-                return Err(de::Error::missing_field("rows"));
-            }
-        }
-        if matches!(self.shape, Shape::Variant) {
-            cell.references = variant.resolve(self.inventory).map_err(de::Error::custom)?;
-        }
-        if cell.check().map_err(de::Error::custom)? {
-            increment(&mut self.counts.sourced_cells)?;
-        }
-        Ok(())
+        self.finish_map(cell, variant, availability.is_some(), rows)
     }
 
     fn visit_seq<A: SeqAccess<'de>>(self, mut sequence: A) -> Result<(), A::Error> {
