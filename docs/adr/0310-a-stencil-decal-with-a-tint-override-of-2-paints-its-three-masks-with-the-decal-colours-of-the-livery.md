@@ -57,8 +57,7 @@ masks with the livery's decal colours: the red mask with `decalColorR`, the gree
 decal. The masks are layers with the mask as their alpha, red below green below blue (provisional,
 see Open 2): a colour counts by its mask and by what the masks above leave of it, the colour of a
 texel is the weighted mean of the three, and the opacity is the strongest mask. A texel that only
-one mask covers partly therefore takes none of the other colours. Any other value above 0, which
-LIVE does not have, keeps the stand-in below.
+one mask covers partly therefore takes none of the other colours.
 
 - **Model.** `StencilTint` tells where the colour comes from; `PaletteSlot::Decal` is what the
   material takes (`Material::palette`); `TintPalette::decal` holds the colours, and
@@ -71,7 +70,8 @@ LIVE does not have, keeps the stand-in below.
   weights and sums the three colours by the masks and takes the maximum of the masks as the alpha.
   A palette without `decal` leaves the decal in its stencil colour and the red channel as its
   opacity.
-- **Override 1** keeps the stand-in of ADR-0298, the primary palette entry.
+- **Other positive overrides**, including the observed override of 1, keep the primary palette
+  entry as the stand-in from ADR-0298.
 
 ## Open
 

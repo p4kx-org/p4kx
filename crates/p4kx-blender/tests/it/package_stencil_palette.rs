@@ -35,6 +35,12 @@ const MASKS: [[u8; 3]; 8] = [
     [128, 0, 0],
 ];
 const CELL: usize = 4;
+const STENCIL_PARAMETERS: [(&str, &str); 4] = [
+    ("StencilDiffuseColor", "0.25,0.5,0.75"),
+    ("StencilDiffuseColor3", "0.1250, 0.25,0.5"),
+    ("StencilTintOverride", "2"),
+    ("StencilDiffuseColor2", "0.75,0.50, 0.125"),
+];
 
 #[test]
 fn stencil_palette_colours_are_projected_into_glb_and_the_blender_package() -> TestResult {
@@ -133,6 +139,14 @@ fn verify_package(manifest: &Manifest, painted: bool) -> TestResult {
         Some(PaletteEntry::Decal),
         "authored override selects decal"
     );
+    let parameters = decal
+        .parameters
+        .iter()
+        .map(|parameter| (parameter.name.as_str(), parameter.value.as_str()));
+    assert!(
+        parameters.eq(STENCIL_PARAMETERS),
+        "the package preserves the original stencil parameter text and order"
+    );
     let stencil = decal.stencil.as_ref().ok_or("package stencil parameters")?;
     assert!(stencil.drawn, "written texture draws");
     assert_eq!(
@@ -198,9 +212,12 @@ fn entries() -> Result<Vec<TestEntry>, Box<dyn Error>> {
         .shader("MeshDecal")
         .specular([0.0; 3])
         .string_gen_mask("%STENCIL_MAP")
-        .public_param("StencilDiffuseColor", "0.25,0.5,0.75")
-        .public_param("StencilTintOverride", "2")
         .texture("TexSlot7", TEXTURE);
+    let stencil = STENCIL_PARAMETERS
+        .into_iter()
+        .fold(stencil, |material, (name, value)| {
+            material.public_param(name, value)
+        });
     let library = TestMtl::multi(&[
         TestMtlMaterial::new("unused"),
         stencil,
