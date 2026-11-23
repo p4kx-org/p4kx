@@ -193,7 +193,7 @@ fn observed<'source>(
         FieldStatisticsReportError,
     >,
 ) -> Result<FieldStatisticsReport<'source>, FieldStatisticsReportError> {
-    let sources = SourceUses::with_compact_coordinates();
+    let sources = SourceUses::with_field_statistics_coordinates();
     let scope = sources.observe(source, InputScope::Payload)?;
     let capture = Mutex::new(Capture::default());
     let (reduction, selection_proof) = walk(&scope, &capture)?;

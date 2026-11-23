@@ -12,7 +12,24 @@ use crate::source_use::{
 
 pub(crate) const RECORD_PATH_TEXT_RANGES: &str = "dataforgeRecordPathTextRanges";
 
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CoordinateEncoding {
+    Standard,
+    FieldStatistics,
+}
+
+#[cfg(test)]
 pub(crate) fn encode(
+    source: &PhysicalSourceRef,
+    scope: InputScope,
+    role: SourceUseRole,
+    location: LocationView<'_>,
+) -> SourceUseRef {
+    encode_with(CoordinateEncoding::Standard, source, scope, role, location)
+}
+
+pub(crate) fn encode_with(
+    encoding: CoordinateEncoding,
     source: &PhysicalSourceRef,
     scope: InputScope,
     role: SourceUseRole,
@@ -36,11 +53,11 @@ pub(crate) fn encode(
     append_counted(&mut key, source.as_str());
     let _written = write!(key, "{scope}{role}");
     match location {
-        LocationView::Original(original) => append_location(&mut key, original),
+        LocationView::Original(original) => append_location(&mut key, original, encoding),
         LocationView::DataForgeField(site) => {
             append_dataforge(&mut key, site.record_index, site.field);
         }
-        LocationView::Subresource(site) => append_subresource(&mut key, &site),
+        LocationView::Subresource(site) => append_subresource(&mut key, &site, encoding),
     }
     SourceUseRef::registered(key)
 }
@@ -49,7 +66,7 @@ fn append_dataforge(key: &mut String, record_index: u32, field: &str) {
     let _written = write!(key, "d{record_index}:{field}");
 }
 
-fn append_location(key: &mut String, location: &SourceLocation) {
+fn append_location(key: &mut String, location: &SourceLocation, encoding: CoordinateEncoding) {
     match location {
         SourceLocation::Opaque { reason } => {
             let _written = write!(key, "o{}", reason.key());
@@ -96,6 +113,7 @@ fn append_location(key: &mut String, location: &SourceLocation) {
                 indices,
                 field,
             },
+            encoding,
         ),
         SourceLocation::Metadata { field } => {
             key.push('m');
@@ -104,7 +122,15 @@ fn append_location(key: &mut String, location: &SourceLocation) {
     }
 }
 
-fn append_subresource(key: &mut String, site: &Subresource<'_>) {
+fn append_subresource(key: &mut String, site: &Subresource<'_>, encoding: CoordinateEncoding) {
+    if encoding == CoordinateEncoding::FieldStatistics
+        && let Some(tag) = statistics_location_tag(site)
+    {
+        key.push('g');
+        key.push(tag);
+        append_coordinates(key, site.indices);
+        return;
+    }
     let Subresource {
         namespace,
         indices,
@@ -126,6 +152,27 @@ fn append_subresource(key: &mut String, site: &Subresource<'_>) {
     }
     key.push(':');
     key.push_str(field);
+}
+
+fn statistics_location_tag(site: &Subresource<'_>) -> Option<char> {
+    // Each tag fixes the namespace, field and number of encoded unsigned coordinates.
+    Some(match (site.namespace, site.field, site.indices) {
+        ("dataforgePropertyDefinition", "instanceLayout", [_]) => 'p',
+        ("dataforgePropertyDefinition", "targetedInstanceLayout", [_]) => 'q',
+        ("dataforgePropertyDefinition", "name", [_]) => 'n',
+        ("dataforgeStructDefinition", "firstProperty", [_]) => 'f',
+        ("dataforgeStructDefinition", "parent", [_]) => 'h',
+        ("dataforgeStructDefinition", "propertyCount", [_]) => 'c',
+        ("dataforgeStructDefinition", "size", [_]) => 'z',
+        ("dataforgeStructDefinition", "sourceType", [_]) => 'y',
+        ("dataforgeDecodedBytes", "arrayHeader", [_, _]) => 'a',
+        ("dataforgeDecodedBytes", "pointer", [_, _]) => 'r',
+        ("dataforgeDecodedBytes", "slot", [_, _]) => 's',
+        ("dataforgeDecodedBytes", "text", [_, _]) => 't',
+        ("dataforgeDecodedBytes", "textTerminator", [_, _]) => 'e',
+        ("dataforgeInstance", "selection", [_, _]) => 'i',
+        _ => return None,
+    })
 }
 
 fn append_path_text_ranges(key: &mut String, indices: &[u64]) {
@@ -237,3 +284,7 @@ fn append_namespace(key: &mut String, namespace: &str) {
 #[cfg(test)]
 #[path = "source_use_ref_encoding_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "source_use_ref_encoding_statistics_tests.rs"]
+mod statistics_tests;

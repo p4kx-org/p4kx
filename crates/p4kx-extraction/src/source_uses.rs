@@ -53,6 +53,10 @@ impl SourceUses {
         Self::with_registry(SourceRegistry::with_compact_coordinates)
     }
 
+    pub(crate) fn with_field_statistics_coordinates() -> Self {
+        Self::with_registry(SourceRegistry::with_field_statistics_coordinates)
+    }
+
     fn with_registry(make: impl FnOnce(Arc<()>) -> SourceRegistry) -> Self {
         let identity = Arc::new(());
         let registry = Arc::new(Mutex::new(make(Arc::clone(&identity))));

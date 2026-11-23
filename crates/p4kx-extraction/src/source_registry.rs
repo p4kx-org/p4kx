@@ -22,7 +22,7 @@ use crate::source_use::{
     InputScope, LocationView, SourceLocation, SourceUse, SourceUseDescription, SourceUseRef,
     SourceUseRole,
 };
-use crate::source_use_ref_encoding;
+use crate::source_use_ref_encoding::{self, CoordinateEncoding};
 use crate::source_value::{SourceValue, SourcedValue};
 
 #[path = "source_registered_uses.rs"]
@@ -57,7 +57,7 @@ pub(crate) struct SourceRegistry {
 enum UseReferences {
     Full,
     CompactOrdinals(CompactUseRefs),
-    CompactCoordinates,
+    CompactCoordinates(CoordinateEncoding),
 }
 
 #[derive(Default)]
@@ -74,9 +74,9 @@ impl UseReferences {
         role: SourceUseRole,
         location: LocationView<'_>,
     ) -> (SourceUseRef, Option<usize>) {
-        if matches!(self, Self::CompactCoordinates) {
+        if let Self::CompactCoordinates(encoding) = self {
             return (
-                source_use_ref_encoding::encode(source, scope, role, location),
+                source_use_ref_encoding::encode_with(*encoding, source, scope, role, location),
                 None,
             );
         }
@@ -118,7 +118,10 @@ impl SourceRegistry {
             identity,
             inputs: Vec::new(),
             sources: BTreeMap::new(),
-            uses: RegisteredUses::new(matches!(use_references, UseReferences::CompactCoordinates)),
+            uses: RegisteredUses::new(matches!(
+                use_references,
+                UseReferences::CompactCoordinates(_)
+            )),
             use_references,
             sealed: false,
         }
@@ -142,7 +145,17 @@ impl SourceRegistry {
     }
 
     pub(crate) const fn with_compact_coordinates(identity: Arc<()>) -> Self {
-        Self::with_references(identity, UseReferences::CompactCoordinates)
+        Self::with_references(
+            identity,
+            UseReferences::CompactCoordinates(CoordinateEncoding::Standard),
+        )
+    }
+
+    pub(crate) const fn with_field_statistics_coordinates(identity: Arc<()>) -> Self {
+        Self::with_references(
+            identity,
+            UseReferences::CompactCoordinates(CoordinateEncoding::FieldStatistics),
+        )
     }
 
     pub(crate) fn with_batched_use_refs(identity: Arc<()>) -> Self {
@@ -299,7 +312,7 @@ impl SourceRegistry {
         let (id, full_start) =
             self.use_references
                 .reference(source, scope, role, LocationView::Original(&location));
-        let compact = matches!(self.use_references, UseReferences::CompactCoordinates);
+        let compact = matches!(self.use_references, UseReferences::CompactCoordinates(_));
         self.retain_use(id, source, scope, role, encryption, |id| {
             RetainedLocation::new(
                 location,
