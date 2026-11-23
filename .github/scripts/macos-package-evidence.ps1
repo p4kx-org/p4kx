@@ -54,3 +54,30 @@ function Complete-P4kxMacHostedPackageSmoke {
     $Smoke.runtime.metal_adapter = $Metal.outcome
     return $Smoke
 }
+
+function New-P4kxMacosCurrentHostedSmoke {
+    param($Runtime)
+
+    if (@($Runtime.package_smokes).Count -ne 1) { throw 'Expected one current macOS package smoke.' }
+    $package = $Runtime.package_smokes[0]
+    $checks = [ordered]@{}
+    foreach ($check in (Get-P4kxPackagedApplicationChecks)) { $checks[$check] = $package.runtime.$check }
+    return [ordered]@{
+        scope = $Runtime.scope
+        version = $Runtime.version
+        revision = $Runtime.revision
+        workflow_run = $Runtime.workflow_run
+        workflow_attempt = $Runtime.workflow_attempt
+        runtime_host = $Runtime.runtime_host
+        package = $package.package
+        target = $package.target
+        archive_sha256 = $package.archive_sha256
+        binaries = $package.binaries
+        signing = $package.signing
+        signing_sha256 = $package.signing_sha256
+        mount = $package.mount
+        relocation = $package.relocation
+        cli_symlink = $package.cli_symlink
+        runtime = $checks
+    }
+}

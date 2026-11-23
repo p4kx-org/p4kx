@@ -2,6 +2,8 @@ param([Parameter(Mandatory)][string]$Directory)
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'platform-contract.ps1')
 . (Join-Path $PSScriptRoot 'native-test-fixtures.ps1')
+. (Join-Path $PSScriptRoot 'native-evidence.ps1')
+. (Join-Path $PSScriptRoot 'macos-package-evidence.ps1')
 . (Join-Path $PSScriptRoot 'test-documents-evidence-fixture.ps1')
 . (Join-Path $PSScriptRoot 'linux-package-lifecycle-evidence.ps1')
 New-Item -ItemType Directory -Path $Directory -Force | Out-Null
@@ -40,6 +42,10 @@ foreach ($row in $contract.targets) {
                 archive_sha256=(Get-FileHash (Join-Path $Directory $asset) -Algorithm SHA256).Hash.ToLowerInvariant()
             }
             if ($row.os -ceq 'macos') {
+                $smoke.signing_sha256 = 'd' * 64
+                $smoke.mount = 'read-only'
+                $smoke.relocation = 'success'
+                $smoke.cli_symlink = 'success'
                 $smoke.signing = @{
                     package='dmg'; mode='ad-hoc'; reason='developer-id-unavailable'
                     signature='verified'; notarization='not-requested'; archive_sha256=$smoke.archive_sha256
@@ -73,6 +79,13 @@ foreach ($row in $contract.targets) {
             macos { 'dmg' }
         }
         $proof.archive_sha256 = ($smokes | Where-Object package -CEQ $sourcePackage).archive_sha256
+        if ($row.os -ceq 'macos') {
+            $proof | Add-Member -NotePropertyMembers @{ signing_sha256=$smokes[0].signing_sha256; workflow_attempt='1' }
+            $current = $proof | ConvertTo-Json -Depth 16 | ConvertFrom-Json
+            $current.workflow_attempt = '2'
+            $current.runtime_host = @{ os_version='27.2'; os_build='26C102'; architecture='arm64' }
+            $smokes[0].current_hosted_smoke = New-P4kxMacosCurrentHostedSmoke $current
+        }
     }
     if ($row.os -ceq 'linux') {
         $fixtureVersion = Get-P4kxLinuxLifecycleFixtureVersion

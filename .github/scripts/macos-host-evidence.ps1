@@ -8,6 +8,16 @@ function Assert-P4kxMacosHostEvidence {
     }
 }
 
+function Assert-P4kxMacosHostedRole {
+    param($HostEvidence, $Platform, [ValidateSet('minimum', 'current')][string]$Role)
+
+    Assert-P4kxMacosHostEvidence -HostEvidence $HostEvidence -Platform $Platform
+    $expectedMajor = if ($Role -ceq 'minimum') { ([version]$Platform.deployment_target).Major } else { 27 }
+    if (([version]$HostEvidence.os_version).Major -ne $expectedMajor) {
+        throw "The $Role macOS package smoke requires macOS $expectedMajor."
+    }
+}
+
 function Get-P4kxMacosHostEvidence {
     param([Parameter(Mandatory)]$Platform)
     Assert-P4kxNativeHost -Platform $Platform

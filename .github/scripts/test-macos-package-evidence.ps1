@@ -85,7 +85,7 @@ $signing = Read-P4kxMacSigningReceipt -Path $path -Build $record
 $metal.archive_sha256 = $record.archive_sha256
 Assert-P4kxMacMetalEvidence -Evidence $metal -Build $record
 
-# The packaged app smoke records app execution and the producer separately proves native Metal.
+
 $smoke = [ordered]@{
     target = $platform.target
     package = 'dmg'
@@ -100,10 +100,11 @@ $smoke = [ordered]@{
     }
 }
 $smoke = Complete-P4kxMacHostedPackageSmoke -Smoke $smoke -Build $record -Signing $signing -Metal $metal
-$runtime = @{ archive_sha256 = $record.archive_sha256; binaries = $actual; package_smokes = @($smoke) }
-Assert-P4kxPackageRuntime -Runtime $runtime -Platform $platform -AssetDirectory $Directory -Version $version
+$runtime = @{ binaries = $actual }
+$checks = Get-P4kxRuntimeChecks -Platform $platform
+Assert-P4kxExecutedPackageRuntime $smoke $runtime $platform $record.archive_sha256 $checks
 $smoke.runtime.Remove('metal_adapter')
 Assert-P4kxMacFixtureRefusal {
-    Assert-P4kxPackageRuntime -Runtime $runtime -Platform $platform -AssetDirectory $Directory -Version $version
+    Assert-P4kxExecutedPackageRuntime $smoke $runtime $platform $record.archive_sha256 $checks
 }
 'PASS: final DMG/signing/Metal bindings and per-application Mach-O/signed-byte evidence.'

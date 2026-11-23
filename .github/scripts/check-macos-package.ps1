@@ -8,6 +8,7 @@ param(
     [Parameter(Mandatory)][string]$FixtureDirectory,
     [Parameter(Mandatory)][string]$TaskDirectory,
     [Parameter(Mandatory)][string]$OutputPath,
+    [Parameter(Mandatory)][ValidateSet('minimum', 'current')][string]$HostedRole,
     [switch]$DryRun
 )
 
@@ -15,8 +16,9 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'platform-contract.ps1')
 . (Join-Path $PSScriptRoot 'macos-dmg-mount.ps1')
 . (Join-Path $PSScriptRoot 'macos-package-evidence.ps1')
+. (Join-Path $PSScriptRoot 'native-evidence.ps1')
 $platform = Get-P4kxPlatform -Target $Target
-Assert-P4kxNativeHost -Platform $platform
+Assert-P4kxMacosHostedRole (Get-P4kxMacosHostEvidence -Platform $platform) $platform $HostedRole
 if ($platform.os -cne 'macos' -or
     (Split-Path -Leaf $Dmg) -cne (Get-P4kxAssetName -Target $Target -Version $Version -Package dmg)) {
     throw 'The macOS consumer requires the selected canonical native DMG.'
@@ -67,4 +69,5 @@ $native = Join-Path $task 'native-runtime.json'
 & (Join-Path $PSScriptRoot 'record-native-runtime.ps1') -Target $Target -MetadataPath $BuildMetadata -OutputPath $native -SmokeOutcomes $smoke.runtime
 $runtime = Get-Content -LiteralPath $native -Raw | ConvertFrom-Json -AsHashtable
 $runtime.package_smokes = @($smoke)
-$runtime | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $OutputPath -Encoding utf8NoBOM
+$evidence = if ($HostedRole -ceq 'current') { New-P4kxMacosCurrentHostedSmoke $runtime } else { $runtime }
+$evidence | ConvertTo-Json -Depth 32 | Set-Content -LiteralPath $OutputPath -Encoding utf8NoBOM

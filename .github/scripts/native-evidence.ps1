@@ -28,10 +28,14 @@ function Get-P4kxNativeMachine {
     }
 }
 
+function Get-P4kxPackagedApplicationChecks {
+    return @('cli_list', 'cli_extract', 'cli_convert', 'mcp_tools', 'mcp_read', 'gui_frames')
+}
+
 function Get-P4kxRuntimeChecks {
     param([Parameter(Mandatory)]$Platform)
     $adapter = if ($Platform.os -ceq 'macos') { 'metal_adapter' } else { 'software_adapter' }
-    return @('cli_list', 'cli_extract', 'cli_convert', 'mcp_tools', 'mcp_read', 'gui_frames', $adapter)
+    return @((Get-P4kxPackagedApplicationChecks) + $adapter)
 }
 
 function Assert-P4kxArchiveEvidence {

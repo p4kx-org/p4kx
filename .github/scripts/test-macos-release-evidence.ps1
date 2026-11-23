@@ -85,9 +85,27 @@ try {
     foreach ($case in @(
         @{ edit={ param($p) $p.package_smokes[0].signing.signature='skipped' }; error='signature evidence' },
         @{ edit={ param($p) $p.package_smokes[0].signing.mode='developer-id' }; error='stapled notarization' },
-        @{ edit={ param($p) $p.package_smokes[0].signing.reason='package-dry-run' }; error='dry-run DMG' },
+        @{ edit={
+            param($p)
+            $p.package_smokes[0].signing.reason='package-dry-run'
+            $p.package_smokes[0].current_hosted_smoke.signing.reason='package-dry-run'
+        }; error='dry-run DMG' },
         @{ edit={ param($p) $p.package_smokes[0].binaries[0].sha256='f' * 64 }; error='differs from release build' },
         @{ edit={ param($p) $p.package_smokes[0].runtime.metal_adapter='skipped' }; error='metal_adapter' },
+        @{ edit={ param($p) $p.package_smokes[0].PSObject.Properties.Remove('current_hosted_smoke') }; error='current macOS hosted package smoke is required' },
+        @{ edit={ param($p) $p.build_host.os_version='27.2' }; error='minimum macOS package smoke requires macOS 26' },
+        @{ edit={ param($p) $p.runtime_host.os_version='27.2' }; error='minimum macOS package smoke requires macOS 26' },
+        @{ edit={ param($p) $p.package_smokes[0].current_hosted_smoke.runtime_host.os_version='26.2' }; error='current macOS package smoke requires macOS 27' },
+        @{ edit={ param($p) $p.package_smokes[0].current_hosted_smoke.workflow_run='https://github.com/p4kx-org/p4kx/actions/runs/2' }; error='different release or workflow run' },
+        @{ edit={ param($p) $p.package_smokes[0].current_hosted_smoke.revision='f' * 40 }; error='different release or workflow run' },
+        @{ edit={ param($p) $p.package_smokes[0].current_hosted_smoke.archive_sha256='f' * 64 }; error='source/target/digest differs' },
+        @{ edit={ param($p) $p.package_smokes[0].current_hosted_smoke.binaries[0].sha256='f' * 64 }; error='differs from release build' },
+        @{ edit={ param($p) $p.package_smokes[0].current_hosted_smoke.signing_sha256='f' * 64 }; error='signing digest differs' },
+        @{ edit={ param($p) $p.package_smokes[0].current_hosted_smoke.runtime.gui_frames='skipped' }; error='gui_frames' },
+        @{ edit={
+            param($p)
+            $p.package_smokes[0].current_hosted_smoke.runtime | Add-Member -NotePropertyName metal_adapter -NotePropertyValue 'success'
+        }; error='producer Metal test' },
         @{ edit={ param($p) $p.macos_devices[0].archive_sha256='f' * 64 }; error='different release bytes' },
         @{ edit={ param($p) $p.macos_devices[0].binaries[0].sha256='f' * 64 }; error='different packaged binary' },
         @{ edit={ param($p) $p.macos_devices[1].host.os_version='26.0' }; error='Incorrect macOS version' },

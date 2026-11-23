@@ -82,6 +82,10 @@ acceptance. Delivery requires the evidence below.
   provenance. Update the supported-platform guide, installation help, Release notes and changelog
   when implementation and evidence are ready.
 
+Hosted verification mounts and executes the same DMG on the macOS 26 runner and the native
+macOS 27 runner selected by the xcode-27 label. One target runtime record binds both
+executions to the same DMG and application digests.
+
 ## Submit the native device receipt
 
 Download the signed macOS DMG and Blender extension ZIP from the tagged Release run. Run the
