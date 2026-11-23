@@ -530,10 +530,11 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   and `project-mission-definitions` starts definition projection. `project-contract-templates`,
   `project-mission-broker-entries` and `project-mission-location-templates` report the three
   definition reads in order. `project-contract-generators` marks the generator read and row
-  assembly.
-  `link-mission-factions` marks scenario faction linking. Within `project-configurations`, the
-  phases are `project-shops`, `resolve-jump-operators`, `read-independent-configurations`,
-  `project-particle-libraries`, `project-flare-libraries` and `project-weapon-animation`.
+  assembly. Scenario faction references resolve during the record scan.
+  Within `project-configurations`, the phases are `project-shops`, `resolve-jump-operators`,
+  `read-independent-configurations`,
+  `project-particle-libraries`, `project-flare-libraries`, `project-subsumption-events` and
+  `project-weapon-animation`.
   `finalize-projections` marks selected row capture. The remaining phases before `export-health` are
   `project-blueprint-tables`, `resolve-cargo-capacities`, `project-facility-loadouts`,
   `project-resource-topology` and `project-starmap-placements`. When facility interior

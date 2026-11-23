@@ -28,7 +28,6 @@ const CATALOG_PHASES: &[&str] = &[
     "project-mission-broker-entries",
     "project-mission-location-templates",
     "project-contract-generators",
-    "link-mission-factions",
     "project-configurations",
     "project-shops",
     "resolve-jump-operators",
