@@ -69,7 +69,7 @@ fn an_authored_empty_array_is_a_resolved_inventory() -> TestResult {
     let catalog = serde_json::from_slice(built.json())?;
     let (shop, resolution) = one_shop(&catalog)?;
     assert_eq!(
-        proof::at(shop, "/itemGuids")?,
+        proof::at(shop, "/itemGuids/value")?,
         &json!([]),
         "the original empty list is present"
     );
@@ -125,7 +125,14 @@ fn invalid_json_failed_reads_and_missing_targets_still_block_normal_publication(
         let built = build_catalog(&archive, &options)?;
         let catalog = serde_json::from_slice(built.json())?;
         let (shop, resolution) = one_shop(&catalog)?;
-        assert_no_list(shop)?;
+        assert_no_list(
+            shop,
+            if expected_status == "missing" {
+                "absent"
+            } else {
+                "unreadable"
+            },
+        )?;
         assert_eq!(
             proof::at(resolution, "/status/value")?,
             expected_status,
@@ -138,7 +145,7 @@ fn invalid_json_failed_reads_and_missing_targets_still_block_normal_publication(
 
 fn verify_empty_source(catalog: &Value, encrypted: bool) -> TestResult {
     let (shop, resolution) = one_shop(catalog)?;
-    assert_no_list(shop)?;
+    assert_no_list(shop, "absent")?;
     let [definition] = proof::rows(catalog, DEFINITIONS)? else {
         return Err("the physical empty source must remain in definitions".into());
     };
@@ -205,13 +212,15 @@ fn one_shop(catalog: &Value) -> TestResult<(&Value, &Value)> {
     Ok((shop, resolution))
 }
 
-fn assert_no_list(shop: &Value) -> TestResult {
+fn assert_no_list(shop: &Value, state: &str) -> TestResult {
+    proof::cell(shop, "inventory", state)?;
+    proof::cell(shop, "itemGuids", state)?;
     assert!(
-        proof::at(shop, "/inventory")?.is_null(),
+        proof::at(shop, "/inventory/value")?.is_null(),
         "no compatibility inventory"
     );
     assert!(
-        proof::at(shop, "/itemGuids")?.is_null(),
+        proof::at(shop, "/itemGuids/value")?.is_null(),
         "no authored item list to publish"
     );
     Ok(())

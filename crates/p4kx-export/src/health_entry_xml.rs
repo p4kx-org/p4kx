@@ -320,6 +320,10 @@ pub(crate) struct XmlAttributeSource {
 }
 
 impl XmlAttributeSource {
+    pub(crate) const fn node_index(&self) -> u32 {
+        self.node.index()
+    }
+
     pub(crate) fn observe(&self, role: SourceUseRole) -> Result<SourceUse, CatalogError> {
         self.slot.observe(&self.node, role)
     }

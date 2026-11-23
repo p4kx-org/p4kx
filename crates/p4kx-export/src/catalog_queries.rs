@@ -124,6 +124,9 @@ pub mod crafting;
 #[path = "equipment_query.rs"]
 pub mod equipment;
 
+#[path = "starmap_name_owner_scan.rs"]
+pub(crate) mod starmap_name_owners;
+
 #[path = "starmap_placement_query.rs"]
 pub mod starmap;
 

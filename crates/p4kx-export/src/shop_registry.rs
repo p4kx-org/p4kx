@@ -67,6 +67,12 @@ pub(crate) enum RegistryNeed {
     Required,
 }
 
+pub(crate) struct RegistryDocument {
+    pub(crate) rows: Vec<RegistryShop>,
+    pub(crate) source: EntrySource,
+    pub(crate) complete: bool,
+}
+
 /// Reads the registry once and retains its Entry identity until row projection finishes.
 pub(crate) fn read_source(
     archive: &Archive,
@@ -75,7 +81,7 @@ pub(crate) fn read_source(
     summary: &mut ShopSummary,
     ledger: &mut ExportLedger,
     capture: &EntryCapture<'_>,
-) -> Result<Option<(Vec<RegistryShop>, EntrySource)>, CatalogError> {
+) -> Result<Option<RegistryDocument>, CatalogError> {
     capture.check_archive(archive.input_origin())?;
     let observed = files.read_observed(REGISTRY);
     match observed.outcome() {
@@ -103,11 +109,15 @@ fn project_registry(
     capture: &EntryCapture<'_>,
     summary: &mut ShopSummary,
     ledger: &mut ExportLedger,
-) -> Result<Option<(Vec<RegistryShop>, EntrySource)>, CatalogError> {
+) -> Result<Option<RegistryDocument>, CatalogError> {
     let read = EntryRead::from_observed(capture, observed)?;
     let source = EntrySource::from_read(&read, EntryOperation::ShopRegistry);
     if let Ok(xml) = EntryXml::parse(&read, capture)? {
-        return Ok(Some((collect(&xml)?, source)));
+        return Ok(Some(RegistryDocument {
+            rows: collect(&xml)?,
+            source,
+            complete: !xml.is_lossy(),
+        }));
     }
     summary.registry_unreadable = true;
     ledger.incomplete_inventory(Kind::Shops);

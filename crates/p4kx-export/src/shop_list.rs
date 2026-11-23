@@ -2,17 +2,19 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::{BTreeMap, BTreeSet, HashSet};
-use std::sync::Arc;
 
-use p4kx_extraction::{SourceUses, SourcedValue};
+use p4kx_extraction::{SourceUses, SourceValueState, SourcedValue};
 
 use super::Lists;
 use crate::contract::Shop;
-use crate::contract_shops::ShopRegistryFields;
+use crate::contract_shops::{ShopItemGuids, ShopRegistryFields};
 use crate::export_ledger::SourceDisposition;
+use crate::guid_text::CatalogGuid;
 use crate::shop_containers::{Containers, Found, Inventory};
 use crate::shop_inventories::{ItemList, is_placeholder};
-use crate::shop_inventory_resolution::{InventoryResolver, ShopInventoryResolution};
+use crate::shop_inventory_resolution::{
+    InventoryResolver, ShopInventoryCells, ShopInventoryResolution,
+};
 use crate::shop_links::Links;
 use crate::shop_registry::{RegistryShop, clean, is_guid};
 use crate::shop_summary::ShopSummary;
@@ -27,7 +29,7 @@ const LISTED_LOCATIONS: usize = 200;
 pub(super) fn with_resolutions(
     registry: &[RegistryShop],
     containers: &Containers,
-    links: &Links,
+    links: &Links<'_>,
     lists: &Lists<'_>,
     summary: &mut ShopSummary,
     resolver: &InventoryResolver<'_, '_>,
@@ -45,8 +47,10 @@ pub(super) fn with_resolutions(
         summary,
         sources,
         |raw, placement| {
-            resolutions.push(resolver.row(raw, &placement.key, &placement.entity_guid)?);
-            Ok(())
+            let row = resolver.row(raw, &placement.key, &placement.entity_guid)?;
+            let compatibility = resolver.compatibility(&row, &placement.entity_guid)?;
+            resolutions.push(row);
+            Ok(compatibility)
         },
     )?;
     sort_resolutions(&mut resolutions);
@@ -130,26 +134,30 @@ pub(super) struct Listed {
 pub(super) fn read(
     registry: &[RegistryShop],
     containers: &Containers,
-    links: &Links,
+    links: &Links<'_>,
     lists: &Lists<'_>,
     summary: &mut ShopSummary,
     sources: &SourceUses,
-    mut emit: impl FnMut(&RegistryShop, &ShopPlacement) -> Result<(), CatalogError>,
+    mut emit: impl FnMut(&RegistryShop, &ShopPlacement) -> Result<ShopInventoryCells, CatalogError>,
 ) -> Result<Listed, CatalogError> {
     let mut built = Vec::with_capacity(registry.len());
     let mut unlinked: BTreeSet<String> = BTreeSet::new();
     let mut systems: BTreeMap<String, usize> = BTreeMap::new();
     let mut kinds: BTreeMap<String, usize> = BTreeMap::new();
     let disposition = visit_registry(registry, summary, |raw, placement, summary| {
-        emit(raw, &placement)?;
-        let shop = shop(raw, placement, containers, links, lists, sources)?;
+        let inventory = emit(raw, &placement)?;
+        let shop =
+            prepare(raw, placement, containers, inventory, sources)?.with_names(links, sources)?;
         let entity_guid = required(&shop.registry.entity_guid)?;
-        match (&shop.starmap_object_guid, shop.registry.location.value()) {
+        match (
+            shop.starmap_object_guid.value(),
+            shop.registry.location.value(),
+        ) {
             (Some(_), _) => summary.linked += 1,
             (None, location) => {
                 summary.unlinked += 1;
                 if let Some(location) = location {
-                    if links.is_ambiguous(location) {
+                    if shop.starmap_object_guid.state() == SourceValueState::Invalid {
                         summary.ambiguous_link += 1;
                     }
                     unlinked.insert(location.clone());
@@ -166,7 +174,7 @@ pub(super) fn read(
         *systems
             .entry(required(&shop.registry.system)?.clone())
             .or_default() += 1;
-        if let Some(kind) = &shop.kind {
+        if let Some(kind) = shop.kind.value() {
             *kinds.entry(kind.clone()).or_default() += 1;
         }
         built.push(shop);
@@ -196,7 +204,7 @@ fn count_inventory(
     lists: &Lists<'_>,
     summary: &mut ShopSummary,
 ) {
-    match (containers.inventory(entity_guid), &shop.item_guids) {
+    match (containers.inventory(entity_guid), shop.item_guids.value()) {
         (_, Some(_)) => {
             summary.with_items += 1;
             summary.prefab_only_shops += usize::from(containers.only_prefab(entity_guid));
@@ -218,31 +226,48 @@ fn count_inventory(
     }
 }
 
-fn shop(
+pub(super) struct PreparedShop {
+    pub(super) registry: ShopRegistryFields,
+    kind: SourcedValue<String>,
+    brand: SourcedValue<String>,
+    inventory: SourcedValue<String>,
+    item_guids: SourcedValue<ShopItemGuids>,
+}
+
+impl PreparedShop {
+    fn with_names(self, links: &Links<'_>, sources: &SourceUses) -> Result<Shop, CatalogError> {
+        let link = links.resolve(&self.registry.location, sources)?;
+        Ok(self.with_location_link(link))
+    }
+
+    pub(super) fn with_location_link(self, starmap_object_guid: SourcedValue<CatalogGuid>) -> Shop {
+        Shop {
+            registry: self.registry,
+            kind: self.kind,
+            brand: self.brand,
+            inventory: self.inventory,
+            item_guids: self.item_guids,
+            starmap_object_guid,
+        }
+    }
+}
+
+pub(super) fn prepare(
     raw: &RegistryShop,
     placement: ShopPlacement,
     containers: &Containers,
-    links: &Links,
-    lists: &Lists<'_>,
+    inventory: ShopInventoryCells,
     sources: &SourceUses,
-) -> Result<Shop, CatalogError> {
-    let starmap_object_guid = placement.path.get(2).and_then(|name| links.find(name));
-    let class = match containers.find(&placement.entity_guid) {
-        Found::One(class) => Some(class),
-        Found::Nowhere | Found::Mixed => None,
-    };
-    let (inventory, item_guids) = match containers.inventory(&placement.entity_guid) {
-        Inventory::One(stem) => match lists.get(stem) {
-            Some(ItemList::Items { guids, .. }) => (Some(stem.to_owned()), Some(Arc::clone(guids))),
-            _ => (None, None),
-        },
-        Inventory::None | Inventory::Ambiguous | Inventory::Unknown => (None, None),
-    };
-    Ok(Shop {
+) -> Result<PreparedShop, CatalogError> {
+    let class = containers.class_cells(&placement.entity_guid, raw.id.authored(), sources)?;
+    let ShopInventoryCells {
+        inventory,
+        item_guids,
+    } = inventory;
+    Ok(PreparedShop {
         registry: registry_fields(raw, placement, sources)?,
-        starmap_object_guid,
-        kind: class.map(|class| class.kind.clone()),
-        brand: class.and_then(|class| class.brand.clone()),
+        kind: class.kind,
+        brand: class.brand,
         inventory,
         item_guids,
     })

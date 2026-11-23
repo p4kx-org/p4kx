@@ -22,4 +22,11 @@ pub(crate) struct StarmapObject<'source> {
     pub(crate) placement_proof: Option<PlacementEvidence>,
     pub(crate) mining_claim: bool,
     pub(crate) location_origin: Option<FieldOrigin>,
+    pub(crate) shop_link_header: Option<ShopLinkHeader>,
+}
+
+#[derive(Debug)]
+pub(crate) struct ShopLinkHeader {
+    pub(crate) guid: FieldOrigin,
+    pub(crate) class_name: FieldOrigin,
 }

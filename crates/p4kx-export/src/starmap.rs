@@ -65,6 +65,7 @@ pub(crate) fn starmap_object<'f>(
         placement_proof: placement.proof,
         mining_claim: tree.field("description").is_some_and(is_mining_claim),
         location_origin: None,
+        shop_link_header: None,
     }
 }
 

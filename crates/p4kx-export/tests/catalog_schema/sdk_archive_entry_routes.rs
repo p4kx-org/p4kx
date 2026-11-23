@@ -11,20 +11,20 @@ use p4kx_export::catalog_queries::particle_libraries::{
 };
 use p4kx_export::catalog_queries::radar_audio::{RadarAudioSelection, read_radar_audio};
 use p4kx_export::catalog_queries::shops::{
-    ResolutionStatus, ShopInventorySelection, ShopResolutionSelection, read_shop_inventories,
-    read_shop_inventory_resolutions,
+    ResolutionStatus, ShopInventorySelection, ShopRegistrySelection, ShopResolutionSelection,
+    read_shop, read_shop_inventories, read_shop_inventory_resolutions,
 };
 use p4kx_export::catalog_queries::subsumption_events::{
     SubsumptionEventSelection, read_subsumption_events,
 };
-use p4kx_export::{CatalogOptions, build_catalog};
-use p4kx_extraction::{Archive, Language};
-use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry};
+use p4kx_export::{CatalogOptions, StarmapTraversalBudget, build_catalog};
+use p4kx_extraction::{Archive, Language, find_entry};
+use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry, test_key};
 use serde_json::{Value, json};
 
 use super::super::{
     FLARE_LIBRARIES, LANGUAGE_POLICY, LANGUAGE_SOURCES, PARTICLE_LIBRARIES, RADAR_AUDIO,
-    SHOP_INVENTORIES, SHOP_RESOLUTION, SUBSUMPTION_EVENTS,
+    SHOP_INVENTORIES, SHOP_RESOLUTION, SHOPS, SUBSUMPTION_EVENTS,
 };
 use super::{Route, TestResult, fixtures};
 
@@ -159,4 +159,120 @@ pub(super) fn read_shop_resolution() -> TestResult<Route> {
         "no declaration source grants a physical target"
     );
     Route::queried_rows(SHOP_RESOLUTION, &snapshot.rows, None)
+}
+
+const REGISTRY: &str = "Data/Libs/CosmoTools/LayerRecovery/LayerBackups.xml";
+const INVENTORY_GUID: &str = "00000000-0000-4000-8000-000000000003";
+
+pub(super) fn read_physical_shop() -> TestResult<Route> {
+    let (_folder, archive) = physical_shop_fixture()?;
+    let built = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;
+    let document: Value = serde_json::from_slice(built.json())?;
+    let [expected] = document
+        .pointer(SHOPS)
+        .and_then(Value::as_array)
+        .ok_or("normal Shop rows")?
+        .as_slice()
+    else {
+        return Err("one normal Shop row".into());
+    };
+    let selected = registry_selection(&archive, &document, expected)?;
+    let snapshot = read_shop(&archive, selected, StarmapTraversalBudget::default(), None)?;
+    assert!(
+        snapshot.coverage.registry_complete && snapshot.coverage.names.is_none(),
+        "the selected registry row was read and has no location dependency"
+    );
+    assert_eq!(
+        snapshot.coverage.inventory_payloads, 1,
+        "one chosen physical inventory body is required"
+    );
+    let row = snapshot.row.ok_or("one scoped Shop row")?;
+    assert_eq!(
+        row.registry.key.origin().contains_encrypted_source(),
+        Some(false),
+        "the key uses only the clear original registry"
+    );
+    let items = row
+        .item_guids
+        .value()
+        .ok_or("the selected inventory items")?;
+    let [item] = items.as_slice() else {
+        return Err("one authored item GUID".into());
+    };
+    assert_eq!(
+        item.value().map(String::as_str),
+        Some(INVENTORY_GUID),
+        "the typed row exposes the exact original item"
+    );
+    assert_eq!(
+        item.origin().contains_encrypted_source(),
+        Some(true),
+        "the item value retains its own encrypted JSON origin"
+    );
+    assert_eq!(
+        &serde_json::to_value(&row)?,
+        expected,
+        "the independently called physical route writes the exact normal Shop row"
+    );
+    Route::queried_rows(
+        SHOPS,
+        std::slice::from_ref(&row),
+        "synthetic Normal row parity available; integrated installed producer parity open",
+    )
+}
+
+fn physical_shop_fixture() -> TestResult<(tempfile::TempDir, Archive)> {
+    let folder = tempfile::tempdir()?;
+    let path = folder.path().join("shop-row.p4k");
+    let registry = r#"<BackupData><LayerBackups><LayerBackup PlatformName="FixtureSystem"><ShopBackups>
+        <ShopBackup ID="00000000-0000-4000-8000-000000000001,00000000-0000-4000-8000-000000000002" SuperName="Fixture,Shop"/>
+    </ShopBackups></LayerBackup></LayerBackups></BackupData>"#;
+    let prefab = r#"<PrefabsLibrary><Prefab><Objects><Object Type="Entity" Id="{00004000-0000-0000-0200-000000000080}">
+        <PropertiesDataCore><EntityComponentShop offlineInventoryJSON="Scripts/ShopInventories/shop.json"/></PropertiesDataCore>
+    </Object></Objects></Prefab></PrefabsLibrary>"#;
+    let inventory = json!({"Inventory": [{"ID": {"ID": [INVENTORY_GUID]}}]});
+    ArchiveBuilder::v2()
+        .entry(
+            TestEntry::stored("Data/Game2.dcb", DataForgeBuilder::new().version(8).build())
+                .with_encryption_field(0),
+        )
+        .entry(TestEntry::stored(REGISTRY, registry).with_encryption_field(0))
+        .entry(TestEntry::stored("Data/Prefabs/Shops/shop.xml", prefab).with_encryption_field(0))
+        .entry(
+            TestEntry::stored(
+                "Data/Scripts/ShopInventories/shop.json",
+                serde_json::to_vec(&inventory)?,
+            )
+            .encrypted(),
+        )
+        .write_to(&path)?;
+    let archive = Archive::open_with_key(path, Some(test_key()))?;
+    Ok((folder, archive))
+}
+
+fn registry_selection(
+    archive: &Archive,
+    catalog: &Value,
+    row: &Value,
+) -> TestResult<ShopRegistrySelection> {
+    let registry = find_entry(archive, REGISTRY).ok_or("the physical shop registry Entry")?;
+    let references = row
+        .pointer("/key/sourceUsesRefs")
+        .and_then(Value::as_array)
+        .ok_or("the original Shop key evidence")?;
+    let uses = catalog
+        .pointer("/provenance/uses")
+        .and_then(Value::as_array)
+        .ok_or("the normal producer source uses")?;
+    let node = uses
+        .iter()
+        .filter(|used| used.get("id").is_some_and(|id| references.contains(id)))
+        .find(|used| used.pointer("/location/field").and_then(Value::as_str) == Some("@ID"))
+        .and_then(|used| used.pointer("/location/indices/0"))
+        .and_then(Value::as_str)
+        .ok_or("the original ShopBackup XML node coordinate")?;
+    Ok(ShopRegistrySelection::new(
+        u32::try_from(registry.index())?,
+        node.parse()?,
+    ))
 }

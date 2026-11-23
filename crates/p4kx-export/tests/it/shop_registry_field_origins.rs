@@ -164,6 +164,15 @@ fn optional_fields(catalog: &Value, row: &Value, encrypted: bool) -> TestResult 
         let cell = health::cell(row, name, "absent")?;
         origin(catalog, cell, encrypted, field, indices, role)?;
     }
+    let no_location = health::cell(row, "starmapObjectGuid", "absent")?;
+    origin(
+        catalog,
+        no_location,
+        encrypted,
+        "@SuperName",
+        &["6", "2"],
+        "conversion",
+    )?;
     Ok(())
 }
 

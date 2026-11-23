@@ -135,10 +135,17 @@ fn malformed_registry_rows_retain_valid_shops_and_one_failed_source() -> TestRes
         "the valid registry row remains present"
     );
     let shop = read.shops.first().ok_or("one valid shop")?;
+    let row = serde_json::to_value(shop)?;
     assert_eq!(
-        serde_json::to_value(shop)?.get("itemGuids"),
+        row.pointer("/itemGuids/state")
+            .and_then(serde_json::Value::as_str),
+        Some("unreadable"),
+        "the unresolved inventory retains its read status"
+    );
+    assert_eq!(
+        row.pointer("/itemGuids/value"),
         Some(&serde_json::Value::Null),
-        "the unresolved inventory still exports a null item list"
+        "the unresolved inventory exports a null item list"
     );
     assert_eq!(
         read.ledger.incomplete_inventories,

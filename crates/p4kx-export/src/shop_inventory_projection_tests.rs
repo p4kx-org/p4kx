@@ -9,7 +9,7 @@ use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
 use crate::catalog_read::original::with_entry_capture;
 use crate::export_ledger::ExportLedger;
-use crate::shop_inventory_compatibility::{ItemList, why_unparsed};
+use crate::shop_inventory_compatibility::why_unparsed;
 use crate::shop_inventory_file::ReadInventory;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
@@ -26,10 +26,9 @@ fn parse(bytes: &[u8]) -> TestResult<Option<(Arc<[String]>, usize)>> {
         let read = ReadInventory::read(&archive, entry, capture, None)?;
         Ok(read.items.selected(&mut ExportLedger::default()))
     })?;
-    Ok(match items {
-        ItemList::Items { guids, dropped } => Some((guids, dropped)),
-        ItemList::Missing | ItemList::EmptySource(_) | ItemList::Unreadable(_) => None,
-    })
+    Ok(items
+        .test_items()
+        .map(|(guids, dropped)| (guids.into_iter().map(str::to_owned).collect(), dropped)))
 }
 
 #[test]

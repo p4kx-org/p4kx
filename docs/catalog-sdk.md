@@ -345,6 +345,29 @@ cargo test --locked -p p4kx-export --test real_archive real_archive_shop_resolut
 cargo test --locked -p p4kx-export --test real_archive real_archive_shop_resolution_sdk::installed_shop_resolution_cold_query -- --ignored --exact --nocapture --test-threads=1
 ```
 
+## Physical shop rows
+
+Use `catalog_queries::shops::read_shop` to select a `/shops` row by the original registry
+Entry index and the XML node index of a `ShopBackup`. Resolve the latter from the first
+coordinate of the `@ID` use referenced by the Shop's sourced `key`. Only the first eligible
+occurrence of a duplicate normalized key has a row.
+
+The result uses the same sourced fields as the normal catalog. Its compatibility list
+follows the catalog's last matching physical inventory rule. The inventory resolution
+table can independently report multiple candidates. A shop without a registry location
+needs no DataForge lookup. Resolve each field's source-use references in the returned
+inventory.
+
+`read_shops` accepts selections in request order and retains duplicates and missing
+positions. Its rows share one source inventory and at most one Starmap name survey.
+The corresponding methods on `CatalogQuerySession` and `ParsedCatalogQueries` reuse the
+session's decoded DataForge and, in the parsed view, its indexes.
+
+Synthetic fixtures compare the exact Normal Shop row and exercise incomplete and
+ambiguous location evidence. Earlier isolated LIVE and PTU measurements covered a
+located row and an absent node. An installed comparison with a Normal producer that
+emits the same sourced Shop representation remains open.
+
 ## Resolve field origins
 
 Use each query's own `SourceInventory`. `SourcedValue::origin` supplies the encryption filter,

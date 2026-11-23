@@ -60,6 +60,10 @@ impl Anchors {
         }
     }
 
+    pub(crate) fn into_guid_receipts(self) -> HashMap<String, Vec<AuthoredEntryPath>> {
+        self.guid_selectors
+    }
+
     pub(crate) fn guid_receipts(&self, guid: &str) -> &[AuthoredEntryPath] {
         self.guid_selectors.get(guid).map_or(&[], Vec::as_slice)
     }

@@ -3,28 +3,27 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use p4kx_extraction::{Archive, CancelToken, Entry};
-use rayon::prelude::*;
+use p4kx_extraction::{SourceUse, SourceUses};
 
 use crate::CatalogError;
-use crate::catalog_read::original::EntryCapture;
+use crate::catalog_read::original::AuthoredEntryPath;
 use crate::export_ledger::ExportLedger;
-use crate::shop_container_scan::{Scanned, shop_entities};
 use crate::shop_inventory_observations::InventoryObservations;
 use crate::shop_inventory_path::InventoryStem;
-use crate::starmap_index::key;
+
+#[path = "shop_classification.rs"]
+mod classification;
+pub(crate) use classification::ShopClassCells;
+use classification::{ClassEvidence, ClassSurvey};
+
+#[path = "shop_container_discovery.rs"]
+mod discovery;
+#[cfg(test)]
+use discovery::classify;
 
 #[cfg(test)]
 #[path = "shop_invalid_suffix_witness.rs"]
 mod invalid_suffix_witness;
-
-const SHOPS: &str = "data\\objectcontainers\\pu\\shops\\";
-const LOC: &str = "data\\objectcontainers\\pu\\loc\\";
-const LOC_KINDS: [&str; 2] = ["shopcomm", "shopfood"];
-const SCANNED: [&str; 2] = [
-    "data\\objectcontainers\\pu\\",
-    "data\\objectcontainers\\ea\\",
-];
 
 /// The kind and the brand of a shop container, from its path.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -74,7 +73,7 @@ pub(crate) enum Component {
 
 #[derive(Debug, Default)]
 struct Named {
-    classes: Vec<Class>,
+    classes: ClassEvidence,
     inventories: Vec<Component>,
     observations: InventoryObservations,
     placed: bool,
@@ -115,6 +114,8 @@ pub(crate) struct Containers {
     pub(crate) soc_findings: Vec<crate::shop_container_scan::soc_subtypes::EntryFindings>,
     pub(crate) unattributed_declarations: bool,
     by_entity: HashMap<String, Named>,
+    class_directory: Option<SourceUse>,
+    class_complete: bool,
     pub(crate) listed: usize,
     pub(crate) unreadable: usize,
     pub(crate) with_shop: usize,
@@ -126,81 +127,6 @@ pub(crate) struct Containers {
 }
 
 impl Containers {
-    /// Opens every socpak below `PU\Shops` and the `shopcomm` and `shopfood` folders below
-    /// `PU\loc`, which give kind and brand, and every other socpak below `PU` and `EA`, and reads
-    /// the `CryGUID`s of its `entitycomponentshop.xml` and the shop components of its `.soc`.
-    pub(crate) fn read(
-        archive: &Archive,
-        cancel: Option<&CancelToken>,
-        capture: &EntryCapture<'_>,
-    ) -> Result<Self, CatalogError> {
-        let listed = listed(archive);
-        let mut containers = Self::default();
-        for window in listed.chunks(rayon::current_num_threads()) {
-            let scanned = window
-                .par_iter()
-                .map(|(entry, _)| {
-                    if cancel.is_some_and(CancelToken::is_cancelled) {
-                        return Err(CatalogError::Cancelled);
-                    }
-                    shop_entities(archive, entry, cancel, capture)
-                })
-                .collect::<Result<Vec<_>, CatalogError>>()?;
-            for ((_, class), entities) in window.iter().zip(scanned) {
-                containers.retain(class.as_ref(), entities)?;
-            }
-        }
-        if cancel.is_some_and(CancelToken::is_cancelled) {
-            return Err(CatalogError::Cancelled);
-        }
-        Ok(containers)
-    }
-
-    fn retain(&mut self, class: Option<&Class>, scanned: Scanned) -> Result<(), CatalogError> {
-        if class.is_some() {
-            self.listed += 1;
-        } else {
-            self.other_scanned += 1;
-        }
-        self.ledger.merge(scanned.ledger);
-        #[cfg(test)]
-        self.soc_findings.extend(scanned.soc_findings);
-        self.unattributed_declarations |= scanned.unattributed_declarations;
-        let mut observations = scanned.observations;
-        let Some((entities, rejected)) = scanned.entities else {
-            if class.is_some() {
-                self.unreadable += 1;
-            } else {
-                self.other_unreadable += 1;
-            }
-            return Ok(());
-        };
-        self.rejected += rejected;
-        if !entities.is_empty() {
-            if class.is_some() {
-                self.with_shop += 1;
-            } else {
-                self.other_with_shop += 1;
-            }
-        }
-        for (entity, inventory) in entities {
-            self.components += usize::from(inventory != Component::NotFound);
-            let original = observations.remove(&entity);
-            let named = self.by_entity.entry(entity).or_default();
-            if let Some(original) = original {
-                named.observations.merge(original)?;
-            }
-            named.placed = true;
-            if let Some(class) = class
-                && !named.classes.contains(class)
-            {
-                named.classes.push(class.clone());
-            }
-            append_inventory(&mut named.inventories, inventory)?;
-        }
-        Ok(())
-    }
-
     /// Moves the declared prefab inventories into each Entity and counts ambiguous selections.
     pub(crate) fn add_prefabs(
         &mut self,
@@ -227,15 +153,31 @@ impl Containers {
 
     /// Returns what the containers say of the Entity with the `CryGUID` `entity`, ignoring case.
     pub(crate) fn find(&self, entity: &str) -> Found<'_> {
-        match self
-            .by_entity
+        self.by_entity
             .get(&entity.to_ascii_lowercase())
-            .map(|named| named.classes.as_slice())
-        {
-            None | Some([]) => Found::Nowhere,
-            Some([class]) => Found::One(class),
-            Some(_) => Found::Mixed,
-        }
+            .map_or(Found::Nowhere, |named| named.classes.found())
+    }
+
+    pub(crate) fn class_cells(
+        &self,
+        entity: &str,
+        selector: Option<&AuthoredEntryPath>,
+        sources: &SourceUses,
+    ) -> Result<ShopClassCells, CatalogError> {
+        let empty = ClassEvidence::default();
+        let evidence = self
+            .by_entity
+            .get(entity)
+            .map_or(&empty, |named| &named.classes);
+        evidence.cells(
+            selector,
+            &ClassSurvey {
+                directory: self.class_directory.as_ref(),
+                complete: self.class_complete,
+                classified: self.listed > 0,
+            },
+            sources,
+        )
     }
 
     /// Returns the inventory file the containers name for the Entity with the `CryGUID` `entity`,
@@ -293,50 +235,6 @@ fn append_inventory(states: &mut Vec<Component>, state: Component) -> Result<(),
         states.push(state);
     }
     Ok(())
-}
-
-fn listed(archive: &Archive) -> Vec<(&Entry, Option<Class>)> {
-    archive
-        .entries()
-        .iter()
-        .filter_map(|entry| {
-            let path = key(entry.path());
-            let class = classify(&path);
-            (class.is_some()
-                || (path.ends_with(".socpak")
-                    && SCANNED.iter().any(|folder| path.starts_with(folder))))
-            .then_some((entry, class))
-        })
-        .collect()
-}
-
-/// Returns the kind and brand of the socpak with the normalised path `path`, `None` when it is no
-/// shop container.
-pub(crate) fn classify(path: &str) -> Option<Class> {
-    if !path.ends_with(".socpak") {
-        return None;
-    }
-    if let Some(rest) = path.strip_prefix(SHOPS) {
-        let mut parts = rest.split('\\');
-        let kind = parts
-            .next()
-            .filter(|kind| !kind.is_empty() && rest.contains('\\'))?;
-        let brand = parts
-            .next()
-            .filter(|brand| !brand.is_empty() && parts.next().is_some());
-        return Some(Class {
-            kind: kind.to_owned(),
-            brand: brand.map(str::to_owned),
-        });
-    }
-    let rest = path.strip_prefix(LOC)?;
-    let mut folders: Vec<&str> = rest.split('\\').collect();
-    folders.pop();
-    let kind = folders.last().copied()?;
-    LOC_KINDS.contains(&kind).then(|| Class {
-        kind: kind.to_owned(),
-        brand: None,
-    })
 }
 
 #[cfg(test)]

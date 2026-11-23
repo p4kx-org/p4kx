@@ -19,7 +19,7 @@ use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_text_contract::GameTextRef;
-use crate::contract_starmap::StarmapObject;
+use crate::contract_starmap::{ShopLinkHeader, StarmapObject};
 use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
 use crate::record_observation::RecordObservation;
 use crate::resource_float::ResourceFloat32;
@@ -52,6 +52,11 @@ pub(crate) fn read<'source>(
         return Err(ExportAccountingError::ConflictingSourceDatum.into());
     }
     object.location_origin = Some(location_origin(tree, projection, marker.origin())?);
+    let header = &definition.definition().source;
+    object.shop_link_header = Some(ShopLinkHeader {
+        guid: header.guid.origin().clone(),
+        class_name: header.class_name().origin().clone(),
+    });
     Ok((StarmapObjectRead { definition, object }, notes))
 }
 

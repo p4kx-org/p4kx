@@ -47272,18 +47272,15 @@
       "type": "object"
     },
     "Shop": {
-      "description": "A shop: one `ShopBackup` entry of the shop registry `Data\\Libs\\CosmoTools\\LayerRecovery\\\nLayerBackups.xml`, one placement of an `SCShop` Entity in the world. No prices and no stock; the\nitem GUIDs come only from an inventory file that the shop containers name (ADR-0071).",
+      "description": "One shop placement from the `ShopBackup` registry.\n\nItem GUIDs come from the offline inventory file named by the shop containers (ADR-0071).",
       "properties": {
         "body": {
           "$ref": "#/$defs/SourcedValueOfstring",
           "description": "The second container, the body or jump point the shop is below (e.g.\n`OOC_Stanton_4_Microtech`, `pyro5`); absent when the chain has none."
         },
         "brand": {
-          "description": "The brand from the same path: the second folder below `PU\\Shops` (e.g. `tdd`, `mcraes`);\n`null` for a container below `PU\\loc`, one without a brand folder, or when the containers\ndisagree.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The second folder below `PU\\Shops`, absent when the classification has no brand."
         },
         "commodityExchange": {
           "$ref": "#/$defs/SourcedValueOfboolean",
@@ -47306,32 +47303,20 @@
           "description": "The name of the `SCShop` Entity, the last element of the registry's `SuperName`, e.g.\n`SCShop_CommEx_TDD_NewBabbage`. An internal name, not a localisation key."
         },
         "inventory": {
-          "description": "The lower-case file stem of `Data\\Scripts\\ShopInventories\\<stem>.json` that the `.soc` of\nevery shop container naming `entityGuid` gives the `SCShop` component (ADR-0071); `null`\nwhen no container names a file, the containers disagree or the file is missing or\nunreadable.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The lower-case stem of the original selected offline inventory file (ADR-0071)."
         },
         "itemGuids": {
-          "description": "The `EntityClassDefinition` GUIDs of the items in that inventory file, lower case, ordered\nand without repeats; `null` exactly when `inventory` is. No price, stock or rental data.",
-          "items": {
-            "type": "string"
-          },
-          "type": [
-            "array",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfShopItemGuids",
+          "description": "The `EntityClassDefinition` GUIDs of the items in that inventory file, lower case, ordered\nand without repeats. Each GUID carries the exact contributing JSON alternatives."
         },
         "key": {
           "$ref": "#/$defs/SourcedValueOfstring",
           "description": "The identity: the `ID` chain of the registry entry, the `CryGUID`s of the containers from\nthe system root down to the `SCShop` Entity, comma separated. Unique in the catalog."
         },
         "kind": {
-          "description": "The kind from the path of the shop container whose `SCShop` Entity is `entityGuid`:\nthe folder below `PU\\Shops` (e.g. `commex`, `clothing`), or `shopcomm` or `shopfood` for a\ncontainer below `PU\\loc`. A closed set the game may extend; `null` when no container or\ncontainers of different kinds hold the Entity.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The container kind supported by the matching path folders and nested `CryGUID` selectors."
         },
         "location": {
           "$ref": "#/$defs/SourcedValueOfstring",
@@ -47342,15 +47327,8 @@
           "description": "The `ShopName` of the registry entry, e.g. `Pharmacy_RestStop_ARC-LEO1`; absent when it is\nempty. An internal name, not a localisation key. Many shops share one."
         },
         "starmapObjectGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The `guid` of the `starmapObjects` entry whose `entityName` or `className` equals\n`location` ignoring ASCII case; `null` when none does or more than one object does."
+          "$ref": "#/$defs/SourcedValueOfGuid",
+          "description": "The unique nominal Starmap GUID selected by the registry location and matching names."
         },
         "system": {
           "$ref": "#/$defs/SourcedValueOfstring",
@@ -47560,6 +47538,13 @@
         "rows"
       ],
       "type": "object"
+    },
+    "ShopItemGuids": {
+      "description": "The ordered distinct item GUIDs of the selected shop inventory.",
+      "items": {
+        "$ref": "#/$defs/SourcedValueOfstring"
+      },
+      "type": "array"
     },
     "ShotInputs": {
       "description": "Stored per-shot values and the actual owned launcher.",
@@ -133963,6 +133948,136 @@
             "properties": {
               "value": {
                 "$ref": "#/$defs/ShopInventoryDocument"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfShopItemGuids": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/$defs/ShopItemGuids"
               }
             }
           }

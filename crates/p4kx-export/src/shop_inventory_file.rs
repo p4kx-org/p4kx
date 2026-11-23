@@ -242,7 +242,7 @@ fn document(
     };
     let parsed = ParsedEntryJson::read(root, cancel)?;
     let fields = ShopInventoryFields::read(&parsed, uses, cancel)?;
-    let items = compatibility::items(&fields, &parsed, cancel)?;
+    let items = compatibility::items(&fields, &parsed, uses, cancel)?;
     let public_strings = fields.public_strings(&parsed, cancel)?;
     let source = parsed.into_wire(uses, &public_strings, cancel)?;
     let content = root.observe(SourceUseRole::Payload)?;

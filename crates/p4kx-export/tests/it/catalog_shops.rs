@@ -6,8 +6,12 @@
 use crate::shops_fixture::{self, EXCHANGE, LOOSE, write_archive};
 use crate::starmap_fixture;
 
+#[path = "shop_class_origins.rs"]
+mod class_origins;
 #[path = "shop_registry_field_origins.rs"]
 mod registry_field_origins;
+#[path = "shop_starmap_link_origins.rs"]
+mod starmap_link_origins;
 
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
@@ -136,7 +140,7 @@ fn the_location_name_links_to_a_starmap_object_by_entity_or_class_name() -> Test
         (LOCATIONS[3], None),
         (LOCATIONS[5], None),
     ] {
-        let linked = &shop(&catalog, location)?["starmapObjectGuid"];
+        let linked = &shop(&catalog, location)?["starmapObjectGuid"]["value"];
         match expected {
             Some(guid) => assert_eq!(linked, guid, "{location}"),
             None => assert!(linked.is_null(), "{location}"),
@@ -159,12 +163,12 @@ fn kind_and_brand_come_from_the_container_that_names_the_entity() -> TestResult 
     for (location, kind, brand) in expected {
         let shop = shop(&catalog, location)?;
         assert_eq!(
-            shop["kind"],
+            shop["kind"]["value"],
             kind.map_or(Value::Null, Value::from),
             "{location}"
         );
         assert_eq!(
-            shop["brand"],
+            shop["brand"]["value"],
             brand.map_or(Value::Null, Value::from),
             "{location}"
         );

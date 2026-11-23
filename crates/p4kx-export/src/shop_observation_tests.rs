@@ -36,7 +36,7 @@ fn read_shops(archive: &Archive, capture: &EntryCapture<'_>) -> Result<shops::Bu
     shops::shops(
         archive,
         &ArchiveFiles::new(archive),
-        &[],
+        (&[], true),
         None,
         capture,
         &mut inventories,
@@ -113,16 +113,22 @@ fn shop_placements_share_their_item_list_and_emit_the_same_guids() -> TestResult
     let [first, second] = read.shops.as_slice() else {
         return Err("two physical shop placements".into());
     };
-    let (Some(first_guids), Some(second_guids)) = (&first.item_guids, &second.item_guids) else {
+    let (Some(first_guids), Some(second_guids)) =
+        (first.item_guids.value(), second.item_guids.value())
+    else {
         return Err("both shops have a resolved inventory".into());
     };
     assert!(
-        Arc::ptr_eq(first_guids, second_guids),
+        Arc::ptr_eq(&first_guids.0, &second_guids.0),
         "placements sharing an inventory reuse its in-memory list"
     );
-    let expected = serde_json::json!([item]);
     for shop in &read.shops {
-        assert_eq!(serde_json::to_value(shop)?["itemGuids"], expected);
+        let wire = serde_json::to_value(shop)?;
+        assert_eq!(
+            wire.pointer("/itemGuids/value/0/value"),
+            Some(&serde_json::json!(item)),
+            "both placements retain the original inventory item",
+        );
     }
     Ok(())
 }
@@ -258,8 +264,11 @@ fn a_filter_finishes_an_empty_shop_inventory_without_reading_shop_sources() -> T
             &archive,
             &ArchiveFiles::new(&archive),
             &mut collected,
-            &options,
-            capture,
+            (
+                &options,
+                capture,
+                &crate::starmap_containers::Placements::default(),
+            ),
         )
     })?;
     assert_eq!(

@@ -227,6 +227,7 @@ pub(crate) enum PlacementRows<'writer> {
     Selected(&'writer mut SelectedPlacementRows),
     OpenedContainers,
     Object(Guid),
+    ShopNames(&'writer [Guid]),
 }
 
 impl PlacementRows<'_> {
@@ -235,7 +236,9 @@ impl PlacementRows<'_> {
             Self::Selected(rows) => {
                 matches!(rows.table, PlacementTable::Containers) && rows.matches(route)
             }
-            Self::Harvest(_) | Self::OpenedContainers | Self::Object(_) => false,
+            Self::Harvest(_) | Self::OpenedContainers | Self::Object(_) | Self::ShopNames(_) => {
+                false
+            }
             Self::Spool { .. } => true,
             #[cfg(test)]
             Self::Typed => true,
@@ -245,6 +248,7 @@ impl PlacementRows<'_> {
     fn records_object(&self, guid: Guid) -> bool {
         match self {
             Self::Object(selected) => *selected == guid,
+            Self::ShopNames(guids) => guids.binary_search(&guid).is_ok(),
             Self::Selected(_) | Self::OpenedContainers => false,
             Self::Spool { .. } | Self::Harvest(_) => true,
             #[cfg(test)]

@@ -7,6 +7,7 @@ use crate::catalog_read::original::{EntryRead, EntryXml, XmlNodeSource};
 use crate::export_ledger::ExportLedger;
 use crate::starmap_containers::instance::ContainerFile;
 use crate::starmap_containers::jump_gate::{GateFiles, JumpGate};
+use crate::starmap_containers::name_coverage;
 use crate::starmap_index::Index;
 use crate::starmap_xml::XmlError;
 
@@ -17,6 +18,7 @@ pub(super) struct ParsedRoot {
     pub(super) entities: entxml::EntXmlIndex,
     pub(super) gate: Option<Box<JumpGate>>,
     pub(super) gate_proof: Option<XmlNodeSource>,
+    pub(super) name_inputs_complete: bool,
 }
 
 pub(super) fn read(
@@ -37,11 +39,14 @@ pub(super) fn read(
         files.capture,
         files.cancel,
     );
-    let mut reader = children::ChildReader::new(bounds, &xml, &mut hcd, index, ledger);
+    let mut companions = ExportLedger::default();
+    let mut reader = children::ChildReader::new(bounds, &xml, &mut hcd, index, &mut companions);
     let root = reader.level(xml.root())?;
     let pending_external = reader.pending_external;
     let guids = reader.entity_guids;
-    let entities = files.scan(&guids, &xml, ledger)?;
+    let entities = files.scan(&guids, &xml, &mut companions)?;
+    let name_inputs_complete = name_coverage::descriptor_inputs_complete(ledger);
+    ledger.merge(companions);
     let (gate, gate_proof) = if bounds.scope.reads_jump_endpoints() {
         let readers = GateFiles {
             archive: files.archive,
@@ -74,5 +79,6 @@ pub(super) fn read(
         entities,
         gate,
         gate_proof,
+        name_inputs_complete,
     }))
 }

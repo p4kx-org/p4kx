@@ -130,11 +130,11 @@ fn physical_shop_inventories_include_orphans_and_placeholders() -> TestResult {
         "the orphan names this exact shop key"
     );
     assert_eq!(
-        food["inventory"], "inv_noodle",
+        food["inventory"]["value"], "inv_noodle",
         "the real prefab controls selection independently of matching ShopID"
     );
     assert!(
-        shop(&catalog, EXCHANGE)?["itemGuids"].is_null(),
+        shop(&catalog, EXCHANGE)?["itemGuids"]["value"].is_null(),
         "a placeholder remains outside compatibility itemGuids"
     );
     assert_eq!(

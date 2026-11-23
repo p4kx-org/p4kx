@@ -6,12 +6,9 @@ use std::collections::HashMap;
 use p4kx_extraction::{Archive, CancelToken, Entry};
 
 use crate::CatalogError;
-use crate::catalog_read::original::{
-    AuthoredEntryPath, EntryCapture, EntryRead, EntryReadError, EntryXml,
-};
+use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, EntryXml};
 use crate::container_read::soc_entries;
 use crate::entry_source::EntrySource;
-use crate::export_diagnostic::ExportDiagnosticCode;
 use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::shop_container_xml;
@@ -20,6 +17,11 @@ use crate::shop_entry_read;
 use crate::shop_inventory_observations::InventoryObservations;
 use crate::shop_soc::{self, Anchors, CapturedScan};
 use crate::starmap_index::key;
+use crate::starmap_xml::Node;
+
+#[path = "shop_container_entry_read.rs"]
+mod entry_read;
+use entry_read::{projected, read, record_read_error, rejected};
 
 #[cfg(test)]
 #[path = "shop_soc_subtypes.rs"]
@@ -32,12 +34,16 @@ const MAX_EDITOR_LEN: u64 = 256 << 20;
 
 pub(crate) type Shops = Vec<(String, Component)>;
 
+type GuidReceipts = HashMap<String, Vec<AuthoredEntryPath>>;
+
 type ObjectNames = HashMap<String, (String, Vec<AuthoredEntryPath>)>;
 
 /// The container projection and the actual Entry operations that produced it.
 #[derive(Default)]
 pub(crate) struct Scanned {
     pub(crate) entities: Option<(Shops, usize)>,
+    pub(crate) class_complete: bool,
+    pub(crate) guid_receipts: GuidReceipts,
     pub(crate) observations: HashMap<String, InventoryObservations>,
     pub(crate) unattributed_declarations: bool,
     pub(crate) ledger: ExportLedger,
@@ -48,6 +54,8 @@ pub(crate) struct Scanned {
 #[derive(Default)]
 struct PreparedShops {
     shops: Shops,
+    class_complete: bool,
+    guid_receipts: GuidReceipts,
     #[cfg(test)]
     soc_findings: Vec<soc_subtypes::EntryFindings>,
     rejected: usize,
@@ -70,6 +78,8 @@ pub(crate) fn shop_entities(
     };
     Ok(Scanned {
         entities: Some((prepared.shops, prepared.rejected)),
+        class_complete: prepared.class_complete,
+        guid_receipts: prepared.guid_receipts,
         #[cfg(test)]
         soc_findings: prepared.soc_findings,
         observations: prepared.observations,
@@ -93,11 +103,16 @@ fn scan(
         return Ok(None);
     };
     source.record(ledger, crate::Kind::Shops, SourceDisposition::Projected);
-    let Some(metadata) = container.entries().iter().find(|inner| {
+    let mut matches = container.entries().iter().filter(|inner| {
         let name = key(inner.path());
         name.ends_with(SHOP_METADATA) || name == SHOP_METADATA.trim_start_matches('\\')
-    }) else {
-        return Ok(Some(PreparedShops::default()));
+    });
+    let directory_complete = crate::export_archive_health::inventory(&container).is_none();
+    let Some(metadata) = matches.next() else {
+        return Ok(Some(PreparedShops {
+            class_complete: directory_complete,
+            ..PreparedShops::default()
+        }));
     };
     let source = EntrySource::inner(capture, archive, socpak, &container, metadata)?
         .operation(EntryOperation::ShopMetadata)
@@ -120,7 +135,15 @@ fn scan(
     };
     let entities = shop_container_xml::captured_guids(&xml)?;
     projected(source, ledger, entities.malformed, "Entity.CryGUID");
-    finish(
+    let root = xml.root();
+    let name = root.name();
+    let complete = directory_complete
+        && matches.next().is_none()
+        && !entities.malformed
+        && !xml.is_lossy()
+        && (name.eq_ignore_ascii_case("Entities")
+            || name.eq_ignore_ascii_case("EntityComponentShop"));
+    let mut result = finish(
         archive,
         socpak,
         &container,
@@ -128,8 +151,9 @@ fn scan(
         ledger,
         cancel,
         capture,
-    )
-    .map(Some)
+    )?;
+    result.class_complete = complete;
+    Ok(Some(result))
 }
 
 fn finish(
@@ -158,11 +182,13 @@ fn finish(
     }
     Ok(PreparedShops {
         shops,
+        guid_receipts: anchors.into_guid_receipts(),
         #[cfg(test)]
         soc_findings: components.soc_findings,
         rejected: components.rejected,
         observations: components.observations,
         unattributed_declarations: components.unattributed_declarations,
+        ..PreparedShops::default()
     })
 }
 
@@ -337,50 +363,6 @@ fn object_names(
     let objects = shop_container_xml::captured_objects(&xml)?;
     projected(source, ledger, objects.malformed, "SCShop.name/guid");
     Ok(Some(objects.names))
-}
-
-fn read(
-    container: &Archive,
-    entry: &Entry,
-    limit: u64,
-    source: &EntrySource,
-    ledger: &mut ExportLedger,
-    capture: &EntryCapture<'_>,
-) -> Result<Option<EntryRead>, CatalogError> {
-    match shop_entry_read::read(capture, source, container, entry, limit)? {
-        Ok(bytes) => Ok(Some(bytes)),
-        Err(error) => {
-            record_read_error(source.clone(), ledger, &error);
-            Ok(None)
-        }
-    }
-}
-
-fn record_read_error(source: EntrySource, ledger: &mut ExportLedger, error: &EntryReadError) {
-    ledger.incomplete_inventory(crate::Kind::Shops);
-    source.diagnosed(
-        ledger,
-        crate::Kind::Shops,
-        SourceDisposition::ReadFailed,
-        error.diagnosis(),
-    );
-}
-
-fn rejected(source: EntrySource, ledger: &mut ExportLedger, field: &'static str) {
-    source.diagnosed(
-        ledger,
-        crate::Kind::Shops,
-        SourceDisposition::ProjectionFailed,
-        shop_entry_read::diagnosis(ExportDiagnosticCode::MalformedSource, field),
-    );
-}
-
-fn projected(source: EntrySource, ledger: &mut ExportLedger, malformed: bool, field: &'static str) {
-    if malformed {
-        rejected(source, ledger, field);
-    } else {
-        source.record(ledger, crate::Kind::Shops, SourceDisposition::Projected);
-    }
 }
 
 #[cfg(test)]

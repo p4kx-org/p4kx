@@ -392,5 +392,6 @@ fn object(
         placement_proof: None,
         mining_claim,
         location_origin: None,
+        shop_link_header: None,
     }
 }

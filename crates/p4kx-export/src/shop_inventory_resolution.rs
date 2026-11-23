@@ -82,6 +82,10 @@ pub enum ResolutionStatus {
     NoDeclaredFile,
 }
 
+#[path = "shop_inventory_compatibility_cells.rs"]
+mod compatibility_cells;
+pub(crate) use compatibility_cells::ShopInventoryCells;
+
 pub(crate) struct InventoryResolver<'read, 'input> {
     containers: &'read Containers,
     inventories: &'read Inventories,

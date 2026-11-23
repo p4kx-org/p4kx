@@ -43,29 +43,47 @@ fn components_in_any_container_and_prefabs_give_lists_and_placeholders_none() ->
     let catalog: Value = serde_json::from_slice(built.json())?;
 
     let clothing = shop(&catalog, CLOTHING)?;
-    assert_eq!(clothing["inventory"], "inv_clothing_city", "tied by name");
-    assert_eq!(clothing["itemGuids"], serde_json::json!([ITEM_A]));
-    assert!(clothing["kind"].is_null(), "the folder gives no kind");
+    assert_eq!(
+        clothing["inventory"]["value"], "inv_clothing_city",
+        "tied by name"
+    );
+    assert_eq!(crate::catalog_shop_items::item_values(clothing)?, [ITEM_A]);
+    assert!(
+        clothing["kind"]["value"].is_null(),
+        "the folder gives no kind"
+    );
 
     let loose = shop(&catalog, LOOSE)?;
-    assert_eq!(loose["inventory"], "inv_loose_city", "no property name");
-    assert_eq!(loose["itemGuids"], serde_json::json!([ITEM_B, ITEM_A]));
+    assert_eq!(
+        loose["inventory"]["value"], "inv_loose_city",
+        "no property name"
+    );
+    assert_eq!(
+        crate::catalog_shop_items::item_values(loose)?,
+        [ITEM_B, ITEM_A]
+    );
 
     let food = shop(&catalog, FOOD)?;
-    assert_eq!(food["inventory"], "inv_noodle", "named by the prefab");
-    assert_eq!(food["itemGuids"], serde_json::json!([ITEM_B]));
+    assert_eq!(
+        food["inventory"]["value"], "inv_noodle",
+        "named by the prefab"
+    );
+    assert_eq!(crate::catalog_shop_items::item_values(food)?, [ITEM_B]);
 
     let exchange = shop(&catalog, EXCHANGE)?;
-    assert!(exchange["inventory"].is_null());
-    assert!(exchange["itemGuids"].is_null());
-    assert_eq!(exchange["kind"], "commex", "kind does not depend on it");
+    assert!(exchange["inventory"]["value"].is_null());
+    assert!(exchange["itemGuids"]["value"].is_null());
+    assert_eq!(
+        exchange["kind"]["value"], "commex",
+        "kind does not depend on it"
+    );
 
     let mixed = shop(&catalog, MIXED)?;
     assert!(
-        mixed["inventory"].is_null(),
+        mixed["inventory"]["value"].is_null(),
         "a prefab that names two files"
     );
-    assert!(mixed["itemGuids"].is_null());
+    assert!(mixed["itemGuids"]["value"].is_null());
 
     let summary = built.summary().shops();
     assert_eq!(summary.with_items, 4, "{summary:?}");

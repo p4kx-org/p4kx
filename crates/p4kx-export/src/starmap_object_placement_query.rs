@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, ArchiveWatch, Build, CancelToken, DataForgeEntry, SourceInventory};
+use p4kx_extraction::{Archive, ArchiveWatch, Build, CancelToken, SourceInventory};
 
 use crate::catalog_origins::CatalogOrigins;
-use crate::catalog_queries::unlocalized_record_query::plan::Plan;
+use crate::catalog_queries::starmap_name_owners;
 use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection};
-use crate::catalog_query_session::{checkpoint, load_error};
+use crate::catalog_query_session::checkpoint;
 use crate::catalog_read::original::{EntryCapture, with_entry_capture};
 use crate::catalog_table::DatasetAvailability;
-use crate::catalog_v3::starmap_object_definition::SOURCE_TYPE;
 use crate::catalog_v3::starmap_placement::StarmapPlacement;
 use crate::export_archive_health;
 use crate::export_entry_counts::ExportEntryCounts;
@@ -138,12 +137,12 @@ pub fn read_starmap_object_placement(
     with_entry_capture(archive, |capture| {
         let owner = read_owner(archive, capture, record_index, cancel)?;
         let (status, rows, traversal) = match &owner.admitted {
-            Some((guid, origins)) => read_placement(
+            Some(guid) => read_placement(
                 archive,
                 capture,
                 record_index,
                 *guid,
-                origins,
+                &owner.origins,
                 budget,
                 cancel,
             )?,
@@ -171,7 +170,8 @@ pub fn read_starmap_object_placement(
 struct ObjectOwner {
     availability: DatasetAvailability,
     coverage: CatalogRecordCoverage,
-    admitted: Option<(CatalogGuid, CatalogOrigins)>,
+    admitted: Option<CatalogGuid>,
+    origins: CatalogOrigins,
 }
 
 impl ObjectOwner {
@@ -188,35 +188,22 @@ fn read_owner(
     record_index: u32,
     cancel: Option<&CancelToken>,
 ) -> Result<ObjectOwner, CatalogError> {
-    let entry =
-        DataForgeEntry::read_until(archive, &|| cancel.is_some_and(CancelToken::is_cancelled))
-            .map_err(load_error)?;
-    let forge = entry.open().map_err(CatalogError::DataForge)?;
-    let Plan { owners, coverage } = Plan::read(
-        &forge,
-        Kind::StarmapObjects,
+    let mut admitted = None;
+    let survey = starmap_name_owners::visit(
+        archive,
+        capture,
         CatalogRecordSelection::RecordIndex(record_index),
         cancel,
-        None,
+        |_, name| {
+            admitted = name.guid.value().copied();
+            Ok(())
+        },
     )?;
-    let origins = CatalogOrigins::for_archive_records_with_uses(
-        archive,
-        &entry,
-        capture.source_uses().clone(),
-    )?;
-    let admitted = owners
-        .first()
-        .map(|owner| (CatalogGuid(owner.record.guid()), origins));
-    let availability = if admitted.is_some() {
-        DatasetAvailability::Available
-    } else {
-        DatasetAvailability::from_source_declarations(&forge, |name| name == SOURCE_TYPE)
-    };
-    checkpoint(cancel)?;
     Ok(ObjectOwner {
-        availability,
-        coverage,
+        availability: survey.availability,
+        coverage: survey.coverage,
         admitted,
+        origins: survey.origins,
     })
 }
 

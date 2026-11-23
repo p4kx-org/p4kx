@@ -199,11 +199,11 @@ pub(super) fn shops() -> serde_json::Value {
         ])),
         "body": present(json!("OOC_Stanton_4_Microtech")),
         "location": present(json!("NewBabbage_LOC")),
-        "starmapObjectGuid": "a2000000-0000-4000-8000-000000000001",
-        "kind": "commex",
-        "brand": "tdd",
+        "starmapObjectGuid": present(json!("a2000000-0000-4000-8000-000000000001")),
+        "kind": present(json!("commex")),
+        "brand": present(json!("tdd")),
         "commodityExchange": present(json!(true)),
-        "inventory": "inv_commex_newbabbage",
-        "itemGuids": ["d195eb47-24b8-45c0-a4d0-1771d60dc1a8"]
+        "inventory": present(json!("inv_commex_newbabbage")),
+        "itemGuids": present(json!([present(json!("d195eb47-24b8-45c0-a4d0-1771d60dc1a8"))]))
     }])
 }

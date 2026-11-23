@@ -34,11 +34,8 @@ fn partial_inventory_json_retains_valid_ids_and_reports_one_failed_entry() -> Te
         "fully enumerated JSON values do not hide additional Archive inputs"
     );
     assert_eq!(
-        items,
-        ItemList::Items {
-            guids: [item.to_owned()].into(),
-            dropped: 3
-        },
+        items.test_items(),
+        Some((vec![item], 3)),
         "valid IDs survive malformed populated values"
     );
     let [source] = ledger.entries.as_slice() else {
@@ -108,11 +105,8 @@ fn an_authored_empty_inventory_is_a_successful_zero_row_projection() -> TestResu
     ])?;
     let mut ledger = ExportLedger::default();
     assert_eq!(
-        items(&archive, "empty", &mut ledger)?,
-        ItemList::Items {
-            guids: [].into(),
-            dropped: 0
-        },
+        items(&archive, "empty", &mut ledger)?.test_items(),
+        Some((Vec::new(), 0)),
         "authored emptiness is retained"
     );
     let [source] = ledger.entries.as_slice() else {

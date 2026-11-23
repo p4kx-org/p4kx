@@ -58,6 +58,20 @@ The `shops[]` registry fields `key`, `entityGuid`, `system`, `entityName`,
 encryption marker before importing these fields. The first valid normalized registry
 key determines the original source occurrence.
 
+Read shop classification from `shops[].kind.value` and `shops[].brand.value`.
+An audited absence is `absent`, disagreeing classifications are `invalid`, and
+undetermined classifications after incomplete reads are `unreadable`. These
+cells retain the exact registry ID, matching container paths and nested GUID selectors.
+
+Read the Shop's linked Starmap GUID from `shops[].starmapObjectGuid.value`.
+A missing registry location is `absent`. Distinct candidate GUIDs are `invalid`.
+A supplied name with no observed match is `unreadable` when the source set
+cannot prove a negative search. The matching original class or placed Child
+name, original Record GUID and registry location retain their source references.
+Read the selected inventory stem from `shops[].inventory.value`. The `shops[].itemGuids.value`
+array contains sourced GUID cells. Inspect each cell's `value`, source references and encryption
+marker before importing it. The dedicated inventory resolution table still reports ambiguity.
+
 ## Loadout identities
 
 Read the original owner GUID and category from `loadouts[].entityGuid.value` and

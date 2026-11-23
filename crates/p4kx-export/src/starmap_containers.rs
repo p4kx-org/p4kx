@@ -30,6 +30,9 @@ use crate::starmap_walk::HarvestOccurrence;
 mod read;
 pub(crate) use read::{finish_route_coverage, unique_system_roots};
 
+#[path = "starmap_name_coverage.rs"]
+pub(crate) mod name_coverage;
+
 #[path = "starmap_jump_class.rs"]
 pub(crate) mod jump_class;
 #[path = "starmap_jump_endpoint.rs"]
@@ -124,6 +127,7 @@ pub(crate) struct Placements {
     ambiguous: HashMap<Guid, Arc<[PlacementProof; 2]>>,
     pub(crate) counts: ContainerCounts,
     pub(crate) placement_routes_incomplete: bool,
+    pub(crate) name_coverage: name_coverage::PlacementNameCoverage,
     pub(crate) report: StarmapReport,
     spools: PlacementSpools,
     #[cfg(test)]

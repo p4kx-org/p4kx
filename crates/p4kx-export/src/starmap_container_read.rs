@@ -8,6 +8,7 @@ use std::time::Instant;
 use p4kx_extraction::{Archive, CancelToken, Guid};
 
 use super::jump_class::JumpEndpointRecords;
+use super::name_coverage::{self, PlacementNameCoverage};
 use super::{Limits, PlacementScope, PlacementSpools, Placements};
 use crate::catalog_read::original::EntryCapture;
 use crate::catalog_table::DatasetAvailability;
@@ -15,12 +16,15 @@ use crate::entry_source;
 use crate::export_ledger::ExportLedger;
 use crate::harvest_locations::HarvestSurvey;
 use crate::starmap_index::Index;
-use crate::starmap_parse::{DescriptorScope, Read};
+use crate::starmap_parse::{DescriptorScope, Read, read_all_scoped};
 use crate::starmap_walk::SystemRead;
 use crate::{CatalogError, ExportAccountingError, Kind};
 
 #[path = "starmap_container_systems.rs"]
 mod systems;
+
+#[path = "starmap_shop_name_routes.rs"]
+mod shop_name_routes;
 
 #[derive(Clone, Copy)]
 enum PlacementStorage<'directory> {
@@ -30,14 +34,27 @@ enum PlacementStorage<'directory> {
     Harvest(&'directory HarvestSurvey<'directory>),
     OpenedContainers,
     Object(Guid),
+    ShopNames(&'directory [Guid]),
     JumpEndpoints,
 }
 
 impl PlacementStorage<'_> {
+    const fn covers_all_names(self) -> bool {
+        match self {
+            Self::Spool(_) | Self::ShopNames(_) => true,
+            #[cfg(test)]
+            Self::Typed => true,
+            Self::Harvest(_) | Self::OpenedContainers | Self::Object(_) | Self::JumpEndpoints => {
+                false
+            }
+        }
+    }
+
     const fn descriptor_scope(self, jump_endpoints: bool) -> DescriptorScope {
         match self {
             Self::Harvest(_) => DescriptorScope::Harvest,
             Self::OpenedContainers | Self::Object(_) => DescriptorScope::OpenedContainers,
+            Self::ShopNames(_) => DescriptorScope::ShopNames,
             Self::Spool(_) => DescriptorScope::Catalog { jump_endpoints },
             Self::JumpEndpoints => DescriptorScope::Catalog {
                 jump_endpoints: true,
@@ -176,6 +193,7 @@ impl Placements {
         capture: &EntryCapture<'_>,
         endpoints: Option<&JumpEndpointRecords>,
         directory_complete: bool,
+        storage: PlacementStorage<'_>,
     ) -> Result<Self, CatalogError> {
         if endpoints.is_some() {
             capture
@@ -193,6 +211,11 @@ impl Placements {
             },
             endpoint_inventory_complete: directory_complete
                 && endpoints.is_some_and(|records| records.complete),
+            name_coverage: PlacementNameCoverage {
+                directory_complete,
+                descriptors_complete: storage.covers_all_names(),
+                routes_complete: storage.covers_all_names(),
+            },
             ..Self::default()
         })
     }
@@ -212,25 +235,22 @@ impl Placements {
         let systems = index.systems();
         let directory_complete = grid_directory_complete(archive);
         if systems.is_empty() && matches!(scope, PlacementScope::ArchiveInventory) {
-            return Self::empty_inventory(archive, capture, endpoints, directory_complete);
+            return Self::empty_inventory(archive, capture, endpoints, directory_complete, storage);
         }
         let system_count = systems.len();
         let mut root_ledger = ExportLedger::default();
         let systems = unique_system_roots(archive, &index, capture, systems, &mut root_ledger)?;
         let roots: Vec<usize> = systems.iter().map(|(_, entry)| *entry).collect();
+        let roots_complete =
+            roots.len() == system_count && name_coverage::descriptor_inputs_complete(&root_ledger);
+        let descriptor_scope = storage.descriptor_scope(endpoints.is_some());
+        let bounds = (limits.source_children, descriptor_scope);
         let Read {
-            bodies, mut ledger, ..
-        } = crate::starmap_parse::read_all_scoped(
-            archive,
-            &index,
-            &roots,
-            cancel,
-            (
-                limits.source_children,
-                storage.descriptor_scope(endpoints.is_some()),
-            ),
-            capture,
-        )?;
+            bodies,
+            mut ledger,
+            name_inputs_complete,
+            ..
+        } = read_all_scoped(archive, &index, &roots, cancel, bounds, capture)?;
         check_cancelled(cancel)?;
         let (read, mut spools) = systems::walk_systems(
             &index,
@@ -254,6 +274,11 @@ impl Placements {
         let mut placements = Self {
             ledger,
             spools,
+            name_coverage: PlacementNameCoverage {
+                directory_complete,
+                descriptors_complete: name_inputs_complete && roots_complete,
+                routes_complete: storage.covers_all_names() && routes_complete,
+            },
             ..Self::default()
         };
         placements.finish(&index, system_count, read, scope, (archive, capture))?;

@@ -52,12 +52,12 @@ fn shops_get_item_lists_from_the_inventories_their_containers_name() -> TestResu
     println!("== summary {summary:#?}");
     let with: Vec<&Value> = shops
         .iter()
-        .filter(|shop| !shop["itemGuids"].is_null())
+        .filter(|shop| !shop["itemGuids"]["value"].is_null())
         .collect();
     let mut by_inventory: BTreeMap<&str, Vec<&str>> = BTreeMap::new();
     for shop in &with {
         by_inventory
-            .entry(shop["inventory"].as_str().unwrap_or("(none)"))
+            .entry(shop["inventory"]["value"].as_str().unwrap_or("(none)"))
             .or_default()
             .push(shop["entityName"]["value"].as_str().unwrap_or_default());
     }
@@ -78,7 +78,7 @@ fn shops_get_item_lists_from_the_inventories_their_containers_name() -> TestResu
             (
                 shop["entityName"]["value"].as_str().unwrap_or_default(),
                 shop["location"]["value"].as_str().unwrap_or_default(),
-                shop["inventory"].as_str().unwrap_or_default(),
+                shop["inventory"]["value"].as_str().unwrap_or_default(),
             )
         })
         .collect();
@@ -110,12 +110,12 @@ fn shops_get_item_lists_from_the_inventories_their_containers_name() -> TestResu
     let mut empty = 0_usize;
     let mut inventories_seen: HashSet<&str> = HashSet::new();
     for shop in &with {
-        let items = shop["itemGuids"].as_array().ok_or("itemGuids")?;
+        let items = shop["itemGuids"]["value"].as_array().ok_or("itemGuids")?;
         empty += usize::from(items.is_empty());
-        if !inventories_seen.insert(shop["inventory"].as_str().unwrap_or_default()) {
+        if !inventories_seen.insert(shop["inventory"]["value"].as_str().unwrap_or_default()) {
             continue;
         }
-        for item in items.iter().filter_map(Value::as_str) {
+        for item in items.iter().filter_map(|item| item["value"].as_str()) {
             total += 1;
             if known.contains(item) {
                 resolved += 1;

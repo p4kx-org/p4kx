@@ -26,9 +26,6 @@ pub(super) fn walk_systems(
     (archive, capture, endpoints): (&Archive, &EntryCapture<'_>, Option<&JumpEndpointRecords>),
     storage: PlacementStorage<'_>,
 ) -> Result<(Vec<SystemRead>, PlacementSpools), CatalogError> {
-    if systems.is_empty() {
-        return Ok((Vec::new(), PlacementSpools::default()));
-    }
     match storage {
         PlacementStorage::Spool(directory) => walk_spooled_systems(
             index,
@@ -59,6 +56,15 @@ pub(super) fn walk_systems(
                 || PlacementRows::OpenedContainers,
             )
         }
+        PlacementStorage::ShopNames(guids) => walk_descriptor_systems(
+            index,
+            bodies,
+            systems,
+            cancel,
+            limits,
+            (archive, capture, None),
+            || PlacementRows::ShopNames(guids),
+        ),
         PlacementStorage::Object(guid) => walk_descriptor_systems(
             index,
             bodies,
@@ -145,6 +151,9 @@ fn walk_spooled_systems(
     (archive, capture, endpoints): (&Archive, &EntryCapture<'_>, Option<&JumpEndpointRecords>),
     directory: &Path,
 ) -> Result<(Vec<SystemRead>, PlacementSpools), CatalogError> {
+    if systems.is_empty() {
+        return Ok((Vec::new(), PlacementSpools::default()));
+    }
     let mut containers = RowSpoolWriter::new(directory)?;
     let mut locations = RowSpoolWriter::new(directory)?;
     let mut unresolved = RowSpoolWriter::new(directory)?;

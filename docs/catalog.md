@@ -2638,8 +2638,8 @@ valid occurrence of the normalized key.
 | `defaultValue` | `DefaultValue`, a GUID; absent when empty. Shops with the same `registryName` share it (1 to 1 on LIVE). What it refers to is not known |
 | `containers` | The elements of `SuperName` before the entity, each without its `_{GUID}` or `_{GUID}_socpak` suffix and surrounding blanks, from the system root down |
 | `body`, `location` | The second and third element of `containers` (`OOC_Stanton_4_Microtech`, `Area18_City_objectContainer`; Pyro: `pyro5`, `rs_ext_pyro6_l3`); absent when the chain is shorter |
-| `starmapObjectGuid` | The `guid` of the `starmapObjects` entry whose `entityName` or `className` equals `location` ignoring ASCII case; `null` when none does or when more than one object does |
-| `kind`, `brand` | From the path of the shop container whose `entitycomponentshop.xml` names `entityGuid`: below `Data\ObjectContainers\PU\Shops` the first folder is the kind (`commex`, `clothing`, ...), the second the brand (`tdd`, `mcraes`), the brand `null` when the file lies directly in the kind folder; a container in a `shopcomm` or `shopfood` folder below `PU\loc` has that folder as kind and no brand. `null` for both when no container names the Entity or containers that differ in kind or brand do. The kind is a closed set the game may extend; a reader maps an unknown value to `null` |
+| `starmapObjectGuid` | Sourced GUID selected by the Shop registry location. The location matches the original class name or selected `Child.entityName` ignoring ASCII case. Physical candidates with the same nominal GUID keep a single winner. Distinct matching GUIDs are `invalid` and retain their matching sources. A missing registry location is `absent`. A supplied location with no observed match is `unreadable` with incomplete negative coverage. |
+| `kind`, `brand` | Sourced strings from the outer directory path of each container whose nested `CryGUID` matches `entityGuid`. Under `Data\ObjectContainers\PU\Shops`, the first folder is the kind and the second, where present, is the brand. `shopcomm` and `shopfood` folders under `PU\loc` have a kind and no brand. Both cells are `invalid` when the matching containers disagree on the kind or brand. A completed survey can report `absent`. An incomplete survey reports `unreadable` for an undetermined value and retains observed consistent values with an incomplete source set. Matching path and GUID selectors retain their individual origins. When no classified container matches, the field carries an incomplete source set if proving absence required consulting nested declarations. |
 | `commodityExchange` | `true` when `entityName` starts with `SCShop_CommEx_TDD_`, or starts with `SCShop_Platinumbay` and ends with `_Commodity` (ignoring case): the commodity exchanges and terminals |
 
 **What the registry holds.** LIVE has two `LayerBackup` elements in the one file: `stantonsystem`
@@ -2706,7 +2706,7 @@ and are recorded in export health.
 | Field | Source |
 |-------|--------|
 | `inventory` | The lower-case stem of that file, e.g. `inv_admin_newbabbage`; `null` when no place names a file, the places disagree (or only some name one), the file is a placeholder, or the file is missing or unreadable |
-| `itemGuids` | The `ID.ID` GUIDs of the elements of the file (`Collection.Inventory`, or `Inventory` in the shape without `Collection`), lower case, ordered, without repeats, and possibly `[]` for a file without items; an `ID` value that is no GUID is left out and counted in `item_ids_dropped`; `null` exactly when `inventory` is. The file's exact design-time fields are in `definitions.shopInventories`. |
+| `itemGuids` | The `ID.ID` GUIDs of the elements of the file (`Collection.Inventory`, or `Inventory` in the shape without `Collection`), lower case, ordered, without repeats, and possibly `[]` for a file without items; an `ID` value that is no GUID is left out and counted in `item_ids_dropped`; `null` exactly when `inventory` is. The parent carries the selected registry, component and physical file contributions. Each member carries the exact JSON item ID alternatives in that file. Filtering a shop-to-item association checks both the parent list cell and the item cell. The file's exact design-time fields are in `definitions.shopInventories`. |
 
 ### Physical offline shop inventories
 
@@ -2730,9 +2730,11 @@ markers are independent and come from each actual source use.
 An unreadable Entry retains its directory identity and an unreadable document state. Nonzero
 invalid JSON retains its identity and an invalid document state. A complete read of a physical
 zero-byte Entry gives a sourced absent document. The selected shop resolution reports
-`emptySource` with that physical target and its payload evidence. The compatibility shop
-fields `inventory` and `itemGuids` are null. A valid empty `Inventory` array resolves with
-`itemGuids: []`. A missing physical target has no definition row. The zero-byte read is a
+`emptySource` with that physical target and its payload evidence. The `inventory` and `itemGuids` cells share their selection evidence and state. The states are
+`absent` for no declared file, a placeholder, a verified missing file or a verified zero-byte
+file, `invalid` for conflicting declarations, and `unreadable` for an incomplete survey or
+unreadable inventory. A valid empty `Inventory` array produces a present `itemGuids` value of
+`[]`. A missing physical target has no definition row. The zero-byte read is a
 complete observation and still contributes to the legacy `unreadable_shop_inventories`
 warning. Archive-entry health retains other read or projection failures. Price, stock and
 rental values describe offline design settings. Stored values and unit-bearing source fields

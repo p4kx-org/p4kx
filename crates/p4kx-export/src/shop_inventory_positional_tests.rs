@@ -35,11 +35,8 @@ fn legacy_inventory_structs_accept_positional_json() -> TestResult {
     for (shape, body) in cases {
         let (list, ledger) = selected(&body)?;
         assert_eq!(
-            list,
-            ItemList::Items {
-                guids: [ITEM.to_owned()].into(),
-                dropped: 0,
-            },
+            list.test_items(),
+            Some((vec![ITEM], 0)),
             "the original positional {shape} supplies the selected item"
         );
         let [source] = ledger.entries.as_slice() else {
@@ -73,11 +70,8 @@ fn duplicate_file_members_refuse_the_list_but_duplicate_item_members_drop_one_li
     );
     let (list, ledger) = selected(&body)?;
     assert_eq!(
-        list,
-        ItemList::Items {
-            guids: [ITEM.to_owned()].into(),
-            dropped: 1,
-        },
+        list.test_items(),
+        Some((vec![ITEM], 1)),
         "the line with a duplicate ID is dropped and the valid line survives"
     );
     let [source] = ledger.entries.as_slice() else {

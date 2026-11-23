@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use p4kx_extraction::{Archive, CancelToken, Entry};
+use p4kx_extraction::{Archive, CancelToken, Entry, FieldOrigin};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -70,6 +70,7 @@ pub(crate) struct Inventories {
     count: usize,
     by_stem: HashMap<String, InventoryFiles>,
     complete_directory: bool,
+    directory_origin: FieldOrigin,
 }
 
 #[derive(Default)]
@@ -111,6 +112,7 @@ impl Inventories {
                 count: by_stem.len(),
                 by_stem,
                 complete_directory,
+                directory_origin: directory_origin(archive, capture, complete_directory)?,
             },
         })
     }
@@ -127,6 +129,10 @@ impl Inventories {
 
     pub(crate) const fn complete_directory(&self) -> bool {
         self.complete_directory
+    }
+
+    pub(crate) const fn directory_origin(&self) -> &FieldOrigin {
+        &self.directory_origin
     }
 
     pub(crate) fn items(
@@ -189,6 +195,16 @@ pub(crate) fn read_definitions(
     }
     let complete = finish_table(archive, &mut table, &mut ledger);
     Ok((table, ledger, complete))
+}
+
+fn directory_origin(
+    archive: &Archive,
+    capture: &EntryCapture<'_>,
+    complete: bool,
+) -> Result<FieldOrigin, CatalogError> {
+    let uses = capture.source_uses();
+    let directory = uses.observe_root_directory_paths(archive)?;
+    Ok(uses.origin(directory.as_slice(), complete && directory.is_some()))
 }
 
 fn finish_table(

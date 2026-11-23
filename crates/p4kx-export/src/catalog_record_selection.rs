@@ -46,7 +46,7 @@ impl CatalogRecordSelection {
 }
 
 /// Physical Records that could not be read fully, or were skipped by selection policy.
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct CatalogRecordCoverage {
     /// Physical indices whose headers could not be classified.

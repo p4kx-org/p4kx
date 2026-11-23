@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use super::{AMMUNITION, ELECTRICAL_BEHAVIORS, FACTION_IDENTITIES, Route, TestResult};
 use p4kx_export::catalog_queries::equipment::with_ammo_definitions;
 use p4kx_export::catalog_queries::faction_identities::with_faction_identities;
 use p4kx_export::catalog_queries::weather::with_electrical_behaviors;
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_extraction::Archive;
-
-use super::{AMMUNITION, ELECTRICAL_BEHAVIORS, FACTION_IDENTITIES, Route, TestResult};
 
 #[path = "sdk_actor_procedural_recoil_routes.rs"]
 mod actor_procedural_recoil;
@@ -263,6 +262,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         unresolved,
         starmap_object_placement::read()?,
     ];
+    routes.push(archive_entries::read_physical_shop()?);
     routes.extend(archive_source::read()?);
     routes.extend(jump_inventory::read()?);
     append_domain_routes(&mut routes, &archive)?;

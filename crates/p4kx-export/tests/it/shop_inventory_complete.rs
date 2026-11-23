@@ -91,10 +91,15 @@ fn assert_inventory_survives(size: usize, reference: &str) -> TestResult {
     let catalog: Value = serde_json::from_slice(built.json())?;
     let food = shop(&catalog, FOOD)?;
     assert_eq!(
-        food["inventory"], "inv_fullcatalog",
+        food.pointer("/inventory/value").and_then(Value::as_str),
+        Some("inv_fullcatalog"),
         "actual prefab selection"
     );
-    assert_eq!(food["itemGuids"], json!([ITEM_B]), "{size}-byte inventory");
+    assert_eq!(
+        crate::catalog_shop_items::item_values(food)?,
+        [ITEM_B],
+        "{size}-byte inventory"
+    );
     Ok(())
 }
 

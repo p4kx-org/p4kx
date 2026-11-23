@@ -160,7 +160,7 @@ impl<'archive> CatalogQuerySession<'archive> {
         })
     }
 
-    fn project<T>(
+    pub(crate) fn project<T>(
         &self,
         cancel: Option<&CancelToken>,
         project: impl FnOnce(&Archive, &DataForgeEntry) -> Result<T, CatalogError>,

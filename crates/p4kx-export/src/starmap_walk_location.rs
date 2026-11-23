@@ -48,7 +48,8 @@ impl System<'_> {
             }
             PlacementRows::Harvest(_)
             | PlacementRows::OpenedContainers
-            | PlacementRows::Object(_) => Ok(()),
+            | PlacementRows::Object(_)
+            | PlacementRows::ShopNames(_) => Ok(()),
         }
     }
 
@@ -100,7 +101,8 @@ impl System<'_> {
             PlacementRows::Harvest(_)
             | PlacementRows::Selected(_)
             | PlacementRows::OpenedContainers
-            | PlacementRows::Object(_) => {
+            | PlacementRows::Object(_)
+            | PlacementRows::ShopNames(_) => {
                 return Ok(());
             }
         }

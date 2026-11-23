@@ -25,7 +25,7 @@ pub(super) struct ChildReader<'a, 'read, 'capture, 'input, 'archive, 'cancel> {
     xml: &'a EntryXml<'read, 'capture, 'input>,
     hcd: &'a mut HcdReader<'archive, 'capture, 'input>,
     index: &'a Index<'archive>,
-    ledger: &'a mut ExportLedger,
+    companions: &'a mut ExportLedger,
     pub(super) entity_guids: HashSet<Guid>,
     pub(super) pending_external: bool,
 }
@@ -38,14 +38,14 @@ impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
         xml: &'a EntryXml<'read, 'capture, 'input>,
         hcd: &'a mut HcdReader<'archive, 'capture, 'input>,
         index: &'a Index<'archive>,
-        ledger: &'a mut ExportLedger,
+        companions: &'a mut ExportLedger,
     ) -> Self {
         Self {
             bounds,
             xml,
             hcd,
             index,
-            ledger,
+            companions,
             entity_guids: HashSet::new(),
             pending_external: false,
         }
@@ -105,13 +105,15 @@ impl<'a, 'read, 'capture, 'input, 'archive, 'cancel>
             pose,
             node: child,
         } = authored;
-        let mut location = if self.bounds.scope.enriches_locations() {
+        let mut location = if self.bounds.scope.reads_location_declarations() {
             ChildLocation::read(xml, child, xml.capture())?
         } else {
             None
         };
-        if let Some(location) = &mut location {
-            location.read_context(self.hcd, xml, child, self.ledger)?;
+        if self.bounds.scope.reads_location_companions()
+            && let Some(location) = &mut location
+        {
+            location.read_context(self.hcd, xml, child, self.companions)?;
             self.entity_guids
                 .extend(location.request_entity(xml, child)?);
         }

@@ -46,7 +46,7 @@ pub(crate) fn read_witness_body(
             .source_uses()
             .observe_root_directory_paths(archive)?,
     };
-    parse(archive, index, entry, &bounds, capture).map(|(body, _)| body)
+    parse(archive, index, entry, &bounds, capture).map(|descriptor| descriptor.body)
 }
 
 pub(crate) fn is_child_list(node: Root<'_>) -> bool {

@@ -50,8 +50,8 @@ fn a_named_inventory_gives_ordered_item_guids_without_prices() -> TestResult {
     let (_, catalog) = build()?;
     let shops = shops_of(&catalog, EXCHANGE);
     assert_eq!(shops.len(), 1);
-    assert_eq!(shops[0]["inventory"], "inv_commex");
-    assert_eq!(shops[0]["itemGuids"], serde_json::json!([ITEM_B, ITEM_A]));
+    assert_eq!(shops[0]["inventory"]["value"], "inv_commex");
+    assert_eq!(item_values(shops[0])?, [ITEM_B, ITEM_A]);
     let text = serde_json::to_string(&catalog["shops"])?;
     for forbidden in ["BuyPrice", "SellPrice", "CurrentInventory", "Rental"] {
         assert!(!text.contains(forbidden), "{forbidden}");
@@ -64,8 +64,8 @@ fn an_xml_name_resolves_to_the_json_file_and_the_flat_shape_is_read() -> TestRes
     let (_, catalog) = build()?;
     let shops = shops_of(&catalog, LOOSE);
     assert_eq!(shops.len(), 1);
-    assert_eq!(shops[0]["inventory"], "inv_loose");
-    assert_eq!(shops[0]["itemGuids"], serde_json::json!([ITEM_A]));
+    assert_eq!(shops[0]["inventory"]["value"], "inv_loose");
+    assert_eq!(item_values(shops[0])?, [ITEM_A]);
     Ok(())
 }
 
@@ -74,8 +74,8 @@ fn a_shop_without_a_usable_inventory_has_no_list() -> TestResult {
     let (_, catalog) = build()?;
     for entity in [CLOTHING, FOOD, MIXED] {
         for shop in shops_of(&catalog, entity) {
-            assert!(shop["inventory"].is_null(), "{entity}");
-            assert!(shop["itemGuids"].is_null(), "{entity}");
+            assert!(shop["inventory"]["value"].is_null(), "{entity}");
+            assert!(shop["itemGuids"]["value"].is_null(), "{entity}");
         }
     }
     Ok(())
@@ -134,8 +134,20 @@ fn a_soc_without_a_shop_component_is_unscanned_and_warns() -> TestResult {
     assert!(
         shops_of(&catalog, EXCHANGE)
             .iter()
-            .all(|shop| shop["itemGuids"].is_null() && shop["kind"] == "commex"),
+            .all(|shop| shop["itemGuids"]["value"].is_null() && shop["kind"]["value"] == "commex"),
         "the kind does not depend on the .soc"
     );
     Ok(())
+}
+
+pub(crate) fn item_values(shop: &Value) -> Result<Vec<&str>, Box<dyn Error>> {
+    let items = crate::health_origin_assertions::rows(shop, "/itemGuids/value")?;
+    items
+        .iter()
+        .map(|item| {
+            crate::health_origin_assertions::at(item, "/value")?
+                .as_str()
+                .ok_or_else(|| "expected a sourced inventory GUID".into())
+        })
+        .collect()
 }

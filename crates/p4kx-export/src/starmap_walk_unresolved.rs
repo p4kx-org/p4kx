@@ -20,7 +20,7 @@ impl System<'_> {
     ) -> Result<(), CatalogError> {
         if matches!(
             &self.rows,
-            PlacementRows::Harvest(_) | PlacementRows::Object(_)
+            PlacementRows::Harvest(_) | PlacementRows::Object(_) | PlacementRows::ShopNames(_)
         ) {
             return Ok(());
         }
@@ -42,14 +42,7 @@ impl System<'_> {
         if !self.rows.includes_container(Some(route)) {
             return Ok(());
         }
-        let read_status = match self.index.candidates(selector.as_str()) {
-            [target] => match self.bodies.get(target) {
-                Some(Body::Unreadable(_)) => ContainerTargetReadStatus::Unreadable,
-                Some(Body::Unparsed) => ContainerTargetReadStatus::Unparsed,
-                _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
-            },
-            _ => ContainerTargetReadStatus::NotAttempted,
-        };
+        let read_status = self.unresolved_target_status(selector.as_str())?;
         let occurrence = UnresolvedOccurrence {
             root_entry: self.root_entry,
             root_inputs: &self.root,
@@ -76,7 +69,22 @@ impl System<'_> {
             }
             PlacementRows::Harvest(_)
             | PlacementRows::OpenedContainers
-            | PlacementRows::Object(_) => Ok(()),
+            | PlacementRows::Object(_)
+            | PlacementRows::ShopNames(_) => Ok(()),
+        }
+    }
+
+    fn unresolved_target_status(
+        &self,
+        selector: &str,
+    ) -> Result<ContainerTargetReadStatus, CatalogError> {
+        match self.index.candidates(selector) {
+            [target] => match self.bodies.get(target) {
+                Some(Body::Unreadable(_)) => Ok(ContainerTargetReadStatus::Unreadable),
+                Some(Body::Unparsed) => Ok(ContainerTargetReadStatus::Unparsed),
+                _ => Err(ExportAccountingError::ConflictingSourceDatum.into()),
+            },
+            _ => Ok(ContainerTargetReadStatus::NotAttempted),
         }
     }
 }

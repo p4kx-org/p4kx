@@ -10,6 +10,7 @@ use p4kx_extraction::{Archive, CancelToken, Guid, PathKeys, SourceUse};
 use rayon::prelude::*;
 
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture};
+use crate::entry_source::EntrySource;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::starmap_containers::instance::ContainerFile;
 use crate::starmap_containers::jump_gate::JumpGate;
@@ -22,6 +23,9 @@ use crate::starmap_xml::AuthoredPose;
 use crate::{CatalogError, Kind};
 #[path = "starmap_children.rs"]
 mod children;
+
+mod descriptor_scope;
+pub(crate) use descriptor_scope::DescriptorScope;
 
 #[path = "starmap_descriptor_root.rs"]
 mod descriptor_root;
@@ -130,39 +134,6 @@ pub(crate) enum Body {
     },
 }
 
-/// The placement details needed by the consumer of the descriptor walk.
-#[derive(Clone, Copy)]
-pub(crate) enum DescriptorScope {
-    Catalog { jump_endpoints: bool },
-    ContainerPlacements,
-    LocationPlacements,
-    Harvest,
-    OpenedContainers,
-}
-
-impl DescriptorScope {
-    const fn enriches_locations(self) -> bool {
-        matches!(self, Self::Catalog { .. } | Self::LocationPlacements)
-    }
-
-    const fn resolves_placements(self) -> bool {
-        !matches!(self, Self::Harvest)
-    }
-
-    const fn reads_location_physics(self) -> bool {
-        matches!(self, Self::Catalog { .. } | Self::ContainerPlacements)
-    }
-
-    const fn reads_jump_endpoints(self) -> bool {
-        matches!(
-            self,
-            Self::Catalog {
-                jump_endpoints: true
-            }
-        )
-    }
-}
-
 /// The shared Child count and read controls for the discovered containers.
 struct Bounds<'a> {
     cancel: Option<&'a CancelToken>,
@@ -184,6 +155,12 @@ impl Bounds<'_> {
     }
 }
 
+struct DescriptorRead {
+    body: Body,
+    ledger: ExportLedger,
+    name_inputs_complete: bool,
+}
+
 /// Reads and parses the container at `entry`.
 fn parse(
     archive: &Archive,
@@ -191,10 +168,23 @@ fn parse(
     entry: usize,
     bounds: &Bounds<'_>,
     capture: &EntryCapture<'_>,
-) -> Result<(Body, ExportLedger), CatalogError> {
+) -> Result<DescriptorRead, CatalogError> {
     let mut ledger = ExportLedger::default();
-    let body = parse_body(archive, index, entry, bounds, capture, &mut ledger)?;
-    Ok((body, ledger))
+    let mut name_inputs_complete = false;
+    let body = parse_body(
+        archive,
+        index,
+        entry,
+        bounds,
+        capture,
+        &mut ledger,
+        &mut name_inputs_complete,
+    )?;
+    Ok(DescriptorRead {
+        body,
+        ledger,
+        name_inputs_complete,
+    })
 }
 
 fn parse_body(
@@ -204,6 +194,7 @@ fn parse_body(
     bounds: &Bounds<'_>,
     capture: &EntryCapture<'_>,
     ledger: &mut ExportLedger,
+    name_inputs_complete: &mut bool,
 ) -> Result<Body, CatalogError> {
     let Some(socpak) = index.entries.get(entry) else {
         ledger.incomplete_inventory(Kind::StarmapObjects);
@@ -230,6 +221,7 @@ fn parse_body(
         gate,
         gate_proof,
         pending_external,
+        name_inputs_complete: observed_name_inputs,
     }) = descriptor_root::read(&main.bytes, bounds, &files, index, ledger)?
     else {
         ledger.incomplete_inventory(Kind::StarmapObjects);
@@ -241,21 +233,13 @@ fn parse_body(
         return Ok(Body::Unparsed);
     };
     let loss = children::source_loss(&mut root, &entities, capture.source_uses(), bounds.cancel)?;
+    *name_inputs_complete = observed_name_inputs && !loss.projection;
     let grid_failed = bounds.scope.reads_location_physics()
         && matches!(
             file.location_physics,
             crate::location_physics::GridRead::Unavailable
         );
-    if loss.inventory || grid_failed {
-        ledger.incomplete_inventory(Kind::StarmapObjects);
-    }
-    let disposition = if loss.projection || grid_failed {
-        SourceDisposition::ProjectionFailed
-    } else {
-        SourceDisposition::Projected
-    };
-    main.source
-        .record(ledger, Kind::StarmapObjects, disposition);
+    record_projection(ledger, main.source, &loss, grid_failed);
     Ok(Body::Parsed {
         root,
         file: Box::new(file),
@@ -266,15 +250,52 @@ fn parse_body(
     })
 }
 
+fn record_projection(
+    ledger: &mut ExportLedger,
+    source: EntrySource,
+    loss: &children::SourceLoss,
+    grid_failed: bool,
+) {
+    if loss.inventory || grid_failed {
+        ledger.incomplete_inventory(Kind::StarmapObjects);
+    }
+    let disposition = if loss.projection || grid_failed {
+        SourceDisposition::ProjectionFailed
+    } else {
+        SourceDisposition::Projected
+    };
+    source.record(ledger, Kind::StarmapObjects, disposition);
+}
+
 /// The containers read, and how many parses that took.
 pub(crate) struct Read {
     pub(crate) ledger: ExportLedger,
+    pub(crate) name_inputs_complete: bool,
     pub(crate) bodies: HashMap<usize, Body>,
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "only the tests count the parses")
-    )]
+    #[cfg(test)]
     pub(crate) parsed: usize,
+}
+
+impl Read {
+    fn retain_frontier(
+        &mut self,
+        descriptors: Vec<(usize, DescriptorRead)>,
+        scope: DescriptorScope,
+        pending: &mut HashSet<usize>,
+    ) {
+        #[cfg(test)]
+        {
+            self.parsed += descriptors.len();
+        }
+        for (entry, descriptor) in descriptors {
+            if scope.resolves_placements() {
+                failed_links::observe(entry, &descriptor.body, pending);
+            }
+            self.name_inputs_complete &= descriptor.name_inputs_complete;
+            self.bodies.insert(entry, descriptor.body);
+            self.ledger.merge(descriptor.ledger);
+        }
+    }
 }
 
 /// Reads each physically distinct container reachable from the roots in breadth-first order.
@@ -319,9 +340,13 @@ pub(crate) fn read_all_scoped(
             .source_uses()
             .observe_root_directory_paths(archive)?,
     };
-    let mut bodies: HashMap<usize, Body> = HashMap::new();
-    let mut ledger = ExportLedger::default();
-    let mut parsed = 0;
+    let mut observed = Read {
+        ledger: ExportLedger::default(),
+        bodies: HashMap::new(),
+        #[cfg(test)]
+        parsed: 0,
+        name_inputs_complete: true,
+    };
     let mut pending = HashSet::new();
     let mut frontier: Vec<usize> = roots
         .iter()
@@ -335,37 +360,28 @@ pub(crate) fn read_all_scoped(
             .filter(|_| !cancel.is_some_and(CancelToken::is_cancelled))
             .map(|&entry| parse(archive, index, entry, &bounds, capture).map(|read| (entry, read)))
             .collect::<Result<_, _>>()?;
-        parsed += read.len();
-        let next = external_sources::next_sources(
-            read.iter().map(|(_, (body, _))| body),
+        let external = external_sources::next_sources(
+            read.iter().map(|(_, descriptor)| &descriptor.body),
             index,
             archive,
             capture,
-            &mut ledger,
+            &mut observed.ledger,
         )?;
-        for (entry, (body, observed)) in read {
-            if scope.resolves_placements() {
-                failed_links::observe(entry, &body, &mut pending);
-            }
-            bodies.insert(entry, body);
-            ledger.merge(observed);
-        }
+        observed.name_inputs_complete &= external.name_inputs_complete;
+        observed.retain_frontier(read, scope, &mut pending);
         if scope.resolves_placements() {
-            failed_links::finish(&mut bodies, &mut pending, index, capture, cancel)?;
+            failed_links::finish(&mut observed.bodies, &mut pending, index, capture, cancel)?;
         }
-        frontier = next
+        frontier = external
+            .next
             .into_iter()
-            .filter(|entry| !bodies.contains_key(entry))
+            .filter(|entry| !observed.bodies.contains_key(entry))
             .collect();
     }
     if scope.resolves_placements() {
         failed_links::completed(&pending, cancel)?;
     }
-    Ok(Read {
-        ledger,
-        bodies,
-        parsed,
-    })
+    Ok(observed)
 }
 
 #[cfg(test)]

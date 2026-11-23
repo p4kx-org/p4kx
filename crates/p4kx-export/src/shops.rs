@@ -10,7 +10,6 @@ use crate::catalog_read::original::{EntryCapture, EntryDiagnosis};
 use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::collected::Collected;
 use crate::contract::{Shop, StarmapObject};
-use crate::crafting_warning::CraftingWarning;
 use crate::entry_source::EntrySource;
 use crate::export_diagnostic::ExportDiagnosticCode;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
@@ -18,12 +17,13 @@ use crate::shop_containers::Containers;
 use crate::shop_entry_read;
 use crate::shop_inventories::{Inventories, ItemList, PreparedInventories, is_placeholder};
 use crate::shop_inventory_resolution::{InventoryResolver, ShopInventoryResolution};
-use crate::shop_links::Links;
+use crate::shop_links::{Links, ShopLinkSubject};
 use crate::shop_prefabs::Prefabs;
 #[cfg(test)]
 use crate::shop_registry::RegistryShop;
 use crate::shop_registry::{self, RegistryNeed};
 use crate::shop_summary::ShopSummary;
+use crate::starmap_containers::Placements;
 use crate::{CatalogError, CatalogOptions, Kind};
 
 /// The shop registry of the layer recovery data.
@@ -31,6 +31,8 @@ pub(crate) const REGISTRY: &str = "Data\\Libs\\CosmoTools\\LayerRecovery\\LayerB
 
 #[path = "shop_resolution_scope.rs"]
 pub(crate) mod resolution_scope;
+#[path = "shop_row_query.rs"]
+pub(crate) mod row_query;
 #[path = "shop_list.rs"]
 mod shop_list;
 #[cfg(test)]
@@ -116,8 +118,7 @@ pub(crate) fn add_shops(
     archive: &Archive,
     files: &ArchiveFiles<'_>,
     collected: &mut Collected<'_>,
-    options: &CatalogOptions<'_>,
-    capture: &EntryCapture<'_>,
+    (options, capture, placements): (&CatalogOptions<'_>, &EntryCapture<'_>, &Placements),
 ) -> Result<ShopSummary, CatalogError> {
     let PreparedInventories {
         table,
@@ -131,50 +132,24 @@ pub(crate) fn add_shops(
         collected.shop_inventory_resolution.availability = DatasetAvailability::Unavailable;
         return Ok(ShopSummary::default());
     }
+    let names_complete = placements
+        .name_coverage
+        .complete_for_lookup(placements.counts, &collected.ledger);
     let built = shops(
         archive,
         files,
-        &collected.starmap_objects,
+        (&collected.starmap_objects, names_complete),
         options.cancel,
         capture,
         &mut inventories,
     )?;
     collected.ledger.merge(built.ledger);
     let summary = built.summary;
-    if summary.registry_unreadable {
-        collected
-            .warnings
-            .push(CraftingWarning::UnreadableShopRegistry);
-    } else if summary.registry_missing && !collected.starmap_objects.is_empty() {
-        collected
-            .warnings
-            .push(CraftingWarning::MissingShopRegistry);
-    }
-    if summary.containers_unreadable > 0 {
-        collected
-            .warnings
-            .push(CraftingWarning::UnreadableShopContainers(
-                summary.containers_unreadable,
-            ));
-    }
-    if summary.inventories_unreadable > 0 {
-        collected
-            .warnings
-            .push(CraftingWarning::UnreadableShopInventories {
-                count: summary.inventories_unreadable,
-                details: built.unreadable_inventories,
-            });
-    }
-    if summary.inventories_missing > 0 {
-        collected
-            .warnings
-            .push(CraftingWarning::MissingShopInventories(
-                summary.inventories_missing,
-            ));
-    }
-    if summary.containers_with_shop > 0 && summary.soc_components == 0 {
-        collected.warnings.push(CraftingWarning::NoShopComponents);
-    }
+    summary.record_warnings(
+        !collected.starmap_objects.is_empty(),
+        built.unreadable_inventories,
+        &mut collected.warnings,
+    );
     collected.shops = built.shops;
     collected.shop_inventory_resolution = built.resolutions;
     Ok(summary)
@@ -185,7 +160,7 @@ pub(crate) fn add_shops(
 pub(crate) fn shops(
     archive: &Archive,
     files: &ArchiveFiles<'_>,
-    starmap: &[StarmapObject<'_>],
+    (starmap, names_complete): (&[StarmapObject<'_>], bool),
     cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
     inventories: &mut Inventories,
@@ -200,7 +175,12 @@ pub(crate) fn shops(
     };
     let registry =
         shop_registry::read_source(archive, files, need, &mut summary, &mut ledger, capture)?;
-    let Some((registry, registry_source)) = registry else {
+    let Some(shop_registry::RegistryDocument {
+        rows: registry,
+        source: registry_source,
+        ..
+    }) = registry
+    else {
         return Ok(Built::without_registry(summary, ledger));
     };
     let declarations = ShopDeclarations::read(archive, cancel, capture, &mut summary)?;
@@ -211,7 +191,7 @@ pub(crate) fn shops(
         ..
     } = declarations;
     summary.registry_entries = registry.len();
-    let links = Links::new(starmap);
+    let links = Links::new(starmap.iter().map(ShopLinkSubject::from), names_complete);
     let lists = inventory_lists(&containers, inventories, &mut summary, &mut ledger)?;
     let unreadable_inventories = unreadable_details(&lists);
 

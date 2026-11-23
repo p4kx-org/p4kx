@@ -176,16 +176,20 @@ fn report(archive: &Archive, built: &p4kx_export::BuiltCatalog, shops: &[Value])
     );
     println!(
         "== shops per kind {:?}",
-        count_by(shops, |shop| shop["kind"].as_str())
+        count_by(shops, |shop| shop
+            .pointer("/kind/value")
+            .and_then(Value::as_str))
     );
     println!(
         "== shops per brand {:?}",
-        count_by(shops, |shop| shop["brand"].as_str())
+        count_by(shops, |shop| shop
+            .pointer("/brand/value")
+            .and_then(Value::as_str))
     );
     let linked = shops
         .iter()
         .filter(|shop| {
-            shop.get("starmapObjectGuid")
+            shop.pointer("/starmapObjectGuid/value")
                 .is_some_and(|guid| !guid.is_null())
         })
         .count();
@@ -202,7 +206,7 @@ fn report(archive: &Archive, built: &p4kx_export::BuiltCatalog, shops: &[Value])
         .filter(|shop| {
             registry_text(shop, "/system/value") == Some("pyro")
                 && shop
-                    .get("starmapObjectGuid")
+                    .pointer("/starmapObjectGuid/value")
                     .is_some_and(|guid| !guid.is_null())
         })
         .count();

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::crafting_warning::CraftingWarning;
 use crate::shop_containers::Containers;
 use crate::shop_prefabs::Prefabs;
 
@@ -111,5 +112,37 @@ impl ShopSummary {
         self.other_containers_scanned = containers.other_scanned;
         self.other_containers_unreadable = containers.other_unreadable;
         self.other_containers_with_shop = containers.other_with_shop;
+    }
+
+    pub(crate) fn record_warnings(
+        &self,
+        registry_expected: bool,
+        unreadable_inventories: Vec<String>,
+        warnings: &mut Vec<CraftingWarning>,
+    ) {
+        if self.registry_unreadable {
+            warnings.push(CraftingWarning::UnreadableShopRegistry);
+        } else if self.registry_missing && registry_expected {
+            warnings.push(CraftingWarning::MissingShopRegistry);
+        }
+        if self.containers_unreadable > 0 {
+            warnings.push(CraftingWarning::UnreadableShopContainers(
+                self.containers_unreadable,
+            ));
+        }
+        if self.inventories_unreadable > 0 {
+            warnings.push(CraftingWarning::UnreadableShopInventories {
+                count: self.inventories_unreadable,
+                details: unreadable_inventories,
+            });
+        }
+        if self.inventories_missing > 0 {
+            warnings.push(CraftingWarning::MissingShopInventories(
+                self.inventories_missing,
+            ));
+        }
+        if self.containers_with_shop > 0 && self.soc_components == 0 {
+            warnings.push(CraftingWarning::NoShopComponents);
+        }
     }
 }

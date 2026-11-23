@@ -152,7 +152,12 @@ fn read_scope(
         capture,
     )?;
     let complete_directory = crate::export_archive_health::inventory(archive).is_none();
-    let Some((registry, registry_source)) = registry else {
+    let Some(shop_registry::RegistryDocument {
+        rows: registry,
+        source: registry_source,
+        complete: registry_complete,
+    }) = registry
+    else {
         if summary.registry_missing && complete_directory {
             read.registry_complete = true;
             read.availability = DatasetAvailability::Absent;
@@ -171,7 +176,8 @@ fn read_scope(
         }
         Ok(())
     })?;
-    read.registry_complete = complete_directory && disposition == SourceDisposition::Projected;
+    read.registry_complete =
+        complete_directory && registry_complete && disposition == SourceDisposition::Projected;
     record_registry(registry_source, disposition, &mut read.ledger);
     if !placements.is_empty() {
         let declarations = ShopDeclarations::read(archive, cancel, capture, &mut summary)?;
@@ -216,12 +222,7 @@ impl ScopeRead {
                 .push(resolver.row(raw, &placement.key, &placement.entity_guid)?);
         }
         shop_list::sort_resolutions(&mut self.rows);
-        let uses = capture.source_uses();
-        let directory = uses.observe_root_directory_paths(archive)?;
-        let inventory_directory = uses.origin(
-            directory.as_slice(),
-            inventories.complete_directory() && directory.is_some(),
-        );
+        let inventory_directory = inventories.directory_origin().clone();
         self.discovery = Some(ShopResolutionDiscovery {
             inventory_directory,
             declarations_complete,

@@ -89,7 +89,8 @@ pub(super) fn assemble<R>(
     let (client_profile_settings, radar_audio) =
         parts::client_configurations(archive, &entry_capture, &mut collected, run)?;
     run.begin(CatalogStage::ProjectShops);
-    let shop_summary = add_shops(archive, &files, &mut collected, options, &entry_capture)?;
+    let shop_inputs = (options, &entry_capture, &placements);
+    let shop_summary = add_shops(archive, &files, &mut collected, shop_inputs)?;
     run.begin(CatalogStage::ResolveJumpOperators);
     let jump_owners = placements.join_jump_operators(&entities, &input, options.cancel)?;
     let jump_connections = CatalogTable::empty(placements.jump_connection_availability());

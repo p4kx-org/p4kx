@@ -39,6 +39,10 @@ mod installed_configuration;
 
 #[path = "real_archive_store_slug_retained_parity.rs"]
 mod store_slug_retained_parity;
+
+#[path = "real_archive_physical_shop_sdk.rs"]
+mod physical_shop;
+
 const STORE: &str = "/shipStoreSlugs";
 const FACILITY: &str = "/placements/facilityInstances/rows";
 const STORE_RECORD: &str = "P4KX_STORE_SLUG_SDK_RECORD";
@@ -158,12 +162,16 @@ fn installed_loadout_facility_cold_query() -> TestResult {
 }
 
 fn report_scoped_rows(kind: &str, phase: &str, rows: &[Value]) -> TestResult {
-    let digest = Checksum::Sha256(Sha256::digest(serde_json::to_vec(rows)?).into()).hex();
+    let digest = scoped_rows_digest(rows)?;
     print_line(&format!(
         "{kind} {phase} rows={} digest={digest}",
         rows.len()
     ));
     Ok(())
+}
+
+fn scoped_rows_digest(rows: &[Value]) -> TestResult<String> {
+    Ok(Checksum::Sha256(Sha256::digest(serde_json::to_vec(rows)?).into()).hex())
 }
 
 fn facility_rows(

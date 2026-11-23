@@ -1,12 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::BTreeSet;
-use std::sync::Arc;
+use std::collections::BTreeMap;
 
-use p4kx_extraction::{CancelToken, SourceValueState};
+use p4kx_extraction::{
+    CancelToken, DecimalU64, FieldOrigin, SourceUses, SourceValue, SourceValueState, SourcedValue,
+};
 
 use crate::catalog_read::parsed_entry_json::{ParsedEntryJson, SourceNodeValue};
+use crate::contract_shops::ShopItemGuids;
 use crate::shop_inventory_fields::ShopInventoryFields;
 use crate::shop_inventory_source_read as source;
 use crate::shop_registry;
@@ -16,7 +18,7 @@ use crate::{CatalogError, ExportAccountingError};
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum ItemList {
     Items {
-        guids: Arc<[String]>,
+        guids: SourcedValue<ShopItemGuids>,
         dropped: usize,
     },
     Missing,
@@ -31,11 +33,30 @@ impl ItemList {
             Self::Items { .. } | Self::Missing => None,
         }
     }
+
+    #[cfg(test)]
+    pub(crate) fn test_items(&self) -> Option<(Vec<&str>, usize)> {
+        match self {
+            Self::Items { guids, dropped } => guids.value().map(|values| {
+                (
+                    values
+                        .0
+                        .iter()
+                        .filter_map(SourcedValue::value)
+                        .map(String::as_str)
+                        .collect(),
+                    *dropped,
+                )
+            }),
+            _ => None,
+        }
+    }
 }
 
 pub(super) fn items(
     fields: &ShopInventoryFields,
     parsed: &ParsedEntryJson<'_>,
+    sources: &SourceUses,
     cancel: Option<&CancelToken>,
 ) -> Result<Option<ItemList>, CatalogError> {
     if fields.inventory.state() == SourceValueState::Invalid
@@ -43,14 +64,14 @@ pub(super) fn items(
     {
         return Ok(None);
     }
-    let lines = fields.collection.value().map_or_else(
-        || fields.inventory.value(),
-        |collection| collection.inventory.value(),
-    );
-    let Some(lines) = lines else {
+    let inventory = fields
+        .collection
+        .value()
+        .map_or(&fields.inventory, |collection| &collection.inventory);
+    let Some(lines) = inventory.value() else {
         return Ok(None);
     };
-    let mut guids = BTreeSet::new();
+    let mut found = BTreeMap::<String, Vec<&FieldOrigin>>::new();
     let mut dropped = 0;
     for line in lines {
         source::check_cancel(cancel)?;
@@ -64,25 +85,40 @@ pub(super) fn items(
         };
         for alternative in alternatives {
             source::check_cancel(cancel)?;
-            let Some(reference) = alternative.value() else {
+            let Some(guid) = item_guid(alternative.value(), parsed)? else {
                 dropped += 1;
                 continue;
             };
-            let node = parsed.node(source::index(*reference)?)?;
-            let SourceNodeValue::String(text) = &node.value else {
-                return Err(ExportAccountingError::ConflictingSourceDatum.into());
-            };
-            if let Some(text) = text.text().filter(|text| shop_registry::is_guid(text)) {
-                guids.insert(text.to_ascii_lowercase());
-            } else {
-                dropped += 1;
-            }
+            source::push(found.entry(guid).or_default(), alternative.origin())?;
         }
     }
-    Ok(Some(ItemList::Items {
-        guids: guids.into_iter().collect(),
-        dropped,
-    }))
+    let mut guids = Vec::new();
+    guids
+        .try_reserve_exact(found.len())
+        .map_err(CatalogError::JsonSourceAllocation)?;
+    for (guid, origins) in found {
+        source::check_cancel(cancel)?;
+        guids.push(sources.value_with_origins(SourceValue::Present(guid), &origins)?);
+    }
+    let guids = inventory.map_ref(|_| ShopItemGuids(guids.into()));
+    Ok(Some(ItemList::Items { guids, dropped }))
+}
+
+fn item_guid(
+    reference: Option<&DecimalU64>,
+    parsed: &ParsedEntryJson<'_>,
+) -> Result<Option<String>, CatalogError> {
+    let Some(reference) = reference else {
+        return Ok(None);
+    };
+    let node = parsed.node(source::index(*reference)?)?;
+    let SourceNodeValue::String(text) = &node.value else {
+        return Err(ExportAccountingError::ConflictingSourceDatum.into());
+    };
+    Ok(text
+        .text()
+        .filter(|text| shop_registry::is_guid(text))
+        .map(str::to_ascii_lowercase))
 }
 
 pub(super) fn why_unparsed(bytes: &[u8]) -> &'static str {

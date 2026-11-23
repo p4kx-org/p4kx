@@ -5,11 +5,12 @@ use p4kx_extraction::{Guid, RecordText, RecordTree, SourceValue, SourcedValue};
 use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 
+use crate::CatalogError;
 use crate::catalog_origins::CatalogOrigins;
 use crate::guid_text::{CatalogGuid, GuidText};
 use crate::record_header_field::RecordHeaderField;
 use crate::schema_fields::every_field_required;
-use crate::{CatalogError, source_header};
+use crate::source_header::RecordNaming;
 
 /// Independently sourced original metadata and stable convenience values of one physical Record.
 #[derive(Debug, Clone, Serialize, JsonSchema)]
@@ -33,14 +34,12 @@ impl<'source> CanonicalRecordHeader<'source> {
     ) -> Result<Self, CatalogError> {
         let context = origins.record(tree.record_index());
         let metadata = tree.metadata();
+        let RecordNaming { guid, class_name } = RecordNaming::read(tree, origins)?;
         Ok(Self {
-            guid: context.header_value(
-                RecordHeaderField::Guid,
-                SourceValue::Present(CatalogGuid(tree.guid())),
-            )?,
+            guid,
             record_name: context
                 .header_value(RecordHeaderField::RecordName, text_value(metadata.name()))?,
-            class_name: source_header::class_name(tree, origins)?,
+            class_name,
             record_path: context.header_conversion(
                 RecordHeaderField::FileName,
                 SourceValue::Present(tree.record_path()),

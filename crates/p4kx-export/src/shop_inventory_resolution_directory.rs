@@ -5,7 +5,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use super::{
     Archive, CancelToken, CatalogError, Entry, EntryCapture, ExportLedger, Inventories,
-    InventoryFileEvidence, InventoryFiles, ReadInventory, inventory_stem, source,
+    InventoryFileEvidence, InventoryFiles, ReadInventory, directory_origin, inventory_stem, source,
 };
 
 impl Inventories {
@@ -16,6 +16,41 @@ impl Inventories {
         ledger: &mut ExportLedger,
         cancel: Option<&CancelToken>,
     ) -> Result<(Self, usize), CatalogError> {
+        Self::prepare_selective(
+            archive,
+            capture,
+            ledger,
+            cancel,
+            |stem, entries| match entries {
+                [entry] if needed_bodies.contains(stem) => Some(*entry),
+                _ => None,
+            },
+        )
+    }
+
+    pub(crate) fn prepare_shop(
+        archive: &Archive,
+        stem: Option<&str>,
+        capture: &EntryCapture<'_>,
+        ledger: &mut ExportLedger,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(Self, usize), CatalogError> {
+        Self::prepare_selective(archive, capture, ledger, cancel, |group, entries| {
+            if stem == Some(group) {
+                entries.last().copied()
+            } else {
+                None
+            }
+        })
+    }
+
+    fn prepare_selective<'archive>(
+        archive: &'archive Archive,
+        capture: &EntryCapture<'_>,
+        ledger: &mut ExportLedger,
+        cancel: Option<&CancelToken>,
+        select: impl Fn(&str, &[&'archive Entry]) -> Option<&'archive Entry>,
+    ) -> Result<(Self, usize), CatalogError> {
         let occurrences = survey(archive, cancel)?;
         let mut by_stem = HashMap::new();
         by_stem
@@ -23,26 +58,30 @@ impl Inventories {
             .map_err(CatalogError::JsonSourceAllocation)?;
         let mut payloads = 0;
         for (stem, entries) in occurrences {
-            source::check_cancel(cancel)?;
-            let files = match entries.as_slice() {
-                [entry] if needed_bodies.contains(stem.as_str()) => {
+            let selected = select(stem.as_str(), &entries).map(Entry::index);
+            let mut files = InventoryFiles::default();
+            for entry in entries {
+                source::check_cancel(cancel)?;
+                let evidence = if selected == Some(entry.index()) {
                     let read = ReadInventory::read(archive, entry, capture, cancel)?;
                     let (_, items, evidence) = read.retain(ledger);
-                    let mut files = InventoryFiles::default();
-                    source::push(&mut files.physical, evidence)?;
                     files.selected = Some(items);
                     payloads += 1;
-                    files
-                }
-                entries => directory_files(entries, archive, capture, cancel)?,
-            };
+                    evidence
+                } else {
+                    InventoryFileEvidence::directory(archive, entry, capture)?
+                };
+                source::push(&mut files.physical, evidence)?;
+            }
             by_stem.insert(stem, files);
         }
+        let complete_directory = crate::export_archive_health::inventory(archive).is_none();
         Ok((
             Self {
                 count: by_stem.len(),
                 by_stem,
-                complete_directory: crate::export_archive_health::inventory(archive).is_none(),
+                complete_directory,
+                directory_origin: directory_origin(archive, capture, complete_directory)?,
             },
             payloads,
         ))
@@ -64,21 +103,4 @@ fn survey<'archive>(
         }
     }
     Ok(occurrences)
-}
-
-fn directory_files(
-    entries: &[&Entry],
-    archive: &Archive,
-    capture: &EntryCapture<'_>,
-    cancel: Option<&CancelToken>,
-) -> Result<InventoryFiles, CatalogError> {
-    let mut files = InventoryFiles::default();
-    for entry in entries {
-        source::check_cancel(cancel)?;
-        source::push(
-            &mut files.physical,
-            InventoryFileEvidence::directory(archive, entry, capture)?,
-        )?;
-    }
-    Ok(files)
 }

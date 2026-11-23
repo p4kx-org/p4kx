@@ -57,6 +57,14 @@ pub(crate) enum RegistryAttributeOrigin {
 }
 
 impl RegistryAttributeOrigin {
+    pub(crate) const fn matches_node(&self, index: u32) -> bool {
+        match self {
+            Self::Original { attribute, .. } => attribute.node_index() == index,
+            #[cfg(test)]
+            Self::Fixture => false,
+        }
+    }
+
     pub(crate) fn read<'node>(
         xml: &EntryXml<'_, '_, '_>,
         node: impl Node<'node>,

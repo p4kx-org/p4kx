@@ -36,7 +36,8 @@ pub(super) fn assert_export(catalog: &Value, rows: &[Value], indices: [usize; 2]
         .find(|shop| shop.pointer("/key/value").and_then(Value::as_str) == Some(key.as_str()))
         .ok_or("the original ambiguous shop")?;
     assert!(
-        legacy["inventory"].is_null() && legacy["itemGuids"].is_null(),
+        legacy.pointer("/inventory/value") == Some(&Value::Null)
+            && legacy.pointer("/itemGuids/value") == Some(&Value::Null),
         "conflicting authored stems still produce no legacy selection"
     );
 

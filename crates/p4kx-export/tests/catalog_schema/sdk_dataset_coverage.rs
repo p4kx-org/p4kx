@@ -51,6 +51,7 @@ const REPUTATION_STANDINGS: &str = "/definitions/reputationStandings";
 const REPUTATION_REWARD_AMOUNTS: &str = "/definitions/reputationRewardAmounts";
 const COMMODITY_DEFINITIONS: &str = "/definitions/commodities";
 const COMMODITY_PRESENTATIONS: &str = "/projections/commodityPresentation";
+const SHOPS: &str = "/shops";
 const SHOP_INVENTORIES: &str = "/definitions/shopInventories";
 const SHOP_RESOLUTION: &str = "/declarations/shopInventoryResolution";
 const FLARE_LIBRARIES: &str = "/definitions/flareLibraries";

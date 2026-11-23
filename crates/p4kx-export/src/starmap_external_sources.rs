@@ -9,8 +9,14 @@ use super::{Body, Child, Level};
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture};
 use crate::entry_source::{self, EntrySource};
 use crate::export_ledger::{ExportLedger, SourceDisposition};
+use crate::starmap_containers::name_coverage;
 use crate::starmap_index::Index;
 use crate::{CatalogError, Kind};
+
+pub(super) struct ExternalSources {
+    pub(super) next: HashSet<usize>,
+    pub(super) name_inputs_complete: bool,
+}
 
 pub(super) fn next_sources<'a>(
     bodies: impl Iterator<Item = &'a Body>,
@@ -18,8 +24,9 @@ pub(super) fn next_sources<'a>(
     archive: &Archive,
     capture: &EntryCapture<'_>,
     ledger: &mut ExportLedger,
-) -> Result<HashSet<usize>, CatalogError> {
+) -> Result<ExternalSources, CatalogError> {
     let mut next = HashSet::new();
+    let mut observations = ExportLedger::default();
     let mut paths = Vec::new();
     for body in bodies {
         if let Body::Parsed { root, .. } = body {
@@ -43,12 +50,12 @@ pub(super) fn next_sources<'a>(
                             };
                         EntrySource::authored_missing(AuthoredEntryPath::clone(path))
                             .dependency()
-                            .record(ledger, Kind::StarmapObjects, disposition);
+                            .record(&mut observations, Kind::StarmapObjects, disposition);
                     }
                     candidates => entry_source::record_ambiguous_outer_entries(
                         archive,
                         capture,
-                        ledger,
+                        &mut observations,
                         Kind::StarmapObjects,
                         Some(path),
                         candidates,
@@ -57,7 +64,12 @@ pub(super) fn next_sources<'a>(
             }
         }
     }
-    Ok(next)
+    let name_inputs_complete = name_coverage::descriptor_inputs_complete(&observations);
+    ledger.merge(observations);
+    Ok(ExternalSources {
+        next,
+        name_inputs_complete,
+    })
 }
 
 fn externals<'level>(level: &'level Level, out: &mut Vec<&'level Child>) {
