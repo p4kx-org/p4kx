@@ -240,6 +240,13 @@ stencil palette function has its own mode.
 [Painted surface investigation](https://github.com/p4kx-org/p4kx/issues/1162)
 · [Independent tint flags](https://github.com/p4kx-org/p4kx/issues/1163)
 
+On LIVE `13220821`, the two measured Corbel owners each selected a different
+named palette through their original worn-material selector. One DataForge
+decode verified the Archive directory checksum, the two owner selections and
+both target Records. The check measured 1,091,555,328 bytes of peak private
+commit. The rigged package still needs a draw-level comparison that binds
+each original geometry slot and UV sample to its emitted palette inputs.
+
 ## LayerBlend palette tint modes
 
 The LayerBlend fixture exports both a GLB and Blender package from one synthetic Archive.
