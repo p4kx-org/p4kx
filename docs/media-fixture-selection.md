@@ -348,7 +348,12 @@ selected helper fields, and attached the satchel to `head` using its authored it
 locator. The fallback locator rested at `(0.00, -0.20, 1.60)` m and the nested
 locator at `(0.00, -0.60, 2.30)` m in Blender. Both followed a pose on their
 respective bones. The root and explicit torso replacement packages also passed.
-The selector interpretation for an installed game Record still requires its own evidence.
+On LIVE build `13220821`, the original Record for an equipped item has the same
+source anchor, item locator and rotation on the root and nested helpers. Its
+original single-precision Y and Z positions differ, and the projected
+placement preserves that difference. Trimming the spaces around the selector
+in a diagnostic query isolated the nominated nested helper. The game's
+selector matching and fallback behavior remain unverified for this Record.
 
 The [static relay fixture](static-relay-blender-verification.md) checks full helper rotation
 in an ordinary entity package imported by native Blender.
