@@ -24,6 +24,8 @@ use crate::record_fields::{class_name, component, integer, number, structure, te
 use crate::selection::{Exosuit, exosuit_control_supported, starts_with_folder};
 use crate::{CatalogFailure, CatalogReadFailure};
 
+pub(crate) use aggregate::VehicleMeasurements;
+
 const SIZE_FIELD: &str = "Components/SAttachableComponentParams/AttachDef/Size";
 const PHYSICS_MASS_FIELD: &str = "Components/SEntityPhysicsControllerParams/PhysType/Mass";
 const LOADOUT_FIELD: &str = "Components/SEntityComponentDefaultLoadoutParams/loadout";
@@ -114,6 +116,7 @@ impl<'f> ShipReader<'f> {
             .map_err(|error| CatalogReadFailure::of(record, &error))?;
         let vehicle = node.vehicle();
         let totals = vehicle.map(&mut totals_of);
+        let measurements = VehicleMeasurements::read(tree, vehicle, totals.as_ref(), physics_mass);
         let mut issues: Vec<String> = node.issues().iter().map(ToString::to_string).collect();
         issues.extend(
             vehicle
@@ -127,19 +130,17 @@ impl<'f> ShipReader<'f> {
             node.loadout()
         };
         let digest = vehicle
-            .filter(|v| v.issues().is_empty())
-            .map(structure_digest);
+            .and_then(|vehicle| vehicle.complete_structure_digest().ok())
+            .map(Digest::from_bytes);
         let base = ShipBase {
             guid: record.guid(),
             class_name: class_name(tree).to_owned(),
             record_path: tree.record_path().to_owned(),
             implementation: vehicle.map(implementation),
-            vehicle_kind: VehicleKindPath::of(tree.record_path()).classify(tree, vehicle),
+            vehicle_kind: measurements.kind,
             size: size(tree),
-            mass: aggregate::mass(tree, vehicle, totals.as_ref(), physics_mass),
-            hull: vehicle
-                .zip(totals.as_ref())
-                .and_then(|(vehicle, totals)| aggregate::hull(vehicle, totals)),
+            mass: measurements.mass,
+            hull: measurements.hull,
             cargo: self.read_cargo(record, &node, &entries, cargo_observation),
             loadout_source: node.loadout_file().map_or_else(
                 || record_source(tree.record_path(), LOADOUT_FIELD),
@@ -181,10 +182,6 @@ impl<'f> ShipReader<'f> {
             self.cargo.read(entries, &mut self.trees)
         }
     }
-}
-
-const fn structure_digest(vehicle: &VehicleImplementation) -> Digest {
-    Digest::from_bytes(vehicle.structure_digest())
 }
 
 const SPACESHIP_FOLDER: usize = 0;

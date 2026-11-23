@@ -169,7 +169,9 @@ impl<'source> Reader<'_, 'source> {
             .playability
             .decide(tree, inputs.vehicle, evidence, self.input)?;
         let exosuit_kind = inputs.playability.exosuit_kind();
-        let kind = exosuit_kind.as_ref().unwrap_or(&aggregates.vehicle_kind);
+        let kind = exosuit_kind
+            .as_ref()
+            .unwrap_or(&aggregates.vehicle.vehicle_kind);
         let evidence =
             ShipBaseEvidence::collect(&base, &inputs.header, kind, playability, &aggregates)?;
         Ok(Ok((base, evidence)))

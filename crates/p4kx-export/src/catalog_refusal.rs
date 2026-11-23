@@ -53,7 +53,7 @@ impl PendingRefusal {
     pub(super) fn freeze(self, run: CatalogRun<'_, '_>) -> Result<CatalogRefusal, CatalogError> {
         Ok(CatalogRefusal {
             health: self.health,
-            provenance: parts::freeze_provenance(&self.uses, run)?,
+            provenance: parts::freeze_provenance(&self.uses, &[], &[], run)?,
         })
     }
 }

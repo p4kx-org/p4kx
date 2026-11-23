@@ -21,7 +21,7 @@ mod base_facts;
 #[path = "sdk_ship_store_slug_route.rs"]
 mod store_slugs;
 
-pub(super) fn read() -> TestResult<[Route; 7]> {
+pub(super) fn read() -> TestResult<[Route; 8]> {
     const REMAINING: &str = "typed Item query and synthetic producer parity witnessed; complete installed producer parity open";
     const TUNING_REMAINING: &str = "typed tuning Record query and synthetic producer parity witnessed; complete installed producer parity open";
     let directory = tempfile::tempdir()?;
@@ -34,8 +34,10 @@ pub(super) fn read() -> TestResult<[Route; 7]> {
         CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
     let parsed = session.parsed(None)?;
     let selected = CatalogRecordSelection::All;
+    let [base, ships] = base_facts::read()?;
     Ok([
-        base_facts::read()?,
+        base,
+        ships,
         store_slugs::read()?,
         parsed.with_shield_generators(selected, None, |snapshot| {
             Route::queried_rows(SHIELD_GENERATORS, snapshot.rows(), REMAINING)

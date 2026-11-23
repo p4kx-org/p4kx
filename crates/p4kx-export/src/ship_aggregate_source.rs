@@ -27,6 +27,7 @@ struct PhysicsOperand {
 pub(super) fn read<'source>(
     fields: Observed<'_, '_, '_, 'source>,
     vehicle: &SelectedSource<'_, 'source>,
+    modification: SourcedValue<bool>,
     notes: &mut Vec<FieldError>,
 ) -> Result<(ShipAggregateOperands, Vec<FieldError>), CatalogError> {
     let physics = SelectedSource::read(
@@ -55,14 +56,22 @@ pub(super) fn read<'source>(
             vehicle: super::fields::selected(fields, vehicle, |source| {
                 text_choice(source, "vehicleDefinition", notes)
             })?,
-            modification: super::fields::selected(fields, vehicle, |source| {
-                text_choice(source, "modification", notes)
-            })?,
+            modification,
             physics: physics.bind(uses, operand.value)?,
             physics_selector: uses.origin_with_origins([&operand.selector, &prefix], true)?,
         },
         physics_notes,
     ))
+}
+
+pub(super) fn modification<'source>(
+    fields: Observed<'_, '_, '_, 'source>,
+    vehicle: &SelectedSource<'_, 'source>,
+    notes: &mut Vec<FieldError>,
+) -> Result<SourcedValue<bool>, CatalogError> {
+    super::fields::selected(fields, vehicle, |source| {
+        text_choice(source, "modification", notes)
+    })
 }
 
 fn text_choice(

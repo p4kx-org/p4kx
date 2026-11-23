@@ -6,10 +6,39 @@ use p4kx_extraction::RecordTree;
 
 use super::{
     Hull, Mass, MassBasis, PARTS_DAMAGE, PARTS_MASS, PHYSICS_MASS_FIELD, Source, SourceKind,
-    SourceShare, partial, rounded, shares, thresholds, unreadable,
+    SourceShare, VehicleKind, VehicleKindPath, partial, rounded, shares, thresholds, unreadable,
 };
 
-pub(super) fn mass(
+/// Measurements defined by the effective Vehicle and the original Physics fallback.
+pub(crate) struct VehicleMeasurements {
+    #[cfg(test)]
+    pub(crate) path_kind: VehicleKindPath,
+    pub(crate) kind: Option<VehicleKind>,
+    pub(crate) mass: Option<Mass>,
+    pub(crate) hull: Option<Hull>,
+}
+
+impl VehicleMeasurements {
+    pub(crate) fn read(
+        tree: &RecordTree<'_>,
+        vehicle: Option<&VehicleImplementation>,
+        totals: Option<&VehicleTotals>,
+        physics_mass: impl FnOnce() -> Option<f32>,
+    ) -> Self {
+        let path_kind = VehicleKindPath::of(tree.record_path());
+        Self {
+            #[cfg(test)]
+            path_kind,
+            kind: path_kind.classify(tree, vehicle),
+            mass: mass(tree, vehicle, totals, physics_mass),
+            hull: vehicle
+                .zip(totals)
+                .and_then(|(vehicle, totals)| hull(vehicle, totals)),
+        }
+    }
+}
+
+fn mass(
     tree: &RecordTree<'_>,
     vehicle: Option<&VehicleImplementation>,
     totals: Option<&VehicleTotals>,
@@ -54,7 +83,7 @@ pub(super) fn mass(
     })
 }
 
-pub(super) fn hull(vehicle: &VehicleImplementation, totals: &VehicleTotals) -> Option<Hull> {
+fn hull(vehicle: &VehicleImplementation, totals: &VehicleTotals) -> Option<Hull> {
     if totals.health_parts() == 0 {
         return None;
     }

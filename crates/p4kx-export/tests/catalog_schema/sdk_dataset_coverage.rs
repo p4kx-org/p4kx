@@ -17,7 +17,9 @@ use dataset_audit::{CoverageGaps, NO_WITNESS, audit};
 
 const LANGUAGE_POLICY: &str = "/texts/languagePolicy";
 const LANGUAGE_SOURCES: &str = "/texts/languageSources";
+const ITEMS: &str = "/items";
 const ITEM_DEFINITIONS: &str = "/definitions/items";
+const SHIPS: &str = "/ships";
 const SHIP_BASE_FACTS: &str = "/projections/shipBaseFacts";
 const SHIP_STORE_SLUGS: &str = "/shipStoreSlugs";
 const LOADOUTS: &str = "/loadouts";
@@ -172,8 +174,10 @@ const REQUIRED_WITNESSES: &[&str] = &[
     "/placements/roomAssociationBindings",
     LANGUAGE_POLICY,
     LANGUAGE_SOURCES,
+    ITEMS,
     ITEM_DEFINITIONS,
     LOADOUTS,
+    SHIPS,
     SHIP_BASE_FACTS,
     SHIP_STORE_SLUGS,
     ITEM_PORTS,

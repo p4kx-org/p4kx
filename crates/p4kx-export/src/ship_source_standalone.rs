@@ -40,7 +40,9 @@ pub(crate) fn read<'read, 'source>(
         "Components",
         "SEntityComponentCrewManifestParams",
     )?;
-    let (operands, _) = aggregate::read(fields, &vehicle, &mut Vec::new())?;
+    let mut notes = Vec::new();
+    let modification = aggregate::modification(fields, &vehicle, &mut notes)?;
+    let (operands, _) = aggregate::read(fields, &vehicle, modification, &mut notes)?;
     let playability = OwnerProof::capture(
         input,
         admission.record(),

@@ -89,7 +89,15 @@ pub(crate) fn minimal_catalog() -> Value {
             },
             "itemClass": source_values::present(json!("Military")),
             "playability": source_values::present(json!("player")),
-            "variantOf": null
+            "variantOf": {
+                "state": "absent",
+                "value": null,
+                "containsEncryptedSource": false,
+                "sourceUsesRefs": [],
+                "sourceSetComplete": true,
+                "sourceUseSetRef": null,
+                "failedSourceUseRefs": []
+            }
         }],
         "ships": ships::rows(),
         "definitions": {"items": {"availability": "available", "rows": []}, "contractGenerators": absent_table(), "missionScenarios": absent_table(), "blueprints": blueprints::definitions(), "blueprintPools": blueprints::pools(), "contractTemplates": absent_table(), "missionBrokerEntries": absent_table(), "lootPoolFilters": loot::filters(), "blueprintCategories": blueprint_categories::definitions(), "gameplayProperties": gameplay_properties::definitions(), "qualityDistributions": quality::distributions(), "qualityQuantizations": quality::quantizations(), "resourceTypes": resources::table(), "resourceGroups": resource_groups::definitions(),

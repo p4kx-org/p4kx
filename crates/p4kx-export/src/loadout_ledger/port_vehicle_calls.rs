@@ -4,7 +4,10 @@
 use std::collections::HashMap;
 use std::ops::ControlFlow;
 
-use p4kx_assembly::{LoadoutFileObservation, LoadoutRequest, LoadoutSelection};
+use p4kx_assembly::{
+    LoadoutDocumentKind, LoadoutFailurePath, LoadoutFileError, LoadoutFileObservation,
+    LoadoutRequest, LoadoutSelection,
+};
 
 use super::path_proofs::PathProofs;
 use super::vehicle_capture;
@@ -16,8 +19,13 @@ use crate::{CatalogError, ExportAccountingError};
 
 #[derive(Default)]
 pub(super) struct PortVehicles {
-    pending: HashMap<LoadoutSelection, Vec<LoadoutFileObservation>>,
+    pending: HashMap<LoadoutSelection, PendingVehicleCall>,
     calls: HashMap<u32, PortVehicleCall>,
+}
+
+struct PendingVehicleCall {
+    request: LoadoutRequest,
+    files: Vec<LoadoutFileObservation>,
 }
 
 pub(super) struct PortVehicleCall {
@@ -31,7 +39,14 @@ impl PortVehicles {
         let Some(selection) = selection(request) else {
             return;
         };
-        let files = self.pending.entry(selection.clone()).or_default();
+        let pending = self
+            .pending
+            .entry(selection.clone())
+            .or_insert_with(|| PendingVehicleCall {
+                request: request.clone(),
+                files: Vec::new(),
+            });
+        let files = &mut pending.files;
         if !files.iter().any(|seen| seen.is_same_operation(file)) {
             files.push(file.clone());
         }
@@ -82,6 +97,67 @@ impl State {
             self.port_vehicles.calls.remove(&record_index);
             return Ok(());
         };
+        let call =
+            self.port_vehicle_call(input, record_index, &observed.request, &observed.files)?;
+        self.port_vehicles.calls.insert(record_index, call);
+        Ok(())
+    }
+
+    pub(super) fn missing_port_vehicle(
+        &self,
+        input: &OriginalCatalogInput<'_, '_>,
+        record_index: u32,
+        missing: &LoadoutFailurePath,
+    ) -> Result<Option<PortVehicleCall>, CatalogError> {
+        let Some(request) = missing.caller() else {
+            return Ok(None);
+        };
+        let Some(observed) = selection(request).and_then(|key| self.port_vehicles.pending.get(key))
+        else {
+            return Ok(None);
+        };
+        let attempts = missing.attempts();
+        if attempts.is_empty()
+            || attempts.len() != observed.files.len()
+            || !attempts
+                .iter()
+                .zip(&observed.files)
+                .all(|(attempt, captured)| {
+                    attempt.is_same_operation(captured)
+                        && attempt.kind() == LoadoutDocumentKind::VehicleImplementation
+                        && attempt.source().is_missing_archive()
+                        && matches!(attempt.read_outcome(), Err(LoadoutFileError::NotFound))
+                })
+        {
+            return Ok(None);
+        }
+        self.port_vehicle_call(input, record_index, &observed.request, attempts)
+            .map(Some)
+    }
+
+    pub(super) fn failed_port_vehicle(
+        &self,
+        input: &OriginalCatalogInput<'_, '_>,
+        record_index: u32,
+    ) -> Result<Option<PortVehicleCall>, CatalogError> {
+        let mut current = self.port_vehicles.pending.values();
+        let Some(only) = current.next() else {
+            return Ok(None);
+        };
+        if current.next().is_some() {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        }
+        self.port_vehicle_call(input, record_index, &only.request, &only.files)
+            .map(Some)
+    }
+
+    fn port_vehicle_call(
+        &self,
+        input: &OriginalCatalogInput<'_, '_>,
+        record_index: u32,
+        request: &LoadoutRequest,
+        observed: &[LoadoutFileObservation],
+    ) -> Result<PortVehicleCall, CatalogError> {
         let caller = caller(input, &self.paths, record_index, request)?;
         let modification_observed = matches!(
             request,
@@ -91,15 +167,11 @@ impl State {
             .iter()
             .map(|file| self.graph.vehicle_selection(file, caller.clone()))
             .collect::<Result<_, _>>()?;
-        self.port_vehicles.calls.insert(
-            record_index,
-            PortVehicleCall {
-                caller,
-                modification_observed,
-                files,
-            },
-        );
-        Ok(())
+        Ok(PortVehicleCall {
+            caller,
+            modification_observed,
+            files,
+        })
     }
 }
 

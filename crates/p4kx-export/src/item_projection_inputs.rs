@@ -42,12 +42,7 @@ impl<'read, 'source> SelectedItem<'read, 'source> {
         definition: &'read ItemDefinition<'source>,
         selection: &'read ItemSourceSelection,
     ) -> Result<Self, CatalogError> {
-        let attachment = selected(definition, selection.attachment_component_ordinal())?
-            .map(|component| match component.body() {
-                ItemDefinitionComponentKind::Attachment(value) => Ok(value),
-                _ => Err(ExportAccountingError::ConflictingSourceDatum),
-            })
-            .transpose()?;
+        let attachment = selected_attachment(definition, selection.attachment_component_ordinal())?;
         let purchasable = selected(definition, selection.purchasable_component_ordinal())?
             .map(|component| match component.body() {
                 ItemDefinitionComponentKind::Purchasable(value) => Ok(value),
@@ -76,18 +71,12 @@ impl<'read, 'source> SelectedItem<'read, 'source> {
         self.attachment_locale(|localization| localization.description_input())
     }
 
-    pub(super) const fn display_name(&self) -> ItemLocaleRead<'read, 'source> {
-        let selected = self.selection.purchasable_component_ordinal();
-        let Some(purchasable) = self.purchasable else {
-            return ItemLocaleRead::unavailable(selected, selected.origin());
-        };
-        let input = purchasable.display_name_input();
-        ItemLocaleRead {
-            input: Some(input),
-            state: input.key().state(),
-            cause: input.key().origin(),
-            parents: [selected.origin(), selected.origin(), selected.origin()],
-        }
+    pub(super) fn display_name(&self) -> Option<&'read AuthoredLocaleInput<'source>> {
+        self.purchasable.map(ItemPurchasable::display_name_input)
+    }
+
+    pub(super) const fn purchasable_ordinal(&self) -> &'read SourcedValue<u32> {
+        self.selection.purchasable_component_ordinal()
     }
 
     pub(super) const fn record_path(&self) -> &SourcedValue<&'source str> {
@@ -133,15 +122,6 @@ impl<'read, 'source> SelectedItem<'read, 'source> {
 }
 
 impl<'read, 'source> ItemLocaleRead<'read, 'source> {
-    pub(super) fn bind<T>(
-        &self,
-        value: SourceValue<T>,
-        uses: &SourceUses,
-    ) -> Result<SourcedValue<T>, CatalogError> {
-        let [component, definition, container] = self.parents;
-        Ok(uses.value_with_origins(value, &[self.cause, component, definition, container])?)
-    }
-
     pub(super) fn add_parents<T>(
         &self,
         value: SourcedValue<T>,
@@ -165,6 +145,18 @@ impl<'read, 'source> ItemLocaleRead<'read, 'source> {
             .and_then(|input| input.key().value().copied())
             .filter(|key| !key.is_empty())
     }
+}
+
+pub(super) fn selected_attachment<'read, 'source>(
+    definition: &'read ItemDefinition<'source>,
+    ordinal: &SourcedValue<u32>,
+) -> Result<Option<&'read SourcedValue<Box<ItemAttachmentPresentation<'source>>>>, CatalogError> {
+    Ok(selected(definition, ordinal)?
+        .map(|component| match component.body() {
+            ItemDefinitionComponentKind::Attachment(value) => Ok(value),
+            _ => Err(ExportAccountingError::ConflictingSourceDatum),
+        })
+        .transpose()?)
 }
 
 fn selected<'read, 'source>(

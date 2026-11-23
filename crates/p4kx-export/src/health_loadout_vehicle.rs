@@ -150,6 +150,38 @@ impl VehicleFileSelection {
         }
         capture.vehicle_xml_site(site, role)
     }
+    pub(crate) fn projected_payload(
+        &self,
+        capture: &EntryCapture<'_>,
+        role: SourceUseRole,
+    ) -> Result<Option<OriginalDatum<()>>, CatalogError> {
+        let Some(original) = self.original.source().entry_origin() else {
+            return Ok(None);
+        };
+        if self.original.read_outcome().is_err()
+            || !matches!(self.original.projection_outcome(), Some(Ok(())))
+        {
+            return Ok(None);
+        }
+        capture.check_origin(original)?;
+        let payload = capture
+            .source_uses()
+            .observe(SourceInput::Archive(original), InputScope::Payload)?
+            .at(
+                SourceLocation::Subresource {
+                    namespace: "loadoutFileRead".to_owned(),
+                    indices: Vec::new(),
+                    field: "content".to_owned(),
+                },
+                role,
+            )?;
+        Ok(Some(OriginalDatum::observed(
+            SourceValue::Present(()),
+            vec![payload],
+            true,
+        )))
+    }
+
     pub(crate) fn attempt(
         &self,
         capture: &EntryCapture<'_>,

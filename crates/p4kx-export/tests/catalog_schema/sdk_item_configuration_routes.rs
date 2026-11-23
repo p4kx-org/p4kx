@@ -4,20 +4,22 @@
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ParsedCatalogQueries,
 };
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog_from};
 use p4kx_extraction::{
     Archive, DataForgeEntry, FieldOrigin, InputScope, SourceInventory, SourceLocation,
+    SourceValueState,
 };
 use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry};
 use serde_json::Value;
 
 use super::super::{
-    ATTACHMENT_CONSTRAINTS, ITEM_BOUNDS, ITEM_DEFINITIONS, ITEM_PORTS, MANUFACTURERS,
+    ATTACHMENT_CONSTRAINTS, ITEM_BOUNDS, ITEM_DEFINITIONS, ITEM_PORTS, ITEMS, MANUFACTURERS,
+    PROVENANCE,
 };
 use super::component_parity::parity;
-use super::{Route, TestResult};
+use super::{Route, TestResult, fixtures};
 
 #[path = "../it/catalog_item_alignment_fixture.rs"]
 #[expect(
@@ -34,7 +36,7 @@ const REMAINING: &str =
     "encrypted synthetic producer parity available; installed producer parity open";
 
 pub(super) fn append_item_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResult<()> {
-    routes.extend(read_entity_definitions(archive)?);
+    routes.extend(read_item_rows_and_definitions(archive)?);
     routes.extend(read()?);
     routes.extend(super::item_durability::read()?);
     routes.extend(super::item_recovery::read()?);
@@ -42,13 +44,16 @@ pub(super) fn append_item_routes(routes: &mut Vec<Route>, archive: &Archive) -> 
     Ok(())
 }
 
-fn read_entity_definitions(archive: &Archive) -> TestResult<[Route; 2]> {
+fn read_item_rows_and_definitions(archive: &Archive) -> TestResult<[Route; 4]> {
     const REMAINING: &str =
         "typed definitions and synthetic producer parity available; installed producer parity open";
     let session = CatalogQuerySession::open(archive, CatalogLanguageSelection::AllAvailable, None)?;
     let parsed = session.parsed(None)?;
     let selection = CatalogRecordSelection::All;
+    let [item, provenance] = item_root(&parsed)?;
     Ok([
+        item,
+        provenance,
         parsed.with_item_definitions(selection, None, |snapshot| {
             Route::queried_rows(ITEM_DEFINITIONS, snapshot.rows(), REMAINING)
         })??,
@@ -56,6 +61,53 @@ fn read_entity_definitions(archive: &Archive) -> TestResult<[Route; 2]> {
             Route::queried_rows(MANUFACTURERS, &snapshot.rows, REMAINING)
         })??,
     ])
+}
+
+fn item_root(parsed: &ParsedCatalogQueries<'_>) -> TestResult<[Route; 2]> {
+    let selection = CatalogRecordSelection::RecordIndex(fixtures::TOOL_RECORD_INDEX);
+    parsed.with_items(selection, None, |snapshot| {
+        let [item] = snapshot.rows() else {
+            return Err("the Item witness returns one physical row".into());
+        };
+        let header = item.source().source();
+        assert_eq!(
+            header.record_index().value(),
+            Some(&fixtures::TOOL_RECORD_INDEX),
+            "the Item SDK uses the requested original Record index"
+        );
+        assert_eq!(
+            header.class_name().value(),
+            Some(&"FixtureTool"),
+            "the fixture index identifies the expected Item"
+        );
+        assert_eq!(
+            item.variant_of().state(),
+            SourceValueState::Absent,
+            "the attach-only fixture has no structurally comparable variant group"
+        );
+        assert!(
+            item.variant_of().origin().source_set_complete()
+                && snapshot.coverage().incomplete_fields.is_empty(),
+            "the Item and its absent variant have complete source evidence"
+        );
+        let provenance = snapshot.provenance();
+        assert!(
+            std::ptr::eq(provenance.inventory(), snapshot.source_inventory()),
+            "the canonical provenance borrows the original query inventory"
+        );
+        Ok([
+            Route::queried_rows(
+                ITEMS,
+                snapshot.rows(),
+                "typed physical Item query exercised; installed producer parity, cold memory and streaming acceptance open",
+            )?,
+            Route::queried_value(
+                PROVENANCE,
+                &provenance,
+                "canonical Item SDK provenance shares the query inventory and variant use sets",
+            )?,
+        ])
+    })?
 }
 
 pub(super) fn read() -> TestResult<[Route; 3]> {

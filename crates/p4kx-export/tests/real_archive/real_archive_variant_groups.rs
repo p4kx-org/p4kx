@@ -8,10 +8,12 @@
 use std::error::Error;
 use std::time::{Instant, SystemTime};
 
-use p4kx_export::{CatalogOptions, Guid, build_catalog, read_variant_groups};
+use p4kx_export::{CatalogOptions, Guid, Kind, build_catalog, read_variant_groups};
 use p4kx_extraction::{Archive, DataForgeEntry};
 use p4kx_testkit::real_archive_path;
 use serde_json::Value;
+
+use crate::catalog_v3_consumer;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -42,12 +44,11 @@ fn the_groups_read_without_a_catalog_are_the_variant_of_of_the_catalog() -> Test
     let took = started.elapsed();
 
     let mut wrong = Vec::new();
-    for kind in ["ships", "items"] {
-        for entity in catalog[kind].as_array().ok_or("no entities")? {
-            let expected = match &entity["variantOf"] {
-                Value::Null => None,
-                value => Some(guid(value)?),
-            };
+    for kind in [Kind::Ships, Kind::Items] {
+        for entity in catalog_v3_consumer::rows(&catalog, kind)? {
+            let expected = crate::catalog_variant_value::variant_target(entity, kind)?
+                .map(|target| target.guid.parse())
+                .transpose()?;
             if groups.base_of(guid(&entity["guid"]["value"])?) != expected {
                 wrong.push(
                     entity["className"]["value"]

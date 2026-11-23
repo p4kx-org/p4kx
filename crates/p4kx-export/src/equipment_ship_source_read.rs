@@ -9,7 +9,7 @@ use p4kx_extraction::{
 };
 
 use super::ShipSourceDependencyCoverage;
-use super::{ShipSourceSnapshot, complete};
+use super::{ShipSnapshot, ShipSourceSnapshot, complete};
 use crate::build::catalog_queries::unlocalized_record_query::plan::{Owner, Plan};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
@@ -24,6 +24,7 @@ use crate::record_observation::RecordObservation;
 use crate::ship::{ShipSource, source_projection};
 use crate::ship_pool::ShipPool;
 use crate::texts::{TextSources, Texts};
+use crate::variant_use_sets::VariantSourceUseSets;
 use crate::{CatalogError, ExportAccountingError, Kind};
 
 pub(super) struct Query<'query> {
@@ -33,6 +34,12 @@ pub(super) struct Query<'query> {
     pub(super) selection: CatalogRecordSelection,
     pub(super) languages: &'query [Language],
     pub(super) cancel: Option<&'query CancelToken>,
+}
+
+#[derive(Clone, Copy)]
+enum Scope {
+    Sources,
+    Canonical,
 }
 
 struct SelectedShips<'source> {
@@ -53,8 +60,28 @@ impl<'query> Query<'query> {
 
     pub(super) fn run_plan<T>(
         &self,
-        mut plan: Plan<'query>,
+        plan: Plan<'query>,
         inspect: impl FnOnce(ShipSourceSnapshot<'_>) -> T,
+    ) -> Result<T, CatalogError> {
+        self.project_plan(plan, Scope::Sources, |snapshot, _| inspect(snapshot))
+    }
+
+    pub(super) fn run_ships<T>(
+        &self,
+        inspect: impl FnOnce(ShipSnapshot<'_>) -> T,
+    ) -> Result<T, CatalogError> {
+        checkpoint(self.cancel)?;
+        let plan = self.plan()?;
+        self.project_plan(plan, Scope::Canonical, |snapshot, variant_sets| {
+            inspect(ShipSnapshot::new(snapshot, variant_sets))
+        })
+    }
+
+    fn project_plan<T>(
+        &self,
+        mut plan: Plan<'query>,
+        scope: Scope,
+        inspect: impl FnOnce(ShipSourceSnapshot<'_>, VariantSourceUseSets) -> T,
     ) -> Result<T, CatalogError> {
         plan.owners.sort_by_key(|owner| {
             (
@@ -63,7 +90,9 @@ impl<'query> Query<'query> {
             )
         });
         if plan.owners.is_empty() {
-            return self.empty(plan.coverage, inspect);
+            return self.empty(plan.coverage, |snapshot| {
+                inspect(snapshot, VariantSourceUseSets::default())
+            });
         }
         let languages = self.languages;
         let sources = TextSources::read_languages(self.archive, languages)?;
@@ -74,31 +103,44 @@ impl<'query> Query<'query> {
         let registry = CatalogTextRegistry::default();
         let projection = CatalogProjection::new(&texts, &input, &registry).for_kind(Kind::Ships);
         let files = ArchiveFiles::new(self.archive);
-        let selected = project(plan, &input, &projection, &files, self.cancel)?;
+        let mut selected = project(plan, &input, &projection, &files, self.cancel)?;
+        let variant_sets = match scope {
+            Scope::Sources => VariantSourceUseSets::default(),
+            Scope::Canonical => super::variants::project(
+                self.archive,
+                &input,
+                &mut selected.rows,
+                &mut selected.coverage,
+                self.cancel,
+            )?,
+        };
         let rows = projection.finish_rows()?;
         let source_inventory = origins.uses.finish_with(|| checkpoint(self.cancel))?;
         checkpoint(self.cancel)?;
-        Ok(inspect(ShipSourceSnapshot {
-            build: self.archive.build().cloned(),
-            availability: if selected.rows.is_empty() {
-                self.declared_availability()
-            } else {
-                DatasetAvailability::Available
+        Ok(inspect(
+            ShipSourceSnapshot {
+                build: self.archive.build().cloned(),
+                availability: if selected.rows.is_empty() {
+                    self.declared_availability()
+                } else {
+                    DatasetAvailability::Available
+                },
+                rows: selected.rows,
+                public_names: rows.public_names,
+                game_texts: rows.game_texts,
+                requested_languages: self.languages.to_vec(),
+                available_languages: languages
+                    .iter()
+                    .copied()
+                    .filter(|language| sources.entry(*language).is_some())
+                    .collect(),
+                localization_notes: texts.notes().to_vec(),
+                source_inventory,
+                coverage: selected.coverage,
+                dependency_coverage: selected.dependencies,
             },
-            rows: selected.rows,
-            public_names: rows.public_names,
-            game_texts: rows.game_texts,
-            requested_languages: self.languages.to_vec(),
-            available_languages: languages
-                .iter()
-                .copied()
-                .filter(|language| sources.entry(*language).is_some())
-                .collect(),
-            localization_notes: texts.notes().to_vec(),
-            source_inventory,
-            coverage: selected.coverage,
-            dependency_coverage: selected.dependencies,
-        }))
+            variant_sets,
+        ))
     }
 
     fn empty<T>(
@@ -229,7 +271,7 @@ impl<'source> ShipQueryProjector<'_, 'source> {
             self.playability,
             self.input,
         )?;
-        let row = ShipSource::from_read(projected.source, aggregates, playability);
+        let row = ShipSource::from_read(projected.source, aggregates, playability)?;
         if !complete::complete(&row) {
             coverage.incomplete_fields.push(owner.record.index());
             dependencies.source_incomplete(owner.record.index());

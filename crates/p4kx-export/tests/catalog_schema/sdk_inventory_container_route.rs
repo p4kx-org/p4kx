@@ -20,7 +20,7 @@ use p4kx_testkit::{
 };
 use serde_json::{Value, json};
 
-use super::super::{INVENTORY_CONTAINERS, PROVENANCE};
+use super::super::INVENTORY_CONTAINERS;
 use super::{Route, TestResult};
 
 #[path = "sdk_inventory_configuration_route.rs"]
@@ -43,7 +43,7 @@ enum DataForgeStorage {
     Encrypted,
 }
 
-pub(super) fn read() -> TestResult<[Route; 2]> {
+pub(super) fn read() -> TestResult<Route> {
     let (_folder, archive) = open(&fixture::database(), DataForgeStorage::Encrypted)?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog: Value = serde_json::from_slice(
@@ -56,18 +56,11 @@ pub(super) fn read() -> TestResult<[Route; 2]> {
         None,
         |snapshot| {
             check_catalog(&snapshot, &catalog)?;
-            Ok([
-                Route::queried_rows(
-                    INVENTORY_CONTAINERS,
-                    snapshot.rows(),
-                    "synthetic source and producer parity witnessed; installed producer parity open",
-                )?,
-                Route::queried_value(
-                    PROVENANCE,
-                    snapshot.source_inventory(),
-                    "reachable source and use parity verified on an encrypted fixture; broader installed parity open",
-                )?,
-            ])
+            Route::queried_rows(
+                INVENTORY_CONTAINERS,
+                snapshot.rows(),
+                "synthetic source and producer parity witnessed; installed producer parity open",
+            )
         },
     )?
 }

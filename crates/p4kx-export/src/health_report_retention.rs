@@ -6,6 +6,7 @@ use p4kx_extraction::SourceUses;
 use super::OriginalDatum;
 use super::health_diagnostic_cells::{ExportDiagnostic, ExportDiagnosticExample};
 use super::health_diagnostic_subject::DiagnosticSubject;
+use super::health_example_body::DiagnosticFieldEvidence;
 use super::health_example_retention::RetainedExampleBody;
 use super::health_failed_record::FailedExportRecord;
 use super::health_header_receipt::CapturedSubject;
@@ -54,6 +55,7 @@ impl RetainedRecord {
 struct RetainedExample {
     captured: Option<CapturedSubject>,
     body: RetainedExampleBody,
+    field_evidence: Option<DiagnosticFieldEvidence>,
 }
 impl RetainedExample {
     fn read(
@@ -64,8 +66,13 @@ impl RetainedExample {
         let captured = observation
             .subject()
             .retain_diagnostic(&input.origins().uses)?;
+        let field_evidence = receipt.field_evidence().cloned();
         let body = RetainedExampleBody::read(receipt, input)?;
-        Ok(Self { captured, body })
+        Ok(Self {
+            captured,
+            body,
+            field_evidence,
+        })
     }
     fn texts(&self) -> impl Iterator<Item = &OriginalDatum<CapturedText>> {
         self.captured
@@ -78,14 +85,24 @@ impl RetainedExample {
         self,
         texts: &SealedTexts,
         sources: &SourceUses,
-    ) -> Result<ExportDiagnosticExample, ExportAccountingError> {
+    ) -> Result<ExportDiagnosticExample, CatalogError> {
         let subject = match self.captured {
             Some(captured) => DiagnosticSubject::finish(captured, texts, sources)?,
             None => DiagnosticSubject::absent(sources),
         };
+        let mut body = self.body.finish(texts, sources)?;
+        let failed_source_uses = match self.field_evidence {
+            Some(evidence) => {
+                body.field = body.field.with_observed_origin(sources, &evidence.origin)?;
+                sources.verify_attempted_uses(&evidence.failed_source_uses)?;
+                evidence.failed_source_uses
+            }
+            None => Box::default(),
+        };
         Ok(ExportDiagnosticExample::new(
             subject,
-            self.body.finish(texts, sources)?,
+            body,
+            failed_source_uses,
         ))
     }
 }
@@ -115,7 +132,7 @@ impl RetainedDiagnostic {
         self,
         texts: &SealedTexts,
         sources: &SourceUses,
-    ) -> Result<ExportDiagnostic, ExportAccountingError> {
+    ) -> Result<ExportDiagnostic, CatalogError> {
         let examples = self
             .examples
             .into_iter()

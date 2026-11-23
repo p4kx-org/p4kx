@@ -13,6 +13,7 @@ pub(super) const ROOT: &str = r"Data\ObjectContainers\PU\system\fixture\fixtures
 pub(super) const OFFLINE_SHOP: &str = r"Data\Scripts\ShopInventories\Inv_Fixture.json";
 pub(super) const FLARE_LIBRARY: &str = r"Data\Libs\Flares\fixture.xml";
 pub(super) const SUBSUMPTION_FIXTURE: &str = "Data/Libs/Subsumption/Events/synthetic.xml";
+pub(super) const TOOL_RECORD_INDEX: u32 = 6;
 const TILE: &str = r"Data\ObjectContainers\PU\fixture\tile.socpak";
 const ROOT_XML: &[u8] = br#"<ObjectContainer version="14" gridRadius="2"><PhysicsGrid/><ChildObjectContainers>
     <Child external="true" name="Data\ObjectContainers\PU\fixture\tile.socpak" pos="0,0,0" rot="1,0,0,0" locationType="3" class="FixtureLocation"/>

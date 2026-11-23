@@ -191,6 +191,7 @@ mod flow_wrapper_tests;
 mod gameplay_v3_conservation;
 #[path = "../real_archive/catalog_v3_consumer.rs"]
 mod gameplay_v3_consumer;
+use gameplay_v3_consumer as catalog_v3_consumer;
 mod gameplay_v3_contract;
 mod gameplay_v3_deep;
 mod gameplay_v3_failures;

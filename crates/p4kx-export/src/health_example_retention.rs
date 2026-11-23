@@ -43,7 +43,7 @@ impl RetainedExampleBody {
                 source_type: texts.capture_shared(source_type.finish(&frame)?)?,
                 target_guid: target_guid.finish(&frame)?,
             }),
-            ExampleBody::Technical { subject, field } => Ok(Self {
+            ExampleBody::Technical { subject, field, .. } => Ok(Self {
                 field: texts.capture_shared(OriginalDatum::observed(
                     SourceValue::Present(field),
                     Vec::new(),

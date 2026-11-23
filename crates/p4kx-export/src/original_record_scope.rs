@@ -38,6 +38,10 @@ impl<'read, 'source> OriginalRecordScope<'read, 'source> {
         self.tree
     }
 
+    pub(crate) const fn input(&self) -> &'read OriginalCatalogInput<'read, 'read> {
+        self.input
+    }
+
     pub(crate) const fn sources(&self) -> &'read SourceUses {
         &self.input.origins().uses
     }

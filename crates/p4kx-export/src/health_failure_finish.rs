@@ -80,9 +80,7 @@ pub(crate) fn finish_report(
             .map_err(CatalogError::Accounting)
     })?;
     let diagnostics = collect(diagnostics, cancel, |diagnostic| {
-        diagnostic
-            .finish(&texts, sources)
-            .map_err(CatalogError::Accounting)
+        diagnostic.finish(&texts, sources)
     })?;
     let references = collect(references, cancel, |reference| {
         reference

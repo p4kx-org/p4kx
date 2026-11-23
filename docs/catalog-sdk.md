@@ -1091,7 +1091,11 @@ The Item source query reports coverage for its returned fields. An incomplete co
 selection or unreadable input to classification or playability identifies the affected owner in
 `coverage.incomplete_fields`. An unusable higher-priority purchase name preserves its source
 state. The attachment name determines playability when the original decision reaches that rule.
-The definition query reports coverage for the full Item definition. See
+The definition query reports coverage for the full Item definition. Use `equipment::with_items`
+or `with_items_from` for the canonical Item row and its original variant decision. The session
+and parsed-view methods provide the same selection and result shape. Read `coverage()` for
+owner-level gaps and use `provenance()` for the query's inventory and shared variant use sets.
+See
 [ADR-0410](adr/0410-equipment-sdk-shares-original-family-readers-and-canonical-variant-choices.md).
 
 An unclassifiable original component slot or unreadable possible occupancy definition keeps the
@@ -1569,7 +1573,11 @@ persistent state only after the outer operation succeeds and the required covera
 The sourced `playability()` getter retains the canonical classification and the original
 rule inputs, including linked crew or tag results and their physical Record lookup. A computed
 classification can carry incomplete source coverage. A failed linked Record read that blocks
-the decision yields `unreadable`. Use a Catalog snapshot for variant choices. See
+the decision yields `unreadable`. Use `equipment::with_ships`, `with_ships_from` or the session
+and parsed-view methods for canonical Ships including variant decisions. Each selected
+`ShipSource` exposes its canonical `catalog_row()` and `variant_of()`. The snapshot provides
+original field coverage through `sources()` and shared variant evidence through `provenance()`.
+See
 [the Ship contract](catalog.md#ship-dcb-source-fields) and
 [ADR-0410](adr/0410-equipment-sdk-shares-original-family-readers-and-canonical-variant-choices.md).
 

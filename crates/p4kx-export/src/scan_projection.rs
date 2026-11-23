@@ -14,7 +14,6 @@ use crate::catalog_v3::catalog_weapon_projectile_ammo::{
 use crate::catalog_v3::mineable_entity_definition;
 use crate::catalog_v3::starmap_object_definition;
 use crate::contract::Item;
-use crate::contract_stats::ItemStats;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::ExportLedger;
 use crate::item_class::ClassLine;
@@ -23,7 +22,7 @@ use crate::record_observation::RecordObservation;
 use crate::scan_health::ScanError;
 use crate::ship;
 use crate::starmap::starmap_object;
-use crate::{CatalogError, ExportAccountingError, Kind, item_stats, item_variant};
+use crate::{CatalogError, ExportAccountingError, Kind, item_stats};
 
 #[path = "scan_loot_projection.rs"]
 mod loot_projection;
@@ -202,12 +201,16 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
             admission,
             cancel,
             |definition, originals, read| {
-                let stats = self
-                    .item_stats_with_magazines(tree, trees, admission, originals, read, ledger)?;
-                let (mut item, line) =
-                    crate::item::item(tree, definition, originals, &self.projection)?;
-                item.variant_key = item_variant::key(tree, stats.as_ref());
-                Ok((item, line))
+                crate::source_projection_notes::record(
+                    Kind::Items,
+                    ExportSourceRole::Selected,
+                    admission,
+                    tree,
+                    std::mem::take(&mut read.notes),
+                    ledger,
+                )?;
+                self.item_stats_with_magazines(tree, trees, admission, originals, read, ledger)?;
+                crate::item::item(tree, definition, originals, &self.projection)
             },
         )
     }
@@ -220,16 +223,8 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
         originals: &crate::catalog_read::original::OriginalFlowFields<'_, '_, 'f>,
         read: &mut ItemComponentsRead<'f>,
         ledger: &mut ExportLedger,
-    ) -> Result<Option<ItemStats<'f>>, CatalogError> {
+    ) -> Result<(), CatalogError> {
         let cancel = self.scan.options.cancel;
-        crate::source_projection_notes::record(
-            Kind::Items,
-            ExportSourceRole::Selected,
-            admission,
-            tree,
-            std::mem::take(&mut read.notes),
-            ledger,
-        )?;
         let health = read.legacy_health;
         let reader = LinkedAmmunitionReader {
             projection: &self.projection,
@@ -238,12 +233,12 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
         };
         let mut projectile_ledger = ExportLedger::default();
         let mut observed_magazine = false;
-        let stats = item_stats::read_with_sources(
+        let _ = item_stats::read_with_sources(
             tree,
             self.scan.forge,
             trees,
             || health,
-            |record, _| self.scan.ammo.dependency(record, ledger),
+            |target, _| self.scan.ammo.dependency(&target.record, ledger),
             |observed| {
                 observed_magazine = true;
                 if let Some(row) = resolution::read(
@@ -267,6 +262,7 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
                 )?;
                 Ok(())
             },
+            |_, _| Ok(()),
         )?;
         if !observed_magazine {
             read.rows.projectile_ammo_selections = catalog_weapon_projectile_ammo::read(
@@ -280,7 +276,7 @@ impl<'f> SelectedProjection<'_, '_, '_, 'f> {
         }
         ledger.merge(projectile_ledger);
         self.retain_projectile_ammo(&read.rows.projectile_ammo_selections, ledger)?;
-        Ok(stats)
+        Ok(())
     }
 
     fn retain_projectile_ammo(

@@ -14,6 +14,11 @@ use crate::catalog_queries::{
 mod complete;
 #[path = "equipment_ship_source_read.rs"]
 mod read;
+#[path = "equipment_ships_query.rs"]
+mod ships;
+#[path = "equipment_ship_variants.rs"]
+mod variants;
+pub use ships::{ShipSnapshot, with_ships, with_ships_from};
 #[path = "equipment_ship_store_slug_query.rs"]
 pub(super) mod store_slugs;
 

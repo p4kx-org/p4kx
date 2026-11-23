@@ -5,7 +5,7 @@
 
 use p4kx_testkit::{TestInstance, TestRecord, TestStruct, TestType, TestValue};
 
-use super::{component, guid};
+use super::{INVALID_COMPONENT_TYPE, component, guid};
 
 pub(super) fn structs() -> Vec<TestStruct> {
     vec![
@@ -277,7 +277,7 @@ fn attach(index: usize, item: &Item) -> TestValue {
     )
 }
 
-fn item_record(index: usize, item: &Item) -> TestRecord {
+fn item_record(index: usize, item: &Item, trailing_component: Option<TestValue>) -> TestRecord {
     let mut components = vec![
         attach(index, item),
         TestValue::Struct(
@@ -303,6 +303,7 @@ fn item_record(index: usize, item: &Item) -> TestRecord {
             ),
         ));
     }
+    components.extend(trailing_component);
     TestRecord::new(
         guid(0x100 + index as u128),
         "EntityClassDefinition",
@@ -319,5 +320,22 @@ pub(super) fn records() -> impl Iterator<Item = TestRecord> {
     ITEMS
         .iter()
         .enumerate()
-        .map(|(index, item)| item_record(index, item))
+        .map(|(index, item)| item_record(index, item, None))
+}
+
+pub(super) fn key_records(unreadable: bool) -> impl Iterator<Item = TestRecord> {
+    let excluded = TestValue::Struct(TestInstance::new("SEntityInteractableParams"));
+    let broken = unreadable.then(|| {
+        let bytes = [INVALID_COMPONENT_TYPE.to_le_bytes(), 3_u32.to_le_bytes()].concat();
+        ("POWR_Key_Unreadable", Some(TestValue::Raw(bytes)))
+    });
+    [
+        ("POWR_Key_Base", None),
+        ("POWR_Key_Empty", Some(TestValue::Null)),
+        ("POWR_Key_Excluded", Some(excluded)),
+    ]
+    .into_iter()
+    .chain(broken)
+    .enumerate()
+    .map(|(index, (class, slot))| item_record(index, &base(class), slot))
 }

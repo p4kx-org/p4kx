@@ -4,7 +4,7 @@
 #[path = "catalog_provenance.rs"]
 mod catalog_provenance;
 
-pub use catalog_provenance::CatalogProvenance;
+pub use catalog_provenance::{CatalogProvenance, CatalogProvenanceView};
 
 #[path = "export_diagnostic.rs"]
 pub(crate) mod export_diagnostic;

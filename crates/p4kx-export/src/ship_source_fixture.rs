@@ -15,6 +15,7 @@ pub(super) type TestResult = Result<(), Box<dyn std::error::Error>>;
 pub(super) const VEHICLE: &str = "VehicleComponentParams";
 pub(super) const INSURANCE: &str = "SEntityInsuranceProperties";
 pub(super) const OWNER: u128 = 0x1166_0000_0000_4000_8000_0000_0000_b201;
+pub(super) const VARIANT_BASE_INDEX: u32 = 1;
 pub(super) const CREW: u128 = 0x1166_0000_0000_4000_8000_0000_0000_b202;
 const BAD_INSTANCE: u32 = u32::MAX - 1;
 const VEHICLE_DECLARATION: u32 = 2;
@@ -115,6 +116,9 @@ fn declarations() -> DataForgeBuilder {
         TestStruct::new("CrewManifest")
             .field("bad", TestType::UInt64)
             .declared_size(1),
+        TestStruct::new("EAEntityDataParams")
+            .parent("Static")
+            .field("inclusionMode", TestType::String),
     ]
     .into_iter()
     .fold(
@@ -244,4 +248,48 @@ fn check_declarations(forge: &DataForge<'_>) -> TestResult {
         );
     }
     Ok(())
+}
+
+pub(super) fn variant_candidates() -> DataForgeBuilder {
+    declarations()
+        .record(variant(
+            "A_Selected",
+            OWNER,
+            "Data/Vehicles/Match.xml",
+            "DoNotInclude",
+        ))
+        .record(variant(
+            "Z_Base",
+            OWNER + 1,
+            "data\\vehicles\\match.xml",
+            "ReadyToInclude",
+        ))
+        .record(variant(
+            "A_Alias",
+            OWNER + 1,
+            "data/vehicles/other.xml",
+            "ReadyToInclude",
+        ))
+}
+
+fn variant(class: &str, guid: u128, definition: &str, inclusion: &str) -> TestRecord {
+    let vehicle = TestInstance::new(VEHICLE)
+        .value("vehicleDefinition", TestValue::text(definition))
+        .value("vehicleName", TestValue::text("@ship_name"));
+    let entity =
+        TestInstance::new("EAEntityDataParams").value("inclusionMode", TestValue::text(inclusion));
+    TestRecord::new(
+        guid,
+        "EntityClassDefinition",
+        format!("EntityClassDefinition.{class}"),
+        format!("libs/foundry/records/entities/spaceships/{class}.xml"),
+    )
+    .value(
+        "Components",
+        TestValue::Array(vec![TestValue::Struct(vehicle)]),
+    )
+    .value(
+        "StaticEntityClassData",
+        TestValue::Array(vec![TestValue::Struct(entity)]),
+    )
 }

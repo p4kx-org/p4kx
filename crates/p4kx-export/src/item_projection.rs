@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{RecordTree, SourceValueState, SourcedValue};
+use p4kx_extraction::{RecordTree, SourceUseRef, SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -12,7 +12,9 @@ use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition;
 use crate::catalog_v3::catalog_item_components::selection::ItemSourceSelection;
 use crate::contract::every_field_required;
 use crate::guid_text::CatalogGuid;
-use crate::item_variant::ItemKey;
+use crate::item_variant::ItemComponentKey;
+use crate::variant_decision::VariantDecision;
+use crate::variant_target::VariantTarget;
 use crate::{CatalogError, ExportAccountingError, ItemClass, Playability};
 
 /// Source-backed fields of one selected physical Item.
@@ -75,41 +77,61 @@ fn complete<T>(value: &SourcedValue<T>) -> bool {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct Item<'source> {
+pub struct Item<'source> {
     #[serde(flatten)]
     pub(crate) source: ItemSource<'source>,
-    pub(crate) variant_of: Option<CatalogGuid>,
+    pub(crate) variant_of: VariantDecision,
     #[serde(skip)]
     #[schemars(skip)]
-    pub(crate) identity: ItemIdentity<'source>,
+    pub(crate) identity: ItemIdentity,
     #[serde(skip)]
     #[schemars(skip)]
     pub(crate) paint: ItemPaintFacts<'source>,
     #[serde(skip)]
     #[schemars(skip)]
-    pub(crate) variant_key: Option<ItemKey<'source>>,
+    pub(crate) variant_components: Option<ItemComponentKey<'source>>,
+}
+
+impl<'source> Item<'source> {
+    /// Borrows the selected Item's original header and source-backed projections.
+    #[must_use]
+    pub const fn source(&self) -> &ItemSource<'source> {
+        &self.source
+    }
+
+    /// Borrows the unfiltered physical variant decision and its evidence.
+    #[must_use]
+    pub fn variant_of(&self) -> &SourcedValue<VariantTarget> {
+        self.variant_of.expanded()
+    }
+
+    /// Returns the shared use-set reference serialized with this variant decision.
+    #[must_use]
+    pub fn variant_source_use_set_ref(&self) -> Option<u32> {
+        self.variant_of.source_use_set_ref()
+    }
+
+    /// Borrows the original failed reads relevant to this variant decision.
+    #[must_use]
+    pub fn variant_failed_source_uses(&self) -> &[SourceUseRef] {
+        self.variant_of.failed_source_uses()
+    }
 }
 
 /// Compact identity keys taken from the same admitted canonical header.
 #[derive(Debug)]
-pub(crate) struct ItemIdentity<'source> {
+pub(crate) struct ItemIdentity {
     pub(crate) guid: CatalogGuid,
-    pub(crate) class_name: &'source str,
 }
 
-impl<'source> ItemIdentity<'source> {
-    pub(super) fn read(header: &CanonicalRecordHeader<'source>) -> Result<Self, CatalogError> {
+impl ItemIdentity {
+    pub(super) fn read(header: &CanonicalRecordHeader<'_>) -> Result<Self, CatalogError> {
         let guid = header
             .guid
             .value()
             .copied()
             .ok_or(ExportAccountingError::MissingFieldInspection)?;
-        let class_name = header
-            .class_name
-            .value()
-            .copied()
-            .ok_or(ExportAccountingError::MissingFieldInspection)?;
-        Ok(Self { guid, class_name })
+        Ok(Self { guid })
     }
 }
 

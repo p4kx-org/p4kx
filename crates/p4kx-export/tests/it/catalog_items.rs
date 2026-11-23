@@ -306,7 +306,11 @@ fn a_ship_carries_crew_and_vehicle_definition() -> TestResult {
     for field in ["size", "insurance", "playability"] {
         crate::health_origin_assertions::cell(ship, field, "absent")?;
     }
-    assert!(ship["variantOf"].is_null(), "the fixture has no variantOf");
+    assert_eq!(
+        ship.pointer("/variantOf/state").and_then(Value::as_str),
+        Some("absent"),
+        "the fixture has no variant base"
+    );
     for field in ["mass", "massBasis", "hullHealth"] {
         crate::health_origin_assertions::cell(ship, field, "unreadable")?;
     }

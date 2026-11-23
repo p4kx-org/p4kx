@@ -65,12 +65,12 @@ actual selectors and sufficient negative-survey evidence contribute to the resul
 candidate or missing required implementation fact cannot prove a complete null/winner. Preserve
 unknown source-set completeness and known actual encrypted contributions independently.
 
-This decision establishes the target for the subsequent Item/Ship/Loadout migration. The original
-three-family query slice does not claim to implement those projection or filter changes. Its
-acceptance requires typed external-consumer parity against actual canonical output, original source
-and numeric closure, selection/failure/cancellation controls and no unintended dependency reads.
-Projection migration, source-backed candidate scope and client memory acceptance remain separate
-required checks.
+The canonical Item and Ship SDK routes and Catalog export share the candidate survey and physical
+winner decision. `variantOf` stores a typed presence, proven absence or unreadable state.
+A present decision has sourced `targetRecordIndex` and `guid` cells. Original failed attempts
+remain independently queryable. Repeated cohort contributors share a set identified by the
+smallest original Record index across that comparison, and emitted owners retain their own
+additional uses. The typed SDK origin expands the same references that the Catalog wire shares.
 
 ## Bounded Item source and classification projection
 
@@ -104,10 +104,9 @@ complete definition. Playability preserves an unusable purchase name's state bef
 lower-priority rules and consumes the attachment name in the name rule. Variant decisions
 require their own unfiltered candidate survey.
 
-This bounded migration does not introduce a provisional unknown variant carrier or weaken
-normal-publication guards. variantOf remains the existing nominal value until its actual
-unfiltered candidate survey and physical target/status projection are implemented together.
-There is no complete root-Item SDK claim or alternate legacy DTO in this source slice.
+Canonical root-Item queries use this same bounded source read plus the independent unfiltered
+variant survey. The variant comparison reads original compact statistics and purchase rank.
+The presentation classification continues to use its original English dependency.
 
 
 ## Ship Record fields

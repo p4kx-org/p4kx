@@ -8,10 +8,11 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::Observed;
+use super::item_attachment::{self, AttachmentDefinition};
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_number_capture::CapturedNumber;
 use crate::catalog_projection::CatalogProjection;
-use crate::catalog_read::original::{OriginalFlowFields, OriginalValuePart};
+use crate::catalog_read::original::{OriginalFlowFields, OriginalValueFact, OriginalValuePart};
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
 use crate::catalog_v3::authored_fields::authored_manufacturer::AuthoredManufacturer;
 use crate::catalog_v3::authored_fields::locale_input::AuthoredLocaleInput;
@@ -32,9 +33,8 @@ mod views;
 
 pub(crate) use self::staging::{ItemDefinitionStaging, StagedItemDefinitions};
 
-const ATTACHABLE: &str = "SAttachableComponentParams";
 const PHYSICS: &str = "SEntityPhysicsControllerParams";
-const PURCHASABLE: &str = "SCItemPurchasableParams";
+pub(super) const PURCHASABLE: &str = "SCItemPurchasableParams";
 
 /// Original Item identity and independently authored presentation and physical fields.
 #[derive(Debug, Serialize, JsonSchema)]
@@ -245,16 +245,10 @@ fn read_component<'source>(
     notes: &mut Vec<FieldError>,
 ) -> Result<Option<ItemDefinitionComponent<'source>>, CatalogError> {
     let body = match source.source_type()? {
-        ATTACHABLE => ItemDefinitionComponentKind::Attachment(
-            if source.storage_type("AttachDef")? == Some(DataType::StrongPointer) {
-                source.declared_pointer("AttachDef", notes, |source, notes| {
-                    ItemAttachmentPresentation::read(source, projection, notes).map(Box::new)
-                })?
-            } else {
-                source.declared_class("AttachDef", notes, |source, notes| {
-                    ItemAttachmentPresentation::read(source, projection, notes).map(Box::new)
-                })?
-            },
+        item_attachment::COMPONENT => ItemDefinitionComponentKind::Attachment(
+            AttachmentDefinition::read(source, notes, |definition, notes| {
+                ItemAttachmentPresentation::read(definition, projection, notes).map(Box::new)
+            })?,
         ),
         PHYSICS => ItemDefinitionComponentKind::Physics(
             if source.storage_type("PhysType")? == Some(DataType::StrongPointer) {
@@ -265,7 +259,9 @@ fn read_component<'source>(
         ),
         PURCHASABLE => {
             let (display_name, name_input) =
-                source.public_name_input("displayName", projection, notes)?;
+                ItemPurchasable::read_display_name(source, notes, |fact| {
+                    projection.public_name_fact(fact)
+                })?;
             ItemDefinitionComponentKind::Purchasable(ItemPurchasable {
                 display_name,
                 display_type: source.protected_locale("displayType", projection, notes)?,
@@ -283,24 +279,35 @@ fn read_component<'source>(
 
 impl<'source> ItemAttachmentPresentation<'source> {
     fn read(
-        source: Observed<'_, '_, '_, 'source>,
+        definition: &AttachmentDefinition<'_, '_, '_, 'source>,
         projection: &CatalogProjection<'_, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
-        let item_type = source.borrowed_label("Type", notes)?;
-        let tags = source.borrowed_label("Tags", notes)?;
+        let item_type = definition.item_type(notes)?;
+        let tags = definition.tags(notes)?;
+        let source = definition.observed();
         let weapon_motion = WeaponAttachmentMotion::read(&item_type, &tags);
         Ok(Self {
             item_type,
             item_subtype: source.borrowed_label("SubType", notes)?,
             size: source.authored_number("Size", notes)?,
             tags,
-            required_tags: source.borrowed_label("RequiredTags", notes)?,
+            required_tags: definition.required_tags(notes)?,
             weapon_motion,
             grade: source.authored_number("Grade", notes)?,
             manufacturer: AuthoredManufacturer::read(source, "Manufacturer", notes)?,
             localization: localization_read::read(source, projection, notes)?,
         })
+    }
+}
+
+impl<'source> ItemPurchasable<'source> {
+    pub(super) fn read_display_name<'scope, 'read, T>(
+        source: Observed<'_, 'scope, 'read, 'source>,
+        notes: &mut Vec<FieldError>,
+        display: impl FnOnce(&OriginalValueFact<'scope, 'read, 'source>) -> Result<T, CatalogError>,
+    ) -> Result<(SourcedValue<T>, AuthoredLocaleInput<'source>), CatalogError> {
+        source.locale_input("displayName", notes, display)
     }
 }
 

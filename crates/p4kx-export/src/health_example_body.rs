@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use p4kx_extraction::{Guid, SourceValue};
+use p4kx_extraction::{FieldOrigin, Guid, SourceUseRef, SourceValue};
 
 use super::health_example_description::ExampleDescription;
 use super::health_example_header::HeaderExampleRecipe;
@@ -16,6 +16,8 @@ use crate::{CatalogError, ExportAccountingError, HealthText};
 mod health_example_body_merge;
 #[path = "health_field_example_recipe.rs"]
 mod health_field_example_recipe;
+#[path = "health_example_technical.rs"]
+mod technical;
 
 use self::health_field_example_recipe::FieldExampleRecipe;
 
@@ -43,12 +45,19 @@ pub(super) enum ExampleBody {
     Technical {
         subject: super::RecordSubject,
         field: HealthText,
+        evidence: Option<DiagnosticFieldEvidence>,
     },
     Loadout(super::health_loadout_body::LoadoutBodyReceipt),
     RequestedLoadout(super::health_loadout_example::LoadoutRequestExample),
     LoadoutTarget(super::health_loadout_target_example::LoadoutTargetExample),
     Absent(super::RecordSubject),
     GuidHeader(super::RecordSubject),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct DiagnosticFieldEvidence {
+    pub(super) origin: FieldOrigin,
+    pub(super) failed_source_uses: Box<[SourceUseRef]>,
 }
 
 impl ExampleBodyReceipt {
@@ -98,22 +107,6 @@ impl ExampleBodyReceipt {
             HeaderExampleRecipe::duplicate_guid(input, subject)?,
         )))
     }
-    pub(crate) fn technical(
-        input: &OriginalCatalogInput<'_, '_>,
-        subject: super::RecordSubject,
-        field: &'static str,
-    ) -> Result<Self, CatalogError> {
-        subject.check_input(input)?;
-        subject.source_type_text()?;
-        let field = input
-            .origins()
-            .health_texts()
-            .retain_text(field)?
-            .text()
-            .clone();
-        Ok(Self::full(ExampleBody::Technical { subject, field }))
-    }
-
     pub(crate) fn loadout(receipt: super::health_loadout_body::LoadoutBodyReceipt) -> Self {
         Self::full(ExampleBody::Loadout(receipt))
     }
@@ -265,7 +258,7 @@ impl ExampleBody {
                 described(source_type.value())?,
                 described(target_guid.value())?,
             )),
-            Self::Technical { subject, field } => {
+            Self::Technical { subject, field, .. } => {
                 Ok((Some(field.clone()), subject.source_type_text()?, None))
             }
             Self::Loadout(receipt) => Ok((Some(receipt.path().clone()), None, None)),
@@ -328,6 +321,7 @@ impl ExampleBody {
             Self::Technical {
                 subject,
                 field: original,
+                ..
             } => {
                 field == Some(original.as_str())
                     && subject

@@ -4,7 +4,7 @@
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::equipment::{
-    ShipBaseFacts, ShipSourceSnapshot, with_ship_sources_from,
+    ShipBaseFacts, ShipSnapshot, ShipSourceSnapshot, with_ship_sources_from, with_ships_from,
 };
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog_from};
@@ -12,7 +12,7 @@ use p4kx_extraction::{Archive, DataForgeEntry, FieldOrigin, SourceInventory};
 use p4kx_testkit::{ArchiveBuilder, TestEntry, test_key};
 use serde_json::{Value, json};
 
-use super::super::super::SHIP_BASE_FACTS;
+use super::super::super::{SHIP_BASE_FACTS, SHIPS};
 use super::super::{Route, TestResult};
 
 #[path = "../it/catalog_ship_cargo_fixture.rs"]
@@ -20,7 +20,7 @@ mod fixture;
 
 const SHIP_RECORD: u32 = 3;
 
-pub(super) fn read() -> TestResult<Route> {
+pub(super) fn read() -> TestResult<[Route; 2]> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("ship-cargo-fixture.p4k");
     let database = fixture::database(125, 975, false).build();
@@ -33,20 +33,47 @@ pub(super) fn read() -> TestResult<Route> {
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     let built = build_catalog_from(&archive, &entry, &options)?;
     let catalog = serde_json::from_slice(built.json())?;
-    with_ship_sources_from(
-        &archive,
-        &entry,
-        CatalogRecordSelection::RecordIndex(SHIP_RECORD),
-        CatalogLanguageSelection::Selected(&[]),
-        None,
-        |snapshot| compare(&snapshot, &catalog),
-    )?
+    let selected = CatalogRecordSelection::RecordIndex(SHIP_RECORD);
+    let languages = CatalogLanguageSelection::Selected(&[]);
+    let base = with_ship_sources_from(&archive, &entry, selected, languages, None, |snapshot| {
+        compare(&snapshot, &catalog)
+    })??;
+    let ships = with_ships_from(&archive, &entry, selected, languages, None, |snapshot| {
+        compare_ship(&snapshot, &catalog)
+    })??;
+    Ok([base, ships])
+}
+
+fn compare_ship(snapshot: &ShipSnapshot<'_>, catalog: &Value) -> TestResult<Route> {
+    let [source] = snapshot.rows() else {
+        return Err("one exact physical Ship from the canonical SDK route".into());
+    };
+    let row = source
+        .catalog_row()
+        .ok_or("the serializable canonical Ship")?;
+    let observed = serde_json::to_value(row)?;
+    let expected = catalog
+        .pointer("/ships/0")
+        .ok_or("the complete producer Ship")?;
+    assert_eq!(
+        &observed, expected,
+        "the scoped SDK keeps the complete Ship wire value and source references"
+    );
+    Route::queried_value(
+        SHIPS,
+        row,
+        "canonical Ship projection and synthetic producer parity witnessed; installed parity and peak memory open",
+    )
 }
 
 fn compare(snapshot: &ShipSourceSnapshot<'_>, catalog: &Value) -> TestResult<Route> {
     let [ship] = snapshot.rows() else {
         return Err("one exact Ship Record from the existing scoped SDK route".into());
     };
+    assert!(
+        ship.catalog_row().is_none(),
+        "the source-only scope leaves variant and Catalog row evaluation to the canonical query"
+    );
     let facts = ship.base_facts();
     let expected = catalog
         .pointer(SHIP_BASE_FACTS)

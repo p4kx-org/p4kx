@@ -8,11 +8,11 @@ use text_kind::TextKindJson;
 use std::path::Path;
 
 use p4kx_export::{
-    ArchiveKeyState, CatalogSummary, CraftingWarning, DECOMPRESSED_LIMIT, ExportHealth,
-    KindSummary, LoadoutSummary, PaintSummary, Playability, PlayabilityCounts, SCHEMA_VERSION,
-    SizeWarning, StarmapSummary, UPLOAD_LIMIT, VariantCounts,
+    ArchiveKeyState, CatalogProvenance, CatalogSummary, CraftingWarning, DECOMPRESSED_LIMIT,
+    ExportHealth, KindSummary, LoadoutSummary, PaintSummary, Playability, PlayabilityCounts,
+    SCHEMA_VERSION, SizeWarning, StarmapSummary, UPLOAD_LIMIT, VariantCounts,
 };
-use p4kx_extraction::{Archive, SourceInventory};
+use p4kx_extraction::Archive;
 use serde::Serialize;
 
 use crate::catalog_failure_json::FailureJson;
@@ -28,7 +28,7 @@ pub(super) struct SummaryJson<'a> {
     archive_key: ArchiveKeyState,
     encrypted_entries_unread: u64,
     export_health: &'a ExportHealth,
-    provenance: &'a SourceInventory,
+    provenance: &'a CatalogProvenance,
     size: u64,
     compressed_size: Option<u64>,
     upload_limit: u64,
@@ -306,7 +306,7 @@ pub(super) fn summary_json<'a>(
         archive_key: summary.archive_key().state(),
         encrypted_entries_unread: summary.archive_key().entries_unread(),
         export_health: summary.export_health(),
-        provenance: summary.source_inventory(),
+        provenance: summary.provenance(),
         size: summary.size(),
         compressed_size: summary.compressed_size(),
         upload_limit: UPLOAD_LIMIT,

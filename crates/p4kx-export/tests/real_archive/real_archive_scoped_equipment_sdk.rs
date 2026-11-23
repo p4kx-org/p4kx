@@ -25,6 +25,15 @@ use crate::real_archive_verification::print_line;
 mod equipment_input;
 use equipment_input::{dataforge, record_index, with_archive};
 
+#[path = "real_archive_canonical_ship_sdk.rs"]
+mod canonical_ship;
+
+#[path = "real_archive_canonical_item_variant_sdk.rs"]
+mod canonical_item;
+
+#[path = "real_archive_variant_parity.rs"]
+mod variant_parity;
+
 #[path = "real_archive_installed_configuration_sdk.rs"]
 mod installed_configuration;
 

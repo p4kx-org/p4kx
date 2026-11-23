@@ -9,17 +9,36 @@ use super::Capture;
 use super::vehicle_capture;
 use super::vehicle_stage::{Contributions, PendingVehicle};
 use crate::catalog_read::original::{EntryCapture, RecordSubjectKey, VehicleFileSelection};
-use crate::ship_base::{ShipCargoObservation, ShipCargoSource, ShipRead, VehicleKindPath};
+use crate::ship_base::{
+    Hull, Mass, ShipCargoObservation, ShipCargoSource, ShipRead, VehicleKindPath,
+};
 use crate::{CatalogError, ExportAccountingError, MassBasis, VehicleKind};
 
-/// The actual `ShipReader` aggregates and their immediate source sets.
+#[cfg(test)]
+#[path = "vehicle_result_scope_tests.rs"]
+mod scope_tests;
+
+/// The direct vehicle measurements and the independently resolved Cargo.
 pub(crate) struct ShipAggregateValues {
+    pub(crate) vehicle: ShipVehicleValues,
+    pub(crate) cargo: ShipCargoSource,
+}
+
+/// The direct vehicle values with their original implementation and Physics evidence.
+pub(crate) struct ShipVehicleValues {
     pub(crate) vehicle_kind: SourcedValue<VehicleKind>,
     pub(crate) mass: SourcedValue<f64>,
     pub(crate) mass_basis: SourcedValue<MassBasis>,
     pub(crate) hull_health: SourcedValue<f64>,
-    pub(crate) cargo: ShipCargoSource,
     pub(crate) physics_used: bool,
+}
+
+struct MeasuredVehicle<'read> {
+    kind_path: VehicleKindPath,
+    kind: Option<VehicleKind>,
+    mass: Option<&'read Mass>,
+    hull: Option<&'read Hull>,
+    physics_used: bool,
 }
 
 impl Capture<'_> {
@@ -31,6 +50,67 @@ impl Capture<'_> {
         physics_used: bool,
         cargo: ShipCargoObservation<'_, '_>,
     ) -> Result<Option<ShipAggregateValues>, CatalogError> {
+        let Some(pending) = self.take_vehicle(record, read.is_some())? else {
+            return Ok(None);
+        };
+        let input = self
+            .input
+            .ok_or(ExportAccountingError::UnboundHealthSubject)?;
+        let read = read.ok_or(ExportAccountingError::UnobservedFailure)?;
+        let base = &read.base;
+        let measurement = MeasuredVehicle {
+            kind_path: VehicleKindPath::of(&base.record_path),
+            kind: base.vehicle_kind,
+            mass: base.mass.as_ref(),
+            hull: base.hull.as_ref(),
+            physics_used,
+        };
+        let cargo = cargo.finish(
+            &base.cargo,
+            &pending.cargo_membership(input, self.cancel.as_ref())?,
+        )?;
+        let vehicle = bind_values(
+            &pending,
+            &measurement,
+            &EntryCapture::for_input(input),
+            archive,
+        )?;
+        Ok(Some(ShipAggregateValues { vehicle, cargo }))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn finish_direct_vehicle(
+        &self,
+        archive: &Archive,
+        record: &Record<'_>,
+        measurements: &crate::ship_base::VehicleMeasurements,
+        physics_used: bool,
+    ) -> Result<ShipVehicleValues, CatalogError> {
+        let pending = self
+            .take_vehicle(record, true)?
+            .ok_or(ExportAccountingError::UnobservedFailure)?;
+        let input = self
+            .input
+            .ok_or(ExportAccountingError::UnboundHealthSubject)?;
+        bind_values(
+            &pending,
+            &MeasuredVehicle {
+                kind_path: measurements.path_kind,
+                kind: measurements.kind,
+                mass: measurements.mass.as_ref(),
+                hull: measurements.hull.as_ref(),
+                physics_used,
+            },
+            &EntryCapture::for_input(input),
+            archive,
+        )
+    }
+
+    fn take_vehicle(
+        &self,
+        record: &Record<'_>,
+        ready: bool,
+    ) -> Result<Option<PendingVehicle>, CatalogError> {
         self.check_record(record)?;
         let input = self
             .input
@@ -45,7 +125,7 @@ impl Capture<'_> {
         if pending.subject.key().map(RecordSubjectKey::index) != Some(record.index()) {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         }
-        if state.error.is_some() || read.is_none() {
+        if state.error.is_some() || !ready {
             return Ok(None);
         }
         drop(state);
@@ -56,32 +136,26 @@ impl Capture<'_> {
         {
             return Err(CatalogError::Cancelled);
         }
-        let read = read.ok_or(ExportAccountingError::UnobservedFailure)?;
         if pending.selected.is_some() != pending.totals_seen {
             return Err(ExportAccountingError::UnobservedFailure.into());
         }
-        Ok(Some(bind_values(
-            &pending,
-            read,
-            &EntryCapture::for_input(input),
-            archive,
-            physics_used,
-            cargo.finish(
-                &read.base.cargo,
-                &pending.cargo_membership(input, self.cancel.as_ref())?,
-            )?,
-        )?))
+        Ok(Some(pending))
     }
 }
 
 fn bind_values(
     pending: &PendingVehicle,
-    read: &ShipRead,
+    measurement: &MeasuredVehicle<'_>,
     capture: &EntryCapture<'_>,
     archive: &Archive,
-    physics_used: bool,
-    cargo: ShipCargoSource,
-) -> Result<ShipAggregateValues, CatalogError> {
+) -> Result<ShipVehicleValues, CatalogError> {
+    let MeasuredVehicle {
+        kind_path,
+        kind,
+        mass,
+        hull,
+        physics_used,
+    } = *measurement;
     let uses = capture.source_uses();
     let selected_inputs = vehicle_inputs(pending, capture, archive)?;
     let membership = pending
@@ -92,11 +166,11 @@ fn bind_values(
         std::iter::once(&selected_inputs).chain(membership.as_ref()),
         true,
     )?;
-    let vehicle_kind = bind_kind(pending, read, uses, &selected_inputs)?;
+    let vehicle_kind = bind_kind(pending, kind_path, kind, uses, &selected_inputs)?;
     let mass_choice = pending.mass.choice.origin(uses);
     let hull_values = pending.hull.value.origin(uses);
-    let mass = bind_mass(pending, read, uses, &common, &mass_choice, physics_used)?;
-    let mass_basis = match &read.base.mass {
+    let mass_value = bind_mass(pending, mass, uses, &common, &mass_choice, physics_used)?;
+    let mass_basis = match mass {
         Some(mass) => {
             let mut origins = vec![&common, &mass_choice];
             if physics_used {
@@ -104,10 +178,10 @@ fn bind_values(
             }
             uses.value_with_origins(SourceValue::Present(mass.basis), &origins)?
         }
-        None => uses.value_with_origins(empty_basis(mass.state()), &[mass.origin()])?,
+        None => uses.value_with_origins(empty_basis(mass_value.state()), &[mass_value.origin()])?,
     };
     let hull_health = uses.value_with_origins(
-        match &read.base.hull {
+        match hull {
             Some(hull) => SourceValue::Present(hull.health),
             None if unavailable_inputs(pending) => SourceValue::Unreadable,
             None if pending.hull.invalid_number => SourceValue::Invalid,
@@ -115,29 +189,26 @@ fn bind_values(
         },
         &[&common, &hull_values],
     )?;
-    Ok(ShipAggregateValues {
+    Ok(ShipVehicleValues {
         vehicle_kind,
-        mass,
+        mass: mass_value,
         mass_basis,
         hull_health,
-        cargo,
         physics_used,
     })
 }
 
 fn bind_kind(
     pending: &PendingVehicle,
-    read: &ShipRead,
+    kind_path: VehicleKindPath,
+    kind: Option<VehicleKind>,
     uses: &SourceUses,
     selected_inputs: &FieldOrigin,
 ) -> Result<SourcedValue<VehicleKind>, CatalogError> {
-    if VehicleKindPath::of(&read.base.record_path) != pending.kind_path {
+    if kind_path != pending.kind_path {
         return Err(ExportAccountingError::ConflictingSourceDatum.into());
     }
-    let value = read
-        .base
-        .vehicle_kind
-        .map_or(SourceValue::Absent, SourceValue::Present);
+    let value = kind.map_or(SourceValue::Absent, SourceValue::Present);
     let path = &pending.kind_path_origin;
     if pending.kind_path != VehicleKindPath::Space {
         return Ok(uses.value_with_origins(value, &[path])?);
@@ -154,14 +225,14 @@ fn bind_kind(
 
 fn bind_mass(
     pending: &PendingVehicle,
-    read: &ShipRead,
+    measured: Option<&Mass>,
     uses: &SourceUses,
     common: &FieldOrigin,
     mass_choice: &FieldOrigin,
     physics_used: bool,
 ) -> Result<SourcedValue<f64>, CatalogError> {
     let physics = &pending.operands.physics;
-    if let Some(mass) = &read.base.mass {
+    if let Some(mass) = measured {
         let mass_values = pending.mass.value.origin(uses);
         let operands = match mass.basis {
             MassBasis::Parts if !physics_used && pending.totals_seen => &mass_values,

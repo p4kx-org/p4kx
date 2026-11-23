@@ -3,7 +3,7 @@
 
 use std::cell::RefCell;
 
-use p4kx_extraction::{CancelToken, RecordTree, SourcedValue, StructValue, Value};
+use p4kx_extraction::{CancelToken, RecordTree, SourcedValue, StructValue};
 
 use super::Observed;
 use super::ship_presentation::{self, ShipPresentation};
@@ -31,10 +31,13 @@ mod playability_inputs;
 mod selection;
 #[path = "ship_source_standalone.rs"]
 pub(crate) mod standalone;
+#[path = "ship_variant_operands.rs"]
+mod variant_operands;
 
 pub(crate) use aggregate::ShipAggregateOperands;
 pub use playability_inputs::ShipPlayabilityInputs;
 use selection::SelectedSource;
+pub(crate) use variant_operands::probe::{DefinitionMembership, read as read_variant_operands};
 
 #[cfg(test)]
 #[path = "ship_source_tests.rs"]
@@ -53,6 +56,7 @@ pub(crate) struct ShipSourceRead<'read, 'source> {
     pub(crate) aggregate: ShipAggregateOperands,
     pub(crate) physics_notes: Vec<FieldError>,
     pub(crate) numbers: Vec<CapturedNumber>,
+    pub(crate) unchecked_variant: crate::variant_decision::VariantDecision,
 }
 
 pub(crate) fn read<'read, 'source>(
@@ -87,38 +91,32 @@ pub(crate) fn read<'read, 'source>(
         attachment.value,
         &attachment.prefix,
     )?;
-    let (aggregate, physics_notes) = aggregate::read(fields, &vehicle, &mut notes)?;
     let crew_size = fields::selected(fields, &vehicle, |owner| {
         owner.authored_number("crewSize", &mut notes)
     })?;
-    let vehicle_definition = fields::selected(fields, &vehicle, |owner| {
-        fields::text(owner, "vehicleDefinition", &mut notes)
-    })?;
+    let variant =
+        variant_operands::read_selected(fields, input, admission, &vehicle, &crew, &mut notes)?;
+    let (aggregate, physics_notes) =
+        aggregate::read(fields, &vehicle, variant.modification, &mut notes)?;
     let insurance = insurance::read(fields, &insured, &mut notes)?;
     let playability_inputs = fields::crew(fields, &crew, &mut notes)?;
-    let playability_proof = OwnerProof::capture(
-        input,
-        admission.record(),
-        &originals,
-        vehicle.value,
-        crew.value,
-    )?;
+
     Ok(ShipSourceRead {
         header: CanonicalRecordHeader::read(tree, input.origins())?,
-        vehicle: vehicle.value.and_then(|value| match value {
-            Value::Struct(value) => Some(value),
-            _ => None,
-        }),
+        vehicle: variant.vehicle,
         presentation,
         crew_size,
-        vehicle_definition,
+        vehicle_definition: variant.definition,
         insurance,
         playability_inputs,
-        playability_proof,
+        playability_proof: variant.playability,
         notes,
         aggregate,
         physics_notes,
         numbers: NumberCapture::deduplicate(numbers.into_inner())?,
+        unchecked_variant: crate::variant_decision::VariantDecision::unresolved(
+            &input.origins().uses,
+        ),
     })
 }
 
@@ -134,5 +132,6 @@ pub(crate) fn aggregate_for_test(
     let numbers = RefCell::new(Vec::new());
     let fields = Observed::definition(&originals, input, &capture, &numbers);
     let vehicle = SelectedSource::read(&originals, "Components", crate::ship::VEHICLE_COMPONENT)?;
-    aggregate::read(fields, &vehicle, &mut Vec::new()).map(|(operands, _)| operands)
+    let modification = aggregate::modification(fields, &vehicle, &mut Vec::new())?;
+    aggregate::read(fields, &vehicle, modification, &mut Vec::new()).map(|(operands, _)| operands)
 }

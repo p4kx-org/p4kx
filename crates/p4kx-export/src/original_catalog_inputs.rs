@@ -5,10 +5,16 @@
 
 #[path = "original_catalog_input.rs"]
 mod input;
+#[path = "original_record_inventory.rs"]
+mod inventory;
 #[path = "original_record_scope.rs"]
 mod scope;
 
 pub(crate) use input::OriginalCatalogInput;
+pub(crate) use inventory::{
+    append_record_guid_inventory, append_record_instance_inventory, record_body_location,
+    record_inventory,
+};
 pub(crate) use scope::OriginalRecordScope;
 
 #[cfg(test)]

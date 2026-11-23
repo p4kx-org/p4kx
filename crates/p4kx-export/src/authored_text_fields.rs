@@ -30,7 +30,7 @@ impl<'scope, 'read, 'source> Observed<'_, 'scope, 'read, 'source> {
         self.locale_input(name, notes, |fact| projection.protected_locale_fact(fact))
     }
 
-    fn locale_input<T>(
+    pub(in crate::catalog_v3) fn locale_input<T>(
         &self,
         name: &str,
         notes: &mut Vec<FieldError>,

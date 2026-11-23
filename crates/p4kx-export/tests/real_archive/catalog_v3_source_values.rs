@@ -10,7 +10,14 @@ use super::TestResult;
 
 /// Validates immediate state/value/origin metadata before reading a typed caller's payload.
 pub(crate) fn source_value(carrier: &Value) -> TestResult<Option<&Value>> {
-    origin(carrier)?;
+    source_value_with_set(carrier, false)
+}
+
+pub(crate) fn source_value_with_set(
+    carrier: &Value,
+    has_shared_uses: bool,
+) -> TestResult<Option<&Value>> {
+    origin(carrier, has_shared_uses)?;
     let value = carrier.get("value").ok_or("required source value")?;
     match carrier.get("state").and_then(Value::as_str) {
         Some("present") => Ok(Some(value)),
@@ -21,7 +28,7 @@ pub(crate) fn source_value(carrier: &Value) -> TestResult<Option<&Value>> {
     }
 }
 
-fn origin(carrier: &Value) -> TestResult<()> {
+fn origin(carrier: &Value, has_shared_uses: bool) -> TestResult<()> {
     let complete = carrier
         .get("sourceSetComplete")
         .and_then(Value::as_bool)
@@ -40,7 +47,7 @@ fn origin(carrier: &Value) -> TestResult<()> {
         .and_then(Value::as_array)
         .ok_or("required source-use references")?;
     let empty_marker = if complete { Some(false) } else { None };
-    if references.is_empty() && marker.as_bool() != empty_marker {
+    if references.is_empty() && !has_shared_uses && marker.as_bool() != empty_marker {
         return Err("empty contributor origin has an inconsistent marker".into());
     }
     let mut seen = HashSet::new();

@@ -5,6 +5,7 @@ use p4kx_extraction::{SourceInventory, SourceLocation, SourceValueState, Sourced
 use serde::Serialize;
 use serde_json::Value;
 
+use crate::contract::Ship;
 use crate::record_header_field::RecordHeaderField;
 use crate::ship::ShipSource;
 
@@ -17,29 +18,29 @@ pub(super) struct Wire {
 }
 
 impl Wire {
-    pub(super) fn read(row: &ShipSource<'_>, public: Value, protected: Value) -> TestResult<Self> {
+    pub(super) fn read(row: &Ship<'_>, public: Value, protected: Value) -> TestResult<Self> {
         Ok(Self {
-            header: wire(row.source())?,
+            header: wire(&row.header)?,
             values: [
-                ("name", wire(row.name())?),
-                ("description", wire(row.description())?),
-                ("role", wire(row.role())?),
-                ("career", wire(row.career())?),
-                ("crewSize", wire(row.crew_size())?),
-                ("vehicleManufacturer", wire(row.vehicle_manufacturer())?),
+                ("name", wire(&row.name)?),
+                ("description", wire(&row.description)?),
+                ("role", wire(&row.role)?),
+                ("career", wire(&row.career)?),
+                ("crewSize", wire(&row.crew_size)?),
+                ("vehicleManufacturer", wire(&row.vehicle_manufacturer)?),
                 (
                     "attachmentManufacturer",
-                    wire(row.attachment_manufacturer())?,
+                    wire(&row.attachment_manufacturer)?,
                 ),
-                ("vehicleDefinition", wire(row.vehicle_definition())?),
-                ("vehicleKind", wire(row.vehicle_kind())?),
-                ("size", wire(row.size())?),
-                ("mass", wire(row.mass())?),
-                ("massBasis", wire(row.mass_basis())?),
-                ("hullHealth", wire(row.hull_health())?),
-                ("insurance", wire(row.insurance())?),
-                ("playability", wire(row.playability())?),
-                ("playabilityInputs", wire(row.playability_inputs())?),
+                ("vehicleDefinition", wire(&row.vehicle_definition)?),
+                ("vehicleKind", wire(&row.vehicle_kind)?),
+                ("size", wire(&row.size)?),
+                ("mass", wire(&row.mass)?),
+                ("massBasis", wire(&row.mass_basis)?),
+                ("hullHealth", wire(&row.hull_health)?),
+                ("insurance", wire(&row.insurance)?),
+                ("playability", wire(&row.playability)?),
+                ("playabilityInputs", wire(&row.playability_inputs)?),
                 ("publicNames", public),
                 ("gameTexts", protected),
             ],

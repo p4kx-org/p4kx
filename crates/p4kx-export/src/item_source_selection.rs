@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{RecordTree, SourceValue, SourcedValue};
+use p4kx_extraction::{RecordTree, SourceValue, SourcedValue, Value};
 use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::super::item_component_owner::ComponentOwner;
+use super::item_attachment;
+use super::item_definition::PURCHASABLE;
 use crate::CatalogError;
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::record_fields;
@@ -28,11 +30,38 @@ impl ItemSourceSelection {
         tree: &RecordTree<'source>,
         originals: &OriginalFlowFields<'_, '_, 'source>,
     ) -> Result<Self, CatalogError> {
+        let select_component = |source_type| {
+            let selected = record_fields::component_occurrence(tree, source_type);
+            select(originals, selected.map(|(value, _)| value))
+        };
         Ok(Self {
-            attachment: select(tree, originals, "SAttachableComponentParams")?,
-            physics: select(tree, originals, "SEntityPhysicsControllerParams")?,
-            purchasable: select(tree, originals, "SCItemPurchasableParams")?,
+            attachment: Self::read_attachment(tree, originals)?,
+            physics: select_component("SEntityPhysicsControllerParams")?,
+            purchasable: Self::with_purchasable(tree, originals, |ordinal, _| Ok(ordinal))?,
         })
+    }
+
+    pub(crate) fn with_purchasable<'read, 'source, T>(
+        tree: &'read RecordTree<'source>,
+        originals: &OriginalFlowFields<'_, '_, 'source>,
+        inspect: impl FnOnce(
+            SourcedValue<u32>,
+            Option<&'read Value<'source>>,
+        ) -> Result<T, CatalogError>,
+    ) -> Result<T, CatalogError> {
+        let occurrence =
+            record_fields::component_occurrence(tree, PURCHASABLE).map(|(value, _)| value);
+        inspect(select(originals, occurrence)?, occurrence)
+    }
+
+    pub(crate) fn read_attachment<'source>(
+        tree: &RecordTree<'source>,
+        originals: &OriginalFlowFields<'_, '_, 'source>,
+    ) -> Result<SourcedValue<u32>, CatalogError> {
+        select(
+            originals,
+            item_attachment::first(tree).map(|(value, _)| value),
+        )
     }
 
     /// Borrows the first physical attachment component ordinal.
@@ -55,11 +84,9 @@ impl ItemSourceSelection {
 }
 
 fn select<'source>(
-    tree: &RecordTree<'source>,
     originals: &OriginalFlowFields<'_, '_, 'source>,
-    source_type: &str,
+    selected: Option<&Value<'source>>,
 ) -> Result<SourcedValue<u32>, CatalogError> {
-    let selected = record_fields::component_occurrence(tree, source_type).map(|(value, _)| value);
     let prefix = originals.component_selection(selected)?;
     let uses = originals.sources();
     let Some(value) = selected else {

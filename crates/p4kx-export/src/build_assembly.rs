@@ -74,11 +74,11 @@ pub(super) fn assemble<R>(
     )?;
     let (tags, paint_tags) = add_tags(&forge, &input, options, &mut collected)?;
     let paint_summary = add_paints(paint_tags, &mut collected, options.cancel)?;
-    let ship_variant_keys = collected.take_ship_variant_keys()?;
+    collected.vehicles = Vec::new();
     run.begin(CatalogStage::ResolveLoadouts);
     let (loadout_summary, crafter_hosts) =
         add_loadouts(&files, &entities, &mut collected, &input, options.cancel)?;
-    let variants = collected.group_variants(ship_variant_keys);
+    let variants = parts::variants(archive, &input, &mut collected, options.cancel)?;
     let starmap_summary = scanning::project_locations(
         archive,
         &mut placements,
@@ -157,6 +157,8 @@ pub(super) fn assemble<R>(
     )?;
     let finished_texts = projection.finish()?;
     let (text_summary, text_notes) = texts.into_summary();
+    let provenance =
+        parts::freeze_provenance(&origins.uses, &collected.items, &collected.ships, run)?;
     let catalog = Catalog {
         schema_version: SCHEMA_VERSION,
         source: source(
@@ -349,7 +351,7 @@ pub(super) fn assemble<R>(
             ),
         },
         texts: finished_texts.texts,
-        provenance: parts::freeze_provenance(&origins.uses, run)?,
+        provenance,
         paints: collected.paints,
         loadouts: collected.loadouts,
         mineable_elements: collected.mineable_elements,

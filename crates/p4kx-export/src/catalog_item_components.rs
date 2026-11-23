@@ -38,8 +38,16 @@ pub(crate) use component_read::{
 pub(crate) mod definition_read;
 #[path = "item_equipment_source_getters.rs"]
 mod getters;
+#[path = "item_attachment.rs"]
+pub(crate) mod item_attachment;
 #[path = "item_definition.rs"]
 pub(crate) mod item_definition;
+#[path = "item_purchase_rank.rs"]
+mod purchase_rank;
+pub(crate) use purchase_rank::read_item_purchase_rank;
+#[cfg(test)]
+#[path = "item_purchase_rank_tests.rs"]
+mod purchase_rank_tests;
 #[path = "catalog_weapon_magazine_resolution.rs"]
 pub(crate) mod resolution;
 #[path = "item_source_selection.rs"]

@@ -93,17 +93,21 @@ pub(super) fn selected(
     kind: Kind,
     coverage: &mut CatalogRecordCoverage,
 ) -> bool {
-    let classified = record.type_name().and_then(|source_type| {
-        if source_type == kind.records().type_name {
-            if kind == Kind::BlueprintPools {
-                crate::crafting::ledger::pool_record(record)
+    let classified = if kind == Kind::Items {
+        entity_selection::select_item_observed(record, |_, _| {})
+    } else {
+        record.type_name().and_then(|source_type| {
+            if source_type == kind.records().type_name {
+                if kind == Kind::BlueprintPools {
+                    crate::crafting::ledger::pool_record(record)
+                } else {
+                    entity_selection::select(record, None)
+                }
             } else {
-                entity_selection::select(record, None)
+                Ok(None)
             }
-        } else {
-            Ok(None)
-        }
-    });
+        })
+    };
     match classified {
         Err(_) => coverage.unreadable_headers.push(record.index()),
         Ok(Some(Selected::Leftover(actual))) if actual == kind => coverage.skipped_leftovers += 1,

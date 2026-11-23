@@ -6,6 +6,9 @@ use p4kx_extraction::{
     Archive, SharedFieldOrigin, SourceUseRole, SourceUses, SourceValue, SourcedValue,
 };
 
+#[path = "vehicle_structure_binding.rs"]
+pub(crate) mod structure_binding;
+
 use super::port_vehicle_calls::PortVehicleCall;
 use super::vehicle_stage::Contributions;
 use super::{Capture, State};
@@ -91,15 +94,23 @@ impl VehicleFiles<'_> {
         archive: Option<&Archive>,
         proof: &mut Contributions,
     ) -> Result<(), CatalogError> {
+        if self.call.is_some_and(|call| !call.modification_observed) {
+            proof.incomplete();
+        }
+        self.observe_file_choices(archive, proof)
+    }
+
+    fn observe_file_choices(
+        &self,
+        archive: Option<&Archive>,
+        proof: &mut Contributions,
+    ) -> Result<(), CatalogError> {
         let (Some(entries), Some(call), Some(archive)) = (&self.entries, self.call, archive) else {
             proof.incomplete();
             return Ok(());
         };
         entries.check_archive(archive.input_origin())?;
         proof.add(call.caller.selection()?);
-        if !call.modification_observed {
-            proof.incomplete();
-        }
         let directory = if call.files.iter().any(VehicleFileSelection::needs_directory) {
             entries
                 .source_uses()

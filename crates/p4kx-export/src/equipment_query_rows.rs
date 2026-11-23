@@ -7,7 +7,9 @@ use super::{
     InventoryOwnerBounds, InventoryOwnerStorage, ItemAttachmentComponent, ItemDefinition,
     ItemSource,
 };
+use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_projection::CatalogProjection;
+use crate::catalog_queries::CatalogRecordCoverage;
 use crate::catalog_read::scoped_source_read::ScopedSourceRead;
 use crate::catalog_table::DatasetAvailability;
 use crate::catalog_v3::ammo_definition;
@@ -52,6 +54,7 @@ impl ConfigurationFamily {
 #[derive(Clone, Copy)]
 pub(super) enum Family {
     Definitions,
+    Items,
     ItemSources,
     Attachments,
     Bounds,
@@ -97,6 +100,7 @@ impl Family {
             Self::CargoLoadingGlobals => Kind::CargoLoadingGlobals,
             Self::ShopCommodityGlobals => Kind::ShopCommodityGlobals,
             Self::Definitions
+            | Self::Items
             | Self::ItemSources
             | Self::Attachments
             | Self::Bounds
@@ -115,7 +119,9 @@ impl Family {
             return DatasetAvailability::Available;
         }
         let types = match self {
-            Self::Definitions | Self::ItemSources => &[p4kx_assembly::ENTITY_TYPE][..],
+            Self::Definitions | Self::Items | Self::ItemSources => {
+                &[p4kx_assembly::ENTITY_TYPE][..]
+            }
             Self::Attachments => &[ATTACHABLE][..],
             Self::Bounds => BOUNDS_SOURCE_TYPES,
             Self::Configuration(family) => family.source_types(),
@@ -164,6 +170,15 @@ pub(super) trait Projector {
         options: &ReadOptions<'_>,
         cancel: Option<&CancelToken>,
     ) -> Result<ScopedSourceRead<Vec<Self::Row<'source>>>, CatalogError>;
+
+    fn finish<'source>(
+        _input: &OriginalCatalogInput<'source, 'source>,
+        _rows: &mut [Self::Row<'source>],
+        _coverage: &mut CatalogRecordCoverage,
+        _cancel: Option<&CancelToken>,
+    ) -> Result<(), CatalogError> {
+        Ok(())
+    }
 }
 
 pub(super) struct Definitions;

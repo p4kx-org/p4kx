@@ -5,7 +5,8 @@ use std::collections::BTreeMap;
 use std::sync::Mutex;
 
 use p4kx_extraction::{
-    CancelToken, SourceUse, SourceUseRef, SourceUses, SourceValue, SourcedValue,
+    CancelToken, FieldOrigin, SourceEvidenceError, SourceUse, SourceUseRef, SourceUses,
+    SourceValue, SourcedValue,
 };
 use serde::{Serialize, Serializer};
 
@@ -278,6 +279,17 @@ impl HealthTextCell {
             cell: sources.value(SourceValue::Absent, &[], true),
             text: None,
         }
+    }
+
+    pub(super) fn with_observed_origin(
+        self,
+        sources: &SourceUses,
+        origin: &FieldOrigin,
+    ) -> Result<Self, SourceEvidenceError> {
+        Ok(Self {
+            cell: sources.add_value_origins(self.cell, &[origin])?,
+            text: self.text,
+        })
     }
 
     pub(super) const fn cell(&self) -> &SourcedValue<HealthTextRef> {

@@ -38,7 +38,7 @@ pub(crate) struct Paint {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct Ship<'a> {
+pub struct Ship<'a> {
     /// The original physical Record position within the source Build.
     #[serde(skip)]
     #[schemars(skip)]
@@ -84,10 +84,8 @@ pub(crate) struct Ship<'a> {
     /// The sourced classification selected by the original Ship rules.
     #[schemars(with = "SourcedValue<String>")]
     pub(crate) playability: SourcedValue<Playability>,
-    /// The GUID of the base of the variant group the ship belongs to: the ships that share the
-    /// vehicle definition and the vehicle implementation after the Modification. `null` for a base
-    /// and for a ship that is alone in its group. It is the `guid` of an entry of `ships`.
-    pub(crate) variant_of: Option<CatalogGuid>,
+    /// Sourced physical base in the unfiltered Build's canonical Ship cohort.
+    pub(crate) variant_of: crate::variant_decision::VariantDecision,
     /// The original selected static insurance declaration and parameter states.
     pub(crate) insurance: SourcedValue<Box<ShipInsurance<'a>>>,
     /// Authored crew-manifest inputs, independently of the derived playability result.

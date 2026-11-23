@@ -3,7 +3,7 @@
 
 use std::convert::Infallible;
 
-use p4kx_extraction::{DataForge, Record, RecordTree, TreeBuilder};
+use p4kx_extraction::{DataForge, DataForgeError, Record, RecordTree, TreeBuilder, Value};
 
 use crate::catalog_v3::catalog_durability;
 use crate::contract_stats::{AmmoStats, ItemStatBlocks, ItemStats, ItemStatsFields};
@@ -12,10 +12,14 @@ use crate::record_fields::{component, structure, text};
 mod gear;
 mod mining;
 mod parts;
+#[cfg(test)]
+mod physical_link_tests;
 mod resources;
+mod scoped;
 mod walk;
 mod weapon;
 
+pub(crate) use scoped::read_scoped;
 pub(crate) use weapon::{
     AMMO_CONTAINER, MagazineRead, MagazineRoute, PRIMARY_MAGAZINE_FIELD, WEAPON_COMPONENT, ammo,
     with_primary_magazine,
@@ -23,6 +27,13 @@ pub(crate) use weapon::{
 
 const POWER_PLANT: &str = "PowerPlant";
 const COOLER: &str = "Cooler";
+
+/// An authored stat link and its exact decoded physical target.
+#[derive(Clone, Copy)]
+pub(crate) struct LinkedStatTarget<'read, 'source> {
+    pub(crate) selector: &'read Value<'source>,
+    pub(crate) record: Record<'source>,
+}
 
 /// Returns the stat blocks of the item `tree`, `None` when it has none of the blocks.
 ///
@@ -41,8 +52,11 @@ pub(crate) fn read<'f>(
         forge,
         trees,
         || catalog_durability::legacy_health(tree),
-        |record, trees| Ok::<_, Infallible>(trees.build(record).ok().map(|tree| ammo(&tree))),
+        |target, trees| {
+            Ok::<_, Infallible>(trees.build(&target.record).ok().map(|tree| ammo(&tree)))
+        },
         |_| Ok(()),
+        |_, _| Ok(()),
     )
     .unwrap_or_else(|error| match error {})
 }
@@ -52,8 +66,15 @@ pub(crate) fn read_with_sources<'f, E>(
     forge: &'f DataForge<'f>,
     trees: &mut TreeBuilder<'f>,
     health: impl FnOnce() -> Option<f32>,
-    ammunition: impl FnOnce(&Record<'f>, &mut TreeBuilder<'f>) -> Result<Option<AmmoStats>, E>,
+    ammunition: impl FnOnce(
+        LinkedStatTarget<'_, 'f>,
+        &mut TreeBuilder<'f>,
+    ) -> Result<Option<AmmoStats>, E>,
     observe_magazine: impl FnOnce(MagazineRead<'_, 'f>) -> Result<(), E>,
+    observe_resistance: impl FnOnce(
+        LinkedStatTarget<'_, 'f>,
+        Result<&RecordTree<'f>, &DataForgeError>,
+    ) -> Result<(), E>,
 ) -> Result<Option<ItemStats<'f>>, E> {
     let attach = structure(component(tree, "SAttachableComponentParams"), "AttachDef");
     let kind = text(attach, "Type");
@@ -65,7 +86,7 @@ pub(crate) fn read_with_sources<'f, E>(
     let power_plant = is(POWER_PLANT).then(|| resources::power_plant(&resource_states));
     let cooler = is(COOLER).then(|| resources::cooler(&resource_states));
     let missile = parts::missile(tree);
-    let armor = gear::armor(tree, forge, trees);
+    let armor = gear::armor(tree, forge, trees, observe_resistance)?;
     let clothing = gear::clothing(tree);
     let radar = gear::radar(tree);
     let tractor_beam = gear::tractor_beam(tree);

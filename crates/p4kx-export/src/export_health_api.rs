@@ -19,7 +19,7 @@ pub use crate::export_reference_issue::{
     ExportReferenceStatus, ExportSourcePointer, ExportUnresolvedReference,
 };
 
-pub use crate::catalog_v3::export_health_capture::CatalogProvenance;
+pub use crate::catalog_v3::export_health_capture::{CatalogProvenance, CatalogProvenanceView};
 
 pub use crate::build::refusal::CatalogRefusal;
 

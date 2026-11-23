@@ -16,13 +16,18 @@ impl ExampleBody {
             }
             (Self::LoadoutTarget(receipt), Self::LoadoutTarget(other)) => receipt.merge(other),
             (
-                Self::Technical { subject, field },
+                Self::Technical {
+                    subject,
+                    field,
+                    evidence,
+                },
                 Self::Technical {
                     subject: other_subject,
                     field: other_field,
+                    evidence: other_evidence,
                 },
             ) => {
-                if *field != other_field {
+                if *field != other_field || *evidence != other_evidence {
                     return Err(ExportAccountingError::ConflictingSourceDatum);
                 }
                 subject.merge(other_subject)

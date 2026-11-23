@@ -99,28 +99,29 @@ fn aggregate_origins(
     values: &ShipAggregateValues,
     fields: &mut FieldOrigins,
 ) -> Result<(), ShipBaseError> {
+    let vehicle = &values.vehicle;
     let grids_with_issue = u64::try_from(ship.cargo.grids_with_issue)
         .map_err(|_| CatalogError::from(ExportAccountingError::CounterOverflow))?;
-    if ship.mass.as_ref().map(|mass| mass.kg) != values.mass.value().copied()
-        || ship.mass.as_ref().map(|mass| mass.basis) != values.mass_basis.value().copied()
-        || ship.hull.as_ref().map(|hull| hull.health) != values.hull_health.value().copied()
+    if ship.mass.as_ref().map(|mass| mass.kg) != vehicle.mass.value().copied()
+        || ship.mass.as_ref().map(|mass| mass.basis) != vehicle.mass_basis.value().copied()
+        || ship.hull.as_ref().map(|hull| hull.health) != vehicle.hull_health.value().copied()
         || ship.cargo.scu != values.cargo.scu().value().copied()
         || values.cargo.grids_with_issue().value() != Some(&grids_with_issue)
     {
         return Err(CatalogError::from(ExportAccountingError::ConflictingSourceDatum).into());
     }
     if ship.mass.is_some() {
-        insert(fields, "/mass/kg", values.mass.origin())?;
-        insert(fields, "/mass/basis", values.mass_basis.origin())?;
+        insert(fields, "/mass/kg", vehicle.mass.origin())?;
+        insert(fields, "/mass/basis", vehicle.mass_basis.origin())?;
     } else {
-        insert(fields, "/mass", values.mass.origin())?;
+        insert(fields, "/mass", vehicle.mass.origin())?;
     }
     let hull = if ship.hull.is_some() {
         "/hull/health"
     } else {
         "/hull"
     };
-    insert(fields, hull, values.hull_health.origin())?;
+    insert(fields, hull, vehicle.hull_health.origin())?;
     insert(fields, "/cargo/scu", values.cargo.scu().origin())?;
     insert(
         fields,

@@ -14,6 +14,10 @@ use crate::ship_base::ShipRead;
 use crate::ship_pool::ShipPool;
 use crate::{CatalogError, CatalogReadFailure, ExportAccountingError, Kind};
 
+#[cfg(test)]
+#[path = "ship_source_projection_direct.rs"]
+pub(crate) mod direct;
+
 pub(crate) struct ProjectedShipSource<'read, 'source> {
     pub(crate) source: ShipSourceRead<'read, 'source>,
     pub(crate) read: Result<ShipRead, CatalogReadFailure<'source>>,
@@ -48,15 +52,11 @@ pub(crate) fn read<'read, 'source>(
             .aggregates
             .as_ref()
             .ok_or(ExportAccountingError::UnobservedFailure)?;
-        if aggregates.physics_used {
-            source.notes.append(&mut source.physics_notes);
-        }
-        crate::source_projection_notes::record(
-            Kind::Ships,
-            ExportSourceRole::Selected,
+        record_notes(
+            &mut source,
             admission,
             tree,
-            std::mem::take(&mut source.notes),
+            aggregates.vehicle.physics_used,
             ledger,
         )?;
     }
@@ -65,4 +65,24 @@ pub(crate) fn read<'read, 'source>(
         read: read.read,
         aggregates: read.aggregates,
     })
+}
+
+fn record_notes(
+    source: &mut ShipSourceRead<'_, '_>,
+    admission: &RecordObservation<'_, '_>,
+    tree: &RecordTree<'_>,
+    physics_used: bool,
+    ledger: &mut ExportLedger,
+) -> Result<(), CatalogError> {
+    if physics_used {
+        source.notes.append(&mut source.physics_notes);
+    }
+    crate::source_projection_notes::record(
+        Kind::Ships,
+        ExportSourceRole::Selected,
+        admission,
+        tree,
+        std::mem::take(&mut source.notes),
+        ledger,
+    )
 }

@@ -3,9 +3,11 @@
 
 use p4kx_extraction::{Build, Language, LocalizationNote, SourceInventory};
 
-use super::{InventoryOwnerBounds, ItemAttachmentComponent, ItemDefinition, ItemSource};
+use super::{InventoryOwnerBounds, Item, ItemAttachmentComponent, ItemDefinition, ItemSource};
+use crate::CatalogProvenanceView;
 use crate::catalog_queries::{CatalogRecordCoverage, DatasetAvailability};
 use crate::catalog_text_contract::{CanonicalText, GameTextRef, PublicNameRef};
+use crate::variant_use_sets::VariantSourceUseSets;
 
 /// Selected canonical original equipment rows with their exact source and text context.
 #[derive(Debug)]
@@ -26,6 +28,41 @@ pub struct EquipmentSnapshot<'source, Row, Dependencies = ()> {
 
 /// Selected original Item presentation, physics and purchase definitions.
 pub type ItemDefinitionSnapshot<'source> = EquipmentSnapshot<'source, ItemDefinition<'source>>;
+
+/// Selected canonical physical Item rows with variant decisions.
+pub type ItemSnapshot<'source> = EquipmentSnapshot<'source, Item<'source>, VariantSourceUseSets>;
+
+impl<'source> EquipmentSnapshot<'source, Item<'source>> {
+    pub(super) fn with_variant_sets(self, sets: VariantSourceUseSets) -> ItemSnapshot<'source> {
+        ItemSnapshot {
+            build: self.build,
+            availability: self.availability,
+            rows: self.rows,
+            public_names: self.public_names,
+            game_texts: self.game_texts,
+            requested_languages: self.requested_languages,
+            available_languages: self.available_languages,
+            localization_notes: self.localization_notes,
+            source_inventory: self.source_inventory,
+            coverage: self.coverage,
+            dependency_coverage: sets,
+        }
+    }
+}
+
+impl ItemSnapshot<'_> {
+    /// Borrows the complete canonical provenance for this Item query.
+    #[must_use]
+    pub const fn provenance(&self) -> CatalogProvenanceView<'_> {
+        CatalogProvenanceView::new(self.source_inventory(), self.variant_source_use_sets())
+    }
+
+    /// Borrows the use sets referenced by the emitted Item variant decisions.
+    #[must_use]
+    pub const fn variant_source_use_sets(&self) -> &VariantSourceUseSets {
+        &self.dependency_coverage
+    }
+}
 
 /// Selected original Item headers, component choices, class and playability.
 pub type ItemSourceSnapshot<'source> = EquipmentSnapshot<'source, ItemSource<'source>>;

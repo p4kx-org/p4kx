@@ -28,6 +28,7 @@ pub use crate::client_profile_settings::{
     read_client_profile_settings, read_client_profile_settings_for,
 };
 pub use crate::contract::{SCHEMA_VERSION, catalog_schema};
+pub use crate::contract_entities::Ship;
 pub use crate::crafting::{Crafting, read_crafting};
 pub use crate::crafting_research::{Research, ResearchBlock, ResearchMember, ResearchValue};
 pub use crate::crafting_types::{
@@ -40,6 +41,7 @@ pub use crate::crafting_warning::CraftingWarning;
 pub use crate::error::CatalogError;
 pub use crate::failure::CatalogFailure;
 pub use crate::form::{FLAT_CSV_FILE, FLAT_NDJSON_FILE, NDJSON_FILE, RecordForm};
+pub use crate::item::Item;
 pub use crate::item_class::{ItemClass, ItemClassSummary};
 pub use crate::localization_table::{
     LocalizationTableDatum, TableFormat, write_localization_table,
@@ -73,6 +75,8 @@ pub use crate::summary::{
     VariantCounts, VariantSummary,
 };
 pub use crate::variant_groups::{VariantGroups, read_variant_groups};
+pub use crate::variant_target::VariantTarget;
+pub use crate::variant_use_sets::{VariantSourceUseSet, VariantSourceUseSets};
 #[expect(
     deprecated,
     reason = "Public compatibility for the released Tag depth constant"

@@ -39,6 +39,8 @@ pub use model::{
 };
 pub use read::ShipReader;
 pub(crate) use read::VehicleKindPath;
+#[cfg(test)]
+pub(crate) use read::VehicleMeasurements;
 pub use write::ShipBaseError;
 
 /// The version of the ship base data format, raised for a breaking change.

@@ -33,7 +33,18 @@ pub(super) fn rows() -> Value {
         "massBasis": present(json!("parts")),
         "hullHealth": present(json!(600.0)),
         "playability": present(json!("ai")),
-        "variantOf": "a0000000-0000-4000-8000-000000000001",
+        "variantOf": {
+            "state": "present",
+            "value": {
+                "guid": present(json!("a0000000-0000-4000-8000-000000000001")),
+                "targetRecordIndex": present(json!(0))
+            },
+            "containsEncryptedSource": true,
+            "sourceSetComplete": true,
+            "sourceUsesRefs": ["test:reference"],
+            "sourceUseSetRef": 0,
+            "failedSourceUseRefs": []
+        },
         "insurance": present(json!({
             "staticElementOrdinal": present(json!(0)),
             "restoreOnClaim": present(json!(true)),

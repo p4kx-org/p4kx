@@ -2,9 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::error::Error;
-use std::sync::Arc;
 
-use p4kx_assembly::{ArchiveFiles, Entities};
+use p4kx_assembly::ArchiveFiles;
 use p4kx_extraction::{Archive, DataForge, DataForgeEntry, Record, RecordTree, SourceInventory};
 
 use crate::Kind;
@@ -12,12 +11,12 @@ use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_text_contract::{CanonicalText, GameTextRef, PublicNameRef};
+use crate::contract::Ship;
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::ExportLedger;
 use crate::playability_rules::Evidence;
 use crate::record_observation::RecordObservation;
-use crate::ship::{ShipSource, source_projection};
-use crate::ship_pool::ShipPool;
+use crate::ship::source_projection::direct;
 use crate::texts::{TextSources, Texts};
 
 type TestResult<T> = Result<T, Box<dyn Error>>;
@@ -35,7 +34,7 @@ pub(crate) fn project<'source, T>(
     forge: &'source DataForge<'source>,
     record: &Record<'source>,
     finish: impl FnOnce(
-        &ShipSource<'_>,
+        &Ship<'_>,
         &[CanonicalText<'_, PublicNameRef>],
         &[CanonicalText<'_, GameTextRef>],
     ) -> TestResult<T>,
@@ -55,9 +54,8 @@ pub(crate) fn project<'source, T>(
         RecordObservation::capture(&input, record).map_err(|_| "admit original Ship Record")?;
     let (playability, mut ledger) = inspect_inputs(&input, &tree, &admission)?;
     let files = ArchiveFiles::new(archive);
-    let pool = ShipPool::new(Arc::new(Entities::new(forge)), &files);
-    let projected = source_projection::read(
-        &pool,
+    let projected = direct::read(
+        &files,
         &projection,
         &input,
         &admission,
@@ -65,20 +63,15 @@ pub(crate) fn project<'source, T>(
         &mut ledger,
         None,
     )
-    .map_err(|_| "scoped producer Ship projection failed")?;
-    projected
-        .read
-        .map_err(|_| "scoped producer Ship resolver failed")?;
-    let aggregates = projected
-        .aggregates
-        .ok_or("producer aggregate cells missing")?;
+    .map_err(|_| "scoped producer Ship projection failed")?
+    .map_err(|_| "scoped producer Ship resolver failed")?;
     let playability = projected.source.playability_proof.decide(
         &tree,
         projected.source.vehicle,
         &playability,
         &input,
     )?;
-    let row = ShipSource::from_read(projected.source, aggregates, playability);
+    let row = Ship::from_read(projected.source, projected.vehicle, playability)?;
     let locales = projection
         .finish_rows()
         .map_err(|_| "finish scoped producer text registry")?;

@@ -103,11 +103,8 @@ impl<'query> Query<'query> {
         } else {
             requested
         };
-        let sources = if matches!(P::FAMILY, Family::ItemSources) && !plan.owners.is_empty() {
-            TextSources::read_item_languages(self.archive, &[])?
-        } else {
-            TextSources::read_languages(self.archive, selected_languages)?
-        };
+        let item_projection = matches!(P::FAMILY, Family::Items | Family::ItemSources);
+        let sources = self.text_sources(P::FAMILY, !plan.owners.is_empty(), selected_languages)?;
         checkpoint(self.cancel)?;
         let origins = CatalogOrigins::new(self.archive, self.entry, &sources)?;
         let input = OriginalCatalogInput::new(self.forge, &origins);
@@ -123,7 +120,7 @@ impl<'query> Query<'query> {
             },
             item_filter,
         };
-        let rows = project::<P>(
+        let mut rows = project::<P>(
             self.forge,
             plan.owners,
             &projection,
@@ -131,7 +128,8 @@ impl<'query> Query<'query> {
             &mut plan.coverage,
             self.cancel,
         )?;
-        let (public_names, game_texts) = (!matches!(P::FAMILY, Family::ItemSources))
+        P::finish(&input, &mut rows, &mut plan.coverage, self.cancel)?;
+        let (public_names, game_texts) = (!item_projection)
             .then(|| projection.finish_rows())
             .transpose()?
             .map_or_else(Default::default, |rows| {
@@ -156,6 +154,19 @@ impl<'query> Query<'query> {
             coverage: plan.coverage,
             dependency_coverage: (),
         }))
+    }
+
+    fn text_sources(
+        &self,
+        family: Family,
+        has_owners: bool,
+        languages: &[Language],
+    ) -> Result<TextSources, CatalogError> {
+        if matches!(family, Family::ItemSources | Family::Items) && has_owners {
+            TextSources::read_item_languages(self.archive, &[])
+        } else {
+            TextSources::read_languages(self.archive, languages)
+        }
     }
 
     fn plan(
@@ -184,6 +195,7 @@ impl<'query> Query<'query> {
                 },
             )?,
             Family::Definitions
+            | Family::Items
             | Family::ItemSources
             | Family::InventoryContainers
             | Family::CargoLoadingGlobals
@@ -237,6 +249,7 @@ impl<'query> Query<'query> {
 fn order(family: Family, owners: &mut [Owner<'_>]) {
     match family {
         Family::Definitions
+        | Family::Items
         | Family::ItemSources
         | Family::AmmoDefinitions
         | Family::ExplosionDefinitions

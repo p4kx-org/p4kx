@@ -5,13 +5,17 @@ use p4kx_extraction::{CancelToken, SourceValueState, Value};
 
 use super::ShipSourceRead;
 use crate::catalog_read::original::{OriginalFlowFields, OriginalValuePart};
+use crate::digest::Digest;
 use crate::record_observation::RecordObservation;
 use crate::resource_number::ResourceNumber;
+use crate::variants::ShipKey;
 
 #[path = "ship_source_fixture.rs"]
 mod fixture;
 #[path = "ship_source_states_tests.rs"]
 mod states;
+#[path = "ship_variant_cohort_input_tests.rs"]
+mod variant_input_tests;
 
 use fixture::{Fault, Origin, TestResult};
 
@@ -73,6 +77,50 @@ fn ship_original_reader_keeps_physical_aliases_raw_selectors_and_exact_numbers()
                     .is_err(),
                 "target body is genuinely unreadable without preventing an authored link"
             );
+            Ok(())
+        },
+    )
+}
+
+#[test]
+fn variant_keys_use_the_original_definition_with_its_prefix_evidence() -> TestResult {
+    fixture::with_projection(
+        &fixture::database(Fault::EarlierComponent),
+        Origin::Encrypted,
+        |forge, projection| {
+            let implementation = Digest::from_bytes([1; 16]);
+            let expected = ShipKey::new("  data/vehicles/original.xml  ", implementation);
+            let primary = forge.record(0).ok_or("original primary ship")?;
+            let alias = forge.record(1).ok_or("original alias ship")?;
+            assert_eq!(
+                primary.guid(),
+                alias.guid(),
+                "the Records are physical aliases"
+            );
+            for (record, wanted, complete) in
+                [(primary, Some(&expected), false), (alias, None, true)]
+            {
+                let tree = record.tree()?;
+                let admission = RecordObservation::capture(projection.original(), &record)?;
+                let row = super::read(&tree, projection, &admission, None)?;
+                let definition = &row.vehicle_definition;
+                let key = ShipKey::from_read(definition.value().copied(), Some(implementation));
+                assert_eq!(
+                    key.as_ref(),
+                    wanted,
+                    "normalize the original nonempty text without trimming it",
+                );
+                assert_eq!(
+                    definition.origin().source_set_complete(),
+                    complete,
+                    "an earlier failed component remains distinct from a known empty definition",
+                );
+                assert_eq!(
+                    definition.origin().contains_encrypted_source(),
+                    Some(true),
+                    "prefix uncertainty does not erase encrypted inputs",
+                );
+            }
             Ok(())
         },
     )

@@ -293,7 +293,7 @@ fn append_domain_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResul
     routes.extend(weapon_procedural::read()?);
     routes.extend(fuel::read()?);
     routes.extend(hacking::read()?);
-    routes.extend(inventory_containers::read()?);
+    routes.push(inventory_containers::read()?);
     routes.push(inventory_containers::read_configurations()?);
     routes.push(facilities::read()?);
     routes.extend(facility_placements::read()?);

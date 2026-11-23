@@ -3,14 +3,23 @@
 
 //! The variant groups of ships in the P4KX catalog, through the public API.
 
+#[path = "../catalog_variant_value/mod.rs"]
+pub(crate) mod decision_reader;
+
 use crate::variants_fixture;
+use crate::variants_fixture::read_rows::{base_of, entry};
 
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::{BuiltCatalog, CatalogOptions, VariantCounts, build_catalog};
-use p4kx_extraction::Archive;
-use serde_json::Value;
+use p4kx_export::{
+    BuiltCatalog, CatalogOptions, CatalogPublicationMode, VariantCounts, build_catalog,
+};
+use p4kx_extraction::{Archive, DataForgeEntry, Value as OriginalValue, ValueError};
+use serde_json::{Value, json};
+
+use crate::commodity_v3_fixture::{self as common, DcbOrigin};
+use crate::health_origin_assertions as proof;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -25,7 +34,7 @@ fn build() -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
     let built = build_catalog(
         &archive,
         &CatalogOptions {
-            publication_mode: p4kx_export::CatalogPublicationMode::DiagnosticPartial,
+            publication_mode: CatalogPublicationMode::DiagnosticPartial,
             ..CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT)
         },
     )?;
@@ -33,39 +42,12 @@ fn build() -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
     Ok((built, json))
 }
 
-fn entry<'c>(catalog: &'c Value, kind: &str, class: &str) -> Result<&'c Value, String> {
-    catalog[kind]
-        .as_array()
-        .and_then(|list| {
-            list.iter().find(|entry| {
-                crate::catalog_items::entity_field(entry, kind, "className").and_then(Value::as_str)
-                    == Some(class)
-            })
-        })
-        .ok_or_else(|| format!("{kind} {class} missing"))
-}
-
-fn base_of(catalog: &Value, kind: &str, class: &str) -> Result<Option<String>, String> {
-    let base = &entry(catalog, kind, class)?["variantOf"];
-    if base.is_null() {
-        return Ok(None);
-    }
-    catalog[kind]
-        .as_array()
-        .and_then(|list| {
-            list.iter()
-                .find(|entry| crate::catalog_items::entity_field(entry, kind, "guid") == Some(base))
-        })
-        .and_then(|entry| {
-            crate::catalog_items::entity_field(entry, kind, "className").and_then(Value::as_str)
-        })
-        .map(|name| Some(name.to_owned()))
-        .ok_or_else(|| format!("variantOf of {class} resolves to no {kind} entry"))
-}
-
 fn base_class(catalog: &Value, class: &str) -> Result<Option<String>, String> {
     base_of(catalog, "ships", class)
 }
+
+#[path = "catalog_ship_variants_filter.rs"]
+mod filtered_ships;
 
 #[test]
 fn items_that_differ_only_in_tags_and_name_are_variants() -> TestResult {
@@ -210,21 +192,30 @@ fn a_ship_that_differs_in_definition_or_modification_is_not_a_variant() -> TestR
 fn a_ship_without_a_readable_implementation_is_ungrouped() -> TestResult {
     let (_, catalog) = build()?;
     for class in ["ACAS_Lonely", "ACAS_Broken", "ACAS_Missing"] {
-        assert_eq!(base_class(&catalog, class)?, None, "{class}");
+        let row = entry(&catalog, "ships", class)?;
+        let state = if class == "ACAS_Broken" {
+            "unreadable"
+        } else {
+            "absent"
+        };
+        decision_reader::variant_cell(row, state)?;
     }
     Ok(())
 }
 
 #[test]
-fn every_ship_carries_the_field_and_it_is_a_guid_or_null() -> TestResult {
+fn every_ship_carries_a_typed_variant_decision() -> TestResult {
     let (_, catalog) = build()?;
     let ships = catalog["ships"].as_array().ok_or("ships")?;
-    assert_eq!(ships.len(), 17);
+    assert_eq!(ships.len(), 17, "all original Ship rows survive");
     for ship in ships {
         let value = ship.get("variantOf").ok_or("variantOf missing")?;
         assert!(
-            value.is_null() || value.is_string(),
-            "{}",
+            matches!(
+                value.get("state").and_then(Value::as_str),
+                Some("present" | "absent" | "unreadable")
+            ),
+            "{} retains a typed physical variant outcome",
             ship["className"]["value"]
         );
     }
@@ -244,7 +235,143 @@ fn the_summary_counts_groups_and_variants() -> TestResult {
     Ok(())
 }
 
+fn check_readable_item_keys(catalog: &Value) -> TestResult {
+    for class in ["POWR_Key_Empty", "POWR_Key_Excluded"] {
+        assert_eq!(
+            base_of(catalog, "items", class)?.as_deref(),
+            Some("POWR_Key_Base"),
+            "{class} keeps its proven variant link"
+        );
+        let components = item_components(catalog, class)?;
+        assert_eq!(
+            proof::at(components, "/sourceSetComplete")?.as_bool(),
+            Some(true),
+            "{class} retains a complete source survey"
+        );
+    }
+    Ok(())
+}
+
+fn item_components<'a>(catalog: &'a Value, class: &str) -> Result<&'a Value, Box<dyn Error>> {
+    let item = entry(catalog, "items", class)?;
+    let index = proof::at(item, "/recordIndex")?;
+    let definition = proof::rows(catalog, "/definitions/items/rows")?
+        .iter()
+        .find(|definition| definition.get("recordIndex") == Some(index))
+        .ok_or("the same physical Item definition")?;
+    proof::cell(definition, "components", "present")
+}
+
+#[test]
+fn item_components_with_null_or_excluded_values_keep_the_normal_variant_key() -> TestResult {
+    let (_, catalog) = common::build(&variants_fixture::item_key_database(false))?;
+    check_readable_item_keys(&catalog)
+}
+
+#[test]
+fn an_unreadable_item_component_cannot_prove_a_variant_link() -> TestResult {
+    let database = variants_fixture::item_key_database(true);
+    let (_folder, archive) = common::open(&database, DcbOrigin::Encrypted)?;
+    let ordinal = unreadable_component_ordinal(&archive)?;
+    let mut options = common::options();
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
+    let built = build_catalog(&archive, &options)?;
+    let catalog = serde_json::from_slice(built.json())?;
+    let class = "POWR_Key_Unreadable";
+    for candidate in [
+        "POWR_Key_Base",
+        "POWR_Key_Empty",
+        "POWR_Key_Excluded",
+        class,
+    ] {
+        let decision =
+            decision_reader::variant_cell(entry(&catalog, "items", candidate)?, "unreadable")?;
+        assert_eq!(
+            decision.get("sourceSetComplete").and_then(Value::as_bool),
+            Some(false),
+            "{candidate} cannot prove a winner while a possible peer remains unreadable"
+        );
+    }
+    let components = item_components(&catalog, class)?;
+    verify_component_attempt(&catalog, components, ordinal)
+}
+
+const UNREADABLE_ITEM_INDEX: u32 = 3;
+
+fn unreadable_component_ordinal(archive: &Archive) -> Result<usize, Box<dyn Error>> {
+    let source = DataForgeEntry::read(archive)?;
+    let forge = source.open()?;
+    let tree = forge
+        .record(UNREADABLE_ITEM_INDEX)
+        .ok_or("actual unreadable Item Record")?
+        .tree()?;
+    let Some(OriginalValue::Array(slots)) = tree.field("Components") else {
+        return Err("actual original Components array".into());
+    };
+    assert!(
+        matches!(
+            slots.last(),
+            Some(OriginalValue::Error(ValueError::InvalidPointer {
+                struct_index: variants_fixture::INVALID_COMPONENT_TYPE,
+                instance_index: 3,
+            }))
+        ),
+        "the final source slot has an actual invalid pointer"
+    );
+
+    let mut ordinals = Vec::new();
+    tree.root().visit_owned_values(|visit| {
+        if visit.field_name() == "Components"
+            && matches!(
+                visit.value(),
+                OriginalValue::Error(ValueError::InvalidPointer { .. })
+            )
+        {
+            ordinals.push(visit.ordinal());
+        }
+    });
+    let [ordinal] = ordinals.as_slice() else {
+        return Err("one unreadable occurrence in the original Components array".into());
+    };
+    Ok(*ordinal)
+}
+
+fn verify_component_attempt(catalog: &Value, components: &Value, ordinal: usize) -> TestResult {
+    assert_eq!(
+        proof::at(components, "/sourceSetComplete")?.as_bool(),
+        Some(false),
+        "the original unavailable component retains its incomplete proof"
+    );
+    assert!(
+        proof::uses(catalog, components)?
+            .iter()
+            .all(|used| used.get("role").and_then(Value::as_str) != Some("attempted")),
+        "the failed read does not contribute a decoded component value"
+    );
+    let coordinate = json!([UNREADABLE_ITEM_INDEX.to_string(), ordinal.to_string()]);
+    assert!(
+        proof::rows(catalog, "/provenance/uses")?
+            .iter()
+            .any(|used| {
+                used.get("role").and_then(Value::as_str) == Some("attempted")
+                    && used.get("scope").and_then(Value::as_str) == Some("payload")
+                    && used.pointer("/location/namespace").and_then(Value::as_str)
+                        == Some("dataforgeValue")
+                    && used.pointer("/location/field").and_then(Value::as_str) == Some("$value")
+                    && used.pointer("/location/indices") == Some(&coordinate)
+            }),
+        "the inventory retains the attempted read at its exact original physical Component slot"
+    );
+    proof::closure(catalog)
+}
+
 #[path = "catalog_variant_identity_fixture.rs"]
 mod physical_fixture;
 #[path = "catalog_variant_physical_identity.rs"]
 mod physical_identity;
+
+#[path = "catalog_variants_filter.rs"]
+mod filtered_items;
+
+#[path = "catalog_item_variant_headers.rs"]
+mod item_headers;

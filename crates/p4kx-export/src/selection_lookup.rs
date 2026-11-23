@@ -3,7 +3,9 @@
 
 use std::fmt;
 
+#[cfg(test)]
 use crate::catalog_v3::loot_definition_catalog::LootDefinitionKind;
+#[cfg(test)]
 use crate::harvest_config::is_slotpreset_path;
 use crate::selection::{Exosuit, Kind, KindRule};
 
@@ -43,16 +45,14 @@ impl Kind {
     /// kinds; only the order of [`Kind::ALL`] resolves it. Kinds that share a folder are told
     /// apart by [`Self::by_record`]. Multi configs retain slot-preset path lookup.
     /// Other type-wide Loot definitions require a Record type.
+    #[cfg(test)]
     pub(crate) fn by_path(record_path: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|kind| {
             if *kind == Self::SubHarvestableMultiConfigs {
                 return is_slotpreset_path(record_path);
             }
             !LootDefinitionKind::of(*kind).is_some_and(LootDefinitionKind::is_type_wide)
-                && (kind
-                    .rule()
-                    .is_some_and(|rule| rule.matches_path(record_path))
-                    || kind.matches_exosuit_path(record_path))
+                && kind.matches_record_path(record_path)
         })
     }
 
@@ -60,15 +60,15 @@ impl Kind {
     /// kinds that share a folder (the V3 and the older loot Records) differ by the struct.
     pub(crate) fn by_record(record_path: &str, type_name: &str) -> Option<Self> {
         Self::ALL.into_iter().find(|kind| {
-            kind.rule()
-                .is_some_and(|rule| rule.selects(record_path, type_name))
-                || (kind.matches_exosuit_path(record_path)
-                    && type_name == Self::Ships.records().type_name)
+            kind.rule().is_some_and(|rule| rule.type_name == type_name)
+                && kind.matches_record_path(record_path)
         })
     }
 
-    fn matches_exosuit_path(self, record_path: &str) -> bool {
-        self == Self::Ships && Exosuit::by_path(record_path).is_some()
+    pub(crate) fn matches_record_path(self, record_path: &str) -> bool {
+        self.rule()
+            .is_some_and(|rule| rule.matches_path(record_path))
+            || (self == Self::Ships && Exosuit::by_path(record_path).is_some())
     }
 
     /// Returns whether the kind is derived from the entities of other kinds and selects no Records

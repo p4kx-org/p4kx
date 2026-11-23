@@ -315,7 +315,7 @@ fn real_key(key: Option<&str>) -> bool {
 /// 3. `special`: `name_key` is no key or a placeholder, so the item has no player-visible name.
 pub(crate) fn item(tree: &RecordTree<'_>, name_key: Option<&str>) -> Option<Playability> {
     let shop = locale_key(component(tree, "SCItemPurchasableParams"), "displayName");
-    item_inputs(shop, tree.record_path(), name_key).value
+    item_inputs(purchase_rank(shop), tree.record_path(), name_key).value
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -330,8 +330,26 @@ pub(crate) struct ItemDecision {
     pub(crate) rule: ItemRule,
 }
 
-pub(crate) fn item_inputs(shop: Option<&str>, path: &str, name_key: Option<&str>) -> ItemDecision {
-    let (value, rule) = if real_key(shop) {
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PurchaseRank {
+    Player,
+    NonPlayer,
+}
+
+pub(crate) fn purchase_rank(display_name: Option<&str>) -> PurchaseRank {
+    if real_key(display_name.filter(|key| !key.is_empty())) {
+        PurchaseRank::Player
+    } else {
+        PurchaseRank::NonPlayer
+    }
+}
+
+pub(crate) fn item_inputs(
+    purchase: PurchaseRank,
+    path: &str,
+    name_key: Option<&str>,
+) -> ItemDecision {
+    let (value, rule) = if purchase == PurchaseRank::Player {
         (Some(Playability::Player), ItemRule::Purchasable)
     } else if MISSION_PREFIXES
         .iter()

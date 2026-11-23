@@ -451,7 +451,7 @@ physical source joins. A GUID or path can name more than one physical declaratio
 | `selection.purchasableComponentOrdinal` | Sourced original slot of the first `SCItemPurchasableParams` |
 | `itemClass` | Sourced classification of the actual English description; known values are `Civilian`, `Competition`, `Industrial`, `Military` and `Stealth` |
 | `playability` | Sourced `player`, `mission` or `special`, or a non-present result; see "Playability" below |
-| `variantOf` | Existing nominal base GUID or null; the separately scoped source-backed variant choice and unfiltered candidate migration remain pending under ADR-0410 |
+| `variantOf` | Physical base choice and original comparison sources, computed over the unfiltered Build |
 
 The root does not duplicate `type`, `subType`, `size`, `grade`, `mass`, `manufacturerGuid` or
 `tags`. Join `recordIndex.value` to `definitions.items.rows[].recordIndex.value` and follow the
@@ -478,8 +478,7 @@ without adopting unrelated translation payloads.
 
 `itemClass` and `playability` use the shared sourced-cell envelope. Their present value domains
 remain open strings in the schema. Read state, value, source completeness and encryption
-independently. This bounded Item normalization does not claim completed provenance for
-`variantOf`, Ship/Loadout projections or a complete root-Item SDK query.
+independently. Use [Variant groups](#variant-groups) for the separate `variantOf` contract.
 
 #### Semantics of `grade`
 
@@ -611,7 +610,7 @@ its key and has absent translation forms.
 | `attachmentManufacturer` | The independently authored `AttachDef.Manufacturer`, with the original attachment component ordinal and AttachDef state |
 | `vehicleDefinition` | Sourced original String/Enum selector, including whitespace, case, separators and empty values. The Archive reader interprets it for lookup. |
 | `playability` | Sourced `player`, `ai`, `mission` or `special`; see "Playability" below |
-| `variantOf` | The `guid` of the base of the ship's variant group, `null` for a base and an ungrouped ship; see "Variant groups" below |
+| `variantOf` | Physical base choice and original comparison sources, computed over the unfiltered Build |
 | `vehicleKind` | Sourced `spaceship` or `groundVehicle`, or an absent kind. A readable fallback can carry incomplete source evidence. |
 | `size` | Sourced original `Components/SAttachableComponentParams/AttachDef/Size` as ResourceNumber with explicit absent, null and unreadable states |
 | `mass` | Immediately sourced hull mass in kilograms; use `value` when `state` is present. A positive total rounding to zero stays present. See "Ship base data" below. |
@@ -1036,12 +1035,25 @@ These are assumptions of the library, not verified against the game.
 
 #### Variant groups
 
-Many ships and items exist in cosmetic variants with the same function. `variantOf` is the `guid`
-of the entry of the same kind that is the base of the entity's group, and `null` for the base
-itself and for an entity that is alone in its group. Every `variantOf` resolves to an entry of the
-same kind. The grouping is a derived fact (ADR-0066): it reads Record data and the vehicle
-implementation, never a name, and it ignores `playability`, so an AI variant that is structurally a
-player ship is grouped with it.
+The structural comparison uses the unfiltered Item or Ship family from the original Build.
+An output filter limits returned owners. A returned owner can point to a base outside the output.
+Structural grouping follows ADR-0066 and compares Record data and vehicle implementations.
+`playability` contributes to choosing the base within a group.
+
+`variantOf` is a sourced decision. Read `state` and `value` together.
+
+| State | Meaning |
+|-------|---------|
+| `present` | `value.targetRecordIndex` and `value.guid` independently identify the selected physical base in the same Build |
+| `absent` | Proven base, singleton, same-GUID alias of the base, or owner with no comparable key. `value` is null |
+| `unreadable` | Original evidence is insufficient to prove a choice or absence. `value` is null and `sourceSetComplete` is false |
+
+Resolve `sourceUsesRefs` and `failedSourceUseRefs` against the result's `provenance.uses`.
+When `sourceUseSetRef` is an integer, also include `sourceUsesRefs` from the matching `id`
+in `provenance.variantSourceUseSets`. Its ID is the smallest physical Record index in the cohort.
+Any returned decision with additional original comparison uses retains its local references.
+The presence of failed attempts and known encrypted contributors remains independently visible.
+Results without shared sets can omit `variantSourceUseSets`.
 
 **Ships** share a group when all of these are equal:
 
@@ -1062,13 +1074,13 @@ The ship Record has no armour component on LIVE (no component struct name contai
 count: editions that differ only in their loadout, or in a material, are variants. On LIVE `AEGS_Idris_P` therefore groups under
 `AEGS_Idris_M` and `AEGS_Sabre_Comet` under `AEGS_Sabre`, because they differ only in their
 default loadout. A ship without a `vehicleDefinition`, or whose vehicle
-implementation cannot be read in full (a missing file or patch file, a broken document), is
-ungrouped, because equality cannot be shown.
+implementation cannot be read in full (a missing file or patch file, a broken document), has
+no published base. The decision distinguishes proven absence from incomplete original evidence.
 
 The implementation key is bound to the original physical ship Record within the current
 DataForge input. Separate Records with an equal GUID keep their own selected implementation
-keys. Reordering such aliases does not change a distinct ship's variant link. The base link
-remains a nominal GUID, and an equal-GUID alias never becomes a variant of itself.
+keys. The chosen physical target retains both its GUID and Record index. Equal-GUID aliases
+of that base are treated as bases for link publication.
 
 **Items** share a group when all of these are equal:
 
@@ -1103,11 +1115,9 @@ build). Fitment differences may or may not split a group. A consumer that wants 
 sees or fits combines `variantOf` with `playability`.
 
 **Base.** The member with `playability` `player`, then the member with the smallest `className`
-(compared byte-wise), then the smallest `guid`. A group holds at least two members with different
-`guid`s, so a repeated `guid` in a malformed Archive makes no group; `p4kx catalog` prints `variants` and `groups` per kind and `--json` lists them.
-
-Size: one `variantOf` per ship and item, 4 bytes (`null`) or 38 bytes (a GUID) uncompressed; the
-GUIDs repeat and compress well.
+(compared byte-wise), then the smallest `guid`. Equal ranks use original physical Record order.
+A group holds at least two members with different GUIDs. `p4kx catalog` reports variant and group
+counts per kind. The JSON CLI summary also reports those counts.
 
 ### Paints
 

@@ -6,9 +6,11 @@
 #[path = "catalog_mining_configurations.rs"]
 mod configurations;
 
-use p4kx_export::build_catalog;
+use p4kx_export::{Kind, build_catalog};
 use p4kx_extraction::Archive;
-use serde_json::{Value, json};
+use serde_json::Value;
+
+use crate::catalog_variants::decision_reader::variant_target;
 
 use crate::commodity_v3_fixture::{self as common, TestResult};
 use crate::gear_fixture::{self, LASER, LASER_RANGE, LASER_TWIN, MODULE, MODULE_INSTABILITY};
@@ -24,21 +26,21 @@ fn catalog() -> TestResult<Value> {
     Ok(serde_json::from_slice(built.json())?)
 }
 
-fn variant(catalog: &Value, guid: u128) -> TestResult<&Value> {
+fn variant(catalog: &Value, guid: u128) -> TestResult<Option<&str>> {
     let guid = common::guid(guid);
     let item = proof::rows(catalog, "/items")?
         .iter()
         .find(|item| item.pointer("/guid/value").and_then(Value::as_str) == Some(guid.as_str()))
         .ok_or_else(|| format!("item {guid}"))?;
-    proof::at(item, "/variantOf")
+    Ok(variant_target(item, Kind::Items)?.map(|target| target.guid))
 }
 
 #[test]
 fn lasers_equal_in_every_compared_field_are_variants() -> TestResult {
     let catalog = catalog()?;
     assert!(
-        variant(&catalog, LASER)? == &json!(common::guid(LASER_TWIN))
-            || variant(&catalog, LASER_TWIN)? == &json!(common::guid(LASER)),
+        variant(&catalog, LASER)? == Some(common::guid(LASER_TWIN).as_str())
+            || variant(&catalog, LASER_TWIN)? == Some(common::guid(LASER).as_str()),
         "one of the twins is the base of the other",
     );
     Ok(())
@@ -48,13 +50,23 @@ fn lasers_equal_in_every_compared_field_are_variants() -> TestResult {
 fn a_beam_range_or_a_module_modifier_starts_a_variant_group_of_its_own() -> TestResult {
     let catalog = catalog()?;
     assert!(
-        variant(&catalog, LASER_RANGE)?.is_null(),
+        variant(&catalog, LASER_RANGE)?.is_none(),
         "a different range is no variant"
     );
     for guid in [LASER, LASER_TWIN] {
-        assert_ne!(variant(&catalog, guid)?, &json!(common::guid(LASER_RANGE)));
+        assert_ne!(
+            variant(&catalog, guid)?,
+            Some(common::guid(LASER_RANGE).as_str()),
+            "the distinct range cannot be the twins' base"
+        );
     }
-    assert!(variant(&catalog, MODULE)?.is_null());
-    assert!(variant(&catalog, MODULE_INSTABILITY)?.is_null());
+    assert!(
+        variant(&catalog, MODULE)?.is_none(),
+        "the stock module has no variant base"
+    );
+    assert!(
+        variant(&catalog, MODULE_INSTABILITY)?.is_none(),
+        "a different module modifier has no variant base"
+    );
     Ok(())
 }

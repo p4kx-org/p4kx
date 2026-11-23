@@ -130,6 +130,8 @@ pub mod factions;
 mod inventory;
 #[path = "equipment_item_source_query.rs"]
 mod item_sources;
+#[path = "equipment_catalog_item_query.rs"]
+mod items;
 #[path = "equipment_planet_audio_query.rs"]
 pub mod planet_audio;
 #[path = "equipment_procedural_definitions_query.rs"]
@@ -186,7 +188,9 @@ pub use crate::catalog_v3::inventory_item_occupancy::InventoryItemOccupancy;
 pub use crate::catalog_v3::inventory_owner_bounds::{
     BoundsFields as InventoryBoundsFields, InventoryOwnerBounds,
 };
-pub use crate::item::ItemSource;
+pub use crate::item::{Item, ItemSource};
+pub use crate::variant_target::VariantTarget;
+pub use crate::variant_use_sets::{VariantSourceUseSet, VariantSourceUseSets};
 pub use ammo::{
     AmmoDefinition, AmmoDefinitionSnapshot, AmmoSelection, with_ammo_definitions,
     with_ammo_definitions_from,
@@ -209,6 +213,7 @@ pub use inventory::{
 #[cfg(test)]
 pub(crate) use item_sources::observe_item_source_query;
 pub use item_sources::{with_item_sources, with_item_sources_from};
+pub use items::{with_items, with_items_from};
 pub use projectile_ammo::{
     CountermeasureEmitter, CountermeasureEmitterRoute, ProjectileAmmoChoice, ProjectileAmmoOwner,
     ProjectileAmmoRole, ProjectileAmmoSnapshot, WeaponProjectileAmmoSelection,
@@ -216,7 +221,7 @@ pub use projectile_ammo::{
 };
 pub use snapshot::{
     AttachmentConstraintSnapshot, EquipmentSnapshot, ItemBoundsSnapshot, ItemDefinitionSnapshot,
-    ItemSourceSnapshot,
+    ItemSnapshot, ItemSourceSnapshot,
 };
 
 pub use weapon::{
@@ -262,6 +267,6 @@ pub use ship_sources::store_slugs::{
     ShipStoreSlug, ShipStoreSlugSnapshot, with_ship_store_slugs, with_ship_store_slugs_from,
 };
 pub use ship_sources::{
-    ShipSourceDependencyCoverage, ShipSourceEntryFailure, ShipSourceFailureStage,
-    ShipSourceSnapshot, with_ship_sources, with_ship_sources_from,
+    ShipSnapshot, ShipSourceDependencyCoverage, ShipSourceEntryFailure, ShipSourceFailureStage,
+    ShipSourceSnapshot, with_ship_sources, with_ship_sources_from, with_ships, with_ships_from,
 };

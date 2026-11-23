@@ -22,7 +22,7 @@ pub(crate) mod gameplay_properties;
 mod named_tables;
 
 #[path = "catalog_v3_source_values.rs"]
-mod source_values;
+pub(crate) mod source_values;
 
 use named_tables::uses_named_definition_table;
 use source_values::record_header;

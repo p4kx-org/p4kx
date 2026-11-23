@@ -72,11 +72,19 @@ fn observed_variant(identity: Identity, key: Key, order: Order) -> TestResult<Op
     assert_physical_ship(&catalog, fixture::ALIAS_CLASS, mass, health)?;
     check_reference_groups(&archive)?;
     let row = ship(&catalog, fixture::VARIANT_CLASS)?;
-    Ok(row
-        .get("variantOf")
-        .ok_or("actual canonical variantOf")?
-        .as_str()
-        .map(str::to_owned))
+    let choice =
+        crate::catalog_variants::decision_reader::variant_target(row, p4kx_export::Kind::Ships)?;
+    if let Some(base) = choice {
+        let original = ship(&catalog, fixture::BASE_CLASS)?;
+        assert_eq!(
+            Some(u64::from(base.record_index)),
+            original
+                .pointer("/recordIndex/value")
+                .and_then(Value::as_u64),
+            "the selected GUID resolves to the exact canonical physical Ship"
+        );
+    }
+    Ok(choice.map(|base| base.guid.to_owned()))
 }
 
 fn check_originals(archive: &Archive, identity: Identity, order: Order) -> TestResult {
@@ -158,7 +166,7 @@ fn assert_physical_ship(catalog: &Value, class: &str, mass: f64, health: f64) ->
         "{class} uses its own actual implementation health"
     );
     assert!(
-        row.get("variantOf").is_some_and(Value::is_null),
+        row.pointer("/variantOf/state").and_then(Value::as_str) == Some("absent"),
         "the base or unrelated alias is not a nominal variant of itself"
     );
     Ok(())

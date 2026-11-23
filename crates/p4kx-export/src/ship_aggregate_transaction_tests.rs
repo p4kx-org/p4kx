@@ -80,10 +80,14 @@ fn run(fault: Fault) -> TestResult {
         check_rejection(&pool, &gate, &result)?;
         let retry = pool.read_catalog(&operands, &record, &tree, &source, input, None)?;
         let aggregates = retry.aggregates.ok_or("fresh complete retry result")?;
-        assert_eq!(aggregates.mass.value(), Some(&12.0), "retry mass");
-        assert_eq!(aggregates.hull_health.value(), Some(&8.0), "retry health");
+        assert_eq!(aggregates.vehicle.mass.value(), Some(&12.0), "retry mass");
+        assert_eq!(
+            aggregates.vehicle.hull_health.value(),
+            Some(&8.0),
+            "retry health"
+        );
         assert!(
-            aggregates.mass.origin().source_set_complete(),
+            aggregates.vehicle.mass.origin().source_set_complete(),
             "retry origin"
         );
         assert_eq!(

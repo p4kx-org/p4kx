@@ -180,6 +180,7 @@ mod item;
 mod item_class;
 mod item_stats;
 mod item_variant;
+mod item_variant_survey;
 mod line_writer;
 mod loadout;
 mod loadout_owner_value;
@@ -294,6 +295,7 @@ mod ship;
 mod ship_base;
 mod ship_pool;
 mod ship_store_slugs;
+mod ship_variant_survey;
 #[cfg(test)]
 mod shop_observation_tests;
 mod shops;
@@ -358,7 +360,11 @@ mod template_objective;
 mod template_property;
 mod template_property_read;
 mod texts;
+mod variant_decision;
+mod variant_evidence;
 mod variant_groups;
+mod variant_target;
+mod variant_use_sets;
 mod variants;
 
 pub(crate) use catalog_v3::export_health_capture::{

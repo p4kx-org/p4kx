@@ -8,12 +8,18 @@ use p4kx_extraction::{
 };
 
 use super::OriginalFlowFields;
-use crate::catalog_read::original::{OriginalContainerKind, OriginalValueEdge, OriginalValueFact};
+use crate::catalog_read::original::{
+    OriginalContainerKind, OriginalRecordScope, OriginalValueEdge, OriginalValueFact,
+};
 use crate::{CatalogError, ExportAccountingError};
 
 impl<'scope, 'read, 'source> OriginalFlowFields<'scope, 'read, 'source> {
     pub(crate) fn facts(&self) -> &[OriginalValueFact<'scope, 'read, 'source>] {
         &self.facts
+    }
+
+    pub(crate) const fn scope(&self) -> &OriginalRecordScope<'read, 'source> {
+        self.scope
     }
 
     pub(crate) const fn sources(&self) -> &SourceUses {

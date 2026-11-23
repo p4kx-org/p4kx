@@ -14,6 +14,8 @@ use crate::{ExportAccountingError, HealthText};
 pub(crate) enum DerivedOperation {
     Record,
     MissionPropertySet(Guid),
+    ItemVariant,
+    ShipVariant,
 }
 
 /// One failed derived operation forwarding its already paired original source.

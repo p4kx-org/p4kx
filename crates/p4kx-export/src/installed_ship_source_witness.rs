@@ -105,7 +105,7 @@ fn inspect(
         return Err("SDK row differs from the exact original Ship owner".into());
     }
     let fields = fields::Wire::read(
-        row,
+        row.direct_row(),
         wire(snapshot.public_names())?,
         wire(snapshot.game_texts())?,
     )?;

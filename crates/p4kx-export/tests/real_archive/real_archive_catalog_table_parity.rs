@@ -3,6 +3,7 @@
 
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
+use std::io::Read;
 use std::path::PathBuf;
 
 use p4kx_channels::PublicPatches;
@@ -342,7 +343,19 @@ impl Origins {
         Ok(())
     }
 
-    fn verify(&self, catalog: &Value) -> TestResult {
+    /// Captures selected Catalog sections and their expected contributing rows.
+    pub(crate) fn read_scope(&self, input: impl Read, paths: &[&str]) -> serde_json::Result<Value> {
+        let mut capture = CatalogCapture::default();
+        for section in paths {
+            capture.keep(section);
+        }
+        for (path, expected) in self.inventories() {
+            capture.project(path, SelectedOrigins(expected));
+        }
+        capture.read(input)
+    }
+
+    pub(crate) fn verify(&self, catalog: &Value) -> TestResult {
         for (path, expected) in self.inventories() {
             verify_inventory(path, catalog.pointer(path), expected)?;
         }

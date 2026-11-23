@@ -7,6 +7,7 @@ use p4kx_export::{CatalogPublicationMode, build_catalog};
 use p4kx_extraction::{DataForgeEntry, Language};
 use serde_json::{Value, json};
 
+use crate::catalog_variants::decision_reader::variant_cell;
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
 
@@ -31,9 +32,11 @@ fn item_projection_links_original_families_and_sources_each_classification() -> 
             json!(marker),
             "key-only playability has no English contributor"
         );
-        assert!(
-            row["variantOf"].is_null(),
-            "the unchanged singleton variant choice is null"
+        let variant = variant_cell(row, "absent")?;
+        assert_eq!(
+            variant.get("sourceSetComplete").and_then(Value::as_bool),
+            Some(true),
+            "the original singleton survey proves absence of a variant base"
         );
         original_attachment(&catalog, 0, 1, marker, false)?;
         proof::closure(&catalog)?;

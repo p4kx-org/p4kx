@@ -8,7 +8,6 @@ use p4kx_assembly::{LoadoutError, VehicleImplementation};
 mod tests;
 
 use crate::guid_text::CatalogGuid;
-use crate::variants::ShipKey;
 
 const PAINTS: &str = "Paints";
 
@@ -21,7 +20,6 @@ pub(crate) struct VehicleFacts {
     pub(crate) tags: Vec<String>,
     pub(crate) paint_ports: Vec<PaintPort>,
     pub(crate) implementation: VehiclePorts,
-    pub(crate) variant_key: Option<ShipKey>,
 }
 
 /// The paint ports of a vehicle implementation and why it was not read in full, if it was not. A

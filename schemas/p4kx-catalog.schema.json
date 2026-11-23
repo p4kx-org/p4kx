@@ -6228,6 +6228,31 @@
       ],
       "type": "object"
     },
+    "CatalogProvenance": {
+      "description": "Borrowed canonical provenance for one result and its variant use sets.",
+      "properties": {
+        "sources": {
+          "items": {
+            "$ref": "#/$defs/PhysicalSource"
+          },
+          "type": "array"
+        },
+        "uses": {
+          "items": {
+            "$ref": "#/$defs/SourceUseDescription"
+          },
+          "type": "array"
+        },
+        "variantSourceUseSets": {
+          "$ref": "#/$defs/VariantSourceUseSets"
+        }
+      },
+      "required": [
+        "sources",
+        "uses"
+      ],
+      "type": "object"
+    },
     "CatalogPublicationMode": {
       "description": "Whether a catalog is intended for normal import or explicit partial diagnosis.",
       "oneOf": [
@@ -17135,6 +17160,12 @@
     "ExportDiagnosticExample": {
       "description": "One diagnostic example with its directly paired original subject cells.",
       "properties": {
+        "failedSourceUses": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
         "field": {
           "$ref": "#/$defs/SourcedValueOfHealthTextRef"
         },
@@ -17155,6 +17186,7 @@
         }
       },
       "required": [
+        "failedSourceUses",
         "field",
         "recordGuid",
         "recordIndex",
@@ -25862,14 +25894,7 @@
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "variantOf": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ]
+          "$ref": "#/$defs/VariantDecision"
         }
       },
       "required": [
@@ -46755,15 +46780,8 @@
           "$ref": "#/$defs/SourcedValueOfstring"
         },
         "variantOf": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
-          "description": "The GUID of the base of the variant group the ship belongs to: the ships that share the\nvehicle definition and the vehicle implementation after the Modification. `null` for a base\nand for a ship that is alone in its group. It is the `guid` of an entry of `ships`."
+          "$ref": "#/$defs/VariantDecision",
+          "description": "Sourced physical base in the unfiltered Build's canonical Ship cohort."
         },
         "vehicleDefinition": {
           "$ref": "#/$defs/SourcedValueOfstring",
@@ -48441,28 +48459,6 @@
         }
       ],
       "x-p4kx-vocabularyClass": "control"
-    },
-    "SourceInventory": {
-      "description": "Immutable sorted physical sources and observed use inventory for one prepared result.",
-      "properties": {
-        "sources": {
-          "items": {
-            "$ref": "#/$defs/PhysicalSource"
-          },
-          "type": "array"
-        },
-        "uses": {
-          "items": {
-            "$ref": "#/$defs/SourceUseDescription"
-          },
-          "type": "array"
-        }
-      },
-      "required": [
-        "sources",
-        "uses"
-      ],
-      "type": "object"
     },
     "SourceLocation": {
       "description": "A retained source coordinate or an explicit omission inside an observed physical input.",
@@ -145035,6 +145031,204 @@
       ],
       "type": "object"
     },
+    "VariantDecision": {
+      "allOf": [
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "sourceUseSetRef": {
+                "type": "integer"
+              },
+              "value": {
+                "type": "object"
+              }
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "sourceSetComplete": {
+                "const": true
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "unreadable"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "containsEncryptedSource": {
+                "enum": [
+                  true,
+                  null
+                ]
+              },
+              "sourceSetComplete": {
+                "const": false
+              }
+            }
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "sourceUseSetRef": {
+                "type": "null"
+              },
+              "sourceUsesRefs": {
+                "maxItems": 0
+              }
+            }
+          },
+          "then": {
+            "else": {
+              "properties": {
+                "containsEncryptedSource": {
+                  "type": "null"
+                }
+              }
+            },
+            "if": {
+              "properties": {
+                "sourceSetComplete": {
+                  "const": true
+                }
+              }
+            },
+            "then": {
+              "properties": {
+                "containsEncryptedSource": {
+                  "const": false
+                }
+              }
+            }
+          }
+        }
+      ],
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "failedSourceUseRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUseSetRef": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array",
+          "uniqueItems": true
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState",
+          "enum": [
+            "present",
+            "absent",
+            "unreadable"
+          ]
+        },
+        "value": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/VariantTarget"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "containsEncryptedSource",
+        "failedSourceUseRefs",
+        "sourceSetComplete",
+        "sourceUseSetRef",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "VariantSourceUseSet": {
+      "properties": {
+        "id": {
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array",
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "id",
+        "sourceUsesRefs"
+      ],
+      "type": "object"
+    },
+    "VariantSourceUseSets": {
+      "items": {
+        "$ref": "#/$defs/VariantSourceUseSet"
+      },
+      "type": "array"
+    },
+    "VariantTarget": {
+      "description": "The physical Record chosen as the base of a variant.",
+      "properties": {
+        "guid": {
+          "$ref": "#/$defs/SourcedValueOfGuid"
+        },
+        "targetRecordIndex": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "guid",
+        "targetRecordIndex"
+      ],
+      "type": "object"
+    },
     "VehicleArmor": {
       "description": "The independently owned tuning of a physical vehicle armour component.",
       "properties": {
@@ -146493,7 +146687,7 @@
       "description": "Explicit derived choices using the canonical definitions' source facts."
     },
     "provenance": {
-      "$ref": "#/$defs/SourceInventory",
+      "$ref": "#/$defs/CatalogProvenance",
       "description": "Physical source observations and actual contribution uses."
     },
     "schemaVersion": {

@@ -54,6 +54,5 @@ fn vehicle(record_index: u32, guid: CatalogGuid, required: &str) -> VehicleFacts
         tags: Vec::new(),
         paint_ports: vec![PaintPort::new(None, Some(required))],
         implementation: VehiclePorts::default(),
-        variant_key: None,
     }
 }

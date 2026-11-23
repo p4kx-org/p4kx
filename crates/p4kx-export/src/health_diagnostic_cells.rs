@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::SourceUseRef;
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -23,11 +24,26 @@ pub struct ExportDiagnosticExample {
     subject: DiagnosticSubject,
     #[serde(flatten)]
     body: ExampleBodyCells,
+    failed_source_uses: Box<[SourceUseRef]>,
 }
 
 impl ExportDiagnosticExample {
-    pub(super) const fn new(subject: DiagnosticSubject, body: ExampleBodyCells) -> Self {
-        Self { subject, body }
+    pub(super) const fn new(
+        subject: DiagnosticSubject,
+        body: ExampleBodyCells,
+        failed_source_uses: Box<[SourceUseRef]>,
+    ) -> Self {
+        Self {
+            subject,
+            body,
+            failed_source_uses,
+        }
+    }
+
+    /// Borrows original failed reads associated with this diagnostic occurrence.
+    #[must_use]
+    pub fn failed_source_uses(&self) -> &[SourceUseRef] {
+        &self.failed_source_uses
     }
 
     /// Borrows the original source-field text cell.

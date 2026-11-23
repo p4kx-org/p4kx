@@ -5,11 +5,10 @@ use p4kx_extraction::{
     DataForge, DataForgeError, Record, RecordTree, StructValue, TreeBuilder, Value,
 };
 
+use super::LinkedStatTarget;
 use super::walk::owner_of;
 use crate::contract_stats::{AmmoStats, WeaponStats};
-use crate::record_fields::{
-    component_occurrence, integer, number, record_reference, reference, structure,
-};
+use crate::record_fields::{component_occurrence, integer, number, structure};
 
 #[path = "weapon_legacy_actions.rs"]
 mod actions;
@@ -20,7 +19,9 @@ mod deep_tests;
 use super::parts::damage;
 use actions::read as fire_actions;
 const AMMO_PARAMS: &str = "AmmoParams";
-const ENTITY: &str = "EntityClassDefinition";
+pub(super) const ENTITY: &str = "EntityClassDefinition";
+pub(super) const AMMO_PARAMS_FIELD: &str = "ammoParamsRecord";
+pub(super) const AMMO_CAPACITY_FIELD: &str = "maxAmmoCount";
 
 pub(crate) fn ammo(tree: &RecordTree<'_>) -> AmmoStats {
     let projectile = structure(Some(tree.root()), "projectileParams");
@@ -76,25 +77,22 @@ pub(crate) enum MagazineRoute<'read, 'source> {
     },
 }
 
-/// Returns the tree of the Record `reference` links to when it has the struct `type_name` and can
-/// be built.
-pub(super) fn linked<'f>(
-    reference: Option<crate::guid_text::CatalogGuid>,
+pub(super) fn linked_target<'read, 'source>(
+    selector: &'read Value<'source>,
     type_name: &str,
-    forge: &'f DataForge<'f>,
-    trees: &mut TreeBuilder<'f>,
-) -> Option<RecordTree<'f>> {
-    let record = linked_record(reference, type_name, forge)?;
-    trees.build(&record).ok()
-}
-
-fn linked_record<'f>(
-    reference: Option<crate::guid_text::CatalogGuid>,
-    type_name: &str,
-    forge: &'f DataForge<'f>,
-) -> Option<Record<'f>> {
-    let record = forge.record_by_guid(reference?.0)?;
-    (record.type_name().ok()? == type_name).then_some(record)
+    forge: &'source DataForge<'source>,
+) -> Option<LinkedStatTarget<'read, 'source>> {
+    let Value::Reference(reference) = selector else {
+        return None;
+    };
+    let target = reference.original_target();
+    if target.record_type() != Some(type_name) {
+        return None;
+    }
+    forge
+        .record(target.record_index())
+        .filter(|record| target.shares_source_with(record))
+        .map(|record| LinkedStatTarget { selector, record })
 }
 
 /// Returns the capacity and ammunition of the container of `tree`.
@@ -102,14 +100,19 @@ fn loaded<'f, E>(
     container: Option<&StructValue<'f>>,
     forge: &'f DataForge<'f>,
     trees: &mut TreeBuilder<'f>,
-    ammunition: impl FnOnce(&Record<'f>, &mut TreeBuilder<'f>) -> Result<Option<AmmoStats>, E>,
+    ammunition: impl FnOnce(
+        LinkedStatTarget<'_, 'f>,
+        &mut TreeBuilder<'f>,
+    ) -> Result<Option<AmmoStats>, E>,
 ) -> Result<(Option<i64>, Option<AmmoStats>), E> {
-    let target = linked_record(reference(container, "ammoParamsRecord"), AMMO_PARAMS, forge);
+    let target = container
+        .and_then(|fields| fields.field(AMMO_PARAMS_FIELD))
+        .and_then(|selector| linked_target(selector, AMMO_PARAMS, forge));
     let ammo = match target {
-        Some(record) => ammunition(&record, trees)?,
+        Some(target) => ammunition(target, trees)?,
         None => None,
     };
-    Ok((integer(container, "maxAmmoCount"), ammo))
+    Ok((integer(container, AMMO_CAPACITY_FIELD), ammo))
 }
 
 /// Returns the weapon block of the item `tree`; `None` without a weapon component.
@@ -121,7 +124,10 @@ pub(super) fn weapon<'f, E>(
     tree: &RecordTree<'f>,
     forge: &'f DataForge<'f>,
     trees: &mut TreeBuilder<'f>,
-    ammunition: impl FnOnce(&Record<'f>, &mut TreeBuilder<'f>) -> Result<Option<AmmoStats>, E>,
+    ammunition: impl FnOnce(
+        LinkedStatTarget<'_, 'f>,
+        &mut TreeBuilder<'f>,
+    ) -> Result<Option<AmmoStats>, E>,
     observe_magazine: impl FnOnce(MagazineRead<'_, 'f>) -> Result<(), E>,
 ) -> Result<Option<WeaponStats<'f>>, E> {
     with_primary_magazine(tree, forge, trees, |weapon, magazine, trees| {
@@ -168,13 +174,13 @@ pub(crate) fn with_primary_magazine<'source, T, E>(
         )
         .map(Some);
     }
-    let linked = weapon.field(PRIMARY_MAGAZINE_FIELD).and_then(|caller| {
-        linked_record(record_reference(caller), ENTITY, forge).map(|record| (caller, record))
-    });
-    let Some((caller, record)) = linked else {
+    let linked = weapon
+        .field(PRIMARY_MAGAZINE_FIELD)
+        .and_then(|selector| linked_target(selector, ENTITY, forge));
+    let Some(target) = linked else {
         return inspect(weapon, None, trees).map(Some);
     };
-    let read = trees.build(&record);
+    let read = trees.build(&target.record);
     let container = read
         .as_ref()
         .ok()
@@ -184,8 +190,8 @@ pub(crate) fn with_primary_magazine<'source, T, E>(
         Some(MagazineRead {
             weapon: occurrence,
             route: MagazineRoute::Linked {
-                caller,
-                record,
+                caller: target.selector,
+                record: target.record,
                 tree: read.as_ref(),
                 container: container.map(|(value, _)| value),
             },

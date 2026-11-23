@@ -4,6 +4,7 @@
 //! A synthetic Archive of ships that share vehicle definitions, Modifications and armour, and of
 //! items that differ in one thing each.
 
+pub(crate) mod item_rank;
 mod items;
 
 use std::error::Error;
@@ -14,6 +15,7 @@ use p4kx_testkit::{
     TestElement, TestEntry, TestInstance, TestRecord, TestStruct, TestType, TestValue,
 };
 
+pub(crate) const INVALID_COMPONENT_TYPE: u32 = u32::MAX - 1;
 pub(crate) const ALPHA_XML: &str = "scripts/entities/vehicles/implementations/xml/acas_alpha.xml";
 pub(crate) const OTHER_XML: &str = "scripts/entities/vehicles/implementations/xml/acas_other.xml";
 const BROKEN_XML: &str = "scripts/entities/vehicles/implementations/xml/acas_broken.xml";
@@ -194,6 +196,10 @@ fn vehicle_xml(tags: &str) -> Vec<u8> {
         .to_cryxml(CryXmlSignature::CryXmlB, CryXmlByteOrder::Little)
 }
 
+pub(crate) fn item_key_database(unreadable: bool) -> DataForgeBuilder {
+    items::key_records(unreadable).fold(builder(), DataForgeBuilder::record)
+}
+
 /// Writes the fixture Archive into `dir` and returns its path.
 pub(crate) fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
     let path = dir.join("Data.p4k");
@@ -225,3 +231,5 @@ pub(crate) fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
         .write_to(&path)?;
     Ok(path)
 }
+
+pub(crate) mod read_rows;
