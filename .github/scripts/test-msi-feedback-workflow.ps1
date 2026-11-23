@@ -48,6 +48,27 @@ $finishStart=Get-FeedbackWorkflowStep $verify 'Start the isolated original MSI F
 $finishStartUpload=Get-FeedbackWorkflowStep $verify 'Preserve original MSI Finish supervisor launch'
 $finishWait=Get-FeedbackWorkflowStep $verify 'Wait for the original MSI Finish receipt'
 $observerFinish=Get-FeedbackWorkflowStep $verify 'Finish the original native MSI lifecycle'
+$previousProgressStep = $finishStartUpload
+foreach ($sequence in 4,5) {
+    $probe = Get-FeedbackWorkflowStep $verify "Observe original MSI Finish progress $sequence"
+    $upload = Get-FeedbackWorkflowStep $verify "Preserve original MSI Finish progress $sequence"
+    Assert-FeedbackWorkflow ($probe.Contains("id: msi-finish-progress-$sequence") -and
+        $probe.Contains("always() && !cancelled() && steps.msi-finish-start.outcome == 'success'") -and
+        $probe.Contains('invoke-msi-observer.ps1 -Stage ProbeFinish') -and $probe.Contains("-Sequence $sequence") -and
+        $upload.Contains("always() && !cancelled() && steps.msi-finish-progress-$sequence.outcome != 'skipped'") -and
+        $upload.Contains('actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9') -and
+        $upload.Contains("/observer/checkpoints/0$sequence/*") -and
+        $upload.Contains('if-no-files-found: error')) 'Each Finish progress checkpoint requires an isolated, pinned upload.'
+    foreach ($step in $probe,$upload) {
+        Assert-FeedbackWorkflow ($step -cmatch '(?m)^        timeout-minutes: 1\r?$' -and
+            $step -cmatch '(?m)^        continue-on-error: true\r?$') 'Finish observations must have independent timeouts and optional verdicts.'
+    }
+    Assert-FeedbackWorkflow ($verify.IndexOf($previousProgressStep,[StringComparison]::Ordinal) -lt $verify.IndexOf($probe,[StringComparison]::Ordinal) -and
+        $verify.IndexOf($probe,[StringComparison]::Ordinal) -lt $verify.IndexOf($upload,[StringComparison]::Ordinal) -and
+        $verify.IndexOf($upload,[StringComparison]::Ordinal) -lt $verify.IndexOf($finishWait,[StringComparison]::Ordinal)) 'Finish progress must be uploaded in order before the original terminal wait.'
+    $previousProgressStep = $upload
+}
+
 $prepare=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/scripts/prepare-msi-feedback.ps1')
 $observerRequest=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/scripts/msi-observer-request.ps1')
 Assert-FeedbackWorkflow ($prepare.Contains('"observer_finish_minutes=$($budget.observer_finish_minutes)" >> $env:GITHUB_OUTPUT') -and

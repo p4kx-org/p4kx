@@ -48,6 +48,57 @@ function Invoke-ObserverFinish {
     & $entry -Stage Finish -Directory $observer -WaitMilliseconds 0
 }
 
+function Assert-ObserverFinishProgress {
+    $launchPath = Join-Path $observer 'finish-supervision/launch.json'
+    $terminalPath = Join-Path $observer 'finish-supervision/result.json'
+    $waitPath = Join-Path $observer 'finish-supervision/wait-result.json'
+    $launchBytes = [IO.File]::ReadAllBytes($launchPath)
+    try {
+        $foreign = Read-P4kxDetachedReceipt $launchPath
+        $foreign.request_sha256 = 'f' * 64
+        [IO.File]::WriteAllText($launchPath, ($foreign | ConvertTo-Json -Compress))
+        Assert-ObserverRefused { & $entry -Stage ProbeFinish -Directory $observer -Sequence 4 } 'Foreign Finish launch authorized a progress checkpoint.'
+        Assert-Observer (-not [IO.Path]::Exists((Join-Path $observer 'checkpoints/04'))) 'Refused Finish probe created a checkpoint.'
+    } finally { [IO.File]::WriteAllBytes($launchPath, $launchBytes) }
+
+    $launch = Read-P4kxDetachedReceipt $launchPath
+    $missing = Join-Path $observer 'snapshots/09/stopExpiredParent-begin.json'
+    $oversize = Join-Path $observer 'snapshots/09/stopExpiredParent-end.json'
+    $unrelated = Join-Path $observer 'snapshots/09/unrelated.log'
+    $savedWait = Join-Path $root 'saved-wait-result.json'
+    [IO.File]::Move($waitPath, $savedWait)
+    try {
+        Assert-Observer (-not [IO.File]::Exists($missing) -and -not [IO.File]::Exists($oversize)) 'Successful fixture unexpectedly occupied cleanup markers.'
+        [IO.File]::WriteAllBytes($oversize, [byte[]]::new(16KB+1))
+        [IO.File]::WriteAllText($unrelated, 'not part of the observer allowlist')
+        foreach ($sequence in 4,5) {
+            & $entry -Stage ProbeFinish -Directory $observer -Sequence $sequence
+            $checkpoint = Join-Path $observer ('checkpoints/{0:d2}' -f $sequence)
+            $path = Join-Path $checkpoint 'checkpoint.json'
+            $proof = Read-P4kxDetachedReceipt (Join-Path $checkpoint 'finish-progress.json')
+            Assert-Observer ($proof.role -ceq 'native-msi-finish-progress' -and $proof.sequence -eq $sequence -and
+                $proof.request_sha256 -ceq $handle.request_sha256 -and $proof.checkpoint_sha256 -ceq (Get-P4kxDetachedDigest $path) -and
+                $proof.supervisor_pid -eq $launch.supervisor_pid -and $proof.supervisor_started_utc_ticks -eq $launch.supervisor_started_utc_ticks -and
+                $proof.cutoff_utc -ceq $launch.cutoff_utc -and $proof.target -ceq $request.target -and
+                $proof.revision -ceq $request.revision -and $proof.run -ceq $request.run -and $proof.attempt -ceq $request.attempt -and
+                $proof.completed_success -eq $false -and $proof.native_completion_unproven -eq $true -and $proof.mutation_authority -eq $false) 'Finish checkpoint lost its exact observation-only binding.'
+            Assert-Observer ($proof.files['finish-launch.json'].sha256 -ceq (Get-P4kxDetachedDigest $launchPath) -and
+                $proof.files['finish-result.json'].sha256 -ceq (Get-P4kxDetachedDigest $terminalPath) -and
+                $proof.files['finish-stopExpiredParent-begin.json'].status -ceq 'absent' -and
+                $proof.files['finish-stopExpiredParent-end.json'].status -ceq 'unreadable' -and
+                -not [IO.File]::Exists((Join-Path $checkpoint 'finish-stopExpiredParent-end.json')) -and
+                -not [IO.File]::Exists((Join-Path $checkpoint 'unrelated.log'))) 'Finish checkpoint did not bound its copied scopes and bytes.'
+        }
+        Assert-ObserverRefused { & $entry -Stage ProbeFinish -Directory $observer -Sequence 4 } 'Repeated Finish probe could overwrite a checkpoint.'
+        Assert-ObserverRefused { & $entry -Stage ProbeFinish -Directory $observer -Sequence 9 } 'Finish probe could occupy the acceptance checkpoint.'
+        Assert-ObserverRefused { & $entry -Stage CollectFinish -Directory $observer } 'Progress evidence replaced the required bounded terminal wait.'
+    } finally {
+        [IO.File]::Delete($oversize)
+        [IO.File]::Delete($unrelated)
+        [IO.File]::Move($savedWait, $waitPath)
+    }
+    & $entry -Stage CollectFinish -Directory $observer
+}
 function Assert-Observer([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
 }
@@ -93,6 +144,7 @@ try {
         Assert-ObserverRefused {Invoke-ObserverFinish} 'Failed or admission-only worker became complete lifecycle evidence.'
     }
     if ($DetachedFinish -and $Case -ceq 'Complete') {
+        Assert-ObserverFinishProgress
         . (Join-Path $PSScriptRoot 'msi-observer-finish-control.ps1')
         $context = Get-P4kxMsiFinishContext $observer
         $launch = Read-P4kxMsiFinishLaunch $context
