@@ -47,6 +47,10 @@ impl<'source> ShipSource<'source> {
     ) -> Self {
         let presentation = source.presentation;
         let base_facts = ShipBaseFacts::new(&source.header, aggregates.cargo);
+        let vehicle_kind = source
+            .playability_proof
+            .exosuit_kind()
+            .unwrap_or(aggregates.vehicle_kind);
         Self {
             header: source.header,
             name: presentation.name,
@@ -57,7 +61,7 @@ impl<'source> ShipSource<'source> {
             vehicle_manufacturer: presentation.vehicle_manufacturer,
             attachment_manufacturer: presentation.attachment_manufacturer,
             vehicle_definition: source.vehicle_definition,
-            vehicle_kind: aggregates.vehicle_kind,
+            vehicle_kind,
             size: presentation.size,
             mass: aggregates.mass,
             mass_basis: aggregates.mass_basis,
@@ -123,7 +127,7 @@ impl<'source> ShipSource<'source> {
         &self.vehicle_definition
     }
 
-    /// Borrows the vehicle kind with its original path and rolling-part decision.
+    /// Borrows the vehicle kind with its original classification evidence.
     #[must_use]
     pub const fn vehicle_kind(&self) -> &SourcedValue<VehicleKind> {
         &self.vehicle_kind

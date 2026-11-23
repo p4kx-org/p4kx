@@ -678,12 +678,16 @@ Cargo is an interpreted projection in `projections.shipBaseFacts`. The Ship row 
 the interpreted `vehicleKind`.
 The standalone `p4kx ships` output reports detailed sources, thresholds, Loadout and cells.
 The payloads of `vehicleKind` and `massBasis` are extensible strings in the schema.
+The `exosuit` code covers the ATLS, ATLS GEO, ATLS IKTI and ATLS IKTI GEO Actor owners.
+It requires the matching physical class, authored control components and the vehicle's
+driver seat in the original default loadout. [ADR-0417](adr/0417-exosuits-share-the-vehicle-catalog.md)
+defines the admission rule.
 
 | Field | Rule and source |
 |-------|-----------------|
 | `mass` | The sum of the `mass` of every part of the vehicle implementation (`vehicleDefinition`) after the ship's Modification is applied, rounded to four decimals; a sum too large to round to a finite number counts as unknown (so does `hullHealth`). Landing gear, Loadout items and docked vehicles are not part of it (#305). Without part masses, the mass of the rigid physics controller (`Components/SEntityPhysicsControllerParams/PhysType/Mass`, `massBasis` `physics`) |
 | `hullHealth` | The sum of the positive `damageMax` of the parts, except parts holding an item port flagged `uneditable` or `invisible`; `null` without a vehicle implementation or when no part states one |
-| `vehicleKind` | `groundVehicle` under `entities/groundvehicles` uses the original Record path. Under `entities/spaceships`, `spaceship` uses the same path and the effective vehicle Parts up to the first wheel (`SubPartWheel`), or the complete Part selection when checking for a tread (`Tread`) after ruling out wheels. The classification is absent for a wheeled or tracked spaceship or any other path. The existing spaceship fallback for unavailable implementations remains present with incomplete evidence. |
+| `vehicleKind` | `groundVehicle` under `entities/groundvehicles` uses the original Record path. Under `entities/spaceships`, `spaceship` uses the same path and the effective vehicle Parts up to the first wheel (`SubPartWheel`), or the complete Part selection when checking for a tread (`Tread`) after ruling out wheels. The classification is absent for a wheeled or tracked spaceship. Matching exosuits use the original Actor and driver's seat evidence. The existing spaceship fallback for unavailable implementations remains present with incomplete evidence. |
 
 #### Projected cargo
 

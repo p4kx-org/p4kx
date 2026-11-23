@@ -5,7 +5,7 @@ use std::fmt;
 
 use crate::catalog_v3::loot_definition_catalog::LootDefinitionKind;
 use crate::harvest_config::is_slotpreset_path;
-use crate::selection::{Kind, KindRule};
+use crate::selection::{Exosuit, Kind, KindRule};
 
 impl Kind {
     /// Returns whether a dedicated reader owns this kind instead of the generic Record scan.
@@ -38,7 +38,7 @@ impl Kind {
         }
     }
 
-    /// Returns the first kind in [`Kind::ALL`] one of whose prefixes `record_path` starts with,
+    /// Returns the first kind in [`Kind::ALL`] matching `record_path`,
     /// and never a derived kind. The prefixes of [`Kind::Crafters`] overlap those of the entity
     /// kinds; only the order of [`Kind::ALL`] resolves it. Kinds that share a folder are told
     /// apart by [`Self::by_record`]. Multi configs retain slot-preset path lookup.
@@ -49,9 +49,10 @@ impl Kind {
                 return is_slotpreset_path(record_path);
             }
             !LootDefinitionKind::of(*kind).is_some_and(LootDefinitionKind::is_type_wide)
-                && kind
+                && (kind
                     .rule()
                     .is_some_and(|rule| rule.matches_path(record_path))
+                    || kind.matches_exosuit_path(record_path))
         })
     }
 
@@ -61,7 +62,13 @@ impl Kind {
         Self::ALL.into_iter().find(|kind| {
             kind.rule()
                 .is_some_and(|rule| rule.selects(record_path, type_name))
+                || (kind.matches_exosuit_path(record_path)
+                    && type_name == Self::Ships.records().type_name)
         })
+    }
+
+    fn matches_exosuit_path(self, record_path: &str) -> bool {
+        self == Self::Ships && Exosuit::by_path(record_path).is_some()
     }
 
     /// Returns whether the kind is derived from the entities of other kinds and selects no Records

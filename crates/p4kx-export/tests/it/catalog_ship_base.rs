@@ -12,6 +12,9 @@ mod aggregate_sources;
 #[path = "catalog_ship_cargo_resolution.rs"]
 mod cargo_resolution;
 
+#[path = "catalog_ship_exosuit_parity.rs"]
+mod exosuit_parity;
+
 use crate::ship_base_fixture::{
     ALPHA, BETA, BROKEN, CAR, DISPLAY, GROUND, GUN_DISPLAY, HUGE, MIXED, ROLLING, TEMP, UNKNOWN,
     write_archive,

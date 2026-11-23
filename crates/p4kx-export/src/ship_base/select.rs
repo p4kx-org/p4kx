@@ -5,6 +5,7 @@ use p4kx_extraction::{DataForgeError, Record};
 use rayon::prelude::*;
 
 use super::ShipBaseOptions;
+use crate::entity_selection;
 use crate::selection::is_kind_leftover;
 use crate::{CatalogFailure, Kind};
 
@@ -22,8 +23,7 @@ enum Check {
     Other,
 }
 
-/// Picks the Records of the catalog's `ships` kind: the Entity Records under
-/// `entities/spaceships` and `entities/groundvehicles` that the Filter matches.
+/// Picks vehicle Records that match the Catalog admission rules and the Filter.
 pub(super) fn ships<'f>(records: &[Record<'f>], options: &ShipBaseOptions<'_>) -> Selection<'f> {
     let checked: Vec<(Record<'f>, Result<Check, CatalogFailure>)> = records
         .par_iter()
@@ -51,13 +51,18 @@ fn check(record: &Record<'_>, options: &ShipBaseOptions<'_>) -> Result<Check, Ca
         if Kind::by_path(path) != Some(Kind::Ships) {
             return Ok(Check::Other);
         }
-        if record.type_name()? != Kind::Ships.records().type_name {
+        let source_type = record.type_name()?;
+        if source_type != Kind::Ships.records().type_name {
             return Ok(Check::Other);
         }
         if options.filter.is_some_and(|filter| !filter.matches(path)) {
             return Ok(Check::Other);
         }
-        Ok(if is_kind_leftover(Kind::Ships, path, record.name()?) {
+        let name = record.name()?;
+        if !entity_selection::admits_ship(record, path, name, source_type) {
+            return Ok(Check::Other);
+        }
+        Ok(if is_kind_leftover(Kind::Ships, path, name) {
             Check::Skipped
         } else {
             Check::Ship

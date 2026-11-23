@@ -4,7 +4,7 @@
 use p4kx_extraction::{DataForgeError, Filter, Record};
 
 use crate::Kind;
-use crate::selection::is_kind_leftover;
+use crate::selection::{Exosuit, admit_exosuit, is_kind_leftover};
 
 /// What the entity kinds make of a Record.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,14 +25,25 @@ pub(crate) fn select(
     if filter.is_some_and(|filter| !filter.matches(path)) {
         return Ok(None);
     }
-    let Some(kind) = Kind::by_record(path, record.type_name()?).filter(|kind| owns(*kind)) else {
+    let source_type = record.type_name()?;
+    let Some(kind) = Kind::by_record(path, source_type).filter(|kind| owns(*kind)) else {
         return Ok(None);
     };
-    Ok(Some(if is_kind_leftover(kind, path, record.name()?) {
+    let name = record.name()?;
+    if kind == Kind::Ships && !admits_ship(record, path, name, source_type) {
+        return Ok(None);
+    }
+    Ok(Some(if is_kind_leftover(kind, path, name) {
         Selected::Leftover(kind)
     } else {
         Selected::Entity(kind)
     }))
+}
+
+pub(crate) fn admits_ship(record: &Record<'_>, path: &str, name: &str, source_type: &str) -> bool {
+    Exosuit::by_path(path).is_none()
+        || Exosuit::from_header(path, name, source_type)
+            .is_some_and(|exosuit| admit_exosuit(exosuit, record))
 }
 
 const fn owns(kind: Kind) -> bool {

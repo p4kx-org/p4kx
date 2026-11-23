@@ -10,12 +10,16 @@ use super::playability_rules::{self, Evidence};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_read::original::{OriginalFlowFields, OriginalValueFact, OriginalValuePart};
 use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
-use crate::{CatalogError, Playability};
+use crate::selection::observe_exosuit_control;
+use crate::{CatalogError, Playability, VehicleKind};
 
-pub(crate) struct OwnerProof {
-    predicates: FieldOrigin,
-    links: FieldOrigin,
-    targets: Vec<Guid>,
+pub(crate) enum OwnerProof {
+    Exosuit(SourcedValue<()>),
+    Vehicle {
+        predicates: FieldOrigin,
+        links: FieldOrigin,
+        targets: Vec<Guid>,
+    },
 }
 
 impl OwnerProof {
@@ -26,6 +30,9 @@ impl OwnerProof {
         vehicle: Option<&Value<'_>>,
         crew: Option<&Value<'_>>,
     ) -> Result<Self, CatalogError> {
+        if let Some(exosuit) = observe_exosuit_control(original, record, fields)? {
+            return Ok(Self::Exosuit(exosuit));
+        }
         let mut predicates = Cells::new(fields);
         let context = original.record_context(record)?;
         context.append_header_input(
@@ -69,11 +76,18 @@ impl OwnerProof {
         }
         targets.sort_unstable();
         targets.dedup();
-        Ok(Self {
+        Ok(Self::Vehicle {
             predicates: predicates.finish(),
             links: links.finish(),
             targets,
         })
+    }
+
+    pub(crate) fn exosuit_kind(&self) -> Option<SourcedValue<VehicleKind>> {
+        match self {
+            Self::Exosuit(proof) => Some(proof.map_ref(|()| VehicleKind::Exosuit)),
+            Self::Vehicle { .. } => None,
+        }
     }
 
     pub(crate) fn decide(
@@ -83,12 +97,20 @@ impl OwnerProof {
         evidence: &Evidence,
         input: &OriginalCatalogInput<'_, '_>,
     ) -> Result<SourcedValue<Playability>, CatalogError> {
+        let (predicates, links, targets) = match self {
+            Self::Exosuit(proof) => return Ok(proof.map_ref(|()| Playability::Player)),
+            Self::Vehicle {
+                predicates,
+                links,
+                targets,
+            } => (predicates, links, targets),
+        };
         let (decision, unreadable_dependency) =
             playability_rules::ship_decision(tree, vehicle, evidence);
-        let dependencies = evidence.provenance(input, &self.targets)?;
-        let mut origins = vec![&self.links, &dependencies];
+        let dependencies = evidence.provenance(input, targets)?;
+        let mut origins = vec![links, &dependencies];
         if !unreadable_dependency {
-            origins.push(&self.predicates);
+            origins.push(predicates);
         }
         let state = match decision {
             Some(value) => SourceValue::Present(value),

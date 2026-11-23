@@ -5,7 +5,12 @@ pub use crate::selection_rules::KindRule;
 pub(crate) use crate::selection_rules::starts_with_folder;
 
 mod blueprint_selection;
+mod exosuit;
 mod names;
+
+pub(crate) use exosuit::{
+    Exosuit, admit_exosuit, exosuit_control_supported, observe_exosuit_control,
+};
 mod record_leftovers;
 
 pub(crate) use blueprint_selection::{BlueprintSelection, selects_blueprint};
@@ -23,8 +28,7 @@ pub enum Kind {
     Manufacturers,
     /// Items: `EntityClassDefinition` Records under `entities/scitem` and `entities/legacyitems`.
     Items,
-    /// Ships and ground vehicles: `EntityClassDefinition` Records under `entities/spaceships` and
-    /// `entities/groundvehicles`.
+    /// Ships, ground vehicles and supported exosuit `EntityClassDefinition` Records.
     Ships,
     /// Commodities: `EntityClassDefinition` Records under `entities/commodities`.
     Commodities,

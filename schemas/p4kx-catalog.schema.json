@@ -27388,7 +27388,7 @@
           "value": "items"
         },
         {
-          "description": "Ships and ground vehicles: `EntityClassDefinition` Records under `entities/spaceships` and\n`entities/groundvehicles`.",
+          "description": "Ships, ground vehicles and supported exosuit `EntityClassDefinition` Records.",
           "value": "ships"
         },
         {

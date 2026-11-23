@@ -21,7 +21,7 @@ use crate::Kind;
 use crate::digest::Digest;
 use crate::paint_port::VehiclePorts;
 use crate::record_fields::{class_name, component, integer, number, structure, text};
-use crate::selection::starts_with_folder;
+use crate::selection::{Exosuit, exosuit_control_supported, starts_with_folder};
 use crate::{CatalogFailure, CatalogReadFailure};
 
 const SIZE_FIELD: &str = "Components/SAttachableComponentParams/AttachDef/Size";
@@ -134,7 +134,7 @@ impl<'f> ShipReader<'f> {
             class_name: class_name(tree).to_owned(),
             record_path: tree.record_path().to_owned(),
             implementation: vehicle.map(implementation),
-            vehicle_kind: VehicleKindPath::of(tree.record_path()).classify(vehicle),
+            vehicle_kind: VehicleKindPath::of(tree.record_path()).classify(tree, vehicle),
             size: size(tree),
             mass: aggregate::mass(tree, vehicle, totals.as_ref(), physics_mass),
             hull: vehicle
@@ -203,6 +203,7 @@ fn in_folder(record_path: &str, index: usize) -> bool {
 pub(crate) enum VehicleKindPath {
     Ground,
     Space,
+    Exosuit,
     Other,
 }
 
@@ -212,17 +213,24 @@ impl VehicleKindPath {
             Self::Ground
         } else if in_folder(record_path, SPACESHIP_FOLDER) {
             Self::Space
+        } else if Exosuit::by_path(record_path).is_some() {
+            Self::Exosuit
         } else {
             Self::Other
         }
     }
 
-    fn classify(self, vehicle: Option<&VehicleImplementation>) -> Option<VehicleKind> {
+    fn classify(
+        self,
+        tree: &RecordTree<'_>,
+        vehicle: Option<&VehicleImplementation>,
+    ) -> Option<VehicleKind> {
         match self {
             Self::Ground => Some(VehicleKind::GroundVehicle),
             Self::Space if !vehicle.is_some_and(VehicleImplementation::has_rolling_parts) => {
                 Some(VehicleKind::Spaceship)
             }
+            Self::Exosuit => exosuit_control_supported(tree).then_some(VehicleKind::Exosuit),
             Self::Space | Self::Other => None,
         }
     }
