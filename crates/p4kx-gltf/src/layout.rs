@@ -39,6 +39,13 @@ pub(crate) struct PrimitiveLayout {
     pub(crate) colours: bool,
 }
 
+/// The material of a primitive and the UV binding available to its textures.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub(crate) struct MaterialUse {
+    pub(crate) id: u16,
+    pub(crate) has_uvs: bool,
+}
+
 /// The blocks of one mesh and the bounds of its converted positions.
 #[derive(Debug, Clone)]
 pub(crate) struct MeshLayout {
@@ -56,6 +63,15 @@ pub(crate) struct MeshLayout {
     pub(crate) morphs: Vec<MorphLayout>,
     pub(crate) min: [f32; 3],
     pub(crate) max: [f32; 3],
+}
+
+impl MeshLayout {
+    pub(crate) const fn material_use(&self, primitive: &PrimitiveLayout) -> MaterialUse {
+        MaterialUse {
+            id: primitive.material_id,
+            has_uvs: self.uvs.is_some(),
+        }
+    }
 }
 
 /// The skeleton a part is skinned to: its inverse bind matrices, and per mesh the influences to
@@ -244,22 +260,21 @@ impl<'m> Layout<'m> {
         self.blocks.len() - 1
     }
 
-    /// Returns the material IDs of the primitives of the model instance `part`, sorted, each once.
-    pub(crate) fn part_material_ids(&self, part: usize) -> Vec<u16> {
-        self.ids_where(|mesh| mesh.part == part)
-    }
-
-    fn ids_where(&self, keep: impl Fn(&MeshLayout) -> bool) -> Vec<u16> {
-        let mut ids: Vec<u16> = self
+    /// Returns the material uses of the primitives of `part`, sorted, each once.
+    pub(crate) fn part_materials(&self, part: usize) -> Vec<MaterialUse> {
+        let mut uses: Vec<_> = self
             .meshes
             .iter()
-            .filter(|mesh| keep(mesh))
-            .flat_map(|mesh| &mesh.primitives)
-            .map(|primitive| primitive.material_id)
+            .filter(|mesh| mesh.part == part)
+            .flat_map(|mesh| {
+                mesh.primitives
+                    .iter()
+                    .map(move |primitive| mesh.material_use(primitive))
+            })
             .collect();
-        ids.sort_unstable();
-        ids.dedup();
-        ids
+        uses.sort_unstable();
+        uses.dedup();
+        uses
     }
 
     /// Plans an image block for each of the `lens` byte lengths, after every other block.

@@ -343,12 +343,12 @@ fn scene_addresses(
     found.extend((next_node..document.nodes.len()).map(RiggedJsonAddress::Bone));
     let mut authors = vec![None; document.materials.len()];
     for (part, (instance, ids)) in instances.iter().zip(materials).enumerate() {
-        for (&id, &index) in ids {
+        for (usage, &index) in ids {
             let Some(author) = authors.get_mut(index.value()) else {
                 continue;
             };
             if author.is_none()
-                && let Some(slot) = instance.plan.slot(id)
+                && let Some(slot) = instance.plan.slot(usage.id)
             {
                 let slot = match slot {
                     Slot::Library(slot) => Some(slot),

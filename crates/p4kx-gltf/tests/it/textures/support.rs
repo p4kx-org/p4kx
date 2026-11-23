@@ -119,6 +119,19 @@ pub(crate) fn model_with(mtl: Vec<u8>) -> Result<Model, Box<dyn Error>> {
     )?)
 }
 
+pub(crate) fn add_uvless_mesh(model: &mut Model) -> TestResult {
+    let lod = model.lods.first_mut().ok_or("first model LOD")?;
+    let mut mesh = lod.meshes.first().ok_or("first model mesh")?.clone();
+    let mut node = model.nodes.get(mesh.node).ok_or("mesh node")?.clone();
+    mesh.node = model.nodes.len();
+    mesh.uvs.clear();
+    mesh.second_uvs = None;
+    node.name = "without-uvs".into();
+    model.nodes.push(node);
+    lod.meshes.push(mesh);
+    Ok(())
+}
+
 pub(crate) fn textured() -> GlbOptions {
     GlbOptions::default().with_materials(MaterialMode::Textures)
 }

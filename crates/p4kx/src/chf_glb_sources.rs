@@ -32,11 +32,15 @@ mod character;
 #[path = "chf_glb_part_origins.rs"]
 mod parts;
 
+#[path = "chf_glb_material_origins.rs"]
+mod material;
+
 #[path = "chf_glb_report_origins.rs"]
 mod report;
 
 use character::CharacterInput;
-use parts::{Parts, image_material, rig};
+use material::image_material;
+use parts::{Parts, rig};
 
 pub(super) struct Projection {
     payload: FieldOrigin,

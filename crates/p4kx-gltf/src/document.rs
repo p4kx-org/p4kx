@@ -37,7 +37,7 @@ pub(crate) fn document(
     layout: &Layout<'_>,
     textures: &TextureSet,
     animations: &[AnimationPlan],
-) -> Root {
+) -> (Root, usize) {
     let Content {
         wrappers,
         instances,
@@ -62,7 +62,8 @@ pub(crate) fn document(
     });
     let image_textures =
         buffer.map_or_default(|buffer| push_images(&mut root, buffer, layout, textures));
-    let materials = materials(&mut root, layout, instances, textures, &image_textures);
+    let (materials, shared_materials) =
+        materials(&mut root, layout, instances, textures, &image_textures);
     let (node_meshes, skinned) = buffer.map_or_else(
         || empty_nodes(instances),
         |buffer| push_meshes(&mut root, buffer, layout, instances, &materials),
@@ -88,7 +89,7 @@ pub(crate) fn document(
             push_animations(&mut root, buffer, layout, animations);
         }
     }
-    root
+    (root, shared_materials)
 }
 
 /// Returns the skeleton of the scene when `rig` is given and a mesh is skinned, after writing the
@@ -317,10 +318,11 @@ fn push_mesh(
             if let Some(colours) = colours.filter(|_| primitive.colours) {
                 attributes.insert(Valid(Semantic::Colors(0)), colours);
             }
+            let usage = mesh.material_use(primitive);
             Some(Primitive {
                 attributes,
                 indices: Some(push_accessor(root, buffer, &indices, None)),
-                material: materials.and_then(|ids| ids.get(&primitive.material_id).copied()),
+                material: materials.and_then(|ids| ids.get(&usage).copied()),
                 mode: Valid(Mode::Triangles),
                 targets: primitive_targets(&targets),
                 extensions: None,

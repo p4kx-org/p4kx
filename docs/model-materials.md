@@ -104,6 +104,13 @@ first. When the Material node omits the reference or that palette cannot be read
 same component's geometry palette can supply it. Source evidence identifies the winning
 `RootRecord` field and the palette Record. An unreadable reference produces a diagnostic.
 
+## GLB texture coordinates
+
+GLB materials use the primitive's `TEXCOORD_0` attribute for their texture bindings.
+Primitives without that attribute use the same material factors without bindings.
+When two primitives use the same source material slot with different UV availability,
+the exported material variants keep their own texture bindings and source evidence.
+
 ## Fitted vehicle paints
 
 Entity GLB and Blender package exports resolve the root vehicle's fitted item on its effective

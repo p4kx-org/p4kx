@@ -104,7 +104,9 @@ pub use rig::{
 };
 pub use rig_addresses::{RiggedBufferSource, RiggedBufferView, RiggedJsonAddress};
 pub use rig_animation::{RigAnimation, SampledAnimation, SampledBone, SampledWeights};
-pub use rig_emission::{RiggedGlbEmission, RiggedPartEmission};
+pub use rig_emission::{
+    RiggedGlbEmission, RiggedMaterialEmission, RiggedMaterialTexture, RiggedPartEmission,
+};
 pub use rig_mount::RigMount;
 pub use scene::{Scene, SceneNode, ScenePart, write_scene_glb, write_scene_glb_with};
 pub use scene_light::{SceneLight, SceneLightKind};

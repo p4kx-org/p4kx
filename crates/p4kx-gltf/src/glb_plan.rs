@@ -141,9 +141,10 @@ pub(crate) fn texture_set(
         .map(|(part, instance)| {
             let mut slots: Vec<Slot> = Vec::new();
             for slot in layout
-                .part_material_ids(part)
+                .part_materials(part)
                 .into_iter()
-                .filter_map(|id| instance.plan.slot(id))
+                .filter(|usage| usage.has_uvs)
+                .filter_map(|usage| instance.plan.slot(usage.id))
             {
                 if !slots.contains(&slot) {
                     slots.push(slot);

@@ -3,109 +3,28 @@
 
 //! Pieces worn on a shared skeleton, written with the textures of their materials.
 
+use std::collections::BTreeMap;
 use std::error::Error;
 
-use p4kx_chunks::ChunkFile;
 use p4kx_gltf::{
-    GlbOptions, GlbSummary, MaterialMode, RigPiece, write_rigged_glb,
-    write_rigged_glb_animated_observed, write_rigged_glb_with,
+    GlbOptions, MaterialMode, RigPiece, RiggedGlbEmission, RiggedJsonAddress, TextureReadId,
+    write_rigged_glb_animated_observed,
 };
-use p4kx_model::{
-    CompanionError, CompanionPath, MaterialLibrary, MaterialStatus, Model, PaletteSlot, TintEntry,
-    TintPalette,
-};
+use p4kx_model::{MaterialStatus, PaletteSlot, TintEntry, TintPalette};
+use p4kx_testkit::gltf::Semantic;
 use p4kx_testkit::gltf::material::AlphaMode;
-use p4kx_testkit::{
-    CheckedGlb, TestBone, TestModel, TestMtl, TestMtlMaterial, TestSkeleton, check_glb,
+use p4kx_testkit::{TestMtlMaterial, check_glb};
+
+use crate::textures::support::{
+    Stub, TestResult, add_uvless_mesh, base_image, material, near, texture,
 };
 
-use crate::textures::support::{Stub, TestResult, base_image, material, near, texture};
+mod support;
 
-fn bone(name: &str, parent: Option<u16>, z: f32) -> TestBone {
-    TestBone {
-        name: name.to_owned(),
-        parent,
-        rotation: [0.0, 0.0, 0.0, 1.0],
-        translation: [0.0, 0.0, z],
-    }
-}
-
-fn body() -> Result<Model, Box<dyn Error>> {
-    let skeleton = TestSkeleton::new(vec![
-        bone("pelvis", None, 0.0),
-        bone("TIP", Some(0), 1.0),
-        bone("root", Some(1), 1.0),
-    ]);
-    let source = TestModel::cube().helpers_only().with_skeleton(&skeleton);
-    let mut none = |_: CompanionPath<'_>| -> Result<Option<Vec<u8>>, CompanionError> { Ok(None) };
-    Ok(Model::read(
-        "body.chr",
-        &ChunkFile::parse(source.cgf())?,
-        &mut none,
-    )?)
-}
-
-fn piece() -> Result<Model, Box<dyn Error>> {
-    let source = TestModel::two_bone_skin();
-    let mut companions = |path: CompanionPath<'_>| -> Result<Option<Vec<u8>>, CompanionError> {
-        Ok(match path {
-            CompanionPath::Sibling("piece.skinm") => Some(source.cgfm()),
-            _ => None,
-        })
-    };
-    Ok(Model::read(
-        "piece.skin",
-        &ChunkFile::parse(source.cgf())?,
-        &mut companions,
-    )?)
-}
-
-fn library(material: &TestMtlMaterial) -> Result<MaterialStatus, Box<dyn Error>> {
-    library_at("objects/test/piece", material)
-}
-
-fn library_at(path: &str, material: &TestMtlMaterial) -> Result<MaterialStatus, Box<dyn Error>> {
-    let materials = [material.clone(), material.clone(), material.clone()];
-    let bytes = TestMtl::multi(&materials).cryxml();
-    Ok(MaterialStatus::Loaded(MaterialLibrary::parse(
-        path, &bytes,
-    )?))
-}
-
-fn hair_cap(file: &str) -> TestMtlMaterial {
-    TestMtlMaterial::new("hair_scalp_m")
-        .shader("HairPBR")
-        .string_gen_mask("%HAIR_CAP")
-        .diffuse([0.0, 0.0, 0.0])
-        .texture("TexSlot1", file)
-}
-
-const MALE_LIBRARY: &str = "objects/test/hair_v2/sc/male/m_hair_31";
-const MALE_SCALP: &str = "Objects/Test/hair_v2/sc/male/textures/m_hair_31_scalp.tif";
-const FEMALE_SCALP: &str = "Objects/Test/hair_v2/sc/female/textures/f_hair_31_scalp.tif";
-
-fn write(
-    status: &MaterialStatus,
-    stub: Option<&Stub>,
-) -> Result<(CheckedGlb, GlbSummary), Box<dyn Error>> {
-    let (body, piece) = (body()?, piece()?);
-    let pieces = [RigPiece::new("head", &piece, status)];
-    let options = GlbOptions::default().with_materials(MaterialMode::Textures);
-    let mut bytes = Vec::new();
-    let summary = match stub {
-        Some(stub) => write_rigged_glb_with(&body.bones, &pieces, &options, stub, &mut bytes)?,
-        None => write_rigged_glb(&body.bones, &pieces, &options, &mut bytes)?,
-    };
-    Ok((check_glb(&bytes)?, summary))
-}
-
-fn skin_material() -> TestMtlMaterial {
-    TestMtlMaterial::new("shader_head")
-        .shader("HumanSkin_V2")
-        .diffuse([0.5, 1.0, 0.25])
-        .texture("TexSlot1", "Objects/Test/head_diff.tif")
-        .texture("TexSlot2", "Objects/Test/head_ddna.tif")
-}
+use support::{
+    FEMALE_SCALP, MALE_LIBRARY, MALE_SCALP, body, hair_cap, library, library_at, piece,
+    skin_material, write,
+};
 
 #[test]
 fn the_textures_of_a_rigged_piece_are_embedded_and_shared() -> TestResult {
@@ -374,4 +293,81 @@ fn a_shared_image_tracks_the_original_job_and_only_the_palette_values_it_uses() 
         "the second part reuses all three images"
     );
     Ok(())
+}
+
+#[test]
+fn a_rigged_slot_attributes_texture_reads_only_to_the_uv_material_index() -> TestResult {
+    let diffuse = TextureReadId::new(0);
+    let normal = TextureReadId::new(1);
+    let stub = Stub::default()
+        .with(
+            "objects/test/head_diff.dds",
+            &texture([200, 100, 50, 255], false)?.with_read(diffuse),
+        )
+        .with(
+            "objects/test/head_ddna.dds",
+            &texture([128, 128, 255, 200], true)?.with_read(normal),
+        );
+    let body = body()?;
+    let mut piece = piece()?;
+    add_uvless_mesh(&mut piece)?;
+    let material = library(&skin_material())?;
+    let pieces = [RigPiece::new("head", &piece, &material)];
+    let options = GlbOptions::default().with_materials(MaterialMode::Textures);
+    let mut bytes = Vec::new();
+    let (_, emission) =
+        write_rigged_glb_animated_observed(&body.bones, &pieces, &[], &options, &stub, &mut bytes)?;
+    let glb = check_glb(&bytes)?;
+    let mut bindings = BTreeMap::new();
+
+    for primitive in glb.document.meshes().flat_map(|mesh| mesh.primitives()) {
+        let index = primitive.material().index().ok_or("material index")?;
+        let has_uvs = primitive.get(&Semantic::TexCoords(0)).is_some();
+        let slot = source_material_slot(&emission, index)?;
+        let material = emission.material(index).ok_or("material emission")?;
+        let reads: Vec<_> = material
+            .texture_bindings()
+            .flat_map(|(_, index)| emission.image_sources().nth(index).into_iter().flatten())
+            .filter_map(|source| source.read)
+            .collect();
+
+        if has_uvs {
+            assert!(reads.contains(&diffuse));
+            assert!(reads.contains(&normal));
+        } else {
+            assert_eq!(
+                reads,
+                [] as [TextureReadId; 0],
+                "a UV-less material has no texture reads"
+            );
+        }
+        let (plain, textured) = bindings.entry(slot).or_insert((None, None));
+        if has_uvs {
+            *textured = Some(index);
+        } else {
+            *plain = Some(index);
+        }
+    }
+    assert!(!bindings.is_empty());
+    for (plain, textured) in bindings.values() {
+        assert!(plain.is_some() && textured.is_some());
+        assert_ne!(plain, textured);
+    }
+    Ok(())
+}
+
+fn source_material_slot(emission: &RiggedGlbEmission, index: usize) -> Result<usize, &'static str> {
+    emission
+        .json_addresses()
+        .iter()
+        .find_map(|address| match *address {
+            RiggedJsonAddress::Material {
+                index: emitted_index,
+                part: 0,
+                slot: Some(slot),
+                ..
+            } if emitted_index == index => Some(slot),
+            _ => None,
+        })
+        .ok_or("source material slot")
 }

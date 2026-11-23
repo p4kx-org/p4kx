@@ -88,7 +88,7 @@ pub use p4kx_dataforge::{
     RecordJsonUse, RecordJsonUseRole,
 };
 pub use p4kx_gltf::{
-    RiggedBufferSource, RiggedBufferView, RiggedGlbEmission, RiggedJsonAddress, RiggedPartEmission,
-    TextureMaterialSource,
+    RiggedBufferSource, RiggedBufferView, RiggedGlbEmission, RiggedJsonAddress,
+    RiggedMaterialEmission, RiggedMaterialTexture, RiggedPartEmission, TextureMaterialSource,
 };
 pub use p4kx_gltf::{TextureComponents, TextureReadUse};

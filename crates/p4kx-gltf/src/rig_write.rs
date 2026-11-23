@@ -195,7 +195,7 @@ fn write_rigged<'m>(
     }
     if let Some(emission) = observe.emission {
         let addresses = Addresses::of(&root, &layout, &instances, &materials, &plans, &total);
-        *emission = RiggedGlbEmission::of(&instances, &layout, &mut images, addresses);
+        *emission = RiggedGlbEmission::of(&instances, &layout, &mut images, &materials, addresses);
     }
     let defaulted = instances
         .iter()

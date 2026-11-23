@@ -3,7 +3,7 @@
 
 use std::collections::HashMap;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use p4kx_extraction::{
     DecimalU64, FieldOrigin, FieldPath, OriginOutputAddress, RiggedBufferSource, RiggedGlbEmission,
     RiggedJsonAddress, SourceUses,
@@ -52,6 +52,23 @@ pub(super) fn fields(
             },
             origin,
         ));
+        if let RiggedJsonAddress::Material { index, .. } = *datum {
+            let material = emission
+                .material(index)
+                .context("missing GLB material evidence")?;
+            for (binding, image) in material.texture_bindings() {
+                let path = format!("/materials/{index}{}", binding.index_pointer());
+                let origin = known
+                    .entry(RiggedBufferSource::Image(image))
+                    .or_insert_with(|| input.source(RiggedBufferSource::Image(image)));
+                found.push((
+                    OriginOutputAddress::GlbJsonField {
+                        path: FieldPath::parse(&path)?,
+                    },
+                    origin.clone(),
+                ));
+            }
+        }
     }
     for image in images {
         super::transfer::addresses(&mut found, image, uses)?;
@@ -95,14 +112,9 @@ impl Inputs<'_> {
             RiggedJsonAddress::Bone(index) => {
                 (format!("/nodes/{index}"), cache(Source::Skeleton, known))
             }
-            RiggedJsonAddress::Material {
-                index,
-                part,
-                slot,
-                archive_default,
-            } => (
+            RiggedJsonAddress::Material { index, .. } => (
                 format!("/materials/{index}"),
-                self.material(part, slot, archive_default),
+                self.measured(self.parts.material_indices.get(&index)),
             ),
             RiggedJsonAddress::Mesh { index, part } => (
                 format!("/meshes/{index}"),
@@ -125,18 +137,6 @@ impl Inputs<'_> {
             }
             _ => return None,
         })
-    }
-
-    fn material(&self, part: usize, slot: Option<usize>, archive_default: bool) -> FieldOrigin {
-        if slot.is_none() && !archive_default {
-            return self.uses.origin(&[], true);
-        }
-        let origin = self.parts.individual.get(part).and_then(|part| {
-            slot.map_or(part.default_material.as_ref(), |slot| {
-                part.material_slots.get(&slot)
-            })
-        });
-        self.measured(origin)
     }
 
     fn measured(&self, origin: Option<&Contributors>) -> FieldOrigin {

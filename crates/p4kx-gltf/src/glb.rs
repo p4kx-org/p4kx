@@ -14,7 +14,7 @@ use crate::document::document;
 use crate::glb_json;
 pub use crate::glb_options::{GlbOptions, MaterialMode, VertexColours};
 use crate::glb_plan::{Skeletal, animation_plans, own_binds, plan_layout, summarise, texture_set};
-use crate::instance::{Content, Instance, material_requests};
+use crate::instance::{Content, Instance};
 use crate::layout::Layout;
 use crate::material_index::index_materials;
 use crate::materials::MaterialPlan;
@@ -287,7 +287,7 @@ pub(crate) fn write_instances(
     };
     let animation_plans = animation_plans(&mut layout, content, single);
     layout.push_images(images.images.iter().map(|image| image.png.len() as u64));
-    let mut root = document(content, &layout, &images, &animation_plans);
+    let (mut root, shared_materials) = document(content, &layout, &images, &animation_plans);
     root.asset.extras = content
         .asset_extras
         .map(serde_json::value::to_raw_value)
@@ -320,10 +320,7 @@ pub(crate) fn write_instances(
     summary.parts = instances.len();
     summary.lod_fallbacks = lod_fallbacks;
     summary.shared_meshes = shared_meshes(instances, &layout);
-    if instances.len() > 1 {
-        summary.shared_materials =
-            material_requests(&layout, instances).saturating_sub(root.materials.len());
-    }
+    summary.shared_materials = shared_materials;
     Ok(summary)
 }
 

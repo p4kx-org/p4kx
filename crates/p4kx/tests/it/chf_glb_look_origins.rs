@@ -89,15 +89,22 @@ fn export(entries: Vec<TestEntry>) -> Result<(Value, Value, Value), Box<dyn Erro
         .clone();
     let path = format!("/materials/{}", material.index().ok_or("material index")?);
     let receipt = fs::read_to_string(out.with_file_name("look.glb.p4kx-origin.jsonl"))?;
-    let material = receipt
+    let rows = receipt
         .lines()
         .map(serde_json::from_str::<Value>)
-        .find(|row| {
-            row.as_ref().is_ok_and(|row| {
-                row.pointer("/address/path").and_then(Value::as_str) == Some(path.as_str())
-            })
-        })
-        .ok_or("material field origin")??;
+        .collect::<Result<Vec<_>, _>>()?;
+    let at = |path: &str| {
+        rows.iter()
+            .find(|row| row.pointer("/address/path").and_then(Value::as_str) == Some(path))
+    };
+    let binding_path = format!("{path}/pbrMetallicRoughness/baseColorTexture/index");
+    let binding = at(&binding_path).ok_or("base colour binding origin")?;
+    assert_eq!(
+        binding.get("containsEncryptedSource"),
+        image.get("containsEncryptedSource"),
+        "the binding references the image inputs"
+    );
+    let material = at(&path).ok_or("material field origin")?.clone();
     Ok((report, material, image))
 }
 

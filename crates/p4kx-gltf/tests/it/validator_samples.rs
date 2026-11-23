@@ -11,6 +11,7 @@ use std::path::PathBuf;
 use p4kx_testkit::{TestMtlMaterial, check_glb};
 
 use crate::morphs::{glb_bytes as rigged_bytes, target};
+use crate::scene_textures::mixed_uv_glb;
 use crate::vertex_colour_primitives::{glass, glb_bytes as coloured_bytes};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -43,6 +44,7 @@ fn the_synthetic_glbs_are_written_for_the_validator() -> TestResult {
         ("head_with_morph_targets.glb", head),
         ("skinned_mesh.glb", skinned),
         ("per_primitive_color_0.glb", coloured),
+        ("mixed_uv_materials.glb", mixed_uv_glb()?),
     ];
     let folder = env::var_os(FOLDER_VARIABLE).map(PathBuf::from);
     if let Some(folder) = &folder {

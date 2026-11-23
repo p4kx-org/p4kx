@@ -36,6 +36,41 @@ pub(crate) fn read_cube() -> Result<Model, Box<dyn Error>> {
     )?)
 }
 
+pub(crate) fn add_cube_tangents(model: &mut Model) -> TestResult {
+    let mesh = model
+        .lods
+        .first_mut()
+        .and_then(|lod| lod.meshes.first_mut())
+        .ok_or("cube mesh")?;
+    let cube = TestModel::cube();
+    let (faces, _) = cube.vertices().as_chunks::<4>();
+    let tangents: Vec<_> = faces
+        .iter()
+        .flat_map(|[origin, right, ..]| {
+            let [x, y, z] = origin.position;
+            let [right_x, right_y, right_z] = right.position;
+            let edge = [right_x - x, right_y - y, right_z - z];
+            let length = edge.iter().map(|value| value * value).sum::<f32>().sqrt();
+            let [x, y, z] = edge.map(|value| value / length);
+            // The glTF writer reverses the authored handedness.
+            [[x, y, z, -1.0]; 4]
+        })
+        .collect();
+    mesh.tangents = Some(
+        mesh.source
+            .iter()
+            .map(|&source| {
+                let index = usize::try_from(source)?;
+                tangents
+                    .get(index)
+                    .copied()
+                    .ok_or_else(|| "cube vertex".into())
+            })
+            .collect::<Result<_, Box<dyn Error>>>()?,
+    );
+    Ok(())
+}
+
 pub(crate) fn library(sub_materials: &[TestMtlMaterial]) -> MaterialStatus {
     let file = TestMtl::multi(sub_materials).cryxml();
     let mut companions = move |path: CompanionPath<'_>| -> Result<Option<Vec<u8>>, CompanionError> {

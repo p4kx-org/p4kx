@@ -3,13 +3,13 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use crate::instance::Instance;
+use crate::instance::{Instance, MaterialIds};
 use crate::layout::Layout;
 use crate::materials::Slot;
 use crate::rig_addresses::{Addresses, RiggedBufferView, RiggedJsonAddress};
 use crate::shading::{shaded_layers, uses_plain_diffuse};
 use crate::texture_origins::{TextureMaterialSource, TextureReadUse};
-use crate::texture_plan::TextureSet;
+use crate::texture_plan::{SlotImages, TextureSet};
 
 /// The geometry and material slots one supplied part wrote into a rigged GLB.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -69,26 +69,82 @@ impl RiggedPartEmission {
 
     fn observe_slot(
         &mut self,
-        part: usize,
         slot: Slot,
         instance: &Instance<'_>,
-        textures: &TextureSet,
+        material: &RiggedMaterialEmission,
     ) {
         match slot {
-            Slot::Library(position) if !self.material_slots.contains_key(&position) => {
-                let (layers, diffuse) = slot_origins(part, slot, instance, textures);
-                self.material_slots.insert(position, layers);
-                if diffuse {
+            Slot::Library(position) => {
+                self.material_slots
+                    .entry(position)
+                    .or_default()
+                    .extend(material.layers());
+                if material.uses_diffuse {
                     self.diffuse_slots.insert(position);
                 }
             }
-            Slot::Default
-                if instance.plan.has_physical_fallback() && self.default_layers.is_none() =>
-            {
-                self.default_layers = Some(slot_origins(part, slot, instance, textures).0);
+            Slot::Default if instance.plan.has_physical_fallback() => {
+                self.default_layers
+                    .get_or_insert_default()
+                    .extend(material.layers());
             }
-            _ => {}
+            Slot::Default => {}
         }
+    }
+}
+
+/// A texture binding in an emitted glTF material.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum RiggedMaterialTexture {
+    /// The base colour map.
+    BaseColour,
+    /// The tangent-space normal map.
+    Normal,
+    /// The metallic-roughness map.
+    MetallicRoughness,
+}
+
+impl RiggedMaterialTexture {
+    /// Returns the relative glTF JSON pointer of the binding's texture index.
+    #[must_use]
+    pub const fn index_pointer(self) -> &'static str {
+        match self {
+            Self::BaseColour => "/pbrMetallicRoughness/baseColorTexture/index",
+            Self::Normal => "/normalTexture/index",
+            Self::MetallicRoughness => "/pbrMetallicRoughness/metallicRoughnessTexture/index",
+        }
+    }
+}
+
+/// The inputs of one emitted GLB material, identified by its index in the file.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RiggedMaterialEmission {
+    layers: BTreeSet<usize>,
+    uses_diffuse: bool,
+    images: [Option<usize>; 3],
+}
+
+impl RiggedMaterialEmission {
+    /// Iterates the authored layers that affected this material.
+    pub fn layers(&self) -> impl Iterator<Item = usize> + '_ {
+        self.layers.iter().copied()
+    }
+
+    /// Returns whether this material used its authored diffuse colour.
+    #[must_use]
+    pub const fn uses_diffuse(&self) -> bool {
+        self.uses_diffuse
+    }
+
+    /// Iterates this material's texture bindings and the embedded image each binding selects.
+    pub fn texture_bindings(&self) -> impl Iterator<Item = (RiggedMaterialTexture, usize)> {
+        use RiggedMaterialTexture::{BaseColour, MetallicRoughness, Normal};
+
+        [BaseColour, Normal, MetallicRoughness]
+            .into_iter()
+            .zip(self.images)
+            .filter_map(|(binding, image)| image.map(|image| (binding, image)))
     }
 }
 
@@ -96,10 +152,10 @@ fn slot_origins(
     part: usize,
     slot: Slot,
     instance: &Instance<'_>,
+    images: SlotImages,
     textures: &TextureSet,
-) -> (BTreeSet<usize>, bool) {
+) -> RiggedMaterialEmission {
     let material = instance.plan.material(slot);
-    let images = textures.of(part, slot);
     let tinted = images.base.is_some_and(|base| base.tinted);
     let layered = images.base.is_some_and(|base| base.layered);
     let roughness = images
@@ -118,7 +174,7 @@ fn slot_origins(
                 .map(|layer| layer.at),
         );
     }
-    let diffuse = !tinted && layers.is_empty() && uses_plain_diffuse(material);
+    let uses_diffuse = !tinted && layers.is_empty() && uses_plain_diffuse(material);
     let position = match slot {
         Slot::Library(position) => Some(position),
         Slot::Default => None,
@@ -134,13 +190,22 @@ fn slot_origins(
             layers.extend(&source.layers);
         }
     }
-    (layers, diffuse)
+    RiggedMaterialEmission {
+        layers,
+        uses_diffuse,
+        images: [
+            images.base.map(|image| image.image),
+            images.normal,
+            images.metallic_roughness.map(|image| image.image),
+        ],
+    }
 }
 
 /// Evidence identifying the actual emitted geometry of each supplied part, in input order.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct RiggedGlbEmission {
     parts: Vec<RiggedPartEmission>,
+    materials: BTreeMap<usize, RiggedMaterialEmission>,
     images: Vec<Vec<TextureReadUse>>,
     image_materials: Vec<Option<TextureMaterialSource>>,
     addresses: Addresses,
@@ -151,29 +216,51 @@ impl RiggedGlbEmission {
         instances: &[Instance<'_>],
         layout: &Layout<'_>,
         textures: &mut TextureSet,
+        materials: &[MaterialIds],
         addresses: Addresses,
     ) -> Self {
         let mut parts = vec![RiggedPartEmission::default(); instances.len()];
         for mesh in &layout.meshes {
-            let (Some(part), Some(instance)) = (parts.get_mut(mesh.part), instances.get(mesh.part))
-            else {
-                continue;
-            };
-            part.geometry = true;
-            part.skinned |= !mesh.joints.is_empty();
-            part.morphs |= !mesh.morphs.is_empty();
-            for primitive in &mesh.primitives {
-                if let Some(slot) = instance.plan.slot(primitive.material_id) {
-                    part.observe_slot(mesh.part, slot, instance, textures);
+            if let Some(part) = parts.get_mut(mesh.part) {
+                part.geometry = true;
+                part.skinned |= !mesh.joints.is_empty();
+                part.morphs |= !mesh.morphs.is_empty();
+            }
+        }
+        let mut material_emissions = BTreeMap::new();
+        for (position, ((part, instance), material_ids)) in
+            parts.iter_mut().zip(instances).zip(materials).enumerate()
+        {
+            let mut observed = BTreeSet::new();
+            for (usage, index) in material_ids {
+                let Some(slot) = instance.plan.slot(usage.id) else {
+                    continue;
+                };
+                if observed.insert((slot, usage.has_uvs)) {
+                    let images = if usage.has_uvs {
+                        textures.of(position, slot)
+                    } else {
+                        SlotImages::default()
+                    };
+                    let emitted = slot_origins(position, slot, instance, images, textures);
+                    part.observe_slot(slot, instance, &emitted);
+                    material_emissions.entry(index.value()).or_insert(emitted);
                 }
             }
         }
         Self {
             parts,
+            materials: material_emissions,
             images: std::mem::take(&mut textures.image_sources),
             image_materials: std::mem::take(&mut textures.image_materials),
             addresses,
         }
+    }
+
+    /// Returns the contributions to the material emitted at `index`.
+    #[must_use]
+    pub fn material(&self, index: usize) -> Option<&RiggedMaterialEmission> {
+        self.materials.get(&index)
     }
 
     /// Iterates the actual sources of each embedded image in its output order.
