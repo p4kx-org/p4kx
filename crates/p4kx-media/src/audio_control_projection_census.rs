@@ -11,8 +11,7 @@ use crate::audio_control_reference::{self as references, NameDeclaration};
 use crate::audio_control_source::AudioControlSource;
 use crate::{MediaError, Subresource, origin_error};
 
-use super::Failure;
-use super::walk::{self, Sink};
+use super::{Failure, Sink, walk};
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct AtlCensus {
@@ -75,6 +74,17 @@ impl<F: FnMut() -> Result<(), MediaError>> Sink for CountSink<F> {
             _ => return Ok(()),
         };
         increment(count)
+    }
+
+    fn cig_audio_definition(
+        &mut self,
+        _entry: usize,
+        _position: AtlPosition,
+        _ancestors: impl Iterator<Item = AtlPosition>,
+        _subresource: &Subresource,
+        _payload: &AtlPayload<'_>,
+    ) -> Result<(), MediaError> {
+        Ok(())
     }
 
     fn name(&mut self, declaration: NameDeclaration<'_>) -> Result<(), MediaError> {

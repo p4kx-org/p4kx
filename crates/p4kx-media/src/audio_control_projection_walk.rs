@@ -20,23 +20,8 @@ use crate::audio_control_source::cig_audio_role::CigAudioRole;
 use crate::xml_source_projection::{content_position, element_position, source_content};
 use crate::{MediaError, Subresource, origin_error};
 
-use super::Failure;
 use super::declaration::ObservedDeclaration;
-
-pub(super) trait Sink {
-    fn work(&mut self) -> Result<(), MediaError>;
-    fn path(&self) -> &Path;
-    fn document(&mut self, payload: wire::AtlDocument) -> Result<(), MediaError>;
-    fn record(
-        &mut self,
-        position: AtlPosition,
-        field: &'static str,
-        role: SourceUseRole,
-        subresource: &Subresource,
-        payload: &AtlPayload<'_>,
-    ) -> Result<(), MediaError>;
-    fn name(&mut self, declaration: NameDeclaration<'_>) -> Result<(), MediaError>;
-}
+use super::{Failure, Sink};
 
 struct Frame<'document> {
     parent: Option<u64>,
@@ -44,7 +29,13 @@ struct Frame<'document> {
     sibling: u64,
     preload: Option<u64>,
     radar: Option<RadarAudioElement>,
-    cig_audio: Option<CigAudioRole>,
+    cig_audio: Option<CigAudioElement>,
+}
+
+#[derive(Clone, Copy)]
+struct CigAudioElement {
+    role: CigAudioRole,
+    position: AtlPosition,
 }
 
 struct ElementRoute {
@@ -150,7 +141,9 @@ impl<S: Sink> Walk<'_, S> {
                     } else {
                         (
                             frame.radar.and_then(|parent| parent.child(element)),
-                            frame.cig_audio.and_then(|parent| parent.child(element)),
+                            frame
+                                .cig_audio
+                                .and_then(|parent| parent.role.child(element)),
                         )
                     };
                     let route = ElementRoute {
@@ -160,7 +153,11 @@ impl<S: Sink> Walk<'_, S> {
                         radar,
                         cig_audio,
                     };
-                    let child = self.element(element, route, matches!(layout, Layout::Atl))?;
+                    let ancestors = stack
+                        .iter()
+                        .filter_map(|frame| frame.cig_audio.map(|element| element.position));
+                    let child =
+                        self.element(element, route, matches!(layout, Layout::Atl), ancestors)?;
                     reserve(&mut stack, self.sink.path())?;
                     stack.push(child);
                 }
@@ -175,6 +172,7 @@ impl<S: Sink> Walk<'_, S> {
         element: SourceElement<'document>,
         route: ElementRoute,
         typed: bool,
+        ancestors: impl Iterator<Item = AtlPosition>,
     ) -> Result<Frame<'document>, Failure> {
         let ElementRoute {
             location,
@@ -212,7 +210,7 @@ impl<S: Sink> Walk<'_, S> {
             radar,
             cig_audio,
         };
-        self.declarations(&syntax, definition, position, index)?;
+        self.declarations(&syntax, definition, position, index, ancestors)?;
         if let Some(text) = syntax.binary_text() {
             let position = content_position(text.position())?;
             self.payload(
@@ -231,7 +229,7 @@ impl<S: Sink> Walk<'_, S> {
             sibling: 0,
             preload,
             radar,
-            cig_audio,
+            cig_audio: cig_audio.map(|role| CigAudioElement { role, position }),
         })
     }
 
@@ -241,6 +239,7 @@ impl<S: Sink> Walk<'_, S> {
         definition: Definition,
         position: AtlPosition,
         index: u64,
+        ancestors: impl Iterator<Item = AtlPosition>,
     ) -> Result<(), Failure> {
         if let Some(family) = definition.family {
             self.payload(
@@ -259,9 +258,10 @@ impl<S: Sink> Walk<'_, S> {
             )?;
         }
         if let Some(role) = definition.cig_audio {
-            self.payload(
+            self.sink.cig_audio_definition(
+                self.entry,
                 position,
-                "element",
+                ancestors,
                 &Subresource::new(wire::CIG_AUDIO_DEFINITION, vec![index]),
                 &AtlPayload::CigAudioDefinition(wire::CigAudioDefinition { role }),
             )?;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::SourceUseRole;
+use p4kx_extraction::{InputScope, SourceUseRole};
 
 use crate::audio_control_payload::AtlPosition;
 use crate::audio_control_source::AudioControlSource;
@@ -25,6 +25,43 @@ pub(crate) fn observation(
         records::capture(input, [(site, role)], writer)
     })?;
     prepared(input, evidence, writer)
+}
+
+pub(crate) fn cig_audio_definition(
+    input: &MediaOriginInput,
+    entry: usize,
+    position: AtlPosition,
+    ancestors: impl Iterator<Item = AtlPosition>,
+    writer: &MediaWriter<'_>,
+) -> Result<PreparedRecordOrigins, MediaError> {
+    let kind = AudioControlSource::CigAudio;
+    let element = with_source_site(kind, position, "element", |site| {
+        records::capture(input, [(site, SourceUseRole::Payload)], writer)
+    })?;
+    let mut role = writer.capture_origins();
+    role.include(&element, writer)?;
+    role.add(
+        input,
+        InputScope::ArchiveDirectoryMetadata,
+        OriginSite::new("archive-entry", &[entry as u64], "path"),
+        SourceUseRole::Selector,
+        writer,
+    )?;
+    for ancestor in ancestors {
+        with_source_site(kind, ancestor, "element", |site| {
+            role.add(
+                input,
+                InputScope::Payload,
+                site,
+                SourceUseRole::Selector,
+                writer,
+            )
+        })?;
+    }
+    let mut prepared = records::prepare_for(input, OriginProfile::AudioControl)?;
+    records::indices(&mut prepared, element, writer)?;
+    records::subtree(&mut prepared, "/data/payload", role.finish(), writer)?;
+    Ok(prepared)
 }
 
 pub(crate) fn prepared(

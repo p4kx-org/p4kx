@@ -25,7 +25,29 @@ mod walk;
 
 #[cfg(test)]
 pub(crate) use self::census::census;
-use self::walk::Sink;
+
+trait Sink {
+    fn work(&mut self) -> Result<(), MediaError>;
+    fn path(&self) -> &Path;
+    fn document(&mut self, payload: wire::AtlDocument) -> Result<(), MediaError>;
+    fn record(
+        &mut self,
+        position: AtlPosition,
+        field: &'static str,
+        role: SourceUseRole,
+        subresource: &Subresource,
+        payload: &AtlPayload<'_>,
+    ) -> Result<(), MediaError>;
+    fn cig_audio_definition(
+        &mut self,
+        entry: usize,
+        position: AtlPosition,
+        ancestors: impl Iterator<Item = AtlPosition>,
+        subresource: &Subresource,
+        payload: &AtlPayload<'_>,
+    ) -> Result<(), MediaError>;
+    fn name(&mut self, declaration: NameDeclaration<'_>) -> Result<(), MediaError>;
+}
 
 pub(crate) struct Projection<'source, 'directory> {
     pub(crate) kind: AudioControlSource,
@@ -160,6 +182,19 @@ impl Sink for WriterSink<'_, '_, '_> {
     ) -> Result<(), MediaError> {
         let prepared =
             origins::observation(self.input, self.kind, position, field, role, self.writer)?;
+        prepared.write(self.writer, subresource, Status::Complete, payload, &[])
+    }
+
+    fn cig_audio_definition(
+        &mut self,
+        entry: usize,
+        position: AtlPosition,
+        ancestors: impl Iterator<Item = AtlPosition>,
+        subresource: &Subresource,
+        payload: &AtlPayload<'_>,
+    ) -> Result<(), MediaError> {
+        let prepared =
+            origins::cig_audio_definition(self.input, entry, position, ancestors, self.writer)?;
         prepared.write(self.writer, subresource, Status::Complete, payload, &[])
     }
 

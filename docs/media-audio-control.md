@@ -78,9 +78,12 @@ selects the authored CIG audio graph. Both Archive separator spellings and ASCII
 match the same fixed path. The source must have a `CIGAudioData` root. Its original bytes and
 syntax rows retain the full graph, including unrecognised elements and declarations.
 
-The role rows classify the original object, logic, reference and link hierarchy. Join
-each definition to its original element occurrence to read the exact name, parent and
-sibling ordinal. The original CryXml graph can use decimal-only element names.
+The role rows classify the original object, logic, reference and link hierarchy. A role's
+origin cites the original element, its ancestor elements used for classification and the
+physical Entry path used to select the graph reader. A numbered child under inLinks and
+one under outLinks have different roles even when their names match. Join each definition
+to its original element occurrence to read the exact name, parent and sibling ordinal.
+The original CryXml graph can use decimal-only element names.
 The text spelling also permits an underscore with optional digits.
 A typed field joins the original declaration by the same indices. Object
 types, classes and mixed-form IDs preserve their exact text. GUID-valued slots retain

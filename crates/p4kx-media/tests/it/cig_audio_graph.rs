@@ -11,6 +11,9 @@ use serde_json::{Value, json};
 use crate::support;
 use crate::support::audio_provider::{Origins, TestResult};
 
+#[path = "cig_audio_role_origins.rs"]
+mod role_origins;
+
 const GRAPH_ENTRY: &str = "Data/Libs/CIGAudio/CIGAudioData.bin";
 const DEFINITION: &str = "audio-control-cig-audio-definition";
 const FIELD: &str = "audio-control-cig-audio-field";
@@ -42,6 +45,7 @@ fn cig_audio_cryxml_preserves_graph_order_fields_and_encrypted_origins() -> Test
     let base = output.join(&index.artifact_base);
     let origins = Origins::read(&base)?;
     check_link_origin(&rows, &origins)?;
+    role_origins::check(&rows, &origins)?;
     let (_, document) = row(&rows, "audio-control-document", &[])?;
     let raw = document
         .source
@@ -112,7 +116,7 @@ fn check_order(rows: &[MediaRecord]) -> TestResult {
             )
         })
         .collect();
-    let expected: [&str; 14] = [
+    let expected: [&str; 16] = [
         "graph",
         "objects",
         "object",
@@ -125,6 +129,8 @@ fn check_order(rows: &[MediaRecord]) -> TestResult {
         "input-link",
         "links",
         "link",
+        "output-links",
+        "output-link",
         "logic-node",
         "object",
     ];
@@ -288,7 +294,8 @@ fn fixture() -> Vec<u8> {
                 .child(
                     TestElement::new("inLinks")
                         .child(TestElement::new("0").child(TestElement::new("links").child(link))),
-                ),
+                )
+                .child(TestElement::new("outLinks").child(TestElement::new("0"))),
         )
         .child(
             TestElement::new("_4")
