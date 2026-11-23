@@ -85,3 +85,31 @@ captures provide display-space RGB under hangar lighting. Incident light, exposu
 transform and active material parameters are still required to attribute the reported
 appearance to a shader input. A matched linear material readback or calibrated runtime
 comparison remains the evidence gate for a rendering change.
+
+### Direct-sun game reference
+
+The follow-up LIVE sequence shows the factory bow in direct Pyro sunlight. The local client
+log and installed manifest agree on Change 13220821. In the two close views, held-out stripe
+contours and the one-stripe-shift control confirm the plate immediately left of the stripes
+as nose mesh 2, subset 3, slot 6. The snapshots use the same Vulkan renderer and reflection
+settings.
+
+Three unmarked regions were mapped between views using the plate's four orange triangle
+markers. The table reports median luma in JPEG code values on a 0–255 scale, with 81 samples
+per region. The nearby white stripe control uses the 80th percentile of the stripe window.
+The sampled stripe windows have zero clipped channels in these three frames.
+
+| View | Bare plate medians | Stripe control |
+| --- | --- | ---: |
+| 3 | 136.2, 137.2, 140.9 | 223.1 |
+| 4 | 117.7, 119.7, 123.7 | 201.8 |
+| 5 | 112.0, 112.0, 114.0 | 202.9 |
+
+Views 3 and 4 report the same camera direction while the position and framing change. Both
+the plate and the stripes become darker in view 4. In view 5 the stripe control is close to
+view 4 and the plate values fall further. A nominal reprojection of one bare point from view 4 into view 5 changes the viewing angle
+by 21.0°. In a 13 × 13 pixel window around that point, the median code value falls from
+116.0 to 111.0. The sequence provides a display-space range for the plate. The stripe
+reflectance and frame response are uncalibrated.
+Attribution of the appearance difference still requires a matched material readback or a
+calibrated lighting and display comparison.
