@@ -29,11 +29,15 @@ function Read-P4kxMsiOriginalBoundary {
     $events = [Collections.Generic.List[hashtable]]::new()
     $journal = Read-P4kxMsiPhaseJournal $Path -ObservedEvents $events
     $platform = Get-P4kxPlatform -Target $Target
+    $phases = @($Phase)
+    if ($Phase -ceq 'lifecycle/install' -and $Target -ceq 'x86_64-pc-windows-msvc') {
+        $phases += 'lifecycle/previous-install'
+    }
     $first = $null
     $status = if ($journal.present) { 'notObserved' } else { 'unavailable' }
     foreach ($event in $events) {
         if ($event.target -cne $Target -or $event.process_arch -ine $platform.runner_arch) { throw 'Original phase journal CPU or target differs.' }
-        if ($event.phase -cne $Phase) { continue }
+        if ($event.phase -cnotin $phases) { continue }
         if ($null -eq $first -and $event.status -ceq 'begin') { $first = $event.id }
         if ($event.id -ne $first) { continue }
         if ($event.status -ceq 'end') { $status = 'reached' }

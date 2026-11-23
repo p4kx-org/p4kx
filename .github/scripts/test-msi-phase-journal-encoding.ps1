@@ -98,30 +98,41 @@ $cases=@(
         Assert-JournalEncoding $refused 'A foreign target must not prove the original capture boundary.'
     }},
     @{name='first-original-install-outcome';action={
-        foreach ($status in @('reached','failed')) {
-            $root=Join-Path $Directory ('install-'+$status)
-            $diagnostics=Join-Path $root 'original/diagnostics'
-            New-Item -ItemType Directory -Force -Path $diagnostics | Out-Null
-            $context=New-P4kxMsiPhaseContext $diagnostics $target
-            $worker=Start-P4kxMsiPhase $context 'worker'
-            $install=Start-P4kxMsiPhase $context 'lifecycle/install'
-            $wait=Start-P4kxMsiPhase $context 'msiexec/wait'
-            Stop-P4kxMsiPhase $context $wait
-            $reported=Read-P4kxMsiOriginalBoundary $context.journal $target 'lifecycle/install'
-            Assert-JournalEncoding ($reported.status -ceq 'notObserved') 'A child wait ending does not establish the original install outcome.'
-            $failure=if ($status -ceq 'failed') { [InvalidOperationException]::new('Synthetic first install failure') }
-            Stop-P4kxMsiPhase $context $install -Failure $failure
-            $later=Start-P4kxMsiPhase $context 'lifecycle/install'
-            Stop-P4kxMsiPhase $context $later
-            $request=@{directory=$root;output_directory=(Join-Path $root 'original');target=$target;mode='Lifecycle'}
-            $handle=@{request_sha256='synthetic-install-journal-fixture'}
-            $state=@{state='running';lifetime_ended=$false}
-            $checkpoint=Save-P4kxMsiObserverCheckpoint $request $handle 3 $state -OriginalBoundary 'lifecycle/install'
-            $actual=Read-P4kxDetachedReceipt (Join-Path $checkpoint 'checkpoint.json')
-            Assert-JournalEncoding ($actual.original_install_phase -ceq $status -and $actual.journal.events -eq 7 -and
-                $actual.journal.active -ccontains 'worker' -and $actual.completed_success -eq $false -and
-                $actual.native_completion_unproven -eq $true -and $actual.mutation_authority -eq $false) 'Sequence 3 must retain the first original install outcome with observation-only authority.'
-            Stop-P4kxMsiPhase $context $worker
+        $firstPhases = @('lifecycle/install')
+        if ($target -ceq 'x86_64-pc-windows-msvc') {
+            $firstPhases += 'lifecycle/previous-install'
+        }
+        foreach ($firstPhase in $firstPhases) {
+            $laterPhase = if ($firstPhase -ceq 'lifecycle/previous-install') {
+                'lifecycle/rename-upgrade'
+            } else {
+                $firstPhase
+            }
+            foreach ($status in @('reached','failed')) {
+                $root=Join-Path $Directory ([IO.Path]::GetFileName($firstPhase)+'-'+$status)
+                $diagnostics=Join-Path $root 'original/diagnostics'
+                New-Item -ItemType Directory -Force -Path $diagnostics | Out-Null
+                $context=New-P4kxMsiPhaseContext $diagnostics $target
+                $worker=Start-P4kxMsiPhase $context 'worker'
+                $install=Start-P4kxMsiPhase $context $firstPhase
+                $wait=Start-P4kxMsiPhase $context 'msiexec/wait'
+                Stop-P4kxMsiPhase $context $wait
+                $reported=Read-P4kxMsiOriginalBoundary $context.journal $target 'lifecycle/install'
+                Assert-JournalEncoding ($reported.status -ceq 'notObserved') 'A child wait ending does not establish the original install outcome.'
+                $failure=if ($status -ceq 'failed') { [InvalidOperationException]::new('Synthetic first install failure') }
+                Stop-P4kxMsiPhase $context $install -Failure $failure
+                $later=Start-P4kxMsiPhase $context $laterPhase
+                Stop-P4kxMsiPhase $context $later
+                $request=@{directory=$root;output_directory=(Join-Path $root 'original');target=$target;mode='Lifecycle'}
+                $handle=@{request_sha256='synthetic-install-journal-fixture'}
+                $state=@{state='running';lifetime_ended=$false}
+                $checkpoint=Save-P4kxMsiObserverCheckpoint $request $handle 3 $state -OriginalBoundary 'lifecycle/install'
+                $actual=Read-P4kxDetachedReceipt (Join-Path $checkpoint 'checkpoint.json')
+                Assert-JournalEncoding ($actual.original_install_phase -ceq $status -and $actual.journal.events -eq 7 -and
+                    $actual.journal.active -ccontains 'worker' -and $actual.completed_success -eq $false -and
+                    $actual.native_completion_unproven -eq $true -and $actual.mutation_authority -eq $false) 'Sequence 3 must retain the first original install outcome with observation-only authority.'
+                Stop-P4kxMsiPhase $context $worker
+            }
         }
     }},
     @{name='exact-one-mib-cap';action={
