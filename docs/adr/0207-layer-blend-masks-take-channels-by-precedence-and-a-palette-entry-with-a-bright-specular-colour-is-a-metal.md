@@ -106,5 +106,12 @@ centres. Slot 1 contains their surrounds and the lower front panel and neck skir
 Both slots contribute to the front. Slot 2 forms a separate angular insert in isolation
 and is occluded in all three combined views with opaque ID materials.
 
-These landmarks identify physical regions of the worn model. The tint rule still
-requires a link from the authored layer mode to the renderer flags.
+These landmarks identify physical regions of the worn model. All fifteen resolved
+wrapper occurrences omit `TintMode`. Two layers from physical slot 0 select the same
+palette entry and their child materials declare modes 1 and 2.
+
+Release 0.5.0 requires a verified renderer witness for this pair. Bind the two child
+modes to the same selected layer occurrences in a matching Build and follow the
+actual upload into `LayerDefinition.Padding_TintIdx`. Read both shader flags, `0x04`
+for diffuse and `0x08` for specular, for each occurrence. The existing native trace
+comes from an older Build and ends before the upload.
