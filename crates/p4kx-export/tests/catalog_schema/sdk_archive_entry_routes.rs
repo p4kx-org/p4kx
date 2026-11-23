@@ -30,11 +30,7 @@ use super::{Route, TestResult, fixtures};
 
 pub(super) fn read_radar_configuration(archive: &Archive) -> TestResult<Route> {
     let snapshot = read_radar_audio(archive, RadarAudioSelection::All, None)?;
-    Route::queried_rows(
-        RADAR_AUDIO,
-        &snapshot.rows,
-        "physical configuration query available; installed producer parity open",
-    )
+    Route::queried_rows(RADAR_AUDIO, &snapshot.rows, None)
 }
 
 pub(super) fn read_language_policy() -> TestResult<Route> {

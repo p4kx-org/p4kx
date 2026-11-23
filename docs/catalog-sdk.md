@@ -2346,6 +2346,21 @@ physical sources referenced by the compared rows.
 Each run used one worker. The timing and peaks cover the combined verifier and Catalog replay.
 For the separate 2 GB SDK acceptance, measure each nominated query in its own cold process.
 
+### Radar Audio in a separate process
+
+On Windows AMD64, `installed_radar_audio_cold_query` ran the all-Entries Radar Audio
+SDK query in a new process with one worker at `8d6cab94e`. Each run returned one
+configuration with 98 source uses and two physical sources. The executable SHA-256 was
+`263881e9be9a6ed90779c3b89db0329df80bf6defe4b5a7259ed9e8f77b119b9`.
+
+| Build | Elapsed ms | Peak private bytes | Peak working set bytes | Minimum host RAM available in bytes |
+| --- | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 3,020 | 953,016,320 | 953,585,664 | 61,809,094,656 |
+| PTU `13248297` | 3,342 | 973,185,024 | 973,549,568 | 61,868,814,336 |
+
+The test left the scratch directory empty. System-wide counters recorded 229 pages
+read from disk on LIVE and 118,587 on PTU, with zero pages written in either interval.
+
 ## Verify dataset coverage
 
 The SDK coverage audit checks canonical dataset boundaries against calls to the public typed
