@@ -9,6 +9,9 @@ on:
       matrix:
         required: true
         type: string
+      addon-artifact-id:
+        required: true
+        type: string
       dry-run:
         required: false
         type: boolean
@@ -194,6 +197,23 @@ jobs:
             DryRun = $env:P4KX_DMG_DRY_RUN -eq 'true'
           }
           .github/scripts/check-macos-package.ps1 @arguments
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ inputs.addon-artifact-id }}
+          path: ${{ env.P4KX_PACKAGE_TASK }}/addon
+          digest-mismatch: error
+      - uses: actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0
+        with:
+          python-version: "3.13"
+      - name: Install and exercise the exact release add-on in native Blender 5.2 LTS
+        timeout-minutes: 20
+        env:
+          P4KX_ADDON_ARTIFACT_ID: ${{ inputs.addon-artifact-id }}
+        run: |
+          . .github/scripts/macos-blender-addon-evidence.ps1
+          $task = $env:P4KX_PACKAGE_TASK
+          $runtime = Join-Path $task "package-check/$env:P4KX_MACOS_HOST_ROLE.json"
+          Invoke-P4kxMacosBlenderAddon -RuntimePath $runtime -Role $env:P4KX_MACOS_HOST_ROLE -Version $env:VERSION -AddonDirectory (Join-Path $task 'addon') -AddonArtifactId $env:P4KX_ADDON_ARTIFACT_ID -TaskDirectory (Join-Path $task 'blender-check')
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         if: always()
         with:
@@ -202,6 +222,7 @@ jobs:
             ${{ env.P4KX_PACKAGE_TASK }}/package-check/**/*.log
             ${{ env.P4KX_PACKAGE_TASK }}/package-check/**/runtime.json
             ${{ env.P4KX_PACKAGE_TASK }}/download/validation/*.json
+            ${{ env.P4KX_PACKAGE_TASK }}/blender-check/**/*.log
           if-no-files-found: ignore
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -235,6 +256,19 @@ jobs:
           pattern: macos-package-runtime-${{ env.P4KX_TARGET }}-*
           path: receipts
           merge-multiple: true
+      - name: Verify native Blender receipt acceptance controls
+        run: .github/scripts/test-macos-blender-addon-evidence.ps1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: ${{ inputs.addon-artifact-id }}
+          path: addon
+          digest-mismatch: error
+      - name: Require both hosted native Blender receipts for the exact add-on ZIP
+        env:
+          P4KX_ADDON_ARTIFACT_ID: ${{ inputs.addon-artifact-id }}
+        run: |
+          . .github/scripts/macos-blender-addon-evidence.ps1
+          Assert-P4kxMacosBlenderAddonSet -EvidenceDirectory receipts -AddonDirectory addon -Version $env:VERSION -AddonArtifactId $env:P4KX_ADDON_ARTIFACT_ID
       - name: Bind both macOS executions to one release record
         run: .github/scripts/merge-macos-package-runtime.ps1 -Target $env:P4KX_TARGET -Version $env:VERSION -AssetDirectory download/package -EvidenceDirectory receipts
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

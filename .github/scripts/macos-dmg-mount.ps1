@@ -5,22 +5,28 @@ $ErrorActionPreference = 'Stop'
 function Copy-P4kxMacMountedBundle {
     param(
         [Parameter(Mandatory)][string]$Dmg,
-        [Parameter(Mandatory)][string]$TaskDirectory
+        [Parameter(Mandatory)][string]$TaskDirectory,
+        [ValidateSet('P4KX.app', 'Blender.app')][string]$BundleName = 'P4KX.app'
     )
     $mount = Join-Path $TaskDirectory 'mount'
     $install = Join-Path $TaskDirectory 'relocated package'
     $null = New-Item -ItemType Directory -Path $mount, $install
-    $source = Join-Path $mount 'P4KX.app'
-    $destination = Join-Path $install 'P4KX.app'
+    $source = Join-Path $mount $BundleName
+    $destination = Join-Path $install $BundleName
     $attached = $false
     try {
         $mountResult = @(Invoke-P4kxMacTool /usr/bin/hdiutil @('attach', '-readonly', '-nobrowse', '-noautoopen', '-mountpoint', $mount, $Dmg))
         $attached = $true
         $mountResult | Set-Content -LiteralPath (Join-Path $TaskDirectory 'attach.log') -Encoding utf8NoBOM
         $app = Get-Item -LiteralPath $source
-        $link = Get-Item -LiteralPath (Join-Path $mount 'Applications')
-        if ($app -isnot [IO.DirectoryInfo] -or $app.LinkType -or $link.LinkType -cne 'SymbolicLink' -or $link.LinkTarget -cne '/Applications') {
-            throw 'Mounted DMG is missing its regular app bundle or Applications link.'
+        if ($app -isnot [IO.DirectoryInfo] -or $app.LinkType) {
+            throw "Mounted DMG is missing the regular $BundleName bundle."
+        }
+        if ($BundleName -ceq 'P4KX.app') {
+            $link = Get-Item -LiteralPath (Join-Path $mount 'Applications')
+            if ($link.LinkType -cne 'SymbolicLink' -or $link.LinkTarget -cne '/Applications') {
+                throw 'Mounted P4KX DMG is missing its Applications link.'
+            }
         }
         Invoke-P4kxMacTool /usr/bin/ditto @($source, $destination) | Out-Host
     }

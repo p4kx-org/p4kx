@@ -82,7 +82,12 @@ acceptance. Delivery requires the evidence below.
 
 Hosted verification mounts and executes the same DMG on the macOS 26 runner and the native
 macOS 27 runner selected by the xcode-27 label. One target runtime record binds both
-executions to the same DMG and application digests.
+executions to the same DMG and application digests. Both hosted consumers install the exact
+add-on ZIP in pinned native Blender 5.2 LTS and pass the synthetic import on tagged releases,
+release pull requests and full dry runs. The macOS release record retains the actual host and
+Blender versions, Blender distribution and executable digests, add-on artifact identity and
+ZIP digest. Tagged release assembly also requires the exact current stable macOS version and
+publishes the same add-on artifact used for the smoke and attestation.
 
 ## References
 
