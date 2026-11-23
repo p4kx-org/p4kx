@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use crate::query::source::QuerySource;
-use crate::query::{CompiledQuery, Query, QueryError, QueryErrorKind};
+use crate::query::{CompiledQuery, Query, QueryError, QueryErrorKind, QueryTypeSource};
 use crate::record::NamedRecords;
-use crate::{DataForge, ObservedReferenceIndex, ReferenceIndex, ReferenceScanGap};
+use crate::{DataForge, LayoutSource, ObservedReferenceIndex, ReferenceIndex, ReferenceScanGap};
 
 /// Whether original Reference-index evidence covers the Query's lookup.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -25,25 +25,74 @@ impl Query {
     pub fn compile_observing_references<'source>(
         &self,
         forge: &'source DataForge<'source>,
+        observe: impl FnMut(QuerySource),
+    ) -> Result<(CompiledQuery<'source>, ReferenceCoverage), QueryError> {
+        self.compile_with_observers(forge, None, None, observe)
+    }
+
+    /// Compiles with observations of original FROM type membership and Reference selection.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as the ordinary compiler.
+    pub fn compile_observing_selection<'source>(
+        &self,
+        forge: &'source DataForge<'source>,
+        mut observe_type: impl FnMut(QueryTypeSource),
+        observe_reference: impl FnMut(QuerySource),
+    ) -> Result<(CompiledQuery<'source>, ReferenceCoverage), QueryError> {
+        self.compile_with_observers(forge, Some(&mut observe_type), None, observe_reference)
+    }
+
+    /// Compiles an observed selection with the actual layout reads for WHERE.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as the ordinary compiler.
+    pub fn compile_observing_predicate_layouts<'source>(
+        &self,
+        forge: &'source DataForge<'source>,
+        mut observe_type: impl FnMut(QueryTypeSource),
+        observe_layout: impl Fn(LayoutSource),
+        observe_reference: impl FnMut(QuerySource),
+    ) -> Result<(CompiledQuery<'source>, ReferenceCoverage), QueryError> {
+        self.compile_with_observers(
+            forge,
+            Some(&mut observe_type),
+            Some(&observe_layout),
+            observe_reference,
+        )
+    }
+
+    fn compile_with_observers<'source>(
+        &self,
+        forge: &'source DataForge<'source>,
+        observe_type: Option<&mut dyn FnMut(QueryTypeSource)>,
+        observe_layout: Option<&dyn Fn(LayoutSource)>,
         mut observe: impl FnMut(QuerySource),
     ) -> Result<(CompiledQuery<'source>, ReferenceCoverage), QueryError> {
         let mut coverage = ReferenceCoverage::Complete;
-        let compiled = self.compile_with_lookup(forge, |targets| {
-            for &index in &targets.positions {
-                observe(QuerySource::ReferenceTarget {
-                    index,
+        let compiled =
+            self.compile_with_lookup(forge, observe_type, observe_layout, |targets| {
+                observe(QuerySource::RecordLookup {
                     kind: targets.kind,
+                    end: forge.record_count() as u64,
                 });
-            }
-            let found = if let Ok(index) = ObservedReferenceIndex::build(forge) {
-                coverage = scan_coverage(&index, &mut observe);
-                observed(&targets.positions, &index, &mut observe, &mut coverage)
-            } else {
-                coverage = ReferenceCoverage::Incomplete;
-                ordinary(&targets.positions, &ReferenceIndex::build(forge))
-            };
-            Some(found)
-        })?;
+                for &index in &targets.positions {
+                    observe(QuerySource::ReferenceTarget {
+                        index,
+                        kind: targets.kind,
+                    });
+                }
+                let found = if let Ok(index) = ObservedReferenceIndex::build(forge) {
+                    coverage = scan_coverage(&index, &mut observe);
+                    observed(&targets.positions, &index, &mut observe, &mut coverage)
+                } else {
+                    coverage = ReferenceCoverage::Incomplete;
+                    ordinary(&targets.positions, &ReferenceIndex::build(forge))
+                };
+                Some(found)
+            })?;
         Ok((compiled, coverage))
     }
 }

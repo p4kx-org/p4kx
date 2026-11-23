@@ -21,6 +21,7 @@
 
 mod annotations;
 mod build;
+mod data_mapping;
 mod dataforge;
 mod error;
 mod field_escapes;
@@ -37,6 +38,7 @@ mod json_text;
 mod kinds;
 mod layout;
 mod layout_cursor;
+mod layout_source;
 mod location;
 mod nested;
 mod pointer_offsets;
@@ -50,6 +52,7 @@ pub mod query;
 mod read_observer;
 mod record;
 mod record_metadata;
+mod record_path_observation;
 mod record_table;
 mod reference_index;
 mod reference_origin;
@@ -87,12 +90,18 @@ mod xml_write;
 
 pub use annotations::{Annotations, TAG_TYPE, TagResolver};
 pub use build::TreeBuilder;
+pub use data_mapping::DataMappingDeclaration;
 pub use dataforge::DataForge;
 pub use error::DataForgeError;
 pub use field_storage::FieldStorage;
 pub use fields::{
-    FieldKind, FieldStat, FieldStatistics, FieldStatisticsError, MAX_DISTINCT_VALUES,
-    MAX_FIELD_PATHS, Number,
+    FieldKind, FieldStat, FieldStatistics, FieldStatisticsCoverageState,
+    FieldStatisticsDistinctUse, FieldStatisticsError, FieldStatisticsFingerprint,
+    FieldStatisticsGap, FieldStatisticsInput, FieldStatisticsMetricCoverage,
+    FieldStatisticsObservation, FieldStatisticsOperand, FieldStatisticsReducedRow,
+    FieldStatisticsReduction, FieldStatisticsRouteEdge, FieldStatisticsRouteTarget,
+    FieldStatisticsScalarRead, FieldStatisticsSlot, FieldStatisticsSourceScope, FieldStatisticsUse,
+    FieldStatisticsValue, MAX_DISTINCT_VALUES, MAX_FIELD_PATHS, Number,
 };
 pub use flat::{FLAT_COLUMNS, FLAT_TAG_COLUMN, FLAT_TEXT_COLUMN, FlatFormat, FlatValues};
 pub use flat_cells::{CSV_BYTE_ORDER_MARK, CsvCellMode, write_csv_cell, write_csv_cell_with_mode};
@@ -104,6 +113,7 @@ pub use json::{
     RecordJsonSource, RecordJsonStep, RecordJsonUse, RecordJsonUseRole,
 };
 pub use kinds::{DataType, ValueKind};
+pub use layout_source::LayoutSource;
 pub use location::{Location, Step};
 pub use nested::{Reference, StructValue};
 pub use positioned_record::PositionedRecord;
@@ -115,12 +125,14 @@ pub use probe::PointerProbe;
 pub use read_observer::CanonicalReadObserver;
 pub use record::Record;
 pub use record_metadata::{RecordMetadata, RecordText};
+pub use record_path_observation::{RecordOrderingName, RecordPathObservation};
 pub use reference_index::{
     FileGraph, IndexedReference, IndexedReferenceOrigin, MAX_INDEXED_REFERENCES, ObservedFileEdge,
     ObservedFileGraph, ObservedReferenceIndex, ReferenceIndex, ReferenceIndexError,
     ReferenceScanGap,
 };
 pub use reference_origin::ReferenceOrigin;
+pub use scalar::ScalarSource;
 pub use schema::{Enum, Property, Struct};
 pub use survey::{FormatSurvey, PointerSurvey, TrailingSurvey};
 #[expect(

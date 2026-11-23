@@ -40,6 +40,7 @@ mod dataforge;
 mod dataforge_convert;
 mod dataforge_file;
 mod dataforge_file_origin;
+mod dataforge_layout_evidence;
 mod dataforge_origin;
 mod dataforge_pick;
 mod dataforge_read_options;
@@ -70,6 +71,8 @@ mod field_origins_seed;
 mod field_origins_tests;
 mod field_path;
 mod field_path_seed;
+pub mod field_statistics_evidence;
+pub mod field_statistics_report;
 mod file_receipt;
 mod filter;
 mod folder_cache;
@@ -117,7 +120,9 @@ mod path_index_error;
 mod path_key_sort;
 mod portable_name;
 mod projection_schema;
+pub mod query_admission_evidence;
 mod query_export;
+pub mod query_source_evidence;
 mod record_combined;
 mod record_existing;
 mod record_export;
@@ -284,7 +289,12 @@ pub use p4kx_cryxml as cryxml;
 pub use p4kx_dataforge::{
     Annotations, CSV_BYTE_ORDER_MARK, CanonicalReadObserver, CsvCellMode, DataForge,
     DataForgeError, DataForgeIssue, DataType, Enum, FLAT_COLUMNS, FLAT_TAG_COLUMN,
-    FLAT_TEXT_COLUMN, Field, FieldKind, FieldStat, FieldStatistics, FieldStatisticsError,
+    FLAT_TEXT_COLUMN, Field, FieldKind, FieldStat, FieldStatistics, FieldStatisticsCoverageState,
+    FieldStatisticsDistinctUse, FieldStatisticsError, FieldStatisticsFingerprint,
+    FieldStatisticsGap, FieldStatisticsInput, FieldStatisticsMetricCoverage,
+    FieldStatisticsObservation, FieldStatisticsOperand, FieldStatisticsReducedRow,
+    FieldStatisticsReduction, FieldStatisticsRouteEdge, FieldStatisticsRouteTarget,
+    FieldStatisticsSlot, FieldStatisticsSourceScope, FieldStatisticsUse, FieldStatisticsValue,
     FieldStorage, FileGraph, FlatFormat, FlatValues, FormatSurvey, Guid, IndexedReference,
     IndexedReferenceOrigin, InvalidGuid, JsonLayout, Location, MAX_DATAFORGE_ISSUES,
     MAX_DISTINCT_VALUES, MAX_FIELD_PATHS, MAX_INDEXED_REFERENCES, Number, ObservedFileEdge,
@@ -296,7 +306,7 @@ pub use p4kx_dataforge::{
     TagTreeIssues, TextResolver, TrailingSurvey, TreeBuilder, Value, ValueError, ValueKind,
     write_csv_cell, write_csv_cell_with_mode,
 };
-pub use p4kx_dataforge::{DataForgeHeaderField, query};
+pub use p4kx_dataforge::{DataForgeHeaderField, RecordOrderingName, RecordPathObservation, query};
 #[expect(
     deprecated,
     reason = "Public compatibility for the released Tag constants"

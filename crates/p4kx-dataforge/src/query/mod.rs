@@ -15,6 +15,7 @@ mod complete;
 mod condition;
 mod error;
 mod expected;
+mod instance_source;
 mod lexer;
 mod matching;
 mod operand;
@@ -23,6 +24,9 @@ mod parser;
 mod path_plan;
 mod predicate;
 mod reader;
+mod record_admission;
+#[cfg(test)]
+mod record_admission_tests;
 mod reference_selection;
 mod resolve;
 mod run;
@@ -38,6 +42,8 @@ mod span;
 mod state;
 mod suggest;
 mod syntax;
+mod traversal_gap;
+mod type_admission;
 mod walk;
 
 pub use crate::record::RecordNameKind;
@@ -48,13 +54,15 @@ pub use error::{Marked, QueryError, QueryErrorKind};
 pub use expected::{Expected, Found, LiteralKind};
 pub use lexer::Keyword;
 pub use output::{RECORD_PATH_COLUMN, ResultFormat, ResultWriter};
+pub use record_admission::{QueryAdmissionOutcome, QueryRecordAdmission};
 pub use reference_selection::ReferenceCoverage;
 pub use run::{Pages, QueryRun, Row};
 pub use selection_error::SelectionError;
 pub use short_text::{LIST_SHOWN, write_short_text};
-pub use source::{QueryByteUse, QueryCellSources, QuerySource};
+pub use source::{QueryByteUse, QueryCellSources, QuerySource, QueryUnavailable, TraversalInput};
 pub use span::Span;
 pub use syntax::{Glob, Name, Path, Query, Referent, Segment};
+pub use type_admission::QueryTypeSource;
 
 /// The most segments a path has behind its first field: `.name`, `[n]`, `[*]`, `[TypeName]`
 /// and `->name`.

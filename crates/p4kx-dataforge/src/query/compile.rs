@@ -6,14 +6,15 @@ use std::collections::{HashMap, HashSet};
 
 use p4kx_foundation::PathPattern;
 
+use crate::query::QueryTypeSource;
 use crate::query::path_plan::PathPlan;
 use crate::query::predicate::{self, Predicate, Test};
 use crate::query::reader::Reader;
 use crate::query::reference_selection;
-use crate::query::schema::{StructFields, ancestors_include};
+use crate::query::schema::StructFields;
 use crate::query::shared::Groups;
-use crate::query::suggest::closest;
 use crate::query::syntax::{Name, Path, Query, Segment};
+use crate::query::type_admission::select_type;
 use crate::query::{Comparison, QueryError, QueryErrorKind};
 use crate::record::NamedRecords;
 use crate::{DataForge, DataForgeError, DataType, ReferenceIndex};
@@ -217,7 +218,7 @@ impl Query {
         forge: &'f DataForge<'f>,
         references: impl FnOnce() -> Option<R>,
     ) -> Result<CompiledQuery<'f>, QueryError> {
-        self.compile_with_lookup(forge, |targets| {
+        self.compile_with_lookup(forge, None, None, |targets| {
             let index = references()?;
             Some(reference_selection::ordinary(
                 &targets.positions,
@@ -229,9 +230,11 @@ impl Query {
     pub(super) fn compile_with_lookup<'f>(
         &self,
         forge: &'f DataForge<'f>,
+        type_source: Option<&mut dyn FnMut(QueryTypeSource)>,
+        layout_source: Option<&dyn Fn(crate::LayoutSource)>,
         lookup: impl FnOnce(&NamedRecords) -> Option<Box<[u32]>>,
     ) -> Result<CompiledQuery<'f>, QueryError> {
-        let structs = StructFields::read_all(forge).map_err(|error| {
+        let mut structs = StructFields::read_all(forge).map_err(|error| {
             let span = self
                 .from
                 .as_ref()
@@ -239,7 +242,7 @@ impl Query {
             QueryError::new(QueryErrorKind::DataForge(error), span)
         })?;
         let selected = match &self.from {
-            Some(name) => select_type(&structs, name)?,
+            Some(name) => select_type(&structs, name, type_source)?,
             None => vec![true; structs.len()],
         };
         let nominal = nominal(&structs, self.from.as_ref())?;
@@ -250,6 +253,9 @@ impl Query {
             .map(|path| PathPlan::of(&structs, nominal, path, from))
             .collect::<Result<Vec<_>, _>>()?;
         let (predicate, comparisons) = self.condition.as_ref().map(Predicate::of).unzip();
+        if predicate.is_some() {
+            structs.observe_layouts(layout_source);
+        }
         let compared = comparisons
             .unwrap_or_default()
             .into_iter()
@@ -281,7 +287,10 @@ impl Query {
 }
 
 /// Returns the first named layout position after validating its source.
-fn nominal(structs: &StructFields<'_>, from: Option<&Name>) -> Result<Option<usize>, QueryError> {
+fn nominal(
+    structs: &StructFields<'_, '_>,
+    from: Option<&Name>,
+) -> Result<Option<usize>, QueryError> {
     from.and_then(|name| {
         let index = structs.position_of(name.as_str())?;
         Some(
@@ -297,7 +306,7 @@ fn nominal(structs: &StructFields<'_>, from: Option<&Name>) -> Result<Option<usi
 /// Resolves the path a comparison reads and checks that a value it reaches can compare with
 /// the literal.
 fn compared<'c>(
-    structs: &StructFields<'_>,
+    structs: &StructFields<'_, '_>,
     nominal: Option<usize>,
     comparison: &'c Comparison,
     from: Option<&Name>,
@@ -310,7 +319,7 @@ fn compared<'c>(
 /// Returns how the Records of the struct at `index` give the `columns` and the values of the
 /// `compared` paths.
 fn plan(
-    structs: &StructFields<'_>,
+    structs: &StructFields<'_, '_>,
     index: usize,
     columns: &[PathPlan],
     compared: &[(&Comparison, PathPlan)],
@@ -350,21 +359,4 @@ fn plan(
             .map(|(comparison, path)| Test::of(comparison, path.reader(heads.get(path.head()))?))
             .collect(),
     }
-}
-
-/// Returns, per struct, whether it is the named struct or derives from it.
-fn select_type(structs: &StructFields<'_>, name: &Name) -> Result<Vec<bool>, QueryError> {
-    let targets: Vec<usize> = structs.positions_of(name.as_str()).collect();
-    if targets.is_empty() {
-        return Err(QueryError::new(
-            QueryErrorKind::UnknownType {
-                name: name.as_str().to_owned(),
-                suggestion: closest(name.as_str(), structs.names()),
-            },
-            name.span(),
-        ));
-    }
-    Ok((0..structs.len())
-        .map(|index| ancestors_include(structs.forge(), index, &targets))
-        .collect())
 }

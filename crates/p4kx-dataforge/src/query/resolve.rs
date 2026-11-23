@@ -6,7 +6,7 @@ mod follow;
 use std::sync::Arc;
 
 use crate::query::reader::{Column, Elements, Reader, Select, Step, Walk};
-use crate::query::schema::{FieldDef, StructFields, ancestors_include, is_scalar};
+use crate::query::schema::{FieldDef, StructFields, is_scalar};
 use crate::query::suggest::{self, closest};
 use crate::query::syntax::{Name, Path, Segment};
 use crate::query::{QueryError, QueryErrorKind, Span};
@@ -41,8 +41,8 @@ enum At {
 
 /// The state of resolving a path: the steps so far, where the path stands and how errors name
 /// it.
-struct Resolver<'s, 'f> {
-    structs: &'s StructFields<'f>,
+struct Resolver<'s, 'f, 'observer> {
+    structs: &'s StructFields<'f, 'observer>,
     steps: Vec<Step>,
     offset: u64,
     at: At,
@@ -53,7 +53,7 @@ struct Resolver<'s, 'f> {
 /// Resolves `path` from its first field `head`, which `owner` declares; offsets are relative
 /// to the instance `head` lies in.
 pub(crate) fn resolve(
-    structs: &StructFields<'_>,
+    structs: &StructFields<'_, '_>,
     head: &FieldDef<'_>,
     path: &Path,
     owner: Option<&str>,
@@ -91,11 +91,12 @@ pub(crate) fn resolve(
     resolver.finish(span, path.is_multi_valued())
 }
 
-impl Resolver<'_, '_> {
+impl Resolver<'_, '_, '_> {
     /// Moves onto `field`, whose offset is already added.
     fn enter(&mut self, field: &FieldDef<'_>) {
         let data_type = field.slot.data_type();
         let target = field.slot.target();
+        self.structs.observe_property_target(field);
         self.at = if field.slot.is_array() {
             At::Array { data_type, target }
         } else {
@@ -273,10 +274,8 @@ impl Resolver<'_, '_> {
             ));
         }
         let element = usize::from(target);
-        let forge = structs.forge();
         let related = structs.positions_of(type_name.as_str()).find(|&index| {
-            ancestors_include(forge, index, &[element])
-                || ancestors_include(forge, element, &[index])
+            structs.derives_from(index, element) || structs.derives_from(element, index)
         });
         let Some(wanted) = related else {
             return Err(QueryError::new(

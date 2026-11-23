@@ -24,8 +24,7 @@ pub(crate) struct DcbFieldsArgs {
     /// the field names, e.g. `Components/SCItemWeaponComponentParams/*`.
     #[arg(long, value_name = "GLOB")]
     pub(crate) path: Option<String>,
-    /// The format of the result, defined in docs/query.md; defaults to table, or to json with
-    /// --json.
+    /// Output format. Defaults to table, or JSON with --json. JSON includes per-field origins.
     #[arg(long, value_enum)]
     pub(crate) format: Option<QueryFormat>,
     /// With --format csv: writes the exact values, without the byte order mark and without the

@@ -3,10 +3,14 @@
 
 use std::fmt::Write as _;
 
+use sha2::{Digest, Sha256};
+
 use crate::source_inventory::PhysicalSourceRef;
 use crate::source_use::{
     InputScope, LocationView, SourceLocation, SourceUseRef, SourceUseRole, Subresource,
 };
+
+pub(crate) const RECORD_PATH_TEXT_RANGES: &str = "dataforgeRecordPathTextRanges";
 
 pub(crate) fn encode(
     source: &PhysicalSourceRef,
@@ -106,6 +110,10 @@ fn append_subresource(key: &mut String, site: &Subresource<'_>) {
         indices,
         field,
     } = site;
+    if *namespace == RECORD_PATH_TEXT_RANGES && *field == "text" {
+        append_path_text_ranges(key, indices);
+        return;
+    }
     if (*namespace == "xml" && append_xml_location(key, indices, field))
         || append_physical_xml_location(key, namespace, indices, field)
     {
@@ -118,6 +126,17 @@ fn append_subresource(key: &mut String, site: &Subresource<'_>) {
     }
     key.push(':');
     key.push_str(field);
+}
+
+fn append_path_text_ranges(key: &mut String, indices: &[u64]) {
+    let mut digest = Sha256::new();
+    for index in indices {
+        digest.update(index.to_le_bytes());
+    }
+    key.push('b');
+    for byte in digest.finalize() {
+        let _written = write!(key, "{byte:02x}");
+    }
 }
 
 fn append_xml_location(key: &mut String, indices: &[u64], field: &str) -> bool {

@@ -4,11 +4,14 @@
 use std::ops::ControlFlow;
 
 use crate::build::{pointer, reference_guid};
+use crate::query::instance_source;
 use crate::query::reader::{Link, Step, Walk};
-use crate::query::schema::ancestors_include;
+use crate::query::schema::{AncestorStep, ancestors_include, ancestors_include_observed};
 use crate::query::sink::{Live, Reached, Sink};
-use crate::query::source::{CellTrace, QueryByteUse, QuerySource};
+use crate::query::source::{CellTrace, QueryByteUse, QuerySource, TraversalInput};
 use crate::query::state::WalkState;
+use crate::query::traversal_gap;
+use crate::record::RecordNameKind;
 use crate::{DataForge, Value, ValueError, ValueKind};
 
 /// The bytes a path reads at one point: an instance of a struct or one value of a pool.
@@ -140,7 +143,15 @@ impl Walk {
                         sink.route_bytes(forge, bytes, QueryByteUse::Pointer);
                         deref(forge, bytes, declared, sink)
                     }
-                    Err(error) => Reached::Value(Value::Error(error)),
+                    Err(error) => traversal_gap::missing(
+                        forge,
+                        place,
+                        *at,
+                        HEADER_LEN,
+                        TraversalInput::Pointer,
+                        error,
+                        sink,
+                    ),
                 };
                 sink.follow_decision(index);
                 return self.continue_from(forge, next, end, reached, sink);
@@ -156,7 +167,15 @@ impl Walk {
                         sink.route_bytes(forge, bytes, kind);
                         follow(forge, *link, bytes, declared, sink)
                     }
-                    Err(error) => Reached::Value(Value::Error(error)),
+                    Err(error) => traversal_gap::missing(
+                        forge,
+                        place,
+                        *at,
+                        link.len(),
+                        link.input(),
+                        error,
+                        sink,
+                    ),
                 };
                 sink.follow_decision(index);
                 return self.continue_from(forge, next, end, reached, sink);
@@ -187,6 +206,14 @@ impl Walk {
 }
 
 impl Link {
+    /// Returns which original link slot is addressed.
+    const fn input(self) -> TraversalInput {
+        match self {
+            Self::Reference => TraversalInput::Reference,
+            Self::Weak => TraversalInput::WeakLink,
+        }
+    }
+
     /// Returns the number of bytes the link takes in an instance or pool.
     const fn len(self) -> u64 {
         match self {
@@ -210,16 +237,36 @@ fn follow<'f>(
         let Some((structure, index)) = pointer(bytes) else {
             return unresolved(sink, bytes);
         };
-        return pointed_instance(forge, structure, index, declared, sink);
+        let reached = pointed_instance(forge, structure, index, declared, sink);
+        traversal_gap::readable(forge, bytes, link.input(), &reached, sink);
+        return reached;
     }
-    let Some(record) = reference_guid(bytes).and_then(|guid| forge.record_by_guid(guid)) else {
+    let Some(guid) = reference_guid(bytes) else {
         return unresolved(sink, bytes);
     };
+    let record = forge.record_by_guid(guid);
+    if sink.source_depth().is_some() {
+        sink.route(QuerySource::RecordLookup {
+            kind: RecordNameKind::Guid,
+            end: forge.record_count() as u64,
+        });
+    }
+    let Some(record) = record else {
+        sink.route_bytes(forge, bytes, QueryByteUse::DanglingReference);
+        return unresolved(sink, bytes);
+    };
+    sink.route(QuerySource::ReferenceTarget {
+        index: record.index(),
+        kind: RecordNameKind::Guid,
+    });
     sink.route(QuerySource::Record {
         index: record.index(),
     });
+    sink.route(QuerySource::RecordType {
+        index: record.index(),
+    });
     let struct_index = record.def.struct_index;
-    instance(
+    let reached = instance(
         forge,
         struct_index,
         u32::from(record.def.instance_index),
@@ -230,7 +277,9 @@ fn follow<'f>(
             declared,
         },
         sink,
-    )
+    );
+    traversal_gap::readable(forge, bytes, link.input(), &reached, sink);
+    reached
 }
 
 /// Counts the link in `bytes` in the sink and returns the null it reaches.
@@ -249,7 +298,9 @@ pub(super) fn deref<'f>(
     let Some((struct_index, instance_index)) = pointer(bytes) else {
         return Reached::Value(Value::Null);
     };
-    pointed_instance(forge, struct_index, instance_index, declared, sink)
+    let reached = pointed_instance(forge, struct_index, instance_index, declared, sink);
+    traversal_gap::readable(forge, bytes, TraversalInput::Pointer, &reached, sink);
+    reached
 }
 
 fn pointed_instance<'f>(
@@ -282,7 +333,12 @@ fn instance<'f>(
     mismatch: impl FnOnce(u32) -> ValueError,
     sink: &mut impl Sink<'f>,
 ) -> Reached<'f> {
-    let Some(target) = forge.instance(struct_index, instance_index) else {
+    let observe = sink
+        .source_depth()
+        .is_some()
+        .then_some(|source| sink.route(source));
+    let target = instance_source::read(forge, struct_index, instance_index, observe);
+    let Some(target) = target else {
         return Reached::Value(Value::Error(ValueError::InvalidPointer {
             struct_index,
             instance_index,
@@ -291,7 +347,7 @@ fn instance<'f>(
     sink.route(QuerySource::Structure {
         index: struct_index,
     });
-    if !derives(forge, struct_index, declared) {
+    if !derives(forge, struct_index, declared, sink) {
         let declared = declared.first().copied().unwrap_or_default();
         return Reached::Value(Value::Error(mismatch(
             u32::try_from(declared).unwrap_or(u32::MAX),
@@ -307,6 +363,28 @@ fn instance<'f>(
     })
 }
 
-pub(super) fn derives(forge: &DataForge<'_>, struct_index: u32, targets: &[usize]) -> bool {
-    usize::try_from(struct_index).is_ok_and(|index| ancestors_include(forge, index, targets))
+pub(super) fn derives<'source>(
+    forge: &'source DataForge<'source>,
+    struct_index: u32,
+    targets: &[usize],
+    sink: &mut impl Sink<'source>,
+) -> bool {
+    let Ok(index) = usize::try_from(struct_index) else {
+        return false;
+    };
+    if sink.source_depth().is_none() {
+        return ancestors_include(forge, index, targets);
+    }
+    ancestors_include_observed(forge, index, targets, |step| {
+        sink.route(match step {
+            AncestorStep::Parent {
+                index,
+                stored_parent,
+            } => QuerySource::AncestorParent {
+                index,
+                stored_parent,
+            },
+            AncestorStep::Unavailable { index } => QuerySource::AncestorGap { index },
+        });
+    })
 }

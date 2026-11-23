@@ -5,7 +5,8 @@ use std::ops::ControlFlow;
 
 use crate::query::reader::{Column, Reader};
 use crate::query::sink::{Reached, Sink};
-use crate::query::source::{self, QuerySource};
+use crate::query::source::{self, QueryByteUse, QuerySource, TraversalInput};
+use crate::query::traversal_gap;
 use crate::query::walk::Place;
 use crate::{DataForge, Value, ValueError};
 
@@ -56,7 +57,42 @@ impl<'f> Sink<'f> for Matching<'_, 'f> {
 
     fn reached(&mut self, reached: Reached<'f>) -> ControlFlow<()> {
         let bytes = self.observer.and_then(|_| reached.bytes(self.leaf));
-        let value = reached.read(self.forge, self.leaf);
+        let place = match &reached {
+            Reached::Place(place) => Some(*place),
+            Reached::Value(_) => None,
+        };
+        let value = match (self.observer, reached) {
+            (Some(observer), Reached::Place(place)) => self.leaf.read_observed(
+                self.forge,
+                place,
+                Some(&mut |scalar| observer(scalar.into())),
+            ),
+            (_, reached) => reached.read(self.forge, self.leaf),
+        };
+        if let Value::Error(error) = value {
+            if let Some(observer) = self.observer {
+                let attempted = bytes
+                    .and_then(|bytes| {
+                        QuerySource::bytes(self.forge, bytes, QueryByteUse::AttemptedValue)
+                    })
+                    .or_else(|| {
+                        place.map(|place| {
+                            traversal_gap::unavailable(
+                                self.forge,
+                                place,
+                                self.leaf.start,
+                                self.leaf.end.saturating_sub(self.leaf.start),
+                                TraversalInput::Value,
+                            )
+                        })
+                    });
+                if let Some(source) = attempted {
+                    observer(source);
+                }
+            }
+            self.error.get_or_insert(error);
+            return ControlFlow::Continue(());
+        }
         if let Some(observer) = self.observer {
             for source in source::value_sources(self.forge, bytes, &value)
                 .into_iter()
@@ -64,10 +100,6 @@ impl<'f> Sink<'f> for Matching<'_, 'f> {
             {
                 observer(source);
             }
-        }
-        if let Value::Error(error) = value {
-            self.error.get_or_insert(error);
-            return ControlFlow::Continue(());
         }
         match (self.test)(&value) {
             Some(true) => {

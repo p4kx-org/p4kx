@@ -4,6 +4,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use crate::ValueError;
+use crate::query::QueryRecordAdmission;
 use crate::query::source::QuerySource;
 
 /// The shared, latched decision to continue selecting Records.
@@ -11,6 +12,7 @@ pub(super) struct Control<'a> {
     proceed: &'a (dyn Fn() -> bool + Sync),
     stopped: AtomicBool,
     observer: Option<&'a (dyn Fn(QuerySource) + Sync)>,
+    admissions: Option<&'a (dyn Fn(QueryRecordAdmission) + Sync)>,
 }
 
 impl<'a> Control<'a> {
@@ -23,11 +25,24 @@ impl<'a> Control<'a> {
             proceed,
             stopped: AtomicBool::new(false),
             observer,
+            admissions: None,
         }
     }
 
     pub(super) const fn observer(&self) -> Option<&'a (dyn Fn(QuerySource) + Sync)> {
         self.observer
+    }
+
+    pub(super) const fn observe_admissions(
+        mut self,
+        admissions: &'a (dyn Fn(QueryRecordAdmission) + Sync),
+    ) -> Self {
+        self.admissions = Some(admissions);
+        self
+    }
+
+    pub(super) const fn admission_sink(&self) -> Option<&'a (dyn Fn(QueryRecordAdmission) + Sync)> {
+        self.admissions
     }
 
     /// Returns false after the callback has declined any work, even if it later returns true.

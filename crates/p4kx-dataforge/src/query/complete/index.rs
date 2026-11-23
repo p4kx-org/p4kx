@@ -212,7 +212,7 @@ impl QuerySchema {
 }
 
 fn entries<'source>(
-    structs: &StructFields<'source>,
+    structs: &StructFields<'source, '_>,
     interner: &mut Interner<'source>,
 ) -> Result<Vec<Entry>, DataForgeError> {
     let mut entries = Vec::new();

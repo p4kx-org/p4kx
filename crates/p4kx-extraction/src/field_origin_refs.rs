@@ -6,7 +6,9 @@ use std::sync::{Arc, OnceLock};
 
 use serde::{Serialize, Serializer};
 
-use crate::source_use::SourceUseRef;
+use crate::source_use::{SourceUse, SourceUseRef};
+
+use super::{FieldOrigin, OriginFacts, SharedFieldOrigin};
 
 #[derive(Debug)]
 pub(super) enum OriginRefs {
@@ -128,3 +130,21 @@ impl<'a> Iterator for RefIter<'a> {
 }
 
 impl ExactSizeIterator for RefIter<'_> {}
+
+impl FieldOrigin {
+    pub(crate) fn with_shared<'a>(
+        shared: &SharedFieldOrigin,
+        uses: impl IntoIterator<Item = &'a SourceUse>,
+        complete: bool,
+    ) -> Self {
+        let facts = OriginFacts::measure(uses.into_iter().map(SourceUse::description), complete);
+        Self::from_shared_facts(shared, facts)
+    }
+
+    pub(super) fn from_shared_facts(shared: &SharedFieldOrigin, facts: OriginFacts) -> Self {
+        Self {
+            identity: Some(Arc::clone(&shared.identity)),
+            fields: shared.fields_with(facts),
+        }
+    }
+}

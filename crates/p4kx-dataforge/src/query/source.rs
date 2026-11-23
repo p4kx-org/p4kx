@@ -4,13 +4,21 @@
 use std::collections::BTreeSet;
 
 use crate::record::RecordNameKind;
+use crate::scalar::ScalarSource;
 use crate::{DataForge, Value};
 
 /// Original input coordinates actually used by the Query evaluator.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 #[non_exhaustive]
 pub enum QuerySource {
-    /// A physical target of the Query's Reference-index lookup.
+    /// Original Record headers examined by the canonical GUID or path index.
+    RecordLookup {
+        /// Original column backing the index.
+        kind: RecordNameKind,
+        /// Exclusive end of the physical Record positions beginning at zero.
+        end: u64,
+    },
+    /// A physical target selected by a Reference lookup.
     ReferenceTarget {
         /// Original target Record table index.
         index: u32,
@@ -52,6 +60,27 @@ pub enum QuerySource {
         /// Original Record table index.
         index: u32,
     },
+    /// The selected Reference target's original type field.
+    RecordType {
+        /// Original Record table position.
+        index: u32,
+    },
+    /// The original `EnumCount` word consulted before decoding an enum selection.
+    EnumCount,
+    /// The declared length of the original text table consulted by a scalar read.
+    TextLength,
+    /// The original class-instance block whose count was consulted.
+    InstanceBlockBound {
+        /// Requested original Struct index.
+        structure: u32,
+    },
+    /// The original block and Struct size consulted for a Query instance.
+    InstanceExtent {
+        /// Original Struct table position read by the instance lookup.
+        structure: u32,
+        /// Whether the lookup also used the block start to reach actual instance bytes.
+        resolved: bool,
+    },
     /// One selected element of an original instance array.
     ArrayElement {
         /// Original field header start in the decoded DCB.
@@ -65,6 +94,20 @@ pub enum QuerySource {
         structure: u32,
         /// Position in that Struct's instance block.
         instance: u32,
+    },
+    /// An actual parent word examined by a runtime type test.
+    AncestorParent {
+        /// Original Struct position containing the parent word.
+        index: usize,
+        /// Stored parent word, including the no-parent sentinel.
+        stored_parent: u32,
+    },
+    /// An addressed traversal input could not be read as bytes.
+    Unavailable(QueryUnavailable),
+    /// A runtime type test could not establish the rest of its original ancestry.
+    AncestorGap {
+        /// Unresolved position, which may not exist in the original table.
+        index: usize,
     },
     /// An examined Struct definition.
     Structure {
@@ -90,18 +133,78 @@ impl QuerySource {
 pub enum QueryByteUse {
     /// A scalar value slot.
     Value,
+    /// A scalar slot consulted but not decoded.
+    AttemptedValue,
+    /// Readable pointer, link or array header bytes used by a failed traversal.
+    AttemptedTraversal(TraversalInput),
     /// Text decoded from a value slot.
     Text,
+    /// Terminating original byte of a nonempty admitted textual value.
+    TextTerminator,
+    /// Consulted original text bytes that did not decode.
+    AttemptedText,
+    /// One original value-pool cardinality word in the DataForge header.
+    PoolBound,
     /// Array count and first-element words.
     Array,
     /// Strong or weak pointer words.
     Pointer,
     /// A Reference used by a follow step.
     Reference,
+    /// An original Reference whose non-null target was absent.
+    DanglingReference,
     /// A weak pointer used by a follow step.
     WeakLink,
     /// A followed slot that resolved to no target.
     Unresolved,
+}
+
+/// The original operand addressed by a query traversal step.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[non_exhaustive]
+pub enum TraversalInput {
+    /// A scalar leaf.
+    Value,
+    /// A strong pointer.
+    Pointer,
+    /// A Reference link.
+    Reference,
+    /// A weak pointer link.
+    WeakLink,
+    /// The authored count/first words of an array.
+    Array,
+}
+
+/// An attempted traversal coordinate whose requested bytes were unavailable.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[non_exhaustive]
+pub enum QueryUnavailable {
+    /// The text offset reached no readable bytes in the original text table.
+    #[non_exhaustive]
+    Text {
+        /// Original offset relative to the text table.
+        offset: u32,
+    },
+    /// A requested slot extends beyond its current original owner.
+    #[non_exhaustive]
+    Field {
+        /// Original decoded start of the available owner bytes, when known.
+        owner_start: Option<u64>,
+        /// Slot offset relative to that owner.
+        offset: u64,
+        /// Requested byte count.
+        byte_count: u64,
+        /// The addressed operand.
+        input: TraversalInput,
+    },
+    /// The logical target instance for resolved words had no original readable bytes.
+    #[non_exhaustive]
+    Instance {
+        /// Original target Struct table position.
+        structure: u32,
+        /// Requested instance position within its block.
+        instance: u32,
+    },
 }
 
 /// Evidence for the emitted values and for the traversal that determined the shape of a cell.
@@ -174,17 +277,45 @@ impl CellTrace {
     }
 }
 
+impl From<ScalarSource> for QuerySource {
+    fn from(source: ScalarSource) -> Self {
+        match source {
+            ScalarSource::EnumCount => Self::EnumCount,
+            ScalarSource::TextLength => Self::TextLength,
+            ScalarSource::TextTerminator { start, end } => Self::Bytes {
+                start,
+                end,
+                kind: QueryByteUse::TextTerminator,
+            },
+            ScalarSource::AttemptedText { start, end } => Self::Bytes {
+                start,
+                end,
+                kind: QueryByteUse::AttemptedText,
+            },
+            ScalarSource::UnavailableText { offset } => {
+                Self::Unavailable(QueryUnavailable::Text { offset })
+            }
+        }
+    }
+}
+
 pub(super) fn value_sources(
     forge: &DataForge<'_>,
     bytes: Option<&[u8]>,
     value: &Value<'_>,
 ) -> [Option<QuerySource>; 2] {
     let text = match value {
-        Value::String(text) | Value::Locale(text) | Value::Enum(text) => Some(text.as_bytes()),
+        Value::String(text) | Value::Locale(text) | Value::Enum(text) => {
+            forge.original_text_span(text)
+        }
         _ => None,
     };
     [
         bytes.and_then(|bytes| QuerySource::bytes(forge, bytes, QueryByteUse::Value)),
-        text.and_then(|bytes| QuerySource::bytes(forge, bytes, QueryByteUse::Text)),
+        text.map(|span| QuerySource::Bytes {
+            start: span.start,
+            end: span.end,
+            kind: QueryByteUse::Text,
+        }),
     ]
 }

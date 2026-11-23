@@ -37,7 +37,7 @@ impl PathPlan {
     /// Without `from`, the path is an error only when it resolves in no struct; the error is the
     /// one of the first struct that declares the field.
     pub(crate) fn of(
-        structs: &StructFields<'_>,
+        structs: &StructFields<'_, '_>,
         nominal: Option<usize>,
         path: &Path,
         from: Option<&Name>,
@@ -58,6 +58,7 @@ impl PathPlan {
                 }
                 Ok(None) | Err(_) => continue,
             };
+            structs.observe_property_target(&field);
             let key = key_of(&field);
             if seen.contains(&key) {
                 continue;
@@ -91,7 +92,7 @@ impl PathPlan {
 
     /// Resolves one path against its nominal struct.
     fn fixed(
-        structs: &StructFields<'_>,
+        structs: &StructFields<'_, '_>,
         index: usize,
         path: &Path,
         from: &Name,

@@ -91,6 +91,10 @@ impl SharedFieldOrigin {
         complete: bool,
     ) -> Self {
         let facts = OriginFacts::measure(uses.into_iter().map(SourceUse::description), complete);
+        Self::from_facts(identity, facts)
+    }
+
+    fn from_facts(identity: Arc<()>, facts: OriginFacts) -> Self {
         Self {
             identity,
             contains_encrypted_source: facts.contains_encrypted_source,
@@ -256,6 +260,14 @@ impl OriginAccumulator {
         FieldOrigin::from_facts(identity, self.into_facts())
     }
 
+    pub(crate) fn finish_shared(self, identity: Arc<()>) -> SharedFieldOrigin {
+        SharedFieldOrigin::from_facts(identity, self.into_facts())
+    }
+
+    pub(crate) fn finish_with_shared(self, shared: &SharedFieldOrigin) -> FieldOrigin {
+        FieldOrigin::from_shared_facts(shared, self.into_facts())
+    }
+
     fn into_facts(mut self) -> OriginFacts {
         self.references.sort();
         self.references.dedup();
@@ -301,20 +313,6 @@ impl FieldOrigin {
                 facts.references,
                 facts.source_set_complete,
             ),
-        }
-    }
-
-    pub(crate) fn with_shared<'a>(
-        shared: &SharedFieldOrigin,
-        uses: impl IntoIterator<Item = &'a SourceUse>,
-        complete: bool,
-    ) -> Self {
-        Self {
-            identity: Some(Arc::clone(&shared.identity)),
-            fields: shared.fields_with(OriginFacts::measure(
-                uses.into_iter().map(SourceUse::description),
-                complete,
-            )),
         }
     }
 

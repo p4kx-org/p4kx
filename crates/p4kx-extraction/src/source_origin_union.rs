@@ -5,7 +5,10 @@ use std::sync::Arc;
 
 use crate::field_origin::OriginAccumulator;
 use crate::source_evidence_error::{self, SourceEvidenceError};
-use crate::{FieldOrigin, SourceUseRef, SourceUseRole, SourceValue, SourcedValue};
+use crate::{
+    FieldOrigin, SharedFieldOrigin, SourceUse, SourceUseRef, SourceUseRole, SourceValue,
+    SourcedValue,
+};
 
 use super::SourceUses;
 
@@ -41,6 +44,45 @@ impl SourceUses {
         }
         drop(registry);
         Ok(())
+    }
+
+    pub(crate) fn shared_origin_from_uses<'source>(
+        &self,
+        uses: impl IntoIterator<Item = &'source SourceUse>,
+        complete: bool,
+    ) -> Result<SharedFieldOrigin, SourceEvidenceError> {
+        Ok(self
+            .measure_uses(uses, complete)?
+            .finish_shared(Arc::clone(&self.identity)))
+    }
+
+    pub(crate) fn origin_with_shared_uses<'source>(
+        &self,
+        shared: &SharedFieldOrigin,
+        uses: impl IntoIterator<Item = &'source SourceUse>,
+        complete: bool,
+    ) -> Result<FieldOrigin, SourceEvidenceError> {
+        if !shared.belongs_to(&self.identity) {
+            return Err(SourceEvidenceError::ForeignEvidence);
+        }
+        Ok(self
+            .measure_uses(uses, complete)?
+            .finish_with_shared(shared))
+    }
+
+    fn measure_uses<'source>(
+        &self,
+        uses: impl IntoIterator<Item = &'source SourceUse>,
+        complete: bool,
+    ) -> Result<OriginAccumulator, SourceEvidenceError> {
+        let mut origin = OriginAccumulator::new(complete);
+        for incoming in uses {
+            if !Arc::ptr_eq(&incoming.identity, &self.identity) {
+                return Err(SourceEvidenceError::ForeignEvidence);
+            }
+            origin.observe(incoming.description().into());
+        }
+        Ok(origin)
     }
 
     /// Combines observed origins through this capture's physical source registry.
@@ -104,6 +146,40 @@ mod tests {
     use crate::{InputScope, SourceEvidenceError, SourceInput, SourceLocation, SourceUseRole};
 
     use super::SourceUses;
+
+    #[test]
+    fn original_use_union_rejects_a_foreign_physical_input() -> Result<(), SourceEvidenceError> {
+        let owner = SourceUses::with_compact_coordinates();
+        let other = SourceUses::with_compact_coordinates();
+        let source = other
+            .observe(SourceInput::Unknown, InputScope::Payload)?
+            .at(
+                SourceLocation::DataForge {
+                    record_index: 0,
+                    field: "value".into(),
+                },
+                SourceUseRole::Selector,
+            )?;
+        assert!(
+            matches!(
+                owner.shared_origin_from_uses([&source], true),
+                Err(SourceEvidenceError::ForeignEvidence)
+            ),
+            "a compact coordinate cannot create original source identity in a different capture"
+        );
+        let empty_basis = owner.shared_origin_from_uses([], true)?;
+        assert_eq!(
+            owner.origin_with_shared_uses(&empty_basis, [&source], true),
+            Err(SourceEvidenceError::ForeignEvidence),
+            "a foreign local operand cannot be added to the summary"
+        );
+        assert_eq!(
+            other.origin_with_shared_uses(&empty_basis, [], true),
+            Err(SourceEvidenceError::ForeignEvidence),
+            "a shared set cannot cross a physical source inventory"
+        );
+        Ok(())
+    }
 
     #[test]
     fn attempted_refs_require_original_inventory_and_attempt_role()

@@ -1363,11 +1363,11 @@ complete empty set of contributors. Unlisted-root topology can have an incomplet
 contributor set when the observed walk supplies no selected incoming relationship.
 `archive` and `tree` are command inputs.
 
-## `p4kx dcb fields <archive> [<type or Query>] [--path <glob>] [--format table|csv|json] --json`
+## `p4kx dcb fields <archive> [<type or Query>] [--path <glob>] [--format table|csv|csv-strict|json] --json`
 
 The statistics per field path of the selected Records ([query.md](query.md#field-statistics)).
 `--json` is `--format json`; with `--format table` or `--format csv` it is invalid input (exit
-code 2).
+code 2). The example omits the origin inventory and proof fields.
 
 ```json
 {"archive": "…", "records": 29693, "unreadable_records": 0, "unreadable_values": 0,
@@ -1386,6 +1386,37 @@ the data types of the values with their counts (`Single`, `Int32[]` for the elem
 non-empty values, at most `max_distinct`, with `distinct_capped` true when there are more, and
 `min` and `max` the smallest and the largest number, `null` for a path without numbers (or an
 infinite float). Integers are JSON integers, floats JSON numbers; `-0.0` is `0`.
+
+`fieldOrigins` addresses individual values with JSON Pointers. A filtered report addresses the
+first displayed row at `/fields/0`, regardless of its original sort position. Examples include
+`/fields/0/min`, `/fields/0/empty`, `/fields/0/kinds/0/count`, and the summary
+`/unreadable_values`. Each carries its immediate `containsEncryptedSource` and
+`sourceSetComplete`. Its `sourceUsesRefs` list holds the complete set of actual contributor references.
+The sorted, unique references resolve in `provenance.uses`. A raw standalone DataForge file
+has unknown original Archive lineage. `archive` and `max_distinct` describe the invocation
+and the statistic algorithm.
+
+`sourceProof.selection` uses the same origin shape. The counters and field metrics that use the Record selection retain its original contributor references.
+`selectionMode` distinguishes `allRecords`, `incompleteHeaders`, and
+`observedQuery`. `referenceCoverage` concerns the Query's Reference lookup and is null without
+a Query. Query evidence includes actual type and path declarations and predicate reads.
+`dataforgeRecordHeaderRange` uses decimal half-open physical Record indices for `fileName`,
+`recordName` and `sourceType`. The `dataforgeRecordPathTextRanges.text` selector gives the
+exact original filename and ordering-name bytes as consecutive pairs of decimal half-open
+decoded DataForge offsets. The ranges are sorted and disjoint. Adjacent strings can share
+a range through their verified NUL terminators.
+A Query using only `FROM` or `AT` has complete selection evidence after a full physical
+Record census with readable path, name and type decisions. A failing admitted Record
+body affects its field metrics separately from that selection proof. Queries with
+`WHERE` or `REFERENCING` retain their observed uses and report incomplete selection coverage.
+
+`selectionAttempts`, `rootAttempts`, and `valueAttempts` retain failed original uses separately
+from completed contributors. `rowAttempts` associates these observations with displayed row
+positions when applicable. Failed attempts for paths that emit no row remain in `valueAttempts`.
+`unresolvedAncestryPositions` and `unavailableTraversals` identify unresolved table positions or
+missing requested slot or instance extents without claiming readable bytes at those positions.
+A missing numeric extremum still carries the comparison scope that produced the null result.
+Table and CSV use their existing output format and statistics.
 
 ## `p4kx grep <archive> <text> [--in records,loc,entries] [--filter <filter>] [--lang <language>,…] [--limit <n>] [--per-item <n>] [--max-entry-size <bytes>] [--format table|json] --json`
 

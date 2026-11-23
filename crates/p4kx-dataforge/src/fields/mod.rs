@@ -8,10 +8,26 @@
 //! values are, how many are empty, how many distinct values it has (up to a cap), and the
 //! smallest and largest number. The result is the same for every number of threads.
 
+#[cfg(test)]
+mod coverage_tests;
+mod finalize;
 mod layouts;
+mod metric_coverage;
 mod navigate;
 mod number;
+mod observation;
+#[cfg(test)]
+mod observation_metric_tests;
+mod observation_metrics;
+mod observation_route;
+#[cfg(test)]
+mod observation_tests;
 mod part;
+mod reduction;
+#[cfg(test)]
+mod reduction_tests;
+mod scalar_read;
+mod scan;
 mod seen;
 #[cfg(test)]
 mod tests;
@@ -21,17 +37,23 @@ mod walk_frame;
 
 use std::cmp::Ordering;
 use std::fmt;
-use std::sync::atomic::{AtomicBool, Ordering as Atomic};
 
-use rayon::prelude::*;
 use thiserror::Error;
 
 use crate::DataForge;
 use crate::DataType;
-use crate::fields::layouts::SharedLayouts;
-use crate::fields::part::Part;
-use crate::fields::trie::ROOT;
+pub use metric_coverage::{FieldStatisticsCoverageState, FieldStatisticsMetricCoverage};
 pub use number::{MAX_DISTINCT_VALUES, Number};
+pub use observation::{FieldStatisticsInput, FieldStatisticsObservation, FieldStatisticsSlot};
+pub use observation_metrics::{
+    FieldStatisticsDistinctUse, FieldStatisticsGap, FieldStatisticsUse, FieldStatisticsValue,
+};
+pub use observation_route::{FieldStatisticsRouteEdge, FieldStatisticsRouteTarget};
+pub use reduction::{
+    FieldStatisticsFingerprint, FieldStatisticsOperand, FieldStatisticsReducedRow,
+    FieldStatisticsReduction, FieldStatisticsSourceScope,
+};
+pub use scalar_read::FieldStatisticsScalarRead;
 
 /// The most distinct field paths the statistics keep; a DataForge with more is an error, so
 /// that the memory stays bounded.
@@ -237,88 +259,7 @@ impl FieldStatistics {
         records: &[u32],
         proceed: impl Fn() -> bool + Sync,
     ) -> Result<Option<Self>, FieldStatisticsError> {
-        let stopped = AtomicBool::new(false);
-        let layouts = SharedLayouts::new(forge);
-        let part = records
-            .par_iter()
-            .with_min_len(min_part_len(records.len(), rayon::current_num_threads()))
-            .fold(
-                || Ok(Part::new(&layouts)),
-                |part: Result<Part<'_, 'f>, FieldStatisticsError>, &record| {
-                    let mut part = part?;
-                    if stopped.load(Atomic::Relaxed) {
-                        return Ok(part);
-                    }
-                    if !proceed() {
-                        stopped.store(true, Atomic::Relaxed);
-                        return Ok(part);
-                    }
-                    part.add(forge, record)?;
-                    Ok(part)
-                },
-            )
-            .reduce(
-                || Ok(Part::new(&layouts)),
-                |left, right| left.and_then(|left| left.merge(right?)),
-            )?;
-        Ok((!stopped.load(Atomic::Relaxed)).then(|| Self::from_part(part)))
-    }
-
-    fn from_part(part: Part<'_, '_>) -> Self {
-        let Part {
-            trie,
-            examined,
-            unreadable_records,
-            unreadable_values,
-            ..
-        } = part;
-        let mut paths: Vec<String> = Vec::with_capacity(trie.nodes.len());
-        for node in &trie.nodes {
-            let parent = paths.get(node.parent as usize).map_or("", String::as_str);
-            let mut path = String::with_capacity(parent.len() + 1 + node.segment.len());
-            if node.parent != ROOT {
-                path.push_str(parent);
-                path.push('/');
-            }
-            path.push_str(node.segment);
-            paths.push(path);
-        }
-        let mut fields: Vec<FieldStat> = trie
-            .nodes
-            .into_iter()
-            .zip(paths)
-            .skip(1)
-            .filter(|(node, _)| node.occurrences > 0)
-            .map(|(node, path)| {
-                let mut kinds = node.kinds;
-                kinds.sort_by_key(|(kind, _)| kind.rank());
-                let extremes = node.extremes;
-                FieldStat {
-                    path,
-                    occurrences: node.occurrences,
-                    records: node.records,
-                    empty: node.empty,
-                    kinds: kinds.into_boxed_slice(),
-                    distinct: node
-                        .distinct
-                        .as_ref()
-                        .map_or(0, |distinct| distinct.count()),
-                    distinct_capped: node
-                        .distinct
-                        .as_ref()
-                        .is_some_and(|distinct| distinct.is_capped()),
-                    min: extremes.as_ref().map(|extremes| extremes.min),
-                    max: extremes.as_ref().map(|extremes| extremes.max),
-                }
-            })
-            .collect();
-        fields.par_sort_by(|a, b| order(&a.path, &b.path));
-        Self {
-            fields,
-            records: examined,
-            unreadable_records,
-            unreadable_values,
-        }
+        scan::read(forge, records, proceed, None, false, finalize::ordinary)
     }
 
     /// Returns the paths with their statistics, sorted by path: segment by segment ignoring ASCII

@@ -9,8 +9,9 @@ use rayon::prelude::*;
 
 use crate::dataforge::out_of_range;
 use crate::query::compile::Plan;
+use crate::query::instance_source;
 use crate::query::shared::Recordings;
-use crate::query::source::{CellTrace, QueryCellSources};
+use crate::query::source::{CellTrace, QueryCellSources, QuerySource};
 use crate::query::state::WalkState;
 use crate::query::walk::Place;
 use crate::query::{CompiledQuery, MAX_PATH_VALUES};
@@ -274,14 +275,31 @@ impl<'f> CompiledQuery<'f> {
 
     /// Returns the Record's instance, which the Record tree reads its values from.
     pub(super) fn instance_of(&self, index: u32) -> Result<Place<'f>, DataForgeError> {
+        self.instance_of_observed(index, None)
+    }
+
+    pub(super) fn instance_of_observed(
+        &self,
+        index: u32,
+        observe: Option<&(dyn Fn(QuerySource) + Sync)>,
+    ) -> Result<Place<'f>, DataForgeError> {
         let forge = self.forge;
         let def = forge
             .record_def(index)
             .ok_or_else(|| out_of_range("Record", index as usize, "Record", index.into()))?;
         let instance = u32::from(def.instance_index);
-        let bytes = forge
-            .instance(def.struct_index, instance)
+        if let Some(observe) = observe {
+            observe(QuerySource::Record { index });
+            observe(QuerySource::RecordType { index });
+        }
+        let bytes = instance_source::read(forge, def.struct_index, instance, observe)
             .ok_or_else(|| out_of_range("Record", index as usize, "instance", instance.into()))?;
+        if let Some(observe) = observe {
+            observe(QuerySource::Instance {
+                structure: def.struct_index,
+                instance,
+            });
+        }
         Ok(Place::Instance {
             struct_index: def.struct_index,
             bytes,

@@ -5,6 +5,9 @@ use std::io::{self, BufWriter, Write};
 use std::process::ExitCode;
 
 use anyhow::Result;
+use p4kx_extraction::field_statistics_report::{
+    FieldStatisticsAddressError, FieldStatisticsReport, FieldStatisticsReportError,
+};
 use p4kx_extraction::query::Query;
 use p4kx_extraction::{CsvCellMode, DataForge, FieldStat, FieldStatistics, Filter};
 
@@ -13,7 +16,7 @@ use crate::dcb_export::FlatConflict;
 use crate::dcb_query::{InvalidQuery, compile_error};
 use crate::dcb_refs::JsonWithTable;
 use crate::forge_input::ForgeInput;
-use crate::{dcb_fields_out, exit};
+use crate::{dcb_fields_json, dcb_fields_out, exit};
 
 /// The words a Query starts with; a selection that starts with another word is a type name.
 const QUERY_WORDS: [&str; 5] = ["from", "at", "referencing", "select", "where"];
@@ -22,6 +25,11 @@ const QUERY_WORDS: [&str; 5] = ["from", "at", "referencing", "select", "where"];
 struct Selection {
     text: String,
     query: Query,
+}
+
+enum PlainFormat {
+    Table,
+    Csv(CsvCellMode),
 }
 
 /// The counts of a result, with the paths it lists.
@@ -52,6 +60,13 @@ pub(crate) fn run(args: &DcbFieldsArgs, as_json: bool) -> Result<ExitCode> {
         .transpose()?;
     let input = ForgeInput::open(&args.archive)?;
     let forge = input.entry().open()?;
+    let plain = match format {
+        QueryFormat::Json => return run_json(&input, &forge, query.as_ref(), args.path.as_deref()),
+        QueryFormat::Table => PlainFormat::Table,
+        QueryFormat::Csv if args.csv_raw => PlainFormat::Csv(CsvCellMode::Raw),
+        QueryFormat::Csv => PlainFormat::Csv(CsvCellMode::Spreadsheet),
+        QueryFormat::CsvStrict => PlainFormat::Csv(CsvCellMode::Strict),
+    };
     let statistics = statistics(&forge, query.as_ref())?;
     let filter = args.path.as_deref().map(Filter::parse).transpose()?;
     let fields: Vec<&FieldStat> = statistics
@@ -68,25 +83,67 @@ pub(crate) fn run(args: &DcbFieldsArgs, as_json: bool) -> Result<ExitCode> {
         fields,
     };
     let mut out = BufWriter::new(io::stdout().lock());
-    let written = match format {
-        QueryFormat::Table => dcb_fields_out::table(&mut out, &listing),
-        QueryFormat::Csv => {
-            let mode = if args.csv_raw {
-                CsvCellMode::Raw
-            } else {
-                CsvCellMode::Spreadsheet
-            };
-            dcb_fields_out::csv(&mut out, &listing, mode)
-        }
-        QueryFormat::CsvStrict => dcb_fields_out::csv(&mut out, &listing, CsvCellMode::Strict),
-        QueryFormat::Json => dcb_fields_out::json(&mut out, &args.archive, &listing),
+    let written = match plain {
+        PlainFormat::Table => dcb_fields_out::table(&mut out, &listing),
+        PlainFormat::Csv(mode) => dcb_fields_out::csv(&mut out, &listing, mode),
     }
     .and_then(|()| out.flush());
+    finish(written, &statistics)
+}
+
+fn run_json(
+    input: &ForgeInput,
+    forge: &DataForge<'_>,
+    selection: Option<&Selection>,
+    path: Option<&str>,
+) -> Result<ExitCode> {
+    let source = input.source_input()?;
+    let result = selection.map_or_else(
+        || FieldStatisticsReport::all(forge, source),
+        |selection| FieldStatisticsReport::query(forge, source, &selection.query),
+    );
+    let report = result.map_err(|error| report_error(error, selection))?;
+    let filter = path.map(Filter::parse).transpose()?;
+    let displayed = report.addressed_origins(filter.as_ref())?;
+    let statistics = report.reduction.statistics();
+    let fields = displayed
+        .ordinals
+        .iter()
+        .map(|&ordinal| {
+            statistics
+                .fields()
+                .get(ordinal)
+                .ok_or(FieldStatisticsAddressError::MissingRow)
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    let listing = Listing { statistics, fields };
+    let mut out = BufWriter::new(io::stdout().lock());
+    let written = dcb_fields_json::write(&mut out, input.path(), &listing, &report, &displayed)
+        .and_then(|()| out.flush());
+    finish(written, statistics)
+}
+
+fn report_error(error: FieldStatisticsReportError, selection: Option<&Selection>) -> anyhow::Error {
+    match error {
+        FieldStatisticsReportError::Compile(error) => {
+            if let Some(selection) = selection {
+                compile_error(&error, &selection.text)
+            } else {
+                error.into()
+            }
+        }
+        FieldStatisticsReportError::Select(error) => error.into(),
+        FieldStatisticsReportError::Scan(error) => error.into(),
+        other => other.into(),
+    }
+}
+
+fn finish(written: io::Result<()>, statistics: &FieldStatistics) -> Result<ExitCode> {
     match written {
         Err(error) if error.kind() != io::ErrorKind::BrokenPipe => return Err(error.into()),
         Ok(()) | Err(_) => {}
     }
-    report(&statistics);
+    report(statistics);
     Ok(ExitCode::from(if statistics.unreadable_records() == 0 {
         exit::SUCCESS
     } else {

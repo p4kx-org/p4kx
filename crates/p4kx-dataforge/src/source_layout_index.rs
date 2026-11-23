@@ -23,6 +23,7 @@ pub(crate) struct SourceLayout<'source> {
     pub(crate) index: &'source SourceLayoutIndex,
     pub(crate) forge: &'source DataForge<'source>,
     pub(crate) summary: &'source LayoutSummary,
+    pub(crate) struct_index: usize,
 }
 
 impl SourceLayoutIndex {
@@ -53,6 +54,7 @@ impl SourceLayoutIndex {
             index: self,
             forge,
             summary,
+            struct_index: index,
         })
     }
 

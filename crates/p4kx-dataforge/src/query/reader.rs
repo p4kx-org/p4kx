@@ -8,7 +8,7 @@ use crate::query::sink::Recording;
 use crate::query::source::CellTrace;
 use crate::query::state::WalkState;
 use crate::query::walk::Place;
-use crate::scalar::read_scalar;
+use crate::scalar::{ScalarSource, read_scalar_with};
 use crate::{DataForge, DataType, Value, ValueKind};
 
 /// Where a scalar lies in the bytes a path has reached, and how it is read.
@@ -23,9 +23,21 @@ pub(crate) struct Column {
 impl Column {
     /// Reads the value from `place`, or the error that its bytes end before the column does.
     pub(crate) fn read<'f>(&self, forge: &'f DataForge<'f>, place: Place<'f>) -> Value<'f> {
+        self.read_observed(forge, place, None)
+    }
+
+    pub(super) fn read_observed<'f>(
+        &self,
+        forge: &'f DataForge<'f>,
+        place: Place<'f>,
+        observe: Option<&mut dyn FnMut(ScalarSource)>,
+    ) -> Value<'f> {
         self.bytes(place).map_or_else(
             || Value::Error(place.too_short(forge, self.end)),
-            |bytes| read_scalar(forge, self.data_type, self.target, bytes).unwrap_or(Value::Null),
+            |bytes| {
+                read_scalar_with(forge, self.data_type, self.target, bytes, observe)
+                    .unwrap_or(Value::Null)
+            },
         )
     }
 

@@ -24,23 +24,43 @@ impl<'a> StringTable<'a> {
 
     /// Returns the string starting at `offset`.
     pub(crate) fn get(&self, offset: u32) -> Result<&'a str, DataForgeError> {
-        usize::try_from(offset)
-            .ok()
-            .and_then(|start| self.bytes.get(start..))
-            .and_then(|tail| CStr::from_bytes_until_nul(tail).ok())
-            .and_then(|text| text.to_str().ok())
-            .ok_or(DataForgeError::InvalidString {
-                table: self.name,
-                offset,
-            })
+        self.read(offset).0.ok_or(DataForgeError::InvalidString {
+            table: self.name,
+            offset,
+        })
     }
 
     /// Returns the string starting at `offset` as a field value.
     pub(crate) fn value(&self, offset: u32) -> Result<&'a str, ValueError> {
-        self.get(offset).map_err(|_| ValueError::InvalidString {
-            table: self.name,
-            offset,
-        })
+        self.value_with_extent(offset).0
+    }
+
+    /// Returns the decoded value and the original inspected range, including its terminator.
+    pub(crate) fn value_with_extent(
+        &self,
+        offset: u32,
+    ) -> (Result<&'a str, ValueError>, Option<&'a [u8]>) {
+        let (text, examined) = self.read(offset);
+        (
+            text.ok_or(ValueError::InvalidString {
+                table: self.name,
+                offset,
+            }),
+            examined,
+        )
+    }
+
+    fn read(&self, offset: u32) -> (Option<&'a str>, Option<&'a [u8]>) {
+        let tail = usize::try_from(offset)
+            .ok()
+            .and_then(|start| self.bytes.get(start..));
+        let Some(tail) = tail else {
+            return (None, None);
+        };
+        let Ok(text) = CStr::from_bytes_until_nul(tail) else {
+            return (None, Some(tail));
+        };
+        (text.to_str().ok(), Some(text.to_bytes_with_nul()))
     }
 }
 

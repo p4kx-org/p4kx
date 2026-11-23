@@ -474,6 +474,8 @@ distinct value or numeric extremum. Invalid array ranges, missing instances, unr
 layouts, repeated ownership and cyclic inline declarations add to the unreadable-value count.
 Only observations retained before a rejected source edge contribute field counts; unread
 descendant occurrences are not invented. The unreadable counts appear on stderr and in JSON.
+JSON adds field-addressed origin and coverage for its metrics and summary counts. Failed reads
+and unresolved traversal positions have separate evidence. See [CLI JSON](cli-json.md#p4kx-dcb-fields-archive-type-or-query---path-glob---format-tablecsvcsv-strictjson---json).
 
 The existing path policy allows 1,048,576 trie nodes including the empty root. Requiring another
 node during discovery or merge is an error (exit code 5), not a successful prefix. This bounds

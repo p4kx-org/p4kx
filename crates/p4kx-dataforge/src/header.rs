@@ -50,6 +50,15 @@ impl DataForgeHeaderField {
     }
 }
 
+pub(crate) fn value_pool_count_span(kind: ValueKind) -> Option<Range<u64>> {
+    let ordinal = ValueKind::HEADER
+        .iter()
+        .position(|candidate| *candidate == kind)?;
+    let word = LEADING_WORDS + ordinal;
+    let width = size_of::<u32>() as u64;
+    Some(word as u64 * width..(word as u64 + 1) * width)
+}
+
 /// The largest version word that is taken for a DataForge version.
 const MAX_PLAUSIBLE_VERSION: u32 = u16::MAX as u32;
 
