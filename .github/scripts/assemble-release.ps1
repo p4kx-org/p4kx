@@ -64,7 +64,7 @@ if (-not $Version) {
 if (-not $Revision) {
     $Revision = if ($env:GITHUB_SHA) { $env:GITHUB_SHA } else { (& git rev-parse HEAD).Trim() }
 }
-& (Join-Path $PSScriptRoot 'check-release-matrix.ps1') -AssetDirectory $AssetDirectory -Version $Version -Revision $Revision -WindowsDesktopEvidencePath $WindowsDesktopEvidencePath -ReleaseRunId $ReleaseRunId
+& (Join-Path $PSScriptRoot 'check-release-matrix.ps1') -AssetDirectory $AssetDirectory -Version $Version -Revision $Revision -WindowsDesktopEvidencePath $WindowsDesktopEvidencePath -ReleaseRunId $ReleaseRunId -RequireStableMacosRelease:$TagAttestations
 
 $macosRuntimePath = Join-Path $AssetDirectory "P4KX-$Version-aarch64-apple-darwin-runtime.json"
 $macosRuntime = Get-Content -LiteralPath $macosRuntimePath -Raw | ConvertFrom-Json

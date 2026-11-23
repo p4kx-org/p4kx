@@ -149,6 +149,10 @@ The top-level archive digest must match the actual portable ZIP on Windows, tar.
 Each package's execution proof carries its own digest. On macOS it includes the signed executable
 hashes, Mach-O deployment target and signing receipt for the final DMG. Hosted Apple Silicon
 consumers verify the exact DMG on macOS 26 and the current stable macOS release.
+Tagged assembly compares the exact current runner version with the release pin in
+[macOS host evidence](../.github/scripts/macos-host-evidence.ps1). Check this pin against
+[Apple's current macOS release](https://support.apple.com/en-us/100100) before tagging.
+Dry runs record the actual version of their macOS 27 runner.
 Windows runtime evidence additionally covers both the portable ZIP and installed MSI payload,
 with package hashes and the exact release EXE hashes. Missing, skipped or mismatched packaged
 runtime evidence fails preflight. [Windows packages](windows-packages.md) describes lifecycle,

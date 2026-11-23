@@ -87,7 +87,7 @@ foreach ($row in $contract.targets) {
             $proof | Add-Member -NotePropertyMembers @{ signing_sha256=$smokes[0].signing_sha256; workflow_attempt='1' }
             $current = $proof | ConvertTo-Json -Depth 16 | ConvertFrom-Json
             $current.workflow_attempt = '2'
-            $current.runtime_host = @{ os_version='27.2'; os_build='26C102'; architecture='arm64' }
+            $current.runtime_host = @{ os_version=(Get-P4kxCurrentMacosReleaseVersion); os_build='26B131'; architecture='arm64' }
             $smokes[0].current_hosted_smoke = New-P4kxMacosCurrentHostedSmoke $current
         }
     }
@@ -194,6 +194,14 @@ Remove-Item -LiteralPath (Join-Path $notesAssets 'SHA256SUMS.txt'),(Join-Path $n
 & $assembler @assembly @desktop
 $macosProofPath = Join-Path $notesAssets "P4KX-$version-aarch64-apple-darwin-runtime.json"
 $macosRuntime = Get-Content -LiteralPath $macosProofPath -Raw | ConvertFrom-Json
+$macosRuntime.package_smokes[0].current_hosted_smoke.runtime_host.os_version = '27.0.1'
+$macosRuntime | ConvertTo-Json -Depth 24 | Set-Content -LiteralPath $macosProofPath -Encoding utf8NoBOM
+& $validator -AssetDirectory $notesAssets -Version $version -Revision $revision
+$failure = try { & $assembler @assembly @desktop | Out-Null } catch { $_.Exception.Message }
+if ($failure -cnotmatch 'Tagged release requires the current stable macOS') {
+    throw 'Tagged assembly accepted an older macOS version from the same major series.'
+}
+$macosRuntime.package_smokes[0].current_hosted_smoke.runtime_host.os_version = Get-P4kxCurrentMacosReleaseVersion
 $macosRuntime.package_smokes[0].signing.reason = 'package-dry-run'
 $macosRuntime.package_smokes[0].current_hosted_smoke.signing.reason = 'package-dry-run'
 $macosRuntime | ConvertTo-Json -Depth 24 | Set-Content -LiteralPath $macosProofPath -Encoding utf8NoBOM
