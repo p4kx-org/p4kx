@@ -35,6 +35,13 @@ function Invoke-ObserverFinish {
             } finally { $supervisor.Dispose() }
             Write-P4kxDetachedReceipt (Join-Path $output 'observer-control-release.json') @{schema=1;role='harmless-msi-observer-release'}
         }
+        & $entry -Stage WaitFinish -Directory $observer
+        $wait = Read-P4kxDetachedReceipt (Join-Path $observer 'finish-supervision/wait-result.json')
+        $terminal = Join-Path $observer 'finish-supervision/result.json'
+        Assert-Observer ($wait.role -ceq 'native-msi-finish-receipt-wait' -and
+            $wait.request_sha256 -ceq $handle.request_sha256 -and
+            $wait.result_sha256 -ceq (Get-P4kxDetachedDigest $terminal) -and
+            $wait.mutation_authority -eq $false) 'Bounded wait lost the original terminal receipt.'
         & $entry -Stage CollectFinish -Directory $observer
         return
     }
@@ -86,9 +93,31 @@ try {
         Assert-ObserverRefused {Invoke-ObserverFinish} 'Failed or admission-only worker became complete lifecycle evidence.'
     }
     if ($DetachedFinish -and $Case -ceq 'Complete') {
-        $supervision=Join-Path $observer 'finish-supervision/result.json'
+        . (Join-Path $PSScriptRoot 'msi-observer-finish-control.ps1')
+        $context = Get-P4kxMsiFinishContext $observer
+        $launch = Read-P4kxMsiFinishLaunch $context
+        $expired = $context.Clone()
+        $expired.directory = Join-Path $root 'expired terminal wait'
+        $null = New-Item -ItemType Directory -Path $expired.directory
+        $expired.collection_cutoff = [DateTimeOffset]::UtcNow.AddSeconds(-1)
+        Assert-ObserverRefused { Wait-P4kxMsiFinishReceipt $expired $launch } 'Expired terminal wait accepted an absent result.'
+        $absence = Read-P4kxDetachedReceipt (Join-Path $expired.directory 'wait-result.json')
+        Assert-Observer ($absence.role -ceq 'native-msi-finish-receipt-wait' -and
+            $absence.request_sha256 -ceq $handle.request_sha256 -and $null -eq $absence.result_sha256 -and
+            $absence.deadline_utc -ceq $expired.collection_cutoff.ToString('o') -and
+            $absence.mutation_authority -eq $false) 'Expired wait did not preserve exact absence evidence.'
+        $supervision=Join-Path $context.directory 'result.json'
+        $waitPath=Join-Path $context.directory 'wait-result.json'
         $valid=[IO.File]::ReadAllText($supervision)
+        $validWait=[IO.File]::ReadAllText($waitPath)
         try {
+            $wrongWait=Read-P4kxDetachedReceipt $waitPath
+            $wrongWait.request_sha256='f' * 64
+            [IO.File]::WriteAllText($waitPath,($wrongWait | ConvertTo-Json -Compress))
+            Assert-ObserverRefused { & $entry -Stage CollectFinish -Directory $observer } 'A foreign terminal wait passed validation.'
+            [IO.File]::WriteAllText($waitPath,$validWait)
+            [IO.File]::WriteAllText($supervision,($valid + ' '))
+            Assert-ObserverRefused { & $entry -Stage CollectFinish -Directory $observer } 'The terminal bytes changed after the bounded wait.'
             foreach ($mutation in @(
                 { param($proof) $proof.supervisor_pid++ },
                 { param($proof) $proof.caller_result_sha256='f' * 64 },
@@ -97,9 +126,15 @@ try {
                 $changed=$valid | ConvertFrom-Json -AsHashtable -DateKind String
                 & $mutation $changed
                 [IO.File]::WriteAllText($supervision,($changed | ConvertTo-Json -Compress))
+                $wait=$validWait | ConvertFrom-Json -AsHashtable -DateKind String
+                $wait.result_sha256=Get-P4kxDetachedDigest $supervision
+                [IO.File]::WriteAllText($waitPath,($wait | ConvertTo-Json -Compress))
                 Assert-ObserverRefused { & $entry -Stage CollectFinish -Directory $observer } 'Wrong owner, receipt or deadline passed detached Finish.'
             }
-        } finally { [IO.File]::WriteAllText($supervision,$valid) }
+        } finally {
+            [IO.File]::WriteAllText($supervision,$valid)
+            [IO.File]::WriteAllText($waitPath,$validWait)
+        }
     }
     $finish=Read-P4kxDetachedReceipt (Join-Path $observer 'snapshots/09/caller-result.json')
     $finishedWrite=Read-P4kxDetachedReceipt (Join-Path $observer 'snapshots/09/writeResult-end.json')

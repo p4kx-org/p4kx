@@ -19,8 +19,7 @@ Write-P4kxMsiObserverProgress binding begin -Directory $progress
 Assert-P4kxMsiObserverBinding $request $root
 if ($OriginalBoundary) {
     $expectedSequence = if ($OriginalBoundary -ceq 'preamble/original-raw') { 2 } else { 3 }
-    if ($Sequence -ne $expectedSequence -or $WaitMilliseconds -ne 0 -or $request.mode -cne 'Lifecycle' -or
-        ($OriginalBoundary -ceq 'lifecycle/install' -and $request.target -cne 'aarch64-pc-windows-msvc')) {
+    if ($Sequence -ne $expectedSequence -or $WaitMilliseconds -ne 0 -or $request.mode -cne 'Lifecycle') {
         throw 'An original phase boundary requires its designated native lifecycle checkpoint.'
     }
 }

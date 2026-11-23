@@ -46,6 +46,7 @@ Assert-FeedbackWorkflow ($installer -cmatch '(?m)^        timeout-minutes: \$\{\
 Assert-FeedbackWorkflow (-not ($installer -match '(?m)^        (continue-on-error|if):')) 'Installer failure must retain ordinary failure gating.'
 $finishStart=Get-FeedbackWorkflowStep $verify 'Start the isolated original MSI Finish supervisor'
 $finishStartUpload=Get-FeedbackWorkflowStep $verify 'Preserve original MSI Finish supervisor launch'
+$finishWait=Get-FeedbackWorkflowStep $verify 'Wait for the original MSI Finish receipt'
 $observerFinish=Get-FeedbackWorkflowStep $verify 'Finish the original native MSI lifecycle'
 $prepare=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/scripts/prepare-msi-feedback.ps1')
 $observerRequest=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/scripts/msi-observer-request.ps1')
@@ -58,10 +59,15 @@ Assert-FeedbackWorkflow ($installer.Contains('id: msi-launch') -and $installer.C
     $finishStart.Contains("always() && !cancelled() && steps.msi-launch.outcome == 'success'") -and
     $finishStart.Contains('id: msi-finish-start') -and
     $finishStart.Contains('invoke-msi-observer.ps1 -Stage StartFinish') -and $finishStart -cmatch '(?m)^        timeout-minutes: 1\r?$' -and
+    $finishWait.Contains('id: msi-finish-wait') -and
+    $finishWait.Contains('invoke-msi-observer.ps1 -Stage WaitFinish') -and
+    $finishWait -cmatch '(?m)^        timeout-minutes: \$\{\{ fromJSON\(steps\.msi-budget\.outputs\.observer_finish_minutes\) \}\}\r?$' -and
+    $finishWait.Contains("always() && !cancelled() && steps.msi-finish-start.outcome == 'success'") -and
+    -not $finishWait.Contains('continue-on-error') -and
     $observerFinish.Contains('invoke-msi-observer.ps1 -Stage CollectFinish') -and
-    $observerFinish -cmatch '(?m)^        timeout-minutes: \$\{\{ fromJSON\(steps\.msi-budget\.outputs\.observer_finish_minutes\) \}\}\r?$' -and
-    $observerFinish.Contains("always() && !cancelled() && steps.msi-finish-start.outcome == 'success'") -and
-    -not $observerFinish.Contains('continue-on-error')) 'Original lifecycle completion lost its source-bound deadline or failure gate.'
+    $observerFinish -cmatch '(?m)^        timeout-minutes: 1\r?$' -and
+    $observerFinish.Contains("always() && !cancelled() && steps.msi-finish-wait.outcome == 'success' && steps.msi-finish-evidence.outcome == 'success'") -and
+    -not $observerFinish.Contains('continue-on-error')) 'Finish must bound the terminal wait independently and require the preserved proof for final validation.'
 $observerStart=Get-FeedbackWorkflowStep $verify 'Preserve original MSI observer start'
 $firstCheckpoint=Get-FeedbackWorkflowStep $verify 'Preserve original MSI phase checkpoint 1'
 Assert-FeedbackWorkflow ($observerStart.Contains("always() && !cancelled() && steps.msi-launch.outcome == 'success'") -and
@@ -84,8 +90,8 @@ Assert-FeedbackWorkflow ($verify.IndexOf($installer,[StringComparison]::Ordinal)
 $firstUpload=Get-FeedbackWorkflowStep $verify 'Upload original MSI phase checkpoint 1'
 $passive=Get-FeedbackWorkflowStep $verify 'Observe the original ARM64 MSI Registry capture'
 $passiveUpload=Get-FeedbackWorkflowStep $verify 'Upload the original ARM64 MSI Registry capture checkpoint'
-$install=Get-FeedbackWorkflowStep $verify 'Observe the first original ARM64 MSI install outcome'
-$installUpload=Get-FeedbackWorkflowStep $verify 'Upload the first original ARM64 MSI install checkpoint'
+$install=Get-FeedbackWorkflowStep $verify 'Observe the first original MSI install outcome'
+$installUpload=Get-FeedbackWorkflowStep $verify 'Upload the first original MSI install checkpoint'
 $finalUpload=Get-FeedbackWorkflowStep $verify 'Upload final original MSI lifecycle evidence'
 Assert-FeedbackWorkflow ($passive.Contains('id: msi-passive-checkpoint') -and
     $passive.Contains("matrix.arch == 'arm64' && steps.msi-launch.outcome == 'success'") -and
@@ -104,11 +110,12 @@ Assert-FeedbackWorkflow ($verify.IndexOf($firstUpload,[StringComparison]::Ordina
     $verify.IndexOf($install,[StringComparison]::Ordinal) -lt $verify.IndexOf($installUpload,[StringComparison]::Ordinal) -and
     $verify.IndexOf($installUpload,[StringComparison]::Ordinal) -lt $verify.IndexOf($observerFinish,[StringComparison]::Ordinal)) 'The separately uploaded original phase checkpoints belong before the final lifecycle gate.'
 Assert-FeedbackWorkflow ($install.Contains('id: msi-install-checkpoint') -and
-    $install.Contains("always() && !cancelled() && matrix.arch == 'arm64' && steps.msi-launch.outcome == 'success'") -and
+    $install.Contains("always() && !cancelled() && steps.msi-launch.outcome == 'success'") -and
+    -not $install.Contains('matrix.arch') -and
     $install.Contains('invoke-msi-observer.ps1 -Stage Snapshot') -and
     $install.Contains('-Sequence 3 -WaitMilliseconds 0 -OriginalInstallBoundary') -and
     $install -cmatch '(?m)^        timeout-minutes: 1\r?$' -and
-    $install -cmatch '(?m)^        continue-on-error: true\r?$') 'The original install outcome must remain a bounded optional ARM64-only observation.'
+    $install -cmatch '(?m)^        continue-on-error: true\r?$') 'The first install outcome must remain a bounded optional observation on both native targets.'
 Assert-FeedbackWorkflow ($installUpload.Contains("always() && !cancelled() && steps.msi-install-checkpoint.outcome != 'skipped'") -and
     $installUpload.Contains('name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-3') -and
     $installUpload -cmatch '(?m)^          path: \$\{\{ env.P4KX_PACKAGE_TASK \}\}/installer-check/observer/\*/03/\*\r?$' -and
@@ -128,15 +135,16 @@ Assert-FeedbackWorkflow ($firstUpload.Contains("always() && !cancelled() && step
     $firstUpload.Contains('/observer/*/01/*') -and $firstUpload.Contains('if-no-files-found: error') -and
     $firstUpload -cmatch '(?m)^        timeout-minutes: 1\r?$' -and -not $firstUpload.Contains('continue-on-error')) 'The immediate snapshot requires its own bounded durable upload.'
 Assert-FeedbackWorkflow ($observerFinish.Contains('id: msi-finish') -and
-    $finalUpload.Contains("always() && !cancelled() && steps.msi-launch.outcome == 'success' && steps.msi-finish.outcome != 'skipped'") -and
+    $finalUpload.Contains('id: msi-finish-evidence') -and
+    $finalUpload.Contains("always() && !cancelled() && steps.msi-launch.outcome == 'success' && steps.msi-finish-wait.outcome != 'skipped'") -and
     $finalUpload.Contains('name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-final') -and
     $finalUpload.Contains('if-no-files-found: error') -and $finalUpload -cmatch '(?m)^        timeout-minutes: 1\r?$' -and
-    -not $finalUpload.Contains('continue-on-error')) 'Final original lifecycle evidence requires a bounded upload after the original Finish.'
+    -not $finalUpload.Contains('continue-on-error')) 'Original lifecycle evidence requires a bounded upload even when the terminal wait fails.'
 Assert-FeedbackWorkflow ($finishStartUpload.Contains("steps.msi-finish-start.outcome == 'success'") -and
     $finishStartUpload.Contains('/observer/finish-supervision/launch.json') -and
     $finishStartUpload -cmatch '(?m)^        timeout-minutes: 1\r?$' -and
     $verify.IndexOf($finishStart,[StringComparison]::Ordinal) -lt $verify.IndexOf($finishStartUpload,[StringComparison]::Ordinal) -and
-    $verify.IndexOf($finishStartUpload,[StringComparison]::Ordinal) -lt $verify.IndexOf($observerFinish,[StringComparison]::Ordinal)) 'Finish launch evidence must be uploaded before collecting the original lifecycle.'
+    $verify.IndexOf($finishStartUpload,[StringComparison]::Ordinal) -lt $verify.IndexOf($finishWait,[StringComparison]::Ordinal)) 'Finish launch evidence must upload before waiting for the original lifecycle.'
 foreach ($evidenceUpload in @($firstUpload,$passiveUpload,$installUpload,$finishStartUpload,$finalUpload)) {
     Assert-FeedbackWorkflow ($evidenceUpload.Contains('actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9') -and
         -not ($evidenceUpload -match '(?m)^        (run|env):')) 'Observer evidence must use the pinned upload action.'
@@ -150,9 +158,10 @@ $expectedFinalPaths=@(
 )
 Assert-FeedbackWorkflow ([string]::Join([char]10,$finalPaths) -ceq [string]::Join([char]10,$expectedFinalPaths)) 'Final compact proof must contain the original checkpoint, bounded Finish progress and observer verdict.'
 Assert-FeedbackWorkflow ($verify.IndexOf($firstCheckpoint,[StringComparison]::Ordinal) -lt $verify.IndexOf($firstUpload,[StringComparison]::Ordinal) -and
-    $verify.IndexOf($firstUpload,[StringComparison]::Ordinal) -lt $verify.IndexOf($observerFinish,[StringComparison]::Ordinal) -and
-    $verify.IndexOf($observerFinish,[StringComparison]::Ordinal) -lt $verify.IndexOf($finalUpload,[StringComparison]::Ordinal) -and
-    $verify.IndexOf($finalUpload,[StringComparison]::Ordinal) -lt $verify.IndexOf('      - name: Record executed release payload evidence',[StringComparison]::Ordinal)) 'Original lifecycle acceptance must follow the immediate observation and precede final runtime publication.'
+    $verify.IndexOf($firstUpload,[StringComparison]::Ordinal) -lt $verify.IndexOf($finishWait,[StringComparison]::Ordinal) -and
+    $verify.IndexOf($finishWait,[StringComparison]::Ordinal) -lt $verify.IndexOf($finalUpload,[StringComparison]::Ordinal) -and
+    $verify.IndexOf($finalUpload,[StringComparison]::Ordinal) -lt $verify.IndexOf($observerFinish,[StringComparison]::Ordinal) -and
+    $verify.IndexOf($observerFinish,[StringComparison]::Ordinal) -lt $verify.IndexOf('      - name: Record executed release payload evidence',[StringComparison]::Ordinal)) 'Preserve the raw original Finish before acceptance and final runtime publication.'
 Assert-FeedbackWorkflow (([regex]::Matches($verify,'invoke-msi-observer\.ps1 -Stage Snapshot').Count -eq 3) -and
     -not ($verify -match 'invoke-msi-observer\.ps1 -Stage Delay|\s-WaitMilliseconds [1-9]|-ScheduledDelay')) 'The installer must not depend on a fixed observation wait.'
 $observerEntry=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/scripts/invoke-msi-observer.ps1')

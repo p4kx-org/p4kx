@@ -11,9 +11,10 @@ function Get-P4kxMsiFinishContext([string]$Directory) {
     $digest = Get-P4kxDetachedDigest $requestPath
     if ($handle.schema -ne 1 -or $handle.role -cne 'native-msi-observer-handle' -or $handle.request_sha256 -cne $digest -or
         $handle.pid -le 0 -or $handle.started_utc_ticks -le 0) { throw 'Finish requires the bound original MSI observer handle.' }
+    $cutoff = Get-P4kxMsiFinishCutoff $request
     return @{
         root=$root; request=$request; handle=$handle; digest=$digest
-        directory=(Join-Path $root 'finish-supervision'); cutoff=(Get-P4kxMsiFinishCutoff $request)
+        directory=(Join-Path $root 'finish-supervision'); cutoff=$cutoff; collection_cutoff=$cutoff.AddSeconds(3)
     }
 }
 
@@ -46,20 +47,66 @@ function Start-P4kxMsiFinishSupervision([string]$Directory) {
     } finally { $process.Dispose() }
 }
 
-function Read-P4kxMsiSupervisedFinish([string]$Directory) {
-    $context = Get-P4kxMsiFinishContext $Directory
+function Read-P4kxMsiFinishLaunch($Context) {
     $launch = Read-P4kxDetachedReceipt (Join-Path $context.directory 'launch.json')
     if ($launch.schema -ne 1 -or $launch.role -cne 'native-msi-finish-supervisor-launch' -or
         $launch.request_sha256 -cne $context.digest -or $launch.cutoff_utc -cne $context.cutoff.ToString('o') -or
         $launch.supervisor_pid -le 0 -or $launch.supervisor_started_utc_ticks -le 0 -or $launch.mutation_authority -ne $false) {
         throw 'Finish supervisor launch differs from the original observer.'
     }
+    return $launch
+}
+
+function Wait-P4kxMsiFinishReceipt($Context, $Launch) {
+    $receiptPath = Join-Path $Context.directory 'result.json'
+    $resultDigest = $null
+    $budget = ($Context.collection_cutoff - [DateTimeOffset]::UtcNow).TotalMilliseconds
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    while ($true) {
+        $wallRemaining = ($Context.collection_cutoff - [DateTimeOffset]::UtcNow).TotalMilliseconds
+        $remaining = [Math]::Min($wallRemaining, $budget - $clock.Elapsed.TotalMilliseconds)
+        if ($remaining -le 0) { break }
+        if ([IO.File]::Exists($receiptPath)) {
+            $resultDigest = Get-P4kxDetachedDigest $receiptPath
+            break
+        }
+        Start-Sleep -Milliseconds ([int][Math]::Min(100, [Math]::Ceiling($remaining)))
+    }
+    $observedAt = [DateTimeOffset]::UtcNow
+    if ($observedAt -gt $Context.collection_cutoff -or $clock.Elapsed.TotalMilliseconds -gt $budget) {
+        $resultDigest = $null
+    }
+    Write-P4kxDetachedReceipt (Join-Path $Context.directory 'wait-result.json') @{
+        schema=1;role='native-msi-finish-receipt-wait';request_sha256=$Context.digest
+        supervisor_pid=$Launch.supervisor_pid;supervisor_started_utc_ticks=$Launch.supervisor_started_utc_ticks
+        deadline_utc=$Context.collection_cutoff.ToString('o');observed_utc=$observedAt.ToString('o')
+        result_sha256=$resultDigest;mutation_authority=$false
+    }
+    if (-not $resultDigest) { throw 'The bound Finish supervisor produced no result within the original allowance.' }
+}
+
+function Wait-P4kxMsiSupervisedFinish([string]$Directory) {
+    $context = Get-P4kxMsiFinishContext $Directory
+    $launch = Read-P4kxMsiFinishLaunch $context
+    Wait-P4kxMsiFinishReceipt $context $launch
+}
+
+function Read-P4kxMsiSupervisedFinish([string]$Directory) {
+    $context = Get-P4kxMsiFinishContext $Directory
+    $launch = Read-P4kxMsiFinishLaunch $context
     $receiptPath = Join-Path $context.directory 'result.json'
-    $collectionCutoff = $context.cutoff.AddSeconds(3)
-    while (-not [IO.File]::Exists($receiptPath)) {
-        $remaining = ($collectionCutoff - [DateTimeOffset]::UtcNow).TotalMilliseconds
-        if ($remaining -le 0) { throw 'The bound Finish supervisor produced no result within the original allowance.' }
-        Start-Sleep -Milliseconds ([int][Math]::Min(100,$remaining))
+    $wait = Read-P4kxDetachedReceipt (Join-Path $context.directory 'wait-result.json')
+    if ($wait.schema -ne 1 -or $wait.role -cne 'native-msi-finish-receipt-wait' -or
+        $wait.request_sha256 -cne $context.digest -or $wait.supervisor_pid -ne $launch.supervisor_pid -or
+        $wait.supervisor_started_utc_ticks -ne $launch.supervisor_started_utc_ticks -or
+        $wait.deadline_utc -cne $context.collection_cutoff.ToString('o') -or $wait.mutation_authority -ne $false -or
+        $wait.result_sha256 -cnotmatch '^[0-9a-f]{64}$' -or
+        $wait.result_sha256 -cne (Get-P4kxDetachedDigest $receiptPath)) {
+        throw 'Finish requires the exact terminal receipt from its bounded wait.'
+    }
+    $waitObserved = ConvertFrom-P4kxMsiBudgetTimestamp $wait.observed_utc
+    if ($waitObserved -gt $context.collection_cutoff -or $waitObserved -gt [DateTimeOffset]::UtcNow) {
+        throw 'The terminal Finish receipt was observed outside its original allowance.'
     }
     $result = Read-P4kxDetachedReceipt $receiptPath
     if ($result.schema -ne 1 -or $result.role -cne 'native-msi-finish-supervisor-result' -or
@@ -72,7 +119,7 @@ function Read-P4kxMsiSupervisedFinish([string]$Directory) {
     }
     $observedExit = ConvertFrom-P4kxMsiBudgetTimestamp $result.observed_exit_utc
     $launchedAt = [DateTime]::new([long]$launch.supervisor_started_utc_ticks,[DateTimeKind]::Utc)
-    if ($observedExit -lt $launchedAt -or $observedExit -gt [DateTimeOffset]::UtcNow) {
+    if ($observedExit -lt $launchedAt -or $observedExit -gt $waitObserved) {
         throw 'Finish supervisor exit observation differs from its process lifetime.'
     }
     $callerPath = Join-Path $context.root 'snapshots/09/caller-result.json'
