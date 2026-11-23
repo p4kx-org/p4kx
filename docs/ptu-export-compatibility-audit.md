@@ -8,6 +8,57 @@ of the current checkout. This report contains technical structures and implement
 only. Game values, text dumps, concrete test-build Record identities, build payloads and
 extracted assets are not included. Public technical issue updates were explicitly authorized.
 
+## PTU 13260598 comparison
+
+The installed PTU manifest identifies change `13260598` and internal version
+`5.0.202.22326`. The preserved `13248297` Archive matches the earlier size,
+modification time and `Data/Game2.dcb` directory size and CRC32C. The stock
+comparator from revision `300226ceeeaf522b7d9af790e8fa3698752cf575` reads both Archives.
+Their identities stayed stable through the comparisons.
+
+| Compared layer | Added | Removed | Changed |
+| --- | ---: | ---: | ---: |
+| Archive directory Entries | 271 | 4 | 920 |
+| DataForge Record comparison | 4 | 1 | 7,574 |
+| DataForge Struct declarations | 2 | 0 | 2 |
+| Property declarations on existing Structs | 2 | 0 | 0 |
+
+The Record comparison reports zero moved or unreadable Records. Enum declarations
+and options agree. Of the changed Records, 3,313 differ solely by the two newly
+declared component fields. Geometry variants account for many other field deltas
+under the existing `SubGeometry` source path.
+
+| DataForge addition | Original declaration and instances |
+| --- | --- |
+| `KioskInteractionEntityComponentParams.supportWalkToAlignInVR` | Scalar Bool. The 616 mapped instances all store `false`. |
+| `SActorAnimationComponentParams.stateMachineMannequinTags` | Scalar StrongPointer to `SStateMachineMannequinTags`. The 2,698 mapped instances all store null. |
+| `SStateMachineMannequinTags` and `SStateMachineMannequinTagDef` | The former declares a `deathTags` Class array of the latter. Each element has `state` as a WeakPointer to `SInteractionState` and `mannequinTag` as a String. Both new Structs have zero mapped instances. |
+
+The original DataForge declaration and mapping tables corroborate the Record
+field states. Generic DataForge tools expose the new component fields. The typed
+item and animation component projections select other blocks.
+
+| Area | Original change and P4KX relevance |
+| --- | --- |
+| Armor and engineering | Four armor component owners change seven existing physical and energy deflection values. The existing vehicle armor reader covers them. The engineering diagnostics Record adds `Armor` to its `includedItemTypes`. That entry is visible in generic DataForge output. The game still supplies the current armor condition and MFD behavior. |
+| Contracts | Ten Generator Records and five Templates change. Nine Generators change existing spawn fields. One changed Generator has eight changed `extendedTextToken` occurrences. One `MissionItem` changes a Locale in `stringVariants`. The 890-class sample changes authored tags. Existing readers cover the relevant field shapes. Live board availability and selected spawn outcomes require a game-side observation. |
+| Navigation | Three gateway `StarMapObject` Records set `hideInWorld` from true to false and two also change their type reference. The Starmap definition projection already retains both fields. The game's route marker requires separate verification. |
+| Reputation and crafting | One reputation scope changes its standing map and ceiling. Two crafting blueprints change existing cost data. The active PTU payout multiplier requires separate runtime evidence. |
+| Arclight | The compared authoring has stable default-loadout Entries and the named weapon and magazine Records. The archived default loadout uses a sidearm port and a separate spare magazine port. First-spawn loading remains a game-side observation. |
+
+The selected Mannequin tag-definition XML adds a `Group` and `Tag` that the
+existing reader recognizes. Both sampled Subsumption XML documents add the
+existing integer `Event.BeingLookedAtCondition` attribute. A selected changed
+Starchitect SOCpak remains readable with the same six nested entry paths and
+three decoded sizes changed. One Starchitect prefab adds an authored
+`Object/EntityLinks/Link` with `Name`, `TargetId` and `Version`. Generic CryXmlB
+conversion preserves it. The complete selected document grows from 44 to 45
+link groups and from 77 to 78 links. The selected `TargetId` matches zero
+`Id`, `CryGUID` or `PrefabGUID` attributes of objects in its owning Prefab
+and in the complete library. This child surfaces in the generic XML export.
+A typed Prefab projection needs to retain the authored attributes and
+source positions. Target resolution needs a proven identity domain.
+
 ## PTU 13215521 comparison
 
 The installed PTU manifest identifies change `13215521`. The checks use installed LIVE
