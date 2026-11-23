@@ -9,13 +9,14 @@ use p4kx_extraction::{Archive, CancelToken, FieldOrigin, Guid, SourcedValue};
 use rayon::prelude::*;
 
 use crate::catalog_read::original::EntryCapture;
-use crate::contract::StarmapObject;
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
 use crate::mining_locations::HarvestableLocation;
 use crate::starmap_containers::proof::PlacementEvidence;
 use crate::starmap_walk::Opened;
 
+#[path = "harvest_location_facts.rs"]
+mod location_facts;
 #[path = "harvest_object_origin.rs"]
 mod object_origin;
 use crate::{CatalogError, Kind};
@@ -78,8 +79,9 @@ pub(crate) struct Objects<'object> {
     by_guid: HashMap<Guid, LocationObject<'object>>,
 }
 
+/// The retained ancestry facts of one admitted Starmap Record.
 #[derive(Clone, Copy)]
-struct LocationObject<'object> {
+pub(crate) struct LocationObject<'object> {
     mining_claim: bool,
     above: Option<Guid>,
     origin: Option<&'object FieldOrigin>,
@@ -90,37 +92,11 @@ struct LocationObject<'object> {
 #[cfg(test)]
 impl LocationObject<'static> {
     const fn unobserved(mining_claim: bool, above: Option<Guid>) -> Self {
-        Self {
-            mining_claim,
-            above,
-            origin: None,
-            placement: None,
-            unique: true,
-        }
+        Self::new(mining_claim, above, None, None)
     }
 }
 
-impl<'object> Objects<'object> {
-    pub(crate) fn new<'source: 'object>(
-        objects: impl IntoIterator<Item = &'object StarmapObject<'source>>,
-    ) -> Self {
-        let mut by_guid = HashMap::new();
-        for object in objects {
-            let unique = !by_guid.contains_key(&object.guid.0);
-            by_guid.insert(
-                object.guid.0,
-                LocationObject {
-                    mining_claim: object.mining_claim,
-                    above: object.placed_under_guid.map(CatalogGuid::get),
-                    origin: object.location_origin.as_ref(),
-                    placement: object.placement_proof.as_ref(),
-                    unique,
-                },
-            );
-        }
-        Self { by_guid }
-    }
-
+impl Objects<'_> {
     /// Returns the first non-marker object above the container or the actual terminal cause.
     pub(crate) fn location(&self, under: Option<Guid>) -> Result<CatalogGuid, NoObject> {
         self.visit_location(under, |_| {})

@@ -145,38 +145,40 @@ pub struct SpawnWith<'a> {
     pub selector: LootSelector<'a>,
 }
 
-/// A container placed with a multi config: an entity that places an object container and carries
-/// a `SubHarvestableMultiConfigRecord`, whose tag points the config fills with harvestables and
-/// their loot. One entry per container, system and starmap object it hangs below.
+/// An object container placed by an entity with a harvestable multi-config.
+///
+/// Each row belongs to one system, container and Starmap ancestor.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct LootContainer {
+#[non_exhaustive]
+pub struct LootContainer {
     /// The `SubHarvestableMultiConfigRecord` the placing entity carries (`multiConfigRef`), an
     /// entry of `subHarvestableMultiConfigs`.
-    pub(crate) multi_config_guid: SourcedValue<CatalogGuid>,
+    pub multi_config_guid: SourcedValue<CatalogGuid>,
     /// The path of the object container the entity places.
-    pub(crate) container: SourcedValue<String>,
+    pub container: SourcedValue<String>,
     /// The star system folder of the system container the walk started in.
-    pub(crate) system: SourcedValue<String>,
+    pub system: SourcedValue<String>,
     /// The `guid` of the `starmapObjects` entry the walk's root container hangs below; `null` for
     /// none or an object the catalog lacks.
-    pub(crate) starmap_object_guid: SourcedValue<CatalogGuid>,
+    pub starmap_object_guid: SourcedValue<CatalogGuid>,
     /// The total entities from the verified `.soc` files of the placed container, including zero.
-    pub(crate) entity_count: SourcedValue<u32>,
+    pub entity_count: SourcedValue<u32>,
     /// Entity counts by GUID from the verified SOC survey, ordered by GUID.
-    pub(crate) tag_counts: SourcedValue<Vec<TagCount>>,
+    pub tag_counts: SourcedValue<Vec<TagCount>>,
 }
 
 /// How many entities carry one tag.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(crate) struct TagCount {
+#[non_exhaustive]
+pub struct TagCount {
     /// The GUID from the first accepted original `TagId` attribute.
-    pub(crate) tag_guid: SourcedValue<CatalogGuid>,
+    pub tag_guid: SourcedValue<CatalogGuid>,
     /// The number of distinct entities that carry the tag in the complete SOC survey.
-    pub(crate) entities: SourcedValue<u32>,
+    pub entities: SourcedValue<u32>,
 }
 
 /// The loot a slot of a harvestable generates (`lootConfig`).

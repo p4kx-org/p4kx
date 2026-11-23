@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{
-    CancelToken, FieldOrigin, RecordTree, SourceUseRole, SourceValueState, SourcedValue,
-};
+use p4kx_extraction::{CancelToken, RecordTree, SourceValueState, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -20,13 +18,17 @@ use crate::catalog_projection::CatalogProjection;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_text_contract::GameTextRef;
 use crate::contract_starmap::{ShopLinkHeader, StarmapObject};
-use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
 use crate::record_observation::RecordObservation;
 use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 use crate::source_value_catalog::SourceArenaOutput;
 use crate::{CatalogError, ExportAccountingError};
+
+#[path = "starmap_location_marker.rs"]
+mod marker;
+pub(crate) use marker::read_location_marker;
+use marker::{location_marker, location_membership};
 
 pub(crate) const SOURCE_TYPE: &str = "StarMapObject";
 const BOOL_OVERRIDE: &str = "StarmapBoolOverride";
@@ -51,43 +53,19 @@ pub(crate) fn read<'source>(
     if marker.value().copied().unwrap_or(false) != object.mining_claim {
         return Err(ExportAccountingError::ConflictingSourceDatum.into());
     }
-    object.location_origin = Some(location_origin(tree, projection, marker.origin())?);
+    let origins = projection.origins();
+    let membership = location_membership(tree, origins)?;
+    object.location_origin = Some(
+        origins
+            .uses
+            .origin_with_origins([&membership, marker.origin()], true)?,
+    );
     let header = &definition.definition().source;
     object.shop_link_header = Some(ShopLinkHeader {
         guid: header.guid.origin().clone(),
         class_name: header.class_name().origin().clone(),
     });
     Ok((StarmapObjectRead { definition, object }, notes))
-}
-
-fn location_origin(
-    tree: &RecordTree<'_>,
-    projection: &CatalogProjection<'_, '_>,
-    marker: &FieldOrigin,
-) -> Result<FieldOrigin, CatalogError> {
-    let origins = projection.origins();
-    let record = origins.record(tree.record_index());
-    let mut uses = Vec::new();
-    for field in [
-        RecordHeaderField::Guid,
-        RecordHeaderField::SourceType,
-        RecordHeaderField::RecordName,
-    ] {
-        record.append_header_input(
-            RecordHeaderInput::Field(field),
-            SourceUseRole::Selector,
-            &mut uses,
-        )?;
-    }
-    record.append_header_input(
-        RecordHeaderInput::NormalizedPath,
-        SourceUseRole::Selector,
-        &mut uses,
-    )?;
-    let membership = origins.uses.origin(&uses, true);
-    Ok(origins
-        .uses
-        .origin_with_origins([&membership, marker], true)?)
 }
 
 pub(super) type PreparedStarmapObject<'source> =
@@ -110,7 +88,7 @@ pub(super) fn prepare<'source>(
         cancel,
         |source, fields, projection, notes| {
             if let Some(marker) = marker {
-                *marker = Some(fields.predicate("description", crate::starmap::is_mining_claim)?);
+                *marker = Some(location_marker(fields)?);
             }
             StarmapObjectDefinition::read(source, fields, projection, notes)
         },

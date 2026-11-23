@@ -8,6 +8,7 @@ use crate::catalog_read::original::{AuthoredEntryPath, EntryXml, with_entry_capt
 use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::SourceDisposition;
 use crate::starmap_index::Index;
+use crate::starmap_read::main_xml;
 use crate::starmap_xml::Document;
 use crate::{CatalogError, ExportAccountingError, Kind};
 
@@ -296,7 +297,7 @@ fn an_xml_node_from_another_parse_cannot_supply_a_placement_receipt() -> TestRes
             .first()
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
         let mut ledger = super::ExportLedger::default();
-        let original = super::main_xml(&archive, entry, capture, &mut ledger)?
+        let original = main_xml(&archive, entry, capture, &mut ledger)?
             .map_err(|_| ExportAccountingError::ConflictingSourceDatum)?;
         let original = EntryXml::parse(&original.bytes, capture)?
             .map_err(|_| ExportAccountingError::ConflictingSourceDatum)?;

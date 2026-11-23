@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{HashMap, HashSet};
 use std::mem;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, OnceLock};
 
-use p4kx_extraction::{Archive, CancelToken, Guid, PathKeys, SourceUse};
-use rayon::prelude::*;
+use p4kx_extraction::{Archive, CancelToken, Entry, Guid, PathKeys, SourceUse};
 
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture};
 use crate::entry_source::EntrySource;
@@ -18,7 +16,7 @@ use crate::starmap_containers::location_declaration::ChildLocation;
 use crate::starmap_containers::proof::ChildOrigins;
 use crate::starmap_containers::unresolved::UnresolvedChild;
 use crate::starmap_index::Index;
-use crate::starmap_read::main_xml;
+use crate::starmap_read::{self, DescriptorSurveyRead, MainXml};
 use crate::starmap_xml::AuthoredPose;
 use crate::{CatalogError, Kind};
 #[path = "starmap_children.rs"]
@@ -26,6 +24,15 @@ mod children;
 
 mod descriptor_scope;
 pub(crate) use descriptor_scope::DescriptorScope;
+
+mod descriptor_frontier;
+#[cfg(test)]
+pub(crate) use descriptor_frontier::read_all;
+pub(crate) use descriptor_frontier::{Read, read_all_scoped};
+
+mod placement_survey;
+use placement_survey::DescriptorObservations;
+pub(crate) use placement_survey::{DescriptorSurvey, PlacementSurvey};
 
 #[path = "starmap_descriptor_root.rs"]
 mod descriptor_root;
@@ -158,7 +165,7 @@ impl Bounds<'_> {
 struct DescriptorRead {
     body: Body,
     ledger: ExportLedger,
-    name_inputs_complete: bool,
+    observations: DescriptorObservations,
 }
 
 /// Reads and parses the container at `entry`.
@@ -170,7 +177,7 @@ fn parse(
     capture: &EntryCapture<'_>,
 ) -> Result<DescriptorRead, CatalogError> {
     let mut ledger = ExportLedger::default();
-    let mut name_inputs_complete = false;
+    let mut observations = DescriptorObservations::new(bounds.scope.captures_loot_survey());
     let body = parse_body(
         archive,
         index,
@@ -178,12 +185,12 @@ fn parse(
         bounds,
         capture,
         &mut ledger,
-        &mut name_inputs_complete,
+        &mut observations,
     )?;
     Ok(DescriptorRead {
         body,
         ledger,
-        name_inputs_complete,
+        observations,
     })
 }
 
@@ -194,19 +201,52 @@ fn parse_body(
     bounds: &Bounds<'_>,
     capture: &EntryCapture<'_>,
     ledger: &mut ExportLedger,
-    name_inputs_complete: &mut bool,
+    observations: &mut DescriptorObservations,
 ) -> Result<Body, CatalogError> {
     let Some(socpak) = index.entries.get(entry) else {
         ledger.incomplete_inventory(Kind::StarmapObjects);
         return Ok(Body::Unreadable("no such entry".to_owned()));
     };
-    let main = match main_xml(archive, socpak, capture, ledger)? {
+    let opened = match &mut observations.survey {
+        Some(inputs) => starmap_read::main_xml_with_survey(
+            archive,
+            socpak,
+            capture,
+            ledger,
+            Some(DescriptorSurveyRead {
+                inputs,
+                cancel: bounds.cancel,
+            }),
+        ),
+        None => starmap_read::main_xml(archive, socpak, capture, ledger),
+    }?;
+    let main = match opened {
         Ok(main) => main,
         Err(reason) => {
             ledger.incomplete_inventory(Kind::StarmapObjects);
             return Ok(Body::Unreadable(reason));
         }
     };
+    parse_descriptor(
+        archive,
+        index,
+        (socpak, main),
+        bounds,
+        capture,
+        ledger,
+        observations,
+    )
+}
+
+fn parse_descriptor(
+    archive: &Archive,
+    index: &Index<'_>,
+    (socpak, main): (&Entry, MainXml),
+    bounds: &Bounds<'_>,
+    capture: &EntryCapture<'_>,
+    ledger: &mut ExportLedger,
+    observations: &mut DescriptorObservations,
+) -> Result<Body, CatalogError> {
     let files = entxml::EntXmlFiles {
         archive,
         outer: socpak,
@@ -222,8 +262,10 @@ fn parse_body(
         gate_proof,
         pending_external,
         name_inputs_complete: observed_name_inputs,
+        survey_document,
     }) = descriptor_root::read(&main.bytes, bounds, &files, index, ledger)?
     else {
+        observations.observe_payload(&main.bytes, None)?;
         ledger.incomplete_inventory(Kind::StarmapObjects);
         main.source.record(
             ledger,
@@ -233,7 +275,8 @@ fn parse_body(
         return Ok(Body::Unparsed);
     };
     let loss = children::source_loss(&mut root, &entities, capture.source_uses(), bounds.cancel)?;
-    *name_inputs_complete = observed_name_inputs && !loss.projection;
+    observations.name_inputs_complete = observed_name_inputs && !loss.projection;
+    observations.observe_payload(&main.bytes, survey_document)?;
     let grid_failed = bounds.scope.reads_location_physics()
         && matches!(
             file.location_physics,
@@ -265,123 +308,6 @@ fn record_projection(
         SourceDisposition::Projected
     };
     source.record(ledger, Kind::StarmapObjects, disposition);
-}
-
-/// The containers read, and how many parses that took.
-pub(crate) struct Read {
-    pub(crate) ledger: ExportLedger,
-    pub(crate) name_inputs_complete: bool,
-    pub(crate) bodies: HashMap<usize, Body>,
-    #[cfg(test)]
-    pub(crate) parsed: usize,
-}
-
-impl Read {
-    fn retain_frontier(
-        &mut self,
-        descriptors: Vec<(usize, DescriptorRead)>,
-        scope: DescriptorScope,
-        pending: &mut HashSet<usize>,
-    ) {
-        #[cfg(test)]
-        {
-            self.parsed += descriptors.len();
-        }
-        for (entry, descriptor) in descriptors {
-            if scope.resolves_placements() {
-                failed_links::observe(entry, &descriptor.body, pending);
-            }
-            self.name_inputs_complete &= descriptor.name_inputs_complete;
-            self.bodies.insert(entry, descriptor.body);
-            self.ledger.merge(descriptor.ledger);
-        }
-    }
-}
-
-/// Reads each physically distinct container reachable from the roots in breadth-first order.
-#[cfg(test)]
-pub(crate) fn read_all(
-    archive: &Archive,
-    index: &Index<'_>,
-    roots: &[usize],
-    cancel: Option<&CancelToken>,
-    children: Option<usize>,
-    capture: &EntryCapture<'_>,
-) -> Result<Read, CatalogError> {
-    read_all_scoped(
-        archive,
-        index,
-        roots,
-        cancel,
-        (
-            children,
-            DescriptorScope::Catalog {
-                jump_endpoints: false,
-            },
-        ),
-        capture,
-    )
-}
-
-pub(crate) fn read_all_scoped(
-    archive: &Archive,
-    index: &Index<'_>,
-    roots: &[usize],
-    cancel: Option<&CancelToken>,
-    (children, scope): (Option<usize>, DescriptorScope),
-    capture: &EntryCapture<'_>,
-) -> Result<Read, CatalogError> {
-    let bounds = Bounds {
-        cancel,
-        children: children.map(AtomicUsize::new),
-        location_grid_paths: OnceLock::new(),
-        scope,
-        directory: capture
-            .source_uses()
-            .observe_root_directory_paths(archive)?,
-    };
-    let mut observed = Read {
-        ledger: ExportLedger::default(),
-        bodies: HashMap::new(),
-        #[cfg(test)]
-        parsed: 0,
-        name_inputs_complete: true,
-    };
-    let mut pending = HashSet::new();
-    let mut frontier: Vec<usize> = roots
-        .iter()
-        .copied()
-        .collect::<HashSet<_>>()
-        .into_iter()
-        .collect();
-    while !frontier.is_empty() && !cancel.is_some_and(CancelToken::is_cancelled) {
-        let read: Vec<_> = frontier
-            .par_iter()
-            .filter(|_| !cancel.is_some_and(CancelToken::is_cancelled))
-            .map(|&entry| parse(archive, index, entry, &bounds, capture).map(|read| (entry, read)))
-            .collect::<Result<_, _>>()?;
-        let external = external_sources::next_sources(
-            read.iter().map(|(_, descriptor)| &descriptor.body),
-            index,
-            archive,
-            capture,
-            &mut observed.ledger,
-        )?;
-        observed.name_inputs_complete &= external.name_inputs_complete;
-        observed.retain_frontier(read, scope, &mut pending);
-        if scope.resolves_placements() {
-            failed_links::finish(&mut observed.bodies, &mut pending, index, capture, cancel)?;
-        }
-        frontier = external
-            .next
-            .into_iter()
-            .filter(|entry| !observed.bodies.contains_key(entry))
-            .collect();
-    }
-    if scope.resolves_placements() {
-        failed_links::completed(&pending, cancel)?;
-    }
-    Ok(observed)
 }
 
 #[cfg(test)]

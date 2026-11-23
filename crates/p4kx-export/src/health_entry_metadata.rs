@@ -117,11 +117,6 @@ impl EntryMetadata {
         Ok(())
     }
 
-    pub(super) fn attempted_payload(&self) -> Result<(), CatalogError> {
-        self.payload_read(SourceUseRole::Attempted)?;
-        Ok(())
-    }
-
     pub(super) fn payload_read(&self, role: SourceUseRole) -> Result<SourceUse, CatalogError> {
         self.payload_at(
             SourceLocation::Subresource {

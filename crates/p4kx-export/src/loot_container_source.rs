@@ -4,10 +4,11 @@
 use std::path::Path;
 
 use p4kx_extraction::{
-    Archive, CancelToken, Entry, InputScope, SourceInput, SourceLocation, SourceUseRole,
+    Archive, CancelToken, Entry, InputScope, SourceInput, SourceLocation, SourceUse, SourceUseRole,
 };
 
 use crate::catalog_read::original::{EntryCapture, EntryDiagnosis, EntryRead};
+use crate::container_read;
 use crate::entry_source::EntrySource;
 use crate::export_diagnostic::ExportDiagnosticCode;
 use crate::export_entry_ledger::EntryOperation;
@@ -20,10 +21,46 @@ use crate::{CatalogError, ExportAccountingError, Kind};
 /// The actual source operations and readable entity links of one container.
 #[derive(Default)]
 pub(crate) struct Read {
-    pub(crate) links: Vec<(String, CapturedEntityLink)>,
+    pub(crate) links: Vec<AuthoredEntityLink>,
     pub(crate) unreadable: Option<Unreadable>,
     pub(crate) original_scope_unknown: bool,
     pub(crate) ledger: ExportLedger,
+    pub(crate) census: Option<Vec<SourceUse>>,
+}
+
+/// One exact original entity document and its captured payload.
+pub(crate) struct AuthoredEntityLink {
+    pub(crate) path: String,
+    pub(crate) link: CapturedEntityLink,
+    pub(crate) author: EntXmlAuthor,
+}
+
+/// Physical directory positions of an original entity document.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct EntXmlAuthor {
+    pub(crate) containing_entry_index: usize,
+    pub(crate) document_entry_index: usize,
+}
+
+impl EntXmlAuthor {
+    fn from_read(read: &EntryRead) -> Result<Self, ExportAccountingError> {
+        let receipt = read.receipt();
+        Ok(Self {
+            containing_entry_index: receipt
+                .entry_index()
+                .ok_or(ExportAccountingError::UnboundHealthSubject)?,
+            document_entry_index: receipt
+                .container_entry_index()
+                .ok_or(ExportAccountingError::UnboundHealthSubject)?,
+        })
+    }
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum EntityReadScope {
+    All,
+    Exact(usize),
+    Census,
 }
 
 /// Reads each selected entity file once and retains read and XML projection failures.
@@ -32,12 +69,15 @@ pub(crate) fn read(
     entry: usize,
     cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
-    entity_index: Option<usize>,
+    scope: EntityReadScope,
 ) -> Result<Read, CatalogError> {
     if cancel.is_some_and(CancelToken::is_cancelled) {
         return Err(CatalogError::Cancelled);
     }
-    let mut read = Read::default();
+    let mut read = Read {
+        census: matches!(scope, EntityReadScope::Census).then(Vec::new),
+        ..Read::default()
+    };
     let Some(socpak) = archive.entries().get(entry) else {
         read.unreadable = Some(Unreadable::NoSuchEntry);
         return Ok(read);
@@ -64,7 +104,7 @@ pub(crate) fn read(
             archive, &container, socpak, inner, &mut read, cancel, capture,
         )
     };
-    if let Some(wanted) = entity_index {
+    if let EntityReadScope::Exact(wanted) = scope {
         if let Some(inner) = exact_entity(&container, wanted, capture)? {
             read_member(inner)?;
         }
@@ -77,7 +117,28 @@ pub(crate) fn read(
             read_member(inner)?;
         }
     }
+    read.observe_directory(&container, capture)?;
     Ok(read)
+}
+
+impl Read {
+    fn observe_directory(
+        &mut self,
+        container: &Archive,
+        capture: &EntryCapture<'_>,
+    ) -> Result<(), CatalogError> {
+        if let Some(census) = &mut self.census {
+            let directory =
+                container_read::observe_container_directory(container, capture.source_uses())?;
+            self.original_scope_unknown |= directory.is_none()
+                || container
+                    .entries()
+                    .iter()
+                    .any(|entry| container.raw_path(entry.index()).is_some());
+            census.extend(directory);
+        }
+        Ok(())
+    }
 }
 
 fn exact_entity<'archive>(
@@ -148,8 +209,9 @@ fn read_entity(
         read.unreadable = Some(Unreadable::EntityFile);
         return Ok(());
     };
-    match loot_entxml::read_original(&bytes, capture, cancel)? {
+    match loot_entxml::read_original(&bytes, capture, cancel, read.census.as_mut())? {
         Ok(link) => {
+            let author = EntXmlAuthor::from_read(&bytes)?;
             read.original_scope_unknown |= !link.original_complete();
             if link.value().malformed_config {
                 source.diagnosed(
@@ -165,7 +227,11 @@ fn read_entity(
                     SourceDisposition::Projected,
                 );
             }
-            read.links.push((inner.path().to_owned(), link));
+            read.links.push(AuthoredEntityLink {
+                path: inner.path().to_owned(),
+                link,
+                author,
+            });
         }
         Err(error) => {
             source.record(

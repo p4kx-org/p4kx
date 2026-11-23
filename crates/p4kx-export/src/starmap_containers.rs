@@ -12,6 +12,7 @@ use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::entry_source;
 use crate::export_ledger::ExportLedger;
 use crate::starmap_index::{Index, unreferenced};
+use crate::starmap_parse::PlacementSurvey;
 use crate::starmap_report::{ContainerCounts, Placement, StarmapReport, apart, clip};
 use crate::starmap_walk::{Opened, SystemRead};
 use crate::{CatalogError, ExportAccountingError, Filter, Kind};
@@ -128,6 +129,7 @@ pub(crate) struct Placements {
     pub(crate) counts: ContainerCounts,
     pub(crate) placement_routes_incomplete: bool,
     pub(crate) name_coverage: name_coverage::PlacementNameCoverage,
+    pub(crate) loot_survey: Option<PlacementSurvey>,
     pub(crate) report: StarmapReport,
     spools: PlacementSpools,
     #[cfg(test)]
@@ -328,7 +330,7 @@ impl Placements {
                     system_entry: *entry,
                     entry: *entry,
                     under: None,
-                    parent: crate::starmap_walk::OpenedParent::Unobserved,
+                    parent: crate::starmap_walk::OpenedParent::DirectoryFallback,
                 }),
                 [] => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
                 candidates => entry_source::record_ambiguous_outer_entries(

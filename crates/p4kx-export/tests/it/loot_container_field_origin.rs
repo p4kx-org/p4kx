@@ -13,7 +13,7 @@ use crate::health_origin_fixture::{self as fixture, Fixture, TestResult};
 #[path = "loot_container_tag_count_origin.rs"]
 mod tag_count_origin;
 
-const CONFIG: &str = "687af3db-4c0d-4e8d-9261-102274f8b6ed";
+pub(super) const CONFIG: &str = "687af3db-4c0d-4e8d-9261-102274f8b6ed";
 const ALIAS: &str = "R:/authoring/Data/ObjectContainers/PU/synthetic/alias-target.socpak";
 pub(super) const LITERAL: &str = "ObjectContainers/PU/synthetic/alias-target.socpak";
 const COMPETING: &str = "Data/ObjectContainers/PU/system/synthetic/competing.socpak";

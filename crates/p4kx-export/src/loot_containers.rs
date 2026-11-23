@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeMap, HashMap};
+use std::collections::HashMap;
 use std::slice::from_ref;
 
 use p4kx_extraction::{Archive, CancelToken, SourceUses, SourceValue, SourcedValue};
@@ -11,11 +11,11 @@ use crate::catalog_read::original::EntryCapture;
 use crate::catalog_rows::staged::StagedCatalogTable;
 use crate::contract_loot::{LootContainer, TagCount};
 use crate::export_ledger::ExportLedger;
-use crate::guid_text::{CatalogGuid, GuidText};
+use crate::guid_text::CatalogGuid;
 use crate::harvest_locations::{NoObject, Objects};
 use crate::loot_soc_source::Counted as Tags;
 use crate::loot_unreadable::{Unreadable, UnreadableContainer};
-use crate::loot_walk::{Explored, Placed, PlacedTarget, Summary, below, explore, path_of};
+use crate::loot_walk::{Explored, Placed, PlacedTarget, Summary, explore, path_of};
 use crate::starmap_index::Index;
 use crate::starmap_walk::Opened;
 use crate::{CatalogError, ExportAccountingError, Kind};
@@ -24,10 +24,29 @@ use crate::{CatalogError, ExportAccountingError, Kind};
 mod parent_origin;
 use parent_origin::ParentOrigins;
 
+#[path = "loot_record_admission.rs"]
+pub(crate) mod admission;
+
+#[path = "loot_ancestor_resolution.rs"]
+mod ancestor_resolution;
+
+#[path = "loot_container_query_read.rs"]
+mod scoped;
+pub(crate) use scoped::read_physical_container;
+
 #[path = "loot_system_origin.rs"]
 mod system_origin;
 
 use system_origin::SystemOrigins;
+
+#[cfg(test)]
+#[path = "loot_system_walk_tests.rs"]
+mod system_walk_tests;
+
+#[path = "loot_container_selection.rs"]
+mod selection;
+
+use selection::SelectedPlacement;
 
 /// The loot containers found and what could not be read or used while looking for them.
 pub(crate) struct Located {
@@ -59,14 +78,16 @@ pub(crate) fn locate(
         mut ledger,
         original_documents,
     } = explore(archive, &index, opened, cancel, capture)?;
-    let (tags, observed) = read_tags(archive, &summaries, cancel, capture)?;
+    let counted_targets = summaries
+        .values()
+        .flat_map(|summary| summary.placed.iter())
+        .filter_map(|placed| placed.target.entry());
+    let (tags, observed) = read_tags(archive, counted_targets, cancel, capture)?;
     ledger.merge(observed);
-    let mut systems = SystemOrigins::try_new(archive, capture)?;
+    let mut systems = SystemOrigins::try_new(archive, capture, &index)?;
     let mut parents = ParentOrigins::new(objects, capture.source_uses());
     let containers = rows(
-        opened,
-        objects,
-        &summaries,
+        selection::first_placements(opened, objects, &summaries),
         &tags,
         capture.source_uses(),
         |root, location| {
@@ -87,23 +108,13 @@ pub(crate) fn locate(
     })
 }
 
-#[derive(PartialEq, Eq, PartialOrd, Ord)]
-struct ContainerKey<'source> {
-    config: GuidText,
-    container: &'source str,
-    system: &'source str,
-    object: Option<GuidText>,
-}
-
 struct PlacementValues {
     system: SourcedValue<String>,
     object: SourcedValue<CatalogGuid>,
 }
 
-fn rows(
-    opened: &[Opened],
-    objects: &Objects<'_>,
-    summaries: &HashMap<usize, Summary>,
+fn rows<'source>(
+    selected: impl Iterator<Item = SelectedPlacement<'source>>,
     tags: &HashMap<usize, Tags>,
     sources: &SourceUses,
     mut placement: impl FnMut(
@@ -111,35 +122,21 @@ fn rows(
         Result<CatalogGuid, NoObject>,
     ) -> Result<PlacementValues, CatalogError>,
 ) -> Result<Vec<LootContainer>, CatalogError> {
-    let mut reached: HashMap<usize, Vec<&Placed>> = HashMap::new();
-    let mut selected = BTreeMap::new();
-    for root in opened {
-        let location = objects.location(root.under);
-        let object = location.ok().map(CatalogGuid::text);
-        let reached_placements = reached
-            .entry(root.entry)
-            .or_insert_with(|| below(root.entry, summaries));
-        for &placed in reached_placements.as_slice() {
-            let key = ContainerKey {
-                config: CatalogGuid(placed.config).text(),
-                container: &placed.path,
-                system: &root.system,
-                object,
-            };
-            selected.entry(key).or_insert((root, placed, location));
-        }
-    }
-    drop(reached);
     selected
-        .into_values()
-        .map(|(root, placed, location)| {
-            row(
-                placed,
-                placement(root, location)?,
-                placed.target.entry().and_then(|entry| tags.get(&entry)),
-                sources,
-            )
-        })
+        .map(
+            |SelectedPlacement {
+                 root,
+                 placed,
+                 location,
+             }| {
+                row(
+                    placed,
+                    placement(root, location)?,
+                    placed.target.entry().and_then(|entry| tags.get(&entry)),
+                    sources,
+                )
+            },
+        )
         .collect()
 }
 
@@ -267,23 +264,14 @@ fn count_value(
     Ok(sources.value_with_origins(SourceValue::Unreadable, &[&placed.path_origin, &incomplete])?)
 }
 
-/// Counts the entities and tags of all `.soc` files of every container a config is placed with,
-/// in parallel.
+/// Counts entities and tags after deduplicating the requested physical containers.
 fn read_tags(
     archive: &Archive,
-    summaries: &HashMap<usize, Summary>,
+    entries: impl Iterator<Item = usize>,
     cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
 ) -> Result<(HashMap<usize, Tags>, ExportLedger), CatalogError> {
-    let mut entries: Vec<usize> = summaries
-        .values()
-        .flat_map(|summary| {
-            summary
-                .placed
-                .iter()
-                .filter_map(|placed| placed.target.entry())
-        })
-        .collect();
+    let mut entries: Vec<usize> = entries.collect();
     entries.sort_unstable();
     entries.dedup();
     let reads: Vec<_> = entries

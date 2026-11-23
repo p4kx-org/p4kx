@@ -30599,7 +30599,7 @@
       "type": "object"
     },
     "LootContainer": {
-      "description": "A container placed with a multi config: an entity that places an object container and carries\na `SubHarvestableMultiConfigRecord`, whose tag points the config fills with harvestables and\ntheir loot. One entry per container, system and starmap object it hangs below.",
+      "description": "An object container placed by an entity with a harvestable multi-config.\n\nEach row belongs to one system, container and Starmap ancestor.",
       "properties": {
         "container": {
           "$ref": "#/$defs/SourcedValueOfstring",

@@ -96,6 +96,8 @@ mod loadout;
 mod location_vocabulary;
 #[path = "sdk_loot_routes.rs"]
 mod loot;
+#[path = "sdk_loot_container_route.rs"]
+mod loot_container;
 #[path = "sdk_loot_generation_route.rs"]
 mod loot_generation;
 #[path = "sdk_medical_tier_route.rs"]
@@ -216,13 +218,6 @@ pub(super) fn world_datasets() -> impl Iterator<Item = &'static str> {
 
 pub(super) fn read() -> TestResult<Vec<Route>> {
     let (_directory, archive) = fixtures::open()?;
-    let [
-        containers,
-        location_instances,
-        location_physics,
-        loot_documents,
-        unresolved,
-    ] = container_placements::read(&archive, fixtures::ROOT)?;
     let independent_ammo = read_ammunition(&archive)?;
     let [projectile, reached_ammo, combat, magazine] = projectile_ammo::read()?;
     if independent_ammo.schema != reached_ammo.schema {
@@ -255,14 +250,11 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         archive_entries::read_subsumption_event(&archive)?,
         archive_entries::read_radar_configuration(&archive)?,
         read_weather(&archive)?,
-        containers,
-        location_instances,
-        location_physics,
-        loot_documents,
-        unresolved,
-        starmap_object_placement::read()?,
     ];
+    routes.extend(container_placements::read(&archive, fixtures::ROOT)?);
+    routes.push(starmap_object_placement::read()?);
     routes.push(archive_entries::read_physical_shop()?);
+    routes.push(loot_container::read()?);
     routes.extend(archive_source::read()?);
     routes.extend(jump_inventory::read()?);
     append_domain_routes(&mut routes, &archive)?;

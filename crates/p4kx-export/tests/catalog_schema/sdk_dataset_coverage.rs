@@ -133,6 +133,7 @@ const WEAPON_ANIMATION: &str = "/projections/weaponPlayerAnimationCandidates";
 const CONTAINERS: &str = "/placements/containerInstances";
 const LOCATION_INSTANCES: &str = "/placements/locationInstances";
 const LOCATION_PHYSICS_GRIDS: &str = "/placements/locationPhysicsGrids";
+const LOOT_CONTAINERS: &str = "/lootContainers";
 const LOOT_DOCUMENTS: &str = "/declarations/lootEntityContainerDocuments";
 const UNRESOLVED: &str = "/placements/unresolvedContainerLinks";
 
@@ -259,6 +260,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     CONTAINERS,
     LOCATION_INSTANCES,
     LOCATION_PHYSICS_GRIDS,
+    LOOT_CONTAINERS,
     LOOT_DOCUMENTS,
     UNRESOLVED,
     "/placements/starmapPlacements",

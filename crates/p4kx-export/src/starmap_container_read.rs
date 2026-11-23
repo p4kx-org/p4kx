@@ -2,26 +2,26 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::path::Path;
-use std::sync::Arc;
 use std::time::Instant;
 
 use p4kx_extraction::{Archive, CancelToken, Guid};
 
 use super::jump_class::JumpEndpointRecords;
-use super::name_coverage::{self, PlacementNameCoverage};
+use super::name_coverage::PlacementNameCoverage;
 use super::{Limits, PlacementScope, PlacementSpools, Placements};
 use crate::catalog_read::original::EntryCapture;
 use crate::catalog_table::DatasetAvailability;
-use crate::entry_source;
 use crate::export_ledger::ExportLedger;
 use crate::harvest_locations::HarvestSurvey;
 use crate::starmap_index::Index;
-use crate::starmap_parse::{DescriptorScope, Read, read_all_scoped};
-use crate::starmap_walk::SystemRead;
+use crate::starmap_parse::{DescriptorScope, Read};
+use crate::starmap_walk::{ObjectSelection, SystemRead};
 use crate::{CatalogError, ExportAccountingError, Kind};
 
 #[path = "starmap_container_systems.rs"]
 mod systems;
+use systems::SystemDescriptors;
+pub(crate) use systems::unique_system_roots;
 
 #[path = "starmap_shop_name_routes.rs"]
 mod shop_name_routes;
@@ -33,7 +33,7 @@ enum PlacementStorage<'directory> {
     Typed,
     Harvest(&'directory HarvestSurvey<'directory>),
     OpenedContainers,
-    Object(Guid),
+    Object(ObjectSelection<'directory>),
     ShopNames(&'directory [Guid]),
     JumpEndpoints,
 }
@@ -53,7 +53,10 @@ impl PlacementStorage<'_> {
     const fn descriptor_scope(self, jump_endpoints: bool) -> DescriptorScope {
         match self {
             Self::Harvest(_) => DescriptorScope::Harvest,
-            Self::OpenedContainers | Self::Object(_) => DescriptorScope::OpenedContainers,
+            Self::Object(ObjectSelection::Loot(_)) => DescriptorScope::LootPlacements,
+            Self::OpenedContainers | Self::Object(ObjectSelection::One(_)) => {
+                DescriptorScope::OpenedContainers
+            }
             Self::ShopNames(_) => DescriptorScope::ShopNames,
             Self::Spool(_) => DescriptorScope::Catalog { jump_endpoints },
             Self::JumpEndpoints => DescriptorScope::Catalog {
@@ -140,14 +143,41 @@ impl Placements {
         capture: &EntryCapture<'_>,
         scope: PlacementScope,
     ) -> Result<Self, CatalogError> {
+        match scope {
+            PlacementScope::RecordSelection => {
+                Self::read_for_objects(archive, cancel, limits, capture, &[])
+            }
+            PlacementScope::ArchiveInventory => Self::read_scoped(
+                archive,
+                cancel,
+                limits,
+                capture,
+                scope,
+                None,
+                PlacementStorage::OpenedContainers,
+            ),
+        }
+    }
+
+    /// Retains the sorted requested Record placements and all physical Loot seeds.
+    pub(crate) fn read_for_objects(
+        archive: &Archive,
+        cancel: Option<&CancelToken>,
+        limits: Limits,
+        capture: &EntryCapture<'_>,
+        guids: &[Guid],
+    ) -> Result<Self, CatalogError> {
+        if !guids.is_sorted() {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        }
         Self::read_scoped(
             archive,
             cancel,
             limits,
             capture,
-            scope,
+            PlacementScope::RecordSelection,
             None,
-            PlacementStorage::OpenedContainers,
+            PlacementStorage::Object(ObjectSelection::Loot(guids)),
         )
     }
 
@@ -165,7 +195,7 @@ impl Placements {
             capture,
             PlacementScope::ArchiveInventory,
             None,
-            PlacementStorage::Object(guid),
+            PlacementStorage::Object(ObjectSelection::One(guid)),
         )
     }
 
@@ -237,20 +267,23 @@ impl Placements {
         if systems.is_empty() && matches!(scope, PlacementScope::ArchiveInventory) {
             return Self::empty_inventory(archive, capture, endpoints, directory_complete, storage);
         }
-        let system_count = systems.len();
-        let mut root_ledger = ExportLedger::default();
-        let systems = unique_system_roots(archive, &index, capture, systems, &mut root_ledger)?;
-        let roots: Vec<usize> = systems.iter().map(|(_, entry)| *entry).collect();
-        let roots_complete =
-            roots.len() == system_count && name_coverage::descriptor_inputs_complete(&root_ledger);
-        let descriptor_scope = storage.descriptor_scope(endpoints.is_some());
-        let bounds = (limits.source_children, descriptor_scope);
-        let Read {
-            bodies,
-            mut ledger,
-            name_inputs_complete,
-            ..
-        } = read_all_scoped(archive, &index, &roots, cancel, bounds, capture)?;
+        let bounds = (
+            limits.source_children,
+            storage.descriptor_scope(endpoints.is_some()),
+        );
+        let SystemDescriptors {
+            systems,
+            system_count,
+            all_roots,
+            names_complete,
+            read:
+                Read {
+                    bodies,
+                    mut ledger,
+                    survey,
+                    ..
+                },
+        } = systems::read_descriptors(archive, &index, systems, cancel, bounds, capture)?;
         check_cancelled(cancel)?;
         let (read, mut spools) = systems::walk_systems(
             &index,
@@ -264,26 +297,19 @@ impl Placements {
         drop(bodies);
         check_cancelled(cancel)?;
         let routes_complete = finish_route_coverage(&read, &mut ledger);
-        ledger.merge(root_ledger);
-        spools.finish_grid_scope(
-            storage,
-            archive,
-            routes_complete && roots.len() == system_count,
-            &ledger,
-        );
+        spools.finish_grid_scope(storage, archive, routes_complete && all_roots, &ledger);
         let mut placements = Self {
             ledger,
             spools,
             name_coverage: PlacementNameCoverage {
                 directory_complete,
-                descriptors_complete: name_inputs_complete && roots_complete,
+                descriptors_complete: names_complete,
                 routes_complete: storage.covers_all_names() && routes_complete,
             },
             ..Self::default()
         };
         placements.finish(&index, system_count, read, scope, (archive, capture))?;
-        placements.endpoint_inventory_complete =
-            directory_complete && placements.has_complete_endpoints(routes_complete, endpoints);
+        placements.finish_scope_coverage(capture, endpoints, routes_complete, survey);
         placements.report.elapsed = started.elapsed();
         Ok(placements)
     }
@@ -350,33 +376,4 @@ fn check_cancelled(cancel: Option<&CancelToken>) -> Result<(), CatalogError> {
         return Err(CatalogError::Cancelled);
     }
     Ok(())
-}
-
-pub(crate) fn unique_system_roots(
-    archive: &Archive,
-    index: &Index<'_>,
-    capture: &EntryCapture<'_>,
-    roots: Vec<(Arc<str>, usize)>,
-    ledger: &mut ExportLedger,
-) -> Result<Vec<(Arc<str>, usize)>, CatalogError> {
-    let mut unique = Vec::with_capacity(roots.len());
-    for (name, index_entry) in roots {
-        let entry = index
-            .entries
-            .get(index_entry)
-            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-        match index.candidates(entry.path()) {
-            [entry] => unique.push((name, *entry)),
-            [] => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
-            candidates => entry_source::record_ambiguous_outer_entries(
-                archive,
-                capture,
-                ledger,
-                Kind::StarmapObjects,
-                None,
-                candidates,
-            )?,
-        }
-    }
-    Ok(unique)
 }

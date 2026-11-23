@@ -12,9 +12,14 @@ pub(crate) enum DescriptorScope {
     ShopNames,
     Harvest,
     OpenedContainers,
+    LootPlacements,
 }
 
 impl DescriptorScope {
+    pub(super) const fn captures_loot_survey(self) -> bool {
+        matches!(self, Self::LootPlacements)
+    }
+
     pub(super) const fn reads_location_declarations(self) -> bool {
         matches!(
             self,

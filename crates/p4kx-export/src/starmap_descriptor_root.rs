@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::SourceUse;
+
 use super::{Bounds, Level, children, entxml, hcd};
 use crate::CatalogError;
 use crate::catalog_read::original::{EntryRead, EntryXml, XmlNodeSource};
@@ -19,6 +21,7 @@ pub(super) struct ParsedRoot {
     pub(super) gate: Option<Box<JumpGate>>,
     pub(super) gate_proof: Option<XmlNodeSource>,
     pub(super) name_inputs_complete: bool,
+    pub(super) survey_document: Option<SourceUse>,
 }
 
 pub(super) fn read(
@@ -72,6 +75,9 @@ pub(super) fn read(
             bounds.directory.as_ref(),
         )?;
     }
+    let survey_document = (bounds.scope.captures_loot_survey() && !xml.is_lossy())
+        .then(|| xml.document_source())
+        .transpose()?;
     Ok(Ok(ParsedRoot {
         root,
         pending_external,
@@ -80,5 +86,6 @@ pub(super) fn read(
         gate,
         gate_proof,
         name_inputs_complete,
+        survey_document,
     }))
 }

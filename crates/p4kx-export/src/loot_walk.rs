@@ -4,28 +4,33 @@
 //! The walk through the containers that entities of containers place.
 
 use std::collections::{HashMap, HashSet};
+use std::convert::Infallible;
+use std::ops::ControlFlow;
 
-use p4kx_extraction::{Archive, CancelToken, FieldOrigin, Guid};
+use p4kx_extraction::{Archive, CancelToken, FieldOrigin, Guid, SourceUse, SourceUses};
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
-use crate::CatalogError;
+use crate::catalog_query_session::checkpoint;
 use crate::catalog_read::original::EntryCapture;
 use crate::catalog_rows::staged::{IndexedCatalogRows, StagedCatalogTable};
 use crate::catalog_table::DatasetAvailability;
 use crate::export_ledger::ExportLedger;
+use crate::loot_container_source::EntXmlAuthor;
 use crate::loot_entxml::documents::LootEntityContainerDocument;
 use crate::loot_unreadable::Unreadable;
 use crate::starmap_index::Index;
 use crate::starmap_walk::Opened;
+use crate::{CatalogError, ExportAccountingError};
 
 #[path = "loot_walk_container.rs"]
 mod container;
 
-use container::ContainerRead;
+use container::{ContainerRead, DocumentOutput};
 
 /// An entity of a container that carries a multi config.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Placed {
+    pub(crate) author: EntXmlAuthor,
     pub(crate) config: Guid,
     pub(crate) config_origin: FieldOrigin,
     /// The path of the placed container: the Archive's when it has it, else as written.
@@ -85,15 +90,17 @@ pub(crate) fn explore(
     let walked = visit_documents(
         archive,
         index,
-        opened,
+        opened.iter().map(|seed| seed.entry),
         cancel,
         capture,
-        None,
-        |entry, document| {
-            originals.append((entry, document.physical_index()?), &document)?;
-            available = true;
-            Ok(())
-        },
+        Some(DocumentVisit {
+            selected: None,
+            visit: |entry, document: LootEntityContainerDocument| {
+                originals.append((entry, document.physical_index()?), &document)?;
+                available = true;
+                Ok(())
+            },
+        }),
     )?;
     let availability = if available {
         DatasetAvailability::Available
@@ -116,36 +123,40 @@ pub(crate) struct SelectedDocument {
     pub(crate) entity_index: Option<usize>,
 }
 
+/// Emits all reached documents or those of one exact reached physical owner.
+pub(crate) struct DocumentVisit<Visit> {
+    pub(crate) selected: Option<SelectedDocument>,
+    pub(crate) visit: Visit,
+}
+
 pub(crate) struct Walked {
     pub(crate) ledger: ExportLedger,
     pub(crate) summaries: HashMap<usize, Summary>,
     pub(crate) documents_complete: bool,
     pub(crate) routes_complete: bool,
     pub(crate) found_owner: bool,
+    /// Original directory and verified documents examined by an exhaustive link lookup.
+    pub(crate) document_census: Option<FieldOrigin>,
 }
 
+/// Walks physically seeded `EntXML` links, optionally delivering document rows.
 pub(crate) fn visit_documents(
     archive: &Archive,
     index: &Index<'_>,
-    opened: &[Opened],
+    seeds: impl Iterator<Item = usize>,
     cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
-    selected: Option<SelectedDocument>,
-    mut visit: impl FnMut(usize, LootEntityContainerDocument) -> Result<(), CatalogError>,
+    mut documents: Option<
+        DocumentVisit<impl FnMut(usize, LootEntityContainerDocument) -> Result<(), CatalogError>>,
+    >,
 ) -> Result<Walked, CatalogError> {
     let directory = capture
         .source_uses()
         .observe_root_directory_paths(archive)?;
-    let inventory_complete = crate::export_archive_health::inventory(archive).is_none();
-    let mut walked = Walked {
-        ledger: ExportLedger::default(),
-        summaries: HashMap::new(),
-        documents_complete: inventory_complete,
-        routes_complete: inventory_complete,
-        found_owner: false,
-    };
-    let mut frontier: Vec<usize> = opened.iter().map(|root| root.entry).collect();
-    let read = |position, member| {
+    let mut walked = Walked::new(archive);
+    let mut frontier: Vec<usize> = seeds.collect();
+    let mut layer = Vec::new();
+    let read = |position, output| {
         container::summarise(
             archive,
             index,
@@ -153,53 +164,144 @@ pub(crate) fn visit_documents(
             cancel,
             capture,
             directory.as_ref(),
-            member,
+            output,
         )
     };
+    let selected = documents.as_ref().and_then(|documents| documents.selected);
+    let mut census = documents
+        .is_none()
+        .then(|| directory.iter().cloned().collect());
+    let frontier_output = match (&census, selected) {
+        (Some(_), _) => DocumentOutput::LinkCensus,
+        (None, Some(_)) => DocumentOutput::LinksOnly,
+        (None, None) => DocumentOutput::Keep(None),
+    };
     while !frontier.is_empty() {
-        crate::catalog_query_session::checkpoint(cancel)?;
+        checkpoint(cancel)?;
         frontier.sort_unstable();
         frontier.dedup();
         frontier.retain(|entry| !walked.summaries.contains_key(entry));
         if let Some(wanted) = selected
             && frontier.binary_search(&wanted.container_position).is_ok()
         {
-            let selected_read = read(wanted.container_position, wanted.entity_index)?;
-            walked.found_owner = true;
-            walked.documents_complete = !selected_read.scope_unknown;
-            walked.merge(wanted.container_position, selected_read, &mut visit)?;
-            crate::catalog_query_session::checkpoint(cancel)?;
+            let selected_read = read(
+                wanted.container_position,
+                DocumentOutput::Keep(wanted.entity_index),
+            )?;
+            walked.finish_selected(wanted.container_position, selected_read, &mut documents)?;
+            checkpoint(cancel)?;
             return Ok(walked);
         }
-        let layer: Vec<_> = frontier
-            .par_iter()
-            .map(|&entry| {
-                let mut outcome = read(entry, None)?;
-                if selected.is_some() {
-                    outcome.documents = Vec::new();
-                }
-                Ok((entry, outcome))
-            })
-            .collect::<Result<Vec<_>, CatalogError>>()?;
-        frontier.clear();
-        for (entry, outcome) in layer {
-            frontier.extend(outcome.summary.nested.iter().copied());
-            walked.merge(entry, outcome, &mut visit)?;
-        }
+        std::mem::swap(&mut frontier, &mut layer);
+        walked.visit_layer(
+            &layer,
+            &mut frontier,
+            |entry| read(entry, frontier_output),
+            &mut documents,
+            &mut census,
+            cancel,
+        )?;
+        layer.clear();
     }
-    crate::catalog_query_session::checkpoint(cancel)?;
+    checkpoint(cancel)?;
+    if let Some(census) = census {
+        walked.finish_census(census, directory.is_some(), capture.source_uses());
+    }
     Ok(walked)
 }
 
 impl Walked {
+    fn new(archive: &Archive) -> Self {
+        let complete = crate::export_archive_health::inventory(archive).is_none();
+        Self {
+            ledger: ExportLedger::default(),
+            summaries: HashMap::new(),
+            documents_complete: complete,
+            routes_complete: complete,
+            found_owner: false,
+            document_census: None,
+        }
+    }
+
+    fn finish_selected(
+        &mut self,
+        entry: usize,
+        read: ContainerRead,
+        documents: &mut Option<
+            DocumentVisit<
+                impl FnMut(usize, LootEntityContainerDocument) -> Result<(), CatalogError>,
+            >,
+        >,
+    ) -> Result<(), CatalogError> {
+        self.found_owner = true;
+        self.documents_complete = !read.scope_unknown;
+        self.merge(entry, read, documents)
+    }
+
+    fn visit_layer(
+        &mut self,
+        layer: &[usize],
+        frontier: &mut Vec<usize>,
+        read: impl Fn(usize) -> Result<ContainerRead, CatalogError> + Sync,
+        documents: &mut Option<
+            DocumentVisit<
+                impl FnMut(usize, LootEntityContainerDocument) -> Result<(), CatalogError>,
+            >,
+        >,
+        census: &mut Option<Vec<SourceUse>>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(), CatalogError> {
+        let batch_width = if census.is_some() {
+            rayon::current_num_threads()
+        } else {
+            layer.len().max(1)
+        };
+        for entries in layer.chunks(batch_width) {
+            checkpoint(cancel)?;
+            let batch: Vec<_> = entries
+                .par_iter()
+                .map(|&entry| read(entry).map(|read| (entry, read)))
+                .collect::<Result<_, _>>()?;
+            for (entry, mut read) in batch {
+                frontier.extend(read.summary.nested.iter().copied());
+                if let Some(census) = census {
+                    census.extend(
+                        read.census
+                            .take()
+                            .ok_or(ExportAccountingError::ConflictingSourceDatum)?,
+                    );
+                }
+                self.merge(entry, read, documents)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn finish_census(&mut self, mut census: Vec<SourceUse>, directory: bool, sources: &SourceUses) {
+        census.sort_unstable_by(|left, right| left.reference().cmp(right.reference()));
+        census.dedup_by(|left, right| left.reference() == right.reference());
+        self.document_census = Some(sources.origin(&census, directory && self.routes_complete));
+        self.routes_complete = self
+            .document_census
+            .as_ref()
+            .is_some_and(FieldOrigin::source_set_complete);
+    }
+
     fn merge(
         &mut self,
         entry: usize,
         read: ContainerRead,
-        visit: &mut impl FnMut(usize, LootEntityContainerDocument) -> Result<(), CatalogError>,
+        documents: &mut Option<
+            DocumentVisit<
+                impl FnMut(usize, LootEntityContainerDocument) -> Result<(), CatalogError>,
+            >,
+        >,
     ) -> Result<(), CatalogError> {
         for document in read.documents {
-            visit(entry, document)?;
+            let visitor = documents
+                .as_mut()
+                .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+            (visitor.visit)(entry, document)?;
         }
         self.documents_complete &= !read.scope_unknown;
         self.routes_complete &= !read.route_unknown && !read.scope_unknown;
@@ -213,17 +315,32 @@ impl Walked {
 /// of containers ends where it returns to a container already seen. The cost is the size of the
 /// subgraph below `root`, once per distinct root.
 pub(crate) fn below(root: usize, summaries: &HashMap<usize, Summary>) -> Vec<&Placed> {
+    let mut found = Vec::new();
+    let _: ControlFlow<Infallible> = visit_below(root, summaries, |placed| {
+        found.push(placed);
+        ControlFlow::Continue(())
+    });
+    found
+}
+
+/// Visits original placements in writer order until the caller stops.
+pub(crate) fn visit_below<'source, Match>(
+    root: usize,
+    summaries: &'source HashMap<usize, Summary>,
+    mut visit: impl FnMut(&'source Placed) -> ControlFlow<Match>,
+) -> ControlFlow<Match> {
     let mut seen: HashSet<usize> = HashSet::from([root]);
     let mut pending = vec![root];
-    let mut found = Vec::new();
     while let Some(entry) = pending.pop() {
         let Some(summary) = summaries.get(&entry) else {
             continue;
         };
-        found.extend(&summary.placed);
+        for placed in &summary.placed {
+            visit(placed)?;
+        }
         pending.extend(summary.nested.iter().filter(|&&next| seen.insert(next)));
     }
-    found
+    ControlFlow::Continue(())
 }
 
 /// Returns the path of the Archive entry `entry`, empty for none.

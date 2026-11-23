@@ -118,7 +118,7 @@ impl<'a> Index<'a> {
             .by_path
             .iter()
             .filter_map(|(path, at)| {
-                let (folder, _) = system_path_parts(path)?;
+                let folder = system_container_folder(path)?;
                 Some((path.as_str(), folder, *at))
             })
             .collect();
@@ -141,6 +141,12 @@ fn is_socpak(path: &str) -> bool {
 /// Splits a normalized system directory key into its folder and relative file.
 pub(crate) fn system_path_parts(key: &str) -> Option<(&str, &str)> {
     key.strip_prefix(SYSTEM_FOLDER)?.split_once('\\')
+}
+
+/// Returns the folder of a normalized system container path.
+pub(crate) fn system_container_folder(path: &str) -> Option<&str> {
+    let (folder, file) = system_path_parts(path)?;
+    is_socpak(file).then_some(folder)
 }
 
 /// Returns `path` in lower case with `\` as separator and no leading separator.

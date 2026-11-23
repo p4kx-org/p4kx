@@ -343,11 +343,15 @@ impl EntryReceipt {
     }
 
     pub(crate) fn attempted_payload(&self) -> Result<(), CatalogError> {
+        self.payload_attempt().map(drop)
+    }
+
+    pub(crate) fn payload_attempt(&self) -> Result<SourceUse, CatalogError> {
         self.inner
             .as_ref()
             .or(self.outer.as_ref())
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?
-            .attempted_payload()
+            .payload_read(SourceUseRole::Attempted)
     }
 
     pub(crate) fn merge(&mut self, other: &Self) -> Result<(), ExportAccountingError> {

@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{
-    Archive, CancelToken, DataForge, DataForgeEntry, SourceUseRole, SourceValue, SourcedValue,
-};
+use p4kx_extraction::{Archive, CancelToken, DataForge, DataForgeEntry};
 
 use super::{
     LootDocumentAdmission, LootDocumentCoverage, LootDocumentQuery, LootDocumentReachability,
@@ -16,12 +14,13 @@ use crate::catalog_query_session::checkpoint;
 use crate::catalog_read::original::EntryCapture;
 use crate::export_entry_counts::ExportEntryCounts;
 use crate::export_health_entries;
+use crate::loot_containers::admission::{RecordPaths, scan};
 use crate::loot_entxml::documents::LootEntityContainerDocument;
-use crate::loot_walk::{self, SelectedDocument};
-use crate::record_header_field::{RecordHeaderField, RecordHeaderInput};
+use crate::loot_walk::{self, DocumentVisit, SelectedDocument};
 use crate::starmap_containers::{PlacementScope, Placements};
 use crate::starmap_index::Index;
-use crate::{CatalogError, ExportAccountingError, Filter, Kind};
+use crate::starmap_parse::PlacementSurvey;
+use crate::{CatalogError, ExportAccountingError, Kind};
 
 pub(super) fn run(
     archive: &Archive,
@@ -32,7 +31,7 @@ pub(super) fn run(
 ) -> Result<LootDocumentSnapshot, CatalogError> {
     let origins = CatalogOrigins::for_archive_records(archive, entry)?;
     let original = OriginalCatalogInput::new(forge, &origins);
-    let admission = admit(forge, &origins, query.catalog_filter, cancel)?;
+    let admission = scan(forge, &origins, query.catalog_filter, cancel)?;
     read(
         archive,
         query,
@@ -42,62 +41,10 @@ pub(super) fn run(
     )
 }
 
-struct Admission {
-    status: LootDocumentAdmission,
-    record: Option<SourcedValue<u32>>,
-}
-
-fn admit(
-    forge: &DataForge<'_>,
-    origins: &CatalogOrigins,
-    filter: Option<&Filter>,
-    cancel: Option<&CancelToken>,
-) -> Result<Admission, CatalogError> {
-    let mut complete = true;
-    for record in forge.records() {
-        checkpoint(cancel)?;
-        match record.record_path() {
-            Ok(path) if PlacementScope::admits_loot_path(path, filter) => {
-                let mut uses = Vec::new();
-                let original = origins.record(record.index());
-                original.append_header_input(
-                    RecordHeaderInput::NormalizedPath,
-                    SourceUseRole::Selector,
-                    &mut uses,
-                )?;
-                original.append_header_input(
-                    RecordHeaderInput::Field(RecordHeaderField::RecordIndex),
-                    SourceUseRole::Payload,
-                    &mut uses,
-                )?;
-                return Ok(Admission {
-                    status: LootDocumentAdmission::Selected,
-                    record: Some(origins.uses.value(
-                        SourceValue::Present(record.index()),
-                        &uses,
-                        true,
-                    )),
-                });
-            }
-            Ok(_) => {}
-            Err(_) => complete = false,
-        }
-    }
-    let status = if complete {
-        LootDocumentAdmission::Absent
-    } else {
-        LootDocumentAdmission::Unavailable
-    };
-    Ok(Admission {
-        status,
-        record: None,
-    })
-}
-
 fn read(
     archive: &Archive,
     query: LootDocumentQuery<'_>,
-    admission: Admission,
+    admission: RecordPaths,
     cancel: Option<&CancelToken>,
     capture: &EntryCapture<'_>,
 ) -> Result<LootDocumentSnapshot, CatalogError> {
@@ -170,14 +117,10 @@ fn read_selected(
         capture,
         PlacementScope::RecordSelection,
     )?;
-    let routes_complete = !placements.placement_routes_incomplete
-        && placements.counts.unreadable == 0
-        && placements.counts.missing == placements.counts.verified_missing
-        && placements.counts.malformed == 0
-        && !placements
-            .ledger
-            .incomplete_inventories
-            .contains(&Kind::StarmapObjects);
+    let routes_complete = placements
+        .loot_survey
+        .as_ref()
+        .is_some_and(PlacementSurvey::is_complete);
     coverage.placement_entries = entry_counts(placements.ledger.entries, Kind::StarmapObjects)?;
     coverage.placements_complete =
         coverage.directory_complete && routes_complete && successful(coverage.placement_entries);
@@ -186,14 +129,16 @@ fn read_selected(
     let walked = loot_walk::visit_documents(
         archive,
         &index,
-        &placements.opened,
+        placements.opened.iter().map(|seed| seed.entry),
         cancel,
         capture,
-        selected,
-        |entry, document| {
-            rows.push(((entry, document.physical_index()?), document));
-            Ok(())
-        },
+        Some(DocumentVisit {
+            selected,
+            visit: |entry, document: LootEntityContainerDocument| {
+                rows.push(((entry, document.physical_index()?), document));
+                Ok(())
+            },
+        }),
     )?;
     coverage.visited_loot_containers = walked.summaries.len();
     coverage.loot_entries = entry_counts(walked.ledger.entries, Kind::LootContainers)?;

@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    Archive, CancelToken, DataForge, DataForgeEntry, Filter, Guid, Record, RecordTree, TreeBuilder,
+    Archive, CancelToken, DataForge, DataForgeEntry, Filter, Guid, Record, RecordTree,
+    SourceUseRole, TreeBuilder,
 };
 
 use crate::catalog_origins::CatalogOrigins;
@@ -15,6 +16,7 @@ use crate::catalog_v3::starmap_object_definition::SOURCE_TYPE;
 use crate::contract_starmap::ShopLinkHeader;
 use crate::entity_selection::{self, Selected};
 use crate::guid_text::CatalogGuid;
+use crate::record_header_field::RecordHeaderInput;
 use crate::scan_health::SourceTrace;
 use crate::source_header::RecordNaming;
 use crate::{CatalogError, ExportAccountingError, Kind};
@@ -107,12 +109,14 @@ pub(super) fn visit_records<'source>(
     let mut observed = false;
     selection.for_each(forge, cancel, |record| {
         checkpoint(cancel)?;
-        if selected(record, filter, &mut coverage)
-            && let Some(owner) = plan::read_owner(&mut trees, record, &mut coverage)?
-        {
-            emit(&owner.record, &owner.tree)?;
-            observed = true;
-        }
+        observed |= visit_admitted_record(
+            &mut trees,
+            record,
+            filter,
+            &mut coverage,
+            |_, _| {},
+            &mut emit,
+        )?;
         Ok(())
     })?;
     checkpoint(cancel)?;
@@ -124,12 +128,38 @@ pub(super) fn visit_records<'source>(
     Ok((availability, coverage))
 }
 
-fn selected(
+pub(crate) fn visit_admitted_record<'source>(
+    trees: &mut TreeBuilder<'source>,
+    record: &Record<'source>,
+    filter: Option<&Filter>,
+    coverage: &mut CatalogRecordCoverage,
+    observe: impl FnMut(RecordHeaderInput, SourceUseRole),
+    emit: impl FnOnce(&Record<'source>, &RecordTree<'source>) -> Result<(), CatalogError>,
+) -> Result<bool, CatalogError> {
+    if selected_observed(record, filter, coverage, observe)
+        && let Some(owner) = plan::read_owner(trees, record, coverage)?
+    {
+        emit(&owner.record, &owner.tree)?;
+        return Ok(true);
+    }
+    Ok(false)
+}
+
+pub(crate) fn selected(
     record: &Record<'_>,
     filter: Option<&Filter>,
     coverage: &mut CatalogRecordCoverage,
 ) -> bool {
-    match entity_selection::select(record, filter) {
+    selected_observed(record, filter, coverage, |_, _| {})
+}
+
+fn selected_observed(
+    record: &Record<'_>,
+    filter: Option<&Filter>,
+    coverage: &mut CatalogRecordCoverage,
+    observe: impl FnMut(RecordHeaderInput, SourceUseRole),
+) -> bool {
+    match entity_selection::select_observed(record, filter, observe) {
         Err(_)
             if SourceTrace::new(record)
                 .selection_candidate_kind()

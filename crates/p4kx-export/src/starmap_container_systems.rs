@@ -9,13 +9,51 @@ use p4kx_extraction::{Archive, CancelToken};
 #[cfg(test)]
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 
-use super::{JumpEndpointRecords, Limits, PlacementSpools, PlacementStorage};
+use super::super::name_coverage;
+use super::{JumpEndpointRecords, Limits, PlacementSpools, PlacementStorage, Placements};
 use crate::CatalogError;
 use crate::catalog_read::original::EntryCapture;
 use crate::catalog_rows::spool::RowSpoolWriter;
+use crate::entry_source;
+use crate::export_ledger::ExportLedger;
 use crate::starmap_index::Index;
-use crate::starmap_parse::Body;
+use crate::starmap_parse::{self, Body, DescriptorScope, DescriptorSurvey, Read};
 use crate::starmap_walk::{PlacementRows, System, SystemRead};
+use crate::{ExportAccountingError, Kind};
+
+pub(super) struct SystemDescriptors {
+    pub(super) systems: Vec<(Arc<str>, usize)>,
+    pub(super) system_count: usize,
+    pub(super) all_roots: bool,
+    pub(super) names_complete: bool,
+    pub(super) read: Read,
+}
+
+pub(super) fn read_descriptors(
+    archive: &Archive,
+    index: &Index<'_>,
+    roots: Vec<(Arc<str>, usize)>,
+    cancel: Option<&CancelToken>,
+    bounds: (Option<usize>, DescriptorScope),
+    capture: &EntryCapture<'_>,
+) -> Result<SystemDescriptors, CatalogError> {
+    let system_count = roots.len();
+    let mut ledger = ExportLedger::default();
+    let systems = unique_system_roots(archive, index, capture, roots, &mut ledger)?;
+    let root_entries: Vec<usize> = systems.iter().map(|(_, entry)| *entry).collect();
+    let all_roots = root_entries.len() == system_count;
+    let names_complete = all_roots && name_coverage::descriptor_inputs_complete(&ledger);
+    let mut read =
+        starmap_parse::read_all_scoped(archive, index, &root_entries, cancel, bounds, capture)?;
+    read.ledger.merge(ledger);
+    Ok(SystemDescriptors {
+        systems,
+        system_count,
+        all_roots,
+        names_complete: names_complete && read.name_inputs_complete,
+        read,
+    })
+}
 
 pub(super) fn walk_systems(
     index: &Index<'_>,
@@ -65,14 +103,14 @@ pub(super) fn walk_systems(
             (archive, capture, None),
             || PlacementRows::ShopNames(guids),
         ),
-        PlacementStorage::Object(guid) => walk_descriptor_systems(
+        PlacementStorage::Object(selection) => walk_descriptor_systems(
             index,
             bodies,
             systems,
             cancel,
             limits,
             (archive, capture, None),
-            || PlacementRows::Object(guid),
+            || PlacementRows::Object(selection),
         ),
         #[cfg(test)]
         PlacementStorage::Typed => walk_typed_systems(
@@ -187,4 +225,65 @@ fn walk_spooled_systems(
         location_physics_availability: Some(grid.availability),
     };
     Ok((reads, spools))
+}
+
+pub(crate) fn unique_system_roots(
+    archive: &Archive,
+    index: &Index<'_>,
+    capture: &EntryCapture<'_>,
+    roots: Vec<(Arc<str>, usize)>,
+    ledger: &mut ExportLedger,
+) -> Result<Vec<(Arc<str>, usize)>, CatalogError> {
+    let mut unique = Vec::with_capacity(roots.len());
+    for (name, index_entry) in roots {
+        let entry = index
+            .entries
+            .get(index_entry)
+            .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+        match index.candidates(entry.path()) {
+            [entry] => unique.push((name, *entry)),
+            [] => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
+            candidates => entry_source::record_ambiguous_outer_entries(
+                archive,
+                capture,
+                ledger,
+                Kind::StarmapObjects,
+                None,
+                candidates,
+            )?,
+        }
+    }
+    Ok(unique)
+}
+
+impl Placements {
+    pub(super) fn finish_scope_coverage(
+        &mut self,
+        capture: &EntryCapture<'_>,
+        endpoints: Option<&JumpEndpointRecords>,
+        routes_complete: bool,
+        survey: Option<DescriptorSurvey>,
+    ) {
+        self.endpoint_inventory_complete = self.name_coverage.directory_complete
+            && self.has_complete_endpoints(routes_complete, endpoints);
+        self.loot_survey = survey.map(|survey| {
+            survey.finish(
+                capture.source_uses(),
+                routes_complete && self.loot_seed_routes_complete(),
+            )
+        });
+    }
+
+    fn loot_seed_routes_complete(&self) -> bool {
+        self.name_coverage.directory_complete
+            && self.name_coverage.descriptors_complete
+            && !self.placement_routes_incomplete
+            && self.counts.unreadable == 0
+            && self.counts.missing == self.counts.verified_missing
+            && self.counts.malformed == 0
+            && !self
+                .ledger
+                .incomplete_inventories
+                .contains(&Kind::StarmapObjects)
+    }
 }

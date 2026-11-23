@@ -215,6 +215,21 @@ impl SelectedPlacementRows {
     }
 }
 
+#[derive(Clone, Copy)]
+pub(crate) enum ObjectSelection<'records> {
+    One(Guid),
+    Loot(&'records [Guid]),
+}
+
+impl ObjectSelection<'_> {
+    fn matches(self, guid: Guid) -> bool {
+        match self {
+            Self::One(selected) => selected == guid,
+            Self::Loot(records) => records.binary_search(&guid).is_ok(),
+        }
+    }
+}
+
 pub(crate) enum PlacementRows<'writer> {
     Spool {
         containers: &'writer mut RowSpoolWriter,
@@ -226,7 +241,7 @@ pub(crate) enum PlacementRows<'writer> {
     Harvest(&'writer HarvestSurvey<'writer>),
     Selected(&'writer mut SelectedPlacementRows),
     OpenedContainers,
-    Object(Guid),
+    Object(ObjectSelection<'writer>),
     ShopNames(&'writer [Guid]),
 }
 
@@ -247,7 +262,7 @@ impl PlacementRows<'_> {
 
     fn records_object(&self, guid: Guid) -> bool {
         match self {
-            Self::Object(selected) => *selected == guid,
+            Self::Object(selection) => selection.matches(guid),
             Self::ShopNames(guids) => guids.binary_search(&guid).is_ok(),
             Self::Selected(_) | Self::OpenedContainers => false,
             Self::Spool { .. } | Self::Harvest(_) => true,
@@ -304,10 +319,13 @@ impl System<'_> {
             system_entry: self.root_slot,
             entry,
             under: path.under,
-            parent: if matches!(self.rows, PlacementRows::Spool { .. }) {
-                OpenedParent::from_path(path)
-            } else {
-                OpenedParent::Unobserved
+            parent: match &self.rows {
+                PlacementRows::Spool { .. } | PlacementRows::Object(ObjectSelection::Loot(_)) => {
+                    OpenedParent::from_path(path)
+                }
+                #[cfg(test)]
+                PlacementRows::Typed => OpenedParent::from_path(path),
+                _ => OpenedParent::Unobserved,
             },
         };
         if let PlacementRows::Harvest(harvest) = &self.rows {

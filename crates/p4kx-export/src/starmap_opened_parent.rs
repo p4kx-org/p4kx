@@ -15,6 +15,8 @@ use crate::starmap_containers::proof::{PlacementStep, container_route_uses};
 pub(crate) enum OpenedParent {
     Root,
     Reached(Box<ReachedParent>),
+    /// The directory seed is a fallback whose ancestry needs an exhaustive route survey.
+    DirectoryFallback,
     Unobserved,
 }
 
@@ -39,7 +41,7 @@ impl OpenedParent {
     pub(crate) fn inputs(&self) -> Result<(Vec<SourceUse>, bool), CatalogError> {
         match self {
             Self::Root => Ok((Vec::new(), true)),
-            Self::Unobserved => Ok((Vec::new(), false)),
+            Self::DirectoryFallback | Self::Unobserved => Ok((Vec::new(), false)),
             Self::Reached(parent) => parent.inputs(),
         }
     }

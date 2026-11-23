@@ -6,19 +6,28 @@ use std::collections::HashMap;
 use p4kx_extraction::{Guid, SourceUses, SourceValue, SourceValueState};
 use p4kx_extraction::{InputScope, SourceInput, SourceLocation, SourceUseRole};
 
+use super::selection::first_placements;
 use super::{PlacementValues, Tags, row, rows};
 use crate::contract_loot::LootContainer;
 use crate::guid_text::CatalogGuid;
 use crate::harvest_locations::Objects;
+use crate::loot_container_source::EntXmlAuthor;
 use crate::loot_soc::EntityTags;
 use crate::loot_unreadable::Unreadable;
 use crate::loot_walk::{Placed, PlacedTarget, Summary};
 use crate::starmap_walk::Opened;
 
+#[path = "loot_container_author_tests.rs"]
+mod author;
+
 const CONFIG: &str = "687af3db-4c0d-4e8d-9261-102274f8b6ed";
 
 fn placed(path: &str, sources: &SourceUses) -> Placed {
     Placed {
+        author: EntXmlAuthor {
+            containing_entry_index: 0,
+            document_entry_index: 0,
+        },
         config: CONFIG.parse::<Guid>().expect("a GUID"),
         config_origin: sources.origin(&[], false),
         path: path.to_owned(),
@@ -119,9 +128,7 @@ fn duplicate_rows_keep_the_first_placement_with_canonical_order()
     ];
     let tags = fixture_tags(first_config, second_config, sources)?;
     let result = rows(
-        &roots,
-        &Objects::new(&[]),
-        &summaries,
+        first_placements(&roots, &Objects::new(&[]), &summaries),
         &tags,
         sources,
         |root, _| Ok(placement(sources, &root.system)),

@@ -32,12 +32,20 @@ mod read;
 
 #[path = "loot_document_query.rs"]
 mod documents;
+
+#[path = "loot_container_query.rs"]
+mod containers;
 pub use crate::catalog_read::original::{PhysicalEntryRef, SourcedXmlAttribute};
+pub use crate::contract_loot::{LootContainer, TagCount};
 pub use crate::guid_text::CatalogGuid;
 pub use crate::loot_entxml::documents::{
     LootContainerLookupRepair, LootContainerLookupRepairKind, LootContainerTargetStatus,
     LootEntityConfigReference, LootEntityContainerDocument, LootEntityContainerLink,
     LootEntityLinkNode,
+};
+pub use containers::{
+    LootAncestorSelection, LootContainerOccurrence, LootContainerQuery, LootContainerSnapshot,
+    LootContainerStatus, read_loot_container,
 };
 pub use documents::{
     LootDocumentAdmission, LootDocumentCoverage, LootDocumentQuery, LootDocumentReachability,

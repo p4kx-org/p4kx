@@ -14,6 +14,13 @@ use super::*;
 use crate::Kind;
 use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::SourceDisposition;
+use crate::loot_container_source::EntXmlAuthor;
+
+#[path = "loot_walk_document_retention_tests.rs"]
+mod document_retention;
+
+#[path = "loot_walk_link_census_tests.rs"]
+mod link_census;
 
 fn explore(
     archive: &Archive,
@@ -36,6 +43,10 @@ fn guid() -> Guid {
 fn placed(path: &str, entry: Option<usize>) -> Placed {
     let source = SourceUses::with_compact_use_refs();
     Placed {
+        author: EntXmlAuthor {
+            containing_entry_index: 0,
+            document_entry_index: 0,
+        },
         config: guid(),
         config_origin: source.origin(&[], false),
         path: path.to_owned(),

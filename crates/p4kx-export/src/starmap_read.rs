@@ -3,9 +3,10 @@
 
 use std::path::Path;
 
-use p4kx_extraction::{Archive, Entry};
+use p4kx_extraction::{Archive, CancelToken, Entry, SourceUse};
 
 use crate::catalog_read::original::{EntryCapture, EntryRead, EntryReadError};
+use crate::container_read;
 use crate::entry_source::EntrySource;
 use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
@@ -21,6 +22,22 @@ pub(crate) struct MainXml {
     pub(crate) source: EntrySource,
     pub(crate) bytes: EntryRead,
     pub(crate) fallback: Option<String>,
+}
+
+#[derive(Default)]
+pub(crate) struct DescriptorInputs {
+    pub(crate) directory: Option<SourceUse>,
+    pub(crate) payload: Option<DescriptorPayload>,
+}
+
+pub(crate) enum DescriptorPayload {
+    Parsed(SourceUse),
+    Attempted(SourceUse),
+}
+
+pub(crate) struct DescriptorSurveyRead<'survey> {
+    pub(crate) inputs: &'survey mut DescriptorInputs,
+    pub(crate) cancel: Option<&'survey CancelToken>,
 }
 
 /// Returns the normalized path of a main placement XML candidate.
@@ -57,18 +74,31 @@ pub(crate) fn main_xml(
     capture: &EntryCapture<'_>,
     ledger: &mut ExportLedger,
 ) -> Result<Result<MainXml, String>, CatalogError> {
+    main_xml_with_survey(archive, socpak, capture, ledger, None)
+}
+
+pub(crate) fn main_xml_with_survey(
+    archive: &Archive,
+    socpak: &Entry,
+    capture: &EntryCapture<'_>,
+    ledger: &mut ExportLedger,
+    survey: Option<DescriptorSurveyRead<'_>>,
+) -> Result<Result<MainXml, String>, CatalogError> {
     let source = EntrySource::outer(capture, archive, socpak)?.dependency();
-    source.receipt().attempted_payload()?;
+    let attempt = source.receipt().payload_attempt()?;
     let container = match archive.open_container(socpak) {
         Ok(container) => container,
         Err(error) => {
+            if let Some(survey) = survey {
+                survey.inputs.payload = Some(DescriptorPayload::Attempted(attempt));
+            }
             source.record(ledger, Kind::StarmapObjects, SourceDisposition::ReadFailed);
             return Ok(Err(format!("cannot be opened as a container: {error:#}")));
         }
     };
     let parent = source.clone().operation(EntryOperation::ContainerXml);
     source.record(ledger, Kind::StarmapObjects, SourceDisposition::Projected);
-    read_main(archive, socpak, container, capture, parent, ledger)
+    read_main(archive, socpak, container, capture, parent, ledger, survey)
 }
 
 fn read_main(
@@ -78,8 +108,14 @@ fn read_main(
     capture: &EntryCapture<'_>,
     parent: EntrySource,
     ledger: &mut ExportLedger,
+    mut survey: Option<DescriptorSurveyRead<'_>>,
 ) -> Result<Result<MainXml, String>, CatalogError> {
-    let (xml, fallback) = match selected_xml(&container, socpak) {
+    let selected = selected_xml(&container, socpak);
+    if let Some(survey) = &mut survey {
+        survey.inputs.directory =
+            container_read::observe_container_directory(&container, capture.source_uses())?;
+    }
+    let (xml, fallback) = match selected {
         Ok(Descriptor::Named(xml)) => (xml, None),
         Ok(Descriptor::Fallback(xml)) => (xml, Some(xml.path().to_owned())),
         Ok(Descriptor::Ambiguous(candidates)) => {
@@ -103,13 +139,7 @@ fn read_main(
     let source = EntrySource::inner(capture, archive, socpak, &container, xml)?
         .dependency()
         .operation(EntryOperation::ContainerXml);
-    match EntryRead::read_bounded_complete(
-        source.receipt().clone(),
-        &container,
-        xml,
-        MAX_XML_LEN,
-        None,
-    )? {
+    match read_descriptor(&container, xml, &source, survey)? {
         Ok(bytes) => Ok(Ok(MainXml {
             container,
             source,
@@ -121,6 +151,35 @@ fn read_main(
             Ok(Err(read_failure(xml, error)))
         }
     }
+}
+
+fn read_descriptor(
+    container: &Archive,
+    xml: &Entry,
+    source: &EntrySource,
+    survey: Option<DescriptorSurveyRead<'_>>,
+) -> Result<Result<EntryRead, EntryReadError>, CatalogError> {
+    let receipt = source.receipt();
+    let Some(survey) = survey else {
+        return EntryRead::read_bounded_complete(
+            receipt.clone(),
+            container,
+            xml,
+            MAX_XML_LEN,
+            None,
+        );
+    };
+    let read = EntryRead::read_bounded_verified(
+        receipt.clone(),
+        container,
+        xml,
+        MAX_XML_LEN,
+        survey.cancel,
+    )?;
+    if let Err(EntryReadError::Open(_) | EntryReadError::Read(_)) = &read {
+        survey.inputs.payload = Some(DescriptorPayload::Attempted(receipt.payload_attempt()?));
+    }
+    Ok(read)
 }
 
 enum Descriptor<'archive> {

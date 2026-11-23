@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::Guid;
+use p4kx_extraction::{
+    Guid, InputScope, SourceInput, SourceLocation, SourceUseRole, SourceUses, SourceValueState,
+};
 
 use super::{LocationObject, NoObject, Objects, losses};
 use crate::guid_text::CatalogGuid;
@@ -14,17 +16,12 @@ fn guid(number: u8) -> Guid {
 }
 
 fn objects(entries: &[(u8, bool, Option<u8>)]) -> Objects<'static> {
-    Objects {
-        by_guid: entries
-            .iter()
-            .map(|&(own, claim, above)| {
-                (
-                    guid(own),
-                    LocationObject::unobserved(claim, above.map(guid)),
-                )
-            })
-            .collect(),
-    }
+    Objects::from_location_facts(entries.iter().map(|&(own, claim, above)| {
+        (
+            guid(own),
+            LocationObject::unobserved(claim, above.map(guid)),
+        )
+    }))
 }
 
 #[test]
@@ -48,6 +45,85 @@ fn each_missing_object_says_why() {
         objects.location(Some(guid(2))),
         Err(NoObject::MarkerWithoutParent)
     );
+}
+
+#[test]
+fn location_facts_preserve_the_last_alias_and_its_source_completeness()
+-> Result<(), crate::CatalogError> {
+    let sources = SourceUses::with_compact_use_refs();
+    let input = sources.observe(SourceInput::Unknown, InputScope::Payload)?;
+    let using = |field: &str| {
+        input.at(
+            SourceLocation::Metadata {
+                field: field.to_owned(),
+            },
+            SourceUseRole::Selector,
+        )
+    };
+    let early = using("earlierPhysicalDescription")?;
+    let winning = using("winningPhysicalDescription")?;
+    let early_origin = sources.origin(std::slice::from_ref(&early), true);
+    let winning_origin = sources.origin(std::slice::from_ref(&winning), true);
+    let selected = guid(1);
+    let earlier = LocationObject::new(true, Some(guid(2)), Some(&early_origin), None);
+    let winner = LocationObject::new(false, None, Some(&winning_origin), None);
+    let actual = Ok(CatalogGuid(selected));
+
+    let unique = Objects::from_location_facts([(selected, winner)]);
+    assert!(
+        unique
+            .location_origin(Some(selected), actual, &sources)?
+            .origin()
+            .source_set_complete(),
+        "one admitted physical source can prove the ancestor"
+    );
+    let aliases = Objects::from_location_facts([(selected, earlier), (selected, winner)]);
+    assert_eq!(
+        aliases.location(Some(selected)),
+        actual,
+        "the last physical alias wins"
+    );
+    let location = aliases.location_origin(Some(selected), actual, &sources)?;
+    assert!(
+        !location.origin().source_set_complete(),
+        "the winner does not prove unique physical identity"
+    );
+    assert!(
+        location
+            .origin()
+            .source_uses_refs()
+            .contains(winning.reference())
+            && !location
+                .origin()
+                .source_uses_refs()
+                .contains(early.reference()),
+        "the returned ancestor retains the actual winning description observation"
+    );
+    Ok(())
+}
+
+#[test]
+fn location_fact_absence_distinguishes_a_root_from_an_unresolved_ancestor()
+-> Result<(), crate::CatalogError> {
+    let sources = SourceUses::with_compact_use_refs();
+    let objects = Objects::from_location_facts([]);
+    for (ancestor, outcome, complete) in [
+        (None, NoObject::NoneAbove, true),
+        (Some(guid(1)), NoObject::NotInCatalog, false),
+    ] {
+        let location = objects.location_origin(ancestor, Err(outcome), &sources)?;
+        assert_eq!(
+            location.state(),
+            SourceValueState::Absent,
+            "neither route has a value"
+        );
+        assert_eq!(
+            location.origin().source_set_complete(),
+            complete,
+            "missing demanded input cannot certify the same absence as an actual root"
+        );
+    }
+    Ok(())
 }
 
 /// `count` markers, each hanging below the next, then a plain object.

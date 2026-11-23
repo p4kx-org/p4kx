@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use p4kx_extraction::{Archive, CancelToken};
+use p4kx_extraction::{Archive, CancelToken, Guid, SourceLocation, SourceUse, SourceUseRole};
 use p4kx_testkit::{ArchiveBuilder, TestContainer, TestEntry};
 use serde_json::Value;
 
@@ -11,7 +11,7 @@ use super::{PlacementScope, Placements};
 use crate::catalog_read::original::with_entry_capture;
 use crate::loot_walk;
 use crate::starmap_index::Index;
-use crate::{CatalogError, StarmapTraversalBudget};
+use crate::{CatalogError, ExportAccountingError, StarmapTraversalBudget};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -120,6 +120,193 @@ fn descriptor_only_loot_dependencies_preserve_scope_and_cancellation() -> TestRe
         Ok(())
     })?;
     Ok(())
+}
+
+#[test]
+fn a_foreign_system_open_suppresses_the_home_system_fallback() -> TestResult {
+    const FOREIGN_ROOT: &str = "Data/ObjectContainers/PU/system/other/othersystem.socpak";
+    let folder = tempfile::tempdir()?;
+    let path = folder.path().join("Data.p4k");
+    let selected = Guid::from_stored([1; 16]);
+    let unselected = Guid::from_stored([2; 16]);
+    let foreign = format!(
+        r#"<ObjectContainer><ChildObjectContainers>
+        <Child name="{FALLBACK}" external="1" pos="1,0,0" starMapRecord="{selected}"/>
+        <Child name="Unselected" pos="2,0,0" starMapRecord="{unselected}"/>
+        </ChildObjectContainers></ObjectContainer>"#
+    );
+    ArchiveBuilder::new()
+        .entry(container(ROOT, "demosystem.xml", "<ObjectContainer/>", []))
+        .entry(container(FOREIGN_ROOT, "othersystem.xml", &foreign, []))
+        .entry(container(
+            FALLBACK,
+            "fallback.xml",
+            "<ObjectContainer/>",
+            [],
+        ))
+        .write_to(&path)?;
+    let archive = Archive::open(path)?;
+    let target = archive
+        .entries()
+        .iter()
+        .find(|entry| entry.path().replace('\\', "/") == FALLBACK)
+        .ok_or("physical container in the home system folder")?;
+    with_entry_capture(&archive, |capture| {
+        let scope = PlacementScope::RecordSelection;
+        let canonical = Placements::read(&archive, None, capture, scope)?;
+        let scoped = Placements::read_for_objects(
+            &archive,
+            None,
+            StarmapTraversalBudget::new(),
+            capture,
+            &[selected],
+        )?;
+        assert!(
+            scoped.get(selected).is_some(),
+            "retain the requested placement"
+        );
+        assert!(
+            scoped.get(unselected).is_none(),
+            "omit the unrelated placement"
+        );
+        assert!(
+            canonical.get(unselected).is_some(),
+            "positive control placement"
+        );
+        assert_foreign_seed(&canonical, &scoped, target.index())
+    })?;
+    Ok(())
+}
+
+fn assert_foreign_seed(
+    canonical: &Placements,
+    scoped: &Placements,
+    entry_index: usize,
+) -> Result<(), CatalogError> {
+    let mut canonical = canonical
+        .opened
+        .iter()
+        .filter(|seed| seed.entry == entry_index);
+    let mut scoped = scoped
+        .opened
+        .iter()
+        .filter(|seed| seed.entry == entry_index);
+    let (Some(normal), Some(selected)) = (canonical.next(), scoped.next()) else {
+        return Err(ExportAccountingError::ConflictingSourceDatum.into());
+    };
+    assert_eq!(
+        selected.key(),
+        normal.key(),
+        "keep the normal physical seed"
+    );
+    assert_eq!(
+        selected.system.as_ref(),
+        "other",
+        "retain the foreign owning system"
+    );
+    assert!(
+        canonical.next().is_none() && scoped.next().is_none(),
+        "omit the home fallback"
+    );
+    let (normal, normal_complete) = normal.parent.inputs()?;
+    let (selected, selected_complete) = selected.parent.inputs()?;
+    assert!(
+        normal_complete && selected_complete,
+        "both routes have original evidence"
+    );
+    assert!(
+        !normal.is_empty()
+            && selected
+                .iter()
+                .map(SourceUse::reference)
+                .eq(normal.iter().map(SourceUse::reference)),
+        "retain the same physical route contributors as the writer"
+    );
+    Ok(())
+}
+
+#[test]
+fn a_failed_competing_descriptor_cannot_certify_the_directory_fallback() -> TestResult {
+    const FOREIGN_ROOT: &str = "Data/ObjectContainers/PU/system/other/othersystem.socpak";
+    for (foreign, complete) in [("<ObjectContainer/>", true), ("<ObjectContainer", false)] {
+        let folder = tempfile::tempdir()?;
+        let path = folder.path().join("Data.p4k");
+        ArchiveBuilder::new()
+            .entry(container(ROOT, "demosystem.xml", "<ObjectContainer/>", []))
+            .entry(container(FOREIGN_ROOT, "othersystem.xml", foreign, []))
+            .entry(container(
+                FALLBACK,
+                "fallback.xml",
+                "<ObjectContainer/>",
+                [],
+            ))
+            .write_to(&path)?;
+        let archive = Archive::open(path)?;
+        with_entry_capture(&archive, |capture| {
+            let placements = Placements::read_for_objects(
+                &archive,
+                None,
+                StarmapTraversalBudget::new(),
+                capture,
+                &[],
+            )?;
+            let survey = placements
+                .loot_survey
+                .as_ref()
+                .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+            assert_eq!(
+                survey.is_complete(),
+                complete,
+                "all competing descriptor reads matter"
+            );
+            assert!(
+                placements
+                    .opened
+                    .iter()
+                    .any(|seed| seed.system.as_ref() == "demo"
+                        && matches!(
+                            seed.parent,
+                            crate::starmap_walk::OpenedParent::DirectoryFallback
+                        )),
+                "retain the same available directory fallback in each case"
+            );
+            assert_descriptor_uses(capture, survey, complete);
+            Ok(())
+        })?;
+    }
+    Ok(())
+}
+
+fn assert_descriptor_uses(
+    capture: &crate::catalog_read::original::EntryCapture<'_>,
+    survey: &crate::starmap_parse::PlacementSurvey,
+    complete: bool,
+) {
+    let inventory = capture
+        .source_uses()
+        .finish_with(|| Ok::<(), CatalogError>(()))
+        .expect("the inventory closes");
+    let verified = inventory.iter_uses().filter(|used| {
+        survey.origin.source_uses_refs().contains(used.id())
+            && used.role() == SourceUseRole::Selector
+            && matches!(used.location(), SourceLocation::Subresource { namespace, field, .. }
+                if namespace == "archiveEntryRead" && field == "content")
+    });
+    assert_eq!(
+        verified.count(),
+        1 + usize::from(complete),
+        "only parsed descriptors contribute"
+    );
+    assert_eq!(survey.failed_source_uses.len(), usize::from(!complete));
+    assert!(
+        survey.failed_source_uses.iter().all(|attempt| {
+            !survey.origin.source_uses_refs().contains(attempt)
+                && inventory
+                    .iter_uses()
+                    .any(|used| used.id() == attempt && used.role() == SourceUseRole::Attempted)
+        }),
+        "failed reads are retained separately from contributors"
+    );
 }
 
 fn read(archive: &Archive, descriptors_only: bool) -> TestResult<(Placements, Value)> {

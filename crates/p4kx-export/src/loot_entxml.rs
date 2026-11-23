@@ -104,12 +104,23 @@ pub(crate) fn read_original(
     read: &EntryRead,
     capture: &EntryCapture<'_>,
     cancel: Option<&CancelToken>,
+    census: Option<&mut Vec<SourceUse>>,
 ) -> Result<Result<CapturedEntityLink, XmlError>, CatalogError> {
     let document = match EntryXml::parse(read, capture)? {
         Ok(document) => document,
         Err(error) => return Ok(Err(error)),
     };
-    Ok(Ok(read_document(&document, cancel)?))
+    let link = read_document(&document, cancel)?;
+    if let Some(census) = census
+        && link.original_complete()
+    {
+        let used = match &link.survey {
+            Some(used) => used.clone(),
+            None => document.document_source()?,
+        };
+        census.push(used);
+    }
+    Ok(Ok(link))
 }
 
 fn read_document(

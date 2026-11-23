@@ -82,6 +82,27 @@ impl EntryRead {
         limit: u64,
         cancel: Option<&CancelToken>,
     ) -> Result<Result<Self, EntryReadError>, CatalogError> {
+        Self::read_bounded(receipt, archive, entry, limit, cancel, Integrity::Archive)
+    }
+
+    pub(crate) fn read_bounded_verified(
+        receipt: EntryReceipt,
+        archive: &Archive,
+        entry: &Entry,
+        limit: u64,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Result<Self, EntryReadError>, CatalogError> {
+        Self::read_bounded(receipt, archive, entry, limit, cancel, Integrity::Verified)
+    }
+
+    fn read_bounded(
+        receipt: EntryReceipt,
+        archive: &Archive,
+        entry: &Entry,
+        limit: u64,
+        cancel: Option<&CancelToken>,
+        integrity: Integrity,
+    ) -> Result<Result<Self, EntryReadError>, CatalogError> {
         if entry.uncompressed_size() > limit {
             receipt.check_entry(archive, entry)?;
             if cancel.is_some_and(CancelToken::is_cancelled) {
@@ -89,7 +110,7 @@ impl EntryRead {
             }
             return Ok(Err(EntryReadError::Limit { limit }));
         }
-        Self::read_all(receipt, archive, entry, cancel)
+        Self::read_with(receipt, archive, entry, None, cancel, integrity)
     }
 
     pub(crate) fn read_all(

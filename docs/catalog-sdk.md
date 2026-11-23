@@ -1005,6 +1005,25 @@ The SDK query and replay took 642.495 s, with 1,114,333,184 bytes of private
 commit and 1,059,139,584 bytes of working set. Both replay workers wrote
 zero scratch bytes.
 
+## Loot container row scope
+
+`catalog_queries::loot::read_loot_container` and the session methods read one
+canonical `/lootContainers` key. Pass the physical system Archive Entry
+index, the authored multi-config GUID, the exact canonical container path
+and either a physical Starmap Record index or the null location key. The
+optional Catalog filter and placement budget apply to the original source walk.
+
+The query uses the writer's order for physical seeds and reached placements.
+The occurrence identifies the system, seed, outer Archive Entry and nested
+EntXML Entry that contributed the row. The source inventory also carries
+placement and link survey inputs and the references for failed reads.
+
+`Found` identifies a row with complete competing placement and owner evidence.
+`NotFound` requires complete coverage of the relevant selection.
+`Ambiguous` identifies competing admitted physical Records for the requested
+Starmap identity. `Unavailable` can carry an observed row when coverage is
+incomplete. A result stays scoped to the requested key.
+
 ## Loot container-document source scope
 
 Catalog v3 `declarations.lootEntityContainerDocuments` retains original attribute sites only from

@@ -3,12 +3,17 @@
 
 use std::collections::BTreeSet;
 
+use p4kx_export::catalog_queries::loot::{
+    LootAncestorSelection, LootContainerQuery, LootContainerStatus, read_loot_container,
+};
+use p4kx_extraction::find_entry;
+
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, TestStruct, TestType, TestValue,
 };
 use serde_json::{Value, json};
 
-use super::field_origin::{LITERAL, main_system, normal_catalog, source, system, target};
+use super::field_origin::{CONFIG, LITERAL, main_system, normal_catalog, source, system, target};
 use super::{ALIAS_TARGET, ROOT};
 use crate::health_origin_assertions as proof;
 use crate::health_origin_fixture::{self as fixture, Fixture, Input, TestResult};
@@ -20,6 +25,52 @@ const DETACHED: u128 = 0x4104;
 const MINING: &str = "@MiningClaims_Desc_001";
 const REACHED: &str = "Data/ObjectContainers/PU/Synthetic/Reached.socpak";
 const FALLBACK: &str = "Data/ObjectContainers/PU/system/FallBack/fallback.socpak";
+
+#[test]
+fn physical_loot_query_matches_the_published_row_and_its_author() -> TestResult {
+    let fixture = with_parent(&branch(PLANET, MARKER, "1", true))?;
+    let catalog = normal_catalog(&fixture)?;
+    let index = |path| -> TestResult<u32> {
+        let entry = find_entry(&fixture.archive, path).ok_or("the physical fixture Entry")?;
+        Ok(u32::try_from(entry.index())?)
+    };
+    let system = index(ROOT)?;
+    let requested = LootContainerQuery::new(
+        system,
+        CONFIG.parse()?,
+        ALIAS_TARGET,
+        LootAncestorSelection::RecordIndex(0),
+    );
+    let selected = read_loot_container(&fixture.archive, requested, None)?;
+    assert_eq!(
+        selected.status,
+        LootContainerStatus::Found,
+        "complete original placement"
+    );
+    assert_eq!(
+        selected.requested_aliases,
+        [0],
+        "the only terminal physical Record"
+    );
+    let occurrence = selected.occurrence.ok_or("the physical author")?;
+    assert_eq!(
+        occurrence.system_entry_index, system,
+        "the original system seed"
+    );
+    assert_eq!(
+        occurrence.containing_entry_index,
+        index(REACHED)?,
+        "the linked container owns the document"
+    );
+    let row = selected.row.ok_or("one exact canonical row")?;
+    let inventory = json!({"provenance": selected.source_inventory});
+    assert_eq!(
+        proof::with_origins(serde_json::to_value(row)?, &inventory)?,
+        proof::with_origins(only_row(&catalog)?.clone(), &catalog)?,
+        "the scoped row keeps the same original contributing inputs"
+    );
+    Ok(())
+}
 
 #[test]
 fn the_marker_chain_identifies_the_actual_admitted_parent() -> TestResult {
