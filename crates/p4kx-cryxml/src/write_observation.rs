@@ -154,6 +154,13 @@ fn source_span(
     section: Option<Range<usize>>,
 ) -> XmlRenderSpan {
     let observed = input.source.field(input, source, section);
+    if source.namespace.is_some()
+        && let Some(attribute) = source.attribute
+    {
+        let value = FieldSite::attribute(source.node, attribute, XmlFieldKind::AttributeValue);
+        let value = input.source.field(input, &value, None);
+        return XmlRenderSpan::namespace_name(emitted, observed, value);
+    }
     let complete = observed.is_some();
     let sources = observed.unwrap_or([None, None, None, None]);
     XmlRenderSpan::new(

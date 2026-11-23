@@ -4,9 +4,16 @@
 use std::borrow::Cow;
 use std::collections::{HashMap, HashSet};
 
+use p4kx_foundation::xml_name;
+
 use crate::element::Attribute;
 
+pub(crate) const DEFAULT_NAMESPACE_ATTRIBUTE: &str = "xmlns";
+
 const PAIRWISE_LIMIT: usize = 16;
+const ORDINARY_NAMESPACE_ATTRIBUTE: &str = "_xmlns";
+const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
+const XMLNS_NAMESPACE: &str = "http://www.w3.org/2000/xmlns/";
 
 /// Returns `name` as an XML name without namespace prefix: every character a name cannot hold,
 /// `:` included, becomes `_`, and an empty name becomes `_`.
@@ -31,10 +38,12 @@ pub(crate) fn sanitized(name: &str) -> Cow<'_, str> {
         .collect()
 }
 
-fn valid(index: usize, character: char) -> bool {
-    character.is_alphabetic()
-        || character == '_'
-        || (index > 0 && (character.is_alphanumeric() || matches!(character, '-' | '.')))
+const fn valid(index: usize, character: char) -> bool {
+    if index == 0 {
+        xml_name::is_start(character)
+    } else {
+        xml_name::is_continue(character)
+    }
 }
 
 /// Reusable scratch space that turns an element's attribute names into distinct XML names.
@@ -46,11 +55,17 @@ pub(crate) struct AttributeNames<'d> {
 pub(crate) struct ResolvedName<'d> {
     pub(crate) name: Cow<'d, str>,
     pub(crate) disambiguated: bool,
+    reserved_default: bool,
+}
+
+impl ResolvedName<'_> {
+    pub(crate) const fn uses_namespace_alias(&self) -> bool {
+        self.reserved_default && !self.disambiguated
+    }
 }
 
 impl<'d> AttributeNames<'d> {
-    /// Returns the sanitised names of `attributes` in order; a name that repeats an earlier one
-    /// gets the suffix `_2`, `_3`, … , the first that is not taken.
+    /// Returns distinct XML names in source order, with reserved default bindings made ordinary.
     pub(crate) fn resolve(
         &mut self,
         attributes: impl Iterator<Item = Attribute<'d>>,
@@ -59,11 +74,37 @@ impl<'d> AttributeNames<'d> {
         self.names.extend(attributes.map(|attribute| ResolvedName {
             name: sanitized(attribute.name()),
             disambiguated: false,
+            reserved_default: attribute.name() == DEFAULT_NAMESPACE_ATTRIBUTE
+                && matches!(attribute.value(), XML_NAMESPACE | XMLNS_NAMESPACE),
         }));
         if has_duplicates(&self.names) {
             make_unique(&mut self.names);
         }
+        repair_namespace_binding(&mut self.names);
         &self.names
+    }
+}
+
+fn repair_namespace_binding(names: &mut [ResolvedName<'_>]) {
+    let Some(index) = names.iter().position(ResolvedName::uses_namespace_alias) else {
+        return;
+    };
+    let alias = if names
+        .iter()
+        .any(|name| name.name == ORDINARY_NAMESPACE_ATTRIBUTE)
+    {
+        let taken: HashSet<_> = names.iter().map(|name| name.name.as_ref()).collect();
+        let mut suffix = 2;
+        Cow::Owned(free_suffix(
+            ORDINARY_NAMESPACE_ATTRIBUTE,
+            &mut suffix,
+            |candidate| taken.contains(candidate),
+        ))
+    } else {
+        Cow::Borrowed(ORDINARY_NAMESPACE_ATTRIBUTE)
+    };
+    if let Some(name) = names.get_mut(index) {
+        name.name = alias;
     }
 }
 
@@ -87,16 +128,20 @@ fn make_unique(names: &mut [ResolvedName<'_>]) {
         if taken.contains(&*name.name) {
             let base = name.name.to_string();
             let suffix = next_suffix.entry(base.clone()).or_insert(2);
-            let unique = loop {
-                let candidate = format!("{base}_{suffix}");
-                *suffix += 1;
-                if !taken.contains(&candidate) {
-                    break candidate;
-                }
-            };
+            let unique = free_suffix(&base, suffix, |candidate| taken.contains(candidate));
             name.name = Cow::Owned(unique);
             name.disambiguated = true;
         }
         taken.insert(name.name.to_string());
+    }
+}
+
+fn free_suffix(base: &str, suffix: &mut u64, is_taken: impl Fn(&str) -> bool) -> String {
+    loop {
+        let candidate = format!("{base}_{suffix}");
+        *suffix += 1;
+        if !is_taken(&candidate) {
+            return candidate;
+        }
     }
 }

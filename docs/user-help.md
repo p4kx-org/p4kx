@@ -160,6 +160,11 @@ conversion (CryXml, split textures, sounds, soundbanks and a DataForge file) int
 the Conversion of an Extraction does. It runs in the background with progress and **Cancel**, and
 ends with a summary. `p4kx convert` does the same on the command line.
 
+CryXml conversion emits XML 1.0 names. It replaces invalid name characters with underscores
+and assigns distinct names to colliding attributes. A forbidden default namespace binding
+becomes an ordinary attribute that retains its original value. Positioned export evidence keeps
+the source name and value.
+
 ## Comparing two Archives
 
 The **Comparison** tab next to **Browse** compares two Archives, for example an older against a newer Build.

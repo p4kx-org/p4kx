@@ -33,6 +33,13 @@ pub(crate) struct FieldSite {
     pub(crate) attribute: Option<u32>,
     pub(crate) kind: XmlFieldKind,
     pub(crate) preceding_names: Option<Range<u32>>,
+    pub(crate) namespace: Option<NamespaceChoice>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) enum NamespaceChoice {
+    Default,
+    Alias(Range<u32>),
 }
 
 impl FieldSite {
@@ -42,6 +49,7 @@ impl FieldSite {
             attribute: None,
             kind,
             preceding_names: None,
+            namespace: None,
         }
     }
 
@@ -51,6 +59,7 @@ impl FieldSite {
             attribute: Some(attribute),
             kind,
             preceding_names: None,
+            namespace: None,
         }
     }
 }
@@ -78,6 +87,24 @@ impl XmlWriteField {
     #[must_use]
     pub const fn preceding_names(&self) -> Option<&Range<u32>> {
         self.site.preceding_names.as_ref()
+    }
+
+    /// Returns the original attribute value index used to choose a default namespace name.
+    #[must_use]
+    pub const fn namespace_value_index(&self) -> Option<u32> {
+        match self.site.namespace {
+            Some(_) => self.site.attribute,
+            None => None,
+        }
+    }
+
+    /// Returns the original attribute group used to choose an available ordinary name.
+    #[must_use]
+    pub const fn namespace_alias_names(&self) -> Option<&Range<u32>> {
+        match &self.site.namespace {
+            Some(NamespaceChoice::Alias(names)) => Some(names),
+            _ => None,
+        }
     }
 
     /// Returns the half-open byte range in the emitted XML.

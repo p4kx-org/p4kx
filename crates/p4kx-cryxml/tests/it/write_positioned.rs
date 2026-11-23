@@ -7,6 +7,9 @@ use std::ops::Range;
 use p4kx_cryxml::{self as cryxml, XmlFieldKind, XmlRawKind, XmlRenderKind, XmlRenderSpan};
 use p4kx_testkit::{CryXmlByteOrder, CryXmlSignature, TestElement};
 
+#[path = "write_namespaces.rs"]
+mod namespaces;
+
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 #[test]

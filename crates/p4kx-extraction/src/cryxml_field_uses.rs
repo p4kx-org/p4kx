@@ -14,7 +14,7 @@ use crate::source_use::{SourceLocation, SourceUse, SourceUseRole};
 pub struct CryXmlFieldUses {
     /// The output field category.
     pub field: OriginXmlField,
-    /// The original value and any preceding-name selector actually used.
+    /// The original value and the selectors used to emit it.
     pub uses: Vec<SourceUse>,
 }
 
@@ -90,10 +90,45 @@ impl SourceScope {
                 SourceUseRole::Selector,
             )?);
         }
+        self.add_namespace_uses(field, attribute_namespace, names_namespace, base, &mut uses)?;
         Ok(Some(CryXmlFieldUses {
             field: output,
             uses,
         }))
+    }
+
+    fn add_namespace_uses(
+        &self,
+        field: &XmlWriteField,
+        attribute_namespace: &str,
+        names_namespace: &str,
+        base: Option<u64>,
+        uses: &mut Vec<SourceUse>,
+    ) -> Result<(), SourceEvidenceError> {
+        let node = u64::from(field.node_index());
+        if let Some(attribute) = field.namespace_value_index() {
+            uses.push(self.at(
+                location(
+                    attribute_namespace,
+                    &[node, u64::from(attribute)],
+                    "value",
+                    base,
+                ),
+                SourceUseRole::Selector,
+            )?);
+        }
+        if let Some(names) = field.namespace_alias_names() {
+            uses.push(self.at(
+                location(
+                    names_namespace,
+                    &[node, u64::from(names.start), u64::from(names.end)],
+                    "namespaceAliasSelection",
+                    base,
+                ),
+                SourceUseRole::Selector,
+            )?);
+        }
+        Ok(())
     }
 }
 

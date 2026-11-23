@@ -6,10 +6,10 @@ use std::io::{self, Write};
 use crate::document::Document;
 use crate::element::{Children, Element};
 use crate::escape::{Context, write_escaped};
-use crate::names::{AttributeNames, sanitized};
+use crate::names::{AttributeNames, DEFAULT_NAMESPACE_ATTRIBUTE, sanitized};
 use crate::write_observation::{ChildMarkup, Observation, no_sources};
 use crate::xml_render_span::RawSpans;
-use crate::xml_write_field::{FieldSite, Tracked, XmlFieldKind};
+use crate::xml_write_field::{FieldSite, NamespaceChoice, Tracked, XmlFieldKind};
 use crate::{XmlRenderKind, XmlRenderSpan, XmlWriteField};
 
 const DECLARATION: &[u8] = b"<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n";
@@ -109,6 +109,15 @@ where
                 FieldSite::attribute(element.index(), index, XmlFieldKind::AttributeName);
             if name.disambiguated {
                 site.preceding_names = Some(first..index);
+            }
+            if name.uses_namespace_alias() {
+                let count = u32::try_from(names.len()).map_err(io::Error::other)?;
+                let end = first
+                    .checked_add(count)
+                    .ok_or_else(|| io::Error::other("XML attribute index exceeds u32"))?;
+                site.namespace = Some(NamespaceChoice::Alias(first..end));
+            } else if name.name == DEFAULT_NAMESPACE_ATTRIBUTE {
+                site.namespace = Some(NamespaceChoice::Default);
             }
             out.field(
                 site,

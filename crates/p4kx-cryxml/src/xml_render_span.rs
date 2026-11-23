@@ -185,6 +185,10 @@ pub(crate) type RawSpans = [Option<XmlRawSpan>; 4];
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Contributors {
     Fields(RawSpans),
+    NamespaceName {
+        fields: RawSpans,
+        value: Box<RawSpans>,
+    },
     Indentation(Vec<XmlRawSpan>),
     ChildAbsence {
         fields: RawSpans,
@@ -212,6 +216,23 @@ impl XmlRenderSpan {
             kind,
             range,
             sources: Contributors::Fields(sources),
+            complete,
+        }
+    }
+
+    pub(crate) fn namespace_name(
+        range: Range<u64>,
+        fields: Option<RawSpans>,
+        value: Option<RawSpans>,
+    ) -> Self {
+        let complete = fields.is_some() && value.is_some();
+        Self {
+            kind: XmlRenderKind::Field(XmlFieldKind::AttributeName),
+            range,
+            sources: Contributors::NamespaceName {
+                fields: fields.unwrap_or_default(),
+                value: Box::new(value.unwrap_or_default()),
+            },
             complete,
         }
     }
@@ -267,18 +288,25 @@ impl XmlRenderSpan {
     pub const fn child_absence(&self) -> Option<&XmlChildAbsence> {
         match &self.sources {
             Contributors::ChildAbsence { absence, .. } => Some(absence),
-            Contributors::Fields(_) | Contributors::Indentation(_) => None,
+            Contributors::Fields(_)
+            | Contributors::NamespaceName { .. }
+            | Contributors::Indentation(_) => None,
         }
     }
 
     /// Iterates the contiguous contributors other than the separate child-absence proof.
     pub fn sources(&self) -> impl Iterator<Item = &XmlRawSpan> {
-        let (fields, indent): (&[_], &[_]) = match &self.sources {
+        let (fields, selector, indent): (&[_], &[_], &[_]) = match &self.sources {
             Contributors::Fields(fields) | Contributors::ChildAbsence { fields, .. } => {
-                (fields, &[])
+                (fields, &[], &[])
             }
-            Contributors::Indentation(indent) => (&[], indent),
+            Contributors::NamespaceName { fields, value } => (fields, value.as_slice(), &[]),
+            Contributors::Indentation(indent) => (&[], &[], indent),
         };
-        fields.iter().flatten().chain(indent)
+        fields
+            .iter()
+            .flatten()
+            .chain(selector.iter().flatten())
+            .chain(indent)
     }
 }
