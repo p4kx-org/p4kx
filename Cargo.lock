@@ -3795,6 +3795,7 @@ dependencies = [
  "p4kx-texture",
  "rayon",
  "serde_json",
+ "sha2",
  "thiserror 2.0.21",
 ]
 

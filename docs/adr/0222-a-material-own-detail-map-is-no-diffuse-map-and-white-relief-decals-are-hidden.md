@@ -84,7 +84,7 @@ These measurements establish a material-input difference between the exporters. 
 captures provide display-space RGB under hangar lighting. Incident light, exposure, display
 transform and active material parameters are still required to attribute the reported
 appearance to a shader input. A matched linear material readback or calibrated runtime
-comparison remains the evidence gate for a rendering change.
+comparison remains the evidence gate for attributing the difference to the game shader.
 
 ### Direct-sun game reference
 
@@ -113,3 +113,38 @@ by 21.0°. In a 13 × 13 pixel window around that point, the median code value f
 reflectance and frame response are uncalibrated.
 Attribution of the appearance difference still requires a matched material readback or a
 calibrated lighting and display comparison.
+
+## Release projection for the factory bow
+
+Textured GLB export approximates the Blender package's dielectric reflection for the confirmed
+factory-painted bow material. The exporter verifies the library and palette pair, the physical
+slot, the foundation and wear declarations, the original specular binding and the texture
+transfer. The approximation uses the selected mip and the same UV0 mapping.
+
+The exporter decodes the original RGB samples with their declared transfer and computes linear
+luminance. It multiplies each value by the selected palette luminance and the package's factor
+of 12.5 to get the package's Specular IOR Level. At IOR 1.5, a neutral glTF specular colour
+equal to twice that level approximates the package's normal-incidence reflectance. The neutral
+colour saturates at 1 and is stored as an sRGB texture in the optional
+`KHR_materials_specular` extension. The extension retains full grazing reflectance and its
+8-bit encoding and filtering can cause small differences between texel centres.
+
+The existing core GLB material supplies the fallback when a consumer lacks the extension or
+the source requirements do not hold. Base colour, normal, roughness and metallic inputs use
+their established paths. The source comparison supports this interchange approximation. A
+matched material readback or calibrated lighting and display comparison remains required to
+attribute the game appearance to a particular shader operation.
+
+### Verified export results
+
+The normal textured GLB and Blender package paths were repeated for LIVE 13220821 and
+PTU 13248297. Blender 5.3.0 build `02f0899d78e3` sampled the dielectric normal-incidence
+reflectance at the four original UVs with mip 2. The GLB estimate differs from the package
+by at most 0.000066 on each Build. The previous GLB default differs by up to 0.033574.
+The effective metalness is zero at the measured points in both paths.
+
+The candidate GLBs carry identical geometry bytes, core material parameters, and base
+colour, normal and packed finish image bytes compared with the earlier paired outputs.
+Each adds one reflectance texture. The glTF Validator reported no errors or warnings for either
+GLB. Synthetic controls additionally cover the neighbouring slot, another paint, source
+transfer and availability, and saturation at the glTF colour limit.

@@ -18,7 +18,7 @@ cbc.workspace = true
 crc32c.workspace = true
 crc32fast.workspace = true
 flate2.workspace = true
-gltf = { workspace = true, features = ["KHR_lights_punctual", "names"] }
+gltf = { workspace = true, features = ["KHR_lights_punctual", "KHR_materials_specular", "names"] }
 half.workspace = true
 lzma-rs.workspace = true
 opus-pure.workspace = true

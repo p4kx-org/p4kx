@@ -21,19 +21,17 @@ type Numbered = (usize, Job);
 pub(crate) fn layer_normals_last(jobs: Vec<Job>, wanted: &mut [Wish]) -> (Vec<Job>, Vec<usize>) {
     let primary: HashSet<usize> = wanted
         .iter()
-        .flat_map(|wish| wish.jobs.into_iter().flatten())
+        .flat_map(|wish| wish.jobs.into_iter().flatten().chain(wish.specular_colour))
         .collect();
     let fallbacks: HashSet<usize> = wanted
         .iter()
         .filter_map(|wish| wish.fallback)
         .filter(|job| !primary.contains(job))
         .collect();
-    let rank = |at: usize, job: &Job| {
-        if matches!(job.key, Key::LayerNormal { .. }) {
-            1
-        } else {
-            u8::from(fallbacks.contains(&at)) * 2
-        }
+    let rank = |at: usize, job: &Job| match job.key {
+        Key::FactoryBowSpecularColour { .. } => 3,
+        Key::LayerNormal { .. } => 1,
+        _ => u8::from(fallbacks.contains(&at)) * 2,
     };
     let mut numbered: Vec<(u8, Numbered)> = jobs
         .into_iter()
@@ -53,6 +51,7 @@ pub(crate) fn layer_normals_last(jobs: Vec<Job>, wanted: &mut [Wish]) -> (Vec<Jo
             .iter_mut()
             .flatten()
             .chain(wish.fallback.iter_mut())
+            .chain(wish.specular_colour.iter_mut())
         {
             *job = moved.get(*job).copied().unwrap_or(*job);
         }
@@ -69,7 +68,7 @@ pub(crate) fn layer_normals_last(jobs: Vec<Job>, wanted: &mut [Wish]) -> (Vec<Jo
 pub(crate) fn fallback_guards(wanted: &[Wish], len: usize) -> Vec<Vec<usize>> {
     let primary: HashSet<usize> = wanted
         .iter()
-        .flat_map(|wish| wish.jobs.into_iter().flatten())
+        .flat_map(|wish| wish.jobs.into_iter().flatten().chain(wish.specular_colour))
         .collect();
     let mut guards = vec![Vec::new(); len];
     for wish in wanted {

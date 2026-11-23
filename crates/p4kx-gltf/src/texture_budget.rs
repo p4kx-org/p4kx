@@ -127,6 +127,13 @@ impl Tally {
         };
         match store.dimensions(&source.path) {
             Ok(Some(size)) => self.reserve(size, Verdict::Refused),
+            Ok(None) if matches!(job.key, Key::FactoryBowSpecularColour { .. }) => {
+                Verdict::Failed(Failure {
+                    role,
+                    file: source.file.clone(),
+                    reason: "the optional specular colour has no verified dimensions".to_owned(),
+                })
+            }
             Ok(None) => Verdict::Unknown,
             Err(error) => Verdict::Failed(Failure {
                 role,
@@ -178,6 +185,7 @@ fn sized_by(job: &Job) -> Option<(TextureRole, &Source)> {
         Key::LayerBase { .. } | Key::LayerNormal { .. } | Key::LayerFinish { .. } => None,
         Key::Base { .. } => diffuse,
         Key::Normal { .. } => normal,
+        Key::FactoryBowSpecularColour { .. } => specular,
         Key::MetallicRoughness { .. } => {
             let mut candidates = normal.into_iter().chain(specular).chain(
                 job.explicit_gloss

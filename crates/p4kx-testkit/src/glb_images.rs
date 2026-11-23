@@ -94,20 +94,7 @@ pub(crate) fn check_textures(glb: &CheckedGlb) -> Result<(), String> {
     }
     let mut texture_used = vec![false; glb.document.textures().len()];
     for material in glb.document.materials() {
-        let pbr = material.pbr_metallic_roughness();
-        let references = [
-            pbr.base_color_texture().map(|info| info.texture().index()),
-            pbr.metallic_roughness_texture()
-                .map(|info| info.texture().index()),
-            material.normal_texture().map(|info| info.texture().index()),
-            material
-                .occlusion_texture()
-                .map(|info| info.texture().index()),
-            material
-                .emissive_texture()
-                .map(|info| info.texture().index()),
-        ];
-        for index in references.into_iter().flatten() {
+        for index in material_texture_indices(&material).into_iter().flatten() {
             *texture_used.get_mut(index).ok_or_else(|| {
                 format!(
                     "material {} has no texture {index}",
@@ -120,4 +107,29 @@ pub(crate) fn check_textures(glb: &CheckedGlb) -> Result<(), String> {
         return Err(format!("texture {orphan} is used by no material"));
     }
     Ok(())
+}
+
+fn material_texture_indices(material: &gltf::Material<'_>) -> [Option<usize>; 7] {
+    let pbr = material.pbr_metallic_roughness();
+    let specular = material.specular();
+    [
+        pbr.base_color_texture().map(|info| info.texture().index()),
+        pbr.metallic_roughness_texture()
+            .map(|info| info.texture().index()),
+        material.normal_texture().map(|info| info.texture().index()),
+        material
+            .occlusion_texture()
+            .map(|info| info.texture().index()),
+        material
+            .emissive_texture()
+            .map(|info| info.texture().index()),
+        specular
+            .as_ref()
+            .and_then(gltf::material::Specular::specular_texture)
+            .map(|info| info.texture().index()),
+        specular
+            .as_ref()
+            .and_then(gltf::material::Specular::specular_color_texture)
+            .map(|info| info.texture().index()),
+    ]
 }

@@ -22,6 +22,7 @@ pub(crate) struct Wish {
     pub(crate) slot: Slot,
     pub(crate) name: String,
     pub(crate) jobs: Wanted,
+    pub(crate) specular_colour: Option<usize>,
     /// The plain normal image of a material whose layered normal image is its normal job: the
     /// material is drawn with it when the layered one could not be made.
     pub(crate) fallback: Option<usize>,
@@ -55,6 +56,7 @@ fn slot_images(wish: &Wish, drawn: Option<usize>, made: &[(Option<usize>, Outcom
             })
         }),
         normal: of(drawn).and_then(|(index, _)| *index),
+        specular_colour: of(wish.specular_colour).and_then(|(index, _)| *index),
         metallic_roughness: of(packed).and_then(|(index, outcome)| {
             Some(MetallicRoughnessImage {
                 image: (*index)?,
@@ -130,7 +132,10 @@ impl TextureSet {
             .collect();
         for (wish, normal) in wanted.iter().zip(&drawn) {
             let [base, _, packed] = wish.jobs;
-            for job in [base, *normal, packed].into_iter().flatten() {
+            for job in [base, *normal, packed, wish.specular_colour]
+                .into_iter()
+                .flatten()
+            {
                 if let Some(used) = used.get_mut(job) {
                     *used = true;
                 }
@@ -162,6 +167,7 @@ impl TextureSet {
                 base,
                 normal,
                 packed,
+                wish.specular_colour,
                 drawn.filter(|job| Some(*job) != normal),
             ]
             .into_iter()

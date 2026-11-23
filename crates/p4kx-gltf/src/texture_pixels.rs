@@ -88,7 +88,7 @@ pub(crate) fn encode(value: f32) -> u8 {
     ENCODED.get(step).copied().unwrap_or(OPAQUE)
 }
 
-fn luminance([red, green, blue]: [f32; 3]) -> f32 {
+pub(crate) fn luminance([red, green, blue]: [f32; 3]) -> f32 {
     0.0722_f32.mul_add(blue, 0.2126_f32.mul_add(red, 0.7152 * green))
 }
 

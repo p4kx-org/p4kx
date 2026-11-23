@@ -3,14 +3,11 @@
 
 use std::collections::{BTreeMap, HashMap};
 
-use p4kx_model::Material;
 use p4kx_texture::DdsTransfer;
 
-use crate::layer_jobs::{fallback_guards, layer_jobs, layer_normals_last};
+use crate::layer_jobs::{fallback_guards, layer_normals_last};
 use crate::layer_plan::{LayerMaps, Layered};
-use crate::material_alpha::uses_alpha;
 use crate::materials::{MaterialPlan, Slot, display_name};
-use crate::shading::shading;
 use crate::surface_finish::SurfaceFinish;
 use crate::texture_assemble::Wish;
 use crate::texture_loader::{TextureLoader, WithFallbacks};
@@ -18,18 +15,15 @@ use crate::texture_make::{Budget, run_guarded};
 use crate::texture_origins::{TextureMaterialSource, TextureReadUse};
 use crate::texture_pixels::Tints;
 use crate::texture_report::{TextureFallback, TextureRole};
-use crate::texture_roles::{
-    Source, Sources, draws_by_opacity_map, explicit_gloss_sources, sources_with,
-};
+use crate::texture_roles::Source;
+
+mod jobs;
 
 /// The most images one GLB embeds.
 pub const MAX_TEXTURE_IMAGES: usize = 256;
 
 /// The most pixels all the images of one GLB hold together.
 pub const MAX_TEXTURE_PIXELS: u64 = 1 << 29;
-
-const NEUTRAL: [u8; 3] = [u8::MAX; 3];
-const REFUSED: &str = "the path is not a safe texture path";
 
 /// What an image of the GLB is made of; equal keys give equal images, which are embedded once.
 ///
@@ -44,6 +38,10 @@ pub(crate) enum Key {
         decal: Option<[[u8; 3]; 3]>,
         keep_alpha: bool,
         opacity_source: bool,
+    },
+    FactoryBowSpecularColour {
+        source: String,
+        level_scale: u32,
     },
     Normal {
         normal: String,
@@ -117,6 +115,9 @@ impl Job {
         match &self.key {
             Key::Base { .. } => self.diffuse.as_ref().map(|s| (TextureRole::Diffuse, s)),
             Key::Normal { .. } => self.normal.as_ref().map(|s| (TextureRole::Normal, s)),
+            Key::FactoryBowSpecularColour { .. } => {
+                self.specular.as_ref().map(|s| (TextureRole::Specular, s))
+            }
             Key::LayerBase { .. } => self
                 .layered
                 .as_ref()
@@ -183,6 +184,7 @@ pub(crate) struct MetallicRoughnessImage {
 pub(crate) struct SlotImages {
     pub(crate) base: Option<BaseImage>,
     pub(crate) normal: Option<usize>,
+    pub(crate) specular_colour: Option<usize>,
     pub(crate) metallic_roughness: Option<MetallicRoughnessImage>,
 }
 
@@ -206,18 +208,6 @@ pub(crate) struct PartSlots<'a> {
     pub(crate) slots: Vec<Slot>,
 }
 
-fn quantise(colour: [f32; 3]) -> [u8; 3] {
-    colour.map(|channel| {
-        #[expect(
-            clippy::cast_possible_truncation,
-            clippy::cast_sign_loss,
-            reason = "the channel is between 0 and 1"
-        )]
-        let byte = (channel.clamp(0.0, 1.0) * 255.0).round() as u8;
-        byte
-    })
-}
-
 impl TextureSet {
     /// Returns the images of the materials `parts` ask for, loaded at mip level `mip`.
     ///
@@ -239,14 +229,19 @@ impl TextureSet {
                         jobs.len() - 1
                     })
                 };
-                let (images, fallback, refused) = jobs_of(material, &mut add);
+                let jobs = jobs::jobs_of(
+                    material,
+                    requested.plan.approximates_factory_bow(slot),
+                    &mut add,
+                );
                 wanted.push(Wish {
                     part: requested.part,
                     slot,
                     name: display_name(material, slot),
-                    jobs: images,
-                    fallback,
-                    refused,
+                    jobs: jobs.images,
+                    specular_colour: jobs.specular_colour,
+                    fallback: jobs.fallback,
+                    refused: jobs.refused,
                 });
             }
         }
@@ -284,118 +279,4 @@ impl TextureSet {
             .map(|image| u64::from(image.width) * u64::from(image.height))
             .sum()
     }
-}
-
-fn refusals(refused: &[(TextureRole, String)]) -> Vec<Failure> {
-    refused
-        .iter()
-        .map(|(role, file)| Failure {
-            role: *role,
-            file: file.clone(),
-            reason: REFUSED.to_owned(),
-        })
-        .collect()
-}
-
-fn tints_of(material: &Material) -> Tints {
-    let shade = shading(material);
-    Tints {
-        diffuse: shade.diffuse.map(|channel| channel.clamp(0.0, 1.0)),
-        specular: shade.specular.map(|channel| channel.clamp(0.0, 1.0)),
-        decal: material
-            .decal_colours
-            .map(|colours| colours.map(|colour| colour.map(|channel| channel.clamp(0.0, 1.0)))),
-    }
-}
-
-/// Returns the job of the base colour image of the diffuse map `diffuse` of `material`, with the
-/// specular map of `found`, if any.
-fn base_job(
-    material: &Material,
-    (found, diffuse): (&Sources, &Source),
-    specular: Option<(String, [u8; 3])>,
-    tints: Tints,
-) -> Job {
-    let tint = if specular.is_some() {
-        quantise(tints.diffuse)
-    } else {
-        NEUTRAL
-    };
-    Job {
-        key: Key::Base {
-            diffuse: diffuse.identity(),
-            specular,
-            tint,
-            decal: tints
-                .decal
-                .filter(|_| diffuse.opacity)
-                .map(|colours| colours.map(quantise)),
-            keep_alpha: diffuse.opacity || uses_alpha(material),
-            opacity_source: diffuse.opacity,
-        },
-        diffuse: Some(diffuse.clone()),
-        normal: None,
-        specular: found.specular.clone(),
-        explicit_gloss: Vec::new(),
-        tints,
-        layered: None,
-    }
-}
-
-/// Registers the jobs for the images of `material` with `add`, which returns a job's number, and
-/// returns the jobs with the textures refused for their unsafe paths.
-fn jobs_of(
-    material: &Material,
-    add: &mut impl FnMut(Job) -> usize,
-) -> (Wanted, Option<usize>, Vec<Failure>) {
-    let mut found = sources_with(material, draws_by_opacity_map(material));
-    if found.diffuse.as_ref().is_none_or(|diffuse| diffuse.opacity) {
-        found.specular = None;
-    }
-    let explicit_gloss = explicit_gloss_sources(material, &mut found.refused);
-    let mut refused = refusals(&found.refused);
-    let tints = tints_of(material);
-    let specular_key = found
-        .specular
-        .as_ref()
-        .map(|specular| (specular.identity(), quantise(tints.specular)));
-    let (layer_base, layer_normal, layer_finish, layer_refused) =
-        layer_jobs(material, &found, tints);
-    refused.extend(refusals(&layer_refused));
-    let base = match (&found.diffuse, layer_base) {
-        (Some(diffuse), _) => Some(add(base_job(
-            material,
-            (&found, diffuse),
-            specular_key.clone(),
-            tints,
-        ))),
-        (None, layered) => layered.map(&mut *add),
-    };
-    let plain_normal = found.normal.as_ref().map(|normal| {
-        add(Job {
-            key: Key::Normal {
-                normal: normal.identity(),
-            },
-            diffuse: None,
-            normal: found.normal.clone(),
-            specular: None,
-            explicit_gloss: Vec::new(),
-            tints,
-            layered: None,
-        })
-    });
-    let (normal, fallback) = layer_normal.map_or((plain_normal, None), |layered| {
-        (Some(add(layered)), plain_normal)
-    });
-    let packed = layer_finish.map(&mut *add).or_else(|| {
-        crate::texture_finish_plan::own_packed(
-            material,
-            &found,
-            explicit_gloss,
-            specular_key,
-            tints,
-        )
-        .map(&mut *add)
-    });
-    ([base, normal, packed], fallback, refused)
 }

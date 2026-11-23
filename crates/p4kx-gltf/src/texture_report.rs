@@ -11,7 +11,7 @@ pub enum TextureRole {
     Diffuse,
     /// The normal map, whose alpha channel may hold the smoothness.
     Normal,
-    /// The specular map, which gives the metalness.
+    /// The specular map, which supplies metalness or dielectric reflectance.
     Specular,
     /// The explicit gloss map, whose RGB gives the smoothness.
     Gloss,

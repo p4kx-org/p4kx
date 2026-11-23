@@ -324,6 +324,13 @@ fn make(job: &Job, decoded: &Decoded) -> Outcome {
         Key::Normal { .. } => make_normal(job, decoded, &mut outcome, &mut failures),
         Key::MetallicRoughness { .. } => make_packed(job, decoded, &mut outcome, &mut failures),
         Key::LayerBase { .. } => make_base_layers(job, decoded, &mut outcome, &mut failures),
+        Key::FactoryBowSpecularColour { level_scale, .. } => crate::factory_bow_reflectance::make(
+            job,
+            *level_scale,
+            decoded,
+            &mut outcome,
+            &mut failures,
+        ),
         Key::LayerNormal { .. } => make_normal_layers(job, decoded, &mut outcome, &mut failures),
         Key::LayerFinish { .. } => {
             crate::layer_finish::make(job, decoded, &mut outcome, &mut failures)

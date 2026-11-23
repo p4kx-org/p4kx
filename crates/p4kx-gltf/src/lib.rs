@@ -35,6 +35,7 @@ mod axes;
 mod block_data;
 mod document;
 mod error;
+mod factory_bow_reflectance;
 mod glb;
 mod glb_json;
 mod glb_options;

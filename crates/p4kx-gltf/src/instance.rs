@@ -8,6 +8,7 @@ use json::{Index, Root};
 use p4kx_model::{Animation, Lod, Model, Transform};
 use serde_json::Value;
 
+use crate::factory_bow_reflectance;
 use crate::layout::{Layout, MaterialUse};
 use crate::materials::{MaterialPlan, MaterialTextures, Slot, build_material, display_name};
 use crate::scene_light::SceneLight;
@@ -76,7 +77,8 @@ pub(crate) fn materials(
                 };
                 let has_images = images.base.is_some()
                     || images.normal.is_some()
-                    || images.metallic_roughness.is_some();
+                    || images.metallic_roughness.is_some()
+                    || images.specular_colour.is_some();
                 let key = (slot, has_images);
                 let index = if let Some(&index) = pushed.get(&key) {
                     index
@@ -98,6 +100,11 @@ pub(crate) fn materials(
             by_id
         })
         .collect();
+    declare_material_extensions(root);
+    (ids, requests.saturating_sub(root.materials.len()))
+}
+
+fn declare_material_extensions(root: &mut Root) {
     if root.materials.iter().any(|material| {
         material
             .extensions
@@ -107,7 +114,15 @@ pub(crate) fn materials(
         root.extensions_used
             .push("KHR_materials_emissive_strength".to_owned());
     }
-    (ids, requests.saturating_sub(root.materials.len()))
+    if root.materials.iter().any(|material| {
+        material
+            .extensions
+            .as_ref()
+            .is_some_and(|extensions| extensions.specular.is_some())
+    }) {
+        root.extensions_used
+            .push(factory_bow_reflectance::EXTENSION.to_owned());
+    }
 }
 
 fn built_material(
@@ -126,6 +141,7 @@ fn built_material(
         metallic_roughness: images
             .metallic_roughness
             .and_then(|packed| Some((texture(packed.image)?, packed.roughness, packed.metallic))),
+        specular_colour: images.specular_colour.and_then(texture),
     };
     build_material(material, &display_name(material, slot), &drawn_with)
 }
