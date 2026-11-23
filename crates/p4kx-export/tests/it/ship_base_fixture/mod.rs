@@ -242,3 +242,19 @@ pub(crate) fn write_encrypted_vehicle_archive(dir: &Path) -> Result<PathBuf, Box
         .write_to(&path)?;
     Ok(path)
 }
+
+/// Writes a clear containing Entry around mixed vehicle and DataForge inputs.
+pub(crate) fn write_nested_vehicle_provenance_archive(
+    dir: &Path,
+) -> Result<PathBuf, Box<dyn Error>> {
+    let inner = ArchiveBuilder::v2()
+        .entry(TestEntry::stored("Data\\Game2.dcb", database().build()))
+        .entry(
+            TestEntry::stored(format!("{XML_DIR}ACME_Alpha.xml"), ALPHA_XML.as_bytes()).encrypted(),
+        );
+    let path = dir.join("Data.p4k");
+    ArchiveBuilder::v2()
+        .entry(TestEntry::stored("nested.pak", inner.build()))
+        .write_to(&path)?;
+    Ok(path)
+}

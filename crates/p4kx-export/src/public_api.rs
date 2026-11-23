@@ -59,9 +59,9 @@ pub use crate::selection::{
 };
 pub use crate::ship_base::{
     BuiltShipBase, Cargo, CargoGrid, Hull, HullThreshold, Implementation, LoadoutPort, Mass,
-    MassBasis, PartialPartValue, SHIP_BASE_VERSION, ShipBase, ShipBaseError, ShipBaseOptions,
-    ShipReader, Source, SourceKind, SourceShare, Sourced, UnreadablePartValue, VehicleKind,
-    build_ship_base, build_ship_base_from,
+    MassBasis, PartialPartValue, SHIP_BASE_VERSION, ShipBase, ShipBaseError, ShipBaseEvidence,
+    ShipBaseOptions, ShipReader, Source, SourceKind, SourceShare, Sourced, UnreadablePartValue,
+    VehicleKind, build_ship_base, build_ship_base_from,
 };
 pub use crate::shop_summary::ShopSummary;
 pub use crate::starmap_report::StarmapReport;

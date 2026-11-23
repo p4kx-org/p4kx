@@ -9,28 +9,28 @@
 //! the library API for catalog kinds built on the same values.
 
 mod cargo;
+mod evidence;
 mod model;
 mod read;
 mod select;
 mod write;
 
-use std::sync::Arc;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::SystemTime;
 
-use p4kx_assembly::{ArchiveFiles, Entities};
 use p4kx_channels::PublicPatches;
-use p4kx_extraction::{Archive, CancelToken, DataForgeEntry, Filter, Record};
-use rayon::prelude::*;
+use p4kx_extraction::{
+    Archive, CancelToken, DataForgeEntry, Filter, Record, SourceInventory, SourceInventorySelection,
+};
 use serde_json::Value;
 
 use crate::ArchiveKeyUse;
 use crate::build::source;
 use crate::guid_text::CatalogGuid;
-use crate::{CatalogFailure, CatalogPhase, CatalogProgress};
+use crate::{CatalogFailure, CatalogProgress};
 
 pub(crate) use cargo::Observation as ShipCargoObservation;
 pub use cargo::{ShipCargoMountSource, ShipCargoSource};
+pub use evidence::ShipBaseEvidence;
 pub(crate) use model::ShipRead;
 pub use model::{
     Cargo, CargoGrid, Hull, HullThreshold, Implementation, LoadoutPort, Mass, MassBasis,
@@ -90,6 +90,8 @@ impl std::fmt::Debug for ShipBaseOptions<'_> {
 #[derive(Debug, Clone, PartialEq)]
 pub struct BuiltShipBase {
     ships: Vec<ShipBase>,
+    evidence: Vec<ShipBaseEvidence>,
+    source_inventory: SourceInventory,
     failures: Vec<CatalogFailure>,
     skipped: usize,
     source: Value,
@@ -102,6 +104,22 @@ impl BuiltShipBase {
     #[must_use]
     pub fn ships(&self) -> &[ShipBase] {
         &self.ships
+    }
+
+    /// Iterates each written row with its physical identity and immediate field origins.
+    pub fn rows_with_evidence(
+        &self,
+    ) -> impl ExactSizeIterator<Item = (&ShipBase, &ShipBaseEvidence)> {
+        self.ships.iter().zip(&self.evidence)
+    }
+
+    /// Selects the original source-use closure of all emitted vehicle rows.
+    ///
+    /// # Errors
+    /// Returns an error if an emitted source reference cannot be verified.
+    pub fn provenance(&self) -> Result<SourceInventorySelection<'_>, ShipBaseError> {
+        let references = self.evidence.iter().flat_map(ShipBaseEvidence::references);
+        Ok(self.source_inventory.select_uses(references)?)
     }
 
     /// Returns the ships that could not be read; they are left out.
@@ -153,49 +171,22 @@ pub fn build_ship_base(
 /// # Errors
 ///
 /// As [`build_ship_base`], except that the DataForge Entry is not read here.
+/// An Entry bound to another original Archive is rejected.
 pub fn build_ship_base_from(
     archive: &Archive,
     entry: &DataForgeEntry,
     options: &ShipBaseOptions<'_>,
 ) -> Result<BuiltShipBase, ShipBaseError> {
     let forge = entry.open().map_err(ShipBaseError::DataForge)?;
-    let files = ArchiveFiles::new(archive);
     let records: Vec<Record<'_>> = forge.records().collect();
     let selection = select::ships(&records, options);
-    let total = selection.ships.len();
-    let done = AtomicUsize::new(0);
-    let entities = Arc::new(Entities::new(&forge));
-    let read: Vec<Option<Result<ShipBase, CatalogFailure>>> = selection
-        .ships
-        .par_iter()
-        .map_init(
-            || ShipReader::with_entities(Arc::clone(&entities), &files),
-            |reader, record| {
-                if options.cancel.is_some_and(CancelToken::is_cancelled) {
-                    return None;
-                }
-                let result = reader.read(record);
-                let finished = done.fetch_add(1, Ordering::Relaxed).saturating_add(1);
-                if let Some(progress) = options.progress {
-                    progress(CatalogProgress {
-                        phase: CatalogPhase::Records,
-                        records_done: finished,
-                        records_total: total,
-                    });
-                }
-                Some(result)
-            },
-        )
-        .collect();
-    let mut ships = Vec::with_capacity(read.len());
+    let observed =
+        crate::build::standalone_ships::read(archive, entry, &forge, &selection.ships, options)?;
+    let mut rows = observed.rows;
+    rows.sort_by_key(|(ship, _)| CatalogGuid(ship.guid).text());
+    let (ships, evidence) = rows.into_iter().unzip();
     let mut failures = selection.failures;
-    for result in read {
-        match result.ok_or(ShipBaseError::Cancelled)? {
-            Ok(ship) => ships.push(ship),
-            Err(failure) => failures.push(failure),
-        }
-    }
-    ships.sort_by_key(|ship| CatalogGuid(ship.guid).text());
+    failures.extend(observed.failures);
     failures.sort_by(|a, b| a.record_path.cmp(&b.record_path).then(a.guid.cmp(&b.guid)));
     let archive_key = ArchiveKeyUse::of(archive);
     let source = serde_json::to_value(source(
@@ -206,6 +197,8 @@ pub fn build_ship_base_from(
     ))?;
     Ok(BuiltShipBase {
         ships,
+        evidence,
+        source_inventory: observed.provenance,
         failures,
         skipped: selection.skipped,
         source,

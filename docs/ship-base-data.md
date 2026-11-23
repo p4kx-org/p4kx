@@ -25,11 +25,10 @@ p4kx ships <archive> --out <file> [--format json|ndjson] [--filter <filter>] [--
 
 ## Selection and order
 
-A ship is an Entity Record under `entities/spaceships` or `entities/groundvehicles`, the selection
-of the catalog's `ships` kind, without the development leftovers (`test`, `template`, `dummy`,
-`debug`, `deprecated`, `dev`, and for ships also `temp`, `display`, `hijacked` as whole words),
-which are counted as skipped. Version 2 left out the ships with the three ship words, 21 on LIVE
-(ADR-0167); version 1 listed them. Ships are ordered by the text of their GUID.
+The command uses the same vehicle selection as the Catalog, including supported ATLS exosuits.
+It counts development leftovers as skipped based on the whole words `test`, `template`, `dummy`,
+`debug`, `deprecated`, `dev`, `temp`, `display` and `hijacked` (ADR-0167).
+Ships are ordered by the text of their GUID.
 
 ## JSON document
 
@@ -39,7 +38,22 @@ which are counted as skipped. Version 2 left out the ships with the three ship w
 
 `source` is the `source` object of the P4KX catalog (Channel, Build, Archive size and time,
 whether the Archive key was there and how many encrypted Entries stayed unread, tool version,
-export time). NDJSON has the ship objects only.
+export time).
+
+JSON puts the shared `provenance` inventory at the document root. Each NDJSON line carries
+its own `provenance` inventory of the source uses and their physical ancestry for that row.
+The row has the same vehicle fields in both formats. `recordIndex` identifies the physical
+Record within its Build, including when two rows share a GUID and original path.
+
+`fieldOrigins` addresses values with JSON Pointers relative to one vehicle row. The initial
+evidence covers `/guid`, `/className`, `/recordPath`, `/recordIndex`, `/vehicleKind`,
+`/vehicleKindState`, `/mass/kg`, `/mass/basis`, `/hull/health`, `/cargo/scu` and
+`/cargo/gridsWithIssue`. A null mass or hull is addressed as `/mass` or `/hull`.
+Each entry has `containsEncryptedSource`, `sourceSetComplete` and exact `sourceUsesRefs`.
+The new `playability` cell carries its own state and origin. `vehicleKindState` distinguishes
+a proved omission from unavailable original evidence while `vehicleKind` keeps its nullable
+string representation. Detailed thresholds, cargo dimensions/cells and Loadout port
+fields still carry the descriptive sources documented below.
 
 ## Ship
 
@@ -47,7 +61,7 @@ export time). NDJSON has the ship objects only.
 | --- | --- |
 | `guid`, `className`, `recordPath` | Identity of the ship's Record |
 | `implementation` | `file`, `modification`, `patchFile` of the vehicle implementation read; `null` when the ship names none or it cannot be read |
-| `vehicleKind` | `spaceship` or `groundVehicle`, see below; `null` when the evidence disagrees |
+| `vehicleKind` | `spaceship`, `groundVehicle` or `exosuit`, see below; `null` when the kind cannot be determined |
 | `size` | `{value, source}` from `AttachDef.Size`; `null` without one |
 | `mass` | hull mass, see below; `null` when neither parts nor physics controller state one |
 | `hull` | hull hit points, see below; `null` without a vehicle implementation or when no part states a `damageMax` |
@@ -72,7 +86,8 @@ the origins that supplied a value appear.
 (`class="Tread"`) part. A missing or unreadable vehicle implementation counts as no wheels, so such
 a Record under `entities/spaceships` is a `spaceship`. A wheeled or tracked Record under `entities/spaceships` gives `null`: the
 folder and the implementation disagree, and the kind is not guessed. The P4KX catalog carries
-the value as `vehicleKind` (`catalog.md`, "Ship base data").
+the value as `vehicleKind` (`catalog.md`, "Ship base data"). Supported ATLS owners with
+verified Actor and driver-seat evidence have `exosuit` (ADR-0417).
 
 ### Mass
 

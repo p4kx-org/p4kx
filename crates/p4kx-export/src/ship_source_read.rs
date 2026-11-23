@@ -29,6 +29,8 @@ mod insurance;
 mod playability_inputs;
 #[path = "ship_source_selection.rs"]
 mod selection;
+#[path = "ship_source_standalone.rs"]
+pub(crate) mod standalone;
 
 pub(crate) use aggregate::ShipAggregateOperands;
 pub use playability_inputs::ShipPlayabilityInputs;

@@ -10,7 +10,6 @@ use p4kx_extraction::{
 use rayon::prelude::*;
 
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_query_session::checkpoint;
 use crate::export_ledger::ExportLedger;
 use crate::playability::Playability;
 use crate::record_fields::{
@@ -21,6 +20,11 @@ use crate::{CatalogError, CatalogFailure, CatalogReadFailure, Kind};
 
 #[path = "playability_dependency_source.rs"]
 mod dependency_source;
+
+#[path = "playability_ship_dependencies.rs"]
+mod ship_dependencies;
+
+pub(crate) use ship_dependencies::ShipDependencies;
 
 const MANIFEST_TYPE: &str = "CrewManifest";
 const TAG_TYPE: &str = "Tag";
@@ -96,28 +100,6 @@ impl Evidence {
         cancel: Option<&CancelToken>,
     ) -> Result<(Self, Vec<CatalogReadFailure<'f>>, ExportLedger), CatalogError> {
         Self::read_observed(records, Some(input), cancel)
-    }
-
-    /// Reads the physical manifest and tag aliases reached by the selected Ships.
-    pub(crate) fn read_for_ships<'tree, 'source: 'tree>(
-        ships: impl IntoIterator<Item = &'tree RecordTree<'source>>,
-        input: &OriginalCatalogInput<'_, 'source>,
-        cancel: Option<&CancelToken>,
-    ) -> Result<(Self, ExportLedger), CatalogError> {
-        let mut targets = HashSet::new();
-        for tree in ships {
-            checkpoint(cancel)?;
-            targets.extend(manifest_guid(tree));
-            targets.extend(tag_guids(tree));
-        }
-        let mut records = Vec::new();
-        for guid in targets {
-            checkpoint(cancel)?;
-            records.extend(input.forge().records_by_guid(guid));
-        }
-        records.sort_by_key(Record::index);
-        let (evidence, _, ledger) = Self::read_captured(&records, input, cancel)?;
-        Ok((evidence, ledger))
     }
 
     fn read_observed<'f>(

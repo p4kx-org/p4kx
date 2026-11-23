@@ -5,6 +5,8 @@
 
 #[path = "ship_base_cargo_bounds.rs"]
 mod cargo_bounds;
+#[path = "ship_base_provenance.rs"]
+mod provenance;
 
 use crate::ship_base_fixture::{
     ALPHA, ALPHA_XML, BETA, BROKEN, CAR, GROUND, MIXED, ROLLING, UNKNOWN, write_archive,
@@ -375,7 +377,19 @@ fn json_and_ndjson_carry_the_same_ships_in_the_same_order() -> TestResult {
         .lines()
         .map(serde_json::from_str)
         .collect::<Result<_, _>>()?;
-    assert_eq!(lines, from_json);
+    assert_eq!(lines.len(), from_json.len(), "same number of vehicle rows");
+    for (line, expected) in lines.iter().zip(&from_json) {
+        let mut value = line.clone();
+        let fields = value.as_object_mut().ok_or("NDJSON row object")?;
+        assert!(
+            fields.remove("provenance").is_some(),
+            "the line carries its own source closure"
+        );
+        assert_eq!(
+            &value, expected,
+            "legacy data and row evidence are identical across formats"
+        );
+    }
     assert_eq!(lines[0]["cargo"]["scu"], 18.5);
     assert!(lines[5]["cargo"]["scu"].is_null(), "unknown cargo is null");
     assert_eq!(lines[0]["mass"]["sources"][0]["kind"], "vehicleXml");

@@ -21,6 +21,8 @@ pub(crate) use metadata::source;
 mod assembly;
 #[path = "build_scan.rs"]
 mod scanning;
+#[path = "build_standalone_ships.rs"]
+pub(crate) mod standalone_ships;
 
 #[cfg(test)]
 #[path = "installed_ship_source_projection.rs"]
