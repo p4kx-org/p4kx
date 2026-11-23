@@ -265,7 +265,7 @@ impl CellTrace {
     }
 
     pub(super) fn value(&mut self, forge: &DataForge<'_>, bytes: Option<&[u8]>, value: &Value<'_>) {
-        let payload = value_sources(forge, bytes, value);
+        let payload = value_sources(forge, bytes, value, false);
         let mut sources = self.path.clone();
         sources.extend(payload.into_iter().flatten());
         self.evidence.traversed.extend(sources.iter().copied());
@@ -303,9 +303,12 @@ pub(super) fn value_sources(
     forge: &DataForge<'_>,
     bytes: Option<&[u8]>,
     value: &Value<'_>,
+    include_empty_text: bool,
 ) -> [Option<QuerySource>; 2] {
     let text = match value {
-        Value::String(text) | Value::Locale(text) | Value::Enum(text) => {
+        Value::String(text) | Value::Locale(text) | Value::Enum(text)
+            if include_empty_text || !text.is_empty() =>
+        {
             forge.original_text_span(text)
         }
         _ => None,

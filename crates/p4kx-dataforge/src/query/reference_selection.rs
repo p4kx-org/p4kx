@@ -71,13 +71,16 @@ impl Query {
         observe_layout: Option<&dyn Fn(LayoutSource)>,
         mut observe: impl FnMut(QuerySource),
     ) -> Result<(CompiledQuery<'source>, ReferenceCoverage), QueryError> {
+        let detailed = observe_type.is_some();
         let mut coverage = ReferenceCoverage::Complete;
         let compiled =
             self.compile_with_lookup(forge, observe_type, observe_layout, |targets| {
-                observe(QuerySource::RecordLookup {
-                    kind: targets.kind,
-                    end: forge.record_count() as u64,
-                });
+                if detailed {
+                    observe(QuerySource::RecordLookup {
+                        kind: targets.kind,
+                        end: forge.record_count() as u64,
+                    });
+                }
                 for &index in &targets.positions {
                     observe(QuerySource::ReferenceTarget {
                         index,

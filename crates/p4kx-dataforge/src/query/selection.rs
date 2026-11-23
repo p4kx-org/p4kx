@@ -237,7 +237,7 @@ impl<'f> CompiledQuery<'f> {
         };
         match plan {
             Plan::Read { tests, .. } => self
-                .instance_of_observed(record, control.observer())
+                .instance_of_observed(record, control.predicate_observer())
                 .map_or(Ok(RetainedUnreadable), |place| {
                     predicate
                         .eval(self.forge, tests, place, control)

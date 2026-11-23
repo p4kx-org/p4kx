@@ -80,13 +80,9 @@ impl Predicate {
                     return Ok(None);
                 };
                 test.reader
-                    .any(
-                        forge,
-                        place,
-                        &|| control.proceed(),
-                        control.observer(),
-                        |value| test.operand.compare(*operator, value),
-                    )
+                    .any(forge, place, control, |value| {
+                        test.operand.compare(*operator, value)
+                    })
                     .map_err(|source| EvaluationError::Read {
                         comparison: *index,
                         source,

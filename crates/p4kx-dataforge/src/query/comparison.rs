@@ -4,6 +4,7 @@
 use std::ops::ControlFlow;
 
 use crate::query::reader::{Column, Reader};
+use crate::query::selection_control::Control;
 use crate::query::sink::{Reached, Sink};
 use crate::query::source::{self, QueryByteUse, QuerySource, TraversalInput};
 use crate::query::traversal_gap;
@@ -14,11 +15,10 @@ use crate::{DataForge, Value, ValueError};
 struct Matching<'s, 'f> {
     forge: &'f DataForge<'f>,
     leaf: &'s Column,
-    proceed: &'s dyn Fn() -> bool,
+    control: &'s Control<'s>,
     test: &'s dyn Fn(&Value<'f>) -> Option<bool>,
     result: Option<bool>,
     error: Option<ValueError>,
-    observer: Option<&'s (dyn Fn(QuerySource) + Sync)>,
 }
 
 impl Matching<'_, '_> {
@@ -28,11 +28,45 @@ impl Matching<'_, '_> {
         }
         self.error.map_or(Ok(self.result), Err)
     }
+
+    fn observe_value(&self, place: Option<Place<'_>>, bytes: Option<&[u8]>, value: &Value<'_>) {
+        let Some(observe) = self.control.observer() else {
+            return;
+        };
+        let details = self.control.predicate_observer().is_some();
+        if matches!(value, Value::Error(_)) && details {
+            let attempted = bytes
+                .and_then(|bytes| {
+                    QuerySource::bytes(self.forge, bytes, QueryByteUse::AttemptedValue)
+                })
+                .or_else(|| {
+                    place.map(|place| {
+                        traversal_gap::unavailable(
+                            self.forge,
+                            place,
+                            self.leaf.start,
+                            self.leaf.end.saturating_sub(self.leaf.start),
+                            TraversalInput::Value,
+                        )
+                    })
+                });
+            if let Some(source) = attempted {
+                observe(source);
+            }
+            return;
+        }
+        for source in source::value_sources(self.forge, bytes, value, details)
+            .into_iter()
+            .flatten()
+        {
+            observe(source);
+        }
+    }
 }
 
 impl<'f> Sink<'f> for Matching<'_, 'f> {
     fn proceed(&mut self) -> ControlFlow<()> {
-        if (self.proceed)() {
+        if self.control.proceed() {
             ControlFlow::Continue(())
         } else {
             ControlFlow::Break(())
@@ -44,66 +78,42 @@ impl<'f> Sink<'f> for Matching<'_, 'f> {
     }
 
     fn source_depth(&self) -> Option<usize> {
-        self.observer.map(|_| 0)
+        self.control.observer().map(|_| 0)
     }
 
     fn route(&mut self, source: QuerySource) {
-        if let Some(observer) = self.observer {
-            observer(source);
+        if let Some(observe) = self.control.observer() {
+            observe(source);
         }
     }
 
     fn predicate_observer(&self) -> Option<&(dyn Fn(QuerySource) + Sync)> {
-        self.observer
+        self.control.predicate_observer()
     }
 
     fn unresolved(&mut self, _link: &'f [u8]) {}
 
     fn reached(&mut self, reached: Reached<'f>) -> ControlFlow<()> {
-        let bytes = self.observer.and_then(|_| reached.bytes(self.leaf));
+        let bytes = self
+            .control
+            .observer()
+            .and_then(|_| reached.bytes(self.leaf));
         let place = match &reached {
             Reached::Place(place) => Some(*place),
             Reached::Value(_) => None,
         };
-        let value = match (self.observer, reached) {
-            (Some(observer), Reached::Place(place)) => self.leaf.read_observed(
+        let value = match (self.control.predicate_observer(), reached) {
+            (Some(observe), Reached::Place(place)) => self.leaf.read_observed(
                 self.forge,
                 place,
-                Some(&mut |scalar| observer(scalar.into())),
+                Some(&mut |scalar| observe(scalar.into())),
             ),
             (_, reached) => reached.read(self.forge, self.leaf),
         };
+        self.observe_value(place, bytes, &value);
         if let Value::Error(error) = value {
-            if let Some(observer) = self.observer {
-                let attempted = bytes
-                    .and_then(|bytes| {
-                        QuerySource::bytes(self.forge, bytes, QueryByteUse::AttemptedValue)
-                    })
-                    .or_else(|| {
-                        place.map(|place| {
-                            traversal_gap::unavailable(
-                                self.forge,
-                                place,
-                                self.leaf.start,
-                                self.leaf.end.saturating_sub(self.leaf.start),
-                                TraversalInput::Value,
-                            )
-                        })
-                    });
-                if let Some(source) = attempted {
-                    observer(source);
-                }
-            }
             self.error.get_or_insert(error);
             return ControlFlow::Continue(());
-        }
-        if let Some(observer) = self.observer {
-            for source in source::value_sources(self.forge, bytes, &value)
-                .into_iter()
-                .flatten()
-            {
-                observer(source);
-            }
         }
         match (self.test)(&value) {
             Some(true) => {
@@ -120,13 +130,12 @@ impl<'f> Sink<'f> for Matching<'_, 'f> {
 }
 
 impl Reader {
-    /// Tests values as they are reached, stopping at a witness or when `proceed` declines work.
+    /// Tests values as they are reached, stopping at a witness or when selection stops.
     pub(super) fn any<'f>(
         &self,
         forge: &'f DataForge<'f>,
         place: Place<'f>,
-        proceed: &dyn Fn() -> bool,
-        observer: Option<&(dyn Fn(QuerySource) + Sync)>,
+        control: &Control<'_>,
         test: impl Fn(&Value<'f>) -> Option<bool>,
     ) -> Result<Option<bool>, ValueError> {
         let leaf = match self {
@@ -136,11 +145,10 @@ impl Reader {
         let mut sink = Matching {
             forge,
             leaf,
-            proceed,
+            control,
             test: &test,
             result: Some(false),
             error: None,
-            observer,
         };
         match self {
             Self::Column(_) if sink.proceed().is_continue() => {

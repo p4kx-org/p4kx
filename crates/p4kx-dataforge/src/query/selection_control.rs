@@ -33,6 +33,14 @@ impl<'a> Control<'a> {
         self.observer
     }
 
+    pub(super) const fn predicate_observer(&self) -> Option<&'a (dyn Fn(QuerySource) + Sync)> {
+        if self.admissions.is_some() {
+            self.observer
+        } else {
+            None
+        }
+    }
+
     pub(super) const fn observe_admissions(
         mut self,
         admissions: &'a (dyn Fn(QueryRecordAdmission) + Sync),
