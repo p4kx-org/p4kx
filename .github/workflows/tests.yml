@@ -143,8 +143,8 @@ jobs:
           PARTITION_COUNT: ${{ inputs.count }}
         shell: pwsh
         run: cargo nextest run --archive-file nextest-archive.tar.zst --workspace-remap . --extract-to . --extract-overwrite --partition "count:$env:PARTITION/$env:PARTITION_COUNT"
-      - name: Native ARM64 audio player reports an injected missing device
-        if: matrix.partition == 1 && (inputs.target == 'aarch64-pc-windows-msvc' || inputs.target == 'aarch64-unknown-linux-gnu')
+      - name: Native audio player reports an injected missing device
+        if: matrix.partition == 1
         shell: pwsh
         run: >-
           cargo nextest run
