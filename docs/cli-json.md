@@ -1415,6 +1415,13 @@ include the demanded operands of
 admitted and rejected candidates. Other runtime selection, including `REFERENCING`, retains
 its observed uses with incomplete selection coverage.
 
+Installed LIVE 13220821 and PTU 13248297 each verified a literal Record query over a fixed
+nonempty string. The ordinary and source-observing queries agreed on the admitted and rejected
+row counts. Both decisions retained the original fixed slot, the source text range and its
+terminator. A PTU conjunction also verified that two demanded operands retain their own ranges
+and a short-circuited operand contributes neither its slot nor its text range. The observations
+use the CLI built at `38fbbafcf`.
+
 `selectionAttempts`, `rootAttempts`, and `valueAttempts` retain failed original uses separately
 from completed contributors. `rowAttempts` associates these observations with displayed row
 positions when applicable. Failed attempts for paths that emit no row remain in `valueAttempts`.
