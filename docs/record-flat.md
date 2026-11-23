@@ -85,8 +85,8 @@ value.
 
 ## CSV
 
-- UTF-8 with a byte order mark, a header row with the column names, CRLF after every row, as in RFC
-  4180. A cell is quoted with `"` when it holds a comma, a quote, a carriage return or a line feed,
+- UTF-8 with a byte order mark, a header row with the column names and CRLF after every row.
+  A cell is quoted with `"` when it holds a comma, a quote, a carriage return or a line feed,
   and a quote inside it is doubled.
 - A `string`, `locale` or `enum` value, a `text` and a `record_tag` that starts with `=`, `+`, `-`,
   `@`, a tab or a carriage return would be run as a formula by a spreadsheet. It is written with a
@@ -95,6 +95,11 @@ value.
   number.
 - `--csv-raw` writes the exact values: no byte order mark and no leading `'`. Use it for scripts
   and databases, and never open such a file in a spreadsheet that trusts it.
+- `p4kx dcb export --flat --format csv-strict` writes ASCII CSV without a byte order mark
+  and validates every field against [RFC 4180 §2](https://www.rfc-editor.org/rfc/rfc4180#section-2).
+  Empty fields are quoted. An invalid field stops file publication and leaves an existing
+  export intact. Use ordinary CSV or NDJSON to preserve values containing characters
+  outside that grammar.
 - Excel shows a `-INF` value as `#NAME?`, because the text is no number to it; `NaN` and `INF` show
   as text.
 

@@ -4,6 +4,7 @@
 //! The Record tag in the flat value export.
 
 use std::error::Error;
+use std::io;
 
 use p4kx_dataforge::{
     Annotations, DataForge, FlatFormat, FlatValues, Resolution, TextResolver, TreeBuilder,
@@ -188,5 +189,28 @@ fn ndjson_of_a_version_6_database_has_no_record_tag() -> TestResult {
 
     assert_eq!(rows.len(), 2);
     assert!(rows.iter().all(|row| row.get("record_tag").is_none()));
+    Ok(())
+}
+
+#[test]
+fn strict_csv_validates_record_tags_and_quotes_missing_tags() -> TestResult {
+    let text = flat(8, "=source,tag", FlatFormat::CsvStrict)?;
+    assert!(
+        text.contains(&format!(
+            "{TAGGED_HEAD}mass,\"\",int,3,\"\",\"=source,tag\"\r\n"
+        )),
+        "a tag retains its text and uses RFC quoting"
+    );
+    assert!(
+        text.contains(&format!("{PLAIN_HEAD}mass,\"\",int,4,\"\",\"\"\r\n")),
+        "a missing final tag is a quoted empty field"
+    );
+    let error = flat(8, "tag\ttext", FlatFormat::CsvStrict)
+        .expect_err("strict flat CSV rejects a tag that contains a tab");
+    assert_eq!(
+        error.downcast_ref::<io::Error>().map(io::Error::kind),
+        Some(io::ErrorKind::InvalidData),
+        "unsupported record metadata is invalid CSV data"
+    );
     Ok(())
 }

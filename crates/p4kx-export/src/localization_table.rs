@@ -4,7 +4,10 @@
 use std::io::{self, Write};
 use std::ops::Range;
 
-use p4kx_extraction::{CSV_BYTE_ORDER_MARK, Language, TextSet, decode_line_breaks, write_csv_cell};
+use p4kx_extraction::{
+    CSV_BYTE_ORDER_MARK, CsvCellMode, Language, TextSet, decode_line_breaks,
+    write_csv_cell_with_mode,
+};
 
 /// The file format of a localisation table.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -16,6 +19,8 @@ pub enum TableFormat {
     Csv,
     /// CSV with a UTF-8 BOM, CRLF and original keys and texts.
     CsvRaw,
+    /// CSV with strict RFC 4180 field characters and no byte order mark.
+    CsvStrict,
 }
 
 /// An addressed datum emitted by the localisation table writer.
@@ -92,8 +97,11 @@ pub fn write_observed_localization_table(
     };
     match format {
         TableFormat::Json => write_json(texts, languages, rows, &mut table),
-        TableFormat::Csv => write_csv(texts, languages, rows, &mut table, true),
-        TableFormat::CsvRaw => write_csv(texts, languages, rows, &mut table, false),
+        TableFormat::Csv => write_csv(texts, languages, rows, &mut table, CsvCellMode::Spreadsheet),
+        TableFormat::CsvRaw => write_csv(texts, languages, rows, &mut table, CsvCellMode::Raw),
+        TableFormat::CsvStrict => {
+            write_csv(texts, languages, rows, &mut table, CsvCellMode::Strict)
+        }
     }
 }
 
@@ -160,9 +168,11 @@ fn write_csv<'a>(
         '_,
         impl FnMut(LocalizationTableDatum<'_>, Range<u64>) -> io::Result<()>,
     >,
-    neutralise: bool,
+    mode: CsvCellMode,
 ) -> io::Result<usize> {
-    table.write_all(CSV_BYTE_ORDER_MARK)?;
+    if mode != CsvCellMode::Strict {
+        table.write_all(CSV_BYTE_ORDER_MARK)?;
+    }
     table.datum(LocalizationTableDatum::KeyHeader, |out| {
         out.write_all(b"key")
     })?;
@@ -177,7 +187,7 @@ fn write_csv<'a>(
     let mut count = 0;
     for (row, key) in rows.enumerate() {
         table.datum(LocalizationTableDatum::Key { row, key }, |out| {
-            write_csv_cell(out, key, neutralise)
+            write_csv_cell_with_mode(out, key, mode)
         })?;
         for &language in languages {
             table.write_all(b",")?;
@@ -189,11 +199,9 @@ fn write_csv<'a>(
                     language,
                     stored,
                 },
-                |out| {
-                    if let Some(text) = stored {
-                        write_csv_cell(out, &decode_line_breaks(text), neutralise)?;
-                    }
-                    Ok(())
+                |out| match stored {
+                    Some(text) => write_csv_cell_with_mode(out, &decode_line_breaks(text), mode),
+                    None => write_csv_cell_with_mode(out, "", mode),
                 },
             )?;
         }

@@ -200,6 +200,21 @@ fn stream(
             .collect();
         batch_len = next_batch_len(batch.len(), parts.iter().map(|part| part.bytes.len()).sum());
         for part in parts {
+            if form == RecordForm::FlatCsvStrict
+                && let Some(source) = part.failures.iter().find_map(|(_, error)| match error {
+                    RecordExportError::Write(ExtractionError::Write { source, .. })
+                        if source.kind() == io::ErrorKind::InvalidData =>
+                    {
+                        Some(source)
+                    }
+                    _ => None,
+                })
+            {
+                return Err(write_error(
+                    destination,
+                    io::Error::new(source.kind(), source.to_string()),
+                ));
+            }
             output
                 .append(&part.bytes)
                 .map_err(|error| write_error(destination, error))?;

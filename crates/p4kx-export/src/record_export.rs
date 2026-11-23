@@ -95,6 +95,7 @@ fn write_planned(
         RecordForm::Ndjson
         | RecordForm::FlatCsv
         | RecordForm::FlatCsvRaw
+        | RecordForm::FlatCsvStrict
         | RecordForm::FlatNdjson => {
             ndjson::write(forge, records, form, target, options, retain_receipt)
         }

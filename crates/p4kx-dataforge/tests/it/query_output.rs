@@ -5,6 +5,7 @@
 //! formulas a spreadsheet would run.
 
 use std::error::Error;
+use std::io::ErrorKind;
 
 use p4kx_dataforge::query::{ResultFormat, ResultWriter};
 use p4kx_dataforge::{Guid, Value, ValueError};
@@ -336,5 +337,59 @@ fn every_row_is_written_through_before_the_result_ends() -> TestResult {
             "{format:?} writes each row at once: {sizes:?}"
         );
     }
+    Ok(())
+}
+
+#[test]
+fn strict_csv_preserves_text_and_numbers_and_quotes_empty_fields() -> TestResult {
+    let actual = written(
+        ResultFormat::CsvStrict,
+        &["", "header,\"text\"", "missing"],
+        &[(
+            "libs/r",
+            vec![
+                Some(Value::String("=1+1\r\n\"line\"")),
+                Some(Value::Int32(-5)),
+            ],
+        )],
+    )?;
+
+    assert_eq!(
+        actual,
+        "record path,\"\",\"header,\"\"text\"\"\",missing\r\nlibs/r,\"=1+1\r\n\"\"line\"\"\",-5,\"\"\r\n",
+        "strict CSV uses CRLF, no BOM and no spreadsheet prefix"
+    );
+    Ok(())
+}
+
+#[test]
+fn strict_csv_rejects_unsupported_header_path_and_value_bytes() -> TestResult {
+    let mut header = Vec::new();
+    let error = ResultWriter::new(&mut header, ResultFormat::CsvStrict, &columns(&["a\tb"]))
+        .expect_err("an unsupported heading is refused");
+    assert_eq!(error.kind(), ErrorKind::InvalidData, "strict header error");
+    assert_eq!(header, b"record path,", "no bytes of the invalid heading");
+
+    let mut writer = ResultWriter::new(Vec::new(), ResultFormat::CsvStrict, &columns(&["a"]))?;
+    let error = writer
+        .write_row("libs/é", &[Some(Value::Int32(1))])
+        .expect_err("a non-ASCII path is refused");
+    assert_eq!(error.kind(), ErrorKind::InvalidData, "strict path error");
+    assert_eq!(
+        writer.get_ref().as_slice(),
+        b"record path,a\r\n",
+        "no bytes of the invalid record path"
+    );
+
+    let error = writer
+        .write_row("libs/r", &[Some(Value::String("private,\né"))])
+        .expect_err("a non-ASCII text cell is refused");
+    assert_eq!(error.kind(), ErrorKind::InvalidData, "strict cell error");
+    assert_eq!(
+        writer.get_ref().as_slice(),
+        b"record path,a\r\nlibs/r,",
+        "no bytes of the invalid cell"
+    );
+    assert_eq!(writer.rows(), 0, "refused rows do not count as written");
     Ok(())
 }

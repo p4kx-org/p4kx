@@ -95,7 +95,7 @@ pub use fields::{
     MAX_FIELD_PATHS, Number,
 };
 pub use flat::{FLAT_COLUMNS, FLAT_TAG_COLUMN, FLAT_TEXT_COLUMN, FlatFormat, FlatValues};
-pub use flat_cells::{CSV_BYTE_ORDER_MARK, write_csv_cell};
+pub use flat_cells::{CSV_BYTE_ORDER_MARK, CsvCellMode, write_csv_cell, write_csv_cell_with_mode};
 pub use guid::{Guid, InvalidGuid};
 pub use header::{DataForgeHeaderField, SNIFF_LEN, SUPPORTED_VERSIONS, looks_like_dataforge};
 pub use issues::{DataForgeIssue, MAX_DATAFORGE_ISSUES};

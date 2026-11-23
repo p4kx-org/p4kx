@@ -60,7 +60,7 @@ filter.
 
 ## Output formats
 
-`p4kx dcb query <archive> "<query>" [--format table|csv|json] [--csv-raw] [--out <file>]` writes
+`p4kx dcb query <archive> "<query>" [--format table|csv|csv-strict|json] [--csv-raw] [--out <file>]` writes
 the result in one of three formats; the default is `table`, or `json` with `--json`. All three have the
 same columns and rows in the same order. No heading of a `select` path is `record path`,
 because a name with a space is written in backticks.
@@ -91,7 +91,7 @@ use CSV or JSON.
 
 ### CSV
 
-CSV after [RFC 4180](https://www.rfc-editor.org/rfc/rfc4180):
+UTF-8 CSV uses the row and quoting conventions of [RFC 4180](https://www.rfc-editor.org/rfc/rfc4180).
 
 - UTF-8 with a byte order mark, so that a spreadsheet reads the encoding right; every row, the
   header row included, ends with CRLF.
@@ -112,7 +112,14 @@ CSV after [RFC 4180](https://www.rfc-editor.org/rfc/rfc4180):
   Numbers, booleans and GUIDs are never changed, so `-0.25` stays a number.
 - `--csv-raw` (with `--format csv`) writes the exact values: no byte order mark and no leading
   `'`. Use it for scripts that read the file. `p4kx dcb fields` follows the same rules;
-  `p4kx loc export` too, except that its file always starts with the byte order mark.
+  `p4kx loc export --format csv` also accepts `--csv-raw` and retains its byte order mark.
+
+Use `--format csv-strict` for the exact field grammar in RFC 4180 §2. The same mode is
+available for `dcb fields`, `dcb export --flat`, `loc export` and `actionmap export`.
+It writes ASCII without a byte order mark, quotes empty fields, and rejects tabs,
+ASCII control characters other than quoted CR/LF, and non-ASCII characters. Use
+ordinary CSV or JSON when those characters need to be exported. Strict CSV preserves
+field values and does not apply the spreadsheet formula prefix.
 
 ```text
 record path,name,crew,mass
@@ -419,7 +426,7 @@ The contract is recorded in [ADR-0358](adr/0358-query-selection-is-complete-or-e
 
 ## Field statistics
 
-`p4kx dcb fields <archive> [<type or Query>] [--path <glob>] [--format table|csv|json]
+`p4kx dcb fields <archive> [<type or Query>] [--path <glob>] [--format table|csv|csv-strict|json]
 [--csv-raw]` and `FieldStatistics` in `p4kx-dataforge` list the **field paths** the Records have, to find the field
 a Query needs. They read every selected Record once, in parallel
 ([ADR-0049](adr/0049-field-statistics-are-counted-per-path-in-one-parallel-pass.md)).

@@ -16,8 +16,10 @@ use crate::model::describe;
 /// A file format a Query result is exported in.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum QueryExportFormat {
-    /// CSV after RFC 4180, as `p4kx dcb query --format csv` writes it.
+    /// UTF-8 CSV as `p4kx dcb query --format csv` writes it.
     Csv,
+    /// CSV with strict RFC 4180 field characters and no byte order mark.
+    CsvStrict,
     /// One JSON array of objects, as `p4kx dcb query --format json` writes it.
     Json,
 }
@@ -27,7 +29,7 @@ impl QueryExportFormat {
     #[must_use]
     pub const fn extension(self) -> &'static str {
         match self {
-            Self::Csv => "csv",
+            Self::Csv | Self::CsvStrict => "csv",
             Self::Json => "json",
         }
     }
@@ -35,6 +37,7 @@ impl QueryExportFormat {
     const fn service(self) -> ResultFormat {
         match self {
             Self::Csv => ResultFormat::Csv,
+            Self::CsvStrict => ResultFormat::CsvStrict,
             Self::Json => ResultFormat::Json,
         }
     }

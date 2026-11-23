@@ -77,6 +77,8 @@ pub(crate) enum ActionMapOutput {
     Json,
     /// CSV with a UTF-8 byte order mark and CRLF line ends, one row per action.
     Csv,
+    /// CSV with strict RFC 4180 field characters and no byte order mark.
+    CsvStrict,
 }
 
 impl ActionMapOutput {
@@ -84,6 +86,7 @@ impl ActionMapOutput {
         match self {
             Self::Json => "json",
             Self::Csv => "csv",
+            Self::CsvStrict => "csv-strict",
         }
     }
 }
@@ -93,7 +96,10 @@ impl ActionMapExportArgs {
     pub(crate) const fn library_format(&self) -> Result<ActionMapFormat, FlatConflict> {
         match (self.format, self.csv_raw) {
             (ActionMapOutput::Csv, true) => Ok(ActionMapFormat::CsvRaw),
-            (ActionMapOutput::Json, true) => Err(FlatConflict("--csv-raw needs --format csv")),
+            (ActionMapOutput::Json | ActionMapOutput::CsvStrict, true) => {
+                Err(FlatConflict("--csv-raw needs --format csv"))
+            }
+            (ActionMapOutput::CsvStrict, false) => Ok(ActionMapFormat::CsvStrict),
             (ActionMapOutput::Csv, false) => Ok(ActionMapFormat::Csv),
             (ActionMapOutput::Json, false) => Ok(ActionMapFormat::Json),
         }

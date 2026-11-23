@@ -5,7 +5,8 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use p4kx_extraction::{
-    CSV_BYTE_ORDER_MARK, FieldStat, MAX_DISTINCT_VALUES, Number, write_csv_cell,
+    CSV_BYTE_ORDER_MARK, CsvCellMode, FieldStat, MAX_DISTINCT_VALUES, Number,
+    write_csv_cell_with_mode,
 };
 use serde::Serialize;
 
@@ -45,15 +46,18 @@ pub(crate) fn table(out: &mut impl Write, listing: &Listing<'_>) -> io::Result<(
     )
 }
 
-/// Writes the listing as CSV after RFC 4180 with a header row; with `neutralise`, it starts with
-/// a byte order mark and a path or kind that a spreadsheet would run as a formula starts with `'`.
-pub(crate) fn csv(out: &mut impl Write, listing: &Listing<'_>, neutralise: bool) -> io::Result<()> {
-    if neutralise {
+/// Writes the listing as CSV using the selected character and spreadsheet policy.
+pub(crate) fn csv(
+    out: &mut impl Write,
+    listing: &Listing<'_>,
+    mode: CsvCellMode,
+) -> io::Result<()> {
+    if mode == CsvCellMode::Spreadsheet {
         out.write_all(CSV_BYTE_ORDER_MARK)?;
     }
-    write_csv_row(out, &HEADER.map(str::to_owned), neutralise)?;
+    write_csv_row(out, &HEADER.map(str::to_owned), mode)?;
     for field in &listing.fields {
-        write_csv_row(out, &cells(field), neutralise)?;
+        write_csv_row(out, &cells(field), mode)?;
     }
     Ok(())
 }
@@ -201,14 +205,19 @@ fn line(
 fn write_csv_row(
     out: &mut impl Write,
     cells: &[String; COLUMNS],
-    neutralise: bool,
+    mode: CsvCellMode,
 ) -> io::Result<()> {
     for (index, cell) in cells.iter().enumerate() {
         if index > 0 {
             out.write_all(b",")?;
         }
-        let text = matches!(index, PATH_COLUMN | KINDS_COLUMN);
-        write_csv_cell(out, cell, neutralise && text)?;
+        let field_mode =
+            if mode == CsvCellMode::Spreadsheet && !matches!(index, PATH_COLUMN | KINDS_COLUMN) {
+                CsvCellMode::Raw
+            } else {
+                mode
+            };
+        write_csv_cell_with_mode(out, cell, field_mode)?;
     }
     out.write_all(b"\r\n")
 }

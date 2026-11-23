@@ -210,7 +210,9 @@ struct ExportJson<'a> {
 fn table_format(args: &LocExportArgs) -> Result<TableFormat, FlatConflict> {
     match (args.format, args.csv_raw) {
         (TableOutput::Csv, true) => Ok(TableFormat::CsvRaw),
-        (TableOutput::Json, true) => Err(FlatConflict("--csv-raw needs --format csv")),
+        (TableOutput::Json | TableOutput::CsvStrict, true) => {
+            Err(FlatConflict("--csv-raw needs --format csv"))
+        }
         (format, false) => Ok(format.into()),
     }
 }
@@ -322,6 +324,7 @@ fn export_summary(
             format: match args.format {
                 TableOutput::Json => "json",
                 TableOutput::Csv => "csv",
+                TableOutput::CsvStrict => "csv-strict",
             },
             languages: columns.iter().map(|language| language.code()).collect(),
             keys,

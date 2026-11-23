@@ -63,6 +63,7 @@ const fn record_form(args: &DcbExportArgs) -> Result<RecordForm, FlatConflict> {
             Some(RecordFormat::Json) => Ok(RecordForm::Json),
             Some(RecordFormat::Ndjson) => Ok(RecordForm::Ndjson),
             Some(RecordFormat::Csv) => Err(FlatConflict("--format csv needs --flat")),
+            Some(RecordFormat::CsvStrict) => Err(FlatConflict("--format csv-strict needs --flat")),
         };
     }
     if args.combined {
@@ -74,12 +75,13 @@ const fn record_form(args: &DcbExportArgs) -> Result<RecordForm, FlatConflict> {
     match args.format {
         None | Some(RecordFormat::Csv) if args.csv_raw => Ok(RecordForm::FlatCsvRaw),
         None | Some(RecordFormat::Csv) => Ok(RecordForm::FlatCsv),
-        Some(RecordFormat::Ndjson) if args.csv_raw => {
+        Some(RecordFormat::CsvStrict | RecordFormat::Ndjson) if args.csv_raw => {
             Err(FlatConflict("--csv-raw needs --flat --format csv"))
         }
+        Some(RecordFormat::CsvStrict) => Ok(RecordForm::FlatCsvStrict),
         Some(RecordFormat::Ndjson) => Ok(RecordForm::FlatNdjson),
         Some(RecordFormat::Xml | RecordFormat::Json) => Err(FlatConflict(
-            "--flat writes --format csv or --format ndjson",
+            "--flat writes --format csv, csv-strict or ndjson",
         )),
     }
 }

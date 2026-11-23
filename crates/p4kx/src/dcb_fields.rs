@@ -6,7 +6,7 @@ use std::process::ExitCode;
 
 use anyhow::Result;
 use p4kx_extraction::query::Query;
-use p4kx_extraction::{DataForge, FieldStat, FieldStatistics, Filter};
+use p4kx_extraction::{CsvCellMode, DataForge, FieldStat, FieldStatistics, Filter};
 
 use crate::cli::{DcbFieldsArgs, QueryFormat};
 use crate::dcb_export::FlatConflict;
@@ -34,7 +34,7 @@ pub(crate) struct Listing<'a> {
 /// to stdout.
 pub(crate) fn run(args: &DcbFieldsArgs, as_json: bool) -> Result<ExitCode> {
     let format = match (as_json, args.format) {
-        (true, Some(QueryFormat::Table | QueryFormat::Csv)) => {
+        (true, Some(QueryFormat::Table | QueryFormat::Csv | QueryFormat::CsvStrict)) => {
             return Err(JsonWithTable.into());
         }
         (true, _) => QueryFormat::Json,
@@ -70,7 +70,15 @@ pub(crate) fn run(args: &DcbFieldsArgs, as_json: bool) -> Result<ExitCode> {
     let mut out = BufWriter::new(io::stdout().lock());
     let written = match format {
         QueryFormat::Table => dcb_fields_out::table(&mut out, &listing),
-        QueryFormat::Csv => dcb_fields_out::csv(&mut out, &listing, !args.csv_raw),
+        QueryFormat::Csv => {
+            let mode = if args.csv_raw {
+                CsvCellMode::Raw
+            } else {
+                CsvCellMode::Spreadsheet
+            };
+            dcb_fields_out::csv(&mut out, &listing, mode)
+        }
+        QueryFormat::CsvStrict => dcb_fields_out::csv(&mut out, &listing, CsvCellMode::Strict),
         QueryFormat::Json => dcb_fields_out::json(&mut out, &args.archive, &listing),
     }
     .and_then(|()| out.flush());

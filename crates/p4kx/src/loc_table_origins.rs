@@ -267,7 +267,10 @@ fn datum_path(datum: LocalizationTableDatum<'_>) -> Result<FieldPath> {
 }
 
 const fn csv_changes(format: TableFormat, value: &str, written: u64) -> bool {
-    matches!(format, TableFormat::Csv | TableFormat::CsvRaw) && written != value.len() as u64
+    matches!(
+        format,
+        TableFormat::Csv | TableFormat::CsvRaw | TableFormat::CsvStrict
+    ) && written != value.len() as u64
 }
 
 pub(super) struct TablePublication {

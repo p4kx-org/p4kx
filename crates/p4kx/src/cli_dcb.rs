@@ -150,8 +150,10 @@ pub(crate) struct DcbQueryArgs {
 pub(crate) enum QueryFormat {
     /// A table with aligned columns, for reading.
     Table,
-    /// CSV after RFC 4180 with a header row and a UTF-8 byte order mark.
+    /// UTF-8 CSV with a header row and a byte order mark.
     Csv,
+    /// CSV with strict RFC 4180 field characters and no byte order mark.
+    CsvStrict,
     /// One line of JSON: an array of objects keyed by column.
     Json,
 }
@@ -162,6 +164,7 @@ impl QueryFormat {
         match self {
             Self::Table => "table",
             Self::Csv => "csv",
+            Self::CsvStrict => "csv-strict",
             Self::Json => "json",
         }
     }
@@ -232,6 +235,8 @@ pub(crate) enum RecordFormat {
     Ndjson,
     /// With --flat: the file values.csv with one CSV row per leaf value.
     Csv,
+    /// With --flat: CSV with strict RFC 4180 field characters.
+    CsvStrict,
 }
 
 /// Arguments of `p4kx dcb info`.

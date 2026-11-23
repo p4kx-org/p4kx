@@ -101,6 +101,18 @@ fn csv_raw_keeps_the_exact_bytes() -> TestResult {
 }
 
 #[test]
+fn strict_csv_is_available_through_the_flat_export_command() -> TestResult {
+    let (dir, _) = export(&["--flat", "--format", "csv-strict"], 0)?;
+    let text = fs::read_to_string(dir.path().join("out").join("values.csv"))?;
+    assert!(text.starts_with("record_guid,"), "no byte order mark");
+    assert!(
+        text.contains(",labels,0,string,=a,\"\",\"\"\r\n"),
+        "verbatim value and quoted empty fields"
+    );
+    Ok(())
+}
+
+#[test]
 fn ndjson_writes_values_ndjson() -> TestResult {
     let (dir, _) = export(&["--flat", "--format", "ndjson"], 0)?;
 
@@ -147,6 +159,8 @@ fn senseless_combinations_are_usage_errors() -> TestResult {
         &["--flat", "--format", "json"],
         &["--flat", "--format", "xml"],
         &["--format", "csv"],
+        &["--format", "csv-strict"],
+        &["--flat", "--format", "csv-strict", "--csv-raw"],
         &["--csv-raw"],
         &["--flat", "--format", "ndjson", "--csv-raw"],
     ] {

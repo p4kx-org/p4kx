@@ -4,7 +4,10 @@
 use std::borrow::Cow;
 use std::io::{self, Write};
 
-use p4kx_extraction::{CSV_BYTE_ORDER_MARK, Language, TextSet, decode_line_breaks, write_csv_cell};
+use p4kx_extraction::{
+    CSV_BYTE_ORDER_MARK, CsvCellMode, Language, TextSet, decode_line_breaks,
+    write_csv_cell_with_mode,
+};
 use serde::Serialize;
 
 use crate::action_map::{Action, ActionMaps, Binding, Device};
@@ -22,6 +25,8 @@ pub enum ActionMapFormat {
     Csv,
     /// As [`Csv`](Self::Csv) with the exact texts and no `'`; the byte order mark stays.
     CsvRaw,
+    /// CSV with strict RFC 4180 field characters and no byte order mark.
+    CsvStrict,
 }
 
 /// What an action map export wrote.
@@ -131,8 +136,9 @@ fn write(
                 origins.json()?;
             }
         }
-        ActionMapFormat::Csv => write_csv(maps, &labels, out, true, origins)?,
-        ActionMapFormat::CsvRaw => write_csv(maps, &labels, out, false, origins)?,
+        ActionMapFormat::Csv => write_csv(maps, &labels, out, CsvCellMode::Spreadsheet, origins)?,
+        ActionMapFormat::CsvRaw => write_csv(maps, &labels, out, CsvCellMode::Raw, origins)?,
+        ActionMapFormat::CsvStrict => write_csv(maps, &labels, out, CsvCellMode::Strict, origins)?,
     }
     Ok(ActionMapCounts {
         action_maps: maps.maps.len(),
@@ -235,11 +241,11 @@ fn write_csv(
     maps: &ActionMaps,
     labels: &Labels<'_, '_>,
     out: &mut dyn Write,
-    neutralise: bool,
+    mode: CsvCellMode,
     mut origins: Option<&mut Recorder<'_>>,
 ) -> io::Result<()> {
     let mut out = Counted { out, position: 0 };
-    write_csv_header(&mut out)?;
+    write_csv_header(&mut out, mode)?;
     let mut cell = String::new();
     let mut index = 0;
     for (map_index, map) in maps.maps.iter().enumerate() {
@@ -268,7 +274,7 @@ fn write_csv(
                 if position > 0 {
                     out.write_all(b",")?;
                 }
-                write_cell(&mut out, text, neutralise, &mut origins, &row, column)?;
+                write_cell(&mut out, text, mode, &mut origins, &row, column)?;
             }
             for device in Device::ALL {
                 out.write_all(b",")?;
@@ -286,7 +292,7 @@ fn write_csv(
                 write_cell(
                     &mut out,
                     &cell,
-                    neutralise,
+                    mode,
                     &mut origins,
                     &row,
                     CsvColumn::Device(device),
@@ -299,8 +305,10 @@ fn write_csv(
     Ok(())
 }
 
-fn write_csv_header(out: &mut impl Write) -> io::Result<()> {
-    out.write_all(CSV_BYTE_ORDER_MARK)?;
+fn write_csv_header(out: &mut impl Write, mode: CsvCellMode) -> io::Result<()> {
+    if mode != CsvCellMode::Strict {
+        out.write_all(CSV_BYTE_ORDER_MARK)?;
+    }
     out.write_all(b"action_map,action_map_label,action,label,activation_mode")?;
     for device in Device::ALL {
         out.write_all(b",")?;
@@ -312,13 +320,13 @@ fn write_csv_header(out: &mut impl Write) -> io::Result<()> {
 fn write_cell(
     out: &mut Counted<'_>,
     text: &str,
-    neutralise: bool,
+    mode: CsvCellMode,
     origins: &mut Option<&mut Recorder<'_>>,
     row: &CsvRow,
     column: CsvColumn,
 ) -> io::Result<()> {
     let start = out.position;
-    write_csv_cell(out, text, neutralise)?;
+    write_csv_cell_with_mode(out, text, mode)?;
     if let Some(origins) = origins {
         origins.csv(row, column, start..out.position)?;
     }

@@ -112,6 +112,7 @@ fn body(
             RecordForm::Ndjson => texts.format(T::FormNdjson, &[("name", NDJSON_FILE.into())]),
             RecordForm::FlatCsv => texts.format(T::FormFlatCsv, &[("name", FLAT_CSV_FILE.into())]),
             RecordForm::FlatCsvRaw => texts.get(T::FormFlatCsvRaw),
+            RecordForm::FlatCsvStrict => "CSV (RFC 4180)".into(),
             RecordForm::FlatNdjson => {
                 texts.format(T::FormFlatNdjson, &[("name", FLAT_NDJSON_FILE.into())])
             }

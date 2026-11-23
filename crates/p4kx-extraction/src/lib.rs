@@ -282,18 +282,19 @@ pub use p4kx_audio::{
 pub use p4kx_chunks as chunks;
 pub use p4kx_cryxml as cryxml;
 pub use p4kx_dataforge::{
-    Annotations, CSV_BYTE_ORDER_MARK, CanonicalReadObserver, DataForge, DataForgeError,
-    DataForgeIssue, DataType, Enum, FLAT_COLUMNS, FLAT_TAG_COLUMN, FLAT_TEXT_COLUMN, Field,
-    FieldKind, FieldStat, FieldStatistics, FieldStatisticsError, FieldStorage, FileGraph,
-    FlatFormat, FlatValues, FormatSurvey, Guid, IndexedReference, IndexedReferenceOrigin,
-    InvalidGuid, JsonLayout, Location, MAX_DATAFORGE_ISSUES, MAX_DISTINCT_VALUES, MAX_FIELD_PATHS,
-    MAX_INDEXED_REFERENCES, Number, ObservedFileEdge, ObservedFileGraph, ObservedReferenceIndex,
-    PointerProbe, PointerSurvey, Property, RECORD_XML_NAMESPACE, Record, RecordJson,
-    RecordMetadata, RecordText, RecordTree, RecordXml, Reference, ReferenceIndex,
-    ReferenceIndexError, ReferenceOrigin, ReferenceScanGap, Resolution, Step, Struct, StructValue,
-    TAG_DATABASE_TYPE, TAG_PATH_SEPARATOR, TAG_TYPE, Tag, TagBuildEvent, TagPath, TagPathEdgeKind,
-    TagPathIncoming, TagRelationIssue, TagResolver, TagTree, TagTreeIssues, TextResolver,
-    TrailingSurvey, TreeBuilder, Value, ValueError, ValueKind, write_csv_cell,
+    Annotations, CSV_BYTE_ORDER_MARK, CanonicalReadObserver, CsvCellMode, DataForge,
+    DataForgeError, DataForgeIssue, DataType, Enum, FLAT_COLUMNS, FLAT_TAG_COLUMN,
+    FLAT_TEXT_COLUMN, Field, FieldKind, FieldStat, FieldStatistics, FieldStatisticsError,
+    FieldStorage, FileGraph, FlatFormat, FlatValues, FormatSurvey, Guid, IndexedReference,
+    IndexedReferenceOrigin, InvalidGuid, JsonLayout, Location, MAX_DATAFORGE_ISSUES,
+    MAX_DISTINCT_VALUES, MAX_FIELD_PATHS, MAX_INDEXED_REFERENCES, Number, ObservedFileEdge,
+    ObservedFileGraph, ObservedReferenceIndex, PointerProbe, PointerSurvey, Property,
+    RECORD_XML_NAMESPACE, Record, RecordJson, RecordMetadata, RecordText, RecordTree, RecordXml,
+    Reference, ReferenceIndex, ReferenceIndexError, ReferenceOrigin, ReferenceScanGap, Resolution,
+    Step, Struct, StructValue, TAG_DATABASE_TYPE, TAG_PATH_SEPARATOR, TAG_TYPE, Tag, TagBuildEvent,
+    TagPath, TagPathEdgeKind, TagPathIncoming, TagRelationIssue, TagResolver, TagTree,
+    TagTreeIssues, TextResolver, TrailingSurvey, TreeBuilder, Value, ValueError, ValueKind,
+    write_csv_cell, write_csv_cell_with_mode,
 };
 pub use p4kx_dataforge::{DataForgeHeaderField, query};
 #[expect(

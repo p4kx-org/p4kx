@@ -132,6 +132,7 @@ impl Output<'_, '_, '_> {
                 return Ok(counts);
             }
             QueryFormat::Csv => self.csv_format(),
+            QueryFormat::CsvStrict => ResultFormat::CsvStrict,
             QueryFormat::Json => ResultFormat::Json,
         };
         let options = QueryExportOptions {
@@ -164,6 +165,7 @@ impl Output<'_, '_, '_> {
                 return query_table::write(columns, self.run, out, count_line, counts);
             }
             QueryFormat::Csv => self.csv_format(),
+            QueryFormat::CsvStrict => ResultFormat::CsvStrict,
             QueryFormat::Json => ResultFormat::Json,
         };
         let mut writer = ResultWriter::new(out, format, columns)?;

@@ -3,7 +3,7 @@
 
 use std::io::{self, Write};
 
-use crate::flat_cells::{CSV_BYTE_ORDER_MARK, write_csv_cell, write_plain};
+use crate::flat_cells::{self, CSV_BYTE_ORDER_MARK, CsvCellMode};
 use crate::texts::annotation;
 use crate::value_json::{write_json_string, write_json_value};
 use crate::{Annotations, Guid, RecordTree, Resolution, Value};
@@ -29,6 +29,7 @@ pub const FLAT_TEXT_COLUMN: &str = "text";
 
 /// How a flat value export is written.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[non_exhaustive]
 pub enum FlatFormat {
     /// CSV with a header row, a UTF-8 byte order mark and CRLF rows; string, localisation and enum
     /// values that a spreadsheet would run as a formula get a leading `'`.
@@ -38,6 +39,19 @@ pub enum FlatFormat {
     CsvRaw,
     /// One compact JSON object per value, ended by a line feed.
     Ndjson,
+    /// CSV with RFC 4180 ASCII fields, CRLF rows and no byte order mark.
+    CsvStrict,
+}
+
+impl FlatFormat {
+    const fn csv_mode(self) -> Option<CsvCellMode> {
+        match self {
+            Self::Csv => Some(CsvCellMode::Spreadsheet),
+            Self::CsvRaw => Some(CsvCellMode::Raw),
+            Self::CsvStrict => Some(CsvCellMode::Strict),
+            Self::Ndjson => None,
+        }
+    }
 }
 
 /// Writes Record trees as one row per leaf value, the format `docs/record-flat.md` defines.
@@ -89,26 +103,29 @@ impl FlatValues {
         self.format
     }
 
-    /// Writes what starts the file: for [`FlatFormat::Csv`] the byte order mark, for both CSV
-    /// formats the header row with the text column when `with_text`; nothing for NDJSON.
+    /// Writes the CSV headings with the optional text column, plus a UTF-8 byte order mark
+    /// for [`FlatFormat::Csv`].
     ///
     /// # Errors
     ///
     /// Returns the I/O error of `out`.
     pub fn write_header<W: Write>(&self, with_text: bool, out: &mut W) -> io::Result<()> {
-        if self.format == FlatFormat::Ndjson {
+        let Some(mode) = self.format.csv_mode() else {
             return Ok(());
-        }
-        if self.format == FlatFormat::Csv {
+        };
+        if mode == CsvCellMode::Spreadsheet {
             out.write_all(CSV_BYTE_ORDER_MARK)?;
         }
-        out.write_all(FLAT_COLUMNS.join(",").as_bytes())?;
-        if with_text {
+        let mode = mode.verbatim();
+        for column in FLAT_COLUMNS {
+            flat_cells::write_csv_cell_with_mode(out, column, mode)?;
             out.write_all(b",")?;
-            out.write_all(FLAT_TEXT_COLUMN.as_bytes())?;
         }
-        out.write_all(b",")?;
-        out.write_all(FLAT_TAG_COLUMN.as_bytes())?;
+        if with_text {
+            flat_cells::write_csv_cell_with_mode(out, FLAT_TEXT_COLUMN, mode)?;
+            out.write_all(b",")?;
+        }
+        flat_cells::write_csv_cell_with_mode(out, FLAT_TAG_COLUMN, mode)?;
         out.write_all(b"\r\n")
     }
 
@@ -117,7 +134,7 @@ impl FlatValues {
     ///
     /// # Errors
     ///
-    /// Returns the I/O error of `out`.
+    /// Returns an I/O error or [`io::ErrorKind::InvalidData`] for unsupported strict CSV data.
     pub fn write_annotated<W: Write>(
         &mut self,
         tree: &RecordTree<'_>,
@@ -129,13 +146,15 @@ impl FlatValues {
         self.escaped.clear();
         self.prefix.clear();
         self.tag.clear();
-        if self.format == FlatFormat::Ndjson {
-            write_json_prefix(&mut self.prefix, tree)?;
+        if let Some(mode) = self.format.csv_mode() {
+            write_csv_prefix(&mut self.prefix, tree, mode.verbatim())?;
+            flat_cells::write_csv_cell_with_mode(
+                &mut self.tag,
+                tree.tag().unwrap_or_default(),
+                mode,
+            )?;
         } else {
-            write_csv_prefix(&mut self.prefix, tree)?;
-            if let Some(tag) = tree.tag() {
-                write_csv_cell(&mut self.tag, tag, self.format == FlatFormat::Csv)?;
-            }
+            write_json_prefix(&mut self.prefix, tree)?;
         }
         let mut out = Out { out, annotations };
         self.walk_fields(&mut out, tree.fields())
@@ -157,10 +176,10 @@ impl FlatValues {
             Leaf::Value(Value::Reference(reference)) => Some(reference.record_path()),
             _ => None,
         };
-        if self.format == FlatFormat::Ndjson {
-            self.write_json_row(out, leaf, target, text.as_deref())
+        if let Some(mode) = self.format.csv_mode() {
+            self.write_csv_row(out, leaf, target, text.as_deref(), mode)
         } else {
-            self.write_csv_row(out, leaf, target, text.as_deref())
+            self.write_json_row(out, leaf, target, text.as_deref())
         }
     }
 
@@ -170,31 +189,32 @@ impl FlatValues {
         leaf: Leaf<'_, '_>,
         target: Option<&str>,
         text: Option<&str>,
+        mode: CsvCellMode,
     ) -> io::Result<()> {
-        let neutralise = self.format == FlatFormat::Csv;
+        let structural = mode.verbatim();
         let sink = &mut *out.out;
         sink.write_all(&self.prefix)?;
-        write_csv_cell(sink, &self.path, false)?;
+        flat_cells::write_csv_cell_with_mode(sink, &self.path, structural)?;
         sink.write_all(b",")?;
-        write_indices(sink, &self.indices)?;
+        if self.indices.is_empty() {
+            flat_cells::write_csv_cell_with_mode(sink, "", structural)?;
+        } else {
+            write_indices(sink, &self.indices)?;
+        }
         write!(sink, ",{},", kind(leaf))?;
         match leaf {
             Leaf::Value(Value::String(text) | Value::Locale(text) | Value::Enum(text)) => {
-                write_csv_cell(sink, text, neutralise)?;
+                flat_cells::write_csv_cell_with_mode(sink, text, mode)?;
             }
             Leaf::Value(Value::Reference(reference)) => write!(sink, "{}", reference.guid())?,
             Leaf::Dangling(guid) => write!(sink, "{guid}")?,
-            Leaf::Value(scalar) => write_plain(sink, scalar)?,
+            Leaf::Value(scalar) => flat_cells::write_plain(sink, scalar)?,
         }
         sink.write_all(b",")?;
-        if let Some(path) = target {
-            write_csv_cell(sink, path, false)?;
-        }
+        flat_cells::write_csv_cell_with_mode(sink, target.unwrap_or_default(), structural)?;
         if out.annotations.texts().is_some() {
             sink.write_all(b",")?;
-            if let Some(text) = text {
-                write_csv_cell(sink, text, neutralise)?;
-            }
+            flat_cells::write_csv_cell_with_mode(sink, text.unwrap_or_default(), mode)?;
         }
         sink.write_all(b",")?;
         sink.write_all(&self.tag)?;
@@ -234,11 +254,15 @@ impl FlatValues {
     }
 }
 
-fn write_csv_prefix(prefix: &mut Vec<u8>, tree: &RecordTree<'_>) -> io::Result<()> {
+fn write_csv_prefix(
+    prefix: &mut Vec<u8>,
+    tree: &RecordTree<'_>,
+    mode: CsvCellMode,
+) -> io::Result<()> {
     write!(prefix, "{},", tree.guid())?;
-    write_csv_cell(prefix, tree.name(), false)?;
+    flat_cells::write_csv_cell_with_mode(prefix, tree.name(), mode)?;
     prefix.push(b',');
-    write_csv_cell(prefix, tree.record_path(), false)?;
+    flat_cells::write_csv_cell_with_mode(prefix, tree.record_path(), mode)?;
     prefix.push(b',');
     Ok(())
 }

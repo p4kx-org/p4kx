@@ -20,6 +20,7 @@ impl LineWriter {
         match form {
             RecordForm::FlatCsv => Self::Flat(FlatValues::new(FlatFormat::Csv)),
             RecordForm::FlatCsvRaw => Self::Flat(FlatValues::new(FlatFormat::CsvRaw)),
+            RecordForm::FlatCsvStrict => Self::Flat(FlatValues::new(FlatFormat::CsvStrict)),
             RecordForm::FlatNdjson => Self::Flat(FlatValues::new(FlatFormat::Ndjson)),
             RecordForm::Xml | RecordForm::Json | RecordForm::Ndjson => {
                 Self::Json(RecordJson::new(JsonLayout::Compact))

@@ -178,6 +178,7 @@ fn a_where_condition_filters_the_csv_and_json_rows() -> TestResult {
 fn out_writes_the_result_to_a_file_and_a_summary_to_stdout() -> TestResult {
     for (format, expected) in [
         ("csv", stdout(&["--format", "csv"])?),
+        ("csv-strict", stdout(&["--format", "csv-strict"])?),
         ("json", stdout(&["--format", "json"])?),
         (
             "table",

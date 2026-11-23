@@ -90,6 +90,8 @@ pub(crate) enum TableOutput {
     Json,
     /// CSV with a UTF-8 byte order mark and CRLF line ends, one row per key.
     Csv,
+    /// CSV with strict RFC 4180 field characters and no byte order mark.
+    CsvStrict,
 }
 
 impl From<TableOutput> for TableFormat {
@@ -97,6 +99,7 @@ impl From<TableOutput> for TableFormat {
         match output {
             TableOutput::Json => Self::Json,
             TableOutput::Csv => Self::Csv,
+            TableOutput::CsvStrict => Self::CsvStrict,
         }
     }
 }

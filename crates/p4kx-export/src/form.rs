@@ -28,23 +28,25 @@ pub enum RecordForm {
     FlatCsv,
     /// Like [`RecordForm::FlatCsv`] without byte order mark and without changing any value.
     FlatCsvRaw,
+    /// CSV with strict RFC 4180 field characters and no byte order mark.
+    FlatCsvStrict,
     /// One file [`FLAT_NDJSON_FILE`] with one compact JSON object per leaf value.
     FlatNdjson,
 }
 
 impl RecordForm {
     /// Every form, in the order they are offered.
-    pub const ALL: [Self; 6] = [
+    pub const ALL: [Self; 7] = [
         Self::Xml,
         Self::Json,
         Self::Ndjson,
         Self::FlatCsv,
         Self::FlatCsvRaw,
+        Self::FlatCsvStrict,
         Self::FlatNdjson,
     ];
 
-    /// Returns the name of the form: `xml`, `json`, `ndjson`, `flat-csv`, `flat-csv-raw` or
-    /// `flat-ndjson`.
+    /// Returns the stable name of the form.
     #[must_use]
     pub const fn name(self) -> &'static str {
         match self {
@@ -53,6 +55,7 @@ impl RecordForm {
             Self::Ndjson => "ndjson",
             Self::FlatCsv => "flat-csv",
             Self::FlatCsvRaw => "flat-csv-raw",
+            Self::FlatCsvStrict => "flat-csv-strict",
             Self::FlatNdjson => "flat-ndjson",
         }
     }
@@ -64,7 +67,7 @@ impl RecordForm {
         match self {
             Self::Xml | Self::Json => None,
             Self::Ndjson => Some(NDJSON_FILE),
-            Self::FlatCsv | Self::FlatCsvRaw => Some(FLAT_CSV_FILE),
+            Self::FlatCsv | Self::FlatCsvRaw | Self::FlatCsvStrict => Some(FLAT_CSV_FILE),
             Self::FlatNdjson => Some(FLAT_NDJSON_FILE),
         }
     }
@@ -72,7 +75,10 @@ impl RecordForm {
     /// Returns whether the form is a flat value export.
     #[must_use]
     pub const fn is_flat(self) -> bool {
-        matches!(self, Self::FlatCsv | Self::FlatCsvRaw | Self::FlatNdjson)
+        matches!(
+            self,
+            Self::FlatCsv | Self::FlatCsvRaw | Self::FlatCsvStrict | Self::FlatNdjson
+        )
     }
 }
 

@@ -223,7 +223,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   References to a GUID no Record has listed apart; `--files` the record files that refer to other
   record files (the File graph), limited by `<target>` to the files that refer to its file or are
   referred to by it; `--unresolved` every Reference to a GUID no Record has.
-- `p4kx dcb fields <archive> [<selection>] [--path <glob>] [--format table|csv|json] [--csv-raw]`
+- `p4kx dcb fields <archive> [<selection>] [--path <glob>] [--format table|csv|csv-strict|json] [--csv-raw]`
   lists every field path of the Records with how often it occurs, in how many Records, of which
   kinds its values are and the smallest and largest number. `<selection>` is a type name or a Query
   ([docs/query.md](query.md); its `select` clause is ignored) and limits the Records counted;
@@ -235,7 +235,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `p4kx dcb query Data.p4k 'from EntityClassDefinition at "*/spaceships/*"'`. `from <type>`
   selects a type and every type deriving from it, `at "<glob>"` selects by record path with the
   rules of `search`. An invalid Query exits with code 2 and marks its position. `--format csv`
-  writes RFC 4180 CSV with a header row and `--format json` (or `--json`) one line of JSON, an
+  writes UTF-8 CSV with a header row. `--format csv-strict` validates the ASCII fields
+  against RFC 4180 §2. `--format json` (or `--json`) writes one line of JSON, an
   array of objects keyed by column with typed values; `--out <file>` writes the result to a file
   instead of stdout and prints a summary. A value-reading failure needed to decide `where`
   exits with code 5 before writing any result; Query-filtered `dcb fields` follows the same rule.
@@ -430,7 +431,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   text of a localisation key, with or without the leading `@`, ignoring case, in `--lang` (English
   by default) and otherwise in `--fallback`, with `\n` decoded; a key with no text in either is
   reported as missing and exits with code 2, a placeholder key such as `@LOC_EMPTY` prints
-  nothing and succeeds. `p4kx loc export <archive> [--lang <language>,Ã¢â‚¬Â¦] [--format json|csv]
+  nothing and succeeds. `p4kx loc export <archive> [--lang <language>,Ã¢â‚¬Â¦] [--format json|csv|csv-strict]
   [--out <file>]` writes every key with its text per language, sorted by key. A `--lang` is a
   code, a folder name such as `german_(germany)` or a name such as `german` where one language has
   it. UTF-8 with or without a byte order mark and UTF-16 files are read; invalid bytes become
@@ -443,7 +444,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
 - `p4kx actionmap settings <archive>` reports the authored general and VR client profile
   attribute files with ordered XML and exact source origins. See
   [client profile settings](client-profile-settings.md).
-- `p4kx actionmap export <archive> [--format json|csv] [--csv-raw] [--language <language>]
+- `p4kx actionmap export <archive> [--format json|csv|csv-strict] [--csv-raw] [--language <language>]
   [--out <file>]` writes the action maps of `Data\Libs\Config\defaultProfile.xml`: every action with the
   localised label of its key and its default bindings for the keyboard, mouse, gamepad and
   joystick. The CSV has one row per action and a cell per device, bindings joined with ` | `; the
