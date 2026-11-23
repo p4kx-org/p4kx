@@ -694,6 +694,13 @@ and both `p4kx ships` formats agreed on the six identity and classification valu
 their physical source evidence. The standalone JSON and NDJSON forms also agreed on
 all ten emitted row-relative origins and their original Archive Entry ancestry.
 
+At revision `9e2ecedea6b60d0b45a98dc5323a7d592dcabaef`, 16 fresh-process checks
+covered the four owners on LIVE `13220821` and PTU `13248297`. Each owner passed
+the cold SDK query and matched the exact scoped Normal Catalog row, field origins
+and physical references in a separate parity check. The highest observed private
+commit was 1,410,633,728 bytes, and the highest working set was 1,267,974,144 bytes.
+The installed Archive identity stayed stable in all checks.
+
 A header census of older EPTU `13025019` and TECH-PREVIEW `13040440` found all four original
 owners by GUID and Record path. It visited 117,952 and 120,857 headers respectively, with every
 path classifiable and zero Record bodies opened. Playability on the older Builds requires
