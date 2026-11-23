@@ -39,6 +39,22 @@ export. Record the OS/CPU, source revision/worktree identity, GUI executable dig
 actual observations and any inconclusive case on the owner's Windows AMD64 desktop. Windows
 ARM64 retains its hosted native runtime and package checks.
 
+## Windows AMD64 dry-run evidence
+
+The packaged GUI from [Release dry run 45173014290](https://github.com/p4kx-org/p4kx/actions/runs/45173014290)
+ran on Windows 11 build 26300 on the maintainer's AMD64 desktop. This dry run reports version
+0.4.2 and source revision `f352d03578e22d98d4e7cd5d0ae29e61223f3418`. The executable SHA-256 is
+`64C019B89253287FDD5D96ED344D53A9D71D7F731157145204663625D3DA1964`.
+
+- P4KX copied the synthetic UTF-8 preview to Notepad. The accent, combining mark, CJK,
+  emoji and tab survived. Notepad converted LF to CRLF on save.
+- P4KX's multiline Query editor received the Notepad text and normalized CRLF to LF. Copying the empty preview left the prior clipboard value in place.
+  Pasting from an empty clipboard left the Query text intact.
+- A separate native window held the clipboard open during a paste attempt. The text
+  stayed intact, and subsequent typing reached the Query editor while the hold was
+  active. The helper released its handle and the clipboard sequence number stayed
+  constant throughout the hold.
+
 ## Failure and empty-text semantics
 
 The pinned arboard Windows implementation retries clipboard acquisition a bounded number of
