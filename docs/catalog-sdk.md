@@ -999,8 +999,11 @@ file cache stayed in normal use.
 The ordered replay for LIVE 13220821 matched all 104 rows in the complete
 Normal Catalog from producer `300226ceeeaf522b7d9af790e8fa3698752cf575`.
 The combined SDK query and replay took 730.014 s, with peaks of 1,091,502,080
-bytes of private commit and 1,023,156,224 bytes of working set. The full
-Catalog comparison for PTU 13260598 is pending.
+bytes of private commit and 1,023,156,224 bytes of working set. The same
+producer's complete PTU 13260598 Catalog matched all 106 rows in order.
+The SDK query and replay took 642.495 s, with 1,114,333,184 bytes of private
+commit and 1,059,139,584 bytes of working set. Both replay workers wrote
+zero scratch bytes.
 
 ## Loot container-document source scope
 
