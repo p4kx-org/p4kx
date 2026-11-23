@@ -75,6 +75,52 @@ fn existing_ancestor_scopes_keep_only_their_original_enclosing_encryption() -> T
     Ok(())
 }
 
+#[test]
+fn selecting_only_a_leaf_use_keeps_its_original_enclosing_sources() -> TestResult {
+    let (_directory, inner) = nested_leaf_archive()?;
+    let origin = inner
+        .entry_origin(inner.entries().first().ok_or("leaf Entry")?)
+        .ok_or("actual leaf origin")?;
+    let sources = SourceUses::with_compact_coordinates();
+    let leaf = sources.observe(SourceInput::Archive(&origin), InputScope::Payload)?;
+    let outer = leaf.ancestor(0)?.ok_or("outer source")?;
+    let middle = leaf.ancestor(1)?.ok_or("middle source")?;
+    let used = leaf.at(
+        SourceLocation::DataForge {
+            record_index: 0,
+            field: "field".into(),
+        },
+        SourceUseRole::Payload,
+    )?;
+    let _unselected = sources
+        .observe(SourceInput::Unknown, InputScope::Payload)?
+        .at(
+            SourceLocation::Metadata {
+                field: "other".into(),
+            },
+            SourceUseRole::Payload,
+        )?;
+    let completed = sources.finish_with(|| Ok::<(), crate::SourceEvidenceError>(()))?;
+    let picked = completed.select_uses([used.reference()])?;
+    let mut expected = [outer.source_ref(), middle.source_ref(), leaf.source_ref()];
+    expected.sort_unstable();
+    assert!(
+        picked
+            .iter_sources()
+            .map(crate::PhysicalSource::id)
+            .eq(expected),
+        "only the leaf and its two original containers are retained",
+    );
+    assert!(
+        picked
+            .iter_uses()
+            .map(crate::SourceUseDescription::id)
+            .eq([used.reference()]),
+        "the original leaf use remains the only use",
+    );
+    Ok(())
+}
+
 fn marker(
     sources: &SourceUses,
     scope: &SourceScope,

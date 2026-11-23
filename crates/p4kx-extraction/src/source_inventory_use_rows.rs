@@ -37,6 +37,18 @@ impl PackedUseRows {
         }
     }
 
+    fn get(&self, id: &str) -> Option<(&Arc<str>, &PackedSourceUse)> {
+        match self {
+            Self::Snapshot(rows) => {
+                let position = rows
+                    .binary_search_by(|(key, _)| key.as_ref().cmp(id))
+                    .ok()?;
+                rows.get(position).map(|(key, row)| (key, row))
+            }
+            Self::Sealed(tree) => tree.get_key_value(id),
+        }
+    }
+
     fn len(&self) -> usize {
         match self {
             Self::Snapshot(rows) => rows.len(),
@@ -94,6 +106,22 @@ impl FrozenUseRows {
                 .collect()
         });
         merge(self.0.live.iter().map(Arc::as_ref), expanded.iter())
+    }
+
+    pub(super) fn get(&self, id: &str) -> Option<Cow<'_, SourceUseDescription>> {
+        if let Ok(position) = self
+            .0
+            .live
+            .binary_search_by(|row| row.id().as_str().cmp(id))
+        {
+            return self
+                .0
+                .live
+                .get(position)
+                .map(|row| Cow::Borrowed(row.as_ref()));
+        }
+        let (original, row) = self.0.packed.get(id)?;
+        Some(Cow::Owned(row.restore(original)))
     }
 
     pub(super) fn len(&self) -> usize {
@@ -188,3 +216,7 @@ where
         self.left.len() + self.right.len()
     }
 }
+
+#[cfg(test)]
+#[path = "source_inventory_use_lookup_tests.rs"]
+mod lookup_tests;

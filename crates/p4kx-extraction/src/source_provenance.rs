@@ -57,7 +57,8 @@ pub use crate::source_evidence_error::SourceEvidenceError;
 pub use crate::source_inventory::{
     ArchiveDirectorySource, ArchiveEntryProof, ArchiveEntrySource, ArchiveFileSource, FileSource,
     PhysicalSource, PhysicalSourceKind, PhysicalSourceRef, SourceDeclarationKind,
-    SourceEncryptionDeclaration, SourceEncryptionState, SourceInventory, SourceRecordFormat,
+    SourceEncryptionDeclaration, SourceEncryptionState, SourceInventory, SourceInventorySelection,
+    SourceRecordFormat,
 };
 pub use crate::source_scope::{SourceInput, SourceScope};
 pub use crate::source_use::{

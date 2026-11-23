@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::cmp::Ordering;
 use std::fmt::{self, Debug, Formatter};
 use std::sync::{Arc, OnceLock};
 
@@ -25,6 +26,15 @@ impl<Row> FrozenRows<Row> {
 
     pub(super) fn iter(&self) -> impl ExactSizeIterator<Item = &Row> {
         self.0.shared.iter().map(Arc::as_ref)
+    }
+
+    pub(super) fn find(&self, mut compare: impl FnMut(&Row) -> Ordering) -> Option<&Row> {
+        let position = self
+            .0
+            .shared
+            .binary_search_by(|row| compare(row.as_ref()))
+            .ok()?;
+        self.0.shared.get(position).map(Arc::as_ref)
     }
 
     pub(super) fn len(&self) -> usize {

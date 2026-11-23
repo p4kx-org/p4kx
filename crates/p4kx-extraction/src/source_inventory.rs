@@ -11,12 +11,15 @@ use serde::{Serialize, Serializer};
 
 #[path = "source_inventory_rows.rs"]
 mod rows;
+#[path = "source_inventory_selection.rs"]
+mod selection;
 #[path = "source_inventory_use_rows.rs"]
 mod use_rows;
 #[path = "source_inventory_views.rs"]
 mod views;
 
 use self::rows::FrozenRows;
+pub use self::selection::SourceInventorySelection;
 use self::use_rows::FrozenUseRows;
 pub(crate) use self::use_rows::PackedUseRows;
 use crate::projection_schema;
