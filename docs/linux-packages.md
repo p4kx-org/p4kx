@@ -81,8 +81,10 @@ für temporäre Dateien. Die Installation bleibt durch die Prüfung der Hostpfad
 geschützt. [Flatpak-Freigaben und Befehle](#profiles-audio-and-sandbox-access)
 
 Die Paketprüfung protokolliert CLI, MCP und GUI je CPU. Die synthetische GUI-Prüfung
-zeichnet Frames mit Xvfb und lavapipe. Nachweise für Hardware-GPU, Audiowiedergabe,
-Dateidialoge und Zwischenablage werden separat erfasst. [Native Prüfungen](#required-native-checks)
+zeichnet Frames mit Xvfb und lavapipe. Die gehosteten Linux-Läufe lassen Hardware-GPU,
+hörbare Wiedergabe, interaktive Dateidialoge und Zwischenablage offen. Zur Release-Abnahme
+gehört der physische Nachweis auf dem Windows-AMD64-Desktop des Maintainers.
+[Native Prüfungen](#required-native-checks)
 
 ## Install and start
 
@@ -231,10 +233,10 @@ positive game-process match is conclusive; a negative sandbox scan produces the 
 status and warning. It never starts a host process to obtain a broader view.
 
 Audio previews use ALSA. A native desktop needs a configured default ALSA device or the
-PipeWire/PulseAudio ALSA bridge. Flatpak uses its runtime and PulseAudio socket. Physical playback,
-clipboard exchange, chooser interactions and hardware GPU behavior have separate evidence states;
-the bounded software-rendered GUI check does not claim those tests passed.
-Use the shared procedure on native AMD64 and ARM64 desktops.
+PipeWire/PulseAudio ALSA bridge. Flatpak uses its runtime and PulseAudio socket. The hosted
+Linux package checks leave audible playback, interactive chooser and clipboard use, and
+hardware GPU behaviour unverified on both CPUs. Release acceptance requires physical
+desktop evidence on the maintainer's Windows AMD64 desktop.
 [Desktop audio verification](supported-platforms.md#desktop-audio-verification)
 
 ## Source, licensing and package identity
@@ -257,8 +259,8 @@ RPATH, stripping or packaging changes their surrounding bytes.
 
 The three target-specific application SBOMs include the bundled library/runtime and source
 artifact identities. Package, producer metadata, SBOM, source artifact and runtime evidence are
-included in release checksums and provenance. Release preflight requires all eight Linux packages
-alongside the four Windows packages.
+included in release checksums and provenance. Release preflight requires all eight Linux
+packages. [Five-target release preflight](supported-platforms.md#release-preflight-and-evidence)
 
 ## Required native checks
 
@@ -325,13 +327,15 @@ exchange, interactive file chooser use and hardware GPU behavior remain unchecke
 runner jobs. [AMD64 CI job](https://github.com/p4kx-org/p4kx/actions/runs/43803352411/job/133091679587) ·
 [ARM64 CI job](https://github.com/p4kx-org/p4kx/actions/runs/43803352411/job/133091363724)
 
-The native package consumers for merge revision `0e1da3f4a7cd5a46fb2594dd6a5fafa97f1fd28b`
-and PR #1117 head `b27bdac875` passed all four package formats on both CPUs. The successful jobs
-include real CLI, GUI and MCP launchers, the separate Documents API 4 and API 5 sessions and
-deb and Flatpak lifecycle checks. These results apply to the packages built in that run.
-The final release candidate requires its own hosted native package evidence on both CPUs.
-[AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/43813424470/job/133132805619) ·
-[ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/43813424470/job/133132805539)
+The branch package run for PR #1117 head `8d6cab94e` built version `0.4.2` at merge revision
+`f47d4a123b16b000d908b7a7cfaa6f0e63d917fe`. Native AMD64 and ARM64 consumers verified
+matching ELF architecture and CLI, MCP and software-rendered GUI execution for all four
+formats. Both CPUs recorded the stock Documents API 4 refusal, the isolated API 5 grants
+and successful deb and Flatpak upgrade, removal and profile preservation.
+[AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45135021176/job/137571371608) ·
+[ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45135021176/job/137571371441)
+
+The tagged v0.5.0 candidate requires its own hosted Linux package evidence on both CPUs.
 
 For a branch-only native Linux validation, dispatch the existing `release.yml` workflow with
 `linux-only=true`. It runs preparation and both Linux producer/consumer rows. Use the branch

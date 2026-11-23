@@ -121,10 +121,16 @@ The [native platform contract](docs/supported-platforms.md) drives the target ma
 test archives and release preflight. Run the PowerShell platform/evidence regression scripts when
 changing their contracts, and preserve the recorded distinction between native synthetic checks
 and physical verification on the owner's Windows AMD64 desktop.
-Linux packaging additionally uses the declared Ubuntu 24.04 / glibc 2.39 baseline, native
-AppImage runtime source builds and fresh native package consumers. Run
-`test-linux-package-contract.ps1` and the source-collector tests when changing their boundaries;
-the [Linux package guide](docs/linux-packages.md) describes the complete evidence and source contract.
+Linux packaging uses Ubuntu 24.04 / glibc 2.39, a native AppImage runtime source build and
+fresh native package consumers. Run the following checks from the repository root when changing
+the package or runtime source contract. [Linux package guide](docs/linux-packages.md)
+
+```powershell
+$packageCheckRoot = '/absolute/path/to/private/package-checks'
+.github/scripts/test-linux-package-contract.ps1 -Directory (Join-Path $packageCheckRoot 'package-contract')
+python3 -B packaging/linux/runtime/test_collect_sources.py --directory (Join-Path $packageCheckRoot 'runtime-sources')
+python3 -B packaging/linux/runtime/test_build_inputs.py --directory (Join-Path $packageCheckRoot 'runtime-inputs')
+```
 
 On native Ubuntu 24.04 AMD64 and ARM64, install the C toolchain, `pkg-config` and ALSA headers.
 

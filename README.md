@@ -146,11 +146,12 @@ it, and settings and the stored Archive key survive uninstall. The CLI and MCP a
 update checks. [Windows packages](docs/windows-packages.md) defines supported-system evidence,
 runtime DLLs and installer verification.
 
-Linux packages cover AMD64 and ARM64 as tar.gz, AppImage, deb and Flatpak, each containing
-the GUI, CLI and MCP server. Native tar.gz/AppImage/deb require Ubuntu 24.04 / glibc 2.39;
-Flatpak uses Freedesktop Platform 25.08 and additionally requires host Documents-portal API 5
-with authenticated host-path lookup. See [Linux packages](docs/linux-packages.md) for
-installation, AppImage CLI/MCP dispatch, sandbox grants, source notices and native verification.
+For Linux, choose `x86_64-unknown-linux-gnu` on AMD64 or `aarch64-unknown-linux-gnu` on ARM64.
+For either target, append `.tar.gz`, `.AppImage`, `.deb` or `.flatpak` to
+`P4KX-<version>-<target>`. Each format provides `p4kx-gui`, `p4kx` and `p4kx-mcp`.
+Native tar.gz, AppImage and deb require Ubuntu 24.04 / glibc 2.39. Flatpak uses Freedesktop
+Platform 25.08 and requires host Documents-portal API 5 with authenticated host-path lookup.
+[Linux installation and launch commands](docs/linux-packages.md#install-and-start)
 [Linux-Hilfe auf Deutsch](docs/linux-packages.md#linux-hilfe-auf-deutsch)
 explains setup, archive discovery and profile folders in German.
 
