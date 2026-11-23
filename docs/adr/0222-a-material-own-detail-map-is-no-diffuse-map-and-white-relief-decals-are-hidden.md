@@ -55,3 +55,33 @@ packages, compared against the owner's in-game screenshot of the Hammerhead.
   authored presentation is the release contract. A comparison with the game's runtime choices
   would require independently verified selection evidence.
 - Issue #1181 covers the light grey panel shading and roughness comparison.
+
+## Factory Hammerhead bow comparison
+
+For #1181, registration of two factory-paint LIVE captures binds the exposed bow plate to nose
+mesh 2, subset 3, material slot 6. The registration residuals are 2.50 and 2.44 pixels. The
+stripe decals provide geometric anchors. Use the adjacent unmarked plate for surface comparison.
+
+The normal exporters produced the GLB and Blender package for the same physical subset on
+LIVE 13220821 and PTU 13248297. Blender 5.3.0 build `02f0899d78e3` sampled the imported
+Principled inputs at four original UVs with mip 2 inputs. The results agree across both Builds.
+
+| Imported input | Paired result at the four UVs |
+| --- | --- |
+| Roughness | Maximum absolute difference 0.001878 |
+| Linear base colour | Maximum absolute RGB component difference 0.000560 |
+| Normal | Maximum absolute signed component difference 0.000000120 on the same tangent frame |
+| IOR and metallic | 1.5 and 0 respectively in both imports |
+| Specular IOR Level | Package 0.08033–0.13823, GLB 0.5 |
+
+The package samples the original specular image using sRGB transfer, converts its linear RGB
+to luminance, and applies the material multiplier and clamp. The measured conservative bound
+for the admitted 512 × 512 mip is 0.007619–0.395728. At the repeat seam, filtering the encoded
+RGB before decoding differs from filtering preconverted linear coefficients. The GLB import
+uses Blender's default Specular IOR Level for this subset.
+
+These measurements establish a material-input difference between the exporters. The game
+captures provide display-space RGB under hangar lighting. Incident light, exposure, display
+transform and active material parameters are still required to attribute the reported
+appearance to a shader input. A matched linear material readback or calibrated runtime
+comparison remains the evidence gate for a rendering change.
