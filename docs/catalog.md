@@ -689,6 +689,12 @@ Record index, GUID, class name, Record path, vehicle kind and playability. The
 comparison included physical source references and encryption states for the
 classifications. The standalone vehicle output returned the same owners and kind.
 
+A second scoped comparison at `152e7c2ad` verified each of the four physical owners on the
+same LIVE and PTU Builds in a separate process. Normal Catalog, the ship-source SDK,
+and both `p4kx ships` formats agreed on the six identity and classification values and
+their physical source evidence. The standalone JSON and NDJSON forms also agreed on
+all ten emitted row-relative origins and their original Archive Entry ancestry.
+
 A header census of older EPTU `13025019` and TECH-PREVIEW `13040440` found all four original
 owners by GUID and Record path. It visited 117,952 and 120,857 headers respectively, with every
 path classifiable and zero Record bodies opened. Playability on the older Builds requires
