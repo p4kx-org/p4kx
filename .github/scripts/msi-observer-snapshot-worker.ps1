@@ -2,10 +2,10 @@ param(
     [Parameter(Mandatory)][string]$Directory,
     [ValidateRange(1,9)][int]$Sequence,
     [ValidateRange(0,75000)][int]$WaitMilliseconds,
-    [switch]$OriginalRawBoundary, [switch]$Finish
+    [ValidateSet('preamble/original-raw','lifecycle/install')][string]$OriginalBoundary, [switch]$Finish
 )
 $ErrorActionPreference='Stop'
-if ($Finish.IsPresent -ne ($Sequence -eq 9) -or ($Finish -and ($WaitMilliseconds -ne 0 -or $OriginalRawBoundary))) {
+if ($Finish.IsPresent -ne ($Sequence -eq 9) -or ($Finish -and ($WaitMilliseconds -ne 0 -or $OriginalBoundary))) {
     throw 'MSI Finish requires its fixed checkpoint 09.'
 }
 . (Join-Path $PSScriptRoot 'msi-observer-evidence.ps1')
@@ -17,8 +17,12 @@ $request=Read-P4kxDetachedReceipt (Join-Path $root 'request.json')
 Write-P4kxMsiObserverProgress readRequest end -Directory $progress
 Write-P4kxMsiObserverProgress binding begin -Directory $progress
 Assert-P4kxMsiObserverBinding $request $root
-if ($OriginalRawBoundary -and ($Sequence -ne 2 -or $WaitMilliseconds -ne 0 -or $request.mode -cne 'Lifecycle')) {
-    throw 'Original raw capture requires lifecycle checkpoint 2.'
+if ($OriginalBoundary) {
+    $expectedSequence = if ($OriginalBoundary -ceq 'preamble/original-raw') { 2 } else { 3 }
+    if ($Sequence -ne $expectedSequence -or $WaitMilliseconds -ne 0 -or $request.mode -cne 'Lifecycle' -or
+        ($OriginalBoundary -ceq 'lifecycle/install' -and $request.target -cne 'aarch64-pc-windows-msvc')) {
+        throw 'An original phase boundary requires its designated native lifecycle checkpoint.'
+    }
 }
 Write-P4kxMsiObserverProgress binding end -Directory $progress
 Write-P4kxMsiObserverProgress readHandle begin -Directory $progress
@@ -36,21 +40,23 @@ try {
             $wait=[int][Math]::Max(0,[Math]::Ceiling(($deadline-[DateTimeOffset]::UtcNow).TotalMilliseconds))
         }
         Write-P4kxMsiObserverProgress wait begin -Directory $progress -RequestDigest $handle.request_sha256
-        if ($OriginalRawBoundary) {
-            try { $state=Wait-P4kxMsiOriginalRawBoundary $request $handle $state $progress }
+        if ($OriginalBoundary) {
+            try { $state=Wait-P4kxMsiOriginalBoundary $request $handle $state $progress $OriginalBoundary }
             catch { $observationFailure=$_.Exception }
         } else {
             $state=Wait-P4kxMsiObserverParent $request $handle $wait
         }
         Write-P4kxMsiObserverProgress wait end -Directory $progress -RequestDigest $handle.request_sha256
     }
-    if (-not $OriginalRawBoundary -and -not $state.lifetime_ended -and [DateTimeOffset]::UtcNow -ge (ConvertFrom-P4kxMsiBudgetTimestamp $request.observer_deadline_utc)) {
+    if (-not $OriginalBoundary -and -not $state.lifetime_ended -and [DateTimeOffset]::UtcNow -ge (ConvertFrom-P4kxMsiBudgetTimestamp $request.observer_deadline_utc)) {
         Write-P4kxMsiObserverProgress stopExpiredParent begin -Directory $progress -RequestDigest $handle.request_sha256
         $state=Stop-P4kxMsiObserverExpiredParent $request $handle
         Write-P4kxMsiObserverProgress stopExpiredParent end -Directory $progress -RequestDigest $handle.request_sha256
     }
     Write-P4kxMsiObserverProgress saveCheckpoint begin -Directory $progress -RequestDigest $handle.request_sha256
-    $snapshot=Save-P4kxMsiObserverCheckpoint $request $handle $Sequence $state -OriginalRawBoundary:$OriginalRawBoundary
+    $parameters = @{Request=$request;Handle=$handle;Sequence=$Sequence;ParentState=$state}
+    if ($OriginalBoundary) { $parameters.OriginalBoundary = $OriginalBoundary }
+    $snapshot=Save-P4kxMsiObserverCheckpoint @parameters
     Write-P4kxMsiObserverProgress saveCheckpoint end -Directory $progress -RequestDigest $handle.request_sha256
     if ($Finish) {
         Write-P4kxMsiObserverProgress validateResult begin -Directory $progress -RequestDigest $handle.request_sha256
@@ -79,6 +85,6 @@ if ($Finish) {
     return
 }
 Write-P4kxMsiObserverProgress workflowOutput begin -Directory $progress -RequestDigest $handle.request_sha256
-if (-not $OriginalRawBoundary -and $state.lifetime_ended -and $env:GITHUB_ENV) { 'P4KX_MSI_OBSERVER_FINISHED=true' >> $env:GITHUB_ENV }
+if (-not $OriginalBoundary -and $state.lifetime_ended -and $env:GITHUB_ENV) { 'P4KX_MSI_OBSERVER_FINISHED=true' >> $env:GITHUB_ENV }
 Write-P4kxMsiObserverProgress workflowOutput end -Directory $progress -RequestDigest $handle.request_sha256
 if ($null -ne $observationFailure) { throw $observationFailure }

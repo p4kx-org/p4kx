@@ -72,12 +72,12 @@ $cases=@(
         $context=New-P4kxMsiPhaseContext $diagnostics $target
         $worker=Start-P4kxMsiPhase $context 'worker'
         $capture=Start-P4kxMsiPhase $context 'preamble/original-raw'
-        $before=Read-P4kxMsiOriginalRawBoundary $context.journal $target
+        $before=Read-P4kxMsiOriginalBoundary $context.journal $target 'preamble/original-raw'
         Assert-JournalEncoding ($before.status -ceq 'notObserved') 'Opening the registry capture must not be counted as reaching its boundary.'
         Stop-P4kxMsiPhase $context $capture
         $prefix=[IO.File]::ReadAllText($context.journal,$utf8)
         [IO.File]::WriteAllText($context.journal,$prefix.TrimEnd([char]10),$utf8)
-        $partial=Read-P4kxMsiOriginalRawBoundary $context.journal $target
+        $partial=Read-P4kxMsiOriginalBoundary $context.journal $target 'preamble/original-raw'
         Assert-JournalEncoding ($partial.status -ceq 'notObserved' -and -not $partial.journal.complete) 'An uncommitted last line must not prove the raw capture.'
         [IO.File]::WriteAllText($context.journal,$prefix,$utf8)
         $request=@{directory=$root;output_directory=(Join-Path $root 'original');target=$target;mode='Lifecycle'}
@@ -85,7 +85,7 @@ $cases=@(
         $state=@{state='running';lifetime_ended=$false}
         $writer=[IO.File]::Open($context.journal,[IO.FileMode]::Append,[IO.FileAccess]::Write,[IO.FileShare]::Read)
         try {
-            $checkpoint=Save-P4kxMsiObserverCheckpoint $request $handle 2 $state -OriginalRawBoundary
+            $checkpoint=Save-P4kxMsiObserverCheckpoint $request $handle 2 $state -OriginalBoundary 'preamble/original-raw'
         } finally { $writer.Dispose() }
         Stop-P4kxMsiPhase $context $worker
         $actual=Read-P4kxDetachedReceipt (Join-Path $checkpoint 'checkpoint.json')
@@ -94,8 +94,35 @@ $cases=@(
             $actual.native_completion_unproven -eq $true -and $actual.mutation_authority -eq $false) 'The shared writer checkpoint must retain the copied boundary without claiming lifecycle proof.'
         $other=if($target -ceq 'x86_64-pc-windows-msvc'){'aarch64-pc-windows-msvc'}else{'x86_64-pc-windows-msvc'}
         $refused=$false
-        try{Read-P4kxMsiOriginalRawBoundary (Join-Path $checkpoint 'phase-journal.jsonl') $other | Out-Null}catch{$refused=$true}
+        try{Read-P4kxMsiOriginalBoundary (Join-Path $checkpoint 'phase-journal.jsonl') $other 'preamble/original-raw' | Out-Null}catch{$refused=$true}
         Assert-JournalEncoding $refused 'A foreign target must not prove the original capture boundary.'
+    }},
+    @{name='first-original-install-outcome';action={
+        foreach ($status in @('reached','failed')) {
+            $root=Join-Path $Directory ('install-'+$status)
+            $diagnostics=Join-Path $root 'original/diagnostics'
+            New-Item -ItemType Directory -Force -Path $diagnostics | Out-Null
+            $context=New-P4kxMsiPhaseContext $diagnostics $target
+            $worker=Start-P4kxMsiPhase $context 'worker'
+            $install=Start-P4kxMsiPhase $context 'lifecycle/install'
+            $wait=Start-P4kxMsiPhase $context 'msiexec/wait'
+            Stop-P4kxMsiPhase $context $wait
+            $reported=Read-P4kxMsiOriginalBoundary $context.journal $target 'lifecycle/install'
+            Assert-JournalEncoding ($reported.status -ceq 'notObserved') 'A child wait ending does not establish the original install outcome.'
+            $failure=if ($status -ceq 'failed') { [InvalidOperationException]::new('Synthetic first install failure') }
+            Stop-P4kxMsiPhase $context $install -Failure $failure
+            $later=Start-P4kxMsiPhase $context 'lifecycle/install'
+            Stop-P4kxMsiPhase $context $later
+            $request=@{directory=$root;output_directory=(Join-Path $root 'original');target=$target;mode='Lifecycle'}
+            $handle=@{request_sha256='synthetic-install-journal-fixture'}
+            $state=@{state='running';lifetime_ended=$false}
+            $checkpoint=Save-P4kxMsiObserverCheckpoint $request $handle 3 $state -OriginalBoundary 'lifecycle/install'
+            $actual=Read-P4kxDetachedReceipt (Join-Path $checkpoint 'checkpoint.json')
+            Assert-JournalEncoding ($actual.original_install_phase -ceq $status -and $actual.journal.events -eq 7 -and
+                $actual.journal.active -ccontains 'worker' -and $actual.completed_success -eq $false -and
+                $actual.native_completion_unproven -eq $true -and $actual.mutation_authority -eq $false) 'Sequence 3 must retain the first original install outcome with observation-only authority.'
+            Stop-P4kxMsiPhase $context $worker
+        }
     }},
     @{name='exact-one-mib-cap';action={
         $source=New-JournalEncodingFixture 'cap-original' 1023

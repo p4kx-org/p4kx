@@ -23,23 +23,30 @@ function Copy-P4kxMsiObserverFile {
     } catch { return @{status='unreadable';failure_type=$_.Exception.GetType().FullName} }
 }
 
-function Read-P4kxMsiOriginalRawBoundary {
-    param([string]$Path, [string]$Target)
+function Read-P4kxMsiOriginalBoundary {
+    param([string]$Path, [string]$Target,
+        [ValidateSet('preamble/original-raw','lifecycle/install')][string]$Phase)
     $events = [Collections.Generic.List[hashtable]]::new()
     $journal = Read-P4kxMsiPhaseJournal $Path -ObservedEvents $events
     $platform = Get-P4kxPlatform -Target $Target
-    $reached = $false
+    $first = $null
+    $status = if ($journal.present) { 'notObserved' } else { 'unavailable' }
     foreach ($event in $events) {
-        if ($event.target -cne $Target -or $event.process_arch -ine $platform.runner_arch) { throw 'Original raw capture journal CPU or target differs.' }
-        if ($event.phase -ceq 'preamble/original-raw' -and $event.status -ceq 'end') { $reached = $true }
+        if ($event.target -cne $Target -or $event.process_arch -ine $platform.runner_arch) { throw 'Original phase journal CPU or target differs.' }
+        if ($event.phase -cne $Phase) { continue }
+        if ($null -eq $first -and $event.status -ceq 'begin') { $first = $event.id }
+        if ($event.id -ne $first) { continue }
+        if ($event.status -ceq 'end') { $status = 'reached' }
+        if ($Phase -ceq 'lifecycle/install' -and $event.status -ceq 'error') { $status = 'failed' }
     }
-    return @{journal=$journal;status=$(if (-not $journal.present) {'unavailable'} elseif ($reached) {'reached'} else {'notObserved'})}
+    return @{journal=$journal;status=$status}
 }
 
-function Wait-P4kxMsiOriginalRawBoundary {
-    param($Request, $Handle, $ParentState, [string]$ProgressDirectory)
+function Wait-P4kxMsiOriginalBoundary {
+    param($Request, $Handle, $ParentState, [string]$ProgressDirectory,
+        [ValidateSet('preamble/original-raw','lifecycle/install')][string]$Phase)
     $journal = Join-Path $Request.output_directory 'diagnostics/phase-journal.jsonl'
-    $sample = Join-Path $ProgressDirectory 'raw-boundary-sample.jsonl'
+    $sample = Join-Path $ProgressDirectory 'phase-boundary-sample.jsonl'
     if ([IO.File]::Exists($sample)) { throw 'Passive checkpoint requires a fresh journal sample.' }
     $cutoff = ConvertFrom-P4kxMsiBudgetTimestamp $Request.observer_deadline_utc
     $window = [TimeSpan]::FromSeconds(5)
@@ -55,8 +62,8 @@ function Wait-P4kxMsiOriginalRawBoundary {
                 if ($copy.status -ceq 'unreadable') { throw 'Passive checkpoint could not read the original live journal.' }
                 if ($copy.status -ceq 'captured') {
                     $sampledLength = $copy.bytes
-                    $observed = Read-P4kxMsiOriginalRawBoundary $sample $Request.target
-                    if ($observed.status -ceq 'reached' -or $observed.journal.terminal) { break }
+                    $observed = Read-P4kxMsiOriginalBoundary $sample $Request.target $Phase
+                    if ($observed.status -cin @('reached','failed') -or $observed.journal.terminal) { break }
                 }
             } finally { [IO.File]::Delete($sample) }
         }
@@ -67,7 +74,8 @@ function Wait-P4kxMsiOriginalRawBoundary {
 }
 
 function Save-P4kxMsiObserverCheckpoint {
-    param($Request, $Handle, [int]$Sequence, $ParentState, [switch]$OriginalRawBoundary)
+    param($Request, $Handle, [int]$Sequence, $ParentState,
+        [ValidateSet('preamble/original-raw','lifecycle/install')][string]$OriginalBoundary)
     $directory = Join-Path $Request.directory ('checkpoints/{0:d2}' -f $Sequence)
     if ([IO.Path]::Exists($directory)) { throw 'MSI observer checkpoint sequence must be fresh.' }
     New-Item -ItemType Directory -Path $directory | Out-Null
@@ -84,9 +92,9 @@ function Save-P4kxMsiObserverCheckpoint {
     $boundary = 'unavailable'
     $copiedJournal = Join-Path $directory 'phase-journal.jsonl'
     try {
-        if ($OriginalRawBoundary) {
+        if ($OriginalBoundary) {
             if ($captured['phase-journal.jsonl'].status -ceq 'captured') {
-                $observed = Read-P4kxMsiOriginalRawBoundary $copiedJournal $Request.target
+                $observed = Read-P4kxMsiOriginalBoundary $copiedJournal $Request.target $OriginalBoundary
                 $journal = $observed.journal
                 $boundary = $observed.status
             }
@@ -98,7 +106,8 @@ function Save-P4kxMsiObserverCheckpoint {
         sequence=$Sequence;request_sha256=$Handle.request_sha256;parent=$ParentState;observed_utc=[DateTimeOffset]::UtcNow.ToString('o');
         deadline_utc=$Request.deadline_utc;observer_deadline_utc=$Request.observer_deadline_utc;files=$captured;journal=$journal;journal_failure_type=$journalFailure;
         completed_success=$false;native_completion_unproven=$true;mutation_authority=$false}
-    if ($OriginalRawBoundary) { $receipt.original_raw_capture = $boundary }
+    if ($OriginalBoundary -ceq 'preamble/original-raw') { $receipt.original_raw_capture = $boundary }
+    if ($OriginalBoundary -ceq 'lifecycle/install') { $receipt.original_install_phase = $boundary }
     Write-P4kxDetachedReceipt (Join-Path $directory 'checkpoint.json') $receipt
     return $directory
 }
