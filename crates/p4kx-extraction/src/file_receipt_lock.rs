@@ -153,11 +153,8 @@ fn lock_file(
         } else {
             continue;
         };
-        if !candidate.admit(path, protection, cancel)? {
-            continue;
-        }
         match candidate.file.as_file().try_lock().map_err(io::Error::from) {
-            Ok(()) if candidate.still_named(path)? => return Ok(candidate),
+            Ok(()) if candidate.admit(path, protection, cancel)? => return Ok(candidate),
             Ok(()) => {}
             Err(error)
                 if error.kind() == io::ErrorKind::WouldBlock && contention == Contention::Wait =>
@@ -388,3 +385,7 @@ mod tests {
         Ok(())
     }
 }
+
+#[cfg(test)]
+#[path = "file_receipt_lock_order_tests.rs"]
+mod order_tests;
