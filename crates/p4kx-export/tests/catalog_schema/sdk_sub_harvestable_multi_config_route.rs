@@ -88,7 +88,7 @@ fn assert_producer_parity(
     Route::queried_rows(
         DATASET,
         rows,
-        "normal synthetic parity and physical selection witnessed; installed producer parity and application memory open",
+        "synthetic physical selection and pinned installed row parity witnessed, with installed source closure and final-candidate verification open",
     )
 }
 

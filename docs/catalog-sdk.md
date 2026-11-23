@@ -364,9 +364,20 @@ The corresponding methods on `CatalogQuerySession` and `ParsedCatalogQueries` re
 session's decoded DataForge and, in the parsed view, its indexes.
 
 Synthetic fixtures compare the exact Normal Shop row and exercise incomplete and
-ambiguous location evidence. Earlier isolated LIVE and PTU measurements covered a
-located row and an absent node. An installed comparison with a Normal producer that
-emits the same sourced Shop representation remains open.
+ambiguous location evidence. Isolated Windows debug test processes built from
+`0dbe2469c` resolved the original registry coordinate, a complete sourced Starmap
+link and one nonempty inventory for one located row per Build.
+
+| Build | Selection | Rows | Peak private commit (bytes) | Peak working set (bytes) | Seconds |
+| --- | --- | ---: | ---: | ---: | ---: |
+| LIVE 13220821 | Located | 1 | 1,139,449,856 | 1,078,960,128 | 71.426 |
+| LIVE 13220821 | Absent | 0 | 953,368,576 | 956,153,856 | 7.035 |
+| PTU 13260598 | Located | 1 | 1,165,918,208 | 1,091,411,968 | 67.627 |
+
+The absent LIVE node completed without inventory or Starmap name traversal. The
+PTU row matched a fresh nomination from its original registry. An installed
+comparison with a Normal producer that emits the same sourced Shop representation
+remains open.
 
 ## Resolve field origins
 
