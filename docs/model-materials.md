@@ -104,6 +104,12 @@ first. When the Material node omits the reference or that palette cannot be read
 same component's geometry palette can supply it. Source evidence identifies the winning
 `RootRecord` field and the palette Record. An unreadable reference produces a diagnostic.
 
+The installed LIVE Build 13220821 and PTU Build 13248297 each supplied two Executive
+Entity Records with distinct material-node and geometry palette references. The Assembly
+resolver selected the material-node palette in all four cases. Each case matched the
+original `RootRecord` field and target Record. The source-resolution test read one original
+DataForge Entry per Build and measured a peak private allocation below 1.12 GB.
+
 ## GLB texture coordinates
 
 GLB materials use the primitive's `TEXCOORD_0` attribute for their texture bindings.
