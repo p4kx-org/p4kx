@@ -9,46 +9,14 @@ mod cargo_bounds;
 mod provenance;
 
 use crate::ship_base_fixture::{
-    ALPHA, ALPHA_XML, BETA, BROKEN, CAR, GROUND, MIXED, ROLLING, UNKNOWN, write_archive,
+    self as fixture, ALPHA, ALPHA_XML, BETA, BROKEN, CAR, GROUND, MIXED, ROLLING, UNKNOWN,
 };
 
-use std::error::Error;
-use std::time::{Duration, UNIX_EPOCH};
-
-use p4kx_export::{
-    BuiltShipBase, Filter, MassBasis, ShipBase, ShipBaseOptions, SourceKind, VehicleKind,
-    build_ship_base,
-};
-use p4kx_extraction::Archive;
+use p4kx_export::{Filter, MassBasis, SourceKind, VehicleKind};
 use serde_json::Value;
+use std::error::Error;
 
 type TestResult = Result<(), Box<dyn Error>>;
-
-fn build(filter: Option<&Filter>) -> Result<BuiltShipBase, Box<dyn Error>> {
-    let dir = tempfile::tempdir()?;
-    let archive =
-        Archive::open_with_key(write_archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
-    let mut options = ShipBaseOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
-    options.filter = filter;
-    Ok(build_ship_base(&archive, &options)?)
-}
-
-fn ship(built: &BuiltShipBase, guid: u128) -> Result<&ShipBase, Box<dyn Error>> {
-    let text = format!("{guid:032x}");
-    let wanted = format!(
-        "{}-{}-{}-{}-{}",
-        &text[0..8],
-        &text[8..12],
-        &text[12..16],
-        &text[16..20],
-        &text[20..32]
-    );
-    built
-        .ships()
-        .iter()
-        .find(|ship| ship.guid.to_string() == wanted)
-        .ok_or_else(|| format!("no ship {wanted}").into())
-}
 
 fn near(left: f64, right: f64) -> bool {
     (left - right).abs() < 1e-6
@@ -56,7 +24,7 @@ fn near(left: f64, right: f64) -> bool {
 
 #[test]
 fn ships_are_the_catalog_ships_without_development_leftovers() -> TestResult {
-    let built = build(None)?;
+    let built = fixture::build(None)?;
     assert_eq!(built.ships().len(), 9, "failures: {:?}", built.failures());
     assert_eq!(
         built.skipped(),
@@ -89,22 +57,22 @@ fn ships_are_the_catalog_ships_without_development_leftovers() -> TestResult {
 
 #[test]
 fn the_vehicle_kind_follows_the_folder_and_the_wheels_of_the_implementation() -> TestResult {
-    let built = build(None)?;
+    let built = fixture::build(None)?;
     assert_eq!(
-        ship(&built, ALPHA)?.vehicle_kind,
+        fixture::ship_by_guid(&built, ALPHA)?.vehicle_kind,
         Some(VehicleKind::Spaceship)
     );
     assert_eq!(
-        ship(&built, GROUND)?.vehicle_kind,
+        fixture::ship_by_guid(&built, GROUND)?.vehicle_kind,
         Some(VehicleKind::GroundVehicle),
         "the ground folder is enough without an implementation"
     );
     assert_eq!(
-        ship(&built, CAR)?.vehicle_kind,
+        fixture::ship_by_guid(&built, CAR)?.vehicle_kind,
         Some(VehicleKind::GroundVehicle)
     );
     assert_eq!(
-        ship(&built, ROLLING)?.vehicle_kind,
+        fixture::ship_by_guid(&built, ROLLING)?.vehicle_kind,
         None,
         "wheels in a spaceship folder: the evidence disagrees"
     );
@@ -134,8 +102,8 @@ fn a_mass_basis_serialises_to_the_names_the_catalog_documents() -> TestResult {
 
 #[test]
 fn the_size_comes_from_the_attach_definition_with_its_source() -> TestResult {
-    let built = build(None)?;
-    let alpha = ship(&built, ALPHA)?;
+    let built = fixture::build(None)?;
+    let alpha = fixture::ship_by_guid(&built, ALPHA)?;
     let size = alpha.size.as_ref().ok_or("no size")?;
     assert_eq!(size.value, 3);
     assert_eq!(size.source.kind, SourceKind::Record);
@@ -145,7 +113,7 @@ fn the_size_comes_from_the_attach_definition_with_its_source() -> TestResult {
         "Components/SAttachableComponentParams/AttachDef/Size"
     );
     assert!(
-        ship(&built, GROUND)?.size.is_none(),
+        fixture::ship_by_guid(&built, GROUND)?.size.is_none(),
         "the ground vehicle has no AttachDef"
     );
     Ok(())
@@ -153,8 +121,8 @@ fn the_size_comes_from_the_attach_definition_with_its_source() -> TestResult {
 
 #[test]
 fn mass_and_hull_are_summed_over_the_parts_with_their_sources() -> TestResult {
-    let built = build(None)?;
-    let alpha = ship(&built, ALPHA)?;
+    let built = fixture::build(None)?;
+    let alpha = fixture::ship_by_guid(&built, ALPHA)?;
     let mass = alpha.mass.as_ref().ok_or("no mass")?;
     assert!(near(mass.kg, 1210.0), "1000 + 200 + 10: {}", mass.kg);
     assert_eq!(mass.basis, MassBasis::Parts);
@@ -187,8 +155,8 @@ fn mass_and_hull_are_summed_over_the_parts_with_their_sources() -> TestResult {
 
 #[test]
 fn the_modification_moves_values_and_names_the_patch_and_the_elem() -> TestResult {
-    let built = build(None)?;
-    let beta = ship(&built, BETA)?;
+    let built = fixture::build(None)?;
+    let beta = fixture::ship_by_guid(&built, BETA)?;
     let mass = beta.mass.as_ref().ok_or("no mass")?;
     assert!(
         near(mass.kg, 1270.0),
@@ -232,8 +200,8 @@ fn the_modification_moves_values_and_names_the_patch_and_the_elem() -> TestResul
 
 #[test]
 fn cargo_sums_the_grids_of_the_loadout_but_not_templates_or_docked_vehicles() -> TestResult {
-    let built = build(None)?;
-    let cargo = &ship(&built, ALPHA)?.cargo;
+    let built = fixture::build(None)?;
+    let cargo = &fixture::ship_by_guid(&built, ALPHA)?.cargo;
     let scu = cargo.scu.ok_or("no scu")?;
     assert!(near(scu, 18.5), "16 SCU open grid + 2.5 SCU closed: {scu}");
     assert_eq!(cargo.cells, Some(16));
@@ -263,7 +231,10 @@ fn cargo_sums_the_grids_of_the_loadout_but_not_templates_or_docked_vehicles() ->
             .as_ref()
             .is_some_and(|s| s.field.ends_with("SCentiCargoUnit/centiSCU"))
     );
-    let none = ship(&built, GROUND)?.cargo.scu.ok_or("no grids is 0")?;
+    let none = fixture::ship_by_guid(&built, GROUND)?
+        .cargo
+        .scu
+        .ok_or("no grids is 0")?;
     assert!(
         near(none, 0.0) && none.is_sign_positive(),
         "no negative zero: {none}"
@@ -273,8 +244,8 @@ fn cargo_sums_the_grids_of_the_loadout_but_not_templates_or_docked_vehicles() ->
 
 #[test]
 fn nonfinite_or_negative_dimensions_are_unreadable() -> TestResult {
-    let built = build(None)?;
-    let mixed = &ship(&built, MIXED)?.cargo;
+    let built = fixture::build(None)?;
+    let mixed = &fixture::ship_by_guid(&built, MIXED)?.cargo;
     assert_eq!(mixed.grids_with_issue, 2);
     assert!(near(mixed.scu.ok_or("one grid is readable")?, 16.0));
     assert_eq!(mixed.cells, Some(16));
@@ -286,7 +257,7 @@ fn nonfinite_or_negative_dimensions_are_unreadable() -> TestResult {
             grid.issue
         );
     }
-    let unknown = ship(&built, UNKNOWN)?;
+    let unknown = fixture::ship_by_guid(&built, UNKNOWN)?;
     assert_eq!(unknown.cargo.scu, None, "unknown cargo is not zero cargo");
     assert_eq!(unknown.cargo.cells, None);
     assert_eq!(unknown.cargo.grids_with_issue, 2);
@@ -297,8 +268,8 @@ fn nonfinite_or_negative_dimensions_are_unreadable() -> TestResult {
 
 #[test]
 fn the_loadout_lists_class_names_per_port_path_and_marks_docked_vehicles() -> TestResult {
-    let built = build(None)?;
-    let alpha = ship(&built, ALPHA)?;
+    let built = fixture::build(None)?;
+    let alpha = fixture::ship_by_guid(&built, ALPHA)?;
     let rows: Vec<_> = alpha
         .loadout
         .iter()
@@ -329,8 +300,8 @@ fn the_loadout_lists_class_names_per_port_path_and_marks_docked_vehicles() -> Te
 
 #[test]
 fn a_ground_vehicle_falls_back_to_the_physics_mass() -> TestResult {
-    let built = build(None)?;
-    let ground = ship(&built, GROUND)?;
+    let built = fixture::build(None)?;
+    let ground = fixture::ship_by_guid(&built, GROUND)?;
     let mass = ground.mass.as_ref().ok_or("no mass")?;
     assert!(near(mass.kg, 5400.0));
     assert_eq!(mass.basis, MassBasis::Physics);
@@ -344,8 +315,8 @@ fn a_ground_vehicle_falls_back_to_the_physics_mass() -> TestResult {
 
 #[test]
 fn an_unreadable_implementation_is_an_issue_and_leaves_the_values_out() -> TestResult {
-    let built = build(None)?;
-    let broken = ship(&built, BROKEN)?;
+    let built = fixture::build(None)?;
+    let broken = fixture::ship_by_guid(&built, BROKEN)?;
     assert!(broken.mass.is_none() && broken.hull.is_none());
     assert!(
         broken
@@ -360,7 +331,7 @@ fn an_unreadable_implementation_is_an_issue_and_leaves_the_values_out() -> TestR
 
 #[test]
 fn json_and_ndjson_carry_the_same_ships_in_the_same_order() -> TestResult {
-    let built = build(None)?;
+    let built = fixture::build(None)?;
     let mut json = Vec::new();
     built.write_json(&mut json)?;
     let document: Value = serde_json::from_slice(&json)?;
@@ -401,7 +372,7 @@ fn json_and_ndjson_carry_the_same_ships_in_the_same_order() -> TestResult {
 #[test]
 fn a_filter_narrows_the_ships_and_marks_the_export_partial() -> TestResult {
     let filter = Filter::new("acme_alpha");
-    let built = build(Some(&filter))?;
+    let built = fixture::build(Some(&filter))?;
     assert_eq!(built.ships().len(), 1);
     assert!(!built.is_complete());
     let mut json = Vec::new();

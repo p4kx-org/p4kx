@@ -17,10 +17,14 @@ use serde_json::{Map, Value};
 use crate::catalog_capture::CatalogCapture;
 use crate::real_archive_catalog_preflight;
 use crate::real_archive_catalog_size::artifact;
-use crate::real_archive_catalog_size::replay::bindings::{Binding, Receipt};
+use crate::real_archive_catalog_size::replay::bindings::Binding;
 
 #[path = "real_archive_catalog_compare_rows.rs"]
 mod compare_rows;
+
+#[path = "real_archive_catalog_measurement.rs"]
+mod measurement;
+pub(crate) use measurement::{with_bound_measurement, with_bound_measurement_from_producer};
 
 #[path = "real_archive_catalog_selected_origins.rs"]
 mod selected_origins;
@@ -54,50 +58,6 @@ pub(crate) struct BoundMeasurement {
     directory: PathBuf,
     binding: Binding,
     watch: ArchiveWatch,
-}
-
-pub(crate) fn with_bound_measurement<T>(
-    verify: impl FnOnce(&Archive, &BoundMeasurement) -> TestResult<T>,
-) -> TestResult<T> {
-    with_measurement(None, verify)
-}
-
-pub(crate) fn with_bound_measurement_from_producer<T>(
-    producer_revision: &str,
-    verify: impl FnOnce(&Archive, &BoundMeasurement) -> TestResult<T>,
-) -> TestResult<T> {
-    with_measurement(Some(producer_revision), verify)
-}
-
-fn with_measurement<T>(
-    producer_revision: Option<&str>,
-    verify: impl FnOnce(&Archive, &BoundMeasurement) -> TestResult<T>,
-) -> TestResult<T> {
-    let directory = std::env::var_os("P4KX_CATALOG_MEASUREMENT_DIR")
-        .map(PathBuf::from)
-        .ok_or("configure the completed Catalog measurement")?;
-    let receipt = Receipt::read(&directory)?;
-    if let Some(producer_revision) = producer_revision {
-        receipt.require_producer_revision(producer_revision)?;
-    }
-    let binding = receipt.binding()?;
-    real_archive_catalog_preflight::check(&directory)?;
-    let path = p4kx_testkit::real_archive_path().map_err(|_| "configure the matching Archive")?;
-    let key = p4kx_testkit::real_archive_key().map_err(|_| "read the configured Archive key")?;
-    let archive =
-        Archive::open_with_key(path, Some(key)).map_err(|_| "open the matching Archive")?;
-    let watch = ArchiveWatch::new(&archive);
-    watch.check()?;
-    binding.check_archive(&archive)?;
-
-    let measurement = BoundMeasurement {
-        directory,
-        binding,
-        watch,
-    };
-    let result = verify(&archive, &measurement);
-    measurement.watch.check()?;
-    result
 }
 
 #[test]

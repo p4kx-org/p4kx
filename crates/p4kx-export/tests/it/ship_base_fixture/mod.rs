@@ -5,11 +5,42 @@
 
 use std::error::Error;
 use std::path::{Path, PathBuf};
+use std::time::{Duration, UNIX_EPOCH};
 
+use p4kx_export::{BuiltShipBase, Filter, ShipBase, ShipBaseOptions};
+use p4kx_extraction::Archive;
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestCapacity, TestEntity, TestEntry, TestLoadout,
     TestLoadoutEntry, closed_container_record, entity_schema, open_container_record,
 };
+
+/// Builds the standard fixture with the public Ship Base API.
+pub(crate) fn build(filter: Option<&Filter>) -> Result<BuiltShipBase, Box<dyn Error>> {
+    let dir = tempfile::tempdir()?;
+    let archive =
+        Archive::open_with_key(write_archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
+    let mut options = ShipBaseOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
+    options.filter = filter;
+    Ok(p4kx_export::build_ship_base(&archive, &options)?)
+}
+
+/// Finds the fixture's Ship row by its original Record GUID.
+pub(crate) fn ship_by_guid(built: &BuiltShipBase, guid: u128) -> Result<&ShipBase, Box<dyn Error>> {
+    let text = format!("{guid:032x}");
+    let wanted = format!(
+        "{}-{}-{}-{}-{}",
+        &text[0..8],
+        &text[8..12],
+        &text[12..16],
+        &text[16..20],
+        &text[20..32]
+    );
+    built
+        .ships()
+        .iter()
+        .find(|ship| ship.guid.to_string() == wanted)
+        .ok_or_else(|| format!("no ship {wanted}").into())
+}
 
 pub(crate) const ALPHA: u128 = 0x10;
 pub(crate) const BETA: u128 = 0x11;
