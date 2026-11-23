@@ -33,7 +33,5 @@ try {
     }
     $caller = Join-Path $context.root 'snapshots/09/caller-result.json'
     if ([IO.File]::Exists($caller)) { $result.caller_result_sha256 = Get-P4kxDetachedDigest $caller }
-    $staged = Join-Path $context.directory 'result.stage.json'
-    Write-P4kxDetachedReceipt $staged $result
-    [IO.File]::Move($staged,(Join-Path $context.directory 'result.json'))
+    Write-P4kxDetachedReceipt (Join-Path $context.directory 'result.json') $result
 }

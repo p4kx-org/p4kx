@@ -82,6 +82,9 @@ jobs:
             ${{ env.P4KX_CONTROL_TASK }}/*.json
             ${{ env.P4KX_CONTROL_TASK }}/*.log
             ${{ env.P4KX_CONTROL_TASK }}/diagnostics/*
+            ${{ env.P4KX_CONTROL_TASK }}-contracts/**/*.json
+            ${{ env.P4KX_CONTROL_TASK }}-contracts/**/*.jsonl
+            ${{ env.P4KX_CONTROL_TASK }}-contracts/**/*.log
           if-no-files-found: error
       - name: Start the harmless native successive observer
         id: successive-start

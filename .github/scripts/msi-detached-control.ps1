@@ -15,8 +15,16 @@ function Get-P4kxDetachedTrackingDigest {
 
 function Write-P4kxDetachedReceipt([string]$Path, $Value) {
     $bytes = [Text.UTF8Encoding]::new($false, $true).GetBytes(($Value | ConvertTo-Json -Depth 10 -Compress)+[char]10)
-    $stream = [IO.File]::Open($Path, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::Read)
-    try { $stream.Write($bytes); $stream.Flush($true) } finally { $stream.Dispose() }
+    $destination = [IO.Path]::GetFullPath($Path)
+    $directory = [IO.Path]::GetDirectoryName($destination)
+    $temporary = Join-Path $directory ('.receipt-' + [IO.Path]::GetRandomFileName() + '.tmp')
+    $stream = [IO.File]::Open($temporary, [IO.FileMode]::CreateNew, [IO.FileAccess]::Write, [IO.FileShare]::None)
+    try {
+        try { $stream.Write($bytes); $stream.Flush($true) } finally { $stream.Dispose() }
+        [IO.File]::Move($temporary,$destination,$false)
+    } finally {
+        if ([IO.File]::Exists($temporary)) { [IO.File]::Delete($temporary) }
+    }
 }
 
 function Read-P4kxDetachedReceipt([string]$Path) {

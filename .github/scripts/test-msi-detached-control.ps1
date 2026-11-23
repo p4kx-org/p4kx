@@ -19,6 +19,66 @@ function Invoke-ControlStage([string]$Stage, [string]$Path, [int]$Budget=$LiveBu
     if ($result.exit_code -ne 0) { throw ('Harmless control stage failed: '+$result.stderr) }
 }
 
+function Assert-DetachedReceiptPublication {
+    $task = Join-Path $root 'receipt-publication'
+    New-Item -ItemType Directory -Path $task | Out-Null
+    $receiptPath = Join-Path $task 'source-bound.json'
+    $prepared = Join-Path $task 'write-open'
+    $released = Join-Path $task 'write-release'
+    $writer = Join-Path $task 'writer.ps1'
+    $source = (Get-Item 'Function:Write-P4kxDetachedReceipt').ScriptBlock.ToString()
+    $write = '$stream.Write($bytes)'
+    if ($source.Split($write,[StringSplitOptions]::None).Count -ne 2) { throw 'Expected one receipt byte-write boundary.' }
+    $hold = @(
+        '[IO.File]::WriteAllText($Prepared,''ready'')'
+        '$watch = [Diagnostics.Stopwatch]::StartNew()'
+        'while (-not [IO.File]::Exists($Released)) {'
+        '    if ($watch.ElapsedMilliseconds -ge 5000) { throw ''Receipt publication test did not release the writer.'' }'
+        '    Start-Sleep -Milliseconds 20'
+        '}'
+    ) -join [char]10
+    $header = 'param([string]$Path,[string]$Prepared,[string]$Released)'
+    $body = $source.Replace($write,($hold + [char]10 + $write))
+    @($header, ('$ErrorActionPreference=''Stop'''), ('function Write-Receipt {' + [char]10 + $body + [char]10 + '}'),
+        ('Write-Receipt $Path @{schema=1;observation=''original''}')) |
+        Set-Content -LiteralPath $writer -Encoding utf8NoBOM
+    $arguments = @('-NoLogo','-NoProfile','-NonInteractive','-File',$writer,$receiptPath,$prepared,$released)
+    $process = New-P4kxPackageProcess $executable $arguments $task
+    try {
+        [void]$process.Start()
+        $process.StandardInput.Close()
+        $timer = [Diagnostics.Stopwatch]::StartNew()
+        while (-not [IO.File]::Exists($prepared)) {
+            if ($timer.ElapsedMilliseconds -ge 4000 -or $process.HasExited) { throw 'Receipt writer did not reach its byte-write boundary.' }
+            Start-Sleep -Milliseconds 20
+        }
+        $visibleBeforeWrite = [IO.File]::Exists($receiptPath)
+        $premature = if ($visibleBeforeWrite) { Read-P4kxDetachedReceipt $receiptPath }
+        [IO.File]::WriteAllText($released,'release')
+        if (-not $process.WaitForExit(2000) -or $process.ExitCode -ne 0) { throw 'The original receipt writer did not return.' }
+        if ($visibleBeforeWrite -and $null -eq $premature) { throw 'The receipt filename was visible before its bytes were written.' }
+        if ($visibleBeforeWrite) { throw 'A final receipt was visible before the original writer returned.' }
+    } finally {
+        try { if (-not $process.HasExited) { $process.Kill($false); [void]$process.WaitForExit(1000) } }
+        finally { $process.Dispose() }
+    }
+    $original = Get-P4kxDetachedDigest $receiptPath
+    $refused = $false
+    try { Write-P4kxDetachedReceipt $receiptPath @{schema=1;observation='replacement'} }
+    catch [IO.IOException] { $refused = $true }
+    catch [System.Management.Automation.MethodInvocationException] {
+        if ($_.Exception.InnerException -isnot [IO.IOException]) { throw }
+        $refused = $true
+    }
+    if (-not $refused -or (Get-P4kxDetachedDigest $receiptPath) -cne $original -or
+        (Read-P4kxDetachedReceipt $receiptPath).observation -cne 'original' -or
+        @(Get-ChildItem -LiteralPath $task -Force -Filter '*.tmp').Count -ne 0) {
+        throw 'Receipt publication overwrote the original or retained a temporary file after refusal.'
+    }
+}
+
+Assert-DetachedReceiptPublication
+
 $complete = Join-Path $root 'complete with spaces'
 Invoke-ControlStage Start $complete
 $request = Read-P4kxDetachedReceipt (Join-Path $complete 'request.json')
