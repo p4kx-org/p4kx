@@ -6,6 +6,9 @@
 use crate::shops_fixture::{self, EXCHANGE, LOOSE, write_archive};
 use crate::starmap_fixture;
 
+#[path = "shop_registry_field_origins.rs"]
+mod registry_field_origins;
+
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
@@ -50,8 +53,8 @@ fn shop<'a>(catalog: &'a Value, location_id: &str) -> Result<&'a Value, Box<dyn 
         .ok_or("shops")?
         .iter()
         .find(|shop| {
-            shop["key"]
-                .as_str()
+            shop.pointer("/key/value")
+                .and_then(Value::as_str)
                 .is_some_and(|key| key.contains(location_id))
         })
         .ok_or_else(|| format!("the shop at {location_id}").into())
@@ -84,7 +87,7 @@ fn a_shop_is_a_registry_entry_with_its_chain_as_the_key() -> TestResult {
         .as_array()
         .ok_or("shops")?
         .iter()
-        .filter_map(|shop| shop["key"].as_str())
+        .filter_map(|shop| shop["key"]["value"].as_str())
         .collect();
     let mut sorted = keys.clone();
     sorted.sort_unstable();
@@ -96,23 +99,30 @@ fn a_shop_is_a_registry_entry_with_its_chain_as_the_key() -> TestResult {
     );
     let first = shop(&catalog, LOCATIONS[0])?;
     assert_eq!(
-        first["key"],
+        first["key"]["value"],
         format!("{ROOT},{},{EXCHANGE}", LOCATIONS[0]).as_str()
     );
-    assert_eq!(first["entityGuid"], EXCHANGE);
-    assert_eq!(first["system"], "stanton");
-    assert_eq!(first["entityName"], "SCShop_CommEx_TDD_Hurston");
-    assert_eq!(first["registryName"], "L_TDD_Hurston");
+    assert_eq!(first["entityGuid"]["value"], EXCHANGE);
+    assert_eq!(first["system"]["value"], "stanton");
+    assert_eq!(first["entityName"]["value"], "SCShop_CommEx_TDD_Hurston");
+    assert_eq!(first["registryName"]["value"], "L_TDD_Hurston");
     assert_eq!(
-        first["defaultValue"],
+        first["defaultValue"]["value"],
         "d0000000-0000-4000-8000-000000000001"
     );
+    let containers = first["containers"]["value"]
+        .as_array()
+        .ok_or("sourced ordered container names")?;
     assert_eq!(
-        first["containers"],
-        serde_json::json!(["OOC_Stanton", "OOC_Stanton_1_Hurston", "Hurston"])
+        containers
+            .iter()
+            .filter_map(|cell| cell["value"].as_str())
+            .collect::<Vec<_>>(),
+        ["OOC_Stanton", "OOC_Stanton_1_Hurston", "Hurston"],
+        "Container names retain source order"
     );
-    assert_eq!(first["body"], "OOC_Stanton_1_Hurston");
-    assert_eq!(first["location"], "Hurston");
+    assert_eq!(first["body"]["value"], "OOC_Stanton_1_Hurston");
+    assert_eq!(first["location"]["value"], "Hurston");
     Ok(())
 }
 
@@ -160,8 +170,8 @@ fn kind_and_brand_come_from_the_container_that_names_the_entity() -> TestResult 
         );
     }
     assert_ne!(
-        shop(&catalog, LOCATIONS[1])?["key"],
-        shop(&catalog, LOCATIONS[2])?["key"],
+        shop(&catalog, LOCATIONS[1])?["key"]["value"],
+        shop(&catalog, LOCATIONS[2])?["key"]["value"],
         "one module placed twice is two shops"
     );
     Ok(())
@@ -177,17 +187,17 @@ fn commodity_exchanges_are_marked_and_empty_names_are_null() -> TestResult {
         (LOCATIONS[5], false),
     ] {
         assert_eq!(
-            shop(&catalog, location)?["commodityExchange"],
+            shop(&catalog, location)?["commodityExchange"]["value"],
             marked,
             "{location}"
         );
     }
     let pyro = shop(&catalog, LOCATIONS[5])?;
-    assert_eq!(pyro["system"], "pyro");
-    assert_eq!(pyro["entityGuid"], LOOSE);
-    assert!(pyro["registryName"].is_null());
-    assert!(pyro["defaultValue"].is_null());
-    assert_eq!(pyro["body"], "OOC_Stanton_1_Hurston");
+    assert_eq!(pyro["system"]["value"], "pyro");
+    assert_eq!(pyro["entityGuid"]["value"], LOOSE);
+    assert!(pyro["registryName"]["value"].is_null());
+    assert!(pyro["defaultValue"]["value"].is_null());
+    assert_eq!(pyro["body"]["value"], "OOC_Stanton_1_Hurston");
     Ok(())
 }
 

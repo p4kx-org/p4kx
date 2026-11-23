@@ -126,7 +126,7 @@ fn physical_shop_inventories_include_orphans_and_placeholders() -> TestResult {
     let catalog: Value = serde_json::from_slice(built.json())?;
     let food = shop(&catalog, FOOD)?;
     assert_eq!(
-        food["key"], FOOD_SHOP_ID,
+        food["key"]["value"], FOOD_SHOP_ID,
         "the orphan names this exact shop key"
     );
     assert_eq!(

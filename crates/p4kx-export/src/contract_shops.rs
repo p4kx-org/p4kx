@@ -3,6 +3,7 @@
 
 use std::sync::Arc;
 
+use p4kx_extraction::SourcedValue;
 use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 
@@ -16,34 +17,8 @@ use crate::guid_text::CatalogGuid;
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub(crate) struct Shop {
-    /// The identity: the `ID` chain of the registry entry, the `CryGUID`s of the containers from
-    /// the system root down to the `SCShop` Entity, comma separated. Unique in the catalog.
-    pub(crate) key: String,
-    /// The `CryGUID` of the `SCShop` Entity, the last element of `key`. A shop module placed in
-    /// several places keeps it, so it is no identity; it is the `CryGUID` the container's
-    /// `entitycomponentshop.xml` names.
-    pub(crate) entity_guid: String,
-    /// The star system whose registry holds the shop: the platform name without the suffix
-    /// `system`, e.g. `stanton`, `pyro`.
-    pub(crate) system: String,
-    /// The name of the `SCShop` Entity, the last element of the registry's `SuperName`, e.g.
-    /// `SCShop_CommEx_TDD_NewBabbage`. An internal name, not a localisation key.
-    pub(crate) entity_name: String,
-    /// The `ShopName` of the registry entry, e.g. `Pharmacy_RestStop_ARC-LEO1`; `null` when it is
-    /// empty. An internal name, not a localisation key. Many shops share one.
-    pub(crate) registry_name: Option<String>,
-    /// The `DefaultValue` GUID of the registry entry; `null` when it is empty. Shops with the same
-    /// `registryName` share it.
-    pub(crate) default_value: Option<String>,
-    /// The names of the containers from the system root down to the one that holds the shop,
-    /// from the `SuperName` chain without its GUIDs and without the `SCShop` Entity.
-    pub(crate) containers: Vec<String>,
-    /// The second container, the body or jump point the shop is below (e.g.
-    /// `OOC_Stanton_4_Microtech`, `pyro5`); `null` when the chain has none.
-    pub(crate) body: Option<String>,
-    /// The third container, the location (e.g. `Area18_City_objectContainer`); `null` when the
-    /// chain has none.
-    pub(crate) location: Option<String>,
+    #[serde(flatten)]
+    pub(crate) registry: ShopRegistryFields,
     /// The `guid` of the `starmapObjects` entry whose `entityName` or `className` equals
     /// `location` ignoring ASCII case; `null` when none does or more than one object does.
     pub(crate) starmap_object_guid: Option<CatalogGuid>,
@@ -56,9 +31,6 @@ pub(crate) struct Shop {
     /// `null` for a container below `PU\loc`, one without a brand folder, or when the containers
     /// disagree.
     pub(crate) brand: Option<String>,
-    /// Whether the shop is a commodity exchange or commodity terminal: `entityName` starts with
-    /// `SCShop_CommEx_TDD_`, or starts with `SCShop_Platinumbay` and ends with `_Commodity`.
-    pub(crate) commodity_exchange: bool,
     /// The lower-case file stem of `Data\Scripts\ShopInventories\<stem>.json` that the `.soc` of
     /// every shop container naming `entityGuid` gives the `SCShop` component (ADR-0071); `null`
     /// when no container names a file, the containers disagree or the file is missing or
@@ -69,6 +41,44 @@ pub(crate) struct Shop {
     #[serde(serialize_with = "serialize_item_guids")]
     #[schemars(with = "Option<Vec<String>>")]
     pub(crate) item_guids: Option<Arc<[String]>>,
+}
+
+/// Converted fields from one selected registry row and its owning layer.
+#[derive(Debug, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[schemars(transform = every_field_required)]
+pub(crate) struct ShopRegistryFields {
+    /// The identity: the `ID` chain of the registry entry, the `CryGUID`s of the containers from
+    /// the system root down to the `SCShop` Entity, comma separated. Unique in the catalog.
+    pub(crate) key: SourcedValue<String>,
+    /// The `CryGUID` of the `SCShop` Entity, the last element of `key`. A shop module placed in
+    /// several places keeps it, so it is no identity; it is the `CryGUID` the container's
+    /// `entitycomponentshop.xml` names.
+    pub(crate) entity_guid: SourcedValue<String>,
+    /// The star system whose registry holds the shop: the platform name without the suffix
+    /// `system`, e.g. `stanton`, `pyro`.
+    pub(crate) system: SourcedValue<String>,
+    /// The name of the `SCShop` Entity, the last element of the registry's `SuperName`, e.g.
+    /// `SCShop_CommEx_TDD_NewBabbage`. An internal name, not a localisation key.
+    pub(crate) entity_name: SourcedValue<String>,
+    /// The `ShopName` of the registry entry, e.g. `Pharmacy_RestStop_ARC-LEO1`; absent when it is
+    /// empty. An internal name, not a localisation key. Many shops share one.
+    pub(crate) registry_name: SourcedValue<String>,
+    /// The `DefaultValue` GUID of the registry entry; absent when it is empty. Shops with the same
+    /// `registryName` share it.
+    pub(crate) default_value: SourcedValue<String>,
+    /// The names of the containers from the system root down to the one that holds the shop,
+    /// from the `SuperName` chain without its GUIDs and without the `SCShop` Entity.
+    pub(crate) containers: SourcedValue<Vec<SourcedValue<String>>>,
+    /// The second container, the body or jump point the shop is below (e.g.
+    /// `OOC_Stanton_4_Microtech`, `pyro5`); absent when the chain has none.
+    pub(crate) body: SourcedValue<String>,
+    /// The third container, the location (e.g. `Area18_City_objectContainer`); absent when the
+    /// chain has none.
+    pub(crate) location: SourcedValue<String>,
+    /// Whether the shop is a commodity exchange or commodity terminal: `entityName` starts with
+    /// `SCShop_CommEx_TDD_`, or starts with `SCShop_Platinumbay` and ends with `_Commodity`.
+    pub(crate) commodity_exchange: SourcedValue<bool>,
 }
 
 #[expect(clippy::ref_option, reason = "serde passes the field by reference")]

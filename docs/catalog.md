@@ -2582,16 +2582,25 @@ names and places. It carries no price, no stock and no description; the item GUI
 inventory file that its containers name (below). The names in it
 are names of containers and entities, not localisation keys, so no field is a game text.
 
+Read the registry-derived fields `key`, `entityGuid`, `system`, `entityName`,
+`registryName`, `defaultValue`, `containers`, `body`, `location` and
+`commodityExchange` as sourced values. Each container in `containers.value` is sourced
+in original order. Resolve the source-use references to the exact XML node and attribute
+ordinal of the selected registry declaration or its owning layer. An absent attribute
+retains the observed absence at that node. An authored blank normalized to an absent
+value retains the original attribute occurrence. The selected declaration is the first
+valid occurrence of the normalized key.
+
 | Field | Source |
 |-------|--------|
 | `key` | The `ID` attribute of the entry: the CryGUIDs of the containers from the system root down to the `SCShop` Entity, comma separated, each element in lower case. Unique (1,184 distinct on LIVE) and the identity of the shop |
 | `entityGuid` | The last element of `key`, the CryGUID of the `SCShop` Entity, lower case. A shop module placed in several places keeps it (235 distinct for 1,184 shops on LIVE), so it is no identity; it is the CryGUID that `metadata\entitycomponentshop.xml` of the shop container names |
 | `system` | `PlatformName` of the `LayerBackup` without the suffix `system`, lower case: `stanton`, `pyro` |
 | `entityName` | The last element of `SuperName`, the name of the `SCShop` Entity, e.g. `SCShop_CommEx_TDD_NewBabbage` |
-| `registryName` | `ShopName`, e.g. `Pharmacy_RestStop_ARC-LEO1`; `null` when empty. A name, not a localisation key; many shops share one (360 distinct non-empty on LIVE) |
-| `defaultValue` | `DefaultValue`, a GUID; `null` when empty. Shops with the same `registryName` share it (1 to 1 on LIVE). What it refers to is not known |
+| `registryName` | `ShopName`, e.g. `Pharmacy_RestStop_ARC-LEO1`; absent when empty. A name, not a localisation key; many shops share one (360 distinct non-empty on LIVE) |
+| `defaultValue` | `DefaultValue`, a GUID; absent when empty. Shops with the same `registryName` share it (1 to 1 on LIVE). What it refers to is not known |
 | `containers` | The elements of `SuperName` before the entity, each without its `_{GUID}` or `_{GUID}_socpak` suffix and surrounding blanks, from the system root down |
-| `body`, `location` | The second and third element of `containers` (`OOC_Stanton_4_Microtech`, `Area18_City_objectContainer`; Pyro: `pyro5`, `rs_ext_pyro6_l3`); `null` when the chain is shorter |
+| `body`, `location` | The second and third element of `containers` (`OOC_Stanton_4_Microtech`, `Area18_City_objectContainer`; Pyro: `pyro5`, `rs_ext_pyro6_l3`); absent when the chain is shorter |
 | `starmapObjectGuid` | The `guid` of the `starmapObjects` entry whose `entityName` or `className` equals `location` ignoring ASCII case; `null` when none does or when more than one object does |
 | `kind`, `brand` | From the path of the shop container whose `entitycomponentshop.xml` names `entityGuid`: below `Data\ObjectContainers\PU\Shops` the first folder is the kind (`commex`, `clothing`, ...), the second the brand (`tdd`, `mcraes`), the brand `null` when the file lies directly in the kind folder; a container in a `shopcomm` or `shopfood` folder below `PU\loc` has that folder as kind and no brand. `null` for both when no container names the Entity or containers that differ in kind or brand do. The kind is a closed set the game may extend; a reader maps an unknown value to `null` |
 | `commodityExchange` | `true` when `entityName` starts with `SCShop_CommEx_TDD_`, or starts with `SCShop_Platinumbay` and ends with `_Commodity` (ignoring case): the commodity exchanges and terminals |

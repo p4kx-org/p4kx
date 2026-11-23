@@ -24,7 +24,11 @@ type TestResult = Result<(), Box<dyn Error>>;
 fn shop<'a>(catalog: &'a Value, entity: &str) -> Result<&'a Value, Box<dyn Error>> {
     catalog["shops"]
         .as_array()
-        .and_then(|shops| shops.iter().find(|shop| shop["entityGuid"] == entity))
+        .and_then(|shops| {
+            shops.iter().find(|shop| {
+                shop.pointer("/entityGuid/value").and_then(Value::as_str) == Some(entity)
+            })
+        })
         .ok_or_else(|| format!("no shop {entity}").into())
 }
 

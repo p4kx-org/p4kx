@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use p4kx_extraction::{Guid, SourceUses, SourceValue};
 
@@ -10,7 +11,7 @@ use crate::contract::StarmapObject;
 use crate::guid_text::CatalogGuid;
 use crate::shop_containers::Containers;
 use crate::shop_links::Links;
-use crate::shop_registry::RegistryId;
+use crate::shop_registry::{RegistryAttribute, RegistryAttributeOrigin, RegistryId};
 
 const ROOT: &str = "4a269932-183e-362d-aacc-188e7debbea9";
 const BODY: &str = "4ce1f681-b479-5269-0536-3d7f02fdccaf";
@@ -34,14 +35,15 @@ fn object(id: u8, class_name: &'static str, entity_name: Option<&str>) -> Starma
 
 fn entry(location: &str, entity_id: &str) -> RegistryShop {
     RegistryShop {
-        platform: "StantonSystem".to_owned(),
+        platform: Arc::new(RegistryAttribute::fixture("StantonSystem".to_owned())),
         id: RegistryId::Fixture(format!(
             "{ROOT},{BODY},{entity_id},{}",
             entity_id.to_ascii_uppercase()
         )),
-        super_name: format!("Root,Body,{location},SCShop_X"),
-        default_value: String::new(),
-        shop_name: String::new(),
+        id_origin: RegistryAttributeOrigin::Fixture,
+        super_name: RegistryAttribute::fixture(format!("Root,Body,{location},SCShop_X")),
+        default_value: RegistryAttribute::fixture(String::new()),
+        shop_name: RegistryAttribute::fixture(String::new()),
     }
 }
 
@@ -67,6 +69,7 @@ fn a_name_of_two_starmap_objects_links_to_none_and_is_counted() {
         &links,
         &lists,
         &mut summary,
+        &SourceUses::new(),
         |_, _| Ok(()),
     )
     .expect("the synthetic listing callback succeeds")
@@ -76,7 +79,7 @@ fn a_name_of_two_starmap_objects_links_to_none_and_is_counted() {
     assert_eq!(summary.ambiguous_link, 1, "only Spot is ambiguous");
     let spot = shops
         .iter()
-        .find(|shop| shop.location.as_deref() == Some("Spot"));
+        .find(|shop| shop.registry.location.value().map(String::as_str) == Some("Spot"));
     assert!(spot.is_some_and(|shop| shop.starmap_object_guid.is_none()));
 }
 
@@ -95,6 +98,7 @@ fn a_key_is_lower_case_and_a_non_guid_element_is_malformed() {
         &links,
         &lists,
         &mut summary,
+        &SourceUses::new(),
         |_, _| Ok(()),
     )
     .expect("the synthetic listing callback succeeds")
@@ -102,10 +106,17 @@ fn a_key_is_lower_case_and_a_non_guid_element_is_malformed() {
     assert_eq!(shops.len(), 1, "the case-duplicate is dropped");
     assert_eq!((summary.duplicate, summary.malformed), (1, 1));
     let shop = &shops[0];
-    assert_eq!(shop.system, "stanton");
-    assert!(
-        shop.key.ends_with(&shop.entity_guid),
-        "entityGuid is the last element"
+    assert_eq!(
+        shop.registry.system.value().map(String::as_str),
+        Some("stanton"),
+        "platform conversion"
     );
-    assert_eq!(shop.key, shop.key.to_ascii_lowercase());
+    let key = shop.registry.key.value().expect("admitted normalized key");
+    let entity = shop
+        .registry
+        .entity_guid
+        .value()
+        .expect("admitted entity GUID");
+    assert!(key.ends_with(entity), "entityGuid is the last element");
+    assert_eq!(key, &key.to_ascii_lowercase(), "normalized placement key");
 }

@@ -230,6 +230,7 @@ pub(crate) fn shops(
         &lists,
         &mut summary,
         &resolver,
+        capture.source_uses(),
     )?;
     record_registry(registry_source, projected.disposition, &mut ledger);
     ledger.merge(containers.ledger);

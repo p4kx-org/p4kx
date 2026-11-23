@@ -33,7 +33,7 @@ pub(super) fn assert_export(catalog: &Value, rows: &[Value], indices: [usize; 2]
     let key = key(2);
     let legacy = health::rows(catalog, "/shops")?
         .iter()
-        .find(|shop| shop["key"] == key)
+        .find(|shop| shop.pointer("/key/value").and_then(Value::as_str) == Some(key.as_str()))
         .ok_or("the original ambiguous shop")?;
     assert!(
         legacy["inventory"].is_null() && legacy["itemGuids"].is_null(),

@@ -41,7 +41,7 @@ pub(crate) fn guid_text(value: u128) -> String {
     )
 }
 
-fn database() -> DataForgeBuilder {
+pub(crate) fn database() -> DataForgeBuilder {
     let builder = DataForgeBuilder::new()
         .version(8)
         .structure(TestStruct::new("StarMapObjectType").field("name", TestType::String))

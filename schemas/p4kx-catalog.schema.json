@@ -47298,11 +47298,8 @@
       "description": "A shop: one `ShopBackup` entry of the shop registry `Data\\Libs\\CosmoTools\\LayerRecovery\\\nLayerBackups.xml`, one placement of an `SCShop` Entity in the world. No prices and no stock; the\nitem GUIDs come only from an inventory file that the shop containers name (ADR-0071).",
       "properties": {
         "body": {
-          "description": "The second container, the body or jump point the shop is below (e.g.\n`OOC_Stanton_4_Microtech`, `pyro5`); `null` when the chain has none.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The second container, the body or jump point the shop is below (e.g.\n`OOC_Stanton_4_Microtech`, `pyro5`); absent when the chain has none."
         },
         "brand": {
           "description": "The brand from the same path: the second folder below `PU\\Shops` (e.g. `tdd`, `mcraes`);\n`null` for a container below `PU\\loc`, one without a brand folder, or when the containers\ndisagree.",
@@ -47312,30 +47309,24 @@
           ]
         },
         "commodityExchange": {
-          "description": "Whether the shop is a commodity exchange or commodity terminal: `entityName` starts with\n`SCShop_CommEx_TDD_`, or starts with `SCShop_Platinumbay` and ends with `_Commodity`.",
-          "type": "boolean"
+          "$ref": "#/$defs/SourcedValueOfboolean",
+          "description": "Whether the shop is a commodity exchange or commodity terminal: `entityName` starts with\n`SCShop_CommEx_TDD_`, or starts with `SCShop_Platinumbay` and ends with `_Commodity`."
         },
         "containers": {
-          "description": "The names of the containers from the system root down to the one that holds the shop,\nfrom the `SuperName` chain without its GUIDs and without the `SCShop` Entity.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfstring",
+          "description": "The names of the containers from the system root down to the one that holds the shop,\nfrom the `SuperName` chain without its GUIDs and without the `SCShop` Entity."
         },
         "defaultValue": {
-          "description": "The `DefaultValue` GUID of the registry entry; `null` when it is empty. Shops with the same\n`registryName` share it.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The `DefaultValue` GUID of the registry entry; absent when it is empty. Shops with the same\n`registryName` share it."
         },
         "entityGuid": {
-          "description": "The `CryGUID` of the `SCShop` Entity, the last element of `key`. A shop module placed in\nseveral places keeps it, so it is no identity; it is the `CryGUID` the container's\n`entitycomponentshop.xml` names.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The `CryGUID` of the `SCShop` Entity, the last element of `key`. A shop module placed in\nseveral places keeps it, so it is no identity; it is the `CryGUID` the container's\n`entitycomponentshop.xml` names."
         },
         "entityName": {
-          "description": "The name of the `SCShop` Entity, the last element of the registry's `SuperName`, e.g.\n`SCShop_CommEx_TDD_NewBabbage`. An internal name, not a localisation key.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The name of the `SCShop` Entity, the last element of the registry's `SuperName`, e.g.\n`SCShop_CommEx_TDD_NewBabbage`. An internal name, not a localisation key."
         },
         "inventory": {
           "description": "The lower-case file stem of `Data\\Scripts\\ShopInventories\\<stem>.json` that the `.soc` of\nevery shop container naming `entityGuid` gives the `SCShop` component (ADR-0071); `null`\nwhen no container names a file, the containers disagree or the file is missing or\nunreadable.",
@@ -47355,8 +47346,8 @@
           ]
         },
         "key": {
-          "description": "The identity: the `ID` chain of the registry entry, the `CryGUID`s of the containers from\nthe system root down to the `SCShop` Entity, comma separated. Unique in the catalog.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The identity: the `ID` chain of the registry entry, the `CryGUID`s of the containers from\nthe system root down to the `SCShop` Entity, comma separated. Unique in the catalog."
         },
         "kind": {
           "description": "The kind from the path of the shop container whose `SCShop` Entity is `entityGuid`:\nthe folder below `PU\\Shops` (e.g. `commex`, `clothing`), or `shopcomm` or `shopfood` for a\ncontainer below `PU\\loc`. A closed set the game may extend; `null` when no container or\ncontainers of different kinds hold the Entity.",
@@ -47366,18 +47357,12 @@
           ]
         },
         "location": {
-          "description": "The third container, the location (e.g. `Area18_City_objectContainer`); `null` when the\nchain has none.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The third container, the location (e.g. `Area18_City_objectContainer`); absent when the\nchain has none."
         },
         "registryName": {
-          "description": "The `ShopName` of the registry entry, e.g. `Pharmacy_RestStop_ARC-LEO1`; `null` when it is\nempty. An internal name, not a localisation key. Many shops share one.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The `ShopName` of the registry entry, e.g. `Pharmacy_RestStop_ARC-LEO1`; absent when it is\nempty. An internal name, not a localisation key. Many shops share one."
         },
         "starmapObjectGuid": {
           "anyOf": [
@@ -47391,8 +47376,8 @@
           "description": "The `guid` of the `starmapObjects` entry whose `entityName` or `className` equals\n`location` ignoring ASCII case; `null` when none does or more than one object does."
         },
         "system": {
-          "description": "The star system whose registry holds the shop: the platform name without the suffix\n`system`, e.g. `stanton`, `pyro`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The star system whose registry holds the shop: the platform name without the suffix\n`system`, e.g. `stanton`, `pyro`."
         }
       },
       "required": [

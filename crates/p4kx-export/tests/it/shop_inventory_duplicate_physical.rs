@@ -160,7 +160,7 @@ fn equivalent_inventory_paths_are_ambiguous_without_changing_legacy_shop_links()
     let catalog: Value = serde_json::from_slice(built.json())?;
     let legacy = health::rows(&catalog, "/shops")?
         .iter()
-        .find(|shop| shop["entityGuid"] == EXCHANGE)
+        .find(|shop| shop["entityGuid"]["value"] == EXCHANGE)
         .ok_or("legacy exchange shop")?;
     assert_eq!(
         legacy["inventory"], "inv_commex",
@@ -175,7 +175,7 @@ fn equivalent_inventory_paths_are_ambiguous_without_changing_legacy_shop_links()
         legacy["starmapObjectGuid"], "10000000-0000-4000-8000-000000000002",
         "the existing Hurston shop link survives"
     );
-    let key = legacy["key"].as_str().ok_or("registry shop key")?;
+    let key = legacy["key"]["value"].as_str().ok_or("registry shop key")?;
     let rows = health::rows(&catalog, "/declarations/shopInventoryResolution/rows")?;
     let row = resolution_row(rows, key)?;
     let status = health::cell(row, "status", "present")?;

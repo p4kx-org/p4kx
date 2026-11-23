@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::sync::Arc;
+
 use p4kx_assembly::{ArchiveFiles, LoadoutFileError, LoadoutFileRead, LoadoutFiles};
 use p4kx_extraction::{Archive, SourceEvidenceError};
 
@@ -13,17 +15,22 @@ use crate::export_entry_ledger::EntryOperation;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::shop_summary::ShopSummary;
 use crate::shops::REGISTRY;
-use crate::starmap_xml::{Node, attribute};
+use crate::starmap_xml::Node;
 use crate::{CatalogError, Kind};
+
+#[path = "shop_registry_datum.rs"]
+mod datum;
+pub(crate) use datum::{RegistryAttribute, RegistryAttributeOrigin};
 
 /// One `ShopBackup` entry of the shop registry, as it is stored.
 #[derive(Debug)]
 pub(crate) struct RegistryShop {
-    pub(crate) platform: String,
+    pub(crate) platform: Arc<RegistryAttribute>,
     pub(crate) id: RegistryId,
-    pub(crate) super_name: String,
-    pub(crate) default_value: String,
-    pub(crate) shop_name: String,
+    pub(crate) id_origin: RegistryAttributeOrigin,
+    pub(crate) super_name: RegistryAttribute,
+    pub(crate) default_value: RegistryAttribute,
+    pub(crate) shop_name: RegistryAttribute,
 }
 
 #[derive(Debug)]
@@ -193,18 +200,18 @@ fn collect(xml: &EntryXml<'_, '_, '_>) -> Result<Vec<RegistryShop>, CatalogError
     let mut shops = Vec::new();
     for backups in named(xml.root(), "LayerBackups") {
         for layer in named(backups, "LayerBackup") {
-            let platform = attribute(layer, "PlatformName").unwrap_or_default();
+            let platform = Arc::new(RegistryAttribute::read(xml, layer, "PlatformName")?);
             for list in named(layer, "ShopBackups") {
                 for shop in named(list, "ShopBackup") {
-                    let text = |name| attribute(shop, name).unwrap_or_default().to_owned();
                     shops.push(RegistryShop {
-                        platform: platform.to_owned(),
+                        platform: Arc::clone(&platform),
                         id: xml
                             .attribute(shop, "ID")?
                             .map_or(RegistryId::Absent, RegistryId::Authored),
-                        super_name: text("SuperName"),
-                        default_value: text("DefaultValue"),
-                        shop_name: text("ShopName"),
+                        id_origin: RegistryAttributeOrigin::read(xml, shop, "ID")?,
+                        super_name: RegistryAttribute::read(xml, shop, "SuperName")?,
+                        default_value: RegistryAttribute::read(xml, shop, "DefaultValue")?,
+                        shop_name: RegistryAttribute::read(xml, shop, "ShopName")?,
                     });
                 }
             }

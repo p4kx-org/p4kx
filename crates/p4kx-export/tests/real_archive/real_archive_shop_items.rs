@@ -59,7 +59,7 @@ fn shops_get_item_lists_from_the_inventories_their_containers_name() -> TestResu
         by_inventory
             .entry(shop["inventory"].as_str().unwrap_or("(none)"))
             .or_default()
-            .push(shop["entityName"].as_str().unwrap_or_default());
+            .push(shop["entityName"]["value"].as_str().unwrap_or_default());
     }
     println!(
         "== shops with an item list {} of {}; distinct inventories {} of {} files in the Archive ({} named by containers or prefabs, placeholders included)",
@@ -76,8 +76,8 @@ fn shops_get_item_lists_from_the_inventories_their_containers_name() -> TestResu
         .iter()
         .map(|shop| {
             (
-                shop["entityName"].as_str().unwrap_or_default(),
-                shop["location"].as_str().unwrap_or_default(),
+                shop["entityName"]["value"].as_str().unwrap_or_default(),
+                shop["location"]["value"].as_str().unwrap_or_default(),
                 shop["inventory"].as_str().unwrap_or_default(),
             )
         })
@@ -154,7 +154,7 @@ fn shops_get_item_lists_from_the_inventories_their_containers_name() -> TestResu
     );
     let by_system: BTreeMap<&str, usize> = with.iter().fold(BTreeMap::new(), |mut counts, shop| {
         *counts
-            .entry(shop["system"].as_str().unwrap_or("(none)"))
+            .entry(shop["system"]["value"].as_str().unwrap_or("(none)"))
             .or_default() += 1;
         counts
     });

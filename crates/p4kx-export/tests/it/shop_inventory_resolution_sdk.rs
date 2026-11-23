@@ -31,10 +31,10 @@ fn scoped_rows_match_canonical_shop_outcomes_and_field_origins() -> TestResult {
     let catalog: Value = serde_json::from_slice(built.json())?;
     let first = health::rows(&catalog, "/shops")?
         .iter()
-        .find(|shop| shop["key"] == key(0))
+        .find(|shop| shop["key"]["value"] == key(0))
         .ok_or("first valid registry row")?;
     assert_eq!(
-        first["registryName"], "resolved",
+        first["registryName"]["value"], "resolved",
         "XML admission keeps the first valid row"
     );
     let table = health::at(&catalog, TABLE)?;

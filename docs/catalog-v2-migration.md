@@ -49,6 +49,15 @@ and the [shared Record header](catalog-record-headers.md).
 For the Commodity GUID join, resource fallbacks and exact presentation rules, see the
 [Commodity contract](catalog-commodity-types.md).
 
+## Shop registry fields
+
+The `shops[]` registry fields `key`, `entityGuid`, `system`, `entityName`,
+`registryName`, `defaultValue`, `containers`, `body`, `location` and
+`commodityExchange` carry their values in `.value`. Each name in
+`containers.value[]` has its own `value` and origin. Check the sourced state and
+encryption marker before importing these fields. The first valid normalized registry
+key determines the original source occurrence.
+
 ## Loadout identities
 
 Read the original owner GUID and category from `loadouts[].entityGuid.value` and
