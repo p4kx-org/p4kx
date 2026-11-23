@@ -145080,7 +145080,8 @@
                 "enum": [
                   true,
                   null
-                ]
+                ],
+                "x-p4kx-vocabularyClass": "control"
               },
               "sourceSetComplete": {
                 "const": false
@@ -145162,7 +145163,8 @@
             "present",
             "absent",
             "unreadable"
-          ]
+          ],
+          "x-p4kx-vocabularyClass": "control"
         },
         "value": {
           "anyOf": [

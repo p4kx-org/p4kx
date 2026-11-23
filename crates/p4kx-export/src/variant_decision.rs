@@ -103,7 +103,10 @@ impl VariantDecision {
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = correlate_decision)]
 struct VariantDecisionWire<'source> {
-    #[schemars(extend("enum" = ["present", "absent", "unreadable"]))]
+    #[schemars(extend(
+        "enum" = ["present", "absent", "unreadable"],
+        "x-p4kx-vocabularyClass" = "control"
+    ))]
     state: SourceValueState,
     value: Option<&'source VariantTarget>,
     contains_encrypted_source: Option<bool>,
@@ -132,7 +135,7 @@ fn correlate_decision(schema: &mut Schema) {
                 "if": {"properties": {"state": {"const": "unreadable"}}},
                 "then": {"properties": {
                     "sourceSetComplete": {"const": false},
-                    "containsEncryptedSource": {"enum": [true, null]}
+                    "containsEncryptedSource": {"enum": [true, null], "x-p4kx-vocabularyClass": "control"}
                 }},
                 "else": {"properties": {"sourceSetComplete": {"const": true}}}
             },
