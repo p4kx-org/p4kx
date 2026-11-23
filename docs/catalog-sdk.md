@@ -2359,8 +2359,18 @@ with the comparator tests. The two executables used different build profiles.
 | LIVE `13220821` | 205 | 3,641,070 | 1,511,899,136 | 1,500,471,296 |
 | PTU `13248297` | 203 | 1,838,634 | 1,532,948,480 | 1,532,145,664 |
 
-The measurements include SDK execution and complete Catalog replay. Cold standalone
-query time and memory are measured separately.
+The measurements above include SDK execution and complete Catalog replay.
+`installed_store_slugs_cold_unfiltered_query` ran separately for each Build in a new native
+Windows AMD64 process with one worker. Each returned the full corresponding row count.
+
+| Build | Rows | Elapsed ms | Peak private bytes | Peak working set bytes |
+| --- | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 205 | 38,367 | 1,512,280,064 | 1,493,921,792 |
+| PTU `13248297` | 203 | 38,613 | 1,531,928,576 | 1,514,065,920 |
+
+Both fresh processes stayed under 2 GB and created no scratch files.
+Their executable SHA-256 was
+`07e7e6cdddec71523c305330088c4d79f7f35f2612b00690e9f9b0be245a35b5`.
 
 ### Radar Audio in a separate process
 
