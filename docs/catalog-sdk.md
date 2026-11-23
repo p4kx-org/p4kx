@@ -1611,6 +1611,13 @@ The literal Record path was anchored and its full physical cohort was
 checked before generation. Complete unfiltered Catalog parity remains separate
 from the cold unfiltered API measurements below.
 
+Installed variant checks at revision `9e2ecedea6b60d0b45a98dc5323a7d592dcabaef`
+covered a selected physical Item and an ordinary Ship on each of LIVE `13220821`
+and PTU `13248297`. Each cold SDK query returned one row with a present variant
+target. The scoped Normal Catalog matched the full row and its source-use closure.
+Across the eight separate processes, private commit peaked at 1,421,991,936 bytes.
+The highest cold-query peak was 1,115,369,472 bytes.
+
 The Catalog's `mass`, `massBasis` and `hullHealth` are immediate sourced aggregate cells.
 Their input sets bind the current physical Record to the original Vehicle XML, the selected
 Modification, patch and overrides, and the fields consulted for each metric. A Physics fallback
