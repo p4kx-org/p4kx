@@ -15,17 +15,24 @@ from p4kx_importer.material_model import Palette, PaletteColours, parse_material
 from synthetic_materials import description, layer, slot
 
 
-def graph(case, detail=0.0, shader="HardSurface", carrier="alpha"):
+def finish_cases():
+    fixture = Path(__file__).with_name("fixtures") / "palette_finish.json"
+    return json.loads(fixture.read_text(encoding="utf-8"))["cases"]
+
+
+def graph(case, detail=None, shader="HardSurface", carrier="alpha"):
     selected = "primary" if case["paletteByte"] is not None else None
     fields = {"gloss_mult": case["multiplier"]}
     if selected:
         fields["palette"] = selected
     samples = [slot("TexSlot6", "gloss", "t0001")] if carrier == "gloss" else [slot("TexSlot2", "normal", "t0001")]
-    samples.append(slot("TexSlot7", "detail", "t0002"))
+    parameters = []
+    if detail is not None:
+        samples.append(slot("TexSlot7", "detail", "t0002"))
+        parameters.append({"name": "DetailGloss", "value": str(detail)})
     raw = [description("x0001", shader, reads_vertex_colours=False,
         layers=[layer("Paint", "x0002", **fields)]),
-        description("x0002", "Layer", textures=samples,
-            parameters=[{"name": "DetailGloss", "value": str(detail)}])]
+        description("x0002", "Layer", textures=samples, parameters=parameters)]
     warnings = []
     materials = parse_materials(raw, warnings)
     assert not warnings, warnings
@@ -79,12 +86,34 @@ def roughness(spec, smoothness, rgb=None, alpha=None, vertex_red=0.25):
 
 class PaletteFinishTest(unittest.TestCase):
     def test_shared_finish_vectors_and_disabled_detail(self):
-        fixture = Path(__file__).with_name("fixtures") / "palette_finish.json"
-        for case in json.loads(fixture.read_text(encoding="utf-8"))["cases"]:
-            for detail in (0.0, 1.0):
+        for case in finish_cases():
+            for detail in (None, 0.0, 1.0):
                 with self.subTest(case=case["name"], detail=detail):
                     actual = roughness(graph(case, detail), case["smoothness"])
                     self.assertTrue(math.isclose(actual, case["roughness"], abs_tol=1e-6), actual)
+
+    def test_operator_discriminator_separates_the_three_alternatives(self):
+        case = next(case for case in finish_cases() if case["name"] == "operator_discriminator")
+        base_roughness = case["baseRoughness"]
+        smoothness = case["smoothness"]
+        palette = case["paletteByte"] / 255.0
+        self.assertAlmostEqual(smoothness, 1.0 - base_roughness**2)
+
+        actual = roughness(graph(case), smoothness)
+        unpainted = roughness(graph({**case, "paletteByte": None}), smoothness)
+        roughness_space = base_roughness * math.sqrt(1.0 - palette)
+        sqrt_after_scaling = math.sqrt(1.0 - smoothness * palette)
+        self.assertAlmostEqual(actual, case["roughness"])
+        self.assertAlmostEqual(unpainted, 1.0 - smoothness)
+        self.assertAlmostEqual(roughness_space, case["roughnessSpaceAlternative"])
+        self.assertAlmostEqual(sqrt_after_scaling, case["sqrtAlternative"])
+        for name, alternative in (
+            ("unpainted", unpainted),
+            ("roughness-space", roughness_space),
+            ("square root after scaling", sqrt_after_scaling),
+        ):
+            with self.subTest(operator=name):
+                self.assertGreater(abs(actual - alternative), 2.0 / 255.0)
 
     def test_ddna_rgb_gloss_and_lossless_companion_share_the_selected_finish(self):
         case = {"paletteByte": 204, "multiplier": 0.5, "smoothness": 0.75}
