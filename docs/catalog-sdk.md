@@ -2321,6 +2321,31 @@ Choose an exact physical Record index from a reference when it is available.
 The Archive, decoded-Entry and parsed-session forms use the original DataForge
 and report availability, selection coverage and per-value source evidence.
 
+## Recorded comparisons with the complete Catalog
+
+The verifier at `7fcf8ee5ceb64eb2570223e320fe3da1cb0ebd9f` passed
+`installed_catalog_sdk_matches_seventeen_tables_in_one_pass` for installed LIVE and PTU.
+Both complete Normal Catalogs came from the packaged producer at
+`300226ceeeaf522b7d9af790e8fa3698752cf575`. Each comparison bound the installed
+Archive to its matching Build and streamed its stored Catalog once. It checked table availability,
+ordered row values, and the source uses and physical sources referenced by those rows.
+
+The compared configurations were `cargoLoadingGlobals`, `quantumDrives`, `radarAudio`,
+`radarOptions`, `resourceNetworkParameters`, `shieldGenerators`, `shopCommodityGlobals`
+and `turretHealth`. The declarations were `itemRoomAssociations`, `resourceNetworkLinks` and
+`roomAssociations`. The definitions were `infractionSets`, `infractions`, `jurisdictions`,
+`resourceNetworkGlobals` and `securityNetworkManifests`. The projection was
+`qualityQuantizationResources`. Both Builds had an empty `infractionSets` table and two
+physical sources referenced by the compared rows.
+
+| Build | Rows compared | Source uses compared | Elapsed ms | Peak private bytes | Peak working set bytes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 15,993 | 2,016,887 | 4,399,018 | 13,502,959,616 | 12,778,622,976 |
+| PTU `13248297` | 16,749 | 2,069,882 | 4,319,906 | 13,810,839,552 | 13,098,971,136 |
+
+Each run used one worker. The timing and peaks cover the combined verifier and Catalog replay.
+For the separate 2 GB SDK acceptance, measure each nominated query in its own cold process.
+
 ## Verify dataset coverage
 
 The SDK coverage audit checks canonical dataset boundaries against calls to the public typed
