@@ -92,5 +92,13 @@ stored bytes and 1,036,960 decoded bytes.
 The normal geometry-only GLB writer emitted one mesh, three primitives and 23,399 triangles.
 One nondegenerate triangle was traced from its original IVO index and UV streams to the emitted
 accessors. It retained all three indices in order and all six UV0 components exactly after
-half-float expansion. The check establishes a source-to-GLB geometry reference. Assigning
-the faceplate and frame to material layers still requires independent material binding.
+half-float expansion. The check establishes a source-to-GLB geometry reference.
+
+A follow-up on the same Build bound all three emitted draws to their original material
+slots. It used two verified geometry payloads and six verified material payloads,
+totalling 1,048,292 decoded bytes. The three draws retained eight, eight and one ordered
+material-layer occurrences. Two occurrences contain explicitly blank paths. The probe
+took 9.4 seconds and peaked at 960,950,272 bytes of working set.
+
+The faceplate and frame still need spatial identification. A link from the authored
+layer mode to the renderer flags is also needed to establish the tint mapping.

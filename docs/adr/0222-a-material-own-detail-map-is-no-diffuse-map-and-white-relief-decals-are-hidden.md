@@ -143,6 +143,11 @@ reflectance at the four original UVs with mip 2. The GLB estimate differs from t
 by at most 0.000066 on each Build. The previous GLB default differs by up to 0.033574.
 The effective metalness is zero at the measured points in both paths.
 
+At the default mip 0, the maximum difference at the same four UVs is 0.000016 on each
+Build. The previous GLB default differs by up to 0.034808. All four samples are below
+the glTF colour limit. The glTF Validator reported zero errors and warnings for both
+default-mip GLBs.
+
 The candidate GLBs carry identical geometry bytes, core material parameters, and base
 colour, normal and packed finish image bytes compared with the earlier paired outputs.
 Each adds one reflectance texture. The glTF Validator reported no errors or warnings for either
