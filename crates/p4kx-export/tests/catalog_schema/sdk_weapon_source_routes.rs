@@ -14,6 +14,9 @@ use super::super::{
 
 use super::projectile_ammo_fixture as fixture;
 
+#[path = "sdk_ammo_binding_witness.rs"]
+mod ammo_binding_witness;
+
 pub(super) fn read_recoil(archive: &Archive) -> TestResult<Route> {
     with_weapon_recoil_definitions(archive, CatalogRecordSelection::All, None, |snapshot| {
         Route::queried_rows(
@@ -42,7 +45,9 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
     let (Some(owner), None) = (owners.next(), owners.next()) else {
         return Err("the fixture requires one physical weapon owner".into());
     };
+    let catalog = ammo_binding_witness::normal(&archive, &entry)?;
     with_weapon_sources_from(&archive, &entry, owner.index(), None, |snapshot| {
+        ammo_binding_witness::verify(&archive, &entry, &snapshot, &catalog)?;
         verify(&snapshot, owner.index())
     })?
 }
@@ -87,6 +92,10 @@ fn verify(snapshot: &WeaponSourceSnapshot<'_>, record_index: u32) -> TestResult<
     Ok([
         Route::queried_rows(WEAPON_ACTIONS, &owner.weapon_actions, OWNERS_OPEN)?,
         Route::queried_rows(AMMO_CONTAINERS, &owner.ammo_containers, DEPENDENCIES_OPEN)?,
-        Route::queried_rows(AMMO_BINDINGS, &owner.ammo_bindings, DEPENDENCIES_OPEN)?,
+        Route::queried_rows(
+            AMMO_BINDINGS,
+            &owner.ammo_bindings,
+            "typed owner and physical Ammo target joins match the synthetic producer; owner enumeration, installed parity and standalone memory open",
+        )?,
     ])
 }
