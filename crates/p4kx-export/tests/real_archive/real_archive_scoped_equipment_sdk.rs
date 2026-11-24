@@ -41,6 +41,12 @@ mod jump_configuration_parity;
 #[path = "real_archive_resource_group_sdk_parity.rs"]
 mod resource_group_parity;
 
+#[path = "real_archive_terrain_definition_sdk_parity.rs"]
+mod terrain_definition_parity;
+
+#[path = "real_archive_npc_spawn_definition_sdk_parity.rs"]
+mod npc_spawn_definition_parity;
+
 #[path = "real_archive_canonical_ship_sdk.rs"]
 mod canonical_ship;
 
