@@ -68,6 +68,26 @@ One unindexed texture batch was stopped during an expensive full-archive repeate
 Seven checks had passed and two had reproduced false test failures; unfinished tests are not
 counted as passed. The indexed exhaustive complex/HDR probe replaces that coverage explicitly.
 
+### Packaged WAV verification on LIVE 13220821 and PTU 13260598
+
+The Windows AMD64 portable package from merge revision
+`24c08bcbff2299b88eff84bf3f7e8f592760b99b` verified one loose root WEM per
+Build. The verifier checked the selected physical Entry and its CRC, reconciled
+the WEM format fields with the original RIFF words, and checked the CLI
+conversion summary against the decoded WAV. Two WAV writes per Entry produced
+identical SHA-256 hashes.
+[Native Windows AMD64 package](https://github.com/p4kx-org/p4kx/actions/runs/45478285490/job/138745091943)
+
+| Build | Source bytes | WAV bytes | Maximum private commit (B) | Maximum working set (B) | Elapsed (s) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 24,625 | 178,524 | 953,982,976 | 959,025,152 | 8.083 |
+| PTU `13260598` | 7,328 | 56,608 | 974,409,728 | 979,394,560 | 7.542 |
+
+Process peaks are the largest lifetime values across the five CLI invocations
+for each Build. Portable provenance for the produced WAV remains open under
+[#1125](https://github.com/p4kx-org/p4kx/issues/1125). The complete Media export
+has its own current-Build verification under [#1088](https://github.com/p4kx-org/p4kx/issues/1088).
+
 ## Confirmed defects and distinctions
 
 ### Material reference resolution
