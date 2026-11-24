@@ -2886,7 +2886,11 @@ selection. An unbound or empty mesh adds no observed count words.
 A selected model checked on LIVE 13220821 and PTU 13260598 had six LODs and 651
 submeshes on each Build. Every material ID and index count had a complete,
 resolvable source-use reference in both outputs. Every rebuilt start index
-retained an unknown origin.
+retained an unknown origin. The CLI at `726a1ae2593ecdb5504b88c5deb83e346081b5ce`
+checked the same model on both installed Builds. On each Build, the 106 mesh and
+six LOD totals resolved to the exact 651 original count words through 1,302
+conversion references. The comparison checked physical Entry identity and byte
+ranges.
 
 `nodes` keeps the order of the file;
 `parent` is the index of the parent node or `null` for a root, and `transform` the 3×4 row-major
