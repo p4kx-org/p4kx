@@ -22,6 +22,31 @@ $verify=[regex]::Match($workflow,'(?ms)^  verify:\r?\n.*\z').Value
 Assert-FeedbackWorkflow ($verify.Length -gt 0) 'Native Windows consumer job is missing.'
 Assert-FeedbackWorkflow ($verify -cmatch '(?m)^    timeout-minutes: 45\r?$') 'The native consumer job must remain bounded to 45 minutes.'
 Assert-FeedbackWorkflow ($verify.Contains('UtcNow.AddMinutes(35)')) 'The original 35-minute absolute diagnostic deadline changed.'
+$download = Get-FeedbackWorkflowStep $verify 'Download native Windows package inputs'
+$retry = Get-FeedbackWorkflowStep $verify 'Retry native Windows package input download'
+$select = Get-FeedbackWorkflowStep $verify 'Select the successful native Windows package inputs'
+$validate = Get-FeedbackWorkflowStep $verify 'Validate release build source, native CPU and toolchain before execution'
+$pinnedDownload = 'uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333'
+foreach ($step in $download,$retry) {
+    Assert-FeedbackWorkflow ($step.Contains($pinnedDownload) -and $step.Contains('pattern: windows-build-*') -and
+        $step.Contains('digest-mismatch: error') -and -not ($step -match '(?m)^          (run-id|repository|github-token):')) 'Both attempts must require the pinned current-run native artifacts and their digests.'
+}
+Assert-FeedbackWorkflow ([regex]::Matches($verify,[regex]::Escape($pinnedDownload)).Count -eq 2 -and
+    $download.Contains('id: windows-input-download') -and $download.Contains('continue-on-error: true') -and
+    $download -cmatch '(?m)^        timeout-minutes: 3\r?$' -and
+    $download.Contains('path: ${{ env.P4KX_PACKAGE_TASK }}/windows-inputs/first') -and
+    $retry.Contains('id: windows-input-retry') -and $retry.Contains("steps.windows-input-download.outcome == 'failure'") -and
+    $retry -cmatch '(?m)^        timeout-minutes: 3\r?$' -and -not $retry.Contains('continue-on-error:') -and
+    $retry.Contains('path: ${{ env.P4KX_PACKAGE_TASK }}/windows-inputs/retry')) 'Native inputs may retry once into a fresh directory, with ordinary failure on a failed retry.'
+Assert-FeedbackWorkflow ($verify.IndexOf($download,[StringComparison]::Ordinal) -lt $verify.IndexOf($retry,[StringComparison]::Ordinal) -and
+    $verify.IndexOf($retry,[StringComparison]::Ordinal) -lt $verify.IndexOf($select,[StringComparison]::Ordinal) -and
+    $verify.IndexOf($select,[StringComparison]::Ordinal) -lt $verify.IndexOf($validate,[StringComparison]::Ordinal) -and
+    $select.Contains("steps.windows-input-download.outcome == 'success'") -and
+    $select.Contains('steps.windows-input-download.outputs.download-path || steps.windows-input-retry.outputs.download-path') -and
+    -not ($select -match '(?m)^        (if|continue-on-error):') -and
+    -not ($validate -match '(?m)^        (if|continue-on-error):') -and
+    $validate.Contains('Join-Path $env:P4KX_WINDOWS_INPUTS') -and $validate.Contains('-ValidateArchive') -and
+    -not $verify.Contains('artifacts/windows-build-')) 'Select completed download output before the original mandatory package admission.'
 $runner=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/scripts/msi-diagnostic-runner.ps1')
 $budgetOwner=Join-Path $Repository '.github/scripts/msi-diagnostic-budget.ps1'
 if(Test-Path -LiteralPath $budgetOwner){$runner+=Get-Content -Raw -LiteralPath $budgetOwner}
