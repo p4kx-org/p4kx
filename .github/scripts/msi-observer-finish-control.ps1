@@ -64,23 +64,36 @@ function Read-P4kxMsiFinishLaunch($Context) {
     return $launch
 }
 
+function Test-P4kxMsiFinishReceiptPresence($Context, [string]$ReceiptPath, [double]$MonotonicRemaining) {
+    $wallRemaining = ($Context.collection_cutoff - [DateTimeOffset]::UtcNow).TotalMilliseconds
+    $remaining = [Math]::Min($wallRemaining, $MonotonicRemaining)
+    if ($remaining -le 0) { return $false }
+    $script = Join-Path $PSScriptRoot 'msi-observer-finish-wait-worker.ps1'
+    $arguments = @('-NoLogo','-NoProfile','-NonInteractive','-File',$script,
+        '-ReceiptPath',$ReceiptPath,'-CollectionCutoff',$Context.collection_cutoff.ToString('o'))
+    $observation = @{}
+    try {
+        $probe = Invoke-P4kxPortalProcess ([Environment]::ProcessPath) $arguments $Context.directory 'wait-probe' `
+            -Milliseconds ([int][Math]::Ceiling($remaining)) -CleanupMilliseconds 1000 -MaximumBytes 1024 -Observation $observation
+    } catch {
+        if ($observation.timed_out -ne $true -or $observation.exited -ne $true -or
+            $_.Exception -isnot [AggregateException] -or $_.Exception.InnerExceptions.Count -ne 1) { throw }
+        return $false
+    }
+    $found = $false
+    if ($probe.exit_code -ne 0 -or -not [bool]::TryParse($probe.stdout.Trim(),[ref]$found)) {
+        throw 'The bounded Finish presence probe did not report a valid outcome.'
+    }
+    return $found
+}
+
 function Wait-P4kxMsiFinishReceipt($Context, $Launch) {
     $receiptPath = Join-Path $Context.directory 'result.json'
     $resultDigest = $null
-    $found = $false
     $budget = ($Context.collection_cutoff - [DateTimeOffset]::UtcNow).TotalMilliseconds
     $clock = [Diagnostics.Stopwatch]::StartNew()
     Write-P4kxMsiObserverProgress finishWaitPoll begin -RequestDigest $Context.digest
-    while ($true) {
-        $wallRemaining = ($Context.collection_cutoff - [DateTimeOffset]::UtcNow).TotalMilliseconds
-        $remaining = [Math]::Min($wallRemaining, $budget - $clock.Elapsed.TotalMilliseconds)
-        if ($remaining -le 0) { break }
-        if ([IO.File]::Exists($receiptPath)) {
-            $found = $true
-            break
-        }
-        Start-Sleep -Milliseconds ([int][Math]::Min(100, [Math]::Ceiling($remaining)))
-    }
+    $found = Test-P4kxMsiFinishReceiptPresence $Context $receiptPath ($budget - $clock.Elapsed.TotalMilliseconds)
     Write-P4kxMsiObserverProgress finishWaitPoll end -RequestDigest $Context.digest
     if ($found) {
         Write-P4kxMsiObserverProgress finishWaitDigest begin -RequestDigest $Context.digest
