@@ -1663,6 +1663,8 @@ playability retain the original control and driver-seat selectors. For those exo
 `name()` uses the selected attachment's `AttachDef.Localization.Name` when the original
 vehicle name is absent. `attachment_manufacturer()` preserves the authored reference and
 its resolution state. Vehicle-only inputs keep their sourced absent or unreadable states.
+The [installed LIVE and PTU comparisons](catalog.md#ship-base-data) cover all nine
+supported ATLS owners, one physical Record at a time.
 
 This query shares the Catalog's original reader, Archive-backed ShipPool and per-call
 Capture. It uses the Entity header index to open the dependencies reached by the selected owners'

@@ -699,6 +699,14 @@ physical Record per GEO and Collector owner. It opened four Actor bodies and one
 driver-seat body per Build. All four owners satisfied the same GEO control predicate.
 Each Collector owner had its own full-name key, and all four shared the GEO short-name key.
 
+Eighteen isolated comparisons verified all nine owners on LIVE `13220821` and
+PTU `13260598`. Each canonical SDK selection matched one exact Normal Catalog row
+with equal source-use closure and unchanged installed Archive identity. The comparisons
+also resolved each original name key and validated the original manufacturer state
+or Reference target. The maximum observed private commits were 1,377,472,512 bytes
+on LIVE and 1,409,744,896 bytes on PTU. Peak working sets were 1,238,863,872 and
+1,271,222,272 bytes respectively.
+
 A scoped verification at revision `54d5e8d00` matched all four owners on LIVE `13220821`
 and PTU `13248297`. The SDK ship-source reader and scoped Normal Catalog agreed on
 Record index, GUID, class name, Record path, vehicle kind and playability. The
