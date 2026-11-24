@@ -1672,6 +1672,15 @@ See
 [the Ship contract](catalog.md#ship-dcb-source-fields) and
 [ADR-0410](adr/0410-equipment-sdk-shares-original-family-readers-and-canonical-variant-choices.md).
 
+On PTU `13260598`, each of the four ATLS roles resolved to one exact original
+physical Record header. The isolated canonical Ship SDK query and scoped
+Normal producer agreed on each playable exosuit row, its local variant
+decision and the recursive contributing sources. Each of the four cold
+queries ran in its own process. The largest peak private commit was
+1,114,398,720 bytes for a cold query and 1,409,536,000 bytes for a scoped
+Normal comparison. Admission uses the original evidence in
+[ADR-0417](adr/0417-exosuits-share-the-vehicle-catalog.md).
+
 `ShipSource::base_facts()` returns the canonical typed row published in
 `projections.shipBaseFacts`. It carries the physical Ship Record index, GUID and cargo
 facts with their sources in the query snapshot's source inventory. The `cargo()` getter
