@@ -248,7 +248,16 @@ pub(super) fn physical_slot(
     })
 }
 
-fn require_complete(
+pub(super) fn expected_leftovers(variable: &str) -> TestResult<usize> {
+    let expected = env::var(variable)?;
+    let count: usize = expected.parse()?;
+    if count.to_string() != expected {
+        return Err("configure the exact canonical excluded Entity count in decimal".into());
+    }
+    Ok(count)
+}
+
+pub(super) fn require_complete(
     path: &str,
     availability: DatasetAvailability,
     rows: usize,

@@ -11,7 +11,7 @@ use p4kx_export::catalog_queries::{
 };
 use p4kx_extraction::Archive;
 
-use super::component_family_parity::physical_slot;
+use super::component_family_parity::{expected_leftovers, physical_slot};
 use super::equipment_input;
 use crate::real_archive_catalog_table_parity::{
     PhysicalSlot, StreamedComponentDigests, TestResult, with_bound_measurement_from_producer,
@@ -26,7 +26,7 @@ const LEFTOVERS: &str = "P4KX_INTERACTION_SDK_EXPECTED_LEFTOVERS";
 #[ignore = "same Build: configure the installed Archive and exact completed Normal producer"]
 fn installed_interaction_visitor_matches_one_complete_catalog() -> TestResult {
     let producer = env::var(PRODUCER)?;
-    let expected_leftovers = expected_leftovers()?;
+    let expected_leftovers = expected_leftovers(LEFTOVERS)?;
     with_bound_measurement_from_producer(&producer, |archive, measurement| {
         let scratch = tempfile::tempdir()?;
         let mut evidence = StreamedComponentDigests::new(scratch.path());
@@ -56,19 +56,10 @@ fn installed_interaction_visitor_matches_one_complete_catalog() -> TestResult {
 #[test]
 #[ignore = "standalone cold query: configure the installed Archive and exact Build"]
 fn installed_interaction_visitor_cold() -> TestResult {
-    let expected_leftovers = expected_leftovers()?;
+    let expected_leftovers = expected_leftovers(LEFTOVERS)?;
     equipment_input::with_archive(|archive| {
         read_all(archive, expected_leftovers, |_| Ok(())).map(|_| ())
     })
-}
-
-fn expected_leftovers() -> TestResult<usize> {
-    let expected = env::var(LEFTOVERS)?;
-    let count: usize = expected.parse()?;
-    if count.to_string() != expected {
-        return Err("configure the exact canonical excluded Entity count in decimal".into());
-    }
-    Ok(count)
 }
 
 fn read_all(
