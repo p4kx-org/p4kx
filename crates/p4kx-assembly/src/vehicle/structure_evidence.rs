@@ -50,10 +50,23 @@ impl<'vehicle> VehicleStructureEvidence<'vehicle> {
     /// The caller must separately bind the original request and archive lookup.
     #[must_use]
     pub fn is_complete(&self) -> bool {
-        let origins = &self.vehicle.declarations;
         self.vehicle.complete_structure_digest().is_ok()
             && self.documents.prefix_complete(self.prefix)
-            && origins.structure_base.is_some()
+            && self.has_original_structure_inputs()
+    }
+
+    /// Reports whether an explicitly missing patch is the only gap in the retained structure inputs.
+    /// The caller must verify the original file lookup before using the absence.
+    #[must_use]
+    pub fn missing_explicit_patch_is_only_gap(&self) -> bool {
+        self.documents
+            .prefix_has_only_missing_explicit_patch(self.prefix)
+            && self.has_original_structure_inputs()
+    }
+
+    fn has_original_structure_inputs(&self) -> bool {
+        let origins = &self.vehicle.declarations;
+        origins.structure_base.is_some()
             && (self.vehicle.patch_path().is_some() == origins.structure_patch.is_some())
             && self.applied_documents().all(|file| {
                 file.read_outcome().is_ok() && matches!(file.projection_outcome(), Some(Ok(())))

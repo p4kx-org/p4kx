@@ -1681,6 +1681,13 @@ queries ran in its own process. The largest peak private commit was
 Normal comparison. Admission uses the original evidence in
 [ADR-0417](adr/0417-exosuits-share-the-vehicle-catalog.md).
 
+The unfiltered canonical Ship query on PTU `13260598` checked 1,036
+rows. The complete original directory proved that three selected
+vehicle patches were absent. These owners retained sourced absence for
+`variantOf`, and their comparison cohorts retained complete variant
+evidence. The query reported zero unreadable variant decisions across
+the roster.
+
 `ShipSource::base_facts()` returns the canonical typed row published in
 `projections.shipBaseFacts`. It carries the physical Ship Record index, GUID and cargo
 facts with their sources in the query snapshot's source inventory. The `cargo()` getter

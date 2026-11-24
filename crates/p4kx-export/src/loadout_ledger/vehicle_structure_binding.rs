@@ -21,6 +21,7 @@ pub(crate) enum Decision {
     Digest(Digest),
     NoConfiguredVehicle,
     MissingImplementation,
+    MissingExplicitPatch,
     Unavailable,
 }
 
@@ -86,12 +87,17 @@ fn bind(
                 entries: Some(entries),
                 call: state.port_vehicles.call(record_index),
             };
-            files.observe_file_choices(Some(archive), &mut proof)?;
-            files.bind_structure(&vehicle, &mut proof)?;
-            proved_digest(
-                &vehicle,
-                sourced_definition && configured && sourced_modification,
-            )
+            let directory_complete = files.observe_file_choices(Some(archive), &mut proof)?;
+            let operands_complete = sourced_definition && configured && sourced_modification;
+            let decision = if operands_complete
+                && files.verified_explicit_patch_absence(&vehicle, directory_complete)
+            {
+                Decision::MissingExplicitPatch
+            } else {
+                proved_digest(&vehicle, operands_complete)
+            };
+            files.bind_structure(&vehicle, &decision, &mut proof)?;
+            decision
         }
         Err(error) => {
             let (call, missing) = match error {
@@ -138,8 +144,11 @@ fn finish(
         &uses,
         complete && decision != Decision::Unavailable,
     );
-    let consulted_modification = matches!(decision, Decision::Digest(_) | Decision::Unavailable)
-        .then_some(operands.modification.origin());
+    let consulted_modification = matches!(
+        decision,
+        Decision::Digest(_) | Decision::MissingExplicitPatch | Decision::Unavailable
+    )
+    .then_some(operands.modification.origin());
     evidence.origin = sources.origin_with_origins(
         [&evidence.origin, operands.vehicle.origin()]
             .into_iter()
@@ -158,13 +167,18 @@ impl VehicleFiles<'_> {
     fn bind_structure(
         &self,
         vehicle: &VehicleImplementation,
+        decision: &Decision,
         proof: &mut Contributions,
     ) -> Result<(), CatalogError> {
         let Some(evidence) = vehicle.structure_evidence() else {
             proof.incomplete();
             return Ok(());
         };
-        if !evidence.is_complete() {
+        let complete = match decision {
+            Decision::MissingExplicitPatch => evidence.missing_explicit_patch_is_only_gap(),
+            _ => evidence.is_complete(),
+        };
+        if !complete {
             proof.incomplete();
         }
         self.bind_structure_documents(&evidence, proof)?;

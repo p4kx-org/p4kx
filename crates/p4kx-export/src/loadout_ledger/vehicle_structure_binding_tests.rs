@@ -123,6 +123,56 @@ fn proved_unconfigured_and_missing_base_have_distinct_states() -> TestResult {
 }
 
 #[test]
+fn verified_absent_explicit_patch_proves_no_comparison_digest() -> TestResult {
+    const EXPLICIT_PATCH_DOCUMENT: &[u8] = br#"<Vehicle>
+        <Parts><Part id="root" mass="2"/></Parts>
+        <Modifications><Modification name="Selected" patchFile="RequiredExplicit.xml">
+            <Elems><Elem idRef="root" name="behavior" value="bound"/></Elems>
+        </Modification></Modifications>
+    </Vehicle>"#;
+
+    let database = configured_database("Selected");
+    let entries = vec![TestEntry::stored(
+        format!("Data/{BASE}"),
+        EXPLICIT_PATCH_DOCUMENT,
+    )];
+    with_structure(&database, entries, |result, uses| {
+        assert_eq!(
+            result.decision,
+            Decision::MissingExplicitPatch,
+            "an absent required patch leaves the member outside structural comparison"
+        );
+        let origin = &result.evidence.origin;
+        assert!(
+            origin.source_set_complete(),
+            "the exact original authored patch and complete directory prove ineligibility"
+        );
+        assert!(
+            uses.iter().any(|used| {
+                origin.source_uses_refs().contains(used.id())
+                    && matches!(used.location(), SourceLocation::Subresource { namespace, field, .. } if namespace == "textXmlAttribute" && field == "patchFile")
+            }),
+            "the original explicit selector contributes to the negative decision"
+        );
+        assert!(
+            uses.iter().any(|used| {
+                origin.source_uses_refs().contains(used.id())
+                    && matches!(
+                        used.location(),
+                        SourceLocation::ArchiveDirectoryPaths { .. }
+                    )
+            }),
+            "the bound directory is original negative lookup evidence"
+        );
+        assert!(
+            result.evidence.failed_source_uses.is_empty(),
+            "the absent physical entry contributes no failed payload attempt"
+        );
+        Ok(())
+    })
+}
+
+#[test]
 fn checksum_failure_and_malformed_patch_do_not_become_comparable() -> TestResult {
     let bad_base = TestEntry::stored(format!("Data/{BASE}"), DOCUMENT).with_crc32c(0);
     let bad_patch = TestEntry::stored(format!("Data/{PATCH}"), b"<Patch>".as_slice());

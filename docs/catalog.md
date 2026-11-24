@@ -1082,7 +1082,11 @@ count: editions that differ only in their loadout, or in a material, are variant
 `AEGS_Idris_M` and `AEGS_Sabre_Comet` under `AEGS_Sabre`, because they differ only in their
 default loadout. A ship without a `vehicleDefinition`, or whose vehicle
 implementation cannot be read in full (a missing file or patch file, a broken document), has
-no published base. The decision distinguishes proven absence from incomplete original evidence.
+no published base. A missing explicitly authored patch closes as sourced absence when the
+complete original Archive directory proves the exact selected file absent and the other
+original comparison inputs close. The member contributes its exclusion evidence to the cohort.
+A failed payload read, malformed document or incomplete directory leaves the affected
+comparison unreadable.
 
 The implementation key is bound to the original physical ship Record within the current
 DataForge input. Separate Records with an equal GUID keep their own selected implementation
