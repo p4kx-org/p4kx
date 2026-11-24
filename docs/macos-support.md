@@ -91,13 +91,16 @@ publishes the same add-on artifact used for the smoke and attestation.
 
 ### Hosted package evidence
 
-For PR #1117 head `405e97268`, both hosted Apple Silicon guests verified the
-same DMG and the release add-on in Blender 5.2.4. The minimum guest reported
-macOS 26.7.2 (25G332). The current-OS pull-request guest reported macOS 27.0.1
-(26A434). The tagged version check requires macOS 27.2.1, so its current-OS host
-evidence still depends on the matching native runner.
-[Minimum guest](https://github.com/p4kx-org/p4kx/actions/runs/45315878218/job/138200257881) ·
-[Current pull-request guest](https://github.com/p4kx-org/p4kx/actions/runs/45315878218/job/138200257839)
+For PR #1117 head `8637591ab`, both hosted Apple Silicon guests ran the same
+dry-run DMG and installed and imported the same release add-on in Blender 5.2.4.
+The `macos-26` guest reported macOS 26.7.2 (25G332). The `xcode-27` guest
+reported macOS 27.0.1 (26A434). Package assembly accepted both receipts.
+Use `xcode-27` for pull-request verification until GitHub provides an Apple
+Silicon guest with the required stable release. Tagged assembly currently
+requires the current guest to report macOS 27.2.1.
+[Minimum guest](https://github.com/p4kx-org/p4kx/actions/runs/45327821298/job/138240051705) ·
+[Current pull-request guest](https://github.com/p4kx-org/p4kx/actions/runs/45327821298/job/138240051662) ·
+[Hosted package assembly](https://github.com/p4kx-org/p4kx/actions/runs/45327821298/job/138240794605)
 
 ## References
 
