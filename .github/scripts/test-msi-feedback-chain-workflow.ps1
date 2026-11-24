@@ -12,18 +12,28 @@ function Get-ChainWorkflowStep([string]$Workflow,[string]$Name) {
 $release=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/workflows/release-windows-execute.yml')
 $prepare=Get-ChainWorkflowStep $release 'Prepare installer inputs and the independent step allowance'
 $installer=Get-ChainWorkflowStep $release 'Installer metadata, upgrade, downgrade, rollback, CPU replacement and preservation'
-$early=Get-ChainWorkflowStep $release 'Preserve prepared allowance, inputs and executed parent controls'
-Assert-ChainWorkflow ($release.IndexOf($prepare,[StringComparison]::Ordinal) -lt $release.IndexOf($early,[StringComparison]::Ordinal) -and
-    $release.IndexOf($early,[StringComparison]::Ordinal) -lt $release.IndexOf($installer,[StringComparison]::Ordinal)) 'Actual prepared receipt must upload after preparation and before native installer work.'
-Assert-ChainWorkflow ($early -cmatch '(?m)^        timeout-minutes: 1\r?$' -and $early.Contains('installer-check/feedback/*.json') -and
-    $early.Contains('contracts/msi-feedback-parent/**/*.jsonl') -and $early.Contains('contracts/msi-feedback-parent/**/*.log') -and
-    $early -cmatch '(?m)^          if-no-files-found: error\r?$') 'Actual pre-risk upload lacks bounded original prepared and parent-control evidence.'
-Assert-ChainWorkflow (-not ($early -match '(?m)^        (if|continue-on-error):')) 'Actual pre-risk evidence failure must refuse installer admission.'
-Assert-ChainWorkflow ($prepare.Contains('Write-P4kxMsiDiagnosticInputs $parameters $feedback') -and
+$collected=Get-ChainWorkflowStep $release 'Finish the original native MSI lifecycle'
+$logs=@([regex]::Matches($release,'(?ms)^      - uses: actions/upload-artifact@[^\r\n]+\r?\n.*?(?=^      - |\z)') |
+    Where-Object {$_.Value.Contains('name: windows-package-logs-')})
+Assert-ChainWorkflow ($logs.Count -eq 1) 'Expected one aggregate native diagnostic upload.'
+$diagnostics=$logs[0].Value
+Assert-ChainWorkflow ($release.IndexOf($prepare,[StringComparison]::Ordinal) -lt $release.IndexOf($installer,[StringComparison]::Ordinal) -and
+    $release.IndexOf($installer,[StringComparison]::Ordinal) -lt $release.IndexOf($collected,[StringComparison]::Ordinal) -and
+    $release.IndexOf($collected,[StringComparison]::Ordinal) -lt $release.IndexOf($diagnostics,[StringComparison]::Ordinal)) 'Prepare and collect the original native lifecycle before diagnostic transport.'
+Assert-ChainWorkflow ($diagnostics -cmatch '(?m)^        if: always\(\)\r?$' -and
+    $diagnostics -cmatch '(?m)^        timeout-minutes: 5\r?$' -and
+    $diagnostics.Contains('installer-check/**/*.json') -and
+    $diagnostics.Contains('contracts/msi-feedback-parent/**/*.json') -and
+    $diagnostics.Contains('contracts/msi-feedback-parent/**/*.jsonl') -and
+    $diagnostics.Contains('contracts/msi-feedback-parent/**/*.log')) 'The bounded aggregate upload must retain prepared allowance and parent-control evidence.'
+Assert-ChainWorkflow ($prepare.Contains('Write-P4kxMsiDiagnosticSources $parameters .github/scripts $feedback') -and
+    $prepare.Contains('Write-P4kxMsiDiagnosticInputs $parameters $feedback') -and
+    $prepare.Contains('$output = Join-Path $env:P4KX_PACKAGE_TASK ''installer-check''') -and
+    $prepare.Contains('$feedback = Join-Path $output ''feedback''') -and
     $prepare.Contains("'msi-invocation.json'") -and $installer.Contains("'msi-invocation.json'") -and
     $installer.Contains('invoke-msi-observer.ps1 -Stage Start') -and
     (Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/scripts/msi-observer-parent.ps1')).Contains("'check-msi.ps1') @parameters") -and
-    -not $early.Contains('msi-invocation.json')) 'Prepared MSI input hashes must upload before the same runner-local invocation is used, without publishing its paths.'
+    -not $diagnostics.Contains('msi-invocation.json')) 'Original input hashes must be recorded before the same local invocation is consumed, with its private manifest kept on the runner.'
 
 $chain=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/workflows/msi-feedback-chain-probe.yml')
 $step=Get-ChainWorkflowStep $chain 'Dynamic parent and Portal fixture'
@@ -51,4 +61,4 @@ Assert-ChainWorkflow ($firstAdmission.Extent.StartOffset -lt $parent.Extent.Star
 $literal=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/workflows/msi-feedback-probe.yml')
 $literalStep=Get-ChainWorkflowStep $literal 'Runner step fuse fixture'
 Assert-ChainWorkflow ($literalStep -cmatch '(?m)^        timeout-minutes: 1\r?$' -and $literalStep.Contains('invoke-msi-feedback-probe.ps1')) 'Independent literal probe was replaced or silently reinterpreted.'
-'PASS: actual pre-risk evidence and separated dynamic chain source contracts; no installer execution or original-hang reproduction.'
+'PASS: local native evidence, deferred transport and separate dynamic chain source contracts; no installer execution or original-hang reproduction.'
