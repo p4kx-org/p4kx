@@ -1686,7 +1686,8 @@ rows. The complete original directory proved that three selected
 vehicle patches were absent. These owners retained sourced absence for
 `variantOf`, and their comparison cohorts retained complete variant
 evidence. The query reported zero unreadable variant decisions across
-the roster.
+the roster. LIVE `13220821` also reported zero unreadable variant decisions
+across its 1,028 canonical Ship rows.
 
 `ShipSource::base_facts()` returns the canonical typed row published in
 `projections.shipBaseFacts`. It carries the physical Ship Record index, GUID and cargo
