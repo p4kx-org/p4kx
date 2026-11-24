@@ -56,6 +56,9 @@ mod item_condition_parity;
 #[path = "real_archive_item_gameplay_sdk_parity.rs"]
 mod item_gameplay_parity;
 
+#[path = "real_archive_entity_component_sdk_parity.rs"]
+mod entity_component_parity;
+
 #[path = "real_archive_canonical_ship_sdk.rs"]
 mod canonical_ship;
 
