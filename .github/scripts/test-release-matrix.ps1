@@ -64,6 +64,7 @@ foreach ($row in $contract.targets) {
                     minimum_distribution='Ubuntu 24.04'; archive_sha256=$smoke.archive_sha256
                 }
                 if ($package -eq 'app-image') {
+                    $smoke.appimage_fuse_launch = 'success'
                     $sourceName = "P4KX-$version-$($row.target)-appimage-corresponding-source.tar.gz"
                     Set-Content -LiteralPath (Join-Path $Directory $sourceName) -Value 'synthetic corresponding source' -Encoding utf8NoBOM
                     $smoke.producer.corresponding_source = @{
@@ -260,6 +261,8 @@ foreach ($mutation in @(
     { param($proof) $proof.package_smokes[0].producer.source_binaries[0].sha256 = 'f' * 64 },
     { param($proof) $proof.package_smokes[0].producer.package = 'app-image' },
     { param($proof) ($proof.package_smokes | Where-Object package -CEQ 'app-image').producer.corresponding_source.sha256 = 'f' * 64 },
+    { param($proof) ($proof.package_smokes | Where-Object package -CEQ 'app-image').PSObject.Properties.Remove('appimage_fuse_launch') },
+    { param($proof) ($proof.package_smokes | Where-Object package -CEQ 'app-image').appimage_fuse_launch = 'skipped' },
     { param($proof) ($proof.package_smokes | Where-Object package -CEQ 'flatpak').documents.game_alias_refusal = 'skipped' },
     { param($proof) ($proof.package_smokes | Where-Object package -CEQ 'flatpak').documents.revision = 'f' * 40 },
     { param($proof) $proof.PSObject.Properties.Remove('linux_lifecycle') },

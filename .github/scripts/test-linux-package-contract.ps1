@@ -4,8 +4,22 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'linux-elf.ps1')
 . (Join-Path $PSScriptRoot 'flatpak-metadata.ps1')
 . (Join-Path $PSScriptRoot 'linux-profile-preservation.ps1')
-. (Join-Path $PSScriptRoot 'linux-debian.ps1')
+. (Join-Path $PSScriptRoot 'linux-package-installation.ps1')
 New-Item -ItemType Directory -Force -Path $Directory | Out-Null
+$appImage = Join-Path $Directory 'P4KX package.AppImage'
+$mounted = Get-P4kxAppImageLaunchers $appImage Mounted
+$extracted = Get-P4kxAppImageLaunchers $appImage Extracted
+$dispatch = @{'p4kx'='--cli'; 'p4kx-gui'=$null; 'p4kx-mcp'='--mcp'}
+$fusePrefix = @('-u', 'APPIMAGE_EXTRACT_AND_RUN', '-u', 'TARGET_APPIMAGE', '-u', 'FUSERMOUNT_PROG', '--', $appImage)
+foreach ($name in $dispatch.Keys) {
+    $suffix = @($dispatch[$name] | Where-Object { $_ })
+    if ($mounted[$name].executable -cne '/usr/bin/env' -or
+        ($mounted[$name].prefix -join [char]0) -cne (($fusePrefix + $suffix) -join [char]0) -or
+        $extracted[$name].executable -cne $appImage -or
+        ($extracted[$name].prefix -join [char]0) -cne ((@('--appimage-extract-and-run') + $suffix) -join [char]0)) {
+        throw "AppImage launch mode or dispatch differs for $name."
+    }
+}
 $settings = Get-P4kxLinuxPackaging
 foreach ($mutation in @(
     { param($value) $value.flatpak.finish_args += '--filesystem=host' },

@@ -27,6 +27,21 @@ function Expand-P4kxLinuxTar {
     return @{binaries=(Join-Path $Directory "$root/bin"); launchers=$null}
 }
 
+function Get-P4kxAppImageLaunchers {
+    param([string]$Asset, [ValidateSet('Mounted', 'Extracted')][string]$Mode)
+    $executable = $Asset
+    $runtimeOptions = @('--appimage-extract-and-run')
+    if ($Mode -ceq 'Mounted') {
+        $executable = '/usr/bin/env'
+        $runtimeOptions = @('-u', 'APPIMAGE_EXTRACT_AND_RUN', '-u', 'TARGET_APPIMAGE', '-u', 'FUSERMOUNT_PROG', '--', $Asset)
+    }
+    return @{
+        'p4kx' = @{executable=$executable; prefix=($runtimeOptions + '--cli')}
+        'p4kx-gui' = @{executable=$executable; prefix=$runtimeOptions}
+        'p4kx-mcp' = @{executable=$executable; prefix=($runtimeOptions + '--mcp')}
+    }
+}
+
 function Expand-P4kxAppImage {
     param([string]$Asset, [string]$Directory, $Platform)
     if ((Get-ImageMachine -Path $Asset -Os linux) -ne $Platform.elf_machine) { throw 'AppImage runtime has the wrong CPU.' }
@@ -35,14 +50,10 @@ function Expand-P4kxAppImage {
     Push-Location $Directory
     try { Invoke-P4kxLinuxTool $Asset @('--appimage-extract') | Out-Null }
     finally { Pop-Location }
-    $launchers = @{}
-    foreach ($binary in @('p4kx', 'p4kx-gui', 'p4kx-mcp')) {
-        $prefix = @('--appimage-extract-and-run')
-        if ($binary -eq 'p4kx') { $prefix += '--cli' }
-        if ($binary -eq 'p4kx-mcp') { $prefix += '--mcp' }
-        $launchers[$binary] = @{executable=$Asset; prefix=$prefix}
+    return @{
+        binaries=(Join-Path $Directory 'squashfs-root/usr/bin')
+        launchers=(Get-P4kxAppImageLaunchers $Asset Extracted)
     }
-    return @{binaries=(Join-Path $Directory 'squashfs-root/usr/bin'); launchers=$launchers}
 }
 
 function Assert-P4kxDebArchive {

@@ -62,6 +62,9 @@ function Assert-P4kxPackageRuntime {
         if ($Platform.os -eq 'linux') {
             Assert-P4kxLinuxPackageProducer $package.producer $Platform $Runtime $AssetDirectory $Version
             Assert-P4kxLinuxPackageExecution $package $package.producer $Platform
+            if ($package.package -ceq 'app-image' -and $package.appimage_fuse_launch -cne 'success') {
+                throw 'AppImage FUSE launch evidence is required.'
+            }
             if ($package.package -eq 'flatpak') {
                 Assert-P4kxFlatpakDocumentsEvidence $package.documents $Platform $Runtime.revision $hash
             }

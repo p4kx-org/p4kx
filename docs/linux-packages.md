@@ -101,9 +101,11 @@ their own platform requirements.
 | `.deb` | Install with `sudo apt install ./P4KX-<version>-<target>.deb`; run `p4kx-gui`, `p4kx` or `p4kx-mcp`. |
 | `.flatpak` | Install with `flatpak install --user --bundle ./P4KX-<version>-<target>.flatpak`; run `flatpak run io.github.p4kx_org.p4kx`. |
 
-For AppImage systems without usable FUSE, the same real runtime supports
+Direct AppImage launch needs a FUSE device accessible to the current user and a compatible
+mount helper on `PATH`. On Ubuntu 24.04, the `fuse3` package supplies `fusermount3`.
+The runtime already includes libfuse3. If FUSE is unavailable, use
 `./P4KX-<version>-<target>.AppImage --appimage-extract-and-run`. Add `--cli` or `--mcp`
-after that runtime option. An installed AppImage is not required for this extraction mode.
+after that runtime option.
 
 The AppImage retains linuxdeploy's relative root desktop and icon links and adds the matching
 `.DirIcon` link. Packaging checks their installed targets and original bytes, preserves the exact
@@ -301,7 +303,8 @@ native CPU and verifies packages on a fresh matching runner. The consumer valida
 SHA, pinned compiler/nextest, baseline, CPU and package hashes before execution. It then runs:
 
 - Real tar executables, the AppImage runtime and AppRun dispatch, installed deb commands and
-  installed `flatpak run` commands for all three applications.
+  installed `flatpak run` commands for all three applications. The AppImage checks require
+  both direct FUSE launch and explicit extract-and-run.
 - CLI version/help, synthetic Archive listing, byte-exact extraction and CryXml conversion;
   MCP help, initialization, tool listing and an exact Unicode read response.
 - Three actual GUI frames under Xvfb with software graphics, followed by normal exit.
@@ -327,7 +330,8 @@ shards, doctests and schema checks passed.
 
 The branch package run built version `0.4.2` from the same merge revision.
 Native AMD64 and ARM64 package consumers passed the four-format application checks,
-software-rendered desktop frames, Documents grants and package lifecycle checks.
+software-rendered desktop frames, Documents grants and package lifecycle checks. These
+AppImage receipts cover extract-and-run.
 [AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45315878218/job/138196477374) ·
 [ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45315878218/job/138196477207)
 

@@ -32,6 +32,14 @@ function Invoke-P4kxLinuxHostPackage {
         & (Join-Path $PSScriptRoot 'check-package-runtime.ps1') -Target $Platform.target -BinaryDirectory $state.binaries -FixtureDirectory $Fixture -OutputDirectory (Join-Path $Directory 'smoke') -Package $Package -Launchers $state.launchers -ExpectedVersion $Version
         $result = Get-Content -LiteralPath (Join-Path $Directory 'smoke/runtime.json') -Raw | ConvertFrom-Json
         Assert-P4kxLinuxPackageExecution $result $producer.proof $Platform
+        if ($Package -ceq 'app-image') {
+            $mounted = Join-Path $Directory 'fuse-smoke'
+            $launchers = Get-P4kxAppImageLaunchers $producer.asset Mounted
+            & (Join-Path $PSScriptRoot 'check-package-runtime.ps1') -Target $Platform.target -BinaryDirectory $state.binaries -FixtureDirectory $Fixture -OutputDirectory $mounted -Package $Package -Launchers $launchers -ExpectedVersion $Version
+            $mountedProof = Get-Content -LiteralPath (Join-Path $mounted 'runtime.json') -Raw | ConvertFrom-Json
+            Assert-P4kxLinuxPackageExecution $mountedProof $producer.proof $Platform
+            $result | Add-Member -NotePropertyName appimage_fuse_launch -NotePropertyValue 'success'
+        }
         $result | Add-Member -NotePropertyName producer -NotePropertyValue $producer.proof
         $result | Add-Member -NotePropertyName archive_sha256 -NotePropertyValue $producer.proof.archive_sha256
     }
