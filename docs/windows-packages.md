@@ -254,6 +254,17 @@ The run also checked repair, rollback, profile preservation and architecture-spe
 package handling. [Native AMD64](https://github.com/p4kx-org/p4kx/actions/runs/44226543671/job/134560610488) ·
 [Native ARM64](https://github.com/p4kx-org/p4kx/actions/runs/44226543671/job/134560610521)
 
+At PR merge `5d3d917f424657990fd775b8fae8ac843a3fd528`, each native job uploaded
+checkpoint 03 and the original Finish supervisor launch. AMD64 had completed the
+predecessor installation and entered rename upgrade. ARM64 had completed the
+current installation and entered the installed runtime checks. GitHub marked both
+jobs cancelled around 55 minutes after they started, with checkpoint 04 still in
+progress. The last available receipts establish the original phase boundary and
+supervisor launch. The specific stalled operation and final installer result remain
+unresolved.
+[AMD64 job](https://github.com/p4kx-org/p4kx/actions/runs/45315878218/job/138200239367) ·
+[ARM64 job](https://github.com/p4kx-org/p4kx/actions/runs/45315878218/job/138200239372)
+
 For release acceptance, repeat the native lifecycle checks with the actual release candidate
 and bind both its MSI and portable ZIP to the candidate revision and run attempt. Record the
 Windows AMD64 desktop and WASAPI checks separately from the hosted package evidence.
