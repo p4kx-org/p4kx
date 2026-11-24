@@ -428,6 +428,29 @@ The Catalog contains 77,896,476,922 decoded bytes and 1,466,041,457 compressed b
 The writer reports 1,915,716,829 peak temporary bytes and Windows reports 1,915,726,571
 process write bytes. The separate replay uses this same sealed compressed output.
 
+### Packaged Normal measurement on PTU 13260598
+
+Windows AMD64 producer `93d92ca20bef8a8c3731339214a3301124ade7ba` completed
+the unfiltered Normal export from the unchanged PTU `13260598` Archive.
+The run used one Rayon worker at below-normal priority, Zstandard level 3 and
+the Unix-epoch export time.
+[Native packaged producer](https://github.com/p4kx-org/p4kx/actions/runs/45375154494/job/138382476262)
+
+| Wall time (s) | Peak working set (B) | Peak private commit (B) | Minimum available host RAM (B) |
+| ---: | ---: | ---: | ---: |
+| 2,314.908 | 36,488,916,992 | 39,266,893,824 | 14,729,175,040 |
+
+Windows reported the process lifetime peaks after exit. The larger peak leaves
+an estimated 29,452,582,912 bytes for the OS and other processes on a 64 GiB
+system. The measured host had 100,573,523,968 bytes of RAM and a minimum commit
+headroom of 37,464,530,944 bytes. The host counted 554,038 additional page
+reads and 218 additional page writes during the export.
+
+The verified frame has 80,616,097,191 decoded bytes and 1,717,255,370 compressed
+bytes. The writer reports 2,215,745,998 peak temporary bytes and Windows
+reports 2,215,756,050 process write bytes. The separate replay uses this same
+sealed compressed output.
+
 ## Measuring a complete export
 
 The installed regression checks verify decoded and stored byte counts against the actual writer
