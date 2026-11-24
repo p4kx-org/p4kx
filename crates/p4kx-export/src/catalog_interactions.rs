@@ -20,12 +20,15 @@ use crate::source_fields::FieldError;
 
 const INTERACTABLE: &str = "SEntityInteractableParams";
 const STATE_MACHINE: &str = "SInteractionStateMachineParams";
-pub(crate) const SOURCE_TYPES: &[&str] = &[INTERACTABLE, STATE_MACHINE];
+const KIOSK: &str = "KioskInteractionEntityComponentParams";
+const KIOSK_VR_ALIGNMENT: &str = "supportWalkToAlignInVR";
+pub(crate) const SOURCE_TYPES: &[&str] = &[INTERACTABLE, STATE_MACHINE, KIOSK];
 
 #[derive(Clone, Copy)]
 pub(super) enum InteractionKind {
     Interactable,
     StateMachine,
+    Kiosk,
 }
 
 impl InteractionKind {
@@ -33,6 +36,7 @@ impl InteractionKind {
         match source_type {
             INTERACTABLE => Some(Self::Interactable),
             STATE_MACHINE => Some(Self::StateMachine),
+            KIOSK => Some(Self::Kiosk),
             _ => None,
         }
     }
@@ -64,6 +68,10 @@ enum InteractionFields<'source> {
     StateMachine {
         state_types: InteractionList<InteractionStateType<'source>>,
     },
+    Kiosk {
+        #[serde(rename = "supportWalkToAlignInVR")]
+        support_walk_to_align_in_vr: SourcedValue<bool>,
+    },
 }
 
 impl<'source> InteractionConfiguration<'source> {
@@ -84,7 +92,7 @@ impl<'source> InteractionConfiguration<'source> {
     pub fn interactable(&self) -> Option<&SourcedValue<InteractableConfiguration<'source>>> {
         match &self.fields {
             InteractionFields::Interactable { interactable } => Some(interactable.as_ref()),
-            InteractionFields::StateMachine { .. } => None,
+            InteractionFields::StateMachine { .. } | InteractionFields::Kiosk { .. } => None,
         }
     }
 
@@ -94,8 +102,19 @@ impl<'source> InteractionConfiguration<'source> {
         &self,
     ) -> Option<&SourcedValue<Vec<SourcedValue<InteractionStateType<'source>>>>> {
         match &self.fields {
-            InteractionFields::Interactable { .. } => None,
+            InteractionFields::Interactable { .. } | InteractionFields::Kiosk { .. } => None,
             InteractionFields::StateMachine { state_types } => Some(state_types),
+        }
+    }
+
+    /// Borrows the original walk-to-align flag for a kiosk component.
+    #[must_use]
+    pub const fn support_walk_to_align_in_vr(&self) -> Option<&SourcedValue<bool>> {
+        match &self.fields {
+            InteractionFields::Kiosk {
+                support_walk_to_align_in_vr,
+            } => Some(support_walk_to_align_in_vr),
+            InteractionFields::Interactable { .. } | InteractionFields::StateMachine { .. } => None,
         }
     }
 
@@ -131,6 +150,16 @@ impl<'source> InteractionConfiguration<'source> {
                 )?;
                 let projected = ("StateTypes", state_types.state());
                 (InteractionFields::StateMachine { state_types }, projected)
+            }
+            InteractionKind::Kiosk => {
+                let support_walk_to_align_in_vr = source.boolean(KIOSK_VR_ALIGNMENT, notes)?;
+                let projected = (KIOSK_VR_ALIGNMENT, support_walk_to_align_in_vr.state());
+                (
+                    InteractionFields::Kiosk {
+                        support_walk_to_align_in_vr,
+                    },
+                    projected,
+                )
             }
         };
         let source = UnitSource::read(source, [projected])?;

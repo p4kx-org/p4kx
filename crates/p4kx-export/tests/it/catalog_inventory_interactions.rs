@@ -8,6 +8,8 @@ use crate::health_origin_assertions as proof;
 
 #[path = "catalog_inventory_interactions_fixture.rs"]
 mod fixture;
+#[path = "catalog_kiosk_interactions.rs"]
+mod kiosk;
 
 #[test]
 fn interaction_components_preserve_slots_states_and_original_weak_links() -> TestResult {

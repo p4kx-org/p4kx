@@ -35,8 +35,10 @@ under the existing `SubGeometry` source path.
 | `SStateMachineMannequinTags` and `SStateMachineMannequinTagDef` | The former declares a `deathTags` Class array of the latter. Each element has `state` as a WeakPointer to `SInteractionState` and `mannequinTag` as a String. Both new Structs have zero mapped instances. |
 
 The original DataForge declaration and mapping tables corroborate the Record
-field states. Generic DataForge tools expose the new component fields. The typed
-item and animation component projections select other blocks.
+field states. Generic DataForge tools expose both component fields. The typed
+[Catalog and SDK kiosk interaction row](catalog-inventory-interactions.md)
+retains the original VR alignment flag. The animation tag pointer is available
+through the generic DataForge tools.
 
 | Area | Original change and P4KX relevance |
 | --- | --- |

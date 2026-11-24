@@ -5,8 +5,8 @@ use std::time::SystemTime;
 
 use p4kx_export::{CatalogOptions, CatalogPublicationMode};
 use p4kx_extraction::{
-    Archive, ArchiveWatch, DataForgeEntry, DataForgeOrigin, InputScope, SourceEncryption,
-    SourceInput, SourceUses, StructValue, Value as Original,
+    Archive, ArchiveWatch, DataForgeEntry, DataForgeOrigin, InputScope, RecordTree,
+    SourceEncryption, SourceInput, SourceUses, StructValue, Value as Original,
 };
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
@@ -15,6 +15,12 @@ use crate::real_archive_item_components::{self as components, cell, owned, requi
 use crate::real_archive_item_durability::{self as proof, Trace};
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+
+const KIOSK: &str = "KioskInteractionEntityComponentParams";
+const KIOSK_VR_ALIGNMENT: &str = "supportWalkToAlignInVR";
+
+#[path = "real_archive_kiosk_interaction.rs"]
+mod installed_kiosk;
 
 #[test]
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
@@ -53,6 +59,7 @@ fn verify(entry: &DataForgeEntry, catalog: &Value) -> TestResult {
     let rows = components::component_rows(catalog, "/configurations/interactions/rows")?;
     let mut interactable = false;
     let mut state_machine = false;
+    let mut kiosk_checked = !rows.values().any(|row| row["kind"] == "kiosk");
     for ((owner, slot), row) in rows {
         let (role, expected, checked) = match row["kind"].as_str() {
             Some("interactable") => (
@@ -65,6 +72,7 @@ fn verify(entry: &DataForgeEntry, catalog: &Value) -> TestResult {
                 "SInteractionStateMachineParams",
                 &mut state_machine,
             ),
+            Some("kiosk") => (compare_kiosk as ComponentCheck, KIOSK, &mut kiosk_checked),
             _ => return Err("unknown interaction component kind".into()),
         };
         if *checked {
@@ -74,12 +82,7 @@ fn verify(entry: &DataForgeEntry, catalog: &Value) -> TestResult {
             .record(owner)
             .ok_or("physical interaction owner Record")?;
         let tree = record.tree()?;
-        let Some(Original::Array(originals)) = tree.field("Components") else {
-            return Err("original interaction Components".into());
-        };
-        let Some(original @ Original::Struct(component)) = originals.get(slot) else {
-            return Err("original interaction component slot".into());
-        };
+        let (original, component) = original_component(&tree, slot)?;
         if component.type_name() != expected || proof::text(row, "/sourceType/value")? != expected {
             return Err("interaction component concrete type differs".into());
         }
@@ -89,15 +92,50 @@ fn verify(entry: &DataForgeEntry, catalog: &Value) -> TestResult {
         trace.check(cell(row, "componentOrdinal")?, original, "conversion")?;
         trace.part(cell(row, "sourceType")?, original, "$type", "selector")?;
         role(component, row)?;
+        if expected == KIOSK
+            && let Some(flag @ Original::Bool(_)) = component.field(KIOSK_VR_ALIGNMENT)
+        {
+            trace.check(cell(row, KIOSK_VR_ALIGNMENT)?, flag, "payload")?;
+        }
         *checked = true;
-        if interactable && state_machine {
+        if interactable && state_machine && kiosk_checked {
             return Ok(());
         }
     }
-    Err("configured build lacks a traced Interactable or StateMachine".into())
+    Err("configured build lacks a traced interaction component".into())
+}
+
+fn original_component<'row, 'source>(
+    tree: &'row RecordTree<'source>,
+    slot: usize,
+) -> TestResult<(&'row Original<'source>, &'row StructValue<'source>)> {
+    let Some(Original::Array(components)) = tree.field("Components") else {
+        return Err("original interaction Components".into());
+    };
+    let Some(original @ Original::Struct(component)) = components.get(slot) else {
+        return Err("original interaction component slot".into());
+    };
+    Ok((original, component))
 }
 
 type ComponentCheck = fn(&StructValue<'_>, &Value) -> TestResult;
+
+fn compare_kiosk(source: &StructValue<'_>, row: &Value) -> TestResult {
+    let carrier = cell(row, KIOSK_VR_ALIGNMENT)?;
+    match source.field(KIOSK_VR_ALIGNMENT) {
+        None => require_state(carrier, "absent"),
+        Some(Original::Null) => require_state(carrier, "null"),
+        Some(Original::Bool(value)) => {
+            require_state(carrier, "present")?;
+            if carrier["value"] != *value {
+                return Err("authored kiosk flag differs".into());
+            }
+            Ok(())
+        }
+        Some(Original::Error(_)) => require_state(carrier, "unreadable"),
+        Some(_) => require_state(carrier, "invalid"),
+    }
+}
 
 fn compare_interactable(source: &StructValue<'_>, row: &Value) -> TestResult {
     let carrier = cell(row, "interactable")?;
