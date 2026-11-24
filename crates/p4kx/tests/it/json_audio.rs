@@ -52,16 +52,16 @@ fn audio_info() -> TestResult {
         ],
     )?;
 
-    remove_info_metadata(&mut value)?;
+    remove_summary_metadata(&mut value)?;
     let json = serde_json::to_string_pretty(&value)?;
     insta::assert_snapshot!(json);
     Ok(())
 }
 
-pub(super) fn remove_info_metadata(value: &mut Value) -> TestResult {
-    let fields = value.as_object_mut().ok_or("Audio Info JSON object")?;
+pub(super) fn remove_summary_metadata(value: &mut Value) -> TestResult {
+    let fields = value.as_object_mut().ok_or("Audio summary JSON object")?;
     for key in ["fieldOrigins", "provenance"] {
-        assert!(fields.remove(key).is_some(), "Audio Info includes {key}");
+        assert!(fields.remove(key).is_some(), "Audio summary includes {key}");
     }
     Ok(())
 }
@@ -72,7 +72,7 @@ fn audio_wav() -> TestResult {
     let archive = sound_archive(dir.path())?;
     let out = dir.path().join("100.wav");
 
-    let value = json(
+    let mut value = json(
         dir.path(),
         &[
             "audio".as_ref(),
@@ -84,6 +84,7 @@ fn audio_wav() -> TestResult {
         ],
     )?;
 
+    remove_summary_metadata(&mut value)?;
     let json = serde_json::to_string_pretty(&value)?;
     insta::assert_snapshot!(json);
     Ok(())

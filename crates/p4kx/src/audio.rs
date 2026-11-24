@@ -70,7 +70,7 @@ struct OggJson<'a> {
 pub(crate) fn run(args: &AudioArgs, as_json: bool) -> Result<()> {
     match &args.action {
         AudioAction::Info(source) => info(&open(source, as_json)?, as_json),
-        AudioAction::Wav { source, out } => wav(&open(source, false)?, out, as_json),
+        AudioAction::Wav { source, out } => wav(&open(source, as_json)?, out, as_json),
         AudioAction::Ogg { source, out } => ogg(&open(source, false)?, out, as_json),
     }
 }
@@ -151,7 +151,7 @@ fn format_duration(duration: Duration) -> String {
 fn wav(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
     let report = sound.write_wav_to_file(out)?;
     if as_json {
-        json::print(&WavJson {
+        let summary = WavJson {
             sound: sound.name(),
             output: json::path(out),
             channels: report.channels,
@@ -161,7 +161,8 @@ fn wav(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
             loop_points: report
                 .loop_points
                 .map(|points| loop_json(points.start, points.end)),
-        })?;
+        };
+        json::print(&info_origins::wav_report(sound, summary)?)?;
     } else {
         writeln!(
             io::stdout().lock(),

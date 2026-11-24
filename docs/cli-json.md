@@ -1962,6 +1962,12 @@ Also `p4kx audio wav <file> --out <file> --json` for a WEM file on disk.
 `sample_count` is the number of frames written and `size` the size of the written WAV file. A
 codec without a decoder prints no JSON; it fails with exit code 1 and an error naming the codec.
 
+`fieldOrigins` addresses `/sound` from the opened input's path metadata. The `/channels` and
+`/sample_rate` cells retain the selected WEM format and the parser decisions used for the
+WAV header. Opus keeps the effective playback rate. The immediate encryption markers apply
+to those input bytes. A standalone WEM has unknown Archive encryption. The corresponding
+source and use identifiers resolve in `provenance`.
+
 ## `p4kx audio ogg <archive> <entry> --out <file> --json`
 
 Also `p4kx audio ogg <file> --out <file> --json` for a WEM file on disk.

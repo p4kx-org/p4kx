@@ -9,7 +9,7 @@ use p4kx_extraction::{
 };
 use serde::Serialize;
 
-use super::InfoJson;
+use super::{InfoJson, WavJson};
 
 const SUMMARY_FIELDS: [(&str, WemOriginField); 8] = [
     ("/format_tag", WemOriginField::FormatTag),
@@ -28,23 +28,46 @@ const LOOP_FIELDS: [(&str, WemOriginField); 3] = [
     ("/loop/frames", WemOriginField::LoopFrames),
 ];
 
+const WAV_FIELDS: [(&str, WemOriginField); 2] = [
+    ("/channels", WemOriginField::Channels),
+    ("/sample_rate", WemOriginField::SampleRate),
+];
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct Report<'sound> {
+pub(super) struct Report<T> {
     #[serde(flatten)]
-    info: InfoJson<'sound>,
+    summary: T,
     field_origins: FieldOrigins,
     provenance: SourceInventory,
 }
 
-pub(super) fn report<'sound>(sound: &Sound, info: InfoJson<'sound>) -> Result<Report<'sound>> {
+pub(super) fn report<'sound>(
+    sound: &Sound,
+    info: InfoJson<'sound>,
+) -> Result<Report<InfoJson<'sound>>> {
+    capture(sound, info, datum_fields(sound))
+}
+
+pub(super) fn wav_report<'sound>(
+    sound: &Sound,
+    summary: WavJson<'sound>,
+) -> Result<Report<WavJson<'sound>>> {
+    capture(sound, summary, WAV_FIELDS)
+}
+
+fn capture<T>(
+    sound: &Sound,
+    summary: T,
+    fields: impl IntoIterator<Item = (&'static str, WemOriginField)>,
+) -> Result<Report<T>> {
     let uses = SourceUses::new();
     let field_origins = match sound.source_input() {
-        Some(input) => read(sound, &uses, input)?,
-        None => unknown(sound, &uses)?,
+        Some(input) => read(sound, &uses, input, fields)?,
+        None => unknown(&uses, fields)?,
     };
     Ok(Report {
-        info,
+        summary,
         field_origins,
         provenance: uses.freeze()?,
     })
@@ -57,11 +80,16 @@ fn datum_fields(sound: &Sound) -> impl Iterator<Item = (&'static str, WemOriginF
         .chain(loops.into_iter().flatten())
 }
 
-fn read(sound: &Sound, uses: &SourceUses, input: SourceInput<'_>) -> Result<FieldOrigins> {
+fn read(
+    sound: &Sound,
+    uses: &SourceUses,
+    input: SourceInput<'_>,
+    datum_fields: impl IntoIterator<Item = (&'static str, WemOriginField)>,
+) -> Result<FieldOrigins> {
     let name_scope = match input {
         SourceInput::Archive(_) => InputScope::ArchiveDirectoryMetadata,
         SourceInput::File(_) => InputScope::FileMetadata,
-        _ => bail!("Audio Info source is outside its original read boundary"),
+        _ => bail!("Audio summary source is outside its original read boundary"),
     };
     let payload = uses.observe(input, InputScope::Payload)?;
     let name = payload.for_scope(name_scope).at(
@@ -75,7 +103,7 @@ fn read(sound: &Sound, uses: &SourceUses, input: SourceInput<'_>) -> Result<Fiel
 
     let wem = sound.wem();
     let plan = WemOriginPlan::new(wem.info_source(), wem.codec(), wem.sample_count());
-    for (path, field) in datum_fields(sound) {
+    for (path, field) in datum_fields {
         let inputs = plan
             .field(field)?
             .iter()
@@ -86,9 +114,12 @@ fn read(sound: &Sound, uses: &SourceUses, input: SourceInput<'_>) -> Result<Fiel
     Ok(fields)
 }
 
-fn unknown(sound: &Sound, uses: &SourceUses) -> Result<FieldOrigins> {
+fn unknown(
+    uses: &SourceUses,
+    datum_fields: impl IntoIterator<Item = (&'static str, WemOriginField)>,
+) -> Result<FieldOrigins> {
     let mut fields = FieldOrigins::new();
-    for path in std::iter::once("/sound").chain(datum_fields(sound).map(|(path, _)| path)) {
+    for path in std::iter::once("/sound").chain(datum_fields.into_iter().map(|(path, _)| path)) {
         fields.insert(FieldPath::parse(path)?, uses.origin(&[], false))?;
     }
     Ok(fields)

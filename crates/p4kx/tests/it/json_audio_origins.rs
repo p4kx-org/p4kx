@@ -44,10 +44,65 @@ fn audio_info_keeps_original_format_and_directory_origins_separate() -> TestResu
         );
         assert_eq!(document.get("sample_count"), Some(&json!(2)), "{input:?}");
 
-        let source = check_source(&document, input)?;
+        let source = check_source(&document, input, 0)?;
         check_name_origin(&document, source, path, input)?;
-        check_format_origins(&document, source, input)?;
+        check_format_origins(
+            &document,
+            source,
+            input,
+            &[("/channels", "channels"), ("/format_tag", "formatTag")],
+        )?;
     }
+    Ok(())
+}
+
+#[test]
+fn audio_wav_binds_formats_to_the_selected_duplicate_entry() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let archive = directory.path().join("duplicates.p4k");
+    let standalone = directory.path().join("standalone.wem");
+    let bytes = duplicate_format_wem();
+    let plain_competitor = TestWem::pcm(TestCodec::Pcm, 1, 22_050, &[0, 1]).bytes();
+    fs::write(&standalone, &bytes)?;
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored("unused.txt", b"unused".to_vec()))
+        .entry(TestEntry::stored(SOUND, bytes).encrypted())
+        .entry(TestEntry::stored(SOUND, plain_competitor))
+        .write_to(&archive)?;
+
+    for (path, input, output) in [
+        (archive.as_path(), Input::Encrypted, "archive.wav"),
+        (standalone.as_path(), Input::Standalone, "standalone.wav"),
+    ] {
+        let output = directory.path().join(output);
+        let result = p4kx_testkit::p4kx()?
+            .args(["--json", "audio", "wav"])
+            .arg(path)
+            .args(input.entry())
+            .arg("--out")
+            .arg(&output)
+            .output()?;
+        assert_eq!(result.status.code(), Some(0), "{result:?}");
+        let document: Value = serde_json::from_slice(&result.stdout)?;
+        assert_eq!(document["channels"], 2, "{input:?}");
+        assert_eq!(document["sample_rate"], 48_000, "{input:?}");
+        assert_eq!(document["sample_count"], 2, "{input:?}");
+        assert_eq!(document["size"], fs::metadata(&output)?.len(), "{input:?}");
+
+        let source = check_source(&document, input, 1)?;
+        check_name_origin(&document, source, path, input)?;
+        check_format_origins(
+            &document,
+            source,
+            input,
+            &[("/channels", "channels"), ("/sample_rate", "sampleRate")],
+        )?;
+    }
+    assert_eq!(
+        fs::read(directory.path().join("archive.wav"))?,
+        fs::read(directory.path().join("standalone.wav"))?,
+        "the identical winning WEM produces identical WAV bytes"
+    );
     Ok(())
 }
 
@@ -131,7 +186,11 @@ impl Input {
     }
 }
 
-fn check_source(document: &Value, input: Input) -> Result<&Value, Box<dyn Error>> {
+fn check_source(
+    document: &Value,
+    input: Input,
+    entry_index: usize,
+) -> Result<&Value, Box<dyn Error>> {
     let sources = document
         .pointer("/provenance/sources")
         .and_then(Value::as_array)
@@ -148,7 +207,7 @@ fn check_source(document: &Value, input: Input) -> Result<&Value, Box<dyn Error>
         Input::Encrypted | Input::Plain => {
             assert_eq!(
                 source.get("entryIndex"),
-                Some(&json!(0)),
+                Some(&json!(entry_index)),
                 "physical Entry index"
             );
             assert_eq!(
@@ -220,8 +279,13 @@ fn check_name_origin(document: &Value, source: &Value, path: &Path, input: Input
     Ok(())
 }
 
-fn check_format_origins(document: &Value, source: &Value, input: Input) -> TestResult {
-    for (output, original) in [("/channels", "channels"), ("/format_tag", "formatTag")] {
+fn check_format_origins(
+    document: &Value,
+    source: &Value,
+    input: Input,
+    fields: &[(&str, &str)],
+) -> TestResult {
+    for &(output, original) in fields {
         let uses = contributors(document, output, input.payload_marker())?;
         let mut payloads = Vec::new();
         for used in uses {

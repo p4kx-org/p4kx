@@ -88,7 +88,7 @@ fn info_of_a_file_prints_json() -> TestResult {
 
     assert_eq!(output.status.code(), Some(0), "success");
     let mut json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
-    super::json_audio::remove_info_metadata(&mut json)?;
+    super::json_audio::remove_summary_metadata(&mut json)?;
     assert_eq!(
         json,
         serde_json::json!({
