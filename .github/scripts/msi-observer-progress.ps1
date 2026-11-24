@@ -6,12 +6,15 @@ function Write-P4kxMsiObserverProgress {
             'readRequest','binding','readHandle','parentState','wait','stopExpiredParent','saveCheckpoint','workflowOutput','validateResult','writeResult',
             'delayCaller','delayBinding','delayReadRequest','delayStartReceipt','delayWait','delayResultReceipt',
             'finishLaunchBinding','finishLaunchProcess','finishLaunchReceipt',
+            'finishWaitBinding','finishWaitPoll','finishWaitDigest','finishWaitReceipt',
+            'finishSupervisorBinding','finishSupervisorCaller','finishSupervisorReceipt',
             'finishProbeCaller','finishProbeBinding','finishProbeWait','finishProbeParent','finishProbeCheckpoint','finishProbeReceipt'
         )][string]$Stage,
         [Parameter(Mandatory)][ValidateSet('begin','end')][string]$Status,
         [string]$Directory,
         [string]$RequestDigest,
-        [ValidateRange(4,5)][int]$Sequence
+        [ValidateRange(4,5)][int]$Sequence,
+        [switch]$FileOnly
     )
     $receipt = @{schema=1;role='native-msi-observer-progress';stage=$Stage;status=$Status;
         revision=$env:GITHUB_SHA;run=$env:GITHUB_RUN_ID;attempt=$env:GITHUB_RUN_ATTEMPT;target=$env:P4KX_TARGET;
@@ -21,5 +24,7 @@ function Write-P4kxMsiObserverProgress {
     if (-not [string]::IsNullOrEmpty($Directory)) {
         Write-P4kxDetachedReceipt (Join-Path $Directory ($Stage+'-'+$Status+'.json')) $receipt
     }
-    Write-Host ('[P4KX-MSI-OBSERVER]'+($receipt | ConvertTo-Json -Depth 3 -Compress))
+    if (-not $FileOnly) {
+        Write-Host ('[P4KX-MSI-OBSERVER]'+($receipt | ConvertTo-Json -Depth 3 -Compress))
+    }
 }

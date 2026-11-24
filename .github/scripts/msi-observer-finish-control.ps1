@@ -67,34 +67,46 @@ function Read-P4kxMsiFinishLaunch($Context) {
 function Wait-P4kxMsiFinishReceipt($Context, $Launch) {
     $receiptPath = Join-Path $Context.directory 'result.json'
     $resultDigest = $null
+    $found = $false
     $budget = ($Context.collection_cutoff - [DateTimeOffset]::UtcNow).TotalMilliseconds
     $clock = [Diagnostics.Stopwatch]::StartNew()
+    Write-P4kxMsiObserverProgress finishWaitPoll begin -RequestDigest $Context.digest
     while ($true) {
         $wallRemaining = ($Context.collection_cutoff - [DateTimeOffset]::UtcNow).TotalMilliseconds
         $remaining = [Math]::Min($wallRemaining, $budget - $clock.Elapsed.TotalMilliseconds)
         if ($remaining -le 0) { break }
         if ([IO.File]::Exists($receiptPath)) {
-            $resultDigest = Get-P4kxDetachedDigest $receiptPath
+            $found = $true
             break
         }
         Start-Sleep -Milliseconds ([int][Math]::Min(100, [Math]::Ceiling($remaining)))
+    }
+    Write-P4kxMsiObserverProgress finishWaitPoll end -RequestDigest $Context.digest
+    if ($found) {
+        Write-P4kxMsiObserverProgress finishWaitDigest begin -RequestDigest $Context.digest
+        $resultDigest = Get-P4kxDetachedDigest $receiptPath
+        Write-P4kxMsiObserverProgress finishWaitDigest end -RequestDigest $Context.digest
     }
     $observedAt = [DateTimeOffset]::UtcNow
     if ($observedAt -gt $Context.collection_cutoff -or $clock.Elapsed.TotalMilliseconds -gt $budget) {
         $resultDigest = $null
     }
+    Write-P4kxMsiObserverProgress finishWaitReceipt begin -RequestDigest $Context.digest
     Write-P4kxDetachedReceipt (Join-Path $Context.directory 'wait-result.json') @{
         schema=1;role='native-msi-finish-receipt-wait';request_sha256=$Context.digest
         supervisor_pid=$Launch.supervisor_pid;supervisor_started_utc_ticks=$Launch.supervisor_started_utc_ticks
         deadline_utc=$Context.collection_cutoff.ToString('o');observed_utc=$observedAt.ToString('o')
         result_sha256=$resultDigest;mutation_authority=$false
     }
+    Write-P4kxMsiObserverProgress finishWaitReceipt end -RequestDigest $Context.digest
     if (-not $resultDigest) { throw 'The bound Finish supervisor produced no result within the original allowance.' }
 }
 
 function Wait-P4kxMsiSupervisedFinish([string]$Directory) {
+    Write-P4kxMsiObserverProgress finishWaitBinding begin
     $context = Get-P4kxMsiFinishContext $Directory
     $launch = Read-P4kxMsiFinishLaunch $context
+    Write-P4kxMsiObserverProgress finishWaitBinding end -RequestDigest $context.digest
     Wait-P4kxMsiFinishReceipt $context $launch
 }
 
