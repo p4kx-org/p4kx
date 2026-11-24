@@ -82,6 +82,38 @@ The query reads selected DataForge bodies and any required target headers. It op
 no locale or placement payloads. Before publishing consumer-owned results, check outer
 query success and the selected coverage.
 
+The Windows AMD64 `real_archive` test
+`real_archive_scoped_equipment_sdk::location_vocabulary_parity::installed_location_vocabulary_cold_query`
+ran each family with an `All` selection in a fresh process. Each run used the
+installed Archive and checked complete source coverage and the contributing
+source closure. All 14 Archive and manifest stamps matched before and after
+the runs.
+
+| Catalog dataset | LIVE `13220821` availability and rows | PTU `13260598` availability and rows |
+| --- | --- | --- |
+| `/definitions/locationClasses` | `Absent` (0) | `Available` (9) |
+| `/definitions/locationFunctions` | `Absent` (0) | `Available` (15) |
+| `/definitions/locationSizes` | `Absent` (0) | `Available` (5) |
+| `/definitions/locationResourceSlots` | `Available` (3) | `Available` (66) |
+| `/definitions/locationRegistries/classes` | `Absent` (0) | `Available` (1) |
+| `/definitions/locationRegistries/functions` | `Absent` (0) | `Available` (1) |
+| `/definitions/locationRegistries/sizes` | `Absent` (0) | `Available` (1) |
+
+The six `Absent` LIVE families each had no matching original type declaration.
+The LIVE resource slots and every PTU family traced contributing values to
+one physical source per family.
+
+| Build | Maximum Windows lifetime private commit (bytes) | Maximum Windows lifetime working set (bytes) |
+| --- | ---: | ---: |
+| LIVE `13220821` | 1,091,608,576 | 1,021,853,696 |
+| PTU `13260598` | 1,114,972,160 | 1,032,101,888 |
+
+Both lifetime peaks stayed below 2,000,000,000 bytes in every process.
+The test executable was built from `1ea6a27fa8a430fd1d7cb1aef97640a846d19fea`
+with the location vocabulary witness. Its SHA-256 was
+`fe34e0e11643b00a44c21a7f77eec0b039323faf5fae1a8f0cc03f29d1219e01`.
+Complete installed Normal row and contributing provenance parity remains open.
+
 ## Location entity declarations
 
 Use `with_location_entity_declarations` or `with_location_entity_declarations_from` for the

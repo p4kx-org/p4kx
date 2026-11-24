@@ -29,6 +29,9 @@ mod vehicle_armor_cold;
 #[path = "real_archive_standalone_mining_sdk_cold.rs"]
 mod mining_cold;
 
+#[path = "real_archive_location_vocabulary_sdk_parity.rs"]
+mod location_vocabulary_parity;
+
 #[path = "real_archive_canonical_ship_sdk.rs"]
 mod canonical_ship;
 

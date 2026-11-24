@@ -138,7 +138,10 @@ fn compare<Row: JsonSchema + Serialize>(
     Route::queried_rows(
         path,
         rows,
-        "synthetic selection and producer parity available; installed producer parity open",
+        concat!(
+            "synthetic producer parity verified. Standalone cold memory verified on LIVE 13220821 ",
+            "and PTU 13260598. Complete installed Normal parity remains open",
+        ),
     )
 }
 
