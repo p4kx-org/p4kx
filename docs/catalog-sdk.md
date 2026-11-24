@@ -2649,6 +2649,21 @@ through these same-Build comparisons.
 Each run used one worker. The timing and peaks cover the combined verifier and Catalog replay.
 For the separate 2 GB SDK acceptance, measure each nominated query in its own cold process.
 
+### ATLS owners and configuration parity
+
+The LIVE `13220821` census read all nine ATLS owner bodies and found no
+components that could add rows to `roomAssociations` or `itemRoomAssociations`.
+The complete same-Build comparison above therefore covers both declarations
+with the expanded ATLS owner selection. All nine owners had an original port
+container with network-link members. `resourceNetworkLinks` still requires a
+comparison with a complete same-Build Catalog that includes all nine owners.
+
+On PTU `13260598`, the [resource supply comparison](catalog-fuel-capacity.md#installed-sdk-parity)
+covered all five tables before the ATLS selection expanded from four to nine owners.
+The census read the five newly selected owner bodies and found no components that
+could add rows to `fuelTanks`, `fuelIntakes`, `resourceContainers`, `resourceComponents`
+or `resourceConnections`. The retained comparison covers all five tables.
+
 ### Store slug comparison
 
 The installed Store slug test ran with one worker on Windows AMD64 against the matching

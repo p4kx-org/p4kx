@@ -21,7 +21,6 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
     const COMPONENT: &str = "ItemResourceComponentParams";
     const POWER: &str = "EntityComponentPowerConnection";
     const HEAT: &str = "EntityComponentHeatConnection";
-    const REMAINING: &str = "installed resource component and connection parity remains open";
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("resource_network_fixture.p4k");
     let database = [COMPONENT, POWER, HEAT]
@@ -54,10 +53,10 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
     let parsed = session.parsed(None)?;
     Ok([
         parsed.with_resource_components(CatalogRecordSelection::All, None, |snapshot| {
-            Route::queried_rows(RESOURCE_COMPONENTS, snapshot.rows(), REMAINING)
+            Route::queried_rows(RESOURCE_COMPONENTS, snapshot.rows(), None)
         })??,
         parsed.with_resource_connections(CatalogRecordSelection::All, None, |snapshot| {
-            Route::queried_rows(RESOURCE_CONNECTIONS, snapshot.rows(), REMAINING)
+            Route::queried_rows(RESOURCE_CONNECTIONS, snapshot.rows(), None)
         })??,
         global_route()?,
     ])

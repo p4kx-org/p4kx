@@ -34,18 +34,14 @@ pub(super) fn read() -> TestResult<[Route; 6]> {
             Route::queried_rows(
                 "/declarations/resourceNetworkLinks",
                 snapshot.rows(),
-                REMAINING,
+                "complete same-Build producer parity with nine-owner ATLS admission remains open",
             )
         })??,
         parsed.with_room_associations(selection, None, |snapshot| {
-            Route::queried_rows("/declarations/roomAssociations", snapshot.rows(), REMAINING)
+            Route::queried_rows("/declarations/roomAssociations", snapshot.rows(), None)
         })??,
         parsed.with_item_room_associations(selection, None, |snapshot| {
-            Route::queried_rows(
-                "/declarations/itemRoomAssociations",
-                snapshot.rows(),
-                REMAINING,
-            )
+            Route::queried_rows("/declarations/itemRoomAssociations", snapshot.rows(), None)
         })??,
         Route::queried_rows(
             "/placements/resourceNetworkNodes",

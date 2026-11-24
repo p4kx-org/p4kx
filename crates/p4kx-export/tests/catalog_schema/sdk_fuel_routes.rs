@@ -17,7 +17,6 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
     const TANK: &str = "SCItemFuelTankParams";
     const INTAKE: &str = "SCItemFuelIntakeParams";
     const CONTAINER: &str = "ResourceContainer";
-    const REMAINING: &str = "installed fuel and resource container parity remains open";
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("fuel_sdk_fixture.p4k");
     let database = [TANK, INTAKE, CONTAINER]
@@ -51,13 +50,13 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
     let selection = CatalogRecordSelection::All;
     Ok([
         parsed.with_fuel_tanks(selection, None, |snapshot| {
-            Route::queried_rows(FUEL_TANKS, snapshot.rows(), REMAINING)
+            Route::queried_rows(FUEL_TANKS, snapshot.rows(), None)
         })??,
         parsed.with_fuel_intakes(selection, None, |snapshot| {
-            Route::queried_rows(FUEL_INTAKES, snapshot.rows(), REMAINING)
+            Route::queried_rows(FUEL_INTAKES, snapshot.rows(), None)
         })??,
         parsed.with_resource_containers(selection, None, |snapshot| {
-            Route::queried_rows(RESOURCE_CONTAINERS, snapshot.rows(), REMAINING)
+            Route::queried_rows(RESOURCE_CONTAINERS, snapshot.rows(), None)
         })??,
     ])
 }
