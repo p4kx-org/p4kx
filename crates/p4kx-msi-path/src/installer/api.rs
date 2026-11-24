@@ -4,7 +4,11 @@
 use std::ffi::OsString;
 use std::fmt;
 
+#[cfg(windows)]
+use crate::installer::driver::DriverError;
 use crate::installer::notification::{Failure, Report};
+#[cfg(windows)]
+use crate::installer::registry_adapter::AdapterFault;
 
 /// A private installer failure retaining its typed original cause.
 pub struct Error {
@@ -16,12 +20,21 @@ enum ErrorKind {
     #[cfg(windows)]
     Arguments(crate::installer::fault::Fault),
     #[cfg(windows)]
-    Operation(
-        crate::installer::driver::DriverError<crate::installer::registry_adapter::AdapterFault>,
-    ),
+    Operation(DriverError<AdapterFault>),
 }
 
 impl Error {
+    /// Returns the private process status for a Registry stage and exact native error code.
+    #[cfg(windows)]
+    #[must_use]
+    pub fn registry_process_status(&self) -> Option<i32> {
+        let ErrorKind::Operation(DriverError::Store(AdapterFault::Registry(error))) = &self.kind
+        else {
+            return None;
+        };
+        error.process_status()
+    }
+
     /// Returns an error for a platform without the Windows MSI adapter.
     #[must_use]
     pub const fn unsupported_platform() -> Self {

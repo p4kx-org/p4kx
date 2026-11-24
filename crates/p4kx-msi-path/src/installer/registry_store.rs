@@ -40,18 +40,23 @@ pub(crate) struct RegistrySnapshot {
 }
 
 #[derive(Debug, Clone, Copy)]
+#[repr(i32)]
 pub(crate) enum Stage {
-    Begin,
-    OpenPath,
-    OpenState,
-    OpenBinding,
-    ReadSize,
-    ReadValue,
-    WritePath,
-    WriteState,
-    WriteBinding,
-    Commit,
+    Begin = 1,
+    OpenPath = 2,
+    OpenState = 3,
+    OpenBinding = 4,
+    ReadSize = 5,
+    ReadValue = 6,
+    WritePath = 7,
+    WriteState = 8,
+    WriteBinding = 9,
+    Commit = 10,
 }
+
+const REGISTRY_STATUS_TAG: i32 = 0x4000_0000;
+const STAGE_SHIFT: u32 = 24;
+const MAX_NATIVE_STATUS: i32 = (1 << STAGE_SHIFT) - 1;
 
 #[derive(Debug)]
 pub(crate) enum RegistryFault {
@@ -59,6 +64,19 @@ pub(crate) enum RegistryFault {
     Limit,
     UnsupportedType,
     Conflict,
+}
+
+impl RegistryFault {
+    pub(crate) fn process_status(&self) -> Option<i32> {
+        let Self::Io { stage, source } = self else {
+            return None;
+        };
+        let raw = source.raw_os_error()?;
+        if !(0..=MAX_NATIVE_STATUS).contains(&raw) {
+            return None;
+        }
+        Some(REGISTRY_STATUS_TAG | ((*stage as i32) << STAGE_SHIFT) | raw)
+    }
 }
 
 impl std::fmt::Display for RegistryFault {
@@ -279,3 +297,7 @@ fn replace(
 const fn fault(stage: Stage, source: io::Error) -> RegistryFault {
     RegistryFault::Io { stage, source }
 }
+
+#[cfg(test)]
+#[path = "registry_status_tests.rs"]
+mod registry_status_tests;

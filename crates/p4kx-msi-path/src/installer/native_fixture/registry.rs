@@ -12,10 +12,19 @@ use super::{FixtureGuard, FixtureImage, FixtureKeys, FixtureValue, KeyPresence};
 
 pub(super) fn capture(guard: &FixtureGuard) -> io::Result<FixtureImage> {
     guard.active()?;
-    let transaction = Transaction::new()?;
+    let transaction =
+        Transaction::new().inspect_err(|source| report_capture_failure(Stage::Begin, source))?;
     let result = read(&transaction)?;
-    transaction.commit()?;
+    transaction
+        .commit()
+        .inspect_err(|source| report_capture_failure(Stage::Commit, source))?;
     Ok(result)
+}
+
+fn report_capture_failure(stage: Stage, source: &io::Error) {
+    use std::io::Write as _;
+
+    let _written = writeln!(io::stderr().lock(), "Registry capture {stage:?}: {source}");
 }
 
 pub(super) fn replace(

@@ -33,9 +33,9 @@ Registry fixture commands and do not establish native transaction or installer b
 
 ## Private helper process status
 
-The Windows helper preserves the operation's original success or failure and error output.
-Success returns 0; a failure without an observed notification failure returns 1. Notification
-diagnostics use the same callback result, without another send or a change to rollback policy.
+The Windows helper preserves the operation's success, failure and error output. Success returns 0.
+A failure without an encodable Registry or notification diagnostic returns 1. Notification
+diagnostics use the existing callback result without sending another notification.
 
 | Status | Observed notification result |
 | --- | --- |
@@ -48,6 +48,12 @@ diagnostics use the same callback result, without another send or a change to ro
 | `0x60000102` / `0x60000103` | Deadline without / with a timeout |
 | `0x60000104` / `0x60000105` | Window limit without / with a timeout |
 | `0x60000106` / `0x60000107` | Unrecognised enumeration stop without / with a timeout |
+
+Registry failures with an exact Win32 code from `0` through `0x00ffffff` use
+`0x40000000 | (stage << 24) | code`. The low 24 bits hold the native code. Stage numbers 1
+through 10 are Begin, OpenPath, OpenState, OpenBinding, ReadSize, ReadValue, WritePath,
+WriteState, WriteBinding and Commit in that order. For example, `0x4a001a30` reports Commit
+with Win32 error 6704. Other Registry failures retain the generic failure status.
 
 Decode only the helper's actual process status in the MSI log, such as
 `CustomAction P4kxPathApply returned actual error code ...`. MSI's translated
@@ -92,7 +98,8 @@ ACLs, key classes and timestamps are outside the image contract. Restoration del
 originally absent key only when it is empty; foreign contents refuse the whole transaction.
 Every mutation compares and reads back the exact fixed image in one safe winreg transaction.
 Evidence uses exclusive file creation before mutation. A failed evidence write after commit
-remains a failure and requires a fresh capture before restoration.
+remains a failure and requires a fresh capture before restoration. Capture logs label native
+transaction creation and commit failures as Begin and Commit and retain the original errors.
 
 JSON is bounded to 40 MiB before parsing. PATH, WAL, Sequence and Binding slots retain their
 own bounds. Native read metadata and post-read checks do not prove a hard peak-allocation

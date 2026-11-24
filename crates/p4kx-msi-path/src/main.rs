@@ -4,7 +4,7 @@
 //! Maintains transactional per-user MSI PATH ownership.
 
 #[cfg(windows)]
-use p4kx_msi_path::notification;
+use p4kx_msi_path::{Error, notification};
 
 #[cfg(any(windows, test))]
 mod notification_recipient;
@@ -29,7 +29,13 @@ fn run() -> i32 {
         observed = notification_status::of(&notification);
         notification
     });
-    let status = notification_status::completed(result.is_ok(), observed);
+    let diagnostic = observed.or_else(|| {
+        result
+            .as_ref()
+            .err()
+            .and_then(Error::registry_process_status)
+    });
+    let status = notification_status::completed(result.is_ok(), diagnostic);
     let _reported = result.report();
     status
 }
