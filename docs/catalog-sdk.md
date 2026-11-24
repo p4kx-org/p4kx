@@ -2652,6 +2652,16 @@ The standalone verifier `c69801a87ad6a7a129e2af69a4473b53f408c2ba` checked
 three complete system roots on each Build. Each run used the original Archive and
 created no Catalog or row spool.
 
+One retained comparison per Build verified both complete Normal tables in the same stream.
+It checked physical occurrence identities, encounter order, authored values and the exact
+contributing source uses and physical sources. The original Archive and Build stamps
+remained stable, and both runs verified their sealed Normal frames.
+
+| Retained Build | Contributing source uses | Contributing physical sources | Peak private commit (bytes) | Peak working set (bytes) |
+| --- | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 690,538 | 10,121 | 953,085,952 | 956,334,080 |
+| PTU `13260598` | 910,628 | 10,685 | 973,496,320 | 989,425,664 |
+
 ## Typed location occurrences
 
 Use `starmap::read_location_instances` for the canonical `placements.locationInstances`

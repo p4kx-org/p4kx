@@ -16,9 +16,6 @@ use super::super::{
 };
 use super::{Route, TestResult};
 
-const REMAINING: &str =
-    "system-root and occurrence query available; root enumeration and installed parity open";
-
 pub(super) fn read(archive: &Archive, root_path: &str) -> TestResult<[Route; 5]> {
     let root = archive
         .entries()
@@ -50,7 +47,7 @@ pub(super) fn read(archive: &Archive, root_path: &str) -> TestResult<[Route; 5]>
         None,
     )?;
     Ok([
-        Route::queried_rows(CONTAINERS, &starmap.container_instances, REMAINING)?,
+        Route::queried_rows(CONTAINERS, &starmap.container_instances, None)?,
         Route::queried_rows(
             LOCATION_INSTANCES,
             &locations.location_instances,
@@ -66,6 +63,6 @@ pub(super) fn read(archive: &Archive, root_path: &str) -> TestResult<[Route; 5]>
             &documents.rows,
             "physical document selection and synthetic Catalog parity; installed normal-Catalog parity open",
         )?,
-        Route::queried_rows(UNRESOLVED, &starmap.unresolved_container_links, REMAINING)?,
+        Route::queried_rows(UNRESOLVED, &starmap.unresolved_container_links, None)?,
     ])
 }
