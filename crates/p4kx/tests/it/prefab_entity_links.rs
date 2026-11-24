@@ -123,16 +123,23 @@ fn assert_original_sites(report: &Value, bytes: &[u8]) -> TestResult {
                 ("target_id", "TargetId"),
                 ("version", "Version"),
             ] {
-                let (position, role) = match link.attributes().find(|at| at.name() == attribute) {
-                    Some(at) => (
-                        SourceLocation::xml_attribute(at.position(), attribute),
-                        "payload",
-                    ),
-                    None => (
-                        SourceLocation::xml_element(&link.position(), attribute),
-                        "conversion",
-                    ),
-                };
+                let (position, role) = link
+                    .attributes()
+                    .find(|at| at.name() == attribute)
+                    .map_or_else(
+                        || {
+                            (
+                                SourceLocation::xml_element(&link.position(), attribute),
+                                "conversion",
+                            )
+                        },
+                        |at| {
+                            (
+                                SourceLocation::xml_attribute(at.position(), attribute),
+                                "payload",
+                            )
+                        },
+                    );
                 assert_site(
                     report,
                     &format!("{path}/{field}"),

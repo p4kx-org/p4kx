@@ -67,8 +67,14 @@ link groups and from 77 to 78 links. The selected `TargetId` matches zero
 and in the complete library. The generic XML export shows the new link. The
 typed Prefab dump exposes ordered link groups for objects in its resolved
 output, with the original attribute values and available source coordinates.
-Synthetic text and CryXml fixtures cover this projection. The identity
-domain of `TargetId` remains unknown.
+Synthetic text and CryXml fixtures cover the projection. On installed PTU
+`13260598`, the normal JSON dump projected the selected Prefab's one link
+group and one link. Eight other objects in the same Prefab omitted the group
+field. A separate reader verified the three CryXml attribute positions against
+the original 1,754,651-byte Entry and its CRC-32C. The group had complete
+observed membership. The outer collection reported incomplete coverage after
+its reader filtered other direct children. The identity domain of `TargetId`
+remains unknown.
 
 ### Complete packaged Normal Catalog
 
