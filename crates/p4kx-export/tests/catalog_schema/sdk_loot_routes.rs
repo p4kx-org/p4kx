@@ -96,6 +96,19 @@ const fn fixture(
     }
 }
 
+const fn definition_remaining(family: LootDefinitionKind) -> Option<&'static str> {
+    match family {
+        LootDefinitionKind::Table
+        | LootDefinitionKind::Archetype
+        | LootDefinitionKind::PoolFilter
+        | LootDefinitionKind::SecondaryChoiceSingleLayer
+        | LootDefinitionKind::SecondaryChoiceMultiLayer
+        | LootDefinitionKind::Theme
+        | LootDefinitionKind::GlobalParams => None,
+        _ => Some(REMAINING),
+    }
+}
+
 pub(super) fn datasets() -> impl Iterator<Item = &'static str> {
     FIXTURES.iter().map(|fixture| fixture.path).chain([
         TABLES,
@@ -137,7 +150,8 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
             CatalogRecordSelection::All,
             None,
             |snapshot| {
-                routes.push(Route::queried_rows(row.path, &snapshot.rows, REMAINING)?);
+                let remaining = definition_remaining(row.family);
+                routes.push(Route::queried_rows(row.path, &snapshot.rows, remaining)?);
                 match row.family {
                     LootDefinitionKind::Table => {
                         routes.push(Route::queried_rows(TABLES, &snapshot.tables, REMAINING)?);

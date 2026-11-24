@@ -1094,6 +1094,16 @@ checks was 1,114,980,352 bytes and peak working set was 1,032,081,408 bytes.
 | `lootThemes` | 0 absent | 51 |
 | `lootGenerationGlobalParams` | 1 | 1 |
 
+The same verifier matched the seven ordered tables and their availability to
+each completed Normal Catalog. It bound 30,858 contributing uses on LIVE and
+38,965 on PTU, each with one original physical source. The binary SHA-256 was
+`8779adcee241c5c1ad8d98d6880a0879b306276a48ae8d19e6824b7932610152`.
+
+| Build | Normal producer | Elapsed seconds | Peak private commit (bytes) | Peak working set (bytes) |
+| --- | --- | ---: | ---: | ---: |
+| LIVE `13220821` | `23addc5e164f65a28a6f258302b30453b331edce` | 3,846.365 | 1,145,274,368 | 1,151,479,808 |
+| PTU `13260598` | `93d92ca20bef8a8c3731339214a3301124ade7ba` | 3,972.778 | 1,216,712,704 | 1,221,267,456 |
+
 ## Harvestable slot-preset queries
 
 Use `catalog_queries::loot::with_loot_definitions` with
