@@ -57,6 +57,15 @@ blend declaration. A direct base clip remains unidentified in the inspected
 declarations. Binding the scope to a physical rig and its owning DBA or CAF, and
 discriminating the composition order in an observed pose, remain open under #668.
 
+The retained original payloads also contain a separate fragment outside that
+single-layer scope. Re-decoding the byte-identical databases found 64 options
+per Build. Exactly one option declared two direct animation layers with
+different named clips and two blend declarations. Both original controllers
+resolve the fragment to a declared scope. Its layer declarations provide no
+additive flag or explicit base selector. The scope and context definitions
+supply no physical rig or clip path. The option identifies a source candidate
+for binding to a rig and original clip headers before comparing a game pose.
+
 ## Consequences
 
 - `AnimationInfo` has public fields and is `#[non_exhaustive]`; `ModelInfo::of_listing` takes the
