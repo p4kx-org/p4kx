@@ -193,7 +193,7 @@ fn binding<'a>(manifest: &'a Value, path: &str) -> Result<&'a Value, Box<dyn std
         .ok_or_else(|| "bound node".into())
 }
 
-fn row<'a>(
+pub(super) fn row<'a>(
     provenance: &'a Value,
     table: &str,
     index: &Value,
@@ -204,7 +204,7 @@ fn row<'a>(
         .ok_or_else(|| "provenance row".into())
 }
 
-fn source_use<'a>(
+pub(super) fn source_use<'a>(
     provenance: &'a Value,
     origin: &Value,
 ) -> Result<&'a Value, Box<dyn std::error::Error>> {
@@ -220,7 +220,10 @@ fn source_use<'a>(
         .ok_or_else(|| "registered source use".into())
 }
 
-fn field<'a>(value: &'a Value, address: &str) -> Result<&'a Value, Box<dyn std::error::Error>> {
+pub(super) fn field<'a>(
+    value: &'a Value,
+    address: &str,
+) -> Result<&'a Value, Box<dyn std::error::Error>> {
     value
         .pointer(address)
         .ok_or_else(|| format!("missing expected field {address}").into())

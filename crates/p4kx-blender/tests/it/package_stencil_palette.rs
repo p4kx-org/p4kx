@@ -5,7 +5,7 @@ use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use p4kx_assembly::ArchiveModels;
+use p4kx_assembly::{ArchiveModels, Assembly};
 use p4kx_blender::{Manifest, PackageInfo, PaletteEntry, TextureUse};
 use p4kx_extraction::Archive;
 use p4kx_gltf::MaterialMode;
@@ -15,6 +15,9 @@ use p4kx_testkit::{
 };
 
 use crate::support::{self, TestResult};
+
+#[path = "package_stencil_palette_fitted.rs"]
+mod fitted;
 
 const MODEL: &str = "Objects/Test/stencil.cgf";
 const MATERIAL_PATH: &str = "Objects/Test/stencil";
@@ -56,33 +59,48 @@ fn stencil_palette_colours_are_projected_into_glb_and_the_blender_package() -> T
 fn archive_case(archive: &Archive, class: &str, package: &Path) -> TestResult {
     let models = ArchiveModels::new(archive);
     let assembly = support::assemble(archive, class)?;
+    let painted = class == PAINTED;
+    let manifest = export_case(&assembly, &models, package, painted)?;
+    verify_package(&manifest, painted)
+}
+
+fn export_case(
+    assembly: &Assembly,
+    models: &ArchiveModels<'_>,
+    package: &Path,
+    painted: bool,
+) -> Result<Manifest, Box<dyn Error>> {
     let textures = models.textures();
     let options = support::glb_options(0).with_materials(MaterialMode::Textures);
     let mut glb = Vec::new();
     let summary = assembly.write_glb_with(&options, &textures, &mut glb)?;
     assert!(
         summary.texture_fallbacks.is_empty(),
-        "{class}: the packed stencil is read"
+        "the packed stencil is read by the normal GLB writer"
     );
-    verify_glb(&glb, class == PAINTED)?;
+    verify_glb(&glb, painted)?;
     p4kx_blender::write_package(
-        &assembly,
-        &models,
+        assembly,
+        models,
         &textures,
         &options,
         &PackageInfo::default(),
         package,
         &support::never,
     )?;
-    let manifest: Manifest = serde_json::from_slice(&fs::read(package.join("scene.json"))?)?;
-    verify_package(&manifest, class == PAINTED)
+    Ok(serde_json::from_slice(&fs::read(
+        package.join("scene.json"),
+    )?)?)
 }
 
 fn verify_glb(bytes: &[u8], painted: bool) -> TestResult {
     let glb = p4kx_testkit::check_glb(bytes)?;
     let material = glb
         .document
-        .materials()
+        .nodes()
+        .filter_map(|node| node.mesh())
+        .flat_map(|mesh| mesh.primitives())
+        .map(|primitive| primitive.material())
         .find(|material| material.name() == Some(MATERIAL_NAME))
         .ok_or("drawn synthetic stencil material")?;
     let pbr = material.pbr_metallic_roughness();
@@ -111,17 +129,20 @@ fn verify_glb(bytes: &[u8], painted: bool) -> TestResult {
         [0, 0, 0, 0],
         [255, 0, 0, 128],
     ];
-    for (cell, (texel, [red, ..])) in expected.into_iter().zip(MASKS).enumerate() {
+    for (cell, (texel, mask)) in expected.into_iter().zip(MASKS).enumerate() {
+        let [red, ..] = mask;
         let want = if painted { texel } else { [255, 255, 255, red] };
         let x = u32::try_from(cell * CELL + CELL / 2)?;
         let pixel = image
             .pixel(x, 0)
             .ok_or("a texel for each authored mask case")?;
+        let tolerance = u8::from(painted && mask == [255, 0, 128]);
         assert!(
             pixel
                 .into_iter()
                 .zip(want)
-                .all(|(actual, expected)| actual.abs_diff(expected) <= 1),
+                .zip([tolerance, tolerance, tolerance, 0])
+                .all(|((actual, target), limit)| actual.abs_diff(target) <= limit),
             "stencil cell {cell}: actual {pixel:?}, expected {want:?}, painted={painted}"
         );
     }
@@ -186,7 +207,6 @@ fn verify_package(manifest: &Manifest, painted: bool) -> TestResult {
 }
 
 fn entries() -> Result<Vec<TestEntry>, Box<dyn Error>> {
-    let model = TestModel::cube();
     let paint = TestEntity::new(0x9702, PAINTED, "entities/scitem/test_stencil_painted.xml")
         .geometry(MODEL, Some(MATERIAL_PATH))
         .palette(COLOUR_GUID, "");
@@ -208,6 +228,13 @@ fn entries() -> Result<Vec<TestEntry>, Box<dyn Error>> {
             DECALS,
         ))
         .build();
+    let mut entries = stencil_assets()?;
+    entries.push(TestEntry::zstd("Data/Game2.dcb", database));
+    Ok(entries)
+}
+
+fn stencil_assets() -> Result<Vec<TestEntry>, Box<dyn Error>> {
+    let model = TestModel::cube();
     let stencil = TestMtlMaterial::new(MATERIAL_NAME)
         .shader("MeshDecal")
         .specular([0.0; 3])
@@ -228,7 +255,6 @@ fn entries() -> Result<Vec<TestEntry>, Box<dyn Error>> {
         TestEntry::stored(format!("Data/{MATERIAL_PATH}.cgfm"), model.cgfm()),
         TestEntry::stored(format!("Data/{MATERIAL_PATH}.mtl"), library.cryxml()),
         TestEntry::stored(format!("Data/{TEXTURE}"), mask_texture()?),
-        TestEntry::zstd("Data/Game2.dcb", database),
     ])
 }
 
