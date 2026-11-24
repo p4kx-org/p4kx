@@ -509,6 +509,15 @@ Starmap links and original localization used by the mining SDK.
 The two checks use the measured Windows portable producer at `25287d184`.
 Additional SDK occurrences follow the separate SDK reach described above.
 Decoded stream lengths matched the producer receipts.
+
+On PTU `13260598`, the shared Mining query matched the full ordered Catalog
+arrays for `/mineableElements` (43 rows), `/mineableCompositions` (231 rows)
+and `/harvestableProviderPresets` (49 rows), including embedded source-use
+references. The verifier `e35bde456` read the Normal Catalog from producer
+`5d3d917f4` in 1,877.068 seconds with 1,869,099,008 peak private bytes,
+including the stream replay. This proves the shared row projection. The
+standalone All selectors, physical inventory equality and per-query cold
+measurements require their own installed verification.
 [Measured producer and streaming method](catalog-partitioning.md#system-memory-acceptance)
 The synthetic `consumer_refresh` integration cases show how one parsed view can serve several
 queries in one refresh. They resolve a reward source to its physical pool and Blueprint and
@@ -2682,8 +2691,8 @@ The LIVE `13220821` census read all nine ATLS owner bodies and found no
 components that could add rows to `roomAssociations` or `itemRoomAssociations`.
 The complete same-Build comparison above therefore covers both declarations
 with the expanded ATLS owner selection. All nine owners had an original port
-container with network-link members. `resourceNetworkLinks` still requires a
-comparison with a complete same-Build Catalog that includes all nine owners.
+container with network-link members. The complete LIVE `13220821` comparison
+covers all 14,024 `resourceNetworkLinks` rows with those owners included.
 
 On PTU `13260598`, the [resource supply comparison](catalog-fuel-capacity.md#installed-sdk-parity)
 covered all five tables before the ATLS selection expanded from four to nine owners.
