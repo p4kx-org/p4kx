@@ -2555,6 +2555,18 @@ availability. An observed missing target with complete lookup evidence contribut
 unresolved row without making traversal incomplete. Commit caller-owned results after the
 visit succeeds and its terminal coverage passes the caller's requirements.
 
+A fresh Windows AMD64 process visited both tables for each installed Build.
+The unresolved counts contain only links with conclusive missing-target evidence.
+
+| Build | Resolved instances | Unresolved links | Peak private commit (bytes) | Peak working set (bytes) |
+| --- | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 196,706 | 3 | 952,983,552 | 955,281,408 |
+| PTU `13260598` | 230,321 | 9 | 973,496,320 | 975,523,840 |
+
+The standalone verifier `c69801a87ad6a7a129e2af69a4473b53f408c2ba` checked
+three complete system roots on each Build. Each run used the original Archive and
+created no Catalog or row spool.
+
 ## Typed location occurrences
 
 Use `starmap::read_location_instances` for the canonical `placements.locationInstances`
@@ -2960,6 +2972,18 @@ The test selects one physical Item per original missile signal family. It
 builds filtered Catalog excerpts in memory and checks each against a query
 for the same Record. This verifies selected rows and their field origins.
 Full-Catalog parity and system-memory acceptance require separate runs.
+
+The all-Record cold queries ran separately in fresh Windows AMD64 processes.
+Missile configuration was available with 67 rows on both Builds. The Explosion
+definition type was declared with no admitted rows on either Build, so its
+availability was `Available` with an empty table.
+
+| Build | Missile peak private commit (bytes) | Explosion definition peak private commit (bytes) |
+| --- | ---: | ---: |
+| LIVE `13220821` | 1,091,457,024 | 1,091,448,832 |
+| PTU `13260598` | 1,114,476,544 | 1,114,427,392 |
+
+The verifier was `c69801a87ad6a7a129e2af69a4473b53f408c2ba`.
 
 ## Jump drives and quantum interdiction
 
