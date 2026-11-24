@@ -1517,6 +1517,21 @@ cargo test --locked -p p4kx-export --test real_archive -- `
     --ignored --exact --test-threads=1
 ```
 
+The original-source witness at `0b64a4a3c` checked one physical occurrence and 19 nested
+values per Build on LIVE `13165946` and PTU `13228337`.
+
+For complete table parity, set `P4KX_DATA_P4K` and `P4KX_CATALOG_MEASUREMENT_DIR` to the
+matching installed Archive and completed Normal measurement. Set
+`P4KX_VEHICLE_ARMOR_CATALOG_PRODUCER_REVISION` to the measurement's exact producer revision.
+This test reads every typed Vehicle Armor row and compares original component positions, row
+order, availability and source uses with `/configurations/vehicleArmor` in the retained artifact.
+
+```powershell
+cargo test --locked -p p4kx-export --test real_archive -- `
+    real_archive_vehicle_armor::parity::installed_vehicle_armor_matches_retained_complete_catalog `
+    --ignored --exact --nocapture --test-threads=1
+```
+
 The installed resource-network test compares original resource-state order, power and heat fields,
 and their physical source coordinates for selected catalog-eligible owners. It uses one decoded
 DataForge Entry and prints the Build and aggregate counts.

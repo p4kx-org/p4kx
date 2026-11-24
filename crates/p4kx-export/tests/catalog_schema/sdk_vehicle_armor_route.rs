@@ -43,7 +43,7 @@ pub(super) fn read() -> TestResult<Route> {
         Route::queried_rows(
             VEHICLE_ARMOR,
             snapshot.rows(),
-            "installed vehicle armor parity remains open",
+            "selected installed original-field witness available; complete retained Normal parity and cold SDK measurement remain open",
         )
     })?
 }
