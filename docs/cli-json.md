@@ -2925,11 +2925,11 @@ input has an unknown marker and an incomplete source set for these fields. The M
 `list_model_items` chunks section uses the same evidence with page-local field addresses.
 `usage` is `read` when the model was read from it, `skipped` for a known type the model does not
 read and `unknown` for an unknown type.
-An installed Archive check on LIVE 13220821 and PTU 13260598 verified all 20 numeric type
-words for one model on each Build. Each source-use reference selected the expected physical
-Entry. An independent table read of seven checksum-verified Entries per Build matched the
-reported four-byte ranges and decoded IDs. Synthetic tests additionally exercise the
-two-byte `CrCh` layout and page-local MCP addresses.
+Installed Archive checks on LIVE 13220821 and PTU 13260598 verified all 20 chunk rows of one
+model per Build. An independent table read from seven checksum-verified Entries per Build
+matched each four-byte type word, the header words for its contributing sources and the row's
+file-local ordinal. Each source-use reference selected the expected physical Entry. Synthetic
+tests additionally cover unknown type names, the two-byte `CrCh` layout and MCP page addresses.
 
 A geometry companion that does not exist exits with code 2, a corrupt or unreadable model or
 companion with 3. A `CrCh` model that is well-formed but has a layout the reader does not
