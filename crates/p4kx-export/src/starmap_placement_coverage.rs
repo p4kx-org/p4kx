@@ -62,10 +62,7 @@ impl ContainerPlacementCoverage {
             && self.unreadable_containers == 0
             && self.missing_containers == 0
             && self.malformed_children == 0
-            && self.source_entries.failed_required_reads == 0
-            && self.source_entries.failed_projections == 0
-            && self.source_entries.failed_dependencies == 0
-            && self.source_entries.failed_selection_candidates == 0
+            && entry_counts_complete(&self.source_entries)
     }
 }
 
@@ -85,15 +82,12 @@ impl ContainerPlacementCoverage {
             && read.missing == 0
             && read.malformed == 0;
         let source_inventory_complete = directory_complete
-            && !ledger
-                .incomplete_inventories
-                .contains(&Kind::StarmapObjects)
+            && descriptor_inventory_complete(&ledger)
             && !matches!(
                 root,
                 ContainerRootStatus::Ambiguous | ContainerRootStatus::Unavailable
             );
-        let entries = export_health_entries::compile(ledger.entries)?;
-        let source_entries = export_health_entries::counts(Kind::StarmapObjects, &entries.sources)?;
+        let source_entries = compile_entry_counts(ledger)?;
         Ok(Self {
             root,
             source_inventory_complete,
@@ -106,4 +100,27 @@ impl ContainerPlacementCoverage {
             source_entries,
         })
     }
+}
+
+pub(super) fn descriptor_inventory_complete(ledger: &ExportLedger) -> bool {
+    !ledger
+        .incomplete_inventories
+        .contains(&Kind::StarmapObjects)
+}
+
+pub(super) fn compile_entry_counts(
+    ledger: ExportLedger,
+) -> Result<ExportEntryCounts, CatalogError> {
+    let entries = export_health_entries::compile(ledger.entries)?;
+    Ok(export_health_entries::counts(
+        Kind::StarmapObjects,
+        &entries.sources,
+    )?)
+}
+
+pub(super) const fn entry_counts_complete(counts: &ExportEntryCounts) -> bool {
+    counts.failed_required_reads == 0
+        && counts.failed_projections == 0
+        && counts.failed_dependencies == 0
+        && counts.failed_selection_candidates == 0
 }

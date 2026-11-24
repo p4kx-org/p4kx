@@ -6,6 +6,7 @@ use std::sync::Arc;
 
 use p4kx_extraction::{Archive, CancelToken, Guid, SourceUse, SourcedValue};
 
+use crate::catalog_queries::starmap::{ContainerPlacementEvent, ContainerPlacementRowCounts};
 use crate::catalog_read::original::{AuthoredEntryPath, EntryCapture, PhysicalEntryRef};
 use crate::catalog_rows::spool::RowSpoolWriter;
 use crate::harvest_locations::HarvestSurvey;
@@ -50,6 +51,7 @@ pub(crate) struct SystemRead {
     pub(crate) malformed: usize,
     pub(crate) routes_incomplete: bool,
     pub(crate) placement_budget_exhausted: bool,
+    pub(crate) visited_container_rows: ContainerPlacementRowCounts,
     pub(crate) named: usize,
     pub(crate) deepest: usize,
     pub(crate) report: StarmapReport,
@@ -230,6 +232,9 @@ impl ObjectSelection<'_> {
     }
 }
 
+pub(crate) type ContainerPlacementSink<'writer> =
+    dyn FnMut(ContainerPlacementEvent<'_>) -> Result<(), CatalogError> + 'writer;
+
 pub(crate) enum PlacementRows<'writer> {
     Spool {
         containers: &'writer mut RowSpoolWriter,
@@ -240,6 +245,7 @@ pub(crate) enum PlacementRows<'writer> {
     Typed,
     Harvest(&'writer HarvestSurvey<'writer>),
     Selected(&'writer mut SelectedPlacementRows),
+    ContainerVisitor(&'writer mut ContainerPlacementSink<'writer>),
     OpenedContainers,
     Object(ObjectSelection<'writer>),
     ShopNames(&'writer [Guid]),
@@ -254,7 +260,7 @@ impl PlacementRows<'_> {
             Self::Harvest(_) | Self::OpenedContainers | Self::Object(_) | Self::ShopNames(_) => {
                 false
             }
-            Self::Spool { .. } => true,
+            Self::Spool { .. } | Self::ContainerVisitor(_) => true,
             #[cfg(test)]
             Self::Typed => true,
         }
@@ -264,7 +270,7 @@ impl PlacementRows<'_> {
         match self {
             Self::Object(selection) => selection.matches(guid),
             Self::ShopNames(guids) => guids.binary_search(&guid).is_ok(),
-            Self::Selected(_) | Self::OpenedContainers => false,
+            Self::Selected(_) | Self::OpenedContainers | Self::ContainerVisitor(_) => false,
             Self::Spool { .. } | Self::Harvest(_) => true,
             #[cfg(test)]
             Self::Typed => true,
@@ -345,7 +351,10 @@ impl System<'_> {
                 });
                 self.read.containers.push(opened);
             }
-        } else if !matches!(&self.rows, PlacementRows::Selected(_)) {
+        } else if !matches!(
+            &self.rows,
+            PlacementRows::Selected(_) | PlacementRows::ContainerVisitor(_)
+        ) {
             self.read.containers.push(opened);
         }
         self.read.deepest = self.read.deepest.max(path.external);

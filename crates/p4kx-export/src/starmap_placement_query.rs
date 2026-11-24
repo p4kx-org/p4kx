@@ -34,6 +34,12 @@ mod jump_inventory;
 #[path = "starmap_object_placement_query.rs"]
 mod object_placements;
 
+#[path = "starmap_system_root_inventory.rs"]
+mod system_roots;
+
+#[path = "starmap_container_placement_visit.rs"]
+mod container_visit;
+
 pub use crate::catalog_projections::JumpConnection;
 pub use crate::catalog_read::original::{PhysicalEntryRef, SourcedXmlAttribute};
 pub use crate::catalog_table::DatasetAvailability;
@@ -72,6 +78,14 @@ pub use locations::{
 pub use object_placements::{
     StarmapObjectPlacementCoverage, StarmapObjectPlacementSnapshot, StarmapObjectPlacementStatus,
     read_starmap_object_placement,
+};
+
+pub use container_visit::{
+    ContainerPlacementEvent, ContainerPlacementRootCoverage, ContainerPlacementRootVisit,
+    ContainerPlacementRowCounts, ContainerPlacementVisitSummary, visit_container_placements,
+};
+pub use system_roots::{
+    ContainerSystemRoot, ContainerSystemRootInventory, read_container_system_roots,
 };
 
 /// A canonical physical system root or a Child route within it.

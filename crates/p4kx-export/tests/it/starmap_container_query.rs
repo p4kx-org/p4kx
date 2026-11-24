@@ -17,6 +17,12 @@ mod location_physics;
 #[path = "starmap_location_instance_query.rs"]
 mod location_instances;
 
+#[path = "starmap_system_root_inventory.rs"]
+mod system_roots;
+
+#[path = "starmap_container_placement_visit.rs"]
+mod visit;
+
 use crate::health_origin_assertions as proof;
 use crate::health_origin_fixture::{self as fixture, Fixture, Input, TestResult};
 

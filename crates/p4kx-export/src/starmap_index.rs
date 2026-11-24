@@ -12,6 +12,11 @@ pub(crate) const SOCPAK: &str = ".socpak";
 const SYSTEM_SUFFIX: &str = "system.socpak";
 const UNREFERENCED_SAMPLE: usize = 200;
 
+pub(crate) enum SystemRootCandidates<'index> {
+    Unique(&'index usize),
+    Ambiguous(&'index [usize]),
+}
+
 /// The socpak Entries of an Archive by normalised path.
 pub(crate) struct Index<'a> {
     pub(crate) entries: &'a [Entry],
@@ -83,6 +88,18 @@ impl<'a> Index<'a> {
                 .root_candidates()
                 .find_map(|candidate| self.by_path.get_key_value(&key(&candidate)))
         })
+    }
+
+    pub(crate) fn system_root_candidates(
+        &self,
+        position: usize,
+    ) -> Option<SystemRootCandidates<'_>> {
+        let entry = self.entries.get(position)?;
+        match self.candidates(entry.path()) {
+            [] => None,
+            [unique] => Some(SystemRootCandidates::Unique(unique)),
+            candidates => Some(SystemRootCandidates::Ambiguous(candidates)),
+        }
     }
 
     /// Returns the folder name and the Entry of the main container of every star system, ordered

@@ -8,6 +8,7 @@
 pub(crate) enum DescriptorScope {
     Catalog { jump_endpoints: bool },
     ContainerPlacements,
+    ContainerRows,
     LocationPlacements,
     ShopNames,
     Harvest,

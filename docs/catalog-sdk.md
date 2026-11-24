@@ -2524,6 +2524,12 @@ or an unavailable result when the required endpoint or partner scope is incomple
 
 ## Starmap container placements
 
+Use `starmap::read_container_system_roots` to enumerate the original root directory choices
+in the Normal writer's system order. Each normalized system folder retains the physical
+Entries at its winning path, including ambiguous choices, with original directory and Entry
+evidence. Check `directory_complete()` for complete enumeration and `is_complete()` for
+a unique observed candidate in every system. The root query reads directory metadata only.
+
 Use `starmap::read_container_placements` to read the canonical `placements.containerInstances` and
 `placements.unresolvedContainerLinks` rows for one original system root. Give a physical root Entry
 index to read a whole root. `ContainerPlacementSelection::Occurrence` selects all rows with the
@@ -2540,6 +2546,14 @@ The result carries Build, original provenance and selected-scope coverage. Check
 `coverage.is_complete()` before treating an empty row list as a confirmed absence. Root availability,
 Entry failures, malformed or blocked routes and caller-selected traversal allowances remain visible
 even if the query could emit some rows.
+
+Use `starmap::visit_container_placements` for both complete, unfiltered placement tables.
+Its visitor receives a single typed resolved or unresolved row in Normal traversal order.
+After each uniquely admitted root, `RootCompleted` supplies that root's coverage and original
+source inventory. The terminal summary retains the directory choices, row counts and table
+availability. An observed missing target with complete lookup evidence contributes an
+unresolved row without making traversal incomplete. Commit caller-owned results after the
+visit succeeds and its terminal coverage passes the caller's requirements.
 
 ## Typed location occurrences
 

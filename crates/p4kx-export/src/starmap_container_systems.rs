@@ -16,7 +16,7 @@ use crate::catalog_read::original::EntryCapture;
 use crate::catalog_rows::spool::RowSpoolWriter;
 use crate::entry_source;
 use crate::export_ledger::ExportLedger;
-use crate::starmap_index::Index;
+use crate::starmap_index::{Index, SystemRootCandidates};
 use crate::starmap_parse::{self, Body, DescriptorScope, DescriptorSurvey, Read};
 use crate::starmap_walk::{PlacementRows, System, SystemRead};
 use crate::{ExportAccountingError, Kind};
@@ -236,21 +236,21 @@ pub(crate) fn unique_system_roots(
 ) -> Result<Vec<(Arc<str>, usize)>, CatalogError> {
     let mut unique = Vec::with_capacity(roots.len());
     for (name, index_entry) in roots {
-        let entry = index
-            .entries
-            .get(index_entry)
+        let candidates = index
+            .system_root_candidates(index_entry)
             .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-        match index.candidates(entry.path()) {
-            [entry] => unique.push((name, *entry)),
-            [] => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
-            candidates => entry_source::record_ambiguous_outer_entries(
-                archive,
-                capture,
-                ledger,
-                Kind::StarmapObjects,
-                None,
-                candidates,
-            )?,
+        match candidates {
+            SystemRootCandidates::Unique(entry) => unique.push((name, *entry)),
+            SystemRootCandidates::Ambiguous(candidates) => {
+                entry_source::record_ambiguous_outer_entries(
+                    archive,
+                    capture,
+                    ledger,
+                    Kind::StarmapObjects,
+                    None,
+                    candidates,
+                )?;
+            }
         }
     }
     Ok(unique)

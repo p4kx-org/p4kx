@@ -4,6 +4,7 @@
 use std::sync::Arc;
 
 use super::{PlacementRows, PlacementTable, System, WalkPath};
+use crate::catalog_queries::starmap::ContainerPlacementEvent;
 use crate::starmap_containers::instance::{ContainerFile, ContainerOccurrence};
 use crate::starmap_containers::location_instance::LocationOccurrence;
 use crate::starmap_parse::Child;
@@ -30,9 +31,11 @@ impl System<'_> {
             world: path.transform,
         };
         let row = instance.project(file, self.capture)?;
-        self.read
-            .location_physics
-            .record(file.reference(), &file.location_physics)?;
+        if !matches!(&self.rows, PlacementRows::ContainerVisitor(_)) {
+            self.read
+                .location_physics
+                .record(file.reference(), &file.location_physics)?;
+        }
         match &mut self.rows {
             PlacementRows::Spool { containers, .. } => {
                 containers.append(&row, self.cancel).map_err(Into::into)
@@ -45,6 +48,10 @@ impl System<'_> {
             PlacementRows::Selected(rows) => {
                 rows.instances.push(row);
                 Ok(())
+            }
+            PlacementRows::ContainerVisitor(visit) => {
+                self.read.visited_container_rows.record_instance()?;
+                visit(ContainerPlacementEvent::Instance(&row))
             }
             PlacementRows::Harvest(_)
             | PlacementRows::OpenedContainers
@@ -100,6 +107,7 @@ impl System<'_> {
             }
             PlacementRows::Harvest(_)
             | PlacementRows::Selected(_)
+            | PlacementRows::ContainerVisitor(_)
             | PlacementRows::OpenedContainers
             | PlacementRows::Object(_)
             | PlacementRows::ShopNames(_) => {

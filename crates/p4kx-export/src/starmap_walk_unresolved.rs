@@ -4,6 +4,7 @@
 use std::borrow::Cow;
 
 use super::{PlacementRows, System, WalkPath};
+use crate::catalog_queries::starmap::ContainerPlacementEvent;
 use crate::starmap_containers::instance::ContainerFile;
 use crate::starmap_containers::unresolved::{ContainerTargetReadStatus, UnresolvedOccurrence};
 use crate::starmap_parse::Body;
@@ -66,6 +67,10 @@ impl System<'_> {
             PlacementRows::Selected(rows) => {
                 rows.unresolved.push(row);
                 Ok(())
+            }
+            PlacementRows::ContainerVisitor(visit) => {
+                self.read.visited_container_rows.record_unresolved_link()?;
+                visit(ContainerPlacementEvent::UnresolvedLink(&row))
             }
             PlacementRows::Harvest(_)
             | PlacementRows::OpenedContainers
