@@ -37,10 +37,12 @@ selects the running CPU's binary; the pinned nextest installer uses the runner a
 
 Test producers build all three applications and native test binaries. PE, ELF and Mach-O machine fields,
 compiler/nextest hosts, source commit, application version and SHA-256 digests identify the
-archive. The artifact and cache identities include the complete Rust target. Consumers validate
-the sidecar and archive hash before extracting or running tests.
+archive. The artifact and cache identities include the complete Rust target. Test execution
+validates the sidecar and archive hash before extracting or running tests. Windows and Linux
+download their target's archive on native partition runners. Apple Silicon validates and runs
+the complete archive on its native build runner, with one partition.
 
-The partitioned synthetic suite retains nextest process isolation. Explicit smoke steps require
+The synthetic suite retains nextest process isolation on all five targets. Explicit smoke steps require
 non-empty selections for CLI Archive listing, extraction and conversion; MCP initialization,
 tool listing and a read-only request; and GUI frames followed by exit. Windows and Linux check a
 software adapter. Linux uses native lavapipe for both the X11 window under Xvfb and the Wayland

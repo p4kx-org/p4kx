@@ -5,7 +5,11 @@ $ErrorActionPreference = 'Stop'
 $contract = Get-P4kxPlatformContract
 $include = @(foreach ($row in $contract.targets) {
     if ($Os -and $row.os -ne $Os) { continue }
-    $count = if ($row.os -eq 'windows' -and $row.arch -eq 'amd64') { 4 } else { 2 }
+    $count = switch ($row.target) {
+        'x86_64-pc-windows-msvc' { 4 }
+        'aarch64-apple-darwin' { 1 }
+        default { 2 }
+    }
     [ordered]@{
         target = $row.target
         runner = $row.runner

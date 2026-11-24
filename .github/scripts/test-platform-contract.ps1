@@ -33,8 +33,9 @@ foreach ($row in $contract.targets) {
 if ($names.Count -ne 13) { throw 'Required native package matrix is incomplete.' }
 $macos = & (Join-Path $PSScriptRoot 'read-platform-matrix.ps1') -Os macos | ConvertFrom-Json
 if (@($macos.include).Count -ne 1 -or $macos.include[0].target -cne 'aarch64-apple-darwin' -or
-    $macos.include[0].runner -cne 'macos-26') {
-    throw 'The macOS matrix must route only the Apple Silicon target on the minimum OS.'
+    $macos.include[0].runner -cne 'macos-26' -or $macos.include[0].count -ne 1 -or
+    ($macos.include[0].partitions -join ',') -cne '1') {
+    throw 'The Apple Silicon build runner must execute the complete native test suite in one partition.'
 }
 $current = Get-P4kxCurrentPlatform
 $other = $contract.targets | Where-Object target -CNE $current.target | Select-Object -First 1
