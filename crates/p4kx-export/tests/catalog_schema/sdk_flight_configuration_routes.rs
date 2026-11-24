@@ -23,8 +23,6 @@ mod values;
 const CONTROLLERS: &str = "/configurations/flightControllers";
 const IFCS: &str = "/configurations/ifcs";
 const THRUSTERS: &str = "/configurations/thrusters";
-const REMAINING: &str =
-    "physical query and synthetic parity available; installed and complete producer parity open";
 const ALL: CatalogRecordSelection = CatalogRecordSelection::All;
 
 pub(super) fn read() -> TestResult<Vec<Route>> {
@@ -34,13 +32,13 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     let parsed = session.parsed(None)?;
     Ok(vec![
         parsed.with_flight_controllers(ALL, None, |snapshot| {
-            Route::queried_rows(CONTROLLERS, snapshot.rows(), REMAINING)
+            Route::queried_rows(CONTROLLERS, snapshot.rows(), None)
         })??,
         parsed.with_ifcs(ALL, None, |snapshot| {
-            Route::queried_rows(IFCS, snapshot.rows(), REMAINING)
+            Route::queried_rows(IFCS, snapshot.rows(), None)
         })??,
         parsed.with_thrusters(ALL, None, |snapshot| {
-            Route::queried_rows(THRUSTERS, snapshot.rows(), REMAINING)
+            Route::queried_rows(THRUSTERS, snapshot.rows(), None)
         })??,
     ])
 }

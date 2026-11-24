@@ -32,11 +32,7 @@ pub(super) fn read() -> TestResult<Route> {
         None,
         |snapshot| {
             parity(LOOT_GENERATION, &snapshot, &catalog)?;
-            Route::queried_rows(
-                LOOT_GENERATION,
-                snapshot.rows(),
-                "synthetic producer parity witnessed; installed producer parity open",
-            )
+            Route::queried_rows(LOOT_GENERATION, snapshot.rows(), None)
         },
     )?
 }

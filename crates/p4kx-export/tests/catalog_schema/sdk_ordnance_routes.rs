@@ -34,7 +34,7 @@ pub(super) fn read() -> TestResult<[Route; 4]> {
             Route::queried_rows(EMP, snapshot.rows(), REMAINING)
         })??,
         parsed.with_explosives(all, None, |snapshot| {
-            Route::queried_rows(EXPLOSIVES, snapshot.rows(), INSTALLED_SELECTED)
+            Route::queried_rows(EXPLOSIVES, snapshot.rows(), None)
         })??,
         parsed.with_missile_configurations(all, None, |snapshot| {
             Route::queried_rows(MISSILE_CONFIGURATIONS, snapshot.rows(), INSTALLED_SELECTED)

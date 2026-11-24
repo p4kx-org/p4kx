@@ -2353,6 +2353,16 @@ before and after all twelve reads. The largest private commit was
 1,410,879,488 bytes and the largest working set was 1,382,797,312 bytes.
 The verifier was built from `914ca2681ec7dc0a4420350c7ba6da0a88237fbc`.
 
+The six tables also matched a single retained complete Normal Catalog per Build.
+The witness compared ordered values, availability and contributing source
+uses against the original producer, including the exact canonical exclusions.
+Each comparison used one Windows AMD64 worker.
+
+| Build | Normal producer revision | Elapsed (s) | Peak private commit (bytes) | Peak working set (bytes) |
+| --- | --- | ---: | ---: | ---: |
+| LIVE `13220821` | `23addc5e164f65a28a6f258302b30453b331edce` | 1,799.522 | 1,898,024,960 | 1,883,656,192 |
+| PTU `13260598` | `93d92ca20bef8a8c3731339214a3301124ade7ba` | 1,857.965 | 1,918,173,184 | 1,904,377,856 |
+
 ## Player weapon animation candidates
 
 Use `equipment::with_weapon_animation_candidates` to read the canonical

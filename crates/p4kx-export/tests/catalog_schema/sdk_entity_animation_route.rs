@@ -39,11 +39,7 @@ pub(super) fn read() -> TestResult<Route> {
     with_entity_animation_controllers_from(&archive, &entry, OWNER_SELECTION, None, |snapshot| {
         verify_fields(&snapshot)?;
         parity(DATASET, &snapshot, &catalog)?;
-        Route::queried_rows(
-            DATASET,
-            snapshot.rows(),
-            "synthetic producer and original locator provenance witnessed; installed producer parity open",
-        )
+        Route::queried_rows(DATASET, snapshot.rows(), None)
     })?
 }
 
