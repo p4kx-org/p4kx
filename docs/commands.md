@@ -1073,6 +1073,12 @@ When the full navigation evidence cannot fit in the existing response budget, th
 cursor report incomplete provenance and retain a proved encrypted contribution when one exists.
 The cursor resumes after the last returned animation.
 
+For `list_model_items` with `section: "unread_animations"`, the source field uses the
+selected Entry's directory path. CAF names use the same path. DBA names use the original
+name bytes, including names of clips whose tracks failed to decode. The additive reason
+identifies the evaluated flag word. Decode and read error reasons and navigation have
+incomplete origins. The provenance counts toward the response budget.
+
 For `mtl_summary`, `fieldOrigins` addresses the fields of the returned page, including each
 admitted texture, parameter and layer. `materialXmlElement` locations are zero-based element
 child ordinals from the original XML root. `materialXmlAttribute` appends the original attribute

@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::{Animation, AnimationClipCoordinates, AnimationDatabaseSelection, SkippedAnimation};
+use crate::{
+    Animation, AnimationClipCoordinates, AnimationDatabaseSelection, SkippedAnimation,
+    UnreadClipCoordinates,
+};
 
 /// A decoded clip paired with the source positions retained by that decode.
 #[derive(Debug, Clone)]
@@ -51,6 +54,15 @@ impl PositionedAnimation {
         self.coordinates.as_ref()
     }
 
+    /// Returns original name and flag positions for an additive rejection.
+    #[must_use]
+    pub fn additive_rejection(&self) -> Option<UnreadClipCoordinates> {
+        let clip = self.coordinates()?;
+        self.animation
+            .additive
+            .then(|| UnreadClipCoordinates::additive(self.clip_ordinal, clip))
+    }
+
     /// Returns the original controller ordinal of one decoded track.
     #[must_use]
     pub fn controller_ordinal(&self, track: usize) -> Option<usize> {
@@ -67,9 +79,16 @@ pub struct PositionedDba {
     /// The original clips that could not be decoded.
     pub skipped: Vec<SkippedAnimation>,
     pub(crate) selection: Option<AnimationDatabaseSelection>,
+    pub(crate) skipped_coordinates: Vec<UnreadClipCoordinates>,
 }
 
 impl PositionedDba {
+    /// Takes the retained name positions in the same order as the skipped clips.
+    #[must_use]
+    pub fn take_skipped_coordinates(&mut self) -> Vec<UnreadClipCoordinates> {
+        std::mem::take(&mut self.skipped_coordinates)
+    }
+
     /// Returns the selectors used to read the original database.
     #[must_use]
     pub const fn selection(&self) -> Option<&AnimationDatabaseSelection> {

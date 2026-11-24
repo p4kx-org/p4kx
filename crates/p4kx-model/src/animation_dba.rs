@@ -6,19 +6,24 @@ use std::sync::Arc;
 
 use p4kx_chunks::{ChunkFile, ivo};
 use p4kx_foundation::ByteReader;
-use rayon::prelude::*;
 
 use crate::animation_clip_coordinates::ClipChunks;
 use crate::animation_read::{
-    AnimationChunk, Block, MAX_ANIMATION_KEYS, MAX_DATABASE_KEYS, RECORD_LEN, TrackPositions,
-    build, check_budget, chunk_bytes, corrupt, declared_keys, decode_tracks, listed_tracks,
-    read_block, read_record, stem,
+    AnimationChunk, Block, MAX_ANIMATION_KEYS, MAX_DATABASE_KEYS, PositionCapture, RECORD_LEN,
+    build, check_budget, chunk_bytes, corrupt, declared_keys, listed_tracks, read_block,
+    read_record, stem,
 };
 use crate::reader::to_usize;
 use crate::{
     Animation, AnimationClipCoordinates, AnimationDatabaseSelection, AnimationError,
     AnimationHeader, CorruptAnimation, DbaHeaderDeclarations, PositionedAnimation, PositionedDba,
+    UnreadClipCoordinates,
 };
+
+#[path = "animation_dba_decode.rs"]
+mod decode;
+
+use decode::{DecodedClip, decode_clips};
 
 pub(crate) const DBA_DATA_VERSION: u32 = 0x900;
 pub(crate) const DBA_METADATA_VERSION: u32 = 0x902;
@@ -96,7 +101,7 @@ impl Dba {
             file_name,
             file,
             |animation, _, _, _| animation,
-            Capture::Off,
+            PositionCapture::Off,
         )?;
         Ok(Self {
             animations: decoded.animations,
@@ -112,15 +117,30 @@ impl Dba {
         file_name: &str,
         file: &ChunkFile<B>,
     ) -> Result<PositionedDba, AnimationError> {
-        let decoded = read_projected(
-            file_name,
-            file,
-            PositionedAnimation::new,
-            Capture::Positions,
-        )?;
+        Self::read_positioned(file_name, file, PositionCapture::Tracks)
+    }
+
+    /// Reads a DBA and retains the metadata positions of decoded and skipped clips.
+    ///
+    /// # Errors
+    /// As [`Self::read`].
+    pub fn read_with_clip_positions<B: AsRef<[u8]>>(
+        file_name: &str,
+        file: &ChunkFile<B>,
+    ) -> Result<PositionedDba, AnimationError> {
+        Self::read_positioned(file_name, file, PositionCapture::Clip)
+    }
+
+    fn read_positioned<B: AsRef<[u8]>>(
+        file_name: &str,
+        file: &ChunkFile<B>,
+        capture: PositionCapture,
+    ) -> Result<PositionedDba, AnimationError> {
+        let decoded = read_projected(file_name, file, PositionedAnimation::new, capture)?;
         Ok(PositionedDba {
             animations: decoded.animations,
             skipped: decoded.skipped,
+            skipped_coordinates: decoded.skipped_coordinates,
             selection: decoded.selection,
         })
     }
@@ -130,7 +150,7 @@ fn read_projected<B: AsRef<[u8]>, T>(
     file_name: &str,
     file: &ChunkFile<B>,
     project: impl Fn(Animation, usize, Vec<usize>, Option<AnimationClipCoordinates>) -> T,
-    capture: Capture,
+    capture: PositionCapture,
 ) -> Result<DecodedDatabase<T>, AnimationError> {
     let metadata = AnimationChunk::read(
         file_name,
@@ -140,9 +160,10 @@ fn read_projected<B: AsRef<[u8]>, T>(
         "DbaMetadata",
     )?;
     let data = AnimationChunk::read(file_name, file, ivo::DBA_DATA, DBA_DATA_VERSION, "DbaData")?;
-    let chunks = matches!(capture, Capture::Positions)
+    let chunks = capture
+        .includes_metadata()
         .then(|| AnimationChunk::observe(file, metadata, data));
-    read_database(metadata, data, project, chunks.as_ref())
+    read_database(metadata, data, project, chunks.as_ref(), capture)
         .map_err(|(chunk, source)| corrupt(file_name, chunk, source))
 }
 
@@ -160,15 +181,10 @@ struct DatabasePath {
     bytes: Range<usize>,
 }
 
-#[derive(Clone, Copy)]
-enum Capture {
-    Off,
-    Positions,
-}
-
 struct DecodedDatabase<T> {
     animations: Vec<T>,
     skipped: Vec<SkippedAnimation>,
+    skipped_coordinates: Vec<UnreadClipCoordinates>,
     selection: Option<AnimationDatabaseSelection>,
 }
 
@@ -177,62 +193,64 @@ fn read_database<T>(
     data: AnimationChunk<'_>,
     project: impl Fn(Animation, usize, Vec<usize>, Option<AnimationClipCoordinates>) -> T,
     chunks: Option<&Arc<ClipChunks>>,
+    capture: PositionCapture,
 ) -> Result<DecodedDatabase<T>, ChunkFailure> {
-    let Layout {
-        records,
-        paths,
-        blocks,
-        ..
-    } = layout(metadata.bytes, data.bytes, Some(MAX_DATABASE_KEYS))?;
-    let count = blocks.len();
-    let decoded: Vec<_> = blocks
-        .par_iter()
-        .zip(records.par_chunks_exact(RECORD_LEN))
-        .map(|(block, record)| {
-            let record = read_record(record)?;
-            check_budget(declared_keys(data.bytes, block)?, MAX_ANIMATION_KEYS)?;
-            let mut positions = chunks.as_ref().map(|_| TrackPositions::default());
-            let tracks = decode_tracks(data, block, &mut positions)?;
-            Ok::<_, CorruptAnimation>((record, tracks, positions))
-        })
-        .collect();
+    let layout = layout(metadata.bytes, data.bytes, Some(MAX_DATABASE_KEYS))?;
+    let decoded = decode_clips(&layout, data, capture);
     let mut dba = DecodedDatabase {
-        animations: Vec::with_capacity(count),
+        animations: Vec::with_capacity(layout.blocks.len()),
         skipped: Vec::new(),
+        skipped_coordinates: Vec::new(),
         selection: chunks.map(|chunks| AnimationDatabaseSelection {
             chunks: Arc::clone(chunks),
             count: metadata.offset..metadata.offset + size_of::<u32>() as u64,
         }),
     };
-    for (ordinal, ((path, block), result)) in
-        paths.into_iter().zip(&blocks).zip(decoded).enumerate()
-    {
+    let clips = layout.paths.into_iter().zip(&layout.blocks).zip(decoded);
+    for (ordinal, ((path, block), result)) in clips.enumerate() {
         let name = stem(&path.name).to_owned();
+        let path_bytes =
+            metadata.offset + path.bytes.start as u64..metadata.offset + path.bytes.end as u64;
         match result {
-            Ok((record, tracks, positions)) => {
-                let (ordinals, coordinates) = positions.zip(chunks).map_or_else(
+            Ok(DecodedClip {
+                timing,
+                tracks,
+                positions,
+            }) => {
+                let (ordinals, coordinates) = chunks.map_or_else(
                     || (Vec::new(), None),
-                    |(positions, chunks)| {
+                    |chunks| {
                         let timing =
                             metadata.offset + (METADATA_HEADER_LEN + ordinal * RECORD_LEN) as u64;
-                        let authored = Some(
-                            metadata.offset + path.bytes.start as u64
-                                ..metadata.offset + path.bytes.end as u64,
+                        let (ordinals, coordinates) = positions.unwrap_or_default().project(
+                            Arc::clone(chunks),
+                            timing,
+                            Some(path_bytes),
+                            data,
+                            block,
                         );
-                        let (ordinals, coordinates) =
-                            positions.project(Arc::clone(chunks), timing, authored, data, block);
                         (ordinals, Some(coordinates))
                     },
                 );
-                let animation = build(name, path.name, record, tracks);
+                let animation = build(name, path.name, timing, tracks);
                 dba.animations
                     .push(project(animation, ordinal, ordinals, coordinates));
             }
-            Err(reason) => dba.skipped.push(SkippedAnimation {
-                name,
-                path: path.name,
-                reason,
-            }),
+            Err(reason) => {
+                if let Some(chunks) = chunks.filter(|_| matches!(capture, PositionCapture::Clip)) {
+                    dba.skipped_coordinates.push(UnreadClipCoordinates {
+                        chunks: Arc::clone(chunks),
+                        ordinal,
+                        name: Some(path_bytes),
+                        flags: None,
+                    });
+                }
+                dba.skipped.push(SkippedAnimation {
+                    name,
+                    path: path.name,
+                    reason,
+                });
+            }
         }
     }
     Ok(dba)

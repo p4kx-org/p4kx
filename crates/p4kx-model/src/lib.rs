@@ -167,7 +167,7 @@ mod vector;
 pub use animation::{Animation, BoundTracks, Keys, Track};
 pub use animation_clip_coordinates::{
     AnimationChunkCoordinates, AnimationClipCoordinates, AnimationDatabaseSelection,
-    AnimationFrameChannel, AnimationLastFrame,
+    AnimationFrameChannel, AnimationLastFrame, UnreadClipCoordinates,
 };
 pub use animation_controller::{
     AnimationChannel, AnimationController, DecodedAnimationChannel, RotationIdentityEvidence,

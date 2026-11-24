@@ -3,10 +3,10 @@
 
 use p4kx_model::{
     Animation, AnimationDatabaseSelection, AnimationError, AnimationHeader, Dba, DbaHeaders,
-    PositionedAnimation, SkippedAnimation,
+    PositionedAnimation, SkippedAnimation, UnreadClipCoordinates,
 };
 
-use crate::{ChunkSource, ConversionError, UnreadAnimation};
+use crate::{ChunkSource, ConversionError, PositionedUnreadAnimation, UnreadAnimation};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Kind {
@@ -32,15 +32,16 @@ pub(crate) fn kind(path: &str) -> Option<Kind> {
 
 pub(crate) struct Loaded<T> {
     pub(crate) animations: Vec<T>,
-    pub(crate) unread: Vec<UnreadAnimation>,
+    pub(crate) unread: Vec<PositionedUnreadAnimation>,
     pub(crate) database: Option<AnimationDatabaseSelection>,
 }
 
 impl<T> Loaded<T> {
-    const fn new(animations: Vec<T>, unread: Vec<UnreadAnimation>) -> Self {
+    const fn new(animations: Vec<T>, unread: Vec<PositionedUnreadAnimation>) -> Self {
         Self {
             animations,
             unread,
+
             database: None,
         }
     }
@@ -50,6 +51,10 @@ pub(crate) trait Described {
     fn name(&self) -> &str;
     fn path(&self) -> &str;
     fn additive(&self) -> bool;
+
+    fn additive_coordinates(&self) -> Option<UnreadClipCoordinates> {
+        None
+    }
 }
 
 impl Described for Animation {
@@ -76,6 +81,10 @@ impl Described for PositionedAnimation {
     fn additive(&self) -> bool {
         self.animation().additive()
     }
+
+    fn additive_coordinates(&self) -> Option<UnreadClipCoordinates> {
+        self.additive_rejection()
+    }
 }
 
 impl Described for AnimationHeader {
@@ -90,13 +99,23 @@ impl Described for AnimationHeader {
     }
 }
 
-fn skipped(label: &str, skipped: Vec<SkippedAnimation>) -> Vec<UnreadAnimation> {
+fn skipped(
+    label: &str,
+    skipped: Vec<SkippedAnimation>,
+    coordinates: Vec<UnreadClipCoordinates>,
+) -> Vec<PositionedUnreadAnimation> {
+    let mut coordinates = coordinates.into_iter();
     skipped
         .into_iter()
-        .map(|skipped| UnreadAnimation {
-            source: label.to_owned(),
-            name: Some(skipped.name),
-            reason: skipped.reason.to_string(),
+        .map(|skipped| {
+            PositionedUnreadAnimation::new(
+                UnreadAnimation {
+                    source: label.to_owned(),
+                    name: Some(skipped.name),
+                    reason: skipped.reason.to_string(),
+                },
+                coordinates.next(),
+            )
         })
         .collect()
 }
@@ -125,7 +144,10 @@ pub(crate) fn load(
         }
         Kind::Dba => {
             let dba = Dba::read(name, source.file()).map_err(failed(label))?;
-            Ok(Loaded::new(dba.animations, skipped(label, dba.skipped)))
+            Ok(Loaded::new(
+                dba.animations,
+                skipped(label, dba.skipped, Vec::new()),
+            ))
         }
     }
 }
@@ -135,19 +157,64 @@ pub(crate) fn load_with_positions(
     label: &str,
     kind: Kind,
 ) -> Result<Loaded<PositionedAnimation>, ConversionError> {
+    load_positioned(source, label, kind, PositionedClipSelection::All)
+}
+
+pub(crate) fn load_unread_clips(
+    source: &ChunkSource,
+    label: &str,
+    kind: Kind,
+) -> Result<Loaded<PositionedAnimation>, ConversionError> {
+    load_positioned(source, label, kind, PositionedClipSelection::Additive)
+}
+
+#[derive(Clone, Copy)]
+enum PositionedClipSelection {
+    All,
+    Additive,
+}
+
+impl PositionedClipSelection {
+    fn needs(self, clip: &PositionedAnimation) -> bool {
+        matches!(self, Self::All) || clip.animation().additive()
+    }
+}
+
+fn load_positioned(
+    source: &ChunkSource,
+    label: &str,
+    kind: Kind,
+    selection: PositionedClipSelection,
+) -> Result<Loaded<PositionedAnimation>, ConversionError> {
     let name = file_name(label);
     match kind {
         Kind::Caf => {
-            let clip =
-                Animation::read_caf_with_positions(name, source.file()).map_err(failed(label))?;
-            Ok(Loaded::new(vec![clip], Vec::new()))
+            let read = match selection {
+                PositionedClipSelection::All => Animation::read_caf_with_positions,
+                PositionedClipSelection::Additive => Animation::read_caf_with_clip_positions,
+            };
+            let clip = read(name, source.file()).map_err(failed(label))?;
+            let animations = if selection.needs(&clip) {
+                vec![clip]
+            } else {
+                Vec::new()
+            };
+            Ok(Loaded::new(animations, Vec::new()))
         }
         Kind::Dba => {
-            let dba = Dba::read_with_positions(name, source.file()).map_err(failed(label))?;
+            let read = match selection {
+                PositionedClipSelection::All => Dba::read_with_positions,
+                PositionedClipSelection::Additive => Dba::read_with_clip_positions,
+            };
+            let mut dba = read(name, source.file()).map_err(failed(label))?;
+            if matches!(selection, PositionedClipSelection::Additive) {
+                dba.animations.retain(|clip| selection.needs(clip));
+            }
             let database = dba.selection().cloned();
+            let unread_coordinates = dba.take_skipped_coordinates();
             Ok(Loaded {
                 animations: dba.animations,
-                unread: skipped(label, dba.skipped),
+                unread: skipped(label, dba.skipped, unread_coordinates),
                 database,
             })
         }
@@ -167,7 +234,10 @@ pub(crate) fn load_headers(
         }
         Kind::Dba => {
             let dba = DbaHeaders::read(name, source.file()).map_err(failed(label))?;
-            Ok(Loaded::new(dba.animations, skipped(label, dba.skipped)))
+            Ok(Loaded::new(
+                dba.animations,
+                skipped(label, dba.skipped, Vec::new()),
+            ))
         }
     }
 }

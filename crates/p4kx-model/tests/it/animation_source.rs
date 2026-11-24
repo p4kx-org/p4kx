@@ -8,14 +8,14 @@ use std::error::Error;
 
 use p4kx_chunks::{ChunkFile, ivo};
 use p4kx_model::{
-    Animation, AnimationController, AnimationError, AnimationSource, CorruptAnimation,
+    Animation, AnimationController, AnimationError, AnimationSource, CorruptAnimation, Dba,
     DbaAnimationSources, MAX_ANIMATION_KEYS,
 };
 use p4kx_testkit::{
     TestAnimation, TestChunkFile, TestDba, TestPositionFormat, TestTimes, TestTrack,
 };
 
-type TestResult = Result<(), Box<dyn Error>>;
+type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 const ANIM_INFO: u32 = 0x4733_C6ED;
 const CAF_DATA: u32 = 0xA949_6CB5;
@@ -182,6 +182,76 @@ fn dba_keeps_ordinals_and_bad_metadata_without_losing_other_clips() -> TestResul
     assert_eq!(name.range(), metadata_at + 112..metadata_at + 125);
     let controller = second.controllers()?.next().ok_or("controller")?;
     assert_independent_channels(&controller)
+}
+
+#[test]
+fn dba_clip_positions_keep_decode_results_without_retaining_track_sites() -> TestResult {
+    let bad = TestAnimation::new("broken.caf", 0);
+    let good = TestAnimation::new("dir/additive.caf", 30)
+        .additive()
+        .track(TestTrack::new(7).rotations(&[(0, IDENTITY), (15, IDENTITY)]));
+    let metadata_fixture = good.anim_info();
+    let bytes = TestDba::new().animation(bad).animation(good).bytes();
+    let file = ChunkFile::parse(bytes.as_slice())?;
+    let full = Dba::read_with_positions("pack.dba", &file)?;
+    let mut metadata = Dba::read_with_clip_positions("pack.dba", &file)?;
+    let ([clip], [fully_positioned]) = (metadata.animations.as_slice(), full.animations.as_slice())
+    else {
+        return Err("one decoded clip in both projections".into());
+    };
+    assert_eq!(
+        clip.animation(),
+        fully_positioned.animation(),
+        "same decoded keys"
+    );
+    assert_eq!(
+        metadata.skipped, full.skipped,
+        "same failed clip and reason"
+    );
+    assert_eq!(
+        fully_positioned.controller_ordinal(0),
+        Some(0),
+        "full track position"
+    );
+    assert!(
+        clip.controller_ordinal(0).is_none(),
+        "clip read omits track positions"
+    );
+    let coordinates = clip.additive_rejection().ok_or("authored additive flag")?;
+    assert_eq!(
+        coordinates.ordinal(),
+        1,
+        "successful clip follows the skipped clip"
+    );
+    let flag = coordinates.additive_flags().ok_or("flag range")?;
+    let flags = fixture_range(&bytes, flag)?;
+    assert_eq!(
+        flags,
+        metadata_fixture.get(..4).ok_or("fixture flags")?,
+        "the complete authored word includes the additive flag"
+    );
+    let skipped = metadata.take_skipped_coordinates();
+    let [bad] = skipped.as_slice() else {
+        return Err("one skipped clip has metadata positions".into());
+    };
+    assert_eq!(bad.ordinal(), 0, "first clip's metadata is retained");
+    let name = bad.database_path().ok_or("skipped clip path")?;
+    assert_eq!(
+        fixture_range(&bytes, name)?,
+        b"broken.caf\0",
+        "original name and terminator"
+    );
+    assert!(
+        bad.additive_flags().is_none(),
+        "failed clip was never rejected as additive"
+    );
+    Ok(())
+}
+
+fn fixture_range(bytes: &[u8], range: std::ops::Range<u64>) -> TestResult<&[u8]> {
+    bytes
+        .get(usize::try_from(range.start)?..usize::try_from(range.end)?)
+        .ok_or_else(|| "fixture byte range".into())
 }
 
 fn assert_independent_channels(controller: &AnimationController<'_>) -> TestResult {

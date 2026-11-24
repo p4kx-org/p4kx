@@ -4,8 +4,8 @@
 use p4kx_archive::EntryOrigin;
 use p4kx_model::{Animation, AnimationClipCoordinates, PositionedAnimation};
 
-use crate::AnimationSet;
 use crate::animation_select::Gathered;
+use crate::{AnimationSet, PositionedUnreadAnimation};
 
 /// The selected animations and their bound Archive reads.
 #[derive(Debug, Clone, Default)]
@@ -74,7 +74,11 @@ impl From<Gathered<PositionedAnimation>> for ArchiveAnimationRead {
                 animations: clips,
                 origins: gathered.origins,
                 inputs: Vec::new(),
-                unread: gathered.unread,
+                unread: gathered
+                    .unread
+                    .into_iter()
+                    .map(PositionedUnreadAnimation::into_unread)
+                    .collect(),
                 files: gathered.files,
             },
             archive_sources: gathered.archive_sources,

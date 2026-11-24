@@ -108,7 +108,7 @@ pub(crate) struct LodShape {
 /// One page of a section of a model.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(extend("allOf" = [{
-    "if": { "properties": { "section": { "enum": ["animations", "bones", "materials", "meshes", "nodes"] } }, "required": ["section"] },
+    "if": { "properties": { "section": { "enum": ["animations", "bones", "materials", "meshes", "nodes", "unread_animations"] } }, "required": ["section"] },
     "then": { "required": ["fieldOrigins", "provenance"] }
 }]))]
 pub(crate) struct ModelItemsResult<Items = Vec<Value>> {

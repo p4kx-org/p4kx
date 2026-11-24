@@ -7,7 +7,7 @@ use p4kx_model::Animation;
 use rayon::prelude::*;
 
 use crate::animation_load::{kind, load, load_with_positions};
-use crate::animation_select::{Gathered, MatchEvidence, read, read_observing};
+use crate::animation_select::{Gathered, ReadEvidence, read, read_observing};
 use crate::animation_sources::{ArchiveAnimationRead, disk_sources, open_entry, with_extras};
 use crate::{CancelToken, ChunkSource, ConversionError, Entry, PathIndex};
 
@@ -290,7 +290,7 @@ impl AnimationSet {
             choice,
             |label| open_entry(index, label, None),
             |file, label, kind, _| load_with_positions(file, label, kind),
-            MatchEvidence::Capture,
+            ReadEvidence::MatchedSpecs,
             |_, _| {},
         )
         .map(ArchiveAnimationRead::from)

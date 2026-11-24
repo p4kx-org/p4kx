@@ -10,14 +10,18 @@ use p4kx_model::{
     PositionedAnimation,
 };
 
-use crate::animation_load::{Loaded, kind, load_with_positions};
-use crate::animation_select::{self, Gathered, MatchEvidence};
+use crate::animation_load::{Loaded, kind, load_unread_clips, load_with_positions};
+use crate::animation_select::{self, Gathered, ReadEvidence};
 use crate::animation_set::{MAX_ANIMATION_FILE_LEN, Source, folder_entries, source_of};
 use crate::{AnimationChoice, AnimationSet, CancelToken, ChunkSource, ConversionError, PathIndex};
 
 #[path = "archive_animation_read.rs"]
 mod read;
 
+#[path = "positioned_unread_animation.rs"]
+mod positioned_unread_animation;
+
+pub use positioned_unread_animation::PositionedUnreadAnimation;
 pub use read::{ArchiveAnimationRead, ArchiveClipEvidence};
 
 /// The selected decoded clip and the physical Archive Entry that supplied it.
@@ -94,30 +98,31 @@ impl ArchiveModelAnimations {
     /// # Errors
     /// As [`AnimationSet::from_archive`] for [`AnimationChoice::All`].
     pub fn read(index: &PathIndex<'_>, model_entry: &str) -> Result<Self, ConversionError> {
-        let sources = folder_entries(index, model_entry)
-            .into_iter()
-            .map(source_of)
-            .collect();
         let mut admissions = Vec::new();
-        let gathered = animation_select::read_observing(
-            sources,
-            &AnimationChoice::All,
-            |label| open_entry(index, label, None),
-            |source, label, kind, _| load_with_positions(source, label, kind),
-            MatchEvidence::Off,
-            |origin, loaded| {
-                let authored_empty = loaded.database.is_some()
-                    && loaded.animations.is_empty()
-                    && loaded.unread.is_empty();
-                if authored_empty || !loaded.animations.is_empty() {
-                    admissions.push(ArchiveAnimationAdmission::of(origin, loaded));
-                }
-            },
-        )?;
+        let gathered = read_model(index, model_entry, ReadEvidence::Off, |origin, loaded| {
+            let authored_empty = loaded.database.is_some()
+                && loaded.animations.is_empty()
+                && loaded.unread.is_empty();
+            if authored_empty || !loaded.animations.is_empty() {
+                admissions.push(ArchiveAnimationAdmission::of(origin, loaded));
+            }
+        })?;
         Ok(Self {
             clips: ArchivePositionedAnimation::gathered(gathered).collect(),
             admissions,
         })
+    }
+
+    /// Reads the unread model rows and the original name and additive flag sites.
+    ///
+    /// # Errors
+    /// As [`AnimationSet::from_archive`] for [`AnimationChoice::All`].
+    pub fn read_unread(
+        index: &PathIndex<'_>,
+        model_entry: &str,
+    ) -> Result<Vec<PositionedUnreadAnimation>, ConversionError> {
+        let gathered = read_model(index, model_entry, ReadEvidence::UnreadClips, |_, _| {})?;
+        Ok(gathered.unread)
     }
 
     /// Returns the clips admitted to the output, in normal order.
@@ -131,6 +136,31 @@ impl ArchiveModelAnimations {
     pub fn admissions(&self) -> &[ArchiveAnimationAdmission] {
         &self.admissions
     }
+}
+
+fn read_model(
+    index: &PathIndex<'_>,
+    model_entry: &str,
+    evidence: ReadEvidence,
+    observe: impl FnMut(Option<&EntryOrigin>, &Loaded<PositionedAnimation>),
+) -> Result<Gathered<PositionedAnimation>, ConversionError> {
+    let sources = folder_entries(index, model_entry)
+        .into_iter()
+        .map(source_of)
+        .collect();
+    animation_select::read_observing(
+        sources,
+        &AnimationChoice::All,
+        |label| open_entry(index, label, None),
+        |source, label, kind, _| match evidence {
+            ReadEvidence::UnreadClips => load_unread_clips(source, label, kind),
+            ReadEvidence::Off | ReadEvidence::MatchedSpecs => {
+                load_with_positions(source, label, kind)
+            }
+        },
+        evidence,
+        observe,
+    )
 }
 
 /// Original admission metadata retained for one successfully read animation Entry.
@@ -247,7 +277,11 @@ impl From<Gathered<Animation>> for AnimationSet {
             animations: gathered.animations,
             origins: gathered.origins,
             inputs: Vec::new(),
-            unread: gathered.unread,
+            unread: gathered
+                .unread
+                .into_iter()
+                .map(PositionedUnreadAnimation::into_unread)
+                .collect(),
             files: gathered.files,
         }
     }

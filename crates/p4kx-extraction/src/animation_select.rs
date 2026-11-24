@@ -4,11 +4,14 @@
 use std::collections::HashSet;
 
 use p4kx_archive::EntryOrigin;
+
 use rayon::prelude::*;
 
 use crate::animation_load::{Described, Kind, Loaded, kind};
 use crate::animation_set::{ADDITIVE_REASON, Source, names, normalised, stem};
-use crate::{AnimationChoice, ChunkSource, ConversionError, UnreadAnimation};
+use crate::{
+    AnimationChoice, ChunkSource, ConversionError, PositionedUnreadAnimation, UnreadAnimation,
+};
 
 /// What a read of animation sources found, before it takes the shape of a front-end's type.
 pub(crate) struct Gathered<T> {
@@ -16,7 +19,7 @@ pub(crate) struct Gathered<T> {
     pub(crate) origins: Vec<String>,
     pub(crate) archive_sources: Vec<Option<EntryOrigin>>,
     pub(crate) matched_specs: Vec<Vec<String>>,
-    pub(crate) unread: Vec<UnreadAnimation>,
+    pub(crate) unread: Vec<PositionedUnreadAnimation>,
     pub(crate) files: usize,
 }
 
@@ -28,6 +31,7 @@ impl<T> Default for Gathered<T> {
             archive_sources: Vec::new(),
             matched_specs: Vec::new(),
             unread: Vec::new(),
+
             files: 0,
         }
     }
@@ -37,28 +41,32 @@ impl<T> Default for Gathered<T> {
 pub(crate) struct Wanted<'a> {
     specs: Vec<&'a str>,
     by_name: bool,
-    capture_matches: bool,
+    evidence: ReadEvidence,
 }
 
 #[derive(Clone, Copy)]
-pub(crate) enum MatchEvidence {
+pub(crate) enum ReadEvidence {
     Off,
-    Capture,
+    MatchedSpecs,
+    UnreadClips,
 }
 
 impl<'a> Wanted<'a> {
-    fn of(choice: &'a AnimationChoice, evidence: MatchEvidence) -> Self {
-        let capture_matches = matches!(evidence, MatchEvidence::Capture);
+    const fn captures_unread(&self) -> bool {
+        matches!(self.evidence, ReadEvidence::UnreadClips)
+    }
+
+    fn of(choice: &'a AnimationChoice, evidence: ReadEvidence) -> Self {
         match choice {
             AnimationChoice::Named(specs) => Self {
                 specs: specs.iter().map(String::as_str).collect(),
                 by_name: true,
-                capture_matches,
+                evidence,
             },
             AnimationChoice::All => Self {
                 specs: Vec::new(),
                 by_name: false,
-                capture_matches,
+                evidence,
             },
         }
     }
@@ -88,7 +96,7 @@ pub(crate) fn read<T: Described + Send>(
     open: impl Fn(&str) -> Result<ChunkSource, ConversionError> + Sync,
     load: impl Fn(&ChunkSource, &str, Kind, bool) -> Result<Loaded<T>, ConversionError> + Sync,
 ) -> Result<Gathered<T>, ConversionError> {
-    read_observing(sources, choice, open, load, MatchEvidence::Off, |_, _| {})
+    read_observing(sources, choice, open, load, ReadEvidence::Off, |_, _| {})
 }
 
 pub(crate) fn read_observing<T: Described + Send>(
@@ -96,7 +104,7 @@ pub(crate) fn read_observing<T: Described + Send>(
     choice: &AnimationChoice,
     open: impl Fn(&str) -> Result<ChunkSource, ConversionError> + Sync,
     load: impl Fn(&ChunkSource, &str, Kind, bool) -> Result<Loaded<T>, ConversionError> + Sync,
-    evidence: MatchEvidence,
+    evidence: ReadEvidence,
     mut observe: impl FnMut(Option<&EntryOrigin>, &Loaded<T>),
 ) -> Result<Gathered<T>, ConversionError> {
     merge_sources(&mut sources);
@@ -121,16 +129,13 @@ pub(crate) fn read_observing<T: Described + Send>(
             Ok(loaded) => loaded,
             Err(error) if is_fatal(source, &error) => return Err(error),
             Err(error) => {
-                set.unread.push(UnreadAnimation {
-                    source: source.label.clone(),
-                    name: None,
-                    reason: describe(&error),
-                });
+                set.unread.push(unread_source(&source.label, &error));
                 continue;
             }
         };
         observe(origin.as_ref(), &loaded);
         set.files += 1;
+
         set.unread.extend(loaded.unread);
         keep(
             &mut set,
@@ -186,13 +191,21 @@ fn keep<'a, T: Described>(
             if wanted.by_name && !source.whole {
                 continue;
             }
-            set.unread.push(UnreadAnimation {
-                source: source.label.clone(),
-                name: Some(animation.name().to_owned()),
-                reason: ADDITIVE_REASON.to_owned(),
-            });
+            let coordinates = if wanted.captures_unread() {
+                animation.additive_coordinates()
+            } else {
+                None
+            };
+            set.unread.push(PositionedUnreadAnimation::new(
+                UnreadAnimation {
+                    source: source.label.clone(),
+                    name: Some(animation.name().to_owned()),
+                    reason: ADDITIVE_REASON.to_owned(),
+                },
+                coordinates,
+            ));
         } else if source.whole || !wanted.by_name || !hits.is_empty() {
-            if wanted.capture_matches {
+            if matches!(wanted.evidence, ReadEvidence::MatchedSpecs) {
                 set.matched_specs
                     .push(hits.iter().map(|spec| (*spec).to_owned()).collect());
             }
@@ -216,7 +229,7 @@ const fn is_fatal(source: &Source, error: &ConversionError) -> bool {
         )
 }
 
-fn describe(error: &ConversionError) -> String {
+fn unread_source(label: &str, error: &ConversionError) -> PositionedUnreadAnimation {
     let mut text = error.to_string();
     let mut cause = std::error::Error::source(error);
     while let Some(next) = cause {
@@ -224,5 +237,12 @@ fn describe(error: &ConversionError) -> String {
         text.push_str(&next.to_string());
         cause = next.source();
     }
-    text
+    PositionedUnreadAnimation::new(
+        UnreadAnimation {
+            source: label.to_owned(),
+            name: None,
+            reason: text,
+        },
+        None,
+    )
 }

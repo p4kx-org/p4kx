@@ -29,7 +29,7 @@ pub use self::record_json_location::RecordJsonLocation;
 pub use self::sourced_value_seed::SourcedValueSeed;
 pub use crate::animation_sources::{
     AnimationFlagRun, ArchiveAnimationAdmission, ArchiveAnimationRead, ArchiveClipEvidence,
-    ArchiveModelAnimations, ArchivePositionedAnimation,
+    ArchiveModelAnimations, ArchivePositionedAnimation, PositionedUnreadAnimation,
 };
 pub use crate::chunk_source::{ChunkDumpMode, ChunkDumpPayload, PreparedChunk};
 pub use crate::field_origin::{FieldOrigin, SharedFieldOrigin};

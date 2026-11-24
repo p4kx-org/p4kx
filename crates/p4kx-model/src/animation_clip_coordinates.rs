@@ -170,6 +170,50 @@ impl AnimationClipCoordinates {
     }
 }
 
+/// Original name and flag positions used to describe an unread clip.
+#[derive(Debug, Clone)]
+pub struct UnreadClipCoordinates {
+    pub(crate) chunks: Arc<ClipChunks>,
+    pub(crate) ordinal: usize,
+    pub(crate) name: Option<Range<u64>>,
+    pub(crate) flags: Option<Range<u64>>,
+}
+
+impl UnreadClipCoordinates {
+    pub(crate) fn additive(ordinal: usize, clip: &AnimationClipCoordinates) -> Self {
+        Self {
+            chunks: Arc::clone(&clip.chunks),
+            ordinal,
+            name: clip.database_path(),
+            flags: Some(clip.flags()),
+        }
+    }
+
+    /// Returns the original clip ordinal.
+    #[must_use]
+    pub const fn ordinal(&self) -> usize {
+        self.ordinal
+    }
+
+    /// Returns the metadata chunk selected by the decoder.
+    #[must_use]
+    pub fn metadata_chunk(&self) -> &AnimationChunkCoordinates {
+        &self.chunks.metadata
+    }
+
+    /// Returns the original DBA path and terminator, when present.
+    #[must_use]
+    pub fn database_path(&self) -> Option<Range<u64>> {
+        self.name.clone()
+    }
+
+    /// Returns the original additive flag word when it caused rejection.
+    #[must_use]
+    pub fn additive_flags(&self) -> Option<Range<u64>> {
+        self.flags.clone()
+    }
+}
+
 /// Original selectors of a successfully read animation database.
 #[derive(Debug, Clone)]
 pub struct AnimationDatabaseSelection {

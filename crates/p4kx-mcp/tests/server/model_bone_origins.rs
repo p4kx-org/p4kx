@@ -194,7 +194,10 @@ fn an_empty_bone_list_proves_the_original_survey_for_its_container() -> TestResu
         "signature",
         &["0", "4"],
     )?;
-    let tools = server.tools()?;
+    assert_model_items_schema(&server.tools()?)
+}
+
+fn assert_model_items_schema(tools: &[Value]) -> TestResult {
     let schema = &tools
         .iter()
         .find(|tool| tool["name"] == "list_model_items")
@@ -206,12 +209,15 @@ fn an_empty_bone_list_proves_the_original_survey_for_its_container() -> TestResu
             "bones",
             "materials",
             "meshes",
-            "nodes"
-        ]))
+            "nodes",
+            "unread_animations"
+        ])),
+        "sections with required origin evidence"
     );
     assert_eq!(
         schema.pointer("/allOf/0/then/required"),
-        Some(&json!(["fieldOrigins", "provenance"]))
+        Some(&json!(["fieldOrigins", "provenance"])),
+        "schema requires both the field markers and provenance inventory"
     );
     Ok(())
 }

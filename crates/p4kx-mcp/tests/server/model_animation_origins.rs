@@ -18,6 +18,8 @@ const CAF: &str = "Data/Animations/Objects/Probe/extend.caf";
 const DBA: &str = "Data/Animations/Objects/Probe/pack.dba";
 const ANIM_INFO: u32 = 0x4733_C6ED;
 const CAF_DATA: u32 = 0xA949_6CB5;
+mod unread;
+
 const RESPONSE_LIMIT: usize = 256 * 1024;
 
 #[test]

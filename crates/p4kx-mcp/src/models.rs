@@ -4,12 +4,10 @@
 use p4kx_extraction::model::{LodSelection, MaterialReading, PositionBox};
 use p4kx_extraction::{
     AnimationChoice, AnimationSet, ConversionError, LibraryInfo, ModelSource, TextureVerdicts,
-    UnreadInfo,
 };
-use serde::Serialize;
 
 use crate::archives::Opened;
-use crate::budget::{MAX_RESPONSE_LEN, fill_within, json_len};
+use crate::budget::{MAX_RESPONSE_LEN, json_len};
 use crate::error::ToolError;
 use crate::model_item_page::ModelItemPage;
 use crate::model_material_items;
@@ -25,6 +23,9 @@ mod chunk_items;
 
 #[path = "model_overview_origins.rs"]
 mod overview_origins;
+
+#[path = "model_unread_animation_items.rs"]
+mod unread_animation_items;
 
 /// Returns the summary of the model Entry at `path`.
 pub(crate) fn overview(opened: &Opened, path: &str) -> Result<ModelOverview, ToolError> {
@@ -83,7 +84,7 @@ pub(crate) fn items(
     section: Section,
     page: Page,
 ) -> Result<ModelItemsResult, ToolError> {
-    let (source, animations) = read(opened, path, ModelRead::Section(section))?;
+    let (source, _) = read(opened, path, ModelRead::Section(section))?;
     let what = section.name();
     let reserved = envelope_len(opened, source.name(), what);
     let observed = ModelItemPage {
@@ -93,26 +94,15 @@ pub(crate) fn items(
         page,
         reserved,
     };
-    let (total, items, next_cursor) = match section {
-        Section::Materials => return model_material_items::list(&observed),
-        Section::Nodes => return model_node_items::list(&observed),
-        Section::Meshes => return model_mesh_items::list(&observed),
-        Section::Bones => return model_bone_items::list(&observed),
-        Section::Animations => return model_animation_items::list(&observed, path),
-        Section::UnreadAnimations => {
-            paged(&animations.unread, page, what, reserved, UnreadInfo::of)?
-        }
-        Section::Chunks => return chunk_items::list(&observed),
-    };
-    Ok(ModelItemsResult {
-        archive: opened.archive().path().display().to_string(),
-        model: source.name().to_owned(),
-        section: what,
-        total,
-        items,
-        next_cursor,
-        origins: None,
-    })
+    match section {
+        Section::Materials => model_material_items::list(&observed),
+        Section::Nodes => model_node_items::list(&observed),
+        Section::Meshes => model_mesh_items::list(&observed),
+        Section::Bones => model_bone_items::list(&observed),
+        Section::Animations => model_animation_items::list(&observed, path),
+        Section::UnreadAnimations => unread_animation_items::list(&observed, path),
+        Section::Chunks => chunk_items::list(&observed),
+    }
 }
 
 fn envelope_len(opened: &Opened, model: &str, section: &str) -> usize {
@@ -122,25 +112,6 @@ fn envelope_len(opened: &Opened, model: &str, section: &str) -> usize {
         section,
     ))
     .saturating_add(128)
-}
-
-type Paged = (usize, Vec<serde_json::Value>, Option<String>);
-
-fn paged<'a, T, U: Serialize>(
-    items: &'a [T],
-    page: Page,
-    what: &str,
-    reserved: usize,
-    convert: impl Fn(&'a T) -> U,
-) -> Result<Paged, ToolError> {
-    let values = page
-        .slice(items)
-        .iter()
-        .map(|item| serde_json::to_value(convert(item)).map_err(ToolError::from));
-    let (values, next) = fill_within(page, items.len(), reserved, values, |_| {
-        format!("item of {what}")
-    })?;
-    Ok((items.len(), values, next))
 }
 
 #[derive(Clone, Copy)]
@@ -182,11 +153,7 @@ fn read(
         )
     }
     .map_err(|error| converted(path, "a model", error))?;
-    let with_animations = matches!(
-        request,
-        ModelRead::Overview | ModelRead::Section(Section::UnreadAnimations)
-    );
-    let animations = if with_animations {
+    let animations = if matches!(request, ModelRead::Overview) {
         AnimationSet::from_archive(&index, source.name(), &AnimationChoice::All, &[])
             .map_err(|error| converted(path, "a model with its animations", error))?
     } else {
