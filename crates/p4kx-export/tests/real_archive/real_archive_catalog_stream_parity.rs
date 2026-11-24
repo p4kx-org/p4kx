@@ -18,8 +18,12 @@ use crate::catalog_capture::CatalogCapture;
 mod digest_index;
 #[path = "real_archive_catalog_digest_runs.rs"]
 mod digest_runs;
+#[path = "real_archive_container_placement_digests.rs"]
+mod placement;
 #[path = "real_archive_catalog_stream_wire.rs"]
 mod wire;
+
+pub(crate) use placement::StreamedPlacementDigests;
 
 use digest_index::DigestIndex;
 use digest_runs::{DigestRuns, OriginDigest};

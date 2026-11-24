@@ -32,7 +32,7 @@ mod stream_parity;
 
 pub(crate) use digest_parity::{DigestedInventory, DigestedTable, PhysicalSlot};
 pub(crate) use measurement::{with_bound_measurement, with_bound_measurement_from_producer};
-pub(crate) use stream_parity::StreamedComponentDigests;
+pub(crate) use stream_parity::{StreamedComponentDigests, StreamedPlacementDigests};
 
 #[path = "real_archive_catalog_selected_origins.rs"]
 mod selected_origins;

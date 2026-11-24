@@ -10,7 +10,7 @@ use p4kx_testkit::{real_archive_key, real_archive_path};
 
 use crate::real_archive_catalog_table_parity::TestResult;
 
-pub(super) fn with_archive(check: impl FnOnce(&Archive) -> TestResult) -> TestResult {
+pub(crate) fn with_archive(check: impl FnOnce(&Archive) -> TestResult) -> TestResult {
     let path = real_archive_path().map_err(|_| "configure the installed Archive path")?;
     let key = real_archive_key().map_err(|_| "configure the trusted installed Archive key")?;
     let archive =

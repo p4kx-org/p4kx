@@ -155,7 +155,7 @@ pub(super) fn capture_inventory<Id: Borrow<str> + Eq + Hash>(
     inventory: &SourceInventory,
     mut references: HashSet<Id>,
     mut retain_use: impl FnMut(String, Value) -> TestResult,
-    mut retain_source: impl FnMut(String, Value) -> TestResult,
+    retain_source: impl FnMut(String, Value) -> TestResult,
 ) -> TestResult {
     if references.is_empty() {
         return Err("expected original cell provenance".into());
@@ -179,6 +179,14 @@ pub(super) fn capture_inventory<Id: Borrow<str> + Eq + Hash>(
         return Err("a value lacks its referenced SDK source use".into());
     }
 
+    capture_physical_sources(inventory, pending, retain_source)
+}
+
+pub(super) fn capture_physical_sources<'inventory>(
+    inventory: &'inventory SourceInventory,
+    mut pending: Vec<&'inventory str>,
+    mut retain_source: impl FnMut(String, Value) -> TestResult,
+) -> TestResult {
     let sources: HashMap<_, _> = inventory
         .iter_sources()
         .map(|source| (source.id().as_str(), source))

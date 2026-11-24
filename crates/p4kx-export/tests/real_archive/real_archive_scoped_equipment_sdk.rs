@@ -20,7 +20,7 @@ use crate::real_archive_shop_inventory_v3::verify_build;
 use crate::real_archive_verification::print_line;
 
 #[path = "real_archive_equipment_input.rs"]
-mod equipment_input;
+pub(crate) mod equipment_input;
 use equipment_input::{dataforge, literal_filter, physical_filter, record_index, with_archive};
 
 #[path = "vehicle_armor_sdk_cold.rs"]
@@ -70,6 +70,9 @@ mod inventory_component_parity;
 
 #[path = "real_archive_interaction_sdk_parity.rs"]
 mod interaction_parity;
+
+#[path = "real_archive_ordnance_sdk_parity.rs"]
+mod ordnance_parity;
 
 #[path = "real_archive_canonical_ship_sdk.rs"]
 mod canonical_ship;

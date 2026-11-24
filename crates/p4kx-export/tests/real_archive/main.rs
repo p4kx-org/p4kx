@@ -40,6 +40,7 @@ mod real_archive_commodity_refining;
 mod real_archive_completion_tags;
 mod real_archive_compression;
 mod real_archive_consumables;
+mod real_archive_container_placement_sdk;
 mod real_archive_contract_cooldown_overrides;
 mod real_archive_contract_cooldowns;
 mod real_archive_contract_facts;

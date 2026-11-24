@@ -95,3 +95,49 @@ fn streamed_source_membership_refuses_conflicts_missing_and_unordered_ids() -> T
     }
     Ok(())
 }
+
+#[test]
+fn authored_encounter_comparison_separates_count_order_and_wire_content() -> TestResult {
+    let first = json!({"instanceId":{"state":"present","value":{
+        "rootEntryIndex": 91,
+        "childNodeIndices": [3, 5],
+        "externalChildStepIndices": [1]
+    }},"name":"external"});
+    let second = json!({"instanceId":{"state":"present","value":{
+        "rootEntryIndex": 7,
+        "childNodeIndices": [3, 5],
+        "externalChildStepIndices": []
+    }},"name":"inline"});
+    let mut ordered = OrderedRows::in_encounter_order();
+    for row in [&first, &second] {
+        ordered.append_encounter_row(super::encounter_key(row)?, fingerprint(row.clone())?)?;
+    }
+    let expected = ordered.finish();
+    assert_eq!(
+        compare_json(expected, &json!([first, second]))?,
+        json!(2),
+        "authored order is independent of numeric root Entry order"
+    );
+    let mut different = second.clone();
+    *different.get_mut("name").ok_or("authored name fixture")? = json!("changed");
+    for (actual, diagnostic) in [
+        (json!([first]), "row count differs"),
+        (
+            json!([second, first]),
+            "identities or encounter order differ",
+        ),
+        (
+            json!([first, different]),
+            "wire digests differ with matching identities and counts",
+        ),
+    ] {
+        let error = compare_json(expected, &actual)
+            .err()
+            .ok_or("comparison accepted a changed row array")?;
+        assert!(
+            error.to_string().contains(diagnostic),
+            "discriminating error: {error}"
+        );
+    }
+    Ok(())
+}

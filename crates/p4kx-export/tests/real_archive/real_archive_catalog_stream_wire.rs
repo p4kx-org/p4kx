@@ -17,32 +17,67 @@ use super::super::selected_origins::SelectOrigin;
 use super::digest_index::DigestIndex;
 use super::digest_runs::{Fingerprint, OriginDigest};
 
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+enum RowOrder {
+    #[default]
+    PhysicalSlot,
+    Encounter,
+}
+
 #[derive(Default)]
 pub(super) struct OrderedRows {
+    order: RowOrder,
     previous: Option<PhysicalSlot>,
     count: usize,
+    identities: Sha256,
     digest: Sha256,
 }
 
 impl OrderedRows {
+    pub(super) fn in_encounter_order() -> Self {
+        Self {
+            order: RowOrder::Encounter,
+            ..Self::default()
+        }
+    }
+
     pub(super) fn append(&mut self, slot: PhysicalSlot, row: Fingerprint) -> TestResult {
         if self.previous.is_some_and(|previous| previous >= slot) {
             return Err("physical component rows are unordered or duplicated".into());
         }
         self.previous = Some(slot);
+        let record = slot.record_index.to_be_bytes();
+        let component = slot.component_ordinal.to_be_bytes();
+        self.identities.update(record);
+        self.identities.update(component);
+        self.digest.update(record);
+        self.digest.update(component);
+        self.append_row(row)
+    }
+
+    pub(super) fn append_encounter_row(
+        &mut self,
+        key: Fingerprint,
+        row: Fingerprint,
+    ) -> TestResult {
+        self.identities.update(key);
+        self.append_row(row)
+    }
+
+    fn append_row(&mut self, row: Fingerprint) -> TestResult {
         self.count = self
             .count
             .checked_add(1)
-            .ok_or("component row counter overflow")?;
-        self.digest.update(slot.record_index.to_be_bytes());
-        self.digest.update(slot.component_ordinal.to_be_bytes());
+            .ok_or("row comparison counter overflow")?;
         self.digest.update(row);
         Ok(())
     }
 
     pub(super) fn finish(self) -> RowDigest {
         RowDigest {
+            order: self.order,
             count: self.count,
+            identities: self.identities.finalize().into(),
             digest: self.digest.finalize().into(),
         }
     }
@@ -50,7 +85,9 @@ impl OrderedRows {
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(in super::super) struct RowDigest {
+    order: RowOrder,
     pub(super) count: usize,
+    identities: Fingerprint,
     digest: Fingerprint,
 }
 
@@ -66,27 +103,63 @@ impl<'de> Visitor<'de> for RowDigest {
     type Value = Value;
 
     fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter.write_str("a complete ordered physical component row array")
+        formatter.write_str("a complete canonical row array in its original order")
     }
 
     fn visit_seq<A: SeqAccess<'de>>(self, mut sequence: A) -> Result<Value, A::Error> {
-        let mut ordered = OrderedRows::default();
+        let mut ordered = OrderedRows {
+            order: self.order,
+            ..OrderedRows::default()
+        };
         while let Some(row) = sequence.next_element::<Value>()? {
             if ordered.count == self.count {
-                return Err(A::Error::custom("extra retained physical component row"));
+                return Err(A::Error::custom(format!(
+                    "extra retained row after {} expected rows",
+                    self.count
+                )));
             }
-            let slot = wire_slot(&row).map_err(A::Error::custom)?;
-            ordered
-                .append(slot, fingerprint(row).map_err(A::Error::custom)?)
-                .map_err(A::Error::custom)?;
+            match self.order {
+                RowOrder::PhysicalSlot => {
+                    let slot = wire_slot(&row).map_err(A::Error::custom)?;
+                    ordered.append(slot, fingerprint(row).map_err(A::Error::custom)?)
+                }
+                RowOrder::Encounter => {
+                    let key = encounter_key(&row).map_err(A::Error::custom)?;
+                    ordered.append_encounter_row(key, fingerprint(row).map_err(A::Error::custom)?)
+                }
+            }
+            .map_err(A::Error::custom)?;
         }
-        if ordered.finish() != self {
+        let observed = ordered.finish();
+        if observed.count != self.count {
+            return Err(A::Error::custom(format!(
+                "retained row count differs: expected {}, observed {}",
+                self.count, observed.count
+            )));
+        }
+        if observed.identities != self.identities {
             return Err(A::Error::custom(
-                "retained physical component order, count or wire digest differs",
+                "retained row identities or encounter order differ",
+            ));
+        }
+        if observed.digest != self.digest {
+            return Err(A::Error::custom(
+                "retained row wire digests differ with matching identities and counts",
             ));
         }
         Ok(Value::from(self.count))
     }
+}
+
+pub(super) fn encounter_key(row: &Value) -> TestResult<Fingerprint> {
+    if row.pointer("/instanceId/state").and_then(Value::as_str) != Some("present") {
+        return Err("the placement row lacks a present occurrence key".into());
+    }
+    let key = row
+        .pointer("/instanceId/value")
+        .filter(|value| value.is_object())
+        .ok_or("the placement occurrence key is malformed")?;
+    Ok(fingerprint(key.clone())?)
 }
 
 fn wire_slot(row: &Value) -> TestResult<PhysicalSlot> {
