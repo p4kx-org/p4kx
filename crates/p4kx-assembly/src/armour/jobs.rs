@@ -10,7 +10,7 @@ use super::hidden;
 use super::layered_worn::OverlayMount;
 use super::piece::{Mount, Note, Source};
 use super::wearable::{Unfit, Worn};
-use super::{BodyVariant, Expressions, Look, PartOrigin, Piece, Wearable, ZoneChunk};
+use super::{BodyVariant, ClothingZones, Expressions, Look, PartOrigin, Piece, Wearable};
 use crate::bespoke::{Bespoke, exists, missing_library};
 use crate::{Issue, IssueKind, MaterialVariant, ModelProvider, PaletteRef, PortHelperDiagnostic};
 
@@ -30,7 +30,7 @@ pub(super) struct Job {
     pub(super) look: Option<Look>,
     pub(super) follows_head: bool,
     pub(super) bespoke: bool,
-    pub(super) zones: Arc<[ZoneChunk]>,
+    pub(super) clothing_zones: Option<Arc<ClothingZones>>,
     pub(super) mount: Option<Mount>,
     pub(super) unresolved_mount_helper: Option<Box<PortHelperDiagnostic>>,
     pub(super) overlay_mount: OverlayMount,
@@ -55,7 +55,7 @@ impl Job {
             look: None,
             follows_head: false,
             bespoke: false,
-            zones: Arc::default(),
+            clothing_zones: None,
             mount: None,
             unresolved_mount_helper: None,
             overlay_mount: OverlayMount::Original,
@@ -162,9 +162,8 @@ pub(super) fn gather(
             .material_selector
             .clone_from(&piece.material_source);
     }
-    let zones = covered_zones(piece, issues);
     jobs.push(Job {
-        zones,
+        clothing_zones: clothing_zones(piece, issues),
         origin: PartOrigin::Piece,
         part: piece.name.clone(),
         owner: String::new(),
@@ -316,15 +315,14 @@ pub(super) fn planned(
     jobs
 }
 
-/// Returns the body zones the piece covers; a Record with more chunks than are read is reported.
-fn covered_zones(piece: &Piece, issues: &mut Vec<Issue>) -> Arc<[ZoneChunk]> {
+fn clothing_zones(piece: &Piece, issues: &mut Vec<Issue>) -> Option<Arc<ClothingZones>> {
     let Source::Wearable(wearable) = &piece.source else {
-        return Arc::default();
+        return None;
     };
     if wearable.zones.truncated {
         let reason = "the Record lists more body zones than are read; the rest are ignored";
         let kind = IssueKind::BodyZonesUnknown(reason.to_owned());
         issues.push(piece_issue(piece, kind));
     }
-    Arc::clone(&wearable.zones.chunks)
+    Some(Arc::new(ClothingZones::from_wearable(wearable)))
 }

@@ -9,15 +9,16 @@ use std::path::Path;
 
 use crate::mesh_options::package_mesh_options;
 use p4kx_assembly::WornMountOrigins;
-use p4kx_extraction::OriginDigestWriter;
+use p4kx_extraction::{OriginArtifactDigest, OriginDigestWriter};
 use p4kx_gltf::{GlbOptions, GlbSummary, GltfError};
 
 use crate::build::{coordinates, generator};
 use crate::finite::sanitise;
 use crate::manifest::{
-    FORMAT_VERSION, Format, Issue, IssueOrigin, MESHES_FOLDER, Manifest, Mesh, Node, Options,
-    Source,
+    CHARACTER_BODY_ZONES_FORMAT_VERSION, FORMAT_VERSION, Format, Issue, IssueOrigin, MESHES_FOLDER,
+    Manifest, Mesh, Node, Options, Source,
 };
+use crate::manifest_body_zones::{BodyZoneData, BodyZoneMap};
 use crate::manifest_rig::Rig;
 use crate::mesh_vertex_map::Writer;
 
@@ -110,6 +111,7 @@ type OptionalMap<'a> = Option<&'a mut Writer>;
 pub(crate) struct WrittenRig {
     pub(crate) summary: GlbSummary,
     pub(crate) worn_origins: Option<WornMountOrigins>,
+    pub(crate) body_zones: Option<BodyZoneData>,
 }
 
 impl WrittenRig {
@@ -117,6 +119,7 @@ impl WrittenRig {
         Self {
             summary,
             worn_origins: None,
+            body_zones: None,
         }
     }
 }
@@ -181,6 +184,7 @@ fn write_rig_files(
     let WrittenRig {
         summary: written,
         worn_origins,
+        body_zones,
     } = write_glb(&package_mesh_options(options), &mut writer, map.as_mut())
         .map_err(|error| glb_error(error, &path, (&id, name), cancelled))?;
     let digest = writer
@@ -194,6 +198,7 @@ fn write_rig_files(
     drop(sink);
     cancelled.check()?;
     let mut manifest = manifest_of(&written);
+    bind_body_zones(&mut manifest, body_zones, &path, &digest)?;
     let sidecar = map
         .map(|map| map.finish(&map_path, &map_name, &relative, &digest, cancelled))
         .transpose()?;
@@ -265,4 +270,25 @@ fn summarise(manifest: &Manifest, written: &GlbSummary, totals: PackageTotals) -
         issues: manifest.issues.clone(),
         ..PackageSummary::default()
     }
+}
+
+fn bind_body_zones(
+    manifest: &mut Manifest,
+    body_zones: Option<BodyZoneData>,
+    path: &Path,
+    digest: &OriginArtifactDigest,
+) -> PackageResult<()> {
+    if let Some(body_zones) = body_zones {
+        let rig = manifest
+            .meshes
+            .first_mut()
+            .and_then(|mesh| mesh.rig.as_mut())
+            .ok_or_else(|| PackageError::write(path, io::Error::other("missing Character rig")))?;
+        rig.body_zones = Some(BodyZoneMap {
+            glb_sha256: digest.sha256().to_owned(),
+            data: body_zones,
+        });
+        CHARACTER_BODY_ZONES_FORMAT_VERSION.clone_into(&mut manifest.version);
+    }
+    Ok(())
 }

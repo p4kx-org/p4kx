@@ -175,6 +175,9 @@ fn specialized_code(error: &anyhow::Error) -> Option<u8> {
     if crate::key::is_key_error(error) {
         return Some(KEY_ERROR);
     }
+    if let Some(code) = crate::character_package::default_chf_exit_code(error) {
+        return Some(code);
+    }
     if let Some(code) = crate::media::error_code(error) {
         return Some(code);
     }

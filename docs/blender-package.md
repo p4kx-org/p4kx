@@ -199,7 +199,7 @@ written (there are no `null`s).
 | Field | Meaning |
 | --- | --- |
 | `format` | Always `p4kx-blender-package`. |
-| `version` | `<major>.<minor>` of the package format. Current exports use 1.21, 1.22 with fitted paint provenance, or 1.23 with an original palette decal-texture field. |
+| `version` | `<major>.<minor>` of the package format. Current exports use 1.21 for ordinary packages, 1.22 with fitted paint provenance, 1.23 with a palette decal-texture field, or 1.24 with Character body-zone addresses. |
 | `generator` | `name` (`p4kx`) and `version` of the program that wrote the package. |
 | `source` | `channel` (the Channel folder, e.g. `LIVE`), `build` (`branch`, `version`, `public_patch`, `change_number`, `build_id` of the Archive's build manifest) and `entity` (`class_name`, `guid`). `channel` and `build` are absent when unknown. A Character package (1.3) also has `character` (`name`, `body`, `chf`, `loadout`), see "Characters", and puts the Character's name in `entity.class_name` with an empty `guid`. |
 | `coordinates` | `basis` is `gltf_y_up` and `unit` is `metre`. A reader refuses a `basis` or `unit` it does not know. |
@@ -713,6 +713,33 @@ encrypted contribution is known. The package validator checks the artifact bindi
 the joint-child links and the root transform addresses. Vertex maps and mount
 provenance use the same GLB generation and can be present together.
 
+### Modular Character outfits
+
+Add `--body-zones` to `character package` to publish `meshes[0].rig.body_zones`
+in a version 1.24 package. For example, export a shared base with
+`--body female --default-chf --body-zones`. Export the items on the same base
+with `--piece <entity>`, retaining the same Build, body, CHF and level of detail.
+
+The map's `body` reports `verified` when the original zone layout and every
+emitted body primitive were identified. Each `primitives` row gives the canonical
+zone name, zero-based GLB mesh and primitive indices, and actual model LOD.
+Verify `glb_sha256` against the rigged GLB before applying these addresses.
+`omitted` lists the body zones already removed in the assembled export. An
+`unavailable` body gives the layout or address failure and withholds the map.
+
+Each `parts` row identifies one emitted part by its zero-based index in `rig.parts`
+and the GLB meshes it supplies. `coverage` names the original Item Record and
+its definite `covers` and unresolved `conditional` zones. A null coverage means
+the part has no retained Item Record coverage. The `chunks_complete` flag
+describes the original chunk list. Damaged chunk rows cannot make a zone definite.
+The field origins retain observed IVO and
+clothing inputs and mark unresolved contributions explicitly.
+
+Select the clothing meshes from each package and apply the union of their
+definite masks to the intact base primitives. Check the shared joint names and
+inverse bind matrices when combining files. The assembled package already
+applies the definite mask during export and imports as an ordinary Character.
+
 ### What a Character package holds
 
 The Character of the real-Archive test (`masculinedefault.chf`, the armour Loadout
@@ -832,6 +859,8 @@ The keys in `fieldOrigins` are JSON Pointers relative to `appearance` and resolv
 and palette bindings.
 **1.23** adds the optional `palettes[].decal_texture` source value. It can coexist with
 fitted paint provenance.
+
+**1.24** adds the optional Character body-zone and worn-part map, addressed in its rigged GLB.
 
 ### Authored Entity Glow
 

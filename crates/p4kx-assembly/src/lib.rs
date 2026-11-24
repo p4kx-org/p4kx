@@ -202,10 +202,11 @@ pub use animation_folders::{
     character_animations_with_archive_sources,
 };
 pub use armour::{
-    Armour, ArmourPart, BodyVariant, CharacterAnimations, Expressions, ForgeItems, Head, HeadError,
-    HeadItems, HeadMaterial, Look, LowerMorphSources, MAX_ANIMATION_VALUES, MAX_DNA_RIG_LEN,
-    MountModelSource, NpcHead, PartOrigin, Piece, Replaced, RigArchiveRead, ShapeArchiveSources,
-    Wearable, WornMountOriginError, WornMountOrigins, WornMountSource, ZoneChunk, is_worn_type,
+    Armour, ArmourPart, BodyVariant, BodyZoneLayoutError, CharacterAnimations,
+    ClothingZoneCoverage, ClothingZones, Expressions, ForgeItems, Head, HeadError, HeadItems,
+    HeadMaterial, Look, LowerMorphSources, MAX_ANIMATION_VALUES, MAX_DNA_RIG_LEN, MountModelSource,
+    NpcHead, PartOrigin, Piece, Replaced, RigArchiveRead, ShapeArchiveSources, Wearable,
+    WornMountOriginError, WornMountOrigins, WornMountSource, ZoneChunk, is_worn_type,
 };
 #[cfg(feature = "verification")]
 pub use armour::{FaceRotationComparison, StandaloneFaceRotationComparison};

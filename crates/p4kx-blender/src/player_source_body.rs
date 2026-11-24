@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_assembly::BodyVariant;
 use p4kx_assembly::character::{Chf, ItemPort};
-use p4kx_assembly::{BodyVariant, SocArchiveMember, SocCaptureError};
 use p4kx_extraction::{
-    Archive, CancelToken, Entry, Guid, InputScope, PathIndex, PhysicalSourceRef, SourceInput,
+    CancelToken, EntryOrigin, Guid, InputScope, PathIndex, PhysicalSourceRef, SourceInput,
     SourceLocation, SourceScope, SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
 
-use crate::player_source::{PlayerSourceError, check, index_error};
+use crate::player_default_chf::{
+    PlayerDefaultChf, PlayerDefaultChfPayloadError, read_player_default_chf,
+};
+use crate::player_source::{PlayerSourceError, check};
 use crate::player_source_classes::{self, ClassTarget, Classes};
 use crate::player_source_port_binding::{self, OwnerPort, PortBinding};
 
@@ -69,21 +72,14 @@ pub(crate) fn read(
     classes: Classes<'_, '_>,
     cancel: &CancelToken,
 ) -> Result<SourcedValue<Body>, PlayerSourceError> {
-    let selector = match variant {
-        BodyVariant::Male => "Data/Libs/CharacterCustomizer/masculinedefault.chf",
-        BodyVariant::Female => "Data/Libs/CharacterCustomizer/femininedefault.chf",
-        _ => return Err(PlayerSourceError::BodyVariant),
-    };
-    let matches = paths
-        .matching_entries_with(selector, |_| check(cancel))
-        .map_err(index_error)?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(index_error)?;
+    let selected = read_player_default_chf(paths, variant, cancel)?;
     let mut uses = vec![directory.clone()];
-    let body = match matches.as_slice() {
-        [] => Body::Missing { selector },
-        [entry] => project(paths.archive(), entry, sources, classes, &mut uses, cancel)?,
-        entries => Body::Ambiguous {
+    let body = match selected {
+        PlayerDefaultChf::Missing { selector } => Body::Missing { selector },
+        PlayerDefaultChf::Selected { origin, payload } => {
+            project(&origin, &payload, sources, classes, &mut uses, cancel)?
+        }
+        PlayerDefaultChf::Ambiguous { selector, entries } => Body::Ambiguous {
             selector,
             candidates: entries
                 .iter()
@@ -112,33 +108,26 @@ pub(crate) fn read(
 }
 
 fn project(
-    archive: &Archive,
-    entry: &Entry,
+    origin: &EntryOrigin,
+    payload: &Result<Box<Chf>, PlayerDefaultChfPayloadError>,
     sources: &SourceUses,
     classes: Classes<'_, '_>,
     uses: &mut Vec<SourceUse>,
     cancel: &CancelToken,
 ) -> Result<Body, PlayerSourceError> {
-    let member = SocArchiveMember::read(archive, entry, || {
-        if cancel.is_cancelled() {
-            Err(SocCaptureError::Cancelled)
-        } else {
-            Ok(())
-        }
-    })?;
-    let scope = sources.observe(SourceInput::Archive(member.origin()), InputScope::Payload)?;
+    let scope = sources.observe(SourceInput::Archive(origin), InputScope::Payload)?;
     let source = scope.source_ref().clone();
-    let Ok(bytes) = member.payload() else {
+    if matches!(payload, Err(PlayerDefaultChfPayloadError::Unreadable(_))) {
         uses.push(at(&scope, &[], "$payload", SourceUseRole::Attempted)?);
         return Ok(Body::Unreadable { source });
-    };
+    }
     uses.push(at(&scope, &[], "$payload", SourceUseRole::Payload)?);
-    let Ok(chf) = Chf::read(bytes) else {
+    let Ok(chf) = payload else {
         return Ok(Body::InvalidChf { source });
     };
     Ok(Body::Present {
         source,
-        data: BodyData::read(&chf, sources, &scope, classes, cancel)?,
+        data: BodyData::read(chf, sources, &scope, classes, cancel)?,
     })
 }
 

@@ -10,6 +10,7 @@ mod animate_rig;
 mod body;
 mod body_zones;
 mod build;
+mod clothing_zones;
 mod default_material;
 mod dress;
 mod expressions;
@@ -69,6 +70,7 @@ pub use animate::{CharacterAnimations, MAX_ANIMATION_VALUES};
 #[cfg(feature = "verification")]
 pub use animate::{FaceRotationComparison, StandaloneFaceRotationComparison};
 pub use body::BodyVariant;
+pub use clothing_zones::ClothingZones;
 pub use dress::{HeadItems, HeadMaterial};
 pub use expressions::Expressions;
 pub use forge_items::ForgeItems;
@@ -81,8 +83,9 @@ pub use npc::NpcHead;
 pub use piece::Piece;
 pub use shape::MAX_DNA_RIG_LEN;
 pub use shape_origins::{LowerMorphSources, RigArchiveRead, ShapeArchiveSources};
+pub use uncover::BodyZoneLayoutError;
 pub use wearable::Wearable;
-pub use zones::ZoneChunk;
+pub use zones::{ClothingZoneCoverage, ZoneChunk};
 pub(crate) use zones::{ZoneList, covered, read_zones, uncovered};
 
 use crate::Issue;
@@ -108,6 +111,7 @@ pub struct ArmourPart {
     pub(crate) definition_origin: Option<EntryOrigin>,
     pub(crate) geometry_selector: Option<SourceLocation>,
     pub(crate) material_selector: Option<SourceLocation>,
+    pub(crate) clothing_zones: Option<Arc<ClothingZones>>,
     pub(crate) look_sources: BTreeMap<usize, Vec<SourceLocation>>,
     pub(crate) materials: Arc<MaterialStatus>,
     pub(crate) material_archive_origins: Arc<MaterialArchiveOrigins>,

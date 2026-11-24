@@ -13,6 +13,8 @@ use p4kx_testkit::{
 };
 use serde_json::Value;
 
+mod default_chf_tests;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 struct Run {
@@ -25,7 +27,7 @@ fn archive(dir: &Path, entries: Vec<TestEntry>) -> Result<PathBuf, Box<dyn Error
     crate::chf_glb::archive(dir, entries)
 }
 
-fn chf(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
+fn chf_fixture() -> TestChf {
     let blend = |part: usize| {
         if part == 3 {
             vec![(65535, 2), (0, 0)]
@@ -33,13 +35,16 @@ fn chf(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
             vec![(0, 0), (0, 0)]
         }
     };
-    let test = TestChf {
+    TestChf {
         dna_hashes: Some((MALE_RIG_HASH, 0)),
         face_parts: (0..HEAD_REGIONS).map(blend).collect(),
         ..TestChf::v8()
-    };
+    }
+}
+
+fn chf(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
     let path = dir.join("hero.chf");
-    fs::write(&path, test.to_bytes())?;
+    fs::write(&path, chf_fixture().to_bytes())?;
     Ok(path)
 }
 

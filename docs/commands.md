@@ -307,13 +307,18 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   [the source format](player-source.md). Use `--bundle` with one or more distinct `--body` selections
   and a new output directory to share original data across bodies.
 - `p4kx character package <archive> --out <folder>` writes a Character as a Blender package: the
-  head of a CHF file (`--chf`), armour and clothing (`--piece`, `--loadout`) on the default body
-  (`--body`, optional when the Loadout has a head), as one skinned GLB with the skeleton, the
+  head of a CHF file (`--chf`) or the Archive's default head (`--default-chf --body male|female`),
+  and armour and clothing (`--piece`, `--loadout`) on the default body. The package has one
+  skinned GLB with the skeleton, the
   head's expressions as morph targets and the animations (`--anim`, `--anim-from`,
   `--anim-folder`), listed in `scene.json`; `--materials` and `--texture-mip` pick plain colours or
   textures. The optional `--vertex-maps` records the GLB's source-stream vertex ordinals.
+  Add `--body-zones` to record the body primitive addresses and the authored clothing coverage
+  for each emitted part. See [modular Character outfits](blender-package.md#modular-character-outfits).
   A `--loadout` of a story character such as Miles Eckhart exports his outfit and his
-  own head, hair and eyes; with `--chf` the CHF's head is kept instead. The Blender add-on imports
+  own head, hair and eyes. An explicit CHF head takes precedence over the Loadout head.
+  `--default-chf` requires a body and uses its original default CHF Entry, including the head's
+  items. Armour and clothing follow the explicit piece and Loadout selections. The Blender add-on imports
   it as an armature with shape keys and actions.
 - `p4kx interior glb <archive> <container>... --out <file>` exports the Interior of a socpak
   container, a ship's rooms or a room on its own, as one GLB: a node per container, per streamed

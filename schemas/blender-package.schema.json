@@ -352,6 +352,129 @@
       ],
       "type": "object"
     },
+    "BodyZoneGeometry": {
+      "description": "Whether the body's geometry could be mapped to the variant's original zones.",
+      "oneOf": [
+        {
+          "description": "The original zone layout and every emitted body primitive were identified.",
+          "properties": {
+            "omitted": {
+              "description": "Zones already omitted by clothing when building this Character.",
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "primitives": {
+              "description": "Exact emitted primitive locations, in writer order.",
+              "items": {
+                "$ref": "#/$defs/BodyZonePrimitive"
+              },
+              "type": "array"
+            },
+            "state": {
+              "const": "verified",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "primitives",
+            "omitted"
+          ],
+          "type": "object"
+        },
+        {
+          "description": "The complete body-zone partition could not be verified.",
+          "properties": {
+            "reason": {
+              "description": "The layout or output-address failure.",
+              "type": "string"
+            },
+            "state": {
+              "const": "unavailable",
+              "type": "string"
+            }
+          },
+          "required": [
+            "state",
+            "reason"
+          ],
+          "type": "object"
+        }
+      ]
+    },
+    "BodyZoneMap": {
+      "description": "The body and worn-part addresses in the Character's rigged GLB.",
+      "properties": {
+        "body": {
+          "$ref": "#/$defs/BodyZoneGeometry",
+          "description": "The body's original zone partition and its visible primitives."
+        },
+        "field_origins": {
+          "$ref": "#/$defs/FieldOrigins",
+          "description": "Immediate provenance at source-derived map fields, in map-relative JSON Pointers."
+        },
+        "glb_sha256": {
+          "description": "SHA-256 of the exact GLB whose mesh and primitive indices this map addresses.",
+          "pattern": "^[0-9a-f]{64}$",
+          "type": "string"
+        },
+        "parts": {
+          "description": "Geometry and clothing coverage for the emitted worn parts.",
+          "items": {
+            "$ref": "#/$defs/PartBodyZones"
+          },
+          "type": "array"
+        },
+        "source_inventory": {
+          "$ref": "#/$defs/SourceInventory",
+          "description": "The original input Entries and their uses in the map."
+        }
+      },
+      "required": [
+        "glb_sha256",
+        "body",
+        "parts",
+        "source_inventory",
+        "field_origins"
+      ],
+      "type": "object"
+    },
+    "BodyZonePrimitive": {
+      "description": "One body surface addressed in the rigged GLB.",
+      "properties": {
+        "mesh": {
+          "description": "The zero-based GLB mesh index.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "model_lod": {
+          "description": "The actual geometry level used by this body mesh.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "primitive": {
+          "description": "The zero-based primitive in that mesh.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        },
+        "zone": {
+          "description": "The body's canonical zone name.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "zone",
+        "mesh",
+        "primitive",
+        "model_lod"
+      ],
+      "type": "object"
+    },
     "BuildInfo": {
       "description": "The Build of the Archive a package was made from, as its build manifest states it.",
       "properties": {
@@ -433,6 +556,54 @@
       "required": [
         "name",
         "body"
+      ],
+      "type": "object"
+    },
+    "ClothingBodyCoverage": {
+      "description": "The retained body-layer coverage of an original worn item.",
+      "properties": {
+        "chunks_complete": {
+          "description": "Whether the admitted authored chunk list is complete.",
+          "type": "boolean"
+        },
+        "conditional": {
+          "description": "Body zones with unevaluated conditions and no unconditional cover from this item.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "covers": {
+          "description": "Body zones unconditionally covered by this item.",
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "guid": {
+          "description": "The item's original DataForge Record GUID.",
+          "type": "string"
+        },
+        "record_index": {
+          "description": "The original physical Record table index when available.",
+          "format": "uint32",
+          "minimum": 0,
+          "type": [
+            "integer",
+            "null"
+          ]
+        },
+        "record_path": {
+          "description": "The item's original DataForge Record path.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "guid",
+        "record_path",
+        "chunks_complete",
+        "covers",
+        "conditional"
       ],
       "type": "object"
     },
@@ -4229,6 +4400,42 @@
       ],
       "type": "object"
     },
+    "PartBodyZones": {
+      "description": "A worn part and its own body coverage on the shared rig.",
+      "properties": {
+        "coverage": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ClothingBodyCoverage"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "Authored clothing coverage when a physical item Record supplied it."
+        },
+        "meshes": {
+          "description": "The zero-based GLB mesh indices produced by this part.",
+          "items": {
+            "format": "uint",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "type": "array"
+        },
+        "part": {
+          "description": "The zero-based index within the owning manifest rig's parts.",
+          "format": "uint",
+          "minimum": 0,
+          "type": "integer"
+        }
+      },
+      "required": [
+        "part",
+        "meshes"
+      ],
+      "type": "object"
+    },
     "Payload": {
       "additionalProperties": false,
       "properties": {
@@ -4440,6 +4647,17 @@
             "string",
             "null"
           ]
+        },
+        "body_zones": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/BodyZoneMap"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The opt-in mapping from body zones and worn parts to emitted Character geometry."
         },
         "bones": {
           "description": "The number of bones written as nodes.",

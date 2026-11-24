@@ -180,7 +180,7 @@ impl EntitySpec {
             classification,
             container,
             object_containers: crate::object_containers::read(tree, component_slots(tree)).into(),
-            zones: read_zones(&components),
+            zones: read_zones(component_slots(tree), forge_origin),
             animation_database: crate::creature_animation::database_of(
                 tree.record_index(),
                 component_slots(tree),

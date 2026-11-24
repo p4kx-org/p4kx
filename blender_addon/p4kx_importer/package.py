@@ -19,6 +19,7 @@ from typing import Any
 from . import collision_helpers as collisions
 from . import material_source, palette_provenance
 from . import ddna_pair
+from .body_zones import VERSION as BODY_ZONES_VERSION
 from .glb_preflight import check_glb as check_glb
 from .manifest_fields import (
     PackageError,
@@ -39,7 +40,7 @@ from .soc_scene import parse_ref as parse_soc_ref
 
 FORMAT_NAME = "p4kx-blender-package"
 SUPPORTED_MAJOR = 1
-SUPPORTED_MINOR = 23
+SUPPORTED_MINOR = 24
 MANIFEST_NAME = "scene.json"
 MAX_MANIFEST_BYTES = 64 * 1024 * 1024
 BLENDER_NAME_BYTES = 63
@@ -354,7 +355,7 @@ def _parse_meshes(
             for slot, material in enumerate(read_array(entry.get("materials"), f"{where}.materials"))
         )
         palette_id = entry.get("palette_id")
-        rig = _rig(entry.get("rig"), f"{where}.rig")
+        rig = _rig(entry.get("rig"), f"{where}.rig", version)
         if rig is not None and rig.worn_mount_provenance is not None:
             rig.worn_mount_provenance.check_mesh(file, version)
         meshes[mesh_id] = Mesh(
@@ -406,10 +407,13 @@ def _parse_material(item: Any, where: str, textures: dict[str, Texture]) -> Mesh
     )
 
 
-def _rig(value: object, where: str) -> Rig | None:
+def _rig(value: object, where: str, version: tuple[int, int]) -> Rig | None:
     if value is None:
         return None
     try:
-        return parse_rig(value, where)
+        rig = parse_rig(value, where)
     except RigError as error:
         raise PackageError(str(error)) from error
+    if rig.body_zones is not None and version < BODY_ZONES_VERSION:
+        raise PackageError(f"{where}.body_zones requires format 1.24 or later.")
+    return rig

@@ -36,6 +36,7 @@ mod catalog_support;
 mod catalog_warning_privacy;
 mod channel_notice;
 mod channels;
+mod character_body_zones;
 mod character_package;
 mod character_source_bundle;
 mod chf;

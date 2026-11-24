@@ -4,7 +4,7 @@
 use std::ffi::OsStr;
 use std::path::Path;
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use p4kx_assembly::character::{CHF_SIZE, Chf};
 use p4kx_assembly::{
     AnimationFolders, ArchiveFiles, ArchiveModels, Armour, AssemblyOptions, BodyVariant,
@@ -27,7 +27,10 @@ use crate::entity_glb::GlbOutputIsArchive;
 use crate::entity_package::build_info;
 use crate::extract::cancel_on_interrupt;
 
+mod default_chf;
 mod report;
+
+pub(crate) use default_chf::exit_code as default_chf_exit_code;
 
 #[path = "character_source.rs"]
 mod source;
@@ -67,10 +70,26 @@ fn package(args: &CharacterPackageArgs, as_json: bool) -> Result<()> {
     let context = PackageWriteContext::new(&protection, cancel.flag());
 
     check_output_with_context(&args.out, &context)?;
+    let default = args
+        .default_chf
+        .then(|| {
+            let variant = args
+                .body
+                .map(BodyVariant::from)
+                .context("--default-chf requires --body")?;
+            default_chf::read(&archive, variant, &cancel)
+        })
+        .transpose()?;
+    let chf = chf
+        .as_ref()
+        .or_else(|| default.as_ref().map(|input| input.chf.as_ref()));
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let files = Files::open(ArchiveFiles::new(&archive), args.loadout.as_deref())?;
-    let (mut selection, head) = select_character(args, &entry, &forge, &files, chf.as_ref())?;
+    let (mut selection, head) = select_character(args, &entry, &forge, &files, chf)?;
+    if let Some((default, head)) = default.as_ref().zip(head.as_ref()) {
+        default.check_rig(head.variant())?;
+    }
     let (variant, pieces) = worn(args, &mut selection, head.as_ref());
     let models = character_models(&archive, &pieces);
     let options = AssemblyOptions::default().with_lod(args.lod);
@@ -91,9 +110,15 @@ fn package(args: &CharacterPackageArgs, as_json: bool) -> Result<()> {
     let animated = armour.animate(&found.animations, &models);
 
     let name = name_of(args, variant);
-    let chf_name = origin_chf_name(args);
+    let chf_name =
+        origin_chf_name(args).or_else(|| default.as_ref().and_then(default_chf::Selected::name));
     let scene = CharacterScene::new(&name, &armour, &animated)
         .with_origin(chf_name, args.loadout.as_deref());
+    let scene = if args.body_zones {
+        scene.with_body_zones()
+    } else {
+        scene
+    };
     let summary = store(args, &archive, &models, &scene, &context)?;
 
     let shown = report::Shown {
@@ -101,6 +126,7 @@ fn package(args: &CharacterPackageArgs, as_json: bool) -> Result<()> {
         args,
         name: &name,
         head: head.as_ref(),
+        default_chf: default.as_ref().map(|input| &input.origin),
         variant,
         selection: &selection,
         armour: &armour,

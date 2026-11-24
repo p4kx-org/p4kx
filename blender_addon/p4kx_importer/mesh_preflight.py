@@ -71,12 +71,17 @@ def _preflight_mesh(root: Path, mesh: Mesh) -> tuple[Path, bool]:
     if not path.is_file():
         raise PackageError(f"{path.name} is missing or is not a regular file.")
     rig = mesh.rig
+    verified_sha256 = None
     if rig is not None and (mount_origins := rig.worn_mount_provenance) is not None:
         info = check_glb(path, inspect_json=partial(mount_origins.inspect, bones=rig.bones))
         mount_origins.check_artifact(path, info.bytes)
+        verified_sha256 = mount_origins.sha256
     else:
         info = check_glb(path)
-    if mesh.rig is None and info.material_slot_issue is not None:
+    if rig is not None and rig.body_zones is not None:
+        rig.body_zones.check_artifact(path, verified_sha256)
+        rig.body_zones.check_glb(tuple(len(bindings) for bindings in info.primitive_bindings))
+    if rig is None and info.material_slot_issue is not None:
         raise PackageError(f"{path.name}: {info.material_slot_issue}")
     if mesh.bytes and mesh.bytes != info.bytes:
         raise PackageError(f"{path.name}: GLB size does not match the manifest.")

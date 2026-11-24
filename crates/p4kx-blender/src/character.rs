@@ -9,6 +9,7 @@ use p4kx_assembly::{Armour, ArmourPart, CharacterAnimations, PartOrigin};
 use p4kx_gltf::{GlbOptions, GlbSummary, GltfError, MeshVertexMap, TextureLoader};
 
 use crate::build::assembly_issue;
+use crate::character_body_zones::ObserveBodyZones;
 use crate::manifest::{CharacterSource, EntityRef, Manifest, Node, NodeKind, Source};
 use crate::manifest_rig::{Rig, RigClip, RigPart, RigPartOrigin};
 use crate::mesh_vertex_map::Writer;
@@ -24,6 +25,7 @@ pub struct CharacterScene<'a> {
     animations: &'a CharacterAnimations<'a>,
     chf: Option<&'a str>,
     loadout: Option<&'a str>,
+    body_zones: bool,
 }
 
 impl<'a> CharacterScene<'a> {
@@ -33,6 +35,13 @@ impl<'a> CharacterScene<'a> {
     pub const fn with_origin(mut self, chf: Option<&'a str>, loadout: Option<&'a str>) -> Self {
         self.chf = chf;
         self.loadout = loadout;
+        self
+    }
+
+    /// Includes original body zones and their emitted geometry addresses in the package.
+    #[must_use]
+    pub const fn with_body_zones(mut self) -> Self {
+        self.body_zones = true;
         self
     }
 
@@ -50,6 +59,7 @@ impl<'a> CharacterScene<'a> {
             animations,
             chf: None,
             loadout: None,
+            body_zones: false,
         }
     }
 }
@@ -127,41 +137,56 @@ fn write_mesh(
 ) -> Result<WrittenRig, GltfError> {
     let armour = character.armour;
     let animations = character.animations;
-    let visitor = map.map(|map| {
-        move |row: MeshVertexMap<'_>, part: &ArmourPart| {
-            map.observe(&row, part.model(), part.model_archive_sources(), context)
+    let mut map = map;
+    let mut zones = character
+        .body_zones
+        .then(|| ObserveBodyZones::new(armour, options.lod));
+    let observe = map.is_some() || zones.is_some();
+    let mut visitor = |row: MeshVertexMap<'_>, part: &ArmourPart| {
+        if let Some(map) = map.as_deref_mut() {
+            map.observe(&row, part.model(), part.model_archive_sources(), context)?;
         }
-    });
-    if !armour
+        if let Some(zones) = &mut zones {
+            zones.observe(&row, part)?;
+        }
+        Ok(())
+    };
+    let mounts = armour
         .parts()
         .iter()
-        .any(|part| part.mount_source().is_some())
-    {
-        return match visitor {
-            Some(mut visitor) => armour
-                .write_glb_with_vertex_origins(animations, options, textures, writer, &mut visitor)
-                .map(WrittenRig::geometry),
-            None => armour
-                .write_glb_animated_with(animations, options, textures, writer)
-                .map(WrittenRig::geometry),
-        };
-    }
-    let (summary, emission) = match visitor {
-        Some(mut visitor) => armour.write_glb_animated_observed_with_vertex_origins(
-            animations,
-            options,
-            textures,
-            writer,
-            &mut visitor,
-        ),
-        None => armour.write_glb_animated_observed(animations, options, textures, writer),
+        .any(|part| part.mount_source().is_some());
+    let (summary, emission) = match (mounts, observe) {
+        (true, true) => armour
+            .write_glb_animated_observed_with_vertex_origins(
+                animations,
+                options,
+                textures,
+                writer,
+                &mut visitor,
+            )
+            .map(|(summary, emission)| (summary, Some(emission))),
+        (true, false) => armour
+            .write_glb_animated_observed(animations, options, textures, writer)
+            .map(|(summary, emission)| (summary, Some(emission))),
+        (false, true) => armour
+            .write_glb_with_vertex_origins(animations, options, textures, writer, &mut visitor)
+            .map(|summary| (summary, None)),
+        (false, false) => armour
+            .write_glb_animated_with(animations, options, textures, writer)
+            .map(|summary| (summary, None)),
     }?;
-    let origins = armour
-        .worn_mount_origins(&emission)
+    let worn_origins = emission
+        .as_ref()
+        .map(|emission| armour.worn_mount_origins(emission))
+        .transpose()
         .map_err(|error| GltfError::Write(io::Error::other(error)))?;
     Ok(WrittenRig {
         summary,
-        worn_origins: Some(origins),
+        worn_origins,
+        body_zones: zones
+            .map(|zones| zones.finish(armour))
+            .transpose()
+            .map_err(GltfError::Write)?,
     })
 }
 
@@ -229,6 +254,7 @@ fn rig(armour: &Armour, written: &GlbSummary) -> Rig {
     Rig {
         body: Some(armour.variant().code().to_owned()),
         worn_mount_provenance: None,
+        body_zones: None,
         skeleton: armour.skeleton_file().to_owned(),
         bones: written.bones,
         skinned_meshes: written.skinned_meshes,

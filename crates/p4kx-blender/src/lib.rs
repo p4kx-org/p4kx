@@ -22,6 +22,8 @@
 
 mod build;
 mod character;
+mod character_body_zone_origins;
+mod character_body_zones;
 mod collect;
 mod collision_helper_cdf;
 mod collision_helper_document;
@@ -36,6 +38,7 @@ mod finite;
 mod interior;
 mod items;
 mod manifest;
+mod manifest_body_zones;
 mod manifest_light;
 mod manifest_materials;
 mod manifest_mesh;
@@ -68,6 +71,7 @@ mod player_bundle;
 mod player_bundle_output;
 mod player_bundle_rows;
 mod player_bundle_wire;
+mod player_default_chf;
 mod player_rig_clip;
 mod player_source;
 mod player_source_body;
@@ -133,6 +137,10 @@ pub use manifest::{
     MaterialTextures, Mesh, MeshMaterial, Node, NodeKind, Options, Replacement, Source,
     TEXTURES_FOLDER, Texture, Unit,
 };
+pub use manifest_body_zones::{
+    BodyZoneData, BodyZoneGeometry, BodyZoneMap, BodyZonePrimitive, ClothingBodyCoverage,
+    PartBodyZones,
+};
 pub use manifest_light::{Light, LightKind};
 pub use manifest_materials::{
     AlphaMode, AuthoredMaterialOrigin, Element, MaterialDescription, MaterialLayer,
@@ -165,6 +173,9 @@ pub(crate) type PackageResult<T> = Result<T, PackageError>;
 
 pub use player_bundle::write_player_source_bundle;
 pub use player_bundle_wire::{player_bundle_manifest_schema, player_bundle_record_schema};
+pub use player_default_chf::{
+    PlayerDefaultChf, PlayerDefaultChfPayloadError, read_player_default_chf,
+};
 pub use player_source::{
     PlayerDocument, PlayerDocumentRejection, PlayerDocumentSink, PlayerSource, PlayerSourceCapture,
     PlayerSourceError, RejectedPlayerDocument, player_source_schema,

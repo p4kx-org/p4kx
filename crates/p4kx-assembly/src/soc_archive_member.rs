@@ -44,6 +44,10 @@ impl SocArchiveMember {
     pub fn payload(&self) -> Result<&[u8], &SocMemberError> {
         self.payload.as_deref()
     }
+    /// Returns the observed physical Entry and its original payload or read failure.
+    pub fn into_parts(self) -> (EntryOrigin, Result<Vec<u8>, SocMemberError>) {
+        (self.origin, self.payload)
+    }
 }
 
 /// The reason an admitted SOC payload could not be read.

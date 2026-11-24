@@ -608,7 +608,9 @@ head of the Loadout is dropped. `--anim` looks first in the character's own anim
 writes the own folder's animations only); `--anim-folder FOLDER` (repeatable) looks only in the
 named folders. `name` is the Character's name (`--name`,
 else the CHF's file name without extension, else the body variant). `chf` is the CHF path as
-given and `null` without `--chf`; `rig` is the head rig and `null` without a CHF. `loadout` is
+given and `null` without `--chf`. With `--default-chf --body male|female`, `default_chf` contains
+the selected Archive Entry's original `path` and zero-based `entry_index`. The option cannot be
+combined with `--chf`. `rig` names the selected head rig when present. `loadout` is
 `null` without `--loadout` and `replaced` lists the pieces of the Loadout that a `--piece` took the
 place of, both as for `p4kx armour glb`. `parts` lists the skins worn on the skeleton, the body
 first (`origin` `body` or `piece`), with the skin `file` and the number of `morph_targets` of the
@@ -623,7 +625,9 @@ Archive, that lies in a Star Citizen installation or that exists and is no earli
 `--chf` that holds no face DNA or whose DNA belongs to an unknown head rig, and a `--chf` beside
 `--body` exit with code 2 and write nothing; a head that could not be shaped, or expressions that
 could not be made, exit with code 1 after the package is written; an Archive key that is missing
-or wrong exits with code 7.
+or wrong exits with code 7. For `--default-chf`, a missing or ambiguous Entry or a head rig for a
+different body exits with code 2. An unreadable or malformed default CHF exits with code 3,
+unless the read requires an Archive key. These failures leave the package destination untouched.
 
 ## `p4kx interior glb <archive> <container>... --out <file> --json`
 

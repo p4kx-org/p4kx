@@ -124,6 +124,7 @@ fn rig(assembly: &Assembly, written: &GlbSummary) -> Rig {
     Rig {
         body: None,
         worn_mount_provenance: None,
+        body_zones: None,
         skeleton: assembly
             .root()
             .and_then(Part::geometry)

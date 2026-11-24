@@ -27,7 +27,8 @@ pub(crate) enum CharacterAction {
     /// with shape keys and actions. The Character is what `chf glb` and `armour glb` write: the
     /// head of a CHF file with its eyes, teeth and hair (--chf), pieces of armour and clothing
     /// (--piece, --loadout), on the default body of the CHF's or the chosen variant (--body).
-    /// Without a CHF, a piece or a Loadout, the bare body is written. The materials are in the
+    /// A default head can be selected from the Archive with --default-chf. Without a head,
+    /// a piece or a Loadout, the bare body is written. The materials are in the
     /// GLB file, there are no texture files. Pieces that cannot be fitted and animations that fit
     /// nothing are listed in the manifest and the report.
     #[command(after_help = EXIT_CODES_HELP)]
@@ -66,7 +67,11 @@ pub(crate) struct CharacterPackageArgs {
     /// face DNA or for an unknown head rig is invalid input.
     #[arg(long, value_name = "FILE", conflicts_with = "body")]
     pub(crate) chf: Option<PathBuf>,
-    /// The body variant to wear the pieces on when there is no CHF, see `p4kx armour bodies`.
+    /// Uses the Archive's default CHF for the chosen --body, including the head and its items.
+    /// Armour and clothing come from the explicit piece and Loadout selections.
+    #[arg(long, requires = "body", conflicts_with = "chf")]
+    pub(crate) default_chf: bool,
+    /// The body variant to wear the pieces on, see `p4kx armour bodies`.
     #[arg(long, value_enum, value_name = "VARIANT")]
     pub(crate) body: Option<BodyArg>,
     /// A piece to wear: an Entity by class name, GUID or record path, as for `armour glb --piece`.
@@ -100,6 +105,9 @@ pub(crate) struct CharacterPackageArgs {
     /// Writes a source vertex map for the rigged GLB.
     #[arg(long)]
     pub(crate) vertex_maps: bool,
+    /// Writes authored body-zone coverage and the emitted body primitives.
+    #[arg(long)]
+    pub(crate) body_zones: bool,
     /// Writes only the expression with this name as a morph target, as for `chf glb
     /// --expression`; repeat the option for more.
     #[arg(

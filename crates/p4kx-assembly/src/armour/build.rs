@@ -15,8 +15,11 @@ use super::materials::{Library, drawn_with, read_libraries};
 use super::own_face::own_head;
 use super::read_models::{Loaded, choose, read_models};
 use super::shape::shaped;
-use super::zones::{Coverage, without_covered};
-use super::{Armour, ArmourPart, BodyVariant, Piece, ShapeArchiveSources};
+use super::zones::without_covered;
+use super::{
+    Armour, ArmourPart, BodyVariant, ClothingZoneCoverage, ClothingZones, Piece,
+    ShapeArchiveSources,
+};
 use crate::build_palettes::Palettes;
 use crate::{
     AssemblyError, AssemblyOptions, Issue, IssueKind, ModelFailure, ModelProvider, PaletteProvider,
@@ -181,6 +184,7 @@ fn part_of(
         archive_sources: Arc::clone(&found.archive_sources),
         definition_origin: found.definition_origin.clone(),
         geometry_selector: job.geometry_selector.clone(),
+        clothing_zones: job.clothing_zones.clone(),
         material_selector: job.material_selector.clone().or_else(|| {
             if job.material.is_none() && found.model.material_library.is_some() {
                 job.geometry_selector.clone()
@@ -201,12 +205,17 @@ fn part_of(
 }
 
 /// Returns the body zones the worn clothing of the jobs that have a model covers.
-fn covering<'j>(jobs: &'j [Job], chosen: &[Option<&Loaded>], variant: BodyVariant) -> Coverage<'j> {
-    Coverage::of(
+fn covering<'jobs>(
+    jobs: &'jobs [Job],
+    chosen: &[Option<&Loaded>],
+    variant: BodyVariant,
+) -> ClothingZoneCoverage<'jobs> {
+    ClothingZoneCoverage::of(
         jobs.iter()
             .zip(chosen)
             .filter(|(_, found)| found.is_some())
-            .flat_map(|(job, _)| job.zones.iter()),
+            .filter_map(|(job, _)| job.clothing_zones.as_deref())
+            .flat_map(ClothingZones::known_chunks),
         variant,
     )
 }

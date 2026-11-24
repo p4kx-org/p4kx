@@ -21,6 +21,7 @@ pub const FORMAT_VERSION: &str = "1.21";
 
 pub(crate) const PAINT_FORMAT_VERSION: &str = "1.22";
 pub(crate) const PALETTE_DECAL_FORMAT_VERSION: &str = "1.23";
+pub(crate) const CHARACTER_BODY_ZONES_FORMAT_VERSION: &str = "1.24";
 
 /// The name of the manifest file in the package folder.
 pub const MANIFEST_FILE: &str = "scene.json";

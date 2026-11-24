@@ -8,6 +8,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from .body_zones import BodyZoneMap, read as read_body_zones
+from .manifest_fields import PackageError
 from .worn_mount_provenance import WornMountProvenance, read as read_worn_mount_provenance
 
 MAX_RIG_ITEMS = 100_000
@@ -49,6 +51,7 @@ class Rig:
     parts: tuple[RigPart, ...]
     animations: tuple[RigClip, ...]
     worn_mount_provenance: WornMountProvenance | None = None
+    body_zones: BodyZoneMap | None = None
 
 
 def parse_rig(value: object, where: str) -> Rig:
@@ -66,6 +69,9 @@ def parse_rig(value: object, where: str) -> Rig:
     if (body is not None and not isinstance(body, str)) or not isinstance(skeleton, str):
         raise RigError(f"{where}: body, when present, and skeleton must be strings.")
     _count(entry, "embedded_textures", where)
+    zones = entry.get("body_zones")
+    if zones is not None and not body:
+        raise PackageError(f"{where}.body_zones requires a Character body.")
     return Rig(
         body=body,
         bones=_count(entry, "bones", where),
@@ -74,6 +80,10 @@ def parse_rig(value: object, where: str) -> Rig:
         parts=parts,
         animations=animations,
         worn_mount_provenance=read_worn_mount_provenance(entry.get("worn_mount_provenance")),
+        body_zones=(
+            read_body_zones(zones, f"{where}.body_zones", tuple(part.origin for part in parts))
+            if zones is not None else None
+        ),
     )
 
 
