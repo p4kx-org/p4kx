@@ -50,10 +50,6 @@ runs:
       if: runner.os == 'Linux'
       shell: pwsh
       run: sudo apt-get update && sudo apt-get install -y --no-install-recommends mesa-vulkan-drivers libvulkan1 libasound2t64 libx11-6 libxcursor1 libxi6 libxrandr2 libxkbcommon-x11-0 libegl1 xvfb
-    - name: Use native Metal for macOS graphical checks
-      if: runner.os == 'macOS'
-      shell: pwsh
-      run: 'Add-Content -LiteralPath $env:GITHUB_ENV -Value "WGPU_BACKEND=metal" -Encoding utf8NoBOM'
     - name: Tests with nextest, one native process per test
       env:
         P4KX_REQUIRE_RENDER_ADAPTER: '1'

@@ -75,6 +75,8 @@ jobs:
       - name: Execute the complete Apple Silicon test suite
         if: inputs.target == 'aarch64-apple-darwin'
         uses: ./.github/actions/test-native-archive
+        env:
+          WGPU_BACKEND: metal
         with:
           partition: '1'
           partition-count: ${{ inputs.count }}
