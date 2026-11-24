@@ -9,7 +9,7 @@ use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, DatasetAvailability,
     ParsedCatalogQueries,
 };
-use p4kx_extraction::{Archive, SourceInventory};
+use p4kx_extraction::{Archive, Build, SourceInventory, SourcedValue};
 use serde::Serialize;
 
 use super::equipment_input;
@@ -127,21 +127,55 @@ pub(super) struct QueryWitness<'scope> {
     capture: Option<DigestCapture<'scope>>,
 }
 
+pub(super) struct ComponentRows<'scope, Row> {
+    pub(super) build: Option<&'scope Build>,
+    pub(super) availability: DatasetAvailability,
+    pub(super) rows: &'scope [Row],
+    pub(super) coverage: &'scope CatalogRecordCoverage,
+    pub(super) inventory: &'scope SourceInventory,
+}
+
+impl<'scope, Row> ComponentRows<'scope, Row> {
+    pub(super) fn equipment(snapshot: &'scope EquipmentSnapshot<'_, Row>) -> Self {
+        Self {
+            build: snapshot.build(),
+            availability: snapshot.availability(),
+            rows: snapshot.rows(),
+            coverage: snapshot.coverage(),
+            inventory: snapshot.source_inventory(),
+        }
+    }
+}
+
 impl QueryWitness<'_> {
     pub(super) fn inspect<Row: Serialize>(
         self,
         snapshot: &EquipmentSnapshot<'_, Row>,
         owner: impl Fn(&Row) -> &ComponentOwner,
     ) -> TestResult<DatasetAvailability> {
+        self.inspect_rows(&ComponentRows::equipment(snapshot), |row| {
+            let owner = owner(row);
+            physical_slot(owner.record_index(), owner.component_ordinal())
+        })
+    }
+
+    pub(super) fn inspect_rows<Row: Serialize>(
+        self,
+        snapshot: &ComponentRows<'_, Row>,
+        slot: impl Fn(&Row) -> TestResult<PhysicalSlot>,
+    ) -> TestResult<DatasetAvailability> {
         let path = self.path;
-        if snapshot.build().is_none() || snapshot.build() != self.archive.build() {
+        let &ComponentRows {
+            build,
+            availability,
+            rows,
+            coverage,
+            inventory,
+        } = snapshot;
+        if build.is_none() || build != self.archive.build() {
             return Err(format!("{path}: component query Build does not match").into());
         }
-        let rows = snapshot.rows();
-        let availability = snapshot.availability();
-        let coverage = snapshot.coverage();
         require_complete(path, availability, rows.len(), coverage)?;
-        let inventory = snapshot.source_inventory();
         let uses = inventory.use_count();
         let sources = inventory.source_count();
         if !rows.is_empty() && (uses == 0 || sources == 0) {
@@ -151,8 +185,8 @@ impl QueryWitness<'_> {
         }
 
         match self.capture {
-            Some(capture) => capture.retain(rows, owner, inventory)?,
-            None => check_cold_physical_slots(rows, owner)?,
+            Some(capture) => capture.retain(rows, slot, inventory)?,
+            None => check_cold_physical_slots(rows, slot)?,
         }
         print_line(&format!(
             "{} SDK: dataset={path} availability={availability:?} rows={} inventoryUses={uses} inventorySources={sources} skippedLeftovers={}",
@@ -168,7 +202,7 @@ impl DigestCapture<'_> {
     fn retain<Row: Serialize>(
         self,
         rows: &[Row],
-        owner: impl Fn(&Row) -> &ComponentOwner,
+        slot: impl Fn(&Row) -> TestResult<PhysicalSlot>,
         inventory: &SourceInventory,
     ) -> TestResult {
         if rows.is_empty() {
@@ -176,8 +210,7 @@ impl DigestCapture<'_> {
         }
         let mut references = HashSet::new();
         for row in rows {
-            self.table
-                .retain_direct(physical_slot(owner(row))?, row, &mut references)?;
+            self.table.retain_direct(slot(row)?, row, &mut references)?;
         }
         self.inventory.retain(inventory, references)
     }
@@ -185,29 +218,33 @@ impl DigestCapture<'_> {
 
 fn check_cold_physical_slots<Row>(
     rows: &[Row],
-    owner: impl Fn(&Row) -> &ComponentOwner,
+    slot: impl Fn(&Row) -> TestResult<PhysicalSlot>,
 ) -> TestResult {
     let mut previous = None;
     for row in rows {
-        let slot = physical_slot(owner(row))?;
-        if previous.is_some_and(|prior| prior >= slot) {
-            return Err("the cold component query has unordered or repeated physical slots".into());
+        let current = slot(row)?;
+        if previous.is_some_and(|prior| prior >= current) {
+            return Err(format!(
+                "the cold component query has an unordered or repeated physical slot at {current:?}"
+            )
+            .into());
         }
-        previous = Some(slot);
+        previous = Some(current);
     }
     Ok(())
 }
 
-fn physical_slot(owner: &ComponentOwner) -> TestResult<PhysicalSlot> {
+pub(super) fn physical_slot(
+    record_index: &SourcedValue<u32>,
+    component_ordinal: &SourcedValue<u32>,
+) -> TestResult<PhysicalSlot> {
     Ok(PhysicalSlot {
-        record_index: *owner
-            .record_index()
+        record_index: *record_index
             .value()
-            .ok_or("missing original Item Record index")?,
-        component_ordinal: *owner
-            .component_ordinal()
+            .ok_or("missing original owner Record index")?,
+        component_ordinal: *component_ordinal
             .value()
-            .ok_or("missing original Item Components ordinal")?,
+            .ok_or("missing original Components ordinal")?,
     })
 }
 

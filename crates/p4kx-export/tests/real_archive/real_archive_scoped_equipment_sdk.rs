@@ -44,6 +44,9 @@ mod resource_group_parity;
 #[path = "real_archive_terrain_definition_sdk_parity.rs"]
 mod terrain_definition_parity;
 
+#[path = "real_archive_electrical_behavior_sdk_parity.rs"]
+mod electrical_behavior_parity;
+
 #[path = "real_archive_npc_spawn_definition_sdk_parity.rs"]
 mod npc_spawn_definition_parity;
 
@@ -58,6 +61,9 @@ mod item_gameplay_parity;
 
 #[path = "real_archive_entity_component_sdk_parity.rs"]
 mod entity_component_parity;
+
+#[path = "real_archive_inventory_component_sdk_parity.rs"]
+mod inventory_component_parity;
 
 #[path = "real_archive_canonical_ship_sdk.rs"]
 mod canonical_ship;
