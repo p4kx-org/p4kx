@@ -42,6 +42,10 @@ mod selected_origins;
 #[path = "real_archive_catalog_selected_row.rs"]
 mod selected_row;
 
+#[path = "real_archive_catalog_selected_texts.rs"]
+mod selected_texts;
+pub(crate) use selected_texts::ScopedTextProof;
+
 #[path = "real_archive_catalog_selected_ships.rs"]
 mod selected_ships;
 pub(crate) use selected_row::check_selected_row;
@@ -137,8 +141,22 @@ impl BoundMeasurement {
         arrays: &[(&str, &[Value])],
         origins: &Origins,
     ) -> TestResult<Counts<TABLES>> {
+        self.verify_table_scope(paths, tables, arrays, origins, None)
+    }
+
+    pub(crate) fn verify_table_scope<const TABLES: usize>(
+        &self,
+        paths: [&str; TABLES],
+        tables: &[Table; TABLES],
+        arrays: &[(&str, &[Value])],
+        origins: &Origins,
+        texts: Option<&ScopedTextProof>,
+    ) -> TestResult<Counts<TABLES>> {
         self.watch.check()?;
         let mut capture = measurement::normal_capture();
+        if let Some(texts) = texts {
+            texts.project(&mut capture);
+        }
         for (path, table) in paths.iter().zip(tables) {
             capture.keep(&format!("{path}/availability"));
             capture.project(
@@ -163,6 +181,9 @@ impl BoundMeasurement {
             check_row_array_count(&catalog, path, rows.len())?;
         }
         origins.verify(&catalog)?;
+        if let Some(texts) = texts {
+            texts.verify(&catalog)?;
+        }
         self.watch.check()?;
         Ok(Counts {
             rows: tables.each_ref().map(|table| table.rows.len()),

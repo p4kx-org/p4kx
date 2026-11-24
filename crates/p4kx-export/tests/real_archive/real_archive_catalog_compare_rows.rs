@@ -10,6 +10,7 @@ use serde_json::Value;
 use super::digest_parity::{DigestedOrigins, DigestedRows};
 use super::selected_origins::SelectedOrigins;
 use super::selected_ships::SelectedShipIdentities;
+use super::selected_texts::SelectedTexts;
 use super::stream_parity::{MissionDispositionRows, RowDigest, StreamOrigins};
 use crate::real_archive_catalog_size::replay::bindings::check_catalog_selection;
 
@@ -19,6 +20,7 @@ pub(super) enum Projection<'scope> {
     ShipIdentities(SelectedShipIdentities),
     Rows(ComparedRows<'scope>),
     Origins(SelectedOrigins<'scope>),
+    ScopedTexts(SelectedTexts<'scope>),
     DigestedRows(DigestedRows<'scope>),
     DigestedOrigins(DigestedOrigins<'scope>),
     StreamRows(RowDigest),
@@ -39,6 +41,7 @@ impl<'de> DeserializeSeed<'de> for Projection<'_> {
             Self::ShipIdentities(ships) => ships.deserialize(deserializer),
             Self::Rows(rows) => rows.deserialize(deserializer),
             Self::Origins(origins) => origins.deserialize(deserializer),
+            Self::ScopedTexts(texts) => texts.deserialize(deserializer),
             Self::DigestedRows(rows) => rows.deserialize(deserializer),
             Self::DigestedOrigins(origins) => origins.deserialize(deserializer),
             Self::StreamRows(rows) => rows.deserialize(deserializer),
