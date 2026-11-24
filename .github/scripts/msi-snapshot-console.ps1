@@ -4,7 +4,7 @@ function New-P4kxMsiSnapshotConsole {
     param([ValidateRange(1,9)][int]$Sequence, [switch]$OriginalInstallBoundary)
     return @{sequence=$Sequence;revision=$env:GITHUB_SHA;run=$env:GITHUB_RUN_ID;attempt=$env:GITHUB_RUN_ATTEMPT;
         target=$env:P4KX_TARGET;pending='';bytes=0;seen=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal);
-        install_boundary=$OriginalInstallBoundary.IsPresent;request_sha256=$null;
+        install_boundary=$OriginalInstallBoundary.IsPresent;request_sha256=$null;install_checkpoint_json=$null;
         validate=(Get-Item 'Function:Read-P4kxMsiSnapshotConsoleRecord').ScriptBlock;
         read_checkpoint=(Get-Item 'Function:Read-P4kxMsiInstallCheckpointFrame').ScriptBlock;
         write=(Get-Item 'Function:Write-P4kxMsiSnapshotConsoleMarker').ScriptBlock}
@@ -89,6 +89,23 @@ function Read-P4kxMsiInstallCheckpointFrame([hashtable]$State, [string]$Line) {
     }
 }
 
+function Write-P4kxMsiInstallStepSummary([hashtable]$State, [bool]$SnapshotReturned) {
+    $path=$env:GITHUB_STEP_SUMMARY
+    if ($env:GITHUB_ACTIONS -cne 'true' -or [string]::IsNullOrEmpty($path) -or
+        -not $State.install_boundary -or $State.sequence -ne 3) { return }
+    $projection=$State.install_checkpoint_json
+    if ($null -eq $projection) {
+        if (-not $SnapshotReturned) { return }
+        $projection=@{snapshot_returned=$true;valid_frame=$false;completed_success=$false;
+            native_completion_unproven=$true;mutation_authority=$false} | ConvertTo-Json -Compress
+    }
+    if (-not $State.seen.Add('install-step-summary')) { return }
+    $newline=[Environment]::NewLine
+    $body=('### Native MSI install observation'+$newline+$newline+'    '+$projection+$newline)
+    try { [IO.File]::AppendAllText($path,$body) }
+    catch { Write-Warning 'Could not write the native MSI observation step summary.' -WarningAction Continue }
+}
+
 function Receive-P4kxMsiSnapshotConsole {
     param([hashtable]$State, [string]$Stream, [string]$Chunk)
     if ($Stream -ceq 'stage') {
@@ -117,6 +134,7 @@ function Receive-P4kxMsiSnapshotConsole {
         $checkpoint=& $State.read_checkpoint $State $line
         if ($null -ne $checkpoint -and $State.seen.Add('install-checkpoint')) {
             $summary=$checkpoint | ConvertTo-Json -Compress
+            $State.install_checkpoint_json=$summary
             Write-Host ('[P4KX-MSI-INSTALL-CHECKPOINT]'+$summary)
             if ($env:GITHUB_ACTIONS -ceq 'true') {
                 $message=$summary.Replace('%','%25').Replace([string][char]13,'%0D').Replace([string][char]10,'%0A')

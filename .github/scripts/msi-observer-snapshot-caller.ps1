@@ -137,6 +137,9 @@ function Invoke-P4kxMsiObserverSnapshot {
     else { $record.snapshot_returned=$returned }
     $record.failure_type=$(if($null -ne $failure){$failure.GetType().FullName}else{$null})
     Write-P4kxDetachedReceipt (Join-Path $capture 'caller-result.json') $record
-    if ($null -ne $console) { Write-P4kxMsiSnapshotConsoleMarker $console 'callerReturn' 'end' }
+    if ($null -ne $console) {
+        Write-P4kxMsiSnapshotConsoleMarker $console 'callerReturn' 'end'
+        Write-P4kxMsiInstallStepSummary $console $returned
+    }
     if ($null -ne $failure) { throw $failure }
 }

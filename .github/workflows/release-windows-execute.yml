@@ -101,7 +101,7 @@ jobs:
           .github/scripts/test-msi-feedback-chain-workflow.ps1
           .github/scripts/test-msi-phase-journal-encoding.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-phase-journal-encoding')
           .github/scripts/test-msi-feedback-parent.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-feedback-parent')
-          .github/scripts/test-msi-snapshot-console.ps1
+          .github/scripts/test-msi-snapshot-console.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-snapshot-console')
           .github/scripts/test-msi-snapshot-delay.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-snapshot-delay')
           .github/scripts/test-msi-snapshot-budget.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/msi-snapshot-budget')
           foreach ($case in @('Complete','Timeout','Admission')) {

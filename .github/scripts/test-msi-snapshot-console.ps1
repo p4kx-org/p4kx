@@ -1,6 +1,9 @@
+param([Parameter(Mandatory)][string]$Directory)
 $ErrorActionPreference='Stop'
+$null=New-Item -ItemType Directory -Path $Directory
 . (Join-Path $PSScriptRoot 'msi-snapshot-console.ps1')
-$saved=@{revision=$env:GITHUB_SHA;run=$env:GITHUB_RUN_ID;attempt=$env:GITHUB_RUN_ATTEMPT;target=$env:P4KX_TARGET;actions=$env:GITHUB_ACTIONS}
+$saved=@{revision=$env:GITHUB_SHA;run=$env:GITHUB_RUN_ID;attempt=$env:GITHUB_RUN_ATTEMPT;target=$env:P4KX_TARGET;actions=$env:GITHUB_ACTIONS;
+    summary=$env:GITHUB_STEP_SUMMARY}
 function Assert-SnapshotConsole([bool]$Condition,[string]$Message) { if (-not $Condition) { throw $Message } }
 function New-SnapshotConsoleLine([hashtable]$Changes=@{}) {
     $row=@{schema=1;role='native-msi-observer-progress';stage='parentState';status='begin';
@@ -82,6 +85,26 @@ try {
     $notice=([string]$published[1]).Substring($noticePrefix.Length)
     Assert-SnapshotConsole ($notice -ceq $summary -and $notice -cnotmatch '[\r\n%]' -and
         $notice -cnotmatch '"(?:revision|run|attempt|request_sha256)"') 'The checkpoint notice must be one safe line of existing sanitized fields.'
+    $header='### Native MSI install observation'+[Environment]::NewLine+[Environment]::NewLine
+    $env:GITHUB_STEP_SUMMARY=Join-Path $Directory 'observed.md'
+    Write-P4kxMsiInstallStepSummary $hostedBoundary $true
+    Write-P4kxMsiInstallStepSummary $hostedBoundary $true
+    $expected=$header+'    '+$summary+[Environment]::NewLine
+    Assert-SnapshotConsole ([IO.File]::ReadAllText($env:GITHUB_STEP_SUMMARY) -ceq $expected) 'The summary must write the typed projection exactly once.'
+
+    $env:GITHUB_STEP_SUMMARY=Join-Path $Directory 'returned.md'
+    $unframed=New-P4kxMsiSnapshotConsole 3 -OriginalInstallBoundary
+    $forged=New-InstallCheckpointFrame @{extra='raw-secret'}
+    Receive-P4kxMsiSnapshotConsole $unframed 'stdout' ($bindingLine+$forged) 6>&1 | Out-Null
+    Write-P4kxMsiInstallStepSummary $unframed $true
+    $fallback=[IO.File]::ReadAllText($env:GITHUB_STEP_SUMMARY).Substring($header.Length).Trim() | ConvertFrom-Json -AsHashtable
+    Assert-SnapshotConsole ($fallback.Count -eq 5 -and $fallback.snapshot_returned -eq $true -and $fallback.valid_frame -eq $false -and
+        $fallback.completed_success -eq $false -and $fallback.native_completion_unproven -eq $true -and
+        $fallback.mutation_authority -eq $false) 'A returned snapshot without an accepted frame must report observation only.'
+
+    $env:GITHUB_STEP_SUMMARY=$null
+    $withoutSummary=New-P4kxMsiSnapshotConsole 3 -OriginalInstallBoundary
+    Assert-SnapshotConsole (@(Write-P4kxMsiInstallStepSummary $withoutSummary $true *>&1).Count -eq 0) 'A missing summary destination must be ignored.'
     $env:GITHUB_ACTIONS='false'
     $stage=@(Receive-P4kxMsiSnapshotConsole $state 'stage' 'portalCleanup.begin' 6>&1)
     Assert-SnapshotConsole ($stage.Count -eq 1) 'A predefined cleanup boundary was not emitted.'
@@ -94,5 +117,5 @@ try {
     'PASS: bounded Snapshot console framing, context, predefined stages and unproven verdicts; no native execution.'
 } finally {
     $env:GITHUB_SHA=$saved.revision;$env:GITHUB_RUN_ID=$saved.run;$env:GITHUB_RUN_ATTEMPT=$saved.attempt;$env:P4KX_TARGET=$saved.target
-    $env:GITHUB_ACTIONS=$saved.actions
+    $env:GITHUB_ACTIONS=$saved.actions;$env:GITHUB_STEP_SUMMARY=$saved.summary
 }
