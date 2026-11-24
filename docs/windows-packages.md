@@ -265,6 +265,18 @@ unresolved.
 [AMD64 job](https://github.com/p4kx-org/p4kx/actions/runs/45315878218/job/138200239367) ·
 [ARM64 job](https://github.com/p4kx-org/p4kx/actions/runs/45315878218/job/138200239372)
 
+At PR merge `3dcb12e6cae223d2594ebac549b601d43a84e7ef`, the native ARM64 package
+job passed in 4 minutes 23 seconds. It uploaded the Finish observations and watchdog
+receipts for checkpoints 04 and 05, collected the terminal MSI lifecycle receipt and
+recorded installed and portable runtime evidence. The AMD64 job verified its own package
+digest. A connection reset while requesting the other package's signed download URL stopped
+that job before MSI execution.
+[Native ARM64](https://github.com/p4kx-org/p4kx/actions/runs/45327821298/job/138241903869) ·
+[Checkpoint 04](https://github.com/p4kx-org/p4kx/actions/runs/45327821298/artifacts/14893021939) ·
+[Checkpoint 05](https://github.com/p4kx-org/p4kx/actions/runs/45327821298/artifacts/14894095084) ·
+[Terminal MSI receipt](https://github.com/p4kx-org/p4kx/actions/runs/45327821298/artifacts/14893786316) ·
+[AMD64 download failure](https://github.com/p4kx-org/p4kx/actions/runs/45327821298/job/138241903849)
+
 For release acceptance, repeat the native lifecycle checks with the actual release candidate
 and bind both its MSI and portable ZIP to the candidate revision and run attempt. Record the
 Windows AMD64 desktop and WASAPI checks separately from the hosted package evidence.
