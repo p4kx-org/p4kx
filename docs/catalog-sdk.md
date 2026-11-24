@@ -1966,7 +1966,10 @@ minimum of 60,785,295,360 host bytes available. Its scratch directory stayed emp
 The separate archive test
 `installed_physical_shop_and_ammo_containers_match_retained_complete_catalog`
 checks these four rows and a physical Shop in one pass through the exact
-same-Build Normal Catalog, including the resolved source-use inventory.
+same-Build Normal Catalog, including the resolved source-use inventory. The selected four
+rows and one Shop row passed on PTU `13260598` against the complete retained package output.
+The Shop digest agreed with its standalone SDK query.
+[PTU package and replay measurements](ptu-export-compatibility-audit.md#complete-packaged-normal-catalog)
 
 ## Projectile ammunition
 

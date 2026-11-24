@@ -85,6 +85,15 @@ rows and compressed publication. The Shop diagnostics identified one empty
 inventory document. Shops referencing it retain their rows with an unavailable
 item list. Both stored and decoded sizes exceed the transport reference targets.
 
+The retained compressed Catalog also passed the paired physical Shop and ammunition-container
+SDK comparison. The selected Shop matched the standalone field and row digest. Two
+original ammunition-container configuration rows and two original binding rows matched
+their locations, values and source-use inventory in the same stream. The verifier completed
+in 4,730,708 ms with 1,302,433,792 peak private bytes, 1,216,573,440 peak working-set
+bytes and a minimum of 48,364,834,816 host bytes available. It bound the producer, original
+Archive and retained Catalog hashes. The result covers the selected Shop and the selected
+container scope.
+
 ## PTU 13215521 comparison
 
 The installed PTU manifest identifies change `13215521`. The checks use installed LIVE
