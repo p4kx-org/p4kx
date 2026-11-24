@@ -253,6 +253,26 @@ class GUID. Query sessions can reuse a parsed DataForge. Geology asset reference
 use Archive directory lookups for geometry, material and mineable paths. The
 queries leave models, materials, textures and audio payloads unopened.
 
+### Installed Terrain cold reads
+
+On Windows AMD64, each standalone query ran in its own process on LIVE
+`13220821` and PTU `13260598`. Numeric counts below are Available results.
+
+| Definitions | LIVE | PTU |
+| --- | ---: | ---: |
+| `ecosystems` | 131 | 163 |
+| `shadingClasses` | Absent | 13 |
+| `geologySets` | Absent | 6 |
+| `geologyTextureSets` | Absent | 3 |
+| `geologyAssets` | Absent | 68 |
+| `creatures` | Absent | 6 |
+| `climateAssets` | Absent | 35 |
+
+All 14 reads completed with stable Build and Archive stamps. The largest
+private commit was 1,137,717,248 bytes and the largest working set was
+1,058,566,144 bytes. The verifier was built from
+`eed6c4b45f7faf4ce325c3a99f6f97281a33b572`.
+
 ## Weather configurations
 
 Use `catalog_queries::weather::with_electrical_behaviors` for the canonical
@@ -889,6 +909,14 @@ The query reads selected bodies and the headers needed to describe their
 references. Query a referenced family separately to read its authored body.
 It opens no locale or world placement inputs and leaves runtime NPC selection,
 conditions and spawning to the game.
+
+On Windows AMD64 all five standalone families returned Absent on LIVE
+`13220821`. On PTU `13260598`, they returned 27 archetypes, 314 class pools,
+44 auto-spawn configurations, 37 sets and 105 encounter indices, all Available.
+The ten separate processes completed with stable Build and Archive stamps.
+The largest private commit was 1,115,009,024 bytes and the largest working set
+was 1,032,044,544 bytes. These reads used the verifier at
+`eed6c4b45f7faf4ce325c3a99f6f97281a33b572`.
 
 ## Mission location templates
 
