@@ -30,8 +30,6 @@ pub(super) fn read() -> TestResult<Route> {
         CatalogRecordSelection::All,
         CatalogLanguageSelection::Selected(&[]),
         None,
-        |snapshot| {
-            Route::queried_rows("/definitions/contractScopes", snapshot.rows(), None)
-        },
+        |snapshot| Route::queried_rows("/definitions/contractScopes", snapshot.rows(), None),
     )?
 }
