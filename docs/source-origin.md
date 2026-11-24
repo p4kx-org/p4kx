@@ -278,6 +278,13 @@ used by each companion lookup and the original container and kind ranges for all
 11 `skipped` rows per Build. File and usage origins carry incomplete contributor sets. Synthetic
 coverage includes encrypted and unbound inputs, the `unknown` usage state and MCP pagination.
 
+The same installed comparison checked 182 node rows and 729 original source
+sites in each Build. An independent read of the primary Entry's authored node
+chunk matched the node count, names, parent links, geometry type and helper
+flag, including their exact field coordinates and physical source identity.
+Synthetic fixtures check original IVO and CrCh transform and property ranges,
+loose inputs and the shared MCP node page.
+
 ## Standalone model GLB
 
 `p4kx model glb` publishes a digest-bound sibling `<file>.p4kx-origin.jsonl`.
