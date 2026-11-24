@@ -35,6 +35,9 @@ mod location_vocabulary_parity;
 #[path = "real_archive_loot_definition_sdk_parity.rs"]
 mod loot_definition_parity;
 
+#[path = "real_archive_jump_configuration_sdk_parity.rs"]
+mod jump_configuration_parity;
+
 #[path = "real_archive_canonical_ship_sdk.rs"]
 mod canonical_ship;
 
