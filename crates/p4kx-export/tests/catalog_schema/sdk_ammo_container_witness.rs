@@ -97,11 +97,7 @@ fn verify(snapshot: &WeaponSourceSnapshot<'_>, catalog: &Value) -> TestResult<Ro
         return Err("the two serialized SDK rows".into());
     };
     verify_attachment_sources(first, second, snapshot.source_inventory(), catalog)?;
-    Route::queried_rows(
-        AMMO_CONTAINERS,
-        &owner.ammo_containers,
-        "the visitor matches ordered container fields in the synthetic Normal Catalog. Standalone visitor memory verified on LIVE 13220821 and PTU 13260598. Installed parity remains open",
-    )
+    Route::queried_rows(AMMO_CONTAINERS, &owner.ammo_containers, None)
 }
 
 fn verify_attachment_sources(

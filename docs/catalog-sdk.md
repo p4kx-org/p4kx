@@ -2079,8 +2079,17 @@ The Archive and manifest were unchanged at the end of each run.
 | PTU `13260598` | 991 | 924 | 490 | 1,414 | 58,173 | 1,114,898,432 | 1,032,060,928 |
 
 Both process peaks stayed under 2,000,000,000 bytes. The scope is the directly authored
-rows and their per-owner inventories. Comparison with the complete Normal Catalog also checks
-the producer's separately linked magazine dependencies.
+rows and their per-owner inventories.
+
+The same executable matched all three ordered datasets and their contributing source
+uses against each Build's complete Normal Catalog. It also checked the producer's
+separately linked magazine scope. Each comparison resolved its contributing uses to one
+physical source.
+
+| Build | Normal producer | Contributing uses | Elapsed seconds | Peak private commit (bytes) | Peak working set (bytes) |
+| --- | --- | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | `23addc5e164f65a28a6f258302b30453b331edce` | 6,282,132 | 4,771.626 | 1,786,421,248 | 1,787,920,384 |
+| PTU `13260598` | `93d92ca20bef8a8c3731339214a3301124ade7ba` | 6,428,761 | 4,462.640 | 1,819,320,320 | 1,821,450,240 |
 
 The weapon component exposes its fire and aim slots, local action nodes and their original
 ordinals. `mode_kind()` classifies each action. For single and rapid projectile actions,

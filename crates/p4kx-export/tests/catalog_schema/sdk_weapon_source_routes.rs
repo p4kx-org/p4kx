@@ -107,15 +107,7 @@ fn verify(snapshot: &WeaponSourceSnapshot<'_>, record_index: u32) -> TestResult<
     }
 
     Ok([
-        Route::queried_rows(
-            WEAPON_ACTIONS,
-            &owner.weapon_actions,
-            "physical Item and full visitor match the synthetic Catalog. Standalone visitor memory verified on LIVE 13220821 and PTU 13260598. Installed parity remains open",
-        )?,
-        Route::queried_rows(
-            AMMO_BINDINGS,
-            &owner.ammo_bindings,
-            "the visitor and physical Ammo target joins match the synthetic producer. Standalone visitor memory verified on LIVE 13220821 and PTU 13260598. Installed parity remains open",
-        )?,
+        Route::queried_rows(WEAPON_ACTIONS, &owner.weapon_actions, None)?,
+        Route::queried_rows(AMMO_BINDINGS, &owner.ammo_bindings, None)?,
     ])
 }
