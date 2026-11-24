@@ -269,6 +269,15 @@ counts. Suppressing one range of a drawn piece affects the PNG.
 Unobserved inputs keep the contributor set incomplete. A known encrypted
 input still gives the artifact a positive marker.
 
+## Model inspection
+
+Installed LIVE 13220821 and PTU 13260598 each yielded 20 Model chunk rows from seven
+checksum-verified Entries. The comparison checked the physical owner and header ranges for eight
+primary chunk rows and 12 geometry companion rows per Build. It also checked the primary path
+used by each companion lookup and the original container and kind ranges for all nine `read` and
+11 `skipped` rows per Build. File and usage origins carry incomplete contributor sets. Synthetic
+coverage includes encrypted and unbound inputs, the `unknown` usage state and MCP pagination.
+
 ## Standalone model GLB
 
 `p4kx model glb` publishes a digest-bound sibling `<file>.p4kx-origin.jsonl`.
