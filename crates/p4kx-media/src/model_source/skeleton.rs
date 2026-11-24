@@ -230,17 +230,27 @@ fn bind_poses(
         ("model_space", field.world_pose()),
     ] {
         bind(prepared, key, span.clone(), origins, writer)?;
-        for (name, start, end) in [
-            ("rotation_xyzw", 0, 16),
-            ("translation_z_up_metres", 16, 28),
-        ] {
+        let word = size_of::<f32>() as u64;
+        for (name, first, count) in [("rotation_xyzw", 0, 4), ("translation_z_up_metres", 4, 3)] {
+            let vector = format!("{key}/{name}");
+            let start = span.start + first * word;
             bind(
                 prepared,
-                &format!("{key}/{name}"),
-                span.start + start..span.start + end,
+                &vector,
+                start..start + count * word,
                 origins,
                 writer,
             )?;
+            for component in 0..count {
+                let start = start + component * word;
+                bind(
+                    prepared,
+                    &format!("{vector}/{component}"),
+                    start..start + word,
+                    origins,
+                    writer,
+                )?;
+            }
         }
     }
     Ok(())

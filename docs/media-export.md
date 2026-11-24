@@ -294,7 +294,8 @@ versions and malformed data. Each admitted model-skeleton-bone row uses the
 physical chunk and original bone ordinals. It carries the authored name with a
 UTF-8 repair indicator, controller ID, parent and optional driven node, and the
 stored relative and model-space bind poses as XYZW quaternions and Z-up metres.
-The exact original bytes of every field remain reachable through the source receipt.
+Each rotation and translation component in the source receipt addresses its own
+four-byte span. The pose and vector fields retain their full original spans.
 
 Model collision Media additionally retains each supported NodeMeshCombo row, including helper
 nodes and nodes with no rendered mesh. The `model-physics-node` record carries its original

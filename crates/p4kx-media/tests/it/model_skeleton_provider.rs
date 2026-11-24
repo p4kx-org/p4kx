@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::path::Path;
+
 use p4kx_extraction::chunks::ivo;
 use p4kx_extraction::{Archive, OpenOptions};
 use p4kx_media::{ExportOptions, MediaKind, MediaRecord};
@@ -35,12 +37,15 @@ fn model_skeletons_keep_physical_chunk_and_bone_coordinates() -> TestResult {
     };
     let index = support::published(p4kx_media::export(&archive, &out, &options)?)?;
     let rows = support::records(&out, &index, "model.jsonl")?;
-    let bone_row = assert_rows(&rows)?;
-    let original = offsets.first().copied().ok_or("physical skeleton offset")?;
-    let location = json!([original + 84, original + 100].map(|word| word.to_string()));
+    let (expanded_bone, compact_bone) = assert_rows(&rows)?;
+    let &[expanded, compact, ..] = offsets.as_slice() else {
+        return Err("physical skeleton offsets".into());
+    };
+    let base = out.join(&index.artifact_base);
+    let location = json!([expanded + 84, expanded + 100].map(|word| word.to_string()));
     let uses = field_uses(
-        &out.join(&index.artifact_base),
-        bone_row,
+        &base,
+        expanded_bone,
         "/data/payload/relative/rotation_xyzw",
         0,
         true,
@@ -50,10 +55,51 @@ fn model_skeletons_keep_physical_chunk_and_bone_coordinates() -> TestResult {
             .any(|fact| fact.pointer("/location/indices") == Some(&location)),
         "rotation refers to its exact original word span"
     );
+    assert_pose_words(&base, expanded_bone, expanded + 84, expanded + 112)?;
+    assert_pose_words(&base, compact_bone, compact + 117, compact + 173)?;
     Ok(())
 }
 
-fn assert_rows(rows: &[MediaRecord]) -> Result<usize, Box<dyn std::error::Error>> {
+fn assert_pose_words(base: &Path, bone: usize, relative: u64, model_space: u64) -> TestResult {
+    let word = size_of::<f32>() as u64;
+    for (pose, start) in [("relative", relative), ("model_space", model_space)] {
+        for (vector, first, count) in [("rotation_xyzw", 0, 4), ("translation_z_up_metres", 4, 3)] {
+            for component in 0..count {
+                let name = format!("{pose}/{vector}/{component}");
+                let field = format!("/data/payload/{name}");
+                let uses = field_uses(base, bone, &field, 0, true)?;
+                let [usage] = uses.as_slice() else {
+                    return Err(format!("expected one original payload word at {field}").into());
+                };
+                let start = start + (first + component) * word;
+                let range = json!([start, start + word].map(|position| position.to_string()));
+                assert_eq!(
+                    usage.pointer("/location/namespace").and_then(Value::as_str),
+                    Some("model-byte-range"),
+                    "physical source namespace at {field}"
+                );
+                assert_eq!(
+                    usage.pointer("/location/field").and_then(Value::as_str),
+                    Some(name.as_str()),
+                    "source field at {field}"
+                );
+                assert_eq!(
+                    usage.pointer("/location/indices"),
+                    Some(&range),
+                    "original scalar word span at {field}"
+                );
+                assert_eq!(
+                    usage.get("role").and_then(Value::as_str),
+                    Some("payload"),
+                    "payload role at {field}"
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+fn assert_rows(rows: &[MediaRecord]) -> Result<(usize, usize), Box<dyn std::error::Error>> {
     let validator = jsonschema::validator_for(&p4kx_media::builtin_record_schema()?)?;
     for row in rows {
         assert!(
@@ -82,7 +128,7 @@ fn assert_rows(rows: &[MediaRecord]) -> Result<usize, Box<dyn std::error::Error>
         Some(&json!([0.5, 0.5, 0.5, 0.5])),
         "stored XYZW quaternion",
     );
-    let compact = row(rows, "model-skeleton-bone", &[1, 1])?.1;
+    let (compact_row, compact) = row(rows, "model-skeleton-bone", &[1, 1])?;
     assert_eq!(
         compact.data.pointer("/payload/node"),
         Some(&json!(1)),
@@ -106,7 +152,7 @@ fn assert_rows(rows: &[MediaRecord]) -> Result<usize, Box<dyn std::error::Error>
         4,
         "one row for each measured original bone",
     );
-    Ok(bone_row)
+    Ok((bone_row, compact_row))
 }
 
 fn row<'a>(
