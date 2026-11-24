@@ -476,6 +476,31 @@ Windows write-transfer bytes for the replay process. The launcher produced
 no terminal receipt or process exit code. The producer measurements above
 have their own Windows lifetime counters.
 
+### Packaged Normal rehearsal on LIVE 13220821 and PTU 13260598
+
+The Windows AMD64 portable CLI from merge revision
+`24c08bcbff2299b88eff84bf3f7e8f592760b99b` completed both unfiltered Normal
+exports. Its source tree matches integration revision `270d86626`. Both runs
+used one Rayon worker at below-normal priority, Zstandard level 3 and the
+Unix-epoch export time. The executable and installed Archive stamps matched
+before and after each run.
+[Native Windows AMD64 package](https://github.com/p4kx-org/p4kx/actions/runs/45478285490/job/138745091943)
+
+| Build | Wall time (s) | Peak working set (B) | Peak private commit (B) | Minimum sampled host RAM available (B) |
+| --- | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 1,856.028 | 35,521,933,312 | 38,381,113,344 | 14,010,568,704 |
+| PTU `13260598` | 2,102.871 | 36,689,035,264 | 39,081,578,496 | 13,142,003,712 |
+
+| Build | Compressed file (B) | Measured decoded size (B) | Peak temporary bytes (writer) | Process writes (B) |
+| --- | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 1,466,921,003 | 77,928,045,838 | 1,917,192,830 | 1,917,202,572 |
+| PTU `13260598` | 1,718,250,277 | 80,649,568,237 | 2,217,352,810 | 2,217,362,862 |
+
+Windows reported both process lifetime peaks after exit. Both private peaks
+meet the strict 40,000,000,000-byte producer limit on the measured host.
+The independent full provenance replay and exact final release-candidate
+measurement are separate acceptance checks.
+
 ## Measuring a complete export
 
 The installed regression checks verify decoded and stored byte counts against the actual writer
