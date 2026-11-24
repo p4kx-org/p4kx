@@ -2871,14 +2871,15 @@ Windows AMD64 process with one worker. Each returned the full corresponding row 
 
 | Build | Rows | Elapsed ms | Peak private bytes | Peak working set bytes |
 | --- | ---: | ---: | ---: | ---: |
-| LIVE `13220821` | 205 | 38,367 | 1,512,280,064 | 1,493,921,792 |
+| LIVE `13220821` (earlier mapping) | 205 | 38,367 | 1,512,280,064 | 1,493,921,792 |
 | PTU `13248297` | 203 | 38,613 | 1,531,928,576 | 1,514,065,920 |
+| LIVE `13220821` (current mapping) | 227 | 46,036 | 1,571,835,904 | 1,558,986,752 |
 | PTU `13260598` | 225 | 58,167 | 1,591,414,784 | 1,581,993,984 |
 
-All three fresh processes stayed under 2 GB and created no scratch files.
-The LIVE `13220821` and PTU `13248297` cold executables had SHA-256
+All four fresh processes stayed under 2 GB and created no scratch files.
+The earlier LIVE `13220821` and PTU `13248297` cold executables had SHA-256
 `07e7e6cdddec71523c305330088c4d79f7f35f2612b00690e9f9b0be245a35b5`.
-The PTU `13260598` cold executable used the Store SDK from
+The current LIVE `13220821` and PTU `13260598` cold checks used the Store SDK from
 `b3c0e21abea216d676b7921c64ef6a45a2153f9b` and had SHA-256
 `5273ad4eb7fb673b440cde789239af3b1c92390a1d38cb6c2d5dbf0409768475`.
 The installed Archive and manifest matched before and after the standalone query.
