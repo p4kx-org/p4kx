@@ -1948,6 +1948,11 @@ methods with one physical Item Record index. The snapshot contains the authored 
 `configurations.weaponActions`, `configurations.ammoContainers` and `declarations.ammoBindings`
 for that Item, with the same value states and source references as the Catalog.
 
+Use `equipment::with_selected_weapon_sources` and its decoded-Entry, session or parsed forms
+to enumerate owners. `All` selects admitted Catalog Items and `Guid` keeps every admitted
+physical occurrence of that GUID. Results follow physical Record order. Check coverage for
+unreadable potential owners and incomplete component fields before inferring absence.
+
 The weapon component exposes its fire and aim slots, local action nodes and their original
 ordinals. `mode_kind()` classifies each action. For single and rapid projectile actions,
 `combat_inputs()` borrows the original rate, projectile count and damage multiplier cells.

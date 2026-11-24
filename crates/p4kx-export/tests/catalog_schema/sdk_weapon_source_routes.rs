@@ -3,7 +3,7 @@
 
 use p4kx_export::catalog_queries::CatalogRecordSelection;
 use p4kx_export::catalog_queries::equipment::{
-    WeaponSourceSnapshot, with_weapon_recoil_definitions, with_weapon_sources_from,
+    WeaponSourceSnapshot, with_selected_weapon_sources_from, with_weapon_recoil_definitions,
 };
 use p4kx_extraction::{Archive, DataForgeEntry, InputScope};
 use p4kx_testkit::{ArchiveBuilder, TestEntry, test_key};
@@ -46,17 +46,20 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
         return Err("the fixture requires one physical weapon owner".into());
     };
     let catalog = ammo_binding_witness::normal(&archive, &entry)?;
-    let [actions, bindings] =
-        with_weapon_sources_from(&archive, &entry, owner.index(), None, |snapshot| {
+    let [actions, bindings] = with_selected_weapon_sources_from(
+        &archive,
+        &entry,
+        CatalogRecordSelection::All,
+        None,
+        |snapshot| {
             ammo_binding_witness::verify(&archive, &entry, &snapshot, &catalog)?;
             verify(&snapshot, owner.index())
-        })??;
+        },
+    )??;
     Ok([actions, ammo_container_witness::read()?, bindings])
 }
 
 fn verify(snapshot: &WeaponSourceSnapshot<'_>, record_index: u32) -> TestResult<[Route; 2]> {
-    const OWNERS_OPEN: &str = "physical Item query and synthetic Catalog parity available; owner enumeration and installed parity open";
-
     let [owner] = snapshot.rows() else {
         return Err("the scoped query must return one physical Item".into());
     };
@@ -91,11 +94,15 @@ fn verify(snapshot: &WeaponSourceSnapshot<'_>, record_index: u32) -> TestResult<
     }
 
     Ok([
-        Route::queried_rows(WEAPON_ACTIONS, &owner.weapon_actions, OWNERS_OPEN)?,
+        Route::queried_rows(
+            WEAPON_ACTIONS,
+            &owner.weapon_actions,
+            "physical Item selection and owner enumeration match the synthetic Catalog; installed parity and standalone memory open",
+        )?,
         Route::queried_rows(
             AMMO_BINDINGS,
             &owner.ammo_bindings,
-            "typed owner and physical Ammo target joins match the synthetic producer; owner enumeration, installed parity and standalone memory open",
+            "direct owner enumeration and physical Ammo target joins match the synthetic producer; installed parity and standalone memory open",
         )?,
     ])
 }

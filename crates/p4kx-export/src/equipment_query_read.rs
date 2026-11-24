@@ -7,7 +7,7 @@ use p4kx_extraction::{
     Archive, CancelToken, CanonicalReadObserver, DataForge, DataForgeEntry, Filter, Language,
 };
 
-use super::rows::{Family, Projector, ReadOptions};
+use super::rows::{Family, Projector, ReadOptions, WEAPON_SOURCE_TYPES};
 use super::snapshot::EquipmentSnapshot;
 use crate::CatalogError;
 use crate::Kind;
@@ -194,6 +194,7 @@ impl<'query> Query<'query> {
                     Ok(false)
                 },
             )?,
+            Family::WeaponSources => self.plan_weapon_sources(observer)?,
             Family::Definitions
             | Family::Items
             | Family::ItemSources
@@ -206,7 +207,6 @@ impl<'query> Query<'query> {
             | Family::ProceduralPlanetAudio
             | Family::Factions
             | Family::ContractScopes
-            | Family::WeaponSources
             | Family::ProjectileAmmo
             | Family::MagazineResolutions => Plan::read(
                 self.forge,
@@ -235,6 +235,28 @@ impl<'query> Query<'query> {
         };
         order(family, &mut plan.owners);
         Ok(plan)
+    }
+
+    fn plan_weapon_sources(
+        &self,
+        observer: Option<Arc<dyn CanonicalReadObserver>>,
+    ) -> Result<Plan<'query>, CatalogError> {
+        match self.selection {
+            CatalogRecordSelection::RecordIndex(_) => Plan::read(
+                self.forge,
+                Family::WeaponSources.kind(),
+                self.selection,
+                self.cancel,
+                observer,
+            ),
+            _ => Plan::read_item_components(
+                self.forge,
+                WEAPON_SOURCE_TYPES,
+                self.selection,
+                self.cancel,
+                observer,
+            ),
+        }
     }
 
     const fn requested(&self, family: Family) -> &[Language] {

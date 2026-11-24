@@ -231,7 +231,8 @@ pub use snapshot::{
 pub use weapon::{
     AmmoBinding, AmmoContainer, ContainerAmmoSlots, ProjectileCombatInputs, SecondaryMagazine,
     WeaponAction, WeaponActions, WeaponMagazineSlots, WeaponModeKind, WeaponSource,
-    WeaponSourceSnapshot, with_weapon_sources, with_weapon_sources_from,
+    WeaponSourceSnapshot, with_selected_weapon_sources, with_selected_weapon_sources_from,
+    with_weapon_sources, with_weapon_sources_from,
 };
 
 pub use weapon_combat::{

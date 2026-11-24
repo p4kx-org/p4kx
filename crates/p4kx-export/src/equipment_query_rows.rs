@@ -23,8 +23,11 @@ use crate::catalog_v3::catalog_item_components::{ItemEquipmentFamily, definition
 use crate::catalog_v3::inventory_entity_configurations::{
     BOUNDS_SOURCE_TYPES, STORAGE_SOURCE_TYPES,
 };
+use crate::item_stats::{AMMO_CONTAINER, WEAPON_COMPONENT};
 use crate::record_observation::RecordObservation;
 use crate::{CatalogError, Kind};
+
+pub(super) const WEAPON_SOURCE_TYPES: &[&str] = &[WEAPON_COMPONENT, AMMO_CONTAINER];
 
 #[derive(Clone, Copy)]
 pub(super) enum ConfigurationFamily {
@@ -141,13 +144,8 @@ impl Family {
                 });
             }
             Self::AmmoDefinitions => &[ammo_definition::SOURCE_TYPE],
-            Self::ProjectileAmmo | Self::MagazineResolutions => {
-                &[crate::item_stats::WEAPON_COMPONENT]
-            }
-            Self::WeaponSources => &[
-                crate::item_stats::WEAPON_COMPONENT,
-                crate::item_stats::AMMO_CONTAINER,
-            ],
+            Self::ProjectileAmmo | Self::MagazineResolutions => &[WEAPON_COMPONENT],
+            Self::WeaponSources => WEAPON_SOURCE_TYPES,
         };
         DatasetAvailability::from_source_declarations(forge, |name| types.contains(&name))
     }

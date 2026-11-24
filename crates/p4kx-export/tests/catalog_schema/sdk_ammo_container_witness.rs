@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_export::catalog_queries::CatalogRecordSelection;
 use p4kx_export::catalog_queries::equipment::{self, WeaponSourceSnapshot};
 use p4kx_extraction::{Archive, DataForgeEntry, InputScope, SourceInventory, SourceLocation};
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
@@ -30,9 +31,13 @@ pub(super) fn read() -> TestResult<Route> {
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog = ammo_binding_witness::normal(&archive, &entry)?;
-    equipment::with_weapon_sources_from(&archive, &entry, OWNER, None, |snapshot| {
-        verify(&snapshot, &catalog)
-    })?
+    equipment::with_selected_weapon_sources_from(
+        &archive,
+        &entry,
+        CatalogRecordSelection::All,
+        None,
+        |snapshot| verify(&snapshot, &catalog),
+    )?
 }
 
 fn verify(snapshot: &WeaponSourceSnapshot<'_>, catalog: &Value) -> TestResult<Route> {
@@ -81,7 +86,7 @@ fn verify(snapshot: &WeaponSourceSnapshot<'_>, catalog: &Value) -> TestResult<Ro
     Route::queried_rows(
         AMMO_CONTAINERS,
         &owner.ammo_containers,
-        "physical Item query, ordered container fields and encrypted synthetic Normal parity witnessed; owner enumeration and installed parity open",
+        "direct owner enumeration and ordered container fields match the encrypted synthetic Normal Catalog; installed parity and standalone memory open",
     )
 }
 
