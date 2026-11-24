@@ -2889,7 +2889,16 @@ identity or 1. The `/nodes` origin records the examined chunk selectors and orig
 where stored. Node field origins use the selected primary model Entry for original names,
 parent operands, transform and scale words, geometry type and property occurrences. Defaulted
 values identify their original selector evidence. A generated root name can use the model Entry
-path. Loose nodes have incomplete Archive origins. `issues` lists in words what a read worked around: `model info` reads
+path. Loose nodes have incomplete Archive origins.
+
+The `/bones` origin records the primary skeleton selection, including the inspected chunk
+header, chunk-type selectors and original bone count where available. A bone row retains
+decoded primary Entry byte ranges for its name, parent, controller id, node link and pose
+values. Each pose vector and component has its own address. A missing optional node link
+uses the original skeleton selection when the layout establishes its absence. Loose-file
+bone rows and selections have unknown Archive origins.
+
+`issues` lists in words what a read worked around. `model info` reads
 strictly, so no fallback of a lenient read appears, but a `CrCh` mesh that names physics data in
 further slots (which are not read) is listed as `node <n> names physics data in <k> further
 slot(s), which are not read`. `lods`

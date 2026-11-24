@@ -36,6 +36,8 @@ pub(crate) enum EvidenceError {
     Chunk(#[source] std::io::Error),
     #[error("the node page origin could not be recorded")]
     Node(#[source] std::io::Error),
+    #[error("the bone page origin could not be recorded")]
+    Bone(#[source] std::io::Error),
 }
 
 pub(crate) struct ModelItemPage<'a> {

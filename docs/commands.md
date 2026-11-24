@@ -855,6 +855,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   (`.skin`) is written with its skeleton and bone weights as a glTF skin (up to eight bones per
   vertex, `JOINTS_0`/`WEIGHTS_0` and `_1`), a `.chr` skeleton file as bone nodes. Both also take a
   model file on disk with its companions next to it, which has no textures to read.
+  In `model info --json`, the primary skeleton supplies field origins for `/bones` and the emitted
+  bone rows, including each pose component. The byte ranges refer to the decoded primary Entry.
+  A loose model marks these fields' Archive origins unknown.
 - Encrypted Entries need the Archive key, which you enter yourself; the tool does not contain it
   ([ADR-0027](adr/0027-archive-key-comes-from-the-user.md)). Without it an Archive still
   opens, lists, searches and compares, and reads every unencrypted Entry; an encrypted Entry fails

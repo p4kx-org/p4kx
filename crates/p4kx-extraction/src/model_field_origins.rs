@@ -5,8 +5,8 @@ use std::io;
 
 use serde::Serialize;
 
-use super::{ModelNodeOrigins, chunk_origins, submesh_origins};
-use crate::{FieldOrigins, FieldPath, ModelSource, SourceInventory, SourceUses};
+use super::{ModelBoneOrigins, ModelNodeOrigins, chunk_origins, submesh_origins};
+use crate::{FieldOrigin, FieldOrigins, FieldPath, ModelSource, SourceInventory, SourceUses};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -38,7 +38,22 @@ impl ModelFieldOrigins {
             let path = FieldPath::parse(&format!("/chunks/{index}")).map_err(io::Error::other)?;
             chunk_origins::write_chunk_origins(source, index, &path, &uses, &mut fields)?;
         }
-        write_nodes(source, &uses, &mut fields)?;
+        let nodes = ModelNodeOrigins::capture(source, &uses)?;
+        write_rows(
+            &mut fields,
+            "/nodes",
+            model.nodes.len(),
+            nodes.collection_origin(),
+            |fields, path, index| nodes.write_node(fields, path, index),
+        )?;
+        let bones = ModelBoneOrigins::capture(source, &uses)?;
+        write_rows(
+            &mut fields,
+            "/bones",
+            model.bones.len(),
+            bones.collection_origin(),
+            |fields, path, index| bones.write_bone(fields, path, index),
+        )?;
         Ok(Self {
             field_origins: fields,
             provenance: uses.freeze().map_err(io::Error::other)?,
@@ -46,19 +61,20 @@ impl ModelFieldOrigins {
     }
 }
 
-fn write_nodes(
-    source: &ModelSource,
-    uses: &SourceUses,
+fn write_rows(
     fields: &mut FieldOrigins,
+    pointer: &str,
+    count: usize,
+    collection: FieldOrigin,
+    write: impl Fn(&mut FieldOrigins, &FieldPath, usize) -> io::Result<()>,
 ) -> io::Result<()> {
-    let nodes = ModelNodeOrigins::capture(source, uses)?;
-    let mut path = FieldPath::parse("/nodes").map_err(io::Error::other)?;
+    let mut path = FieldPath::parse(pointer).map_err(io::Error::other)?;
     fields
-        .insert(path.clone(), nodes.collection_origin())
+        .insert(path.clone(), collection)
         .map_err(io::Error::other)?;
-    for index in 0..source.model().nodes.len() {
+    for index in 0..count {
         path.push_index(index).map_err(io::Error::other)?;
-        nodes.write_node(fields, &path, index)?;
+        write(fields, &path, index)?;
         path.pop();
     }
     Ok(())

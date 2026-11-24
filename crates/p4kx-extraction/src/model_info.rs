@@ -16,6 +16,8 @@ use crate::model_info_materials::receipt::MaterialFieldReceipt;
 use crate::model_info_materials::{DefaultMaterialInfo, LibraryInfo, MaterialInfo};
 use crate::{AnimationListing, AnimationSet, ModelSource};
 
+#[path = "model_bone_origins.rs"]
+mod bone_origins;
 #[path = "model_chunk_origins.rs"]
 mod chunk_origins;
 #[path = "model_field_origins.rs"]
@@ -29,6 +31,7 @@ mod node_origins;
 #[path = "model_submesh_origins.rs"]
 mod submesh_origins;
 
+pub use bone_origins::{ModelBoneOrigins, primary_skeleton_selection_uses};
 pub use chunk_origins::{write_chunk_origins, write_chunk_type_origin};
 use field_origins::ModelFieldOrigins;
 pub use mesh_info::MeshInfo;
@@ -95,7 +98,7 @@ impl<'a> ModelInfo<'a> {
         )
     }
 
-    /// Describes the model with original node, submesh and chunk evidence.
+    /// Describes the model with original node, bone, submesh and chunk evidence.
     ///
     /// # Errors
     /// Returns invalid evidence positions or an invalid source inventory.

@@ -4,10 +4,10 @@
 use std::ops::Range;
 
 use p4kx_extraction::model::{AnimationChunkCoordinates, ModelBoneSources};
+use p4kx_extraction::model_info::primary_skeleton_selection_uses;
 use p4kx_extraction::{SourceEvidenceError, SourceLocation, SourceScope, SourceUse, SourceUseRole};
 
 use crate::content_origin::EntryPageSources;
-use crate::model_bone_items;
 use crate::model_item_page::ModelItemPage;
 
 pub(crate) struct ChunkSites {
@@ -124,7 +124,8 @@ impl SkeletonSites {
         let primary = request.primary();
         let survey = primary.and_then(|source| source.primary_skeleton());
         let skeleton = primary.and_then(|source| source.bone_sources());
-        let (mut uses, complete) = model_bone_items::primary_selection(model, survey, skeleton)?;
+        let (mut uses, complete) =
+            primary_skeleton_selection_uses(model.payload_scope(), survey, skeleton)?;
         let count = request.source.model().bones.len();
         let words = skeleton.and_then(|skeleton| controller_words(skeleton, count));
         let located = words.is_some();

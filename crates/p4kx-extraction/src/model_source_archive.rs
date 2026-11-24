@@ -26,7 +26,7 @@ enum Coordinates {
     Skip,
     Nodes,
     NodesAndBones,
-    NodesAndMaterialListing,
+    Listing,
     MaterialListing,
     MaterialPage,
 }
@@ -42,15 +42,15 @@ impl Coordinates {
         }
         match self {
             Self::Skip | Self::MaterialListing | Self::MaterialPage => Capture::Skip,
-            Self::Nodes | Self::NodesAndMaterialListing => Capture::Nodes(&mut observed.nodes),
-            Self::NodesAndBones => Capture::NodesAndBones(observed),
+            Self::Nodes => Capture::Nodes(&mut observed.nodes),
+            Self::NodesAndBones | Self::Listing => Capture::NodesAndBones(observed),
         }
     }
 
     const fn keeps_materials(self) -> bool {
         matches!(
             self,
-            Self::MaterialListing | Self::NodesAndMaterialListing | Self::MaterialPage
+            Self::MaterialListing | Self::Listing | Self::MaterialPage
         )
     }
 
@@ -62,7 +62,7 @@ impl Coordinates {
         fields: Observations,
     ) -> Result<Option<MaterialEvidence>, ConversionError> {
         Ok(match self {
-            Self::MaterialListing | Self::NodesAndMaterialListing => fields
+            Self::MaterialListing | Self::Listing => fields
                 .project(model, source.archive_origin(), origins.library())?
                 .map(MaterialEvidence::Listing),
             Self::MaterialPage => Some(MaterialEvidence::Page(Box::new(MaterialPageRead {
@@ -165,7 +165,7 @@ impl ModelSource {
         )
     }
 
-    /// Reads an Archive model listing with original node and material field evidence.
+    /// Reads an Archive model listing with original node, bone and material field evidence.
     ///
     /// # Errors
     /// Returns the original model-read or receipt-recording error.
@@ -181,7 +181,7 @@ impl ModelSource {
             PositionBox::default(),
             MaterialReading::Plain,
             verdicts,
-            Coordinates::NodesAndMaterialListing,
+            Coordinates::Listing,
         )
     }
 
@@ -359,7 +359,7 @@ fn bind_sources(
 ) {
     if matches!(
         coordinates,
-        Coordinates::Nodes | Coordinates::NodesAndBones | Coordinates::NodesAndMaterialListing
+        Coordinates::Nodes | Coordinates::NodesAndBones | Coordinates::Listing
     ) {
         if let Some(primary) = archive_sources.first_mut() {
             primary.set_node_sources(observed.nodes);
