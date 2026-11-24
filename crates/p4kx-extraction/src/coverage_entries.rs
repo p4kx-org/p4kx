@@ -8,6 +8,7 @@ use p4kx_cryxml::{self as cryxml, Format};
 use rayon::prelude::*;
 
 use crate::coverage::{EntryCoverage, ReferenceItem, ReferenceKind};
+use crate::coverage_origins::FailureSite;
 
 /// The largest Entry the check reads into memory.
 const MAX_ENTRY_LEN: u64 = 64 << 20;
@@ -18,15 +19,30 @@ enum Outcome {
     Failed(String),
 }
 
-pub(crate) fn check(archive: &Archive, items: &[ReferenceItem<'_>]) -> Vec<EntryCoverage> {
+struct FailedEntry<'archive> {
+    entry: &'archive Entry,
+    reason: String,
+}
+
+pub(crate) fn check<'archive>(
+    archive: &'archive Archive,
+    items: &[ReferenceItem<'_>],
+    mut sites: Option<&mut Vec<FailureSite<'archive>>>,
+) -> Vec<EntryCoverage> {
     items
         .iter()
         .filter(|item| item.kind == ReferenceKind::Entries)
-        .map(|item| folder(archive, item))
+        .enumerate()
+        .map(|(folder_index, item)| folder(archive, item, folder_index, sites.as_deref_mut()))
         .collect()
 }
 
-fn folder(archive: &Archive, item: &ReferenceItem<'_>) -> EntryCoverage {
+fn folder<'archive>(
+    archive: &'archive Archive,
+    item: &ReferenceItem<'_>,
+    folder_index: usize,
+    sites: Option<&mut Vec<FailureSite<'archive>>>,
+) -> EntryCoverage {
     let inside: Vec<&Entry> = archive
         .entries()
         .iter()
@@ -44,14 +60,28 @@ fn folder(archive: &Archive, item: &ReferenceItem<'_>) -> EntryCoverage {
         text: 0,
         failures: Vec::new(),
     };
+    let mut failed = Vec::new();
     for (entry, outcome) in outcomes {
         match outcome {
             Outcome::Converted => coverage.converted += 1,
             Outcome::Text => coverage.text += 1,
-            Outcome::Failed(reason) => coverage.failures.push((entry.path().to_owned(), reason)),
+            Outcome::Failed(reason) => failed.push(FailedEntry { entry, reason }),
         }
     }
-    coverage.failures.sort();
+    failed.sort_by(|left, right| {
+        (left.entry.path(), &left.reason).cmp(&(right.entry.path(), &right.reason))
+    });
+    if let Some(sites) = sites {
+        sites.extend(failed.iter().enumerate().map(|(row, failure)| FailureSite {
+            folder: folder_index,
+            row,
+            entry: failure.entry,
+        }));
+    }
+    coverage.failures = failed
+        .into_iter()
+        .map(|failure| (failure.entry.path().to_owned(), failure.reason))
+        .collect();
     coverage
 }
 

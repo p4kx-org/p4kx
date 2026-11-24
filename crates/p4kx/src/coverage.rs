@@ -22,18 +22,23 @@ pub(crate) fn run(args: &CoverageArgs, as_json: bool) -> Result<ExitCode> {
     let archive = crate::key::open(&args.archive)?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
-    let report = CoverageReport::of(&archive, &forge, &ReferenceList::builtin()?);
-    let written = if json {
-        coverage_json::print(&args.archive, &report)
+    let references = ReferenceList::builtin()?;
+    let (written, complete) = if json {
+        let observed = CoverageReport::observed(&archive, &forge, &entry, &references)?;
+        (
+            coverage_json::print(&args.archive, &observed),
+            observed.report().is_complete(),
+        )
     } else {
-        table(&report)
+        let report = CoverageReport::of(&archive, &forge, &references);
+        (table(&report), report.is_complete())
     };
     if let Err(error) = written
         && error.kind() != io::ErrorKind::BrokenPipe
     {
         return Err(error.into());
     }
-    Ok(ExitCode::from(if report.is_complete() {
+    Ok(ExitCode::from(if complete {
         exit::SUCCESS
     } else {
         exit::PARTIAL_FAILURE

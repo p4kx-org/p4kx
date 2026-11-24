@@ -4,15 +4,17 @@
 use std::collections::{HashMap, HashSet};
 
 use p4kx_dataforge::query::{Query, QueryErrorKind};
-use p4kx_dataforge::{
-    DataForge, JsonLayout, RecordJson, RecordTree, RecordXml, TreeBuilder, Value,
-};
+use p4kx_dataforge::{DataForge, RecordTree, TreeBuilder, Value};
 use rayon::prelude::*;
 
 use crate::coverage::{
     ComponentCoverage, ObjectCoverage, ReferenceItem, ReferenceKind, SampleExport, TypeCoverage,
 };
 use crate::coverage_objects::{self, STAR_MAP_OBJECT, TypeSlots};
+use crate::coverage_origins::{SampleSection, SampleSite};
+
+#[path = "coverage_sample.rs"]
+mod sample;
 
 const ENTITY_TYPE: &str = "EntityClassDefinition";
 const COMPONENTS: &str = "Components";
@@ -108,11 +110,12 @@ pub(crate) struct ForgeCoverage {
 
 /// Counts the Records of the listed types, reads them and exports a sample of each, and counts
 /// the listed components, derived structs included, in the `EntityClassDefinition` Records.
-pub(crate) fn check(forge: &DataForge<'_>, items: &[ReferenceItem<'_>]) -> ForgeCoverage {
-    let defined: HashSet<&str> = forge
-        .structs()
-        .filter_map(|found| found.name().ok())
-        .collect();
+pub(crate) fn check<'forge>(
+    forge: &'forge DataForge<'_>,
+    items: &[ReferenceItem<'_>],
+    sites: Option<&mut Vec<SampleSite<'forge>>>,
+) -> ForgeCoverage {
+    let defined = defined_types(forge);
     let types = of_kind(items, |kind| {
         matches!(kind, ReferenceKind::Record | ReferenceKind::Candidate)
     });
@@ -132,18 +135,28 @@ pub(crate) fn check(forge: &DataForge<'_>, items: &[ReferenceItem<'_>]) -> Forge
         &context,
         [types.len(), components.len(), objects.len()],
     );
+    let mut read_sample = sample::reader(forge, sites);
     ForgeCoverage {
-        objects: coverage_objects::coverage(forge, &objects, &context.objects, &pass.objects),
+        objects: coverage_objects::coverage(
+            &objects,
+            &context.objects,
+            &pass.objects,
+            |row, index| read_sample(SampleSection::StarMapTypes, row, index),
+        ),
         types: types
             .iter()
-            .map(|item| {
+            .enumerate()
+            .map(|(row, item)| {
                 let tally = context
                     .types
                     .get(item.name)
                     .and_then(|first| pass.tallies.get(*first))
                     .copied()
                     .unwrap_or_default();
-                type_coverage(forge, item, &defined, &tally)
+                let sample = tally
+                    .sample
+                    .map(|index| read_sample(SampleSection::Types, row, index));
+                type_coverage(item, &defined, &tally, sample)
             })
             .collect(),
         components: components
@@ -160,6 +173,13 @@ pub(crate) fn check(forge: &DataForge<'_>, items: &[ReferenceItem<'_>]) -> Forge
             .collect(),
         unreadable_entities: pass.unreadable_entities,
     }
+}
+
+fn defined_types<'forge>(forge: &'forge DataForge<'_>) -> HashSet<&'forge str> {
+    forge
+        .structs()
+        .filter_map(|found| found.name().ok())
+        .collect()
 }
 
 fn component_coverage(
@@ -335,10 +355,10 @@ fn count_components(context: &Context<'_>, tree: &RecordTree<'_>, pass: &mut Pas
 }
 
 fn type_coverage(
-    forge: &DataForge<'_>,
     item: &ReferenceItem<'_>,
     defined: &HashSet<&str>,
     tally: &Tally,
+    sample: Option<SampleExport>,
 ) -> TypeCoverage {
     TypeCoverage {
         area: item.area.to_owned(),
@@ -348,38 +368,7 @@ fn type_coverage(
         records: tally.records,
         unreadable_records: tally.unreadable,
         error_values: tally.errors,
-        sample: tally.sample.map(|index| sample(forge, index)),
-    }
-}
-
-pub(crate) fn sample(forge: &DataForge<'_>, index: u32) -> SampleExport {
-    let Some(record) = forge.record(index) else {
-        return failed(String::new(), "the Record is gone".to_owned());
-    };
-    let path = record.record_path().unwrap_or_default().to_owned();
-    let tree = match record.tree() {
-        Ok(tree) => tree,
-        Err(error) => return failed(path, error.to_string()),
-    };
-    let mut xml = Vec::new();
-    let mut json = Vec::new();
-    let written = RecordXml::new()
-        .write(&tree, &mut xml)
-        .and_then(|()| RecordJson::new(JsonLayout::Pretty).write(&tree, &mut json));
-    SampleExport {
-        record_path: path,
-        xml_bytes: xml.len(),
-        json_bytes: json.len(),
-        error: written.err().map(|error| error.to_string()),
-    }
-}
-
-const fn failed(record_path: String, error: String) -> SampleExport {
-    SampleExport {
-        record_path,
-        xml_bytes: 0,
-        json_bytes: 0,
-        error: Some(error),
+        sample,
     }
 }
 

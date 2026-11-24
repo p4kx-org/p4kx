@@ -1632,7 +1632,9 @@ The coverage of the reference list in [coverage.md](coverage.md). The exit code 
 listed type (candidates excepted), component or folder is missing, unreadable or does not convert.
 
 ```json
-{"archive": "…", "complete": false, "unreadable_entities": 0, "types": [Type, …], "components": [Component, …], "starmap_types": [StarMapType, …], "entries": [Folder, …]}
+{"archive": "…", "complete": false, "unreadable_entities": 0,
+ "types": [Type, …], "components": [Component, …], "starmap_types": [StarMapType, …],
+ "entries": [Folder, …], "fieldOrigins": {}, "provenance": {"sources": [], "uses": []}}
 ```
 
 `unreadable_entities` counts the `EntityClassDefinition` Records that cannot be built and so cannot
@@ -1687,6 +1689,18 @@ be searched for components; above 0 it makes `complete` false.
 `complete` is true when every non-candidate type has Records that read without error and export,
 every component occurs and is reachable, every `starmap_types` entry has Records whose sample
 exports, and every folder has Entries that all convert.
+
+`fieldOrigins` addresses these source-backed paths by zero-based output ordinals. Each cell
+carries `containsEncryptedSource`, `sourceUsesRefs`, and `sourceSetComplete`. The references
+resolve against the document's `provenance` inventory.
+
+- `/types/{row}/sample/record_path` and `/starmap_types/{row}/sample/record_path` use the selected
+  physical Record's filename field and original DataForge text bytes.
+- `/entries/{folder}/failures/{row}/path` uses the failed physical Entry's directory path. Entries
+  with identical paths retain separate physical origins. The marker describes directory bytes independently
+  of the Entry payload's encryption.
+
+Counts, sample byte lengths, and failure reasons are outside this origin coverage.
 
 ## `p4kx ships <archive> --out <file> --json`
 

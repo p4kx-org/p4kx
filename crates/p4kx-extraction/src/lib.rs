@@ -34,6 +34,7 @@ mod coverage;
 mod coverage_entries;
 mod coverage_forge;
 mod coverage_objects;
+mod coverage_origins;
 mod coverage_run;
 mod cryxml_field_uses;
 mod dataforge;
@@ -217,6 +218,7 @@ pub use coverage::{
     ComponentCoverage, CoverageReport, EntryCoverage, ObjectCoverage, ReferenceError,
     ReferenceItem, ReferenceKind, ReferenceList, SampleExport, TypeCoverage,
 };
+pub use coverage_origins::{CoverageOriginError, ObservedCoverage};
 pub use cryxml_field_uses::CryXmlFieldUses;
 pub use dataforge::{DATAFORGE_ENTRIES, DataForgeEntry, DataForgeLoadError};
 pub use dataforge_file::is_dataforge_file;
