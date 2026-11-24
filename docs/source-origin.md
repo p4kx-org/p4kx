@@ -285,6 +285,13 @@ flag, including their exact field coordinates and physical source identity.
 Synthetic fixtures check original IVO and CrCh transform and property ranges,
 loose inputs and the shared MCP node page.
 
+On LIVE `13220821` and PTU `13260598`, the installed verifier independently
+read one primary compact skeleton Entry for each Build. The CLI at
+`1b18d6a7040b3530a2e59721d287a5afa18277e6` matched all 182 bone rows,
+4,551 field-origin addresses and 2,548 pose words on each Build. The
+comparison checked original chunk selection, per-field byte ranges, source
+roles and the physical Entry behind every matching source-use reference.
+
 ## Standalone model GLB
 
 `p4kx model glb` publishes a digest-bound sibling `<file>.p4kx-origin.jsonl`.
