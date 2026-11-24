@@ -6,6 +6,7 @@ use std::sync::Arc;
 use p4kx_cryxml::{SourceAttributePosition, SourceElementPosition};
 
 use crate::mtl_xml::XmlElement;
+use crate::prefab_entity_links::PrefabEntityLinksSource;
 use crate::prefab_guid_remapping::PrefabGuidRemappingBlockSource;
 
 /// Original transform operands of one Prefab object or its parent.
@@ -162,6 +163,8 @@ pub struct PrefabObjectSource {
     pub model: PrefabModelSource,
     /// The authored selectors when the object instances another prefab.
     pub reference: Option<PrefabReferenceSource>,
+    /// Original coordinates in the parsed `EntityLinks` group and link order.
+    pub entity_links: Option<Box<PrefabEntityLinksSource>>,
     /// The selectors evaluated for the object's attachment flag.
     pub attachment: PrefabAttachmentSource,
     /// The object's own local transform operands.

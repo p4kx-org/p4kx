@@ -769,6 +769,16 @@ contains the original `default_guid` and `instance_guid` text, or null when the 
 attribute is absent. Empty blocks, duplicate pairs, and invalid GUID text remain visible.
 The regular object list continues to report original IDs.
 
+An object with direct `EntityLinks` children adds an `entity_links` array. Each group
+has a `links` array of its direct `Link` children. The group and link order, empty
+groups and repeated links follow the source. Each link has `name`, `target_id` and
+`version` strings from the corresponding attributes. An empty attribute stays an
+empty string and an absent attribute is null. `target_id` is an opaque authored
+value. Link fields retain the original XML byte ranges or CryXml node and attribute
+indices. Collections include the selected child sites and report incomplete coverage
+where a filtered sibling's selector site was not retained. When the input requires
+repair, the source Entry remains identified and its coordinates are unavailable.
+
 The dump includes `fieldOrigins` and `provenance`. Origin keys are JSON Pointers from the
 document root. They cover the selected library, prefab, collections, object fields and
 resolution issues. Source uses retain the original XML or CryXml positions and the physical

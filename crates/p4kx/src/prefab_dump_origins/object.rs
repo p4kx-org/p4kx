@@ -7,9 +7,9 @@ use p4kx_extraction::SourceUseRole::{Conversion, Payload, Selector};
 use p4kx_extraction::model::{PrefabAttributeObservation, PrefabModelSource, PrefabResourceEnd};
 use p4kx_extraction::{FieldOrigins, SharedFieldOrigin, SourceUseRole};
 
-use super::origins;
 use super::route::{self, TransformUse};
 use super::sites::{PrefabAttribute, Proof, Sites};
+use super::{entity_links, origins};
 
 pub(super) fn collect(
     sites: &mut Sites<'_, '_>,
@@ -38,6 +38,7 @@ pub(super) fn collect(
         outer
     };
     scalar_fields(sites, fields, &path, object, &local)?;
+    entity_links::collect(sites, fields, &path, object, &local)?;
     transforms(sites, fields, &path, object, &local)
 }
 

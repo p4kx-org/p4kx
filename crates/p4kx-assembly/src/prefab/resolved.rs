@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use p4kx_model::{PrefabObject, PrefabRef, Transform};
+use p4kx_model::{PrefabEntityLinkGroup, PrefabObject, PrefabRef, Transform};
 
 use super::{
     PrefabFile, PrefabGuidRemappingInstance, PrefabInstanceSource, PrefabIssue, PrefabLinkSource,
@@ -90,6 +90,13 @@ impl ResolvedObject {
     #[must_use]
     pub fn unexpanded(&self) -> Option<&PrefabRef> {
         self.source().and_then(|object| object.nested.as_ref())
+    }
+
+    /// Borrows the original `EntityLinks` declarations of this object.
+    #[must_use]
+    pub fn entity_links(&self) -> &[PrefabEntityLinkGroup] {
+        self.source()
+            .map_or(&[], |object| object.entity_links.as_ref())
     }
 
     /// Returns whether the object is attached to another one, so that its transform is not

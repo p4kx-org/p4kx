@@ -4,7 +4,6 @@
 use std::sync::Arc;
 
 use crate::mtl_xml::XmlElement;
-use crate::prefab_guid_remapping;
 use crate::soc_entities::entity_transform;
 use crate::{
     MAX_GROUP_DEPTH, MAX_LIBRARY_OBJECTS, Prefab, PrefabAttachmentSource,
@@ -12,6 +11,7 @@ use crate::{
     PrefabRef, PrefabReferenceSource, PrefabResourceChild, PrefabResourceEnd,
     PrefabTransformAncestor, PrefabTransformInputs, Transform,
 };
+use crate::{prefab_entity_links, prefab_guid_remapping};
 
 fn attribute<'a>(element: impl XmlElement<'a>, name: &str) -> String {
     attribute_text(element, name).to_owned()
@@ -179,6 +179,7 @@ fn read_object<'a, E: XmlElement<'a>>(
     let outside_group = !parent.is_empty() && !parent.eq_ignore_ascii_case(&pending.group_id);
     let attached = outside_group || !attribute_text(element, "AttachmentTarget").is_empty();
     let geometry = Geometry::read(element, &kind);
+    let (entity_links, link_sources) = prefab_entity_links::read(element, sources.is_some());
     if let Some(sources) = sources {
         sources.push(PrefabObjectSource {
             name: element.attribute_position("Name"),
@@ -191,6 +192,7 @@ fn read_object<'a, E: XmlElement<'a>>(
                 guid: element.attribute_position("PrefabGUID"),
                 guid_remapping_blocks: remapping_sources,
             }),
+            entity_links: link_sources,
             attachment: PrefabAttachmentSource {
                 parent: element.attribute_position("Parent"),
                 compared_group_id: !parent.is_empty() && pending.groups.is_some(),
@@ -212,6 +214,7 @@ fn read_object<'a, E: XmlElement<'a>>(
         class: attribute(element, "EntityClass"),
         transform,
         nested,
+        entity_links,
         attached,
     }
 }

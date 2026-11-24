@@ -12,6 +12,8 @@ use super::{TestResult, original_bytes, run};
 
 #[path = "prefab_dump_diagnostics.rs"]
 mod diagnostics;
+#[path = "prefab_entity_links.rs"]
+mod entity_links;
 
 const ROOT: &str = concat!(
     "<PrefabsLibrary Name='Root'><Prefab Name='Start'><Objects>",

@@ -9,6 +9,7 @@ use thiserror::Error;
 use crate::Transform;
 use crate::mtl_xml::XmlElement;
 use crate::prefab_diagnostic::PrefabParseFailure;
+use crate::prefab_entity_links::PrefabEntityLinkGroup;
 use crate::prefab_guid_remapping::PrefabGuidRemapping;
 use crate::prefab_objects;
 use crate::prefab_source::{PositionedPrefabLibrary, PrefabLibrarySource, PrefabSource};
@@ -84,6 +85,8 @@ pub struct PrefabObject {
     pub transform: Transform,
     /// The prefab the object instances, for an object of type `Prefab`.
     pub nested: Option<PrefabRef>,
+    /// Direct authored `EntityLinks` groups in their original order.
+    pub entity_links: Box<[PrefabEntityLinkGroup]>,
     /// Whether the object is attached to another object (`Parent` other than its group, or an
     /// `AttachmentTarget`), in which case its transform is relative to that attachment and not
     /// to the prefab.

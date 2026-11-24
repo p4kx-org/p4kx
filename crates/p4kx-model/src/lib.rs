@@ -129,6 +129,7 @@ mod physics_trimesh;
 mod positioned_animation;
 mod prefab;
 mod prefab_diagnostic;
+mod prefab_entity_links;
 mod prefab_guid_remapping;
 mod prefab_object_source;
 mod prefab_objects;
@@ -264,6 +265,10 @@ pub use prefab::{
     PrefabObject, PrefabParseMode, PrefabRef,
 };
 pub use prefab_diagnostic::{PrefabDiagnostic, PrefabParseFailure};
+pub use prefab_entity_links::{
+    PrefabEntityLink, PrefabEntityLinkGroup, PrefabEntityLinkGroupSource, PrefabEntityLinkSource,
+    PrefabEntityLinksSource,
+};
 pub use prefab_guid_remapping::{
     PrefabGuidRemapping, PrefabGuidRemappingBlockSource, PrefabGuidRemappingSource,
 };

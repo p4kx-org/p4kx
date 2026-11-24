@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "prefab_dump_origins/entity_links.rs"]
+mod entity_links;
 #[path = "prefab_dump_origins/issue.rs"]
 mod issue;
 #[path = "prefab_dump_origins/object.rs"]

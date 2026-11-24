@@ -64,9 +64,11 @@ three decoded sizes changed. One Starchitect prefab adds an authored
 conversion preserves it. The complete selected document grows from 44 to 45
 link groups and from 77 to 78 links. The selected `TargetId` matches zero
 `Id`, `CryGUID` or `PrefabGUID` attributes of objects in its owning Prefab
-and in the complete library. This child surfaces in the generic XML export.
-A typed Prefab projection needs to retain the authored attributes and
-source positions. Target resolution needs a proven identity domain.
+and in the complete library. The generic XML export shows the new link. The
+typed Prefab dump exposes ordered link groups for objects in its resolved
+output, with the original attribute values and available source coordinates.
+Synthetic text and CryXml fixtures cover this projection. The identity
+domain of `TargetId` remains unknown.
 
 ### Complete packaged Normal Catalog
 
