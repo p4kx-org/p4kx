@@ -1518,6 +1518,23 @@ They require no localization or other Asset reads. The snapshot includes
 source-family availability, read coverage and per-value origin evidence. Use
 an exact physical index when the caller already knows which Item to inspect.
 
+### Installed Item condition cold reads
+
+On Windows AMD64, each query ran in its own process without opening a complete
+Catalog. The tested processes read every eligible owner for their one table.
+
+| Configuration | LIVE `13220821` | PTU `13260598` |
+| --- | ---: | ---: |
+| `durability` | 6,472 | 6,515 |
+| `degradation` | 1,199 | 1,213 |
+| `distortion` | 1,225 | 1,228 |
+| `emp` | 7 | 7 |
+
+All eight queries returned Available and stable Build and Archive stamps. The
+largest lifetime private commit was 1,579,773,952 bytes and the largest working
+set was 1,566,150,656 bytes. Both peaks occurred in the PTU durability query.
+The verifier was built from `cae92b947dd0b133e0e35fadd4cec8904a47ffd3`.
+
 ## Vehicle armor
 
 Use `catalog_queries::equipment::vehicle_armor::with_vehicle_armor` for
