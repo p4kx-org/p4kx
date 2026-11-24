@@ -25,7 +25,6 @@ use super::{Route, TestResult};
 mod fixture;
 
 const ALL: CatalogRecordSelection = CatalogRecordSelection::All;
-const REMAINING: &str = "typed physical owner query and synthetic producer parity witnessed; complete installed producer parity open";
 
 pub(super) fn read() -> TestResult<[Route; 3]> {
     let (_directory, archive) = fixture::archive()?;
@@ -34,13 +33,13 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
     let parsed = session.parsed(None)?;
     Ok([
         parsed.with_mining_lasers(ALL, None, |snapshot| {
-            Route::queried_rows(MINING_LASERS, snapshot.rows(), REMAINING)
+            Route::queried_rows(MINING_LASERS, snapshot.rows(), None)
         })??,
         parsed.with_attachable_modifiers(ALL, None, |snapshot| {
-            Route::queried_rows(ATTACHABLE_MODIFIERS, snapshot.rows(), REMAINING)
+            Route::queried_rows(ATTACHABLE_MODIFIERS, snapshot.rows(), None)
         })??,
         parsed.with_consumables(ALL, None, |snapshot| {
-            Route::queried_rows(CONSUMABLE_CONFIGURATIONS, snapshot.rows(), REMAINING)
+            Route::queried_rows(CONSUMABLE_CONFIGURATIONS, snapshot.rows(), None)
         })??,
     ])
 }

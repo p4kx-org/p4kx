@@ -1465,6 +1465,51 @@ A different Record lies outside a physical lookup even if it has the same GUID. 
 GUID queries inspect the admitted physical owners in order. These readers need no locales
 or loadout resolution.
 
+## Installed Item gameplay component verification
+
+Each of these nine `/configurations` datasets ran in its own fresh Windows AMD64
+process with `CatalogRecordSelection::All` on LIVE `13220821` and PTU `13260598`.
+The standalone queries used only the installed Archive. All 18 runs returned
+complete available coverage in physical Record and component order.
+
+| Dataset | LIVE rows | PTU rows |
+| --- | ---: | ---: |
+| `attachableModifiers` | 101 | 101 |
+| `clothing` | 4,445 | 5,124 |
+| `consumables` | 308 | 308 |
+| `hackableDevices` | 14 | 14 |
+| `hackingChips` | 38 | 38 |
+| `itemRadars` | 110 | 110 |
+| `miningLasers` | 52 | 52 |
+| `quantumInterdiction` | 6 | 6 |
+| `suitArmor` | 2,405 | 2,782 |
+
+One retained comparison per Build verified all nine datasets in a single stream of
+the corresponding complete Normal Catalog. Each comparison checked availability,
+ordered physical Record and component identities, full serialized row digests, and
+the transitive source-use and physical-source closure of those rows. LIVE matched
+1,846,727 contributing source uses and PTU matched 2,054,471. Each closure reached
+one physical source. The measured scope is the canonical component selection.
+The hacking-chip and quantum-interdiction queries each reported 1,160 skipped
+leftover candidates on LIVE and 1,172 on PTU.
+
+| Build and mode | Processes | Peak private commit bytes | Peak working set bytes |
+| --- | ---: | ---: | ---: |
+| LIVE standalone cold | 9 | 1,443,868,672 | 1,419,403,264 |
+| PTU standalone cold | 9 | 1,522,737,152 | 1,499,852,800 |
+| LIVE retained comparison | 1 | 1,792,245,760 | 1,783,627,776 |
+| PTU retained comparison | 1 | 1,884,553,216 | 1,875,632,128 |
+
+All processes stayed below 2,000,000,000 bytes in both native peak counters
+and retained matching initial and final Archive and Build stamps. The
+`installed_item_gameplay_cold_query` and
+`installed_item_gameplay_tables_match_one_complete_catalog` witnesses were
+built from `2e31f098fb85a7c70e2180d44b014080545b3517`. The executable SHA-256 was
+`6e5389edf2b628292e9f6ce1fc7db1ffab52528d63ab5eac32bea7b7f7345e29`.
+The retained Normal producer revisions were
+`23addc5e164f65a28a6f258302b30453b331edce` for LIVE and
+`93d92ca20bef8a8c3731339214a3301124ade7ba` for PTU.
+
 ## Worn gear and item radar
 
 Use `catalog_queries::equipment::worn_gear` for `configurations.suitArmor` with

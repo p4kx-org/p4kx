@@ -16,7 +16,6 @@ const CHIPS: &str = "/configurations/hackingChips";
 const DEVICES: &str = "/configurations/hackableDevices";
 
 pub(super) fn read() -> TestResult<[Route; 2]> {
-    const REMAINING: &str = "typed source queries and synthetic producer parity witnessed; same-build installed producer parity open";
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("hacking_fixture.p4k");
     ArchiveBuilder::new()
@@ -33,12 +32,12 @@ pub(super) fn read() -> TestResult<[Route; 2]> {
         parsed.with_hacking_chips(
             CatalogRecordSelection::RecordIndex(fixture::CHIP_RECORD),
             None,
-            |snapshot| Route::queried_rows(CHIPS, snapshot.rows(), REMAINING),
+            |snapshot| Route::queried_rows(CHIPS, snapshot.rows(), None),
         )??,
         parsed.with_hackable_devices(
             CatalogRecordSelection::RecordIndex(fixture::DEVICE_RECORD),
             None,
-            |snapshot| Route::queried_rows(DEVICES, snapshot.rows(), REMAINING),
+            |snapshot| Route::queried_rows(DEVICES, snapshot.rows(), None),
         )??,
     ])
 }

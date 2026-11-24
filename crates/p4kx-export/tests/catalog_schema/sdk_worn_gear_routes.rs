@@ -21,7 +21,6 @@ mod fixture;
 mod shared_radar;
 
 const ALL: CatalogRecordSelection = CatalogRecordSelection::All;
-const REMAINING: &str = "typed physical owner query and synthetic producer parity witnessed; complete installed producer parity open";
 
 pub(super) fn read() -> TestResult<[Route; 4]> {
     let (_directory, archive) = fixture::archive()?;
@@ -30,13 +29,13 @@ pub(super) fn read() -> TestResult<[Route; 4]> {
     let parsed = session.parsed(None)?;
     Ok([
         parsed.with_suit_armor(ALL, None, |snapshot| {
-            Route::queried_rows(SUIT_ARMOR, snapshot.rows(), REMAINING)
+            Route::queried_rows(SUIT_ARMOR, snapshot.rows(), None)
         })??,
         parsed.with_clothing(ALL, None, |snapshot| {
-            Route::queried_rows(CLOTHING, snapshot.rows(), REMAINING)
+            Route::queried_rows(CLOTHING, snapshot.rows(), None)
         })??,
         parsed.with_item_radars(ALL, None, |snapshot| {
-            Route::queried_rows(ITEM_RADARS, snapshot.rows(), REMAINING)
+            Route::queried_rows(ITEM_RADARS, snapshot.rows(), None)
         })??,
         shared_radar::read(&archive, &parsed)?,
     ])
