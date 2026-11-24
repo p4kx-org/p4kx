@@ -2923,6 +2923,12 @@ incomplete source set. The MCP `list_model_items` chunks section uses the same e
 page-local field addresses.
 `usage` is `read` when the model was read from it, `skipped` for a known type the model does not
 read and `unknown` for an unknown type.
+An installed Archive check on LIVE 13220821 and PTU 13260598 verified all 20 numeric type
+words for one model on each Build. Each source-use reference selected the expected physical
+Entry. An independent table read of seven checksum-verified Entries per Build matched the
+reported four-byte ranges and decoded IDs. Synthetic tests additionally exercise the
+two-byte `CrCh` layout and page-local MCP addresses.
+
 A geometry companion that does not exist exits with code 2, a corrupt or unreadable model or
 companion with 3. A `CrCh` model that is well-formed but has a layout the reader does not
 implement (a mesh in data streams, a big-endian chunk, a `Mesh` or physics data chunk of another
