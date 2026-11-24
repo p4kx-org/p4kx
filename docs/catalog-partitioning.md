@@ -428,6 +428,16 @@ The Catalog contains 77,896,476,922 decoded bytes and 1,466,041,457 compressed b
 The writer reports 1,915,716,829 peak temporary bytes and Windows reports 1,915,726,571
 process write bytes. The separate replay uses this same sealed compressed output.
 
+The archive-free verifier replayed the sealed LIVE frame twice and checked the
+84,763,855 sourced cells against its original provenance inventory. The passing
+test covered 77,896,476,922 decoded bytes, 254 measured sections, 95,261 physical
+sources, 120,142,831 source uses and 989 variant source-use sets in 5,536.06 s.
+The PowerShell launcher failed while naming its output receipt. An independent
+check verified the preserved test transcript, the signed driver and the
+unchanged sealed frame and Normal receipt. Terminal replay memory and write
+counters were unavailable. The producer measurements above have their own
+Windows lifetime counters.
+
 ### Packaged Normal measurement on PTU 13260598
 
 Windows AMD64 producer `93d92ca20bef8a8c3731339214a3301124ade7ba` completed
