@@ -47,8 +47,7 @@ impl Paint {
     }
 }
 
-/// A ship or ground vehicle: an `EntityClassDefinition` Record under `entities/spaceships` or
-/// `entities/groundvehicles`.
+/// A ship, ground vehicle or playable exosuit from an original `EntityClassDefinition` Record.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
@@ -65,7 +64,7 @@ pub struct Ship<'a> {
     #[serde(skip)]
     #[schemars(skip)]
     pub(crate) source_numbers: Vec<CapturedNumber>,
-    /// The name, from `vehicleName` of the vehicle parameters.
+    /// The authored vehicle name or the playable exosuit's attachment localization name.
     pub(crate) name: SourcedValue<PublicNameRef>,
     /// The description, from `vehicleDescription` of the vehicle parameters.
     #[schemars(extend("x-gameText" = true))]

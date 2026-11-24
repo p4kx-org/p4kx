@@ -90,7 +90,7 @@ impl<'source> ShipSource<'source> {
         &self.ship.header
     }
 
-    /// Borrows the original vehicle-name reference.
+    /// Borrows the original vehicle or exosuit attachment name reference.
     #[must_use]
     pub const fn name(&self) -> &SourcedValue<PublicNameRef> {
         &self.ship.name

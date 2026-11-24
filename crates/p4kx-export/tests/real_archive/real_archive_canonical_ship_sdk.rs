@@ -5,11 +5,11 @@ use std::env;
 use std::slice;
 
 use p4kx_export::catalog_queries::equipment::{
-    ShipSnapshot, ShipSource, with_ships, with_ships_from,
+    ShipManufacturerValue, ShipSnapshot, ShipSource, with_ships, with_ships_from,
 };
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_export::{Playability, VariantTarget, VehicleKind};
-use p4kx_extraction::{Archive, Checksum, SourceValueState, SourcedValue};
+use p4kx_extraction::{Archive, Checksum, DataForgeEntry, SourceValueState, SourcedValue};
 use serde_json::Value;
 use sha2::{Digest, Sha256};
 
@@ -21,6 +21,8 @@ use crate::real_archive_verification::print_line;
 
 const RECORD: &str = "P4KX_SHIP_SDK_RECORD";
 const RECORD_PATH: &str = "P4KX_SHIP_SDK_RECORD_PATH";
+const NAME_KEY: &str = "P4KX_SHIP_SDK_PUBLIC_NAME_KEY";
+const MANUFACTURER: &str = "P4KX_SHIP_SDK_ATTACHMENT_MANUFACTURER";
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Evidence {
@@ -32,6 +34,8 @@ struct Selection {
     index: u32,
     path: String,
     evidence: Evidence,
+    name_key: Option<String>,
+    manufacturer: Option<String>,
 }
 
 impl Selection {
@@ -50,11 +54,22 @@ impl Selection {
             index,
             path,
             evidence,
+            name_key: optional_expected(NAME_KEY)?,
+            manufacturer: optional_expected(MANUFACTURER)?,
         })
     }
 
     const fn record(&self) -> CatalogRecordSelection {
         CatalogRecordSelection::RecordIndex(self.index)
+    }
+}
+
+fn optional_expected(name: &str) -> TestResult<Option<String>> {
+    match env::var(name) {
+        Ok(value) if value.is_empty() => Err("an expected Ship source value is empty".into()),
+        Ok(value) => Ok(Some(value)),
+        Err(env::VarError::NotPresent) => Ok(None),
+        Err(error) => Err(error.into()),
     }
 }
 
@@ -97,6 +112,11 @@ fn installed_canonical_ship_matches_exact_scoped_normal_producer() -> TestResult
             |snapshot| take_snapshot(archive, &selection, &snapshot),
         )
         .map_err(|_| "scoped canonical Ship query did not complete")??;
+        if let Some(code) = &selection.manufacturer
+            && code != "null"
+        {
+            verify_manufacturer_target(&input, &expected.row, code)?;
+        }
         let filter = literal_filter(&input, selection.index)?;
         let normal =
             variant_parity::scoped_normal(archive, &input, &filter, "/ships", &expected.origins)?;
@@ -112,6 +132,9 @@ fn installed_canonical_ship_matches_exact_scoped_normal_producer() -> TestResult
             return Err("the exact Normal and SDK Ship row or variant evidence differs".into());
         }
         expected.origins.verify(&normal)?;
+        if selection.name_key.is_some() && selection.manufacturer.is_some() {
+            print_line("Canonical Ship authored presentation verified");
+        }
         report("parity", &expected)
     })
 }
@@ -141,6 +164,7 @@ fn take_snapshot(
     {
         return Err("the selected Ship differs from the retained physical owner".into());
     }
+    verify_presentation_sources(selection, ship, snapshot)?;
     let row = wire_row(ship.catalog_row().ok_or("canonical Ship row unavailable")?)?;
     let provenance = snapshot.provenance();
     let set = snapshot_set(snapshot, ship, selection.evidence)?;
@@ -162,6 +186,64 @@ fn take_snapshot(
         origins,
         state,
     })
+}
+
+fn verify_presentation_sources(
+    selection: &Selection,
+    ship: &ShipSource<'_>,
+    snapshot: &ShipSnapshot<'_>,
+) -> TestResult {
+    if let Some(expected) = selection.name_key.as_deref() {
+        let name = ship
+            .name()
+            .value()
+            .and_then(|name| snapshot.sources().public_name(name))
+            .ok_or("the selected Ship lacks its authored name")?;
+        if name.key().value().copied() != Some(expected)
+            || !ship.name().origin().source_set_complete()
+        {
+            return Err("the selected Ship name or its source evidence differs".into());
+        }
+    }
+    if let Some(expected) = selection.manufacturer.as_deref() {
+        let cell = ship.attachment_manufacturer().manufacturer();
+        let matches = match (expected, cell.value()) {
+            ("null", None) => cell.state() == SourceValueState::Null,
+            ("ARGO" | "BANU" | "UNKN", Some(ShipManufacturerValue::Record(link))) => {
+                link.resolved_index().is_some() && link.guid().value().is_some()
+            }
+            _ => false,
+        };
+        if !matches || !cell.origin().source_set_complete() {
+            return Err("the selected Ship manufacturer or its source evidence differs".into());
+        }
+    }
+    Ok(())
+}
+
+fn verify_manufacturer_target(input: &DataForgeEntry, row: &Value, code: &str) -> TestResult {
+    let link = row
+        .pointer("/attachmentManufacturer/manufacturer/value")
+        .ok_or("the expected manufacturer needs an original Record link")?;
+    let index = link
+        .pointer("/targetRecordIndex/value")
+        .and_then(Value::as_u64)
+        .and_then(|index| u32::try_from(index).ok())
+        .ok_or("the original manufacturer target index is missing")?;
+    let forge = input.open()?;
+    let target = forge
+        .record(index)
+        .ok_or("the original manufacturer target Record is missing")?;
+    let guid = target.guid().to_string();
+    if link.pointer("/guid/value").and_then(Value::as_str) != Some(guid.as_str())
+        || !matches!(
+            target.tree()?.field("Code"),
+            Some(p4kx_extraction::Value::String(actual)) if *actual == code
+        )
+    {
+        return Err("the original manufacturer target identity or code differs".into());
+    }
+    Ok(())
 }
 
 fn snapshot_set(

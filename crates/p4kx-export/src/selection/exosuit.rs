@@ -19,16 +19,31 @@ const SEAT_FOLDER: &str = "libs/foundry/records/entities/scitem/vehicles/seat/";
 pub(crate) enum Exosuit {
     Atls,
     Geo,
+    GeoCollectorGrade1,
+    GeoCollectorGrade2,
+    GeoCollectorGrade3,
     Ikti,
     IktiGeo,
+    IktiAkuma,
+    IktiRad,
 }
 
 impl Exosuit {
     pub(crate) fn by_path(path: &str) -> Option<Self> {
         let class = strip_folder(path, ACTOR_FOLDER)?;
-        [Self::Atls, Self::Geo, Self::Ikti, Self::IktiGeo]
-            .into_iter()
-            .find(|owner| class.eq_ignore_ascii_case(owner.class()))
+        [
+            Self::Atls,
+            Self::Geo,
+            Self::GeoCollectorGrade1,
+            Self::GeoCollectorGrade2,
+            Self::GeoCollectorGrade3,
+            Self::Ikti,
+            Self::IktiGeo,
+            Self::IktiAkuma,
+            Self::IktiRad,
+        ]
+        .into_iter()
+        .find(|owner| class.eq_ignore_ascii_case(owner.class()))
     }
 
     pub(crate) fn from_header(path: &str, record_name: &str, source_type: &str) -> Option<Self> {
@@ -41,8 +56,13 @@ impl Exosuit {
     pub(crate) fn matches_seat(self, path: &str) -> bool {
         let expected = match self {
             Self::Atls => "argo_atls_powersuit_scitem_seat_driver",
-            Self::Geo => "argo_atls_geo_scitem_seat_driver",
-            Self::Ikti | Self::IktiGeo => "argo_atls_ikti_scitem_seat_driver",
+            Self::Geo
+            | Self::GeoCollectorGrade1
+            | Self::GeoCollectorGrade2
+            | Self::GeoCollectorGrade3 => "argo_atls_geo_scitem_seat_driver",
+            Self::Ikti | Self::IktiGeo | Self::IktiAkuma | Self::IktiRad => {
+                "argo_atls_ikti_scitem_seat_driver"
+            }
         };
         strip_folder(path, SEAT_FOLDER).is_some_and(|class| class.eq_ignore_ascii_case(expected))
     }
@@ -51,8 +71,13 @@ impl Exosuit {
         match self {
             Self::Atls => "argo_atls",
             Self::Geo => "argo_atls_geo",
+            Self::GeoCollectorGrade1 => "argo_atls_geo_collector_grad01",
+            Self::GeoCollectorGrade2 => "argo_atls_geo_collector_grad02",
+            Self::GeoCollectorGrade3 => "argo_atls_geo_collector_grad03",
             Self::Ikti => "argo_atls_ikti",
             Self::IktiGeo => "argo_atls_geo_ikti",
+            Self::IktiAkuma => "argo_atls_geo_ikti_ntls",
+            Self::IktiRad => "argo_atls_ikti_argos",
         }
     }
 }

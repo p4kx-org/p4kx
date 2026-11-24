@@ -9,7 +9,7 @@ use p4kx_export::catalog_queries::equipment::{ShipSourceSnapshot, with_ship_sour
 use p4kx_export::catalog_queries::{
     CanonicalText, CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability, TextForms,
 };
-use p4kx_export::{Kind, Language};
+use p4kx_export::{Kind, Language, VehicleKind};
 use p4kx_extraction::{
     Archive, ArchiveWatch, DataForge, DataForgeEntry, LocalizationSet, RecordTree,
     SourceValueState, SourcedValue, StructValue, Value, is_placeholder_key,
@@ -156,6 +156,7 @@ fn inspect(
 ) -> TestResult<(usize, [FieldStatistics; 2], usize)> {
     verify_query_selection(archive, snapshot)?;
     let mut selected = physical_ships(original)?;
+    let mut exosuits = HashSet::new();
     let mut stats = [FieldStatistics::default(), FieldStatistics::default()];
     let mut closure = Closure::default();
     for row in snapshot.rows() {
@@ -164,21 +165,26 @@ fn inspect(
             .record_index()
             .value()
             .ok_or("Ship physical index")?;
-        if !selected.remove(&index) {
+        let exosuit = row.vehicle_kind().value() == Some(&VehicleKind::Exosuit);
+        if !selected.remove(&index) && (!exosuit || !exosuits.insert(index)) {
             return Err("the Ship query returned a foreign or duplicated physical row".into());
         }
         let record = original.record(index).ok_or("original Ship Record")?;
         let tree = record
             .tree()
             .map_err(|_| "read a selected original Ship body")?;
-        let component = vehicle_component(&tree);
+        let component = component(&tree, "VehicleComponentParams");
         let authored = |field| component.and_then(|fields| fields.field(field));
+        let name = match authored("vehicleName") {
+            None | Some(Value::Locale("")) if exosuit => attachment_name(&tree),
+            other => other,
+        };
         closure.owners.extend([
             (index, row.name().origin()),
             (index, row.description().origin()),
         ]);
         check_field(
-            authored("vehicleName"),
+            name,
             row.name(),
             row.name()
                 .value()
@@ -207,16 +213,31 @@ fn inspect(
     Ok((snapshot.rows().len(), stats, uses))
 }
 
-fn vehicle_component<'tree, 'source>(
+fn component<'tree, 'source>(
     tree: &'tree RecordTree<'source>,
+    source_type: &str,
 ) -> Option<&'tree StructValue<'source>> {
     let Value::Array(components) = tree.field("Components")? else {
         return None;
     };
     components.iter().find_map(|component| match component {
-        Value::Struct(fields) if fields.type_name() == "VehicleComponentParams" => Some(fields),
+        Value::Struct(fields) if fields.type_name() == source_type => Some(fields),
         _ => None,
     })
+}
+
+fn attachment_name<'tree, 'source>(
+    tree: &'tree RecordTree<'source>,
+) -> Option<&'tree Value<'source>> {
+    let Value::Struct(definition) =
+        component(tree, "SAttachableComponentParams")?.field("AttachDef")?
+    else {
+        return None;
+    };
+    let Value::Struct(localization) = definition.field("Localization")? else {
+        return None;
+    };
+    localization.field("Name")
 }
 
 fn verify_query_selection(archive: &Archive, snapshot: &ShipSourceSnapshot<'_>) -> TestResult {

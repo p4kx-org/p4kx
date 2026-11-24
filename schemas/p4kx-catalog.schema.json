@@ -46659,7 +46659,7 @@
       "type": "object"
     },
     "Ship": {
-      "description": "A ship or ground vehicle: an `EntityClassDefinition` Record under `entities/spaceships` or\n`entities/groundvehicles`.",
+      "description": "A ship, ground vehicle or playable exosuit from an original `EntityClassDefinition` Record.",
       "properties": {
         "attachmentManufacturer": {
           "$ref": "#/$defs/ShipAttachmentManufacturer",
@@ -46708,7 +46708,7 @@
         },
         "name": {
           "$ref": "#/$defs/SourcedValueOfPublicNameRef",
-          "description": "The name, from `vehicleName` of the vehicle parameters."
+          "description": "The authored vehicle name or the playable exosuit's attachment localization name."
         },
         "playability": {
           "$ref": "#/$defs/SourcedValueOfstring",

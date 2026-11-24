@@ -603,7 +603,8 @@ its key and has absent translation forms.
 
 | Field | Source |
 |-------|--------|
-| `name`, `role`, `career` | `vehicleName`, `vehicleRole`, `vehicleCareer` → `texts.publicNames` |
+| `name` | `vehicleName` → `texts.publicNames`. When the vehicle name is absent for a supported exosuit Actor, use the original `AttachDef.Localization.Name` on its selected attachment component. |
+| `role`, `career` | `vehicleRole`, `vehicleCareer` → `texts.publicNames` |
 | `description` | `vehicleDescription` → `texts.gameTexts` (`x-gameText`) |
 | `crewSize` | Sourced original `crewSize` as ResourceNumber, independently of CrewManifest membership |
 | `vehicleManufacturer` | The selected `VehicleComponentParams.manufacturer`, with its original component ordinal |
@@ -677,10 +678,26 @@ Cargo is an interpreted projection in `projections.shipBaseFacts`. The Ship row 
 the interpreted `vehicleKind`.
 The standalone `p4kx ships` output reports detailed sources, thresholds, Loadout and cells.
 The payloads of `vehicleKind` and `massBasis` are extensible strings in the schema.
-The `exosuit` code covers the ATLS, ATLS GEO, ATLS IKTI and ATLS IKTI GEO Actor owners.
+The `exosuit` code covers the ATLS, ATLS GEO, ATLS IKTI, ATLS IKTI GEO, ATLS IKTI Akuma,
+ATLS IKTI Rad and the three ATLS GEO Collector Actor owners.
 It requires the matching physical class, authored control components and the vehicle's
 driver seat in the original default loadout. [ADR-0417](adr/0417-exosuits-share-the-vehicle-catalog.md)
 defines the admission rule.
+
+The manufacturer remains the original reference on each selected attachment component.
+The ATLS stores null, the GEO and three Collector owners target `ARGO`, the IKTI,
+IKTI GEO and IKTI Rad target `BANU`, and the IKTI Akuma targets `UNKN`.
+
+The three Collector owners each have a separate playable row. They resolve the same
+original driver seat as the GEO and each declares the GEO class in
+`insurance.shipInsuranceParams.shipEntityClassName`. The original insured class name and
+its source are part of the insurance data. The Ship variant decision uses vehicle
+implementation membership.
+
+An original source check on LIVE `13220821` and PTU `13260598` found one readable
+physical Record per GEO and Collector owner. It opened four Actor bodies and one
+driver-seat body per Build. All four owners satisfied the same GEO control predicate.
+Each Collector owner had its own full-name key, and all four shared the GEO short-name key.
 
 A scoped verification at revision `54d5e8d00` matched all four owners on LIVE `13220821`
 and PTU `13248297`. The SDK ship-source reader and scoped Normal Catalog agreed on
@@ -705,6 +722,8 @@ A header census of older EPTU `13025019` and TECH-PREVIEW `13040440` found all f
 owners by GUID and Record path. It visited 117,952 and 120,857 headers respectively, with every
 path classifiable and zero Record bodies opened. Playability on the older Builds requires
 their authored control and driver-seat evidence.
+An older Archive that demonstrates genuine absence for one of those four owners is unavailable
+in the installed and retained set. That acceptance criterion remains open.
 
 | Field | Rule and source |
 |-------|-----------------|

@@ -3,7 +3,7 @@
 
 use std::cell::RefCell;
 
-use p4kx_extraction::{CancelToken, RecordTree, SourcedValue, StructValue};
+use p4kx_extraction::{CancelToken, RecordTree, SourceValueState, SourcedValue, StructValue};
 
 use super::Observed;
 use super::ship_presentation::{self, ShipPresentation};
@@ -16,6 +16,7 @@ use crate::contract_insurance::ShipInsurance;
 use crate::playability_projection::OwnerProof;
 use crate::record_observation::RecordObservation;
 use crate::resource_number::ResourceNumber;
+use crate::selection::Exosuit;
 use crate::source_fields::FieldError;
 use crate::template_field_capture::TemplateFieldCapture;
 
@@ -83,14 +84,8 @@ pub(crate) fn read<'read, 'source>(
         "StaticEntityClassData",
         "SEntityInsuranceProperties",
     )?;
-    let (presentation, mut notes) = ship_presentation::read(
-        fields,
-        projection,
-        vehicle.value,
-        &vehicle.prefix,
-        attachment.value,
-        &attachment.prefix,
-    )?;
+    let (presentation, mut notes) =
+        read_presentation(fields, projection, tree, &vehicle, &attachment)?;
     let crew_size = fields::selected(fields, &vehicle, |owner| {
         owner.authored_number("crewSize", &mut notes)
     })?;
@@ -118,6 +113,35 @@ pub(crate) fn read<'read, 'source>(
             &input.origins().uses,
         ),
     })
+}
+
+fn read_presentation<'source>(
+    fields: Observed<'_, '_, '_, 'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    tree: &RecordTree<'source>,
+    vehicle: &SelectedSource<'_, 'source>,
+    attachment: &SelectedSource<'_, 'source>,
+) -> Result<(ShipPresentation<'source>, Vec<FieldError>), CatalogError> {
+    let (mut presentation, mut notes) = ship_presentation::read(
+        fields,
+        projection,
+        vehicle.value,
+        &vehicle.prefix,
+        attachment.value,
+        &attachment.prefix,
+    )?;
+    if presentation.name.state() == SourceValueState::Absent
+        && Exosuit::from_header(tree.record_path(), tree.name(), tree.type_name()).is_some()
+    {
+        let name = fields::selected(fields, attachment, |owner| {
+            ship_presentation::read_exosuit_name(owner, projection, &mut notes)
+        })?;
+        presentation.name = fields
+            .originals
+            .sources()
+            .add_value_origins(name, &[presentation.name.origin()])?;
+    }
+    Ok((presentation, notes))
 }
 
 #[cfg(test)]

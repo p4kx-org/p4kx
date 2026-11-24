@@ -54,6 +54,10 @@ fn exosuit_catalog_and_sdk_admit_the_same_physical_owners_and_sources() -> TestR
                         .remove(&index)
                         .ok_or("unique admitted Catalog row")?;
                     compare_row(row, producer, &context, &catalog)?;
+                    let authored = expected.get(&index).ok_or("expected Actor presentation")?;
+                    let name = row.name().value().ok_or("SDK authored Actor name")?;
+                    let text = snapshot.public_name(name).ok_or("SDK retained name key")?;
+                    assert_eq!(text.key().value().copied(), Some(authored.name_key));
                 }
                 assert!(
                     remaining.is_empty(),
@@ -137,6 +141,8 @@ struct ExpectedOwner<'source> {
     owner: Record<'source>,
     class: &'static str,
     driver_index: u32,
+    name_key: &'static str,
+    manufacturer: Option<fixture::Manufacturer>,
 }
 
 fn expected_owners<'source>(
@@ -178,6 +184,8 @@ fn expected_owners<'source>(
                     owner: record,
                     class: owner.class,
                     driver_index: driver.index(),
+                    name_key: owner.name_key,
+                    manufacturer: owner.manufacturer,
                 },
             );
         }
@@ -222,6 +230,10 @@ fn catalog_rows<'catalog>(
             Some(encrypted),
         )?;
         proof::present(row, "vehicleKind", &json!("exosuit"), Some(encrypted))?;
+        check_presentation(catalog, row, original, encrypted)?;
+        if proof::at(row, "/variantOf/state")? != "absent" {
+            return Err("the independent Actor has a variant base".into());
+        }
         let playability = proof::present(row, "playability", &json!("player"), Some(encrypted))?;
         let uses = proof::uses(catalog, playability)?;
         assert!(
@@ -238,6 +250,67 @@ fn catalog_rows<'catalog>(
         );
     }
     Ok(emitted)
+}
+
+fn check_presentation(
+    catalog: &Value,
+    row: &Value,
+    owner: &ExpectedOwner<'_>,
+    encrypted: bool,
+) -> TestResult {
+    let name = proof::cell(row, "name", "present")?;
+    let index = owner.owner.index();
+    assert!(
+        name["containsEncryptedSource"] == encrypted
+            && uses_record(&proof::uses(catalog, name)?, index),
+        "the Name points to its authored Actor field and encryption state"
+    );
+    let text = proof::rows(catalog, "/texts/publicNames")?
+        .iter()
+        .find(|text| text.pointer("/id/value") == name.get("value"))
+        .ok_or("public name from the original Actor locale")?;
+    proof::present(text, "key", &json!(owner.name_key), Some(encrypted))?;
+
+    let vehicle = proof::at(row, "/vehicleManufacturer")?;
+    proof::cell(vehicle, "manufacturer", "absent")?;
+    let attachment = proof::at(row, "/attachmentManufacturer")?;
+    proof::present(
+        attachment,
+        "attachDefPresent",
+        &json!(true),
+        Some(encrypted),
+    )?;
+    let Some(manufacturer) = owner.manufacturer else {
+        let cell = proof::cell(attachment, "manufacturer", "null")?;
+        assert!(
+            cell["containsEncryptedSource"] == encrypted
+                && uses_record(&proof::uses(catalog, cell)?, index),
+            "the stored null manufacturer retains its Actor field and encryption state"
+        );
+        return Ok(());
+    };
+    let link = proof::at(
+        proof::cell(attachment, "manufacturer", "present")?,
+        "/value",
+    )?;
+    assert_eq!(
+        link["status"], "present",
+        "the manufacturer reference resolves"
+    );
+    let guid = json!(super::guid(manufacturer.guid));
+    proof::present(link, "guid", &guid, Some(encrypted))?;
+    let original = proof::rows(catalog, "/definitions/manufacturers/rows")?
+        .iter()
+        .find(|definition| definition.pointer("/guid/value") == Some(&guid))
+        .ok_or("definition of the stored manufacturer")?;
+    proof::present(
+        link,
+        "targetRecordIndex",
+        proof::at(original, "/recordIndex/value")?,
+        Some(encrypted),
+    )?;
+    proof::present(original, "code", &json!(manufacturer.code), Some(encrypted))?;
+    Ok(())
 }
 
 fn check_standalone(
@@ -304,6 +377,15 @@ fn compare_row(row: &ShipSource<'_>, producer: &Value, sdk: &Value, catalog: &Va
         ),
         ("vehicleKind", serde_json::to_value(row.vehicle_kind())?),
         ("playability", serde_json::to_value(row.playability())?),
+        ("name", serde_json::to_value(row.name())?),
+        (
+            "vehicleManufacturer",
+            serde_json::to_value(row.vehicle_manufacturer())?,
+        ),
+        (
+            "attachmentManufacturer",
+            serde_json::to_value(row.attachment_manufacturer())?,
+        ),
     ] {
         assert_eq!(
             proof::with_origins(selected, sdk)?,

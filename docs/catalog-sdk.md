@@ -1659,8 +1659,10 @@ getters for the complete original Header, name/description/role/career, crew siz
 manufacturer declarations, original vehicle selector, exact size, insurance and authored
 crew-manifest inputs, plus canonical sourced vehicle kind, mass, mass basis, hull health and playability.
 The same physical selection includes the supported ATLS Actor owners. Their sourced vehicle kind and
-playability retain the original control and driver-seat selectors. Ship-specific values follow their
-usual absent or unreadable state when the original input leaves them unavailable.
+playability retain the original control and driver-seat selectors. For those exosuits,
+`name()` uses the selected attachment's `AttachDef.Localization.Name` when the original
+vehicle name is absent. `attachment_manufacturer()` preserves the authored reference and
+its resolution state. Vehicle-only inputs keep their sourced absent or unreadable states.
 
 This query shares the Catalog's original reader, Archive-backed ShipPool and per-call
 Capture. It uses the Entity header index to open the dependencies reached by the selected owners'

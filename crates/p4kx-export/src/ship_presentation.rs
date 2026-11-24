@@ -4,13 +4,13 @@
 use p4kx_extraction::{SourceUseRole, SourceValue, SourcedValue, Value};
 
 use super::{Fact, Observed};
-use crate::CatalogError;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::original::{
     OriginalArraySelection, OriginalFlowFields, OriginalValuePart,
 };
 use crate::catalog_text_contract::{GameTextRef, PublicNameRef};
 use crate::source_fields::FieldError;
+use crate::{CatalogError, ExportAccountingError};
 
 #[path = "ship_manufacturers.rs"]
 mod manufacturers;
@@ -73,6 +73,41 @@ pub(super) fn read<'source>(
         },
         notes,
     ))
+}
+
+pub(super) fn read_exosuit_name<'source>(
+    attachment: Observed<'_, '_, '_, 'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    notes: &mut Vec<FieldError>,
+) -> Result<SourcedValue<PublicNameRef>, CatalogError> {
+    read_owned_name(attachment, "AttachDef", notes, |definition, notes| {
+        read_owned_name(definition, "Localization", notes, |localization, notes| {
+            localization.public_name("Name", projection, notes)
+        })
+    })
+}
+
+fn read_owned_name<'reader, 'scope, 'read, 'source>(
+    owner: Observed<'reader, 'scope, 'read, 'source>,
+    field: &str,
+    notes: &mut Vec<FieldError>,
+    read: impl FnOnce(
+        Observed<'reader, 'scope, 'read, 'source>,
+        &mut Vec<FieldError>,
+    ) -> Result<SourcedValue<PublicNameRef>, CatalogError>,
+) -> Result<SourcedValue<PublicNameRef>, CatalogError> {
+    let mut name = None;
+    let parent = owner.declared_owned(field, notes, |child, notes| {
+        name = Some(read(child, notes)?);
+        Ok(())
+    })?;
+    match name {
+        Some(name) => Ok(owner
+            .originals
+            .sources()
+            .add_value_origins(name, &[parent.origin()])?),
+        None => parent.try_map(|()| Err(ExportAccountingError::ConflictingSourceDatum.into())),
+    }
 }
 
 fn missing_component<T>(
