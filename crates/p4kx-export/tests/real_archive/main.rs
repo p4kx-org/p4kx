@@ -59,6 +59,7 @@ mod real_archive_crafting_catalog;
 mod real_archive_crafting_details;
 mod real_archive_crafting_metadata_sdk_parity;
 mod real_archive_definition_sdk;
+mod real_archive_economy_definition_sdk_parity;
 mod real_archive_emp;
 mod real_archive_equipment_catalog;
 mod real_archive_explosive_components;
