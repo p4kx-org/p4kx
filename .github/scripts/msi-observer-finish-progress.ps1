@@ -18,11 +18,21 @@ function Wait-P4kxMsiFinishProgressSample($Context, $Launch, [int]$Sequence) {
 }
 
 function Save-P4kxMsiFinishProgress([string]$Directory, [ValidateRange(4,5)][int]$Sequence) {
+    Write-P4kxMsiObserverProgress finishProbeBinding begin -Sequence $Sequence
     $context = Get-P4kxMsiFinishContext $Directory
     $launch = Read-P4kxMsiFinishLaunch $context
+    $marker = @{Sequence=$Sequence;RequestDigest=$context.digest}
+    Write-P4kxMsiObserverProgress finishProbeBinding end @marker
+    Write-P4kxMsiObserverProgress finishProbeWait begin @marker
     Wait-P4kxMsiFinishProgressSample $context $launch $Sequence
+    Write-P4kxMsiObserverProgress finishProbeWait end @marker
+    Write-P4kxMsiObserverProgress finishProbeParent begin @marker
     $parent = Get-P4kxMsiObserverParentState $context.request $context.handle
+    Write-P4kxMsiObserverProgress finishProbeParent end @marker
+    Write-P4kxMsiObserverProgress finishProbeCheckpoint begin @marker
     $checkpoint = Save-P4kxMsiObserverCheckpoint $context.request $context.handle $Sequence $parent
+    Write-P4kxMsiObserverProgress finishProbeCheckpoint end @marker
+    Write-P4kxMsiObserverProgress finishProbeReceipt begin @marker
     $sources = [ordered]@{
         'finish-launch.json' = 'finish-supervision/launch.json'
         'finish-result.json' = 'finish-supervision/result.json'
@@ -47,4 +57,5 @@ function Save-P4kxMsiFinishProgress([string]$Directory, [ValidateRange(4,5)][int
         observed_utc=[DateTimeOffset]::UtcNow.ToString('o');cutoff_utc=$launch.cutoff_utc
         completed_success=$false;native_completion_unproven=$true;mutation_authority=$false
     }
+    Write-P4kxMsiObserverProgress finishProbeReceipt end @marker
 }

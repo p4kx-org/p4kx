@@ -30,8 +30,11 @@ if ($Stage -ceq 'Delay') {
     return
 }
 if ($Stage -ceq 'ProbeFinish') {
+    . (Join-Path $PSScriptRoot 'msi-observer-progress.ps1')
+    Write-P4kxMsiObserverProgress finishProbeCaller begin -Sequence $Sequence
     . (Join-Path $PSScriptRoot 'msi-observer-finish-progress.ps1')
     Save-P4kxMsiFinishProgress $Directory $Sequence
+    Write-P4kxMsiObserverProgress finishProbeCaller end -Sequence $Sequence
     return
 }
 if ($Stage -cin @('StartFinish','WaitFinish','CollectFinish')) {

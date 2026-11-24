@@ -2,9 +2,13 @@ param(
     [Parameter(Mandatory)][string]$Directory,
     [ValidateSet('Complete','Timeout','Admission')][string]$Case='Complete',
     [ValidateRange(1000,10000)][int]$Milliseconds=3000,
-    [ValidateRange(0,1000)][int]$SnapshotWaitMilliseconds=0,[switch]$DetachedFinish
+    [ValidateRange(0,1000)][int]$SnapshotWaitMilliseconds=0,[switch]$DetachedFinish,[switch]$LiveFinishProbe
 )
 $ErrorActionPreference = 'Stop'
+if ($LiveFinishProbe -and ($Case -cne 'Complete' -or -not $DetachedFinish)) {
+    throw 'The active Finish probe requires the harmless detached Complete fixture.'
+}
+$controlMilliseconds = if ($LiveFinishProbe) { 60000 } else { $Milliseconds }
 . (Join-Path $PSScriptRoot 'msi-observer-evidence.ps1')
 if (-not $IsWindows -or [IO.Path]::Exists($Directory)) { throw 'Harmless observer needs a fresh Windows fixture directory.' }
 New-Item -ItemType Directory -Path $Directory | Out-Null
@@ -19,16 +23,61 @@ if ($Case -ceq 'Admission') { $parameters.AdmissionOnly=$true }
 Write-P4kxDetachedReceipt $invocation $parameters
 $saved = @{deadline=$env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC;actions=$env:GITHUB_ACTIONS;runner=$env:RUNNER_ENVIRONMENT;tracking=$env:RUNNER_TRACKING_ID;target=$env:P4KX_TARGET}
 $request=$null;$handle=$null
+function Read-ObserverProgress([string]$Output) {
+    $prefix = '[P4KX-MSI-OBSERVER]'
+    [regex]::Split($Output, '\r?\n') |
+        Where-Object { $_.StartsWith($prefix, [StringComparison]::Ordinal) } |
+        ForEach-Object { $_.Substring($prefix.Length) | ConvertFrom-Json -AsHashtable -DateKind String }
+}
+
+function Assert-ObserverLiveFinishProbe($Launch) {
+    $arguments = @('-NoLogo','-NoProfile','-NonInteractive','-File',$entry,
+        '-Stage','ProbeFinish','-Directory',$observer,'-Sequence','4')
+    $probe = Invoke-P4kxPortalProcess ([Environment]::ProcessPath) $arguments $root 'live-finish-probe' -Milliseconds 45000
+    Assert-Observer ($probe.exit_code -eq 0) 'The held Finish probe did not return successfully.'
+    $records = @(Read-ObserverProgress $probe.stdout)
+    $observed = @($records | ForEach-Object { $_.stage + '.' + $_.status })
+    $expected = @('finishProbeCaller.begin','finishProbeBinding.begin','finishProbeBinding.end',
+        'finishProbeWait.begin','finishProbeWait.end','finishProbeParent.begin','finishProbeParent.end',
+        'finishProbeCheckpoint.begin','finishProbeCheckpoint.end','finishProbeReceipt.begin',
+        'finishProbeReceipt.end','finishProbeCaller.end')
+    Assert-Observer (($observed -join ' ') -ceq ($expected -join ' ')) 'The held Finish probe lost its ordered console boundaries.'
+    foreach ($marker in $records) {
+        $bound = $marker.stage -cne 'finishProbeCaller' -and
+            -not ($marker.stage -ceq 'finishProbeBinding' -and $marker.status -ceq 'begin')
+        Assert-Observer ($marker.sequence -eq 4 -and $marker.completed_success -eq $false -and
+            $marker.native_completion_unproven -eq $true -and $marker.mutation_authority -eq $false -and
+            (-not $bound -or $marker.request_sha256 -ceq $Launch.request_sha256)) 'The held Finish probe marker lost its observation-only identity.'
+    }
+
+    $directory = Join-Path $observer 'checkpoints/04'
+    $checkpointPath = Join-Path $directory 'checkpoint.json'
+    $checkpoint = Read-P4kxDetachedReceipt $checkpointPath
+    $progress = Read-P4kxDetachedReceipt (Join-Path $directory 'finish-progress.json')
+    $started = [DateTimeOffset]::new([long]$Launch.supervisor_started_utc_ticks, [TimeSpan]::Zero)
+    $sampled = ConvertFrom-P4kxMsiBudgetTimestamp $progress.observed_utc
+    Assert-Observer ($sampled -ge $started.AddSeconds(30) -and $progress.sequence -eq 4 -and
+        $progress.request_sha256 -ceq $Launch.request_sha256 -and
+        $progress.checkpoint_sha256 -ceq (Get-P4kxDetachedDigest $checkpointPath) -and
+        $progress.supervisor_pid -eq $Launch.supervisor_pid -and
+        $progress.supervisor_started_utc_ticks -eq $Launch.supervisor_started_utc_ticks -and
+        $progress.files['finish-result.json'].status -ceq 'absent' -and
+        $progress.completed_success -eq $false -and $progress.native_completion_unproven -eq $true -and
+        $progress.mutation_authority -eq $false) 'The held Finish probe lost its scheduled observation and original receipt binding.'
+    Assert-Observer (-not $checkpoint.parent.lifetime_ended -and $checkpoint.journal.complete -eq $true -and
+        $checkpoint.journal.events -eq 2 -and $checkpoint.journal.active.Count -eq 2 -and
+        $checkpoint.journal.active -ccontains 'worker' -and $checkpoint.journal.active -ccontains 'fixture/wait' -and
+        $null -eq $checkpoint.journal.terminal) 'The Finish probe did not observe the held original worker.'
+    'PASS: Finish probe 4 observed the active harmless worker at its scheduled interval and returned all 12 console boundaries.'
+}
+
 function Invoke-ObserverFinish {
     if ($DetachedFinish) {
         $arguments=@('-NoLogo','-NoProfile','-NonInteractive','-File',$entry,'-Stage','StartFinish','-Directory',$observer)
         $launched=Invoke-P4kxPortalProcess ([Environment]::ProcessPath) $arguments $root 'detached-finish-launch' -Milliseconds 4000
         Assert-Observer ($launched.exit_code -eq 0) 'The Finish launcher or its redirected streams did not close.'
         if ($Case -ceq 'Complete') {
-            $prefix = '[P4KX-MSI-OBSERVER]'
-            $records = @([regex]::Split($launched.stdout, '\r?\n') |
-                Where-Object { $_.StartsWith($prefix, [StringComparison]::Ordinal) } |
-                ForEach-Object { $_.Substring($prefix.Length) | ConvertFrom-Json -AsHashtable -DateKind String })
+            $records = @(Read-ObserverProgress $launched.stdout)
             $observed = @($records | ForEach-Object { $_.stage + '.' + $_.status })
             $expected = @('finishLaunchBinding.begin','finishLaunchBinding.end','finishLaunchProcess.begin',
                 'finishLaunchProcess.end','finishLaunchReceipt.begin','finishLaunchReceipt.end')
@@ -45,6 +94,7 @@ function Invoke-ObserverFinish {
                     [string]::Equals($supervisor.Path,[Environment]::ProcessPath,[StringComparison]::OrdinalIgnoreCase) -and
                     -not [IO.File]::Exists((Join-Path $observer 'finish-supervision/result.json'))) 'The exact supervisor did not outlive the launcher and its redirected streams.'
             } finally { $supervisor.Dispose() }
+            if ($LiveFinishProbe) { Assert-ObserverLiveFinishProbe $launch }
             Write-P4kxDetachedReceipt (Join-Path $output 'observer-control-release.json') @{schema=1;role='harmless-msi-observer-release'}
         }
         & $entry -Stage WaitFinish -Directory $observer
@@ -65,12 +115,14 @@ function Assert-ObserverFinishProgress {
     $terminalPath = Join-Path $observer 'finish-supervision/result.json'
     $waitPath = Join-Path $observer 'finish-supervision/wait-result.json'
     $launchBytes = [IO.File]::ReadAllBytes($launchPath)
+    $firstSequence = if ($LiveFinishProbe) { 5 } else { 4 }
     try {
         $foreign = Read-P4kxDetachedReceipt $launchPath
         $foreign.request_sha256 = 'f' * 64
         [IO.File]::WriteAllText($launchPath, ($foreign | ConvertTo-Json -Compress))
-        Assert-ObserverRefused { & $entry -Stage ProbeFinish -Directory $observer -Sequence 4 } 'Foreign Finish launch authorized a progress checkpoint.'
-        Assert-Observer (-not [IO.Path]::Exists((Join-Path $observer 'checkpoints/04'))) 'Refused Finish probe created a checkpoint.'
+        Assert-ObserverRefused { & $entry -Stage ProbeFinish -Directory $observer -Sequence $firstSequence } 'Foreign Finish launch authorized a progress checkpoint.'
+        $checkpoint = Join-Path $observer ('checkpoints/{0:d2}' -f $firstSequence)
+        Assert-Observer (-not [IO.Path]::Exists($checkpoint)) 'Refused Finish probe created a checkpoint.'
     } finally { [IO.File]::WriteAllBytes($launchPath, $launchBytes) }
 
     $launch = Read-P4kxDetachedReceipt $launchPath
@@ -83,7 +135,7 @@ function Assert-ObserverFinishProgress {
         Assert-Observer (-not [IO.File]::Exists($missing) -and -not [IO.File]::Exists($oversize)) 'Successful fixture unexpectedly occupied cleanup markers.'
         [IO.File]::WriteAllBytes($oversize, [byte[]]::new(16KB+1))
         [IO.File]::WriteAllText($unrelated, 'not part of the observer allowlist')
-        foreach ($sequence in 4,5) {
+        foreach ($sequence in $firstSequence..5) {
             & $entry -Stage ProbeFinish -Directory $observer -Sequence $sequence
             $checkpoint = Join-Path $observer ('checkpoints/{0:d2}' -f $sequence)
             $path = Join-Path $checkpoint 'checkpoint.json'
@@ -126,8 +178,8 @@ try {
     $parameters.Target=$env:P4KX_TARGET
     [IO.File]::Delete($invocation)
     Write-P4kxDetachedReceipt $invocation $parameters
-    $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC=[DateTimeOffset]::UtcNow.AddMilliseconds($Milliseconds).ToString('o')
-    & $entry -Stage Start -Directory $observer -Invocation $invocation -Mode Control -ControlMilliseconds $Milliseconds
+    $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC=[DateTimeOffset]::UtcNow.AddMilliseconds($controlMilliseconds).ToString('o')
+    & $entry -Stage Start -Directory $observer -Invocation $invocation -Mode Control -ControlMilliseconds $controlMilliseconds
     $request=Read-P4kxDetachedReceipt (Join-Path $observer 'request.json')
     $handle=Read-P4kxDetachedReceipt (Join-Path $observer 'handle.json')
     $bad=$handle.Clone();$bad.request_sha256='not-the-original-request'

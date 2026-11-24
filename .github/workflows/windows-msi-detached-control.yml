@@ -55,6 +55,9 @@ jobs:
       - name: Check harmless ownership and deadline controls
         timeout-minutes: 1
         run: .github/scripts/test-msi-detached-control.ps1 -Directory ($env:P4KX_CONTROL_TASK+'-contracts')
+      - name: Observe Finish progress while its harmless worker is held
+        timeout-minutes: 2
+        run: .github/scripts/test-msi-observer.ps1 -Directory ($env:P4KX_CONTROL_TASK+'-finish-probe') -Case Complete -DetachedFinish -LiveFinishProbe
       - name: Start harmless tracked phase worker and leave its launcher
         timeout-minutes: 1
         run: .github/scripts/invoke-msi-detached-control.ps1 -Stage Start -Directory $env:P4KX_CONTROL_TASK
