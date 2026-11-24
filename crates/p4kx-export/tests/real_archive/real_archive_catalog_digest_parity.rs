@@ -20,14 +20,14 @@ use super::selected_origins::SelectOrigin;
 use super::wire_row;
 use super::{BoundMeasurement, Counts, SOURCES, TestResult, USES, collect_references, measurement};
 
-type WireDigest = [u8; 32];
+pub(super) type WireDigest = [u8; 32];
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(crate) struct PhysicalSlot {
     pub(crate) record_index: u32,
     pub(crate) component_ordinal: u32,
 }
 
-fn fingerprint(mut value: Value) -> serde_json::Result<WireDigest> {
+pub(super) fn fingerprint(mut value: Value) -> serde_json::Result<WireDigest> {
     value.sort_all_objects();
     Ok(Sha256::digest(serde_json::to_vec(&value)?).into())
 }
@@ -94,7 +94,7 @@ impl DigestedTable {
     }
 }
 
-fn row_fingerprint(
+pub(super) fn row_fingerprint(
     row: &impl Serialize,
     references: &mut HashSet<String>,
 ) -> TestResult<WireDigest> {

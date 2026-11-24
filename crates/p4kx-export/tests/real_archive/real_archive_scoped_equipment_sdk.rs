@@ -65,6 +65,9 @@ mod entity_component_parity;
 #[path = "real_archive_inventory_component_sdk_parity.rs"]
 mod inventory_component_parity;
 
+#[path = "real_archive_interaction_sdk_parity.rs"]
+mod interaction_parity;
+
 #[path = "real_archive_canonical_ship_sdk.rs"]
 mod canonical_ship;
 
