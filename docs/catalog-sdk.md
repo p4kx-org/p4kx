@@ -1059,6 +1059,27 @@ Neither query opens linked target bodies, reads placement files, nor creates a C
 Use each datum's `containsEncryptedSource` and resolve its source-use references through the
 snapshot's inventory. The row's original arena is local to that physical owner.
 
+## Original Loot definition queries
+
+`with_loot_definitions` reads the selected definition kind by physical Record index,
+GUID or family. Read `rows`, `availability`, `coverage` and the source inventory in the
+same callback. A declared family with zero selected rows has availability `available`.
+An undeclared family has availability `absent`.
+
+Fourteen Windows AMD64 cold checks used a separate process for each family and
+Build. All original Archive stamps stayed stable. Peak private commit across the
+checks was 1,114,980,352 bytes and peak working set was 1,032,081,408 bytes.
+
+| Definition | LIVE 13220821 | PTU 13260598 |
+| --- | ---: | ---: |
+| `lootTables` | 54 | 58 |
+| `lootArchetypes` | 34 | 36 |
+| `lootPoolFilters` | 15 | 14 |
+| `lootSecondaryChoiceSingleLayers` | 10 | 11 |
+| `lootSecondaryChoiceMultiLayers` | 15 | 0 available |
+| `lootThemes` | 0 absent | 51 |
+| `lootGenerationGlobalParams` | 1 | 1 |
+
 ## Harvestable slot-preset queries
 
 Use `catalog_queries::loot::with_loot_definitions` with
