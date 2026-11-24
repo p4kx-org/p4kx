@@ -320,20 +320,16 @@ operation is written as a successful runtime proof. Portal-origin behavior remai
 the actual FUSE-grant check, and the release job produces no passing proof if it exposes an
 installation-alias bypass.
 
-The native Ubuntu CI jobs for PR #1117 head `c7a033bd5` checked merge revision
-`b625a98948ba4eb8f6dd833a5d4b27a97edb884b`. Both CPUs passed the synthetic CLI and MCP
-checks, rendered GUI frames under X11 and headless HiDPI Wayland with software graphics,
-and reported an injected missing audio device. The suite covers an encrypted synthetic
-Archive in a mixed-case Proton prefix and key discovery in the default XDG profile.
-[AMD64 CI job](https://github.com/p4kx-org/p4kx/actions/runs/45287771414/job/138094105716) ·
-[ARM64 CI job](https://github.com/p4kx-org/p4kx/actions/runs/45287771414/job/138095092538)
+The native Ubuntu CI jobs for PR #1117 head `405e97268` checked merge revision
+`5d3d917f424657990fd775b8fae8ac843a3fd528`. All native AMD64 and ARM64 test
+shards, doctests and schema checks passed.
+[CI run](https://github.com/p4kx-org/p4kx/actions/runs/45315878072)
 
-The branch package run built version `0.4.2` from the same merge revision. Native AMD64 and
-ARM64 consumers verified matching ELF architecture and ran the CLI, MCP and software-rendered
-GUI across all four formats. Both CPUs recorded the stock Documents API 4 refusal, the
-isolated API 5 grants and successful deb and Flatpak upgrade, removal and profile preservation.
-[AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45287771385/job/138108167457) ·
-[ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45287771385/job/138108167514)
+The branch package run built version `0.4.2` from the same merge revision.
+Native AMD64 and ARM64 package consumers passed the four-format application checks,
+software-rendered desktop frames, Documents grants and package lifecycle checks.
+[AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45315878218/job/138196477374) ·
+[ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45315878218/job/138196477207)
 
 The tagged v0.5.0 candidate requires its own hosted Linux package evidence on both CPUs.
 

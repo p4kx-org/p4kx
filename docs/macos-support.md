@@ -89,6 +89,16 @@ Blender versions, Blender distribution and executable digests, add-on artifact i
 ZIP digest. Tagged release assembly also requires the exact current stable macOS version and
 publishes the same add-on artifact used for the smoke and attestation.
 
+### Hosted package evidence
+
+For PR #1117 head `405e97268`, both hosted Apple Silicon guests verified the
+same DMG and the release add-on in Blender 5.2.4. The minimum guest reported
+macOS 26.7.2 (25G332). The current-OS pull-request guest reported macOS 27.0.1
+(26A434). The tagged version check requires macOS 27.2.1, so its current-OS host
+evidence still depends on the matching native runner.
+[Minimum guest](https://github.com/p4kx-org/p4kx/actions/runs/45315878218/job/138200257881) ·
+[Current pull-request guest](https://github.com/p4kx-org/p4kx/actions/runs/45315878218/job/138200257839)
+
 ## References
 
 - [Shared native platform contract (ADR-0343)](adr/0343-one-native-platform-contract-and-target-bound-runtime-evidence.md)
