@@ -32,6 +32,7 @@ mod selected_origins;
 
 #[path = "real_archive_catalog_selected_row.rs"]
 mod selected_row;
+pub(crate) use selected_row::check_selected_row;
 
 use compare_rows::{ComparedRows, Projection};
 use selected_origins::SelectedOrigins;

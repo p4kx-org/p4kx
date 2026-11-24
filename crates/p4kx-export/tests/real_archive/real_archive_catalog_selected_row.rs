@@ -16,22 +16,35 @@ impl BoundMeasurement {
         origins: &Origins,
         same_identity: impl Fn(&Value) -> bool,
     ) -> TestResult {
+        self.verify_selected_scope(&[path], origins, |catalog| {
+            check_selected_row(catalog, path, expected, same_identity)
+        })
+    }
+
+    pub(crate) fn verify_selected_scope(
+        &self,
+        paths: &[&str],
+        origins: &Origins,
+        verify: impl FnOnce(&Value) -> TestResult,
+    ) -> TestResult {
         self.watch.check()?;
         let mut capture = measurement::normal_capture();
-        capture.keep(path);
+        for path in paths {
+            capture.keep(path);
+        }
         for (section, expected) in origins.inventories() {
             capture.project(section, Projection::Origins(SelectedOrigins(expected)));
         }
         let catalog = artifact::read_completed(&self.directory, |input| Ok(capture.read(input)?))?;
         self.binding.check_catalog(&catalog)?;
-        check_selected_row(&catalog, path, expected, same_identity)?;
+        verify(&catalog)?;
         origins.verify(&catalog)?;
         self.watch.check()?;
         Ok(())
     }
 }
 
-fn check_selected_row(
+pub(crate) fn check_selected_row(
     catalog: &Value,
     path: &str,
     expected: &Value,

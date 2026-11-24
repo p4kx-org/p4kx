@@ -22,6 +22,7 @@ use crate::real_archive_verification;
 mod dependencies;
 #[path = "weapon_magazine_sdk_proof.rs"]
 mod magazine;
+pub(crate) use magazine::ammo_container_replay;
 #[path = "weapon_combat_original.rs"]
 pub(super) mod original;
 #[path = "weapon_combat_projectile_proof.rs"]

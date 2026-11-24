@@ -15,8 +15,10 @@ use serde_json::Value;
 use super::equipment_input::with_archive;
 use super::report_scoped_rows;
 use crate::real_archive_catalog_table_parity::{
-    Origins, TestResult, wire_row, with_bound_measurement_from_producer,
+    Origins, TestResult, check_selected_row, wire_row, with_bound_measurement_from_producer,
 };
+use crate::real_archive_verification::print_line;
+use crate::real_archive_weapon_combat::ammo_container_replay;
 
 #[path = "real_archive_shop_original_nomination.rs"]
 mod original_nomination;
@@ -46,6 +48,22 @@ fn installed_physical_shop_located_cold_query() -> TestResult {
 #[test]
 #[ignore = "same Build: compare an admitted physical Shop with a retained Normal Catalog"]
 fn installed_physical_shop_matches_retained_complete_catalog() -> TestResult {
+    verify_retained_catalog(Replay::Shop)
+}
+
+#[test]
+#[ignore = "same Build: compare one Shop and two original magazine slots in one retained Normal stream"]
+fn installed_physical_shop_and_ammo_containers_match_retained_complete_catalog() -> TestResult {
+    verify_retained_catalog(Replay::ShopAndAmmo)
+}
+
+#[derive(Clone, Copy)]
+enum Replay {
+    Shop,
+    ShopAndAmmo,
+}
+
+fn verify_retained_catalog(replay: Replay) -> TestResult {
     let revision = env::var("P4KX_SHOP_CATALOG_PRODUCER_REVISION")
         .map_err(|_| "configure the exact Shop Catalog producer revision")?;
     with_bound_measurement_from_producer(&revision, |archive, measurement| {
@@ -65,9 +83,27 @@ fn installed_physical_shop_matches_retained_complete_catalog() -> TestResult {
         let rows = std::slice::from_ref(&row);
         let mut origins = Origins::default();
         origins.extend(&snapshot.source_inventory, rows)?;
-        measurement.verify_selected_row("/shops", &row, &origins, |candidate| {
+        let same_shop = |candidate: &Value| {
             candidate.pointer("/key/value").and_then(Value::as_str) == Some(key.as_str())
-        })?;
+        };
+        match replay {
+            Replay::Shop => measurement.verify_selected_row("/shops", &row, &origins, same_shop)?,
+            Replay::ShopAndAmmo => {
+                let ammo = ammo_container_replay::read(archive, &mut origins)?;
+                let [containers, bindings] = ammo_container_replay::PATHS;
+                measurement.verify_selected_scope(
+                    &["/shops", containers, bindings],
+                    &origins,
+                    |catalog| {
+                        check_selected_row(catalog, "/shops", &row, same_shop)?;
+                        ammo_container_replay::verify(catalog, &ammo)
+                    },
+                )?;
+                print_line(
+                    "Ammo container retained parity: two physical slots and two original bindings",
+                );
+            }
+        }
         report_scoped_rows("Physical Shop", "retained-parity", rows)
     })
 }

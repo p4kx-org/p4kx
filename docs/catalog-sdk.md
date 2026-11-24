@@ -1938,6 +1938,21 @@ to include a second installed Build.
 cargo test --locked -p p4kx-export --test real_archive real_archive_weapon_combat::magazine::weapon_magazine_sdk_matches_original_primary_routes -- --ignored --exact --nocapture --test-threads=1
 ```
 
+### Installed ammunition container scope
+
+On the installed PTU `13260598`, an independent original-field check selected
+a weapon's own container and a linked magazine container. The typed SDK returned
+the two physical configuration rows and their two original binding rows with
+complete scoped coverage. The selected capacities matched their authored signed
+values. The same process ran one worker on Windows AMD64. It measured 13,735 ms,
+1,114,701,824 peak private bytes, 1,032,351,744 peak working-set bytes and a
+minimum of 60,785,295,360 host bytes available. Its scratch directory stayed empty.
+
+The separate archive test
+`installed_physical_shop_and_ammo_containers_match_retained_complete_catalog`
+checks these four rows and a physical Shop in one pass through the exact
+same-Build Normal Catalog, including the resolved source-use inventory.
+
 ## Projectile ammunition
 
 Use `equipment::with_projectile_ammo`, its decoded-Entry form or the corresponding session

@@ -16,6 +16,9 @@ use crate::real_archive_item_components::selected_item;
 use super::original::{self, WEAPON};
 use super::{TestResult, Trace, cell, proof, with_sdk_archive_samples};
 
+#[path = "weapon_magazine_container_replay.rs"]
+pub(crate) mod ammo_container_replay;
+
 const ENTRY_TYPE: &str = "EntityClassDefinition";
 const CONTAINER: &str = "SAmmoContainerComponentParams";
 const PRIMARY: &str = "ammoContainerRecord";
