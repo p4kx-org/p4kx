@@ -9,7 +9,6 @@ use p4kx_testkit::{
 };
 
 use super::super::MINEABLE_ENTITIES;
-use super::mining_families::STANDALONE_MINING_REMAINING;
 use super::{Route, TestResult};
 
 pub(super) fn read() -> TestResult<Route> {
@@ -36,12 +35,6 @@ pub(super) fn read() -> TestResult<Route> {
         &archive,
         CatalogRecordSelection::RecordIndex(0),
         None,
-        |snapshot| {
-            Route::queried_rows(
-                MINEABLE_ENTITIES,
-                snapshot.rows(),
-                STANDALONE_MINING_REMAINING,
-            )
-        },
+        |snapshot| Route::queried_rows(MINEABLE_ENTITIES, snapshot.rows(), None),
     )?
 }

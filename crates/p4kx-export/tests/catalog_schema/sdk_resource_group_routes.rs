@@ -16,7 +16,6 @@ use serde_json::Value;
 use super::super::{
     RESOURCE_GROUP_MEMBERS, RESOURCE_GROUP_PARENTS, RESOURCE_GROUPS, RESOURCE_TYPES,
 };
-use super::mining_families::STANDALONE_MINING_REMAINING;
 use super::{Route, TestResult};
 
 #[path = "../it/canonical_json.rs"]
@@ -93,10 +92,6 @@ fn witness<Row: JsonSchema + Serialize>(
         .and_then(|table| table.get("rows"))
         .ok_or_else(|| format!("missing canonical rows for {dataset}"))?;
     canonical_json::assert_canonical(rows, expected, dataset)?;
-    let remaining = if dataset == RESOURCE_TYPES {
-        STANDALONE_MINING_REMAINING
-    } else {
-        REMAINING
-    };
+    let remaining = (dataset != RESOURCE_TYPES).then_some(REMAINING);
     Route::queried_rows(dataset, rows, remaining)
 }

@@ -549,12 +549,11 @@ references. The verifier `e35bde456` read the Normal Catalog from producer
 `5d3d917f4` in 1,877.068 seconds with 1,869,099,008 peak private bytes,
 including the stream replay. This proves the shared mining-location row projection.
 
-A separate verifier used seven standalone `All` selectors against the complete
-Normal Catalog from PTU producer `93d92ca20bef8a8c3731339214a3301124ade7ba`
-on the matching installed Build `13260598`. It compared all rows in order and
-matched 125,893 contributing source uses and one physical source.
+Separate verifiers used seven standalone `All` selectors against each matching
+complete Normal Catalog. They compared all rows in order and bound the original
+source uses to one physical source on each Build.
 
-| Catalog dataset | PTU rows compared | LIVE rows in the cold query |
+| Catalog dataset | PTU 13260598 rows compared | LIVE 13220821 rows compared |
 | --- | ---: | ---: |
 | `/mineableElements` | 43 | 43 |
 | `/mineableCompositions` | 231 | 231 |
@@ -564,13 +563,21 @@ matched 125,893 contributing source uses and one physical source.
 | `/definitions/resourceTypes` | 209 | 207 |
 | `/definitions/mineableEntities` | 247 | 231 |
 
-The Windows AMD64 test executable built from `aca28691148f61a44a825db6b3dcd7979eaeb032`
-with the standalone Mining comparator had SHA-256
+The PTU comparison matched 125,893 contributing uses against the Normal Catalog
+from `93d92ca20bef8a8c3731339214a3301124ade7ba`. The Windows AMD64 test executable
+built from `aca28691148f61a44a825db6b3dcd7979eaeb032` with the standalone Mining
+comparator had SHA-256
 `fc7ef084e475c03bc51ccaf4e0df56e8c876870d40a12a1b09eee2c4adc446da`.
 The SDK queries and one retained Catalog stream took 5,081.889 seconds.
 Windows lifetime peaks were 1,368,436,736 bytes of private commit and
 1,371,025,408 bytes of working set. The minimum sampled available host memory
 was 14,267,056,128 bytes.
+
+The LIVE comparison matched 119,822 contributing uses against Normal producer
+`23addc5e164f65a28a6f258302b30453b331edce`. The guard completed in 4,353.446
+seconds. Windows lifetime peaks were 1,317,343,232 bytes of private commit and
+1,299,329,024 bytes of working set. The verifier used the exact executable
+identified with the cold checks below.
 [Measured producer and streaming method](catalog-partitioning.md#system-memory-acceptance)
 
 Each of the seven standalone `All` queries also ran in its own Windows AMD64
@@ -592,7 +599,6 @@ standalone process. The test executable was built from
 `485f28b17ae99af1b7872958f1628105ef3b76b2` with the Mining witnesses and Catalog
 query changes. Its SHA-256 was
 `b582efebce5f6bf1f6040e53946ea38e64dd184f1a57a1597c8f6184bbca2676`.
-Complete standalone LIVE Normal row and contributing provenance parity remains open.
 
 The synthetic `consumer_refresh` integration cases show how one parsed view can serve several
 queries in one refresh. They resolve a reward source to its physical pool and Blueprint and

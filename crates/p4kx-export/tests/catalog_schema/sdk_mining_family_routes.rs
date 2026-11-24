@@ -22,12 +22,6 @@ use super::{Route, TestResult};
 #[path = "sdk_mining_family_fixture.rs"]
 mod fixture;
 
-pub(super) const STANDALONE_MINING_REMAINING: &str = concat!(
-    "complete Normal row and contributing provenance parity on PTU 13260598 verified. ",
-    "Individual standalone cold memory verified on LIVE 13220821 and PTU 13260598. ",
-    "Complete standalone LIVE Normal row and contributing provenance parity remains open",
-);
-
 pub(super) fn read() -> TestResult<[Route; 5]> {
     let (_folder, archive) = fixture::open()?;
     let entry = DataForgeEntry::read(&archive)?;
@@ -140,5 +134,5 @@ fn witness<Row: JsonSchema + Serialize>(
             }),
         "original {dataset} payload evidence is present in the selective result"
     );
-    Route::queried_rows(dataset, rows, STANDALONE_MINING_REMAINING)
+    Route::queried_rows(dataset, rows, None)
 }
