@@ -320,20 +320,20 @@ operation is written as a successful runtime proof. Portal-origin behavior remai
 the actual FUSE-grant check, and the release job produces no passing proof if it exposes an
 installation-alias bypass.
 
-At merge revision `8195275fda13f8176c48c77a91465249c9d3f8f7` for PR #1117 head `2f134fbfc`,
-both native Ubuntu CI rows passed the synthetic CLI and MCP checks and GUI frames under
-X11 and headless HiDPI Wayland with software rendering. Physical audio playback, clipboard
-exchange, interactive file chooser use and hardware GPU behavior remain unchecked by these
-runner jobs. [AMD64 CI job](https://github.com/p4kx-org/p4kx/actions/runs/43803352411/job/133091679587) ·
-[ARM64 CI job](https://github.com/p4kx-org/p4kx/actions/runs/43803352411/job/133091363724)
+The native Ubuntu CI jobs for PR #1117 head `c7a033bd5` checked merge revision
+`b625a98948ba4eb8f6dd833a5d4b27a97edb884b`. Both CPUs passed the synthetic CLI and MCP
+checks, rendered GUI frames under X11 and headless HiDPI Wayland with software graphics,
+and reported an injected missing audio device. The suite covers an encrypted synthetic
+Archive in a mixed-case Proton prefix and key discovery in the default XDG profile.
+[AMD64 CI job](https://github.com/p4kx-org/p4kx/actions/runs/45287771414/job/138094105716) ·
+[ARM64 CI job](https://github.com/p4kx-org/p4kx/actions/runs/45287771414/job/138095092538)
 
-The branch package run for PR #1117 head `8d6cab94e` built version `0.4.2` at merge revision
-`f47d4a123b16b000d908b7a7cfaa6f0e63d917fe`. Native AMD64 and ARM64 consumers verified
-matching ELF architecture and CLI, MCP and software-rendered GUI execution for all four
-formats. Both CPUs recorded the stock Documents API 4 refusal, the isolated API 5 grants
-and successful deb and Flatpak upgrade, removal and profile preservation.
-[AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45135021176/job/137571371608) ·
-[ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45135021176/job/137571371441)
+The branch package run built version `0.4.2` from the same merge revision. Native AMD64 and
+ARM64 consumers verified matching ELF architecture and ran the CLI, MCP and software-rendered
+GUI across all four formats. Both CPUs recorded the stock Documents API 4 refusal, the
+isolated API 5 grants and successful deb and Flatpak upgrade, removal and profile preservation.
+[AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45287771385/job/138108167457) ·
+[ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45287771385/job/138108167514)
 
 The tagged v0.5.0 candidate requires its own hosted Linux package evidence on both CPUs.
 
