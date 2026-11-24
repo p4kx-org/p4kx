@@ -7,6 +7,9 @@ function Write-P4kxMsiObserverProgress {
             'delayCaller','delayBinding','delayReadRequest','delayStartReceipt','delayWait','delayResultReceipt',
             'finishLaunchBinding','finishLaunchProcess','finishLaunchReceipt',
             'finishWaitBinding','finishWaitPoll','finishWaitDigest','finishWaitReceipt',
+            'finishWaitPortalStart','finishWaitPortalInputClose','finishWaitPortalCapture','finishWaitPortalCleanup',
+            'finishCollectBinding','finishCollectWaitReceipt','finishCollectSupervisorReceipt',
+            'finishCollectCallerReceipt','finishCollectOriginalResult',
             'finishSupervisorBinding','finishSupervisorCaller','finishSupervisorReceipt',
             'finishProbeCaller','finishProbeBinding','finishProbeWait','finishProbeParent','finishProbeCheckpoint','finishProbeReceipt'
         )][string]$Stage,

@@ -72,9 +72,18 @@ function Test-P4kxMsiFinishReceiptPresence($Context, [string]$ReceiptPath, [doub
     $arguments = @('-NoLogo','-NoProfile','-NonInteractive','-File',$script,
         '-ReceiptPath',$ReceiptPath,'-CollectionCutoff',$Context.collection_cutoff.ToString('o'))
     $observation = @{}
+    $progress = {
+        param([string]$Stream, [string]$Chunk)
+        if ($Stream -ceq 'stage' -and $Chunk -cmatch '^portal(Start|InputClose|Capture|Cleanup)\.(begin|end)\z') {
+            Write-P4kxMsiObserverProgress ('finishWaitPortal' + $Matches[1]) $Matches[2] -RequestDigest $Context.digest
+            if ($env:GITHUB_ACTIONS -ceq 'true' -and $Chunk -ceq 'portalCapture.begin') {
+                Write-Host '::notice title=Native MSI Finish progress::WaitFinish owned probe entered capture. Observation only.'
+            }
+        }
+    }
     try {
         $probe = Invoke-P4kxPortalProcess ([Environment]::ProcessPath) $arguments $Context.directory 'wait-probe' `
-            -Milliseconds ([int][Math]::Ceiling($remaining)) -CleanupMilliseconds 1000 -MaximumBytes 1024 -Observation $observation
+            -Milliseconds ([int][Math]::Ceiling($remaining)) -CleanupMilliseconds 1000 -MaximumBytes 1024 -Observation $observation -OnProgress $progress
     } catch {
         if ($observation.timed_out -ne $true -or $observation.exited -ne $true -or
             $_.Exception -isnot [AggregateException] -or $_.Exception.InnerExceptions.Count -ne 1) { throw }
@@ -124,8 +133,14 @@ function Wait-P4kxMsiSupervisedFinish([string]$Directory) {
 }
 
 function Read-P4kxMsiSupervisedFinish([string]$Directory) {
+    Write-P4kxMsiObserverProgress finishCollectBinding begin
     $context = Get-P4kxMsiFinishContext $Directory
     $launch = Read-P4kxMsiFinishLaunch $context
+    Write-P4kxMsiObserverProgress finishCollectBinding end -RequestDigest $context.digest
+    if ($env:GITHUB_ACTIONS -ceq 'true') {
+        Write-Host '::notice title=Native MSI Finish progress::CollectFinish bound the original request and launch. Observation only.'
+    }
+    Write-P4kxMsiObserverProgress finishCollectWaitReceipt begin -RequestDigest $context.digest
     $receiptPath = Join-Path $context.directory 'result.json'
     $wait = Read-P4kxDetachedReceipt (Join-Path $context.directory 'wait-result.json')
     if ($wait.schema -ne 1 -or $wait.role -cne 'native-msi-finish-receipt-wait' -or
@@ -140,6 +155,8 @@ function Read-P4kxMsiSupervisedFinish([string]$Directory) {
     if ($waitObserved -gt $context.collection_cutoff -or $waitObserved -gt [DateTimeOffset]::UtcNow) {
         throw 'The terminal Finish receipt was observed outside its original allowance.'
     }
+    Write-P4kxMsiObserverProgress finishCollectWaitReceipt end -RequestDigest $context.digest
+    Write-P4kxMsiObserverProgress finishCollectSupervisorReceipt begin -RequestDigest $context.digest
     $result = Read-P4kxDetachedReceipt $receiptPath
     if ($result.schema -ne 1 -or $result.role -cne 'native-msi-finish-supervisor-result' -or
         $result.request_sha256 -cne $context.digest -or $result.supervisor_pid -ne $launch.supervisor_pid -or
@@ -154,6 +171,8 @@ function Read-P4kxMsiSupervisedFinish([string]$Directory) {
     if ($observedExit -lt $launchedAt -or $observedExit -gt $waitObserved) {
         throw 'Finish supervisor exit observation differs from its process lifetime.'
     }
+    Write-P4kxMsiObserverProgress finishCollectSupervisorReceipt end -RequestDigest $context.digest
+    Write-P4kxMsiObserverProgress finishCollectCallerReceipt begin -RequestDigest $context.digest
     $callerPath = Join-Path $context.root 'snapshots/09/caller-result.json'
     if ($result.caller_result_sha256 -cne (Get-P4kxDetachedDigest $callerPath)) { throw 'The original Finish caller receipt differs.' }
     $caller = Read-P4kxDetachedReceipt $callerPath
@@ -176,5 +195,8 @@ function Read-P4kxMsiSupervisedFinish([string]$Directory) {
         $observer.parent.state -ceq 'stoppedAfterDeadline' -or [IO.File]::Exists((Join-Path $context.root 'deadline-stop.json'))) {
         throw 'The original Finish caller or observer result is incomplete or unproven.'
     }
+    Write-P4kxMsiObserverProgress finishCollectCallerReceipt end -RequestDigest $context.digest
+    Write-P4kxMsiObserverProgress finishCollectOriginalResult begin -RequestDigest $context.digest
     Assert-P4kxMsiObserverOriginalResult $context.request $context.handle $snapshot
+    Write-P4kxMsiObserverProgress finishCollectOriginalResult end -RequestDigest $context.digest
 }
