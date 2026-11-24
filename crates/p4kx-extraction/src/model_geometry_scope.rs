@@ -45,6 +45,24 @@ impl ModelGeometryScope {
             .map_err(io::Error::other)
     }
 
+    pub(crate) fn directory_path_selector(&self) -> io::Result<SourceUse> {
+        self.scope
+            .for_scope(InputScope::ArchiveDirectoryMetadata)
+            .at(
+                SourceLocation::Metadata {
+                    field: "path".into(),
+                },
+                SourceUseRole::Selector,
+            )
+            .map_err(io::Error::other)
+    }
+
+    pub(crate) fn selection_at(&self, original: &SourceUse) -> io::Result<SourceUse> {
+        self.scope
+            .at_observed_location(original, SourceUseRole::Selector)
+            .map_err(io::Error::other)
+    }
+
     pub(crate) fn word(
         &self,
         range: Range<u64>,

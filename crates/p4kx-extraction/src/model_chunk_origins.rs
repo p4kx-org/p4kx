@@ -3,13 +3,15 @@
 
 use std::io;
 
+use p4kx_model::ModelFile;
+
 use crate::model_geometry_scope::ModelGeometryScope;
 use crate::source_provenance::ChunkHeaderField;
 use crate::{
     FieldOrigin, FieldOrigins, FieldPath, ModelSource, SourceUse, SourceUseRole, SourceUses,
 };
 
-/// Writes the chunk type and physical table ordinal origins at the output path.
+/// Writes chunk identity, file role and reader-use origins at the output path.
 ///
 /// # Errors
 /// Returns an invalid chunk position or source evidence error.
@@ -21,10 +23,13 @@ pub fn write_chunk_origins(
     fields: &mut FieldOrigins,
 ) -> io::Result<()> {
     let origins = match ChunkTypeEvidence::capture(source, index, uses)? {
-        Some(evidence) => evidence.origins(uses)?,
+        Some(evidence) => evidence.origins(source, uses)?,
         None => std::array::from_fn(|_| uses.origin(&[], false)),
     };
-    for (name, origin) in ["type_id", "type", "index"].into_iter().zip(origins) {
+    for (name, origin) in ["type_id", "type", "index", "file", "usage"]
+        .into_iter()
+        .zip(origins)
+    {
         insert_origin(fields, chunk_path, name, origin)?;
     }
     Ok(())
@@ -51,6 +56,7 @@ pub fn write_chunk_type_origin(
 struct ChunkTypeEvidence {
     scope: ModelGeometryScope,
     kind: SourceUse,
+    file: ModelFile,
 }
 
 impl ChunkTypeEvidence {
@@ -67,23 +73,54 @@ impl ChunkTypeEvidence {
             return Ok(None);
         };
         let kind = scope.word(range, "typeId", SourceUseRole::Payload)?;
-        Ok(Some(Self { scope, kind }))
+        Ok(Some(Self {
+            scope,
+            kind,
+            file: chunk.file,
+        }))
     }
 
     fn type_id(&self, uses: &SourceUses) -> FieldOrigin {
         uses.origin(std::slice::from_ref(&self.kind), self.scope.complete)
     }
 
-    fn origins(self, uses: &SourceUses) -> io::Result<[FieldOrigin; 3]> {
+    fn origins(self, model: &ModelSource, uses: &SourceUses) -> io::Result<[FieldOrigin; 5]> {
         let numeric = self.type_id(uses);
         let signature = self.scope.chunk_header(ChunkHeaderField::Signature)?;
         let table_offset = self.scope.chunk_header(ChunkHeaderField::TableOffset)?;
         let count = self.scope.chunk_header(ChunkHeaderField::RowCount)?;
+        let role = self.file_origin(model, uses, [&signature, &table_offset, &count])?;
+        let usage = uses.origin(
+            &[
+                self.scope.selection_at(&self.kind)?,
+                self.scope.selection_at(&signature)?,
+            ],
+            false,
+        );
         Ok([
             numeric,
             uses.origin(&[self.kind, signature], self.scope.complete),
             uses.origin(&[table_offset, count], self.scope.complete),
+            role,
+            usage,
         ])
+    }
+
+    fn file_origin(
+        &self,
+        model: &ModelSource,
+        uses: &SourceUses,
+        header: [&SourceUse; 3],
+    ) -> io::Result<FieldOrigin> {
+        let mut contributors = Vec::with_capacity(header.len() + 2);
+        contributors.extend(header.into_iter().cloned());
+        contributors.push(self.scope.directory_path_selector()?);
+        let primary = self.file == ModelFile::Model;
+        if !primary && let Some(root) = ModelGeometryScope::capture(uses, model, ModelFile::Model)?
+        {
+            contributors.push(root.directory_path_selector()?);
+        }
+        Ok(uses.origin(&contributors, false))
     }
 }
 

@@ -67,6 +67,7 @@ fn chunk_identity_origins_use_page_local_pointers_and_the_actual_file() -> TestR
     let mut args = json!({"path": MODEL, "section": "chunks", "limit": 1});
     let mut seen = 0;
     let mut saw_encrypted_unknown = false;
+    let mut usage_labels = std::collections::BTreeSet::new();
     loop {
         let response = server.call("list_model_items", &args)?;
         let reply = &response["structuredContent"];
@@ -85,6 +86,8 @@ fn chunk_identity_origins_use_page_local_pointers_and_the_actual_file() -> TestR
         marker(field(reply, pointer)?, encrypted);
         assert_geometry_entry(reply, pointer, "typeId", entry)?;
         assert_chunk_header_origins(reply, encrypted)?;
+        assert_chunk_role_origins(reply, entry, encrypted)?;
+        usage_labels.insert(row["usage"].as_str().ok_or("reader usage")?.to_owned());
         assert_all_addresses(&response)?;
         seen += 1;
         if row["type_id"] == UNKNOWN_TYPE {
@@ -101,6 +104,10 @@ fn chunk_identity_origins_use_page_local_pointers_and_the_actual_file() -> TestR
     assert!(
         saw_encrypted_unknown,
         "later pages include an encrypted unknown type"
+    );
+    assert_eq!(
+        usage_labels,
+        ["read", "skipped", "unknown"].map(str::to_owned).into()
     );
     Ok(())
 }
@@ -131,6 +138,124 @@ fn assert_chunk_header_origins(reply: &Value, encrypted: bool) -> TestResult {
     assert_site(reply, kind, header, "signature", &["0", "4"])?;
     assert_site(reply, index, header, "rowCount", &["8", "12"])?;
     assert_site(reply, index, header, "tableOffset", &["12", "16"])?;
+    Ok(())
+}
+
+fn assert_chunk_role_origins(reply: &Value, entry: &str, encrypted: bool) -> TestResult {
+    let numeric = uses(reply, "items/0/type_id")?;
+    let [kind] = numeric.as_slice() else {
+        return Err("one original type word".into());
+    };
+    let owner = kind.get("source").ok_or("owning archive entry")?;
+    assert_chunk_file_origins(reply, entry, owner, encrypted)?;
+    assert_chunk_usage_origins(reply, kind, owner, encrypted)
+}
+
+fn assert_chunk_file_origins(
+    reply: &Value,
+    entry: &str,
+    owner: &Value,
+    encrypted: bool,
+) -> TestResult {
+    let sources = reply
+        .pointer("/provenance/sources")
+        .and_then(Value::as_array)
+        .ok_or("physical sources")?;
+    let file = "items/0/file";
+    let primary = entry == MODEL;
+    assert_partial_origin(reply, file, encrypted)?;
+    let file_uses = uses(reply, file)?;
+    let selectors = file_uses
+        .iter()
+        .filter(|site| site["role"] == "selector")
+        .collect::<Vec<_>>();
+    assert_eq!(
+        file_uses.len(),
+        if primary { 4 } else { 5 },
+        "file role contributors"
+    );
+    assert_eq!(
+        selectors.len(),
+        if primary { 1 } else { 2 },
+        "directory path selectors"
+    );
+    for path in [Some(entry), (!primary).then_some(MODEL)]
+        .into_iter()
+        .flatten()
+    {
+        let id = sources
+            .iter()
+            .find(|row| row.pointer("/path/value").and_then(Value::as_str) == Some(path))
+            .and_then(|row| row.get("id"))
+            .ok_or("actual directory path owner")?;
+        assert!(
+            selectors.iter().any(|site| {
+                site.get("source") == Some(id)
+                    && site["scope"] == "archiveDirectoryMetadata"
+                    && site["location"] == json!({"type": "metadata", "field": "path"})
+            }),
+            "directory selector for {path}"
+        );
+    }
+    assert!(
+        file_uses
+            .iter()
+            .filter(|site| site["role"] == "payload")
+            .all(|site| {
+                site.get("source") == Some(owner)
+                    && site.pointer("/location/namespace").and_then(Value::as_str)
+                        == Some("cryEngineChunkHeader")
+            }),
+        "table header inputs belong to the chunk's actual file"
+    );
+    Ok(())
+}
+
+fn assert_chunk_usage_origins(
+    reply: &Value,
+    kind: &Value,
+    owner: &Value,
+    encrypted: bool,
+) -> TestResult {
+    let usage = "items/0/usage";
+    assert_partial_origin(reply, usage, encrypted)?;
+    let usage_uses = uses(reply, usage)?;
+    assert_eq!(usage_uses.len(), 2, "observed kind and signature selectors");
+    assert!(
+        usage_uses.iter().all(|site| {
+            site.get("source") == Some(owner)
+                && site["role"] == "selector"
+                && site["scope"] == "payload"
+        }),
+        "usage selectors belong to the physical chunk payload"
+    );
+    assert!(
+        usage_uses
+            .iter()
+            .any(|site| site.get("location") == kind.get("location")),
+        "usage includes the original type word"
+    );
+    assert_site(
+        reply,
+        usage,
+        "cryEngineChunkHeader",
+        "signature",
+        &["0", "4"],
+    )?;
+    Ok(())
+}
+
+fn assert_partial_origin(reply: &Value, path: &str, encrypted: bool) -> TestResult {
+    let origin = field(reply, path)?;
+    assert_eq!(
+        origin["containsEncryptedSource"].as_bool(),
+        encrypted.then_some(true),
+        "{path} preserves known encryption with an incomplete contributor set"
+    );
+    assert_eq!(
+        origin["sourceSetComplete"], false,
+        "{path} omits unobserved selectors"
+    );
     Ok(())
 }
 

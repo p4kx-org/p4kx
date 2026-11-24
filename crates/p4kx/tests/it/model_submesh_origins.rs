@@ -100,7 +100,7 @@ fn model_info_reports_unknown_origin_for_loose_submesh_fields() -> TestResult {
     for name in ["material_id", "index_count", "first_index"] {
         assert_unknown(&info, &format!("{submesh}/{name}"))?;
     }
-    for name in ["type_id", "type", "index"] {
+    for name in ["type_id", "type", "index", "file", "usage"] {
         assert_unknown(&info, &format!("/chunks/0/{name}"))?;
     }
     assert_eq!(

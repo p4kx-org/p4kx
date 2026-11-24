@@ -92,7 +92,7 @@ impl<'a> ModelInfo<'a> {
         )
     }
 
-    /// Describes the model with original submesh and chunk identity evidence.
+    /// Describes the model with original submesh and chunk evidence.
     ///
     /// # Errors
     /// Returns invalid evidence positions or an invalid source inventory.

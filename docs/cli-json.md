@@ -2915,7 +2915,7 @@ with the Entry path or file, then the cause, e.g. `Data\x\a.caf: the CafData chu
 the cause no longer repeats the file name.
 `chunks` lists every chunk of actually read model and geometry files. `file` is `model`,
 `geometry`, `lod<n>-geometry` or `lod<n>-model`; the last role identifies a level-specific model
-file read for its skeleton. These roles do not independently prove physical source identity.
+file read for its skeleton.
 For each `type_id`, `fieldOrigins` and `provenance` identify the original little-endian
 type word in the selected decoded Entry. The word is four bytes in `#ivo` and two in `CrCh`.
 The resolved `type` references that word and the container signature, including when the
@@ -2925,6 +2925,13 @@ input has an unknown marker and an incomplete source set for these fields. The M
 `list_model_items` chunks section uses the same evidence with page-local field addresses.
 `usage` is `read` when the model was read from it, `skipped` for a known type the model does not
 read and `unknown` for an unknown type.
+For `file`, the evidence identifies the original owner Entry lookup and the table header
+that admitted the chunk. Companion rows also identify the primary Entry path used to derive
+the sibling lookup. The contributor set stays incomplete because the observer records the
+selected paths and table headers, while other path and file admission inputs are possible.
+For `usage`, the evidence identifies the original kind and container selectors. Its contributor
+set stays incomplete while the model reader retains only part of its decoding decisions.
+Loose inputs and Entries without an original binding have an unknown origin for both fields.
 Installed Archive checks on LIVE 13220821 and PTU 13260598 verified all 20 chunk rows of one
 model per Build. An independent table read from seven checksum-verified Entries per Build
 matched each four-byte type word, the header words for its contributing sources and the row's
