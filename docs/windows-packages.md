@@ -304,6 +304,24 @@ step remained pending.
 [Native ARM64](https://github.com/p4kx-org/p4kx/actions/runs/45338631037/job/138277997254) ·
 [ARM64 checkpoint 03](https://github.com/p4kx-org/p4kx/actions/runs/45338631037/artifacts/14897991980)
 
+Release run `45425645716` for PR head `1ea6a27fa` reached `CollectFinish` on native
+AMD64 and `WaitFinish` on native ARM64. GitHub reported the 45-minute maximum and recorded
+both jobs as cancelled about 55 minutes after their start. The terminal installer results were
+unavailable. The operation responsible for the stall remains undetermined.
+[AMD64 job](https://github.com/p4kx-org/p4kx/actions/runs/45425645716/job/138594799181) ·
+[ARM64 job](https://github.com/p4kx-org/p4kx/actions/runs/45425645716/job/138594799037)
+
+Release run `45447246086` for PR head `e0cf389cf` passed both native Windows jobs.
+AMD64 finished in 3 minutes 49 seconds and ARM64 in 4 minutes 42 seconds.
+Both verified terminal Lifecycle receipts bind attempt 1 to the merge revision
+`5b0f5f8b044f1df7cc1cc35500eb8acfd71c2984`. Both original workers exited with code 0,
+with 200 journal events on AMD64 and 174 on ARM64. The native jobs recorded their
+installed and portable execution evidence and uploaded both executed release payloads.
+[AMD64 job](https://github.com/p4kx-org/p4kx/actions/runs/45447246086/job/138657917218) ·
+[ARM64 job](https://github.com/p4kx-org/p4kx/actions/runs/45447246086/job/138657917270) ·
+[AMD64 terminal receipt](https://github.com/p4kx-org/p4kx/actions/runs/45447246086/artifacts/14949192760) ·
+[ARM64 terminal receipt](https://github.com/p4kx-org/p4kx/actions/runs/45447246086/artifacts/14951115024)
+
 For release acceptance, repeat the native lifecycle checks with the actual release candidate
 and bind both its MSI and portable ZIP to the candidate revision and run attempt. Record the
 Windows AMD64 desktop and WASAPI checks separately from the hosted package evidence.
