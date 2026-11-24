@@ -8,14 +8,14 @@ use p4kx_export::catalog_queries::equipment::{
 use p4kx_extraction::{Archive, DataForgeEntry, InputScope};
 use p4kx_testkit::{ArchiveBuilder, TestEntry, test_key};
 
-use super::super::{
-    AMMO_BINDINGS, AMMO_CONTAINERS, Route, TestResult, WEAPON_ACTIONS, WEAPON_RECOIL,
-};
+use super::super::{AMMO_BINDINGS, Route, TestResult, WEAPON_ACTIONS, WEAPON_RECOIL};
 
 use super::projectile_ammo_fixture as fixture;
 
 #[path = "sdk_ammo_binding_witness.rs"]
 mod ammo_binding_witness;
+#[path = "sdk_ammo_container_witness.rs"]
+mod ammo_container_witness;
 
 pub(super) fn read_recoil(archive: &Archive) -> TestResult<Route> {
     with_weapon_recoil_definitions(archive, CatalogRecordSelection::All, None, |snapshot| {
@@ -46,15 +46,16 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
         return Err("the fixture requires one physical weapon owner".into());
     };
     let catalog = ammo_binding_witness::normal(&archive, &entry)?;
-    with_weapon_sources_from(&archive, &entry, owner.index(), None, |snapshot| {
-        ammo_binding_witness::verify(&archive, &entry, &snapshot, &catalog)?;
-        verify(&snapshot, owner.index())
-    })?
+    let [actions, bindings] =
+        with_weapon_sources_from(&archive, &entry, owner.index(), None, |snapshot| {
+            ammo_binding_witness::verify(&archive, &entry, &snapshot, &catalog)?;
+            verify(&snapshot, owner.index())
+        })??;
+    Ok([actions, ammo_container_witness::read()?, bindings])
 }
 
-fn verify(snapshot: &WeaponSourceSnapshot<'_>, record_index: u32) -> TestResult<[Route; 3]> {
+fn verify(snapshot: &WeaponSourceSnapshot<'_>, record_index: u32) -> TestResult<[Route; 2]> {
     const OWNERS_OPEN: &str = "physical Item query and synthetic Catalog parity available; owner enumeration and installed parity open";
-    const DEPENDENCIES_OPEN: &str = "physical Item query and synthetic Catalog parity available; linked dependency rows, owner enumeration and installed parity open";
 
     let [owner] = snapshot.rows() else {
         return Err("the scoped query must return one physical Item".into());
@@ -91,7 +92,6 @@ fn verify(snapshot: &WeaponSourceSnapshot<'_>, record_index: u32) -> TestResult<
 
     Ok([
         Route::queried_rows(WEAPON_ACTIONS, &owner.weapon_actions, OWNERS_OPEN)?,
-        Route::queried_rows(AMMO_CONTAINERS, &owner.ammo_containers, DEPENDENCIES_OPEN)?,
         Route::queried_rows(
             AMMO_BINDINGS,
             &owner.ammo_bindings,
