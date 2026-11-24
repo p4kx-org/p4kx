@@ -2571,6 +2571,16 @@ source inventory with the result. References retain the authored target and
 resolution state. Use the target's physical Record index with the Tag declaration
 query to read a linked Tag definition.
 
+For an incremental read, use `visit_interactions` or
+`visit_interactions_from` in the same module, or their session and parsed
+methods. Each callback borrows one readable physical Record's rows, protected
+text definitions and source inventory. Callbacks run in physical Record order,
+including readable candidates with no rows. Text origins cover the uses reached
+by that Record. A canonical Catalog text row can combine uses from several
+Records. The terminal summary reports family availability, total owner and row
+counts, and full selection coverage. Stage consumer changes until the visit
+returns successfully and the coverage meets the caller's requirements.
+
 ## Paint compatibility
 
 Use `equipment::paints::read_paint_compatibility` with a physical Paint

@@ -22,6 +22,10 @@ pub use crate::catalog_v3::interaction_state_edges::InteractionTagList;
 pub use crate::catalog_v3::interaction_state_type::InteractionStateType;
 pub use crate::catalog_v3::shared_interaction::SharedInteraction;
 
+#[path = "equipment_interaction_visit.rs"]
+mod visit;
+pub use visit::{InteractionVisitSummary, visit_interactions, visit_interactions_from};
+
 /// Selected original interactions, reached protected texts and source evidence.
 pub type InteractionSnapshot<'source> =
     super::EquipmentSnapshot<'source, InteractionConfiguration<'source>>;

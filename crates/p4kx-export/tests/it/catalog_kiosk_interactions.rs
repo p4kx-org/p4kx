@@ -99,7 +99,7 @@ fn check_sdk_row(
     )?
 }
 
-fn database(flag: Option<(TestType, TestValue)>) -> DataForgeBuilder {
+pub(super) fn database(flag: Option<(TestType, TestValue)>) -> DataForgeBuilder {
     let mut declaration = TestStruct::new(COMPONENT)
         .parent("DataForgeComponentParams")
         .field(EXTENSION, TestType::UInt32);

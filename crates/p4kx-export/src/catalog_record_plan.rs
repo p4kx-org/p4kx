@@ -16,6 +16,11 @@ use crate::entity_selection::{self, Selected};
 use crate::scan::{CRAFTER_FIELD, CRAFTER_STRUCT};
 use crate::{CatalogError, Kind};
 
+#[path = "catalog_record_entity_candidates.rs"]
+mod entity_candidates;
+
+use entity_candidates::entity_candidates;
+
 pub(in crate::build::catalog_queries) struct Owner<'source> {
     pub(in crate::build::catalog_queries) record: Record<'source>,
     pub(in crate::build::catalog_queries) tree: RecordTree<'source>,
@@ -59,6 +64,24 @@ impl<'source> Plan<'source> {
         Self::read_entities_matching(forge, selection, cancel, observer, may_match)
     }
 
+    pub(in crate::build::catalog_queries) fn visit_entity_components<E: From<CatalogError>>(
+        forge: &'source DataForge<'source>,
+        component_types: &[&str],
+        selection: CatalogRecordSelection,
+        cancel: Option<&CancelToken>,
+        visit: impl FnMut(Owner<'source>, &mut CatalogRecordCoverage) -> Result<(), E>,
+    ) -> Result<CatalogRecordCoverage, E> {
+        let may_match = component_candidate(forge, component_types, cancel)?;
+        Self::visit_with(
+            forge,
+            selection,
+            cancel,
+            None,
+            entity_candidates(forge, may_match),
+            visit,
+        )
+    }
+
     pub(in crate::build::catalog_queries) fn read_crafters(
         forge: &'source DataForge<'source>,
         selection: CatalogRecordSelection,
@@ -96,41 +119,14 @@ impl<'source> Plan<'source> {
         selection: CatalogRecordSelection,
         cancel: Option<&CancelToken>,
         observer: Option<Arc<dyn CanonicalReadObserver>>,
-        mut may_match: impl FnMut(&Record<'source>, &mut TreeBuilder<'source>) -> bool,
+        may_match: impl FnMut(&Record<'source>, &mut TreeBuilder<'source>) -> bool,
     ) -> Result<Self, CatalogError> {
-        let crafter = forge.pointer_probe(CRAFTER_FIELD, CRAFTER_STRUCT);
         Self::read_with(
             forge,
             selection,
             cancel,
             observer,
-            |record, trees, coverage| {
-                let classified = record.type_name().and_then(|source_type| {
-                    if source_type == p4kx_assembly::ENTITY_TYPE {
-                        entity_selection::select(record, None)
-                    } else {
-                        Ok(None)
-                    }
-                });
-                match classified {
-                    Err(_) => coverage.unreadable_headers.push(record.index()),
-                    Ok(Some(Selected::Leftover(_))) => coverage.skipped_leftovers += 1,
-                    Ok(Some(Selected::Entity(kind))) => {
-                        if kind != Kind::Crafters {
-                            return Ok(may_match(record, trees));
-                        }
-                        match crafter
-                            .as_ref()
-                            .map_or(Ok(false), |probe| trees.holds(probe, record))
-                        {
-                            Ok(holds) => return Ok(holds && may_match(record, trees)),
-                            Err(_) => coverage.unreadable_headers.push(record.index()),
-                        }
-                    }
-                    Ok(None) => {}
-                }
-                Ok(false)
-            },
+            entity_candidates(forge, may_match),
         )
     }
 
