@@ -93,6 +93,7 @@ mod material_source_owned;
 mod material_xml_info;
 mod model_chunk_source_info;
 mod model_companions;
+mod model_geometry_scope;
 pub mod model_info;
 mod model_info_animations;
 mod model_info_materials;
@@ -387,9 +388,6 @@ pub use textures::{
     Texture, TextureArtifacts, TextureImage, TextureImageArtifact, TextureImageFace,
     TextureImageFormat, TextureImagePlan, codec as texture_codec,
 };
-use ui_service::{ui_jobs, ui_movie};
-pub use verified_entry_payload::VerifiedEntryPayload;
-
 pub use ui_images::{ArchiveImages, MAX_SCREEN_TEXTURE_PIXELS, ObservedScreenVector};
 pub use ui_imports::{
     ImportIssue, ImportReport, MAX_IMPORT_BYTES, MAX_IMPORT_DEPTH, MAX_IMPORTED_FONTS,
@@ -398,6 +396,8 @@ pub use ui_imports::{
 pub use ui_render::{MAX_UI_RENDER_BITMAP_PIXELS, UiBitmapFailure, UiRender};
 pub use ui_screen_texts::ScreenTexts;
 pub use ui_service::*;
+use ui_service::{ui_jobs, ui_movie};
 pub use ui_svg::UiSvg;
+pub use verified_entry_payload::VerifiedEntryPayload;
 pub use verify::{VerificationReport, VerifyOptions, verify, verify_observed};
 pub use watch::{ArchiveChanged, ArchiveWatch, DEFAULT_WATCH_INTERVAL, FileStamp};

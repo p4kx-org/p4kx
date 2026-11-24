@@ -21,7 +21,9 @@ pub(crate) fn info(
     as_json: bool,
 ) -> Result<()> {
     if as_json {
-        json::print(&ModelInfo::of_listing(source, listing))?;
+        json::print(&ModelInfo::of_listing_with_submesh_origins(
+            source, listing,
+        )?)?;
         return Ok(());
     }
     let model = source.model();

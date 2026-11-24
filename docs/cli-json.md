@@ -2854,6 +2854,18 @@ these fields are references that the listing leaves untouched. With a standalone
 covered values have a null marker and incomplete source sets. The library status reports
 a missing or unreadable library.
 
+For model submeshes, `fieldOrigins` and `provenance` describe the original geometry
+words independently of the material library. In the supported IVO 0x900 Skin
+layout, an Archive-backed `material_id` or `index_count` that matches the decoded
+row is bound to its original word in the selected geometry Entry. The rebuilt
+`first_index`, loose inputs and submeshes without a proven word have a null marker
+and incomplete source sets.
+
+A selected model checked on LIVE 13220821 and PTU 13260598 had six LODs and 651
+submeshes on each Build. Every material ID and index count had a complete,
+resolvable source-use reference in both outputs. Every rebuilt start index
+retained an unknown origin.
+
 `nodes` keeps the order of the file;
 `parent` is the index of the parent node or `null` for a root, and `transform` the 3×4 row-major
 matrix from the node's space to its parent's, translation last, in CryEngine axes (Z up) and

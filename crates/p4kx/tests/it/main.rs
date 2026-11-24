@@ -137,6 +137,7 @@ mod model_material_origins;
 mod model_materials;
 mod model_skeleton_info;
 mod model_skin;
+mod model_submesh_origins;
 mod model_textures;
 mod portable_names;
 mod prefab;

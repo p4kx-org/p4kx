@@ -264,6 +264,12 @@ impl MeshSubmeshSource {
         self.inner.start + WORD_BYTES..self.inner.start + 3 * WORD_BYTES
     }
 
+    /// Returns the original index-count word's byte interval.
+    #[must_use]
+    pub const fn index_count_range(self) -> Range<u64> {
+        self.inner.start + 2 * WORD_BYTES..self.inner.start + 3 * WORD_BYTES
+    }
+
     /// Returns the original source vertex page-base word's byte interval.
     #[must_use]
     pub const fn page_base_range(self) -> Range<u64> {

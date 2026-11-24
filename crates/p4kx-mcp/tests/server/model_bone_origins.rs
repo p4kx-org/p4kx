@@ -201,7 +201,13 @@ fn an_empty_bone_list_proves_the_original_survey_for_its_container() -> TestResu
         .ok_or("model item tool")?["outputSchema"];
     assert_eq!(
         schema.pointer("/allOf/0/if/properties/section/enum"),
-        Some(&json!(["animations", "bones", "materials", "nodes"]))
+        Some(&json!([
+            "animations",
+            "bones",
+            "materials",
+            "meshes",
+            "nodes"
+        ]))
     );
     assert_eq!(
         schema.pointer("/allOf/0/then/required"),

@@ -11,12 +11,12 @@ use p4kx_gltf::{
 };
 use p4kx_model::ModelFile;
 
+use crate::model_geometry_scope::ModelGeometryScope;
 use crate::model_source::{ArchiveDefaultMaterial, ModelSource};
 use crate::output_file::write_error;
 use crate::{
-    AnimationSet, CancelToken, ConversionError, FieldOrigin, FieldPath, FileReceipt, InputScope,
-    ModelArchiveSource, OriginOutputAddress, SourceInput, SourceLocation, SourceScope, SourceUse,
-    SourceUseRole, SourceUses, write_origin_companion,
+    AnimationSet, CancelToken, ConversionError, FieldOrigin, FieldPath, FileReceipt,
+    OriginOutputAddress, SourceUse, SourceUseRole, SourceUses, write_origin_companion,
 };
 
 /// The written standalone GLB summary and its geometry-origin companion.
@@ -99,8 +99,7 @@ struct GeometryOrigins<'model> {
 
 struct BoundGeometry {
     file: ModelFile,
-    scope: SourceScope,
-    complete: bool,
+    scope: ModelGeometryScope,
 }
 
 #[derive(Clone, Copy)]
@@ -131,16 +130,13 @@ impl<'model> GeometryOrigins<'model> {
         for primitive in mesh.primitives() {
             if let Some(accessor) = primitive.index_accessor {
                 let origin = match (file, primitive.original) {
-                    (Some(file), Some(original)) => {
-                        let end = original.index_selection_range().end;
-                        self.origin_for_range(
-                            file,
-                            end - size_of::<u32>() as u64..end,
-                            "indexCount",
-                            SourceUseRole::Payload,
-                            ContributionCoverage::Complete,
-                        )?
-                    }
+                    (Some(file), Some(original)) => self.origin_for_range(
+                        file,
+                        original.index_count_range(),
+                        "indexCount",
+                        SourceUseRole::Payload,
+                        ContributionCoverage::Complete,
+                    )?,
                     _ => self.uses.origin(&[], false),
                 };
                 self.push_field(&format!("/accessors/{accessor}/count"), origin)?;
@@ -193,18 +189,8 @@ impl<'model> GeometryOrigins<'model> {
         let Some(bound) = self.scope(file)? else {
             return Ok(self.uses.origin(&[], false));
         };
-        let source = bound
-            .scope
-            .at(
-                SourceLocation::Subresource {
-                    namespace: "model-byte-range".into(),
-                    indices: vec![range.start, range.end],
-                    field: field.into(),
-                },
-                role,
-            )
-            .map_err(io::Error::other)?;
-        let complete = bound.complete && matches!(coverage, ContributionCoverage::Complete);
+        let source = bound.scope.word(range, field, role)?;
+        let complete = bound.scope.complete && matches!(coverage, ContributionCoverage::Complete);
         let origin = self.uses.origin(std::slice::from_ref(&source), complete);
         self.contributions.push(source);
         Ok(origin)
@@ -214,23 +200,10 @@ impl<'model> GeometryOrigins<'model> {
         if let Some(index) = self.scopes.iter().position(|bound| bound.file == file) {
             return Ok(self.scopes.get(index));
         }
-        let Some(entry) = self
-            .model
-            .archive_sources()
-            .iter()
-            .find(|source| source.file() == file)
-            .and_then(ModelArchiveSource::origin)
-        else {
+        let Some(scope) = ModelGeometryScope::capture(&self.uses, self.model, file)? else {
             return Ok(None);
         };
-        self.scopes.push(BoundGeometry {
-            file,
-            scope: self
-                .uses
-                .observe(SourceInput::Archive(entry), InputScope::Payload)
-                .map_err(io::Error::other)?,
-            complete: entry.ancestors().all(|ancestor| ancestor.is_some()),
-        });
+        self.scopes.push(BoundGeometry { file, scope });
         Ok(self.scopes.last())
     }
 }

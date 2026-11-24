@@ -4,6 +4,7 @@
 //! What `p4kx model info --json` and `p4kx chunks list --json` say, as serialisable shapes.
 
 use std::borrow::Cow;
+use std::io;
 
 use p4kx_chunks::Chunk;
 use p4kx_model::{Bone, BoneTransform, ChunkUsage, Model, ModelChunk, ModelFile, Node};
@@ -18,7 +19,12 @@ use crate::{AnimationListing, AnimationSet, ModelSource};
 #[path = "model_mesh_info.rs"]
 mod mesh_info;
 
+#[path = "model_submesh_origins.rs"]
+mod submesh_origins;
+
 pub use mesh_info::MeshInfo;
+use submesh_origins::ModelSubmeshOrigins;
+pub use submesh_origins::write_submesh_origins;
 
 /// What `p4kx model info --json` says about a model, and what front-ends serialise of it.
 #[derive(Debug, Serialize)]
@@ -39,6 +45,8 @@ pub struct ModelInfo<'a> {
     pub materials: Vec<MaterialInfo<'a>>,
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     material_receipt: Option<&'a MaterialFieldReceipt>,
+    #[serde(flatten, skip_serializing_if = "Option::is_none")]
+    submesh_origins: Option<ModelSubmeshOrigins>,
     /// The list of material indices of the node table.
     pub node_material_indices: &'a [u16],
     /// What a lenient read worked around, as sentences.
@@ -78,6 +86,19 @@ impl<'a> ModelInfo<'a> {
         )
     }
 
+    /// Describes the model with corresponding original submesh field evidence.
+    ///
+    /// # Errors
+    /// Returns invalid evidence positions or an invalid source inventory.
+    pub fn of_listing_with_submesh_origins(
+        source: &'a ModelSource,
+        listing: &AnimationListing,
+    ) -> io::Result<Self> {
+        let mut info = Self::of_listing(source, listing);
+        info.submesh_origins = Some(ModelSubmeshOrigins::capture(source)?);
+        Ok(info)
+    }
+
     fn with_animations(
         source: &'a ModelSource,
         animations: Vec<AnimationInfo>,
@@ -93,6 +114,7 @@ impl<'a> ModelInfo<'a> {
             default_material: source.default_material().map(DefaultMaterialInfo::of),
             materials: MaterialInfo::of_model(model),
             material_receipt: source.material_receipt(),
+            submesh_origins: None,
             node_material_indices: &model.material_indices,
             issues: model.issues.iter().map(ToString::to_string).collect(),
             nodes: NodeInfo::of_model(model),

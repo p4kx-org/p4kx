@@ -1023,6 +1023,12 @@ cells. The parser's default selectors account for identity matrices and the synt
 The generated root name also uses the selected model's directory path. The same response budget
 and cursor apply to node pages.
 
+For `list_model_items` with `section: "meshes"`, submesh field origins use the
+returned mesh and submesh positions. The source ranges identify the original
+IVO material ID and index-count words in the selected geometry Entry. The rebuilt
+`first_index` and fields with unproved inputs use the unknown marker. Provenance
+counts toward the response budget, and the cursor resumes after the last returned mesh.
+
 For `list_model_items` with `section: "animations"`, each row has source and encryption
 markers for its values. CAF names use the selected directory path. DBA names use the original
 database name bytes. Timing and counts use the admitted chunk and controller records.

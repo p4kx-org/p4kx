@@ -247,6 +247,13 @@ impl TestModel {
         self
     }
 
+    /// Replaces the physical index stream.
+    #[must_use]
+    pub fn with_indices(mut self, indices: Vec<u32>) -> Self {
+        self.indices = indices;
+        self
+    }
+
     /// Replaces the index at `position` with `index`.
     #[must_use]
     pub fn with_index(mut self, position: usize, index: u32) -> Self {

@@ -3,8 +3,8 @@
 
 use p4kx_extraction::model::{LodSelection, MaterialReading, PositionBox};
 use p4kx_extraction::{
-    AnimationChoice, AnimationSet, ChunkInfo, ConversionError, LibraryInfo, LodInfo, MeshInfo,
-    ModelSource, TextureVerdicts, UnreadInfo,
+    AnimationChoice, AnimationSet, ChunkInfo, ConversionError, LibraryInfo, ModelSource,
+    TextureVerdicts, UnreadInfo,
 };
 use serde::Serialize;
 
@@ -13,6 +13,7 @@ use crate::budget::{MAX_RESPONSE_LEN, fill_within, json_len};
 use crate::error::ToolError;
 use crate::model_item_page::ModelItemPage;
 use crate::model_material_items;
+use crate::model_mesh_items;
 use crate::model_node_items;
 use crate::model_params::Section;
 use crate::model_shapes::{LodShape, ModelCounts, ModelItemsResult, ModelOverview};
@@ -87,19 +88,7 @@ pub(crate) fn items(
     let (total, items, next_cursor) = match section {
         Section::Materials => return model_material_items::list(&observed),
         Section::Nodes => return model_node_items::list(&observed),
-        Section::Meshes => {
-            let lods = LodInfo::of_model(model);
-            let meshes: Vec<LodMesh<'_>> = lods
-                .iter()
-                .flat_map(|lod| {
-                    lod.meshes.iter().map(|mesh| LodMesh {
-                        lod: lod.level,
-                        mesh,
-                    })
-                })
-                .collect();
-            paged(&meshes, page, what, reserved, |item| item)?
-        }
+        Section::Meshes => return model_mesh_items::list(&observed),
         Section::Bones => return model_bone_items::list(&observed),
         Section::Animations => return model_animation_items::list(&observed, path),
         Section::UnreadAnimations => {
@@ -127,13 +116,6 @@ fn envelope_len(opened: &Opened, model: &str, section: &str) -> usize {
         section,
     ))
     .saturating_add(128)
-}
-
-#[derive(Serialize)]
-struct LodMesh<'a> {
-    lod: u32,
-    #[serde(flatten)]
-    mesh: &'a MeshInfo,
 }
 
 type Paged = (usize, Vec<serde_json::Value>, Option<String>);

@@ -30,6 +30,8 @@ pub(crate) enum EvidenceError {
     MissingRows,
     #[error("the material page origin could not be recorded")]
     Material(#[source] Box<ConversionError>),
+    #[error("the mesh page origin could not be recorded")]
+    Mesh(#[source] std::io::Error),
 }
 
 pub(crate) struct ModelItemPage<'a> {
