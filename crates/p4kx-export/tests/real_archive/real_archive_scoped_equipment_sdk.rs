@@ -43,6 +43,9 @@ mod store_slug_retained_parity;
 #[path = "real_archive_physical_shop_sdk.rs"]
 mod physical_shop;
 
+#[path = "real_archive_paint_compatibility.rs"]
+mod paint_compatibility;
+
 const STORE: &str = "/shipStoreSlugs";
 const FACILITY: &str = "/placements/facilityInstances/rows";
 const STORE_RECORD: &str = "P4KX_STORE_SLUG_SDK_RECORD";
