@@ -1600,6 +1600,16 @@ largest lifetime private commit was 1,579,773,952 bytes and the largest working
 set was 1,566,150,656 bytes. Both peaks occurred in the PTU durability query.
 The verifier was built from `cae92b947dd0b133e0e35fadd4cec8904a47ffd3`.
 
+The four tables also matched each Build's complete retained Normal Catalog
+in one Windows AMD64 process. The comparison verified ordered rows, availability
+and original contributors. The canonical exclusions were 1,160 on LIVE and 1,172
+on PTU and were accounted for before row comparison.
+
+| Build | Normal producer revision | Peak private commit (bytes) | Peak working set (bytes) |
+| --- | --- | ---: | ---: |
+| LIVE `13220821` | `23addc5e164f65a28a6f258302b30453b331edce` | 1,598,033,920 | 1,577,988,096 |
+| PTU `13260598` | `93d92ca20bef8a8c3731339214a3301124ade7ba` | 1,631,551,488 | 1,607,401,472 |
+
 ## Vehicle armor
 
 Use `catalog_queries::equipment::vehicle_armor::with_vehicle_armor` for

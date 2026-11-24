@@ -21,7 +21,6 @@ pub(super) const fn datasets() -> [&'static str; 3] {
 }
 
 pub(super) fn read() -> TestResult<[Route; 3]> {
-    const REMAINING: &str = "typed Item query and synthetic producer parity witnessed; complete installed producer parity open";
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("durability_fixture.p4k");
     ArchiveBuilder::new()
@@ -37,13 +36,13 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
     let selection = CatalogRecordSelection::All;
     Ok([
         parsed.with_durability(selection, None, |snapshot| {
-            Route::queried_rows(fixture::DURABILITY, snapshot.rows(), REMAINING)
+            Route::queried_rows(fixture::DURABILITY, snapshot.rows(), None)
         })??,
         parsed.with_degradation(selection, None, |snapshot| {
-            Route::queried_rows(fixture::DEGRADATION, snapshot.rows(), REMAINING)
+            Route::queried_rows(fixture::DEGRADATION, snapshot.rows(), None)
         })??,
         parsed.with_distortion(selection, None, |snapshot| {
-            Route::queried_rows(fixture::DISTORTION, snapshot.rows(), REMAINING)
+            Route::queried_rows(fixture::DISTORTION, snapshot.rows(), None)
         })??,
     ])
 }

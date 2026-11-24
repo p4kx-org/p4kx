@@ -31,7 +31,7 @@ pub(super) fn read() -> TestResult<[Route; 4]> {
     let all = CatalogRecordSelection::All;
     Ok([
         parsed.with_emp(all, None, |snapshot| {
-            Route::queried_rows(EMP, snapshot.rows(), REMAINING)
+            Route::queried_rows(EMP, snapshot.rows(), None)
         })??,
         parsed.with_explosives(all, None, |snapshot| {
             Route::queried_rows(EXPLOSIVES, snapshot.rows(), None)
