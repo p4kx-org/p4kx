@@ -2,9 +2,13 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::io;
+use std::ops::Range;
 use std::path::{Path, PathBuf};
 
-use p4kx_gltf::{self as gltf, GlbOptions, GlbSummary, GltfError, MeshVertexMap, TextureLoader};
+use p4kx_gltf::{
+    self as gltf, GlbOptions, GlbSummary, GltfError, MeshVertexMap, PrimitiveMaterialSource,
+    TextureLoader,
+};
 use p4kx_model::ModelFile;
 
 use crate::model_source::{ArchiveDefaultMaterial, ModelSource};
@@ -26,7 +30,7 @@ pub struct GlbGeometryPublication {
 }
 
 impl ModelSource {
-    /// Writes the standalone GLB and a digest-bound receipt for observed index accessor counts.
+    /// Writes the standalone GLB and a digest-bound receipt for observed geometry fields.
     ///
     /// # Errors
     /// Returns the ordinary GLB write errors and any companion publication error.
@@ -99,6 +103,12 @@ struct BoundGeometry {
     complete: bool,
 }
 
+#[derive(Clone, Copy)]
+enum ContributionCoverage {
+    Complete,
+    Partial,
+}
+
 impl<'model> GeometryOrigins<'model> {
     fn new(model: &'model ModelSource) -> Self {
         Self {
@@ -112,41 +122,89 @@ impl<'model> GeometryOrigins<'model> {
 
     fn observe(&mut self, mesh: MeshVertexMap<'_>) -> io::Result<()> {
         let file = mesh.origin.map(|origin| origin.file);
+        let library = self
+            .model
+            .model()
+            .materials
+            .library()
+            .filter(|library| !library.single);
         for primitive in mesh.primitives() {
-            let Some(accessor) = primitive.index_accessor else {
-                continue;
-            };
-            let path = FieldPath::parse(&format!("/accessors/{accessor}/count"))
-                .map_err(io::Error::other)?;
-            let origin = match (file, primitive.original) {
-                (Some(file), Some(original)) => {
-                    self.index_count(file, original.index_selection_range().end)?
-                }
-                _ => self.uses.origin(&[], false),
-            };
-            self.fields
-                .push((OriginOutputAddress::GlbJsonField { path }, origin));
+            if let Some(accessor) = primitive.index_accessor {
+                let origin = match (file, primitive.original) {
+                    (Some(file), Some(original)) => {
+                        let end = original.index_selection_range().end;
+                        self.origin_for_range(
+                            file,
+                            end - size_of::<u32>() as u64..end,
+                            "indexCount",
+                            SourceUseRole::Payload,
+                            ContributionCoverage::Complete,
+                        )?
+                    }
+                    _ => self.uses.origin(&[], false),
+                };
+                self.push_field(&format!("/accessors/{accessor}/count"), origin)?;
+            }
+            if primitive.material_index.is_some() {
+                let origin = match (file, primitive.original, primitive.material_source) {
+                    (Some(file), Some(original), PrimitiveMaterialSource::Library(slot))
+                        if usize::from(original.material()) == slot
+                            && library.is_some_and(|library| {
+                                !library.is_empty_slot(original.material())
+                            }) =>
+                    {
+                        self.origin_for_range(
+                            file,
+                            original.material_range(),
+                            "materialId",
+                            SourceUseRole::Selector,
+                            ContributionCoverage::Partial,
+                        )?
+                    }
+                    _ => self.uses.origin(&[], false),
+                };
+                self.push_field(
+                    &format!(
+                        "/meshes/{}/primitives/{}/material",
+                        mesh.mesh, primitive.primitive
+                    ),
+                    origin,
+                )?;
+            }
         }
         Ok(())
     }
 
-    fn index_count(&mut self, file: ModelFile, end: u64) -> io::Result<FieldOrigin> {
+    fn push_field(&mut self, pointer: &str, origin: FieldOrigin) -> io::Result<()> {
+        let path = FieldPath::parse(pointer).map_err(io::Error::other)?;
+        self.fields
+            .push((OriginOutputAddress::GlbJsonField { path }, origin));
+        Ok(())
+    }
+
+    fn origin_for_range(
+        &mut self,
+        file: ModelFile,
+        range: Range<u64>,
+        field: &str,
+        role: SourceUseRole,
+        coverage: ContributionCoverage,
+    ) -> io::Result<FieldOrigin> {
         let Some(bound) = self.scope(file)? else {
             return Ok(self.uses.origin(&[], false));
         };
-        let start = end - size_of::<u32>() as u64;
         let source = bound
             .scope
             .at(
                 SourceLocation::Subresource {
                     namespace: "model-byte-range".into(),
-                    indices: vec![start, end],
-                    field: "indexCount".into(),
+                    indices: vec![range.start, range.end],
+                    field: field.into(),
                 },
-                SourceUseRole::Payload,
+                role,
             )
             .map_err(io::Error::other)?;
-        let complete = bound.complete;
+        let complete = bound.complete && matches!(coverage, ContributionCoverage::Complete);
         let origin = self.uses.origin(std::slice::from_ref(&source), complete);
         self.contributions.push(source);
         Ok(origin)

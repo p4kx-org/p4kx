@@ -275,9 +275,13 @@ input still gives the artifact a positive marker.
 The `glbJsonField` pointers at `/accessors/N/count` identify emitted primitive index
 accessor counts. When the writer has the original IVO submesh, the receipt binds
 the count to its exact four-byte word in the selected geometry Entry. Loose models
-and unbound submesh layouts receive an explicitly incomplete origin. The opaque
-artifact row includes the observed geometry contributions and remains incomplete
-while other layout, material, texture and animation inputs are unresolved.
+and unbound submesh layouts receive an explicitly incomplete origin.
+The pointers at `/meshes/N/primitives/P/material` also carry the exact two-byte
+IVO selector when it chooses an authored sub-material. The reference stays
+incomplete because the final GLB index depends on material ordering and reuse.
+Single-material libraries, fallback and unbound references report unknown.
+The opaque artifact row includes the observed geometry contributions and remains
+incomplete while other layout, material, texture and animation inputs are unresolved.
 
 ## CHF GLB
 

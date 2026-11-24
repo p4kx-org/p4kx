@@ -13,6 +13,8 @@ use p4kx_testkit::{
 };
 use serde_json::Value;
 
+mod material;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const MODEL: &str = "Data/Objects/Test/cube.cgf";
@@ -21,7 +23,7 @@ const LOD_MODEL: &str = "Data/Objects/Test/cube_lod1.cgf";
 const LOD: &str = "Data/Objects/Test/cube_lod1.cgfm";
 
 #[test]
-fn standalone_receipt_binds_only_the_emitted_lod_index_counts() -> TestResult {
+fn standalone_receipt_binds_emitted_lod_counts_and_material_selectors() -> TestResult {
     let dir = tempfile::tempdir()?;
     let archive_path = dir.path().join("fixture.p4k");
     let model = TestModel::cube().with_lod(TestModel::cube());
@@ -78,6 +80,7 @@ fn standalone_receipt_binds_only_the_emitted_lod_index_counts() -> TestResult {
         assert_eq!(bytes, fs::read(ordinary)?, "standalone GLB payload bytes");
         let rows = receipt(&output, &bytes)?;
         check_counts(&bytes, &rows, entry, geometry, encrypted)?;
+        material::check_material_selectors(&bytes, &rows, entry, geometry, encrypted)?;
     }
     Ok(())
 }
@@ -163,12 +166,7 @@ fn check_counts(
     let mut count = 0;
     for accessor in accessors {
         let pointer = format!("/accessors/{}/count", accessor.index());
-        let field = rows
-            .iter()
-            .find(|row| {
-                row.pointer("/address/path").and_then(Value::as_str) == Some(pointer.as_str())
-            })
-            .ok_or("emitted index count field")?;
+        let field = field_at(rows, &pointer)?;
         let raw_count = original_word(field, rows, entry, geometry, encrypted)?;
         assert_eq!(
             accessor.count(),
@@ -218,30 +216,55 @@ fn original_word(
         Some(encrypted),
         "marker follows the exact selected geometry: {field}"
     );
+    let (used, bytes) = original_range(field, rows, entry, geometry)?;
+    assert_use(used, "indexCount", "payload");
+    Ok(u32::from_le_bytes(bytes.try_into()?))
+}
+
+fn assert_use(used: &Value, field: &str, role: &str) {
+    assert_eq!(
+        used.pointer("/location/field").and_then(Value::as_str),
+        Some(field),
+        "authored field in source use {used}"
+    );
+    assert_eq!(
+        used.get("role").and_then(Value::as_str),
+        Some(role),
+        "contribution role for {field}"
+    );
+}
+
+fn field_at<'a>(rows: &'a [Value], pointer: &str) -> Result<&'a Value, Box<dyn Error>> {
+    rows.iter()
+        .find(|row| row.pointer("/address/path").and_then(Value::as_str) == Some(pointer))
+        .ok_or_else(|| format!("missing GLB origin at {pointer}").into())
+}
+
+fn original_range<'a, 'bytes>(
+    field: &Value,
+    rows: &'a [Value],
+    entry: &str,
+    geometry: &'bytes [u8],
+) -> Result<(&'a Value, &'bytes [u8]), Box<dyn Error>> {
     let uses = field
         .get("sourceUsesRefs")
         .and_then(Value::as_array)
-        .ok_or("count source references")?;
-    assert_eq!(uses.len(), 1, "a count uses one authored word: {field}");
+        .ok_or("geometry field source references")?;
+    assert_eq!(uses.len(), 1, "an observed geometry word: {field}");
     let use_row = rows
         .iter()
         .filter_map(|row| row.get("sourceUse"))
         .find(|row| row.get("id") == uses.first())
-        .ok_or("count source use")?;
-    assert_eq!(
-        use_row.pointer("/location/field").and_then(Value::as_str),
-        Some("indexCount"),
-        "physical count field: {use_row}"
-    );
+        .ok_or("geometry source use")?;
     let source = rows
         .iter()
         .filter_map(|row| row.get("source"))
         .find(|row| row.get("id") == use_row.get("source"))
-        .ok_or("count physical source")?;
+        .ok_or("physical geometry source")?;
     assert_eq!(
         source.pointer("/path/value").and_then(Value::as_str),
         Some(entry),
-        "count belongs to the selected physical geometry Entry: {source}"
+        "selected physical geometry Entry: {source}"
     );
     let coordinate = |index| -> Result<usize, Box<dyn Error>> {
         Ok(use_row
@@ -254,6 +277,6 @@ fn original_word(
     let end = coordinate("/location/indices/1")?;
     let bytes = geometry
         .get(start..end)
-        .ok_or("count word lies in the selected Entry")?;
-    Ok(u32::from_le_bytes(bytes.try_into()?))
+        .ok_or("observed word lies in the selected Entry")?;
+    Ok((use_row, bytes))
 }
