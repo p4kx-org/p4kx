@@ -94,6 +94,16 @@ bytes and a minimum of 48,364,834,816 host bytes available. It bound the produce
 Archive and retained Catalog hashes. The result covers the selected Shop and the selected
 container scope.
 
+A second pass compared the mining SDK and all 203 ordered Store Slug rows against the same
+retained artifact. It matched 43 elements, 231 compositions, 49 provider presets, 494
+locations, 2,094 Starmap rows, 67 resources and 1,305 catalogued routes. The verifier also
+checked 67 public names, 1,541 protected texts and one SDK-only occurrence. The same physical
+Archive supported an independent Store Slug cold read in 38,030 ms with 1,532,764,160 peak
+private bytes and an empty scratch directory. The paired pass completed in 1,877,068 ms with
+1,869,099,008 peak private bytes, 1,742,618,624 peak working-set bytes and a minimum of
+45,537,599,488 host bytes available. The native test driver used an optimized test profile
+for streaming the complete retained document.
+
 ## PTU 13215521 comparison
 
 The installed PTU manifest identifies change `13215521`. The checks use installed LIVE
