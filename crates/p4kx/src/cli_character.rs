@@ -87,27 +87,8 @@ pub(crate) struct CharacterPackageArgs {
     /// without extension, else the code of the body variant.
     #[arg(long, value_name = "NAME")]
     pub(crate) name: Option<String>,
-    /// The level of detail of the head and the body: 0 is the most detailed. A model that lacks
-    /// the level is written at the nearest lower level it has.
-    #[arg(long, value_name = "N", default_value_t = 0, value_parser = lod_range())]
-    pub(crate) lod: u32,
-    /// How to write the materials into the GLB file. textures: the diffuse, normal and specular
-    /// maps as embedded PNG images; colours: plain colours.
-    #[arg(long, value_enum, value_name = "MODE", default_value_t = ChfMaterialsArg::Textures)]
-    pub(crate) materials: ChfMaterialsArg,
-    /// The mip level of the textures with --materials textures: 0 is the largest, each level
-    /// halves the width and height. The default 1 keeps the file at a few tens of megabytes.
-    #[arg(long, value_name = "N", default_value_t = 1)]
-    pub(crate) texture_mip: u32,
-    /// Leaves the vertex colours out of the meshes.
-    #[arg(long)]
-    pub(crate) no_vertex_colours: bool,
-    /// Writes a source vertex map for the rigged GLB.
-    #[arg(long)]
-    pub(crate) vertex_maps: bool,
-    /// Writes authored body-zone coverage and the emitted body primitives.
-    #[arg(long)]
-    pub(crate) body_zones: bool,
+    #[command(flatten)]
+    pub(crate) output: CharacterOutputArgs,
     /// Writes only the expression with this name as a morph target, as for `chf glb
     /// --expression`; repeat the option for more.
     #[arg(
@@ -135,4 +116,30 @@ pub(crate) struct CharacterPackageArgs {
     /// `Animations/pu/<body>/` looks there first and then in the folders of the body.
     #[arg(long = "anim-folder", value_name = "FOLDER")]
     pub(crate) animation_folders: Vec<String>,
+}
+
+/// Mesh and metadata options of a Character package.
+#[derive(Debug, Args)]
+pub(crate) struct CharacterOutputArgs {
+    /// The level of detail of the head and the body: 0 is the most detailed. A model that lacks
+    /// the level is written at the nearest lower level it has.
+    #[arg(long, value_name = "N", default_value_t = 0, value_parser = lod_range())]
+    pub(crate) lod: u32,
+    /// How to write the materials into the GLB file. textures: the diffuse, normal and specular
+    /// maps as embedded PNG images; colours: plain colours.
+    #[arg(long, value_enum, value_name = "MODE", default_value_t = ChfMaterialsArg::Textures)]
+    pub(crate) materials: ChfMaterialsArg,
+    /// The mip level of the textures with --materials textures: 0 is the largest, each level
+    /// halves the width and height. The default 1 keeps the file at a few tens of megabytes.
+    #[arg(long, value_name = "N", default_value_t = 1)]
+    pub(crate) texture_mip: u32,
+    /// Leaves the vertex colours out of the meshes.
+    #[arg(long)]
+    pub(crate) no_vertex_colours: bool,
+    /// Writes a source vertex map for the rigged GLB.
+    #[arg(long)]
+    pub(crate) vertex_maps: bool,
+    /// Writes authored body-zone coverage and the emitted body primitives.
+    #[arg(long)]
+    pub(crate) body_zones: bool,
 }

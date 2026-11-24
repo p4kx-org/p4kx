@@ -105,7 +105,7 @@ fn json_of<'a>(shown: &'a Shown<'a>, summary: &'a PackageSummary) -> PackageJson
         rig: shown.head.map(Head::rig),
         skeleton: shown.armour.skeleton_file(),
         out: json::path(&shown.args.out),
-        lod: shown.args.lod,
+        lod: shown.args.output.lod,
         loadout: shown.selection.loadout.as_ref(),
         replaced: shown
             .selection

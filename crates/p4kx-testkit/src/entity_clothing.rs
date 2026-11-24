@@ -1,7 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use crate::{TestInstance, TestStruct, TestType, TestValue};
+use crate::{TestInstance, TestRecord, TestStruct, TestType, TestValue};
+
+const VISIBILITY_TAG_GUID: u128 = 0x77;
+
+pub(crate) fn visibility_condition_tag() -> TestRecord {
+    TestRecord::new(
+        VISIBILITY_TAG_GUID,
+        "Tag",
+        "TEST_ClothingVisibility",
+        "libs/foundry/records/tags/test_clothing_visibility.xml",
+    )
+}
 
 /// The visibility condition of a [`TestZoneChunk`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -89,7 +100,9 @@ impl TestZoneChunk {
             }
             TestClothingCondition::Unrestricted => (Vec::new(), Vec::new()),
             TestClothingCondition::OnPort => (vec![TestValue::text("backpack")], Vec::new()),
-            TestClothingCondition::OnTag => (Vec::new(), vec![TestValue::Reference(0x77)]),
+            TestClothingCondition::OnTag => {
+                (Vec::new(), vec![TestValue::Reference(VISIBILITY_TAG_GUID)])
+            }
         };
         let entry = TestInstance::new("SCItemClothingPortVisibilityConditionParams")
             .value("Ports", TestValue::Array(ports))

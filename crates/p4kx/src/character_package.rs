@@ -15,13 +15,17 @@ use p4kx_blender::{
     write_character_package_with_context,
 };
 use p4kx_channels::channel_name;
-use p4kx_extraction::{Archive, DataForge, DataForgeEntry, GlbOptions, MaterialMode, is_same_file};
+use p4kx_extraction::{
+    Archive, CancelToken, DataForge, DataForgeEntry, GlbOptions, MaterialMode, is_same_file,
+};
 
 use crate::armour_loadout::{Files, Selection};
 use crate::chf::{InvalidChf, read_capped};
 use crate::chf_glb::{expressions_choice, failure};
 use crate::cli_armour::BodyArg;
-use crate::cli_character::{CharacterAction, CharacterArgs, CharacterPackageArgs};
+use crate::cli_character::{
+    CharacterAction, CharacterArgs, CharacterOutputArgs, CharacterPackageArgs,
+};
 use crate::cli_chf::ChfMaterialsArg;
 use crate::entity_glb::GlbOutputIsArchive;
 use crate::entity_package::build_info;
@@ -43,7 +47,7 @@ pub(crate) fn run(args: &CharacterArgs, as_json: bool) -> Result<()> {
     }
 }
 
-fn glb_options(args: &CharacterPackageArgs) -> GlbOptions {
+fn glb_options(args: &CharacterOutputArgs) -> GlbOptions {
     let mode = match args.materials {
         ChfMaterialsArg::Colours => MaterialMode::Colours,
         ChfMaterialsArg::Textures => MaterialMode::Textures,
@@ -70,16 +74,7 @@ fn package(args: &CharacterPackageArgs, as_json: bool) -> Result<()> {
     let context = PackageWriteContext::new(&protection, cancel.flag());
 
     check_output_with_context(&args.out, &context)?;
-    let default = args
-        .default_chf
-        .then(|| {
-            let variant = args
-                .body
-                .map(BodyVariant::from)
-                .context("--default-chf requires --body")?;
-            default_chf::read(&archive, variant, &cancel)
-        })
-        .transpose()?;
+    let default = select_default_chf(args, &archive, &cancel)?;
     let chf = chf
         .as_ref()
         .or_else(|| default.as_ref().map(|input| input.chf.as_ref()));
@@ -92,7 +87,7 @@ fn package(args: &CharacterPackageArgs, as_json: bool) -> Result<()> {
     }
     let (variant, pieces) = worn(args, &mut selection, head.as_ref());
     let models = character_models(&archive, &pieces);
-    let options = AssemblyOptions::default().with_lod(args.lod);
+    let options = AssemblyOptions::default().with_lod(args.output.lod);
     let armour = Armour::build_with_palettes(
         variant,
         &pieces,
@@ -114,12 +109,7 @@ fn package(args: &CharacterPackageArgs, as_json: bool) -> Result<()> {
         origin_chf_name(args).or_else(|| default.as_ref().and_then(default_chf::Selected::name));
     let scene = CharacterScene::new(&name, &armour, &animated)
         .with_origin(chf_name, args.loadout.as_deref());
-    let scene = if args.body_zones {
-        scene.with_body_zones()
-    } else {
-        scene
-    };
-    let summary = store(args, &archive, &models, &scene, &context)?;
+    let summary = store(args, &archive, &models, scene, &context)?;
 
     let shown = report::Shown {
         archive: archive.path(),
@@ -134,6 +124,21 @@ fn package(args: &CharacterPackageArgs, as_json: bool) -> Result<()> {
     };
     report::print(&shown, &summary, as_json)?;
     failure(&armour, &args.out).map_or(Ok(()), Err)
+}
+
+fn select_default_chf(
+    args: &CharacterPackageArgs,
+    archive: &Archive,
+    cancel: &CancelToken,
+) -> Result<Option<default_chf::Selected>> {
+    if !args.default_chf {
+        return Ok(None);
+    }
+    let variant = args
+        .body
+        .map(BodyVariant::from)
+        .context("--default-chf requires --body")?;
+    default_chf::read(archive, variant, cancel).map(Some)
 }
 
 fn select_character<'a>(
@@ -222,19 +227,24 @@ fn store(
     args: &CharacterPackageArgs,
     archive: &Archive,
     models: &ArchiveModels<'_>,
-    scene: &CharacterScene<'_>,
+    scene: CharacterScene<'_>,
     context: &PackageWriteContext<'_>,
 ) -> Result<PackageSummary> {
     let info = PackageInfo::new(channel_name(archive.path()), build_info(archive)?);
-    let context = if args.vertex_maps {
+    let context = if args.output.vertex_maps {
         context.with_vertex_maps()
     } else {
         *context
     };
+    let scene = if args.output.body_zones {
+        scene.with_body_zones()
+    } else {
+        scene
+    };
     Ok(write_character_package_with_context(
-        scene,
+        &scene,
         &models.textures(),
-        &glb_options(args),
+        &glb_options(&args.output),
         &info,
         &args.out,
         &context,

@@ -5,7 +5,7 @@ use crate::entity_armour::{
     FEMALE_ARMOUR, FEMALE_BODY, MALE_ARMOUR, MALE_BODY, armour_database, armour_female_skeleton,
     armour_files, armour_male_skeleton, skin_entries,
 };
-use crate::entity_clothing::{TestZoneChunk, clothing_component_hiding};
+use crate::entity_clothing::{TestZoneChunk, clothing_component_hiding, visibility_condition_tag};
 use crate::{TestEntity, TestEntry, TestModel, TestMtl, TestMtlMaterial};
 
 const LIBRARY: &str = "Data\\objects\\test\\cube";
@@ -76,6 +76,7 @@ pub(crate) fn zone_entries_with(
             armour_database().record(shirt.record()),
             |builder, entity| builder.record(entity.record()),
         )
+        .record(visibility_condition_tag())
         .build();
     let mut entries = vec![TestEntry::zstd("Data\\Game2.dcb", database)];
     let replaced = [MALE_BODY, FEMALE_BODY, LIBRARY].map(str::to_ascii_lowercase);
