@@ -2602,6 +2602,13 @@ Both fresh processes stayed under 2 GB and created no scratch files.
 Their executable SHA-256 was
 `07e7e6cdddec71523c305330088c4d79f7f35f2612b00690e9f9b0be245a35b5`.
 
+The test `installed_mining_and_store_slugs_match_retained_complete_catalog`
+shares one stream of the verified Normal Catalog for the mining consumer and the
+complete ordered Store slug array. Set `P4KX_CATALOG_MEASUREMENT_DIR`,
+`P4KX_STORE_SLUG_CATALOG_PRODUCER_REVISION` and `P4KX_DATA_P4K` to the matching
+measurement, producer revision and installed Archive. Use the standalone cold
+queries to measure each workflow's process peak.
+
 ### Radar Audio in a separate process
 
 On Windows AMD64, `installed_radar_audio_cold_query` ran the all-Entries Radar Audio

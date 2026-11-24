@@ -4,7 +4,7 @@
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::equipment::with_ship_store_slugs_from;
-use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog_from};
+use p4kx_export::{CatalogError, CatalogOptions, CatalogPublicationMode};
 use p4kx_extraction::{Archive, DataForgeEntry, Filter};
 use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntity, TestEntry, entity_schema};
 use serde_json::{Value, json};
@@ -16,55 +16,106 @@ const ACTIVE: &str = "Aurora-Mk-I-ES";
 const FAILED: &str = "Aurora-Mk-I-LX";
 const ALIAS_PATH: &str = "alias_ship.xml";
 
+#[derive(Clone, Copy)]
+enum SourceFixture {
+    Readable,
+    UnreadableShips,
+}
+
 pub(super) fn read() -> TestResult<Route> {
-    let (_dir, archive) = open()?;
+    check_unreadable_sources()?;
+    let (_dir, archive) = open(SourceFixture::Readable)?;
+    let entry = DataForgeEntry::read(&archive)?;
+    let options = CatalogOptions::new(UNIX_EPOCH);
+    let (_, route) = verify_rows(&archive, &entry, &options, &[], |scope| {
+        let [row] = scope.rows() else {
+            return Err("one successfully resolved curated Ship remains".into());
+        };
+        assert_eq!(
+            row.slug(),
+            ACTIVE,
+            "the physical alias cannot hide the matching class"
+        );
+        assert!(
+            row.ship_guid().is_some(),
+            "the active Store row retains its canonical GUID"
+        );
+        assert!(!row.is_retired(), "the fixture proves an active mapping");
+        Route::queried_rows(
+            SHIP_STORE_SLUGS,
+            scope.rows(),
+            concat!(
+                "synthetic unfiltered Normal parity, complete installed parity and cold memory on ",
+                "LIVE 13220821 and PTU 13248297 verified. Current PTU 13260598 complete Normal ",
+                "parity and standalone cold memory remain open",
+            ),
+        )
+    })?;
+    Ok(route)
+}
+
+fn check_unreadable_sources() -> TestResult<()> {
+    let (_dir, archive) = open(SourceFixture::UnreadableShips)?;
     let entry = DataForgeEntry::read(&archive)?;
     let active = Filter::new("mapped_ship");
     let alias = Filter::new(ALIAS_PATH.trim_end_matches(".xml"));
+    let mut options = CatalogOptions::new(UNIX_EPOCH);
     for filter in [&active, &alias] {
-        let (rows, ()) = verify_rows(&archive, &entry, Some(filter), |_| Ok(()))?;
+        options.filter = Some(filter);
+        let (rows, ()) = verify_rows(&archive, &entry, &options, &[], |_| Ok(()))?;
         assert_eq!(
             rows,
             usize::from(filter == &active),
             "a matching physical GUID needs its exact curated class in the same Filter"
         );
     }
-    verify_rows(&archive, &entry, None, |scope| {
-        let [row] = scope.rows() else {
-            return Err("one successfully resolved curated Ship remains".into());
-        };
-        assert_eq!(row.slug(), ACTIVE, "the physical alias cannot hide the matching class");
-        assert!(row.ship_guid().is_some(), "the active Store row retains its canonical GUID");
-        assert!(!row.is_retired(), "the fixture proves an active mapping");
-        Route::queried_rows(
-            SHIP_STORE_SLUGS,
-            scope.rows(),
-            "synthetic parity, installed scoped producer parity and unfiltered query memory verified; complete producer parity open",
-        )
-    })
-    .map(|(_, route)| route)
+    options.filter = None;
+    assert!(
+        matches!(
+            p4kx_export::build_catalog_from(&archive, &entry, &options),
+            Err(CatalogError::IncompleteExport(_))
+        ),
+        "the unfiltered Normal export rejects an unreadable required Ship"
+    );
+    options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
+    let (rows, ()) = verify_rows(&archive, &entry, &options, &[2], |_| Ok(()))?;
+    assert_eq!(
+        rows, 1,
+        "the degraded read preserves the healthy mapped Ship"
+    );
+    Ok(())
 }
 
 fn verify_rows<T>(
     archive: &Archive,
     entry: &DataForgeEntry,
-    filter: Option<&Filter>,
+    options: &CatalogOptions<'_>,
+    unreadable: &[u32],
     inspect: impl FnOnce(
         p4kx_export::catalog_queries::equipment::ShipStoreSlugSnapshot<'_>,
     ) -> TestResult<T>,
 ) -> TestResult<(usize, T)> {
-    let options = CatalogOptions {
-        filter,
-        publication_mode: if filter.is_none() {
-            CatalogPublicationMode::DiagnosticPartial
-        } else {
-            CatalogPublicationMode::Normal
-        },
-        ..CatalogOptions::new(UNIX_EPOCH)
-    };
-    let built = build_catalog_from(archive, entry, &options)?;
+    let built = p4kx_export::build_catalog_from(archive, entry, options)?;
     let catalog: Value = serde_json::from_slice(built.json())?;
-    with_ship_store_slugs_from(archive, entry, filter, None, |scope| {
+    if options.filter.is_none()
+        && matches!(options.publication_mode, CatalogPublicationMode::Normal)
+    {
+        for (field, expected) in [
+            ("publicationMode", "normal"),
+            ("status", "complete"),
+            ("read", "complete"),
+            ("projection", "complete"),
+        ] {
+            assert_eq!(
+                catalog
+                    .pointer(&format!("/exportHealth/{field}"))
+                    .and_then(Value::as_str),
+                Some(expected),
+                "the unfiltered readable fixture must publish a complete Normal Catalog"
+            );
+        }
+    }
+    with_ship_store_slugs_from(archive, entry, options.filter, None, |scope| {
         let rows = scope.rows();
         assert_eq!(
             serde_json::to_value(rows)?,
@@ -89,7 +140,6 @@ fn verify_rows<T>(
             built.summary().store_slugs(),
             "the exact selection preserves curated counts and stale decisions"
         );
-        let unreadable: &[u32] = if scope.filter().is_none() { &[2] } else { &[] };
         assert_eq!(
             scope.coverage().unreadable_bodies.as_slice(),
             unreadable,
@@ -100,25 +150,28 @@ fn verify_rows<T>(
     })?
 }
 
-fn open() -> TestResult<(tempfile::TempDir, Archive)> {
+fn open(sources: SourceFixture) -> TestResult<(tempfile::TempDir, Archive)> {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("curated-slug-scope.p4k");
     let curated: Value = serde_json::from_str(include_str!("../../data/ship-store-slugs.json"))?;
     let (guid, class) = curated_ship(&curated, ACTIVE)?;
-    let (broken_guid, broken_class) = curated_ship(&curated, FAILED)?;
-    let database = entity_schema(DataForgeBuilder::new().version(8))
+    let mut database = entity_schema(DataForgeBuilder::new().version(8))
         .record(ship(guid, "UnmappedAlias", ALIAS_PATH).record())
-        .record(ship(guid, class, "mapped_ship.xml").record())
-        .record(
-            ship(broken_guid, broken_class, "failed_ship.xml")
-                .record()
-                .with_instance_index(u16::MAX),
-        )
-        .record(
-            ship(0x01, "BrokenNeighbor", "unrelated_ship.xml")
-                .record()
-                .with_instance_index(u16::MAX),
-        );
+        .record(ship(guid, class, "mapped_ship.xml").record());
+    if matches!(sources, SourceFixture::UnreadableShips) {
+        let (broken_guid, broken_class) = curated_ship(&curated, FAILED)?;
+        database = database
+            .record(
+                ship(broken_guid, broken_class, "failed_ship.xml")
+                    .record()
+                    .with_instance_index(u16::MAX),
+            )
+            .record(
+                ship(0x01, "BrokenNeighbor", "unrelated_ship.xml")
+                    .record()
+                    .with_instance_index(u16::MAX),
+            );
+    }
     ArchiveBuilder::new()
         .entry(TestEntry::stored(r"Data\Game2.dcb", database.build()))
         .write_to(&path)?;

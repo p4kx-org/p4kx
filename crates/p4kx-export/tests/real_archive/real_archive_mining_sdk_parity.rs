@@ -2,24 +2,19 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::{BTreeMap, BTreeSet};
-use std::env;
-use std::path::{Path, PathBuf};
 
-use p4kx_export::SCHEMA_VERSION;
 use p4kx_export::mining_locations::{
     HarvestableLocation, MiningLocationOptions, MiningLocationSnapshot, read_mining_locations,
 };
-use p4kx_extraction::{Archive, ArchiveWatch, Language, utc_rfc3339};
+use p4kx_extraction::{Archive, ArchiveWatch, Language};
 use serde::Serialize;
 use serde_json::{Value, json};
 
 use crate::catalog_capture::CatalogCapture;
 use crate::catalog_v3_consumer as consumer;
-use crate::real_archive_catalog_preflight;
-use crate::real_archive_catalog_size::artifact;
-use crate::real_archive_catalog_size::replay::bindings::check_catalog_selection;
-use crate::real_archive_catalog_table_parity::first_difference;
-use crate::real_archive_shop_inventory_v3::verify_build;
+use crate::real_archive_catalog_table_parity::{
+    BoundMeasurement, first_difference, with_bound_measurement,
+};
 use crate::real_archive_verification::print_line;
 
 #[path = "real_archive_mining_catalog_scope.rs"]
@@ -36,25 +31,28 @@ const RESOURCE_TYPES: &str = "/definitions/resourceTypes";
 #[test]
 #[ignore = "same Build: set P4KX_DATA_P4K and P4KX_CATALOG_MEASUREMENT_DIR"]
 fn installed_mining_sdk_matches_the_same_complete_catalog() -> TestResult {
-    let directory = env::var_os("P4KX_CATALOG_MEASUREMENT_DIR")
-        .map(PathBuf::from)
-        .ok_or("configure the completed catalog measurement")?;
-    real_archive_catalog_preflight::check(&directory)?;
-    let path = p4kx_testkit::real_archive_path().map_err(|_| "configure the matching Archive")?;
-    let key = p4kx_testkit::real_archive_key().map_err(|_| "read the configured Archive key")?;
-    let archive =
-        Archive::open_with_key(path, Some(key)).map_err(|_| "open the matching Archive")?;
-    let watch = ArchiveWatch::new(&archive);
+    with_bound_measurement(|archive, measurement| {
+        verify_mining_and_row_arrays(measurement, archive, &[])
+    })
+}
+
+pub(crate) fn verify_mining_and_row_arrays(
+    measurement: &BoundMeasurement,
+    archive: &Archive,
+    arrays: &[(&str, &[Value])],
+) -> TestResult {
+    let watch = ArchiveWatch::new(archive);
     watch.check()?;
-    let snapshot = read_mining_locations(
-        &archive,
-        MiningLocationOptions::new(Language::English, None),
-    )
-    .map_err(|_| "read the mining SDK snapshot")?;
+    let snapshot =
+        read_mining_locations(archive, MiningLocationOptions::new(Language::English, None))
+            .map_err(|_| "read the mining SDK snapshot")?;
     watch.check()?;
-    let catalog = read_catalog(&directory, &snapshot)?;
-    require_same_build_and_complete_scope(&catalog, &archive, &snapshot)?;
+    let catalog = read_catalog(measurement, &snapshot, arrays)?;
+    check_mining_scope(&catalog, archive, &snapshot)?;
     compare_rows(&catalog, &snapshot)?;
+    for (path, expected) in arrays {
+        compare_ordered(&catalog, path, expected)?;
+    }
     watch.check()?;
     print_line(&format!(
         "mining SDK parity: elements={} compositions={} providers={} locations={} starmap={} resources={} cataloguedRoutes={} SDKOnlyOccurrences={} publicNames={} gameTexts={}",
@@ -76,7 +74,11 @@ fn installed_mining_sdk_matches_the_same_complete_catalog() -> TestResult {
     Ok(())
 }
 
-fn read_catalog(directory: &Path, snapshot: &MiningLocationSnapshot) -> TestResult<Value> {
+fn read_catalog(
+    measurement: &BoundMeasurement,
+    snapshot: &MiningLocationSnapshot,
+    arrays: &[(&str, &[Value])],
+) -> TestResult<Value> {
     let keys = rows::SelectedKeys::for_snapshot(snapshot)?;
     let mut paths = CatalogCapture::default();
     for path in [
@@ -99,55 +101,20 @@ fn read_catalog(directory: &Path, snapshot: &MiningLocationSnapshot) -> TestResu
     ] {
         paths.keep(path);
     }
+    for (path, _) in arrays {
+        paths.keep(path);
+    }
     keys.project(&mut paths);
-    artifact::read_completed(directory, |input| Ok(paths.read(input)?))
+    measurement.read_catalog(&paths)
 }
 
-fn require_same_build_and_complete_scope(
+fn check_mining_scope(
     catalog: &Value,
     archive: &Archive,
     snapshot: &MiningLocationSnapshot,
 ) -> TestResult {
-    verify_build(archive, catalog)?;
-    let modified = utc_rfc3339(
-        archive
-            .file_modified()
-            .ok_or("missing Archive modification time")?,
-    );
-    if catalog.get("schemaVersion").and_then(Value::as_u64) != Some(u64::from(SCHEMA_VERSION))
-        || snapshot.build.as_ref() != archive.build()
-        || catalog
-            .pointer("/source/archiveSize")
-            .and_then(Value::as_u64)
-            != Some(archive.file_len())
-        || catalog
-            .pointer("/source/archiveModified")
-            .and_then(Value::as_str)
-            != Some(modified.as_str())
-    {
-        return Err(
-            "the SDK and catalog must identify the same schema-v3 Archive Build and stamp".into(),
-        );
-    }
-    let healthy = [
-        ("status", "complete"),
-        ("read", "complete"),
-        ("projection", "complete"),
-        ("publicationMode", "normal"),
-    ];
-    for (field, value) in healthy {
-        require_equal(
-            catalog.pointer(&format!("/exportHealth/{field}")),
-            Some(&json!(value)),
-            "complete normal export health",
-        )?;
-    }
-    check_catalog_selection(
-        catalog
-            .get("completeness")
-            .ok_or("missing Catalog completeness")?,
-    )?;
-    if !snapshot.coverage.language_available
+    if snapshot.build.as_ref() != archive.build()
+        || !snapshot.coverage.language_available
         || snapshot.coverage.archive_inventory_incomplete
         || snapshot.coverage.placement_inventory_incomplete
         || catalog

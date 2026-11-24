@@ -4,10 +4,12 @@
 use std::path::PathBuf;
 
 use p4kx_extraction::{Archive, ArchiveWatch};
+use serde::de::DeserializeSeed;
+use serde_json::Value;
 
 use crate::catalog_capture::CatalogCapture;
 use crate::real_archive_catalog_preflight;
-use crate::real_archive_catalog_size::replay::bindings::Receipt;
+use crate::real_archive_catalog_size::{artifact, replay::bindings::Receipt};
 
 use super::compare_rows::Projection;
 use super::{BoundMeasurement, TestResult};
@@ -54,6 +56,17 @@ fn with_measurement<T>(
     let result = verify(&archive, &measurement);
     measurement.watch.check()?;
     result
+}
+
+impl BoundMeasurement {
+    pub(crate) fn read_catalog<P>(&self, capture: &CatalogCapture<P>) -> TestResult<Value>
+    where
+        P: for<'de> DeserializeSeed<'de, Value = Value> + Copy,
+    {
+        let catalog = artifact::read_completed(&self.directory, |input| Ok(capture.read(input)?))?;
+        self.binding.check_catalog(&catalog)?;
+        Ok(catalog)
+    }
 }
 
 pub(super) fn normal_capture<'scope>() -> CatalogCapture<Projection<'scope>> {

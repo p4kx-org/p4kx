@@ -6,7 +6,7 @@ use serde_json::Value;
 use super::compare_rows::Projection;
 use super::measurement;
 use super::selected_origins::SelectedOrigins;
-use super::{BoundMeasurement, Origins, TestResult, artifact, first_difference};
+use super::{BoundMeasurement, Origins, TestResult, first_difference};
 
 impl BoundMeasurement {
     pub(crate) fn verify_selected_row(
@@ -35,8 +35,7 @@ impl BoundMeasurement {
         for (section, expected) in origins.inventories() {
             capture.project(section, Projection::Origins(SelectedOrigins(expected)));
         }
-        let catalog = artifact::read_completed(&self.directory, |input| Ok(capture.read(input)?))?;
-        self.binding.check_catalog(&catalog)?;
+        let catalog = self.read_catalog(&capture)?;
         verify(&catalog)?;
         origins.verify(&catalog)?;
         self.watch.check()?;
