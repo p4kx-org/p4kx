@@ -200,6 +200,11 @@ finished. Diagnostics cannot replace the source-bound native runtime and exact-P
 proofs. The infrastructure tests execute synthetic PowerShell children and mocked native
 adapters; they are not a reproduction of an installer timeout.
 
+The package consumer preserves the original Finish supervisor launch and then waits
+for its terminal receipt within the original deadline. It uploads and validates that
+receipt before accepting the MSI lifecycle. The detached observer controls exercise
+the intermediate Finish probes and their watchdog receipts in harmless native workers.
+
 The diagnostic-only `MSI feedback runner-fuse probe` workflow runs native AMD64 and ARM64
 complete/timeout controls through the same phase writer. Its separate verifier downloads the
 actual artifacts and checks the service's failed-step and timeout annotations, source revision,

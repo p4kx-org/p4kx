@@ -268,40 +268,6 @@ jobs:
           name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-finish-start
           path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/finish-supervision/launch.json
           if-no-files-found: error
-      - name: Observe original MSI Finish progress 4
-        id: msi-finish-progress-4
-        if: ${{ always() && !cancelled() && steps.msi-finish-start.outcome == 'success' }}
-        timeout-minutes: 1
-        continue-on-error: true
-        run: .github/scripts/invoke-msi-observer.ps1 -Stage ProbeFinish -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -Sequence 4
-      - name: Preserve original MSI Finish progress 4
-        if: ${{ always() && !cancelled() && steps.msi-finish-progress-4.outcome != 'skipped' }}
-        timeout-minutes: 1
-        continue-on-error: true
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-4
-          path: |
-            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/*
-            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/finish-probes/04/*.json
-          if-no-files-found: error
-      - name: Observe original MSI Finish progress 5
-        id: msi-finish-progress-5
-        if: ${{ always() && !cancelled() && steps.msi-finish-start.outcome == 'success' }}
-        timeout-minutes: 1
-        continue-on-error: true
-        run: .github/scripts/invoke-msi-observer.ps1 -Stage ProbeFinish -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -Sequence 5
-      - name: Preserve original MSI Finish progress 5
-        if: ${{ always() && !cancelled() && steps.msi-finish-progress-5.outcome != 'skipped' }}
-        timeout-minutes: 1
-        continue-on-error: true
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-5
-          path: |
-            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/05/*
-            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/finish-probes/05/*.json
-          if-no-files-found: error
       - name: Wait for the original MSI Finish receipt
         id: msi-finish-wait
         if: ${{ always() && !cancelled() && steps.msi-finish-start.outcome == 'success' }}
