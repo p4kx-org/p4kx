@@ -1,9 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::BTreeSet;
 use std::env;
 
-use p4kx_extraction::{Archive, ArchiveWatch, DataForgeEntry};
+use p4kx_assembly::ENTITY_TYPE;
+use p4kx_extraction::{Archive, ArchiveWatch, DataForge, DataForgeEntry, Filter};
 use p4kx_testkit::{real_archive_key, real_archive_path};
 
 use crate::real_archive_catalog_table_parity::TestResult;
@@ -47,4 +49,68 @@ pub(super) fn record_index(variable: &str) -> TestResult<u32> {
         .ok()
         .and_then(|value| value.parse().ok())
         .ok_or_else(|| "configure a private physical Ship Record index".into())
+}
+
+pub(super) fn literal_filter(input: &DataForgeEntry, index: u32) -> TestResult<Filter> {
+    let forge = input.open().map_err(|_| "parse the original DataForge")?;
+    let record = forge
+        .record(index)
+        .ok_or("the nominated physical Ship Record is missing")?;
+    let path = record
+        .record_path()
+        .map_err(|_| "the original Ship path is unreadable")?;
+    if record.type_name().ok() != Some(ENTITY_TYPE) || path.contains(['*', '?']) {
+        return Err("the nominated Ship lacks a literal Entity Record path".into());
+    }
+    let anchor = path
+        .find(|character: char| character.is_ascii_alphabetic())
+        .ok_or("the original Ship path has no ASCII anchor")?;
+    let mut glob = path.to_owned();
+    glob.replace_range(anchor..=anchor, "?");
+    let filter = Filter::parse(&glob)?;
+    let exact = forge
+        .records_at_path(path)
+        .map(|record| record.index())
+        .collect();
+    if matching(&forge, &filter) != exact {
+        return Err("the anchored literal Store Filter admits an unrelated Record".into());
+    }
+    Ok(filter)
+}
+
+pub(super) fn physical_filter(
+    input: &DataForgeEntry,
+    filter_variable: &str,
+    records_variable: &str,
+    required: &BTreeSet<u32>,
+) -> TestResult<Filter> {
+    let literal = env::var(filter_variable)
+        .map_err(|_| "configure the private structurally anchored producer glob")?;
+    let filter = Filter::parse(&literal)?;
+    let declared = env::var(records_variable)
+        .map_err(|_| "configure the exact approved producer Record inventory")?;
+    let admitted = declared
+        .split(',')
+        .map(str::parse)
+        .collect::<Result<BTreeSet<u32>, _>>()
+        .map_err(|_| "the approved Record inventory is invalid")?;
+    let forge = input.open().map_err(|_| "parse the original DataForge")?;
+    if !filter.is_glob() || !required.is_subset(&admitted) || matching(&forge, &filter) != admitted
+    {
+        return Err("the glob admits a different physical scope or omits a reached owner".into());
+    }
+    Ok(filter)
+}
+
+fn matching(forge: &DataForge<'_>, filter: &Filter) -> BTreeSet<u32> {
+    forge
+        .records()
+        .filter_map(|record| {
+            record
+                .record_path()
+                .ok()
+                .filter(|path| filter.matches(path))
+                .map(|_| record.index())
+        })
+        .collect()
 }

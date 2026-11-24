@@ -2,10 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::BTreeSet;
-use std::env;
 use std::time::UNIX_EPOCH;
 
-use p4kx_assembly::ENTITY_TYPE;
 use p4kx_export::catalog_queries::CatalogRecordCoverage;
 use p4kx_export::catalog_queries::equipment::{
     AlignmentDependencyState, LoadoutFacilityPlacementSnapshot, ShipStoreSlugSnapshot,
@@ -13,7 +11,7 @@ use p4kx_export::catalog_queries::equipment::{
     with_ship_store_slugs_from,
 };
 use p4kx_export::{BuiltCatalog, CatalogOptions, SCHEMA_VERSION, build_catalog_from};
-use p4kx_extraction::{Archive, Checksum, DataForge, DataForgeEntry, Filter, SourceValueState};
+use p4kx_extraction::{Archive, Checksum, DataForgeEntry, Filter, SourceValueState};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 
@@ -23,7 +21,7 @@ use crate::real_archive_verification::print_line;
 
 #[path = "real_archive_equipment_input.rs"]
 mod equipment_input;
-use equipment_input::{dataforge, record_index, with_archive};
+use equipment_input::{dataforge, literal_filter, physical_filter, record_index, with_archive};
 
 #[path = "real_archive_canonical_ship_sdk.rs"]
 mod canonical_ship;
@@ -61,6 +59,13 @@ fn installed_store_slugs_match_exact_scoped_normal_producer() -> TestResult {
         let output = produce(archive, &input, &filter)?;
         let document = document(archive, &output)?;
         let original = ship_row(&document, index)?;
+        if original
+            .pointer("/playability/value")
+            .and_then(Value::as_str)
+            != Some("player")
+        {
+            return Err("the nominated original Ship is not classified as player".into());
+        }
         let class = original
             .pointer("/className/value")
             .and_then(Value::as_str)
@@ -73,11 +78,12 @@ fn installed_store_slugs_match_exact_scoped_normal_producer() -> TestResult {
             .map_err(|_| "the original Ship GUID is invalid")?;
         with_ship_store_slugs_from(archive, &input, Some(&filter), None, |snapshot| {
             store_selection(archive, &snapshot, Some(&filter))?;
-            if !snapshot
+            let mut bindings = snapshot
                 .rows()
                 .iter()
-                .any(|row| row.ship_guid() == Some(guid) && row.class_name() == Some(class))
-            {
+                .filter(|row| row.ship_guid() == Some(guid) && row.class_name() == Some(class))
+                .peekable();
+            if bindings.peek().is_none() {
                 return Err("the nominated physical Ship has no admitted Store slug".into());
             }
             if document.pointer(STORE) != Some(&serde_json::to_value(snapshot.rows())?)
@@ -88,6 +94,13 @@ fn installed_store_slugs_match_exact_scoped_normal_producer() -> TestResult {
                 return Err(
                     "the scoped Store rows, summary or selection differ from the producer".into(),
                 );
+            }
+            for binding in bindings {
+                print_line(&format!(
+                    "Store slug scoped parity rsi_id={} slug={} guid={guid} class={class}",
+                    binding.rsi_id(),
+                    binding.slug(),
+                ));
             }
             print_line(&format!(
                 "Store slug scoped parity rows={}",
@@ -235,33 +248,6 @@ fn store_selection(
     Ok(())
 }
 
-fn literal_filter(input: &DataForgeEntry, index: u32) -> TestResult<Filter> {
-    let forge = input.open().map_err(|_| "parse the original DataForge")?;
-    let record = forge
-        .record(index)
-        .ok_or("the nominated physical Ship Record is missing")?;
-    let path = record
-        .record_path()
-        .map_err(|_| "the original Ship path is unreadable")?;
-    if record.type_name().ok() != Some(ENTITY_TYPE) || path.contains(['*', '?']) {
-        return Err("the nominated Ship lacks a literal Entity Record path".into());
-    }
-    let anchor = path
-        .find(|character: char| character.is_ascii_alphabetic())
-        .ok_or("the original Ship path has no ASCII anchor")?;
-    let mut glob = path.to_owned();
-    glob.replace_range(anchor..=anchor, "?");
-    let filter = Filter::parse(&glob)?;
-    let exact = forge
-        .records_at_path(path)
-        .map(|record| record.index())
-        .collect();
-    if matching(&forge, &filter) != exact {
-        return Err("the anchored literal Store Filter admits an unrelated Record".into());
-    }
-    Ok(filter)
-}
-
 fn facility_filter(
     input: &DataForgeEntry,
     index: u32,
@@ -273,30 +259,6 @@ fn facility_filter(
         "P4KX_FACILITY_SDK_SELECTED_RECORDS",
         &facility_dependencies(index, snapshot)?,
     )
-}
-
-fn physical_filter(
-    input: &DataForgeEntry,
-    filter_variable: &str,
-    records_variable: &str,
-    required: &BTreeSet<u32>,
-) -> TestResult<Filter> {
-    let literal = env::var(filter_variable)
-        .map_err(|_| "configure the private structurally anchored producer glob")?;
-    let filter = Filter::parse(&literal)?;
-    let declared = env::var(records_variable)
-        .map_err(|_| "configure the exact approved producer Record inventory")?;
-    let admitted = declared
-        .split(',')
-        .map(str::parse)
-        .collect::<Result<BTreeSet<u32>, _>>()
-        .map_err(|_| "the approved Record inventory is invalid")?;
-    let forge = input.open().map_err(|_| "parse the original DataForge")?;
-    if !filter.is_glob() || !required.is_subset(&admitted) || matching(&forge, &filter) != admitted
-    {
-        return Err("the glob admits a different physical scope or omits a reached owner".into());
-    }
-    Ok(filter)
 }
 
 fn facility_dependencies(
@@ -337,19 +299,6 @@ fn facility_dependencies(
         }
     }
     Ok(required)
-}
-
-fn matching(forge: &DataForge<'_>, filter: &Filter) -> BTreeSet<u32> {
-    forge
-        .records()
-        .filter_map(|record| {
-            record
-                .record_path()
-                .ok()
-                .filter(|path| filter.matches(path))
-                .map(|_| record.index())
-        })
-        .collect()
 }
 
 fn produce(archive: &Archive, input: &DataForgeEntry, filter: &Filter) -> TestResult<BuiltCatalog> {

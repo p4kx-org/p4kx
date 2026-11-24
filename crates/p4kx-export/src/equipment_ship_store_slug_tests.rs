@@ -11,6 +11,44 @@ use super::{CatalogLanguageSelection, CatalogQuerySession, StoreSlugs};
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 #[test]
+fn distinct_store_identities_resolve_to_one_physical_ship() -> TestResult {
+    const MAPPING: &str = r#"{"format":1,"ships":[
+        {"slug":"Active-Edition","rsiId":2,"storeName":"Active","className":"Active","guid":"00000000-0000-0000-0000-000000000001","retired":false},
+        {"slug":"Active","rsiId":1,"storeName":"Active","className":"Active","guid":"00000000-0000-0000-0000-000000000001","retired":false}
+    ]}"#;
+    let mapping = StoreSlugs::parse(MAPPING)?;
+    let (_dir, archive) = open()?;
+    let session =
+        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
+    let parsed = session.parsed(None)?;
+    parsed.with_store_mapping(&mapping, None, None, |scope| -> TestResult {
+        let [standard, edition] = scope.rows() else {
+            return Err("one physical Ship must retain both Store identity rows".into());
+        };
+        assert_eq!(
+            [
+                (standard.rsi_id(), standard.slug()),
+                (edition.rsi_id(), edition.slug())
+            ],
+            [(1, "Active"), (2, "Active-Edition")],
+            "the two Store identities retain their independent keys in slug order"
+        );
+        assert_eq!(
+            standard.ship_guid().map(|guid| guid.to_string()).as_deref(),
+            Some("00000000-0000-0000-0000-000000000001"),
+            "the source GUID of the physical fixture Ship resolves"
+        );
+        assert_eq!(
+            (edition.ship_guid(), edition.class_name()),
+            (standard.ship_guid(), Some("Active")),
+            "the reverse GUID and class join includes both Store identities"
+        );
+        Ok(())
+    })??;
+    Ok(())
+}
+
+#[test]
 fn retired_scope_keeps_missing_owners_and_checks_reappearing_guid_aliases() -> TestResult {
     const MAPPING: &str = r#"{"format":1,"ships":[
         {"slug":"Active","rsiId":1,"storeName":"Active","className":"Active","guid":"00000000-0000-0000-0000-000000000001","retired":false},

@@ -219,7 +219,15 @@ fn invalid_data_is_rejected() {
         mapped("x", 1, "A", AURORA, false),
         mapped("y", 2, "B", AURORA, false)
     ));
-    assert!(error_of(&same_guid).contains("maps a second slug"));
+    assert!(error_of(&same_guid).contains("disagrees with another slug's class or retirement"));
+    let mixed_retirement = data(&format!(
+        "{}, {}",
+        mapped("x", 1, "A", AURORA, false),
+        mapped("y", 2, "A", AURORA, true)
+    ));
+    assert!(
+        error_of(&mixed_retirement).contains("disagrees with another slug's class or retirement")
+    );
     let bad_guid = data(&mapped("x", 1, "A", "nope", false));
     assert!(error_of(&bad_guid).contains("slug x"));
     let half = data(

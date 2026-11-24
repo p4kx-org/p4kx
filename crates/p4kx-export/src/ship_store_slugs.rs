@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 use std::str::FromStr;
 
 use p4kx_extraction::Guid;
@@ -66,7 +66,7 @@ impl StoreSlugs {
     }
 
     /// Reads `text` as a data file and checks it: a known format, unique slugs and RSI ids, a
-    /// class name with every GUID, and a mapping behind every `retired` mark.
+    /// class name with every GUID, and consistent targets across aliases of a physical Ship.
     pub(crate) fn parse(text: &str) -> Result<Self, CatalogError> {
         let file: File = serde_json::from_str(text).map_err(|error| invalid(&error))?;
         if file.format != FORMAT {
@@ -75,7 +75,6 @@ impl StoreSlugs {
         let mut slugs = Vec::with_capacity(file.ships.len());
         let mut seen_slugs = HashSet::with_capacity(file.ships.len());
         let mut seen_ids = HashSet::with_capacity(file.ships.len());
-        let mut seen_guids = HashSet::new();
         for entry in file.ships {
             let name = entry.slug.as_str();
             if !seen_slugs.insert(entry.slug.clone()) {
@@ -91,11 +90,6 @@ impl StoreSlugs {
                 (Some(class_name), Some(guid)) => {
                     let guid = Guid::from_str(&guid)
                         .map_err(|error| invalid(&format_args!("slug {name}: {error}")))?;
-                    if !seen_guids.insert(guid) {
-                        return Err(invalid(&format_args!(
-                            "the GUID of slug {name} maps a second slug"
-                        )));
-                    }
                     Some(Mapped { class_name, guid })
                 }
                 (None, None) => None,
@@ -116,6 +110,7 @@ impl StoreSlugs {
                 retired: entry.retired,
             });
         }
+        validate_targets(&slugs)?;
         slugs.sort_by(|left, right| left.slug.cmp(&right.slug));
         Ok(Self { slugs })
     }
@@ -177,6 +172,26 @@ impl StoreSlugs {
         summary.exported = exported.len();
         Resolved { exported, summary }
     }
+}
+
+fn validate_targets(slugs: &[StoreShip]) -> Result<(), CatalogError> {
+    let mut targets = HashMap::new();
+    for slug in slugs {
+        let Some(mapped) = &slug.mapped else {
+            continue;
+        };
+        let target = (mapped.class_name.as_str(), slug.retired);
+        if targets
+            .insert(mapped.guid, target)
+            .is_some_and(|previous| previous != target)
+        {
+            return Err(invalid(&format_args!(
+                "slug {} disagrees with another slug's class or retirement for GUID {}",
+                slug.slug, mapped.guid
+            )));
+        }
+    }
+    Ok(())
 }
 
 fn entry<'s>(slug: &'s StoreShip, mapped: Option<&'s Mapped>) -> ShipStoreSlug<'s> {

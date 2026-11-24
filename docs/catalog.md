@@ -2920,6 +2920,12 @@ extracted data. Only identifiers are kept: no description, price or media.
 | `shipGuid` | The `guid` of the mapped entry of `ships`; `null` for a retired slug |
 | `retired` | `true` when the slug's ship no longer exists in the game data |
 
+Resolve a pledge by `rsiId` or `slug`, then join `(shipGuid, className)` to the same
+Build's `ships[]` sourced `(guid.value, className.value)`. For the reverse lookup,
+index the pair to a list of Store rows. Each row retains its own RSI identity even
+when multiple pledges resolve to the same Ship. `storeName` is display metadata.
+All mappings that share a GUID agree on the class and retirement state.
+
 The kind lists only slugs that map to a ship: the slugs of ships the game does not have (the
 store lists concept ships) are not exported. A slug is exported when its `shipGuid` and `className`
 resolve to a ship of the catalog, or when it is `retired`; a retired slug stays in the data file
@@ -2941,23 +2947,20 @@ The mapping is made by name, manufacturer and variant against the ships of the `
   suffixes of a display, test, event or reward variant (`_BISÃ¢â‚¬Â¦`, `_Display`, `_TEMPÃ¢â‚¬Â¦`, `_Unmanned`,
   `_AI_Super`, `_Tutorial`, `_Collector_Ã¢â‚¬Â¦`, `_Prison`, `_NoInterior`, `_HijackedÃ¢â‚¬Â¦`, `_Exec_Ã¢â‚¬Â¦` and the
   like) is taken; if more than one is left, the slug stays unmapped;
-- a store name that is a part of exactly one catalog name (`M50` for "Origin M50 Interceptor", `C2
-  Hercules`, `Mercury`, `Ares Ion`, `85X`, `C8R Pisces`) is accepted after review of each such slug,
-  and so is `F7C-M Super Hornet Heartseeker Mk I` for `ANVL_Hornet_F7CM_Heartseeker`, the only ship
-  of that name apart from the word "Super".
+- a store name that is part of exactly one catalog name can map after individual review.
+  A pledge confirmed to include the same primary Ship can share its mapping. For example,
+  `Carrack-Expedition` and `Carrack-Expedition-W-C8X` both resolve to the Carrack Expedition.
+  The mapping carries only the primary Ship identity. Use of the mapping establishes no
+  entitlement to a package's other contents.
 
-On `LIVE` 4.7 the 256 slugs of the store (227 flight-ready, 29 in concept) give 205 mapped slugs
-and 51 unmapped: the 29 concept ships, 5 whose name fits several equal ships (the four Constellation
-Mk IV variants and the Hammerhead, each present once as `_GS` and once without), and 17 flight-ready
-ones the Archive holds under another name or not at all (e.g. `Mustang Alpha Vindicator`, `Carrack
-w/C8X`, `600i Explorer`, `ATLS`).
-
-Seven of the unmapped slugs have a ship under the store name that the player-only rule excluded,
-because no rule classifies it and its `playability.value` is `null`. They include `GAMA_Railen`, `GAMA_Tyilui`,
-`GLSN_Basher`, `KRIG_S65_Stingray`, `RSI_Skylark`, `RSI_Constellation_Mk5_Centaurus` and
-`AEGS_Sabre_Raven_EX`. They can be mapped once their playability is settled. Before ADR-0167, 119 ships with
-`playability.value` of `player` have no slug; most are event, reward and display variants of a ship that
-has one.
+The LIVE `13220821` refresh uses the four Gold Standard Records for the current
+Constellation Mk IV pledges. Taurus and Phoenix also have older player Records.
+RSI's published Mk IV rework and the matching physical Gold Standard owners establish
+the curated selection. The S-65 Stingray pledge matches the standard laser loadout.
+Its other player Record uses ballistic weapons and shares the localization key.
+MOLE Carbon Edition and Talus Edition remain unmapped. The Archive has their
+named Paint Records and the base MOLE, and the reviewed RSI data leaves the
+physical pledge binding unverified.
 
 To refresh the file, a human fetches the public ship list of the store, reduces it to the
 identifiers above (`id`, name, pledge URL), and adds new slugs to `ship-store-slugs.json` with
