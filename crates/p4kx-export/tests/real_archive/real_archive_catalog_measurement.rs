@@ -5,9 +5,11 @@ use std::path::PathBuf;
 
 use p4kx_extraction::{Archive, ArchiveWatch};
 
+use crate::catalog_capture::CatalogCapture;
 use crate::real_archive_catalog_preflight;
 use crate::real_archive_catalog_size::replay::bindings::Receipt;
 
+use super::compare_rows::Projection;
 use super::{BoundMeasurement, TestResult};
 
 pub(crate) fn with_bound_measurement<T>(
@@ -52,4 +54,20 @@ fn with_measurement<T>(
     let result = verify(&archive, &measurement);
     measurement.watch.check()?;
     result
+}
+
+pub(super) fn normal_capture<'scope>() -> CatalogCapture<Projection<'scope>> {
+    let mut capture = CatalogCapture::default();
+    for path in [
+        "/schemaVersion",
+        "/source",
+        "/exportHealth/status",
+        "/exportHealth/read",
+        "/exportHealth/projection",
+        "/exportHealth/publicationMode",
+    ] {
+        capture.keep(path);
+    }
+    capture.project("/completeness", Projection::CompleteSelection);
+    capture
 }

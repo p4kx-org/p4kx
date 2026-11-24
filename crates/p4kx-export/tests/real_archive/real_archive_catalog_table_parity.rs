@@ -30,6 +30,9 @@ pub(crate) use measurement::{with_bound_measurement, with_bound_measurement_from
 #[path = "real_archive_catalog_selected_origins.rs"]
 mod selected_origins;
 
+#[path = "real_archive_catalog_selected_row.rs"]
+mod selected_row;
+
 use compare_rows::{ComparedRows, Projection};
 use selected_origins::SelectedOrigins;
 
@@ -92,7 +95,7 @@ fn installed_public_patch_matches_the_same_catalog_build() -> TestResult {
 impl BoundMeasurement {
     pub(crate) fn verify_row_array(&self, path: &str, expected: &[Value]) -> TestResult {
         self.watch.check()?;
-        let mut capture = normal_capture();
+        let mut capture = measurement::normal_capture();
         capture.project(
             path,
             Projection::Rows(ComparedRows::bare_array(path, expected)),
@@ -111,7 +114,7 @@ impl BoundMeasurement {
         origins: &Origins,
     ) -> TestResult<Counts<TABLES>> {
         self.watch.check()?;
-        let mut capture = normal_capture();
+        let mut capture = measurement::normal_capture();
         for (path, table) in paths.iter().zip(tables) {
             capture.keep(&format!("{path}/availability"));
             capture.project(
@@ -137,22 +140,6 @@ impl BoundMeasurement {
             physical_sources: origins.sources.len(),
         })
     }
-}
-
-fn normal_capture<'scope>() -> CatalogCapture<Projection<'scope>> {
-    let mut capture = CatalogCapture::default();
-    for path in [
-        "/schemaVersion",
-        "/source",
-        "/exportHealth/status",
-        "/exportHealth/read",
-        "/exportHealth/projection",
-        "/exportHealth/publicationMode",
-    ] {
-        capture.keep(path);
-    }
-    capture.project("/completeness", Projection::CompleteSelection);
-    capture
 }
 
 fn check_row_array_count(catalog: &Value, path: &str, expected: usize) -> TestResult {

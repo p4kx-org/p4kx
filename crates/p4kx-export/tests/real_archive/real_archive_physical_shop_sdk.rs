@@ -10,9 +10,13 @@ use p4kx_export::catalog_queries::shops::{
 };
 use p4kx_extraction::{Archive, PhysicalSourceKind, SourceInventory, SourceLocation, SourcedValue};
 
+use serde_json::Value;
+
 use super::equipment_input::with_archive;
 use super::report_scoped_rows;
-use crate::real_archive_catalog_table_parity::{Origins, TestResult, wire_row};
+use crate::real_archive_catalog_table_parity::{
+    Origins, TestResult, wire_row, with_bound_measurement_from_producer,
+};
 
 #[path = "real_archive_shop_original_nomination.rs"]
 mod original_nomination;
@@ -36,6 +40,35 @@ fn installed_physical_shop_located_cold_query() -> TestResult {
         let rows = [wire_row(shop)?];
         Origins::default().extend(&snapshot.source_inventory, &rows)?;
         report_scoped_rows("Physical Shop", "located-cold", &rows)
+    })
+}
+
+#[test]
+#[ignore = "same Build: compare an admitted physical Shop with a retained Normal Catalog"]
+fn installed_physical_shop_matches_retained_complete_catalog() -> TestResult {
+    let revision = env::var("P4KX_SHOP_CATALOG_PRODUCER_REVISION")
+        .map_err(|_| "configure the exact Shop Catalog producer revision")?;
+    with_bound_measurement_from_producer(&revision, |archive, measurement| {
+        let snapshot = read_registry_node(archive, coordinate(NODE)?)?;
+        let shop = snapshot
+            .row
+            .as_ref()
+            .ok_or("the nominated Shop was not admitted")?;
+        check_located(&snapshot, shop)?;
+        check_key_source(&snapshot, shop)?;
+        let key = shop
+            .registry
+            .key
+            .value()
+            .ok_or("expected the original Shop key")?;
+        let row = wire_row(shop)?;
+        let rows = std::slice::from_ref(&row);
+        let mut origins = Origins::default();
+        origins.extend(&snapshot.source_inventory, rows)?;
+        measurement.verify_selected_row("/shops", &row, &origins, |candidate| {
+            candidate.pointer("/key/value").and_then(Value::as_str) == Some(key.as_str())
+        })?;
+        report_scoped_rows("Physical Shop", "retained-parity", rows)
     })
 }
 
