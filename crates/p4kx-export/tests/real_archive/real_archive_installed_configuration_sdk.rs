@@ -114,9 +114,14 @@ fn selected_rows(
             .ok_or("the installed flight occurrence has no physical Loadout position")?;
         let owner = match row.attached_item() {
             Some(attachment) if !position.port_ordinals().is_empty() => {
-                attached |= row.original_port().is_some();
-                *attachment
-                    .target_record_index()
+                let target = attachment.target_record_index();
+                if !target.origin().source_set_complete() {
+                    return Err(
+                        "the original attached flight owner has incomplete source evidence".into(),
+                    );
+                }
+                attached = true;
+                *target
                     .value()
                     .ok_or("the original attached flight owner is absent")?
             }
@@ -138,7 +143,7 @@ fn selected_rows(
         rows.push(wire_row(row)?);
     }
     if !attached {
-        return Err("nominate a Ship with a flight configuration on a physical item port".into());
+        return Err("nominate a Ship with a source-backed flight attachment".into());
     }
     Ok(rows)
 }
