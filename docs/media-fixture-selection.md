@@ -209,6 +209,16 @@ on the retained LIVE 13165946 outputs agreed at all four UVs with foreground and
 The separate synthetic Gloss regression passed with a freshly generated package. These
 consumer-projection checks leave runtime shader activation and game appearance open.
 
+The Release add-on from PR #1117 head `405e97268` matched all 42 signed
+package files. Blender 5.3.0 (`02f0899d78e3`) imported the retained LIVE
+`13165946` subset in an isolated profile and reproduced the four original
+foreground UV comparisons. The maximum absolute Roughness difference
+was `0.001093` at tolerance `2/255`. The same exact add-on passed eight
+linear scalar controls with a fresh synthetic package from the current
+Rust producer. The game-side shader permutation and parameter binding
+require a separate runtime witness.
+[Release add-on](https://github.com/p4kx-org/p4kx/actions/runs/45315878218/artifacts/14884972989)
+
 ### Independently bound installed shader operations
 
 The installed LIVE and PTU token vocabularies were independently bound to each engine's
