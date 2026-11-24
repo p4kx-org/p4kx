@@ -14,7 +14,7 @@ use serde_json::{Value, json};
 
 use super::super::compare_rows::Projection;
 use super::super::digest_parity::{capture_inventory, fingerprint};
-use super::super::{BoundMeasurement, Counts, TestResult, collect_references};
+use super::super::{BoundMeasurement, Counts, TestResult, collect_references, wire_row};
 use super::digest_runs::{DigestRuns, Fingerprint};
 use super::wire::{EncounterRow, OrderedRows};
 use super::{StreamedComponentDigests, spill};
@@ -65,17 +65,12 @@ impl<'directory> StreamedMissionDigests<'directory> {
             retain(
                 properties,
                 EncounterRow::MissionProperties,
-                serde_json::to_value(row)?,
+                row,
                 &mut references,
             )?;
         }
         for row in &snapshot.flows {
-            retain(
-                flows,
-                EncounterRow::MissionFlows,
-                serde_json::to_value(row)?,
-                &mut references,
-            )?;
+            retain(flows, EncounterRow::MissionFlows, row, &mut references)?;
         }
         let arenas = match &snapshot.source.owner {
             MissionFlowOwnerRef::ContractTemplate(_) => templates,
@@ -83,14 +78,15 @@ impl<'directory> StreamedMissionDigests<'directory> {
             _ => return Err("the mission arena has an unsupported physical owner family".into()),
         };
         let owner = snapshot.source.owner.physical();
-        let source = serde_json::to_value(&snapshot.source.arena)?;
-        let row = json!({
-            "inputRef": owner.input_ref(),
-            "recordIndex": {"state": "present", "value": owner.record_index()},
-            "guid": {"state": "present", "value": owner.record_guid()},
-            "source": source,
-        });
-        retain(arenas, EncounterRow::MissionArena, row, &mut references)?;
+        let row = ArenaRow {
+            header: json!({
+                "inputRef": owner.input_ref(),
+                "recordIndex": {"state": "present", "value": owner.record_index()},
+                "guid": {"state": "present", "value": owner.record_guid()},
+            }),
+            source: &snapshot.source.arena,
+        };
+        retain(arenas, EncounterRow::MissionArena, &row, &mut references)?;
         capture_inventory(
             &snapshot.source_inventory,
             references,
@@ -100,13 +96,20 @@ impl<'directory> StreamedMissionDigests<'directory> {
     }
 }
 
+#[derive(Serialize)]
+struct ArenaRow<'source, Source> {
+    #[serde(flatten)]
+    header: Value,
+    source: &'source Source,
+}
+
 fn retain(
     ordered: &mut OrderedRows,
     shape: EncounterRow,
-    row: Value,
+    row: &impl Serialize,
     references: &mut HashSet<String>,
 ) -> TestResult {
-    let (key, wire) = shape.project(row)?;
+    let (key, wire) = shape.project(wire_row(row)?)?;
     let mut needed = HashSet::new();
     collect_references(&wire, &mut needed);
     for reference in needed {

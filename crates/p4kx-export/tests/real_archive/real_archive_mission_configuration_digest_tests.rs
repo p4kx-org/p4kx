@@ -1,11 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::HashSet;
+
+use serde::Serialize;
 use serde_json::{Value, json};
 
 use super::{
-    EncounterRow, HEALTH, MissionDisposition, MissionDispositionRows, OrderedRows, Projection,
-    TestResult, fingerprint, verify_health,
+    ArenaRow, EncounterRow, HEALTH, MissionDisposition, MissionDispositionRows, OrderedRows,
+    Projection, TestResult, fingerprint, retain, verify_health,
 };
 
 #[test]
@@ -40,6 +43,43 @@ fn mission_arena_digest_separates_alias_order_and_wire_changes() -> TestResult {
     assert!(
         changed.to_string().contains("wire digests differ"),
         "a source change preserves the owner identity"
+    );
+    Ok(())
+}
+
+#[test]
+fn mission_arena_digest_preserves_binary32_wire_projection() -> TestResult {
+    use crate::catalog_capture::CatalogCapture;
+
+    #[derive(Serialize)]
+    struct Source {
+        finite: f32,
+    }
+    let header = json!({
+        "inputRef": "physical-input",
+        "recordIndex": {"state": "present", "value": 11},
+        "guid": {"state": "present", "value": "fixture-guid"},
+    });
+    let row = ArenaRow {
+        header,
+        source: &Source { finite: 0.1 },
+    };
+    let producer = format!(r#"{{"rows":[{}]}}"#, serde_json::to_string(&row)?);
+    let mut ordered = OrderedRows::with_encounter(EncounterRow::MissionArena);
+    retain(
+        &mut ordered,
+        EncounterRow::MissionArena,
+        &row,
+        &mut HashSet::new(),
+    )?;
+    let mut capture = CatalogCapture::default();
+    capture.project("/rows", Projection::StreamRows(ordered.finish()));
+    capture.read(producer.as_bytes())?;
+    let widened_row = serde_json::to_value(&row)?;
+    let widened = serde_json::to_vec(&json!({"rows": [widened_row]}))?;
+    assert!(
+        capture.read(widened.as_slice()).is_err(),
+        "widening an original Single changes its serialized finite projection"
     );
     Ok(())
 }
