@@ -1029,10 +1029,11 @@ IVO material ID and index-count words in the selected geometry Entry. The rebuil
 `first_index` and fields with unproved inputs use the unknown marker. Provenance
 counts toward the response budget, and the cursor resumes after the last returned mesh.
 
-For `list_model_items` with `section: "chunks"`, each numeric `type_id` uses the
-returned row position. Its source range identifies the original table word in the
-Archive Entry that supplies the chunk, including geometry companions. A row with
-an unbound file uses the unknown marker.
+For `list_model_items` with `section: "chunks"`, field origins for `type_id`,
+`type` and `index` use the returned row position. The original type word and container
+signature identify the name or null. The original row count and table offset identify
+the per-file ordinal. These facts come from the Archive Entry that supplies the chunk,
+including geometry companions. A row with an unbound file uses the unknown marker.
 
 For `list_model_items` with `section: "animations"`, each row has source and encryption
 markers for its values. CAF names use the selected directory path. DBA names use the original

@@ -70,6 +70,7 @@ pub use archive_animation_path::{
     NamedCafSelector, animation_bank_path_crc32, archive_animation_path,
 };
 pub use archive_layout_origins::{ArchiveLayoutOriginError, ArchiveLayoutOrigins};
+pub(crate) use chunk_table_evidence::ChunkHeaderField;
 pub use chunk_table_evidence::{ChunkEvidenceError, ChunkTableEvidence, ChunkTableRows};
 pub use default_material_receipt::{
     DefaultMaterialContainer, DefaultMaterialReceipt, DefaultMaterialSource, DefaultMaterialState,

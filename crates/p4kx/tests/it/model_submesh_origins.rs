@@ -17,12 +17,14 @@ const LOD_MODEL: &str = "Data/Objects/Test/cube_lod1.cgf";
 const LOD: &str = "Data/Objects/Test/cube_lod1.cgfm";
 const TABLE_START_WORD: Range<usize> = 12..16;
 const TABLE_ROW_BYTES: usize = 16;
+const UNKNOWN_TYPE: u32 = 0x00C0_FFEE;
 
 #[test]
 fn model_info_binds_original_submesh_words_to_their_actual_levels() -> TestResult {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("Data.p4k");
-    let model = TestModel::cube().with_lod(TestModel::cube());
+    let later = TestModel::cube().with_geometry_chunk(UNKNOWN_TYPE, [7; 12]);
+    let model = TestModel::cube().with_lod(later);
     let base = model.cgfm();
     let lod = model.lod_cgfm(1).ok_or("LOD geometry")?;
     ArchiveBuilder::new()
@@ -35,6 +37,16 @@ fn model_info_binds_original_submesh_words_to_their_actual_levels() -> TestResul
         .entry(TestEntry::zstd(LOD, lod.clone()).encrypted())
         .write_to(&path)?;
     let info = listing(&path, Some(MODEL))?;
+    let unknown = info["chunks"]
+        .as_array()
+        .and_then(|chunks| chunks.iter().find(|chunk| chunk["type_id"] == UNKNOWN_TYPE))
+        .ok_or("the original unknown chunk")?;
+    assert_eq!(unknown["file"], "lod1-geometry", "encrypted companion");
+    assert_eq!(
+        unknown["type"],
+        Value::Null,
+        "unrecognized original type ID"
+    );
     let levels = [
         ("geometry", BASE, &base, false),
         ("lod1-geometry", LOD, &lod, true),
@@ -88,7 +100,9 @@ fn model_info_reports_unknown_origin_for_loose_submesh_fields() -> TestResult {
     for name in ["material_id", "index_count", "first_index"] {
         assert_unknown(&info, &format!("{submesh}/{name}"))?;
     }
-    assert_unknown(&info, "/chunks/0/type_id")?;
+    for name in ["type_id", "type", "index"] {
+        assert_unknown(&info, &format!("/chunks/0/{name}"))?;
+    }
     assert_eq!(
         info.get("provenance"),
         Some(&json!({"sources": [], "uses": []}))
@@ -145,19 +159,76 @@ fn assert_chunk_words(
             .try_into()?,
     ))?;
     let chunks = info["chunks"].as_array().ok_or("model chunks")?;
-    let mut found = false;
+    let mut file_rows = 0;
     for (ordinal, chunk) in chunks.iter().enumerate() {
         if chunk["file"] != role {
             continue;
         }
         let index = usize::try_from(chunk["index"].as_u64().ok_or("chunk index")?)?;
+        assert_eq!(index, file_rows, "physical ordinal within {role}");
         let start = table_start + index * TABLE_ROW_BYTES;
         let path = format!("/chunks/{ordinal}");
         let range = assert_word(info, &path, ("type_id", "typeId", width), geometry)?;
         assert_eq!(range, start..start + width, "original table row for {path}");
-        found = true;
+        assert_derived_chunk_words(info, &path, geometry.encrypted)?;
+        file_rows += 1;
     }
-    assert!(found, "{role} chunk words are tested");
+    assert!(file_rows > 0, "{role} chunk words are tested");
+    Ok(())
+}
+
+fn assert_derived_chunk_words(info: &Value, parent: &str, encrypted: bool) -> TestResult {
+    let numeric = field_origin(info, &format!("{parent}/type_id"))?;
+    let id = numeric
+        .pointer("/sourceUsesRefs/0")
+        .ok_or("the original numeric kind reference")?;
+    let kind = origin_row(info, "/provenance/uses", id)?;
+    let owner = kind.get("source").ok_or("numeric kind physical owner")?;
+    let signature = [("signature", ["0", "4"])];
+    let addressing = [("rowCount", ["8", "12"]), ("tableOffset", ["12", "16"])];
+    for (field, words, contains_kind) in [
+        ("type", signature.as_slice(), true),
+        ("index", addressing.as_slice(), false),
+    ] {
+        let path = format!("{parent}/{field}");
+        let origin = field_origin(info, &path)?;
+        assert_eq!(
+            origin["containsEncryptedSource"], encrypted,
+            "{path} marker"
+        );
+        assert_eq!(origin["sourceSetComplete"], true, "{path} source set");
+        let ids = origin["sourceUsesRefs"]
+            .as_array()
+            .ok_or("chunk origin uses")?;
+        assert_eq!(
+            ids.len(),
+            words.len() + usize::from(contains_kind),
+            "{path} uses"
+        );
+        assert_eq!(
+            ids.contains(id),
+            contains_kind,
+            "{path} uses the numeric kind"
+        );
+        let sites = ids
+            .iter()
+            .map(|id| origin_row(info, "/provenance/uses", id))
+            .collect::<Result<Vec<_>, _>>()?;
+        for (field, bytes) in words {
+            let range = json!(bytes);
+            assert!(
+                sites.iter().any(|site| {
+                    site.get("source") == Some(owner)
+                        && site.get("role").and_then(Value::as_str) == Some("payload")
+                        && site.pointer("/location/namespace").and_then(Value::as_str)
+                            == Some("cryEngineChunkHeader")
+                        && site.pointer("/location/field").and_then(Value::as_str) == Some(*field)
+                        && site.pointer("/location/indices") == Some(&range)
+                }),
+                "{path} has the exact {field} range in its owning file"
+            );
+        }
+    }
     Ok(())
 }
 

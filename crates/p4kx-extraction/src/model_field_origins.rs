@@ -5,9 +5,8 @@ use std::io;
 
 use serde::Serialize;
 
-use super::submesh_origins;
-use crate::model_geometry_scope::ModelGeometryScope;
-use crate::{FieldOrigins, FieldPath, ModelSource, SourceInventory, SourceUseRole, SourceUses};
+use super::{chunk_origins, submesh_origins};
+use crate::{FieldOrigins, FieldPath, ModelSource, SourceInventory, SourceUses};
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -37,40 +36,11 @@ impl ModelFieldOrigins {
         }
         for index in 0..model.chunks.len() {
             let path = FieldPath::parse(&format!("/chunks/{index}")).map_err(io::Error::other)?;
-            write_chunk_type_origin(source, index, &path, &uses, &mut fields)?;
+            chunk_origins::write_chunk_origins(source, index, &path, &uses, &mut fields)?;
         }
         Ok(Self {
             field_origins: fields,
             provenance: uses.freeze().map_err(io::Error::other)?,
         })
     }
-}
-
-/// Writes the origin of the numeric type ID for a chunk at its model-wide ordinal.
-///
-/// # Errors
-/// Returns an invalid chunk position or source evidence error.
-pub fn write_chunk_type_origin(
-    source: &ModelSource,
-    index: usize,
-    chunk_path: &FieldPath,
-    uses: &SourceUses,
-    fields: &mut FieldOrigins,
-) -> io::Result<()> {
-    let chunk = source
-        .model()
-        .chunks
-        .get(index)
-        .ok_or_else(|| io::Error::other("the selected model chunk is unavailable"))?;
-    let origin = if let Some(range) = chunk.type_id_range()
-        && let Some(scope) = ModelGeometryScope::capture(uses, source, chunk.file)?
-    {
-        let payload = scope.word(range, "typeId", SourceUseRole::Payload)?;
-        uses.origin(std::slice::from_ref(&payload), scope.complete)
-    } else {
-        uses.origin(&[], false)
-    };
-    let mut path = chunk_path.clone();
-    path.push_field("type_id").map_err(io::Error::other)?;
-    fields.insert(path, origin).map_err(io::Error::other)
 }

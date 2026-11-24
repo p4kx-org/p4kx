@@ -12,10 +12,9 @@ use crate::{
     SourceUse, SourceUseRole, SourceUses,
 };
 
-const SIGNATURE: Range<u64> = 0..4;
-const VERSION: Range<u64> = 4..8;
-const COUNT: Range<u64> = 8..12;
-const TABLE_OFFSET: Range<u64> = 12..16;
+#[path = "chunk_header_evidence.rs"]
+mod header;
+pub(crate) use header::ChunkHeaderField;
 
 /// Failure to represent a selected chunk table field.
 #[derive(Debug, Error)]
@@ -107,9 +106,9 @@ impl<'source> ChunkTableEvidence<'source> {
     /// # Errors
     /// Returns a source observation error.
     pub fn rows(&self) -> Result<ChunkTableRows<'_, '_>, ChunkEvidenceError> {
-        let signature = self.header("signature", SIGNATURE)?;
-        let table_offset = self.header("tableOffset", TABLE_OFFSET)?;
-        let count = self.header("rowCount", COUNT)?;
+        let signature = self.header(ChunkHeaderField::Signature)?;
+        let table_offset = self.header(ChunkHeaderField::TableOffset)?;
+        let count = self.header(ChunkHeaderField::RowCount)?;
         let index = self.origin(&[table_offset.clone(), count.clone()]);
         let layout = self.one(&signature);
         Ok(ChunkTableRows {
@@ -127,7 +126,7 @@ impl<'source> ChunkTableEvidence<'source> {
     /// # Errors
     /// Returns a source observation error.
     pub fn container(&self) -> Result<FieldOrigin, ChunkEvidenceError> {
-        Ok(self.one(&self.header("signature", SIGNATURE)?))
+        Ok(self.one(&self.header(ChunkHeaderField::Signature)?))
     }
 
     /// Returns the origin of the declared container version.
@@ -135,7 +134,7 @@ impl<'source> ChunkTableEvidence<'source> {
     /// # Errors
     /// Returns a source observation error.
     pub fn version(&self) -> Result<FieldOrigin, ChunkEvidenceError> {
-        Ok(self.one(&self.header("version", VERSION)?))
+        Ok(self.one(&self.header(ChunkHeaderField::Version)?))
     }
 
     /// Returns the original selectors used to locate a prepared chunk payload.
@@ -150,14 +149,7 @@ impl<'source> ChunkTableEvidence<'source> {
         let file = self.source.file();
         let columns = self.columns(index)?;
         let role = SourceUseRole::Selector;
-        let header = |name, range: Range<u64>| {
-            self.site(
-                "cryEngineChunkHeader",
-                name,
-                vec![range.start, range.end],
-                role,
-            )
-        };
+        let header = |field: ChunkHeaderField| field.observe(&self.scope, role);
         let word = |name, range: Range<u64>| {
             self.site(
                 "cryEngineChunkTable",
@@ -167,11 +159,11 @@ impl<'source> ChunkTableEvidence<'source> {
             )
         };
         let mut uses = vec![
-            header("signature", SIGNATURE)?,
-            header("rowCount", COUNT)?,
+            header(ChunkHeaderField::Signature)?,
+            header(ChunkHeaderField::RowCount)?,
             word("offset", columns.offset)?,
         ];
-        let table = header("tableOffset", TABLE_OFFSET)?;
+        let table = header(ChunkHeaderField::TableOffset)?;
         if let Some(range) = columns.size {
             uses.push(table);
             uses.push(word("size", range)?);
@@ -184,13 +176,8 @@ impl<'source> ChunkTableEvidence<'source> {
         Ok(uses)
     }
 
-    fn header(&self, name: &str, range: Range<u64>) -> Result<SourceUse, ChunkEvidenceError> {
-        self.site(
-            "cryEngineChunkHeader",
-            name,
-            vec![range.start, range.end],
-            SourceUseRole::Payload,
-        )
+    fn header(&self, field: ChunkHeaderField) -> Result<SourceUse, ChunkEvidenceError> {
+        Ok(field.observe(&self.scope, SourceUseRole::Payload)?)
     }
 
     fn column(

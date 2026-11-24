@@ -31,7 +31,7 @@ fn field_origins(
     let mut path = FieldPath::parse("/structuredContent/items")?;
     for (local, index) in selected.enumerate() {
         path.push_index(local)?;
-        model_info::write_chunk_type_origin(request.source, index, &path, &uses, &mut fields)
+        model_info::write_chunk_origins(request.source, index, &path, &uses, &mut fields)
             .map_err(EvidenceError::Chunk)?;
         path.pop();
     }

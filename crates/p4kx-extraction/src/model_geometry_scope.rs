@@ -6,6 +6,7 @@ use std::ops::Range;
 
 use p4kx_model::ModelFile;
 
+use crate::source_provenance::ChunkHeaderField;
 use crate::{
     InputScope, ModelArchiveSource, ModelSource, SourceInput, SourceLocation, SourceScope,
     SourceUse, SourceUseRole, SourceUses,
@@ -36,6 +37,12 @@ impl ModelGeometryScope {
                 .map_err(io::Error::other)?,
             complete: entry.ancestors().all(|ancestor| ancestor.is_some()),
         }))
+    }
+
+    pub(crate) fn chunk_header(&self, field: ChunkHeaderField) -> io::Result<SourceUse> {
+        field
+            .observe(&self.scope, SourceUseRole::Payload)
+            .map_err(io::Error::other)
     }
 
     pub(crate) fn word(

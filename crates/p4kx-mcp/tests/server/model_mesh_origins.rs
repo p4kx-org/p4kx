@@ -4,7 +4,7 @@
 use p4kx_testkit::{TestEntry, TestModel, TestSubmesh};
 use serde_json::{Value, json};
 
-use crate::model_item_origin_checks::{assert_all_addresses, field, marker, uses};
+use crate::model_item_origin_checks::{assert_all_addresses, assert_site, field, marker, uses};
 use crate::support::{Install, TestResult};
 
 const MODEL: &str = "Data/cube.cgf";
@@ -12,6 +12,7 @@ const BASE: &str = "Data/cube.cgfm";
 const LOD_MODEL: &str = "Data/cube_lod1.cgf";
 const LOD: &str = "Data/cube_lod1.cgfm";
 const RESPONSE_LIMIT: usize = 256 * 1024;
+const UNKNOWN_TYPE: u32 = 0x00C0_FFEE;
 
 #[test]
 fn mesh_page_origins_follow_the_original_lod_with_page_local_addresses() -> TestResult {
@@ -59,12 +60,13 @@ fn mesh_page_origins_follow_the_original_lod_with_page_local_addresses() -> Test
 }
 
 #[test]
-fn chunk_type_id_origins_use_page_local_pointers_and_the_actual_file() -> TestResult {
-    let install = installation(&TestModel::cube(), 2)?;
+fn chunk_identity_origins_use_page_local_pointers_and_the_actual_file() -> TestResult {
+    let cube = TestModel::cube().with_geometry_chunk(UNKNOWN_TYPE, [7; 12]);
+    let install = installation(&cube, 2)?;
     let mut server = install.serve(&["--archive", "LIVE"])?;
     let mut args = json!({"path": MODEL, "section": "chunks", "limit": 1});
     let mut seen = 0;
-    let mut saw_encrypted = false;
+    let mut saw_encrypted_unknown = false;
     loop {
         let response = server.call("list_model_items", &args)?;
         let reply = &response["structuredContent"];
@@ -82,9 +84,13 @@ fn chunk_type_id_origins_use_page_local_pointers_and_the_actual_file() -> TestRe
         let pointer = "items/0/type_id";
         marker(field(reply, pointer)?, encrypted);
         assert_geometry_entry(reply, pointer, "typeId", entry)?;
+        assert_chunk_header_origins(reply, encrypted)?;
         assert_all_addresses(&response)?;
         seen += 1;
-        saw_encrypted |= encrypted;
+        if row["type_id"] == UNKNOWN_TYPE {
+            assert_eq!(row["type"], Value::Null, "unknown type has no name");
+            saw_encrypted_unknown |= encrypted;
+        }
         if let Some(cursor) = reply.get("next_cursor") {
             args["cursor"] = cursor.clone();
         } else {
@@ -92,7 +98,39 @@ fn chunk_type_id_origins_use_page_local_pointers_and_the_actual_file() -> TestRe
             break;
         }
     }
-    assert!(saw_encrypted, "later pages include the encrypted companion");
+    assert!(
+        saw_encrypted_unknown,
+        "later pages include an encrypted unknown type"
+    );
+    Ok(())
+}
+
+fn assert_chunk_header_origins(reply: &Value, encrypted: bool) -> TestResult {
+    let type_id = "items/0/type_id";
+    let kind = "items/0/type";
+    let index = "items/0/index";
+    let numeric = uses(reply, type_id)?;
+    let [word] = numeric.as_slice() else {
+        return Err("one original type word".into());
+    };
+    for path in [kind, index] {
+        marker(field(reply, path)?, encrypted);
+        let actual = uses(reply, path)?;
+        assert_eq!(actual.len(), 2, "{path} has two original contributors");
+        assert!(
+            actual.iter().all(|site| site["source"] == word["source"]),
+            "{path} contributors use the same physical file"
+        );
+        assert_eq!(
+            actual.contains(word),
+            path == kind,
+            "{path} kind contributor"
+        );
+    }
+    let header = "cryEngineChunkHeader";
+    assert_site(reply, kind, header, "signature", &["0", "4"])?;
+    assert_site(reply, index, header, "rowCount", &["8", "12"])?;
+    assert_site(reply, index, header, "tableOffset", &["12", "16"])?;
     Ok(())
 }
 
