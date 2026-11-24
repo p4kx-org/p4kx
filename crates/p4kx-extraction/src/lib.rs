@@ -98,7 +98,6 @@ mod model_info_animations;
 mod model_info_materials;
 mod model_observed;
 mod model_source;
-mod model_source_glb;
 mod model_textures;
 mod observed_file_origin;
 mod observed_verification;
@@ -262,6 +261,7 @@ pub use model_info_animations::{AnimationInfo, UnreadInfo};
 pub use model_info_materials::{
     DefaultMaterialInfo, LibraryInfo, MaterialInfo, MaterialPageOrigins, model_material_selector,
 };
+pub use model_source::GlbGeometryPublication;
 pub use model_source::{ArchiveDefaultMaterial, ArchiveDefaultMaterialState, ModelSource};
 pub use model_textures::{ArchiveTextures, MAX_MODEL_TEXTURE_PIXELS};
 pub use observed_file_origin::{ObservedFileOrigin, ObservedFileRead, read_observed_file};

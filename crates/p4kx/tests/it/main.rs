@@ -129,6 +129,7 @@ mod media_texture;
 mod model;
 mod model_animation;
 mod model_animation_sources;
+mod model_glb_origins;
 mod model_crch;
 mod model_lods;
 mod model_material_origins;

@@ -269,6 +269,16 @@ counts. Suppressing one range of a drawn piece affects the PNG.
 Unobserved inputs keep the contributor set incomplete. A known encrypted
 input still gives the artifact a positive marker.
 
+## Standalone model GLB
+
+`p4kx model glb` publishes a digest-bound sibling `<file>.p4kx-origin.jsonl`.
+The `glbJsonField` pointers at `/accessors/N/count` identify emitted primitive index
+accessor counts. When the writer has the original IVO submesh, the receipt binds
+the count to its exact four-byte word in the selected geometry Entry. Loose models
+and unbound submesh layouts receive an explicitly incomplete origin. The opaque
+artifact row includes the observed geometry contributions and remains incomplete
+while other layout, material, texture and animation inputs are unresolved.
+
 ## CHF GLB
 
 `p4kx chf glb` writes a sibling `<output>.p4kx-origin.jsonl` companion. Its

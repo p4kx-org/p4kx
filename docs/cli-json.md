@@ -2970,6 +2970,9 @@ model's files, a `--lod` the model lacks, a name `--anim` finds no animation for
 `--anim-from` Entry that does not exist or is no `.caf` or `.dba` exits with code 2, an animation
 file that is corrupt or not supported, an `--anim-from` one included, with 3.
 
+The `originReceipt` field names the digest-bound sibling origin companion. Both
+output modes publish the companion. See [standalone model GLB origins](source-origin.md#standalone-model-glb).
+
 ## `p4kx extract … --json`
 
 ```json

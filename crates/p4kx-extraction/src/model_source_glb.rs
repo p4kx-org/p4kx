@@ -13,6 +13,11 @@ use crate::path_index::PathIndex;
 use crate::texture_parts::is_same_file;
 use crate::{AnimationSet, CancelToken, ConversionError};
 
+#[path = "model_source_glb_receipt.rs"]
+mod receipt;
+
+pub use receipt::GlbGeometryPublication;
+
 impl ModelSource {
     /// Writes the model as a GLB file to `out`, replacing it; the file is written under a
     /// temporary name first.
@@ -114,11 +119,7 @@ impl ModelSource {
         cancel: &CancelToken,
         progress: &dyn Fn(u64, u64),
     ) -> Result<GlbSummary, ConversionError> {
-        if is_same_file(out, self.inputs().iter().chain(&animations.inputs).cloned()) {
-            return Err(ConversionError::OutputIsInput {
-                path: out.to_path_buf(),
-            });
-        }
+        self.refuse_glb_input(out, animations)?;
         if cancel.is_cancelled() {
             return Err(ConversionError::Cancelled);
         }
@@ -135,14 +136,31 @@ impl ModelSource {
                 fallback,
                 &mut observed,
             );
-            written.map_err(|error| match error {
-                GltfError::Write(source) if is_cancelled(&source) => ConversionError::Cancelled,
-                GltfError::Write(source) => write_error(out, source),
-                source => ConversionError::Glb {
-                    file: self.name().to_owned(),
-                    source,
-                },
-            })
+            written.map_err(|error| self.glb_write_error(out, error))
         })
+    }
+
+    pub(super) fn refuse_glb_input(
+        &self,
+        out: &Path,
+        animations: &AnimationSet,
+    ) -> Result<(), ConversionError> {
+        if is_same_file(out, self.inputs().iter().chain(&animations.inputs).cloned()) {
+            return Err(ConversionError::OutputIsInput {
+                path: out.to_path_buf(),
+            });
+        }
+        Ok(())
+    }
+
+    pub(super) fn glb_write_error(&self, out: &Path, error: GltfError) -> ConversionError {
+        match error {
+            GltfError::Write(source) if is_cancelled(&source) => ConversionError::Cancelled,
+            GltfError::Write(source) => write_error(out, source),
+            source => ConversionError::Glb {
+                file: self.name().to_owned(),
+                source,
+            },
+        }
     }
 }

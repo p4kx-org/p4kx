@@ -26,6 +26,10 @@ use crate::texture_grey::TextureVerdicts;
 
 #[path = "model_source_archive.rs"]
 mod archive_read;
+#[path = "model_source_glb.rs"]
+mod glb;
+
+pub use glb::GlbGeometryPublication;
 
 /// A model read from a chunk file Entry of an Archive or from a file on disk, with the
 /// companions next to it.
