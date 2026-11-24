@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::{
-    LoadoutFailurePath, VehicleAttributeEvidence, VehiclePortSelection, VehicleXmlSite,
+    LoadoutDocumentKind, LoadoutError, LoadoutFailurePath, LoadoutFileError,
+    VehicleAttributeEvidence, VehicleImplementation, VehiclePortSelection, VehicleXmlSite,
 };
 use p4kx_extraction::{
     Archive, SharedFieldOrigin, SourceUseRole, SourceUses, SourceValue, SourcedValue,
@@ -117,7 +118,7 @@ impl Capture<'_> {
     pub(crate) fn paint_vehicle_survey(
         &self,
         record_index: u32,
-        vehicle: &p4kx_assembly::VehicleImplementation,
+        vehicle: &VehicleImplementation,
         archive: &Archive,
     ) -> Result<p4kx_extraction::FieldOrigin, CatalogError> {
         let state = self.lock()?;
@@ -127,7 +128,9 @@ impl Capture<'_> {
             call: state.port_vehicles.call(record_index),
         };
         let mut proof = Contributions::default();
-        files.select_files(Some(archive), &mut proof)?;
+        let directory_complete = files.select_files(Some(archive), &mut proof)?;
+        let explicit_patch_absent =
+            files.verified_explicit_patch_absence(vehicle, directory_complete);
         files.paint_contents(&mut proof)?;
         for selection in vehicle.item_ports_with_selection() {
             let port = selection.port();
@@ -146,7 +149,9 @@ impl Capture<'_> {
                 proof.incomplete();
                 continue;
             };
-            if !selection.is_complete() {
+            if !(selection.is_complete()
+                || explicit_patch_absent && selection.missing_explicit_patch_is_only_gap())
+            {
                 proof.incomplete();
             }
             for site in selection.selectors().chain(item_type.selection_sites()) {
@@ -192,11 +197,34 @@ impl VehicleFiles<'_> {
         Ok(())
     }
 
+    fn verified_explicit_patch_absence(
+        &self,
+        vehicle: &VehicleImplementation,
+        directory_complete: bool,
+    ) -> bool {
+        let Some(call) = self.call.filter(|_| directory_complete) else {
+            return false;
+        };
+        let [LoadoutError::MissingVehicleImplementation { path }] = vehicle.issues() else {
+            return false;
+        };
+        let [attempt] = path.attempts() else {
+            return false;
+        };
+        attempt.kind() == LoadoutDocumentKind::VehiclePatch
+            && attempt.source().is_missing_archive()
+            && matches!(attempt.read_outcome(), Err(LoadoutFileError::NotFound))
+            && call
+                .files
+                .iter()
+                .any(|file| file.matches(attempt, &call.caller))
+    }
+
     fn select_files(
         &self,
         archive: Option<&Archive>,
         proof: &mut Contributions,
-    ) -> Result<(), CatalogError> {
+    ) -> Result<bool, CatalogError> {
         if self.call.is_some_and(|call| !call.modification_observed) {
             proof.incomplete();
         }
@@ -207,10 +235,10 @@ impl VehicleFiles<'_> {
         &self,
         archive: Option<&Archive>,
         proof: &mut Contributions,
-    ) -> Result<(), CatalogError> {
+    ) -> Result<bool, CatalogError> {
         let (Some(entries), Some(call), Some(archive)) = (&self.entries, self.call, archive) else {
             proof.incomplete();
-            return Ok(());
+            return Ok(false);
         };
         entries.check_archive(archive.input_origin())?;
         proof.add(call.caller.selection()?);
@@ -226,7 +254,7 @@ impl VehicleFiles<'_> {
         for file in &call.files {
             proof.add(file.attempt(entries, directory.as_ref(), directory_complete)?);
         }
-        Ok(())
+        Ok(directory_complete)
     }
 
     fn retain(

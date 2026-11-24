@@ -72,6 +72,17 @@ impl<'vehicle> VehiclePortSelection<'vehicle> {
         self.documents.as_ref().is_some_and(Prefix::is_complete)
             && self.parts.as_ref().is_some_and(Prefix::is_complete)
     }
+
+    /// Reports whether an explicitly missing patch is the only gap in the original XML selection.
+    /// The caller must separately prove the exact patch absence from its original file lookup.
+    #[must_use]
+    pub fn missing_explicit_patch_is_only_gap(&self) -> bool {
+        self.documents.as_ref().is_some_and(|documents| {
+            documents
+                .evidence
+                .prefix_has_only_missing_explicit_patch(documents.end)
+        }) && self.parts.as_ref().is_some_and(Prefix::is_complete)
+    }
 }
 
 impl VehicleImplementation {

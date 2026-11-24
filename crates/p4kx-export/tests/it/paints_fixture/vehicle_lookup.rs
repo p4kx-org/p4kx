@@ -55,3 +55,69 @@ pub(crate) fn write_vehicle_lookup_archive(
     std::fs::write(&path, bytes)?;
     Ok(path)
 }
+
+pub(crate) const EXPLICIT_PATCH_VEHICLE_XML: &str = r#"<Vehicle>
+  <Parts>
+    <Part name="paint" class="ItemPort">
+      <ItemPort requiredTags="DirectAlpha"><Types><Type type="Paints"/></Types></ItemPort>
+    </Part>
+  </Parts>
+  <Modifications>
+    <Modification name="ExampleModification" patchFile="Modifications/explicit.xml"/>
+  </Modifications>
+</Vehicle>"#;
+pub(crate) const EXPLICIT_PATCH_ARCHIVE_PATH: &str =
+    "Data\\Scripts\\Entities\\Vehicles\\Implementations\\Xml\\Modifications\\explicit.xml";
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ExplicitPatchInput {
+    Missing,
+    Malformed,
+    Encrypted,
+    Recovered,
+}
+
+pub(crate) fn write_explicit_patch_archive(
+    directory: &Path,
+    input: ExplicitPatchInput,
+) -> Result<PathBuf, Box<dyn Error>> {
+    let forge = builder()
+        .record(paint(PAINT_ALPHA_RED, "FixturePaint", "DirectAlpha", ""))
+        .record(ship(
+            SHIP_MISSING,
+            "ACAS_Missing",
+            "scripts/entities/vehicles/implementations/xml/acas_missing.xml",
+            "ExampleModification",
+            Vec::new(),
+        ))
+        .build();
+    let mut archive = ArchiveBuilder::new()
+        .entry(TestEntry::stored("Data/Game2.dcb", forge))
+        .entry(TestEntry::stored(
+            format!("{XML_DIR}ACAS_Missing.xml"),
+            EXPLICIT_PATCH_VEHICLE_XML.as_bytes(),
+        ));
+    let explicit_patch = match input {
+        ExplicitPatchInput::Missing | ExplicitPatchInput::Recovered => None,
+        ExplicitPatchInput::Malformed => Some(TestEntry::stored(
+            EXPLICIT_PATCH_ARCHIVE_PATH,
+            b"CryXmlB\0not really",
+        )),
+        ExplicitPatchInput::Encrypted => {
+            Some(TestEntry::stored(EXPLICIT_PATCH_ARCHIVE_PATH, b"<Modifications/>").encrypted())
+        }
+    };
+    if let Some(patch) = explicit_patch {
+        archive = archive.entry(patch);
+    }
+    if input == ExplicitPatchInput::Recovered {
+        archive = archive.entry(TestEntry::stored("Data/Unrelated.xml", b"<Unrelated/>"));
+    }
+    let mut bytes = archive.build();
+    if input == ExplicitPatchInput::Recovered {
+        crate::export_health_recovery::remove_directory_record_and_end(&mut bytes)?;
+    }
+    let path = directory.join("Data.p4k");
+    std::fs::write(&path, bytes)?;
+    Ok(path)
+}

@@ -2207,9 +2207,12 @@ A `Found` row has complete observed inputs for this scope. A `Partial` row
 contains the matches supported by the inputs read so far. The snapshot reports
 incomplete owner, Ship and vehicle dependencies separately. A vehicle Record that
 authors an empty modification string retains that original selector for the base
-implementation.
+implementation. The Paint query also closes a missing explicit patch lookup when
+the complete original Archive directory proves the exact attempted Entry absent
+and the other XML selection evidence is complete. Failed reads and recovered
+directory scopes remain incomplete.
 
-An isolated Windows debug query selected one physical Paint and matched its
+Before applying the verified missing-patch rule, a Windows debug query selected one physical Paint and matched its
 one observed fitting Ship in both installed Builds. The test resolved the
 attachment and vehicle definition selectors to their original DataForge Entry.
 

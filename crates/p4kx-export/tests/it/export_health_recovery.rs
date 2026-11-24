@@ -71,12 +71,8 @@ pub(crate) fn remove_directory_record_and_end(bytes: &mut Vec<u8>) -> TestResult
         .enumerate()
         .filter_map(|(index, value)| (value == CENTRAL).then_some(index))
         .collect();
-    assert_eq!(
-        central.len(),
-        2,
-        "the fixture has exactly two directory records"
-    );
-    let missing = *central.get(1).ok_or("second central record")?;
+    assert!(central.len() >= 2, "the fixture retains a directory record");
+    let missing = *central.last().ok_or("last central record")?;
     bytes
         .get_mut(missing..missing + CENTRAL.len())
         .ok_or("central signature")?

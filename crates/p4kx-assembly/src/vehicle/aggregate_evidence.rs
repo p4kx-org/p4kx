@@ -154,8 +154,18 @@ impl VehicleAggregateEvidence {
     }
 
     pub(super) fn prefix_complete(&self, checkpoint: Checkpoint) -> bool {
-        checkpoint.issues == 0
-            && checkpoint.selectors <= self.selectors.len()
+        checkpoint.issues == 0 && self.prefix_has_coordinates(checkpoint)
+    }
+
+    pub(super) fn prefix_has_only_missing_explicit_patch(&self, checkpoint: Checkpoint) -> bool {
+        matches!(
+            self.issues.get(..checkpoint.issues),
+            Some([VehicleAggregateIssue::ExplicitPatchMissing])
+        ) && self.prefix_has_coordinates(checkpoint)
+    }
+
+    fn prefix_has_coordinates(&self, checkpoint: Checkpoint) -> bool {
+        checkpoint.selectors <= self.selectors.len()
             && self
                 .prefix_selectors(checkpoint)
                 .all(|site| site.location().is_some())

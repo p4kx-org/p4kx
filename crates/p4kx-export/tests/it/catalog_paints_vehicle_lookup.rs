@@ -10,7 +10,10 @@ use p4kx_extraction::{
 };
 
 use super::{TestResult, guid};
-use crate::paints_fixture::vehicle_lookup::{VehicleLookupInput, write_vehicle_lookup_archive};
+use crate::paints_fixture::vehicle_lookup::{
+    EXPLICIT_PATCH_ARCHIVE_PATH, EXPLICIT_PATCH_VEHICLE_XML, ExplicitPatchInput,
+    VehicleLookupInput, write_explicit_patch_archive, write_vehicle_lookup_archive,
+};
 use crate::paints_fixture::{PAINT_ALPHA_RED, SHIP_MISSING};
 
 #[path = "../fixtures/owned_value_location.rs"]
@@ -175,6 +178,130 @@ fn check_vehicle_selector(
                 && matches!(source.kind(), PhysicalSourceKind::ArchiveEntry(entry) if entry.entry_index() == entry_index)
         }),
         "the vehicle selector names the original DataForge Entry"
+    );
+    Ok(())
+}
+
+#[test]
+fn scoped_paint_accepts_only_proved_explicit_patch_absence() -> TestResult {
+    for input in [
+        ExplicitPatchInput::Missing,
+        ExplicitPatchInput::Malformed,
+        ExplicitPatchInput::Encrypted,
+        ExplicitPatchInput::Recovered,
+    ] {
+        let directory = tempfile::tempdir()?;
+        let archive = Archive::open_with(
+            write_explicit_patch_archive(directory.path(), input)?,
+            OpenOptions::new().recover(true),
+        )?;
+        let snapshot = read_paint_compatibility(&archive, PaintSelection::RecordIndex(0), None)?;
+        assert_eq!(snapshot.paint_record_indices, [0], "{input:?}");
+        assert_eq!(snapshot.ship_record_indices, [1], "{input:?}");
+        assert_eq!(
+            serde_json::to_value(snapshot.row.as_ref().ok_or("the original Paint row")?)?,
+            serde_json::json!({"itemGuid": guid(PAINT_ALPHA_RED), "shipGuids": [guid(SHIP_MISSING)]}),
+            "the observed base XML Paint port supplies the same original fit"
+        );
+        let complete = input == ExplicitPatchInput::Missing;
+        let expected = if complete {
+            PaintCompatibilityStatus::Found
+        } else {
+            PaintCompatibilityStatus::Partial
+        };
+        assert_eq!(snapshot.status, expected, "{input:?}");
+        let coverage = snapshot
+            .vehicle_dependencies
+            .as_ref()
+            .ok_or("original vehicle dependency coverage")?;
+        assert_eq!(
+            coverage.directory_complete(),
+            input != ExplicitPatchInput::Recovered,
+            "{input:?}"
+        );
+        let origin = snapshot
+            .compatibility_inputs
+            .as_ref()
+            .ok_or("vehicle compatibility inputs")?;
+        assert_eq!(origin.source_set_complete(), complete, "{input:?}");
+        let selected = snapshot
+            .source_inventory
+            .select_uses(origin.source_uses_refs())?;
+        check_base_paint_port(&selected)?;
+        if complete {
+            check_missing_origin(&archive, &snapshot)?;
+            check_vehicle_selector(&archive, &selected, "modification")?;
+        }
+        if matches!(
+            input,
+            ExplicitPatchInput::Malformed | ExplicitPatchInput::Encrypted
+        ) {
+            check_failed_explicit_patch(&archive, &snapshot)?;
+        }
+    }
+    Ok(())
+}
+
+fn check_base_paint_port(selected: &SourceInventorySelection<'_>) -> TestResult {
+    let document = roxmltree::Document::parse(EXPLICIT_PATCH_VEHICLE_XML)?;
+    let required = document
+        .descendants()
+        .find_map(|node| node.attribute_node("requiredTags"))
+        .ok_or("the exact base port requiredTags attribute")?
+        .range();
+    let coordinate = SourceLocation::Subresource {
+        namespace: "textXmlAttribute".to_owned(),
+        indices: vec![u64::try_from(required.start)?, u64::try_from(required.end)?],
+        field: "requiredTags".to_owned(),
+    };
+    assert!(
+        selected.iter_uses().any(|used| {
+            used.location() == &coordinate
+                && used.scope() == InputScope::Payload
+                && used.role() == SourceUseRole::Conversion
+        }),
+        "the observed fit retains the original base XML port tag"
+    );
+    Ok(())
+}
+
+fn check_failed_explicit_patch(
+    archive: &Archive,
+    snapshot: &PaintCompatibilitySnapshot,
+) -> TestResult {
+    let patch = archive
+        .entries()
+        .iter()
+        .find(|entry| {
+            entry
+                .path()
+                .eq_ignore_ascii_case(EXPLICIT_PATCH_ARCHIVE_PATH)
+        })
+        .ok_or("the original explicit patch Entry")?;
+    let coverage = snapshot
+        .vehicle_dependencies
+        .as_ref()
+        .ok_or("vehicle dependency coverage")?;
+    assert!(
+        coverage
+            .failed_entries()
+            .iter()
+            .any(|entry| entry.entry_index() == Some(patch.index())),
+        "the selected explicit patch retains its failed original Entry"
+    );
+    let inventory = &snapshot.source_inventory;
+    let origin = inventory.iter_sources().find(|source| {
+        matches!(source.kind(), PhysicalSourceKind::ArchiveEntry(entry) if entry.entry_index() == patch.index())
+    }).ok_or("the original explicit patch source")?;
+    assert!(
+        inventory.iter_uses().any(|used| {
+            used.source() == origin.id()
+                && used.role() == SourceUseRole::Attempted
+                && used.scope() == InputScope::Payload
+                && matches!(used.location(), SourceLocation::Subresource { namespace, field, .. }
+                if namespace == "loadoutFileRead" && field == "content")
+        }),
+        "the original explicit patch remains an attempted payload"
     );
     Ok(())
 }
