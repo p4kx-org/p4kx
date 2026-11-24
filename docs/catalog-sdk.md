@@ -1504,6 +1504,28 @@ Components ordinal and per-value provenance. Use an existing decoded Entry
 or parsed query session to avoid reopening the DataForge Entry. These routes
 require no locale inputs.
 
+### Installed equipment component cold reads
+
+The Windows AMD64 verifier at `2e31f098fb85a7c70e2180d44b014080545b3517`
+ran each component query in its own process without opening a complete Catalog.
+Each query selected all eligible owners for its table.
+
+| Configuration | LIVE `13220821` | PTU `13260598` |
+| --- | ---: | ---: |
+| `attachableModifiers` | 101 | 101 |
+| `clothing` | 4,445 | 5,124 |
+| `consumables` | 308 | 308 |
+| `hackableDevices` | 14 | 14 |
+| `hackingChips` | 38 | 38 |
+| `itemRadars` | 110 | 110 |
+| `miningLasers` | 52 | 52 |
+| `quantumInterdiction` | 6 | 6 |
+| `suitArmor` | 2,405 | 2,782 |
+
+All 18 calls returned Available and stable Build and Archive stamps. The
+largest lifetime private commit was 1,522,737,152 bytes, and the largest
+working set was 1,499,852,800 bytes, both on the PTU Clothing query.
+
 ## Authored item durability
 
 Use `equipment::durability::with_durability`, `with_degradation` or
