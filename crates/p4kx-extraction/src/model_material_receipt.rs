@@ -21,6 +21,9 @@ use crate::{
     SourceUse, SourceUseRole, SourceUses,
 };
 
+#[path = "model_material_summary_receipt.rs"]
+mod summary;
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct MaterialFieldReceipt {
@@ -41,11 +44,12 @@ pub struct MaterialPageOrigins {
 #[derive(Debug)]
 pub(crate) enum MaterialEvidence {
     Listing(MaterialFieldReceipt),
-    Page(Box<MaterialPageRead>),
+    Page(Box<MaterialReadInput>),
+    Summary(Box<MaterialReadInput>),
 }
 
 #[derive(Debug)]
-pub(crate) struct MaterialPageRead {
+pub(crate) struct MaterialReadInput {
     pub(crate) fields: Observations,
     pub(crate) library: Option<EntryOrigin>,
 }

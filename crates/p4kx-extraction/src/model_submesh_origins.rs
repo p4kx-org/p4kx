@@ -4,7 +4,7 @@
 use std::io;
 use std::ops::Range;
 
-use p4kx_model::{Mesh, MeshSubmeshSource};
+use p4kx_model::{Mesh, MeshSubmeshSource, ModelChunk};
 
 use crate::model_geometry_scope::ModelGeometryScope;
 use crate::{
@@ -91,7 +91,33 @@ fn mesh_at(source: &ModelSource, lod_index: usize, mesh_index: usize) -> io::Res
         .ok_or_else(|| io::Error::other("the selected model mesh is unavailable"))
 }
 
-fn covers_mesh_indices(mesh: &Mesh, observed: usize) -> bool {
+pub(super) fn source_chunk<'a>(source: &'a ModelSource, mesh: &Mesh) -> Option<&'a ModelChunk> {
+    let origin = mesh.origin()?;
+    source
+        .model()
+        .chunks
+        .iter()
+        .find(|chunk| origin.matches_chunk(chunk))
+}
+
+pub(super) fn original_material(
+    original: Option<MeshSubmeshSource>,
+    material: u16,
+) -> Option<Range<u64>> {
+    original
+        .filter(|original| original.material() == material)
+        .map(MeshSubmeshSource::material_range)
+}
+
+pub(super) fn original_count(
+    original: Option<MeshSubmeshSource>,
+    index_count: usize,
+) -> Option<Range<u64>> {
+    original
+        .filter(|original| u32::try_from(index_count).ok() == Some(original.index_count()))
+        .map(MeshSubmeshSource::index_count_range)
+}
+pub(super) fn covers_mesh_indices(mesh: &Mesh, observed: usize) -> bool {
     if observed == 0 || observed != mesh.submeshes.len() {
         return false;
     }
@@ -112,26 +138,14 @@ fn write_submeshes(
     fields: &mut FieldOrigins,
     mut counts: Option<&mut Vec<Range<u64>>>,
 ) -> io::Result<Option<ModelGeometryScope>> {
-    let chunk = mesh.origin().and_then(|origin| {
-        source
-            .model()
-            .chunks
-            .iter()
-            .find(|chunk| origin.matches_chunk(chunk))
-    });
+    let chunk = source_chunk(source, mesh);
     let mut scope = None;
     let mut path = parent.clone();
     path.push_field("submeshes").map_err(io::Error::other)?;
     for (index, submesh) in mesh.submeshes.iter().enumerate() {
         let original = chunk.and_then(|chunk| mesh.source_submesh(index, chunk));
-        let material = original
-            .filter(|original| original.material() == submesh.material_id)
-            .map(MeshSubmeshSource::material_range);
-        let count = original
-            .filter(|original| {
-                u32::try_from(submesh.index_count).ok() == Some(original.index_count())
-            })
-            .map(MeshSubmeshSource::index_count_range);
+        let material = original_material(original, submesh.material_id);
+        let count = original_count(original, submesh.index_count);
         if let Some(counts) = counts.as_deref_mut()
             && let Some(range) = &count
         {

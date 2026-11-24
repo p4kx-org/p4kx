@@ -23,17 +23,22 @@ use crate::{model_animation_items, model_bone_items};
 #[path = "model_chunk_items.rs"]
 mod chunk_items;
 
+#[path = "model_overview_origins.rs"]
+mod overview_origins;
+
 /// Returns the summary of the model Entry at `path`.
 pub(crate) fn overview(opened: &Opened, path: &str) -> Result<ModelOverview, ToolError> {
     let (source, animations) = read(opened, path, ModelRead::Overview)?;
     let model = source.model();
     let library = serde_json::to_value(LibraryInfo::of(model))?;
+    let material_ids = model.material_ids();
+    let origins = overview_origins::capture(&source, &library, &material_ids)?;
     let overview = ModelOverview {
         archive: opened.archive().path().display().to_string(),
         model: source.name().to_owned(),
         geometry: model.geometry.clone(),
         material_library: model.material_library.clone(),
-        material_ids: model.material_ids(),
+        material_ids,
         library,
         counts: ModelCounts {
             materials: model
@@ -58,6 +63,7 @@ pub(crate) fn overview(opened: &Opened, path: &str) -> Result<ModelOverview, Too
                 meshes: lod.meshes.len(),
             })
             .collect(),
+        origins,
     };
     if json_len(&overview) > MAX_RESPONSE_LEN {
         return Err(ToolError::TooLargeItem {
@@ -155,21 +161,26 @@ fn read(
                 .map_err(|error| converted(path, "a model with its material sources", error))?;
         return Ok((source, AnimationSet::default()));
     }
-    let load = match request {
-        ModelRead::Section(Section::Bones | Section::Animations) => {
-            ModelSource::from_index_observing_model_sources
-        }
-        ModelRead::Section(Section::Nodes) => ModelSource::from_index_observing_nodes,
-        _ => ModelSource::from_index_reading,
-    };
-    let source = load(
-        &index,
-        path,
-        LodSelection::All,
-        PositionBox::default(),
-        MaterialReading::Plain,
-        &TextureVerdicts::new(),
-    )
+    let verdicts = TextureVerdicts::new();
+    let source = if matches!(request, ModelRead::Overview) {
+        ModelSource::from_index_with_material_summary_origins(&index, path, &verdicts)
+    } else {
+        let load = match request {
+            ModelRead::Section(Section::Bones | Section::Animations) => {
+                ModelSource::from_index_observing_model_sources
+            }
+            ModelRead::Section(Section::Nodes) => ModelSource::from_index_observing_nodes,
+            _ => ModelSource::from_index_reading,
+        };
+        load(
+            &index,
+            path,
+            LodSelection::All,
+            PositionBox::default(),
+            MaterialReading::Plain,
+            &verdicts,
+        )
+    }
     .map_err(|error| converted(path, "a model", error))?;
     let with_animations = matches!(
         request,

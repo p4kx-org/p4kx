@@ -67,6 +67,8 @@ pub(crate) struct ModelOverview {
     pub(crate) counts: ModelCounts,
     /// The levels of detail with their size.
     pub(crate) lods: Vec<LodShape>,
+    #[serde(flatten)]
+    pub(crate) origins: ModelItemOrigins,
 }
 
 /// The number of items in each section of a model.

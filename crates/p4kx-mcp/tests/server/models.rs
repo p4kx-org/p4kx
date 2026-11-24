@@ -7,6 +7,9 @@ use serde_json::{Value, json};
 
 use crate::support::{Install, Server, TestResult};
 
+#[path = "model_overview_origins.rs"]
+mod overview_origins;
+
 const MODEL: &str = "Data/Objects/Test/cube.cgf";
 const UNKNOWN_TYPE: u32 = 0x00C0_FFEE;
 
@@ -222,6 +225,21 @@ fn get_model_info_summarises_the_model() -> TestResult {
     assert_eq!(info["counts"]["bones"], 0, "bones");
     assert_eq!(info["counts"]["animations"], 0, "animations");
     assert_eq!(info["counts"]["materials"], 3, "materials");
+    let sources = info
+        .pointer("/provenance/sources")
+        .and_then(Value::as_array)
+        .ok_or("model summary source inventory")?;
+    for output in ["counts/materials", "library/single"] {
+        let uses = crate::model_item_origin_checks::uses(&info, output)?;
+        assert!(
+            uses.iter().any(|site| sources.iter().any(|source| {
+                source.get("id") == site.get("source")
+                    && source.pointer("/path/value").and_then(Value::as_str)
+                        == Some("Data/objects/test/CUBE.mtl")
+            })),
+            "{output} includes the selected material library Entry"
+        );
+    }
     assert!(
         info["counts"]["chunks"]
             .as_u64()

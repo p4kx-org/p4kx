@@ -1035,6 +1035,19 @@ depends on geometry and submesh selection. The rebuilt `first_index` and fields
 with unproved inputs use the unknown marker. Provenance
 counts toward the response budget, and the cursor resumes after the last returned mesh.
 
+For `get_model_info`, `fieldOrigins` addresses summary values and `provenance`
+resolves their source references. `model-submesh-words` records the exact retained IVO
+`indexCount` and `materialId` words as
+`[chunkOrdinal, firstStart, firstEndExclusive, stride, count]`. A run describes
+`count` half-open ranges with both endpoints advanced by `stride` per
+occurrence. Runs preserve gaps and physical Entry boundaries. The generated
+CrCh material ID records its original format selector. Mesh and LOD selection
+can leave these origin sets incomplete. A loaded material library contributes
+its original Entry to `counts.materials`, `library.single`,
+`library.default_palette` and the decoded fields in `library.authored`.
+The 256 KiB response limit includes the full evidence. A summary that exceeds
+the limit returns a size error.
+
 For `list_model_items` with `section: "chunks"`, field origins for `type_id`,
 `type`, `index`, `file` and `usage` use the returned row position. The original type word and container
 signature identify the name or null. The original row count and table offset identify

@@ -5,8 +5,8 @@ use std::error::Error;
 
 use p4kx_extraction::model::LayerCache;
 use p4kx_extraction::{
-    Archive, ArchiveMaterialReads, ModelSource, OpenOptions, PathIndex, SourceEncryption,
-    TextureVerdicts,
+    Archive, ArchiveMaterialReads, FieldOrigins, FieldPath, ModelSource, OpenOptions, PathIndex,
+    SourceEncryption, SourceUses, TextureVerdicts,
 };
 use p4kx_testkit::{ArchiveBuilder, TestEntry, TestMtl, TestMtlMaterial, test_key};
 
@@ -101,6 +101,109 @@ fn check_shared_layer(
         original.encryption(),
         SourceEncryption::Unencrypted,
         "a plain cached layer retains its own encryption state"
+    );
+    Ok(())
+}
+
+#[test]
+fn model_material_summary_retains_only_the_actual_loaded_library_and_its_selector() -> TestResult {
+    use p4kx_testkit::TestModel;
+
+    const MODEL: &str = "Data/objects/test/cube.cgf";
+    const LIBRARY: &str = "Data/objects/test/cube.mtl";
+    let fixture = TestModel::cube();
+    let material =
+        TestMtl::single(&TestMtlMaterial::new("selected")).with_default_palette("opaque");
+    let directory = tempfile::tempdir()?;
+    let library_path = FieldPath::parse("/structuredContent/library")?;
+    let count_path = FieldPath::parse("/structuredContent/counts/materials")?;
+    for loaded in [true, false] {
+        let archive_path = directory
+            .path()
+            .join(if loaded { "loaded.p4k" } else { "invalid.p4k" });
+        let bytes = if loaded {
+            material.cryxml()
+        } else {
+            b"invalid".to_vec()
+        };
+        ArchiveBuilder::new()
+            .entry(TestEntry::stored(MODEL, fixture.cgf()))
+            .entry(TestEntry::stored(
+                "Data/objects/test/cube.cgfm",
+                fixture.cgfm(),
+            ))
+            .entry(TestEntry::stored(LIBRARY, bytes).encrypted())
+            .write_to(&archive_path)?;
+        let archive = Archive::open_with(archive_path, OpenOptions::new().key(Some(test_key())))?;
+        let model = ModelSource::from_index_with_material_summary_origins(
+            &PathIndex::new(&archive),
+            MODEL,
+            &TextureVerdicts::new(),
+        )?;
+        let uses = SourceUses::with_compact_use_refs();
+        let origins = model.loaded_material_summary_origins(&uses, &library_path, &count_path)?;
+        assert_eq!(model.model().materials.library().is_some(), loaded);
+        if !loaded {
+            assert_eq!(
+                origins.iter().count(),
+                0,
+                "the failed payload contributes no loaded fields"
+            );
+            assert_eq!(
+                uses.freeze()?.source_count(),
+                0,
+                "the failed source is not payload evidence"
+            );
+            continue;
+        }
+        check_loaded_summary(&origins, &uses)?;
+    }
+    Ok(())
+}
+
+fn check_loaded_summary(origins: &FieldOrigins, source_uses: &SourceUses) -> TestResult {
+    for pointer in [
+        "/structuredContent/library/single",
+        "/structuredContent/library/default_palette",
+        "/structuredContent/library/authored/encoding",
+        "/structuredContent/counts/materials",
+    ] {
+        let origin = origins
+            .get(&FieldPath::parse(pointer)?)
+            .ok_or_else(|| format!("missing exact origin at {pointer}"))?;
+        assert_eq!(
+            origin.contains_encrypted_source(),
+            Some(true),
+            "original loaded bytes at {pointer}"
+        );
+        assert!(
+            !origin.source_set_complete(),
+            "resolver decisions are not part of this payload observation"
+        );
+    }
+    let inventory = serde_json::to_value(source_uses.freeze()?)?;
+    let uses = inventory
+        .get("uses")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("source uses")?;
+    assert!(
+        uses.iter().any(|entry| {
+            entry
+                .pointer("/location/field")
+                .and_then(serde_json::Value::as_str)
+                == Some("materialLibrary")
+                && entry.get("role").and_then(serde_json::Value::as_str) == Some("selector")
+        }),
+        "the original selected model declaration"
+    );
+    assert!(
+        uses.iter().any(|entry| {
+            entry
+                .pointer("/location/field")
+                .and_then(serde_json::Value::as_str)
+                == Some("DefaultPalette")
+        }),
+        "the original selected library attribute"
     );
     Ok(())
 }

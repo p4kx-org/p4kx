@@ -13,13 +13,16 @@ use super::{ModelSource, split_entry_path};
 use crate::chunk_source::ChunkSource;
 use crate::model_companions::ArchiveCompanions;
 use crate::model_info_materials::receipt::{
-    MaterialEvidence, MaterialPageOrigins, MaterialPageRead, Observations, ReceiptError,
+    MaterialEvidence, MaterialPageOrigins, MaterialReadInput, Observations, ReceiptError,
 };
 use crate::path_index::PathIndex;
 use crate::source_provenance::ModelArchiveSource;
 use crate::source_provenance::model_material_origins::MaterialObservation;
 use crate::texture_grey::TextureVerdicts;
 use crate::{ArchiveMaterialReads, ConversionError, FieldPath, MaterialArchiveOrigins, SourceUses};
+
+#[path = "model_source_material_summary.rs"]
+mod material_summary;
 
 #[derive(Clone, Copy)]
 enum Coordinates {
@@ -29,6 +32,7 @@ enum Coordinates {
     Listing,
     MaterialListing,
     MaterialPage,
+    MaterialSummary,
 }
 
 impl Coordinates {
@@ -43,14 +47,16 @@ impl Coordinates {
         match self {
             Self::Skip | Self::MaterialListing | Self::MaterialPage => Capture::Skip,
             Self::Nodes => Capture::Nodes(&mut observed.nodes),
-            Self::NodesAndBones | Self::Listing => Capture::NodesAndBones(observed),
+            Self::NodesAndBones | Self::Listing | Self::MaterialSummary => {
+                Capture::NodesAndBones(observed)
+            }
         }
     }
 
     const fn keeps_materials(self) -> bool {
         matches!(
             self,
-            Self::MaterialListing | Self::Listing | Self::MaterialPage
+            Self::MaterialListing | Self::Listing | Self::MaterialPage | Self::MaterialSummary
         )
     }
 
@@ -65,10 +71,17 @@ impl Coordinates {
             Self::MaterialListing | Self::Listing => fields
                 .project(model, source.archive_origin(), origins.library())?
                 .map(MaterialEvidence::Listing),
-            Self::MaterialPage => Some(MaterialEvidence::Page(Box::new(MaterialPageRead {
-                fields,
-                library: origins.library().cloned(),
-            }))),
+            Self::MaterialPage | Self::MaterialSummary => {
+                let read = Box::new(MaterialReadInput {
+                    fields,
+                    library: origins.library().cloned(),
+                });
+                Some(if matches!(self, Self::MaterialSummary) {
+                    MaterialEvidence::Summary(read)
+                } else {
+                    MaterialEvidence::Page(read)
+                })
+            }
             _ => None,
         })
     }
@@ -304,7 +317,11 @@ impl ModelSource {
         let reads = ArchiveMaterialReads::default();
         let mut material_origins = MaterialArchiveOrigins::default();
         let mut material_fields = Observations::default();
-        let mut retain_field = |field: MaterialReadObservation<'_>| material_fields.retain(field);
+        let mut retain_field = |field: MaterialReadObservation<'_>| {
+            if coordinates.keeps_material_field(field.field) {
+                material_fields.retain(field);
+            }
+        };
         let mut companions = ArchiveCompanions {
             index,
             folder,
@@ -359,7 +376,10 @@ fn bind_sources(
 ) {
     if matches!(
         coordinates,
-        Coordinates::Nodes | Coordinates::NodesAndBones | Coordinates::Listing
+        Coordinates::Nodes
+            | Coordinates::NodesAndBones
+            | Coordinates::Listing
+            | Coordinates::MaterialSummary
     ) {
         if let Some(primary) = archive_sources.first_mut() {
             primary.set_node_sources(observed.nodes);

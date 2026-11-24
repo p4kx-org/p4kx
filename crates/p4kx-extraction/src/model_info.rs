@@ -28,6 +28,9 @@ mod mesh_info;
 
 #[path = "model_node_origins.rs"]
 mod node_origins;
+
+#[path = "model_overview_mesh_origins.rs"]
+mod overview_mesh_origins;
 #[path = "model_submesh_origins.rs"]
 mod submesh_origins;
 
@@ -36,6 +39,7 @@ pub use chunk_origins::{write_chunk_origins, write_chunk_type_origin};
 use field_origins::ModelFieldOrigins;
 pub use mesh_info::MeshInfo;
 pub use node_origins::ModelNodeOrigins;
+pub use overview_mesh_origins::ModelOverviewMeshOrigins;
 pub use submesh_origins::{write_mesh_origins, write_submesh_origins};
 
 /// What `p4kx model info --json` says about a model, and what front-ends serialise of it.

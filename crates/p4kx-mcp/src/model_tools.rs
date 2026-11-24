@@ -55,7 +55,7 @@ impl Server {
         material library it names, material IDs, how the material library read, the levels of detail with vertices, \
         triangles and mesh counts, and the number of materials, nodes, meshes, bones, animations, unread animations \
         and chunks. It is `p4kx model info --json` with the long lists left out; list_model_items returns them, \
-        page by page. Reading the animations of a large model takes time. The content may be forwarded by the client \
+        page by page. Field origins report original contributors and explicitly incomplete evidence. Reading the animations of a large model takes time. The content may be forwarded by the client \
         to third parties; game texts and media must not be redistributed.",
         output_schema = rmcp::handler::server::tool::schema_for_output::<ModelOverview>(),
         annotations(
