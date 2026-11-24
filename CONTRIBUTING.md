@@ -171,11 +171,16 @@ The tests against a real Archive are ignored by default; see
 | [Profile locations](crates/p4kx-settings/tests/it/locations.rs) | The configuration folder follows the Windows Known Folder. |
 | [Archive installation protection](crates/p4kx-guard/tests/installation.rs), [output-name validation](crates/p4kx-gui/src/output_target/tests.rs) and [junction exports](crates/p4kx-media/tests/it/junctions.rs) | Windows path case and verbatim prefixes, drive and UNC path spelling, and directory junctions used by installation, cleanup and output protection. The [owned-output](crates/p4kx-guard/src/owned_output_cleanup/tests.rs) and [reference path](crates/p4kx-extraction/tests/reference/mutation_manifest_paths.rs) fixtures exercise junction handling in those callers. |
 | [GUI software adapter](crates/p4kx-gui/tests/it/software_wgpu_setup.rs) and [render backend](crates/p4kx-render/src/gpu/tests.rs) | Direct3D 12 backend selection and enumeration of the Windows WARP adapter. |
+| [Blender package rename](crates/p4kx-blender/src/rename.rs) | Win32 access-denied and sharing-violation codes select bounded rename retries. An unrelated I/O error is tested on every target. |
 | [MSI fixture lane](.github/workflows/tests.yml) and [Windows package verification](docs/windows-packages.md) | The opt-in Registry-fixture codec is tested on native Windows without accessing the Registry. The package workflow exercises Windows Installer and the actual Registry and PATH lifecycle. |
 
-The [Wine-prefix fixtures](crates/p4kx-channels/tests/wine_prefix.rs) share test logic across
-Windows and Linux. Unix symlink checks use the host filesystem, and the Linux profile fixtures exercise
-XDG and stored-key lookup. Both native Linux rows use the common synthetic Nextest suite and
+The [Wine-prefix fixtures](crates/p4kx-channels/tests/wine_prefix.rs) use host-native absolute
+paths with shared assertions. The [folder conversion](crates/p4kx-extraction/tests/it/folder_conversion.rs)
+and [archive-link fixtures](crates/p4kx-extraction/tests/it/folder_links.rs) use Windows directory
+links or Unix symlinks to exercise the same traversal guards. The
+[portal protocol fixture](crates/p4kx-guard/src/portal_dbus/tests.rs) uses a local socket pair.
+The Linux profile fixtures exercise XDG and stored-key lookup. Both native Linux rows use the
+common synthetic Nextest suite and
 execute X11 and HiDPI Wayland software-rendered GUI checks. The hosted native checks determine
 Linux release acceptance. [Native test workflow](.github/workflows/tests.yml)
 
