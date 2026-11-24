@@ -267,6 +267,10 @@ pub use crate::catalog_v3::authored_fields::ship_source_read::ShipPlayabilityInp
 pub use crate::contract_insurance::{ShipInsurance, ShipInsuranceParams};
 pub use crate::ship::ShipSource;
 pub use crate::ship_base::{ShipCargoMountSource, ShipCargoSource};
+pub use crate::ship_store_pledge::{
+    ShipPledgeProductionStatus, ShipStorePledge, ShipStorePledgeScope, ShipStorePledgeSnapshot,
+    ShipStorePledges, ship_store_pledges,
+};
 pub use ship_sources::store_slugs::{
     ShipStoreSlug, ShipStoreSlugSnapshot, with_ship_store_slugs, with_ship_store_slugs_from,
 };

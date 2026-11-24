@@ -373,6 +373,7 @@ pub(super) fn assemble<R>(
         contract_entity_spawns: collected.contract_entity_spawns,
         mission_property_sets: collected.mission_property_sets,
         ship_store_slugs: resolved.exported,
+        ship_store_pledges: crate::ship_store_pledge::ship_store_pledges()?,
     };
     let output = emit(&catalog)?;
     Ok(ControlFlow::Continue((

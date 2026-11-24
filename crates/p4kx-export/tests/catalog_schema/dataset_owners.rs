@@ -355,6 +355,12 @@ const GROUPS: &[Group] = &[
         shape: Shape::Array,
         members: &["shipStoreSlugs"],
     },
+    Group {
+        owner: Owner::Curated,
+        prefix: "",
+        shape: Shape::Object,
+        members: &["shipStorePledges"],
+    },
 ];
 
 pub(super) fn entries() -> BTreeMap<String, Entry> {

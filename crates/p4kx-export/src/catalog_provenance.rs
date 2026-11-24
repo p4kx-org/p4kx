@@ -120,6 +120,7 @@ impl CatalogError {
             | Self::LoadTexts(_)
             | Self::Texts { .. }
             | Self::StoreSlugs(_)
+            | Self::ShipStorePledges(_)
             | Self::Json(_)
             | Self::Write(_)
             | Self::Cancelled => None,

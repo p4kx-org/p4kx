@@ -82,6 +82,33 @@ fn assert_ships(catalog: &Value, expected: &[(&str, Option<&str>)]) -> TestResul
 mod sdk;
 
 #[test]
+fn curated_pledge_status_preserves_record_playability() -> TestResult {
+    use p4kx_export::catalog_queries::equipment::{ShipPledgeProductionStatus, ship_store_pledges};
+
+    let (_, catalog) = catalog()?;
+    let curated = ship_store_pledges()?;
+    let javelin = curated.by_rsi_id(63).ok_or("reviewed Javelin pledge")?;
+    assert_eq!(
+        javelin.production_status(),
+        ShipPledgeProductionStatus::InConcept,
+        "the matrix supplies the production status"
+    );
+    assert_eq!(
+        catalog.pointer("/shipStorePledges"),
+        Some(&serde_json::to_value(curated)?),
+        "the Normal export carries the same independently reviewed scope"
+    );
+    assert_ships(
+        &catalog,
+        &[
+            ("Ship_Not_Shipped", Some("special")),
+            ("Ship_Crewed", Some("ai")),
+            ("Ship_Player", Some("player")),
+        ],
+    )
+}
+
+#[test]
 fn a_ship_without_ai_evidence_that_the_game_ships_is_a_player_ship() -> TestResult {
     let (_, catalog) = catalog()?;
     assert_ships(

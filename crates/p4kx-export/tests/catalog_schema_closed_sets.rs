@@ -73,6 +73,7 @@ const CONTROL_TYPES: &[&str] = &[
     "RadarAudioField",
     "ResolutionStatus",
     "ScopedLocationFilterKind",
+    "ShipStorePledgeScope",
     "SourceCoordinateOmission",
     "SourceDataType",
     "SourceDeclarationKind",
@@ -114,6 +115,7 @@ const OPEN_TYPES: &[&str] = &[
     "PropertyKind",
     "Reaction",
     "RepeatType",
+    "ShipPledgeProductionStatus",
     "SpawnLevel",
     "StandingLevel",
 ];

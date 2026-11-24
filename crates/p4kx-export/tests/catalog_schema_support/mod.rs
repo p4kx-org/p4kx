@@ -275,7 +275,8 @@ pub(crate) fn minimal_catalog() -> Value {
         "legacyLootTables": loot::legacy_tables(),
         "legacyLootArchetypes": loot::legacy_archetypes(),
         "lootContainers": loot::containers(),
-        "shipStoreSlugs": slugs::ship_store_slugs()
+        "shipStoreSlugs": slugs::ship_store_slugs(),
+        "shipStorePledges": slugs::ship_store_pledges()
     });
     dataset_availability::add_defaults(&mut catalog);
     loot::add_definition_tables(&mut catalog);

@@ -156,6 +156,8 @@ mod resource_groups;
 mod resource_network;
 #[path = "sdk_resource_topology_routes.rs"]
 mod resource_topology;
+#[path = "sdk_ship_store_pledge_route.rs"]
+mod ship_store_pledges;
 #[path = "sdk_ship_system_routes.rs"]
 mod ship_systems;
 #[path = "sdk_soil_routes.rs"]
@@ -234,6 +236,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
         crafters::read()?,
         crafter_hosts::read()?,
         archive_entries::read_language_policy()?,
+        ship_store_pledges::read()?,
         archive_entries::read_language_sources(&archive)?,
         location_vocabulary::read_entities(&archive)?,
         mission_location::read()?,

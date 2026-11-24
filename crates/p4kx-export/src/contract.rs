@@ -130,6 +130,8 @@ pub(crate) struct Catalog<'a> {
     /// The RSI store slugs that map to a ship of `ships`, with the retired ones flagged, ordered
     /// by `slug`. A curated list, not read from the Archive.
     pub(crate) ship_store_slugs: Vec<ShipStoreSlug<'a>>,
+    /// The non-flight-ready Store pledges admitted by the dated candidate review.
+    pub(crate) ship_store_pledges: crate::ship_store_pledge::ShipStorePledges,
 }
 
 /// The serialized text-key shape in an NPC pool content identifier.

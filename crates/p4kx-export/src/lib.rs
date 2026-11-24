@@ -294,6 +294,7 @@ mod selection_rules;
 mod ship;
 mod ship_base;
 mod ship_pool;
+mod ship_store_pledge;
 mod ship_store_slugs;
 mod ship_variant_survey;
 #[cfg(test)]

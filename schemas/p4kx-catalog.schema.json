@@ -46947,6 +46947,17 @@
       ],
       "type": "object"
     },
+    "ShipPledgeProductionStatus": {
+      "description": "The published production status of an admitted Store pledge.",
+      "type": "string",
+      "x-p4kx-vocabularyClass": "open",
+      "x-values": [
+        {
+          "description": "The Ship Matrix labels the pledge In Concept.",
+          "value": "in-concept"
+        }
+      ]
+    },
     "ShipRecall": {
       "description": "Original physical recall parameters and its referenced AI module tag.",
       "properties": {
@@ -47158,6 +47169,117 @@
       },
       "required": [
         "options"
+      ],
+      "type": "object"
+    },
+    "ShipStorePledge": {
+      "description": "One reviewed Store pledge and its published production status.",
+      "properties": {
+        "manufacturerCode": {
+          "description": "The manufacturer code published by RSI.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "productionStatus": {
+          "$ref": "#/$defs/ShipPledgeProductionStatus",
+          "description": "The published non-flight-ready production status."
+        },
+        "rsiId": {
+          "description": "The positive RSI ship identifier.",
+          "format": "uint32",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "slug": {
+          "description": "The exact case-sensitive Store slug.",
+          "minLength": 1,
+          "type": "string"
+        },
+        "storeName": {
+          "description": "The short public Store name.",
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "manufacturerCode",
+        "productionStatus",
+        "rsiId",
+        "slug",
+        "storeName"
+      ],
+      "type": "object"
+    },
+    "ShipStorePledgeScope": {
+      "description": "The review population described by a curated Store pledge snapshot.",
+      "enum": [
+        "reviewedCandidates"
+      ],
+      "type": "string",
+      "x-p4kx-vocabularyClass": "control"
+    },
+    "ShipStorePledgeSnapshot": {
+      "description": "The source identity and review scope of the bundled Store pledges.",
+      "properties": {
+        "captureDate": {
+          "description": "The date of the original population capture in YYYY-MM-DD form.",
+          "format": "date",
+          "type": "string"
+        },
+        "reviewedDate": {
+          "description": "The date on which the candidate review completed in YYYY-MM-DD form.",
+          "format": "date",
+          "type": "string"
+        },
+        "revision": {
+          "description": "The positive revision number of these curated rows.",
+          "format": "uint32",
+          "minimum": 1,
+          "type": "integer"
+        },
+        "scope": {
+          "$ref": "#/$defs/ShipStorePledgeScope",
+          "description": "The population to which the review applies."
+        },
+        "source": {
+          "const": "https://robertsspaceindustries.com/ship-matrix/index",
+          "description": "The official source of the original manually captured population.",
+          "type": "string"
+        },
+        "sourceRevision": {
+          "description": "The SHA-256 digest of the original source capture, in lowercase hexadecimal.",
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        }
+      },
+      "required": [
+        "captureDate",
+        "reviewedDate",
+        "revision",
+        "scope",
+        "source",
+        "sourceRevision"
+      ],
+      "type": "object"
+    },
+    "ShipStorePledges": {
+      "description": "The complete bundled section within its reviewed candidate scope.",
+      "properties": {
+        "rows": {
+          "description": "All admitted rows in strictly ascending RSI ship identifier order.",
+          "items": {
+            "$ref": "#/$defs/ShipStorePledge"
+          },
+          "type": "array"
+        },
+        "snapshot": {
+          "$ref": "#/$defs/ShipStorePledgeSnapshot",
+          "description": "Shared source identity and review scope for every row."
+        }
+      },
+      "required": [
+        "rows",
+        "snapshot"
       ],
       "type": "object"
     },
@@ -147562,6 +147684,10 @@
       "minimum": 0,
       "type": "integer"
     },
+    "shipStorePledges": {
+      "$ref": "#/$defs/ShipStorePledges",
+      "description": "The non-flight-ready Store pledges admitted by the dated candidate review."
+    },
     "shipStoreSlugs": {
       "description": "The RSI store slugs that map to a ship of `ships`, with the retired ones flagged, ordered\nby `slug`. A curated list, not read from the Archive.",
       "items": {
@@ -147628,6 +147754,7 @@
     "projections",
     "provenance",
     "schemaVersion",
+    "shipStorePledges",
     "shipStoreSlugs",
     "ships",
     "shops",

@@ -333,6 +333,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `definitions.mineableEntities` | The physical mineable rocks and deposits with original mining and radar declarations, ordered by GUID and Record index |
 | `definitions.crafters`, `projections.crafterHosts` | Authored crafting stations and the derived physical default Loadout mounts. |
 | `shipStoreSlugs` | The RSI store slugs that map to a ship of `ships`, with the retired ones flagged, ordered by `slug` (curated data, ADR-0117) |
+| `shipStorePledges` | Reviewed non-flight-ready Store pledges in ascending RSI ship ID order with their shared source and scope (ADR-0117, ADR-0245) |
 | `configurations.craftingGlobal` | Not a kind: original physical crafting-global configurations |
 | `configurations.itemRecoveryEconomy`, `configurations.itemRecoveryOverrides` and `configurations.itemRecoveryPolicy` | The selected recovery policy's economy parameters and original override declarations. See [Item recovery rules](#item-recovery-rules). |
 
@@ -2969,6 +2970,21 @@ current `LIVE` Archive and its `store_slugs.stale` and `unmapped` lists show wha
 new ship is mapped by the rules above, a mapping that went stale is corrected, or marked
 `"retired": true` when the ship is gone. The real-Archive test must pass before the file is
 committed.
+
+### Reviewed Store ship pledges
+
+Catalog v3 includes `shipStorePledges.snapshot` and `shipStorePledges.rows`. The snapshot records
+`source`, `captureDate`, `sourceRevision` (the capture's SHA-256), `reviewedDate`, positive
+curated `revision` and `scope`. The `reviewedCandidates` scope covers the manually checked
+cohort from the dated capture. Every Catalog includes all bundled rows. That population is
+independent of the Archive, Build and Filter and may omit pledges outside the reviewed cohort.
+
+Each row has `rsiId`, `slug`, `storeName`, `manufacturerCode` and `productionStatus`.
+The current published status vocabulary includes `in-concept`. The dated Matrix review
+supplies that production status, while an original Ship Record supplies its own physical
+identity and `playability`. For example, Javelin (63) has a reviewed `in-concept` row and a
+`special` Archive Ship. A retired mapping is identified by `shipStoreSlugs[].retired`.
+A pledge absent from both tables has no reviewed status or validated mapping in this output.
 
 ### Item recovery rules
 

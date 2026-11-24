@@ -1725,6 +1725,7 @@ dependency coverage and the marker can still be true when a known contributor is
 
 `with_ship_store_slugs` and `with_ship_store_slugs_from` supply the same curated
 `shipStoreSlugs` rows as the Catalog. Session and parsed views provide the same selection.
+
 The optional `Filter` selects original Ship paths using Catalog matching. Unfiltered
 queries include retired mappings whose original Ship GUID is absent from the admitted
 Ship rows. Filtered queries publish only active mappings to selected, readable Ships.
@@ -1737,6 +1738,13 @@ rows and curated summary on installed LIVE `13220821` and PTU `13248297`.
 The literal Record path was anchored and its full physical cohort was
 checked before generation. Complete unfiltered Catalog parity remains separate
 from the cold unfiltered API measurements below.
+
+`catalog_queries::equipment::ship_store_pledges()` loads the bundled `ShipStorePledges`
+section shared with Catalog v3. Call `snapshot()` for the source, date, revision and reviewed
+candidate scope, `rows()` for all bundled rows in ascending RSI ID order, or
+`by_rsi_id(id)` for an exact lookup. The function reads embedded metadata without
+an Archive, Filter, session or network. An absent ID has no row in this reviewed snapshot.
+Use Archive-backed Ship queries for physical Record identity and structural `playability`.
 
 Installed variant checks at revision `9e2ecedea6b60d0b45a98dc5323a7d592dcabaef`
 covered a selected physical Item and an ordinary Ship on each of LIVE `13220821`

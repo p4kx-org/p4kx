@@ -24,6 +24,7 @@ const ITEM_DEFINITIONS: &str = "/definitions/items";
 const SHIPS: &str = "/ships";
 const SHIP_BASE_FACTS: &str = "/projections/shipBaseFacts";
 const SHIP_STORE_SLUGS: &str = "/shipStoreSlugs";
+const SHIP_STORE_PLEDGES: &str = "/shipStorePledges";
 const LOADOUTS: &str = "/loadouts";
 const ITEM_PORTS: &str = "/configurations/itemPorts";
 const ATTACHMENT_CONSTRAINTS: &str = "/configurations/itemAttachmentConstraints";
@@ -150,6 +151,7 @@ const REQUIRED_WITNESSES: &[&str] = &[
     SHIPS,
     SHIP_BASE_FACTS,
     SHIP_STORE_SLUGS,
+    SHIP_STORE_PLEDGES,
     ITEM_PORTS,
     ATTACHMENT_CONSTRAINTS,
     ITEM_BOUNDS,

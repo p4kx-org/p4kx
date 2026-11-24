@@ -1,0 +1,201 @@
+{
+  "snapshot": {
+    "source": "https://robertsspaceindustries.com/ship-matrix/index",
+    "captureDate": "2026-10-28",
+    "sourceRevision": "ebd0549ca188d5c233b7cd82d79ccc8ebfc6f1bc7fd586b33a376780194a33d6",
+    "reviewedDate": "2026-11-24",
+    "revision": 1,
+    "scope": "reviewedCandidates"
+  },
+  "rows": [
+    {
+      "rsiId": 36,
+      "slug": "Merchantman",
+      "storeName": "Merchantman",
+      "manufacturerCode": "BANU",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 63,
+      "slug": "Javelin",
+      "storeName": "Javelin",
+      "manufacturerCode": "AEGS",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 71,
+      "slug": "Orion",
+      "storeName": "Orion",
+      "manufacturerCode": "RSI",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 86,
+      "slug": "Hull-D",
+      "storeName": "Hull D",
+      "manufacturerCode": "MISC",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 87,
+      "slug": "Hull-E",
+      "storeName": "Hull E",
+      "manufacturerCode": "MISC",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 91,
+      "slug": "Genesis",
+      "storeName": "Genesis",
+      "manufacturerCode": "CRUS",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 97,
+      "slug": "Endeavor",
+      "storeName": "Endeavor",
+      "manufacturerCode": "MISC",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 103,
+      "slug": "Crucible",
+      "storeName": "Crucible",
+      "manufacturerCode": "ANVL",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 149,
+      "slug": "Pioneer",
+      "storeName": "Pioneer",
+      "manufacturerCode": "CNOU",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 155,
+      "slug": "Vulcan",
+      "storeName": "Vulcan",
+      "manufacturerCode": "AEGS",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 170,
+      "slug": "Kraken",
+      "storeName": "Kraken",
+      "manufacturerCode": "DRAK",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 175,
+      "slug": "Kraken-Privateer",
+      "storeName": "Kraken Privateer",
+      "manufacturerCode": "DRAK",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 180,
+      "slug": "Ranger-RC",
+      "storeName": "Ranger RC",
+      "manufacturerCode": "TMBL",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 181,
+      "slug": "Ranger-TR",
+      "storeName": "Ranger TR",
+      "manufacturerCode": "TMBL",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 182,
+      "slug": "Ranger-CV",
+      "storeName": "Ranger CV",
+      "manufacturerCode": "TMBL",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 186,
+      "slug": "Nautilus",
+      "storeName": "Nautilus",
+      "manufacturerCode": "AEGS",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 187,
+      "slug": "Nautilus-Solstice-Edition",
+      "storeName": "Nautilus Solstice Edition",
+      "manufacturerCode": "AEGS",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 208,
+      "slug": "G12",
+      "storeName": "G12",
+      "manufacturerCode": "ORIG",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 209,
+      "slug": "G12r",
+      "storeName": "G12r",
+      "manufacturerCode": "ORIG",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 210,
+      "slug": "G12a",
+      "storeName": "G12a",
+      "manufacturerCode": "ORIG",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 227,
+      "slug": "Odyssey",
+      "storeName": "Odyssey",
+      "manufacturerCode": "MISC",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 230,
+      "slug": "Expanse",
+      "storeName": "Expanse",
+      "manufacturerCode": "MISC",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 232,
+      "slug": "Legionnaire",
+      "storeName": "Legionnaire",
+      "manufacturerCode": "ANVL",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 239,
+      "slug": "E1-Spirit",
+      "storeName": "E1 Spirit",
+      "manufacturerCode": "CRUS",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 256,
+      "slug": "Zeus-Mk-II-MR",
+      "storeName": "Zeus Mk II MR",
+      "manufacturerCode": "RSI",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 260,
+      "slug": "Arrastra",
+      "storeName": "Arrastra",
+      "manufacturerCode": "RSI",
+      "productionStatus": "in-concept"
+    },
+    {
+      "rsiId": 317,
+      "slug": "Odin",
+      "storeName": "Odin",
+      "manufacturerCode": "ANVL",
+      "productionStatus": "in-concept"
+    }
+  ]
+}

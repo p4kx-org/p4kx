@@ -35,6 +35,19 @@ had no matching class name. `variantOf` (#325) groups cosmetic variants but does
   matching, the stale list and the test then say what remains. The steps are in
   `docs/catalog.md`.
 
+### Reviewed pledge production status
+
+Catalog v3 also carries `shipStorePledges`, keyed by RSI ship ID. It keeps the exact slug,
+short name, RSI manufacturer code and production status of each reviewed non-flight-ready
+pledge. Its snapshot records the official source, date of capture, source digest, candidate
+review date, curated revision and review scope. It is bundled and exported for every Channel
+and Filter. The store identity refresh reviews the snapshot by hand under ADR-0245.
+
+`shipStoreSlugs` keeps its existing selection and retirement rules. A curated pledge row and
+a physical Ship row can coexist. The Archive supplies the original Ship identity and
+`playability`. Absence in the two Store datasets leaves the Store status and mapping unknown
+to the consumer.
+
 ## Considered Options
 
 - **Keep the mapping in the Basetool:** rejected. The GUIDs it points to come from this repository,
