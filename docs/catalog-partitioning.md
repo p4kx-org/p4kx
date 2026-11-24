@@ -406,6 +406,28 @@ candidate are separate acceptance checks.
 [Catalog work](https://github.com/p4kx-org/p4kx/issues/1151) ·
 [Release acceptance](https://github.com/p4kx-org/p4kx/issues/1116)
 
+### LIVE package rehearsal for integration revision `54121ab3e`
+
+The Windows AMD64 portable package built from merge revision
+`23addc5e164f65a28a6f258302b30453b331edce` completed an unfiltered Normal Catalog
+on unchanged LIVE `13220821`. The packaged CLI used Rust 1.100.0, one Rayon
+worker at below-normal priority, Zstandard level 3 and the Unix-epoch export time.
+[Native Windows AMD64 package](https://github.com/p4kx-org/p4kx/actions/runs/45359023253/job/138324296731)
+
+| Wall time (s) | Peak working set (B) | Peak private commit (B) | Minimum available host RAM (B) |
+| ---: | ---: | ---: | ---: |
+| 2,114.990 | 35,562,864,640 | 38,409,072,640 | 9,234,272,256 |
+
+Windows reported both process lifetime peaks after exit. The larger peak leaves an
+estimated 30,310,404,096 bytes for the OS and other processes on a 64 GiB system.
+The measured host had 100,573,523,968 bytes of RAM and reached a minimum
+commit headroom of 23,345,311,744 bytes. The host's page-read and page-write
+counters increased by 434,785 and 2,821 during the run.
+
+The Catalog contains 77,896,476,922 decoded bytes and 1,466,041,457 compressed bytes.
+The writer reports 1,915,716,829 peak temporary bytes and Windows reports 1,915,726,571
+process write bytes. The separate replay uses this same sealed compressed output.
+
 ## Measuring a complete export
 
 The installed regression checks verify decoded and stored byte counts against the actual writer
