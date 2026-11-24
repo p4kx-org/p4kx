@@ -2407,6 +2407,24 @@ cargo test --locked -p p4kx-export --test real_archive real_archive_crafter_sdk:
 cargo test --locked -p p4kx-export --test real_archive real_archive_crafter_sdk::installed_crafter_hosts_match_original_sdk_and_exact_filtered_producer -- --ignored --exact --nocapture --test-threads=1
 ```
 
+For the cold host measurement, set `P4KX_CRAFTER_WITNESS_NOMINATION` to
+an unused absolute receipt path in a private output directory. The first
+test identifies an original complete Loadout with at least one Crafter
+mount. `P4KX_CRAFTER_WITNESS_SHIP_INDEX` can pin a particular original host.
+The second test requires that same receipt and Build and checks the
+public SDK's physical mounts and contributing source closures.
+
+```powershell
+cargo test --locked -p p4kx-export --test real_archive real_archive_crafter_sdk::nomination::nominate_original_crafter_host -- --ignored --exact --nocapture --test-threads=1
+cargo test --locked -p p4kx-export --test real_archive real_archive_crafter_sdk::nomination::installed_crafter_host_cold_query -- --ignored --exact --nocapture --test-threads=1
+```
+
+On PTU `13260598`, the original source nominated one mount group and one
+port route. An isolated Windows AMD64 debug process checked the group in
+13.068 seconds. Its peak private commit was 1,114,697,728 bytes and its peak
+working set was 1,033,297,920 bytes. Exact producer parity is a separate
+acceptance requirement.
+
 ## Cargo loading and shop fees
 
 Use `equipment::cargo_globals::with_cargo_loading_globals` and

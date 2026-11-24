@@ -20,6 +20,9 @@ use crate::real_archive_catalog_table_parity::{Origins, TestResult, wire_row};
 use crate::real_archive_shop_inventory_v3::verify_build;
 use crate::real_archive_verification::print_line;
 
+#[path = "real_archive_crafter_nomination.rs"]
+mod nomination;
+
 #[path = "real_archive_crafter_original.rs"]
 mod original;
 
@@ -94,14 +97,8 @@ fn installed_crafter_hosts_match_original_sdk_and_exact_filtered_producer() -> T
     )?;
     let parsed = session.parsed(None)?;
     let snapshot = parsed.read_crafter_hosts(ship, None)?;
-    verify_mounts(&archive, ship, &snapshot, &mounts)?;
     let mut origins = Origins::default();
-    let host_rows = snapshot
-        .rows
-        .iter()
-        .map(wire_row)
-        .collect::<TestResult<Vec<_>>>()?;
-    origins.extend(&snapshot.source_inventory, &host_rows)?;
+    let host_rows = verified_host_rows(&archive, ship, &snapshot, &mounts, &mut origins)?;
     compare_table(&catalog, HOSTS, &host_rows)?;
     verify_host_stations(&archive, &forge, &parsed, &catalog, &expected, &mut origins)?;
     origins.verify_in_document(&catalog)?;
@@ -203,6 +200,23 @@ fn capture_station(
     let wire = wire_row(row)?;
     origins.extend(&snapshot.source_inventory, std::slice::from_ref(&wire))?;
     Ok(wire)
+}
+
+fn verified_host_rows(
+    archive: &Archive,
+    index: u32,
+    snapshot: &CrafterHostSnapshot,
+    expected: &original::Mounts,
+    origins: &mut Origins,
+) -> TestResult<Vec<Json>> {
+    verify_mounts(archive, index, snapshot, expected)?;
+    let rows = snapshot
+        .rows
+        .iter()
+        .map(wire_row)
+        .collect::<TestResult<Vec<_>>>()?;
+    origins.extend(&snapshot.source_inventory, &rows)?;
+    Ok(rows)
 }
 
 fn verify_mounts(

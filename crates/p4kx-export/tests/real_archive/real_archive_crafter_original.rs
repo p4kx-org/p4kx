@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use p4kx_assembly::{ArchiveFiles, Attachment, LoadoutResolver};
+use p4kx_assembly::{ArchiveFiles, Attachment, EntityNode, LoadoutError, LoadoutResolver};
 use p4kx_export::{Filter, Kind, is_kind_leftover};
 use p4kx_extraction::{
     Archive, ArchiveWatch, DataForge, PointerProbe, Record, RecordTree, TreeBuilder, Value,
@@ -15,6 +15,11 @@ const COMPONENTS: &str = "Components";
 const CRAFTER: &str = "CrafterComponentParams";
 
 pub(super) type Mounts = BTreeMap<u32, Vec<Vec<u32>>>;
+
+pub(super) struct MountedHost {
+    pub(super) record_index: u32,
+    pub(super) mounts: Mounts,
+}
 
 pub(super) fn station<'source>(
     forge: &'source DataForge<'source>,
@@ -113,21 +118,79 @@ pub(super) fn resolve_mounts(
     let mut resolver = LoadoutResolver::new(forge)
         .with_files(&files)
         .stopping_at_docked_vehicles();
-    let original = resolver
-        .resolve(&record)
-        .map_err(|_| "resolve the originally authored host Loadout")?;
-    if original.record_index() != Some(index) || !original.issues().is_empty() {
-        return Err("the source-selected host has incomplete original Loadout coverage".into());
+    let mounts = inspect_mounts(forge, watch, &probe, &mut resolver, &record)?
+        .ok_or("the source-selected host has incomplete original Loadout coverage")?;
+    if mounts.is_empty() {
+        return Err("the exact host has no positive original crafter mounts".into());
     }
-    collect_mounts(forge, watch, &probe, &original)
+    Ok(mounts)
+}
+
+pub(super) fn nominate_mounts(
+    archive: &Archive,
+    forge: &DataForge<'_>,
+    watch: &ArchiveWatch,
+) -> TestResult<MountedHost> {
+    let probe = forge
+        .pointer_probe(COMPONENTS, CRAFTER)
+        .ok_or("no original Crafter component instances are available")?;
+    let files = ArchiveFiles::new(archive);
+    let mut resolver = LoadoutResolver::new(forge)
+        .with_files(&files)
+        .stopping_at_docked_vehicles();
+    let mut empty = 0;
+    let mut incomplete = 0;
+    for record in forge.records() {
+        watch
+            .poll()
+            .map_err(|_| "Archive changed during host nomination")?;
+        if selected_kind(&record)? != Some(Kind::Ships) {
+            continue;
+        }
+        match inspect_mounts(forge, watch, &probe, &mut resolver, &record)? {
+            Some(mounts) if !mounts.is_empty() => {
+                return Ok(MountedHost {
+                    record_index: record.index(),
+                    mounts,
+                });
+            }
+            Some(_) => empty += 1,
+            None => incomplete += 1,
+        }
+    }
+    Err(format!(
+        "no positive original Crafter host among {empty} complete empty and {incomplete} incomplete Ship Loadouts"
+    )
+    .into())
+}
+
+fn inspect_mounts<'source>(
+    forge: &'source DataForge<'source>,
+    watch: &ArchiveWatch,
+    probe: &PointerProbe<'source>,
+    resolver: &mut LoadoutResolver<'source>,
+    record: &Record<'source>,
+) -> TestResult<Option<Mounts>> {
+    let original = match resolver.resolve(record) {
+        Ok(original) => original,
+        Err(LoadoutError::UnreadableRecord { .. }) => return Ok(None),
+        Err(_) => return Err("resolve the originally authored host Loadout".into()),
+    };
+    if original.record_index() != Some(record.index()) {
+        return Err("the resolved host has a different physical Record".into());
+    }
+    if !original.issues().is_empty() {
+        return Ok(None);
+    }
+    collect_mounts(forge, watch, probe, &original)
 }
 
 fn collect_mounts<'source>(
     forge: &'source DataForge<'source>,
     watch: &ArchiveWatch,
     probe: &PointerProbe<'source>,
-    original: &p4kx_assembly::EntityNode,
-) -> TestResult<Mounts> {
+    original: &EntityNode,
+) -> TestResult<Option<Mounts>> {
     let mut trees = TreeBuilder::new();
     let mut mounts = BTreeMap::new();
     let mut path = Vec::new();
@@ -165,9 +228,7 @@ fn collect_mounts<'source>(
                     &[]
                 }
             }
-            Attachment::Unresolved(_) => {
-                return Err("the source-selected host has an unresolved mount".into());
-            }
+            Attachment::Unresolved(_) => return Ok(None),
         };
         if children.is_empty() {
             path.pop();
@@ -175,10 +236,7 @@ fn collect_mounts<'source>(
             walk.push(children.iter().enumerate());
         }
     }
-    if mounts.is_empty() {
-        return Err("the exact host has no positive original crafter mounts".into());
-    }
-    Ok(mounts)
+    Ok(Some(mounts))
 }
 
 fn has_component<'source>(
