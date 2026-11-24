@@ -18,7 +18,10 @@ use super::{
 };
 use crate::real_archive_catalog_table_parity::{Origins, TestResult, wire_row};
 
-const TABLE: &str = "/placements/installedConfigurations";
+#[path = "installed_flight_retained_parity.rs"]
+pub(super) mod retained_parity;
+
+pub(super) const TABLE: &str = "/placements/installedConfigurations";
 const SHIP_RECORD: &str = "P4KX_FLIGHT_SDK_RECORD";
 
 #[test]

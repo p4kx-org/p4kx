@@ -2389,6 +2389,17 @@ cargo test --locked -p p4kx-export --test real_archive real_archive_scoped_equip
 cargo test --locked -p p4kx-export --test real_archive real_archive_scoped_equipment_sdk::installed_configuration::installed_flight_matches_exact_scoped_normal_producer -- --ignored --exact --test-threads=1
 ```
 
+For a retained complete Normal Catalog, set `P4KX_CATALOG_MEASUREMENT_DIR` to its measurement
+directory and `P4KX_FLIGHT_CATALOG_PRODUCER_REVISION` to the exact producer revision. The comparison
+binds the installed Archive and matches each row for the selected physical Ship in producer
+order, including source-use and source identities. The combined check compares every Vehicle
+Armor row in the same Catalog stream.
+
+```powershell
+cargo test --locked -p p4kx-export --test real_archive real_archive_scoped_equipment_sdk::installed_configuration::retained_parity::installed_flight_matches_retained_complete_catalog -- --ignored --exact --nocapture --test-threads=1
+cargo test --locked -p p4kx-export --test real_archive real_archive_scoped_equipment_sdk::installed_configuration::retained_parity::installed_flight_and_vehicle_armor_match_retained_complete_catalog -- --ignored --exact --nocapture --test-threads=1
+```
+
 ## Original cargo manifests
 
 Use `catalog_queries::cargo_manifests::with_cargo_manifests` for

@@ -34,7 +34,8 @@ mod selected_origins;
 mod selected_row;
 pub(crate) use selected_row::check_selected_row;
 
-use compare_rows::{ComparedRows, Projection};
+pub(crate) use compare_rows::first_difference;
+use compare_rows::{ComparedRows, Projection, RowSelection};
 use selected_origins::SelectedOrigins;
 
 pub(crate) type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
@@ -120,7 +121,7 @@ impl BoundMeasurement {
             capture.keep(&format!("{path}/availability"));
             capture.project(
                 &format!("{path}/rows"),
-                Projection::Rows(ComparedRows::new(path, &table.rows)),
+                Projection::Rows(ComparedRows::table(path, &table.rows, table.selection)),
             );
         }
         capture.project(USES, Projection::Origins(SelectedOrigins(&origins.uses)));
@@ -153,6 +154,33 @@ fn check_row_array_count(catalog: &Value, path: &str, expected: usize) -> TestRe
 pub(crate) struct Table {
     availability: Value,
     rows: Vec<Value>,
+    selection: RowSelection,
+}
+
+impl Table {
+    pub(crate) fn physical_ship(
+        availability: DatasetAvailability,
+        ship: u32,
+        rows: Vec<Value>,
+    ) -> TestResult<Self> {
+        Self::from_wire(availability, rows, RowSelection::PhysicalShip(ship))
+    }
+
+    pub(crate) fn rows(&self) -> &[Value] {
+        &self.rows
+    }
+
+    fn from_wire(
+        availability: DatasetAvailability,
+        rows: Vec<Value>,
+        selection: RowSelection,
+    ) -> TestResult<Self> {
+        Ok(Self {
+            availability: serde_json::to_value(availability)?,
+            rows,
+            selection,
+        })
+    }
 }
 
 pub(crate) fn capture_table<Row: Serialize, Id: Eq + Hash, Dependencies>(
@@ -198,10 +226,7 @@ pub(crate) fn capture_rows<Row: Serialize, Id: Eq + Hash>(
     if !rows.is_empty() {
         origins.extend(inventory, &rows)?;
     }
-    Ok(Table {
-        availability: serde_json::to_value(availability)?,
-        rows,
-    })
+    Table::from_wire(availability, rows, RowSelection::All)
 }
 
 pub(crate) fn wire_row(row: &impl Serialize) -> TestResult<Value> {
@@ -233,37 +258,6 @@ pub(crate) fn collect_references<'a>(value: &'a Value, references: &mut HashSet<
             }
         }
         _ => {}
-    }
-}
-
-pub(crate) fn first_difference(expected: &Value, actual: &Value) -> Option<String> {
-    if expected == actual {
-        return None;
-    }
-    match (expected, actual) {
-        (Value::Object(expected), Value::Object(actual)) => {
-            for (key, child) in expected {
-                match actual.get(key) {
-                    Some(actual) => {
-                        if let Some(path) = first_difference(child, actual) {
-                            return Some(format!("/{key}{path}"));
-                        }
-                    }
-                    None => return Some(format!("/{key}")),
-                }
-            }
-            Some("/additionalKey".into())
-        }
-        (Value::Array(expected), Value::Array(actual)) if expected.len() == actual.len() => {
-            expected
-                .iter()
-                .zip(actual)
-                .enumerate()
-                .find_map(|(at, (left, right))| {
-                    first_difference(left, right).map(|path| format!("/{at}{path}"))
-                })
-        }
-        _ => Some(String::new()),
     }
 }
 
