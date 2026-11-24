@@ -140,6 +140,9 @@ fn the_json_has_a_stable_shape() -> TestResult {
 
     let mut report = json(&[], &file)?;
     report["soundbank"] = "[FILE]".into();
+    let fields = report.as_object_mut().ok_or("objects response")?;
+    fields.remove("fieldOrigins");
+    fields.remove("provenance");
     for object in report["objects"].as_array_mut().ok_or("objects")? {
         let has_independent_source_test = matches!(
             object["type"].as_str(),

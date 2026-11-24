@@ -2034,6 +2034,15 @@ prints no JSON; it fails with exit code 1 and an error naming the section.
 Also `p4kx bnk objects <file> --json` for a soundbank file on disk. It has no JSON Schema file:
 the shape is documented here and fixed by a snapshot test.
 
+The JSON response includes `fieldOrigins` and the referenced `provenance` inventory.
+`/soundbank` addresses the selected Archive directory or standalone file name. `/version`
+and `/bank_id` address the original decoded BKHD words. Each displayed object's
+`/objects/<page index>/id`, `/objects/<page index>/type` and, when emitted,
+`/objects/<page index>/type_byte` use the actual object envelope in the selected bank.
+The decoded type and selection of the raw type-byte field also use the original bank version.
+These paths follow the emitted page after filtering. A standalone bank has unknown original
+Archive encryption.
+
 An illustrative example, shortened and with values that do not come from one bank:
 
 ```json

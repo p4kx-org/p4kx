@@ -23,6 +23,7 @@ mod archive_region_info;
 mod archive_summary;
 mod archive_table_declaration;
 pub mod bank;
+mod bank_field_evidence;
 pub mod bank_wem_evidence;
 mod budget;
 mod buffers;

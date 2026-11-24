@@ -10,6 +10,9 @@ use std::path::Path;
 use p4kx_testkit::{TestBank, TestCodec, TestWem, test_signal};
 use serde_json::{Value, json};
 
+#[path = "bnk_object_origins.rs"]
+mod object_origins;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 fn write_bank(dir: &Path) -> Result<std::path::PathBuf, Box<dyn Error>> {

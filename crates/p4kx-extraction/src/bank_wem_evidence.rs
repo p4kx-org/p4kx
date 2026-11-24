@@ -3,12 +3,13 @@
 
 //! Common source bindings for a soundbank's embedded WEM list.
 
+use crate::bank_field_evidence::BankFieldEvidence;
 use crate::wem_payload_evidence::{
     DidxWord, EvidenceError, PayloadField, embedded_extent, put, range_use,
 };
 use crate::{
-    Bank, EmbeddedWem, FieldOrigin, FieldOrigins, InputScope, SectionId, SourceInput,
-    SourceInventory, SourceLocation, SourceScope, SourceUseRole, SourceUses,
+    Bank, EmbeddedWem, FieldOrigin, FieldOrigins, SectionId, SourceInventory, SourceLocation,
+    SourceUseRole,
 };
 
 #[path = "bank_wem_read.rs"]
@@ -20,11 +21,7 @@ const WORD_BYTES: u64 = size_of::<u32>() as u64;
 
 /// Physical source of one observed bank listing.
 pub struct BankWemEvidence<'bank> {
-    bank: &'bank Bank,
-    uses: SourceUses,
-    scope: SourceScope,
-    complete: bool,
-    name_scope: InputScope,
+    evidence: BankFieldEvidence<'bank>,
 }
 
 impl<'bank> BankWemEvidence<'bank> {
@@ -33,24 +30,8 @@ impl<'bank> BankWemEvidence<'bank> {
     /// # Errors
     /// Returns an error when the original source cannot be recorded.
     pub fn new(bank: &'bank Bank) -> Result<Self, EvidenceError> {
-        let source = bank.observed_input();
-        let uses = SourceUses::with_compact_use_refs();
-        let scope = uses.observe(source, InputScope::Payload)?;
-        let complete = match source {
-            SourceInput::Archive(origin) => origin.ancestors().all(|step| step.is_some()),
-            SourceInput::File(_) => true,
-            _ => false,
-        };
-        let name_scope = match source {
-            SourceInput::File(_) => InputScope::FileMetadata,
-            _ => InputScope::ArchiveDirectoryMetadata,
-        };
         Ok(Self {
-            bank,
-            uses,
-            scope,
-            complete,
-            name_scope,
+            evidence: BankFieldEvidence::new(bank)?,
         })
     }
 
@@ -59,48 +40,7 @@ impl<'bank> BankWemEvidence<'bank> {
     /// # Errors
     /// Returns an error for missing original ranges or invalid output addresses.
     pub fn header(&self, root: &str, fields: &mut FieldOrigins) -> Result<(), EvidenceError> {
-        let path = self.scope.for_scope(self.name_scope).at(
-            SourceLocation::Metadata {
-                field: if self.name_scope == InputScope::FileMetadata {
-                    "name"
-                } else {
-                    "path"
-                }
-                .into(),
-            },
-            SourceUseRole::Payload,
-        )?;
-        put(
-            fields,
-            root,
-            "soundbank",
-            self.uses.origin(&[path], self.complete),
-        )?;
-        let version = self
-            .bank
-            .soundbank()
-            .version_byte_range()
-            .ok_or(EvidenceError::MissingHeader)?;
-        let version = version.start as u64..version.end as u64;
-        for (output, original, range) in [
-            ("version", "version", version.clone()),
-            ("bank_id", "bankId", version.end..version.end + WORD_BYTES),
-        ] {
-            let word = range_use(
-                &self.scope,
-                "bnkBkhd",
-                original,
-                range,
-                SourceUseRole::Payload,
-            )?;
-            put(
-                fields,
-                root,
-                output,
-                self.uses.origin(&[word], self.complete),
-            )?;
-        }
-        Ok(())
+        self.evidence.header(root, fields)
     }
 
     /// Returns the directory, DIDX and DATA facts that determine the list.
@@ -111,7 +51,7 @@ impl<'bank> BankWemEvidence<'bank> {
         let mut decoded_end = 0;
         let mut didx = None;
         let mut data = None;
-        for (tag, body) in self.bank.soundbank().source_section_bodies() {
+        for (tag, body) in self.evidence.bank.soundbank().source_section_bodies() {
             decoded_end = body.end;
             match tag {
                 SectionId::DIDX => didx = Some(body),
@@ -119,7 +59,7 @@ impl<'bank> BankWemEvidence<'bank> {
                 _ => {}
             }
         }
-        let routing = self.scope.at(
+        let routing = self.evidence.scope.at(
             SourceLocation::Subresource {
                 namespace: "bnkSectionDirectory".into(),
                 indices: vec![decoded_end],
@@ -130,21 +70,24 @@ impl<'bank> BankWemEvidence<'bank> {
         let mut membership = vec![routing];
         if let (Some(didx), Some(data)) = (didx, data) {
             membership.push(range_use(
-                &self.scope,
+                &self.evidence.scope,
                 "bnkDidx",
                 "triplets",
                 didx,
                 SourceUseRole::Conversion,
             )?);
             membership.push(range_use(
-                &self.scope,
+                &self.evidence.scope,
                 "bnkData",
                 "bodyLength",
                 data.start - WORD_BYTES..data.start,
                 SourceUseRole::Selector,
             )?);
         }
-        Ok(self.uses.origin(&membership, self.complete))
+        Ok(self
+            .evidence
+            .uses
+            .origin(&membership, self.evidence.complete))
     }
 
     /// Binds one selected physical WEM and the fields its caller emits.
@@ -162,18 +105,18 @@ impl<'bank> BankWemEvidence<'bank> {
         self.check_member(wem)?;
         let triplet = wem.source().triplet_offset();
         for (name, field) in [("id", DidxWord::Id), ("size", DidxWord::Length)] {
-            let word = field.bind(&self.scope, triplet, SourceUseRole::Payload)?;
+            let word = field.bind(&self.evidence.scope, triplet, SourceUseRole::Payload)?;
             put(
                 fields,
                 parent,
                 name,
-                self.uses.origin(&[word], self.complete),
+                self.evidence.uses.origin(&[word], self.evidence.complete),
             )?;
         }
         read.payload_plan().record(
-            &self.uses,
-            &self.scope,
-            self.complete,
+            &self.evidence.uses,
+            &self.evidence.scope,
+            self.evidence.complete,
             parent,
             fields,
             selection,
@@ -187,21 +130,23 @@ impl<'bank> BankWemEvidence<'bank> {
         self.check_member(wem)?;
         let placement = wem.source();
         let triplet = placement.triplet_offset();
-        let mut uses = embedded_extent(&self.scope, triplet, placement.data_body_offset())?;
-        uses.push(DidxWord::Id.bind(&self.scope, triplet, SourceUseRole::Selector)?);
+        let mut uses =
+            embedded_extent(&self.evidence.scope, triplet, placement.data_body_offset())?;
+        uses.push(DidxWord::Id.bind(&self.evidence.scope, triplet, SourceUseRole::Selector)?);
         uses.push(range_use(
-            &self.scope,
+            &self.evidence.scope,
             "bnkEmbeddedWem",
             "payload",
             placement.byte_range(),
             SourceUseRole::Payload,
         )?);
-        let origin = self.uses.origin(&uses, self.complete);
+        let origin = self.evidence.uses.origin(&uses, self.evidence.complete);
         Ok((self.finish()?, origin))
     }
 
     fn check_member(&self, wem: &EmbeddedWem<'_>) -> Result<(), EvidenceError> {
         let admitted = self
+            .evidence
             .bank
             .soundbank()
             .wem(wem.id())
@@ -219,7 +164,7 @@ impl<'bank> BankWemEvidence<'bank> {
     /// Returns an origin for a tool argument with no original source use.
     #[must_use]
     pub fn request(&self) -> FieldOrigin {
-        self.uses.origin(&[], true)
+        self.evidence.uses.origin(&[], true)
     }
 
     /// Freezes the observed physical contributors.
@@ -227,7 +172,7 @@ impl<'bank> BankWemEvidence<'bank> {
     /// # Errors
     /// Returns an error if the evidence inventory cannot be constructed.
     pub fn finish(self) -> Result<SourceInventory, EvidenceError> {
-        Ok(self.uses.freeze()?)
+        self.evidence.finish()
     }
 }
 
