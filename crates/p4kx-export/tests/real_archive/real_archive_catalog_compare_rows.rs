@@ -7,14 +7,19 @@ use serde::Deserialize;
 use serde::de::{DeserializeSeed, Deserializer, Error, IgnoredAny, SeqAccess, Visitor};
 use serde_json::Value;
 
+use super::digest_parity::{DigestedOrigins, DigestedRows};
 use super::selected_origins::SelectedOrigins;
+use super::selected_ships::SelectedShipIdentities;
 use crate::real_archive_catalog_size::replay::bindings::check_catalog_selection;
 
 #[derive(Clone, Copy)]
 pub(super) enum Projection<'scope> {
     CompleteSelection,
+    ShipIdentities(SelectedShipIdentities),
     Rows(ComparedRows<'scope>),
     Origins(SelectedOrigins<'scope>),
+    DigestedRows(DigestedRows<'scope>),
+    DigestedOrigins(DigestedOrigins<'scope>),
 }
 
 impl<'de> DeserializeSeed<'de> for Projection<'_> {
@@ -27,8 +32,11 @@ impl<'de> DeserializeSeed<'de> for Projection<'_> {
                 check_catalog_selection(&value).map_err(D::Error::custom)?;
                 Ok(value)
             }
+            Self::ShipIdentities(ships) => ships.deserialize(deserializer),
             Self::Rows(rows) => rows.deserialize(deserializer),
             Self::Origins(origins) => origins.deserialize(deserializer),
+            Self::DigestedRows(rows) => rows.deserialize(deserializer),
+            Self::DigestedOrigins(origins) => origins.deserialize(deserializer),
         }
     }
 }

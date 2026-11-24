@@ -6,6 +6,7 @@ use serde_json::Value;
 use super::compare_rows::Projection;
 use super::measurement;
 use super::selected_origins::SelectedOrigins;
+use super::selected_ships::SelectedShipIdentities;
 use super::{BoundMeasurement, Origins, TestResult, first_difference};
 
 impl BoundMeasurement {
@@ -19,6 +20,22 @@ impl BoundMeasurement {
         self.verify_selected_scope(&[path], origins, |catalog| {
             check_selected_row(catalog, path, expected, same_identity)
         })
+    }
+
+    pub(crate) fn read_selected_ship_identities(
+        &self,
+        paths: &[&str],
+        includes: fn(&str) -> bool,
+    ) -> TestResult<Value> {
+        let mut capture = measurement::normal_capture();
+        for path in paths {
+            capture.keep(path);
+        }
+        capture.project(
+            "/ships",
+            Projection::ShipIdentities(SelectedShipIdentities(includes)),
+        );
+        self.read_catalog(&capture)
     }
 
     pub(crate) fn verify_selected_scope(

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::hash::Hash;
 use std::io::Read;
 use std::path::PathBuf;
@@ -9,7 +9,7 @@ use std::path::PathBuf;
 use p4kx_channels::PublicPatches;
 use p4kx_export::catalog_queries::DatasetAvailability;
 use p4kx_export::catalog_queries::equipment::EquipmentSnapshot;
-use p4kx_extraction::{Archive, ArchiveWatch, SourceInventory, SourceUseRole};
+use p4kx_extraction::{Archive, ArchiveWatch, SourceInventory};
 use serde::Serialize;
 use serde::de::DeserializeSeed;
 use serde_json::map::Entry;
@@ -23,8 +23,12 @@ use crate::real_archive_catalog_size::replay::bindings::Binding;
 #[path = "real_archive_catalog_compare_rows.rs"]
 mod compare_rows;
 
+#[path = "real_archive_catalog_digest_parity.rs"]
+mod digest_parity;
 #[path = "real_archive_catalog_measurement.rs"]
 mod measurement;
+
+pub(crate) use digest_parity::{DigestedInventory, DigestedTable, PhysicalSlot};
 pub(crate) use measurement::{with_bound_measurement, with_bound_measurement_from_producer};
 
 #[path = "real_archive_catalog_selected_origins.rs"]
@@ -32,6 +36,9 @@ mod selected_origins;
 
 #[path = "real_archive_catalog_selected_row.rs"]
 mod selected_row;
+
+#[path = "real_archive_catalog_selected_ships.rs"]
+mod selected_ships;
 pub(crate) use selected_row::check_selected_row;
 
 pub(crate) use compare_rows::first_difference;
@@ -115,6 +122,16 @@ impl BoundMeasurement {
         tables: &[Table; TABLES],
         origins: &Origins,
     ) -> TestResult<Counts<TABLES>> {
+        self.verify_tables_and_arrays(paths, tables, &[], origins)
+    }
+
+    pub(crate) fn verify_tables_and_arrays<const TABLES: usize>(
+        &self,
+        paths: [&str; TABLES],
+        tables: &[Table; TABLES],
+        arrays: &[(&str, &[Value])],
+        origins: &Origins,
+    ) -> TestResult<Counts<TABLES>> {
         self.watch.check()?;
         let mut capture = measurement::normal_capture();
         for (path, table) in paths.iter().zip(tables) {
@@ -123,6 +140,9 @@ impl BoundMeasurement {
                 &format!("{path}/rows"),
                 Projection::Rows(ComparedRows::table(path, &table.rows, table.selection)),
             );
+        }
+        for &(path, rows) in arrays {
+            capture.project(path, Projection::Rows(ComparedRows::bare_array(path, rows)));
         }
         capture.project(USES, Projection::Origins(SelectedOrigins(&origins.uses)));
         capture.project(
@@ -133,6 +153,9 @@ impl BoundMeasurement {
         self.binding.check_catalog(&catalog)?;
         for (path, table) in paths.into_iter().zip(tables) {
             check_table(&catalog, path, table)?;
+        }
+        for &(path, rows) in arrays {
+            check_row_array_count(&catalog, path, rows.len())?;
         }
         origins.verify(&catalog)?;
         self.watch.check()?;
@@ -268,61 +291,21 @@ pub(crate) struct Origins {
 }
 
 impl Origins {
+    pub(crate) fn contributing_counts(&self) -> (usize, usize) {
+        (self.uses.len(), self.sources.len())
+    }
+
     pub(crate) fn extend(&mut self, inventory: &SourceInventory, rows: &[Value]) -> TestResult {
         let mut needed = HashSet::new();
         for row in rows {
             collect_references(row, &mut needed);
         }
-        if needed.is_empty() {
-            return Err("expected original cell provenance".into());
-        }
-        let mut pending = Vec::new();
-        for used in inventory.iter_uses() {
-            let id = used.id().as_str();
-            if !needed.remove(id) {
-                continue;
-            }
-            if !matches!(
-                used.role(),
-                SourceUseRole::Payload | SourceUseRole::Selector | SourceUseRole::Conversion
-            ) {
-                return Err("a value refers to a noncontributing observation".into());
-            }
-            retain(&mut self.uses, id.to_owned(), serde_json::to_value(used)?)?;
-            pending.push(used.source().as_str().to_owned());
-        }
-        if !needed.is_empty() {
-            return Err("a value lacks its referenced SDK source use".into());
-        }
-        let sources: HashMap<_, _> = inventory
-            .iter_sources()
-            .map(|source| (source.id().as_str(), source))
-            .collect();
-        let mut visited = HashSet::new();
-        while let Some(id) = pending.pop() {
-            if visited.contains(&id) {
-                continue;
-            }
-            let source = sources
-                .get(id.as_str())
-                .ok_or("missing SDK physical source or ancestor")?;
-            let row = serde_json::to_value(source)?;
-            for ancestor in row
-                .get("ancestors")
-                .and_then(Value::as_array)
-                .ok_or("missing SDK physical source ancestry")?
-            {
-                pending.push(
-                    ancestor
-                        .as_str()
-                        .ok_or("invalid ancestor reference")?
-                        .to_owned(),
-                );
-            }
-            retain(&mut self.sources, id.clone(), row)?;
-            visited.insert(id);
-        }
-        Ok(())
+        digest_parity::capture_inventory(
+            inventory,
+            needed,
+            |id, row| retain(&mut self.uses, id, row),
+            |id, row| retain(&mut self.sources, id, row),
+        )
     }
 
     /// Captures selected Catalog sections and their expected contributing rows.

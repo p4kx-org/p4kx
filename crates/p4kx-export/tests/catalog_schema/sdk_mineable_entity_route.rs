@@ -9,6 +9,7 @@ use p4kx_testkit::{
 };
 
 use super::super::MINEABLE_ENTITIES;
+use super::mining_families::STANDALONE_MINING_REMAINING;
 use super::{Route, TestResult};
 
 pub(super) fn read() -> TestResult<Route> {
@@ -39,7 +40,7 @@ pub(super) fn read() -> TestResult<Route> {
             Route::queried_rows(
                 MINEABLE_ENTITIES,
                 snapshot.rows(),
-                "physical selection and synthetic catalog parity available; installed producer parity open",
+                STANDALONE_MINING_REMAINING,
             )
         },
     )?

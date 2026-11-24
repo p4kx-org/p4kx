@@ -26,6 +26,9 @@ use equipment_input::{dataforge, literal_filter, physical_filter, record_index, 
 #[path = "vehicle_armor_sdk_cold.rs"]
 mod vehicle_armor_cold;
 
+#[path = "real_archive_standalone_mining_sdk_cold.rs"]
+mod mining_cold;
+
 #[path = "real_archive_canonical_ship_sdk.rs"]
 mod canonical_ship;
 
@@ -46,6 +49,8 @@ mod physical_shop;
 
 #[path = "real_archive_paint_compatibility.rs"]
 mod paint_compatibility;
+#[path = "real_archive_selected_weapon_sdk.rs"]
+mod selected_weapon;
 
 const STORE: &str = "/shipStoreSlugs";
 const FACILITY: &str = "/placements/facilityInstances/rows";

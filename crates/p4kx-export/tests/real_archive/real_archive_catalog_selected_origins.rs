@@ -27,7 +27,8 @@ impl<'de> Visitor<'de> for SelectedOrigins<'_> {
     fn visit_seq<A: SeqAccess<'de>>(self, mut sequence: A) -> Result<Value, A::Error> {
         use serde::de::Error as _;
         let mut selected = Map::new();
-        while let Some(row) = sequence.next_element_seed(SelectOrigin(self.0))? {
+        let includes = |id: &str| self.0.contains_key(id);
+        while let Some(row) = sequence.next_element_seed(SelectOrigin(&includes))? {
             if let Some((id, row)) = row
                 && selected.insert(id, row).is_some()
             {
@@ -41,7 +42,7 @@ impl<'de> Visitor<'de> for SelectedOrigins<'_> {
 }
 
 #[derive(Clone, Copy)]
-struct SelectOrigin<'scope>(&'scope Map<String, Value>);
+pub(super) struct SelectOrigin<'scope>(pub(super) &'scope dyn Fn(&str) -> bool);
 
 impl<'de> DeserializeSeed<'de> for SelectOrigin<'_> {
     type Value = Option<(String, Value)>;
@@ -138,7 +139,7 @@ impl Visitor<'_> for ReadField {
     }
 }
 
-struct SelectId<'scope>(&'scope Map<String, Value>);
+struct SelectId<'scope>(&'scope dyn Fn(&str) -> bool);
 
 enum OriginId {
     Missing,
@@ -162,7 +163,7 @@ impl Visitor<'_> for SelectId<'_> {
     }
 
     fn visit_str<E: serde::de::Error>(self, id: &str) -> Result<OriginId, E> {
-        Ok(if self.0.contains_key(id) {
+        Ok(if (self.0)(id) {
             OriginId::Selected(id.to_owned())
         } else {
             OriginId::Unselected

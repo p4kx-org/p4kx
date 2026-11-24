@@ -515,10 +515,53 @@ arrays for `/mineableElements` (43 rows), `/mineableCompositions` (231 rows)
 and `/harvestableProviderPresets` (49 rows), including embedded source-use
 references. The verifier `e35bde456` read the Normal Catalog from producer
 `5d3d917f4` in 1,877.068 seconds with 1,869,099,008 peak private bytes,
-including the stream replay. This proves the shared row projection. The
-standalone All selectors, physical inventory equality and per-query cold
-measurements require their own installed verification.
+including the stream replay. This proves the shared mining-location row projection.
+
+A separate verifier used seven standalone `All` selectors against the complete
+Normal Catalog from PTU producer `93d92ca20bef8a8c3731339214a3301124ade7ba`
+on the matching installed Build `13260598`. It compared all rows in order and
+matched 125,893 contributing source uses and one physical source.
+
+| Catalog dataset | PTU rows compared | LIVE rows in the cold query |
+| --- | ---: | ---: |
+| `/mineableElements` | 43 | 43 |
+| `/mineableCompositions` | 231 | 231 |
+| `/harvestableProviderPresets` | 49 | 49 |
+| `/configurations/miningGlobal` | 8 | 6 |
+| `/definitions/refiningProcesses` | 9 | 9 |
+| `/definitions/resourceTypes` | 209 | 207 |
+| `/definitions/mineableEntities` | 247 | 231 |
+
+The Windows AMD64 test executable built from `aca28691148f61a44a825db6b3dcd7979eaeb032`
+with the standalone Mining comparator had SHA-256
+`fc7ef084e475c03bc51ccaf4e0df56e8c876870d40a12a1b09eee2c4adc446da`.
+The SDK queries and one retained Catalog stream took 5,081.889 seconds.
+Windows lifetime peaks were 1,368,436,736 bytes of private commit and
+1,371,025,408 bytes of working set. The minimum sampled available host memory
+was 14,267,056,128 bytes.
 [Measured producer and streaming method](catalog-partitioning.md#system-memory-acceptance)
+
+Each of the seven standalone `All` queries also ran in its own Windows AMD64
+process on LIVE `13220821` and PTU `13260598` with one Rayon worker. Each process
+opened the installed Archive and decoded and parsed DataForge without opening a
+Normal Catalog frame. It checked owner and dependency coverage and contributing
+source references through their
+physical ancestry. Each result traced to one physical source. PTU cold row
+counts matched the PTU column above. The Archive and manifest matched their
+sealed Build stamps before and after all 14 runs.
+
+| Build | Private commit peak range (bytes) | Working set peak range (bytes) | Minimum sampled host physical available (bytes) | Minimum sampled host commit headroom (bytes) |
+| --- | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 1,091,407,872–1,091,612,672 | 1,021,788,160–1,048,432,640 | 34,148,630,528 | 59,509,202,944 |
+| PTU `13260598` | 1,114,513,408–1,114,980,352 | 1,031,688,192–1,091,035,136 | 30,681,665,536 | 59,481,092,096 |
+
+Windows reported both lifetime peaks below 2,000,000,000 bytes in every
+standalone process. The test executable was built from
+`485f28b17ae99af1b7872958f1628105ef3b76b2` with the Mining witnesses and Catalog
+query changes. Its SHA-256 was
+`b582efebce5f6bf1f6040e53946ea38e64dd184f1a57a1597c8f6184bbca2676`.
+Complete standalone LIVE Normal row and contributing provenance parity remains open.
+
 The synthetic `consumer_refresh` integration cases show how one parsed view can serve several
 queries in one refresh. They resolve a reward source to its physical pool and Blueprint and
 read a mission location and Item ports. The joined mining case follows the provider,
