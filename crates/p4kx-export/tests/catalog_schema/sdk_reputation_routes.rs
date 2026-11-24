@@ -101,9 +101,5 @@ fn witness<Row: JsonSchema + Serialize>(
         &table, expected,
         "canonical rows and source references for {dataset}"
     );
-    Route::queried_rows(
-        dataset,
-        &result.rows,
-        "encrypted synthetic producer parity available; installed producer parity open",
-    )
+    Route::queried_rows(dataset, &result.rows, None)
 }

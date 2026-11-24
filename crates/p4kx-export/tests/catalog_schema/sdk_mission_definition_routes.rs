@@ -220,11 +220,7 @@ fn parity<Row: schemars::JsonSchema + Serialize>(
         expected,
         "exact producer parity for {path}"
     );
-    Route::queried_rows(
-        path,
-        rows,
-        "encrypted synthetic producer parity available; installed producer parity open",
-    )
+    Route::queried_rows(path, rows, None)
 }
 
 fn database() -> DataForgeBuilder {

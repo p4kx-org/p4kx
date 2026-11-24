@@ -3285,6 +3285,55 @@ configuration with 98 source uses and two physical sources. The executable SHA-2
 The test left the scratch directory empty. System-wide counters recorded 229 pages
 read from disk on LIVE and 118,587 on PTU, with zero pages written in either interval.
 
+### Mission definitions, crafting metadata, reputation and factions
+
+The Windows AMD64 verifier compared each group's typed SDK routes with one stream
+of the same Build's complete Normal Catalog. It checked availability, ordered
+values, original physical Record identity and contributing source uses. The
+reputation and faction comparison also checked the selected localized values
+and their source contributors.
+
+The row counts below follow these table orders.
+
+- Mission definitions include `missionScenarios`, `missionModuleDeclarations`
+  and `missionItems`.
+- Crafting metadata includes `craftingGlobal`, `blueprintCategories` and
+  `blueprintCategoryLists`.
+- Reputation and faction data includes `factionReputations`, `reputationScopes`,
+  `reputationStandings`, `reputationContexts`, `reputationPerks`,
+  `reputationTriggerRecords`, `reputationTriggers`, `reputationRewardAmounts`,
+  `factions` and `factionIdentities`. The LIVE `factionIdentities` declaration
+  was absent.
+
+| Group | Build | Ordered row counts | Source uses | Physical sources | Peak private bytes | Peak working set bytes |
+| --- | --- | --- | ---: | ---: | ---: | ---: |
+| Mission definitions | LIVE `13220821` | 15, 8, 228 | 13,989 | 1 | 1,091,522,560 | 1,022,967,808 |
+| Mission definitions | PTU `13260598` | 15, 52, 263 | 21,925 | 1 | 1,114,521,600 | 1,042,501,632 |
+| Crafting metadata | LIVE `13220821` | 1, 21, 1 | 324 | 1 | 1,091,538,944 | 1,031,643,136 |
+| Crafting metadata | PTU `13260598` | 1, 21, 1 | 324 | 1 | 1,114,558,464 | 1,042,477,056 |
+| Reputation and faction | LIVE `13220821` | 39, 46, 380, 27, 2, 3, 39, 58, 60, 0 | 40,700 | 12 | 1,445,834,752 | 1,337,544,704 |
+| Reputation and faction | PTU `13260598` | 49, 46, 380, 28, 2, 3, 49, 70, 92, 14 | 47,823 | 12 | 1,495,089,152 | 1,385,889,792 |
+
+The standalone cold measurements each ran one full route in a fresh process
+with one worker and no retained Catalog. The table reports the largest
+lifetime process peaks over the LIVE and PTU queries in each group.
+
+| Group | Cold runs | Peak private bytes | Peak working set bytes |
+| --- | ---: | ---: | ---: |
+| Mission definitions | 6 | 1,114,861,568 | 1,055,703,040 |
+| Crafting metadata | 6 | 1,114,869,760 | 1,055,703,040 |
+| Reputation and faction | 20 | 1,114,898,432 | 1,045,016,576 |
+
+The complete Normal producer revisions were
+`23addc5e164f65a28a6f258302b30453b331edce` on LIVE and
+`93d92ca20bef8a8c3731339214a3301124ade7ba` on PTU. Mission definitions and
+crafting metadata used the signed verifier source
+`e21ded16a9b2e72ff04fef458e0daf98a17e0e4d` and executable SHA-256
+`c6497b77771f5553b5cde4e04b3d5a5e9a7cea095e3c17a4a812b5590b20deee`.
+Reputation and factions used signed verifier source
+`6c917387ba663a8f06643d1de9fe64fcbe0d6877` and executable SHA-256
+`d8be9805427c93f78fd6090e5d45e03c0fbca9d86eb6abd43c4e135eb9e52b18`.
+
 ## Verify dataset coverage
 
 The SDK coverage audit checks canonical dataset boundaries against calls to the public typed

@@ -361,13 +361,7 @@ fn read_faction_identities(archive: &Archive) -> TestResult<Route> {
         CatalogRecordSelection::All,
         CatalogLanguageSelection::Selected(&[]),
         None,
-        |snapshot| {
-            Route::queried_rows(
-                FACTION_IDENTITIES,
-                &snapshot.rows,
-                "physical selection and synthetic Catalog parity available; installed parity open",
-            )
-        },
+        |snapshot| Route::queried_rows(FACTION_IDENTITIES, &snapshot.rows, None),
     )?
 }
 

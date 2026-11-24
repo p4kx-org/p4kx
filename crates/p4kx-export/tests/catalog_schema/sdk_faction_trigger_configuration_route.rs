@@ -31,11 +31,7 @@ pub(super) fn read() -> TestResult<Route> {
         None,
         |snapshot| {
             compare(&snapshot, &catalog)?;
-            Route::queried_rows(
-                REPUTATION_TRIGGER_CONFIGURATIONS,
-                &snapshot.rows,
-                "encrypted synthetic producer parity available; installed producer parity open",
-            )
+            Route::queried_rows(REPUTATION_TRIGGER_CONFIGURATIONS, &snapshot.rows, None)
         },
     )?
 }

@@ -30,12 +30,6 @@ pub(super) fn read() -> TestResult<Route> {
         CatalogRecordSelection::All,
         CatalogLanguageSelection::Selected(&[]),
         None,
-        |snapshot| {
-            Route::queried_rows(
-                "/definitions/factions",
-                snapshot.rows(),
-                "synthetic producer parity witnessed; same-build installed producer parity open",
-            )
-        },
+        |snapshot| Route::queried_rows("/definitions/factions", snapshot.rows(), None),
     )?
 }

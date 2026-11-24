@@ -127,24 +127,36 @@ fn selected_routes(snapshot: &BlueprintSnapshot<'_>) -> TestResult<([Route; 3], 
 }
 
 fn global_route(parsed: &ParsedCatalogQueries<'_>, guid: Guid) -> TestResult<Route> {
-    parsed.with_crafting_global_params(CatalogRecordSelection::RecordIndex(GLOBAL), None, |snapshot| {
-        let [row] = snapshot.rows() else {
-            return Err("one selected Crafting Global definition".into());
-        };
-        let default = row.default_blueprint_selection().value()
-            .ok_or("authored Crafting Global default selection")?;
-        let [slot] = default.blueprint_records().value().map(Vec::as_slice)
-            .ok_or("authored default Blueprint slots")? else {
+    parsed.with_crafting_global_params(
+        CatalogRecordSelection::RecordIndex(GLOBAL),
+        None,
+        |snapshot| {
+            let [row] = snapshot.rows() else {
+                return Err("one selected Crafting Global definition".into());
+            };
+            let default = row
+                .default_blueprint_selection()
+                .value()
+                .ok_or("authored Crafting Global default selection")?;
+            let [slot] = default
+                .blueprint_records()
+                .value()
+                .map(Vec::as_slice)
+                .ok_or("authored default Blueprint slots")?
+            else {
                 return Err("one original default Blueprint slot".into());
             };
-        if row.source().record_index().value() != Some(&GLOBAL)
-            || slot.value().and_then(|link| link.guid().value().copied()) != Some(guid)
-        {
-            return Err("the selected global must retain its own position and authored Blueprint GUID".into());
-        }
-        Route::queried_rows(CRAFTING_GLOBAL, snapshot.rows(),
-            "typed physical owner and reference exercised; complete installed producer parity open")
-    })?
+            if row.source().record_index().value() != Some(&GLOBAL)
+                || slot.value().and_then(|link| link.guid().value().copied()) != Some(guid)
+            {
+                return Err(
+                    "the selected global must retain its own position and authored Blueprint GUID"
+                        .into(),
+                );
+            }
+            Route::queried_rows(CRAFTING_GLOBAL, snapshot.rows(), None)
+        },
+    )?
 }
 
 fn database() -> DataForgeBuilder {

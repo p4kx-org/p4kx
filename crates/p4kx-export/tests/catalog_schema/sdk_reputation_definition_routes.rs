@@ -180,9 +180,5 @@ fn witness<Row: JsonSchema + Serialize>(
             }),
         "the original payload proof is retained in the snapshot inventory"
     );
-    Route::queried_rows(
-        dataset,
-        &result.rows,
-        "encrypted synthetic producer parity available; installed producer parity open",
-    )
+    Route::queried_rows(dataset, &result.rows, None)
 }

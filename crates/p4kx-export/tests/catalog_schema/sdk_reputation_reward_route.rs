@@ -52,11 +52,7 @@ pub(super) fn read() -> TestResult<Route> {
         None,
         |snapshot| {
             check_catalog_parity(&snapshot, &catalog)?;
-            Route::queried_rows(
-                REPUTATION_REWARD_AMOUNTS,
-                &snapshot.rows,
-                "synthetic producer parity witnessed, installed producer parity open",
-            )
+            Route::queried_rows(REPUTATION_REWARD_AMOUNTS, &snapshot.rows, None)
         },
     )?
 }

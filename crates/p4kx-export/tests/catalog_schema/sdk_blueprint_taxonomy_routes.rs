@@ -37,8 +37,8 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
     let categories = session.read_blueprint_categories(selection, None)?;
     let properties = session.read_gameplay_properties(selection, None)?;
     Ok([
-        Route::queried_rows(BLUEPRINT_CATEGORY_LISTS, &lists.rows, REMAINING)?,
-        Route::queried_rows(BLUEPRINT_CATEGORIES, &categories.rows, REMAINING)?,
+        Route::queried_rows(BLUEPRINT_CATEGORY_LISTS, &lists.rows, None)?,
+        Route::queried_rows(BLUEPRINT_CATEGORIES, &categories.rows, None)?,
         Route::queried_rows(GAMEPLAY_PROPERTIES, &properties.rows, REMAINING)?,
     ])
 }
