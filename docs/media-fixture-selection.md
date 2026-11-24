@@ -423,7 +423,8 @@ cargo test --locked -p p4kx-blender --test it -- stencil_palette_colours_are_pro
 
 Use the isolated Blender profile above and a new output directory. The test measures
 three separate masks, two overlaps, and zero and fractional coverage. It compares
-GLB colour in sRGB bytes and coverage in raw alpha bytes, each within one byte.
+GLB colour in sRGB bytes and coverage in raw alpha bytes. Pure colours and coverage
+match exactly, and the mixed red and blue colour permits one byte of quantization.
 It measures the imported Blender colour and coverage sockets in two fixed-camera
 linear EXRs within 0.012. The one-thread Cycles probe uses fixed sampling and disables
 denoising. The script routes the imported sockets through emission on two copies of
@@ -432,3 +433,15 @@ It records the supplied source revision, Blender build, importer and package-fil
 hashes, sample values and warnings in `stencil-report.json`. This checks the
 override-2 and missing-palette projections of ADR-0310 in both outputs. The ADR
 also records the remaining questions about in-game mask priority and stencil fields.
+
+The Rust test `fitted_paint_supplies_the_drawn_stencil_and_its_physical_colour_origins`
+reuses the masks with a fitted Paint Record that selects a tagged hull variant. The
+GLB and package distinguish the selected palette from the base palette. The package
+links all nine colour components to their fields in the encrypted physical palette Record.
+
+Producer revision `256a1960cbdcc74793096031c0864c8bff91d6f1` passed both Rust cases.
+Blender 5.3.0 (build `02f0899d78e3`) imported the generated painted and fallback
+packages with the release add-on from `405e97268b10c2dd0125e0440d1d6a60d300c8b0`.
+The two imports reported zero warnings. Both sets of eight colour and coverage
+samples agreed within the 0.012 linear tolerance.
+[Release add-on artifact](https://github.com/p4kx-org/p4kx/actions/runs/45315878218/artifacts/14884972989)

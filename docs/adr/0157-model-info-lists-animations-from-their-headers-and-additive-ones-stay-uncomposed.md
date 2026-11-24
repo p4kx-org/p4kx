@@ -42,6 +42,21 @@ additive animations can be composed onto a base.
   reopened if a base is named by a source (an animation graph or `.chrparams` entry) and a
   convention is confirmed against the game.
 
+## Scoped installed source check
+
+LIVE `13220821` and PTU `13260598` each supplied the original controller and
+Mannequin animation database at uniquely admitted physical entries. The LIVE
+payloads matched the retained CRC-verified copies. The PTU extraction verified
+the CRC of both current entries and read 185,457 decoded bytes. The Archive stamps
+and manifest digests were stable across the checks.
+
+The animation database was byte-identical across Builds. Both controllers named
+the same fragment-definition selector and scope. The matching scope carried two
+alternative fragments, each with one direct animation layer, one named clip and one
+blend declaration. A direct base clip remains unidentified in the inspected
+declarations. Binding the scope to a physical rig and its owning DBA or CAF, and
+discriminating the composition order in an observed pose, remain open under #668.
+
 ## Consequences
 
 - `AnimationInfo` has public fields and is `#[non_exhaustive]`; `ModelInfo::of_listing` takes the
