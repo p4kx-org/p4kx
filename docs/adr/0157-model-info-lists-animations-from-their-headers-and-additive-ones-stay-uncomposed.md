@@ -66,6 +66,18 @@ additive flag or explicit base selector. The scope and context definitions
 supply no physical rig or clip path. The option identifies a source candidate
 for binding to a rig and original clip headers before comparing a game pose.
 
+On LIVE 13220821 two original Mannequin Preview setups bind the same controller
+and root ADB to two physical rig entries across two of the relevant contexts.
+The verified root ADB has one original SubADB link to the candidate database
+and explicitly admits the selected fragment. This establishes the authored
+editor setup for those contexts. Gameplay can bind the contexts separately.
+
+The adjacent CHRPARAMS files do not explicitly name either candidate clip or
+include another CHRPARAMS. An exact basename lookup under their CAF masks
+found no loose entry and no matching path field in the verified 0x902 CAF
+image. The exact physical clip binding in the authored track databases and
+the base and multiplication order remain unresolved.
+
 ## Consequences
 
 - `AnimationInfo` has public fields and is `#[non_exhaustive]`; `ModelInfo::of_listing` takes the
