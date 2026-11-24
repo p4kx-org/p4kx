@@ -134,6 +134,15 @@ upload step has one. The snapshot stores the original copies in the checkpoint d
 caller progress and logs in the snapshot directory. The independent harmless controls retain
 their timed observations of runner step behavior.
 
+While the isolated Finish supervisor observes the original MSI lifecycle, two optional
+probes capture progress at sequences 4 and 5. Each probe gets 42 seconds of child capture
+time and up to three seconds for cleanup of its directly owned probe process. The
+installer and original supervisor retain their existing lifecycle. Each boundary writes
+an atomic JSON marker with the probe sequence and run identity. The upload retains the
+watchdog and available markers even when the worker times out before producing a
+checkpoint. These files describe progress and timeout state. The final lifecycle
+verdict still requires the original supervisor result and its validation.
+
 Before checksums and release notes are assembled, `check-release-matrix.ps1` requires:
 
 - Thirteen non-empty native packages, comprising four for Windows, eight for Linux and one DMG for macOS.
