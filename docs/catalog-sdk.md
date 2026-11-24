@@ -2726,10 +2726,17 @@ Windows AMD64 process with one worker. Each returned the full corresponding row 
 | --- | ---: | ---: | ---: | ---: |
 | LIVE `13220821` | 205 | 38,367 | 1,512,280,064 | 1,493,921,792 |
 | PTU `13248297` | 203 | 38,613 | 1,531,928,576 | 1,514,065,920 |
+| PTU `13260598` | 225 | 58,167 | 1,591,414,784 | 1,581,993,984 |
 
-Both fresh processes stayed under 2 GB and created no scratch files.
-Their executable SHA-256 was
+All three fresh processes stayed under 2 GB and created no scratch files.
+The LIVE `13220821` and PTU `13248297` cold executables had SHA-256
 `07e7e6cdddec71523c305330088c4d79f7f35f2612b00690e9f9b0be245a35b5`.
+The PTU `13260598` cold executable used the Store SDK from
+`b3c0e21abea216d676b7921c64ef6a45a2153f9b` and had SHA-256
+`5273ad4eb7fb673b440cde789239af3b1c92390a1d38cb6c2d5dbf0409768475`.
+The installed Archive and manifest matched before and after the standalone query.
+The complete ordered Store comparison against current PTU Normal producer
+`93d92ca20bef8a8c3731339214a3301124ade7ba` remains open.
 
 The test `installed_mining_and_store_slugs_match_retained_complete_catalog`
 shares one stream of the verified Normal Catalog for the mining consumer and the

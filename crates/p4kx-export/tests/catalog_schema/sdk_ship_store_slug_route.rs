@@ -46,8 +46,8 @@ pub(super) fn read() -> TestResult<Route> {
             scope.rows(),
             concat!(
                 "synthetic unfiltered Normal parity, complete installed parity and cold memory on ",
-                "LIVE 13220821 and PTU 13248297 verified. Current PTU 13260598 complete Normal ",
-                "parity and standalone cold memory remain open",
+                "LIVE 13220821 and PTU 13248297 verified. Current PTU 13260598 standalone cold ",
+                "memory verified for 225 canonical rows. Current complete Normal parity remains open",
             ),
         )
     })?;
