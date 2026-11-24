@@ -75,8 +75,11 @@ editor setup for those contexts. Gameplay can bind the contexts separately.
 The adjacent CHRPARAMS files do not explicitly name either candidate clip or
 include another CHRPARAMS. An exact basename lookup under their CAF masks
 found no loose entry and no matching path field in the verified 0x902 CAF
-image. The exact physical clip binding in the authored track databases and
-the base and multiplication order remain unresolved.
+image. The same-build track-database survey CRC-verified all 181 entries
+reached by the two files' literal selectors and observed Archive glob matches.
+Neither exact alias stem occurs among the 6,452 metadata names. The survey
+reads no controller blocks or keyframes. Runtime alias resolution, base
+selection and multiplication order remain unresolved.
 
 ## Consequences
 
