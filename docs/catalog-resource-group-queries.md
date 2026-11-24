@@ -87,4 +87,24 @@ sequential original-field preparations are reused; a single body read does not i
 memory. Measure the application peak for the requested projection against
 the SDK memory budget.
 
+## Installed parity and memory
+
+The Windows AMD64 verifier at `8e85fb65026b660deb1c5d4b82b1b71eff77a0a5`
+compared the SDK rows and their contributing source inventory to complete Normal
+Catalogs for the same Archive Builds. All three ResourceGroup datasets were
+Available. The tables matched all 19 definition, 19 membership and 19 parent rows
+on each Build, including original values, physical order and per-value origins.
+
+| Build | Normal producer | Contributing source uses | Physical sources |
+| --- | --- | ---: | ---: |
+| LIVE `13220821` | `23addc5e164f65a28a6f258302b30453b331edce` | 1,186 | 1 |
+| PTU `13260598` | `93d92ca20bef8a8c3731339214a3301124ade7ba` | 1,194 | 1 |
+
+The comparisons checked the complete decoded streams and kept Build and Archive
+stamps stable. The higher process lifetime peaks were 1,115,025,408 bytes private
+and 1,042,235,392 bytes working set. Four independent cold reads also ran both
+routes on both Builds, one route per process without a Catalog frame. Across the
+four reads the highest private commit was 1,114,550,272 bytes and the highest
+working set was 1,031,684,096 bytes.
+
 Decision: [ADR0409](adr/0409-resource-group-queries-separate-authored-memberships-from-parent-surveys.md).

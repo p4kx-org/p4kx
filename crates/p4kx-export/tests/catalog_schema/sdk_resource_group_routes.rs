@@ -23,9 +23,6 @@ mod canonical_json;
 #[path = "../it/resource_group_records.rs"]
 mod fixture;
 
-const REMAINING: &str =
-    "typed query and synthetic producer parity witnessed; complete installed producer parity open";
-
 pub(super) fn read() -> TestResult<[Route; 4]> {
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("resource_group_fixture.p4k");
@@ -92,6 +89,5 @@ fn witness<Row: JsonSchema + Serialize>(
         .and_then(|table| table.get("rows"))
         .ok_or_else(|| format!("missing canonical rows for {dataset}"))?;
     canonical_json::assert_canonical(rows, expected, dataset)?;
-    let remaining = (dataset != RESOURCE_TYPES).then_some(REMAINING);
-    Route::queried_rows(dataset, rows, remaining)
+    Route::queried_rows(dataset, rows, None)
 }
