@@ -11,28 +11,35 @@ use serde_json::Value;
 
 use super::compare_rows::Projection;
 use super::digest_parity::{PhysicalSlot, capture_inventory, fingerprint, row_fingerprint};
-use super::{BoundMeasurement, Counts, SOURCES, TestResult, USES, measurement};
+use super::{BoundMeasurement, Counts, SOURCES, ScopedTextProof, TestResult, USES, measurement};
 use crate::catalog_capture::CatalogCapture;
 
 #[path = "real_archive_catalog_digest_index.rs"]
 mod digest_index;
 #[path = "real_archive_catalog_digest_runs.rs"]
 mod digest_runs;
+#[path = "real_archive_loot_harvest_digests.rs"]
+mod loot_harvest;
 #[path = "real_archive_mission_configuration_digests.rs"]
 mod mission;
 #[path = "real_archive_container_placement_digests.rs"]
 mod placement;
 #[path = "real_archive_catalog_stream_wire.rs"]
 mod wire;
+#[path = "real_archive_world_definition_stream.rs"]
+mod world;
 
+pub(crate) use loot_harvest::{LootHarvestDataset, LootHarvestDigests};
 pub(super) use mission::MissionDispositionRows;
 pub(crate) use mission::{MissionDisposition, StreamedMissionDigests};
 pub(crate) use placement::StreamedPlacementDigests;
 
 use digest_index::DigestIndex;
 use digest_runs::{DigestRuns, OriginDigest};
+pub(crate) use wire::DefinitionOwner;
 use wire::OrderedRows;
 pub(super) use wire::{RowDigest, StreamOrigins};
+pub(crate) use world::WorldDefinitionDigests;
 
 pub(crate) struct StreamedComponentDigests<'directory, const TABLES: usize = 1> {
     rows: [OrderedRows; TABLES],
@@ -127,6 +134,25 @@ impl BoundMeasurement {
         extend_capture: impl for<'scope> FnOnce(&mut CatalogCapture<Projection<'scope>>),
         verify_extra: impl FnOnce(&Value) -> TestResult,
     ) -> TestResult<Counts<TABLES>> {
+        self.verify_streamed_scope(
+            paths,
+            availability,
+            evidence,
+            None,
+            extend_capture,
+            verify_extra,
+        )
+    }
+
+    fn verify_streamed_scope<const TABLES: usize>(
+        &self,
+        paths: [&str; TABLES],
+        availability: [DatasetAvailability; TABLES],
+        evidence: StreamedComponentDigests<'_, TABLES>,
+        texts: Option<&ScopedTextProof>,
+        extend_capture: impl for<'scope> FnOnce(&mut CatalogCapture<Projection<'scope>>),
+        verify_extra: impl FnOnce(&Value) -> TestResult,
+    ) -> TestResult<Counts<TABLES>> {
         self.watch.check()?;
         let rows = evidence.rows.map(OrderedRows::finish);
         let uses = DigestIndex::open(evidence.uses.finish()?)?;
@@ -139,9 +165,15 @@ impl BoundMeasurement {
         project_tables(&mut capture, &paths, &availability, &rows)?;
         capture.project(USES, Projection::StreamOrigins(StreamOrigins(&uses)));
         capture.project(SOURCES, Projection::StreamOrigins(StreamOrigins(&sources)));
+        if let Some(texts) = texts {
+            texts.project(&mut capture);
+        }
         extend_capture(&mut capture);
         let catalog = self.read_catalog(&capture)?;
         verify_extra(&catalog)?;
+        if let Some(texts) = texts {
+            texts.verify(&catalog)?;
+        }
         verify_tables(&catalog, &paths, &availability, &rows)?;
         if catalog.pointer(USES) != Some(&Value::from(uses.count()))
             || catalog.pointer(SOURCES) != Some(&Value::from(sources.count()))

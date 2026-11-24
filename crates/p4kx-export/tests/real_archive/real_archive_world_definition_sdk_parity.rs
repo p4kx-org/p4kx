@@ -133,7 +133,8 @@ fn installed_world_definitions_match_one_complete_catalog() -> TestResult {
     let producer = env::var(PRODUCER)?;
     let expected = expected()?;
     with_bound_measurement_from_producer(&producer, |archive, measurement| {
-        let mut proof = Proof::retained(archive, expected);
+        let directory = tempfile::tempdir()?;
+        let mut proof = Proof::retained(archive, expected, directory.path());
         retain(archive, &mut proof)?;
         let compared = proof.compare(measurement)?;
         print_line(&format!(

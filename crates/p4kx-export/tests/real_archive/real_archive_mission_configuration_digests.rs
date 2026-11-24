@@ -129,7 +129,10 @@ pub(super) fn project_mission_row(
             configuration_row(row, shape)
         }
         EncounterRow::MissionArena => arena_row(row),
-        EncounterRow::Placement => Err("expected a mission comparison row".into()),
+        EncounterRow::Placement
+        | EncounterRow::LootOriginal
+        | EncounterRow::LootWeighted
+        | EncounterRow::HarvestSlotPreset => Err("expected a mission comparison row".into()),
     }
 }
 

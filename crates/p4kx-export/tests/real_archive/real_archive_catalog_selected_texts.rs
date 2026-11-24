@@ -32,8 +32,17 @@ impl ScopedTextProof {
         inventory: &SourceInventory,
         origins: &mut Origins,
     ) -> TestResult {
-        retain(&mut self.public, public, inventory, origins)?;
-        retain(&mut self.protected, protected, inventory, origins)
+        self.retain_with(public, protected, |wires| origins.extend(inventory, wires))
+    }
+
+    pub(super) fn retain_with(
+        &mut self,
+        public: &[impl Serialize],
+        protected: &[impl Serialize],
+        mut capture: impl FnMut(&[Value]) -> TestResult,
+    ) -> TestResult {
+        retain(&mut self.public, public, &mut capture)?;
+        retain(&mut self.protected, protected, &mut capture)
     }
 
     pub(super) fn project<'scope>(&'scope self, capture: &mut CatalogCapture<Projection<'scope>>) {
@@ -63,8 +72,7 @@ impl ScopedTextProof {
 fn retain(
     expected: &mut Texts,
     rows: &[impl Serialize],
-    inventory: &SourceInventory,
-    origins: &mut Origins,
+    capture: &mut impl FnMut(&[Value]) -> TestResult,
 ) -> TestResult {
     if rows.is_empty() {
         return Ok(());
@@ -73,7 +81,7 @@ fn retain(
         .iter()
         .map(serde_json::to_value)
         .collect::<Result<Vec<_>, _>>()?;
-    origins.extend(inventory, &wires)?;
+    capture(&wires)?;
     let mut seen = HashSet::new();
     for value in wires {
         let id = text_identity(&value).ok_or("the SDK omitted its selected text ID")?;

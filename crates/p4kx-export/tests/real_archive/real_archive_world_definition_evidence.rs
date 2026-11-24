@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeMap, HashSet};
+use std::collections::HashSet;
+use std::path::Path;
 
 use p4kx_export::catalog_queries::starmap::StarmapDefinitionSnapshot;
 use p4kx_export::catalog_queries::{
@@ -9,10 +10,9 @@ use p4kx_export::catalog_queries::{
 };
 use p4kx_extraction::{Archive, Build, SourceInventory};
 use serde::Serialize;
-use serde_json::Value;
 
 use crate::real_archive_catalog_table_parity::{
-    BoundMeasurement, Counts, Origins, ScopedTextProof, Table, TestResult, capture_rows,
+    BoundMeasurement, Counts, DefinitionOwner, TestResult, WorldDefinitionDigests,
 };
 use crate::real_archive_verification::print_line;
 
@@ -55,14 +55,7 @@ pub(super) struct RecordScope<'read> {
 pub(super) struct Proof<'archive> {
     archive: &'archive Archive,
     expected: Expected,
-    retained: Option<Retained>,
-}
-
-#[derive(Default)]
-struct Retained {
-    tables: BTreeMap<Family, Table>,
-    origins: Origins,
-    texts: ScopedTextProof,
+    retained: Option<WorldDefinitionDigests<'archive, COUNT>>,
 }
 
 impl<'archive> Proof<'archive> {
@@ -74,9 +67,21 @@ impl<'archive> Proof<'archive> {
         }
     }
 
-    pub(super) fn retained(archive: &'archive Archive, expected: Expected) -> Self {
+    pub(super) fn retained(
+        archive: &'archive Archive,
+        expected: Expected,
+        directory: &'archive Path,
+    ) -> Self {
         Self {
-            retained: Some(Retained::default()),
+            retained: Some(WorldDefinitionDigests::new(
+                directory,
+                FAMILIES.map(|family| match family {
+                    Family::Soils | Family::SoilTextureSets | Family::PlanetResources => {
+                        DefinitionOwner::Entry
+                    }
+                    _ => DefinitionOwner::Record,
+                }),
+            )),
             ..Self::cold(archive, expected)
         }
     }
@@ -110,7 +115,6 @@ impl<'archive> Proof<'archive> {
                 availability: scope.availability,
                 inventory: scope.inventory,
                 skipped: coverage.skipped_leftovers,
-                domain: Domain::Record,
             },
             identity,
         )
@@ -138,7 +142,6 @@ impl<'archive> Proof<'archive> {
                 availability: snapshot.availability,
                 inventory: &snapshot.source_inventory,
                 skipped: snapshot.entries.intentionally_skipped,
-                domain: Domain::Entry,
             },
             |row| Some(identity(row)),
         )
@@ -155,11 +158,10 @@ impl<'archive> Proof<'archive> {
             return Err("the Starmap query has inconsistent localization coverage".into());
         }
         if let Some(retained) = &mut self.retained {
-            retained.texts.retain(
+            retained.retain_texts(
                 &snapshot.public_names,
                 &snapshot.game_texts,
                 &snapshot.source_inventory,
-                &mut retained.origins,
             )?;
         }
         Ok(())
@@ -201,16 +203,12 @@ impl<'archive> Proof<'archive> {
         }
         require_unique(observed.rows.iter().map(identity))?;
         if let Some(retained) = &mut self.retained {
-            let table = capture_rows(
+            retained.retain(
+                family as usize,
                 observed.availability,
                 observed.rows,
                 observed.inventory,
-                &mut retained.origins,
-                |row| observed.domain.physical_index(row),
             )?;
-            if retained.tables.insert(family, table).is_some() {
-                return Err(format!("{path}: selected route was repeated").into());
-            }
         }
         print_line(&format!(
             "World definition SDK: dataset={path} availability={:?} rows={count} inventoryUses={uses} inventorySources={sources} skippedLeftovers={}",
@@ -220,31 +218,9 @@ impl<'archive> Proof<'archive> {
     }
 
     pub(super) fn compare(self, measurement: &BoundMeasurement) -> TestResult<Counts<COUNT>> {
-        let Some(Retained {
-            mut tables,
-            origins,
-            texts,
-        }) = self.retained
-        else {
-            return Err("the retained World definition proof was not captured".into());
-        };
-        let tables: [Table; COUNT] = FAMILIES
-            .into_iter()
-            .map(|family| {
-                tables
-                    .remove(&family)
-                    .ok_or("missing selected World definition route")
-            })
-            .collect::<Result<Vec<_>, _>>()?
-            .try_into()
-            .map_err(|_| "the retained World definition routes are incomplete")?;
-        measurement.verify_table_scope(
-            FAMILIES.map(Family::path),
-            &tables,
-            &[],
-            &origins,
-            Some(&texts),
-        )
+        self.retained
+            .ok_or_else(|| "the retained World definition proof was not captured".into())
+            .and_then(|retained| retained.compare(measurement, FAMILIES.map(Family::path)))
     }
 }
 
@@ -254,31 +230,6 @@ struct Observation<'read, Row> {
     availability: DatasetAvailability,
     inventory: &'read SourceInventory,
     skipped: usize,
-    domain: Domain,
-}
-
-#[derive(Clone, Copy)]
-enum Domain {
-    Record,
-    Entry,
-}
-
-impl Domain {
-    fn physical_index(self, row: &Value) -> TestResult<u32> {
-        let position = match self {
-            Self::Record
-                if row.pointer("/recordIndex/state").and_then(Value::as_str) == Some("present") =>
-            {
-                row.pointer("/recordIndex/value")
-            }
-            Self::Record => None,
-            Self::Entry => row.pointer("/identity/entryIndex"),
-        };
-        position
-            .and_then(Value::as_u64)
-            .and_then(|index| u32::try_from(index).ok())
-            .ok_or_else(|| "missing or unreadable physical World definition owner index".into())
-    }
 }
 
 const fn known_disposition(availability: DatasetAvailability, count: usize) -> bool {
@@ -306,17 +257,21 @@ fn distinguishes_physical_owner_domains_and_absence() -> TestResult {
     let record = json!({"recordIndex":{"state":"present","value":4}});
     let entry = json!({"identity":{"entryIndex":4}});
     assert_eq!(
-        Domain::Record.physical_index(&record)?,
+        DefinitionOwner::Record.physical_index(&record)?,
         4,
         "original Record"
     );
-    assert_eq!(Domain::Entry.physical_index(&entry)?, 4, "original Entry");
+    assert_eq!(
+        DefinitionOwner::Entry.physical_index(&entry)?,
+        4,
+        "original Entry"
+    );
     assert!(
-        Domain::Record.physical_index(&entry).is_err(),
+        DefinitionOwner::Record.physical_index(&entry).is_err(),
         "Entry is no Record"
     );
     assert!(
-        Domain::Entry.physical_index(&record).is_err(),
+        DefinitionOwner::Entry.physical_index(&record).is_err(),
         "Record is no Entry"
     );
     assert!(

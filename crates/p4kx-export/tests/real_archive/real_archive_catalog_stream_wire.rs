@@ -22,6 +22,7 @@ enum RowOrder {
     #[default]
     PhysicalSlot,
     Encounter(EncounterRow),
+    Definition(DefinitionOwner),
 }
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
@@ -30,12 +31,18 @@ pub(super) enum EncounterRow {
     MissionProperties,
     MissionFlows,
     MissionArena,
+    LootOriginal,
+    LootWeighted,
+    HarvestSlotPreset,
 }
 
 impl EncounterRow {
     pub(super) fn project(self, row: Value) -> TestResult<(Fingerprint, Value)> {
         match self {
             Self::Placement => Ok((encounter_key(&row)?, row)),
+            Self::LootOriginal | Self::LootWeighted | Self::HarvestSlotPreset => {
+                Ok((super::loot_harvest::loot_harvest_key(self, &row)?, row))
+            }
             _ => super::mission::project_mission_row(self, row),
         }
     }
@@ -51,6 +58,16 @@ pub(super) struct OrderedRows {
 }
 
 impl OrderedRows {
+    pub(super) fn with_definition(owner: DefinitionOwner) -> Self {
+        Self {
+            order: RowOrder::Definition(owner),
+            ..Self::default()
+        }
+    }
+
+    pub(super) fn append_definition(&mut self, index: u32, row: Fingerprint) -> TestResult {
+        self.append_encounter_row(Sha256::digest(index.to_be_bytes()).into(), row)
+    }
     pub(super) fn in_encounter_order() -> Self {
         Self::with_encounter(EncounterRow::Placement)
     }
@@ -144,6 +161,10 @@ impl<'de> Visitor<'de> for RowDigest {
                     let slot = wire_slot(&row).map_err(A::Error::custom)?;
                     ordered.append(slot, fingerprint(row).map_err(A::Error::custom)?)
                 }
+                RowOrder::Definition(owner) => {
+                    let index = owner.physical_index(&row).map_err(A::Error::custom)?;
+                    ordered.append_definition(index, fingerprint(row).map_err(A::Error::custom)?)
+                }
                 RowOrder::Encounter(shape) => {
                     let (key, row) = shape.project(row).map_err(A::Error::custom)?;
                     ordered.append_encounter_row(key, fingerprint(row).map_err(A::Error::custom)?)
@@ -169,6 +190,30 @@ impl<'de> Visitor<'de> for RowDigest {
             ));
         }
         Ok(Value::from(self.count))
+    }
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(crate) enum DefinitionOwner {
+    Record,
+    Entry,
+}
+
+impl DefinitionOwner {
+    pub(crate) fn physical_index(self, row: &Value) -> TestResult<u32> {
+        let position = match self {
+            Self::Record
+                if row.pointer("/recordIndex/state").and_then(Value::as_str) == Some("present") =>
+            {
+                row.pointer("/recordIndex/value")
+            }
+            Self::Record => None,
+            Self::Entry => row.pointer("/identity/entryIndex"),
+        };
+        position
+            .and_then(Value::as_u64)
+            .and_then(|index| u32::try_from(index).ok())
+            .ok_or_else(|| "missing or unreadable physical definition owner index".into())
     }
 }
 
