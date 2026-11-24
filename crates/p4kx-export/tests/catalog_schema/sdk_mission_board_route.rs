@@ -39,11 +39,7 @@ pub(super) fn read() -> TestResult<Route> {
         |snapshot| {
             verify_rows(&snapshot)?;
             parity(DATASET, &snapshot, &catalog)?;
-            Route::queried_rows(
-                DATASET,
-                snapshot.rows(),
-                "encrypted synthetic producer and source parity witnessed; installed producer parity open",
-            )
+            Route::queried_rows(DATASET, snapshot.rows(), None)
         },
     )?
 }

@@ -1511,6 +1511,23 @@ duplicated, and dangling slots. The snapshot supplies immediate source uses for
 original values and resolved target headers. The query reads the selected owners
 that carry a provider component and uses the original header for referenced factions.
 
+### Installed mission board and contract scope queries
+
+The independent `location_vocabulary::with_contract_scopes` query reads
+`definitions.contractScopes` by original Record selection. On Windows AMD64,
+both queries ran separately in fresh processes and matched their Build's
+complete Normal Catalog for availability, ordered rows and source provenance.
+
+| Build | Contract scopes | Mission boards | Maximum cold private commit (bytes) | Retained private commit (bytes) |
+| --- | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | Absent | Absent | 1,091,493,888 | 1,091,588,096 |
+| PTU `13260598` | 1 | 24 | 1,114,501,120 | 1,114,578,944 |
+
+The verifier `fdbebda92b998a21a4b61f0c5bfa6ca2b7103701` checked the declared
+family state even when it emitted zero rows. The Normal producer revisions were
+`23addc5e164f65a28a6f258302b30453b331edce` and
+`93d92ca20bef8a8c3731339214a3301124ade7ba`, respectively.
+
 ## Loot-generation components
 
 Use `catalog_queries::equipment::loot_generation::with_loot_generation_components` for
