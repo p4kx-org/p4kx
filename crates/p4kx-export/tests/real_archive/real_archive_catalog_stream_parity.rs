@@ -18,11 +18,15 @@ use crate::catalog_capture::CatalogCapture;
 mod digest_index;
 #[path = "real_archive_catalog_digest_runs.rs"]
 mod digest_runs;
+#[path = "real_archive_mission_configuration_digests.rs"]
+mod mission;
 #[path = "real_archive_container_placement_digests.rs"]
 mod placement;
 #[path = "real_archive_catalog_stream_wire.rs"]
 mod wire;
 
+pub(super) use mission::MissionDispositionRows;
+pub(crate) use mission::{MissionDisposition, StreamedMissionDigests};
 pub(crate) use placement::StreamedPlacementDigests;
 
 use digest_index::DigestIndex;
@@ -112,6 +116,17 @@ impl BoundMeasurement {
         availability: [DatasetAvailability; TABLES],
         evidence: StreamedComponentDigests<'_, TABLES>,
     ) -> TestResult<Counts<TABLES>> {
+        self.verify_streamed_tables(paths, availability, evidence, |_| {}, |_| Ok(()))
+    }
+
+    fn verify_streamed_tables<const TABLES: usize>(
+        &self,
+        paths: [&str; TABLES],
+        availability: [DatasetAvailability; TABLES],
+        evidence: StreamedComponentDigests<'_, TABLES>,
+        extend_capture: impl for<'scope> FnOnce(&mut CatalogCapture<Projection<'scope>>),
+        verify_extra: impl FnOnce(&Value) -> TestResult,
+    ) -> TestResult<Counts<TABLES>> {
         self.watch.check()?;
         let rows = evidence.rows.map(OrderedRows::finish);
         let uses = DigestIndex::open(evidence.uses.finish()?)?;
@@ -124,7 +139,9 @@ impl BoundMeasurement {
         project_tables(&mut capture, &paths, &availability, &rows)?;
         capture.project(USES, Projection::StreamOrigins(StreamOrigins(&uses)));
         capture.project(SOURCES, Projection::StreamOrigins(StreamOrigins(&sources)));
+        extend_capture(&mut capture);
         let catalog = self.read_catalog(&capture)?;
+        verify_extra(&catalog)?;
         verify_tables(&catalog, &paths, &availability, &rows)?;
         if catalog.pointer(USES) != Some(&Value::from(uses.count()))
             || catalog.pointer(SOURCES) != Some(&Value::from(sources.count()))

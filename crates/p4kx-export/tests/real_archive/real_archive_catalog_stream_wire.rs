@@ -21,7 +21,24 @@ use super::digest_runs::{Fingerprint, OriginDigest};
 enum RowOrder {
     #[default]
     PhysicalSlot,
-    Encounter,
+    Encounter(EncounterRow),
+}
+
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub(super) enum EncounterRow {
+    Placement,
+    MissionProperties,
+    MissionFlows,
+    MissionArena,
+}
+
+impl EncounterRow {
+    pub(super) fn project(self, row: Value) -> TestResult<(Fingerprint, Value)> {
+        match self {
+            Self::Placement => Ok((encounter_key(&row)?, row)),
+            _ => super::mission::project_mission_row(self, row),
+        }
+    }
 }
 
 #[derive(Default)]
@@ -35,8 +52,12 @@ pub(super) struct OrderedRows {
 
 impl OrderedRows {
     pub(super) fn in_encounter_order() -> Self {
+        Self::with_encounter(EncounterRow::Placement)
+    }
+
+    pub(super) fn with_encounter(row: EncounterRow) -> Self {
         Self {
-            order: RowOrder::Encounter,
+            order: RowOrder::Encounter(row),
             ..Self::default()
         }
     }
@@ -123,8 +144,8 @@ impl<'de> Visitor<'de> for RowDigest {
                     let slot = wire_slot(&row).map_err(A::Error::custom)?;
                     ordered.append(slot, fingerprint(row).map_err(A::Error::custom)?)
                 }
-                RowOrder::Encounter => {
-                    let key = encounter_key(&row).map_err(A::Error::custom)?;
+                RowOrder::Encounter(shape) => {
+                    let (key, row) = shape.project(row).map_err(A::Error::custom)?;
                     ordered.append_encounter_row(key, fingerprint(row).map_err(A::Error::custom)?)
                 }
             }
