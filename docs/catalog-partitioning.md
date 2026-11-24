@@ -461,6 +461,21 @@ bytes. The writer reports 2,215,745,998 peak temporary bytes and Windows
 reports 2,215,756,050 process write bytes. The separate replay uses this same
 sealed compressed output.
 
+The archive-free replay passed in 5,311.84 s. Two streaming passes verified
+80,616,097,191 decoded bytes, 254 measured sections, 116,775 physical sources,
+125,100,723 source uses, 511 variant source-use sets and 89,005,054 sourced cells.
+The decoded SHA-256 was
+`1a51de43ba862e2bd66e46910b4afdd1fe56847fcfd2c57b7c7ac5e1e2554978`.
+
+The PowerShell launcher failed while naming its output receipt. Independent
+verification matched the closed Rust transcript, original signed preparation
+and producer receipts, driver, and complete original compressed frame. A
+separate query handle retained through termination recorded 17,111,257,088 bytes
+of peak private commit, 16,704,876,544 bytes of peak working set and 23,839
+Windows write-transfer bytes for the replay process. The launcher produced
+no terminal receipt or process exit code. The producer measurements above
+have their own Windows lifetime counters.
+
 ## Measuring a complete export
 
 The installed regression checks verify decoded and stored byte counts against the actual writer
