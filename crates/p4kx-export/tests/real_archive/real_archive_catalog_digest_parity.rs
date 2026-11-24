@@ -204,12 +204,30 @@ impl BoundMeasurement {
         tables: &[DigestedTable; TABLES],
         inventory: &DigestedInventory,
     ) -> TestResult<Counts<TABLES>> {
-        self.watch.check()?;
-        let mut capture = measurement::normal_capture();
         for (path, table) in paths.iter().zip(tables) {
             if table.rows.is_empty() {
                 return Err(format!("the parity route has no rows at {path}").into());
             }
+        }
+        self.verify_digested_tables_with_availability(
+            paths,
+            tables,
+            [DatasetAvailability::Available; TABLES],
+            inventory,
+        )
+    }
+
+    pub(crate) fn verify_digested_tables_with_availability<const TABLES: usize>(
+        &self,
+        paths: [&str; TABLES],
+        tables: &[DigestedTable; TABLES],
+        availability: [DatasetAvailability; TABLES],
+        inventory: &DigestedInventory,
+    ) -> TestResult<Counts<TABLES>> {
+        self.watch.check()?;
+        let mut capture = measurement::normal_capture();
+        for ((path, table), expected) in paths.iter().zip(tables).zip(availability) {
+            require_digest_scope(path, table, expected)?;
             capture.keep(&format!("{path}/availability"));
             capture.project(
                 &format!("{path}/rows"),
@@ -225,10 +243,10 @@ impl BoundMeasurement {
             Projection::DigestedOrigins(DigestedOrigins(&inventory.sources)),
         );
         let catalog = self.read_catalog(&capture)?;
-        let available = serde_json::to_value(DatasetAvailability::Available)?;
-        for (path, table) in paths.iter().zip(tables) {
+        for ((path, table), expected) in paths.iter().zip(tables).zip(availability) {
             let actual = catalog.pointer(path).ok_or("required full Catalog table")?;
-            if actual.get("availability") != Some(&available)
+            let expected = serde_json::to_value(expected)?;
+            if actual.get("availability") != Some(&expected)
                 || actual.get("rows") != Some(&Value::from(table.rows.len()))
             {
                 return Err(format!("Catalog and SDK table scope differs at {path}").into());
@@ -247,6 +265,18 @@ impl BoundMeasurement {
             source_uses: inventory.uses.len(),
             physical_sources: inventory.sources.len(),
         })
+    }
+}
+
+fn require_digest_scope(
+    path: &str,
+    table: &DigestedTable,
+    availability: DatasetAvailability,
+) -> TestResult {
+    match availability {
+        DatasetAvailability::Available => Ok(()),
+        DatasetAvailability::Absent if table.rows.is_empty() => Ok(()),
+        _ => Err(format!("the parity route has incomplete availability at {path}").into()),
     }
 }
 
@@ -337,64 +367,6 @@ impl<'de> Visitor<'de> for DigestedOrigins<'_> {
     }
 }
 
-#[test]
-fn digested_comparison_rejects_missing_and_conflicting_rows() -> TestResult {
-    use serde_json::json;
-
-    let mut table = DigestedTable::default();
-    let mut references = HashSet::new();
-    let row = json!({"number": 7, "origin": {"sourceUsesRefs": ["a"]}});
-    let linked = json!({"number": 2, "origin": {"sourceUsesRefs": ["b"]}});
-    let direct_slot = PhysicalSlot {
-        record_index: 5,
-        component_ordinal: 1,
-    };
-    let linked_slot = PhysicalSlot {
-        record_index: 2,
-        component_ordinal: 1,
-    };
-    table.retain_direct(direct_slot, &row, &mut references)?;
-    table.retain_dependency(linked_slot, &linked, &mut references)?;
-    table.retain_dependency(linked_slot, &linked, &mut references)?;
-    assert!(
-        table
-            .retain_dependency(direct_slot, &row, &mut references)
-            .is_err()
-    );
-    assert!(
-        table
-            .retain_dependency(linked_slot, &row, &mut references)
-            .is_err()
-    );
-    let seed = DigestedRows("/table", &table);
-    let reordered_keys = json!({"origin": {"sourceUsesRefs": ["a"]}, "number": 7});
-    for (rows, accepted) in [
-        (json!([linked, reordered_keys]), true),
-        (json!([row]), false),
-        (json!([row, linked]), false),
-        (json!([linked, row, linked]), false),
-    ] {
-        assert_eq!(
-            seed.deserialize(rows).is_ok(),
-            accepted,
-            "full ordered occurrence fingerprints"
-        );
-    }
-
-    let origin = json!({"id":"a", "role":"payload"});
-    let origins = HashMap::from([("a".to_owned(), fingerprint(origin.clone())?)]);
-    let seed = DigestedOrigins(&origins);
-    for (rows, accepted) in [
-        (json!([{"id":"unused"}, origin]), true),
-        (json!([origin, origin]), false),
-        (json!([{"id":"a", "role":"selector"}]), false),
-        (json!([]), false),
-    ] {
-        assert_eq!(
-            seed.deserialize(rows).is_ok(),
-            accepted,
-            "exact contributing provenance"
-        );
-    }
-    Ok(())
-}
+#[cfg(test)]
+#[path = "real_archive_catalog_digest_parity_tests.rs"]
+mod tests;
