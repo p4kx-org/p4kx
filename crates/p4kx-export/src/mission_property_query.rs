@@ -21,6 +21,18 @@ use crate::mission_flow_owner::FlowOwnerKind;
 use crate::record_observation::RecordObservation;
 use crate::template_field_capture::TemplateFieldCapture;
 
+#[path = "mission_property_visit.rs"]
+mod visit;
+pub use visit::{
+    MissionPropertyOwnerSnapshot, MissionPropertyVisitSummary, visit_mission_properties,
+    visit_mission_properties_from,
+};
+
+const OWNER_KINDS: [FlowOwnerKind; 2] = [
+    FlowOwnerKind::ContractTemplate,
+    FlowOwnerKind::MissionBrokerEntry,
+];
+
 pub use crate::mission_flow_owner::{MissionFlowOwnerRef, PhysicalFlowOwner};
 pub use crate::source_value_catalog::{SourceField, SourceNode, SourcePayload, SourceValueRef};
 pub use crate::template_configuration::{
@@ -203,14 +215,20 @@ fn read<'source>(
     }
     Ok(MissionPropertySnapshot {
         build: archive.build().cloned(),
-        availability: DatasetAvailability::from_source_declarations(forge, |name| {
-            matches!(name, "ContractTemplate" | "MissionBrokerEntry")
-        }),
+        availability: availability(forge),
         rows,
         flows,
         sources,
         source_inventory: origins.uses.finish_with(|| checkpoint(cancel))?,
         coverage,
+    })
+}
+
+fn availability(forge: &DataForge<'_>) -> DatasetAvailability {
+    DatasetAvailability::from_source_declarations(forge, |name| {
+        OWNER_KINDS
+            .iter()
+            .any(|family| family.catalog_kind().records().type_name == name)
     })
 }
 

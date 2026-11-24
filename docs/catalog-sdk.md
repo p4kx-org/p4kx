@@ -852,6 +852,16 @@ and original values. The query reads no localization, mission
 dependency graphs or contextual projections. Use `with_contracts` for the separate
 Generator-authored `missionPropertySets`.
 
+Use `mission_properties::visit_mission_properties` for bounded reads of both tables.
+The Archive, decoded-Entry, session and parsed forms visit Contract Templates before
+Mission Broker Entries in canonical GUID order, with physical Record order for equal
+GUIDs. `CatalogRecordSelection::All` uses the Normal producer's path, type and
+development-leftover policies. GUID and physical-index selections apply the same
+admission rules. Each callback sees that owner's rows, arena and source inventory.
+Stage consumer changes until the visit returns successfully and its terminal coverage
+meets the caller's requirements. The query retains the selected Record headers and
+reads one body and its original source closure at a time.
+
 Use `mission_definitions::with_mission_definitions` or its decoded-Entry and session forms
 to read `definitions.missionScenarios`, `definitions.missionModuleDeclarations`,
 `definitions.missionItems`, `definitions.contractTemplates` or

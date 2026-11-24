@@ -21,10 +21,42 @@ const TAG_LEAF: u128 = 0x20;
 const TAG_DB: u128 = 0x30;
 
 pub(super) fn open(null_template_guid: u128) -> TestResult<(tempfile::TempDir, Archive)> {
+    open_database(database(null_template_guid).build())
+}
+
+pub(super) fn open_with_skipped_owners(
+    null_template_guid: u128,
+) -> TestResult<(tempfile::TempDir, Archive)> {
+    let data = database(null_template_guid)
+        .record(template(7, "variant_template", TestValue::Null).value(
+            "contractProperties",
+            TestValue::Array(vec![TestValue::Struct(
+                TestInstance::new(TARGET)
+                    .value("missionVariableName", TestValue::text("root-property")),
+            )]),
+        ))
+        .record(template(4, "debug_fixture", TestValue::Null))
+        .record(TestRecord::new(
+            5,
+            BROKER_TYPE,
+            "MissionBrokerEntry.Deprecated",
+            "libs/foundry/records/missionbroker/other.xml",
+        ))
+        .record(TestRecord::new(
+            6,
+            BROKER_TYPE,
+            "MissionBrokerEntry.External",
+            "outside/external.xml",
+        ))
+        .build();
+    open_database(data)
+}
+
+fn open_database(bytes: Vec<u8>) -> TestResult<(tempfile::TempDir, Archive)> {
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("mission-flow-sdk.p4k");
     ArchiveBuilder::new()
-        .entry(TestEntry::stored("Data/Game2.dcb", database(null_template_guid)).encrypted())
+        .entry(TestEntry::stored("Data/Game2.dcb", bytes).encrypted())
         .entry(TestEntry::stored(
             Language::English.global_ini_path(),
             b"fixture_broker_title=Fixture Broker title\nfixture_template_title=Fixture Template title\n",
@@ -36,7 +68,7 @@ pub(super) fn open(null_template_guid: u128) -> TestResult<(tempfile::TempDir, A
     ))
 }
 
-fn database(null_template_guid: u128) -> Vec<u8> {
+fn database(null_template_guid: u128) -> DataForgeBuilder {
     dataforge_layout()
         .record(
             TestRecord::new(
@@ -73,7 +105,6 @@ fn database(null_template_guid: u128) -> Vec<u8> {
                 TestValue::Array(vec![TestValue::Reference(TAG_ROOT)]),
             ),
         )
-        .build()
 }
 
 fn dataforge_layout() -> DataForgeBuilder {
@@ -85,7 +116,8 @@ fn dataforge_layout() -> DataForgeBuilder {
                 .field(
                     "contractStartCommsNotification",
                     strong("FixtureTemplateComms"),
-                ),
+                )
+                .array("contractProperties", strong(TARGET)),
         )
         .structure(
             TestStruct::new("FixtureTemplateComms")

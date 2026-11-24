@@ -20,6 +20,9 @@ use super::{Route, TestResult};
 mod fixture;
 use fixture::open;
 
+#[path = "sdk_mission_property_visit.rs"]
+mod visit;
+
 #[path = "sdk_broker_definition_route.rs"]
 mod broker_definitions;
 pub(super) use broker_definitions::DATASET as BROKER_DEFINITIONS;
