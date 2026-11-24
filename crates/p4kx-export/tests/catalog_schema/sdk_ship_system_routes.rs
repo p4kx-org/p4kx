@@ -23,7 +23,6 @@ mod store_slugs;
 
 pub(super) fn read() -> TestResult<[Route; 8]> {
     const REMAINING: &str = "typed Item query and synthetic producer parity witnessed; complete installed producer parity open";
-    const TUNING_REMAINING: &str = "typed tuning Record query and synthetic producer parity witnessed; complete installed producer parity open";
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("ship_system_fixture.p4k");
     ArchiveBuilder::new()
@@ -49,10 +48,10 @@ pub(super) fn read() -> TestResult<[Route; 8]> {
             Route::queried_rows(QUANTUM_INTERDICTION, snapshot.rows(), REMAINING)
         })??,
         parsed.with_jump_drives(selected, None, |snapshot| {
-            Route::queried_rows(JUMP_DRIVES, snapshot.rows(), REMAINING)
+            Route::queried_rows(JUMP_DRIVES, snapshot.rows(), None)
         })??,
         parsed.with_jump_drive_flight_tuning(selected, None, |snapshot| {
-            Route::queried_rows(JUMP_DRIVE_FLIGHT_TUNING, snapshot.rows(), TUNING_REMAINING)
+            Route::queried_rows(JUMP_DRIVE_FLIGHT_TUNING, snapshot.rows(), None)
         })??,
     ])
 }

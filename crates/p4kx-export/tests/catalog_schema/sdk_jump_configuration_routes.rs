@@ -16,7 +16,6 @@ use super::{Route, TestResult};
 mod fixture;
 
 pub(super) fn read() -> TestResult<[Route; 3]> {
-    const REMAINING: &str = "typed source queries and synthetic producer parity witnessed; same-build installed producer parity open";
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("jump_configuration_fixture.p4k");
     ArchiveBuilder::new()
@@ -32,13 +31,13 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
     let all = CatalogRecordSelection::All;
     Ok([
         parsed.with_jump_point_configurations(all, None, |snapshot| {
-            Route::queried_rows(JUMP_POINT_CONFIGURATIONS, snapshot.rows(), REMAINING)
+            Route::queried_rows(JUMP_POINT_CONFIGURATIONS, snapshot.rows(), None)
         })??,
         parsed.with_global_jump_point_configurations(all, None, |snapshot| {
-            Route::queried_rows(GLOBAL_JUMP_POINT_CONFIGURATIONS, snapshot.rows(), REMAINING)
+            Route::queried_rows(GLOBAL_JUMP_POINT_CONFIGURATIONS, snapshot.rows(), None)
         })??,
         parsed.with_jump_tunnel_forces(all, None, |snapshot| {
-            Route::queried_rows(JUMP_TUNNEL_FORCES, snapshot.rows(), REMAINING)
+            Route::queried_rows(JUMP_TUNNEL_FORCES, snapshot.rows(), None)
         })??,
     ])
 }

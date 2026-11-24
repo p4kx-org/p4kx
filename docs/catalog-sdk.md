@@ -2836,6 +2836,15 @@ working set was 1,032,163,328 bytes. The Archive and Build stamps remained
 stable throughout. The exact test executable SHA-256 was
 `4c0431fef6a45951d3cf5e5597865f53656e6aeb0a5699ed0017dbace3cf0ccf`.
 
+The installed comparison `installed_jump_configurations_match_one_complete_catalog`
+streamed each Build's complete Normal Catalog once and checked all five tables'
+availability, ordered values and contributing source uses. The LIVE and PTU
+producer revisions were `23addc5e164f65a28a6f258302b30453b331edce` and
+`93d92ca20bef8a8c3731339214a3301124ade7ba`, respectively. Each comparison
+matched 28,359 uses from one physical source. The larger private commit was
+1,151,631,360 bytes and the larger working set was 1,161,601,024 bytes.
+The strict SDK ledger recognizes these five source tables.
+
 ## Recorded comparisons with the complete Catalog
 
 The verifier at `7fcf8ee5ceb64eb2570223e320fe3da1cb0ebd9f` passed
