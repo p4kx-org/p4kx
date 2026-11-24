@@ -18,7 +18,7 @@ use crate::catalog_v3::catalog_entity_configurations::{
     RESOURCE_CONNECTION_TYPES, ResourceComponent, ResourceConnection, ResourceContainer,
     ResourceTopologyKind, VEHICLE_ARMOR_TYPES, VehicleArmor,
 };
-use crate::catalog_v3::catalog_item_alignment::{ATTACHABLE, AlignmentOptions};
+use crate::catalog_v3::catalog_item_alignment::{ATTACHABLE, AlignmentOptions, CONTAINER};
 use crate::catalog_v3::catalog_item_components::{ItemEquipmentFamily, definition_read};
 use crate::catalog_v3::inventory_entity_configurations::{
     BOUNDS_SOURCE_TYPES, STORAGE_SOURCE_TYPES,
@@ -60,6 +60,7 @@ pub(super) enum Family {
     Items,
     ItemSources,
     Attachments,
+    ItemPorts,
     Bounds,
     CargoGrids,
     Facilities,
@@ -84,6 +85,7 @@ impl Family {
         matches!(
             self,
             Self::Definitions
+                | Self::ItemPorts
                 | Self::AmmoDefinitions
                 | Self::Factions
                 | Self::ContractScopes
@@ -106,6 +108,7 @@ impl Family {
             | Self::Items
             | Self::ItemSources
             | Self::Attachments
+            | Self::ItemPorts
             | Self::Bounds
             | Self::CargoGrids
             | Self::Facilities
@@ -126,6 +129,7 @@ impl Family {
                 &[p4kx_assembly::ENTITY_TYPE][..]
             }
             Self::Attachments => &[ATTACHABLE][..],
+            Self::ItemPorts => &[CONTAINER],
             Self::Bounds => BOUNDS_SOURCE_TYPES,
             Self::Configuration(family) => family.source_types(),
             Self::ItemEquipment(family) => family.source_types(),

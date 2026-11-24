@@ -751,6 +751,14 @@ scope coverage, public labels in the selected languages, and the field origin
 inventory. The query reads the selected components and requested localization.
 The archive-backed loadout resolver supplies equipped-item and XML-override data.
 
+Use `visit_item_ports` or `visit_item_ports_from` to process one readable physical Record
+at a time. Requested locale payloads load when traversal reaches the first readable owner.
+The visitor borrows its port rows, public labels and source inventory for the current owner.
+Empty snapshots count toward the terminal owner count. An unreadable component selection
+is included in the terminal
+coverage. Commit consumer-owned output only after a successful traversal whose coverage
+meets the consumer's requirements.
+
 `ItemPort::alignment_axis()` borrows the original axis label.
 `alignment_axis_option_status()` borrows its optional `SourcedValue<AttachmentAxisOptionStatus>`.
 `Declared` and `Undeclared` describe membership in the original axis enumeration; an undeclared
@@ -1331,6 +1339,13 @@ Use `catalog_queries::equipment::with_item_definitions`, `with_attachment_constr
 `with_item_bounds` for the corresponding canonical datasets. Each has a decoded-Entry `_from`
 form and the same-named session/parsed-view method. Select the dataset, all physical declarations
 with a GUID, or a physical Record index. Physical indices are local to the supplied DataForge.
+
+Use `catalog_queries::equipment::visit_item_bounds` or `visit_attachment_constraints`
+to process one readable physical Record at a time. Each has a decoded-Entry `_from` form
+and a session or parsed-view method. Rows and their original source inventory are scoped
+to the current owner. The terminal summary reports availability, owner and row counts,
+and selection-wide coverage. Commit consumer-owned output only after a successful
+traversal whose coverage meets the consumer's requirements.
 
 `definitions.items` contains original Item presentation, physics and purchase fields. Its nested
 immutable getters preserve the original component order, numbers, null/unavailable states,
@@ -2580,6 +2595,16 @@ by that Record. A canonical Catalog text row can combine uses from several
 Records. The terminal summary reports family availability, total owner and row
 counts, and full selection coverage. Stage consumer changes until the visit
 returns successfully and the coverage meets the caller's requirements.
+
+The Windows AMD64 cold runs of verifier `691a8791` read `All` directly from
+each installed Archive with an empty locale selection. Both reported
+`Available`, exact owner and row order, and complete selection coverage
+after accounting for the verified canonical exclusions.
+
+| Build | Owners | Rows | Peak private commit (bytes) | Peak working set (bytes) | Elapsed (ms) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 16,747 | 30,066 | 1,091,502,080 | 1,022,038,016 | 262,359 |
+| PTU `13260598` | 17,524 | 31,521 | 1,114,439,680 | 1,031,843,840 | 285,355 |
 
 ## Paint compatibility
 

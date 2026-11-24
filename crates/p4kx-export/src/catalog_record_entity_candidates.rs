@@ -1,12 +1,31 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{DataForge, Record, TreeBuilder};
+use p4kx_extraction::{CancelToken, DataForge, Record, TreeBuilder};
 
-use crate::catalog_queries::CatalogRecordCoverage;
+use super::{Owner, Plan};
+use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection};
 use crate::entity_selection::{self, Selected};
 use crate::scan::{CRAFTER_FIELD, CRAFTER_STRUCT};
 use crate::{CatalogError, Kind};
+
+impl<'source> Plan<'source> {
+    pub(in crate::build::catalog_queries) fn visit_entities<E: From<CatalogError>>(
+        forge: &'source DataForge<'source>,
+        selection: CatalogRecordSelection,
+        cancel: Option<&CancelToken>,
+        visit: impl FnMut(Owner<'source>, &mut CatalogRecordCoverage) -> Result<(), E>,
+    ) -> Result<CatalogRecordCoverage, E> {
+        Self::visit_with(
+            forge,
+            selection,
+            cancel,
+            None,
+            entity_candidates(forge, |_, _| true),
+            visit,
+        )
+    }
+}
 
 pub(super) fn entity_candidates<'source, Candidate>(
     forge: &'source DataForge<'source>,

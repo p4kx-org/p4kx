@@ -16,6 +16,8 @@ mod display_names;
 mod links;
 #[path = "catalog_item_port_sdk.rs"]
 mod sdk;
+#[path = "catalog_item_port_visit.rs"]
+mod visit;
 
 #[path = "catalog_item_alignment_fixture.rs"]
 mod fixture;

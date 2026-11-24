@@ -26,6 +26,8 @@ mod parity;
 mod selection;
 #[path = "equipment_units_walk.rs"]
 mod units;
+#[path = "equipment_configuration_visit.rs"]
+mod visit;
 
 const ATTACHMENTS: &str = "/configurations/itemAttachmentConstraints";
 const BOUNDS: &str = "/configurations/itemBounds";

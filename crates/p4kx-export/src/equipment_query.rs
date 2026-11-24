@@ -121,6 +121,8 @@ mod bounds;
 mod cargo;
 #[path = "equipment_cargo_read.rs"]
 mod cargo_read;
+#[path = "equipment_configuration_visit.rs"]
+mod configuration_visit;
 #[path = "equipment_item_query.rs"]
 mod definitions;
 #[path = "equipment_facility_query.rs"]
@@ -129,10 +131,14 @@ mod facilities;
 pub mod factions;
 #[path = "equipment_inventory_query.rs"]
 mod inventory;
+#[path = "equipment_item_port_visit.rs"]
+pub(super) mod item_port_visit;
 #[path = "equipment_item_source_query.rs"]
 mod item_sources;
 #[path = "equipment_catalog_item_query.rs"]
 mod items;
+#[path = "equipment_owner_visit.rs"]
+mod owner_visit;
 /// Scoped canonical Paint compatibility.
 #[path = "equipment_paint_compatibility_query.rs"]
 pub mod paints;
@@ -208,6 +214,10 @@ pub use cargo::{
     InventoryContainerDefinition, InventoryContainerType, InventoryItemTypeFilter,
     InventoryOpenContainer, InventoryOwnerStorage, with_cargo_grids, with_cargo_grids_from,
 };
+pub use configuration_visit::{
+    visit_attachment_constraints, visit_attachment_constraints_from, visit_item_bounds,
+    visit_item_bounds_from,
+};
 pub use definitions::{with_item_definitions, with_item_definitions_from};
 pub use facilities::{
     FacilityKind, FacilityOwner, FacilitySnapshot, with_facilities, with_facilities_from,
@@ -220,6 +230,7 @@ pub use inventory::{
 pub(crate) use item_sources::observe_item_source_query;
 pub use item_sources::{with_item_sources, with_item_sources_from};
 pub use items::{with_items, with_items_from};
+pub use owner_visit::EquipmentVisitSummary;
 pub use projectile_ammo::{
     CountermeasureEmitter, CountermeasureEmitterRoute, ProjectileAmmoChoice, ProjectileAmmoOwner,
     ProjectileAmmoRole, ProjectileAmmoSnapshot, WeaponProjectileAmmoSelection,

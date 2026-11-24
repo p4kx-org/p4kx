@@ -112,14 +112,7 @@ impl<'query> Query<'query> {
         let registry = CatalogTextRegistry::default();
         let projection =
             CatalogProjection::new(&texts, &input, &registry).for_kind(P::FAMILY.kind());
-        let options = ReadOptions {
-            alignment: if matches!(P::FAMILY, Family::Attachments) {
-                AlignmentOptions::read(self.forge, self.cancel)?
-            } else {
-                AlignmentOptions::default()
-            },
-            item_filter,
-        };
+        let options = self.read_options(P::FAMILY, item_filter)?;
         let mut rows = project::<P>(
             self.forge,
             plan.owners,
@@ -177,23 +170,9 @@ impl<'query> Query<'query> {
     ) -> Result<Plan<'query>, CatalogError> {
         checkpoint(self.cancel)?;
         let mut plan = match family {
-            Family::MagazineResolutions if item_filter.is_some() => Plan::read_with(
-                self.forge,
-                self.selection,
-                self.cancel,
-                observer,
-                |record, _, coverage| {
-                    match entity_selection::select(record, item_filter) {
-                        Err(_) => coverage.unreadable_headers.push(record.index()),
-                        Ok(Some(Selected::Leftover(Kind::Items))) => {
-                            coverage.skipped_leftovers += 1;
-                        }
-                        Ok(Some(Selected::Entity(Kind::Items))) => return Ok(true),
-                        Ok(_) => {}
-                    }
-                    Ok(false)
-                },
-            )?,
+            Family::MagazineResolutions if item_filter.is_some() => {
+                self.plan_filtered_magazines(item_filter, observer)?
+            }
             Family::Definitions
             | Family::Items
             | Family::ItemSources
@@ -229,7 +208,11 @@ impl<'query> Query<'query> {
                 self.cancel,
                 observer,
             )?,
-            Family::Attachments | Family::Bounds | Family::CargoGrids | Family::Facilities => {
+            Family::Attachments
+            | Family::ItemPorts
+            | Family::Bounds
+            | Family::CargoGrids
+            | Family::Facilities => {
                 Plan::read_entities(self.forge, self.selection, self.cancel, observer)?
             }
         };
@@ -237,7 +220,46 @@ impl<'query> Query<'query> {
         Ok(plan)
     }
 
-    const fn requested(&self, family: Family) -> &[Language] {
+    fn plan_filtered_magazines(
+        &self,
+        item_filter: Option<&Filter>,
+        observer: Option<Arc<dyn CanonicalReadObserver>>,
+    ) -> Result<Plan<'query>, CatalogError> {
+        Plan::read_with(
+            self.forge,
+            self.selection,
+            self.cancel,
+            observer,
+            |record, _, coverage| {
+                match entity_selection::select(record, item_filter) {
+                    Err(_) => coverage.unreadable_headers.push(record.index()),
+                    Ok(Some(Selected::Leftover(Kind::Items))) => {
+                        coverage.skipped_leftovers += 1;
+                    }
+                    Ok(Some(Selected::Entity(Kind::Items))) => return Ok(true),
+                    Ok(_) => {}
+                }
+                Ok(false)
+            },
+        )
+    }
+
+    pub(super) fn read_options<'options>(
+        &'options self,
+        family: Family,
+        item_filter: Option<&'options Filter>,
+    ) -> Result<ReadOptions<'options>, CatalogError> {
+        Ok(ReadOptions {
+            alignment: if matches!(family, Family::Attachments | Family::ItemPorts) {
+                AlignmentOptions::read(self.forge, self.cancel)?
+            } else {
+                AlignmentOptions::default()
+            },
+            item_filter,
+        })
+    }
+
+    pub(super) const fn requested(&self, family: Family) -> &[Language] {
         if family.localized() {
             self.languages
         } else {
@@ -266,6 +288,7 @@ fn order(family: Family, owners: &mut [Owner<'_>]) {
             )
         }),
         Family::Attachments
+        | Family::ItemPorts
         | Family::Bounds
         | Family::CargoGrids
         | Family::Facilities

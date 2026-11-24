@@ -268,6 +268,7 @@ pub use harvest_provider_presets::{
     read_harvestable_provider_presets_from,
 };
 
+pub use equipment::item_port_visit::{visit_item_ports, visit_item_ports_from};
 pub use item_ports::{ItemPortSnapshot, with_item_ports, with_item_ports_from};
 pub use location_entity_declarations::{
     LocationEntityDeclarationSnapshot, with_location_entity_declarations,
