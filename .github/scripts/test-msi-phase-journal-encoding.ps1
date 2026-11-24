@@ -118,7 +118,7 @@ $cases=@(
                 $wait=Start-P4kxMsiPhase $context 'msiexec/wait'
                 Stop-P4kxMsiPhase $context $wait
                 $reported=Read-P4kxMsiOriginalBoundary $context.journal $target 'lifecycle/install'
-                Assert-JournalEncoding ($reported.status -ceq 'notObserved') 'A child wait ending does not establish the original install outcome.'
+                Assert-JournalEncoding ($reported.status -ceq 'notObserved' -and $reported.phase -ceq $firstPhase) 'A child wait ending identifies its parent phase without establishing the original install outcome.'
                 $failure=if ($status -ceq 'failed') { [InvalidOperationException]::new('Synthetic first install failure') }
                 Stop-P4kxMsiPhase $context $install -Failure $failure
                 $later=Start-P4kxMsiPhase $context $laterPhase

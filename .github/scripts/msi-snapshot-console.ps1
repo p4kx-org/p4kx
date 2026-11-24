@@ -1,10 +1,12 @@
 $ErrorActionPreference='Stop'
 
 function New-P4kxMsiSnapshotConsole {
-    param([ValidateRange(1,9)][int]$Sequence)
+    param([ValidateRange(1,9)][int]$Sequence, [switch]$OriginalInstallBoundary)
     return @{sequence=$Sequence;revision=$env:GITHUB_SHA;run=$env:GITHUB_RUN_ID;attempt=$env:GITHUB_RUN_ATTEMPT;
         target=$env:P4KX_TARGET;pending='';bytes=0;seen=[Collections.Generic.HashSet[string]]::new([StringComparer]::Ordinal);
+        install_boundary=$OriginalInstallBoundary.IsPresent;request_sha256=$null;
         validate=(Get-Item 'Function:Read-P4kxMsiSnapshotConsoleRecord').ScriptBlock;
+        read_checkpoint=(Get-Item 'Function:Read-P4kxMsiInstallCheckpointFrame').ScriptBlock;
         write=(Get-Item 'Function:Write-P4kxMsiSnapshotConsoleMarker').ScriptBlock}
 }
 
@@ -53,6 +55,40 @@ function Read-P4kxMsiSnapshotConsoleRecord {
     return $row
 }
 
+function Read-P4kxMsiInstallCheckpointFrame([hashtable]$State, [string]$Line) {
+    $prefix='[P4KX-MSI-INSTALL-CHECKPOINT]'
+    if (-not $State.install_boundary -or $State.sequence -ne 3 -or
+        -not $Line.StartsWith($prefix,[StringComparison]::Ordinal)) { return $null }
+    try { $frame=$Line.Substring($prefix.Length) | ConvertFrom-Json -AsHashtable -Depth 3 }
+    catch { return $null }
+    $fields=@('schema','role','sequence','revision','run','attempt','target','request_sha256',
+        'install_phase','install_outcome','journal_events','journal_terminal',
+        'completed_success','native_completion_unproven','mutation_authority')
+    if ($frame -isnot [Collections.IDictionary] -or $frame.Count -ne $fields.Count -or
+        @($frame.Keys | Where-Object { $_ -cnotin $fields }).Count -ne 0) { return $null }
+    if ($frame.schema -isnot [long] -or $frame.schema -ne 1 -or $frame.sequence -isnot [long] -or $frame.sequence -ne 3 -or
+        $frame.role -isnot [string] -or $frame.role -cne 'native-msi-install-checkpoint') { return $null }
+    foreach ($field in @('revision','run','attempt','target','request_sha256')) {
+        if ($frame[$field] -isnot [string] -or [string]::IsNullOrEmpty($State[$field]) -or $frame[$field] -cne $State[$field]) { return $null }
+    }
+    $phases=@('lifecycle/install')
+    if ($State.target -ceq 'x86_64-pc-windows-msvc') { $phases += 'lifecycle/previous-install' }
+    if ($null -ne $frame.install_phase -and ($frame.install_phase -isnot [string] -or $frame.install_phase -cnotin $phases)) { return $null }
+    if ($frame.install_outcome -isnot [string] -or $frame.install_outcome -cnotin @('reached','failed','notObserved','unavailable') -or
+        ($frame.install_outcome -cin @('reached','failed') -and $null -eq $frame.install_phase)) { return $null }
+    if ($frame.journal_events -isnot [long] -or $frame.journal_events -lt 0 -or $frame.journal_events -gt 2048 -or
+        ($null -ne $frame.journal_terminal -and ($frame.journal_terminal -isnot [string] -or $frame.journal_terminal -cnotin @('end','error')))) { return $null }
+    if ($frame.completed_success -isnot [bool] -or $frame.completed_success -or
+        $frame.native_completion_unproven -isnot [bool] -or -not $frame.native_completion_unproven -or
+        $frame.mutation_authority -isnot [bool] -or $frame.mutation_authority) { return $null }
+    return @{
+        schema=1;role='native-msi-install-checkpoint-console';sequence=3
+        install_phase=$frame.install_phase;install_outcome=$frame.install_outcome
+        journal_events=$frame.journal_events;journal_terminal=$frame.journal_terminal
+        completed_success=$false;native_completion_unproven=$true;mutation_authority=$false
+    }
+}
+
 function Receive-P4kxMsiSnapshotConsole {
     param([hashtable]$State, [string]$Stream, [string]$Chunk)
     if ($Stream -ceq 'stage') {
@@ -71,6 +107,16 @@ function Receive-P4kxMsiSnapshotConsole {
         $line=$State.pending.Substring(0,$newline).TrimEnd([char]13)
         $State.pending=$State.pending.Substring($newline+1)
         $row=& $State.validate $State $line
-        if ($null -ne $row) { & $State.write $State ('worker.'+$row.stage) $row.status }
+        if ($null -ne $row) {
+            if ($State.install_boundary -and $null -eq $State.request_sha256 -and $row.stage -ceq 'parentState' -and $row.status -ceq 'begin') {
+                $State.request_sha256=$row.request_sha256
+            }
+            & $State.write $State ('worker.'+$row.stage) $row.status
+            continue
+        }
+        $checkpoint=& $State.read_checkpoint $State $line
+        if ($null -ne $checkpoint -and $State.seen.Add('install-checkpoint')) {
+            Write-Host ('[P4KX-MSI-INSTALL-CHECKPOINT]'+($checkpoint | ConvertTo-Json -Compress))
+        }
     }
 }

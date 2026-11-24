@@ -57,7 +57,7 @@ function Invoke-P4kxMsiObserverSnapshot {
     }
     $console=$null;$progress=$null
     if (-not $Finish) {
-        $console=New-P4kxMsiSnapshotConsole -Sequence $Sequence
+        $console=New-P4kxMsiSnapshotConsole -Sequence $Sequence -OriginalInstallBoundary:($OriginalBoundary -ceq 'lifecycle/install')
         Write-P4kxMsiSnapshotConsoleMarker $console 'caller' 'begin'
         $receive=(Get-Item 'Function:Receive-P4kxMsiSnapshotConsole').ScriptBlock
         $progress={param([string]$Stream,[string]$Chunk); & $receive $console $Stream $Chunk}.GetNewClosure()

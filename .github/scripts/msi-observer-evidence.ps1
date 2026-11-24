@@ -34,16 +34,20 @@ function Read-P4kxMsiOriginalBoundary {
         $phases += 'lifecycle/previous-install'
     }
     $first = $null
+    $selectedPhase = $null
     $status = if ($journal.present) { 'notObserved' } else { 'unavailable' }
     foreach ($event in $events) {
         if ($event.target -cne $Target -or $event.process_arch -ine $platform.runner_arch) { throw 'Original phase journal CPU or target differs.' }
         if ($event.phase -cnotin $phases) { continue }
-        if ($null -eq $first -and $event.status -ceq 'begin') { $first = $event.id }
+        if ($null -eq $first -and $event.status -ceq 'begin') {
+            $first = $event.id
+            $selectedPhase = $event.phase
+        }
         if ($event.id -ne $first) { continue }
         if ($event.status -ceq 'end') { $status = 'reached' }
         if ($Phase -ceq 'lifecycle/install' -and $event.status -ceq 'error') { $status = 'failed' }
     }
-    return @{journal=$journal;status=$status}
+    return @{journal=$journal;status=$status;phase=$selectedPhase}
 }
 
 function Wait-P4kxMsiOriginalBoundary {
@@ -94,6 +98,7 @@ function Save-P4kxMsiObserverCheckpoint {
     $captured['phase-journal.jsonl'] = Copy-P4kxMsiObserverFile (Join-Path $original 'phase-journal.jsonl') (Join-Path $directory 'phase-journal.jsonl') 1MB
     $journal = $null;$journalFailure=$null
     $boundary = 'unavailable'
+    $observed = $null
     $copiedJournal = Join-Path $directory 'phase-journal.jsonl'
     try {
         if ($OriginalBoundary) {
@@ -113,7 +118,21 @@ function Save-P4kxMsiObserverCheckpoint {
     if ($OriginalBoundary -ceq 'preamble/original-raw') { $receipt.original_raw_capture = $boundary }
     if ($OriginalBoundary -ceq 'lifecycle/install') { $receipt.original_install_phase = $boundary }
     Write-P4kxDetachedReceipt (Join-Path $directory 'checkpoint.json') $receipt
+    if ($Sequence -eq 3 -and $OriginalBoundary -ceq 'lifecycle/install') {
+        Write-P4kxMsiInstallCheckpointFrame $receipt $observed
+    }
     return $directory
+}
+
+function Write-P4kxMsiInstallCheckpointFrame($Checkpoint, $Observed) {
+    $frame = @{
+        schema=1;role='native-msi-install-checkpoint';revision=$Checkpoint.revision
+        run=$Checkpoint.run;attempt=$Checkpoint.attempt;target=$Checkpoint.target;sequence=$Checkpoint.sequence
+        request_sha256=$Checkpoint.request_sha256;install_phase=$Observed.phase;install_outcome=$Checkpoint.original_install_phase
+        journal_events=[int]$Checkpoint.journal.events;journal_terminal=$Checkpoint.journal.terminal
+        completed_success=$false;native_completion_unproven=$true;mutation_authority=$false
+    }
+    Write-Host ('[P4KX-MSI-INSTALL-CHECKPOINT]'+($frame | ConvertTo-Json -Compress))
 }
 
 function Assert-P4kxMsiObserverClosedJournal {

@@ -10,6 +10,17 @@ function New-SnapshotConsoleLine([hashtable]$Changes=@{}) {
     foreach ($entry in $Changes.GetEnumerator()) { $row[$entry.Key]=$entry.Value }
     return '[P4KX-MSI-OBSERVER]'+($row | ConvertTo-Json -Compress)+[char]10
 }
+function New-InstallCheckpointFrame([hashtable]$Changes=@{}) {
+    $row=@{
+        schema=1;role='native-msi-install-checkpoint';sequence=3;revision=$env:GITHUB_SHA
+        run=$env:GITHUB_RUN_ID;attempt=$env:GITHUB_RUN_ATTEMPT;target=$env:P4KX_TARGET
+        request_sha256=('a'*64);install_phase='lifecycle/install';install_outcome='failed'
+        journal_events=7;journal_terminal=$null;completed_success=$false;native_completion_unproven=$true
+        mutation_authority=$false
+    }
+    foreach ($entry in $Changes.GetEnumerator()) { $row[$entry.Key]=$entry.Value }
+    return '[P4KX-MSI-INSTALL-CHECKPOINT]'+($row | ConvertTo-Json -Compress)+[char]10
+}
 try {
     $env:GITHUB_SHA='synthetic-revision';$env:GITHUB_RUN_ID='synthetic-run';$env:GITHUB_RUN_ATTEMPT='1';$env:P4KX_TARGET='aarch64-pc-windows-msvc'
     $state=New-P4kxMsiSnapshotConsole 1
@@ -37,6 +48,28 @@ try {
         $negative=@(Receive-P4kxMsiSnapshotConsole (New-P4kxMsiSnapshotConsole 2) $stream ('raw-secret'+[char]10) 6>&1)
         Assert-SnapshotConsole ($negative.Count -eq 0) 'Unmarked output reached the console.'
     }
+    $installBoundary=New-P4kxMsiSnapshotConsole 3 -OriginalInstallBoundary
+    $checkpointLine=New-InstallCheckpointFrame
+    $beforeBinding=@(Receive-P4kxMsiSnapshotConsole $installBoundary 'stdout' $checkpointLine 6>&1)
+    Assert-SnapshotConsole ($beforeBinding.Count -eq 0) 'The install observation was forwarded before the original request binding.'
+    $bindingLine=New-SnapshotConsoleLine @{request_sha256=('a'*64)}
+    Receive-P4kxMsiSnapshotConsole $installBoundary 'stdout' $bindingLine 6>&1 | Out-Null
+    foreach ($changes in @(@{request_sha256=('b'*64)},@{run='other'},@{sequence=2},@{native_completion_unproven=$false},
+        @{mutation_authority=$true},@{completed_success=$true},@{install_phase='lifecycle/previous-install'},
+        @{install_outcome='success'},@{journal_events='7'},@{extra='raw-secret'})) {
+        $negative=@(Receive-P4kxMsiSnapshotConsole $installBoundary 'stdout' (New-InstallCheckpointFrame $changes) 6>&1)
+        Assert-SnapshotConsole ($negative.Count -eq 0) 'An invalid install checkpoint was forwarded.'
+    }
+    $exact=@(Receive-P4kxMsiSnapshotConsole $installBoundary 'stdout' $checkpointLine 6>&1)
+    Assert-SnapshotConsole ($exact.Count -eq 1) 'The bound native install observation was not forwarded.'
+    $seen=([string]$exact[0]).Substring('[P4KX-MSI-INSTALL-CHECKPOINT]'.Length) | ConvertFrom-Json -AsHashtable
+    Assert-SnapshotConsole ($seen.role -ceq 'native-msi-install-checkpoint-console' -and $seen.install_outcome -ceq 'failed' -and
+        $seen.install_phase -ceq 'lifecycle/install' -and $seen.journal_events -eq 7 -and -not $seen.completed_success -and
+        $seen.native_completion_unproven -and -not $seen.mutation_authority -and -not $seen.ContainsKey('request_sha256') -and
+        -not $seen.ContainsKey('revision')) 'Install boundary lost its detail or published identity material.'
+    $duplicate=@(Receive-P4kxMsiSnapshotConsole $installBoundary 'stdout' $checkpointLine 6>&1)
+    $ordinary=@(Receive-P4kxMsiSnapshotConsole (New-P4kxMsiSnapshotConsole 3) 'stdout' ($bindingLine+$checkpointLine) 6>&1)
+    Assert-SnapshotConsole ($duplicate.Count -eq 0 -and $ordinary.Count -eq 1) 'Only the original install boundary may report the checkpoint once.'
     $stage=@(Receive-P4kxMsiSnapshotConsole $state 'stage' 'portalCleanup.begin' 6>&1)
     Assert-SnapshotConsole ($stage.Count -eq 1) 'A predefined cleanup boundary was not emitted.'
     $refused=$false

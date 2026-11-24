@@ -336,6 +336,9 @@ The real consumer records the prepared allowance, source hashes, checkpoints and
 on the runner. It refreshes admission under the original deadline before launching the installer.
 The cancellation-aware diagnostic upload collects those local files after the terminal evidence
 and package publication steps. A runner failure before the upload can prevent delivery.
+The first install snapshot emits one bounded observation in its existing console stream after
+validating the original phase journal. It reports the actual install phase and observed outcome
+with a journal event count and terminal marker. The observation carries no lifecycle verdict.
 `diagnostic-start.json` is written before worker launch, records the original worker source and
 budget, and always declares completion unproven and no mutation authority. It is not evidence that
 the child started, exited or left the Windows Installer service idle. All real installer cases,
