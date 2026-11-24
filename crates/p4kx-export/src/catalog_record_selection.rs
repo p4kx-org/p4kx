@@ -23,8 +23,17 @@ impl CatalogRecordSelection {
         self,
         forge: &'source DataForge<'_>,
         cancel: Option<&CancelToken>,
-        mut read: impl FnMut(&Record<'source>) -> Result<(), CatalogError>,
+        read: impl FnMut(&Record<'source>) -> Result<(), CatalogError>,
     ) -> Result<(), CatalogError> {
+        self.try_for_each(forge, cancel, read)
+    }
+
+    pub(crate) fn try_for_each<'source, E: From<CatalogError>>(
+        self,
+        forge: &'source DataForge<'_>,
+        cancel: Option<&CancelToken>,
+        mut read: impl FnMut(&Record<'source>) -> Result<(), E>,
+    ) -> Result<(), E> {
         match self {
             Self::RecordIndex(index) => {
                 if let Some(record) = forge.record(index) {

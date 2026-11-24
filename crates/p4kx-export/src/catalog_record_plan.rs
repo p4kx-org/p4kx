@@ -75,19 +75,20 @@ impl<'source> Plan<'source> {
         cancel: Option<&CancelToken>,
         observer: Option<Arc<dyn CanonicalReadObserver>>,
     ) -> Result<Self, CatalogError> {
-        let mut may_match = component_candidate(forge, component_types, cancel)?;
-        Self::read_with(
-            forge,
-            selection,
-            cancel,
-            observer,
-            |record, trees, coverage| {
-                Ok(
-                    unlocalized_record_query::selected(record, Kind::Items, coverage)
-                        && may_match(record, trees),
-                )
-            },
-        )
+        let selected = item_selection(forge, Some(component_types), cancel)?;
+        Self::read_with(forge, selection, cancel, observer, selected)
+    }
+
+    pub(in crate::build::catalog_queries) fn visit_items<E: From<CatalogError>>(
+        forge: &'source DataForge<'source>,
+        component_types: Option<&[&str]>,
+        selection: CatalogRecordSelection,
+        cancel: Option<&CancelToken>,
+        observer: Option<Arc<dyn CanonicalReadObserver>>,
+        visit: impl FnMut(Owner<'source>, &mut CatalogRecordCoverage) -> Result<(), E>,
+    ) -> Result<CatalogRecordCoverage, E> {
+        let selected = item_selection(forge, component_types, cancel)?;
+        Self::visit_with(forge, selection, cancel, observer, selected, visit)
     }
 
     fn read_entities_matching(
@@ -176,31 +177,83 @@ impl<'source> Plan<'source> {
         selection: CatalogRecordSelection,
         cancel: Option<&CancelToken>,
         observer: Option<Arc<dyn CanonicalReadObserver>>,
-        mut selected: impl FnMut(
+        selected: impl FnMut(
             &Record<'source>,
             &mut TreeBuilder<'source>,
             &mut CatalogRecordCoverage,
         ) -> Result<bool, CatalogError>,
     ) -> Result<Self, CatalogError> {
-        let mut result = Self {
-            owners: Vec::new(),
-            coverage: CatalogRecordCoverage::default(),
-        };
+        let mut owners = Vec::new();
+        let coverage = Self::visit_with::<CatalogError>(
+            forge,
+            selection,
+            cancel,
+            observer,
+            selected,
+            |owner, _| {
+                owners.push(owner);
+                Ok(())
+            },
+        )?;
+        Ok(Self { owners, coverage })
+    }
+
+    fn visit_with<E: From<CatalogError>>(
+        forge: &'source DataForge<'source>,
+        selection: CatalogRecordSelection,
+        cancel: Option<&CancelToken>,
+        observer: Option<Arc<dyn CanonicalReadObserver>>,
+        mut selected: impl FnMut(
+            &Record<'source>,
+            &mut TreeBuilder<'source>,
+            &mut CatalogRecordCoverage,
+        ) -> Result<bool, CatalogError>,
+        mut visit: impl FnMut(Owner<'source>, &mut CatalogRecordCoverage) -> Result<(), E>,
+    ) -> Result<CatalogRecordCoverage, E> {
+        let mut coverage = CatalogRecordCoverage::default();
         let mut trees = TreeBuilder::new();
         trees.set_read_observer(observer);
-        selection.for_each(forge, cancel, |record| {
+        selection.try_for_each::<E>(forge, cancel, |record| {
             checkpoint(cancel)?;
-            if !selected(record, &mut trees, &mut result.coverage)? {
+            if !selected(record, &mut trees, &mut coverage)? {
                 return Ok(());
             }
             checkpoint(cancel)?;
-            result
-                .owners
-                .extend(read_owner(&mut trees, record, &mut result.coverage)?);
+            if let Some(owner) = read_owner(&mut trees, record, &mut coverage)? {
+                visit(owner, &mut coverage)?;
+            }
             Ok(())
         })?;
-        Ok(result)
+        Ok(coverage)
     }
+}
+
+fn item_selection<'source>(
+    forge: &'source DataForge<'source>,
+    component_types: Option<&[&str]>,
+    cancel: Option<&CancelToken>,
+) -> Result<
+    impl FnMut(
+        &Record<'source>,
+        &mut TreeBuilder<'source>,
+        &mut CatalogRecordCoverage,
+    ) -> Result<bool, CatalogError>
+    + use<'source>,
+    CatalogError,
+> {
+    let mut candidate = component_types
+        .map(|types| component_candidate(forge, types, cancel))
+        .transpose()?;
+    Ok(
+        move |record: &Record<'source>,
+              trees: &mut TreeBuilder<'source>,
+              coverage: &mut CatalogRecordCoverage| {
+            Ok(
+                unlocalized_record_query::selected(record, Kind::Items, coverage)
+                    && candidate.as_mut().is_none_or(|probe| probe(record, trees)),
+            )
+        },
+    )
 }
 
 const COMPONENTS: &str = "Components";

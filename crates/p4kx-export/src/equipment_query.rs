@@ -176,6 +176,8 @@ pub mod weapon_procedural;
 mod weapon_recoil;
 #[path = "equipment_weapon_query_rows.rs"]
 mod weapon_rows;
+#[path = "equipment_weapon_visit.rs"]
+mod weapon_visit;
 
 pub use crate::catalog_v3::authored_fields::authored_manufacturer::AuthoredManufacturer;
 pub use crate::catalog_v3::catalog_capacity::ResourceCapacity;
@@ -231,9 +233,9 @@ pub use snapshot::{
 pub use weapon::{
     AmmoBinding, AmmoContainer, ContainerAmmoSlots, ProjectileCombatInputs, SecondaryMagazine,
     WeaponAction, WeaponActions, WeaponMagazineSlots, WeaponModeKind, WeaponSource,
-    WeaponSourceSnapshot, with_selected_weapon_sources, with_selected_weapon_sources_from,
-    with_weapon_sources, with_weapon_sources_from,
+    WeaponSourceSnapshot, with_weapon_sources, with_weapon_sources_from,
 };
+pub use weapon_visit::{WeaponSourceVisitSummary, visit_weapon_sources, visit_weapon_sources_from};
 
 pub use weapon_combat::{
     AlphaUnit, CombatModel, CombatUnits, DamageChannels, DistanceUnit, DpsUnit, FireRateUnit,

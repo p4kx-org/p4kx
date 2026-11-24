@@ -165,10 +165,18 @@ impl<'archive> CatalogQuerySession<'archive> {
         cancel: Option<&CancelToken>,
         project: impl FnOnce(&Archive, &DataForgeEntry) -> Result<T, CatalogError>,
     ) -> Result<T, CatalogError> {
+        self.project_fallible(cancel, project)
+    }
+
+    fn project_fallible<T, E: From<CatalogError>>(
+        &self,
+        cancel: Option<&CancelToken>,
+        project: impl FnOnce(&Archive, &DataForgeEntry) -> Result<T, E>,
+    ) -> Result<T, E> {
         checkpoint(cancel)?;
-        self.watch.check()?;
+        self.watch.check().map_err(CatalogError::from)?;
         let result = project(self.archive, self.entry.get());
-        self.watch.check()?;
+        self.watch.check().map_err(CatalogError::from)?;
         checkpoint(cancel)?;
         result
     }
@@ -185,6 +193,16 @@ impl ParsedCatalogQueries<'_> {
         project: impl FnOnce(&Archive, &DataForgeEntry, &DataForge<'_>) -> Result<T, CatalogError>,
     ) -> Result<T, CatalogError> {
         self.session.project(cancel, |archive, entry| {
+            project(archive, entry, &self.forge)
+        })
+    }
+
+    pub(crate) fn project_fallible<T, E: From<CatalogError>>(
+        &self,
+        cancel: Option<&CancelToken>,
+        project: impl FnOnce(&Archive, &DataForgeEntry, &DataForge<'_>) -> Result<T, E>,
+    ) -> Result<T, E> {
+        self.session.project_fallible(cancel, |archive, entry| {
             project(archive, entry, &self.forge)
         })
     }

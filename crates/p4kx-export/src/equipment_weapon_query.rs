@@ -33,9 +33,11 @@ pub fn with_weapon_sources<T>(
     cancel: Option<&CancelToken>,
     inspect: impl FnOnce(WeaponSourceSnapshot<'_>) -> T,
 ) -> Result<T, CatalogError> {
-    with_selected_weapon_sources(
+    read::with_archive::<weapon_rows::WeaponSources, T>(
         archive,
+        None,
         CatalogRecordSelection::RecordIndex(record_index),
+        CatalogLanguageSelection::Selected(&[]),
         cancel,
         inspect,
     )
@@ -52,51 +54,10 @@ pub fn with_weapon_sources_from<T>(
     cancel: Option<&CancelToken>,
     inspect: impl FnOnce(WeaponSourceSnapshot<'_>) -> T,
 ) -> Result<T, CatalogError> {
-    with_selected_weapon_sources_from(
-        archive,
-        entry,
-        CatalogRecordSelection::RecordIndex(record_index),
-        cancel,
-        inspect,
-    )
-}
-
-/// Supplies authored weapon and ammo rows owned by the selected Catalog Items.
-/// Owners are ordered by physical Record index. Check coverage before inferring absence.
-///
-/// # Errors
-/// Returns input, source-evidence, Archive-change or cancellation errors.
-pub fn with_selected_weapon_sources<T>(
-    archive: &Archive,
-    selection: CatalogRecordSelection,
-    cancel: Option<&CancelToken>,
-    inspect: impl FnOnce(WeaponSourceSnapshot<'_>) -> T,
-) -> Result<T, CatalogError> {
-    read::with_archive::<weapon_rows::WeaponSources, T>(
-        archive,
-        None,
-        selection,
-        CatalogLanguageSelection::Selected(&[]),
-        cancel,
-        inspect,
-    )
-}
-
-/// Supplies selected weapon and ammo rows from an already decoded Archive Entry.
-///
-/// # Errors
-/// Returns query errors or a source-origin mismatch for a foreign Entry.
-pub fn with_selected_weapon_sources_from<T>(
-    archive: &Archive,
-    entry: &DataForgeEntry,
-    selection: CatalogRecordSelection,
-    cancel: Option<&CancelToken>,
-    inspect: impl FnOnce(WeaponSourceSnapshot<'_>) -> T,
-) -> Result<T, CatalogError> {
     read::with_archive::<weapon_rows::WeaponSources, T>(
         archive,
         Some(entry),
-        selection,
+        CatalogRecordSelection::RecordIndex(record_index),
         CatalogLanguageSelection::Selected(&[]),
         cancel,
         inspect,
@@ -114,25 +75,8 @@ impl CatalogQuerySession<'_> {
         cancel: Option<&CancelToken>,
         inspect: impl FnOnce(WeaponSourceSnapshot<'_>) -> T,
     ) -> Result<T, CatalogError> {
-        self.with_selected_weapon_sources(
-            CatalogRecordSelection::RecordIndex(record_index),
-            cancel,
-            inspect,
-        )
-    }
-
-    /// Supplies authored weapon and ammo rows for the selected Items through this session.
-    ///
-    /// # Errors
-    /// Returns canonical query, Archive-change or cancellation errors.
-    pub fn with_selected_weapon_sources<T>(
-        &self,
-        selection: CatalogRecordSelection,
-        cancel: Option<&CancelToken>,
-        inspect: impl FnOnce(WeaponSourceSnapshot<'_>) -> T,
-    ) -> Result<T, CatalogError> {
         self.parsed(cancel)?
-            .with_selected_weapon_sources(selection, cancel, inspect)
+            .with_weapon_sources(record_index, cancel, inspect)
     }
 }
 
@@ -147,29 +91,12 @@ impl ParsedCatalogQueries<'_> {
         cancel: Option<&CancelToken>,
         inspect: impl FnOnce(WeaponSourceSnapshot<'_>) -> T,
     ) -> Result<T, CatalogError> {
-        self.with_selected_weapon_sources(
-            CatalogRecordSelection::RecordIndex(record_index),
-            cancel,
-            inspect,
-        )
-    }
-
-    /// Supplies authored weapon and ammo rows for the selected Items through this parsed view.
-    ///
-    /// # Errors
-    /// Returns canonical query, Archive-change or cancellation errors.
-    pub fn with_selected_weapon_sources<T>(
-        &self,
-        selection: CatalogRecordSelection,
-        cancel: Option<&CancelToken>,
-        inspect: impl FnOnce(WeaponSourceSnapshot<'_>) -> T,
-    ) -> Result<T, CatalogError> {
         self.project(cancel, |archive, entry, forge| {
             read::with_parsed::<weapon_rows::WeaponSources, T>(
                 archive,
                 entry,
                 forge,
-                selection,
+                CatalogRecordSelection::RecordIndex(record_index),
                 &[],
                 cancel,
                 inspect,

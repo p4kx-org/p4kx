@@ -1948,10 +1948,29 @@ methods with one physical Item Record index. The snapshot contains the authored 
 `configurations.weaponActions`, `configurations.ammoContainers` and `declarations.ammoBindings`
 for that Item, with the same value states and source references as the Catalog.
 
-Use `equipment::with_selected_weapon_sources` and its decoded-Entry, session or parsed forms
-to enumerate owners. `All` selects admitted Catalog Items and `Guid` keeps every admitted
-physical occurrence of that GUID. Results follow physical Record order. Check coverage for
-unreadable potential owners and incomplete component fields before inferring absence.
+Use `equipment::visit_weapon_sources` and its decoded-Entry, session or parsed forms for a
+full or GUID-scoped scan. It calls the visitor in physical Record order with one owner index
+and that owner's typed rows, field coverage and original source inventory. The callback can
+consume or serialize each snapshot before the next owner is read. Repeated physical source
+identities can occur across snapshots. Use the final availability, owner and row counts, and
+combined coverage before concluding that an owner or component is absent. Keep any results
+staged until the visitor returns success if a callback error, cancellation or Archive change
+must preserve the previous output. `All` selects admitted Catalog Items. `Guid` keeps every
+admitted physical occurrence of the requested GUID. `RecordIndex` addresses one owner.
+
+The full visitor ran in fresh Windows AMD64 processes without opening a Normal Catalog.
+The measured verifier executable had SHA-256
+`b582efebce5f6bf1f6040e53946ea38e64dd184f1a57a1597c8f6184bbca2676`.
+The Archive and manifest were unchanged at the end of each run.
+
+| Build | Owners | Actions | Containers | Bindings | Elapsed (ms) | Peak Private Commit (bytes) | Peak Working Set (bytes) |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 974 | 907 | 483 | 1,390 | 56,275 | 1,091,649,536 | 1,021,804,544 |
+| PTU `13260598` | 991 | 924 | 490 | 1,414 | 58,173 | 1,114,898,432 | 1,032,060,928 |
+
+Both process peaks stayed under 2,000,000,000 bytes. The scope is the directly authored
+rows and their per-owner inventories. Comparison with the complete Normal Catalog also checks
+the producer's separately linked magazine dependencies.
 
 The weapon component exposes its fire and aim slots, local action nodes and their original
 ordinals. `mode_kind()` classifies each action. For single and rapid projectile actions,

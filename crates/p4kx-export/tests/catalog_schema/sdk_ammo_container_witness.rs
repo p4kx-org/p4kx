@@ -31,13 +31,27 @@ pub(super) fn read() -> TestResult<Route> {
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog = ammo_binding_witness::normal(&archive, &entry)?;
-    equipment::with_selected_weapon_sources_from(
+    let mut route = None;
+    let summary = equipment::visit_weapon_sources_from(
         &archive,
         &entry,
         CatalogRecordSelection::All,
         None,
-        |snapshot| verify(&snapshot, &catalog),
-    )?
+        |index, snapshot| -> TestResult<()> {
+            assert_eq!(
+                index, OWNER,
+                "the visitor keeps the physical container owner"
+            );
+            route = Some(verify(&snapshot, &catalog)?);
+            Ok(())
+        },
+    )?;
+    assert_eq!(
+        summary.owner_count(),
+        1,
+        "the fixture admits exactly one container owner"
+    );
+    route.ok_or_else(|| "expected the canonical ammo container owner".into())
 }
 
 fn verify(snapshot: &WeaponSourceSnapshot<'_>, catalog: &Value) -> TestResult<Route> {
@@ -86,7 +100,7 @@ fn verify(snapshot: &WeaponSourceSnapshot<'_>, catalog: &Value) -> TestResult<Ro
     Route::queried_rows(
         AMMO_CONTAINERS,
         &owner.ammo_containers,
-        "direct owner enumeration and ordered container fields match the encrypted synthetic Normal Catalog; installed parity and standalone memory open",
+        "the visitor matches ordered container fields in the synthetic Normal Catalog. Standalone visitor memory verified on LIVE 13220821 and PTU 13260598. Installed parity remains open",
     )
 }
 

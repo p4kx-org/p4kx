@@ -3,7 +3,7 @@
 
 use p4kx_export::catalog_queries::CatalogRecordSelection;
 use p4kx_export::catalog_queries::equipment::{
-    WeaponSourceSnapshot, with_selected_weapon_sources_from, with_weapon_recoil_definitions,
+    WeaponSourceSnapshot, visit_weapon_sources_from, with_weapon_recoil_definitions,
 };
 use p4kx_extraction::{Archive, DataForgeEntry, InputScope};
 use p4kx_testkit::{ArchiveBuilder, TestEntry, test_key};
@@ -46,16 +46,29 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
         return Err("the fixture requires one physical weapon owner".into());
     };
     let catalog = ammo_binding_witness::normal(&archive, &entry)?;
-    let [actions, bindings] = with_selected_weapon_sources_from(
+    let mut routes = None;
+    let summary = visit_weapon_sources_from(
         &archive,
         &entry,
         CatalogRecordSelection::All,
         None,
-        |snapshot| {
+        |index, snapshot| -> TestResult<()> {
+            assert_eq!(
+                index,
+                owner.index(),
+                "the visitor retains the original weapon owner"
+            );
             ammo_binding_witness::verify(&archive, &entry, &snapshot, &catalog)?;
-            verify(&snapshot, owner.index())
+            routes = Some(verify(&snapshot, index)?);
+            Ok(())
         },
-    )??;
+    )?;
+    assert_eq!(
+        summary.owner_count(),
+        1,
+        "the fixture admits exactly one weapon owner"
+    );
+    let [actions, bindings] = routes.ok_or("expected the canonical weapon owner")?;
     Ok([actions, ammo_container_witness::read()?, bindings])
 }
 
@@ -97,12 +110,12 @@ fn verify(snapshot: &WeaponSourceSnapshot<'_>, record_index: u32) -> TestResult<
         Route::queried_rows(
             WEAPON_ACTIONS,
             &owner.weapon_actions,
-            "physical Item selection and owner enumeration match the synthetic Catalog; installed parity and standalone memory open",
+            "physical Item and full visitor match the synthetic Catalog. Standalone visitor memory verified on LIVE 13220821 and PTU 13260598. Installed parity remains open",
         )?,
         Route::queried_rows(
             AMMO_BINDINGS,
             &owner.ammo_bindings,
-            "direct owner enumeration and physical Ammo target joins match the synthetic producer; installed parity and standalone memory open",
+            "the visitor and physical Ammo target joins match the synthetic producer. Standalone visitor memory verified on LIVE 13220821 and PTU 13260598. Installed parity remains open",
         )?,
     ])
 }

@@ -7,7 +7,7 @@ use p4kx_extraction::{
     Archive, CancelToken, CanonicalReadObserver, DataForge, DataForgeEntry, Filter, Language,
 };
 
-use super::rows::{Family, Projector, ReadOptions, WEAPON_SOURCE_TYPES};
+use super::rows::{Family, Projector, ReadOptions};
 use super::snapshot::EquipmentSnapshot;
 use crate::CatalogError;
 use crate::Kind;
@@ -194,7 +194,6 @@ impl<'query> Query<'query> {
                     Ok(false)
                 },
             )?,
-            Family::WeaponSources => self.plan_weapon_sources(observer)?,
             Family::Definitions
             | Family::Items
             | Family::ItemSources
@@ -207,6 +206,7 @@ impl<'query> Query<'query> {
             | Family::ProceduralPlanetAudio
             | Family::Factions
             | Family::ContractScopes
+            | Family::WeaponSources
             | Family::ProjectileAmmo
             | Family::MagazineResolutions => Plan::read(
                 self.forge,
@@ -235,28 +235,6 @@ impl<'query> Query<'query> {
         };
         order(family, &mut plan.owners);
         Ok(plan)
-    }
-
-    fn plan_weapon_sources(
-        &self,
-        observer: Option<Arc<dyn CanonicalReadObserver>>,
-    ) -> Result<Plan<'query>, CatalogError> {
-        match self.selection {
-            CatalogRecordSelection::RecordIndex(_) => Plan::read(
-                self.forge,
-                Family::WeaponSources.kind(),
-                self.selection,
-                self.cancel,
-                observer,
-            ),
-            _ => Plan::read_item_components(
-                self.forge,
-                WEAPON_SOURCE_TYPES,
-                self.selection,
-                self.cancel,
-                observer,
-            ),
-        }
     }
 
     const fn requested(&self, family: Family) -> &[Language] {
@@ -309,18 +287,31 @@ fn project<'source, P: Projector>(
 ) -> Result<Vec<P::Row<'source>>, CatalogError> {
     let mut rows = Vec::new();
     for owner in owners {
-        checkpoint(cancel)?;
-        let admission = RecordObservation::capture(projection.original(), &owner.record)?;
-        let read = P::read(forge, &owner.tree, projection, &admission, options, cancel)?;
-        if !read.selection_complete
-            || read
-                .notes
-                .iter()
-                .any(|note| note.description().issue.blocks_projection())
-        {
-            coverage.incomplete_fields.push(owner.record.index());
-        }
-        rows.extend(read.value);
+        rows.extend(project_owner::<P>(
+            forge, &owner, projection, options, coverage, cancel,
+        )?);
     }
     Ok(rows)
+}
+
+pub(super) fn project_owner<'source, P: Projector>(
+    forge: &'source DataForge<'source>,
+    owner: &Owner<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    options: &ReadOptions<'_>,
+    coverage: &mut CatalogRecordCoverage,
+    cancel: Option<&CancelToken>,
+) -> Result<Vec<P::Row<'source>>, CatalogError> {
+    checkpoint(cancel)?;
+    let admission = RecordObservation::capture(projection.original(), &owner.record)?;
+    let read = P::read(forge, &owner.tree, projection, &admission, options, cancel)?;
+    if !read.selection_complete
+        || read
+            .notes
+            .iter()
+            .any(|note| note.description().issue.blocks_projection())
+    {
+        coverage.incomplete_fields.push(owner.record.index());
+    }
+    Ok(read.value)
 }
