@@ -3,9 +3,10 @@
 
 use std::error::Error;
 use std::fs;
+use std::ops::Range;
 use std::path::Path;
 
-use p4kx_testkit::{ArchiveBuilder, TestEntry, TestModel, p4kx, test_key};
+use p4kx_testkit::{ArchiveBuilder, TestCrchModel, TestEntry, TestModel, p4kx, test_key};
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -14,6 +15,8 @@ const MODEL: &str = "Data/Objects/Test/cube.cgf";
 const BASE: &str = "Data/Objects/Test/cube.cgfm";
 const LOD_MODEL: &str = "Data/Objects/Test/cube_lod1.cgf";
 const LOD: &str = "Data/Objects/Test/cube_lod1.cgfm";
+const TABLE_START_WORD: Range<usize> = 12..16;
+const TABLE_ROW_BYTES: usize = 16;
 
 #[test]
 fn model_info_binds_original_submesh_words_to_their_actual_levels() -> TestResult {
@@ -32,18 +35,44 @@ fn model_info_binds_original_submesh_words_to_their_actual_levels() -> TestResul
         .entry(TestEntry::zstd(LOD, lod.clone()).encrypted())
         .write_to(&path)?;
     let info = listing(&path, Some(MODEL))?;
-    let levels = [(BASE, base, false), (LOD, lod, true)];
-    for (level, (entry, bytes, encrypted)) in levels.iter().enumerate() {
+    let levels = [
+        ("geometry", BASE, &base, false),
+        ("lod1-geometry", LOD, &lod, true),
+    ];
+    for (level, (role, entry, bytes, encrypted)) in levels.into_iter().enumerate() {
         let submesh = format!("/lods/{level}/meshes/0/submeshes/0");
         let geometry = Geometry {
             entry,
             bytes,
-            encrypted: *encrypted,
+            encrypted,
         };
         assert_word(&info, &submesh, ("material_id", "materialId", 2), &geometry)?;
         assert_word(&info, &submesh, ("index_count", "indexCount", 4), &geometry)?;
         assert_unknown(&info, &format!("{submesh}/first_index"))?;
+        assert_chunk_words(&info, role, &geometry, 4)?;
     }
+    Ok(())
+}
+
+#[test]
+fn model_info_binds_crch_chunk_type_ids_to_two_original_bytes() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let path = dir.path().join("Data.p4k");
+    let bytes = TestCrchModel::cube().bytes();
+    ArchiveBuilder::new()
+        .entry(TestEntry::zstd(MODEL, bytes.clone()).encrypted())
+        .write_to(&path)?;
+    let info = listing(&path, Some(MODEL))?;
+    assert_chunk_words(
+        &info,
+        "model",
+        &Geometry {
+            entry: MODEL,
+            bytes: &bytes,
+            encrypted: true,
+        },
+        2,
+    )?;
     Ok(())
 }
 
@@ -59,6 +88,7 @@ fn model_info_reports_unknown_origin_for_loose_submesh_fields() -> TestResult {
     for name in ["material_id", "index_count", "first_index"] {
         assert_unknown(&info, &format!("{submesh}/{name}"))?;
     }
+    assert_unknown(&info, "/chunks/0/type_id")?;
     assert_eq!(
         info.get("provenance"),
         Some(&json!({"sources": [], "uses": []}))
@@ -80,7 +110,7 @@ fn listing(path: &Path, entry: Option<&str>) -> Result<Value, Box<dyn Error>> {
 }
 
 fn field_origin<'a>(info: &'a Value, path: &str) -> Result<&'a Value, Box<dyn Error>> {
-    assert!(info.pointer(path).is_some(), "emitted submesh field {path}");
+    assert!(info.pointer(path).is_some(), "emitted model field {path}");
     info.get("fieldOrigins")
         .and_then(|fields| fields.get(path))
         .ok_or_else(|| format!("missing origin at {path}").into())
@@ -101,14 +131,44 @@ struct Geometry<'a> {
     encrypted: bool,
 }
 
+fn assert_chunk_words(
+    info: &Value,
+    role: &str,
+    geometry: &Geometry<'_>,
+    width: usize,
+) -> TestResult {
+    let table_start = usize::try_from(u32::from_le_bytes(
+        geometry
+            .bytes
+            .get(TABLE_START_WORD)
+            .ok_or("table offset")?
+            .try_into()?,
+    ))?;
+    let chunks = info["chunks"].as_array().ok_or("model chunks")?;
+    let mut found = false;
+    for (ordinal, chunk) in chunks.iter().enumerate() {
+        if chunk["file"] != role {
+            continue;
+        }
+        let index = usize::try_from(chunk["index"].as_u64().ok_or("chunk index")?)?;
+        let start = table_start + index * TABLE_ROW_BYTES;
+        let path = format!("/chunks/{ordinal}");
+        let range = assert_word(info, &path, ("type_id", "typeId", width), geometry)?;
+        assert_eq!(range, start..start + width, "original table row for {path}");
+        found = true;
+    }
+    assert!(found, "{role} chunk words are tested");
+    Ok(())
+}
+
 fn assert_word(
     info: &Value,
-    submesh: &str,
+    parent: &str,
     field: (&str, &str, usize),
     geometry: &Geometry<'_>,
-) -> TestResult {
+) -> Result<Range<usize>, Box<dyn Error>> {
     let (output, original, width) = field;
-    let path = format!("{submesh}/{output}");
+    let path = format!("{parent}/{output}");
     let origin = field_origin(info, &path)?;
     assert_eq!(
         origin["containsEncryptedSource"], geometry.encrypted,
@@ -163,7 +223,7 @@ fn assert_word(
         Some(&json!(u32::from_le_bytes(widened))),
         "the original value at {path}"
     );
-    Ok(())
+    Ok(start..end)
 }
 
 fn origin_row<'a>(info: &'a Value, path: &str, id: &Value) -> Result<&'a Value, Box<dyn Error>> {

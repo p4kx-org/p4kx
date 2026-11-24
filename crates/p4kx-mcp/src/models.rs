@@ -3,8 +3,8 @@
 
 use p4kx_extraction::model::{LodSelection, MaterialReading, PositionBox};
 use p4kx_extraction::{
-    AnimationChoice, AnimationSet, ChunkInfo, ConversionError, LibraryInfo, ModelSource,
-    TextureVerdicts, UnreadInfo,
+    AnimationChoice, AnimationSet, ConversionError, LibraryInfo, ModelSource, TextureVerdicts,
+    UnreadInfo,
 };
 use serde::Serialize;
 
@@ -19,6 +19,9 @@ use crate::model_params::Section;
 use crate::model_shapes::{LodShape, ModelCounts, ModelItemsResult, ModelOverview};
 use crate::page::Page;
 use crate::{model_animation_items, model_bone_items};
+
+#[path = "model_chunk_items.rs"]
+mod chunk_items;
 
 /// Returns the summary of the model Entry at `path`.
 pub(crate) fn overview(opened: &Opened, path: &str) -> Result<ModelOverview, ToolError> {
@@ -75,7 +78,6 @@ pub(crate) fn items(
     page: Page,
 ) -> Result<ModelItemsResult, ToolError> {
     let (source, animations) = read(opened, path, ModelRead::Section(section))?;
-    let model = source.model();
     let what = section.name();
     let reserved = envelope_len(opened, source.name(), what);
     let observed = ModelItemPage {
@@ -94,9 +96,7 @@ pub(crate) fn items(
         Section::UnreadAnimations => {
             paged(&animations.unread, page, what, reserved, UnreadInfo::of)?
         }
-        Section::Chunks => paged(&ChunkInfo::of_model(model), page, what, reserved, |item| {
-            item
-        })?,
+        Section::Chunks => return chunk_items::list(&observed),
     };
     Ok(ModelItemsResult {
         archive: opened.archive().path().display().to_string(),

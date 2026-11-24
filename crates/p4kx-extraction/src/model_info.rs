@@ -16,14 +16,18 @@ use crate::model_info_materials::receipt::MaterialFieldReceipt;
 use crate::model_info_materials::{DefaultMaterialInfo, LibraryInfo, MaterialInfo};
 use crate::{AnimationListing, AnimationSet, ModelSource};
 
+#[path = "model_field_origins.rs"]
+mod field_origins;
+
 #[path = "model_mesh_info.rs"]
 mod mesh_info;
 
 #[path = "model_submesh_origins.rs"]
 mod submesh_origins;
 
+use field_origins::ModelFieldOrigins;
+pub use field_origins::write_chunk_type_origin;
 pub use mesh_info::MeshInfo;
-use submesh_origins::ModelSubmeshOrigins;
 pub use submesh_origins::write_submesh_origins;
 
 /// What `p4kx model info --json` says about a model, and what front-ends serialise of it.
@@ -46,7 +50,7 @@ pub struct ModelInfo<'a> {
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
     material_receipt: Option<&'a MaterialFieldReceipt>,
     #[serde(flatten, skip_serializing_if = "Option::is_none")]
-    submesh_origins: Option<ModelSubmeshOrigins>,
+    field_origins: Option<ModelFieldOrigins>,
     /// The list of material indices of the node table.
     pub node_material_indices: &'a [u16],
     /// What a lenient read worked around, as sentences.
@@ -86,7 +90,7 @@ impl<'a> ModelInfo<'a> {
         )
     }
 
-    /// Describes the model with corresponding original submesh field evidence.
+    /// Describes the model with original submesh and chunk type ID evidence.
     ///
     /// # Errors
     /// Returns invalid evidence positions or an invalid source inventory.
@@ -95,7 +99,7 @@ impl<'a> ModelInfo<'a> {
         listing: &AnimationListing,
     ) -> io::Result<Self> {
         let mut info = Self::of_listing(source, listing);
-        info.submesh_origins = Some(ModelSubmeshOrigins::capture(source)?);
+        info.field_origins = Some(ModelFieldOrigins::capture(source)?);
         Ok(info)
     }
 
@@ -114,7 +118,7 @@ impl<'a> ModelInfo<'a> {
             default_material: source.default_material().map(DefaultMaterialInfo::of),
             materials: MaterialInfo::of_model(model),
             material_receipt: source.material_receipt(),
-            submesh_origins: None,
+            field_origins: None,
             node_material_indices: &model.material_indices,
             issues: model.issues.iter().map(ToString::to_string).collect(),
             nodes: NodeInfo::of_model(model),

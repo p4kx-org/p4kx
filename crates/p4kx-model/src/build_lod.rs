@@ -4,10 +4,10 @@
 use p4kx_chunks::ivo;
 
 use crate::bone_map::check_joints;
-use crate::build;
 use crate::build::{Geometry, MAX_LOD, Rig, corrupt, fetch, first_of, read_meshes};
 use crate::companion::lod_file_name;
 use crate::model::MESH_TYPES;
+use crate::model::chunk_usage;
 use crate::skeleton_source;
 use crate::{
     Bone, CompanionResolver, Lod, LodSelection, LodSkeletonOrigin, Mesh, MeshOrigin,
@@ -46,7 +46,7 @@ fn level_skeleton(
     let mut read = Vec::new();
     let bones =
         skeleton_source::read_model_skeleton(&file_name, &file, which, &mut read, sources, None)?;
-    chunks.extend(build::usage(&file, which, &read));
+    chunks.extend(chunk_usage(&file, which, &read));
     let origin = if read.is_empty() {
         LodSkeletonOrigin::NoSkeleton
     } else if bones.is_empty() {
@@ -87,11 +87,9 @@ pub(crate) fn read_lod_companions(
                         file: companion_name,
                     });
                 }
-                found.chunks.extend(build::usage(
-                    &companion,
-                    ModelFile::LodGeometry(level),
-                    read,
-                ));
+                found
+                    .chunks
+                    .extend(chunk_usage(&companion, ModelFile::LodGeometry(level), read));
                 continue;
             }
             return Err(ModelError::NoMesh {
@@ -123,11 +121,9 @@ pub(crate) fn read_lod_companions(
             bones: skeleton.bones,
             skeleton_origin: skeleton.origin,
         });
-        found.chunks.extend(build::usage(
-            &companion,
-            ModelFile::LodGeometry(level),
-            read,
-        ));
+        found
+            .chunks
+            .extend(chunk_usage(&companion, ModelFile::LodGeometry(level), read));
     }
     Ok(())
 }

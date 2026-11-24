@@ -9,6 +9,7 @@ use crate::support::{Install, TestResult};
 
 const MODEL: &str = "Data/cube.cgf";
 const BASE: &str = "Data/cube.cgfm";
+const LOD_MODEL: &str = "Data/cube_lod1.cgf";
 const LOD: &str = "Data/cube_lod1.cgfm";
 const RESPONSE_LIMIT: usize = 256 * 1024;
 
@@ -54,6 +55,44 @@ fn mesh_page_origins_follow_the_original_lod_with_page_local_addresses() -> Test
             );
         }
     }
+    Ok(())
+}
+
+#[test]
+fn chunk_type_id_origins_use_page_local_pointers_and_the_actual_file() -> TestResult {
+    let install = installation(&TestModel::cube(), 2)?;
+    let mut server = install.serve(&["--archive", "LIVE"])?;
+    let mut args = json!({"path": MODEL, "section": "chunks", "limit": 1});
+    let mut seen = 0;
+    let mut saw_encrypted = false;
+    loop {
+        let response = server.call("list_model_items", &args)?;
+        let reply = &response["structuredContent"];
+        let items = reply["items"].as_array().ok_or("chunk rows")?;
+        let [row] = items.as_slice() else {
+            return Err("expected one page-local chunk".into());
+        };
+        let (entry, encrypted) = match row["file"].as_str() {
+            Some("model") => (MODEL, false),
+            Some("geometry") => (BASE, false),
+            Some("lod1-model") => (LOD_MODEL, false),
+            Some("lod1-geometry") => (LOD, true),
+            _ => return Err(format!("unexpected chunk role: {row}").into()),
+        };
+        let pointer = "items/0/type_id";
+        marker(field(reply, pointer)?, encrypted);
+        assert_geometry_entry(reply, pointer, "typeId", entry)?;
+        assert_all_addresses(&response)?;
+        seen += 1;
+        saw_encrypted |= encrypted;
+        if let Some(cursor) = reply.get("next_cursor") {
+            args["cursor"] = cursor.clone();
+        } else {
+            assert_eq!(reply["total"], seen, "all table rows were paged");
+            break;
+        }
+    }
+    assert!(saw_encrypted, "later pages include the encrypted companion");
     Ok(())
 }
 

@@ -5,38 +5,9 @@ use std::io;
 use std::ops::Range;
 
 use p4kx_model::MeshSubmeshSource;
-use serde::Serialize;
 
 use crate::model_geometry_scope::ModelGeometryScope;
-use crate::{
-    FieldOrigin, FieldOrigins, FieldPath, ModelSource, SourceInventory, SourceUseRole, SourceUses,
-};
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub(super) struct ModelSubmeshOrigins {
-    field_origins: FieldOrigins,
-    provenance: SourceInventory,
-}
-
-impl ModelSubmeshOrigins {
-    pub(super) fn capture(source: &ModelSource) -> io::Result<Self> {
-        let model = source.model();
-        let uses = SourceUses::with_compact_use_refs();
-        let mut fields = FieldOrigins::new();
-        for (level, lod) in model.lods.iter().enumerate() {
-            for index in 0..lod.meshes.len() {
-                let path = FieldPath::parse(&format!("/lods/{level}/meshes/{index}"))
-                    .map_err(io::Error::other)?;
-                write_submesh_origins(source, level, index, &path, &uses, &mut fields)?;
-            }
-        }
-        Ok(Self {
-            field_origins: fields,
-            provenance: uses.freeze().map_err(io::Error::other)?,
-        })
-    }
-}
+use crate::{FieldOrigin, FieldOrigins, FieldPath, ModelSource, SourceUseRole, SourceUses};
 
 /// Writes original submesh field origins for one mesh in its model's LOD and mesh order.
 ///

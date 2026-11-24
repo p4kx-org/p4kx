@@ -7,17 +7,16 @@ use crate::bone_map::check_joints;
 use crate::build_lod::read_lod_companions;
 use crate::material::{MaterialName, material_library};
 use crate::mesh::split_by_node;
-use crate::model::MESH_TYPES;
+use crate::model::{MESH_TYPES, chunk_usage};
 use crate::model_node_sources::ReadCapture;
 use crate::mtl_load::load;
 use crate::nmc;
 use crate::skeleton_source;
 use crate::skin::read_skin;
 use crate::{
-    Bone, ChunkUsage, CompanionResolver, CorruptChunk, LayerCache, Lod, LodSelection,
-    LodSkeletonOrigin, MaterialReading, Mesh, MeshOrigin, Model, ModelBoneSources, ModelChunk,
-    ModelChunkLayout, ModelError, ModelFile, ModelIssue, Node, PositionBox, RigLogicBytes,
-    Transform,
+    Bone, CompanionResolver, CorruptChunk, LayerCache, Lod, LodSelection, LodSkeletonOrigin,
+    MaterialReading, Mesh, MeshOrigin, Model, ModelBoneSources, ModelChunk, ModelError, ModelFile,
+    ModelIssue, Node, PositionBox, RigLogicBytes, Transform,
 };
 
 pub(crate) const MAX_LOD: u32 = 15;
@@ -82,7 +81,7 @@ pub(crate) fn build<B: AsRef<[u8]>>(
         capture.skeletons,
     )?;
 
-    let mut chunks = usage(file, ModelFile::Model, &read);
+    let mut chunks = chunk_usage(file, ModelFile::Model, &read);
     chunks.extend(companion_chunks);
     let materials = load(
         material_library.as_deref(),
@@ -155,7 +154,7 @@ fn read_geometry<B: AsRef<[u8]>>(
         )?);
     }
     if let Some((companion_name, companion)) = base {
-        chunks.extend(usage(&companion, ModelFile::Geometry, read));
+        chunks.extend(chunk_usage(&companion, ModelFile::Geometry, read));
         geometry = Some(companion_name);
     }
     let mut found = Geometry {
@@ -225,7 +224,7 @@ fn read_fallback_lod<B: AsRef<[u8]>>(
     if let Some((companion_name, companion)) = base {
         found
             .chunks
-            .extend(usage(&companion, ModelFile::Geometry, read));
+            .extend(chunk_usage(&companion, ModelFile::Geometry, read));
         found.base_name = Some(companion_name);
     }
     Ok(())
@@ -351,34 +350,6 @@ pub(crate) fn first_of<B: AsRef<[u8]>>(file: &ChunkFile<B>, types: &[ChunkType])
         .iter()
         .find_map(|&chunk_type| file.chunks_of(chunk_type).next())
         .map(|(index, _)| index)
-}
-
-pub(crate) fn usage<B: AsRef<[u8]>>(
-    file: &ChunkFile<B>,
-    which: ModelFile,
-    read: &[(ModelFile, usize)],
-) -> Vec<ModelChunk> {
-    file.chunks()
-        .iter()
-        .enumerate()
-        .map(|(index, chunk)| {
-            let chunk_type = chunk.chunk_type();
-            let usage = if read.contains(&(which, index)) {
-                ChunkUsage::Read
-            } else if chunk_type.is_known() {
-                ChunkUsage::Skipped
-            } else {
-                ChunkUsage::Unknown
-            };
-            ModelChunk {
-                file: which,
-                index,
-                chunk_type,
-                usage,
-                layout: ModelChunkLayout::of(chunk),
-            }
-        })
-        .collect()
 }
 
 pub(crate) fn root_node(name: &str) -> Node {

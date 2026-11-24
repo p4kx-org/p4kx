@@ -3,11 +3,12 @@
 
 use p4kx_chunks::{ByteOrder, ChunkFile, crch};
 
-use crate::build::{root_node, usage};
+use crate::build::root_node;
 use crate::crch_mesh::{physics_slots, read_physics_mesh};
 use crate::crch_node::{self, CrchNode};
 use crate::error::failure;
 use crate::material::{MaterialName, material_library};
+use crate::model::chunk_usage;
 use crate::mtl_load::load;
 use crate::{
     CompanionResolver, CorruptChunk, LayerCache, Lod, LodSelection, LodSkeletonOrigin,
@@ -85,7 +86,7 @@ pub(crate) fn build<B: AsRef<[u8]>>(
         bones: Vec::new(),
         material_indices: Vec::new(),
         issues,
-        chunks: usage(file, ModelFile::Model, &read),
+        chunks: chunk_usage(file, ModelFile::Model, &read),
         rig_logic: None,
     })
 }

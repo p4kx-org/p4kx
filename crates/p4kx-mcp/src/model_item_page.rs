@@ -32,6 +32,8 @@ pub(crate) enum EvidenceError {
     Material(#[source] Box<ConversionError>),
     #[error("the mesh page origin could not be recorded")]
     Mesh(#[source] std::io::Error),
+    #[error("the chunk page origin could not be recorded")]
+    Chunk(#[source] std::io::Error),
 }
 
 pub(crate) struct ModelItemPage<'a> {

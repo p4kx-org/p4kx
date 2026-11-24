@@ -2916,6 +2916,11 @@ the cause no longer repeats the file name.
 `chunks` lists every chunk of actually read model and geometry files. `file` is `model`,
 `geometry`, `lod<n>-geometry` or `lod<n>-model`; the last role identifies a level-specific model
 file read for its skeleton. These roles do not independently prove physical source identity.
+For each `type_id`, `fieldOrigins` and `provenance` identify the original little-endian
+type word in the selected decoded Entry, including for unknown chunk types. The word is four
+bytes in `#ivo` and two in `CrCh`. A standalone or unbound input has an unknown marker and an
+incomplete source set. The MCP `list_model_items` chunks section uses the same evidence with
+page-local field addresses.
 `usage` is `read` when the model was read from it, `skipped` for a known type the model does not
 read and `unknown` for an unknown type.
 A geometry companion that does not exist exits with code 2, a corrupt or unreadable model or

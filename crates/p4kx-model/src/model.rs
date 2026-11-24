@@ -3,13 +3,18 @@
 
 use p4kx_chunks::{ChunkFile, ChunkType, ivo};
 
+#[path = "model_chunk.rs"]
+mod chunk;
+pub use chunk::ModelChunk;
+pub(crate) use chunk::chunk_usage;
+
 #[path = "model_drawable.rs"]
 mod drawable;
 
 use crate::model_node_sources::{self, ReadCapture};
 use crate::{
     Bone, CompanionResolver, Influences, LodSkeletonOrigin, MaterialReading, MaterialStatus,
-    MeshOrigin, ModelChunkLayout, ModelError, ModelIssue, PositionBox, RigLogicBytes, Transform,
+    MeshOrigin, ModelError, ModelIssue, PositionBox, RigLogicBytes, Transform,
 };
 
 /// A model read from a chunk file and its companions, in `CryEngine` coordinates: Z up, metres.
@@ -243,22 +248,6 @@ pub enum ChunkUsage {
     Skipped,
     /// The chunk type is unknown and was skipped.
     Unknown,
-}
-
-/// One chunk of a model's files and how the model used it.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub struct ModelChunk {
-    /// The file holding the chunk.
-    pub file: ModelFile,
-    /// The chunk's position in the file's chunk table.
-    pub index: usize,
-    /// The chunk's type.
-    pub chunk_type: ChunkType,
-    /// How the model used it.
-    pub usage: ChunkUsage,
-    /// Parsed physical table fields, including the container's byte-span convention.
-    pub layout: ModelChunkLayout,
 }
 
 impl Model {
