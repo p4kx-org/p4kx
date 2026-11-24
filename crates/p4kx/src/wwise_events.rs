@@ -18,6 +18,9 @@ use crate::exit::PARTIAL_FAILURE;
 use crate::json;
 use crate::query_table::one_line;
 
+#[path = "wwise_events_origins.rs"]
+mod origins;
+
 const CLASS_PREFIX: &str = "EntityClassDefinition.";
 
 #[derive(Serialize)]
@@ -32,6 +35,8 @@ struct EventsJson<'a> {
     unreadable_records: usize,
     triggers: Vec<HitJson<'a>>,
     issues: Vec<IssueJson<'a>>,
+    #[serde(flatten)]
+    origins: origins::DefinitionOrigins,
 }
 
 #[derive(Serialize)]
@@ -135,6 +140,7 @@ pub(crate) fn run(args: &WwiseEventsArgs, as_json: bool) -> Result<ExitCode> {
                 .map(|hit| hit_json(hit, finder.as_ref()))
                 .collect(),
             issues: issues_json(index),
+            origins: origins::capture(&archive, index, page.hits())?,
         })?;
         return Ok(code);
     }

@@ -984,6 +984,13 @@ the reason, a warning goes to stderr and the exit code is 1. Otherwise `entities
 trigger; above 0 it is also a warning on stderr. A page without triggers does not read the
 DataForge, so `entities_skipped` is `null` and `unreadable_records` is 0 there.
 
+`fieldOrigins` addresses `/triggers/{row}/name`, `/triggers/{row}/definition`,
+`/triggers/{row}/events/{event}/name`, and `/triggers/{row}/events/{event}/localised`.
+Names use their original ATL attributes. Localisation uses its attribute or the owning
+event element when the attribute is absent. The definition path uses the defining Entry's
+directory metadata. Equal paths retain distinct physical Entry identities. The source and use
+references resolve in `provenance`.
+
 ## `p4kx wwise extract <archive> <trigger> --out <folder> --json`
 
 ```json

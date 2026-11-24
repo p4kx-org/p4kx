@@ -12,6 +12,9 @@ use p4kx_testkit::{
     TestRecord, TestStruct, TestType, audio_schema, entity_schema, wwise_short_id,
 };
 
+#[path = "wwise_event_origins.rs"]
+mod origins;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const PLAY: u16 = 0x0403;
@@ -240,7 +243,11 @@ fn the_number_of_listed_entities_is_bounded_but_the_count_is_not() -> TestResult
 fn json_has_a_stable_shape() -> TestResult {
     let run = events(&["--search", "shield", "--entities", "1"], true, true, 0)?;
     assert_eq!(run.stdout.lines().count(), 1, "one line of JSON");
-    let value: serde_json::Value = serde_json::from_str(&run.stdout)?;
+    let mut value: serde_json::Value = serde_json::from_str(&run.stdout)?;
+    let fields = value.as_object_mut().ok_or("Wwise Events JSON object")?;
+    for key in ["fieldOrigins", "provenance"] {
+        assert!(fields.remove(key).is_some(), "Wwise Events includes {key}");
+    }
     insta::assert_snapshot!(serde_json::to_string_pretty(&value)?);
     Ok(())
 }
@@ -307,6 +314,9 @@ fn an_empty_page_does_not_read_the_dataforge() -> TestResult {
     assert!(run.stderr.is_empty(), "no warnings: {}", run.stderr);
     let value: serde_json::Value = serde_json::from_str(&run.stdout)?;
     assert!(value["entities_skipped"].is_null(), "{value}");
+    assert_eq!(value["fieldOrigins"], serde_json::json!({}));
+    assert_eq!(value["provenance"]["sources"], serde_json::json!([]));
+    assert_eq!(value["provenance"]["uses"], serde_json::json!([]));
     Ok(())
 }
 
