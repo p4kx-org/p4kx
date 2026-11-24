@@ -66,6 +66,25 @@ and in the complete library. This child surfaces in the generic XML export.
 A typed Prefab projection needs to retain the authored attributes and
 source positions. Target resolution needs a proven identity domain.
 
+### Complete packaged Normal Catalog
+
+The Windows AMD64 package built from PR merge
+`5d3d917f424657990fd775b8fae8ac843a3fd528` produced a complete Normal Catalog
+from the unchanged installed PTU `13260598`. The CLI completed with exit code 0.
+The measurement used one Rayon worker and Zstandard level 3.
+[Native package artifact](https://github.com/p4kx-org/p4kx/actions/runs/45315878218/artifacts/14888020908)
+
+| Elapsed ms | Peak private bytes | Peak working-set bytes | Minimum host RAM available in bytes |
+| ---: | ---: | ---: | ---: |
+| 2,423,389 | 39,186,558,976 | 36,433,010,688 | 26,409,271,296 |
+
+The Windows lifetime peaks satisfy the strict 40,000,000,000-byte process limit.
+The Catalog contains 80,608,642,049 decoded bytes and 1,717,107,409 stored bytes.
+The producer reported 2,215,562,349 peak temporary bytes including the staged
+rows and compressed publication. The Shop diagnostics identified one empty
+inventory document. Shops referencing it retain their rows with an unavailable
+item list. Both stored and decoded sizes exceed the transport reference targets.
+
 ## PTU 13215521 comparison
 
 The installed PTU manifest identifies change `13215521`. The checks use installed LIVE
