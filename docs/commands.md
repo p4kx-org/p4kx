@@ -1041,7 +1041,9 @@ resolves their source references. `model-submesh-words` records the exact retain
 `[chunkOrdinal, firstStart, firstEndExclusive, stride, count]`. A run describes
 `count` half-open ranges with both endpoints advanced by `stride` per
 occurrence. Runs preserve gaps and physical Entry boundaries. The generated
-CrCh material ID records its original format selector. Mesh and LOD selection
+CrCh material ID records its original format selector. CrCh LOD counts record
+the primitive selector and original count words from the physics chunks that
+supplied emitted meshes. Mesh and LOD selection
 can leave these origin sets incomplete. A loaded material library contributes
 its original Entry to `counts.materials`, `library.single`,
 `library.default_palette` and the decoded fields in `library.authored`.

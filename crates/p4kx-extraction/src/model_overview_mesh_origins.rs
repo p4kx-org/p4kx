@@ -6,7 +6,7 @@ use std::io;
 use std::ops::Range;
 
 use p4kx_chunks::Container;
-use p4kx_model::{Lod, Mesh, ModelChunk, ModelFile};
+use p4kx_model::{CrchMeshSource, Lod, Mesh, ModelChunk, ModelFile};
 
 use super::submesh_origins::{
     covers_mesh_indices, original_count, original_material, source_chunk,
@@ -17,7 +17,7 @@ use crate::{
     FieldOrigins, FieldPath, ModelSource, SourceLocation, SourceUse, SourceUseRole, SourceUses,
 };
 
-/// Writes retained geometry inputs for LOD triangle totals and the distinct material IDs.
+/// Writes retained geometry inputs for LOD counts and the distinct material IDs.
 pub struct ModelOverviewMeshOrigins<'a> {
     source: &'a ModelSource,
     uses: &'a SourceUses,
@@ -45,12 +45,17 @@ impl<'a> ModelOverviewMeshOrigins<'a> {
         path.push_field("lods").map_err(io::Error::other)?;
         for (index, lod) in self.source.model().lods.iter().enumerate() {
             path.push_index(index).map_err(io::Error::other)?;
-            path.push_field("triangles").map_err(io::Error::other)?;
             let inputs = self.lod_words(lod, &mut materials)?;
-            fields
-                .insert(path.clone(), self.uses.origin(&inputs, false))
-                .map_err(io::Error::other)?;
-            path.pop();
+            for (name, words) in [
+                ("triangles", inputs.triangles),
+                ("vertices", inputs.vertices),
+            ] {
+                path.push_field(name).map_err(io::Error::other)?;
+                fields
+                    .insert(path.clone(), self.uses.origin(&words, false))
+                    .map_err(io::Error::other)?;
+                path.pop();
+            }
             path.pop();
         }
         if let Some(selector) = self.generated_material_selector()? {
@@ -76,9 +81,18 @@ impl<'a> ModelOverviewMeshOrigins<'a> {
         &self,
         lod: &Lod,
         materials: &mut BTreeMap<u16, Vec<SourceUse>>,
-    ) -> io::Result<Vec<SourceUse>> {
-        let mut triangles = Vec::new();
+    ) -> io::Result<LodCountUses> {
+        let mut counts = LodCountUses::default();
+        let model = self.source.model();
         for mesh in &lod.meshes {
+            if let Some(physics) = mesh.crch_physics_source(&model.chunks) {
+                if let Some(scope) =
+                    ModelGeometryScope::capture(self.uses, self.source, ModelFile::Model)?
+                {
+                    counts.append_crch(&scope, physics)?;
+                }
+                continue;
+            }
             let Some(chunk) = source_chunk(self.source, mesh) else {
                 continue;
             };
@@ -88,7 +102,13 @@ impl<'a> ModelOverviewMeshOrigins<'a> {
                 continue;
             };
             if covers_mesh_indices(mesh, words.observed_counts) {
-                append_uses(&mut triangles, &scope, chunk, "indexCount", words.counts)?;
+                append_uses(
+                    &mut counts.triangles,
+                    &scope,
+                    chunk,
+                    "indexCount",
+                    words.counts,
+                )?;
             }
             for (material, runs) in words.materials {
                 append_uses(
@@ -100,7 +120,7 @@ impl<'a> ModelOverviewMeshOrigins<'a> {
                 )?;
             }
         }
-        Ok(triangles)
+        Ok(counts)
     }
 
     fn generated_material_selector(&self) -> io::Result<Option<SourceUse>> {
@@ -121,6 +141,39 @@ impl<'a> ModelOverviewMeshOrigins<'a> {
             .observe(scope.scope(), SourceUseRole::Selector)
             .map(Some)
             .map_err(io::Error::other)
+    }
+}
+
+#[derive(Default)]
+struct LodCountUses {
+    triangles: Vec<SourceUse>,
+    vertices: Vec<SourceUse>,
+}
+
+impl LodCountUses {
+    fn append_crch(
+        &mut self,
+        scope: &ModelGeometryScope,
+        source: CrchMeshSource,
+    ) -> io::Result<()> {
+        let primitive = scope.word(
+            source.primitive_range(),
+            "primitive",
+            SourceUseRole::Selector,
+        )?;
+        self.triangles.push(primitive.clone());
+        self.triangles.push(scope.word(
+            source.triangle_count_range(),
+            "triangleCount",
+            SourceUseRole::Conversion,
+        )?);
+        self.vertices.push(primitive);
+        self.vertices.push(scope.word(
+            source.vertex_count_range(),
+            "vertexCount",
+            SourceUseRole::Conversion,
+        )?);
+        Ok(())
     }
 }
 

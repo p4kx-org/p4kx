@@ -193,6 +193,7 @@ pub use companion::{
     companion_file_names,
 };
 pub use controller_binding::{ControllerBinder, ControllerBinding, ControllerEligibility};
+pub use crch_mesh::CrchMeshSource;
 pub use dba_animation_sources::DbaAnimationSources;
 pub use dba_header_declarations::DbaHeaderDeclarations;
 pub use dba_metadata_records::{DbaMetadataRecord, DbaMetadataRecords};

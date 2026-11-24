@@ -111,7 +111,7 @@ fn write_lod_shape(
     for index in 0..source.model().lods.len() {
         path.push_index(index)?;
         fields.insert(path.clone(), unknown.clone())?;
-        for name in ["level", "vertices", "meshes"] {
+        for name in ["level", "meshes"] {
             model_item_page::put(fields, &path, name, unknown.clone())?;
         }
         path.pop();

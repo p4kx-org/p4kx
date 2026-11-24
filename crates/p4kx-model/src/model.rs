@@ -143,6 +143,7 @@ pub struct Mesh {
     /// is how data stored per stream vertex, such as a DNA rig, is matched to the mesh.
     pub source: Vec<u32>,
     pub(crate) origin: Option<MeshOrigin>,
+    pub(crate) crch_physics: Option<crate::CrchMeshSource>,
     pub(crate) index_width: Option<u32>,
     pub(crate) original_vertex_order_changed: bool,
     /// The unit vertex normals: the stored ones, or the computed smooth ones when the mesh

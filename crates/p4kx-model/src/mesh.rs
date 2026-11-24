@@ -107,6 +107,7 @@ impl<'s, 'a> MeshBuilder<'s, 'a> {
                 positions: Vec::new(),
                 source: Vec::new(),
                 origin: None,
+                crch_physics: None,
                 index_width: Some(skin.streams.indices.width()),
                 original_vertex_order_changed: false,
                 normals: skin.streams.normals.map(|_| Vec::new()),

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::chunks::ChunkFile;
 use p4kx_testkit::{TestCrchModel, TestEntry, TestModel, TestSubmesh};
 use serde_json::{Value, json};
 
@@ -83,7 +84,7 @@ fn model_overview_keeps_every_original_count_and_material_word_within_the_budget
 }
 
 #[test]
-fn model_overview_distinguishes_runs_with_gaps_and_generated_ids() -> TestResult {
+fn model_overview_preserves_gaps_between_original_material_words() -> TestResult {
     let fixture = install(&cube_with_materials([1, 1, 2, 1, 2])?, false)?;
     let mut server = fixture.serve(&["--archive", "LIVE"])?;
     let model = server.ok("get_model_info", &json!({"path": MODEL}))?;
@@ -100,9 +101,19 @@ fn model_overview_distinguishes_runs_with_gaps_and_generated_ids() -> TestResult
         assert_eq!(first, at(&[0, 1, 3]), "material 1 only");
         assert_eq!(second, at(&[2, 4]), "material 2 only");
     }
-    let crch = Install::new(vec![
-        TestEntry::zstd(MODEL, TestCrchModel::cube().bytes()).encrypted(),
-    ])?;
+    Ok(())
+}
+
+#[test]
+fn model_overview_binds_crch_counts_and_generated_material_to_physical_words() -> TestResult {
+    let bytes = TestCrchModel::cube().bytes();
+    let original = ChunkFile::parse(bytes.as_slice())?;
+    let physics = original
+        .chunks()
+        .get(3)
+        .ok_or("original fixture physics chunk")?;
+    let offset = physics.offset();
+    let crch = Install::new(vec![TestEntry::zstd(MODEL, bytes).encrypted()])?;
     let mut server = crch.serve(&["--archive", "LIVE"])?;
     let generated = server.ok("get_model_info", &json!({"path": MODEL}))?;
     assert_eq!(
@@ -130,6 +141,39 @@ fn model_overview_distinguishes_runs_with_gaps_and_generated_ids() -> TestResult
         Some(&json!("signature")),
         "generated value has no authored word"
     );
+    assert_crch_counts(&generated, offset)
+}
+
+fn assert_crch_counts(generated: &Value, offset: u64) -> TestResult {
+    for (field_name, range_start, value) in [("vertices", 96, 24), ("triangles", 100, 12)] {
+        let path = format!("lods/0/{field_name}");
+        assert_eq!(
+            generated.pointer(&format!("/{path}")),
+            Some(&json!(value)),
+            "retained {field_name}"
+        );
+        assert_marker(field(generated, &path)?, true);
+        let original = uses(generated, &path)?;
+        let expected = json!([
+            (offset + range_start).to_string(),
+            (offset + range_start + 4).to_string()
+        ]);
+        assert!(
+            original
+                .iter()
+                .any(|site| site.get("role") == Some(&json!("conversion"))
+                    && site.pointer("/location/namespace") == Some(&json!("model-byte-range"))
+                    && site.pointer("/location/indices") == Some(&expected)),
+            "the original selected count word for {field_name}",
+        );
+        assert!(
+            original
+                .iter()
+                .any(|site| site.get("role") == Some(&json!("selector"))
+                    && site.pointer("/location/field") == Some(&json!("primitive"))),
+            "the admitted physics primitive selects the {field_name} interpretation",
+        );
+    }
     Ok(())
 }
 

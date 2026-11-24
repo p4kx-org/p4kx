@@ -4,7 +4,7 @@
 use p4kx_chunks::{ByteOrder, ChunkFile, crch};
 
 use crate::build::root_node;
-use crate::crch_mesh::{physics_slots, read_physics_mesh};
+use crate::crch_mesh::{PHYSICS_DATA_VERSION, physics_slots, read_physics_mesh};
 use crate::crch_node::{self, CrchNode};
 use crate::error::failure;
 use crate::material::{MaterialName, material_library};
@@ -17,7 +17,6 @@ use crate::{
 };
 
 const MESH_VERSION: u32 = 0x801;
-const PHYSICS_DATA_VERSION: u32 = 0x800;
 
 /// Builds the model of a `CrCh` file: its nodes, the meshes of the nodes that refer to a `Mesh`
 /// chunk and the material library its `MtlName` chunk names. A `CrCh` model has one level of
@@ -142,25 +141,27 @@ fn read_node_mesh<B: AsRef<[u8]>>(
         return Ok(None);
     };
 
-    let physics_index = match file.chunk_by_id(physics_id) {
+    let (physics_index, physics_chunk) = match file.chunk_by_id(physics_id) {
         Some((index, chunk)) if chunk.chunk_type() == crch::MESH_PHYSICS_DATA => {
             if chunk.version() != PHYSICS_DATA_VERSION {
                 return Err(failure(name, index, "MeshPhysicsData")(
                     UnsupportedLayout::PhysicsVersion(chunk.version()).into(),
                 ));
             }
-            index
+            (index, chunk)
         }
         _ => return Err(fail(CorruptChunk::ReferencedChunk(physics_id).into())),
     };
     let fail = failure(name, physics_index, "MeshPhysicsData");
-    if file
-        .chunks()
-        .get(physics_index)
-        .is_none_or(|chunk| chunk.byte_order() != ByteOrder::Little)
-    {
+    if physics_chunk.byte_order() != ByteOrder::Little {
         return Err(fail(UnsupportedLayout::BigEndian.into()));
     }
     read.push((ModelFile::Model, physics_index));
-    read_physics_mesh(position, file.chunk_data(physics_index).unwrap_or_default()).map_err(fail)
+    read_physics_mesh(
+        position,
+        physics_index,
+        physics_chunk.offset(),
+        file.chunk_data(physics_index).unwrap_or_default(),
+    )
+    .map_err(fail)
 }
