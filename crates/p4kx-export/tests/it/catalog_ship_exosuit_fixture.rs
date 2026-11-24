@@ -47,6 +47,7 @@ const ACCESSORY: Driver = Driver {
 
 const MODE_GUID: u128 = 0x1182_0030;
 pub(super) const ALIASED_OWNER: u128 = 0x1182_0001;
+pub(super) const GEO_OWNER_GUID: u128 = 0x1182_0002;
 
 #[derive(Clone, Copy)]
 pub(super) struct Manufacturer {
@@ -90,7 +91,7 @@ pub(super) const OWNERS: [Owner; 9] = [
         driver: ATLS_DRIVER,
     },
     Owner {
-        guid: 0x1182_0002,
+        guid: GEO_OWNER_GUID,
         class: "ARGO_ATLS_GEO",
         name_key: "@fixture_atls_geo",
         manufacturer: Some(ARGO),
@@ -148,14 +149,25 @@ pub(super) const OWNERS: [Owner; 9] = [
 ];
 
 pub(super) fn database() -> DataForgeBuilder {
-    database_with_geo_mode(MODE_GUID)
+    database_with_geo(GeoOwner::Present, MODE_GUID)
 }
 
 pub(super) fn database_with_unreadable_geo_mode() -> DataForgeBuilder {
-    database_with_geo_mode(0x1182_ffff)
+    database_with_geo(GeoOwner::Present, 0x1182_ffff)
 }
 
-fn database_with_geo_mode(mode: u128) -> DataForgeBuilder {
+#[derive(Clone, Copy)]
+pub(super) enum GeoOwner {
+    Present,
+    Absent,
+    Unreadable,
+}
+
+pub(super) fn database_with_geo_owner(owner: GeoOwner) -> DataForgeBuilder {
+    database_with_geo(owner, MODE_GUID)
+}
+
+fn database_with_geo(geo: GeoOwner, mode: u128) -> DataForgeBuilder {
     let mut source = declarations();
     for driver in [ATLS_DRIVER, GEO_DRIVER, IKTI_DRIVER, ACCESSORY] {
         let mode = if driver.guid == GEO_DRIVER.guid {
@@ -184,7 +196,17 @@ fn database_with_geo_mode(mode: u128) -> DataForgeBuilder {
         );
     }
     for owner in &OWNERS {
-        source = source.record(owner_record(owner));
+        let record = owner_record(owner);
+        let record = if owner.guid == GEO_OWNER_GUID {
+            match geo {
+                GeoOwner::Present => record,
+                GeoOwner::Absent => continue,
+                GeoOwner::Unreadable => record.with_instance_index(u16::MAX),
+            }
+        } else {
+            record
+        };
+        source = source.record(record);
     }
     source
         .record(owner_record(&OWNERS[0]))

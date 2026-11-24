@@ -9,12 +9,14 @@ use std::time::UNIX_EPOCH;
 use p4kx_export::catalog_queries::equipment::{ShipSource, with_ship_sources_from};
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_export::{ShipBaseOptions, VehicleKind, build_catalog_from, build_ship_base_from};
-use p4kx_extraction::{DataForge, DataForgeEntry, Record, SourceValueState};
+use p4kx_extraction::{DataForge, DataForgeEntry, Record};
 use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
 
+#[path = "catalog_ship_exosuit_availability.rs"]
+mod availability;
 #[path = "catalog_ship_exosuit_fixture.rs"]
 mod fixture;
 
@@ -69,72 +71,6 @@ fn exosuit_catalog_and_sdk_admit_the_same_physical_owners_and_sources() -> TestR
         proof::closure(&catalog)?;
     }
     Ok(())
-}
-
-#[test]
-fn an_unreadable_driver_mode_keeps_the_actor_and_its_unreadable_classification() -> TestResult {
-    let (_directory, archive) = common::open(
-        &fixture::database_with_unreadable_geo_mode(),
-        DcbOrigin::Encrypted,
-    )?;
-    let entry = DataForgeEntry::read(&archive)?;
-    let forge = entry.open()?;
-    let geo = fixture_record(&forge, "EntityClassDefinition.ARGO_ATLS_GEO")?;
-    let built = build_catalog_from(&archive, &entry, &common::options())?;
-    let catalog: Value = serde_json::from_slice(built.json())?;
-    let owner = proof::rows(&catalog, "/ships")?
-        .iter()
-        .find(|row| {
-            row.pointer("/recordIndex/value").and_then(Value::as_u64)
-                == Some(u64::from(geo.index()))
-        })
-        .ok_or("the unresolved physical owner remains observable")?;
-    let driver = fixture_record(
-        &forge,
-        "EntityClassDefinition.argo_atls_geo_scitem_seat_driver",
-    )?;
-    assert!(
-        uses_record(
-            &proof::uses(&catalog, proof::at(owner, "/vehicleKind")?)?,
-            driver.index()
-        ),
-        "the unresolved operator mode retains the original driver Record"
-    );
-    with_ship_sources_from(
-        &archive,
-        &entry,
-        CatalogRecordSelection::RecordIndex(geo.index()),
-        CatalogLanguageSelection::Selected(&[]),
-        None,
-        |snapshot| -> TestResult {
-            let [row] = snapshot.rows() else {
-                return Err("one physical owner with incomplete control evidence".into());
-            };
-            assert_eq!(
-                row.playability().state(),
-                SourceValueState::Unreadable,
-                "an unreadable mode leaves player control unproved"
-            );
-            assert_eq!(
-                row.vehicle_kind().state(),
-                SourceValueState::Unreadable,
-                "an unreadable mode leaves the sourced classification unproved"
-            );
-            let context = json!({"provenance": snapshot.source_inventory()});
-            compare_row(row, owner, &context, &catalog)
-        },
-    )??;
-    Ok(())
-}
-
-fn fixture_record<'source>(
-    forge: &'source DataForge<'_>,
-    name: &str,
-) -> TestResult<Record<'source>> {
-    forge
-        .records()
-        .find(|record| record.name().is_ok_and(|actual| actual == name))
-        .ok_or_else(|| format!("missing synthetic Record {name}").into())
 }
 
 struct ExpectedOwner<'source> {

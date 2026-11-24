@@ -722,8 +722,11 @@ A header census of older EPTU `13025019` and TECH-PREVIEW `13040440` found all f
 owners by GUID and Record path. It visited 117,952 and 120,857 headers respectively, with every
 path classifiable and zero Record bodies opened. Playability on the older Builds requires
 their authored control and driver-seat evidence.
-An older Archive that demonstrates genuine absence for one of those four owners is unavailable
-in the installed and retained set. That acceptance criterion remains open.
+The absent-owner acceptance uses two DataForge fixtures for the same physical GEO
+identity. One has no matching Record and permits Normal publication. The other has an
+unreadable body with a readable header. Normal publication refuses it, Diagnostic Partial
+retains its original GUID and Record index, and the SDK reports that index in its body
+read coverage. The installed and retained older Builds supply positive presence evidence.
 
 | Field | Rule and source |
 |-------|-----------------|
