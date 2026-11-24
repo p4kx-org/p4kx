@@ -58,6 +58,7 @@ foreach ($sequence in 4,5) {
         $upload.Contains("always() && !cancelled() && steps.msi-finish-progress-$sequence.outcome != 'skipped'") -and
         $upload.Contains('actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9') -and
         $upload.Contains("/observer/checkpoints/0$sequence/*") -and
+        $upload.Contains("/observer/finish-probes/0$sequence/*.json") -and
         $upload.Contains('if-no-files-found: error')) 'Each Finish progress checkpoint requires an isolated, pinned upload.'
     foreach ($step in $probe,$upload) {
         Assert-FeedbackWorkflow ($step -cmatch '(?m)^        timeout-minutes: 1\r?$' -and

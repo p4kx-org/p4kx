@@ -259,7 +259,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-4
-          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/*
+          path: |
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/*
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/finish-probes/04/*.json
           if-no-files-found: error
       - name: Observe original MSI Finish progress 5
         id: msi-finish-progress-5
@@ -274,7 +276,9 @@ jobs:
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-5
-          path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/05/*
+          path: |
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/05/*
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/finish-probes/05/*.json
           if-no-files-found: error
       - name: Wait for the original MSI Finish receipt
         id: msi-finish-wait

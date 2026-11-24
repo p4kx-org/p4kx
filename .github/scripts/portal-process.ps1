@@ -48,9 +48,12 @@ function Wait-P4kxPortalChannels {
 
 function Receive-P4kxPortalChannels {
     param([object[]]$Channels, [Diagnostics.Stopwatch]$Timer, [int]$Milliseconds, [int]$MaximumBytes,
-        [scriptblock]$OnProgress, [Collections.Generic.List[Exception]]$Failures)
+        [scriptblock]$OnProgress, [Collections.Generic.List[Exception]]$Failures, [hashtable]$Observation)
     while (@($Channels | Where-Object { $null -ne $_.pending }).Count -ne 0) {
-        if ($Timer.ElapsedMilliseconds -ge $Milliseconds) { throw 'Portal measurement timed out.' }
+        if ($Timer.ElapsedMilliseconds -ge $Milliseconds) {
+            $Observation['timed_out'] = $true
+            throw 'Portal measurement timed out.'
+        }
         Update-P4kxPortalChannels $Channels $MaximumBytes $OnProgress $Failures
         Wait-P4kxPortalChannels $Channels
     }
@@ -102,6 +105,7 @@ function Invoke-P4kxPortalProcess {
     $started = $false
     $result = $null
     $failures = [Collections.Generic.List[Exception]]::new()
+    $Observation['timed_out'] = $false
     try {
         Send-P4kxPortalProgress $OnProgress 'stage' 'portalStart.begin' $failures
         [void]$process.Start()
@@ -113,10 +117,13 @@ function Invoke-P4kxPortalProcess {
         $timer = [Diagnostics.Stopwatch]::StartNew()
         $channels = New-P4kxPortalChannels $process
         Send-P4kxPortalProgress $OnProgress 'stage' 'portalCapture.begin' $failures
-        Receive-P4kxPortalChannels $channels $timer $Milliseconds $MaximumBytes $OnProgress $failures
+        Receive-P4kxPortalChannels $channels $timer $Milliseconds $MaximumBytes $OnProgress $failures $Observation
         Send-P4kxPortalProgress $OnProgress 'stage' 'portalCapture.end' $failures
         $remaining = [Math]::Max(1, $Milliseconds - [int]$timer.ElapsedMilliseconds)
-        if (-not $process.WaitForExit($remaining)) { throw 'Portal measurement timed out.' }
+        if (-not $process.WaitForExit($remaining)) {
+            $Observation['timed_out'] = $true
+            throw 'Portal measurement timed out.'
+        }
         $result = @{exit_code=$process.ExitCode; stdout=$channels[0].text.ToString(); stderr=$channels[1].text.ToString()}
     }
     catch { $failures.Add($_.Exception) }

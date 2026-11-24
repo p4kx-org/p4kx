@@ -30,12 +30,33 @@ function Read-ObserverProgress([string]$Output) {
         ForEach-Object { $_.Substring($prefix.Length) | ConvertFrom-Json -AsHashtable -DateKind String }
 }
 
+function Assert-ObserverFinishProbeWatchdog($Launch) {
+    . (Join-Path $PSScriptRoot 'msi-observer-finish-progress.ps1')
+    Assert-ObserverRefused { Invoke-P4kxMsiBoundedFinishProbe $observer 5 -MaximumMilliseconds 8000 } `
+        'The held Finish probe outlived its short watchdog.'
+    $directory = Get-P4kxMsiFinishProbeDirectory $observer 5
+    $watchdog = Read-P4kxDetachedReceipt (Join-Path $directory 'watchdog-result.json')
+    $marker = Read-P4kxDetachedReceipt (Join-Path $directory 'finishProbeWait-begin.json')
+    Assert-Observer ($watchdog.sequence -eq 5 -and $watchdog.budget_ms -eq 8000 -and
+        $watchdog.worker.started -eq $true -and $watchdog.worker.exited -eq $true -and
+        $watchdog.worker.timed_out -eq $true -and $watchdog.worker.signal_contract -ceq 'direct-process-only' -and
+        $watchdog.worker.pid -notin @($handle.pid,$Launch.supervisor_pid) -and
+        $watchdog.mutation_authority -eq $false -and $watchdog.native_completion_unproven -eq $true -and
+        $marker.request_sha256 -ceq $Launch.request_sha256 -and
+        -not [IO.File]::Exists((Join-Path $directory 'finishProbeWait-end.json')) -and
+        -not [IO.Directory]::Exists((Join-Path $observer 'checkpoints/05')) -and
+        -not (Get-P4kxMsiObserverParentState $request $handle).lifetime_ended) 'Probe timeout lost durable partial evidence or disturbed the original observer.'
+    [IO.Directory]::Move($directory,(Join-Path $root 'timed-out-probe-05'))
+}
+
 function Assert-ObserverLiveFinishProbe($Launch) {
+    Assert-ObserverFinishProbeWatchdog $Launch
     $arguments = @('-NoLogo','-NoProfile','-NonInteractive','-File',$entry,
         '-Stage','ProbeFinish','-Directory',$observer,'-Sequence','4')
-    $probe = Invoke-P4kxPortalProcess ([Environment]::ProcessPath) $arguments $root 'live-finish-probe' -Milliseconds 45000
+    $probe = Invoke-P4kxPortalProcess ([Environment]::ProcessPath) $arguments $root 'live-finish-probe' -Milliseconds 50000
     Assert-Observer ($probe.exit_code -eq 0) 'The held Finish probe did not return successfully.'
-    $records = @(Read-ObserverProgress $probe.stdout)
+    $progressDirectory = Join-Path $observer 'finish-probes/04'
+    $records = @(Read-ObserverProgress ([IO.File]::ReadAllText((Join-Path $progressDirectory 'probe-stdout.log'))))
     $observed = @($records | ForEach-Object { $_.stage + '.' + $_.status })
     $expected = @('finishProbeCaller.begin','finishProbeBinding.begin','finishProbeBinding.end',
         'finishProbeWait.begin','finishProbeWait.end','finishProbeParent.begin','finishProbeParent.end',
@@ -45,7 +66,9 @@ function Assert-ObserverLiveFinishProbe($Launch) {
     foreach ($marker in $records) {
         $bound = $marker.stage -cne 'finishProbeCaller' -and
             -not ($marker.stage -ceq 'finishProbeBinding' -and $marker.status -ceq 'begin')
-        Assert-Observer ($marker.sequence -eq 4 -and $marker.completed_success -eq $false -and
+        $savedMarker = Read-P4kxDetachedReceipt (Join-Path $progressDirectory ($marker.stage + '-' + $marker.status + '.json'))
+        Assert-Observer ($savedMarker.observed_utc -ceq $marker.observed_utc -and
+            $marker.sequence -eq 4 -and $marker.completed_success -eq $false -and
             $marker.native_completion_unproven -eq $true -and $marker.mutation_authority -eq $false -and
             (-not $bound -or $marker.request_sha256 -ceq $Launch.request_sha256)) 'The held Finish probe marker lost its observation-only identity.'
     }
@@ -68,7 +91,7 @@ function Assert-ObserverLiveFinishProbe($Launch) {
         $checkpoint.journal.events -eq 2 -and $checkpoint.journal.active.Count -eq 2 -and
         $checkpoint.journal.active -ccontains 'worker' -and $checkpoint.journal.active -ccontains 'fixture/wait' -and
         $null -eq $checkpoint.journal.terminal) 'The Finish probe did not observe the held original worker.'
-    'PASS: Finish probe 4 observed the active harmless worker at its scheduled interval and returned all 12 console boundaries.'
+    'PASS: Finish probe 4 observed the active harmless worker and preserved all 12 boundaries. The short watchdog stopped only probe 5.'
 }
 
 function Invoke-ObserverFinish {
@@ -123,6 +146,8 @@ function Assert-ObserverFinishProgress {
         Assert-ObserverRefused { & $entry -Stage ProbeFinish -Directory $observer -Sequence $firstSequence } 'Foreign Finish launch authorized a progress checkpoint.'
         $checkpoint = Join-Path $observer ('checkpoints/{0:d2}' -f $firstSequence)
         Assert-Observer (-not [IO.Path]::Exists($checkpoint)) 'Refused Finish probe created a checkpoint.'
+        $refused = Join-Path $observer ('finish-probes/{0:d2}' -f $firstSequence)
+        [IO.Directory]::Move($refused,(Join-Path $root 'refused-finish-probe'))
     } finally { [IO.File]::WriteAllBytes($launchPath, $launchBytes) }
 
     $launch = Read-P4kxDetachedReceipt $launchPath

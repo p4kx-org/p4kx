@@ -1,6 +1,39 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'msi-observer-finish-control.ps1')
 
+function Get-P4kxMsiFinishProbeDirectory([string]$Directory, [ValidateRange(4,5)][int]$Sequence) {
+    Join-Path ([IO.Path]::GetFullPath($Directory)) ('finish-probes/{0:d2}' -f $Sequence)
+}
+
+function Invoke-P4kxMsiBoundedFinishProbe {
+    param([string]$Directory, [ValidateRange(4,5)][int]$Sequence,
+        [ValidateRange(1,42000)][int]$MaximumMilliseconds=42000)
+
+    $progress = Get-P4kxMsiFinishProbeDirectory $Directory $Sequence
+    $null = [IO.Directory]::CreateDirectory((Split-Path -Parent $progress))
+    $null = New-Item -ItemType Directory -Path $progress
+    $observation = @{}
+    $receipt = @{
+        schema=1;role='native-msi-finish-probe-watchdog';revision=$env:GITHUB_SHA;run=$env:GITHUB_RUN_ID
+        attempt=$env:GITHUB_RUN_ATTEMPT;target=$env:P4KX_TARGET;sequence=$Sequence
+        budget_ms=$MaximumMilliseconds;started_utc=[DateTimeOffset]::UtcNow.ToString('o')
+        completed_success=$false;native_completion_unproven=$true;mutation_authority=$false
+    }
+    Write-P4kxDetachedReceipt (Join-Path $progress 'watchdog-start.json') $receipt
+    $script = Join-Path $PSScriptRoot 'invoke-msi-observer.ps1'
+    $arguments = @('-NoLogo','-NoProfile','-NonInteractive','-File',$script,
+        '-Stage','ProbeFinishWorker','-Directory',[IO.Path]::GetFullPath($Directory),'-Sequence',[string]$Sequence)
+    try {
+        $result = Invoke-P4kxPortalProcess ([Environment]::ProcessPath) $arguments $progress 'probe' `
+            -Milliseconds $MaximumMilliseconds -CleanupMilliseconds 3000 -MaximumBytes 32KB -Observation $observation
+        if ($result.exit_code -ne 0) { throw 'Finish probe worker did not return successfully.' }
+    } finally {
+        $receipt.worker = $observation
+        $receipt.observed_utc = [DateTimeOffset]::UtcNow.ToString('o')
+        Write-P4kxDetachedReceipt (Join-Path $progress 'watchdog-result.json') $receipt
+    }
+}
+
 function Wait-P4kxMsiFinishProgressSample($Context, $Launch, [int]$Sequence) {
     $offset = if ($Sequence -eq 4) { 30 } else { 60 }
     $started = [DateTimeOffset]::new([long]$Launch.supervisor_started_utc_ticks, [TimeSpan]::Zero)
@@ -17,11 +50,11 @@ function Wait-P4kxMsiFinishProgressSample($Context, $Launch, [int]$Sequence) {
     }
 }
 
-function Save-P4kxMsiFinishProgress([string]$Directory, [ValidateRange(4,5)][int]$Sequence) {
-    Write-P4kxMsiObserverProgress finishProbeBinding begin -Sequence $Sequence
+function Save-P4kxMsiFinishProgress([string]$Directory, [ValidateRange(4,5)][int]$Sequence, [string]$Progress) {
+    Write-P4kxMsiObserverProgress finishProbeBinding begin -Sequence $Sequence -Directory $Progress
     $context = Get-P4kxMsiFinishContext $Directory
     $launch = Read-P4kxMsiFinishLaunch $context
-    $marker = @{Sequence=$Sequence;RequestDigest=$context.digest}
+    $marker = @{Sequence=$Sequence;RequestDigest=$context.digest;Directory=$Progress}
     Write-P4kxMsiObserverProgress finishProbeBinding end @marker
     Write-P4kxMsiObserverProgress finishProbeWait begin @marker
     Wait-P4kxMsiFinishProgressSample $context $launch $Sequence

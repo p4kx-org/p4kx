@@ -1,5 +1,5 @@
 param(
-    [Parameter(Mandatory)][ValidateSet('Start','Delay','Snapshot','Finish','StartFinish','ProbeFinish','WaitFinish','CollectFinish')][string]$Stage,
+    [Parameter(Mandatory)][ValidateSet('Start','Delay','Snapshot','Finish','StartFinish','ProbeFinish','ProbeFinishWorker','WaitFinish','CollectFinish')][string]$Stage,
     [Parameter(Mandatory)][string]$Directory,
     [string]$Invocation,
     [ValidateSet('Lifecycle','Control')][string]$Mode='Lifecycle',
@@ -29,12 +29,16 @@ if ($Stage -ceq 'Delay') {
     } finally { Write-P4kxMsiObserverProgress delayCaller end }
     return
 }
-if ($Stage -ceq 'ProbeFinish') {
-    . (Join-Path $PSScriptRoot 'msi-observer-progress.ps1')
-    Write-P4kxMsiObserverProgress finishProbeCaller begin -Sequence $Sequence
+if ($Stage -cin @('ProbeFinish','ProbeFinishWorker')) {
     . (Join-Path $PSScriptRoot 'msi-observer-finish-progress.ps1')
-    Save-P4kxMsiFinishProgress $Directory $Sequence
-    Write-P4kxMsiObserverProgress finishProbeCaller end -Sequence $Sequence
+    if ($Stage -ceq 'ProbeFinish') {
+        Invoke-P4kxMsiBoundedFinishProbe $Directory $Sequence
+    } else {
+        $progress = Get-P4kxMsiFinishProbeDirectory $Directory $Sequence
+        Write-P4kxMsiObserverProgress finishProbeCaller begin -Sequence $Sequence -Directory $progress
+        Save-P4kxMsiFinishProgress $Directory $Sequence $progress
+        Write-P4kxMsiObserverProgress finishProbeCaller end -Sequence $Sequence -Directory $progress
+    }
     return
 }
 if ($Stage -cin @('StartFinish','WaitFinish','CollectFinish')) {
