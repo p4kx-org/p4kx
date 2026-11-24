@@ -112,7 +112,15 @@ Both lifetime peaks stayed below 2,000,000,000 bytes in every process.
 The test executable was built from `1ea6a27fa8a430fd1d7cb1aef97640a846d19fea`
 with the location vocabulary witness. Its SHA-256 was
 `fe34e0e11643b00a44c21a7f77eec0b039323faf5fae1a8f0cc03f29d1219e01`.
-Complete installed Normal row and contributing provenance parity remains open.
+The same executable compared all seven ordered tables with each installed Build's
+completed Normal Catalog. The comparison matched the availability states above,
+70 contributing uses on LIVE and 1,457 on PTU, each resolving to one physical
+source.
+
+| Build | Normal producer | Elapsed seconds | Peak private commit (bytes) | Peak working set (bytes) |
+| --- | --- | ---: | ---: | ---: |
+| LIVE `13220821` | `23addc5e164f65a28a6f258302b30453b331edce` | 4,126.206 | 1,091,653,632 | 1,023,537,152 |
+| PTU `13260598` | `93d92ca20bef8a8c3731339214a3301124ade7ba` | 4,107.900 | 1,114,607,616 | 1,033,596,928 |
 
 ## Location entity declarations
 
@@ -2858,7 +2866,12 @@ The PTU `13260598` cold executable used the Store SDK from
 `5273ad4eb7fb673b440cde789239af3b1c92390a1d38cb6c2d5dbf0409768475`.
 The installed Archive and manifest matched before and after the standalone query.
 The complete ordered Store comparison against current PTU Normal producer
-`93d92ca20bef8a8c3731339214a3301124ade7ba` remains open.
+`93d92ca20bef8a8c3731339214a3301124ade7ba` matched all 225 rows. The guarded
+run took 4,378.194 seconds, with peaks of 1,590,845,440 bytes of private commit
+and 1,579,806,720 bytes of working set. Its executable SHA-256 was
+`b582efebce5f6bf1f6040e53946ea38e64dd184f1a57a1597c8f6184bbca2676`.
+The current LIVE comparison matched all 227 rows alongside the pledge data.
+[Store and pledge evidence](catalog.md#reviewed-store-ship-pledges)
 
 The test `installed_mining_and_store_slugs_match_retained_complete_catalog`
 shares one stream of the verified Normal Catalog for the mining consumer and the

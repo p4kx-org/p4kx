@@ -135,14 +135,7 @@ fn compare<Row: JsonSchema + Serialize>(
         Some(&query),
         "selected {path} rows use the canonical schema and field origins"
     );
-    Route::queried_rows(
-        path,
-        rows,
-        concat!(
-            "synthetic producer parity verified. Standalone cold memory verified on LIVE 13220821 ",
-            "and PTU 13260598. Complete installed Normal parity remains open",
-        ),
-    )
+    Route::queried_rows(path, rows, None)
 }
 
 #[test]

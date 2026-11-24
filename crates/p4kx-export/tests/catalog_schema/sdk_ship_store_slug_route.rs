@@ -41,15 +41,7 @@ pub(super) fn read() -> TestResult<Route> {
             "the active Store row retains its canonical GUID"
         );
         assert!(!row.is_retired(), "the fixture proves an active mapping");
-        Route::queried_rows(
-            SHIP_STORE_SLUGS,
-            scope.rows(),
-            concat!(
-                "synthetic unfiltered Normal parity, complete installed parity and cold memory on ",
-                "LIVE 13220821 and PTU 13248297 verified. Current PTU 13260598 standalone cold ",
-                "memory verified for 225 canonical rows. Current complete Normal parity remains open",
-            ),
-        )
+        Route::queried_rows(SHIP_STORE_SLUGS, scope.rows(), None)
     })?;
     Ok(route)
 }
