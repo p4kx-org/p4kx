@@ -2271,8 +2271,16 @@ directory.
 
 | Build | Matching ships | Incomplete vehicle Records | Peak private commit (bytes) | Peak working set (bytes) | Seconds |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| LIVE 13220821 | 1 | 0 | 1,206,112,256 | 1,177,767,936 | 76.037 |
-| PTU 13260598 | 1 | 0 | 1,231,532,032 | 1,202,864,128 | 77.295 |
+| LIVE 13220821 | 1 | 0 | 1,203,261,440 | 1,176,604,672 | 75.647 |
+| PTU 13260598 | 1 | 0 | 1,228,677,120 | 1,199,923,200 | 75.721 |
+
+The signed verifier at `5c1602209` bound both original coordinates independently
+and produced the same one-row digest on both Builds. Set `P4KX_DATA_P4K` and
+`P4KX_NEW_SDK_BUILD` for the installed source, then run the scoped witness.
+
+```powershell
+cargo test --locked -p p4kx-export --test real_archive real_archive_scoped_equipment_sdk::paint_compatibility::installed_paint_compatibility_keeps_original_record_evidence -- --ignored --exact --nocapture --test-threads=1
+```
 
 Full Normal parity and Paint enumeration remain part of release acceptance.
 
