@@ -1532,6 +1532,24 @@ cargo test --locked -p p4kx-export --test real_archive -- `
     --ignored --exact --nocapture --test-threads=1
 ```
 
+Cold direct-query checks on LIVE `13220821` and PTU `13260598` each
+read all 205 physical occurrences with complete typed origins, 16,824
+source uses and two physical sources. Both finish in a fresh process
+without temporary output. All rows also matched the complete LIVE
+Normal Catalog in the [combined replay](#installed-flight-configurations).
+
+| Build | Wall time (s) | Peak private commit (B) | Peak working set (B) |
+| --- | ---: | ---: | ---: |
+| LIVE `13220821` | 8.356 | 1,091,776,512 | 1,022,832,640 |
+| PTU `13260598` | 8.274 | 1,114,603,520 | 1,032,642,560 |
+
+Set `P4KX_DATA_P4K` and `P4KX_NEW_SDK_BUILD` for the installed Build
+and measure the ignored test in its own optimized process.
+
+```text
+cargo test --locked -p p4kx-export --test real_archive real_archive_scoped_equipment_sdk::vehicle_armor_cold::installed_vehicle_armor_full_cold_query -- --ignored --exact --test-threads=1
+```
+
 The installed resource-network test compares original resource-state order, power and heat fields,
 and their physical source coordinates for selected catalog-eligible owners. It uses one decoded
 DataForge Entry and prints the Build and aggregate counts.
@@ -2418,6 +2436,14 @@ physical-source identities. The optimized verifier completed in
 1,723.431 s with 1,114,714,112 peak private bytes and 1,048,502,272 peak
 working-set bytes.
 
+On LIVE `13220821`, one replay of the complete Normal Catalog from producer
+`23addc5e164f65a28a6f258302b30453b331edce` matched the 12 selected Flight rows,
+all 205 Vehicle Armor rows and all 14,024 resource network link rows. The three
+tables resolved 1,048,291 source uses to one physical source. The verifier
+completed in 1,991.235 s with 6,538,014,720 peak private bytes and
+6,376,349,696 peak working-set bytes. This measurement includes the combined
+comparison and the streaming Normal replay.
+
 For the installed checks, set `P4KX_DATA_P4K` for the original Archive,
 `P4KX_NEW_SDK_BUILD` for its exact change number and
 `P4KX_FLIGHT_SDK_RECORD` for the physical Ship. Choose a Ship with a complete
@@ -2440,6 +2466,7 @@ Armor row in the same Catalog stream.
 ```powershell
 cargo test --locked -p p4kx-export --test real_archive real_archive_scoped_equipment_sdk::installed_configuration::retained_parity::installed_flight_matches_retained_complete_catalog -- --ignored --exact --nocapture --test-threads=1
 cargo test --locked -p p4kx-export --test real_archive real_archive_scoped_equipment_sdk::installed_configuration::retained_parity::installed_flight_and_vehicle_armor_match_retained_complete_catalog -- --ignored --exact --nocapture --test-threads=1
+cargo test --locked -p p4kx-export --test real_archive real_archive_scoped_equipment_sdk::installed_configuration::retained_parity::installed_flight_vehicle_armor_and_resource_links_match_retained_complete_catalog -- --ignored --exact --nocapture --test-threads=1
 ```
 
 ## Original cargo manifests

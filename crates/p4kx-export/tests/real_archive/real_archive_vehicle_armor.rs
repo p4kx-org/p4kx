@@ -27,7 +27,7 @@ mod sdk;
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
 const TABLE: &str = "/configurations/vehicleArmor/rows";
-const ARMOR: &str = "SCItemVehicleArmorParams";
+pub(super) const ARMOR: &str = "SCItemVehicleArmorParams";
 const FILTER: &str = "libs/foundry/records/entities/scitem/ships/armor/*";
 const DAMAGE: [(&str, &str); 6] = [
     ("DamagePhysical", "physical"),

@@ -23,6 +23,9 @@ use crate::real_archive_verification::print_line;
 mod equipment_input;
 use equipment_input::{dataforge, literal_filter, physical_filter, record_index, with_archive};
 
+#[path = "vehicle_armor_sdk_cold.rs"]
+mod vehicle_armor_cold;
+
 #[path = "real_archive_canonical_ship_sdk.rs"]
 mod canonical_ship;
 

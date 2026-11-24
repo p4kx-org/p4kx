@@ -31,11 +31,7 @@ pub(super) fn read() -> TestResult<[Route; 6]> {
     let placements = projected.placements;
     Ok([
         parsed.with_resource_network_links(selection, None, |snapshot| {
-            Route::queried_rows(
-                "/declarations/resourceNetworkLinks",
-                snapshot.rows(),
-                "complete same-Build producer parity with nine-owner ATLS admission remains open",
-            )
+            Route::queried_rows("/declarations/resourceNetworkLinks", snapshot.rows(), None)
         })??,
         parsed.with_room_associations(selection, None, |snapshot| {
             Route::queried_rows("/declarations/roomAssociations", snapshot.rows(), None)

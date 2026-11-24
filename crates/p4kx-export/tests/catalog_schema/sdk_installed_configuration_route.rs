@@ -67,7 +67,7 @@ pub(super) fn read() -> TestResult<Route> {
     Route::queried_rows(
         DATASET,
         &snapshot.rows,
-        "selected physical Ship and origin parity match synthetic and installed PTU producers. Installed all-roots memory and replay remain open",
+        "selected physical Ship and origin parity match synthetic, LIVE and current PTU producers. Installed all-roots memory and replay remain open",
     )
 }
 

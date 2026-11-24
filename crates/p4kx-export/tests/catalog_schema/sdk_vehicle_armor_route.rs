@@ -40,10 +40,6 @@ pub(super) fn read() -> TestResult<Route> {
         .write_to(&path)?;
     let archive = Archive::open(path)?;
     vehicle_armor::with_vehicle_armor(&archive, CatalogRecordSelection::All, None, |snapshot| {
-        Route::queried_rows(
-            VEHICLE_ARMOR,
-            snapshot.rows(),
-            "selected installed original-field witness available; complete retained Normal parity and cold SDK measurement remain open",
-        )
+        Route::queried_rows(VEHICLE_ARMOR, snapshot.rows(), None)
     })?
 }
