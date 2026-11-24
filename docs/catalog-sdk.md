@@ -1259,6 +1259,16 @@ first-parent projection separately through the complete canonical group-family s
 Resource/World bodies or locale payloads. Both retain physical GUID aliases, direct source cells,
 result-scoped provenance and explicit coverage. See [Resource group queries](catalog-resource-group-queries.md).
 
+Four Windows AMD64 cold checks ran the joint definition and membership query and
+the separate parent query in fresh processes on LIVE 13220821 and PTU 13260598.
+Each Build returned 19 definitions, 19 membership rows and 19 parent rows with
+complete available coverage. The two direct tables shared one query per Build.
+
+The peak private commit was 1,114,550,272 bytes and the peak working set was
+1,031,684,096 bytes across all four processes. The Archive and Build stamps
+remained stable. The exact test executable SHA-256 was
+`6be54c14baffb1f42b44ac22530c0f1890d444b776860ceccb57eaa320b1adf0`.
+
 ## Original equipment definitions and configurations
 
 Use `catalog_queries::equipment::with_item_definitions`, `with_attachment_constraints` or
