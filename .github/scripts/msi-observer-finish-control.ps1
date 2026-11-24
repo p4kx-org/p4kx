@@ -1,6 +1,7 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'msi-observer-evidence.ps1')
 . (Join-Path $PSScriptRoot 'msi-observer-snapshot-caller.ps1')
+. (Join-Path $PSScriptRoot 'msi-observer-progress.ps1')
 
 function Get-P4kxMsiFinishContext([string]$Directory) {
     $root = [IO.Path]::GetFullPath($Directory)
@@ -34,16 +35,22 @@ function Start-P4kxMsiFinishProcess($Context, [string]$EntryPoint, [string]$LogN
 }
 
 function Start-P4kxMsiFinishSupervision([string]$Directory) {
+    Write-P4kxMsiObserverProgress finishLaunchBinding begin
     $context = Get-P4kxMsiFinishContext $Directory
     $null = Get-P4kxMsiSnapshotBudget $context.cutoff.ToString('o')
     New-Item -ItemType Directory -Path $context.directory | Out-Null
+    Write-P4kxMsiObserverProgress finishLaunchBinding end -RequestDigest $context.digest
+    Write-P4kxMsiObserverProgress finishLaunchProcess begin -RequestDigest $context.digest
     $process = Start-P4kxMsiFinishProcess $context 'msi-observer-finish-supervisor.ps1' '' @()
     try {
+        Write-P4kxMsiObserverProgress finishLaunchProcess end -RequestDigest $context.digest
+        Write-P4kxMsiObserverProgress finishLaunchReceipt begin -RequestDigest $context.digest
         Write-P4kxDetachedReceipt (Join-Path $context.directory 'launch.json') @{
             schema=1;role='native-msi-finish-supervisor-launch';request_sha256=$context.digest
             supervisor_pid=$process.Id;supervisor_started_utc_ticks=$process.StartTime.ToUniversalTime().Ticks
             cutoff_utc=$context.cutoff.ToString('o');mutation_authority=$false
         }
+        Write-P4kxMsiObserverProgress finishLaunchReceipt end -RequestDigest $context.digest
     } finally { $process.Dispose() }
 }
 

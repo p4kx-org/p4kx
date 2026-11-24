@@ -4,7 +4,8 @@ function Write-P4kxMsiObserverProgress {
     param(
         [Parameter(Mandatory)][ValidateSet(
             'readRequest','binding','readHandle','parentState','wait','stopExpiredParent','saveCheckpoint','workflowOutput','validateResult','writeResult',
-            'delayCaller','delayBinding','delayReadRequest','delayStartReceipt','delayWait','delayResultReceipt'
+            'delayCaller','delayBinding','delayReadRequest','delayStartReceipt','delayWait','delayResultReceipt',
+            'finishLaunchBinding','finishLaunchProcess','finishLaunchReceipt'
         )][string]$Stage,
         [Parameter(Mandatory)][ValidateSet('begin','end')][string]$Status,
         [string]$Directory,

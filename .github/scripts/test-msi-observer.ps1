@@ -25,6 +25,18 @@ function Invoke-ObserverFinish {
         $launched=Invoke-P4kxPortalProcess ([Environment]::ProcessPath) $arguments $root 'detached-finish-launch' -Milliseconds 4000
         Assert-Observer ($launched.exit_code -eq 0) 'The Finish launcher or its redirected streams did not close.'
         if ($Case -ceq 'Complete') {
+            $prefix = '[P4KX-MSI-OBSERVER]'
+            $records = @([regex]::Split($launched.stdout, '\r?\n') |
+                Where-Object { $_.StartsWith($prefix, [StringComparison]::Ordinal) } |
+                ForEach-Object { $_.Substring($prefix.Length) | ConvertFrom-Json -AsHashtable -DateKind String })
+            $observed = @($records | ForEach-Object { $_.stage + '.' + $_.status })
+            $expected = @('finishLaunchBinding.begin','finishLaunchBinding.end','finishLaunchProcess.begin',
+                'finishLaunchProcess.end','finishLaunchReceipt.begin','finishLaunchReceipt.end')
+            Assert-Observer (($observed -join ' ') -ceq ($expected -join ' ')) 'Finish launcher lost its ordered console boundaries.'
+            foreach ($marker in $records) {
+                Assert-Observer ($marker.completed_success -eq $false -and $marker.mutation_authority -eq $false -and
+                    $marker.native_completion_unproven -eq $true) 'Finish launch marker claimed mutation or native completion.'
+            }
             $launch=Read-P4kxDetachedReceipt (Join-Path $observer 'finish-supervision/launch.json')
             $supervisor=Get-Process -Id $launch.supervisor_pid
             try {
