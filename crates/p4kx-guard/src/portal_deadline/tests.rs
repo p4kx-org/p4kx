@@ -8,6 +8,7 @@ use std::io::Write;
 use std::net::{Shutdown, TcpListener, TcpStream};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(target_os = "linux")]
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -24,40 +25,34 @@ fn sockets() -> std::io::Result<(TcpStream, TcpStream)> {
 
 #[test]
 fn success_and_error_join_the_supervisor_without_a_late_shutdown() -> TestResult {
-    for fails in [false, true] {
+    const COMPLETION_DEADLINE: Duration = Duration::from_secs(30);
+
+    for expected in [Ok(42), Err(AliasUncertainty::AccessDenied)] {
         let (client, mut server) = sockets()?;
         let shutdown = client.try_clone()?;
         let called = Arc::new(AtomicBool::new(false));
         let watched = Arc::clone(&called);
         let result = super::with_socket_deadline(
-            Instant::now() + Duration::from_millis(40),
+            Instant::now() + COMPLETION_DEADLINE,
             &AtomicBool::new(false),
             move || {
                 watched.store(true, Ordering::Release);
                 shutdown.shutdown(Shutdown::Both)
             },
-            || {
-                if fails {
-                    Err(UnknownAlias::new(AliasUncertainty::AccessDenied))
-                } else {
-                    Ok(42)
-                }
-            },
+            || expected.map_err(UnknownAlias::new),
         );
-        if fails {
-            assert!(
-                matches!(result, Err(error) if error.reason() == AliasUncertainty::AccessDenied),
-                "the work error is retained after the supervisor joins"
-            );
-        } else {
-            assert_eq!(result?, 42, "successful work is returned after joining");
-        }
-        thread::sleep(Duration::from_millis(60));
-        server.write_all(b"alive")?;
+        assert_eq!(
+            result.map_err(|error| error.reason()),
+            expected,
+            "the work result is retained after the supervisor joins"
+        );
+        let called = Arc::try_unwrap(called)
+            .map_err(|_| "the supervisor still owns the socket shutdown callback")?;
         assert!(
-            !called.load(Ordering::Acquire),
-            "a detached watchdog would shut down the still-live socket after its deadline"
+            !called.into_inner(),
+            "completed work must leave the socket live"
         );
+        server.write_all(b"alive")?;
     }
     Ok(())
 }
