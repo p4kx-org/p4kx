@@ -71,7 +71,7 @@ pub(crate) fn run(args: &AudioArgs, as_json: bool) -> Result<()> {
     match &args.action {
         AudioAction::Info(source) => info(&open(source, as_json)?, as_json),
         AudioAction::Wav { source, out } => wav(&open(source, as_json)?, out, as_json),
-        AudioAction::Ogg { source, out } => ogg(&open(source, false)?, out, as_json),
+        AudioAction::Ogg { source, out } => ogg(&open(source, as_json)?, out, as_json),
     }
 }
 
@@ -162,7 +162,7 @@ fn wav(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
                 .loop_points
                 .map(|points| loop_json(points.start, points.end)),
         };
-        json::print(&info_origins::wav_report(sound, summary)?)?;
+        json::print(&info_origins::conversion_report(sound, summary)?)?;
     } else {
         writeln!(
             io::stdout().lock(),
@@ -179,7 +179,7 @@ fn ogg(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
     let report = sound.write_ogg_to_file(out)?;
     let duration = report.duration();
     if as_json {
-        json::print(&OggJson {
+        let summary = OggJson {
             sound: sound.name(),
             output: json::path(out),
             codec: report.codec.id(),
@@ -192,7 +192,8 @@ fn ogg(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
             loop_points: report
                 .loop_points
                 .map(|points| loop_json(points.start, points.end)),
-        })?;
+        };
+        json::print(&info_origins::conversion_report(sound, summary)?)?;
     } else {
         writeln!(
             io::stdout().lock(),

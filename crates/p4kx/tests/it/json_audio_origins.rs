@@ -11,6 +11,9 @@ use serde_json::{Value, json};
 
 use super::{SOUND, TestResult};
 
+#[path = "json_audio_ogg_origins.rs"]
+mod ogg;
+
 const SELECTED_FORMAT_BODY: u64 = 44;
 
 #[test]
@@ -50,6 +53,7 @@ fn audio_info_keeps_original_format_and_directory_origins_separate() -> TestResu
             &document,
             source,
             input,
+            SELECTED_FORMAT_BODY,
             &[("/channels", "channels"), ("/format_tag", "formatTag")],
         )?;
     }
@@ -95,6 +99,7 @@ fn audio_wav_binds_formats_to_the_selected_duplicate_entry() -> TestResult {
             &document,
             source,
             input,
+            SELECTED_FORMAT_BODY,
             &[("/channels", "channels"), ("/sample_rate", "sampleRate")],
         )?;
     }
@@ -283,6 +288,7 @@ fn check_format_origins(
     document: &Value,
     source: &Value,
     input: Input,
+    format_body: u64,
     fields: &[(&str, &str)],
 ) -> TestResult {
     for &(output, original) in fields {
@@ -300,7 +306,7 @@ fn check_format_origins(
             [&json!({
                 "type": "subresource",
                 "namespace": "wemChunk",
-                "indices": [SELECTED_FORMAT_BODY.to_string()],
+                "indices": [format_body.to_string()],
                 "field": original
             })],
             "{input:?} {output} retains the value from the actual selected format body"

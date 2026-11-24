@@ -9,7 +9,7 @@ use p4kx_extraction::{
 };
 use serde::Serialize;
 
-use super::{InfoJson, WavJson};
+use super::InfoJson;
 
 const SUMMARY_FIELDS: [(&str, WemOriginField); 8] = [
     ("/format_tag", WemOriginField::FormatTag),
@@ -28,7 +28,7 @@ const LOOP_FIELDS: [(&str, WemOriginField); 3] = [
     ("/loop/frames", WemOriginField::LoopFrames),
 ];
 
-const WAV_FIELDS: [(&str, WemOriginField); 2] = [
+const CONVERSION_FORMAT_FIELDS: [(&str, WemOriginField); 2] = [
     ("/channels", WemOriginField::Channels),
     ("/sample_rate", WemOriginField::SampleRate),
 ];
@@ -49,11 +49,8 @@ pub(super) fn report<'sound>(
     capture(sound, info, datum_fields(sound))
 }
 
-pub(super) fn wav_report<'sound>(
-    sound: &Sound,
-    summary: WavJson<'sound>,
-) -> Result<Report<WavJson<'sound>>> {
-    capture(sound, summary, WAV_FIELDS)
+pub(super) fn conversion_report<T>(sound: &Sound, summary: T) -> Result<Report<T>> {
+    capture(sound, summary, CONVERSION_FORMAT_FIELDS)
 }
 
 fn capture<T>(

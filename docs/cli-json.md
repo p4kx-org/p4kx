@@ -1986,6 +1986,12 @@ rebuilt with: `default`, `aotuv` or `inline`; it is `null` for Opus. `size` is t
 written Ogg file. A codec other than Wwise Vorbis and Opus, a Vorbis WEM that no codebooks fit or
 a malformed Opus WEM prints no JSON; it fails with exit code 1 and an error giving the reason.
 
+`fieldOrigins` addresses `/sound`, `/channels`, and `/sample_rate`. The name uses the opened
+input's path metadata. The channel count comes from the selected WEM format. Vorbis uses the
+WEM sample-rate declaration. Opus selects its 48 kHz rate through the codec decision.
+A standalone WEM has unknown Archive encryption. The source and use identifiers resolve in
+`provenance`.
+
 ## `p4kx bnk list <archive> <entry> --json`
 
 Also `p4kx bnk list <file> --json` for a soundbank file on disk.
