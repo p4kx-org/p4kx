@@ -335,12 +335,13 @@ AppImage receipts cover extract-and-run.
 [AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45315878218/job/138196477374) ·
 [ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45315878218/job/138196477207)
 
-Release merge `8b6032a9d` passed the four native package checks on AMD64 and ARM64.
-Each architecture's digest-verified package logs include separate AppImage runtime
-receipts for direct FUSE launch and extract-and-run. Its `executed-packages.json`
-binds both launch modes to the corresponding native target and merge revision.
-[AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45338631037/job/138282038446) ·
-[ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45338631037/job/138282038436)
+Release merge `23addc5e164f65a28a6f258302b30453b331edce` for PR #1117 head
+`54121ab3e` passed all four native package checks on AMD64 and ARM64. Both
+`executed-packages.json` receipts bind the package to that revision and record
+successful AppImage direct FUSE launch and extract-and-run. The same jobs
+verified the Flatpak Documents grants and the deb and Flatpak lifecycle.
+[AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45359023253/job/138344687384) ·
+[ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45359023253/job/138344687148)
 
 The tagged v0.5.0 candidate requires its own hosted Linux package evidence on both CPUs.
 
