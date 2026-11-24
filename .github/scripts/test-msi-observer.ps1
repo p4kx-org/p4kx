@@ -188,6 +188,35 @@ function Assert-ObserverFinishProgress {
     }
     & $entry -Stage CollectFinish -Directory $observer
 }
+function Assert-ObserverMissingFinishReceipt($Context, $Launch) {
+    $bounded = $Context.Clone()
+    $bounded.directory = Join-Path $root 'bounded missing terminal wait'
+    $null = New-Item -ItemType Directory -Path $bounded.directory
+    $bounded.collection_cutoff = [DateTimeOffset]::UtcNow.AddSeconds(5)
+    $output = @(& {
+        try {
+            Wait-P4kxMsiFinishReceipt $bounded $Launch
+            throw 'A missing terminal receipt satisfied the active bounded wait.'
+        } catch {
+            if ($_.Exception.Message -cne 'The bound Finish supervisor produced no result within the original allowance.') { throw }
+        }
+    } 6>&1)
+    $markers = @(Read-ObserverProgress ($output -join [Environment]::NewLine))
+    $ownedStages = @('finishWaitPortalStart.end','finishWaitPortalCapture.begin','finishWaitPortalCleanup.end')
+    $observed = @($markers | ForEach-Object { $_.stage + '.' + $_.status })
+    Assert-Observer (@($ownedStages | Where-Object { $_ -cnotin $observed }).Count -eq 0 -and
+        @($markers | Where-Object { $_.request_sha256 -cne $bounded.digest -or $_.completed_success -ne $false -or
+            $_.native_completion_unproven -ne $true -or $_.mutation_authority -ne $false }).Count -eq 0) 'Missing-receipt wait did not start and clean up its bound owned probe.'
+    $absence = Read-P4kxDetachedReceipt (Join-Path $bounded.directory 'wait-result.json')
+    Assert-Observer ($absence.schema -eq 1 -and $absence.role -ceq 'native-msi-finish-receipt-wait' -and
+        $absence.request_sha256 -ceq $bounded.digest -and $absence.supervisor_pid -eq $Launch.supervisor_pid -and
+        $absence.supervisor_started_utc_ticks -eq $Launch.supervisor_started_utc_ticks -and
+        $absence.deadline_utc -ceq $bounded.collection_cutoff.ToString('o') -and
+        $null -eq $absence.result_sha256 -and $absence.mutation_authority -eq $false -and
+        $observed -cnotcontains 'finishWaitDigest.begin' -and
+        -not [IO.File]::Exists((Join-Path $bounded.directory 'result.json'))) 'The active bounded wait did not preserve its original receipt absence.'
+}
+
 function Assert-Observer([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
 }
@@ -247,6 +276,7 @@ try {
             $absence.request_sha256 -ceq $handle.request_sha256 -and $null -eq $absence.result_sha256 -and
             $absence.deadline_utc -ceq $expired.collection_cutoff.ToString('o') -and
             $absence.mutation_authority -eq $false) 'Expired wait did not preserve exact absence evidence.'
+        Assert-ObserverMissingFinishReceipt $context $launch
         $supervision=Join-Path $context.directory 'result.json'
         $waitPath=Join-Path $context.directory 'wait-result.json'
         $valid=[IO.File]::ReadAllText($supervision)
