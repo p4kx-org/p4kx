@@ -97,11 +97,7 @@ fn parity<Row: Serialize + JsonSchema>(
         Some(&table(snapshot)),
         "scoped and canonical rows, including field origins, are identical"
     );
-    Route::queried_rows(
-        dataset,
-        &snapshot.rows,
-        "synthetic producer and source parity available; installed producer parity open",
-    )
+    Route::queried_rows(dataset, &snapshot.rows, None)
 }
 
 fn verify_geology(asset: &PlanetGeologyAsset) -> TestResult {

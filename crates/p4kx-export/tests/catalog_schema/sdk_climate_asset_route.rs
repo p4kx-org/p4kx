@@ -60,11 +60,7 @@ pub(super) fn read() -> TestResult<Route> {
         "preloaded DataForge preserves the same field evidence"
     );
 
-    Route::queried_rows(
-        DATASET,
-        &scoped.rows,
-        "synthetic producer and source parity available; installed producer parity open",
-    )
+    Route::queried_rows(DATASET, &scoped.rows, None)
 }
 
 fn table(snapshot: &ClimateAssetSnapshot) -> Value {

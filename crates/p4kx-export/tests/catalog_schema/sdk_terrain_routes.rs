@@ -87,11 +87,7 @@ fn parity<Row: JsonSchema + Serialize>(
         Some(&json!({"availability": availability, "rows": rows})),
         "selected canonical terrain rows and original origins match the normal Catalog"
     );
-    Route::queried_rows(
-        path,
-        rows,
-        "synthetic producer and source parity available; installed producer parity open",
-    )
+    Route::queried_rows(path, rows, None)
 }
 
 fn verify_ecosystem(row: &Ecosystem) -> TestResult {

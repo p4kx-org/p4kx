@@ -137,11 +137,7 @@ fn compare<'source, Row: JsonSchema + Serialize>(
             "the body field has evidence at its original physical NPC Record"
         );
     }
-    Route::queried_rows(
-        dataset,
-        rows,
-        "encrypted synthetic producer and source parity available; installed producer parity open",
-    )
+    Route::queried_rows(dataset, rows, None)
 }
 
 #[test]

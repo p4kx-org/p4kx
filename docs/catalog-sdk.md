@@ -273,6 +273,21 @@ private commit was 1,137,717,248 bytes and the largest working set was
 1,058,566,144 bytes. The verifier was built from
 `eed6c4b45f7faf4ce325c3a99f6f97281a33b572`.
 
+### Comparison with the complete Catalog
+
+On both Builds, the Terrain verifier streamed the complete Normal Catalog
+and matched all seven definition tables, including availability, ordered
+rows, and the source uses and physical sources referenced by those rows.
+LIVE matched 3,669 uses from 132 physical sources. PTU matched 35,554 uses
+from 391 physical sources. The largest private commit was 1,138,044,928
+bytes and the largest working set was 1,064,734,720 bytes.
+
+The matching Normal Catalog producer revisions were
+`23addc5e164f65a28a6f258302b30453b331edce` on LIVE and
+`93d92ca20bef8a8c3731339214a3301124ade7ba` on PTU. The verifier used the
+same revision as the standalone reads and checked the Build and Archive
+stamps before and after each comparison.
+
 ## Weather configurations
 
 Use `catalog_queries::weather::with_electrical_behaviors` for the canonical
@@ -917,6 +932,19 @@ The ten separate processes completed with stable Build and Archive stamps.
 The largest private commit was 1,115,009,024 bytes and the largest working set
 was 1,032,044,544 bytes. These reads used the verifier at
 `eed6c4b45f7faf4ce325c3a99f6f97281a33b572`.
+
+The same verifier matched all five tables against the complete Normal
+Catalog for each Build. It checked availability, ordered rows, and the
+referenced source uses and physical sources. On LIVE, all tables were
+Absent and referenced zero sources. On PTU, the rows referenced 25,103
+uses from one physical source. Both runs reported zero ignored development
+leftovers. The largest private commit was 1,115,025,408 bytes and the
+largest working set was 1,043,886,080 bytes.
+
+The Normal Catalog producer revisions were
+`23addc5e164f65a28a6f258302b30453b331edce` on LIVE and
+`93d92ca20bef8a8c3731339214a3301124ade7ba` on PTU. The verifier checked the
+Build and Archive stamps before and after each comparison.
 
 ## Mission location templates
 
@@ -2288,6 +2316,27 @@ or all admitted owners. Each row identifies the original component slot and expo
 authored Mannequin controller and animation database locators with their immediate source
 evidence. Additional authored component members remain accessible in the same snapshot.
 The query reads the owner bodies that contain the requested component.
+
+### Installed Entity component queries
+
+Each of the six `All` selectors below ran alone in a fresh Windows AMD64
+process against LIVE `13220821` and PTU `13260598`. All twelve queries
+reported Available and preserved unique physical Record and component slots.
+
+| Configuration | LIVE rows | PTU rows |
+| --- | ---: | ---: |
+| `entityAnimationControllers` | 8,076 | 8,219 |
+| `explosives` | 99 | 100 |
+| `flightControllers` | 277 | 275 |
+| `ifcs` | 277 | 275 |
+| `lootGeneration` | 1,314 | 1,698 |
+| `thrusters` | 1,485 | 1,485 |
+
+The explosives queries counted 1,160 LIVE and 1,172 PTU development
+leftovers separately from admitted rows. Build and Archive stamps matched
+before and after all twelve reads. The largest private commit was
+1,410,879,488 bytes and the largest working set was 1,382,797,312 bytes.
+The verifier was built from `914ca2681ec7dc0a4420350c7ba6da0a88237fbc`.
 
 ## Player weapon animation candidates
 
