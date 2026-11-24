@@ -21,6 +21,7 @@ pub struct V2DirectoryMetadata {
     pub(crate) trie_offset: u64,
     pub(crate) trie_size: u64,
     pub(crate) sector_size: u64,
+    pub(crate) flags_offset: u64,
     pub(crate) flags: u8,
     pub(crate) layout_version: u16,
     pub(crate) magic: u32,
@@ -97,6 +98,11 @@ impl V2DirectoryMetadata {
     #[must_use]
     pub const fn flags(&self) -> u8 {
         self.flags
+    }
+    /// Returns the owning-source byte offset of the installation flags.
+    #[must_use]
+    pub const fn flags_offset(&self) -> u64 {
+        self.flags_offset
     }
     /// Returns the actual stored layout-version word.
     #[must_use]

@@ -684,7 +684,16 @@ serialized Build cannot establish that original handle. A private coherence toke
 only checks an already-bound value. Missing or unreadable manifests retain
 Attempted observations without contributing a completed File. Malformed completed
 reads retain their parse-outcome Selector and Conversion for the generated null,
-without inventing a stored-null Payload. Other RootSource fields remain unmigrated.
+without inventing a stored-null Payload.
+
+The Archive-root occurrence can also carry an independent `/data/installation_flags`
+cell. An admitted v2 trailer supplies the exact one-byte Payload in the root
+Archive directory metadata. The cell cites that original byte range and does not
+inherit the Build manifest's lineage or a leaf Entry's encryption. A v1 result
+or a value without a matching original binding has unknown origin. The
+`archiveBuild` profile and the existing verification of actual field paths also
+accept historical occurrences where this cell's origin was unknown. Index Build
+coverage is unchanged.
 
 The reader verifies this projection's hash, ordinal, full field paths, node count,
 single occurrence, completion and EOF against the committed receipts. A declared

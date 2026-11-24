@@ -10,11 +10,11 @@ use serde::de::{Deserializer, SeqAccess, Visitor};
 use crate::origin_decimal;
 
 /// A validated decimal coordinate without original-input authority.
-pub(crate) struct DecimalCoordinate;
+pub(crate) struct DecimalCoordinate(u64);
 
 impl<'de> Deserialize<'de> for DecimalCoordinate {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        origin_decimal::deserialize(deserializer).map(|_| Self)
+        origin_decimal::deserialize(deserializer).map(|value| Self(value.get()))
     }
 }
 
@@ -100,8 +100,13 @@ impl DeclarationKind {
     }
 }
 
-/// A checked coordinate string whose contents are not retained as authority.
-pub(crate) struct CoordinateText;
+/// Recognizes directory metadata coordinates without retaining arbitrary strings.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CoordinateText {
+    ArchiveV2Trailer,
+    Flags,
+    Other,
+}
 
 impl<'de> Deserialize<'de> for CoordinateText {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
@@ -118,13 +123,19 @@ impl Visitor<'_> for TextVisitor {
         formatter.write_str("one descriptive coordinate string")
     }
 
-    fn visit_str<E: serde::de::Error>(self, _: &str) -> Result<CoordinateText, E> {
-        Ok(CoordinateText)
+    fn visit_str<E: serde::de::Error>(self, value: &str) -> Result<CoordinateText, E> {
+        Ok(match value {
+            "archiveV2Trailer" => CoordinateText::ArchiveV2Trailer,
+            "flags" => CoordinateText::Flags,
+            _ => CoordinateText::Other,
+        })
     }
 }
 
-/// Checked decimal ordinals without copied coordinate storage.
-pub(crate) struct CoordinateIndices;
+/// Checked decimal ordinals and whether they describe exactly one byte.
+pub(crate) struct CoordinateIndices {
+    pub(crate) single_byte_range: bool,
+}
 
 impl<'de> Deserialize<'de> for CoordinateIndices {
     fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
@@ -142,10 +153,14 @@ impl<'de> Visitor<'de> for IndicesVisitor {
     }
 
     fn visit_seq<S: SeqAccess<'de>>(self, mut sequence: S) -> Result<CoordinateIndices, S::Error> {
-        let mut coordinate = sequence.next_element::<DecimalCoordinate>()?;
-        while coordinate.is_some() {
-            coordinate = sequence.next_element::<DecimalCoordinate>()?;
+        let start = sequence.next_element::<DecimalCoordinate>()?;
+        let end = sequence.next_element::<DecimalCoordinate>()?;
+        let mut single_byte_range = start
+            .zip(end)
+            .is_some_and(|(start, end)| start.0.checked_add(1) == Some(end.0));
+        while sequence.next_element::<DecimalCoordinate>()?.is_some() {
+            single_byte_range = false;
         }
-        Ok(CoordinateIndices)
+        Ok(CoordinateIndices { single_byte_range })
     }
 }

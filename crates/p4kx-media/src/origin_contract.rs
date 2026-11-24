@@ -103,7 +103,7 @@ pub enum OriginProfile {
     MaterialSourceLimit,
     /// Invalid material reader configuration without a content contribution.
     MaterialConfigurationFailure,
-    /// Original manifest-backed Build members within the Archive-root record.
+    /// Original Build members and independently bound installation flags in the Archive-root record.
     ArchiveBuild,
     /// Original manifest-backed nullable Build projection in the Index.
     IndexBuild,

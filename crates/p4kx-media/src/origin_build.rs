@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+#[path = "origin_installation_flags.rs"]
+pub(crate) mod installation_flags;
+
 use p4kx_extraction::{ArchiveInputOrigin, BuildManifestOutcome, SourceUses};
 
 use crate::build_projection;

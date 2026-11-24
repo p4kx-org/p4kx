@@ -41,6 +41,7 @@ impl Trailer {
                 trie_offset: reader.read_u64()?,
                 trie_size: reader.read_u64()?,
                 sector_size: reader.read_u64()?,
+                flags_offset: reader.offset(),
                 flags: reader.read_bytes(1)?.first().copied().ok_or_else(|| {
                     FormatError::corrupt(offset, "v2 installation status is cut off")
                 })?,

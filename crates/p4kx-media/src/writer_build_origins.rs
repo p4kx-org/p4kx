@@ -96,8 +96,9 @@ impl MediaWriter<'_> {
         root: &RootSource,
         issues: &[MediaIssue],
     ) -> Result<(), MediaError> {
-        let prepared =
+        let mut prepared =
             origin_build_map::prepare(root, "/data/build", OriginProfile::ArchiveBuild, self)?;
+        crate::origin_build::installation_flags::insert(root, &mut prepared, self)?;
         self.record_with_origins(subresource, status, root, issues, prepared)
     }
 

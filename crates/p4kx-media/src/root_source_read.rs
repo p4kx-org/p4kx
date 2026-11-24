@@ -46,6 +46,7 @@ impl<'de> Deserialize<'de> for RootSource {
             build_present: wire.build.present,
             build_origin: None,
             installation_flags: wire.installation_flags,
+            installation_flags_origin: None,
             directory_issue_count: wire.directory_issue_count,
             directory_issues: wire.directory_issues,
             directory_issue_samples_complete: wire.directory_issue_samples_complete,

@@ -42,6 +42,33 @@ impl SourceUses {
         })
     }
 
+    /// Observes the original v2 root installation flags byte when available.
+    ///
+    /// # Errors
+    /// Returns an error when the original source cannot register the use.
+    pub fn observe_root_installation_flags(
+        &self,
+        archive: &Archive,
+    ) -> Result<Option<SourceUse>, SourceEvidenceError> {
+        let Some(trailer) = archive.metadata().v2_directory() else {
+            return Ok(None);
+        };
+        let Some(scope) = self.root_directory_scope(archive)? else {
+            return Ok(None);
+        };
+        let offset = trailer.flags_offset();
+        scope
+            .at(
+                SourceLocation::Subresource {
+                    namespace: "archiveV2Trailer".into(),
+                    indices: vec![offset, offset + 1],
+                    field: "flags".into(),
+                },
+                SourceUseRole::Payload,
+            )
+            .map(Some)
+    }
+
     /// Retains the consulted prefix of the original root Archive directory.
     /// The prefix is in admitted Entry order.
     ///

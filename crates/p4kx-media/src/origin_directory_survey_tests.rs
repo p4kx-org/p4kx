@@ -140,3 +140,40 @@ fn a_path_order_subtree_is_bounded_by_the_admitted_root_directory() -> TestResul
         Ok(())
     })
 }
+
+#[test]
+fn installation_flags_require_the_directory_and_one_original_byte() -> TestResult {
+    use p4kx_testkit::ArchiveBuilder;
+
+    origin_index_test_support::run(|root, checkpoint| {
+        let path = root.join("v2.p4k");
+        ArchiveBuilder::v2().write_to(&path)?;
+        let archive = Archive::open(path)?;
+        let registry = SourceUses::new();
+        let used = registry
+            .observe_root_installation_flags(&archive)?
+            .ok_or("original installation flags")?;
+        let inventory = registry.freeze()?;
+        let source = serde_json::to_value(inventory.sources().first().ok_or("directory source")?)?;
+        let usage = serde_json::to_value(used.description())?;
+        check(root, checkpoint, &source, &usage)?;
+        for (pointer, value) in [
+            ("/location/namespace", json!("unrelated")),
+            ("/location/field", json!("otherField")),
+            ("/location/indices", json!(["1", "3"])),
+            ("/location/indices", json!(["1", "2", "3"])),
+            ("/role", json!("selector")),
+            ("/scope", json!("payload")),
+        ] {
+            let mut forged = usage.clone();
+            *forged
+                .pointer_mut(pointer)
+                .ok_or("original flags coordinate")? = value;
+            assert!(
+                check(root, checkpoint, &source, &forged).is_err(),
+                "{pointer}"
+            );
+        }
+        Ok(())
+    })
+}

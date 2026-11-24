@@ -31,10 +31,13 @@ pub(crate) fn build(
     )?;
     checkpoint.finish()?;
     let mut root = source::root(archive, digest, size);
-    let capabilities = providers
+    let capabilities: Vec<_> = providers
         .iter()
         .map(|provider| provider.capability())
         .collect();
+    let include_archive = capabilities
+        .iter()
+        .any(|item| item.kind == MediaKind::Archive);
     let mut writer = MediaWriter::new(
         stage,
         capabilities,
@@ -42,23 +45,17 @@ pub(crate) fn build(
         checkpoint,
         options.diagnostic,
     )?;
-    writer.audio_output = options.audio_output;
-    writer.texture_mip = options.texture_mip;
-    writer
-        .animation_skeleton
-        .clone_from(&options.animation_skeleton);
-    writer
-        .animation_entity
-        .clone_from(&options.animation_entity);
-    writer.animation_model.clone_from(&options.animation_model);
-    writer.scoped_animation_definitions = options.kinds.contains(&MediaKind::AnimationDefinition)
-        && (options.animation_entity.is_some() || options.animation_model.is_some());
+    apply_output_options(&mut writer, options);
     writer.origins.observe_root(archive, size)?;
     writer.bind_build(archive, &mut root)?;
+    if include_archive {
+        crate::origin_build::installation_flags::bind(archive, &mut root, &writer)?;
+    }
     root_callbacks(&root, providers, &mut writer)?;
     let entries = collect(archive, options, &root, providers, &mut writer)?;
     writer.index_build(&root)?;
     root.build_origin = None;
+    root.installation_flags_origin = None;
     let finished = writer.finish()?;
     let complete = root.enumeration_complete
         && finished
@@ -82,6 +79,20 @@ pub(crate) fn build(
     };
     index.generation = hashing::generation(&mut index, &checkpoint)?;
     Ok(index)
+}
+
+fn apply_output_options(writer: &mut MediaWriter<'_>, options: &ExportOptions) {
+    writer.audio_output = options.audio_output;
+    writer.texture_mip = options.texture_mip;
+    writer
+        .animation_skeleton
+        .clone_from(&options.animation_skeleton);
+    writer
+        .animation_entity
+        .clone_from(&options.animation_entity);
+    writer.animation_model.clone_from(&options.animation_model);
+    writer.scoped_animation_definitions = options.kinds.contains(&MediaKind::AnimationDefinition)
+        && (options.animation_entity.is_some() || options.animation_model.is_some());
 }
 
 fn root_callbacks(

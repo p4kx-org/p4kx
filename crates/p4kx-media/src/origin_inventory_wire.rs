@@ -161,6 +161,17 @@ impl Location {
         }
     }
 
+    pub(crate) fn installation_flags(&self) -> Option<bool> {
+        (self.kind == LocationKind::Subresource
+            && self.namespace == Some(CoordinateText::ArchiveV2Trailer)
+            && self.field == Some(CoordinateText::Flags))
+        .then(|| {
+            self.indices
+                .as_ref()
+                .is_some_and(|indices| indices.single_byte_range)
+        })
+    }
+
     pub(crate) fn require_shape(&self) -> Result<(), MediaError> {
         let valid = match self.kind {
             LocationKind::Opaque => self.reason.is_some(),

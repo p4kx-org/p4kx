@@ -40,6 +40,7 @@ struct UseLocation {
     kind: LocationKind,
     selector: Option<String>,
     directory_paths: Option<[DirectoryOrdinal; 2]>,
+    installation_flags: Option<bool>,
 }
 
 impl ReadInventory {
@@ -116,6 +117,7 @@ impl ReadInventory {
                 location: UseLocation {
                     kind: used.location.kind,
                     directory_paths: used.location.directory_paths(),
+                    installation_flags: used.location.installation_flags(),
                     selector: used.location.selector,
                 },
                 effective_encryption: used.effective_encryption,
@@ -167,7 +169,22 @@ impl ReadInventory {
         Ok(())
     }
 
-    fn validate_directory_paths(used: &UseFacts, source: &SourceFacts) -> Result<(), MediaError> {
+    fn validate_directory_location(
+        used: &UseFacts,
+        source: &SourceFacts,
+    ) -> Result<(), MediaError> {
+        if let Some(single_byte) = used.location.installation_flags {
+            if single_byte
+                && source.kind == SourceKind::ArchiveDirectory
+                && used.scope == Scope::ArchiveDirectoryMetadata
+                && used.role == Role::Payload
+            {
+                return Ok(());
+            }
+            return Err(invalid(
+                "installation flags contradict their original directory byte",
+            ));
+        }
         match (source.kind, used.location.directory_paths) {
             (SourceKind::ArchiveDirectory, Some([start, end]))
                 if used.role == Role::Selector
@@ -197,7 +214,7 @@ impl ReadInventory {
                 .get(&used.source)
                 .ok_or_else(|| invalid("source use refers to a missing physical source"))?;
             Self::validate_use_encryption(used, source, states)?;
-            Self::validate_directory_paths(used, source)?;
+            Self::validate_directory_location(used, source)?;
             if used.location.kind == LocationKind::LocalizationLookup {
                 let Some(selector) = &used.location.selector else {
                     return Err(invalid("localization use lacks its selector reference"));

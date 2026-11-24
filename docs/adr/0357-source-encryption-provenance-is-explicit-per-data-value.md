@@ -125,7 +125,12 @@ binding and bounded projection token check coherence of the already-bound value;
 the token cannot restore authority. Parsed members retain their own logical
 manifest Payload/Conversion plus the successful parse-shape Selector. Generated
 malformed null retains its actual parse Selector/Conversion without a fabricated
-stored-null Payload. Other RootSource metadata remains explicitly unmigrated.
+stored-null Payload.
+
+An independently bound v2 installation flags byte supplies the optional exact
+`/data/installation_flags` cell in the Archive-root `archiveBuild` occurrence.
+The byte is original root directory metadata. Missing or detached evidence
+stays unknown. Index coverage remains confined to the nullable Build projection.
 
 The Archive-root placement addresses `/data/build` under profile `archiveBuild`.
 Every fresh generation also emits stream/profile `indexBuild`, independently of

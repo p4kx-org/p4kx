@@ -109,6 +109,10 @@ pub struct RootSource {
     pub(crate) build_present: bool,
     /// Public source installation flags, absent when the layout provides none.
     pub installation_flags: Option<u8>,
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub(crate) installation_flags_origin:
+        Option<crate::origin_build::installation_flags::BoundFlags>,
     /// Total directory issues observed by the reader, including beyond its sample limit.
     pub directory_issue_count: usize,
     /// Reader-bounded issue samples in their exposed order.
@@ -210,6 +214,7 @@ pub(crate) fn root(archive: &Archive, digest: Digest, size: u64) -> RootSource {
         build_origin: None,
         build_present: true,
         installation_flags: archive.installation_status().raw_flags(),
+        installation_flags_origin: None,
         directory_issue_count: archive.issue_count(),
         directory_issues: archive
             .issues()
