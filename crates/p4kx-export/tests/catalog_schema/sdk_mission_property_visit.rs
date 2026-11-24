@@ -3,13 +3,17 @@
 
 use std::time::UNIX_EPOCH;
 
+use p4kx_export::catalog_queries::mission_definitions::{
+    MissionDefinitionFamily, MissionDefinitionRows, MissionDefinitionSelection,
+};
 use p4kx_export::catalog_queries::mission_properties::{
     MissionFlowOwnerRef, MissionPropertyOwnerFamily, MissionPropertyOwnerSnapshot,
-    MissionPropertySelection, MissionPropertyVisitSummary, PropertySelection,
+    MissionPropertySelection, MissionPropertyVisitSummary, PropertySelection, TemplateSource,
     visit_mission_properties, visit_mission_properties_from,
 };
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
+    OriginalValueErrorFacts,
 };
 use p4kx_export::{CatalogError, CatalogOptions, build_catalog_from};
 use p4kx_extraction::{CancelToken, DataForgeEntry, PhysicalSourceKind};
@@ -116,7 +120,11 @@ fn check_owner(snapshot: &MissionPropertyOwnerSnapshot<'_>, catalog: &Value) -> 
         _ => return Err("unexpected mission definition family".into()),
     };
     let index = u64::from(snapshot.source.owner.physical().record_index());
-    if index == u64::from(ROOT_PROPERTY_TEMPLATE) {
+    if matches!(
+        &snapshot.source.owner,
+        MissionFlowOwnerRef::ContractTemplate(_)
+    ) && index == u64::from(ROOT_PROPERTY_TEMPLATE)
+    {
         let [property] = snapshot.rows.as_slice() else {
             return Err("the Template has one original root property declaration".into());
         };
@@ -158,6 +166,88 @@ fn check_owner(snapshot: &MissionPropertyOwnerSnapshot<'_>, catalog: &Value) -> 
         "locale projection is outside authored configuration reads"
     );
     Ok(())
+}
+
+#[test]
+fn mission_queries_distinguish_missing_targets_from_malformed_values() -> TestResult {
+    const BROKER_LINK_RECORD: u32 = 6;
+    let broker_record = BROKER_LINK_RECORD;
+    let selection = CatalogRecordSelection::RecordIndex(broker_record);
+    let properties =
+        MissionPropertySelection::new(MissionPropertyOwnerFamily::MissionBrokerEntries, selection);
+    let definitions =
+        MissionDefinitionSelection::new(MissionDefinitionFamily::MissionBrokerEntries, selection);
+    for (fault, expected) in [
+        (fixture::BrokerFieldFault::MissingTarget, true),
+        (fixture::BrokerFieldFault::MalformedFlag, false),
+    ] {
+        let (_folder, archive) = fixture::open_with_broker_fault(fault)?;
+        let entry = DataForgeEntry::read(&archive)?;
+        let session = CatalogQuerySession::from_entry(
+            &archive,
+            &entry,
+            CatalogLanguageSelection::AllAvailable,
+            None,
+        )?;
+        let expected_incomplete = if expected { &[][..] } else { &[broker_record] };
+        let catalog = if expected {
+            Some(serde_json::from_slice(
+                build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?.json(),
+            )?)
+        } else {
+            None
+        };
+        let summary =
+            session.visit_mission_properties(selection, None, |snapshot| -> TestResult {
+                assert_eq!(
+                    snapshot.fields_complete, expected,
+                    "original projection state"
+                );
+                check_retained_error(&snapshot.source.arena, expected);
+                if let Some(catalog) = &catalog {
+                    check_owner(snapshot, catalog)?;
+                }
+                Ok(())
+            })?;
+        assert_eq!(summary.owner_count, 1, "the physical owner is retained");
+        assert_eq!(summary.coverage.incomplete_fields, expected_incomplete);
+        let parsed = session.parsed(None)?;
+        parsed.with_mission_properties(properties, None, |snapshot| {
+            assert_eq!(snapshot.coverage.incomplete_fields, expected_incomplete);
+        })?;
+        parsed.with_mission_definitions(definitions, None, |snapshot| -> TestResult {
+            let MissionDefinitionRows::MissionBrokerEntries(rows) = &snapshot.rows else {
+                return Err("expected the selected Broker definition".into());
+            };
+            let [broker] = rows.as_slice() else {
+                return Err("expected one physical Broker".into());
+            };
+            assert_eq!(snapshot.coverage.incomplete_fields, expected_incomplete);
+            check_retained_error(broker.source(), expected);
+            Ok(())
+        })??;
+    }
+    Ok(())
+}
+
+fn check_retained_error(arena: &TemplateSource<'_>, complete: bool) {
+    let mut errors = arena
+        .values()
+        .iter()
+        .filter_map(|value| value.original().original_error());
+    let error = errors.next();
+    let expected = if complete {
+        matches!(
+            error,
+            Some(OriginalValueErrorFacts::DanglingReference { .. })
+        )
+    } else {
+        matches!(error, Some(OriginalValueErrorFacts::InvalidBool { .. }))
+    };
+    assert!(
+        expected && errors.next().is_none(),
+        "exact original diagnostic state"
+    );
 }
 
 #[test]

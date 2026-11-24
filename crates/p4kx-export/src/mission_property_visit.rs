@@ -36,7 +36,7 @@ pub struct MissionPropertyOwnerSnapshot<'source> {
     pub source: MissionPropertySource<'source>,
     /// The original inputs and uses captured for this owner.
     pub source_inventory: SourceInventory,
-    /// Whether the original fields and interpreted flow are readable.
+    /// Whether the original fields and required flow interpretation meet Normal projection rules.
     pub fields_complete: bool,
 }
 

@@ -11,7 +11,7 @@ use crate::catalog_read::original::{
 };
 use crate::health_diagnostic_observation::ExampleObservation;
 use crate::mission_flow_owner::FlowOwnerKind;
-use crate::source_value_catalog::SourceValueRef;
+use crate::source_value_catalog::{SourceValueRef, retained_facts_complete};
 use crate::template_issues::Unknowns;
 use crate::template_source_refs::{PhysicalTemplateRef, SourceFieldRef};
 use crate::{CatalogError, ExportAccountingError};
@@ -164,6 +164,12 @@ impl<'fields, 'scope, 'read, 'source> TemplateMembers<'fields, 'scope, 'read, 's
         &self,
     ) -> impl Iterator<Item = &'fields OriginalValueFact<'scope, 'read, 'source>> + '_ {
         self.spans.iter().flat_map(|span| span.values.iter())
+    }
+
+    pub(crate) fn retained_source_complete(&self) -> bool {
+        self.spans
+            .iter()
+            .all(|span| retained_facts_complete(span.values))
     }
 
     fn containing_span(

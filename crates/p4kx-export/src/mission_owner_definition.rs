@@ -62,7 +62,7 @@ pub(crate) fn read_selected<'source>(
         crate::template_property_configuration_read::read(&members, &plan.objectives, owner)?;
     let (source, failure) =
         crate::template_meanings::read(&members, &plan.flow, references.get_mut(), None, &capture)?;
-    let complete = failure.is_none() && source.values_are_readable();
+    let complete = failure.is_none() && members.retained_source_complete();
     let row = MissionOwnerDefinition::read(input, &fields, tree, source, (flows, properties))?;
     Ok(ScopedSourceRead::new(row, Vec::new(), complete))
 }

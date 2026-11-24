@@ -35,12 +35,6 @@ impl<'source> TemplateSource<'source> {
         &self.values
     }
 
-    pub(crate) fn values_are_readable(&self) -> bool {
-        self.values
-            .iter()
-            .all(|value| value.original().original_error().is_none())
-    }
-
     /// Resolves a value linked by a row that belongs to this original owner.
     #[must_use]
     pub fn value(&self, reference: SourceValueRef) -> Option<&TemplateSourceValue<'source>> {

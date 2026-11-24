@@ -52,6 +52,28 @@ pub(super) fn open_with_skipped_owners(
     open_database(data)
 }
 
+#[derive(Clone, Copy)]
+pub(super) enum BrokerFieldFault {
+    MissingTarget,
+    MalformedFlag,
+}
+
+pub(super) fn open_with_broker_fault(
+    fault: BrokerFieldFault,
+) -> TestResult<(tempfile::TempDir, Archive)> {
+    let broker = TestRecord::new(
+        7,
+        BROKER_TYPE,
+        "MissionBrokerEntry.SourceFault",
+        "libs/foundry/records/missionbroker/sdk_source_fault.xml",
+    );
+    let broker = match fault {
+        BrokerFieldFault::MissingTarget => broker.value("fixtureLink", TestValue::Reference(0x81)),
+        BrokerFieldFault::MalformedFlag => broker.value("fixtureFlag", TestValue::Raw(vec![3])),
+    };
+    open_database(database(3).record(broker).build())
+}
+
 fn open_database(bytes: Vec<u8>) -> TestResult<(tempfile::TempDir, Archive)> {
     let folder = tempfile::tempdir()?;
     let path = folder.path().join("mission-flow-sdk.p4k");
@@ -135,7 +157,9 @@ fn dataforge_layout() -> DataForgeBuilder {
         .structure(
             TestStruct::new(BROKER_TYPE)
                 .field("missionFlow", strong(FLOW))
-                .field("title", TestType::Locale),
+                .field("title", TestType::Locale)
+                .field("fixtureLink", TestType::ReferenceTo("Tag".to_owned()))
+                .field("fixtureFlag", TestType::Bool),
         )
         .structure(
             TestStruct::new(FLOW)

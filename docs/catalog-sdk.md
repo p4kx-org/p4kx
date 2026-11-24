@@ -860,7 +860,10 @@ development-leftover policies. GUID and physical-index selections apply the same
 admission rules. Each callback sees that owner's rows, arena and source inventory.
 Stage consumer changes until the visit returns successfully and its terminal coverage
 meets the caller's requirements. The query retains the selected Record headers and
-reads one body and its original source closure at a time.
+reads one body and its original source closure at a time. Coverage follows Normal
+projection rules. Informational unresolved references retain their original
+identity and error evidence. Unreadable values and unsupported required flow
+interpretations remain incomplete.
 
 Use `mission_definitions::with_mission_definitions` or its decoded-Entry and session forms
 to read `definitions.missionScenarios`, `definitions.missionModuleDeclarations`,
