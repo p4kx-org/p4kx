@@ -1739,6 +1739,13 @@ The literal Record path was anchored and its full physical cohort was
 checked before generation. Complete unfiltered Catalog parity remains separate
 from the cold unfiltered API measurements below.
 
+On installed LIVE `13220821`, the RSI binding refresh matched exact scoped Normal
+and SDK rows for Liberator (224), Galaxy (244), both Carrack Expedition Store
+identities (205 and 206) and ATLS IKTI Akuma (327). The largest combined Normal
+and SDK process peaked at 4,315,688,960 private bytes. The separate cold,
+unfiltered Store SDK query returned 227 rows in 63.102 s with 1,572,540,416
+peak private bytes and 1,560,834,048 peak working-set bytes.
+
 `catalog_queries::equipment::ship_store_pledges()` loads the bundled `ShipStorePledges`
 section shared with Catalog v3. Call `snapshot()` for the source, date, revision and reviewed
 candidate scope, `rows()` for all bundled rows in ascending RSI ID order, or
@@ -2397,8 +2404,12 @@ Read `loadout_state`, `loadout_coverage`, `loadout_dependencies` and the per-own
 `availability` field describes the declared flight component families. Preserve the
 same Build and source inventory when interpreting source references. Compare a selected
 Ship with the rows for its physical Record in the complete producer or an equivalent
-scope whose Record selection includes all reached flight owners. Installed Build
-parity and cold peak memory for this route still require their own acceptance runs.
+scope whose Record selection includes all reached flight owners.
+
+A cold query on installed PTU `13260598` matched the twelve independently
+nominated Flight rows. It completed in 14.623 s with 1,114,664,960 peak private
+bytes and 1,032,646,656 peak working-set bytes. The witness retains the original
+attached Record, the ordered Loadout position and the owning component.
 
 For the installed checks, set `P4KX_DATA_P4K` for the original Archive,
 `P4KX_NEW_SDK_BUILD` for its exact change number and
