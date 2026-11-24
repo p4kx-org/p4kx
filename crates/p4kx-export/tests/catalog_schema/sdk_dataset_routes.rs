@@ -373,11 +373,7 @@ fn read_faction_identities(archive: &Archive) -> TestResult<Route> {
 
 fn read_weather(archive: &Archive) -> TestResult<Route> {
     with_electrical_behaviors(archive, CatalogRecordSelection::All, None, |snapshot| {
-        Route::queried_rows(
-            ELECTRICAL_BEHAVIORS,
-            snapshot.rows(),
-            "synthetic canonical parity available; complete installed producer parity open",
-        )
+        Route::queried_rows(ELECTRICAL_BEHAVIORS, snapshot.rows(), None)
     })?
 }
 

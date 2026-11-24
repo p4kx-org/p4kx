@@ -25,3 +25,15 @@ independently of other values.
 The selective SDK route `catalog_queries::weather::with_electrical_behaviors` returns the same
 canonical rows and original source inventory without producing a full catalog. Its
 `RecordIndex` selection is scoped directly to one physical Record.
+
+Windows AMD64 cold queries and replay of each complete Normal Catalog matched the
+availability, ordered rows and source uses for both installed Builds.
+
+| Build | Rows | Cold peak private commit (bytes) | Retained comparison peak private commit (bytes) |
+| --- | ---: | ---: | ---: |
+| LIVE `13220821` | 2 | 1,091,469,312 | 1,091,571,712 |
+| PTU `13260598` | 3 | 1,114,443,776 | 1,114,484,736 |
+
+The witness used `1e151f453e7cb03f5f644083a2d64342f6d30703`. The complete Normal
+producer revisions were `23addc5e164f65a28a6f258302b30453b331edce` for LIVE and
+`93d92ca20bef8a8c3731339214a3301124ade7ba` for PTU.
