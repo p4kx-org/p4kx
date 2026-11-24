@@ -91,11 +91,7 @@ fn check(
         [] as [u32; 0],
         "the complete storage fixture has no incomplete fields"
     );
-    let route = Route::queried_rows(
-        INVENTORY_CONFIGURATIONS,
-        snapshot.rows(),
-        "Item and Vehicle storage have synthetic producer parity; installed producer parity open",
-    )?;
+    let route = Route::queried_rows(INVENTORY_CONFIGURATIONS, snapshot.rows(), None)?;
     let record = vehicle
         .owner()
         .record_index()

@@ -14,8 +14,6 @@ use super::{Route, TestResult};
 mod fixture;
 
 pub(super) fn read() -> TestResult<[Route; 4]> {
-    const REMAINING: &str = "typed source queries and synthetic producer parity witnessed; same-build installed producer parity open";
-    const INSTALLED_SELECTED: &str = "typed source queries and selected installed LIVE/PTU producer parity witnessed; full same-build parity and application memory open";
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("ordnance_fixture.p4k");
     ArchiveBuilder::new()
@@ -37,10 +35,10 @@ pub(super) fn read() -> TestResult<[Route; 4]> {
             Route::queried_rows(EXPLOSIVES, snapshot.rows(), None)
         })??,
         parsed.with_missile_configurations(all, None, |snapshot| {
-            Route::queried_rows(MISSILE_CONFIGURATIONS, snapshot.rows(), INSTALLED_SELECTED)
+            Route::queried_rows(MISSILE_CONFIGURATIONS, snapshot.rows(), None)
         })??,
         parsed.with_explosion_definitions(all, None, |snapshot| {
-            Route::queried_rows(EXPLOSION_DEFINITIONS, snapshot.rows(), REMAINING)
+            Route::queried_rows(EXPLOSION_DEFINITIONS, snapshot.rows(), None)
         })??,
     ])
 }

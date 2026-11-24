@@ -32,8 +32,6 @@ mod bounds;
 
 const ALL: CatalogRecordSelection = CatalogRecordSelection::All;
 const LANGUAGES: CatalogLanguageSelection = CatalogLanguageSelection::Selected(&[]);
-const REMAINING: &str =
-    "encrypted synthetic producer parity available; installed producer parity open";
 
 pub(super) fn append_item_routes(routes: &mut Vec<Route>, archive: &Archive) -> TestResult<()> {
     routes.extend(read_item_rows_and_definitions(archive)?);
@@ -151,7 +149,7 @@ fn alignment_routes() -> TestResult<[Route; 2]> {
             port.name().origin(),
             &snapshot.source_inventory,
         );
-        Route::queried_rows(ITEM_PORTS, &snapshot.rows, REMAINING)
+        Route::queried_rows(ITEM_PORTS, &snapshot.rows, None)
     })??;
     let attachments = parsed.with_attachment_constraints(ALL, None, |snapshot| {
         parity(ATTACHMENT_CONSTRAINTS, &snapshot, &catalog)?;
@@ -171,7 +169,7 @@ fn alignment_routes() -> TestResult<[Route; 2]> {
             definition.alignment_axis().origin(),
             snapshot.source_inventory(),
         );
-        Route::queried_rows(ATTACHMENT_CONSTRAINTS, snapshot.rows(), REMAINING)
+        Route::queried_rows(ATTACHMENT_CONSTRAINTS, snapshot.rows(), None)
     })??;
     Ok([ports, attachments])
 }
@@ -196,7 +194,7 @@ fn bounds_route() -> TestResult<Route> {
             first.component_ordinal().origin(),
             snapshot.source_inventory(),
         );
-        Route::queried_rows(ITEM_BOUNDS, snapshot.rows(), REMAINING)
+        Route::queried_rows(ITEM_BOUNDS, snapshot.rows(), None)
     })?
 }
 

@@ -2690,6 +2690,32 @@ Use `item_container_params` or `vehicle_container_params` for the typed original
 and `with_inventory_containers` to read the linked inventory definition. The storage query
 projects its own component fields. Bounds and room associations have their own datasets.
 
+The installed Windows AMD64 verification ran each table as a standalone cold query and compared all
+four tables in one complete retained Normal Catalog stream per Build. The port, bounds and attachment
+queries used `visit_item_ports`, `visit_item_bounds` and `visit_attachment_constraints`. Storage used
+`with_inventory_configurations`. All four routes accounted for 1,332 canonical exclusions in LIVE
+`13220821` and 1,341 in PTU `13260598`.
+
+| Configuration | LIVE rows | PTU rows |
+| --- | ---: | ---: |
+| `itemPorts` | 14,024 | 14,751 |
+| `itemBounds` | 25,607 | 26,417 |
+| `itemAttachmentConstraints` | 23,201 | 23,977 |
+| `inventoryConfigurations` | 3,506 | 3,779 |
+
+The retained comparison verified physical owner and slot order, authored values and contributing
+original provenance. It verified 5,179,572 distinct source uses in LIVE and 5,788,426 in PTU, with one contributing
+physical source in each Build. Across the eight cold runs, the largest native lifetime private
+commit was 1,745,113,088 bytes and the largest working set was 1,757,732,864 bytes.
+
+| Retained Build | Peak private commit (bytes) | Peak working set (bytes) |
+| --- | ---: | ---: |
+| LIVE `13220821` | 1,658,818,560 | 1,672,790,016 |
+| PTU `13260598` | 1,748,770,816 | 1,761,230,848 |
+
+Both retained runs bound the original Archive and Build stamps and the sealed Normal frames from
+producers `23addc5e` (LIVE) and `93d92ca2` (PTU).
+
 ## Authored interactions
 
 Use `equipment::interactions::with_interactions`, its decoded-Entry form or the
@@ -3056,7 +3082,6 @@ cargo test -p p4kx-export --test real_archive real_archive_missile_configuration
 The test selects one physical Item per original missile signal family. It
 builds filtered Catalog excerpts in memory and checks each against a query
 for the same Record. This verifies selected rows and their field origins.
-Full-Catalog parity and system-memory acceptance require separate runs.
 
 The all-Record cold queries ran separately in fresh Windows AMD64 processes.
 Missile configuration was available with 67 rows on both Builds. The Explosion
@@ -3069,6 +3094,21 @@ availability was `Available` with an empty table.
 | PTU `13260598` | 1,114,476,544 | 1,114,427,392 |
 
 The verifier was `c69801a87ad6a7a129e2af69a4473b53f408c2ba`.
+
+One complete retained Normal Catalog comparison per Build verified both
+tables in the same stream. It compared all 67 Missile rows in physical
+owner order, the declared empty Explosion table, and 13,578 distinct
+contributing source uses backed by one original physical source on each Build.
+The Missile selection accounted for 1,160 canonical exclusions in LIVE and
+1,172 in PTU.
+
+| Build | Retained peak private commit (bytes) | Retained peak working set (bytes) |
+| --- | ---: | ---: |
+| LIVE `13220821` | 1,091,563,520 | 1,023,234,048 |
+| PTU `13260598` | 1,114,963,968 | 1,041,694,720 |
+
+Both comparisons retained stable Archive and Build stamps and used the
+sealed Normal frames from producers `23addc5e` (LIVE) and `93d92ca2` (PTU).
 
 ## Jump drives and quantum interdiction
 
