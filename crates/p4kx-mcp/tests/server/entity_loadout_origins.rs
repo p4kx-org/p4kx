@@ -10,6 +10,8 @@ use serde_json::{Value, json};
 use crate::audio_origin_assertions as proof;
 use crate::support::{Install, TestResult};
 
+mod route;
+
 const TOOL: &str = "entity_loadout";
 const DCB: &str = "Data/Game2.dcb";
 const ROOT: &str = "/structuredContent";
@@ -18,7 +20,7 @@ const BASE_PATH: &str = "Data/Loadouts/Base.xml";
 const LOCAL_PATH: &str = "Data/Loadouts/Root.xml";
 const BASE: &str = concat!(
     "\u{feff}",
-    "<Loadout><Items><Item portName='left' itemName='Red'/>",
+    "<Loadout><Items><Item portName='left/wing' itemName='Red'/>",
     "<Item portName='right' itemName='Red'/></Items></Loadout>",
 );
 const LOCAL: &str = concat!(
@@ -99,7 +101,7 @@ fn loadout_port_name_receipts_preserve_winning_xml_and_nested_records_on_warm_pa
     let mut server = install.serve(&["--archive", "LIVE"])?;
     let mut args = json!({"entity": "Root", "limit": 1});
     for (path, name, authored) in [
-        ("left", "left", Some((BASE_PATH, BASE, true))),
+        ("left/wing", "left/wing", Some((BASE_PATH, BASE, true))),
         ("right", "right", Some((LOCAL_PATH, LOCAL, false))),
         ("right/mount", "mount", None),
         ("right/mount/capsule", "capsule", None),
@@ -121,6 +123,7 @@ fn loadout_port_name_receipts_preserve_winning_xml_and_nested_records_on_warm_pa
         } else {
             check_record_name(&page, &database, name)?;
         }
+        route::check(&page, name, &database)?;
         if name == "capsule" {
             assert!(
                 page.get("next_cursor").is_none(),

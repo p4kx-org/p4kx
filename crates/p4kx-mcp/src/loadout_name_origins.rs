@@ -34,6 +34,7 @@ impl ResolvedLoadout {
         &self,
         output: &ForgeOrigins,
         port: &PortNode,
+        role: SourceUseRole,
     ) -> Result<FieldOrigin, EvidenceError> {
         let site = selected_name(port).and_then(|selection| self.sources.get(selection));
         Ok(match site {
@@ -46,11 +47,11 @@ impl ResolvedLoadout {
                 &output.scope,
                 *index,
                 *ordinal,
-                SourceUseRole::Payload,
+                role,
                 output.complete,
             )?,
             Some(Site::Xml { original, location }) => {
-                xml_origin(output, original, location.as_ref())?
+                xml_origin(output, original, location.as_ref(), role)?
             }
             None => output.uses.origin(&[], false),
         })
@@ -83,20 +84,18 @@ fn xml_origin(
     output: &ForgeOrigins,
     original: &EntryOrigin,
     location: Option<&SourceLocation>,
+    role: SourceUseRole,
 ) -> Result<FieldOrigin, SourceEvidenceError> {
     let scope = output
         .uses
         .observe(SourceInput::Archive(original), InputScope::Payload)?;
     let (site, complete) = match location {
         Some(location) => (
-            scope.at(location.clone(), SourceUseRole::Payload)?,
+            scope.at(location.clone(), role)?,
             original.ancestors().all(|ancestor| ancestor.is_some()),
         ),
         None => (
-            scope.at_opaque(
-                SourceUseRole::Payload,
-                SourceCoordinateOmission::Unavailable,
-            )?,
+            scope.at_opaque(role, SourceCoordinateOmission::Unavailable)?,
             false,
         ),
     };

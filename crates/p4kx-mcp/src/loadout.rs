@@ -4,7 +4,8 @@
 use std::sync::Arc;
 
 use p4kx_assembly::{
-    ArchiveFiles, Attachment, Entities, LoadoutChanges, LoadoutPicks, LoadoutResolver, PortNode,
+    ArchiveFiles, Attachment, Entities, EntityNode, LoadoutChanges, LoadoutPicks, LoadoutResolver,
+    PortNode,
 };
 use p4kx_extraction::{DataForge, DataForgeOrigin};
 
@@ -48,19 +49,19 @@ pub(crate) fn resolve(
             .clamp(1, MAX_DEPTH),
     )
     .unwrap_or(1);
-    let all = resolved.tree.walk();
-    let counts = counts(&all);
-    let near: Vec<_> = all
-        .iter()
-        .filter(|(path, _)| depth(path) <= max_depth)
-        .map(|(path, port)| (path, *port))
-        .collect();
+    let Listing {
+        counts,
+        total,
+        window,
+    } = Listing::collect(&resolved.tree, max_depth, page);
+    page.check(total)?;
+    let deeper = counts.ports - total;
     let header = loadout_shape::header(
         opened.archive().path(),
         &resolved.tree,
         counts,
-        near.len(),
-        all.len() - near.len(),
+        total,
+        deeper,
     )?;
     Projection {
         forge,
@@ -68,7 +69,7 @@ pub(crate) fn resolve(
         resolved: &resolved,
         page,
     }
-    .publish(header, &near)
+    .publish(header, &window)
 }
 
 fn resolve_tree(
@@ -113,14 +114,14 @@ impl Projection<'_, '_> {
     fn publish(
         self,
         header: LoadoutHeader,
-        near: &[(&String, &PortNode)],
+        window: &[PagePort<'_>],
     ) -> Result<LoadoutResult, ToolError> {
         let page = self.page;
-        let window = page.slice(near);
+        let total = header.total;
         let items = window
             .iter()
-            .map(|&(path, port)| loadout_shape::port(path, depth(path), port));
-        let (mut ports, _) = fill_within(page, near.len(), json_len(&header), items, |shape| {
+            .map(|row| loadout_shape::port(&row.path, row.depth, row.port));
+        let (mut ports, _) = fill_within(page, total, json_len(&header), items, |shape| {
             format!("loadout port at depth {}", shape.depth)
         })?;
         let (keep, fitted) = fit_prefix(
@@ -130,12 +131,12 @@ impl Projection<'_, '_> {
                     self.forge,
                     self.origin,
                     self.resolved,
-                    window.iter().take(len).map(|&(_, port)| port),
+                    window.split_at(len).0,
                 )?;
                 Ok(LoadoutResult {
                     header: &header,
                     ports: ports.split_at(len).0,
-                    next_cursor: page.next_cursor_after(len, near.len())?,
+                    next_cursor: page.next_cursor_after(len, total)?,
                     origins,
                 })
             },
@@ -171,21 +172,46 @@ pub(crate) fn picks_of(texts: &[String]) -> Result<LoadoutPicks, ToolError> {
     Ok(LoadoutPicks::from_list(&texts.join(","))?)
 }
 
-fn depth(path: &str) -> usize {
-    path.matches('/').count() + 1
+struct PagePort<'tree> {
+    path: String,
+    depth: usize,
+    port: &'tree PortNode,
+    ancestors: Vec<&'tree PortNode>,
 }
 
-fn counts(all: &[(String, &PortNode)]) -> Counts {
-    let mut counts = Counts {
-        ports: all.len(),
-        ..Counts::default()
-    };
-    for (_, port) in all {
-        match port.attachment() {
-            Attachment::Empty => counts.empty += 1,
-            Attachment::Entity(_) => counts.attached += 1,
-            Attachment::Unresolved(_) => counts.unresolved += 1,
-        }
+#[derive(Default)]
+struct Listing<'tree> {
+    counts: Counts,
+    total: usize,
+    window: Vec<PagePort<'tree>>,
+}
+
+impl<'tree> Listing<'tree> {
+    fn collect(tree: &'tree EntityNode, max_depth: usize, page: Page) -> Self {
+        let mut listing = Self::default();
+        tree.visit_ports(|path, route| {
+            let Some((&port, ancestors)) = route.split_last() else {
+                return;
+            };
+            listing.counts.ports += 1;
+            match port.attachment() {
+                Attachment::Empty => listing.counts.empty += 1,
+                Attachment::Entity(_) => listing.counts.attached += 1,
+                Attachment::Unresolved(_) => listing.counts.unresolved += 1,
+            }
+            let depth = path.matches('/').count() + 1;
+            if depth <= max_depth {
+                if page.contains(listing.total) {
+                    listing.window.push(PagePort {
+                        path: path.to_owned(),
+                        depth,
+                        port,
+                        ancestors: ancestors.to_vec(),
+                    });
+                }
+                listing.total += 1;
+            }
+        });
+        listing
     }
-    counts
 }
