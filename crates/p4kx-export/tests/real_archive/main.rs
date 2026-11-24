@@ -164,6 +164,7 @@ mod real_archive_weapon_actions;
 mod real_archive_weapon_combat;
 mod real_archive_weapon_recoil_sdk;
 mod real_archive_weapon_reload;
+mod real_archive_world_definition_sdk_parity;
 mod real_archive_worn_gear;
 mod shield_generators;
 mod ship_matrix_compare;
