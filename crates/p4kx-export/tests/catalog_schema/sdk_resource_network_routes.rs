@@ -74,10 +74,6 @@ fn global_route() -> TestResult<Route> {
         .write_to(&path)?;
     let archive = Archive::open(path)?;
     with_resource_network_globals(&archive, CatalogRecordSelection::All, None, |snapshot| {
-        Route::queried_rows(
-            "/definitions/resourceNetworkGlobals",
-            snapshot.rows(),
-            "scoped installed producer parity witnessed; complete Catalog parity remains open",
-        )
+        Route::queried_rows("/definitions/resourceNetworkGlobals", snapshot.rows(), None)
     })?
 }

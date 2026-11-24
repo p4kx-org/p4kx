@@ -16,10 +16,6 @@ use super::{Route, TestResult};
 #[path = "../it/catalog_resource_network_fixture.rs"]
 mod fixture;
 
-const NETWORK_REMAINING: &str = "typed source query and synthetic producer parity witnessed; complete installed producer parity open";
-const RADAR_REMAINING: &str =
-    "scoped installed producer parity witnessed; complete Catalog parity remains open";
-
 pub(super) fn read() -> TestResult<[Route; 2]> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("radar_options_fixture.p4k");
@@ -36,17 +32,13 @@ pub(super) fn read() -> TestResult<[Route; 2]> {
     let selection = CatalogRecordSelection::All;
     Ok([
         parsed.with_radar_options(selection, None, |snapshot| {
-            Route::queried_rows(
-                "/configurations/radarOptions",
-                snapshot.rows(),
-                RADAR_REMAINING,
-            )
+            Route::queried_rows("/configurations/radarOptions", snapshot.rows(), None)
         })??,
         parsed.with_resource_network_parameters(selection, None, |snapshot| {
             Route::queried_rows(
                 "/configurations/resourceNetworkParameters",
                 snapshot.rows(),
-                NETWORK_REMAINING,
+                None,
             )
         })??,
     ])

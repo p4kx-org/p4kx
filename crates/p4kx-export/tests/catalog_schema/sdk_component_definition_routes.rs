@@ -41,11 +41,7 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
             witness("/definitions/miningLaserGlobals", &rows)
         })??,
         with_turret_health(&archive, all, None, |snapshot| {
-            Route::queried_rows(
-                "/configurations/turretHealth",
-                snapshot.rows(),
-                "typed source query and synthetic producer parity witnessed; same-build installed producer parity open",
-            )
+            Route::queried_rows("/configurations/turretHealth", snapshot.rows(), None)
         })??,
         with_turret_health_modifiers(&archive, all, None, |rows| {
             witness("/definitions/turretHealthModifiers", &rows)

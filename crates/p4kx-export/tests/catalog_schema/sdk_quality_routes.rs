@@ -59,7 +59,7 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
                 Route::queried_rows(
                     QUALITY_QUANTIZATION_RESOURCES,
                     snapshot.projection.rows(),
-                    REMAINING,
+                    None,
                 )
             },
         )??,

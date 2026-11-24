@@ -2633,6 +2633,11 @@ physical sources referenced by the compared rows.
 | LIVE `13220821` | 15,993 | 2,016,887 | 4,399,018 | 13,502,959,616 | 12,778,622,976 |
 | PTU `13248297` | 16,749 | 2,069,882 | 4,319,906 | 13,810,839,552 | 13,098,971,136 |
 
+The SDK coverage registry accepts installed parity for the two cargo globals, the four law
+definitions, `qualityQuantizationResources`, `quantumDrives`, `shieldGenerators`,
+`turretHealth`, `radarOptions`, `resourceNetworkParameters`, and `resourceNetworkGlobals`
+through these same-Build comparisons.
+
 Each run used one worker. The timing and peaks cover the combined verifier and Catalog replay.
 For the separate 2 GB SDK acceptance, measure each nominated query in its own cold process.
 

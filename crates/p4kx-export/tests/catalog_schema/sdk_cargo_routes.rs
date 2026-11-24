@@ -376,14 +376,13 @@ fn open(
 }
 
 pub(super) fn read_globals(archive: &Archive) -> TestResult<[Route; 2]> {
-    const REMAINING: &str = "scoped installed parity proven; full Catalog parity remains open";
     let selection = CatalogRecordSelection::All;
     Ok([
         cargo_globals::with_cargo_loading_globals(archive, selection, None, |snapshot| {
-            Route::queried_rows(CARGO_LOADING_GLOBALS, snapshot.rows(), REMAINING)
+            Route::queried_rows(CARGO_LOADING_GLOBALS, snapshot.rows(), None)
         })??,
         cargo_globals::with_shop_commodity_globals(archive, selection, None, |snapshot| {
-            Route::queried_rows(SHOP_COMMODITY_GLOBALS, snapshot.rows(), REMAINING)
+            Route::queried_rows(SHOP_COMMODITY_GLOBALS, snapshot.rows(), None)
         })??,
     ])
 }

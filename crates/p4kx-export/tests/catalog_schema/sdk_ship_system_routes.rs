@@ -40,10 +40,10 @@ pub(super) fn read() -> TestResult<[Route; 8]> {
         ships,
         store_slugs::read()?,
         parsed.with_shield_generators(selected, None, |snapshot| {
-            Route::queried_rows(SHIELD_GENERATORS, snapshot.rows(), REMAINING)
+            Route::queried_rows(SHIELD_GENERATORS, snapshot.rows(), None)
         })??,
         parsed.with_quantum_drives(selected, None, |snapshot| {
-            Route::queried_rows(QUANTUM_DRIVES, snapshot.rows(), REMAINING)
+            Route::queried_rows(QUANTUM_DRIVES, snapshot.rows(), None)
         })??,
         parsed.with_quantum_interdiction_generators(selected, None, |snapshot| {
             Route::queried_rows(QUANTUM_INTERDICTION, snapshot.rows(), REMAINING)

@@ -77,11 +77,7 @@ fn witness<Row: Serialize + JsonSchema>(
         catalog.pointer(path),
         "SDK preserves canonical rows and origins for {path}"
     );
-    Route::queried_rows(
-        path,
-        &table.rows,
-        "synthetic definition, origin and producer parity witnessed; installed producer parity open",
-    )
+    Route::queried_rows(path, &table.rows, None)
 }
 
 fn check_text_and_payload(snapshot: &LawSnapshot<'_>, catalog: &Value) -> TestResult {
