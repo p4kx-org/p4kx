@@ -2790,6 +2790,23 @@ Choose an exact physical Record index from a reference when it is available.
 The Archive, decoded-Entry and parsed-session forms use the original DataForge
 and report availability, selection coverage and per-value source evidence.
 
+Ten standalone Windows AMD64 checks ran each exact family selector in a fresh
+process on LIVE 13220821 and PTU 13260598. Both Builds returned the same
+family counts and complete owner and definition discovery.
+
+| Dataset | Rows per Build |
+| --- | ---: |
+| `jumpPointConfigurations` | 1 |
+| `globalJumpPointConfigurations` | 2 |
+| `jumpDrives` | 8 |
+| `jumpDriveFlightTuning` | 5 |
+| `jumpTunnelForces` | 7 |
+
+The largest observed private commit was 1,114,955,776 bytes. The largest
+working set was 1,032,163,328 bytes. The Archive and Build stamps remained
+stable throughout. The exact test executable SHA-256 was
+`4c0431fef6a45951d3cf5e5597865f53656e6aeb0a5699ed0017dbace3cf0ccf`.
+
 ## Recorded comparisons with the complete Catalog
 
 The verifier at `7fcf8ee5ceb64eb2570223e320fe3da1cb0ebd9f` passed
