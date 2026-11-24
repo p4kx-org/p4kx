@@ -26,6 +26,7 @@ enum Coordinates {
     Skip,
     Nodes,
     NodesAndBones,
+    NodesAndMaterialListing,
     MaterialListing,
     MaterialPage,
 }
@@ -41,9 +42,16 @@ impl Coordinates {
         }
         match self {
             Self::Skip | Self::MaterialListing | Self::MaterialPage => Capture::Skip,
-            Self::Nodes => Capture::Nodes(&mut observed.nodes),
+            Self::Nodes | Self::NodesAndMaterialListing => Capture::Nodes(&mut observed.nodes),
             Self::NodesAndBones => Capture::NodesAndBones(observed),
         }
+    }
+
+    const fn keeps_materials(self) -> bool {
+        matches!(
+            self,
+            Self::MaterialListing | Self::NodesAndMaterialListing | Self::MaterialPage
+        )
     }
 
     fn material_evidence(
@@ -54,7 +62,7 @@ impl Coordinates {
         fields: Observations,
     ) -> Result<Option<MaterialEvidence>, ConversionError> {
         Ok(match self {
-            Self::MaterialListing => fields
+            Self::MaterialListing | Self::NodesAndMaterialListing => fields
                 .project(model, source.archive_origin(), origins.library())?
                 .map(MaterialEvidence::Listing),
             Self::MaterialPage => Some(MaterialEvidence::Page(Box::new(MaterialPageRead {
@@ -154,6 +162,26 @@ impl ModelSource {
             MaterialReading::Plain,
             verdicts,
             Coordinates::MaterialListing,
+        )
+    }
+
+    /// Reads an Archive model listing with original node and material field evidence.
+    ///
+    /// # Errors
+    /// Returns the original model-read or receipt-recording error.
+    pub fn from_index_with_listing_origins(
+        index: &PathIndex<'_>,
+        path: &str,
+        verdicts: &TextureVerdicts,
+    ) -> Result<Self, ConversionError> {
+        Self::read_archive(
+            index,
+            path,
+            LodSelection::All,
+            PositionBox::default(),
+            MaterialReading::Plain,
+            verdicts,
+            Coordinates::NodesAndMaterialListing,
         )
     }
 
@@ -272,10 +300,7 @@ impl ModelSource {
             ModelFile::Model,
             source.archive_origin().cloned(),
         )];
-        let keep_materials = matches!(
-            coordinates,
-            Coordinates::MaterialListing | Coordinates::MaterialPage
-        );
+        let keep_materials = coordinates.keeps_materials();
         let reads = ArchiveMaterialReads::default();
         let mut material_origins = MaterialArchiveOrigins::default();
         let mut material_fields = Observations::default();
@@ -332,7 +357,10 @@ fn bind_sources(
     observed: ModelReadSources,
     archive_sources: &mut [ModelArchiveSource],
 ) {
-    if matches!(coordinates, Coordinates::Nodes | Coordinates::NodesAndBones) {
+    if matches!(
+        coordinates,
+        Coordinates::Nodes | Coordinates::NodesAndBones | Coordinates::NodesAndMaterialListing
+    ) {
         if let Some(primary) = archive_sources.first_mut() {
             primary.set_node_sources(observed.nodes);
             if let Some(selection) = observed.primary_skeleton {

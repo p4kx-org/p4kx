@@ -59,7 +59,7 @@ fn open_listing(
         let index = PathIndex::new(&archive);
         let verdicts = TextureVerdicts::new();
         let model = if with_material_receipt {
-            ModelSource::from_index_with_material_receipt(&index, entry, &verdicts)?
+            ModelSource::from_index_with_listing_origins(&index, entry, &verdicts)?
         } else {
             ModelSource::from_index_reading(
                 &index,

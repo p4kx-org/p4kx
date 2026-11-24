@@ -135,6 +135,7 @@ mod model_glb_origins;
 mod model_lods;
 mod model_material_origins;
 mod model_materials;
+mod model_node_origins;
 mod model_skeleton_info;
 mod model_skin;
 mod model_submesh_origins;

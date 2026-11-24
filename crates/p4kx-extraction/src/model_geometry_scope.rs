@@ -39,6 +39,10 @@ impl ModelGeometryScope {
         }))
     }
 
+    pub(crate) const fn scope(&self) -> &SourceScope {
+        &self.scope
+    }
+
     pub(crate) fn chunk_header(&self, field: ChunkHeaderField) -> io::Result<SourceUse> {
         field
             .observe(&self.scope, SourceUseRole::Payload)
@@ -46,13 +50,17 @@ impl ModelGeometryScope {
     }
 
     pub(crate) fn directory_path_selector(&self) -> io::Result<SourceUse> {
+        self.directory_path(SourceUseRole::Selector)
+    }
+
+    pub(crate) fn directory_path(&self, role: SourceUseRole) -> io::Result<SourceUse> {
         self.scope
             .for_scope(InputScope::ArchiveDirectoryMetadata)
             .at(
                 SourceLocation::Metadata {
                     field: "path".into(),
                 },
-                SourceUseRole::Selector,
+                role,
             )
             .map_err(io::Error::other)
     }

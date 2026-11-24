@@ -66,7 +66,6 @@ mod model_bone_items;
 mod model_item_page;
 mod model_material_items;
 mod model_mesh_items;
-mod model_node_fields;
 mod model_node_items;
 mod model_params;
 mod model_shapes;

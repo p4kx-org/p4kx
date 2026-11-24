@@ -24,12 +24,15 @@ mod field_origins;
 #[path = "model_mesh_info.rs"]
 mod mesh_info;
 
+#[path = "model_node_origins.rs"]
+mod node_origins;
 #[path = "model_submesh_origins.rs"]
 mod submesh_origins;
 
 pub use chunk_origins::{write_chunk_origins, write_chunk_type_origin};
 use field_origins::ModelFieldOrigins;
 pub use mesh_info::MeshInfo;
+pub use node_origins::ModelNodeOrigins;
 pub use submesh_origins::write_submesh_origins;
 
 /// What `p4kx model info --json` says about a model, and what front-ends serialise of it.
@@ -92,7 +95,7 @@ impl<'a> ModelInfo<'a> {
         )
     }
 
-    /// Describes the model with original submesh and chunk evidence.
+    /// Describes the model with original node, submesh and chunk evidence.
     ///
     /// # Errors
     /// Returns invalid evidence positions or an invalid source inventory.

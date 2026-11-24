@@ -2885,7 +2885,11 @@ record's geometry type (0 for geometry, 2 or 3 for a helper; `null` without a `N
 chunk), `helper` whether it is a helper, `properties` the `key=value` lines of the node's entry in
 the chunk's property table in order, e.g. `class=AnimatedJoint`, and `node_material_indices` the
 chunk's list of material indices. A transform or scale whose values are all below 1e-5 is the
-identity or 1. `issues` lists in words what a read worked around: `model info` reads
+identity or 1. The `/nodes` origin records the examined chunk selectors and original count
+where stored. Node field origins use the selected primary model Entry for original names,
+parent operands, transform and scale words, geometry type and property occurrences. Defaulted
+values identify their original selector evidence. A generated root name can use the model Entry
+path. Loose nodes have incomplete Archive origins. `issues` lists in words what a read worked around: `model info` reads
 strictly, so no fallback of a lenient read appears, but a `CrCh` mesh that names physics data in
 further slots (which are not read) is listed as `node <n> names physics data in <k> further
 slot(s), which are not read`. `lods`

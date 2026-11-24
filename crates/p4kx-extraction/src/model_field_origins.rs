@@ -5,7 +5,7 @@ use std::io;
 
 use serde::Serialize;
 
-use super::{chunk_origins, submesh_origins};
+use super::{ModelNodeOrigins, chunk_origins, submesh_origins};
 use crate::{FieldOrigins, FieldPath, ModelSource, SourceInventory, SourceUses};
 
 #[derive(Debug, Serialize)]
@@ -38,9 +38,28 @@ impl ModelFieldOrigins {
             let path = FieldPath::parse(&format!("/chunks/{index}")).map_err(io::Error::other)?;
             chunk_origins::write_chunk_origins(source, index, &path, &uses, &mut fields)?;
         }
+        write_nodes(source, &uses, &mut fields)?;
         Ok(Self {
             field_origins: fields,
             provenance: uses.freeze().map_err(io::Error::other)?,
         })
     }
+}
+
+fn write_nodes(
+    source: &ModelSource,
+    uses: &SourceUses,
+    fields: &mut FieldOrigins,
+) -> io::Result<()> {
+    let nodes = ModelNodeOrigins::capture(source, uses)?;
+    let mut path = FieldPath::parse("/nodes").map_err(io::Error::other)?;
+    fields
+        .insert(path.clone(), nodes.collection_origin())
+        .map_err(io::Error::other)?;
+    for index in 0..source.model().nodes.len() {
+        path.push_index(index).map_err(io::Error::other)?;
+        nodes.write_node(fields, &path, index)?;
+        path.pop();
+    }
+    Ok(())
 }
