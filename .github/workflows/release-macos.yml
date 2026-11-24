@@ -68,6 +68,7 @@ jobs:
       - name: Verify bundle, signing and evidence contracts
         run: |
           .github/scripts/test-macos-bundle.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'bundle-contract')
+          .github/scripts/test-macos-dmg-mount.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'dmg-mount-contract')
           .github/scripts/test-macos-signing-plan.ps1
           .github/scripts/test-macos-package-evidence.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'evidence-contract')
       - name: Build the three native release applications

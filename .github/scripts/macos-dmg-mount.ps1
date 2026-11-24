@@ -1,6 +1,28 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'macos-bundle.ps1')
 . (Join-Path $PSScriptRoot 'macos-resources.ps1')
+. (Join-Path $PSScriptRoot 'portal-process.ps1')
+
+function Dismount-P4kxMacDmg {
+    param([string]$Mount, [string]$TaskDirectory)
+    $busyExitCode = 16
+    $retryDelays = @(0, 500, 1000)
+    for ($index = 0; $index -lt $retryDelays.Count; $index++) {
+        $delay = $retryDelays[$index]
+        if ($delay -gt 0) { Start-Sleep -Milliseconds $delay }
+        $attempt = $index + 1
+        $name = "dmg-detach-$attempt"
+        $result = Invoke-P4kxPortalProcess -Executable /usr/bin/hdiutil -Arguments @('detach', $Mount) `
+            -Directory $TaskDirectory -Name $name -Milliseconds 20000
+        if ($result.exit_code -eq 0) {
+            Set-Content -LiteralPath (Join-Path $TaskDirectory 'detach.log') -Value $result.stdout -Encoding utf8NoBOM -NoNewline
+            return
+        }
+        if ($result.exit_code -ne $busyExitCode -or $attempt -eq $retryDelays.Count) {
+            throw "DMG detach failed with exit $($result.exit_code); see $name-stderr.log."
+        }
+    }
+}
 
 function Copy-P4kxMacMountedBundle {
     param(
@@ -14,6 +36,7 @@ function Copy-P4kxMacMountedBundle {
     $source = Join-Path $mount $BundleName
     $destination = Join-Path $install $BundleName
     $attached = $false
+    $bodyFailed = $false
     try {
         $mountResult = @(Invoke-P4kxMacTool /usr/bin/hdiutil @('attach', '-readonly', '-nobrowse', '-noautoopen', '-mountpoint', $mount, $Dmg))
         $attached = $true
@@ -29,11 +52,17 @@ function Copy-P4kxMacMountedBundle {
             }
         }
         Invoke-P4kxMacTool /usr/bin/ditto @($source, $destination) | Out-Host
-    }
-    finally {
-        if ($attached -or (Test-Path -LiteralPath $source -PathType Container)) {
-            Invoke-P4kxMacTool /usr/bin/hdiutil @('detach', $mount) |
-                Set-Content -LiteralPath (Join-Path $TaskDirectory 'detach.log') -Encoding utf8NoBOM
+    } catch {
+        $bodyFailed = $true
+        throw
+    } finally {
+        try {
+            if ($attached -or (Test-Path -LiteralPath $source -PathType Container)) {
+                Dismount-P4kxMacDmg -Mount $mount -TaskDirectory $TaskDirectory
+            }
+        } catch {
+            if (!$bodyFailed) { throw }
+            Write-Warning "DMG cleanup also failed: $($_.Exception.Message)" -WarningAction Continue
         }
     }
     return $destination
