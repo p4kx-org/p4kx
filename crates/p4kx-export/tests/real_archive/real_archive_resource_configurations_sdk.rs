@@ -96,7 +96,7 @@ fn capture_game_mode<Row: Serialize>(
     })
 }
 
-fn component_identity(row: &Value) -> TestResult<(u64, u64)> {
+pub(super) fn component_identity(row: &Value) -> TestResult<(u64, u64)> {
     Ok((
         index(row, "/ownerRecordIndex/value")?,
         index(row, "/componentOrdinal/value")?,

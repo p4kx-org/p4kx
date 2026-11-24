@@ -127,6 +127,7 @@ mod real_archive_reputation_sandbox;
 mod real_archive_reputation_standings;
 mod real_archive_resource_components;
 mod real_archive_resource_configurations_sdk;
+mod real_archive_resource_supply_sdk;
 mod real_archive_resource_network;
 mod real_archive_resource_network_global;
 mod real_archive_scoped_equipment_sdk;

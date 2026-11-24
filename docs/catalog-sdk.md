@@ -2212,17 +2212,19 @@ the complete original Archive directory proves the exact attempted Entry absent
 and the other XML selection evidence is complete. Failed reads and recovered
 directory scopes remain incomplete.
 
-Before applying the verified missing-patch rule, a Windows debug query selected one physical Paint and matched its
-one observed fitting Ship in both installed Builds. The test resolved the
-attachment and vehicle definition selectors to their original DataForge Entry.
+An isolated Windows debug query selected one physical Paint and matched its one
+observed fitting Ship in each Build. The test resolved the attachment and
+vehicle definition selectors to their original DataForge Entry. Both results
+reported `Found` and complete fleet scope. The source census reported zero
+unreadable or incomplete Ship and vehicle inputs and a complete Archive
+directory.
 
 | Build | Matching ships | Incomplete vehicle Records | Peak private commit (bytes) | Peak working set (bytes) | Seconds |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| LIVE 13220821 | 1 | 3 | 1,204,817,920 | 1,178,042,368 | 82.230 |
-| PTU 13260598 | 1 | 3 | 1,229,987,840 | 1,202,024,448 | 78.350 |
+| LIVE 13220821 | 1 | 0 | 1,206,112,256 | 1,177,767,936 | 76.037 |
+| PTU 13260598 | 1 | 0 | 1,231,532,032 | 1,202,864,128 | 77.295 |
 
-Both snapshots reported `Partial`. Full Normal parity, fleet source closure
-and Paint enumeration remain open.
+Full Normal parity and Paint enumeration remain part of release acceptance.
 
 ## Cargo Grid configurations
 
