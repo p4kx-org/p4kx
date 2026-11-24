@@ -47,8 +47,14 @@ mod terrain_definition_parity;
 #[path = "real_archive_npc_spawn_definition_sdk_parity.rs"]
 mod npc_spawn_definition_parity;
 
+#[path = "real_archive_component_family_parity.rs"]
+mod component_family_parity;
+
 #[path = "real_archive_item_condition_sdk_parity.rs"]
 mod item_condition_parity;
+
+#[path = "real_archive_item_gameplay_sdk_parity.rs"]
+mod item_gameplay_parity;
 
 #[path = "real_archive_canonical_ship_sdk.rs"]
 mod canonical_ship;
