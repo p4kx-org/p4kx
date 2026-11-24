@@ -358,6 +358,15 @@ selected helper fields, and attached the satchel to `head` using its authored it
 locator. The fallback locator rested at `(0.00, -0.20, 1.60)` m and the nested
 locator at `(0.00, -0.60, 2.30)` m in Blender. Both followed a pose on their
 respective bones. The root and explicit torso replacement packages also passed.
+
+A second Windows AMD64 control on the same Blender build used one synthetic
+Archive with a padded selector. The ordinary exporter recorded the unresolved
+selector and used the root translation. The fixture-only evaluator selected
+the nested translation after trimming that token. Both GLBs preserved the
+spine parent, item locator and rotation. Under the same spine pose, the mesh,
+locator and checked vertex retained the expected difference from the authored
+translation. All four package controls passed with verified file digests.
+
 On LIVE build `13220821`, the original Record for an equipped item has the same
 source anchor, item locator and rotation on the root and nested helpers. Its
 original single-precision Y and Z positions differ, and the projected
