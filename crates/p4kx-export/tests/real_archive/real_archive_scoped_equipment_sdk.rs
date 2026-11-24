@@ -54,7 +54,7 @@ mod electrical_behavior_parity;
 mod npc_spawn_definition_parity;
 
 #[path = "real_archive_component_family_parity.rs"]
-mod component_family_parity;
+pub(crate) mod component_family_parity;
 
 #[path = "real_archive_item_condition_sdk_parity.rs"]
 mod item_condition_parity;

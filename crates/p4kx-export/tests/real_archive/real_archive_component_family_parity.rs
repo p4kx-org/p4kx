@@ -257,7 +257,7 @@ pub(super) fn expected_leftovers(variable: &str) -> TestResult<usize> {
     Ok(count)
 }
 
-pub(super) fn require_complete(
+pub(crate) fn require_complete(
     path: &str,
     availability: DatasetAvailability,
     rows: usize,

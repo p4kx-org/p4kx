@@ -107,6 +107,7 @@ mod real_archive_mission_boards;
 mod real_archive_mission_item_tokens;
 mod real_archive_mission_items;
 mod real_archive_mission_module_declarations;
+mod real_archive_mission_definition_sdk_parity;
 mod real_archive_mission_scenarios;
 mod real_archive_npc_spawn_definitions;
 mod real_archive_npc_spawns;
