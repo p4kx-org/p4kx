@@ -374,7 +374,7 @@ pub use source_provenance::*;
 pub use target::{
     create_default_target, create_default_target_protected, default_target_name, utc_rfc3339,
 };
-pub use texture_exr::ExrReport;
+pub use texture_exr::{ExrOrigins, ExrReport};
 pub use texture_grey::{TextureVerdicts, probe_saturation};
 pub use texture_groups::{TextureGroup, TextureGroups};
 pub use texture_job::{Member as TextureMember, Role as TextureMemberRole, role as texture_role};

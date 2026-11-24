@@ -159,9 +159,20 @@ impl<'a> Texture<'a> {
         ConversionError,
     > {
         let alpha = self.checked_alpha_tail(level)?;
-        let (read, color) = if let Parts::Files(parts) = self.parts() {
+        let (read, color) = self.read_color_mip(level)?;
+        let mut images = self.decode_mip_data(&read.mip)?;
+        let observation = observe(&mut images, read.raw_header, alpha.is_some());
+        let alpha = Self::merge_alpha_input(alpha, level, &mut images)?;
+        Ok((images, PreviewInputs { color, alpha }, observation))
+    }
+
+    pub(crate) fn read_color_mip(
+        &self,
+        level: u32,
+    ) -> Result<(LocatedMip, TexturePreviewInput<'a, MipPayloadLocation>), ConversionError> {
+        let (read, input) = if let Parts::Files(parts) = self.parts() {
             let disk = disk_mip::read(parts, self.header_size(), level, self.name())?;
-            let color = TexturePreviewInput::from_disk(
+            let input = TexturePreviewInput::from_disk(
                 disk.mip.raw_header,
                 disk.mip.payload,
                 disk.header,
@@ -171,16 +182,13 @@ impl<'a> Texture<'a> {
                     input: self.disk_header.clone(),
                 },
             );
-            (disk.mip, color)
+            (disk.mip, input)
         } else {
             let read = self.read_mip_with_source(level)?;
-            let color = TexturePreviewInput::of_read(self.parts(), read.raw_header, read.payload);
-            (read, color)
+            let input = TexturePreviewInput::of_read(self.parts(), read.raw_header, read.payload);
+            (read, input)
         };
-        let mut images = self.decode_mip_data(&read.mip)?;
-        let observation = observe(&mut images, read.raw_header, alpha.is_some());
-        let alpha = Self::merge_alpha_input(alpha, level, &mut images)?;
-        Ok((images, PreviewInputs { color, alpha }, observation))
+        Ok((read, input))
     }
 
     /// Decodes every image of `mip`, read from this texture, to 8-bit RGBA without the alpha

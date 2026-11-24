@@ -7,6 +7,8 @@ mod decode;
 mod disk;
 #[path = "texture/disk_mip.rs"]
 mod disk_mip;
+#[path = "texture/image_receipt.rs"]
+pub(crate) mod image_receipt;
 #[path = "texture/merge_inputs.rs"]
 mod merge_inputs;
 #[path = "texture/merge_receipt.rs"]

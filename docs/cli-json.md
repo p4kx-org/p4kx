@@ -1930,6 +1930,12 @@ a `gAMA` value of 1.0, sRGB RGB carries an `sRGB` chunk, and unknown or data sam
 untagged. Floating-point tone mapping produces sRGB. The transfer tag leaves the encoded
 RGB and alpha samples unchanged.
 
+Automatic OpenEXR JSON reports also include `origin_receipts`, `field_origins` and
+`provenance`. The report dimensions use the original DDS header of the decoded mip.
+The CLI writes the companions with both text and JSON reports. Each companion binds
+its exact OpenEXR bytes to the DDS header and the selected color
+surface or cubemap surfaces. OpenEXR leaves separate DDS alpha tails unread.
+
 ## `p4kx audio info <archive> <entry> --json`
 
 Also `p4kx audio info <file> --json` for a WEM file on disk.

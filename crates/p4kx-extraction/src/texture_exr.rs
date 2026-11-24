@@ -6,10 +6,22 @@ use std::path::{Path, PathBuf};
 use p4kx_texture::{HdrImage, TextureError, cube_cross_hdr, write_exr};
 use rayon::prelude::*;
 
-use crate::output_file::write_replacing_protected;
+use crate::output_file::{write_error, write_replacing_protected};
+use crate::texture_preview_png::input::PreviewInputs;
 use crate::{ConversionError, CubemapLayout, Texture, TextureImageFormat, TextureImagePlan};
 
+#[path = "texture_exr_receipt.rs"]
+mod receipt;
+
+pub use crate::textures::image_receipt::PngOrigins as ExrOrigins;
+
 const CUBE_FACES: usize = 6;
+
+#[derive(Clone, Copy)]
+enum Publication {
+    Ordinary,
+    WithOrigins,
+}
 
 /// What an OpenEXR export wrote.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -81,7 +93,34 @@ impl Texture<'_> {
         level: u32,
         layout: CubemapLayout,
     ) -> Result<ExrReport, ConversionError> {
-        let cross = layout == CubemapLayout::Cross;
+        self.write_exr_images(out, level, layout, Publication::Ordinary)
+            .map(|(report, _)| report)
+    }
+
+    /// Writes OpenEXR images with byte-bound receipts and the origins of the report fields.
+    ///
+    /// # Errors
+    /// Returns an input, output or evidence error.
+    pub fn exr_to_file_with_origins(
+        &self,
+        out: &Path,
+        level: u32,
+        layout: CubemapLayout,
+    ) -> Result<(ExrReport, ExrOrigins), ConversionError> {
+        let (report, origins) =
+            self.write_exr_images(out, level, layout, Publication::WithOrigins)?;
+        let origins = origins
+            .ok_or_else(|| write_error(out, std::io::Error::other("OpenEXR origin is missing")))?;
+        Ok((report, origins))
+    }
+
+    fn write_exr_images(
+        &self,
+        out: &Path,
+        level: u32,
+        layout: CubemapLayout,
+        publication: Publication,
+    ) -> Result<(ExrReport, Option<ExrOrigins>), ConversionError> {
         let files: Vec<PathBuf> =
             TextureImagePlan::new(self.header(), level, layout, TextureImageFormat::Exr)
                 .map_err(|error| ConversionError::of_texture(self.name(), error))?
@@ -90,18 +129,20 @@ impl Texture<'_> {
         for file in &files {
             self.refuse_input(file)?;
         }
-        let surfaces = self.decode_surfaces_hdr(level)?;
-        let images = if cross && self.header().faces() as usize == CUBE_FACES {
-            surfaces
-                .chunks(CUBE_FACES)
-                .map(|faces| {
-                    cube_cross_hdr(faces)
-                        .map_err(|error| ConversionError::of_texture(self.name(), error))
-                })
-                .collect::<Result<Vec<_>, _>>()?
-        } else {
-            surfaces
+        let (surfaces, inputs) = match publication {
+            Publication::Ordinary => (self.decode_surfaces_hdr(level)?, None),
+            Publication::WithOrigins => {
+                self.check_high_range()?;
+                let (read, color) = self.read_color_mip(level)?;
+                let surfaces = read
+                    .mip
+                    .decode_surfaces_hdr()
+                    .map_err(|error| ConversionError::of_texture(self.name(), error))?;
+                (surfaces, Some(PreviewInputs { color, alpha: None }))
+            }
         };
+        let cross = layout == CubemapLayout::Cross && self.header().faces() as usize == CUBE_FACES;
+        let images = self.layout_exr_images(surfaces, cross)?;
         if images.len() != files.len() {
             return Err(ConversionError::of_texture(
                 self.name(),
@@ -110,23 +151,52 @@ impl Texture<'_> {
                 },
             ));
         }
-        files
-            .par_iter()
-            .zip(&images)
-            .try_for_each(|(file, image)| {
-                write_replacing_protected(file, self.write_protection()?, None, |writer| {
-                    write_exr(image, writer)
-                        .map_err(|error| ConversionError::of_texture(self.name(), error))
-                })
-            })?;
+        let origins = if let Some(inputs) = inputs {
+            Some(receipt::publish(
+                self, &inputs, out, level, cross, &files, &images,
+            )?)
+        } else {
+            files
+                .par_iter()
+                .zip(&images)
+                .try_for_each(|(file, image)| self.write_exr_file(file, image))?;
+            None
+        };
         let (width, height) = images
             .first()
             .map_or((0, 0), |image| (image.width(), image.height()));
-        Ok(ExrReport {
-            level,
-            width,
-            height,
-            files,
+        Ok((
+            ExrReport {
+                level,
+                width,
+                height,
+                files,
+            },
+            origins,
+        ))
+    }
+
+    fn layout_exr_images(
+        &self,
+        surfaces: Vec<HdrImage>,
+        cross: bool,
+    ) -> Result<Vec<HdrImage>, ConversionError> {
+        if !cross {
+            return Ok(surfaces);
+        }
+        surfaces
+            .chunks(CUBE_FACES)
+            .map(|faces| {
+                cube_cross_hdr(faces)
+                    .map_err(|error| ConversionError::of_texture(self.name(), error))
+            })
+            .collect()
+    }
+
+    fn write_exr_file(&self, file: &Path, image: &HdrImage) -> Result<(), ConversionError> {
+        write_replacing_protected(file, self.write_protection()?, None, |writer| {
+            write_exr(image, writer)
+                .map_err(|error| ConversionError::of_texture(self.name(), error))
         })
     }
 

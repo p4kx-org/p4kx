@@ -5,13 +5,20 @@
 //! `--tone-map`.
 
 use std::error::Error;
-use std::fs::File;
+use std::fs::{self, File};
+use std::io;
 use std::path::{Path, PathBuf};
 
 use assert_cmd::Command;
 use exr::prelude::{ReadChannels, ReadLayers, Vec2};
 use p4kx_testkit::{SplitDds, TestTextureFormat};
 use predicates::prelude::predicate;
+use serde_json::Value;
+
+#[path = "texture_exr_origins.rs"]
+mod exr_origins;
+
+use exr_origins::{check_exr_receipt, check_exr_width_origin, check_file_format_origin};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -43,7 +50,7 @@ fn write_block(
     bytes.truncate(dds.header_len());
     bytes.extend_from_slice(&block);
     let path = folder.join("sky_cube.dds");
-    std::fs::write(&path, bytes)?;
+    fs::write(&path, bytes)?;
     Ok(path)
 }
 
@@ -142,7 +149,7 @@ fn tone_map_forces_an_8_bit_png() -> TestResult {
         .code(0)
         .stdout(predicate::str::contains("tone-mapped to 8 bits"));
 
-    let mut reader = png::Decoder::new(std::io::BufReader::new(File::open(&out)?)).read_info()?;
+    let mut reader = png::Decoder::new(io::BufReader::new(File::open(&out)?)).read_info()?;
     assert!(
         reader.info().srgb.is_some(),
         "tone-mapped samples are tagged sRGB"
@@ -174,7 +181,8 @@ fn json_names_the_written_format() -> TestResult {
         .arg(dir.path().join("sky.png"))
         .output()?;
 
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    assert!(output.status.success(), "automatic EXR export: {output:?}");
+    let json: Value = serde_json::from_slice(&output.stdout)?;
     assert_eq!(json["format"], "exr", "{json}");
     assert!(
         json["output"]
@@ -188,7 +196,27 @@ fn json_names_the_written_format() -> TestResult {
             .is_some_and(|path| path.ends_with("sky.exr")),
         "{json}"
     );
-    Ok(())
+    let out = dir.path().join("sky.exr");
+    check_exr_width_origin(&json, None)?;
+    check_file_format_origin(&json, "/files")?;
+    check_file_format_origin(&json, "/files/0")?;
+    check_exr_receipt(&out, None, None)?;
+    assert_eq!(
+        json.pointer("/origin_receipts/0").and_then(Value::as_str),
+        Some("sky.exr.p4kx-origin.jsonl"),
+        "JSON names the EXR companion"
+    );
+
+    let ordinary = dir.path().join("ordinary.exr");
+    p4kx()?
+        .args(["texture", "png"])
+        .arg(&header)
+        .arg("--out")
+        .arg(&ordinary)
+        .assert()
+        .success();
+    assert_eq!(fs::read(out)?, fs::read(&ordinary)?, "identical EXR bytes");
+    check_exr_receipt(&ordinary, None, None)
 }
 
 #[test]

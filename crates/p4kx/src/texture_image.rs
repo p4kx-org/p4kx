@@ -8,7 +8,6 @@ use anyhow::Result;
 use p4kx_extraction::texture_codec::{
     DdsAlphaAssociation, DdsAlphaTransform, DdsPngTransform, DdsTransfer,
 };
-use p4kx_extraction::texture_preview::PngOrigins;
 use p4kx_extraction::{CubemapLayout, FieldOrigins, SourceInventory, Texture};
 use serde::Serialize;
 
@@ -40,7 +39,7 @@ struct ImageJson<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     alpha_transform: Option<DdsAlphaTransform>,
     #[serde(flatten)]
-    origins: Option<ReportOrigins>,
+    origins: ReportOrigins,
 }
 
 #[derive(Serialize)]
@@ -70,7 +69,7 @@ struct Written {
     png_transform: Option<DdsPngTransform>,
     alpha_association: Option<DdsAlphaAssociation>,
     alpha_transform: Option<DdsAlphaTransform>,
-    origins: Option<PngOrigins>,
+    origins: ReportOrigins,
 }
 
 /// Runs `p4kx texture png`: an 8-bit PNG, or OpenEXR for a high-range texture without
@@ -104,20 +103,7 @@ pub(crate) fn export_image(
             png_transform: written.png_transform,
             alpha_association: written.alpha_association,
             alpha_transform: written.alpha_transform,
-            origins: written.origins.map(|origins| ReportOrigins {
-                origin_receipts: origins
-                    .receipts
-                    .iter()
-                    .map(|path| {
-                        path.file_name()
-                            .unwrap_or(path.as_os_str())
-                            .to_string_lossy()
-                            .into_owned()
-                    })
-                    .collect(),
-                field_origins: origins.fields,
-                provenance: origins.inventory,
-            }),
+            origins: written.origins,
         })?;
         return Ok(());
     }
@@ -133,7 +119,9 @@ fn write_image(
 ) -> Result<Written> {
     if high_range && !options.tone_map {
         let exr = out.with_extension("exr");
-        let report = texture.exr_to_file_as(&exr, options.mip, options.layout)?;
+        let (report, origins) =
+            texture.exr_to_file_with_origins(&exr, options.mip, options.layout)?;
+        let origins = ReportOrigins::new(&origins.receipts, origins.fields, origins.inventory);
         Ok(Written {
             format: ImageFormat::Exr,
             level: report.level,
@@ -145,7 +133,7 @@ fn write_image(
             png_transform: None,
             alpha_association: None,
             alpha_transform: None,
-            origins: None,
+            origins,
         })
     } else {
         let (report, origins) =
@@ -162,8 +150,27 @@ fn write_image(
             alpha_association: Some(report.alpha_association),
             alpha_transform: (report.alpha_transform != DdsAlphaTransform::Preserve)
                 .then_some(report.alpha_transform),
-            origins: Some(origins),
+            origins: ReportOrigins::new(&origins.receipts, origins.fields, origins.inventory),
         })
+    }
+}
+
+impl ReportOrigins {
+    fn new(receipts: &[PathBuf], field_origins: FieldOrigins, provenance: SourceInventory) -> Self {
+        let origin_receipts = receipts
+            .iter()
+            .map(|path| {
+                path.file_name()
+                    .unwrap_or(path.as_os_str())
+                    .to_string_lossy()
+                    .into_owned()
+            })
+            .collect();
+        Self {
+            origin_receipts,
+            field_origins,
+            provenance,
+        }
     }
 }
 
