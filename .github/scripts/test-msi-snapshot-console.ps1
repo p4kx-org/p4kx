@@ -1,6 +1,6 @@
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'msi-snapshot-console.ps1')
-$saved=@{revision=$env:GITHUB_SHA;run=$env:GITHUB_RUN_ID;attempt=$env:GITHUB_RUN_ATTEMPT;target=$env:P4KX_TARGET}
+$saved=@{revision=$env:GITHUB_SHA;run=$env:GITHUB_RUN_ID;attempt=$env:GITHUB_RUN_ATTEMPT;target=$env:P4KX_TARGET;actions=$env:GITHUB_ACTIONS}
 function Assert-SnapshotConsole([bool]$Condition,[string]$Message) { if (-not $Condition) { throw $Message } }
 function New-SnapshotConsoleLine([hashtable]$Changes=@{}) {
     $row=@{schema=1;role='native-msi-observer-progress';stage='parentState';status='begin';
@@ -23,6 +23,7 @@ function New-InstallCheckpointFrame([hashtable]$Changes=@{}) {
 }
 try {
     $env:GITHUB_SHA='synthetic-revision';$env:GITHUB_RUN_ID='synthetic-run';$env:GITHUB_RUN_ATTEMPT='1';$env:P4KX_TARGET='aarch64-pc-windows-msvc'
+    $env:GITHUB_ACTIONS='false'
     $state=New-P4kxMsiSnapshotConsole 1
     $line=New-SnapshotConsoleLine
     $split=[Math]::Floor($line.Length/2)
@@ -70,6 +71,18 @@ try {
     $duplicate=@(Receive-P4kxMsiSnapshotConsole $installBoundary 'stdout' $checkpointLine 6>&1)
     $ordinary=@(Receive-P4kxMsiSnapshotConsole (New-P4kxMsiSnapshotConsole 3) 'stdout' ($bindingLine+$checkpointLine) 6>&1)
     Assert-SnapshotConsole ($duplicate.Count -eq 0 -and $ordinary.Count -eq 1) 'Only the original install boundary may report the checkpoint once.'
+    $env:GITHUB_ACTIONS='true'
+    $hostedBoundary=New-P4kxMsiSnapshotConsole 3 -OriginalInstallBoundary
+    Receive-P4kxMsiSnapshotConsole $hostedBoundary 'stdout' $bindingLine 6>&1 | Out-Null
+    $published=@(Receive-P4kxMsiSnapshotConsole $hostedBoundary 'stdout' ($checkpointLine+$checkpointLine) 6>&1)
+    $noticePrefix='::notice title=Native MSI install checkpoint::'
+    Assert-SnapshotConsole ($published.Count -eq 2 -and ([string]$published[0]).StartsWith('[P4KX-MSI-INSTALL-CHECKPOINT]',[StringComparison]::Ordinal) -and
+        ([string]$published[1]).StartsWith($noticePrefix,[StringComparison]::Ordinal)) 'GitHub Actions must get one checkpoint notice alongside its console observation.'
+    $summary=([string]$published[0]).Substring('[P4KX-MSI-INSTALL-CHECKPOINT]'.Length)
+    $notice=([string]$published[1]).Substring($noticePrefix.Length)
+    Assert-SnapshotConsole ($notice -ceq $summary -and $notice -cnotmatch '[\r\n%]' -and
+        $notice -cnotmatch '"(?:revision|run|attempt|request_sha256)"') 'The checkpoint notice must be one safe line of existing sanitized fields.'
+    $env:GITHUB_ACTIONS='false'
     $stage=@(Receive-P4kxMsiSnapshotConsole $state 'stage' 'portalCleanup.begin' 6>&1)
     Assert-SnapshotConsole ($stage.Count -eq 1) 'A predefined cleanup boundary was not emitted.'
     $refused=$false
@@ -81,4 +94,5 @@ try {
     'PASS: bounded Snapshot console framing, context, predefined stages and unproven verdicts; no native execution.'
 } finally {
     $env:GITHUB_SHA=$saved.revision;$env:GITHUB_RUN_ID=$saved.run;$env:GITHUB_RUN_ATTEMPT=$saved.attempt;$env:P4KX_TARGET=$saved.target
+    $env:GITHUB_ACTIONS=$saved.actions
 }

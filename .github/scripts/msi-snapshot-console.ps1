@@ -116,7 +116,12 @@ function Receive-P4kxMsiSnapshotConsole {
         }
         $checkpoint=& $State.read_checkpoint $State $line
         if ($null -ne $checkpoint -and $State.seen.Add('install-checkpoint')) {
-            Write-Host ('[P4KX-MSI-INSTALL-CHECKPOINT]'+($checkpoint | ConvertTo-Json -Compress))
+            $summary=$checkpoint | ConvertTo-Json -Compress
+            Write-Host ('[P4KX-MSI-INSTALL-CHECKPOINT]'+$summary)
+            if ($env:GITHUB_ACTIONS -ceq 'true') {
+                $message=$summary.Replace('%','%25').Replace([string][char]13,'%0D').Replace([string][char]10,'%0A')
+                Write-Host ('::notice title=Native MSI install checkpoint::'+$message)
+            }
         }
     }
 }
