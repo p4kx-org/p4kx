@@ -194,7 +194,7 @@ fn mounted_armour_glb_receipt_binds_physical_port_and_applied_model_fields() -> 
     Ok(())
 }
 
-fn mount_archive(
+pub(super) fn mount_archive(
     folder: &Path,
     entries: Vec<TestEntry>,
     encrypted: bool,

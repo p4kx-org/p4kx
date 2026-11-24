@@ -3,6 +3,8 @@
 
 use p4kx_model::{Bone, Lod, Model, ModelFile, Transform, chained_world_poses};
 
+use crate::{IssueKind, ItemOffsetDiagnostic};
+
 /// Converts an authored offset with translation in metres and rotation in X, Y, Z degrees.
 #[must_use]
 pub fn offset_transform(position: [f32; 3], rotation: [f32; 3]) -> Transform {
@@ -44,10 +46,17 @@ pub(crate) struct NodePlacement {
 }
 
 pub(crate) fn node_placement(model: &Model, name: &str) -> Option<NodePlacement> {
-    let node = model
+    placement_at(model, named_node(model, name)?)
+}
+
+fn named_node(model: &Model, name: &str) -> Option<usize> {
+    model
         .nodes
         .iter()
-        .position(|node| node.name.eq_ignore_ascii_case(name))?;
+        .position(|node| node.name.eq_ignore_ascii_case(name))
+}
+
+fn placement_at(model: &Model, node: usize) -> Option<NodePlacement> {
     let mut transform = Transform::IDENTITY;
     for (_, ancestor) in model.node_ancestors(node) {
         transform = ancestor.transform.then(&transform);
@@ -56,6 +65,33 @@ pub(crate) fn node_placement(model: &Model, name: &str) -> Option<NodePlacement>
         }
     }
     None
+}
+
+pub(crate) struct ItemOffsetPlacement {
+    pub(crate) node: usize,
+    pub(crate) inverse: Transform,
+}
+
+pub(crate) fn item_offset_placement(
+    model: Option<&Model>,
+    helper: &str,
+) -> Result<Option<ItemOffsetPlacement>, IssueKind> {
+    let Some(model) = model.filter(|_| !helper.is_empty()) else {
+        return Ok(None);
+    };
+    let node = named_node(model, helper).ok_or_else(|| ItemOffsetDiagnostic::NotFound {
+        helper: helper.to_owned(),
+    })?;
+    let inverse = placement_at(model, node)
+        .ok_or_else(|| ItemOffsetDiagnostic::InvalidPlacement {
+            helper: helper.to_owned(),
+        })?
+        .transform
+        .inverse()
+        .ok_or_else(|| ItemOffsetDiagnostic::NotInvertible {
+            helper: helper.to_owned(),
+        })?;
+    Ok(Some(ItemOffsetPlacement { node, inverse }))
 }
 
 /// Returns whether the model has a level of detail near `level` and none of its meshes is skinned;
@@ -142,7 +178,33 @@ fn named_bone_pose(bones: &[Bone], name: &str) -> Option<(usize, Transform)> {
 
 #[cfg(test)]
 mod tests {
-    use super::offset_transform;
+    use std::error::Error;
+
+    use p4kx_chunks::ChunkFile;
+    use p4kx_model::{CompanionError, CompanionPath, Model};
+    use p4kx_testkit::TestModel;
+
+    use super::{item_offset_placement, offset_transform};
+    use crate::{IssueKind, ItemOffsetDiagnostic};
+
+    #[test]
+    fn an_item_offset_helper_with_a_cyclic_parent_has_no_placement() -> Result<(), Box<dyn Error>> {
+        let bytes = TestModel::cube().single_file().cgf();
+        let file = ChunkFile::parse(bytes)?;
+        let mut companions =
+            |_: CompanionPath<'_>| -> Result<Option<Vec<u8>>, CompanionError> { Ok(None) };
+        let mut model = Model::read("item.cgf", &file, &mut companions)?;
+        let node = model.nodes.first_mut().ok_or("item node")?;
+        node.parent = Some(0);
+        let name = node.name.clone();
+        assert!(!name.is_empty(), "the cyclic node has a selectable name");
+        assert!(
+            matches!(item_offset_placement(Some(&model), &name),
+                Err(IssueKind::ItemOffsetHelper(ItemOffsetDiagnostic::InvalidPlacement { helper })) if helper == name),
+            "a named cyclic node has no placement"
+        );
+        Ok(())
+    }
 
     fn close(actual: [f32; 4], expected: [f32; 4]) {
         for (a, e) in actual.iter().zip(expected) {

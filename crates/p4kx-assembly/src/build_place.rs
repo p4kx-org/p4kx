@@ -73,14 +73,18 @@ impl Anchor {
         port: &PortNode,
         definition: Option<&PortTransform>,
         model: Option<&Loaded>,
+        draft: &Draft<'_>,
+        issues: &mut Vec<Issue>,
     ) -> PlacedPart {
-        let (local, offset) = with_offset(self.transform, definition, model);
-        let source = PortPlacementSource::anchor(port, &self.kind, definition, offset.is_some());
+        let offset = with_offset(self.transform, definition, model);
+        issues.extend(offset.issue.map(|kind| issue(draft, kind)));
+        let source =
+            PortPlacementSource::anchor(port, &self.kind, definition, offset.node.is_some());
         PlacedPart {
-            local,
+            local: offset.transform,
             kind: self.kind,
             port: source,
-            nodes: ModelPlacement::new(self.source, offset),
+            nodes: ModelPlacement::new(self.source, offset.node),
             gear: None,
         }
     }
@@ -167,7 +171,7 @@ pub(crate) fn place(
         let helper = helper.to_owned();
         issues.push(issue(draft, IssueKind::HelperNotFound { helper }));
     }
-    anchored.with_port_offset(port, definition, model)
+    anchored.with_port_offset(port, definition, model, draft, issues)
 }
 
 fn skin_anchor(rig: PlacementSkeleton<'_>, parent: &Part, helper: &str) -> Option<Anchor> {
@@ -179,28 +183,40 @@ fn skin_anchor(rig: PlacementSkeleton<'_>, parent: &Part, helper: &str) -> Optio
     ))
 }
 
+struct PortOffset {
+    transform: Transform,
+    node: Option<usize>,
+    issue: Option<IssueKind>,
+}
+
 fn with_offset(
     base: Transform,
     definition: Option<&PortTransform>,
     model: Option<&Loaded>,
-) -> (Transform, Option<usize>) {
-    let Some(definition) = definition else {
-        return (base, None);
+) -> PortOffset {
+    let mut offset = PortOffset {
+        transform: base,
+        node: None,
+        issue: None,
     };
-    let local = base.then(&offset_transform(
-        definition.position(),
-        definition.rotation(),
-    ));
-    let inner = (!definition.offset_helper().is_empty())
-        .then(|| {
-            let child = model?;
-            let found = placement::node_placement(&child.model, definition.offset_helper())?;
-            Some((found.transform.inverse()?, found.node))
-        })
-        .flatten();
-    inner.map_or((local, None), |(inner, node)| {
-        (local.then(&inner), Some(node))
-    })
+    if let Some(definition) = definition {
+        offset.transform = base.then(&offset_transform(
+            definition.position(),
+            definition.rotation(),
+        ));
+        match placement::item_offset_placement(
+            model.map(|loaded| loaded.model.as_ref()),
+            definition.offset_helper(),
+        ) {
+            Ok(Some(placement)) => {
+                offset.transform = offset.transform.then(&placement.inverse);
+                offset.node = Some(placement.node);
+            }
+            Ok(None) => {}
+            Err(kind) => offset.issue = Some(kind),
+        }
+    }
+    offset
 }
 
 /// Returns the transform of a landing gear: the node `bone` of its Entity's model.

@@ -547,6 +547,11 @@ and `too_deep` (a limit of [ADR-0040](adr/0040-the-assembly-places-parts-at-port
 was reached). `port_helper_unresolved` records that an authored helper selector or tree
 could not establish a more specific transform. The Issue text identifies the physical port
 and original helper position. A usable root transform still places the attachment.
+If a loaded attachment cannot use its declared item offset helper, it keeps the port placement.
+`item_offset_helper_not_found` means the attached model lacks the named node.
+`item_offset_helper_invalid_placement` means its node hierarchy does not yield a placement.
+`item_offset_helper_not_invertible` means the placed node's transform has no inverse.
+All three issues have `skipped: false`.
 New kinds may be added in later versions.
 
 ## `p4kx entity package <archive> <entity> --out <folder> --json`
@@ -844,7 +849,9 @@ head. `material` of a part is the material library it is drawn with, `null` when
 bind a rigid mesh to a unique compatible holder port and its helper. `port_helper_unresolved`
 has `skipped: false` when a worn piece uses the root helper with an unresolved selector or
 stays at the scene origin because it has no usable root helper. The `reason` includes the
-original physical port and helper position for that note.
+original physical port and helper position for that note. A mounted piece keeps its port placement
+when its item offset helper is unusable and uses the same `item_offset_helper_…` issue kinds as
+`entity glb`.
 
 `--anim NAME` (repeatable, `all` for every one) and `--anim-from ENTRY` write the animations of
 the body variant's folders on the body skeleton, those of the character's own folder

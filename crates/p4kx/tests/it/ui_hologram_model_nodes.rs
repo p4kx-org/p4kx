@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::error::Error;
 use std::fs;
 use std::ops::Range;
 
@@ -12,6 +13,9 @@ use p4kx_testkit::{
 use serde_json::{Value, json};
 
 use super::{TestResult, hologram, receipt, skip, source_uses, write_archive};
+
+#[path = "item_offset_glb.rs"]
+mod item_offset_glb;
 
 const SHIP: &str = "Data\\Objects\\Test\\ship.cgf";
 const CHILD: &str = "Data\\Objects\\Test\\child.cgf";
@@ -177,7 +181,7 @@ fn assert_site(
     );
 }
 
-fn crch_parent() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+fn crch_parent() -> Result<Vec<u8>, Box<dyn Error>> {
     let mut bytes = TestCrchModel::cube().bytes();
     let file = ChunkFile::parse(bytes.as_slice())?;
     let chunk = file.chunks().get(5).ok_or("CrCh child node")?;
@@ -190,13 +194,13 @@ fn crch_parent() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     Ok(bytes)
 }
 
-fn offset_entries(parent: Vec<u8>, child: Vec<u8>) -> Vec<TestEntry> {
+fn offset_entries(parent: Vec<u8>, child: Vec<u8>, item_helper: &str) -> Vec<TestEntry> {
     let root = TestEntity::new(1, "TEST_Ship", "entities/spaceships/test_ship.xml")
         .geometry("Objects/Test/ship.cgf", None)
         .port(
             TestPort::new("socket")
                 .helper("hp_nose", [0.0; 3], [0.0; 3])
-                .item_helper("item_socket"),
+                .item_helper(item_helper),
         )
         .loadout(TestLoadout::Manual(vec![TestLoadoutEntry::class(
             "socket",
@@ -215,10 +219,14 @@ fn offset_entries(parent: Vec<u8>, child: Vec<u8>) -> Vec<TestEntry> {
     ]
 }
 
-fn offset_model(invertible: bool) -> Vec<u8> {
-    let mut socket = model_node("item_socket", Some(0), 3.0, 2);
+fn offset_model(name: &str, invertible: bool) -> Vec<u8> {
+    let mut socket = model_node(name, Some(0), 3.0, 2);
     if !invertible {
-        socket.local[0][0] = 0.0;
+        socket.local = [
+            [0.0, 0.0, 0.0, 3.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+        ];
     }
     TestModel::cube()
         .single_file()
@@ -226,7 +234,7 @@ fn offset_model(invertible: bool) -> Vec<u8> {
             model_node("item", None, 0.0, 2),
             model_node("item_mesh", Some(0), 0.0, 0),
             socket,
-            model_node("ITEM_SOCKET", Some(0), 90.0, 2),
+            model_node(&name.to_ascii_uppercase(), Some(0), 90.0, 2),
         ])
         .cgf()
 }
@@ -240,9 +248,12 @@ fn crch_parent_ids_and_only_successful_child_inversions_reach_the_receipt() -> T
     let crch = ChunkFile::parse(parent.as_slice())?;
     for invertible in [true, false] {
         let input = tempfile::tempdir_in(dir.path())?;
-        let bytes = offset_model(invertible);
+        let bytes = offset_model("item_socket", invertible);
         let child = ChunkFile::parse(bytes.as_slice())?;
-        let archive = write_archive(input.path(), offset_entries(parent.clone(), bytes.clone()))?;
+        let archive = write_archive(
+            input.path(),
+            offset_entries(parent.clone(), bytes.clone(), "item_socket"),
+        )?;
         let run = hologram(&archive, &out, &["--size", "96", "--key", &key], true)?;
         if skip(
             "crch_parent_ids_and_only_successful_child_inversions_reach_the_receipt",

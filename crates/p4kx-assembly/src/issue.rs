@@ -4,7 +4,7 @@
 use thiserror::Error;
 
 use crate::issue_text::{animations_left_out, attachments_left_out};
-use crate::{ContainerAmbiguity, LoadoutError, PortHelperDiagnostic};
+use crate::{ContainerAmbiguity, ItemOffsetDiagnostic, LoadoutError, PortHelperDiagnostic};
 
 /// What went wrong with a part of an Assembly.
 #[derive(Debug, Clone, PartialEq, Error)]
@@ -79,6 +79,9 @@ pub enum IssueKind {
         /// The helper the port or the container names.
         helper: String,
     },
+    /// An attached item keeps its port placement because its offset helper cannot be used.
+    #[error(transparent)]
+    ItemOffsetHelper(#[from] ItemOffsetDiagnostic),
     /// The rigid piece has no valid mount after a worn overlay.
     #[error("the rigid piece cannot be mounted: {0}")]
     WornMountUnresolved(&'static str),
@@ -94,8 +97,7 @@ pub enum IssueKind {
         /// The path the definition names, with `/` as separator.
         path: String,
     },
-    /// The skeleton file of a character definition (`.cdf`) is too large or cannot be read as a
-    /// model; the skin is drawn as it is.
+    /// The `.cdf` skeleton is too large or unreadable, so the skin is drawn as it is.
     #[error("the skeleton {path} the character definition names cannot be read: {reason}")]
     SkeletonUnreadable {
         /// The path the definition names, with `/` as separator.
@@ -103,8 +105,7 @@ pub enum IssueKind {
         /// What is wrong.
         reason: String,
     },
-    /// The landing gear could not be posed at the end of its deploy clip, so it keeps the pose of
-    /// its model.
+    /// The gear keeps its model pose when the end of its deploy clip cannot be used.
     #[error("the landing gear keeps the pose of its model: {reason}")]
     GearNotDeployed {
         /// Why the gear was not posed.
@@ -238,8 +239,7 @@ pub enum IssueKind {
     /// Worn clothing covers these zones of the body, so the body's triangles in them are left out.
     #[error("the body zones {} are covered by the clothing and left out", .0.join(", "))]
     BodyZonesHidden(Vec<String>),
-    /// The body has no part to cut or its submeshes do not fit its zone table, so no body
-    /// triangles are left out.
+    /// Without a body part or a matching submesh zone table, all body triangles remain.
     #[error("the body cannot be cut by zone: {0}")]
     BodyZonesUnknown(String),
     /// Clothing covers these body zones only under conditions that are not evaluated.

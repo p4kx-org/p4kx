@@ -10,7 +10,7 @@ use super::layered_worn::OverlayMount;
 use super::mount_source::{PlacementModel, WornMountSource};
 use super::piece::Mount;
 use super::read_models::Loaded;
-use crate::placement::{bone_placement, is_unskinned, node_placement, offset_transform};
+use crate::placement::{self, bone_placement, is_unskinned, offset_transform};
 use crate::{Issue, IssueKind, PortPlacementSource};
 
 /// The turn about X in degrees from the frame of a bone, which has Z up, to the frame of the
@@ -42,10 +42,11 @@ pub(super) fn place(
         let diagnostic = job.mount.as_ref().map_or(
             job.unresolved_mount_helper.as_ref(),
             |mount| match mounted(parts, jobs, index, mount, skeleton, level) {
-                Ok(placed) => {
+                Ok((placed, offset_issue)) => {
                     if let Some(part) = parts.get_mut(index) {
                         part.mount = Some(Box::new(placed));
                     }
+                    issues.extend(offset_issue.map(|kind| issue(job, kind)));
                     mount.helper_diagnostic.as_ref()
                 }
                 Err(helper) => {
@@ -154,7 +155,7 @@ fn mounted(
     mount: &Mount,
     skeleton: PlacementModel<'_>,
     level: u32,
-) -> Result<Placed, String> {
+) -> Result<(Placed, Option<IssueKind>), String> {
     let missing = || mount.helper.clone();
     let binding = jobs.get(index).ok_or_else(missing)?.overlay_mount;
     let holder = holder(parts, jobs, mount, binding, skeleton, level).ok_or_else(missing)?;
@@ -175,25 +176,26 @@ fn mounted(
         .ok_or_else(missing)?;
     let inverse = anchor.transform.inverse().ok_or_else(missing)?;
     let held = bone_placement(holder.model, &mount.helper).ok_or_else(missing)?;
-    let own = parts.get(index).and_then(|part| {
-        if mount.offset_helper.is_empty() {
-            return None;
-        }
-        let placement = node_placement(&part.model, &mount.offset_helper)?;
-        Some((
-            placement.transform.inverse()?,
-            PlacementModel::part(part).node_source(placement.node),
-        ))
-    });
+    let wearable = parts.get(index).map(PlacementModel::part);
+    let (own, offset_issue) = match placement::item_offset_placement(
+        wearable.map(|model| model.model),
+        &mount.offset_helper,
+    ) {
+        Ok(placement) => (placement, None),
+        Err(kind) => (None, Some(kind)),
+    };
     let at_port = inverse
         .then(&held.transform)
         .then(&offset_transform([0.0; 3], BONE_TO_HELPER))
         .then(&offset_transform(mount.position(), mount.rotation()));
     let port = PortPlacementSource::worn(mount.port, mount.offset_fields, own.is_some());
-    let (transform, locator) = own.map_or((at_port, None), |(inner, source)| {
-        (at_port.then(&inner), source)
+    let (transform, locator) = own.map_or((at_port, None), |placement| {
+        (
+            at_port.then(&placement.inverse),
+            wearable.and_then(|model| model.node_source(placement.node)),
+        )
     });
-    Ok(Placed {
+    let placed = Placed {
         frame: RigMount::new(bone, transform),
         source: WornMountSource::new(
             port,
@@ -202,5 +204,6 @@ fn mounted(
             skeleton.bone_source(anchor.selection),
             locator,
         ),
-    })
+    };
+    Ok((placed, offset_issue))
 }

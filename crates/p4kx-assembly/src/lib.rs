@@ -124,6 +124,7 @@ mod issue;
 mod issue_code;
 mod issue_record;
 mod issue_text;
+mod item_offset_diagnostic;
 mod loadout_entry;
 mod loadout_failure_path;
 mod loadout_file_cache;
@@ -264,6 +265,7 @@ pub use interior_check::{
 };
 pub use issue::IssueKind;
 pub use issue_record::Issue;
+pub use item_offset_diagnostic::ItemOffsetDiagnostic;
 pub use loadout_entry::LoadoutEntry;
 pub use loadout_failure_path::LoadoutFailurePath;
 pub use loadout_file_events::{LoadoutDocumentKind, LoadoutFileIdentity};
