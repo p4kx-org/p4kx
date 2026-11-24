@@ -2986,6 +2986,12 @@ identity and `playability`. For example, Javelin (63) has a reviewed `in-concept
 `special` Archive Ship. A retired mapping is identified by `shipStoreSlugs[].retired`.
 A pledge absent from both tables has no reviewed status or validated mapping in this output.
 
+The installed LIVE `13220821` Normal export matched all 27 bundled pledge rows
+and all 227 Store mapping rows in order. The comparison also verified the
+physical Javelin and AI siblings, active player Store bindings and the separate
+unbound MOLE outcomes. The matching producer used revision
+`23addc5e164f65a28a6f258302b30453b331edce`.
+
 ### Item recovery rules
 
 `configurations.itemRecoveryEconomy` and `configurations.itemRecoveryOverrides` contain the
