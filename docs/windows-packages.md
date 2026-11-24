@@ -282,6 +282,15 @@ that job before MSI execution.
 [Terminal MSI receipt](https://github.com/p4kx-org/p4kx/actions/runs/45327821298/artifacts/14893786316) ·
 [AMD64 download failure](https://github.com/p4kx-org/p4kx/actions/runs/45327821298/job/138241903849)
 
+The targeted AMD64 retry downloaded both inputs and preserved checkpoint 03 and the
+Finish supervisor launch. Checkpoint 03 recorded a successful predecessor install and
+an open rename-upgrade wait. GitHub still reported checkpoint 04's observation step
+in progress after its one-minute step allowance and the original Finish collection
+cutoff. The blocking operation remains unknown.
+[AMD64 retry](https://github.com/p4kx-org/p4kx/actions/runs/45327821298/job/138250078993) ·
+[Checkpoint 03](https://github.com/p4kx-org/p4kx/actions/runs/45327821298/artifacts/14893049565) ·
+[Finish launch](https://github.com/p4kx-org/p4kx/actions/runs/45327821298/artifacts/14894530139)
+
 For release acceptance, repeat the native lifecycle checks with the actual release candidate
 and bind both its MSI and portable ZIP to the candidate revision and run attempt. Record the
 Windows AMD64 desktop and WASAPI checks separately from the hosted package evidence.
