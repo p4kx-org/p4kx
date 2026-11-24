@@ -2411,10 +2411,18 @@ nominated Flight rows. It completed in 14.623 s with 1,114,664,960 peak private
 bytes and 1,032,646,656 peak working-set bytes. The witness retains the original
 attached Record, the ordered Loadout position and the owning component.
 
+The retained Normal Catalog from producer
+`5d3d917f424657990fd775b8fae8ac843a3fd528` matched all twelve ordered rows
+for the same physical Ship on PTU `13260598`, including source-use and
+physical-source identities. The optimized verifier completed in
+1,723.431 s with 1,114,714,112 peak private bytes and 1,048,502,272 peak
+working-set bytes.
+
 For the installed checks, set `P4KX_DATA_P4K` for the original Archive,
 `P4KX_NEW_SDK_BUILD` for its exact change number and
 `P4KX_FLIGHT_SDK_RECORD` for the physical Ship. Choose a Ship with a complete
-Loadout and at least one flight component attached at an original port.
+Loadout and an attached Flight configuration whose nonempty port-ordinal path
+and original owner have complete source evidence.
 The parity check also uses `P4KX_FLIGHT_SDK_FILTER` and
 `P4KX_FLIGHT_SDK_SELECTED_RECORDS` to bind the exact producer scope.
 
