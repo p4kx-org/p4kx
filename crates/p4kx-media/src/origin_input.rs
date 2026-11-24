@@ -4,9 +4,12 @@
 use p4kx_extraction::EntryMetadata;
 
 use p4kx_extraction::{
-    Archive, Entry, EntryOrigin, InputScope, SourceDetails, SourceInput, SourceScope, SourceUses,
+    Archive, Entry, EntryOrigin, InputScope, SourceDetails, SourceInput, SourceLocation,
+    SourceScope, SourceUseRole, SourceUses,
 };
 
+use crate::origin_capture::OriginCapture;
+use crate::origin_contributions::OriginContributions;
 use crate::origin_error;
 use crate::{MediaError, MediaWriter, SourceContext};
 
@@ -16,6 +19,8 @@ pub(crate) struct MediaOriginInput {
     pub(crate) owner: SourceUses,
     pub(crate) scope: SourceScope,
     pub(crate) details_limited: bool,
+    /// Completed byte count of the original whole-file read.
+    pub(crate) archive_file_length: Option<u64>,
 }
 
 impl MediaOriginInput {
@@ -83,7 +88,34 @@ impl MediaOriginInput {
             owner: owner.clone(),
             scope,
             details_limited: !full,
+            archive_file_length: None,
         })
+    }
+
+    pub(crate) fn archive_file_size_origin(
+        &self,
+        size: u64,
+        detail_bytes: u64,
+    ) -> Result<OriginContributions, MediaError> {
+        if self.archive_file_length != Some(size) {
+            return Ok(OriginContributions::unknown(&self.owner));
+        }
+        let used = self
+            .scope
+            .for_scope(InputScope::FileMetadata)
+            .at(
+                SourceLocation::Metadata {
+                    field: "byteLength".to_owned(),
+                },
+                SourceUseRole::Payload,
+            )
+            .map_err(origin_error::evidence)?;
+        let mut capture = OriginCapture::with_limit(&self.owner, detail_bytes);
+        capture.include_original(&OriginContributions {
+            uses: [used].into(),
+            ..OriginContributions::independent(&self.owner)
+        })?;
+        Ok(capture.finish())
     }
 
     pub(crate) fn ancestor(&self, position: usize) -> Result<Option<Self>, MediaError> {
@@ -95,6 +127,7 @@ impl MediaOriginInput {
                     owner: self.owner.clone(),
                     scope,
                     details_limited: self.details_limited,
+                    archive_file_length: None,
                 })
             })
     }

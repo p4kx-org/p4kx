@@ -49,11 +49,13 @@ pub(crate) fn build(
     writer.origins.observe_root(archive, size)?;
     writer.bind_build(archive, &mut root)?;
     if include_archive {
+        root.size_origin.clone_from(&writer.origins.root);
         crate::origin_build::installation_flags::bind(archive, &mut root, &writer)?;
     }
     root_callbacks(&root, providers, &mut writer)?;
     let entries = collect(archive, options, &root, providers, &mut writer)?;
     writer.index_build(&root)?;
+    root.size_origin = None;
     root.build_origin = None;
     root.installation_flags_origin = None;
     let finished = writer.finish()?;

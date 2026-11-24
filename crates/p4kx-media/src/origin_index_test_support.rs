@@ -31,6 +31,7 @@ pub(super) fn index() -> Index {
                 hex: "0".repeat(64),
             },
             size: 0,
+            size_origin: None,
             build: None,
             build_origin: None,
             build_present: true,

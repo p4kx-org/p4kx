@@ -42,6 +42,7 @@ impl<'de> Deserialize<'de> for RootSource {
             path: wire.path,
             digest: wire.digest,
             size: wire.size,
+            size_origin: None,
             build: wire.build.value,
             build_present: wire.build.present,
             build_origin: None,

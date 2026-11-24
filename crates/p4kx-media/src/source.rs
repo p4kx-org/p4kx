@@ -99,6 +99,9 @@ pub struct RootSource {
     pub digest: Digest,
     /// File size in bytes.
     pub size: u64,
+    #[serde(skip)]
+    #[schemars(skip)]
+    pub(crate) size_origin: Option<crate::origin_input::MediaOriginInput>,
     /// Build fields as declared by the adjacent launcher manifest.
     pub build: Option<BuildProvenance>,
     #[serde(skip)]
@@ -210,6 +213,7 @@ pub(crate) fn root(archive: &Archive, digest: Digest, size: u64) -> RootSource {
         path: archive.path().to_string_lossy().into_owned(),
         digest,
         size,
+        size_origin: None,
         build,
         build_origin: None,
         build_present: true,

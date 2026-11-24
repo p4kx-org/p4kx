@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    Archive, BuildManifestObservation, BuildManifestOutcome, InputScope, SourceInput, SourceUseRole,
+    Archive, BuildManifestObservation, BuildManifestOutcome, FieldPath, InputScope, SourceInput,
+    SourceUseRole,
 };
 
 use crate::build_projection;
@@ -57,6 +58,7 @@ impl MediaWriter<'_> {
                 owner: self.origins.owner.clone(),
                 scope,
                 details_limited: false,
+                archive_file_length: None,
             }));
         }
         self.build_attempt(observed.outcome())?;
@@ -73,6 +75,7 @@ impl MediaWriter<'_> {
             owner: self.origins.owner.clone(),
             scope,
             details_limited: false,
+            archive_file_length: None,
         };
         let field = match outcome {
             BuildManifestOutcome::Missing => "missing",
@@ -98,6 +101,14 @@ impl MediaWriter<'_> {
     ) -> Result<(), MediaError> {
         let mut prepared =
             origin_build_map::prepare(root, "/data/build", OriginProfile::ArchiveBuild, self)?;
+        if let Some(input) = &root.size_origin
+            && input.owner.is_same_inventory(&self.origins.owner)
+        {
+            let path =
+                FieldPath::parse("/data/size").map_err(|cause| origin_error::address(&cause))?;
+            let origin = input.archive_file_size_origin(root.size, self.limits.record_bytes)?;
+            prepared.insert(&path, origin, self)?;
+        }
         crate::origin_build::installation_flags::insert(root, &mut prepared, self)?;
         self.record_with_origins(subresource, status, root, issues, prepared)
     }

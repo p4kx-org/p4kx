@@ -33,6 +33,12 @@ impl OriginState {
         archive: &Archive,
         byte_length: u64,
     ) -> Result<(), MediaError> {
+        let opened_length = archive.file_len();
+        if byte_length != opened_length {
+            return Err(MediaError::Contract(format!(
+                "completed Archive read measured {byte_length} bytes but the opened Archive length was {opened_length} bytes"
+            )));
+        }
         self.require_root(archive)?;
         let scope = self
             .owner
@@ -48,6 +54,7 @@ impl OriginState {
             owner: self.owner.clone(),
             scope,
             details_limited: false,
+            archive_file_length: Some(byte_length),
         };
         self.root = Some(input.clone());
         self.directories.push(input);
@@ -103,6 +110,33 @@ impl OriginState {
         if !actual.is_same_input(archive.input_origin()) {
             return Err(origin_error::foreign());
         }
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use p4kx_extraction::Archive;
+    use p4kx_testkit::ArchiveBuilder;
+
+    use super::OriginState;
+    use crate::MediaError;
+
+    #[test]
+    fn mismatched_root_length_does_not_bind_the_file() -> Result<(), Box<dyn std::error::Error>> {
+        let folder = tempfile::tempdir()?;
+        let path = folder.path().join("Data.p4k");
+        ArchiveBuilder::new().write_to(&path)?;
+        let archive = Archive::open(path)?;
+        let mut origins = OriginState::new(1024);
+        let expected = archive.file_len();
+        let measured = expected + 1;
+        let result = origins.observe_root(&archive, measured);
+        assert!(matches!(result,
+            Err(MediaError::Contract(detail))
+                if detail.contains(&measured.to_string()) && detail.contains(&expected.to_string())
+        ));
+        assert!(origins.root.is_none());
         Ok(())
     }
 }

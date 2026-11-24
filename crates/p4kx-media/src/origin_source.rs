@@ -8,7 +8,7 @@ use crate::origin_contributions::OriginContributions;
 use crate::origin_input::MediaOriginInput;
 use crate::origin_resolver::{self, OriginResolver};
 use crate::origin_source_identity;
-use crate::{MediaError, Source};
+use crate::{Identity, MediaError, Source};
 
 const MEMBERS: &[&str] = &[
     "/root",
@@ -81,6 +81,10 @@ fn member(
             Ok(OriginContributions::independent(resolver.owner))
         }
         "/verification" => verification(resolver),
+        "/size" if matches!(source.identity, Identity::Root) => resolver.source.map_or_else(
+            || Ok(OriginContributions::unknown(resolver.owner)),
+            |input| input.archive_file_size_origin(source.size, resolver.detail_bytes),
+        ),
         "/size" => metadata(resolver, "uncompressedSize"),
         _ if origin_resolver::within(field, "/raw") => raw(resolver, source),
         _ if origin_resolver::within(field, "/declared_integrity") => {

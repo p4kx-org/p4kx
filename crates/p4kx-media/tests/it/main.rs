@@ -30,6 +30,7 @@ mod animation_xml_loadout_scope;
 mod archive;
 mod archive_installation_flags;
 mod archive_layout;
+mod archive_root_size;
 mod audio_bank_action_properties_provider;
 mod audio_bank_action_target_provider;
 mod audio_bank_actor_mixer_provider;

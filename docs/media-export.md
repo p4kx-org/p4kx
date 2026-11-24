@@ -695,6 +695,14 @@ or a value without a matching original binding has unknown origin. The
 accept historical occurrences where this cell's origin was unknown. Index Build
 coverage is unchanged.
 
+The Archive-root `/data/size` field and its `/source/size` envelope field use
+the same measured byte count from the completed root file read. Both cite the
+original `archiveFile` source's `byteLength` use in the file metadata domain.
+The contributing use set is complete and whole-file encryption is unknown.
+The payload size origin requires the live read binding and its measured value.
+An Archive Entry envelope continues to cite its own original uncompressed
+size declaration.
+
 The reader verifies this projection's hash, ordinal, full field paths, node count,
 single occurrence, completion and EOF against the committed receipts. A declared
 `indexBuild` scope requires the actual canonical object/null: missing `build` or
