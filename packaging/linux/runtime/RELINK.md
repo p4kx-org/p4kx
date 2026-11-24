@@ -8,6 +8,10 @@ corresponding sources and Alpine recipes are alongside them.
 The recipe archives use Alpine's official GitHub mirror or public GitLab repository API, with
 the exact signed-package recipe commit, archive root and SHA-256 pinned in `inputs.json`.
 
+The pinned `zstd-dev` package requires the `zstd` executable package at the exact same
+version. Both APKs use the same Alpine recipe and are part of the recorded build inputs.
+The toolchain installs the signed APKs and their dependencies in one transaction.
+
 The zlib distfile for the pinned recipe is preloaded from Alpine's v3.23 distfiles mirror.
 The collector verifies the pinned SHA-256 before invoking the original recipe's
 `abuild fetch verify unpack`. The recipe checks its own SHA-512 and the exact distfile remains

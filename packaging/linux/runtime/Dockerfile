@@ -1,10 +1,9 @@
 ARG BUILDER_IMAGE
 FROM ${BUILDER_IMAGE} AS toolchain
+COPY packages/ /src/packages/
 RUN apk add --no-cache bash alpine-sdk util-linux strace file autoconf automake libtool xz \
     eudev-dev gettext-dev linux-headers meson zstd-dev zstd-static zlib-dev zlib-static \
-    clang musl-dev mimalloc2-dev python3 git
-COPY packages/ /src/packages/
-RUN apk add --no-cache /src/packages/*.apk
+    clang musl-dev mimalloc2-dev python3 git /src/packages/*.apk
 COPY upstream/ /src/runtime/
 COPY Dockerfile collect-sources.py build_inputs.py RELINK.md /src/
 COPY inputs.json /src/inputs.json
