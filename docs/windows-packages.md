@@ -200,10 +200,12 @@ finished. Diagnostics cannot replace the source-bound native runtime and exact-P
 proofs. The infrastructure tests execute synthetic PowerShell children and mocked native
 adapters; they are not a reproduction of an installer timeout.
 
-The package consumer preserves the original Finish supervisor launch and then waits
-for its terminal receipt within the original deadline. It uploads and validates that
-receipt before accepting the MSI lifecycle. The detached observer controls exercise
-the intermediate Finish probes and their watchdog receipts in harmless native workers.
+The package consumer records the original Finish supervisor launch locally, waits
+for its terminal receipt within the original deadline, and validates that receipt
+against the closed journal. The original terminal evidence must upload successfully
+before package evidence and payload publication. The detached observer controls
+exercise the intermediate Finish probes and their watchdog receipts in harmless
+native workers.
 
 The diagnostic-only `MSI feedback runner-fuse probe` workflow runs native AMD64 and ARM64
 complete/timeout controls through the same phase writer. Its separate verifier downloads the
@@ -291,6 +293,17 @@ cutoff. The blocking operation remains unknown.
 [Checkpoint 03](https://github.com/p4kx-org/p4kx/actions/runs/45327821298/artifacts/14893049565) ·
 [Finish launch](https://github.com/p4kx-org/p4kx/actions/runs/45327821298/artifacts/14894530139)
 
+Release merge `8b6032a9d` finished the native AMD64 job in 4 minutes 51 seconds.
+The original terminal journal has 200 events, a completed worker with exit 0 and
+no active event. The ARM64 job captured and published checkpoint 03 after the
+first install. GitHub still reported that upload step as in progress after its
+one-minute allowance and the original observer deadline. The next Finish launch
+step remained pending.
+[Native AMD64](https://github.com/p4kx-org/p4kx/actions/runs/45338631037/job/138277997319) ·
+[Terminal AMD64 receipt](https://github.com/p4kx-org/p4kx/actions/runs/45338631037/artifacts/14898410480) ·
+[Native ARM64](https://github.com/p4kx-org/p4kx/actions/runs/45338631037/job/138277997254) ·
+[ARM64 checkpoint 03](https://github.com/p4kx-org/p4kx/actions/runs/45338631037/artifacts/14897991980)
+
 For release acceptance, repeat the native lifecycle checks with the actual release candidate
 and bind both its MSI and portable ZIP to the candidate revision and run attempt. Record the
 Windows AMD64 desktop and WASAPI checks separately from the hosted package evidence.
@@ -319,10 +332,10 @@ mutations of the actual downloaded artifacts. Any outer interruption leaves nati
 unproven, whether a final parent result exists or not. The fixture can establish cancellation and
 feedback behavior; it cannot establish the cause of an MSI timeout or permit external cleanup.
 
-The real consumer preserves the actual prepared allowance, source hashes and already executed
-parent-contract artifacts in a one-minute bounded upload after preparation and before installer
-work. That upload does not refresh the original deadline or allowance; admission remains the next
-installer entry guard. The later cancellation-aware capture also includes the parent controls.
+The real consumer records the prepared allowance, source hashes, checkpoints and parent controls
+on the runner. It refreshes admission under the original deadline before launching the installer.
+The cancellation-aware diagnostic upload collects those local files after the terminal evidence
+and package publication steps. A runner failure before the upload can prevent delivery.
 `diagnostic-start.json` is written before worker launch, records the original worker source and
 budget, and always declares completion unproven and no mutation authority. It is not evidence that
 the child started, exited or left the Windows Installer service idle. All real installer cases,
