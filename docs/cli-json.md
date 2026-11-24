@@ -2878,6 +2878,11 @@ row is bound to its original word in the selected geometry Entry. The rebuilt
 `first_index`, loose inputs and submeshes without a proven word have a null marker
 and incomplete source sets.
 
+Each mesh's `triangles` identifies the original index-count words when they account for
+every retained submesh range. The LOD's `triangles` retains those words across its meshes.
+These origins remain incomplete because the fields also depend on geometry and submesh
+selection. An unbound or empty mesh adds no observed count words.
+
 A selected model checked on LIVE 13220821 and PTU 13260598 had six LODs and 651
 submeshes on each Build. Every material ID and index count had a complete,
 resolvable source-use reference in both outputs. Every rebuilt start index

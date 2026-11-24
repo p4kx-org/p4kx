@@ -21,18 +21,21 @@ impl ModelFieldOrigins {
         let uses = SourceUses::with_compact_use_refs();
         let mut fields = FieldOrigins::new();
         for (level, lod) in model.lods.iter().enumerate() {
+            let lod_path = FieldPath::parse(&format!("/lods/{level}")).map_err(io::Error::other)?;
+            let mut triangle_uses = Vec::new();
             for index in 0..lod.meshes.len() {
                 let path = FieldPath::parse(&format!("/lods/{level}/meshes/{index}"))
                     .map_err(io::Error::other)?;
-                submesh_origins::write_submesh_origins(
+                triangle_uses.extend(submesh_origins::write_mesh_origins_with_triangle_uses(
                     source,
                     level,
                     index,
                     &path,
                     &uses,
                     &mut fields,
-                )?;
+                )?);
             }
+            submesh_origins::write_triangle_origin(&lod_path, &uses, &mut fields, &triangle_uses)?;
         }
         for index in 0..model.chunks.len() {
             let path = FieldPath::parse(&format!("/chunks/{index}")).map_err(io::Error::other)?;

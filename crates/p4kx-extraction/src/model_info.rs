@@ -36,7 +36,7 @@ pub use chunk_origins::{write_chunk_origins, write_chunk_type_origin};
 use field_origins::ModelFieldOrigins;
 pub use mesh_info::MeshInfo;
 pub use node_origins::ModelNodeOrigins;
-pub use submesh_origins::write_submesh_origins;
+pub use submesh_origins::{write_mesh_origins, write_submesh_origins};
 
 /// What `p4kx model info --json` says about a model, and what front-ends serialise of it.
 #[derive(Debug, Serialize)]
@@ -98,7 +98,7 @@ impl<'a> ModelInfo<'a> {
         )
     }
 
-    /// Describes the model with original node, bone, submesh and chunk evidence.
+    /// Describes the model with original node, bone, mesh and chunk evidence.
     ///
     /// # Errors
     /// Returns invalid evidence positions or an invalid source inventory.

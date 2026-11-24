@@ -3,7 +3,7 @@
 
 use std::ops::Range;
 
-use p4kx_extraction::model_info::write_submesh_origins;
+use p4kx_extraction::model_info::write_mesh_origins;
 use p4kx_extraction::{FieldOrigins, FieldPath, LodInfo, MeshInfo, ModelArchiveSource};
 use serde::Serialize;
 
@@ -86,7 +86,6 @@ fn field_origins(
             "lod",
             "node",
             "vertices",
-            "triangles",
             "normals",
             "normals_computed",
             "tangents",
@@ -97,7 +96,7 @@ fn field_origins(
         ] {
             model_item_page::put(&mut fields, &path, field, unknown.clone())?;
         }
-        write_submesh_origins(
+        write_mesh_origins(
             request.source,
             row.lod_index,
             row.mesh_index,

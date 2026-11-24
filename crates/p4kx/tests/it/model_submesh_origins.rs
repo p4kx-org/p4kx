@@ -6,7 +6,9 @@ use std::fs;
 use std::ops::Range;
 use std::path::Path;
 
-use p4kx_testkit::{ArchiveBuilder, TestCrchModel, TestEntry, TestModel, p4kx, test_key};
+use p4kx_testkit::{
+    ArchiveBuilder, TestCrchModel, TestEntry, TestModel, TestSubmesh, p4kx, test_key,
+};
 use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -23,7 +25,9 @@ const UNKNOWN_TYPE: u32 = 0x00C0_FFEE;
 fn model_info_binds_original_submesh_words_to_their_actual_levels() -> TestResult {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("Data.p4k");
-    let later = TestModel::cube().with_geometry_chunk(UNKNOWN_TYPE, [7; 12]);
+    let later = TestModel::cube()
+        .with_submeshes(vec![submesh(1, 0, 3), submesh(0, 3, 6), submesh(1, 9, 12)])
+        .with_geometry_chunk(UNKNOWN_TYPE, [7; 12]);
     let model = TestModel::cube().with_lod(later);
     let base = model.cgfm();
     let lod = model.lod_cgfm(1).ok_or("LOD geometry")?;
@@ -59,8 +63,9 @@ fn model_info_binds_original_submesh_words_to_their_actual_levels() -> TestResul
             encrypted,
         };
         assert_word(&info, &submesh, ("material_id", "materialId", 2), &geometry)?;
-        assert_word(&info, &submesh, ("index_count", "indexCount", 4), &geometry)?;
         assert_unknown(&info, &format!("{submesh}/first_index"))?;
+        let expected: &[usize] = if level == 0 { &[12] } else { &[2, 5] };
+        assert_triangle_counts(&info, level, &geometry, expected)?;
         assert_chunk_words(&info, role, &geometry, 4)?;
     }
     Ok(())
@@ -75,6 +80,8 @@ fn model_info_binds_crch_chunk_type_ids_to_two_original_bytes() -> TestResult {
         .entry(TestEntry::zstd(MODEL, bytes.clone()).encrypted())
         .write_to(&path)?;
     let info = listing(&path, Some(MODEL))?;
+    assert_unknown(&info, "/lods/0/meshes/0/triangles")?;
+    assert_unknown(&info, "/lods/0/triangles")?;
     assert_chunk_words(
         &info,
         "model",
@@ -103,10 +110,96 @@ fn model_info_reports_unknown_origin_for_loose_submesh_fields() -> TestResult {
     for name in ["type_id", "type", "index", "file", "usage"] {
         assert_unknown(&info, &format!("/chunks/0/{name}"))?;
     }
+    assert_unknown(&info, "/lods/0/meshes/0/triangles")?;
+    assert_unknown(&info, "/lods/0/triangles")?;
     assert_eq!(
         info.get("provenance"),
         Some(&json!({"sources": [], "uses": []}))
     );
+    Ok(())
+}
+
+const fn submesh(node: u16, first_index: u32, index_count: u32) -> TestSubmesh {
+    TestSubmesh {
+        material_id: 1,
+        node,
+        first_index,
+        index_count,
+        first_vertex: 0,
+        vertex_count: 24,
+    }
+}
+
+fn assert_triangle_counts(
+    info: &Value,
+    level: usize,
+    geometry: &Geometry<'_>,
+    expected: &[usize],
+) -> TestResult {
+    let parent = format!("/lods/{level}");
+    let rows = info
+        .pointer(&format!("{parent}/meshes"))
+        .and_then(Value::as_array)
+        .ok_or("LOD meshes")?;
+    assert_eq!(rows.len(), expected.len(), "all emitted meshes");
+    let mut lod_words = Vec::new();
+    for (index, (mesh, &triangles)) in rows.iter().zip(expected).enumerate() {
+        let mesh_path = format!("{parent}/meshes/{index}");
+        let count = mesh["submeshes"].as_array().ok_or("mesh submeshes")?.len();
+        let mut mesh_words = Vec::new();
+        for ordinal in 0..count {
+            mesh_words.push(assert_word(
+                info,
+                &format!("{mesh_path}/submeshes/{ordinal}"),
+                ("index_count", "indexCount", 4),
+                geometry,
+            )?);
+        }
+        assert_triangle_words(info, &mesh_path, &mesh_words, geometry.encrypted, triangles)?;
+        lod_words.extend(mesh_words);
+    }
+    assert_triangle_words(
+        info,
+        &parent,
+        &lod_words,
+        geometry.encrypted,
+        expected.iter().sum(),
+    )
+}
+
+fn assert_triangle_words(
+    info: &Value,
+    parent: &str,
+    expected: &[Range<usize>],
+    encrypted: bool,
+    triangles: usize,
+) -> TestResult {
+    let path = format!("{parent}/triangles");
+    assert_eq!(info.pointer(&path), Some(&json!(triangles)), "{path} value");
+    let origin = field_origin(info, &path)?;
+    assert_eq!(origin["sourceSetComplete"], false, "{path} selectors");
+    assert_eq!(
+        origin["containsEncryptedSource"].as_bool(),
+        encrypted.then_some(true),
+        "{path} encryption",
+    );
+    let ids = origin["sourceUsesRefs"]
+        .as_array()
+        .ok_or("triangle input uses")?;
+    assert_eq!(ids.len(), expected.len(), "count words at {path}");
+    for id in ids {
+        let row = origin_row(info, "/provenance/uses", id)?;
+        assert_eq!(row["role"], "conversion", "{path} computes the count");
+        let word = row.get("location").ok_or("conversion word")?;
+        assert_eq!(word["field"], "indexCount", "{path} original input");
+        assert!(
+            expected
+                .iter()
+                .any(|range| word["indices"]
+                    == json!([range.start.to_string(), range.end.to_string(),])),
+            "{path} geometry word {word}",
+        );
+    }
     Ok(())
 }
 

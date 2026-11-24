@@ -40,6 +40,7 @@ fn mesh_page_origins_follow_the_original_lod_with_page_local_addresses() -> Test
             marker(field(reply, &path)?, encrypted);
             assert_geometry_entry(reply, &path, label, entry)?;
         }
+        assert_mesh_triangle_words(reply, encrypted)?;
         let origin = field(reply, &format!("{submesh}/first_index"))?;
         assert_eq!(
             origin,
@@ -334,6 +335,34 @@ fn installation(cube: &TestModel, levels: usize) -> TestResult<Install> {
         entries.push(if level == 1 { entry.encrypted() } else { entry });
     }
     Install::new(entries)
+}
+
+fn assert_mesh_triangle_words(reply: &Value, encrypted: bool) -> TestResult {
+    let path = "items/0/triangles";
+    assert_partial_origin(reply, path, encrypted)?;
+    assert_eq!(
+        reply.pointer("/items/0/triangles"),
+        Some(&json!(12)),
+        "the returned mesh has the twelve cube triangles",
+    );
+    let inputs = uses(reply, path)?;
+    assert_eq!(inputs.len(), 2, "one use per original cube submesh");
+    for position in 0..2 {
+        let count = format!("items/0/submeshes/{position}/index_count");
+        let original = uses(reply, &count)?;
+        let [word] = original.as_slice() else {
+            return Err("one original count word".into());
+        };
+        assert!(
+            inputs.iter().any(|input| {
+                input["role"] == "conversion"
+                    && input["location"] == word["location"]
+                    && input["source"] == word["source"]
+            }),
+            "the mesh count uses the current page's original word at {count}"
+        );
+    }
+    Ok(())
 }
 
 fn assert_geometry_entry(reply: &Value, output: &str, label: &str, entry: &str) -> TestResult {

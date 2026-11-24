@@ -1028,8 +1028,11 @@ and cursor apply to node pages.
 
 For `list_model_items` with `section: "meshes"`, submesh field origins use the
 returned mesh and submesh positions. The source ranges identify the original
-IVO material ID and index-count words in the selected geometry Entry. The rebuilt
-`first_index` and fields with unproved inputs use the unknown marker. Provenance
+IVO material ID and index-count words in the selected geometry Entry. The mesh's
+`triangles` origin identifies all original count words for its retained submeshes when
+they cover the emitted index list. Its contributor set remains incomplete because it
+depends on geometry and submesh selection. The rebuilt `first_index` and fields
+with unproved inputs use the unknown marker. Provenance
 counts toward the response budget, and the cursor resumes after the last returned mesh.
 
 For `list_model_items` with `section: "chunks"`, field origins for `type_id`,
