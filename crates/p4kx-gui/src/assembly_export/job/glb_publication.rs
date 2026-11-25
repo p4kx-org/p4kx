@@ -6,8 +6,8 @@ use std::io;
 
 use p4kx_assembly::{ArchiveModels, Assembly, Interior};
 use p4kx_extraction::{
-    Archive, ArchiveWriteProtection, CancelToken, ConversionError, FileReceipt, GlbOptions,
-    GlbSummary, GltfError, TextureLoader, WriteProtectionError,
+    Archive, ArchiveWriteProtection, CancelToken, ConversionError, FileReceipt, GlbMeshOrigins,
+    GlbOptions, GlbSummary, GltfError, TextureLoader, WriteProtectionError,
 };
 
 use thiserror::Error;
@@ -15,11 +15,6 @@ use thiserror::Error;
 use super::stop::{Observed, StoppableTextures};
 use super::{Request, Shared};
 use crate::EntryIndex;
-
-#[path = "glb_origins.rs"]
-mod origins;
-
-use origins::Origins;
 
 pub(super) enum Scene<'a> {
     Entity(&'a Assembly),
@@ -60,7 +55,7 @@ pub(super) fn publish(
                     cancel,
                     written: &shared.done,
                 };
-                let mut origins = Origins::new();
+                let mut origins = GlbMeshOrigins::new();
                 let summary = scene
                     .write(&request.options(), &textures, &mut observed, &mut origins)
                     .map_err(io::Error::other)?;
@@ -85,23 +80,27 @@ impl Scene<'_> {
         options: &GlbOptions,
         textures: &dyn TextureLoader,
         writer: &mut impl io::Write,
-        origins: &mut Origins,
+        origins: &mut GlbMeshOrigins,
     ) -> Result<GlbSummary, GltfError> {
         match self {
             Self::Entity(assembly) => assembly.write_glb_with_vertex_origins(
                 options,
                 textures,
                 writer,
-                &mut |mesh, _, sources| origins.mesh(mesh.position_accessor, mesh.origin, sources),
+                &mut |mesh, _, sources| {
+                    origins.observe_mesh(mesh.position_accessor, mesh.origin, sources)
+                },
             ),
             Self::Interior { interior, opened } => {
-                origins.containers(opened).map_err(GltfError::Write)?;
+                origins
+                    .observe_containers(opened)
+                    .map_err(GltfError::Write)?;
                 interior.write_glb_with_vertex_origins(
                     options,
                     textures,
                     writer,
                     &mut |mesh, _, sources| {
-                        origins.mesh(mesh.position_accessor, mesh.origin, sources)
+                        origins.observe_mesh(mesh.position_accessor, mesh.origin, sources)
                     },
                 )
             }

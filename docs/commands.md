@@ -271,7 +271,10 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   below the Entity whose Entity or geometry cannot be resolved are skipped and listed, and so are
   palettes and textures that cannot be resolved. When the geometry of the Entity itself is not in
   the Archive (exit code 2) or cannot be read, also for want of its `.chrm` companion (exit code
-  3), the command fails naming the file and writes nothing; `entity package` does the same. With
+  3), the command fails naming the file and writes nothing; `entity package` does the same.
+  Entity GLB exports publish a sibling `<file>.p4kx-origin.jsonl` bound to the written bytes.
+  The ordinary export reports original geometry for the emitted POSITION accessor counts where
+  its source was retained. Whole-artifact geometry evidence is partial. With
   `--json` the report has the shape described in [docs/cli-json.md](cli-json.md). A docked
   vehicle such as a Merlin or an Archimedes is
   placed as one part, without the parts of its own Loadout, unless `--expand-docked-vehicles`

@@ -10,7 +10,7 @@ use p4kx_gltf::{
 };
 use p4kx_model::Model;
 
-use crate::{Assembly, creature_rig};
+use crate::{Assembly, CreatureAnimations, creature_rig};
 
 impl Assembly {
     pub(crate) fn scene(&self) -> Result<Scene<'_>, GltfError> {
@@ -28,13 +28,36 @@ impl Assembly {
         out: &mut impl io::Write,
         visitor: &mut impl FnMut(MeshVertexMap<'_>, &Model, &[ModelArchiveSource]) -> io::Result<()>,
     ) -> Result<GlbSummary, GltfError> {
+        self.write_glb_animated_with_vertex_origins(
+            &CreatureAnimations::default(),
+            options,
+            textures,
+            out,
+            visitor,
+        )
+    }
+
+    /// Writes a GLB with fitted animations and the original sources of emitted meshes.
+    ///
+    /// # Errors
+    /// Returns scene and write failures, or an error from the visitor.
+    pub fn write_glb_animated_with_vertex_origins(
+        &self,
+        animations: &CreatureAnimations<'_>,
+        options: &GlbOptions,
+        textures: &dyn TextureLoader,
+        out: &mut impl io::Write,
+        visitor: &mut impl FnMut(MeshVertexMap<'_>, &Model, &[ModelArchiveSource]) -> io::Result<()>,
+    ) -> Result<GlbSummary, GltfError> {
         let mut sources: Vec<&[ModelArchiveSource]> = Vec::new();
-        let scene = self.scene_with(|node, origin| {
-            sources.resize(node + 1, &[]);
-            if let Some(slot) = sources.get_mut(node) {
-                *slot = origin;
-            }
-        })?;
+        let scene = self
+            .scene_with(|node, origin| {
+                sources.resize(node + 1, &[]);
+                if let Some(slot) = sources.get_mut(node) {
+                    *slot = origin;
+                }
+            })?
+            .with_animations(animations.animations().iter().copied());
         write_scene_with_vertex_origins(&scene, &sources, options, textures, out, visitor)
     }
 

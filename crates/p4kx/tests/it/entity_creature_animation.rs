@@ -5,8 +5,11 @@
 //! `--animations` is given, and lists what it could not write.
 
 use std::error::Error;
+use std::io::{self, Write};
 use std::path::Path;
 
+use p4kx_extraction::OriginDigestWriter;
+use p4kx_testkit::gltf::Semantic;
 use p4kx_testkit::{
     CREATURE_ANIMATED, CREATURE_ANIMATION_DATABASE_LOST, CREATURE_ANIMATION_SCOPED, check_glb,
     creature_entries,
@@ -43,10 +46,98 @@ fn the_clips_of_a_creature_are_written_and_the_report_counts_them() -> TestResul
 
     let text = glb(&archive, CREATURE_ANIMATED, &out, &["--animations"])?;
 
-    let checked = check_glb(&std::fs::read(&out)?)?;
+    let bytes = std::fs::read(&out)?;
+    let checked = check_glb(&bytes)?;
     assert_eq!(checked.document.animations().len(), 1);
+    check_mesh_origins(&out, &bytes, &checked)?;
     assert!(text.contains("1 animations, 1 channels"), "{text}");
     assert!(text.contains("additive"), "{text}");
+    Ok(())
+}
+
+fn check_mesh_origins(path: &Path, bytes: &[u8], glb: &p4kx_testkit::CheckedGlb) -> TestResult {
+    let receipt = std::fs::read_to_string(path.with_extension("glb.p4kx-origin.jsonl"))?;
+    let rows = receipt
+        .lines()
+        .map(serde_json::from_str)
+        .collect::<Result<Vec<Value>, _>>()?;
+    let mut writer = OriginDigestWriter::new(io::sink());
+    writer.write_all(bytes)?;
+    let actual = serde_json::to_value(writer.finish()?)?;
+    let binding = rows
+        .first()
+        .and_then(|row| row.get("binding"))
+        .ok_or("companion binding")?;
+    for field in ["byteLength", "sha256"] {
+        let expected = actual.get(field).ok_or("computed artifact digest field")?;
+        assert_eq!(
+            binding.get(field),
+            Some(expected),
+            "exact written GLB {field}"
+        );
+    }
+    check_position_count(&rows, glb)
+}
+
+fn check_position_count(rows: &[Value], glb: &p4kx_testkit::CheckedGlb) -> TestResult {
+    let position = glb
+        .document
+        .meshes()
+        .flat_map(|mesh| mesh.primitives())
+        .find_map(|primitive| primitive.get(&Semantic::Positions))
+        .ok_or("the emitted position accessor")?;
+    let path = format!("/accessors/{}/count", position.index());
+    let count = rows
+        .iter()
+        .find(|row| {
+            row.pointer("/address/type").and_then(Value::as_str) == Some("glbJsonField")
+                && row.pointer("/address/path").and_then(Value::as_str) == Some(path.as_str())
+        })
+        .ok_or("the position count origin")?;
+    assert_eq!(
+        count.get("sourceSetComplete").and_then(Value::as_bool),
+        Some(false),
+        "the observation is a partial contribution set"
+    );
+    assert!(
+        count
+            .get("containsEncryptedSource")
+            .is_some_and(Value::is_null),
+        "unknown prerequisites keep the encryption marker null"
+    );
+    let refs = count
+        .get("sourceUsesRefs")
+        .and_then(Value::as_array)
+        .ok_or("count source uses")?;
+    let source = rows
+        .iter()
+        .find(|row| {
+            row.pointer("/sourceUse/location/namespace")
+                .and_then(Value::as_str)
+                == Some("modelChunk")
+                && row
+                    .pointer("/sourceUse/location/field")
+                    .and_then(Value::as_str)
+                    == Some("geometry")
+                && row.pointer("/sourceUse/role").and_then(Value::as_str) == Some("conversion")
+                && row
+                    .pointer("/sourceUse/id")
+                    .is_some_and(|id| refs.contains(id))
+        })
+        .ok_or("the actual model chunk contribution")?;
+    let source_id = source
+        .pointer("/sourceUse/source")
+        .ok_or("geometry source reference")?;
+    assert!(
+        rows.iter().any(|row| {
+            row.pointer("/source/id") == Some(source_id)
+                && row
+                    .pointer("/source/path/value")
+                    .and_then(Value::as_str)
+                    .is_some_and(|value| value.ends_with("creature.skinm"))
+        }),
+        "the contribution names the physical creature mesh Entry"
+    );
     Ok(())
 }
 

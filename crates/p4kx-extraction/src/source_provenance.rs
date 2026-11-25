@@ -13,6 +13,8 @@ mod default_material_receipt;
 mod entity_material_effects;
 #[path = "entry_directory_origins.rs"]
 mod entry_directory_origins;
+#[path = "glb_mesh_origins.rs"]
+mod glb_mesh_origins;
 #[path = "provenance_mode.rs"]
 pub(crate) mod mode;
 #[path = "model_archive_source.rs"]
@@ -83,6 +85,7 @@ pub(crate) use entry_directory_origins::issues as entry_issue_origins;
 pub use entry_directory_origins::{
     EntryDirectoryFact, EntryDirectoryOrigins, EntryDirectoryOriginsError, directory_path_uses,
 };
+pub use glb_mesh_origins::{FrozenGlbMeshOrigins, GlbMeshOrigins};
 pub use model_archive_source::{ArchiveModelRead, ModelArchiveSource};
 pub use model_material_origins::{
     ArchiveMaterialRead, ArchiveMaterialReads, MaterialArchiveOrigins, MaterialLayerOrigin,

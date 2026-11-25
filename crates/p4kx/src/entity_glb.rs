@@ -10,8 +10,8 @@ use p4kx_assembly::{
     ForgePalettes, LoadoutResolver, creature_animations,
 };
 use p4kx_extraction::{
-    ConversionError, DataForgeEntry, FileReceipt, GlbOptions, GlbSummary, GltfError, MaterialMode,
-    is_same_file, write_replacing_protected,
+    ArchiveWriteProtection, CancelToken, ConversionError, DataForgeEntry, FileReceipt,
+    GlbMeshOrigins, GlbOptions, GlbSummary, GltfError, MaterialMode, TextureLoader, is_same_file,
 };
 use thiserror::Error;
 
@@ -34,7 +34,7 @@ pub(crate) fn run(args: &EntityGlbArgs, as_json: bool) -> Result<()> {
     let changes = args.changes.changes()?;
     let archive = crate::key::open(&args.archive)?;
     let cancel = crate::extract::cancel_on_interrupt()?;
-    let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
+    let protection = ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let files = ArchiveFiles::new(&archive);
@@ -92,8 +92,8 @@ fn write(
     animated: &CreatureAnimations<'_>,
     models: &ArchiveModels<'_>,
     args: &EntityGlbArgs,
-    protection: &p4kx_extraction::ArchiveWriteProtection,
-    cancel: &p4kx_extraction::CancelToken,
+    protection: &ArchiveWriteProtection,
+    cancel: &CancelToken,
 ) -> Result<GlbSummary> {
     let mode = match args.materials {
         EntityMaterialsArg::Colours => MaterialMode::Colours,
@@ -134,20 +134,54 @@ fn write(
                 },
             })?);
     }
-    Ok(write_replacing_protected(
+    publish_mesh_origins(
+        assembly,
+        animated,
+        &options,
+        &textures,
         out,
-        Some(protection),
-        Some(cancel),
-        |writer| {
-            assembly
-                .write_glb_animated_with(animated, &options, &textures, writer)
-                .map_err(|error| match error {
-                    GltfError::Write(source) => ConversionError::Write {
-                        path: out.to_path_buf(),
-                        source,
-                    },
-                    source => ConversionError::Glb { file: name, source },
-                })
-        },
-    )?)
+        name,
+        (protection, cancel),
+    )
+}
+
+fn publish_mesh_origins(
+    assembly: &Assembly,
+    animated: &CreatureAnimations<'_>,
+    options: &GlbOptions,
+    textures: &dyn TextureLoader,
+    out: &Path,
+    name: String,
+    (protection, cancel): (&ArchiveWriteProtection, &CancelToken),
+) -> Result<GlbSummary> {
+    let write_error = |source| ConversionError::Write {
+        path: out.to_path_buf(),
+        source,
+    };
+    let receipt = FileReceipt::for_staged_replacement(out, Some(protection), cancel.clone())
+        .map_err(write_error)?;
+    let (summary, _) = receipt
+        .publish(
+            |mut writer| {
+                let mut origins = GlbMeshOrigins::new();
+                let summary = assembly
+                    .write_glb_animated_with_vertex_origins(
+                        animated,
+                        options,
+                        textures,
+                        &mut writer,
+                        &mut |mesh, _, sources| {
+                            origins.observe_mesh(mesh.position_accessor, mesh.origin, sources)
+                        },
+                    )
+                    .map_err(io::Error::other)?;
+                Ok((summary, origins.finish()?))
+            },
+            |writer, binding, (_, origins)| origins.write_companion(writer, binding),
+        )
+        .map_err(|error| match error.downcast::<GltfError>() {
+            Ok(GltfError::Write(source)) | Err(source) => write_error(source),
+            Ok(source) => ConversionError::Glb { file: name, source },
+        })?;
+    Ok(summary)
 }

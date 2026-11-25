@@ -3,22 +3,31 @@
 
 use std::io;
 
-use p4kx_extraction::model::MeshOrigin;
-use p4kx_extraction::{
+use crate::{
     Archive, EntryOrigin, FieldOrigin, FieldPath, InputScope, ModelArchiveSource,
     OriginArtifactBinding, OriginOutputAddress, SourceCoordinateOmission, SourceInput,
     SourceInventory, SourceLocation, SourceScope, SourceUse, SourceUseRole, SourceUses,
     write_origin_companion,
 };
+use p4kx_model::MeshOrigin;
 
-pub(super) struct Origins {
+/// Collects the original mesh geometry and opened Container inputs of one emitted GLB.
+pub struct GlbMeshOrigins {
     uses: SourceUses,
     fields: Vec<(OriginOutputAddress, FieldOrigin)>,
     contributors: Vec<SourceUse>,
 }
 
-impl Origins {
-    pub(super) fn new() -> Self {
+impl Default for GlbMeshOrigins {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl GlbMeshOrigins {
+    /// Starts a field-origin capture for one GLB.
+    #[must_use]
+    pub fn new() -> Self {
         Self {
             uses: SourceUses::with_compact_use_refs(),
             fields: Vec::new(),
@@ -26,7 +35,11 @@ impl Origins {
         }
     }
 
-    pub(super) fn containers(&mut self, opened: &[Archive]) -> io::Result<()> {
+    /// Retains original Container inputs that were opened to build the scene.
+    ///
+    /// # Errors
+    /// Returns an error if a source observation cannot be registered.
+    pub fn observe_containers(&mut self, opened: &[Archive]) -> io::Result<()> {
         for entry in opened.iter().filter_map(Archive::container_input_origin) {
             let source = self
                 .payload(&entry)?
@@ -40,7 +53,12 @@ impl Origins {
         Ok(())
     }
 
-    pub(super) fn mesh(
+    /// Captures the geometry contributor to an emitted POSITION accessor count.
+    /// The result remains incomplete when the full set of emission operands is unavailable.
+    ///
+    /// # Errors
+    /// Returns an error if an address or observation cannot be registered.
+    pub fn observe_mesh(
         &mut self,
         accessor: usize,
         geometry: Option<MeshOrigin>,
@@ -80,9 +98,13 @@ impl Origins {
             .map_err(io::Error::other)
     }
 
-    pub(super) fn finish(self) -> io::Result<FrozenOrigins> {
+    /// Freezes the addressed observations and the partial artifact summary.
+    ///
+    /// # Errors
+    /// Returns an error if the physical evidence cannot be frozen.
+    pub fn finish(self) -> io::Result<FrozenGlbMeshOrigins> {
         let artifact = self.uses.origin(&self.contributors, false);
-        Ok(FrozenOrigins {
+        Ok(FrozenGlbMeshOrigins {
             inventory: self.uses.freeze().map_err(io::Error::other)?,
             artifact,
             fields: self.fields,
@@ -90,14 +112,20 @@ impl Origins {
     }
 }
 
-pub(super) struct FrozenOrigins {
+/// Observed GLB geometry fields and their shared physical origin inventory.
+#[derive(Debug)]
+pub struct FrozenGlbMeshOrigins {
     inventory: SourceInventory,
     artifact: FieldOrigin,
     fields: Vec<(OriginOutputAddress, FieldOrigin)>,
 }
 
-impl FrozenOrigins {
-    pub(super) fn write_companion(
+impl FrozenGlbMeshOrigins {
+    /// Writes a digest-bound companion containing the observed fields.
+    ///
+    /// # Errors
+    /// Returns an error if the companion cannot be serialized or written.
+    pub fn write_companion(
         &self,
         writer: &mut dyn io::Write,
         binding: &OriginArtifactBinding,

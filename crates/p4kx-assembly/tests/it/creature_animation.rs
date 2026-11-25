@@ -48,9 +48,32 @@ fn export(class: &str) -> Result<Exported, Box<dyn std::error::Error>> {
         .iter()
         .map(|issue| issue.kind().to_string())
         .collect();
+    let options = GlbOptions::default();
+    let textures = models.textures();
     let mut bytes = Vec::new();
-    assembly.write_glb_animated(&fitted, &GlbOptions::default(), &mut bytes)?;
+    assembly.write_glb_animated_with(&fitted, &options, &textures, &mut bytes)?;
+    let mut observed = Vec::new();
+    let mut meshes = 0;
+    assembly.write_glb_animated_with_vertex_origins(
+        &fitted,
+        &options,
+        &textures,
+        &mut observed,
+        &mut |_, _, _| {
+            meshes += 1;
+            Ok(())
+        },
+    )?;
+    assert_eq!(
+        observed, bytes,
+        "observing mesh sources preserves the GLB bytes"
+    );
     let glb = check_glb(&bytes)?;
+    assert_eq!(
+        meshes,
+        glb.document.meshes().len(),
+        "one observation per emitted mesh"
+    );
     let targets = glb
         .document
         .animations()
