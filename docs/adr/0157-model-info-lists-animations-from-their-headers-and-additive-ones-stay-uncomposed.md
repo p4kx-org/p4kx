@@ -81,6 +81,12 @@ Neither exact alias stem occurs among the 6,452 metadata names. The survey
 reads no controller blocks or keyframes. Runtime alias resolution, base
 selection and multiplication order remain unresolved.
 
+An additional directory pass on the same installed LIVE Build checked the two
+exact alias stems in the adjoining Rig CHRPARAMS folders for the authored
+`.aim`, `.bspace` and `.comb` families. It found no matching Entries. That
+pass used the original names and verified the Archive and manifest stamps
+before and after the read.
+
 ## Consequences
 
 - `AnimationInfo` has public fields and is `#[non_exhaustive]`; `ModelInfo::of_listing` takes the
