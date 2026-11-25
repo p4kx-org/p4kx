@@ -24,8 +24,9 @@ fn each_mode_owns_its_original_rules_with_per_field_origin() -> TestResult {
     let schema = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&database, origin)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
         schema
             .validate(&catalog)
             .map_err(|error| format!("catalog schema: {error}"))?;
@@ -64,7 +65,8 @@ fn global_scope_respects_record_filter() -> TestResult {
         filter: Some(&filter),
         ..common::options()
     };
-    let filtered: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let filtered: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let [selected] = proof::rows(&filtered, ROWS)? else {
         return Err("exactly the selected resource-rule owner".into());
     };
@@ -108,7 +110,7 @@ fn malformed_global_rule_affects_export_health() -> TestResult {
     )?;
     assert!(
         matches!(
-            build_catalog(&malformed, &common::options()),
+            build_catalog(&malformed, common::options().with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "a wrong original declaration must affect publication"
@@ -117,7 +119,8 @@ fn malformed_global_rule_affects_export_health() -> TestResult {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let report: Value = serde_json::from_slice(build_catalog(&malformed, &options)?.json())?;
+    let report: Value =
+        serde_json::from_slice(build_catalog(&malformed, options.with_full_provenance())?.json())?;
     let rows = proof::rows(&report, ROWS)?;
     let [invalid, ..] = rows else {
         return Err("first malformed mode".into());

@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::cargo_manifests::{
-    CargoManifestDefinition, CargoManifestSnapshot, with_cargo_manifests, with_cargo_manifests_from,
+    CargoManifestDefinition, CargoManifestSnapshot, with_cargo_manifests,
 };
 use p4kx_export::catalog_queries::equipment::cargo_globals;
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    ResourceNumber,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability, ResourceNumber,
 };
 use p4kx_export::{CatalogError, CatalogOptions, build_catalog_from};
 use p4kx_extraction::{
@@ -41,11 +41,13 @@ enum DataForgeStorage {
 pub(super) fn read_manifests() -> TestResult<Route> {
     let (_directory, archive) = open(&manifest_database(), DataForgeStorage::Encrypted)?;
     let entry = DataForgeEntry::read(&archive)?;
-    let built = build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?;
-    let catalog: Value = serde_json::from_slice(built.json())?;
-    with_cargo_manifests_from(
+    let built = build_catalog_from(
         &archive,
         &entry,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
+    let catalog: Value = serde_json::from_slice(built.json())?;
+    full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?.with_cargo_manifests(
         CatalogRecordSelection::All,
         None,
         |snapshot| {
@@ -167,7 +169,7 @@ fn cargo_manifest_sdk_uses_physical_selection_and_restricts_source_reads() -> Te
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let guid = forge.record(0).ok_or("manifest GUID")?.guid();
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::Selected(&[Language::English]),

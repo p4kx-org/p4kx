@@ -5,7 +5,8 @@ use std::ops::ControlFlow;
 use std::sync::{Arc, Mutex};
 
 use p4kx_extraction::{
-    Archive, CancelToken, CanonicalReadObserver, DataForgeEntry, DataForgeError, Record, RecordTree,
+    Archive, CancelToken, CanonicalReadObserver, DataForgeEntry, DataForgeError, ProvenanceMode,
+    Record, RecordTree,
 };
 use p4kx_testkit::{ArchiveBuilder, TestEntry, TestRecord, TestStruct, TestType, TestValue};
 
@@ -13,6 +14,7 @@ use super::reward_read::Query;
 use super::{BlueprintRewardSelection, BlueprintRewardSnapshot};
 use crate::CatalogError;
 use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection};
+use crate::catalog_query_session::CatalogQuerySource;
 
 #[path = "blueprint_reward_query_alias_tests.rs"]
 mod aliases;
@@ -91,7 +93,7 @@ fn query(
     let capture = Arc::new(Capture::default());
     let result = Query {
         archive: &archive,
-        entry: &entry,
+        entry: CatalogQuerySource::new(&entry, ProvenanceMode::Full),
         forge: &forge,
         selection,
         cancel: None,
@@ -263,7 +265,7 @@ fn cancellation_during_actual_source_read_prevents_consumer_invocation() -> Test
     });
     let result = Query {
         archive: &archive,
-        entry: &entry,
+        entry: CatalogQuerySource::new(&entry, ProvenanceMode::Full),
         forge: &forge,
         selection: BlueprintRewardSelection::SourceOwners(CatalogRecordSelection::RecordIndex(
             fixture::SOURCE,

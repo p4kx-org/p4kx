@@ -129,7 +129,7 @@ fn build_fixture(entries: Vec<TestEntry>) -> Result<BuiltCatalog, Box<dyn Error>
     let archive = Archive::open_with_key(&path, Some(p4kx_testkit::test_key()))?;
     Ok(build_catalog(
         &archive,
-        &CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT),
+        CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT).with_full_provenance(),
     )?)
 }
 
@@ -336,9 +336,9 @@ fn a_catalog_from_a_read_entry_equals_one_read_from_the_archive() -> TestResult 
     let archive = Archive::open_with_key(&path, Some(p4kx_testkit::test_key()))?;
     let options = CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT);
 
-    let read = build_catalog(&archive, &options)?;
+    let read = build_catalog(&archive, options.with_full_provenance())?;
     let entry = DataForgeEntry::read(&archive)?;
-    let from = build_catalog_from(&archive, &entry, &options)?;
+    let from = build_catalog_from(&archive, &entry, options.with_full_provenance())?;
 
     assert_eq!(from.json(), read.json(), "identical bytes");
     assert_eq!(from.summary(), read.summary(), "identical summary");

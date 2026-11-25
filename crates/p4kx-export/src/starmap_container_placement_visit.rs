@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, ArchiveWatch, CancelToken, SourceInventory};
+use p4kx_extraction::{Archive, ArchiveWatch, CancelToken, ProvenanceMode, SourceInventory};
 
 use super::coverage::{compile_entry_counts, descriptor_inventory_complete, entry_counts_complete};
 use super::system_roots::{self, RootChoice};
@@ -10,7 +10,7 @@ use super::{
     UnresolvedContainerLink,
 };
 use crate::catalog_query_session::checkpoint;
-use crate::catalog_read::original::with_entry_capture;
+use crate::catalog_read::original::with_entry_capture_mode;
 use crate::export_ledger::ExportLedger;
 use crate::starmap_containers::finish_route_coverage;
 use crate::starmap_index::{Index, SystemRootCandidates};
@@ -166,13 +166,32 @@ impl ContainerPlacementVisitSummary {
 pub fn visit_container_placements(
     archive: &Archive,
     cancel: Option<&CancelToken>,
+    visit: impl FnMut(ContainerPlacementEvent<'_>) -> Result<(), CatalogError>,
+) -> Result<ContainerPlacementVisitSummary, CatalogError> {
+    visit_container_placements_with_provenance_mode(
+        archive,
+        ProvenanceMode::MarkersOnly,
+        cancel,
+        visit,
+    )
+}
+
+/// Visits container placements with the selected source detail.
+///
+/// # Errors
+/// Returns the errors of `visit_container_placements`.
+pub fn visit_container_placements_with_provenance_mode(
+    archive: &Archive,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
     mut visit: impl FnMut(ContainerPlacementEvent<'_>) -> Result<(), CatalogError>,
 ) -> Result<ContainerPlacementVisitSummary, CatalogError> {
     checkpoint(cancel)?;
     let watch = ArchiveWatch::new(archive);
     let index = Index::new(archive);
     let choices = system_roots::choose_roots(&index, cancel)?;
-    let root_inventory = system_roots::capture_roots(archive, &index, &choices, cancel)?;
+    let root_inventory =
+        system_roots::capture_roots(archive, &index, &choices, provenance_mode, cancel)?;
     let directory_complete = root_inventory.directory_complete();
     let availability = availability(&root_inventory);
     let mut complete = root_inventory.is_complete();
@@ -191,6 +210,7 @@ pub fn visit_container_placements(
             &index,
             (choice, **position, entry.entry_index()),
             directory_complete,
+            provenance_mode,
             cancel,
             &mut visit,
         )?;
@@ -216,10 +236,11 @@ fn visit_root(
     index: &Index<'_>,
     (choice, position, root_entry_index): (&RootChoice<'_>, usize, u32),
     directory_complete: bool,
+    provenance_mode: ProvenanceMode,
     cancel: Option<&CancelToken>,
     visit: &mut impl FnMut(ContainerPlacementEvent<'_>) -> Result<(), CatalogError>,
 ) -> Result<ContainerPlacementRootVisit, CatalogError> {
-    with_entry_capture(archive, |capture| {
+    with_entry_capture_mode(archive, provenance_mode, |capture| {
         let Read { bodies, ledger, .. } = starmap_parse::read_all_scoped(
             archive,
             index,

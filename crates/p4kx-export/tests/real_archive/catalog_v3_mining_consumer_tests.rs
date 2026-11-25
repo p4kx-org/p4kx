@@ -14,7 +14,7 @@ fn both_migrated_mining_families_have_nonempty_canonical_rows_and_sourced_identi
     let (_folder, archive) = common::open(&database(), DcbOrigin::Plain)?;
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let mut catalog: Value = serde_json::from_slice(built.json())?;
     for (kind, guid) in [
         (Kind::RefiningProcesses, 0xC111),

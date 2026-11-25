@@ -187,7 +187,7 @@ fn catalog(archive: &Archive, filter: Option<&Filter>) -> TestResult<Value> {
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     options.filter = filter;
-    let catalog = build_catalog(archive, &options)?;
+    let catalog = build_catalog(archive, options.with_full_provenance())?;
     Ok(serde_json::from_slice(catalog.json())?)
 }
 

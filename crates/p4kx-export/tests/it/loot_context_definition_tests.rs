@@ -37,7 +37,11 @@ fn loot_context_definitions_share_one_record_with_the_legacy_multi_projection() 
     let bytes = database();
     let fixture = Fixture::open(&bytes, Input::Encrypted, Vec::new())?;
     source_declarations(&fixture)?;
-    let built = build_catalog_from(&fixture.archive, &fixture.entry, &options())?;
+    let built = build_catalog_from(
+        &fixture.archive,
+        &fixture.entry,
+        options().with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let multi = catalog
         .get(MULTI_KIND.name())
@@ -91,7 +95,11 @@ fn loot_context_definitions_retain_exact_theme_targets_under_a_context_filter() 
     let filter = Filter::parse("synthetic/dev/context")?;
     let mut selected = options();
     selected.filter = Some(&filter);
-    let built = build_catalog_from(&fixture.archive, &fixture.entry, &selected)?;
+    let built = build_catalog_from(
+        &fixture.archive,
+        &fixture.entry,
+        selected.with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let excluded = catalog
         .pointer("/definitions/lootThemes")

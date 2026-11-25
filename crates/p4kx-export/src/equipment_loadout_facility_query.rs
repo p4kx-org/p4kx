@@ -147,7 +147,7 @@ fn selected(
         coverage: mut loadout_coverage,
     } = scope::read_ship(query.forge, ship_record_index, query.cancel)?;
     let admitted = !wanted.is_empty();
-    let origins = CatalogOrigins::for_archive_records(query.archive, query.entry)?;
+    let origins = query.entry.records(query.archive)?;
     let input = OriginalCatalogInput::new(query.forge, &origins);
     let locale = TextSources::read_languages(query.archive, &[])?;
     let texts = Texts::parse(&locale)?;

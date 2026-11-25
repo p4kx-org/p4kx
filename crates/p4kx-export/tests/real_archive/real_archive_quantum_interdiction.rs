@@ -95,8 +95,8 @@ fn compare_archive(archive: &Archive) -> Check {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let built =
-        build_catalog_from(archive, &entry, &options).map_err(|_| "build scoped QIG catalog")?;
+    let built = build_catalog_from(archive, &entry, options.with_full_provenance())
+        .map_err(|_| "build scoped QIG catalog")?;
     let items = built
         .summary()
         .export_health()

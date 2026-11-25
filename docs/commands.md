@@ -486,7 +486,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   scopes, publication rules and provider API are in [media-export.md](media-export.md).
   `p4kx media schema` prints the index schema; mutually exclusive `--record`, `--reference` and
   `--source` select the JSONL record, common reference and retained-source schemas.
-- `p4kx catalog <archive> --out <file> [--filter <filter>] [--diagnostic-partial]
+- `p4kx catalog <archive> --out <file> [--provenance markers-only|full] [--filter <filter>] [--diagnostic-partial]
   [--exported-at <seconds>] [--progress-phases] [--zstd-level <level>]` writes the
   P4KX catalog ([docs/catalog.md](catalog.md)):
   schema version (3), Channel and Build, Filter selection scope per kind, read/projection health
@@ -544,7 +544,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   `project-blueprint-tables`, `resolve-cargo-capacities`, `project-facility-loadouts`,
   `project-resource-topology` and `project-starmap-placements`. When facility interior
   projection runs, `project-facility-interiors` follows the facility loadout joins.
-  `p4kx catalog schema` prints the catalog's JSON Schema.
+  Marker provenance is the default. It writes the `p4kx-catalog-markers` format v1
+  containing the v3 dataset. Select `--provenance full` for the standalone v3 document with
+  proof references. `p4kx catalog schema` prints the selected profile's JSON Schema.
 - `p4kx ships <archive> --out <file> [--format json|ndjson] [--filter <filter>]
   [--exported-at <seconds>]` writes the base data of every ship
   ([docs/ship-base-data.md](ship-base-data.md)): hull mass and hit points summed from the

@@ -135,8 +135,8 @@ fn verify(
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let built =
-        build_catalog_from(archive, input, &options).map_err(|_| "build filtered loot catalog")?;
+    let built = build_catalog_from(archive, input, options.with_full_provenance())
+        .map_err(|_| "build filtered loot catalog")?;
     let catalog: Value =
         serde_json::from_slice(built.json()).map_err(|_| "read filtered loot catalog")?;
     crate::real_archive_shop_inventory_v3::verify_build(archive, &catalog)?;

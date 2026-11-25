@@ -181,10 +181,11 @@ pub(crate) fn build_with_entries(
     let archive = Archive::open(&path)?;
     let built = build_catalog(
         &archive,
-        &CatalogOptions {
+        CatalogOptions {
             publication_mode: mode,
             ..CatalogOptions::new(UNIX_EPOCH)
-        },
+        }
+        .with_full_provenance(),
     )?;
     Ok(serde_json::from_slice(built.json())?)
 }

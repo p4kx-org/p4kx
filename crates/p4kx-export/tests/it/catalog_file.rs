@@ -31,11 +31,17 @@ fn a_cancel_while_writing_leaves_no_file_and_the_old_file_intact() -> TestResult
         ..options()
     };
 
-    let result = write_catalog_from(&archive, &entry, &options, Compression::ZSTD, || {
-        let file = CatalogFile::create(&out)?;
-        cancel.cancel();
-        Ok(file)
-    });
+    let result = write_catalog_from(
+        &archive,
+        &entry,
+        options.with_full_provenance(),
+        Compression::ZSTD,
+        || {
+            let file = CatalogFile::create(&out)?;
+            cancel.cancel();
+            Ok(file)
+        },
+    );
 
     assert!(matches!(result, Err(CatalogError::Cancelled)), "cancelled");
     drop(result);
@@ -56,9 +62,13 @@ fn a_committed_file_replaces_the_old_one_and_leaves_no_temporary_file() -> TestR
     let out = dir.path().join("catalog.json.zst");
     fs::write(&out, "old")?;
 
-    let (_, file) = write_catalog_from(&archive, &entry, &options(), Compression::ZSTD, || {
-        CatalogFile::create(&out)
-    })?;
+    let (_, file) = write_catalog_from(
+        &archive,
+        &entry,
+        options().with_full_provenance(),
+        Compression::ZSTD,
+        || CatalogFile::create(&out),
+    )?;
     assert_eq!(
         fs::read_to_string(&out)?,
         "old",
@@ -108,11 +118,17 @@ fn protected_catalog_cancellation_explicitly_removes_the_created_temporary() -> 
         cancel: Some(&cancel),
         ..options()
     };
-    let result = write_catalog_file_from(&archive, &entry, &options, Compression::None, || {
-        let file = CatalogFile::create_protected(&out, &protection, &cancel)?;
-        cancel.cancel();
-        Ok(file)
-    });
+    let result = write_catalog_file_from(
+        &archive,
+        &entry,
+        options.with_full_provenance(),
+        Compression::None,
+        || {
+            let file = CatalogFile::create_protected(&out, &protection, &cancel)?;
+            cancel.cancel();
+            Ok(file)
+        },
+    );
     assert!(matches!(result, Err(CatalogError::Cancelled)));
     assert_eq!(fs::read(&out)?, b"prior");
     assert_eq!(fs::read_dir(dir.path())?.count(), 2);
@@ -134,13 +150,19 @@ fn a_changed_temporary_does_not_hide_cleanup_failure_as_catalog_cancellation() -
         cancel: Some(&cancel),
         ..options()
     };
-    let result = write_catalog_file_from(&archive, &entry, &options, Compression::None, || {
-        let file = CatalogFile::create_protected(&out, &protection, &cancel)?;
-        fs::rename(&temporary, &retained)?;
-        fs::hard_link(archive.path(), &temporary)?;
-        cancel.cancel();
-        Ok(file)
-    });
+    let result = write_catalog_file_from(
+        &archive,
+        &entry,
+        options.with_full_provenance(),
+        Compression::None,
+        || {
+            let file = CatalogFile::create_protected(&out, &protection, &cancel)?;
+            fs::rename(&temporary, &retained)?;
+            fs::hard_link(archive.path(), &temporary)?;
+            cancel.cancel();
+            Ok(file)
+        },
+    );
     let CatalogError::CleanupFailed { primary, .. } = result.expect_err("typed retained output")
     else {
         return Err("cleanup failure was hidden".into());
@@ -165,10 +187,16 @@ fn a_cancelled_build_never_calls_the_file_factory() -> TestResult {
         ..options()
     };
     let mut called = false;
-    let result = write_catalog_file_from(&archive, &entry, &options, Compression::None, || {
-        called = true;
-        CatalogFile::create(&dir.path().join("catalog.json"))
-    });
+    let result = write_catalog_file_from(
+        &archive,
+        &entry,
+        options.with_full_provenance(),
+        Compression::None,
+        || {
+            called = true;
+            CatalogFile::create(&dir.path().join("catalog.json"))
+        },
+    );
     assert!(matches!(result, Err(CatalogError::Cancelled)));
     assert!(!called);
     assert_eq!(fs::read_dir(dir.path())?.count(), 1);

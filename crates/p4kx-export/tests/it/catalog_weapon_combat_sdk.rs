@@ -3,7 +3,6 @@
 
 use p4kx_export::catalog_queries::equipment::{
     AmmoSelection, CombatModel, DistanceUnit, WeaponCombatBase, WeaponCombatOwner,
-    with_weapon_combat_bases,
 };
 use p4kx_export::{CatalogPublicationMode, build_catalog};
 use p4kx_extraction::{DataForge, SourceValueState};
@@ -12,6 +11,7 @@ use serde_json::{Value, json};
 use super::{COMBAT_ROWS, fixture};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn combat_sdk_retains_nominal_values_and_the_original_ammo_roles() -> TestResult {
@@ -233,23 +233,28 @@ fn compare(
     let (_folder, archive) = common::open_bytes(bytes, origin)?;
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
-    with_weapon_combat_bases(&archive, weapon, None, |snapshot| -> TestResult {
-        let [owner] = snapshot.rows() else {
-            return Err("one physical combat owner".into());
-        };
-        let scoped = json!({
-            "projections": {"weaponCombatBases": {"rows": owner.combat_bases}},
-            "provenance": snapshot.source_inventory(),
-        });
-        assert_eq!(
-            proof::rows(&scoped, COMBAT_ROWS)?,
-            proof::rows(&catalog, COMBAT_ROWS)?,
-            "all original mode rows, values, states and source references match the Catalog"
-        );
-        proof::closure(&scoped)?;
-        inspect(owner)
-    })?
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
+    full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?.with_weapon_combat_bases(
+        weapon,
+        None,
+        |snapshot| -> TestResult {
+            let [owner] = snapshot.rows() else {
+                return Err("one physical combat owner".into());
+            };
+            let scoped = json!({
+                "projections": {"weaponCombatBases": {"rows": owner.combat_bases}},
+                "provenance": snapshot.source_inventory(),
+            });
+            assert_eq!(
+                proof::rows(&scoped, COMBAT_ROWS)?,
+                proof::rows(&catalog, COMBAT_ROWS)?,
+                "all original mode rows, values, states and source references match the Catalog"
+            );
+            proof::closure(&scoped)?;
+            inspect(owner)
+        },
+    )?
 }
 
 fn physical(bytes: &[u8], guid: u128) -> TestResult<u32> {

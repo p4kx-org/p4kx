@@ -171,7 +171,6 @@ fn assert_instance_labels(catalog: &Value, first_label: &str) -> TestResult {
     )?;
     assert_child_attribute_source(catalog, first, label, "@label")?;
     assert_child_attribute_source(catalog, first, entity, "@entityName")?;
-
     let empty = proof::present(second, "declaredLabel", &json!(""), Some(true))?;
     let missing = proof::cell(second, "declaredEntityName", "absent")?;
     assert_eq!(
@@ -371,7 +370,7 @@ fn catalog(
         ..CatalogOptions::new(std::time::UNIX_EPOCH + EXPORTED_AT)
     };
     Ok(serde_json::from_slice(
-        build_catalog(&archive, &options)?.json(),
+        build_catalog(&archive, options.with_full_provenance())?.json(),
     )?)
 }
 

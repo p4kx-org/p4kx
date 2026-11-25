@@ -83,7 +83,7 @@ pub(super) fn verify_field_inventory(
         filter: scope,
         ..super::audit_scope::options(SystemTime::now())
     };
-    let built = p4kx_export::build_catalog_from(&archive, &loaded, &options)?;
+    let built = p4kx_export::build_catalog_from(&archive, &loaded, options.with_full_provenance())?;
     let health = super::audit_scope::verify(built.summary().export_health(), &kinds);
     if let Err(error) = &health {
         super::report(&format!("mapped production health: {error}"));
@@ -297,7 +297,7 @@ fn compare_snapshot(archive: &Archive, dataset: &Dataset, actual: &Build) -> sup
         filter: filter.as_ref(),
         ..super::audit_scope::options(SystemTime::now())
     };
-    let built = p4kx_export::build_catalog_from(archive, &loaded, &options)?;
+    let built = p4kx_export::build_catalog_from(archive, &loaded, options.with_full_provenance())?;
     let health = super::audit_scope::verify(built.summary().export_health(), &kinds);
     if let Err(error) = &health {
         super::report(&format!("mapped production health: {error}"));

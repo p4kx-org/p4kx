@@ -20,7 +20,9 @@ pub struct PhysicalEntryIdentity {
 }
 
 impl PhysicalEntryIdentity {
-    /// Borrows the source identity in the originating report's inventory.
+    /// Borrows the report-local physical input identity.
+    ///
+    /// Resolve it through the source inventory in Full provenance.
     #[must_use]
     pub const fn input_ref(&self) -> &PhysicalSourceRef {
         &self.input_ref

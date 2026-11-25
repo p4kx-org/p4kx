@@ -11,6 +11,7 @@ use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry};
 
 use super::{Layout, attachments, bounds, catalog, common, database, parity};
 use crate::commodity_v3_fixture::{DcbOrigin, TestResult};
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn attachment_query_preserves_selected_failures_and_excludes_unrelated_port_errors() -> TestResult {
@@ -21,8 +22,7 @@ fn attachment_query_preserves_selected_failures_and_excludes_unrelated_port_erro
     ] {
         let (_folder, archive) = common::open(&database(layout), DcbOrigin::Encrypted)?;
         let expected = catalog(&archive, CatalogPublicationMode::DiagnosticPartial)?;
-        equipment::with_attachment_constraints(
-            &archive,
+        full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?.with_attachment_constraints(
             CatalogRecordSelection::RecordIndex(0),
             None,
             |snapshot| {

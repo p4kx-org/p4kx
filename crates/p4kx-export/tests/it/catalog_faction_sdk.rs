@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::build_catalog;
 use p4kx_export::catalog_queries::factions::{
-    FactionDefinition, FactionSnapshot, FactionText, with_factions, with_factions_from,
+    FactionDefinition, FactionSnapshot, FactionText, with_factions,
 };
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_extraction::DataForgeEntry;
@@ -17,17 +18,19 @@ use crate::health_origin_assertions as origin;
 #[test]
 fn faction_sdk_matches_canonical_rows_and_both_text_domains() -> TestResult {
     let (_directory, archive) = common::open(&fixture::sdk_neighbors(), DcbOrigin::Encrypted)?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
     let entry = DataForgeEntry::read(&archive)?;
-    with_factions_from(
+    full_proof::from_entry(
         &archive,
         &entry,
-        CatalogRecordSelection::All,
         CatalogLanguageSelection::AllAvailable,
         None,
-        |snapshot| check_parity(&snapshot, &catalog),
-    )??;
+    )?
+    .with_factions(CatalogRecordSelection::All, None, |snapshot| {
+        check_parity(&snapshot, &catalog)
+    })??;
     Ok(())
 }
 

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection, equipment};
 use p4kx_extraction::{SourceEncryptionState, SourceInventory};
 use p4kx_testkit::{DataForgeBuilder, TestCapacity, TestEntity, TestEntry, TestLoadout};
@@ -38,14 +39,15 @@ fn only_the_reached_encrypted_attachment_can_mark_the_plain_inventory_cargo() ->
         else {
             return Err("one selected physical host Ship".into());
         };
-        equipment::with_ship_sources_from(
+        full_proof::from_entry(
             &fixtures.archive,
             &fixtures.entry,
-            CatalogRecordSelection::All,
             CatalogLanguageSelection::Selected(&[]),
             None,
-            |snapshot| assert_sdk_cargo(&snapshot, projection, selected_encrypted),
-        )??;
+        )?
+        .with_ship_sources(CatalogRecordSelection::All, None, |snapshot| {
+            assert_sdk_cargo(&snapshot, projection, selected_encrypted)
+        })??;
         crate::health_origin_assertions::closure(&catalog)?;
     }
     Ok(())

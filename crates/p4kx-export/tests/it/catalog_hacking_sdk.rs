@@ -4,10 +4,10 @@
 use p4kx_export::build_catalog;
 use p4kx_export::catalog_queries::equipment::EquipmentSnapshot;
 use p4kx_export::catalog_queries::equipment::hacking::{
-    HackableDeviceSnapshot, HackingChipSnapshot, HackingConfiguration, with_hackable_devices_from,
+    HackableDeviceSnapshot, HackingChipSnapshot, HackingConfiguration,
 };
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ResourceFloat32,
+    CatalogLanguageSelection, CatalogRecordSelection, ResourceFloat32,
 };
 use p4kx_extraction::{DataForgeEntry, SourceValueState};
 use serde::Serialize;
@@ -15,6 +15,7 @@ use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 #[path = "../catalog_schema/sdk_hacking_fixture.rs"]
 mod fixture;
@@ -22,10 +23,11 @@ mod fixture;
 #[test]
 fn hacking_sdk_preserves_canonical_rows_and_distinct_physical_owner_scopes() -> TestResult {
     let (_folder, archive) = common::open(&fixture::database(), DcbOrigin::Encrypted)?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
     let entry = DataForgeEntry::read(&archive)?;
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::AllAvailable,
@@ -41,9 +43,7 @@ fn hacking_sdk_preserves_canonical_rows_and_distinct_physical_owner_scopes() -> 
             "chip rows require an admitted Item even if the component is present"
         );
     })?;
-    with_hackable_devices_from(&archive, &entry, device, None, |snapshot| {
-        check_device(&snapshot, &catalog)
-    })??;
+    session.with_hackable_devices(device, None, |snapshot| check_device(&snapshot, &catalog))??;
     parsed.with_hackable_devices(chip, None, |snapshot| {
         assert!(
             snapshot.rows().is_empty(),

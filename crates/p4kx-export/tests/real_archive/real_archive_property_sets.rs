@@ -63,7 +63,8 @@ fn verify() -> OracleResult {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(SystemTime::now())
     };
-    let built = build_catalog_from(&archive, &entry, &options).map_err(catalog_failure)?;
+    let built = build_catalog_from(&archive, &entry, options.with_full_provenance())
+        .map_err(catalog_failure)?;
     let catalog: Value = Failure::classify(
         serde_json::from_slice(built.json()),
         Failure::OutputParse(error::OutputFault::JsonDecode),

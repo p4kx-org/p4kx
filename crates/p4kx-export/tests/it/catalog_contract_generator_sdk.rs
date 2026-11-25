@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
-    ContractGeneratorSnapshot, with_contract_generators,
+    CatalogLanguageSelection, CatalogRecordSelection, ContractGeneratorSnapshot,
+    with_contract_generators,
 };
 use p4kx_export::{CatalogPublicationMode, build_catalog};
 use p4kx_extraction::{Archive, DataForgeEntry};
@@ -18,6 +18,7 @@ use super::TestResult;
 use crate::commodity_v3_fixture::{self, DcbOrigin, guid};
 use crate::contracts_fixture;
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn selected_generator_definitions_match_canonical_catalog() -> TestResult {
@@ -28,11 +29,11 @@ fn selected_generator_definitions_match_canonical_catalog() -> TestResult {
     )?;
     let mut options = commodity_v3_fixture::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let expected = proof::rows(&catalog, "/definitions/contractGenerators/rows")?;
     let entry = DataForgeEntry::read(&archive)?;
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::AllAvailable,

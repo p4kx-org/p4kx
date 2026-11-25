@@ -3,14 +3,14 @@
 
 use p4kx_export::catalog_queries::crafting::BlueprintRewardSelection;
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
-    ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogRecordCoverage, CatalogRecordSelection, ParsedCatalogQueries,
 };
 use p4kx_extraction::{Archive, CancelToken, Guid, Language, SourceInventory, SourcedValue};
 
 use crate::catalog_loadouts::catalog_item_alignment;
 use crate::commodity_v3_fixture::{TestResult, guid};
 use crate::crafting_detail_fixture::POOL;
+use crate::sdk_full_proof as full_proof;
 
 use super::cache::Dashboard;
 use super::fixture;
@@ -22,7 +22,7 @@ pub(super) fn collect(
     cancel: Option<&CancelToken>,
     after_reward: impl FnOnce(),
 ) -> TestResult<Dashboard> {
-    let session = CatalogQuerySession::open(
+    let session = full_proof::open(
         archive,
         CatalogLanguageSelection::Selected(&[language]),
         cancel,

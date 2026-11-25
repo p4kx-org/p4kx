@@ -3,7 +3,7 @@
 
 use std::cell::OnceCell;
 
-use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
+use p4kx_extraction::{Archive, CancelToken, DataForgeEntry, ProvenanceMode};
 
 use super::lazy_loose_records::LazyLooseRecords;
 use super::loose_definitions::{self, LooseDefinitionSnapshot};
@@ -40,13 +40,15 @@ impl<Row> GuidLinkedDefinitionRead<Row> {
         &self,
         archive: &Archive,
         selection: Selection<'_>,
+        provenance_mode: ProvenanceMode,
         cancel: Option<&CancelToken>,
     ) -> Result<LooseDefinitionSnapshot<Row>, CatalogError> {
-        loose_definitions::read(
+        loose_definitions::read_with_provenance_mode(
             archive,
             selection,
             cancel,
             self.kind,
+            provenance_mode,
             |capture, ledger, options| {
                 let entry = OnceCell::new();
                 let records = LazyLooseRecords::new(archive, capture.source_uses(), cancel, &entry);
@@ -91,15 +93,16 @@ impl<Row> GuidLinkedDefinitionRead<Row> {
         cancel: Option<&CancelToken>,
     ) -> Result<LooseDefinitionSnapshot<Row>, CatalogError> {
         parsed.project(cancel, |archive, entry, forge| {
-            loose_definitions::read(
+            loose_definitions::read_with_provenance_mode(
                 archive,
                 selection,
                 cancel,
                 self.kind,
+                entry.provenance_mode(),
                 |capture, ledger, options| {
                     let origins = CatalogOrigins::for_archive_records_with_uses(
                         archive,
-                        entry,
+                        entry.entry(),
                         capture.source_uses().clone(),
                     )?;
                     let original = OriginalCatalogInput::new(forge, &origins);

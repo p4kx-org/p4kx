@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::starmap::{
     StarmapDefinitionFamily, StarmapDefinitionRows, StarmapDefinitionSelection,
-    StarmapDefinitionSnapshot, with_starmap_definitions,
+    StarmapDefinitionSnapshot,
 };
 use p4kx_export::catalog_queries::{
-    CanonicalRecordHeader, CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
-    DatasetAvailability, ParsedCatalogQueries,
+    CanonicalRecordHeader, CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability,
+    ParsedCatalogQueries,
 };
 use p4kx_export::{CatalogError, CatalogOptions, build_catalog_from};
 use p4kx_extraction::{Archive, DataForgeEntry, Language, SourceLocation};
@@ -41,9 +42,14 @@ pub(super) fn read() -> TestResult<[Route; 4]> {
     ))?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog: Value = serde_json::from_slice(
-        build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?.json(),
+        build_catalog_from(
+            &archive,
+            &entry,
+            CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+        )?
+        .json(),
     )?;
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::AllAvailable,
@@ -163,7 +169,7 @@ fn one_starmap_definition_reads_its_owned_fields_and_selected_languages() -> Tes
             .with_uncompressed_size(u64::try_from(german.len())? + 1),
     )?;
     let entry = DataForgeEntry::read(&archive)?;
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::Selected(LANGUAGES),
@@ -185,37 +191,31 @@ fn one_starmap_definition_reads_its_owned_fields_and_selected_languages() -> Tes
     parsed.with_starmap_definitions(selection, None, |snapshot| {
         verify_selected_sources(&snapshot, index)
     })??;
-    let all_languages = with_starmap_definitions(
-        &archive,
-        selection,
-        CatalogLanguageSelection::AllAvailable,
-        None,
-        |_| (),
-    );
+    let all_languages = full_proof::open(&archive, CatalogLanguageSelection::AllAvailable, None)?
+        .with_starmap_definitions(selection, None, |_| ());
     assert!(
         matches!(all_languages, Err(CatalogError::LoadTexts(_))),
         "the same request fails when the truncated locale is selected"
     );
-    with_starmap_definitions(
-        &archive,
-        StarmapDefinitionSelection::new(StarmapDefinitionFamily::Amenities, records),
-        CatalogLanguageSelection::AllAvailable,
-        None,
-        |snapshot| {
-            let StarmapDefinitionRows::Amenities(rows) = snapshot.rows else {
-                return Err("typed empty starmap amenity selection".into());
-            };
-            assert!(
-                rows.is_empty(),
-                "the requested physical Record belongs to another family"
-            );
-            assert!(
-                snapshot.available_languages.is_empty(),
-                "an empty selection requires no localization payload"
-            );
-            Ok(())
-        },
-    )?
+    full_proof::open(&archive, CatalogLanguageSelection::AllAvailable, None)?
+        .with_starmap_definitions(
+            StarmapDefinitionSelection::new(StarmapDefinitionFamily::Amenities, records),
+            None,
+            |snapshot| {
+                let StarmapDefinitionRows::Amenities(rows) = snapshot.rows else {
+                    return Err("typed empty starmap amenity selection".into());
+                };
+                assert!(
+                    rows.is_empty(),
+                    "the requested physical Record belongs to another family"
+                );
+                assert!(
+                    snapshot.available_languages.is_empty(),
+                    "an empty selection requires no localization payload"
+                );
+                Ok(())
+            },
+        )?
 }
 
 fn verify_selected_sources(snapshot: &StarmapDefinitionSnapshot<'_>, index: u32) -> TestResult {

@@ -5,11 +5,11 @@ use p4kx_export::build_catalog;
 use p4kx_export::catalog_queries::equipment::EquipmentSnapshot;
 use p4kx_export::catalog_queries::equipment::ordnance::{
     EmpSnapshot, ExplosionDefinitionSnapshot, ExplosiveConfiguration, ExplosiveSnapshot,
-    MissileConfigurationSnapshot, with_missile_configurations_from,
+    MissileConfigurationSnapshot,
 };
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    DefinitionStatus, ResourceFloat32,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability, DefinitionStatus,
+    ResourceFloat32,
 };
 use p4kx_extraction::{DataForgeEntry, SourceValueState};
 use serde::Serialize;
@@ -17,6 +17,7 @@ use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 #[path = "../catalog_schema/sdk_ordnance_fixture.rs"]
 mod fixture;
@@ -24,10 +25,11 @@ mod fixture;
 #[test]
 fn ordnance_sdk_preserves_item_admission_optional_references_and_producer_parity() -> TestResult {
     let (_folder, archive) = common::open(&fixture::database(), DcbOrigin::Encrypted)?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
     let entry = DataForgeEntry::read(&archive)?;
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::AllAvailable,
@@ -39,9 +41,7 @@ fn ordnance_sdk_preserves_item_admission_optional_references_and_producer_parity
     parsed.with_explosives(selection, None, |snapshot| {
         check_explosives(&snapshot, &catalog)
     })??;
-    with_missile_configurations_from(
-        &archive,
-        &entry,
+    session.with_missile_configurations(
         CatalogRecordSelection::RecordIndex(0),
         None,
         |snapshot| check_missile(&snapshot, &catalog),

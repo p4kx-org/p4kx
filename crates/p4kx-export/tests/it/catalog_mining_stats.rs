@@ -22,7 +22,7 @@ fn catalog() -> TestResult<Value> {
         gear_fixture::write_archive(dir.path())?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let built = build_catalog(&archive, &common::options())?;
+    let built = build_catalog(&archive, common::options().with_full_provenance())?;
     Ok(serde_json::from_slice(built.json())?)
 }
 

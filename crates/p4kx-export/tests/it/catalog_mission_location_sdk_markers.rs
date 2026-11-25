@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogRecordSelection, with_mission_location_templates,
-};
+use crate::sdk_full_proof as full_proof;
+use p4kx_export::catalog_queries::{CatalogQuerySession, CatalogRecordSelection, ProvenanceMode};
 
 use super::{TestResult, assert_source_uses};
 use crate::commodity_v3_fixture::{self, DcbOrigin, guid};
@@ -17,12 +16,14 @@ fn mission_location_tag_markers_distinguish_all_dataforge_origins() -> TestResul
         (DcbOrigin::Unknown, None),
     ] {
         let (_folder, archive) = commodity_v3_fixture::open(&spawns_fixture::database(), source)?;
-        with_mission_location_templates(
-            &archive,
-            CatalogRecordSelection::Guid(guid(LOCATION_A).parse()?),
-            CatalogLanguageSelection::Selected(&[]),
-            None,
-            |snapshot| {
+        let marker_session = CatalogQuerySession::open(&archive, full_proof::NO_LANGUAGES, None)?;
+        let full_session = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?;
+        let selection = CatalogRecordSelection::Guid(guid(LOCATION_A).parse()?);
+        for (session, mode) in [
+            (marker_session, ProvenanceMode::MarkersOnly),
+            (full_session, ProvenanceMode::Full),
+        ] {
+            session.with_mission_location_templates(selection, None, |snapshot| {
                 let [row] = snapshot.rows.as_slice() else {
                     return Err("one original template".into());
                 };
@@ -37,10 +38,28 @@ fn mission_location_tag_markers_distinguish_all_dataforge_origins() -> TestResul
                     expected,
                     "the value independently preserves the original DCB origin"
                 );
-                assert_source_uses(&snapshot, projected.origin().source_uses_refs());
+                let references = projected.origin().source_uses_refs();
+                assert_eq!(
+                    snapshot.source_inventory.provenance_mode(),
+                    mode,
+                    "location tag inventory follows the session's provenance profile"
+                );
+                if mode == ProvenanceMode::Full {
+                    assert_source_uses(&snapshot, references);
+                } else {
+                    assert_eq!(
+                        references,
+                        [],
+                        "marker-only tag path carries no source references"
+                    );
+                    assert!(
+                        snapshot.source_inventory.iter_uses().next().is_none(),
+                        "marker-only location query retains no physical source uses"
+                    );
+                }
                 Ok::<_, Box<dyn std::error::Error>>(())
-            },
-        )??;
+            })??;
+        }
     }
     Ok(())
 }

@@ -104,6 +104,11 @@ codes are in `p4kx --help`. Every command takes the path of a `Data.p4k` as `<ar
 | 3D and Blender | `entity loadout\|glb\|package`, `interior glb\|package`, `armour`, `character package`, `chf`, `ui hologram\|screens` |
 | Audio resolution | `wwise resolve\|events\|extract`, `entity audio` |
 
+`p4kx catalog schema` prints the default marker document schema. Use
+`p4kx catalog schema --provenance full` for the standalone v3 schema.
+The Rust client-profile readers default to encryption markers and offer an option
+for full source evidence. [Client profile SDK](docs/catalog-sdk.md#client-profile-documents)
+
 ## MCP server
 
 `p4kx-mcp` is a read-only [Model Context Protocol](https://modelcontextprotocol.io) server over

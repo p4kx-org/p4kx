@@ -318,7 +318,10 @@ fn report_codes(catalog: &Value) -> TestResult {
 fn the_loadouts_of_a_real_archive_resolve_and_match_the_loadout_tree_of_a_ship() -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
     let started = Instant::now();
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     report(&built, started.elapsed());
     let catalog: Value = serde_json::from_slice(built.json())?;
     check_counts(&built, &catalog)?;

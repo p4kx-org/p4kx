@@ -5,7 +5,8 @@ use std::borrow::Cow;
 use std::sync::Arc;
 
 use p4kx_extraction::{
-    FieldOrigin, SourceUseRef, SourceUses, SourceValue, SourceValueState, SourcedValue,
+    FieldOrigin, ProvenanceMode, SourceUseRef, SourceUses, SourceValue, SourceValueState,
+    SourcedValue,
 };
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Serialize, Serializer};
@@ -157,6 +158,9 @@ fn correlate_decision(schema: &mut Schema) {
 impl Serialize for VariantDecision {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let origin = self.origin();
+        if origin.provenance_mode() == ProvenanceMode::MarkersOnly {
+            return self.expanded.serialize(serializer);
+        }
         VariantDecisionWire {
             state: self.expanded.state(),
             value: self.expanded.value(),

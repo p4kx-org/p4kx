@@ -5,7 +5,8 @@ use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::terrain::{
     CatalogJsonNumber, Ecosystem, LooseArchivePathState, LooseDefinitionSelection as Selection,
-    ShadingClass, read_ecosystems, read_shading_classes,
+    ShadingClass, read_ecosystems, read_ecosystems_with_provenance_mode,
+    read_shading_classes_with_provenance_mode,
 };
 use p4kx_export::{CatalogOptions, build_catalog};
 use p4kx_extraction::Archive;
@@ -15,6 +16,7 @@ use serde::Serialize;
 use serde_json::{Value, json};
 
 use super::{Route, TestResult};
+use crate::sdk_full_proof as full_proof;
 
 #[path = "sdk_geology_routes.rs"]
 mod geology;
@@ -46,9 +48,15 @@ pub(super) fn read() -> TestResult<[Route; 4]> {
         .into_iter()
         .chain(geology::definitions()),
     )?;
+    let options = CatalogOptions::new(UNIX_EPOCH);
     let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?.json())?;
-    let ecosystem = read_ecosystems(&archive, Selection::ArchivePath(ECO), None)?;
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
+    let ecosystem = read_ecosystems_with_provenance_mode(
+        &archive,
+        Selection::ArchivePath(ECO),
+        full_proof::MODE,
+        None,
+    )?;
     assert!(
         ecosystem.is_selection_complete(),
         "the physical ecosystem owner was read"
@@ -57,7 +65,12 @@ pub(super) fn read() -> TestResult<[Route; 4]> {
         return Err("one scoped ecosystem".into());
     };
     verify_ecosystem(row)?;
-    let shading = read_shading_classes(&archive, Selection::Guid(SHADE_GUID.parse()?), None)?;
+    let shading = read_shading_classes_with_provenance_mode(
+        &archive,
+        Selection::Guid(SHADE_GUID.parse()?),
+        full_proof::MODE,
+        None,
+    )?;
     let [row] = shading.rows.as_slice() else {
         return Err("one scoped shading class".into());
     };

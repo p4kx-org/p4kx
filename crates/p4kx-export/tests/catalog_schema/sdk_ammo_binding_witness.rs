@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::equipment::{
-    AmmoBinding, ContainerAmmoSlots, WeaponSourceSnapshot, with_ammo_definitions_from,
+    AmmoBinding, ContainerAmmoSlots, WeaponSourceSnapshot,
 };
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_export::{CatalogOptions, build_catalog_from};
@@ -16,7 +17,11 @@ use super::{AMMO_BINDINGS, TestResult};
 const AMMO_ROWS: &str = "/definitions/ammoDefinitions/rows";
 
 pub(super) fn normal(archive: &Archive, entry: &DataForgeEntry) -> TestResult<Value> {
-    let catalog = build_catalog_from(archive, entry, &CatalogOptions::new(UNIX_EPOCH))?;
+    let catalog = build_catalog_from(
+        archive,
+        entry,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
     Ok(serde_json::from_slice(catalog.json())?)
 }
 
@@ -41,11 +46,14 @@ pub(super) fn verify(
             snapshot.source_inventory(),
             catalog,
         )?;
-        with_ammo_definitions_from(
+        full_proof::from_entry(
             archive,
             entry,
-            CatalogRecordSelection::RecordIndex(index),
             CatalogLanguageSelection::Selected(&[]),
+            None,
+        )?
+        .with_ammo_definitions(
+            CatalogRecordSelection::RecordIndex(index),
             None,
             |target| {
                 let [ammo] = target.rows() else {
@@ -152,8 +160,8 @@ fn compare_origin(origin: &FieldOrigin, sdk: &SourceInventory, catalog: &Value) 
 
 #[cfg(test)]
 mod tests {
+    use crate::sdk_full_proof as full_proof;
     use p4kx_export::catalog_queries::DefinitionStatus;
-    use p4kx_export::catalog_queries::equipment::with_weapon_sources_from;
     use p4kx_extraction::{Archive, DataForgeEntry, SourceValueState};
     use p4kx_testkit::{ArchiveBuilder, TestEntry, test_key};
 
@@ -173,42 +181,43 @@ mod tests {
             let archive = Archive::open_with_key(path, Some(test_key()))?;
             let entry = DataForgeEntry::read(&archive)?;
             let catalog = normal(&archive, &entry)?;
-            with_weapon_sources_from(&archive, &entry, 3, None, |snapshot| -> TestResult<()> {
-                let slots = compare_bindings(&snapshot, &catalog)?;
-                assert_eq!(
-                    slots
-                        .primary_ammo()
-                        .value()
-                        .and_then(|ammo| ammo.resolved_index()),
-                    Some(0),
-                    "the readable sibling retains its own physical target"
-                );
-                let secondary = slots.secondary_ammo();
-                if case == fixture::Case::DanglingAmmo {
-                    let missing = secondary
-                        .value()
-                        .ok_or("the stored GUID still has a value")?;
-                    assert!(
-                        matches!(missing.status(), DefinitionStatus::Dangling)
-                            && missing.resolved_index().is_none()
-                            && missing.guid().value().is_some(),
-                        "a dangling target retains its authored GUID without a physical index"
-                    );
-                    compare_origin(
-                        missing.guid().origin(),
-                        snapshot.source_inventory(),
-                        &catalog,
-                    )?;
-                } else {
+            full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+                .with_weapon_sources(3, None, |snapshot| -> TestResult<()> {
+                    let slots = compare_bindings(&snapshot, &catalog)?;
                     assert_eq!(
-                        secondary.state(),
-                        SourceValueState::Null,
-                        "the original explicit null stores no target"
+                        slots
+                            .primary_ammo()
+                            .value()
+                            .and_then(|ammo| ammo.resolved_index()),
+                        Some(0),
+                        "the readable sibling retains its own physical target"
                     );
-                    compare_origin(secondary.origin(), snapshot.source_inventory(), &catalog)?;
-                }
-                Ok(())
-            })??;
+                    let secondary = slots.secondary_ammo();
+                    if case == fixture::Case::DanglingAmmo {
+                        let missing = secondary
+                            .value()
+                            .ok_or("the stored GUID still has a value")?;
+                        assert!(
+                            matches!(missing.status(), DefinitionStatus::Dangling)
+                                && missing.resolved_index().is_none()
+                                && missing.guid().value().is_some(),
+                            "a dangling target retains its authored GUID without a physical index"
+                        );
+                        compare_origin(
+                            missing.guid().origin(),
+                            snapshot.source_inventory(),
+                            &catalog,
+                        )?;
+                    } else {
+                        assert_eq!(
+                            secondary.state(),
+                            SourceValueState::Null,
+                            "the original explicit null stores no target"
+                        );
+                        compare_origin(secondary.origin(), snapshot.source_inventory(), &catalog)?;
+                    }
+                    Ok(())
+                })??;
         }
         Ok(())
     }

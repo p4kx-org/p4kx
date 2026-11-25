@@ -148,7 +148,8 @@ fn database() -> DataForgeBuilder {
 #[test]
 fn local_contract_generators_preserve_ordered_terms_and_actual_handler_scope() -> TestResult {
     let (_folder, archive) = fixture::open(&database(), DcbOrigin::Encrypted)?;
-    let built = build_catalog(&archive, &fixture::options()).map_err(|error| error.to_string())?;
+    let built = build_catalog(&archive, fixture::options().with_full_provenance())
+        .map_err(|error| error.to_string())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let table = at(&catalog, "/configurations/localContractGenerators")?;
     assert_eq!(at(table, "/availability")?, "available");
@@ -275,7 +276,8 @@ fn current_handler_shape_reports_scope_configuration_as_absent() -> TestResult {
             .value("generators", TestValue::Array(Vec::new())),
         );
     let (_folder, archive) = fixture::open(&database, DcbOrigin::Plain)?;
-    let built = build_catalog(&archive, &fixture::options()).map_err(|error| error.to_string())?;
+    let built = build_catalog(&archive, fixture::options().with_full_provenance())
+        .map_err(|error| error.to_string())?;
     check_generator_spool(&archive, &built)?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let table = at(&catalog, "/configurations/localContractGenerators")?;
@@ -305,7 +307,7 @@ fn check_generator_spool(archive: &Archive, built: &BuiltCatalog) -> TestResult 
     let (summary, packed) = write_catalog_from(
         archive,
         &entry,
-        &fixture::options(),
+        fixture::options().with_full_provenance(),
         Compression::Zstd { level: 1 },
         || Ok(Vec::new()),
     )?;

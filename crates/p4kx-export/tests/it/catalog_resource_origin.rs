@@ -40,7 +40,7 @@ fn text_row<'a>(catalog: &'a Value, domain: &str, key: &str) -> TestResult<&'a V
 #[test]
 fn a_consumer_classifies_each_value_without_reconstructing_provenance() -> TestResult {
     let (_directory, archive) = fixture::open(fixture::database(2.5).build(), false)?;
-    let built = build_catalog(&archive, &fixture::options())?;
+    let built = build_catalog(&archive, fixture::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     assert!(
         catalog.get("resourceTypes").is_none(),
@@ -58,7 +58,7 @@ fn a_consumer_classifies_each_value_without_reconstructing_provenance() -> TestR
 fn every_nested_resource_value_has_the_immediate_shared_carrier() -> TestResult {
     let database = crate::resource_fixture::database(OverrideEntryTarget::Concrete).build();
     let (_directory, archive) = fixture::open(database, false)?;
-    let built = build_catalog(&archive, &fixture::options())?;
+    let built = build_catalog(&archive, fixture::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let rows = catalog["definitions"]["resourceTypes"]["rows"]
         .as_array()
@@ -82,7 +82,7 @@ fn raw_ieee_values_are_present_and_zero_false_empty_null_absent_stay_distinct() 
         fixture::database(f32::from_bits(0x7fc0_1234)).build(),
         false,
     )?;
-    let built = build_catalog(&archive, &fixture::options())?;
+    let built = build_catalog(&archive, fixture::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let resource = row(&catalog)?;
     assert_eq!(catalog["exportHealth"]["status"], "complete");
@@ -113,7 +113,7 @@ fn raw_ieee_values_are_present_and_zero_false_empty_null_absent_stay_distinct() 
 #[test]
 fn the_quality_distribution_retains_its_nonfinite_token_and_direct_plain_origin() -> TestResult {
     let (_directory, archive) = fixture::open(fixture::unported().build(), false)?;
-    let built = build_catalog(&archive, &fixture::options())?;
+    let built = build_catalog(&archive, fixture::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let row = crate::quality_v3_support::rows(&catalog, crate::quality_v3_support::DISTRIBUTIONS)?
         .first()
@@ -141,7 +141,7 @@ fn the_quality_distribution_retains_its_nonfinite_token_and_direct_plain_origin(
 #[test]
 fn every_available_supported_language_uses_its_actual_winning_entry() -> TestResult {
     let (_directory, archive) = fixture::open(fixture::database(1.0).build(), true)?;
-    let built = build_catalog(&archive, &fixture::options())?;
+    let built = build_catalog(&archive, fixture::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let text = text_row(&catalog, "publicNames", "@fixture_name")?;
     let languages = text["translations"]["value"]
@@ -177,18 +177,21 @@ fn every_available_supported_language_uses_its_actual_winning_entry() -> TestRes
 #[test]
 fn cli_and_gui_file_adapters_write_the_same_prepared_plain_and_compressed_values() -> TestResult {
     let (directory, archive) = fixture::open(fixture::database(-0.0).build(), false)?;
-    let baseline = build_catalog(&archive, &fixture::options())?;
+    let baseline = build_catalog(&archive, fixture::options().with_full_provenance())?;
     let plain = directory.path().join("catalog.json");
-    let (_, file) = write_catalog_file(&archive, &fixture::options(), Compression::None, || {
-        CatalogFile::create(&plain)
-    })?;
+    let (_, file) = write_catalog_file(
+        &archive,
+        fixture::options().with_full_provenance(),
+        Compression::None,
+        || CatalogFile::create(&plain),
+    )?;
     file.commit()?;
     let loaded = DataForgeEntry::read(&archive)?;
     let packed = directory.path().join("catalog.json.zst");
     let (_, file) = write_catalog_file_from(
         &archive,
         &loaded,
-        &fixture::options(),
+        fixture::options().with_full_provenance(),
         Compression::Zstd { level: 1 },
         || CatalogFile::create(&packed),
     )?;
@@ -209,7 +212,11 @@ fn standalone_dcb_origin_is_not_inferred_from_the_localization_archive() -> Test
     let path = directory.path().join("external.dcb");
     fs::write(&path, fixture::database(3.0).build())?;
     let external = DataForgeEntry::read_file(&path)?;
-    let built = build_catalog_from(&archive, &external, &fixture::options())?;
+    let built = build_catalog_from(
+        &archive,
+        &external,
+        fixture::options().with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     assert!(
         row(&catalog)?["guid"]["containsEncryptedSource"].is_null(),

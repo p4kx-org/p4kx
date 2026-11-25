@@ -62,7 +62,7 @@ fn refused_report(source: &Fixture) -> TestResult<Value> {
     let result = write_catalog_from(
         &source.archive,
         &source.entry,
-        &fixture::options(),
+        fixture::options().with_full_provenance(),
         Compression::None,
         || {
             created.set(true);

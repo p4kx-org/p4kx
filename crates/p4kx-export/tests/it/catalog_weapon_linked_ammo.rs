@@ -193,6 +193,6 @@ fn build(case: Case, origin: DcbOrigin) -> TestResult<Value> {
     let filter = Filter::parse(fixture::FILTER)?;
     options.filter = Some(&filter);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let result = build_catalog(&archive, &options)?;
+    let result = build_catalog(&archive, options.with_full_provenance())?;
     Ok(serde_json::from_slice(result.json())?)
 }

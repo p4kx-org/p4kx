@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::catalog_queries::mission_broker_context::{
-    MissionBrokerContextSnapshot, with_mission_broker_context_from,
-};
+use p4kx_export::catalog_queries::mission_broker_context::MissionBrokerContextSnapshot;
 use p4kx_export::catalog_queries::mission_properties::{DeclarationBinding, SourcePayload};
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_export::{CatalogError, CatalogOptions, CatalogPublicationMode, build_catalog_from};
@@ -112,7 +111,7 @@ fn with_fixture<T>(
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
     let entry = DataForgeEntry::read(&archive)?;
     let options = CatalogOptions::new(UNIX_EPOCH);
-    let normal = build_catalog_from(&archive, &entry, &options);
+    let normal = build_catalog_from(&archive, &entry, options.with_full_provenance());
     let built = match body {
         Body::Readable => normal?,
         Body::Unreadable => {
@@ -124,15 +123,18 @@ fn with_fixture<T>(
                 publication_mode: CatalogPublicationMode::DiagnosticPartial,
                 ..options
             };
-            build_catalog_from(&archive, &entry, &partial)?
+            build_catalog_from(&archive, &entry, partial.with_full_provenance())?
         }
     };
     let catalog: Value = serde_json::from_slice(built.json())?;
-    with_mission_broker_context_from(
+    full_proof::from_entry(
         &archive,
         &entry,
-        CatalogRecordSelection::RecordIndex(BROKER),
         CatalogLanguageSelection::Selected(&[]),
+        None,
+    )?
+    .with_mission_broker_context(
+        CatalogRecordSelection::RecordIndex(BROKER),
         None,
         |snapshot| inspect(snapshot, &catalog),
     )?

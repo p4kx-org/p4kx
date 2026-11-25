@@ -192,7 +192,7 @@ fn cancellation_returns_the_typed_stop_error_without_a_catalog() -> TestResult {
     options.cancel = Some(&cancel);
     assert!(
         matches!(
-            build_catalog(&archive, &options),
+            build_catalog(&archive, options.with_full_provenance()),
             Err(CatalogError::Cancelled)
         ),
         "cancellation publishes no catalog"

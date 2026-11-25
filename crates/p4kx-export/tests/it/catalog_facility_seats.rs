@@ -16,8 +16,9 @@ fn seat_and_ejection_keep_their_physical_source_and_typed_values() -> TestResult
     let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_directory, archive) = common::open(&database, origin)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
         let [crew, operator] = proof::rows(&catalog, "/configurations/facilities/rows")? else {
             return Err("two physical seat component occurrences".into());
         };
@@ -153,8 +154,9 @@ fn single(row: &Value, field: &str, original: f32, encrypted: bool) -> TestResul
 fn nonfinite_ejection_offset_retains_its_exact_bits_in_a_complete_catalog() -> TestResult {
     let original = f32::from_bits(0x7fc0_1063);
     let (_directory, archive) = common::open(&fixture::database(original), DcbOrigin::Encrypted)?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
     let angles = proof::at(
         &catalog,
         "/configurations/facilities/rows/0/ejection/value/offsetAngles/value",
@@ -180,7 +182,7 @@ fn absent_or_invalid_ejection_preserves_original_storage_state() -> TestResult {
     let (_directory, archive) = common::open(&database, DcbOrigin::Encrypted)?;
     assert!(
         matches!(
-            build_catalog(&archive, &common::options()),
+            build_catalog(&archive, common::options().with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "invalid original storage affects publication"
@@ -189,7 +191,8 @@ fn absent_or_invalid_ejection_preserves_original_storage_state() -> TestResult {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let row = proof::at(&catalog, "/configurations/facilities/rows/0")?;
     proof::cell(row, "ejection", "invalid")?;
     let [original] = proof::rows(row, "/additionalFields/roots")? else {

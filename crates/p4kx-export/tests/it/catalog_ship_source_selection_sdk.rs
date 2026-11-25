@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::cell::Cell;
 
 use p4kx_export::CatalogError;
@@ -24,14 +25,12 @@ fn direct_ship_sdk_keeps_guid_aliases_and_exact_physical_selection() -> TestResu
     let guid = forge.record(0).ok_or("actual first physical Ship")?.guid();
     let catalog = fixture::catalog(&archive)?;
     let languages = CatalogLanguageSelection::Selected(&[]);
-    equipment::with_ship_sources(
-        &archive,
+    full_proof::open(&archive, languages, None)?.with_ship_sources(
         CatalogRecordSelection::All,
-        languages,
         None,
         |snapshot| aliases(&snapshot, &catalog, &[0, 1], &[10.0, 20.0]),
     )??;
-    let session = CatalogQuerySession::from_entry(&archive, &entry, languages, None)?;
+    let session = full_proof::from_entry(&archive, &entry, languages, None)?;
     session.with_ship_sources(CatalogRecordSelection::Guid(guid), None, |snapshot| {
         aliases(&snapshot, &catalog, &[0, 1], &[10.0, 20.0])
     })??;

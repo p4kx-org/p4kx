@@ -1,11 +1,18 @@
 # P4KX catalog
 
-The P4KX catalog exports authored game data and derived projections as versioned JSON. Its
-contract is the JSON Schema (draft 2020-12) in
-[`schemas/p4kx-catalog.schema.json`](../schemas/p4kx-catalog.schema.json), generated from
-the Rust types in `crates/p4kx-export/src/contract.rs`. A test fails when the checked-in schema and
-the types drift apart; `P4KX_BLESS=1 cargo test -p p4kx-export --test catalog_schema` regenerates
-it.
+The P4KX catalog exports authored game data and derived projections as versioned JSON.
+The standard marker document identifies itself with `format: "p4kx-catalog-markers"`
+and `formatVersion: 1`. Its `catalog` object contains the version 3 data. A sourced
+value carries `state`, `value` and `containsEncryptedSource`; the marker remains
+`true`, `false` or `null` according to the observed origin.
+
+Use `--provenance full` in the CLI, the full-provenance export action in the GUI,
+or `CatalogOptions::with_provenance_mode(ProvenanceMode::Full)` in Rust to write
+the standalone version 3 catalog with its source inventory and proof references.
+Its JSON Schema is [`schemas/p4kx-catalog.schema.json`](../schemas/p4kx-catalog.schema.json).
+The CLI generates the marker document's separate draft 2020-12 schema with
+`p4kx catalog schema`. Use `p4kx catalog schema --provenance full` for the
+standalone version 3 schema.
 
 The [Rust SDK](catalog-sdk.md) also reads supported catalog data directly from an opened Archive.
 `CatalogOptions::starmap_budget` defaults to complete Child traversal without a fixed count quota.
@@ -26,7 +33,8 @@ for the operating system and desktop on 64 GiB and 16 GiB systems.
 The catalog carries media references and metadata, such as Archive paths, physical Entry
 identities, material settings, animation selection and sound-event bindings. The normal file
 and media exporters write texture pixels, 3D model geometry and audio payloads on request,
-including the supported converted formats.
+including the supported converted formats. Catalog references retain their existing path and
+metadata types. The Catalog schema has no shared Game-Media annotation for these references.
 
 Use the Archive view's file export in the GUI. In the CLI, use `p4kx extract` for original
 Entries, `p4kx texture png` or `p4kx texture merge` for textures, `p4kx model glb` or
@@ -157,9 +165,9 @@ This class annotation does not replace counter reconciliation, physical target o
 selection completeness or publication checks.
 
 ```powershell
-p4kx catalog <archive> --out p4kx-catalog.json [--filter <filter>] [--exported-at <seconds>]
-p4kx catalog <archive> --out p4kx-catalog.json.zst [--zstd-level <level>]
-p4kx catalog schema
+p4kx catalog <archive> --out p4kx-catalog.markers.json [--filter <filter>] [--exported-at <seconds>]
+p4kx catalog <archive> --provenance full --out p4kx-catalog.json.zst [--zstd-level <level>]
+p4kx catalog schema > p4kx-catalog-markers.schema.json
 ```
 
 ### Compressed form
@@ -3240,7 +3248,7 @@ reference-safe selective imports.
 
 The following measurements describe earlier catalog revisions. Use the size investigation for
 measurements of Catalog v3. The LIVE capture from 2026-10-26 included all kinds and English
-and German texts. Bytes is the whole decoded catalog. The CLI summary was produced with `p4kx catalog --json`.
+and German texts. Bytes is the whole decoded catalog. Reproduce the Full-profile CLI summary with `p4kx catalog --provenance full --json`.
 
 | Channel | Bytes | Manufacturers | Items | Ships | Commodities | Blueprints | Resource groups | Blueprint categories | Properties | Distributions | Pools | Dismantle | Paints | Loadouts |
 |---------|------:|--------------:|------:|------:|------------:|-----------:|----------------:|---------------------:|-----------:|--------------:|------:|----------:|-------:|---------:|

@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::path::Path;
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use p4kx_export::Compression;
 use thiserror::Error;
@@ -16,6 +17,21 @@ impl InvalidExportTime {
     pub(crate) const fn of(seconds: u64) -> Self {
         Self(seconds)
     }
+}
+
+/// Converts the explicit Unix timestamp or captures the current time.
+///
+/// # Errors
+/// Returns an error if the explicit timestamp exceeds the system time range.
+pub(crate) fn export_time(seconds: Option<u64>) -> Result<SystemTime, InvalidExportTime> {
+    seconds.map_or_else(
+        || Ok(SystemTime::now()),
+        |seconds| {
+            UNIX_EPOCH
+                .checked_add(Duration::from_secs(seconds))
+                .ok_or_else(|| InvalidExportTime::of(seconds))
+        },
+    )
 }
 
 /// `p4kx catalog` was given no Archive or no output file.

@@ -19,11 +19,15 @@ fn gameplay_v3_keeps_interpreted_read_crafting_and_plain_compressed_cancelled_pu
     interpreted(&database)?;
     let (_folder, archive) = common::open(&database, DcbOrigin::Plain)?;
     let options = common::options();
-    let built = export::build_catalog(&archive, &options)?;
+    let built = export::build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     support::row(&catalog, 0)?;
-    let (summary, compressed) =
-        export::write_catalog(&archive, &options, Compression::ZSTD, || Ok(Vec::new()))?;
+    let (summary, compressed) = export::write_catalog(
+        &archive,
+        options.with_full_provenance(),
+        Compression::ZSTD,
+        || Ok(Vec::new()),
+    )?;
     let decoded = zstd::stream::decode_all(compressed.as_slice())?;
     assert_eq!(
         serde_json::from_slice::<Value>(&decoded)?,
@@ -79,10 +83,15 @@ fn cancelled(archive: &p4kx_extraction::Archive, options: CatalogOptions<'_>) {
         ..options
     };
     let creates = Cell::new(0);
-    let result = export::write_catalog(archive, &cancelled, Compression::None, || {
-        creates.set(creates.get() + 1);
-        Ok(Vec::<u8>::new())
-    });
+    let result = export::write_catalog(
+        archive,
+        cancelled.with_full_provenance(),
+        Compression::None,
+        || {
+            creates.set(creates.get() + 1);
+            Ok(Vec::<u8>::new())
+        },
+    );
     assert!(
         matches!(result, Err(CatalogError::Cancelled)),
         "cancellation remains a fatal typed outcome"

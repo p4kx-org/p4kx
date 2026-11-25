@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
+use p4kx_extraction::{Archive, CancelToken, DataForgeEntry, ProvenanceMode};
 
 use super::guid_linked_definition_read::GuidLinkedDefinitionRead;
 use super::{CatalogQuerySession, LooseDefinitionSnapshot, ParsedCatalogQueries};
@@ -33,7 +33,25 @@ pub fn read_geology_assets(
     selection: LooseDefinitionSelection<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<GeologyAssetSnapshot, CatalogError> {
-    QUERY.read(archive, selection, cancel)
+    read_geology_assets_with_provenance_mode(
+        archive,
+        selection,
+        ProvenanceMode::MarkersOnly,
+        cancel,
+    )
+}
+
+/// Reads selected planet geology assets with the requested source detail.
+///
+/// # Errors
+/// Returns the errors of `read_geology_assets`.
+pub fn read_geology_assets_with_provenance_mode(
+    archive: &Archive,
+    selection: LooseDefinitionSelection<'_>,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<GeologyAssetSnapshot, CatalogError> {
+    QUERY.read(archive, selection, provenance_mode, cancel)
 }
 
 /// Reads selected geology assets with an already decoded DataForge Entry.

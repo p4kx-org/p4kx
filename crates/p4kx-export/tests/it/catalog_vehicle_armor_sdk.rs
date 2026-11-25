@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::equipment::vehicle_armor::{self, VehicleArmorDamage};
+use p4kx_export::catalog_queries::equipment::vehicle_armor::VehicleArmorDamage;
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ParsedCatalogQueries,
-    ResourceFloat32,
+    CatalogLanguageSelection, CatalogRecordSelection, ParsedCatalogQueries, ResourceFloat32,
 };
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog};
 use p4kx_extraction::{DataForgeEntry, Guid};
@@ -13,21 +12,23 @@ use serde_json::{Value, json};
 use super::{TABLE, fixture};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn vehicle_armor_query_keeps_producer_rows_and_physical_origins() -> TestResult {
     let database = fixture::database(fixture::Layout::Complete);
     for origin in [DcbOrigin::Plain, DcbOrigin::Encrypted] {
         let (_directory, archive) = common::open(&database, origin)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
         let entry = DataForgeEntry::read(&archive)?;
         let forge = entry.open()?;
         let known = forge
             .record(0)
             .ok_or("known physical fixture owner")?
             .guid();
-        let session = CatalogQuerySession::from_entry(
+        let session = full_proof::from_entry(
             &archive,
             &entry,
             CatalogLanguageSelection::AllAvailable,
@@ -111,11 +112,10 @@ fn a_malformed_armor_curve_reports_incomplete_scope_without_losing_the_original(
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let entry = DataForgeEntry::read(&archive)?;
-    vehicle_armor::with_vehicle_armor_from(
-        &archive,
-        &entry,
+    full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?.with_vehicle_armor(
         CatalogRecordSelection::RecordIndex(0),
         None,
         |snapshot| -> TestResult {

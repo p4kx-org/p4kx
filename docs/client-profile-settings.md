@@ -5,10 +5,13 @@ The Rust SDK uses `read_client_profile_settings` for both documents and
 `read_client_profile_settings_for` with a `ProfileKind` for a single payload.
 Both calls need the opened Archive directory and selected profile XML. Settings,
 physical candidates, elements, declarations and text are accessible as typed values.
-The report also provides the checked Archive's Build when available and its own
-source inventory for resolving the returned origin references.
+The SDK report provides the checked Archive's Build when available. By default,
+sourced values carry encryption markers and the report has an empty source inventory.
+Use `read_client_profile_settings_with_provenance_mode` or
+`read_client_profile_settings_for_with_provenance_mode` with `ProvenanceMode::Full`
+to resolve the returned origin references against the report's own inventory.
 Catalog schema v3 exposes the same documents under `configurations.clientProfileSettings`.
-The CLI report wraps them in `settings` and includes its own `provenance` inventory.
+The CLI report wraps them in `settings` and includes its full `provenance` inventory.
 Catalog references use the Catalog's shared inventory.
 
 The `documents` array places the general client profile first and the VR client profile second.
@@ -32,8 +35,8 @@ elements use the same representation, including repeated settings and explicit e
 The `value` cell retains the decoded string. A `lexeme` cell is present when a text XML
 spelling differs from that string. Element `content` carries direct text values and their
 original positions. For CryXml, the location addresses the original content or attribute
-table slot. Each value cites its actual Archive source and carries
-`sourceUsesRefs`, `sourceSetComplete` and `containsEncryptedSource`.
+table slot. Each value carries `containsEncryptedSource`. Full provenance adds
+`sourceUsesRefs` and `sourceSetComplete` for its actual Archive evidence.
 
 These documents describe the defaults authored in shipping client profiles. Effective
 values, user overrides, enum-to-label mappings and persistence require independent

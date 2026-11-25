@@ -80,7 +80,7 @@ impl<'source> Selection<'source> {
             publication_mode: CatalogPublicationMode::DiagnosticPartial,
             ..CatalogOptions::new(UNIX_EPOCH)
         };
-        let catalog = build_catalog_from(archive, entry, &options)
+        let catalog = build_catalog_from(archive, entry, options.with_full_provenance())
             .map_err(|_| "build selected diagnostic Catalog")?;
         serde_json::from_slice(catalog.json()).map_err(|_| "read selected Catalog JSON".into())
     }

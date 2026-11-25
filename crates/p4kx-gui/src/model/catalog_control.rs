@@ -4,7 +4,7 @@
 use std::path::PathBuf;
 use std::sync::Arc;
 
-use p4kx_extraction::is_same_file;
+use p4kx_extraction::{ProvenanceMode, is_same_file};
 
 use super::Model;
 use crate::catalog_export::{is_gzip, normalised_catalog_file, refused, refused_gzip, start};
@@ -49,6 +49,17 @@ impl Model {
         options: CatalogExportOptions,
         wake: impl Fn() + Send + 'static,
     ) -> bool {
+        self.start_catalog_with_provenance_mode(file, options, ProvenanceMode::MarkersOnly, wake)
+    }
+
+    /// Starts a catalog job with an explicit provenance profile.
+    pub fn start_catalog_with_provenance_mode(
+        &mut self,
+        file: PathBuf,
+        options: CatalogExportOptions,
+        provenance_mode: ProvenanceMode,
+        wake: impl Fn() + Send + 'static,
+    ) -> bool {
         if self.check_archive() || !self.catalog_available() {
             return false;
         }
@@ -70,6 +81,7 @@ impl Model {
             &index,
             file,
             options,
+            provenance_mode,
             wake,
             self.catalog
                 .gate
@@ -77,7 +89,7 @@ impl Model {
                 .map_or_else(Pause::default, Pause::at),
         );
         #[cfg(not(feature = "test-hooks"))]
-        let run = start(&index, file, options, wake);
+        let run = start(&index, file, options, provenance_mode, wake);
         self.catalog.run = Some(run);
         true
     }

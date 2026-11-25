@@ -19,7 +19,7 @@ fn hacking_components_empty_target_rejects_an_unrelated_class_even_without_eleme
     let (_folder, archive) = common::open(&source, DcbOrigin::Encrypted)?;
     assert!(
         matches!(
-            build_catalog(&archive, &common::options()),
+            build_catalog(&archive, common::options().with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "normal publication cannot report an unrelated declared Class array as known empty"
@@ -49,8 +49,9 @@ fn hacking_components_empty_target_keeps_the_original_empty_class_and_its_exact_
     let source = fixture::database(Case::Valid);
     let (ordinal, target) = original_empty_target(&source, MODIFIER)?;
     let (_folder, archive) = common::open(&source, DcbOrigin::Plain)?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
     let row = proof::rows(&catalog, ROWS)?
         .get(2)
         .ok_or("actual empty modifier row")?;

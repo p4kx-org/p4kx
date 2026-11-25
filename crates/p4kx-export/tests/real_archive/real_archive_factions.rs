@@ -36,8 +36,8 @@ fn faction_definitions_and_incoming_scenario_links_match_the_original_records() 
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(SystemTime::now())
     };
-    let built =
-        build_catalog_from(&archive, &entry, &options).map_err(|_| "build Faction catalog")?;
+    let built = build_catalog_from(&archive, &entry, options.with_full_provenance())
+        .map_err(|_| "build Faction catalog")?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     crate::real_archive_shop_inventory_v3::verify_build(&archive, &catalog)?;
     let forge = entry.open().map_err(|_| "open original DataForge")?;

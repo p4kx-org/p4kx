@@ -98,7 +98,7 @@ fn compare(
         ..CatalogOptions::new(UNIX_EPOCH)
     };
     watch.check().map_err(|_| "Archive changed")?;
-    let built = build_catalog_from(archive, entry, &options)
+    let built = build_catalog_from(archive, entry, options.with_full_provenance())
         .map_err(|_| "build selected AutoSpawns owner")?;
     let catalog: Value = serde_json::from_slice(built.json()).map_err(|_| "read catalog JSON")?;
     let mission = physical_context(&catalog, witness)?;

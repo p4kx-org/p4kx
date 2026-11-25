@@ -151,7 +151,11 @@ fn refusal(input: &Fixture) {
     let options = health_origin_fixture::options();
     assert!(
         matches!(
-            p4kx_export::build_catalog_from(&input.archive, &input.entry, &options),
+            p4kx_export::build_catalog_from(
+                &input.archive,
+                &input.entry,
+                options.with_full_provenance()
+            ),
             Err(CatalogError::IncompleteExport(_))
         ),
         "Normal refuses the same required original cause"
@@ -161,7 +165,7 @@ fn refusal(input: &Fixture) {
         let result = p4kx_export::write_catalog_from(
             &input.archive,
             &input.entry,
-            &options,
+            options.with_full_provenance(),
             compression,
             || {
                 created = true;
@@ -191,7 +195,7 @@ fn recognized_reputation_and_modifier_keep_their_original_complete_results() -> 
         let built = p4kx_export::build_catalog_from(
             &input.archive,
             &input.entry,
-            &health_origin_fixture::options(),
+            health_origin_fixture::options().with_full_provenance(),
         )?;
         let document: Value = serde_json::from_slice(built.json())?;
         recognized(&document)?;

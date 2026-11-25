@@ -65,7 +65,7 @@ fn phases_are_logged_with_redirected_stderr_without_changing_the_catalog() -> Te
     let archive = write_archive_with(dir.path(), &[english(), german(), system])?;
     let out = dir.path().join("p4kx-catalog.json.zst");
     let run = |flags: &[&str]| -> Result<_, Box<dyn std::error::Error>> {
-        Ok(p4kx(&["catalog", "--json"])?
+        Ok(p4kx(&["catalog", "--provenance", "full", "--json"])?
             .arg(&archive)
             .arg("--out")
             .arg(&out)

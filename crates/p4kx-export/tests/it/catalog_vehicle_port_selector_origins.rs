@@ -5,12 +5,12 @@ use std::collections::BTreeSet;
 use std::ops::Range;
 
 use p4kx_export::catalog_queries::CatalogRecordSelection;
-use p4kx_export::catalog_queries::equipment::read_loadouts;
 use roxmltree::{Document, Node};
 use serde_json::{Value, json};
 
 use super::{catalog_from, fixture, loadout, proof};
 use crate::commodity_v3_fixture::TestResult;
+use crate::sdk_full_proof as full_proof;
 
 const VEHICLE: &str = r#"<Vehicle name="FixtureTopology">
     <Parts>
@@ -52,7 +52,8 @@ fn vehicle_port_fields_retain_the_original_first_match_prefix_in_catalog_and_sdk
         let (_directory, archive) =
             fixture::graph_archive_with_vehicle(VEHICLE.as_bytes(), encrypted)?;
         check_cached_port_callers(&catalog_from(&archive)?, encrypted)?;
-        let selected = read_loadouts(&archive, CatalogRecordSelection::All, None)?;
+        let selected = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?
+            .read_loadouts(CatalogRecordSelection::All, None)?;
         check_cached_port_callers(
             &json!({"loadouts": selected.rows, "provenance": selected.source_inventory}),
             encrypted,

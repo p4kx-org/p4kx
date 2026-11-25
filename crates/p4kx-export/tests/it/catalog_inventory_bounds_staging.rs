@@ -22,9 +22,13 @@ fn staged_bounds_replay_in_physical_order_with_original_provenance() -> common::
         (common::DcbOrigin::Encrypted, true),
     ] {
         let (_directory, archive) = common::open(&database, origin)?;
-        let built = p4kx_export::build_catalog(&archive, &options)?;
-        let (summary, compressed) =
-            p4kx_export::write_catalog(&archive, &options, Compression::ZSTD, || Ok(Vec::new()))?;
+        let built = p4kx_export::build_catalog(&archive, options.with_full_provenance())?;
+        let (summary, compressed) = p4kx_export::write_catalog(
+            &archive,
+            options.with_full_provenance(),
+            Compression::ZSTD,
+            || Ok(Vec::new()),
+        )?;
         assert!(
             summary.staged_row_bytes() > 0,
             "the producer accounts for staged bytes"
@@ -76,7 +80,7 @@ fn empty_staged_bounds_preserve_declared_source_availability() -> common::TestRe
         (fixture::database(), "absent"),
     ] {
         let (_directory, archive) = common::open(&database, common::DcbOrigin::Plain)?;
-        let built = p4kx_export::build_catalog(&archive, &options)?;
+        let built = p4kx_export::build_catalog(&archive, options.with_full_provenance())?;
         let catalog: Value = serde_json::from_slice(built.json())?;
         assert_eq!(
             *proof::at(&catalog, TABLE)?,

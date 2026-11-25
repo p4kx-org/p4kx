@@ -16,7 +16,7 @@ fn ammo_geometry_accepts_all_known_original_model_tag_derivatives() -> TestResul
         ("GeometryAsteroidModelTag", "asteroid"),
     ] {
         let (_folder, archive) = common::open(&database(source_type), DcbOrigin::Encrypted)?;
-        let built = build_catalog(&archive, &common::options())?;
+        let built = build_catalog(&archive, common::options().with_full_provenance())?;
         let catalog: Value = serde_json::from_slice(built.json())?;
         let tag = proof::at(
             &catalog,

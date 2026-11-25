@@ -192,7 +192,7 @@ pub(crate) fn with_output(
     let built = p4kx_export::build_catalog_from(
         &source.archive,
         &source.entry,
-        &CatalogOptions::new(UNIX_EPOCH),
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
     )?;
     assert_eq!(
         built.summary().export_health().status,

@@ -13,6 +13,7 @@ use serde_json::Value;
 use super::TestResult;
 use crate::commodity_v3_fixture::{self, DcbOrigin, guid};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 use super::query_source_fixture as fixture;
 
@@ -60,7 +61,7 @@ fn contract_sdk_logical_parent_matches_complete_catalog_and_preserves_owner_api(
         commodity_v3_fixture::open_bytes(fixture::database(false, false), DcbOrigin::Plain)?;
     let mut options = commodity_v3_fixture::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let expected = proof::rows(&catalog, "/projections/contracts/rows")?
         .iter()
@@ -72,8 +73,7 @@ fn contract_sdk_logical_parent_matches_complete_catalog_and_preserves_owner_api(
                     .is_none()
         })
         .ok_or("the canonical parent")?;
-    let session =
-        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
+    let session = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?;
     let parsed = session.parsed(None)?;
     parsed.with_contract(parent_key()?, None, |snapshot| {
         verify_single(&snapshot, parent_key()?, 1)?;

@@ -5,7 +5,7 @@ use p4kx_export::catalog_queries::faction_identities::{
     FactionIdentityDefinition, FactionIdentitySnapshot,
 };
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability,
 };
 use p4kx_export::{CatalogError, CatalogOptions, CatalogPublicationMode, Filter, build_catalog};
 use p4kx_extraction::Guid;
@@ -14,6 +14,7 @@ use serde_json::{Value, json};
 
 use crate::canonical_header::json::assert_canonical;
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult, at, guid};
+use crate::sdk_full_proof as full_proof;
 
 #[path = "catalog_faction_identity/fixture.rs"]
 mod fixture;
@@ -228,7 +229,7 @@ fn faction_identity_sdk_selects_canonical_rows_and_physical_duplicates() -> Test
     let (_directory, archive) = common::open(&database, DcbOrigin::Encrypted)?;
     assert!(
         matches!(
-            build_catalog(&archive, &common::options()),
+            build_catalog(&archive, common::options().with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "a complete catalog refuses ambiguous physical owners"
@@ -237,11 +238,10 @@ fn faction_identity_sdk_selects_canonical_rows_and_physical_duplicates() -> Test
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let catalog = build_catalog(&archive, &options)?;
+    let catalog = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(catalog.json())?;
     let definitions = at(&catalog, "/definitions/factionIdentities/rows")?;
-    let session =
-        CatalogQuerySession::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
+    let session = full_proof::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
     let parsed = session.parsed(None)?;
     let (duplicate_guid, index) =
         parsed.with_faction_identities(CatalogRecordSelection::All, None, |snapshot| {

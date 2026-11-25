@@ -49,7 +49,7 @@ fn physical_shop_inventory_scope_is_global_without_registry_or_record_matches() 
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.filter = Some(&filter);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = p4kx_export::build_catalog(&archive, &options)?;
+    let built = p4kx_export::build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let rows = health::rows(&catalog, "/definitions/shopInventories/rows")?;
     assert_eq!(rows.len(), 1, "every actual scoped physical file");

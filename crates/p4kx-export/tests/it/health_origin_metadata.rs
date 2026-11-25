@@ -282,7 +282,11 @@ fn a_filtered_original_failure_produces_no_unused_header_payload_claims() -> Tes
         filter: Some(&filter),
         ..fixture::options()
     };
-    let built = p4kx_export::build_catalog_from(&source.archive, &source.entry, &options)?;
+    let built = p4kx_export::build_catalog_from(
+        &source.archive,
+        &source.entry,
+        options.with_full_provenance(),
+    )?;
     assert!(
         built.summary().export_health().is_complete(),
         "ordinary filtering preserves successful absence without reading the broken body"

@@ -19,8 +19,12 @@ fn text_census_matches_a_published_synthetic_catalog() -> TestResult<()> {
     let data = fixture::with_keys("@shared", "@shared", "@shared");
     let (_folder, archive) = fixture::open(&data, DcbOrigin::Plain)?;
     let options = fixture::options();
-    let (file_summary, mut file) =
-        p4kx_export::write_catalog(&archive, &options, Compression::None, tempfile::tempfile)?;
+    let (file_summary, mut file) = p4kx_export::write_catalog(
+        &archive,
+        options.with_full_provenance(),
+        Compression::None,
+        tempfile::tempfile,
+    )?;
     file.rewind()?;
     let catalog: Value = serde_json::from_reader(io::BufReader::new(file))?;
     let mut writing = false;
@@ -34,7 +38,6 @@ fn text_census_matches_a_published_synthetic_catalog() -> TestResult<()> {
         projected.pointer("/provenance/uses").is_none(),
         "the text census omits use rows"
     );
-
     let locales = LocalizationSet::read(&archive, &[Language::English, Language::German])?;
     let english = Oracle::of(&locales, Language::English)?;
     let german = Oracle::of(&locales, Language::German)?;
@@ -47,7 +50,6 @@ fn text_census_matches_a_published_synthetic_catalog() -> TestResult<()> {
             "text checks for {kind}"
         );
     }
-
     let mut corrupted = catalog;
     corrupt_german_display(&mut corrupted)?;
     let serialized = serde_json::to_vec(&corrupted)?;

@@ -16,7 +16,7 @@ fn item_ports_supply_canonical_display_names_at_the_original_locale_occurrence()
     let bytes = database(Layout::Localized).build();
     let ordinal = original_locale_ordinal(&bytes)?;
     let (_fixture, archive) = archive(bytes)?;
-    let built = build_catalog(&archive, &options())?;
+    let built = build_catalog(&archive, options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     jsonschema::validator_for(&catalog_schema())?
         .validate(&catalog)

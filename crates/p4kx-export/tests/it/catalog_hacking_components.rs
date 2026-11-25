@@ -26,8 +26,9 @@ fn hacking_components_keep_zero_charges_and_ordered_original_modifier_values() -
     let source_ordinals = with_tree(&source, original_modifiers)?;
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&source, origin)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
         let [charges, modifiers, empty] = proof::rows(&catalog, ROWS)? else {
             return Err("one chip charge and two removable modifier declarations".into());
         };
@@ -286,7 +287,7 @@ fn configuration<'row>(
 fn diagnostic(archive: &Archive) -> TestResult<Value> {
     assert!(
         matches!(
-            build_catalog(archive, &common::options()),
+            build_catalog(archive, common::options().with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "normal publication refuses incomplete source"
@@ -294,7 +295,7 @@ fn diagnostic(archive: &Archive) -> TestResult<Value> {
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     Ok(serde_json::from_slice(
-        build_catalog(archive, &options)?.json(),
+        build_catalog(archive, options.with_full_provenance())?.json(),
     )?)
 }
 

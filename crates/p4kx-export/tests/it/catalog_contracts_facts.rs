@@ -32,7 +32,7 @@ pub(crate) fn catalog() -> Result<Value, Box<dyn Error>> {
     )?;
     let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
     Ok(serde_json::from_slice(
-        build_catalog(&archive, &options)?.json(),
+        build_catalog(&archive, options.with_full_provenance())?.json(),
     )?)
 }
 

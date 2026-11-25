@@ -87,6 +87,16 @@ fn the_export_menu_asks_for_the_catalog_file_only_with_a_dataforge() -> TestResu
 }
 
 #[test]
+fn the_full_catalog_menu_requests_a_separate_save_dialog() -> TestResult {
+    let (_dir, model, _) = opened(&makers())?;
+    let mut harness = harness(model);
+
+    pick(&mut harness, "Export", "P4KX catalog with full provenance…");
+    assert_eq!(harness.state().dialog, Some(Dialog::FullCatalogFile));
+    Ok(())
+}
+
+#[test]
 fn the_diagnostic_menu_requests_a_separate_save_dialog() -> TestResult {
     let (_dir, model, _) = opened(&makers())?;
     let mut harness = harness(model);

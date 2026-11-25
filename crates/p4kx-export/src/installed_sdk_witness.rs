@@ -4,7 +4,7 @@
 use std::cell::Cell;
 use std::error::Error;
 
-use p4kx_extraction::{Archive, ArchiveWatch, CancelToken};
+use p4kx_extraction::{Archive, ArchiveWatch, CancelToken, ProvenanceMode};
 use p4kx_testkit::{self, watchdog};
 use serde::Serialize;
 use serde_json::Value;
@@ -67,7 +67,8 @@ fn installed_selective_sdk_has_original_owners_and_closed_sources() -> TestResul
         .map_err(|_| "Archive changed before SDK session open")?;
     let session =
         CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)
-            .map_err(|_| "installed SDK session open failed")?;
+            .map_err(|_| "installed SDK session open failed")?
+            .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session
         .parsed(None)
         .map_err(|_| "installed SDK parsed view failed")?;

@@ -13,7 +13,7 @@ use p4kx_export::{
     CatalogPublicationMode, CatalogSummary, Compression, ExportHealth, StarmapTraversalBudget,
     write_catalog_file_from,
 };
-use p4kx_extraction::{ArchiveWriteProtection, SourceInventory, is_same_file};
+use p4kx_extraction::{ArchiveWriteProtection, ProvenanceMode, SourceInventory, is_same_file};
 
 use super::refusal::Refusal;
 use super::{
@@ -217,6 +217,7 @@ pub(crate) fn start(
     index: &Arc<EntryIndex>,
     file: PathBuf,
     options: CatalogExportOptions,
+    provenance_mode: ProvenanceMode,
     wake: impl Fn() + Send + 'static,
     #[cfg(feature = "test-hooks")] pause: crate::hold::Pause,
 ) -> CatalogExport {
@@ -230,6 +231,7 @@ pub(crate) fn start(
         cancel: cancel.clone(),
         shared: Arc::clone(&shared),
         options,
+        provenance_mode,
         #[cfg(feature = "test-hooks")]
         pause,
     };
@@ -275,6 +277,7 @@ struct Job {
     cancel: CancelToken,
     shared: Arc<Shared>,
     options: CatalogExportOptions,
+    provenance_mode: ProvenanceMode,
     #[cfg(feature = "test-hooks")]
     pause: crate::hold::Pause,
 }
@@ -315,7 +318,7 @@ impl Job {
         let created = write_catalog_file_from(
             archive,
             &source.entry,
-            &options,
+            options.with_provenance_mode(self.provenance_mode),
             Compression::for_path(&self.file),
             || {
                 self.shared.enter(CatalogExportStage::Writing);

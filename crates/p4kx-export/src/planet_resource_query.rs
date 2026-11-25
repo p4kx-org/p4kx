@@ -4,6 +4,8 @@
 //! Selective access to original loose planet resource definitions.
 
 use std::cell::OnceCell;
+
+use p4kx_extraction::ProvenanceMode;
 use std::time::UNIX_EPOCH;
 
 use p4kx_extraction::{
@@ -14,7 +16,6 @@ use super::lazy_loose_records::LazyLooseRecords;
 use super::loose_definitions::{self, LooseDefinitionSnapshot};
 use super::{CatalogLanguageSelection, CatalogQuerySession, ParsedCatalogQueries};
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_query_session::checkpoint;
 pub use crate::catalog_read::loose_archive_path::{LooseArchivePath, LooseArchivePathState};
 use crate::catalog_read::loose_definition::Selection;
@@ -23,7 +24,7 @@ pub use crate::catalog_read::loose_definition::{
 };
 pub use crate::catalog_read::loose_record_link::LooseRecordCandidate;
 use crate::catalog_read::loose_record_link::LooseRecordLink;
-use crate::catalog_read::original::{EntryCapture, with_entry_capture};
+use crate::catalog_read::original::{EntryCapture, with_entry_capture_mode};
 pub use crate::catalog_read::original::{PhysicalEntryIdentity, PhysicalEntryRef};
 use crate::catalog_v3::catalog_definitions::planet_resource;
 pub use crate::catalog_v3::catalog_definitions::planet_resource::{
@@ -51,10 +52,28 @@ pub fn read_planet_resources(
     selection: PlanetResourceSelection<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<PlanetResourceSnapshot, CatalogError> {
+    read_planet_resources_with_provenance_mode(
+        archive,
+        selection,
+        ProvenanceMode::MarkersOnly,
+        cancel,
+    )
+}
+
+/// Reads planet resources with the selected source detail.
+///
+/// # Errors
+/// Returns the errors of `read_planet_resources`.
+pub fn read_planet_resources_with_provenance_mode(
+    archive: &Archive,
+    selection: PlanetResourceSelection<'_>,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<PlanetResourceSnapshot, CatalogError> {
     checkpoint(cancel)?;
     let watch = ArchiveWatch::new(archive);
     watch.check()?;
-    let snapshot = with_entry_capture(archive, |capture| {
+    let snapshot = with_entry_capture_mode(archive, provenance_mode, |capture| {
         let loaded = OnceCell::new();
         let records = LazyLooseRecords::new(archive, capture.source_uses(), cancel, &loaded);
         read(archive, capture, selection, cancel, |path, authored| {
@@ -120,7 +139,7 @@ impl ParsedCatalogQueries<'_> {
         cancel: Option<&CancelToken>,
     ) -> Result<PlanetResourceSnapshot, CatalogError> {
         self.project(cancel, |archive, entry, forge: &DataForge<'_>| {
-            let origins = CatalogOrigins::for_archive_records(archive, entry)?;
+            let origins = entry.records(archive)?;
             let original = OriginalCatalogInput::new(forge, &origins);
             let capture = EntryCapture::for_input(&original);
             read(archive, &capture, selection, cancel, |path, authored| {

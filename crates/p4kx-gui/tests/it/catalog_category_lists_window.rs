@@ -11,7 +11,7 @@ use p4kx_export::{
     self as export, CatalogOptions, CatalogSummary, ExportSourceCounts, ExportStageStatus, Filter,
     Kind,
 };
-use p4kx_extraction::{Archive, DataForge, Value as Raw};
+use p4kx_extraction::{Archive, DataForge, ProvenanceMode, Value as Raw};
 use p4kx_gui::{CatalogExportOptions, CatalogExportStatus, Language};
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, TestStruct, TestType, TestValue,
@@ -142,7 +142,7 @@ fn assert_public_build(builder: &ArchiveBuilder) -> TestResult {
     let filter = Filter::new(FILTER);
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.filter = Some(&filter);
-    let built = export::build_catalog(&archive, &options)?;
+    let built = export::build_catalog(&archive, options.with_full_provenance())?;
     assert_summary(built.summary())?;
     assert_published(&serde_json::from_slice(built.json())?)
 }
@@ -155,12 +155,13 @@ fn check_window(builder: &ArchiveBuilder, language: Language, label: &str) -> Te
     model.set_language(language);
     let file = out.join("filtered-category-lists.json");
     assert!(
-        model.start_catalog_with_options(
+        model.start_catalog_with_provenance_mode(
             file.clone(),
             CatalogExportOptions {
                 filter: Some(Filter::new(FILTER)),
                 ..Default::default()
             },
+            ProvenanceMode::Full,
             || {},
         ),
         "the real normal GUI catalog job starts"

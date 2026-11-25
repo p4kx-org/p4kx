@@ -149,7 +149,7 @@ fn the_real_compressor_stream_reconciles_with_catalog_inventory() -> TestResult<
     let (summary, census) = transfer(|writer| {
         p4kx_export::write_catalog(
             &archive,
-            &CatalogOptions::new(UNIX_EPOCH),
+            CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
             Compression::ZSTD,
             || Ok(writer),
         )

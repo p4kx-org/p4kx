@@ -19,7 +19,11 @@ fn full_canonical_owned_depth_roundtrips_whole_default_json_and_zstd() -> TestRe
         let input = fixture::open(requested)?;
         let observed = source::check(&input, requested)?;
         let options = CatalogOptions::new(UNIX_EPOCH);
-        let baseline = p4kx_export::build_catalog_from(&input.archive, &input.entry, &options)?;
+        let baseline = p4kx_export::build_catalog_from(
+            &input.archive,
+            &input.entry,
+            options.with_full_provenance(),
+        )?;
         assert_eq!(
             baseline.summary().export_health().status,
             ExportHealthStatus::Complete,
@@ -36,7 +40,11 @@ fn sixty_five_original_owned_nodes_remain_normal_complete_and_roundtrip() -> Tes
     let input = fixture::open(65)?;
     let observed = source::check(&input, 65)?;
     let options = CatalogOptions::new(UNIX_EPOCH);
-    let baseline = p4kx_export::build_catalog_from(&input.archive, &input.entry, &options)?;
+    let baseline = p4kx_export::build_catalog_from(
+        &input.archive,
+        &input.entry,
+        options.with_full_provenance(),
+    )?;
     assert_eq!(
         baseline.summary().export_health().status,
         ExportHealthStatus::Complete,
@@ -67,7 +75,7 @@ fn cancelled(input: &Fixture, compression: Compression, at_creation: bool) {
     let result = p4kx_export::write_catalog_from(
         &input.archive,
         &input.entry,
-        &options,
+        options.with_full_provenance(),
         compression,
         || {
             creates.set(creates.get() + 1);
@@ -97,7 +105,7 @@ fn check_writers(
         let (summary, bytes) = p4kx_export::write_catalog_from(
             &input.archive,
             &input.entry,
-            options,
+            options.with_full_provenance(),
             compression,
             || {
                 creates.set(creates.get() + 1);

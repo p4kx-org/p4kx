@@ -27,7 +27,7 @@ fn catalog_selects_profile_documents_and_counts_only_read_physical_entries() -> 
     let filter = Filter::parse(VR)?;
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.filter = Some(&filter);
-    let result = build_catalog(&archive, &options)?;
+    let result = build_catalog(&archive, options.with_full_provenance())?;
     let document: Value = serde_json::from_slice(result.json())?;
     assert_eq!(
         at(&document, "/completeness/clientProfileSettings")?,
@@ -74,7 +74,7 @@ fn malformed_selected_profile_refuses_normal_catalog_publication() -> TestResult
     options.filter = Some(&filter);
     assert!(
         matches!(
-            build_catalog(&archive, &options),
+            build_catalog(&archive, options.with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "the source projection failure cannot publish a complete Catalog"
@@ -93,7 +93,10 @@ fn ambiguous_profile_candidates_are_selection_failures_without_read_counts() -> 
         ],
         None,
     )?;
-    let result = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH));
+    let result = build_catalog(
+        &archive,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    );
     let Err(CatalogError::IncompleteExport(refusal)) = result else {
         return Err("selection ambiguity must refuse Catalog publication".into());
     };

@@ -3,9 +3,7 @@
 
 use std::error::Error;
 
-use p4kx_export::catalog_queries::equipment::{
-    Loadout, LoadoutOwnerSnapshot, visit_loadouts, visit_loadouts_from,
-};
+use p4kx_export::catalog_queries::equipment::{Loadout, LoadoutOwnerSnapshot, visit_loadouts_from};
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
 };
@@ -19,20 +17,23 @@ use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as source_checks;
 use crate::loadouts_fixture::{ALPHA, BROKEN, EMPTY_LOADOUT, SNUB};
 use crate::loadouts_support;
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn owned_loadout_visits_match_catalog_rows_and_original_sources() -> TestResult {
     let (_folder, archive) = fixture()?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &loadouts_support::options(None))?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(
+            &archive,
+            loadouts_support::options(None).with_full_provenance(),
+        )?
+        .json(),
+    )?;
     let rows = catalog["loadouts"].as_array().ok_or("Catalog Loadouts")?;
     let mut expected = rows.iter();
     let mut malformed_seen = false;
-    let result = visit_loadouts::<Box<dyn Error>>(
-        &archive,
-        CatalogRecordSelection::All,
-        None,
-        |snapshot| {
+    let result = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?
+        .visit_loadouts::<Box<dyn Error>>(CatalogRecordSelection::All, None, |snapshot| {
             if let Some(row) = &snapshot.row {
                 let wire = serde_json::to_value(row)?;
                 assert_eq!(Some(&wire), expected.next(), "canonical row and order");
@@ -50,8 +51,7 @@ fn owned_loadout_visits_match_catalog_rows_and_original_sources() -> TestResult 
                 );
             }
             Ok(())
-        },
-    )?;
+        })?;
     assert!(expected.next().is_none(), "all canonical rows were visited");
     assert_eq!(result.row_count, rows.len(), "the terminal row count");
     assert!(

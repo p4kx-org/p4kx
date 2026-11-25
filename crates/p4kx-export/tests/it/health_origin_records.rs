@@ -120,7 +120,7 @@ fn refused_before_creation(source: &Fixture) -> TestResult {
     let error = write_catalog_from(
         &source.archive,
         &source.entry,
-        &fixture::options(),
+        fixture::options().with_full_provenance(),
         Compression::None,
         || {
             created.set(true);

@@ -2,9 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::catalog_queries::CatalogRecordSelection;
-use p4kx_export::catalog_queries::game_modes::{
-    RadarOptionsSnapshot, with_radar_options, with_radar_options_from,
-};
+use p4kx_export::catalog_queries::game_modes::{RadarOptionsSnapshot, with_radar_options};
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog};
 use p4kx_extraction::{DataForgeEntry, SourceValueState};
 use serde_json::{Value, json};
@@ -12,6 +10,7 @@ use serde_json::{Value, json};
 use super::fixture::{self, Layout};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 const DATASET: &str = "/configurations/radarOptions";
 
@@ -23,16 +22,15 @@ fn radar_sdk_matches_the_producer_with_a_malformed_resource_network_sibling() ->
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let network = proof::at(
         &catalog,
         "/configurations/resourceNetworkParameters/rows/0/params/value",
     )?;
     proof::cell(network, "resourceNetworkParams", "invalid")?;
     let entry = DataForgeEntry::read(&archive)?;
-    with_radar_options_from(
-        &archive,
-        &entry,
+    full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?.with_radar_options(
         CatalogRecordSelection::All,
         None,
         |snapshot| check_rows(&snapshot, &catalog),

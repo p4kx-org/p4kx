@@ -3,11 +3,12 @@
 
 use std::error::Error;
 
-use p4kx_extraction::{Archive, ArchiveKey};
+use p4kx_extraction::{Archive, ArchiveKey, ProvenanceMode};
 use p4kx_testkit::{ArchiveBuilder, CryXmlByteOrder, CryXmlSignature, TestElement, TestEntry};
 use serde_json::{Value, json};
 
-use super::{ClientProfileSettingsReport, GENERAL, VR, read_client_profile_settings};
+use super::read_client_profile_settings_with_provenance_mode as read_profiles;
+use super::{ClientProfileSettingsReport, GENERAL, VR};
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
@@ -49,7 +50,7 @@ fn observe(
     key: Option<ArchiveKey>,
 ) -> TestResult<ClientProfileSettingsReport> {
     let (_directory, archive) = archive(entries, key)?;
-    Ok(read_client_profile_settings(&archive, None)?)
+    Ok(read_profiles(&archive, ProvenanceMode::Full, None)?)
 }
 
 fn at<'value>(value: &'value Value, pointer: &str) -> TestResult<&'value Value> {

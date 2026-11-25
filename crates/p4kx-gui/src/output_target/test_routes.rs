@@ -4,7 +4,7 @@
 use crate::QueryExportFormat;
 use crate::dialog::Dialog;
 
-pub(crate) const OUTPUT_DIALOGS: [Dialog; 11] = [
+pub(crate) const OUTPUT_DIALOGS: [Dialog; 12] = [
     Dialog::ModelFile,
     Dialog::AssemblyFile,
     Dialog::AssemblyPackage,
@@ -12,6 +12,7 @@ pub(crate) const OUTPUT_DIALOGS: [Dialog; 11] = [
     Dialog::CharacterPackage,
     Dialog::UiFile,
     Dialog::CatalogFile,
+    Dialog::FullCatalogFile,
     Dialog::DiagnosticCatalogFile,
     Dialog::ComparisonReport,
     Dialog::QueryExport(QueryExportFormat::Csv),

@@ -249,7 +249,11 @@ pub(super) fn diagnostic(bytes: &[u8], filter: &Filter) -> TestResult<Value> {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let built = build_catalog_from(&fixture.archive, &fixture.entry, &options)?;
+    let built = build_catalog_from(
+        &fixture.archive,
+        &fixture.entry,
+        options.with_full_provenance(),
+    )?;
     Ok(serde_json::from_slice(built.json())?)
 }
 

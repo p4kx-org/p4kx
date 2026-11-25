@@ -10,6 +10,7 @@ use p4kx_extraction::{CancelToken, DataForgeEntry, Filter};
 use serde_json::{Value, json};
 
 use super::{Case, DcbOrigin, TestResult, common, fixture, proof};
+use crate::sdk_full_proof as full_proof;
 
 const CONTAINERS: &str = "/configurations/ammoContainers/rows";
 const BINDINGS: &str = "/declarations/ammoBindings/rows";
@@ -37,22 +38,19 @@ fn scoped_magazine_dependency_matches_canonical_rows_and_original_alias_selectio
             build_catalog_from(
                 &archive,
                 &entry,
-                &CatalogOptions {
+                CatalogOptions {
                     filter: Some(&filter),
                     publication_mode: CatalogPublicationMode::DiagnosticPartial,
                     ..common::options()
-                },
+                }
+                .with_full_provenance(),
             )?
             .json(),
         )?;
-        with_weapon_magazine_dependencies_from(
-            &archive,
-            &entry,
-            weapon,
-            Some(&filter),
-            None,
-            |snapshot| compare(&snapshot, &catalog, magazine, encrypted),
-        )??;
+        full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+            .with_weapon_magazine_dependencies(weapon, Some(&filter), None, |snapshot| {
+                compare(&snapshot, &catalog, magazine, encrypted)
+            })??;
     }
     Ok(())
 }

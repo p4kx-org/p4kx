@@ -4,12 +4,12 @@
 use std::io::{self, Write};
 use std::ops::ControlFlow;
 
-use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
+use p4kx_extraction::{Archive, DataForgeEntry};
 
 use crate::catalog_output::{Compression, emit};
 use crate::contract::Catalog;
 use crate::options::CatalogRun;
-use crate::{BuiltCatalog, CatalogError, CatalogOptions, CatalogSummary};
+use crate::{BuiltCatalog, CatalogError, CatalogOutputOptions, CatalogSummary};
 
 use super::parts::Parts;
 
@@ -26,20 +26,19 @@ mod resource_projection;
 
 /// Builds a deterministic P4KX catalog from the DataForge and available localization inputs.
 ///
-/// Resource definitions retain per-value source origins and canonical text references.
+/// Marker provenance is the default. [`crate::CatalogOptions::with_provenance_mode`] selects full proofs.
 /// Normal publication requires complete export health; diagnostic mode retains available rows.
 ///
 /// # Errors
 ///
 /// Returns an input, projection, accounting or cancellation error when the catalog cannot be built.
 /// Returns [`CatalogError::IncompleteExport`] when normal publication is unsafe.
-pub fn build_catalog(
+pub fn build_catalog<'run, 'inputs: 'run>(
     archive: &Archive,
-    options: &CatalogOptions<'_>,
+    options: impl Into<CatalogOutputOptions<'run, 'inputs>>,
 ) -> Result<BuiltCatalog, CatalogError> {
-    if options.cancel.is_some_and(CancelToken::is_cancelled) {
-        return Err(CatalogError::Cancelled);
-    }
+    let options = options.into();
+    CatalogRun::for_output(options, None).check_cancelled()?;
     let entry = DataForgeEntry::read(archive).map_err(CatalogError::Load)?;
     build_catalog_from(archive, &entry, options)
 }
@@ -49,15 +48,14 @@ pub fn build_catalog(
 /// # Errors
 ///
 /// As [`build_catalog`] and [`write_catalog_from`].
-pub fn write_catalog<W: Write>(
+pub fn write_catalog<'run, 'inputs: 'run, W: Write>(
     archive: &Archive,
-    options: &CatalogOptions<'_>,
+    options: impl Into<CatalogOutputOptions<'run, 'inputs>>,
     compression: Compression,
     create: impl FnOnce() -> io::Result<W>,
 ) -> Result<(CatalogSummary, W), CatalogError> {
-    if options.cancel.is_some_and(CancelToken::is_cancelled) {
-        return Err(CatalogError::Cancelled);
-    }
+    let options = options.into();
+    CatalogRun::for_output(options, None).check_cancelled()?;
     let entry = DataForgeEntry::read(archive).map_err(CatalogError::Load)?;
     write_catalog_from(archive, &entry, options, compression, create)
 }
@@ -68,12 +66,12 @@ pub fn write_catalog<W: Write>(
 /// # Errors
 ///
 /// As [`build_catalog`], except that the DataForge Entry is not read here.
-pub fn build_catalog_from(
+pub fn build_catalog_from<'run, 'inputs: 'run>(
     archive: &Archive,
     entry: &DataForgeEntry,
-    options: &CatalogOptions<'_>,
+    options: impl Into<CatalogOutputOptions<'run, 'inputs>>,
 ) -> Result<BuiltCatalog, CatalogError> {
-    let run = CatalogRun::new(options, None);
+    let run = CatalogRun::for_output(options, None);
     let (parts, written) = assemble(archive, entry, run, |catalog| {
         emit(catalog, Vec::new(), Compression::None, run)
     })?;
@@ -99,18 +97,18 @@ pub fn build_catalog_from(
 ///
 /// As [`build_catalog`], except that the DataForge Entry is not read here, plus
 /// [`CatalogError::Write`] when `create` or the writer fails and [`CatalogError::Cancelled`] when
-/// the [`CancelToken`] of `options` is cancelled while writing.
-pub fn write_catalog_from<W: Write>(
+/// the cancellation token of `options` is cancelled while writing.
+pub fn write_catalog_from<'run, 'inputs: 'run, W: Write>(
     archive: &Archive,
     entry: &DataForgeEntry,
-    options: &CatalogOptions<'_>,
+    options: impl Into<CatalogOutputOptions<'run, 'inputs>>,
     compression: Compression,
     create: impl FnOnce() -> io::Result<W>,
 ) -> Result<(CatalogSummary, W), CatalogError> {
     write_catalog_from_with_run(
         archive,
         entry,
-        CatalogRun::new(options, None),
+        CatalogRun::for_output(options, None),
         compression,
         create,
     )

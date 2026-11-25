@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::equipment::{self, ShipSourceSnapshot};
+use crate::sdk_full_proof as full_proof;
+use p4kx_export::catalog_queries::equipment::ShipSourceSnapshot;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability,
 };
@@ -19,14 +20,15 @@ fn direct_ship_sdk_cells_match_canonical_available_and_unavailable_aggregates() 
         let (_folder, archive) = fixture::open(case)?;
         let entry = DataForgeEntry::read(&archive)?;
         let catalog = fixture::catalog(&archive)?;
-        equipment::with_ship_sources_from(
+        full_proof::from_entry(
             &archive,
             &entry,
-            CatalogRecordSelection::All,
             CatalogLanguageSelection::Selected(&[]),
             None,
-            |snapshot| verify(&snapshot, &catalog, case, name),
-        )??;
+        )?
+        .with_ship_sources(CatalogRecordSelection::All, None, |snapshot| {
+            verify(&snapshot, &catalog, case, name)
+        })??;
         proof::closure(&catalog)?;
     }
     Ok(())
@@ -154,12 +156,8 @@ fn direct_ship_sdk_keeps_each_actual_dcb_origin_independent_of_encrypted_xml() -
     ] {
         let (_folder, archive) = fixture::open_with_origin(Case::Parts, origin)?;
         let catalog = fixture::catalog(&archive)?;
-        equipment::with_ship_sources(
-            &archive,
-            CatalogRecordSelection::All,
-            CatalogLanguageSelection::Selected(&[]),
-            None,
-            |snapshot| {
+        full_proof::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?
+            .with_ship_sources(CatalogRecordSelection::All, None, |snapshot| {
                 let [row] = snapshot.rows() else {
                     return Err("one original Ship with selected DCB origin".into());
                 };
@@ -182,8 +180,7 @@ fn direct_ship_sdk_keeps_each_actual_dcb_origin_independent_of_encrypted_xml() -
                     "encryption knowledge does not change complete original inputs"
                 );
                 Ok::<_, Box<dyn std::error::Error>>(())
-            },
-        )??;
+            })??;
     }
     Ok(())
 }

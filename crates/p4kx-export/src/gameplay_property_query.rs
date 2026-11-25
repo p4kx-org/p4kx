@@ -17,7 +17,7 @@ use super::{
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::catalog_text_contract::{CanonicalText, PublicNameRef, TextForms};
 use crate::catalog_v3::gameplay_property_catalog;
 use crate::crafting::ledger;
@@ -136,7 +136,7 @@ const KIND: Kind = Kind::GameplayProperties;
 
 fn read_archive(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     selection: CatalogRecordSelection,
     requested_languages: &[Language],
@@ -152,8 +152,8 @@ fn read_archive(
     };
     checkpoint(cancel)?;
     let origins = match &text_sources {
-        Some(sources) => CatalogOrigins::new(archive, entry, sources)?,
-        None => CatalogOrigins::for_archive_records(archive, entry)?,
+        Some(sources) => entry.with_texts(archive, sources)?,
+        None => entry.records(archive)?,
     };
     let projected = match &text_sources {
         Some(sources) => read_selected(

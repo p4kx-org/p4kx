@@ -9,10 +9,11 @@ use std::path::Path;
 use std::ptr;
 
 use p4kx_export::CatalogPublicationMode;
+use p4kx_extraction::ProvenanceMode;
 use p4kx_gui::{CatalogExportOptions, CatalogExportStatus, Model};
 use serde_json::Value;
 
-use crate::cataloging::{self, TestResult};
+use crate::cataloging::{self, TestResult, start_full_catalog};
 
 #[test]
 fn finished_catalog_inventory_is_the_summary_snapshot_and_the_written_provenance() -> TestResult {
@@ -26,12 +27,13 @@ fn finished_catalog_inventory_is_the_summary_snapshot_and_the_written_provenance
         let (_dir, mut model, out) = cataloging::opened(&builder)?;
         let file = out.join("snapshot.json");
         assert!(
-            model.start_catalog_with_options(
+            model.start_catalog_with_provenance_mode(
                 file.clone(),
                 CatalogExportOptions {
                     publication_mode: mode,
                     ..CatalogExportOptions::default()
                 },
+                ProvenanceMode::Full,
                 || {}
             ),
             "the actual background job starts"
@@ -53,7 +55,7 @@ fn incomplete_catalog_keeps_its_original_inventory_without_publishing() -> TestR
     let file = out.join("refused.json");
     fs::write(&file, "previous verified generation")?;
     assert!(
-        model.start_catalog(file.clone(), || {}),
+        start_full_catalog(&mut model, file.clone()),
         "the actual normal job starts"
     );
     cataloging::ended(&mut model)?;

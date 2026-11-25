@@ -43,7 +43,10 @@ fn integer_of(letter: &str) -> Option<i64> {
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn the_grade_letter_of_ship_components_follows_the_integer() -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, None)?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let items = catalog["items"].as_array().ok_or("the items array")?;
     let presentation = ItemPresentationIndex::new(&catalog)?;

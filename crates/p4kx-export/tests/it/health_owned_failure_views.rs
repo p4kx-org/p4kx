@@ -40,8 +40,12 @@ fn normal_refusal_keeps_actual_failure_cells_closed_in_its_owned_inventory() -> 
         Vec::new(),
     )?;
     let reason = original(&source)?;
-    let error = build_catalog_from(&source.archive, &source.entry, &fixture::options())
-        .expect_err("normal publication refuses this actual source failure");
+    let error = build_catalog_from(
+        &source.archive,
+        &source.entry,
+        fixture::options().with_full_provenance(),
+    )
+    .expect_err("normal publication refuses this actual source failure");
     let inventory = error
         .source_inventory()
         .ok_or("actual refusal's immutable inventory")?;
@@ -63,6 +67,13 @@ fn normal_refusal_keeps_actual_failure_cells_closed_in_its_owned_inventory() -> 
         reason,
         "the actual canonical reason and source chain are retained"
     );
+    verify_encrypted_failure_origins(failure, inventory)
+}
+
+fn verify_encrypted_failure_origins(
+    failure: CatalogFailureView<'_>,
+    inventory: &SourceInventory,
+) -> TestResult {
     let details = failure.details();
     for origin in [
         details.guid().origin(),

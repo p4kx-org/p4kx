@@ -172,7 +172,10 @@ fn canonical_catalog() -> Result<Value, Box<dyn Error>> {
         .write_to(&path)?;
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
     assert_original_locales(&archive)?;
-    let built = p4kx_export::build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;
+    let built = p4kx_export::build_catalog(
+        &archive,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
     assert!(
         built.summary().export_health().is_complete(),
         "the source fixture has complete production health"

@@ -121,7 +121,11 @@ fn ambiguous_loot_targets_keep_the_authored_path_without_a_candidate() -> TestRe
     );
     assert!(
         matches!(
-            build_catalog_from(&source.archive, &source.entry, &fixture::options()),
+            build_catalog_from(
+                &source.archive,
+                &source.entry,
+                fixture::options().with_full_provenance()
+            ),
             Err(CatalogError::IncompleteExport(_))
         ),
         "ambiguous target remains a refusal in Normal"
@@ -160,7 +164,11 @@ fn a_bad_soc_checksum_refuses_normal_and_has_no_count_payload() -> TestResult {
     let source = source([main_system(LITERAL)], [target_with_soc(true)])?;
     assert!(
         matches!(
-            build_catalog_from(&source.archive, &source.entry, &fixture::options()),
+            build_catalog_from(
+                &source.archive,
+                &source.entry,
+                fixture::options().with_full_provenance()
+            ),
             Err(CatalogError::IncompleteExport(_))
         ),
         "Normal refuses a damaged SOC required by the placement"
@@ -246,7 +254,11 @@ pub(super) fn target() -> TestEntry {
 }
 
 pub(super) fn normal_catalog(source: &Fixture) -> TestResult<Value> {
-    let built = build_catalog_from(&source.archive, &source.entry, &fixture::options())?;
+    let built = build_catalog_from(
+        &source.archive,
+        &source.entry,
+        fixture::options().with_full_provenance(),
+    )?;
     assert!(
         built.summary().export_health().is_complete(),
         "Normal projected every source"

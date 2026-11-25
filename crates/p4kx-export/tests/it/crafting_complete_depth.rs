@@ -73,7 +73,7 @@ fn normal_catalog_emits_the_readable_deep_blueprint_in_schema_three() -> TestRes
     let filter = Filter::new("*/bp_craft_too_deep");
     let mut options = common::options();
     options.filter = Some(&filter);
-    let built = p4kx_export::build_catalog_from(&archive, &entry, &options)?;
+    let built = p4kx_export::build_catalog_from(&archive, &entry, options.with_full_provenance())?;
     assert!(
         built.summary().is_complete(),
         "the selected deep source produces complete health"

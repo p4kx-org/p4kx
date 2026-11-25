@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability,
     ResourceGroupParentSnapshot, ResourceGroupSnapshot,
 };
 use p4kx_export::{CatalogPublicationMode, build_catalog};
@@ -23,7 +24,7 @@ fn group_queries_match_all_canonical_getters_and_origin_states() -> TestResult {
         let (_folder, archive) = common::open(&fixture::graph(), origin)?;
         let catalog = catalog(&archive, CatalogPublicationMode::DiagnosticPartial)?;
         let entry = DataForgeEntry::read(&archive)?;
-        let session = CatalogQuerySession::from_entry(
+        let session = full_proof::from_entry(
             &archive,
             &entry,
             CatalogLanguageSelection::AllAvailable,
@@ -52,8 +53,7 @@ fn clean_normal_catalog_and_session_queries_share_canonical_group_tables() -> Te
         Some("complete"),
         "the positive counterpart uses normal complete publication"
     );
-    let session =
-        CatalogQuerySession::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
+    let session = full_proof::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
     session.with_resource_groups(CatalogRecordSelection::All, None, |snapshot| {
         direct(&snapshot, &catalog)
     })??;
@@ -67,7 +67,7 @@ pub(super) fn catalog(archive: &Archive, mode: CatalogPublicationMode) -> TestRe
     let mut options = common::options();
     options.publication_mode = mode;
     Ok(serde_json::from_slice(
-        build_catalog(archive, &options)?.json(),
+        build_catalog(archive, options.with_full_provenance())?.json(),
     )?)
 }
 

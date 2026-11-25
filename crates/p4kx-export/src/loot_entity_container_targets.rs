@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::ChildContainerPath;
-use p4kx_extraction::{Archive, SourceUse, SourceValue, SourcedValue};
+use p4kx_extraction::{Archive, SourceUse, SourceUseRole, SourceValue, SourcedValue};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -80,15 +80,17 @@ pub(super) struct ResolvedTargets<'index> {
     pub(super) targets: LootContainerTargets,
     candidates: &'index [usize],
     pub(super) literal: &'index [usize],
+    inputs: Vec<SourceUse>,
 }
 
 impl<'index> ResolvedTargets<'index> {
     pub(super) fn cites_selector(&self, selector: &[SourceUse]) -> bool {
-        let references = self.targets.target_status.origin();
         !selector.is_empty()
-            && selector
-                .iter()
-                .all(|used| references.source_uses_refs().contains(used.reference()))
+            && selector.iter().all(|used| {
+                self.inputs.iter().any(|input| {
+                    input.role() == SourceUseRole::Selector && input.reference() == used.reference()
+                })
+            })
     }
 
     pub(super) fn selected_target(&self) -> Option<SelectedTarget<'index>> {
@@ -188,6 +190,7 @@ pub(super) fn resolve<'index>(
         },
         candidates: entries,
         literal: literal.unwrap_or_default(),
+        inputs,
     })
 }
 

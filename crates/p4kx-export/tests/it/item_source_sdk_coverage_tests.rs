@@ -12,6 +12,7 @@ use serde_json::Value;
 use super::fixture::{self, Layout};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn later_unreadable_component_does_not_taint_selected_item_source_coverage() -> TestResult {
@@ -108,8 +109,7 @@ fn required_playability_input_failures_retain_their_states_in_producer_and_sdk()
             return Err("one actual producer Item".into());
         };
         let producer = proof::cell(producer, "playability", wire_state)?;
-        equipment::with_item_sources(
-            &archive,
+        full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?.with_item_sources(
             CatalogRecordSelection::RecordIndex(0),
             None,
             |snapshot| -> TestResult {
@@ -257,7 +257,7 @@ fn diagnostic_catalog(archive: &Archive) -> TestResult<Value> {
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     Ok(serde_json::from_slice(
-        p4kx_export::build_catalog(archive, &options)?.json(),
+        p4kx_export::build_catalog(archive, options.with_full_provenance())?.json(),
     )?)
 }
 

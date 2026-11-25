@@ -42,7 +42,10 @@ fn print_line(line: &str) {
 fn known_ships_and_items_of_a_real_archive_have_the_expected_playability() -> TestResult {
     let archive =
         Archive::open_with_key(real_archive_path()?, p4kx_testkit::real_archive_key().ok())?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let summary = built.summary().playability();
     for (kind, counts) in [("items", summary.items), ("ships", summary.ships)] {
@@ -83,7 +86,10 @@ const AI_RECORD_TAG: &str = "SystemsDesign";
 fn no_player_ship_carries_the_ai_record_tag() -> TestResult {
     let archive =
         Archive::open_with_key(real_archive_path()?, p4kx_testkit::real_archive_key().ok())?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;

@@ -8,7 +8,6 @@ use crate::playability_fixture;
 use std::error::Error;
 use std::time::{Duration, UNIX_EPOCH};
 
-use p4kx_export::catalog_queries::equipment::with_ship_sources;
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_export::{CatalogOptions, Playability, PlayabilityCounts, build_catalog};
 use p4kx_extraction::Archive;
@@ -44,10 +43,11 @@ fn catalog_mode(
     )?;
     let built = build_catalog(
         &archive,
-        &CatalogOptions {
+        CatalogOptions {
             publication_mode,
             ..CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT)
-        },
+        }
+        .with_full_provenance(),
     )?;
     let json = serde_json::from_slice(built.json())?;
     Ok((built, json))

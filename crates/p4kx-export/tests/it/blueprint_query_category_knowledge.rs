@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::{
-    BlueprintSnapshot, CatalogLanguageSelection, CatalogRecordSelection, with_blueprints,
-};
+use p4kx_export::catalog_queries::{BlueprintSnapshot, CatalogRecordSelection};
 use p4kx_export::{CatalogPublicationMode, build_catalog};
 use p4kx_extraction::{Archive, DataForge};
 use p4kx_testkit::{TestRecord, TestStruct};
@@ -12,6 +10,7 @@ use serde_json::Value;
 use super::blueprint_query_fixture as fixture;
 use crate::canonical_header::wire::Wire;
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
+use crate::sdk_full_proof as full_proof;
 
 const FOREIGN_PATH: &str = "libs/foundry/records/unrelated/sdk/category_alias.xml";
 
@@ -67,10 +66,8 @@ fn verify_candidate(candidate: Candidate, origin: DcbOrigin) -> TestResult {
         marker,
         "Incomplete plain knowledge cannot establish a wholly plain source set"
     );
-    with_blueprints(
-        &archive,
+    full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?.with_blueprints(
         CatalogRecordSelection::Guid(common::guid(fixture::OWNER).parse()?),
-        CatalogLanguageSelection::Selected(&[]),
         None,
         |snapshot| verify_selected(&snapshot, &cell, physical, complete),
     )??;
@@ -122,7 +119,8 @@ fn verify_selected(
 fn canonical_category(archive: &Archive) -> TestResult<Value> {
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value = serde_json::from_slice(build_catalog(archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(archive, options.with_full_provenance())?.json())?;
     let owner = common::guid(fixture::OWNER);
     let physical = catalog
         .pointer("/definitions/blueprints/rows")

@@ -51,7 +51,7 @@ fn jump_drive_retains_exact_device_values_and_original_linked_definitions() -> T
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let built = build_catalog_from(&archive, &entry, &options)
+    let built = build_catalog_from(&archive, &entry, options.with_full_provenance())
         .map_err(|_| "build original selected Jump Drive catalog")?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     real_archive_shop_inventory_v3::verify_build(&archive, &catalog)?;

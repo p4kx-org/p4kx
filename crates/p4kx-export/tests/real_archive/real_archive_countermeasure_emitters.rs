@@ -71,8 +71,8 @@ fn bounded_catalog(
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let built =
-        build_catalog_from(archive, entry, &options).map_err(|_| "build bounded catalog")?;
+    let built = build_catalog_from(archive, entry, options.with_full_provenance())
+        .map_err(|_| "build bounded catalog")?;
     serde_json::from_slice(built.json()).map_err(|_| "read bounded catalog".into())
 }
 

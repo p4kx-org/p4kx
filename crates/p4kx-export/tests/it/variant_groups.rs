@@ -32,10 +32,11 @@ fn the_groups_are_the_variant_of_of_every_ship_and_item_of_the_catalog() -> Test
     )?;
     let built = build_catalog(
         &archive,
-        &CatalogOptions {
+        CatalogOptions {
             publication_mode: p4kx_export::CatalogPublicationMode::DiagnosticPartial,
             ..CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT)
-        },
+        }
+        .with_full_provenance(),
     )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let entry = DataForgeEntry::read(&archive)?;
@@ -96,7 +97,10 @@ fn shield_variant_groups_use_original_stats_after_the_wire_field_is_removed() ->
         item_stats_fixture::write_shield_variant_archive(dir.path())?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let built = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let items = catalog["items"].as_array().ok_or("catalog items")?;
     let item = |name: &str| {

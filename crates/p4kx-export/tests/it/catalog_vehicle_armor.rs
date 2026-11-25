@@ -22,8 +22,9 @@ fn vehicle_and_suit_armor_keep_independent_original_tuning() -> TestResult {
     let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&database, origin)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
         validator
             .validate(&catalog)
             .map_err(|error| format!("catalog schema: {error}"))?;
@@ -51,7 +52,7 @@ fn a_broken_curve_link_is_diagnosed_with_its_original_guid() -> TestResult {
     let (_folder, archive) = common::open(&database, DcbOrigin::Encrypted)?;
     assert!(
         matches!(
-            build_catalog(&archive, &common::options()),
+            build_catalog(&archive, common::options().with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "a malformed authored curve affects normal publication"
@@ -60,7 +61,8 @@ fn a_broken_curve_link_is_diagnosed_with_its_original_guid() -> TestResult {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let original = proof::at(
         configuration(&catalog, fixture::KNOWN)?,
         "/armorDeflection/value",
@@ -89,7 +91,8 @@ fn an_invisible_armor_override_joins_its_physical_definition() -> TestResult {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let ship = loadout(&catalog, fixture::SHIP)?;
     let ports = proof::at(ship, "/ports")?;
     let attached = port(ports, "armor_mount")?;

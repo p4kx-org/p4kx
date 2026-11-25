@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::catalog_queries::equipment::{
-    ProjectileAmmoOwner, ProjectileAmmoRole, with_projectile_ammo_from,
-};
+use p4kx_export::catalog_queries::equipment::{ProjectileAmmoOwner, ProjectileAmmoRole};
 use p4kx_export::{CatalogOptions, build_catalog};
 use p4kx_extraction::{Archive, DataForgeEntry, Filter};
 use p4kx_testkit::{ArchiveBuilder, TestEntry, test_key};
@@ -22,10 +21,11 @@ pub(super) fn read() -> TestResult<Route> {
     let filter = Filter::parse(WEAPON_PATH)?;
     let catalog = build_catalog(
         &archive,
-        &CatalogOptions {
+        CatalogOptions {
             filter: Some(&filter),
             ..CatalogOptions::new(UNIX_EPOCH)
-        },
+        }
+        .with_full_provenance(),
     )?;
     let document: Value = serde_json::from_slice(catalog.json())?;
     let table = document
@@ -129,20 +129,24 @@ fn with_weapon<T>(
         return Err("exactly one physical fixture Item".into());
     };
     let index = weapon.index();
-    with_projectile_ammo_from(archive, &entry, index, None, |snapshot| {
-        let [owner] = snapshot.rows() else {
-            return Err("the selected Item's original ammunition routes".into());
-        };
-        assert_eq!(
-            snapshot.coverage().unreadable_bodies,
-            [] as [u32; 0],
-            "the selected original Item is readable"
-        );
-        assert_eq!(
-            owner.dependency_coverage.unreadable_bodies,
-            [] as [u32; 0],
-            "all admitted original dependencies are readable"
-        );
-        inspect(index, owner)
-    })?
+    full_proof::from_entry(archive, &entry, full_proof::NO_LANGUAGES, None)?.with_projectile_ammo(
+        index,
+        None,
+        |snapshot| {
+            let [owner] = snapshot.rows() else {
+                return Err("the selected Item's original ammunition routes".into());
+            };
+            assert_eq!(
+                snapshot.coverage().unreadable_bodies,
+                [] as [u32; 0],
+                "the selected original Item is readable"
+            );
+            assert_eq!(
+                owner.dependency_coverage.unreadable_bodies,
+                [] as [u32; 0],
+                "all admitted original dependencies are readable"
+            );
+            inspect(index, owner)
+        },
+    )?
 }

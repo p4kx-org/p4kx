@@ -79,10 +79,13 @@ fn selected_catalog(
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let (summary, payload) =
-        p4kx_export::write_catalog_from(archive, entry, &options, Compression::None, || {
-            Ok(Vec::new())
-        })?;
+    let (summary, payload) = p4kx_export::write_catalog_from(
+        archive,
+        entry,
+        options.with_full_provenance(),
+        Compression::None,
+        || Ok(Vec::new()),
+    )?;
     let catalog = serde_json::from_slice(&payload)?;
     Ok((summary, catalog))
 }

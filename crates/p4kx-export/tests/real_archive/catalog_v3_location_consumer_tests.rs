@@ -17,7 +17,7 @@ fn nonempty_location_root_rows_expose_sourced_identity_to_the_actual_acceptance_
     let (_folder, archive) = common::open(&database(), DcbOrigin::Plain)?;
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     assert_eq!(
         built
             .summary()

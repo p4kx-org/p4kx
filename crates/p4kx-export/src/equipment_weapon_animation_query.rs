@@ -6,7 +6,6 @@ use p4kx_extraction::{Archive, Build, CancelToken, DataForge, DataForgeEntry, So
 
 use super::EquipmentDependencyCoverage;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_projections::weapon_reload;
 use crate::catalog_queries::unlocalized_record_query::plan::Plan;
@@ -14,7 +13,7 @@ use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
     DatasetAvailability, ParsedCatalogQueries,
 };
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::catalog_v3::catalog_item_components::definition_read;
 use crate::record_observation::RecordObservation;
 use crate::texts::{TextSources, Texts};
@@ -115,7 +114,7 @@ impl ParsedCatalogQueries<'_> {
 
 fn with_owner<T>(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     record_index: u32,
     cancel: Option<&CancelToken>,
@@ -128,7 +127,7 @@ fn with_owner<T>(
         cancel,
         None,
     )?;
-    let origins = CatalogOrigins::for_archive_records(archive, entry)?;
+    let origins = entry.records(archive)?;
     let input = OriginalCatalogInput::new(forge, &origins);
     let locale_sources = TextSources::read_languages(archive, &[])?;
     let texts = Texts::parse(&locale_sources)?;

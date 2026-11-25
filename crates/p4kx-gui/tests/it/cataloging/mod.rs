@@ -16,7 +16,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use p4kx_export::Language as TextLanguage;
-use p4kx_gui::{CatalogExport, CatalogExportStage, CatalogExportStatus, Language, Model};
+use p4kx_extraction::ProvenanceMode;
+use p4kx_gui::{
+    CatalogExport, CatalogExportOptions, CatalogExportStage, CatalogExportStatus, Language, Model,
+};
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, GlobalIniBuilder, TestEntry, TestInstance, TestRecord,
     TestStruct, TestType, TestValue,
@@ -222,6 +225,15 @@ pub(crate) fn opened(
 }
 
 /// Waits until the P4KX catalog is building, where a hold of the model keeps it.
+pub(crate) fn start_full_catalog(model: &mut Model, file: PathBuf) -> bool {
+    model.start_catalog_with_provenance_mode(
+        file,
+        CatalogExportOptions::default(),
+        ProvenanceMode::Full,
+        || {},
+    )
+}
+
 pub(crate) fn building(model: &mut Model) -> TestResult {
     wait_until(model, |model| {
         model.catalog().is_some_and(|run| {

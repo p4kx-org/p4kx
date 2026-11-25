@@ -222,7 +222,7 @@ fn origins_match_the_catalogs_compact_physical_inventory() -> TestResult {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let built = build_catalog_from(&archive, &entry, &options)?;
+    let built = build_catalog_from(&archive, &entry, options.with_full_provenance())?;
     let catalog = serde_json::from_slice(built.json())?;
     Origins::read(&catalog, entry.origin())?;
     Ok(())

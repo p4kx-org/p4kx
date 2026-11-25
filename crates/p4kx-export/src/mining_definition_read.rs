@@ -12,12 +12,11 @@ use super::plan::{Owner, Plan};
 use super::rows::Projector;
 use super::snapshot::MiningDefinitionSnapshot;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
 };
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::catalog_table::DatasetAvailability;
 use crate::guid_text::CatalogGuid;
 use crate::record_observation::RecordObservation;
@@ -53,7 +52,7 @@ pub(super) fn with_archive<P: Projector, T>(
 
 pub(super) fn with_parsed<P: Projector, T>(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     selection: CatalogRecordSelection,
     requested_languages: &[Language],
@@ -79,7 +78,7 @@ pub(super) struct Observers {
 
 pub(super) struct Query<'query> {
     pub(super) archive: &'query Archive,
-    pub(super) entry: &'query DataForgeEntry,
+    pub(super) entry: CatalogQuerySource<'query>,
     pub(super) forge: &'query DataForge<'query>,
     pub(super) selection: CatalogRecordSelection,
     pub(super) requested_languages: &'query [Language],
@@ -111,7 +110,7 @@ impl Query<'_> {
         };
         let sources = TextSources::read_languages(archive, selected_languages)?;
         checkpoint(cancel)?;
-        let origins = CatalogOrigins::new(archive, entry, &sources)?;
+        let origins = entry.with_texts(archive, &sources)?;
         let input = OriginalCatalogInput::new(forge, &origins);
         let texts = Texts::parse(&sources)?;
         let registry = CatalogTextRegistry::default();

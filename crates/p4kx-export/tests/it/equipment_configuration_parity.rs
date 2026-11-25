@@ -3,11 +3,9 @@
 
 use p4kx_export::CatalogPublicationMode;
 use p4kx_export::catalog_queries::equipment::{
-    self, AttachmentConstraintSnapshot, EquipmentSnapshot, ItemBoundsSnapshot,
+    AttachmentConstraintSnapshot, EquipmentSnapshot, ItemBoundsSnapshot,
 };
-use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
-};
+use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_extraction::{DataForgeEntry, Language};
 use serde_json::Value;
 
@@ -17,6 +15,7 @@ use super::{
 };
 use crate::canonical_header::wire::Wire;
 use crate::commodity_v3_fixture::{DcbOrigin, TestResult};
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn configuration_queries_walk_every_canonical_field_and_origin_state() -> TestResult {
@@ -28,12 +27,8 @@ fn configuration_queries_walk_every_canonical_field_and_origin_state() -> TestRe
         let (_folder, archive) = common::open(&attachments::original_restrictions(), origin)?;
         let expected = catalog(&archive, CatalogPublicationMode::DiagnosticPartial)?;
         let entry = DataForgeEntry::read(&archive)?;
-        equipment::with_attachment_constraints_from(
-            &archive,
-            &entry,
-            CatalogRecordSelection::All,
-            None,
-            |snapshot| {
+        full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+            .with_attachment_constraints(CatalogRecordSelection::All, None, |snapshot| {
                 assert_eq!(
                     snapshot.rows().len(),
                     3,
@@ -48,13 +43,14 @@ fn configuration_queries_walk_every_canonical_field_and_origin_state() -> TestRe
                     "physical attachment ownership uses the actual DCB origin"
                 );
                 attachment(&snapshot, &expected, None)
-            },
-        )??;
+            })??;
         let (_folder, archive) = common::open(&bounds::complete(), origin)?;
         let expected = catalog(&archive, CatalogPublicationMode::DiagnosticPartial)?;
-        equipment::with_item_bounds(&archive, CatalogRecordSelection::All, None, |snapshot| {
-            bounds_rows(&snapshot, &expected, None)
-        })??;
+        full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?.with_item_bounds(
+            CatalogRecordSelection::All,
+            None,
+            |snapshot| bounds_rows(&snapshot, &expected, None),
+        )??;
     }
     Ok(())
 }
@@ -64,7 +60,7 @@ fn existing_inventory_states_keep_typed_bounds_and_exact_raw_numbers() -> TestRe
     for database in [entities::database(), entities::wrong_dimension_type()] {
         let (_folder, archive) = common::open(&database, DcbOrigin::Encrypted)?;
         let expected = catalog(&archive, CatalogPublicationMode::DiagnosticPartial)?;
-        let session = CatalogQuerySession::open(
+        let session = full_proof::open(
             &archive,
             CatalogLanguageSelection::Selected(&[Language::English, Language::German]),
             None,
@@ -82,8 +78,7 @@ fn clean_normal_attachment_output_and_session_reader_share_the_same_cells() -> T
     let (_folder, archive) =
         common::open(&super::database(super::Layout::Complete), DcbOrigin::Plain)?;
     let expected = catalog(&archive, CatalogPublicationMode::Normal)?;
-    let session =
-        CatalogQuerySession::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
+    let session = full_proof::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
     session.with_attachment_constraints(CatalogRecordSelection::All, None, |snapshot| {
         attachment(&snapshot, &expected, None)
     })??;

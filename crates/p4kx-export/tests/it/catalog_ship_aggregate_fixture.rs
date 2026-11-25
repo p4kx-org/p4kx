@@ -136,7 +136,8 @@ pub(super) fn catalog(archive: &Archive) -> TestResult<Value> {
         ..CatalogOptions::new(UNIX_EPOCH)
     };
     let pool = rayon::ThreadPoolBuilder::new().num_threads(1).build()?;
-    let built = pool.install(|| p4kx_export::build_catalog(archive, &options))?;
+    let built =
+        pool.install(|| p4kx_export::build_catalog(archive, options.with_full_provenance()))?;
     Ok(serde_json::from_slice(built.json())?)
 }
 

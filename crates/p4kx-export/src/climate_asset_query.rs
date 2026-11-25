@@ -3,7 +3,7 @@
 
 //! Selective access to original loose climate-asset definitions.
 
-use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
+use p4kx_extraction::{Archive, CancelToken, DataForgeEntry, ProvenanceMode};
 
 use super::guid_linked_definition_read::GuidLinkedDefinitionRead;
 use super::loose_definitions::LooseDefinitionSnapshot;
@@ -50,7 +50,25 @@ pub fn read_climate_assets(
     selection: LooseDefinitionSelection<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<ClimateAssetSnapshot, CatalogError> {
-    QUERY.read(archive, selection, cancel)
+    read_climate_assets_with_provenance_mode(
+        archive,
+        selection,
+        ProvenanceMode::MarkersOnly,
+        cancel,
+    )
+}
+
+/// Reads selected climate assets with the requested source detail.
+///
+/// # Errors
+/// Returns the errors of `read_climate_assets`.
+pub fn read_climate_assets_with_provenance_mode(
+    archive: &Archive,
+    selection: LooseDefinitionSelection<'_>,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<ClimateAssetSnapshot, CatalogError> {
+    QUERY.read(archive, selection, provenance_mode, cancel)
 }
 
 /// Reads selected climate assets with an already decoded DataForge Entry.

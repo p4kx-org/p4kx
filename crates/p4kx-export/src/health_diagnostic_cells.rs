@@ -24,14 +24,16 @@ pub struct ExportDiagnosticExample {
     subject: DiagnosticSubject,
     #[serde(flatten)]
     body: ExampleBodyCells,
-    failed_source_uses: Box<[SourceUseRef]>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Vec<SourceUseRef>")]
+    failed_source_uses: Option<Box<[SourceUseRef]>>,
 }
 
 impl ExportDiagnosticExample {
     pub(super) const fn new(
         subject: DiagnosticSubject,
         body: ExampleBodyCells,
-        failed_source_uses: Box<[SourceUseRef]>,
+        failed_source_uses: Option<Box<[SourceUseRef]>>,
     ) -> Self {
         Self {
             subject,
@@ -43,7 +45,7 @@ impl ExportDiagnosticExample {
     /// Borrows original failed reads associated with this diagnostic occurrence.
     #[must_use]
     pub fn failed_source_uses(&self) -> &[SourceUseRef] {
-        &self.failed_source_uses
+        self.failed_source_uses.as_deref().unwrap_or_default()
     }
 
     /// Borrows the original source-field text cell.

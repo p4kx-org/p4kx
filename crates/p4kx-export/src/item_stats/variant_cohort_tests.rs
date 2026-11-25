@@ -108,7 +108,9 @@ fn normal_variant_failure_retains_the_exact_attempt_and_diagnostic_row() -> Test
         filter: Some(&filter),
         ..CatalogOptions::new(std::time::UNIX_EPOCH)
     };
-    let Err(CatalogError::IncompleteExport(refusal)) = build_catalog(&archive, &options) else {
+    let Err(CatalogError::IncompleteExport(refusal)) =
+        build_catalog(&archive, options.with_full_provenance())
+    else {
         return Err("Normal must refuse an undecidable selected Item variant".into());
     };
     let health = refusal.health();
@@ -160,7 +162,7 @@ fn normal_variant_failure_retains_the_exact_attempt_and_diagnostic_row() -> Test
 }
 
 fn check_partial_publication(archive: &Archive, options: &CatalogOptions<'_>) -> TestResult {
-    let partial = build_catalog(archive, options)?;
+    let partial = build_catalog(archive, options.with_full_provenance())?;
     let catalog: serde_json::Value = serde_json::from_slice(partial.json())?;
     assert_eq!(
         catalog

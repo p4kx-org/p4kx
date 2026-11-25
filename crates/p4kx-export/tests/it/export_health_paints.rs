@@ -73,7 +73,7 @@ fn unrelated_loadout_failure_does_not_invalidate_healthy_paint_vehicle_facts() -
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let health = built.summary().export_health();
     assert!(
         health
@@ -120,7 +120,7 @@ fn required_vehicle_parse_failure_still_blocks_paints_and_normal_publication() -
     let normal = CatalogOptions::new(UNIX_EPOCH);
     assert!(
         matches!(
-            build_catalog(&archive, &normal),
+            build_catalog(&archive, normal.with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "normal publication refuses the actual vehicle failure"
@@ -129,7 +129,7 @@ fn required_vehicle_parse_failure_still_blocks_paints_and_normal_publication() -
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..normal
     };
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let paints = built
         .summary()
         .export_health()
@@ -161,7 +161,7 @@ fn a_paints_only_filter_does_not_read_excluded_vehicle_or_loadout_files() -> Tes
         filter: Some(&filter),
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let health = built.summary().export_health();
     assert!(
         health.is_complete(),

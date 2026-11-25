@@ -3,10 +3,11 @@
 
 //! Catalog and SDK parity for playable exosuits and physical Record aliases.
 
+use crate::sdk_full_proof as full_proof;
 use std::collections::BTreeMap;
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::catalog_queries::equipment::{ShipSource, with_ship_sources_from};
+use p4kx_export::catalog_queries::equipment::ShipSource;
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_export::{ShipBaseOptions, VehicleKind, build_catalog_from, build_ship_base_from};
 use p4kx_extraction::{DataForge, DataForgeEntry, Record};
@@ -27,16 +28,19 @@ fn exosuit_catalog_and_sdk_admit_the_same_physical_owners_and_sources() -> TestR
         let entry = DataForgeEntry::read(&archive)?;
         let forge = entry.open()?;
         let expected = expected_owners(&forge)?;
-        let built = build_catalog_from(&archive, &entry, &common::options())?;
+        let built = build_catalog_from(&archive, &entry, common::options().with_full_provenance())?;
         let catalog: Value = serde_json::from_slice(built.json())?;
         let ships = catalog_rows(&catalog, &expected, encrypted)?;
         let standalone = build_ship_base_from(&archive, &entry, &ShipBaseOptions::new(UNIX_EPOCH))?;
         check_standalone(standalone.ships(), &expected)?;
-        with_ship_sources_from(
+        full_proof::from_entry(
             &archive,
             &entry,
-            CatalogRecordSelection::All,
             CatalogLanguageSelection::Selected(&[]),
+            None,
+        )?
+        .with_ship_sources(
+            CatalogRecordSelection::All,
             None,
             |snapshot| -> TestResult {
                 assert_eq!(

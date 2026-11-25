@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::equipment::resource_network::{
     ResourceNetworkGlobalSnapshot, with_resource_network_globals,
-    with_resource_network_globals_from,
 };
 use p4kx_export::catalog_queries::{CatalogRecordSelection, ResourceFloat32};
 use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct, TestType, TestValue};
@@ -19,9 +19,13 @@ const DATASET: &str = "/definitions/resourceNetworkGlobals";
 fn resource_network_global_sdk_retains_canonical_rows_and_per_value_evidence() -> TestResult {
     let fixture = Fixture::open(&fixture::database(), Input::Encrypted, Vec::new())?;
     let (_, catalog) = fixture.diagnostic()?;
-    with_resource_network_globals_from(
+    full_proof::from_entry(
         &fixture.archive,
         &fixture.entry,
+        full_proof::NO_LANGUAGES,
+        None,
+    )?
+    .with_resource_network_globals(
         CatalogRecordSelection::RecordIndex(0),
         None,
         |snapshot| check_row(&snapshot, &catalog),

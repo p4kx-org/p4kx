@@ -17,7 +17,7 @@ const PROPERTY_VALUE: &str = "BaseMissionPropertyValue";
 #[test]
 fn module_keeps_typed_inputs_and_original_property_slots() -> TestResult {
     let (_directory, archive) = common::open(&database(), DcbOrigin::Encrypted)?;
-    let built = build_catalog(&archive, &common::options())?;
+    let built = build_catalog(&archive, common::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let module = at(
         &catalog,

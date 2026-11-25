@@ -3,13 +3,13 @@
 
 use p4kx_export::catalog_queries::{
     CatalogRecordSelection, SourceArenaOutput, SourceNode, SourcePayload, SourceValueRef,
-    with_mineable_entities,
 };
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog};
 use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 use super::{MODIFIER, MODIFIER_PRIORITY, database_with_modifiers};
 
@@ -23,13 +23,13 @@ fn populated_tagged_modifiers_preserve_order_types_and_source_values() -> TestRe
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let expected = proof::rows(&catalog, "/definitions/mineableEntities/rows")?
         .iter()
         .find(|row| row.pointer("/recordIndex/value").and_then(Value::as_u64) == Some(0))
         .ok_or("the original tagged mineable in the Catalog")?;
-    with_mineable_entities(
-        &archive,
+    full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?.with_mineable_entities(
         CatalogRecordSelection::RecordIndex(0),
         None,
         |snapshot| -> TestResult {

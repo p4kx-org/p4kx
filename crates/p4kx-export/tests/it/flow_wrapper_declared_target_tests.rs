@@ -46,7 +46,11 @@ fn check(case: Case, wrapper: &str, field: &str, storage: DataType) -> TestResul
     let fixture = fixture::open(case, Input::Encrypted, true)?;
     let forge = fixture.entry.open()?;
     let declared = check_original(&forge, case, field, storage)?;
-    let ordinary = build_catalog_from(&fixture.archive, &fixture.entry, &source::options());
+    let ordinary = build_catalog_from(
+        &fixture.archive,
+        &fixture.entry,
+        source::options().with_full_provenance(),
+    );
     assert!(
         matches!(ordinary, Err(CatalogError::IncompleteExport(_))),
         "a correctly shaped but wrongly declared target cannot publish as complete: {wrapper}.{field}"

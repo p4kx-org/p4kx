@@ -3,7 +3,7 @@
 
 //! Selective access to original particle libraries.
 
-use p4kx_extraction::{Archive, CancelToken};
+use p4kx_extraction::{Archive, CancelToken, ProvenanceMode};
 
 use super::loose_definitions::{self, LooseDefinitionSnapshot};
 use crate::build_derived::particle_library;
@@ -37,15 +37,34 @@ pub fn read_particle_libraries(
     selection: ParticleLibrarySelection,
     cancel: Option<&CancelToken>,
 ) -> Result<ParticleLibrarySnapshot, CatalogError> {
+    read_particle_libraries_with_provenance_mode(
+        archive,
+        selection,
+        ProvenanceMode::MarkersOnly,
+        cancel,
+    )
+}
+
+/// Reads particle libraries with the selected source detail.
+///
+/// # Errors
+/// Returns the errors of `read_particle_libraries`.
+pub fn read_particle_libraries_with_provenance_mode(
+    archive: &Archive,
+    selection: ParticleLibrarySelection,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<ParticleLibrarySnapshot, CatalogError> {
     let selection = match selection {
         ParticleLibrarySelection::All => Selection::All,
         ParticleLibrarySelection::EntryIndex(index) => Selection::EntryIndex(index),
     };
-    loose_definitions::read(
+    loose_definitions::read_with_provenance_mode(
         archive,
         selection,
         cancel,
         Kind::ParticleLibraries,
+        provenance_mode,
         |capture, ledger, options| {
             particle_library::read_selected(
                 archive,

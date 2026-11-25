@@ -3,7 +3,7 @@
 
 use std::sync::OnceLock;
 
-use p4kx_extraction::{SourceUses, SourceValue, SourcedValue, is_placeholder_key};
+use p4kx_extraction::{ProvenanceMode, SourceUses, SourceValue, SourcedValue, is_placeholder_key};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -178,29 +178,53 @@ impl Loadout {
     }
 }
 
+#[derive(Clone)]
+struct UnobservedPortFields {
+    size: SourcedValue<u32>,
+    words: SourcedValue<Vec<String>>,
+    name_key: SourcedValue<String>,
+}
+
+impl UnobservedPortFields {
+    fn with_mode(mode: ProvenanceMode) -> Self {
+        static MARKERS: OnceLock<UnobservedPortFields> = OnceLock::new();
+        static FULL: OnceLock<UnobservedPortFields> = OnceLock::new();
+        match mode {
+            ProvenanceMode::MarkersOnly => MARKERS.get_or_init(|| Self::new(mode)).clone(),
+            ProvenanceMode::Full => FULL.get_or_init(|| Self::new(mode)).clone(),
+            _ => Self::new(mode),
+        }
+    }
+
+    fn new(mode: ProvenanceMode) -> Self {
+        let uses = SourceUses::with_provenance_mode(mode);
+        Self {
+            size: uses.value(SourceValue::Absent, &[], false),
+            words: uses.value(SourceValue::Absent, &[], false),
+            name_key: uses.value(SourceValue::Absent, &[], false),
+        }
+    }
+}
+
 impl LoadoutPort {
     pub(crate) fn named(name: SourcedValue<String>) -> Self {
-        static NO_SIZE: OnceLock<SourcedValue<u32>> = OnceLock::new();
-        static NO_WORDS: OnceLock<SourcedValue<Vec<String>>> = OnceLock::new();
-        static NO_NAME_KEY: OnceLock<SourcedValue<String>> = OnceLock::new();
-        let size =
-            NO_SIZE.get_or_init(|| SourceUses::default().value(SourceValue::Absent, &[], false));
-        let words =
-            NO_WORDS.get_or_init(|| SourceUses::default().value(SourceValue::Absent, &[], false));
-        let name_key = NO_NAME_KEY
-            .get_or_init(|| SourceUses::default().value(SourceValue::Absent, &[], false));
+        let UnobservedPortFields {
+            size,
+            words,
+            name_key,
+        } = UnobservedPortFields::with_mode(name.origin().provenance_mode());
         Self {
             name,
             name_proof: None,
             attachment_port_inventory_complete: false,
             source: "",
             min_size: size.clone(),
-            max_size: size.clone(),
+            max_size: size,
             types: Vec::new(),
             flags: words.clone(),
             port_tags: words.clone(),
-            required_tags: words.clone(),
-            display_name_key: name_key.clone(),
+            required_tags: words,
+            display_name_key: name_key,
             visibility: "",
             item_guid: None,
             item_class_name: None,

@@ -172,7 +172,10 @@ fn repeated_resource_inspections_are_identical_across_projection_contexts() -> T
 #[test]
 fn emitted_resource_bits_cover_the_same_physical_commodity_dependency() -> TestResult {
     let (_directory, archive) = open(&database(false))?;
-    let built = crate::build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;
+    let built = crate::build_catalog(
+        &archive,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     assert_eq!(catalog["exportHealth"]["status"], "complete");
     assert_eq!(
@@ -206,7 +209,7 @@ fn filtered_resource_bits_cannot_cover_an_unexported_commodity_dependency() -> T
         filter: Some(&filter),
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let outcome = crate::build_catalog(&archive, &options);
+    let outcome = crate::build_catalog(&archive, options.with_full_provenance());
     assert!(
         matches!(&outcome, Err(CatalogError::IncompleteExport(_))),
         "an unexported raw value cannot excuse the finite-only Commodity presentation: {:?}",
@@ -223,7 +226,7 @@ fn a_same_guid_resource_alias_does_not_cover_the_unexported_physical_source() ->
         filter: Some(&filter),
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let outcome = crate::build_catalog(&archive, &options);
+    let outcome = crate::build_catalog(&archive, options.with_full_provenance());
     assert!(
         matches!(&outcome, Err(CatalogError::IncompleteExport(_))),
         "a nominal GUID alias does not prove the physical source's raw value was emitted: {:?}",
@@ -234,7 +237,7 @@ fn a_same_guid_resource_alias_does_not_cover_the_unexported_physical_source() ->
 
 fn assert_missing_capture(archive: &Archive, mut options: CatalogOptions<'_>) -> TestResult {
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = crate::build_catalog(archive, &options)?;
+    let built = crate::build_catalog(archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     assert_eq!(catalog["exportHealth"]["status"], "incomplete");
     assert_eq!(

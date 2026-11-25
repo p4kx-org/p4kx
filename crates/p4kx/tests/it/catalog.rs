@@ -30,7 +30,7 @@ fn p4kx(args: &[&str]) -> Result<Command, Box<dyn Error>> {
 }
 
 fn catalog(archive: &Path, out: &Path, args: &[&str]) -> Result<String, Box<dyn Error>> {
-    let output = p4kx(&["catalog"])?
+    let output = p4kx(&["catalog", "--provenance", "full"])?
         .arg(archive)
         .arg("--out")
         .arg(out)
@@ -51,7 +51,7 @@ fn catalog(archive: &Path, out: &Path, args: &[&str]) -> Result<String, Box<dyn 
 }
 
 fn printed_schema() -> Result<String, Box<dyn Error>> {
-    let output = p4kx(&["catalog", "schema"])?.output()?;
+    let output = p4kx(&["catalog", "--provenance", "full", "schema"])?.output()?;
     assert_eq!(output.status.code(), Some(0), "exit code: {output:?}");
     Ok(String::from_utf8(output.stdout)?)
 }
@@ -180,7 +180,7 @@ fn catalog_source_carries_the_public_patch_the_launcher_log_names() -> TestResul
         "Delta update applied (SC LIVE 4.4.1-live.10012345) in C:\\SC\\LIVE\n",
     )?;
     let out = dir.path().join("with-patch.json");
-    let output = p4kx(&["catalog"])?
+    let output = p4kx(&["catalog", "--provenance", "full"])?
         .env("P4KX_LAUNCHER_LOGS", &logs)
         .arg(&archive)
         .arg("--out")
@@ -323,7 +323,7 @@ fn catalog_reads_a_german_global_ini_with_invalid_bytes_lossily() -> TestResult 
     let archive = write_archive_with(dir.path(), &[english(), damaged])?;
     let out = dir.path().join("damaged.json");
     origins::assert_input_encryption(&archive, Language::German)?;
-    let output = p4kx(&["catalog"])?
+    let output = p4kx(&["catalog", "--provenance", "full"])?
         .arg(&archive)
         .arg("--out")
         .arg(&out)

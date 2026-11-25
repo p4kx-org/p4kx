@@ -7,11 +7,11 @@ known physical Record in the current DataForge. The physical index is local to t
 input. The `_from` form reuses an already decoded `DataForgeEntry` from the same Archive.
 
 The query opens the complete DataForge and projects the selected category-list bodies.
-Original category
-links carry their target header, resolution state and source uses. Their order, duplicates, null
+Category links retain their target header and resolution state. Their order, duplicates, null
 slots and dangling links match `declarations.blueprintCategoryLists` in the complete Catalog.
-The snapshot carries family availability, unreadable Record positions and a source inventory for
-the returned cells. The query opens no localization or placement payloads.
+The snapshot carries family availability and unreadable Record positions. Full provenance adds
+the source uses and source inventory for the returned cells. The query opens no localization or
+placement payloads.
 
 Use `read_blueprint_categories` or `read_blueprint_categories_from` to read the physical
 Blueprint Category definitions in `definitions.blueprintCategories`. The result has the same
@@ -30,7 +30,20 @@ definitions with decoded and display forms. The requested languages describe the
 The available languages list the localization payloads read successfully for this query. A query
 with no admitted gameplay-property Record opens no localization payloads and returns an empty
 available list. Compare physical Record indices only within the same DataForge input and resolve
-source uses through each result's own inventory.
+source uses through each full-provenance result's own inventory.
+
+## Provenance detail
+
+Selective queries default to `ProvenanceMode::MarkersOnly`. The outputs retain the typed game
+values, canonical text and media references, selection coverage and each sourced value's
+`containsEncryptedSource` marker. The marker is true for a known encrypted contributor, false
+when all contributors are known and unencrypted, and null when the contributors are insufficient
+to reach either conclusion.
+
+Use `CatalogQuerySession::with_provenance_mode(ProvenanceMode::Full)` before calling
+`parsed` or a session method to retain contributor references and physical coordinates.
+Archive-only readers that expose a `*_with_provenance_mode` function accept the mode on
+that function. Descriptions of source uses, source inventories and physical coordinates in this guide use this mode.
 
 ## Archive source metadata
 
@@ -318,7 +331,10 @@ Use `read_client_profile_settings` for both documents or `read_client_profile_se
 `ProfileKind::General` or `ProfileKind::VirtualReality` for one payload. The typed rows match
 `configurations.clientProfileSettings.documents` in General then VR order. A single-profile
 query retains the unselected document's directory candidates and status. Both calls return the
-Archive Build and the source inventory for their field origins.
+Archive Build, values and encryption markers. Candidate `inputRef` values identify physical
+Entries within the report. Use `read_client_profile_settings_with_provenance_mode` or
+`read_client_profile_settings_for_with_provenance_mode` with `ProvenanceMode::Full` to
+resolve those keys and field origin references through the report's inventory.
 [Profile document contract](client-profile-settings.md).
 
 ## Localization Entry metadata
@@ -456,7 +472,7 @@ remains open.
 
 ## Resolve field origins
 
-Use each query's own `SourceInventory`. `SourcedValue::origin` supplies the encryption filter,
+In Full mode, use each query's own `SourceInventory`. `SourcedValue::origin` supplies the encryption filter,
 completeness state and contributor IDs. Match those IDs to `iter_uses()`, then join each use's
 `source()` to `iter_sources()` by `PhysicalSource::id`. Follow `ancestors()` within the same
 inventory. `kind()` exposes the immutable original Entry, limited proof, directory, whole-Archive
@@ -504,7 +520,7 @@ The language policy selects possible localization payloads for the session. Cate
 list requests open none. Gameplay property requests use the configured languages. Mining
 requests use their requested language when it is in the session policy, and still return
 untranslated keys when it is excluded. Each query reads its own source and dependency
-scope and provides the source inventory for the returned values. The session retains the decoded
+scope and retains the source detail selected for the session. The session retains the decoded
 DataForge bytes. Session methods open a parsed view for one request. For consecutive requests,
 call `parsed` once and use that borrowed view to retain the DataForge's layout and lookup indexes.
 Other input payloads use the Archive's configured key when the query reads them.

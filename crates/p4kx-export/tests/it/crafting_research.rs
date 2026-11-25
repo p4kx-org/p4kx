@@ -37,7 +37,11 @@ fn blueprint_research_distinguishes_absent_null_empty_and_known() -> TestResult 
                 return Err("one standalone tier".into());
             };
             assert_standalone(&tier.research, case)?;
-            let built = p4kx_export::build_catalog_from(&archive, &entry, &common::options())?;
+            let built = p4kx_export::build_catalog_from(
+                &archive,
+                &entry,
+                common::options().with_full_provenance(),
+            )?;
             assert!(built.summary().is_complete());
             let catalog: Value = serde_json::from_slice(built.json())?;
             assert_wire(&catalog, state, case, encrypted)?;
@@ -60,14 +64,19 @@ fn unsupported_or_unreadable_research_retains_exact_original_slots() -> TestResu
         assert_original(&record.tree()?, case)?;
         assert!(
             matches!(
-                p4kx_export::build_catalog_from(&archive, &entry, &common::options()),
+                p4kx_export::build_catalog_from(
+                    &archive,
+                    &entry,
+                    common::options().with_full_provenance()
+                ),
                 Err(CatalogError::IncompleteExport(_))
             ),
             "only explicit diagnostic publication may include the unsupported interpretation"
         );
         let mut options = common::options();
         options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-        let built = p4kx_export::build_catalog_from(&archive, &entry, &options)?;
+        let built =
+            p4kx_export::build_catalog_from(&archive, &entry, options.with_full_provenance())?;
         assert!(!built.summary().is_complete());
         let catalog: Value = serde_json::from_slice(built.json())?;
         assert_wire(&catalog, "present", case, true)?;
@@ -298,7 +307,7 @@ fn a_null_research_pointer_to_another_declared_family_is_unsupported() -> TestRe
 
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = p4kx_export::build_catalog_from(&archive, &entry, &options)?;
+    let built = p4kx_export::build_catalog_from(&archive, &entry, options.with_full_provenance())?;
     assert!(
         !built.summary().is_complete(),
         "the wrong declaration has an explicit coverage failure"

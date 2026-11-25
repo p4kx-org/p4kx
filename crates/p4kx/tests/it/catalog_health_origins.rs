@@ -21,7 +21,7 @@ fn catalog_machine_summary_retains_direct_health_origins_on_success_and_diagnost
         let out = folder.path().join("catalog.json");
         let mut command = p4kx_testkit::p4kx()?;
         command
-            .arg("catalog")
+            .args(["catalog", "--provenance", "full"])
             .arg(&original.archive)
             .arg("--out")
             .arg(&out)

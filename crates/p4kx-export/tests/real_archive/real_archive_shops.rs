@@ -233,7 +233,10 @@ fn report(archive: &Archive, built: &p4kx_export::BuiltCatalog, shops: &[Value])
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn the_shops_of_a_real_archive_have_a_kind_and_a_link() -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let shops = catalog["shops"].as_array().ok_or("shops")?;
     report(&archive, &built, shops)?;

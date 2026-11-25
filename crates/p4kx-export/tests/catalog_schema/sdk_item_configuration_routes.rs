@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::{
@@ -45,7 +46,8 @@ pub(super) fn append_item_routes(routes: &mut Vec<Route>, archive: &Archive) -> 
 fn read_item_rows_and_definitions(archive: &Archive) -> TestResult<[Route; 4]> {
     const REMAINING: &str =
         "typed definitions and synthetic producer parity available; installed producer parity open";
-    let session = CatalogQuerySession::open(archive, CatalogLanguageSelection::AllAvailable, None)?;
+    let session = CatalogQuerySession::open(archive, CatalogLanguageSelection::AllAvailable, None)?
+        .with_provenance_mode(full_proof::MODE);
     let parsed = session.parsed(None)?;
     let selection = CatalogRecordSelection::All;
     let [item, provenance] = item_root(&parsed)?;
@@ -118,7 +120,8 @@ fn alignment_routes() -> TestResult<[Route; 2]> {
         encrypted_archive(&alignment::database(alignment::Layout::Complete))?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog = catalog(&archive, &entry, CatalogPublicationMode::Normal)?;
-    let session = CatalogQuerySession::from_entry(&archive, &entry, LANGUAGES, None)?;
+    let session = CatalogQuerySession::from_entry(&archive, &entry, LANGUAGES, None)?
+        .with_provenance_mode(full_proof::MODE);
     let parsed = session.parsed(None)?;
     let ports = parsed.with_item_ports(ALL, None, |snapshot| {
         let canonical = catalog
@@ -178,7 +181,8 @@ fn bounds_route() -> TestResult<Route> {
     let (_directory, archive) = encrypted_archive(&bounds::complete())?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog = catalog(&archive, &entry, CatalogPublicationMode::DiagnosticPartial)?;
-    let session = CatalogQuerySession::from_entry(&archive, &entry, LANGUAGES, None)?;
+    let session = CatalogQuerySession::from_entry(&archive, &entry, LANGUAGES, None)?
+        .with_provenance_mode(full_proof::MODE);
     session.with_item_bounds(ALL, None, |snapshot| {
         parity(ITEM_BOUNDS, &snapshot, &catalog)?;
         let first = snapshot
@@ -206,7 +210,7 @@ fn catalog(
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.publication_mode = publication_mode;
     Ok(serde_json::from_slice(
-        build_catalog_from(archive, entry, &options)?.json(),
+        build_catalog_from(archive, entry, options.with_full_provenance())?.json(),
     )?)
 }
 

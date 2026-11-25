@@ -24,8 +24,9 @@ fn grenade_components_preserve_physical_origins_and_original_device_shapes() -> 
     let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&database(), origin)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
         validator
             .validate(&catalog)
             .map_err(|error| error.to_string())?;

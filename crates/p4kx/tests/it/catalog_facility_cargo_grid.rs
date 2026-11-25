@@ -20,7 +20,7 @@ fn catalog_cli_writes_one_row_per_port_with_original_cargo_grid_and_storage_slot
         )
         .write_to(&archive)?;
     let output = p4kx_testkit::p4kx()?
-        .arg("catalog")
+        .args(["catalog", "--provenance", "full"])
         .arg(&archive)
         .arg("--out")
         .arg(&output_file)

@@ -7,7 +7,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 
 use p4kx_extraction::{
     Archive, ArchiveWatch, CanonicalReadObserver, DataForge, DataForgeError, InputScope, Language,
-    LocalizationEntry, Record, RecordTree, SourceLocation, Step,
+    LocalizationEntry, ProvenanceMode, Record, RecordTree, SourceLocation, Step,
 };
 use p4kx_testkit::watchdog;
 use serde::Serialize;
@@ -70,7 +70,8 @@ fn installed_item_source_sdk_matches_one_original_record() -> TestResult {
     let archive = open_archive()?;
     let watch = ArchiveWatch::new(&archive);
     let session = CatalogQuerySession::open(&archive, CatalogLanguageSelection::AllAvailable, None)
-        .map_err(|_| "installed Item SDK session open failed")?;
+        .map_err(|_| "installed Item SDK session open failed")?
+        .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session
         .parsed(None)
         .map_err(|_| "installed Item SDK parsed view failed")?;

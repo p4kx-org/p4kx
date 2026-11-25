@@ -95,7 +95,8 @@ fn database() -> DataForgeBuilder {
 #[test]
 fn authored_scenario_requirements_preserve_each_physical_owner_and_inherited_slot() -> TestResult {
     let (_folder, archive) = fixture::open(&database(), DcbOrigin::Encrypted)?;
-    let built = build_catalog(&archive, &fixture::options()).map_err(|error| error.to_string())?;
+    let built = build_catalog(&archive, fixture::options().with_full_provenance())
+        .map_err(|error| error.to_string())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let table = at(&catalog, "/declarations/contractScenarioRequirements")?;
     assert_eq!(at(table, "/availability")?, "available");
@@ -190,7 +191,8 @@ fn check_physical_occurrences(catalog: &Value, rows: &[Value]) -> TestResult {
 #[test]
 fn authored_scenario_requirements_keep_filter_availability_and_clear_origin() -> TestResult {
     let (_folder, archive) = fixture::open(&database(), DcbOrigin::Plain)?;
-    let built = build_catalog(&archive, &fixture::options()).map_err(|error| error.to_string())?;
+    let built = build_catalog(&archive, fixture::options().with_full_provenance())
+        .map_err(|error| error.to_string())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     assert_eq!(
         at(
@@ -202,7 +204,8 @@ fn authored_scenario_requirements_keep_filter_availability_and_clear_origin() ->
     let filter = Filter::new("*/missionscenarios/*");
     let mut options = fixture::options();
     options.filter = Some(&filter);
-    let filtered = build_catalog(&archive, &options).map_err(|error| error.to_string())?;
+    let filtered = build_catalog(&archive, options.with_full_provenance())
+        .map_err(|error| error.to_string())?;
     let catalog: Value = serde_json::from_slice(filtered.json())?;
     let table = at(&catalog, "/declarations/contractScenarioRequirements")?;
     assert_eq!(at(table, "/availability")?, "available");

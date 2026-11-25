@@ -17,8 +17,9 @@ use self::fixture::{NAME_KEY, TEXT_KEY, database};
 fn radar_preserves_link_slots_and_typed_scan_values_with_independent_origins() -> TestResult {
     let (_folder, archive) = common::open(&database("Tag"), DcbOrigin::Encrypted)?;
     check_original_radar_field(&archive)?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
     let ammo = proof::at(&catalog, "/definitions/ammoDefinitions/rows/0")?;
     let radar_cell = proof::cell(ammo, "radarParams", "present")?;
     let radar = proof::at(radar_cell, "/value")?;
@@ -40,13 +41,14 @@ fn radar_reference_array_rejects_a_different_original_target_declaration() -> Te
     let mut options = common::options();
     assert!(
         matches!(
-            build_catalog(&archive, &options),
+            build_catalog(&archive, options.with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "an incompatible declared target refuses complete publication"
     );
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let radar = proof::at(
         &catalog,
         "/definitions/ammoDefinitions/rows/0/radarParams/value",

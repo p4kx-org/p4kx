@@ -43,7 +43,7 @@ impl Fixture {
             publication_mode: CatalogPublicationMode::DiagnosticPartial,
             ..CatalogOptions::new(UNIX_EPOCH)
         };
-        let built = build_catalog_from(&self.archive, &self.entry, &options)?;
+        let built = build_catalog_from(&self.archive, &self.entry, options.with_full_provenance())?;
         assert!(
             built.summary().export_health().is_complete(),
             "the source fixture has no actual read or projection failures"

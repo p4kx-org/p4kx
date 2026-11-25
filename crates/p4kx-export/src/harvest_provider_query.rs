@@ -8,6 +8,7 @@ use super::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
     DatasetAvailability, ParsedCatalogQueries,
 };
+use crate::catalog_query_session::CatalogQuerySource;
 use crate::catalog_v3::catalog_harvest_modules::harvest_provider::{
     self, HarvestableProviderPreset,
 };
@@ -103,7 +104,7 @@ impl ParsedCatalogQueries<'_> {
 
 fn read(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     selection: CatalogRecordSelection,
     cancel: Option<&CancelToken>,

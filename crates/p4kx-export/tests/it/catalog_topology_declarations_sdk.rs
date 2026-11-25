@@ -8,7 +8,7 @@ use p4kx_export::catalog_queries::equipment::resource_topology::{
 };
 use p4kx_export::catalog_queries::equipment::{AlignmentDependencyState, EquipmentSnapshot};
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, SourceWeakTarget,
+    CatalogLanguageSelection, CatalogRecordSelection, SourceWeakTarget,
 };
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog};
 use serde::Serialize;
@@ -16,6 +16,7 @@ use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 #[path = "catalog_topology_declarations_fixture.rs"]
 mod fixture;
@@ -27,9 +28,9 @@ fn topology_sdk_declarations_match_canonical_rows_and_original_uses() -> TestRes
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
-    let session =
-        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
+    let session = full_proof::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
     let parsed = session.parsed(None)?;
     let selection = CatalogRecordSelection::All;
     parsed.with_resource_network_links(selection, None, |snapshot| {

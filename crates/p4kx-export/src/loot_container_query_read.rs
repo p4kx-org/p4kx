@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    Archive, CancelToken, DataForge, FieldOrigin, Guid, SourceUseRef, SourceValueState,
+    Archive, CancelToken, DataForge, FieldOrigin, Guid, ProvenanceMode, SourceUseRef,
+    SourceValueState,
 };
 
 use super::ancestor_resolution::{AncestorFacts, AncestorOwner};
@@ -118,7 +119,11 @@ pub(crate) fn read_physical_container<'source>(
         admission_origin: outcome.admission_origin,
         ancestor_selection_origin: outcome.ancestor_selection_origin,
         placement_survey: outcome.placement_survey,
-        failed_source_uses: outcome.failed_source_uses,
+        failed_source_uses: if source_inventory.provenance_mode() == ProvenanceMode::Full {
+            outcome.failed_source_uses
+        } else {
+            Vec::new()
+        },
         entity_link_survey: outcome.entity_link_survey,
         records: outcome.records,
         requested_aliases: outcome.requested_aliases,

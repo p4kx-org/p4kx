@@ -36,7 +36,7 @@ fn catalog(
     let out = dir.join("catalog.json");
     let mut command = keyless_command(dir)?;
     command
-        .arg("catalog")
+        .args(["catalog", "--provenance", "full"])
         .arg(archive)
         .arg("--out")
         .arg(&out)

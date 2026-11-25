@@ -43,7 +43,7 @@ fn producer(case: Case) -> TestResult {
         let built = p4kx_export::build_catalog_from(
             &fixture.archive,
             &fixture.entry,
-            &CatalogOptions::new(UNIX_EPOCH),
+            CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
         )?;
         assert_eq!(
             built.summary().export_health().status,
@@ -70,7 +70,7 @@ fn check_template_replay(fixture: &Fixture, expected: &[u8]) -> TestResult {
     let (summary, packed) = write_catalog_from(
         &fixture.archive,
         &fixture.entry,
-        &options,
+        options.with_full_provenance(),
         Compression::Zstd { level: 1 },
         || Ok(Vec::new()),
     )?;

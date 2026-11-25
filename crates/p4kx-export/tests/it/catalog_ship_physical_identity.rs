@@ -49,7 +49,7 @@ fn same_guid_ship_records_keep_their_physical_authored_values() -> TestResult {
         check_originals(tree.fields(), case)?;
     }
     let options = common::options();
-    let built = p4kx_export::build_catalog_from(&archive, &entry, &options)?;
+    let built = p4kx_export::build_catalog_from(&archive, &entry, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let rows = proof::rows(&catalog, "/ships")?;
     assert_eq!(rows.len(), records.len(), "same-GUID rows remain distinct");

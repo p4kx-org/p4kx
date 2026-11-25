@@ -12,9 +12,10 @@ use super::unlocalized_record_query::{
 };
 use super::{CatalogLanguageSelection, CatalogRecordCoverage, CatalogRecordSelection};
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
-use crate::catalog_query_session::{CatalogQuerySession, ParsedCatalogQueries, checkpoint};
+use crate::catalog_query_session::{
+    CatalogQuerySession, CatalogQuerySource, ParsedCatalogQueries, checkpoint,
+};
 use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::catalog_text_contract::{CanonicalText, GameTextRef};
 use crate::catalog_v3::location_entity_declaration::{self, LocationEntityDeclaration};
@@ -153,7 +154,7 @@ impl ParsedCatalogQueries<'_> {
 )]
 fn with_parsed<T>(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     selection: CatalogRecordSelection,
     filter: Option<&Filter>,
@@ -177,7 +178,7 @@ fn with_parsed<T>(
     };
     let sources = TextSources::read_languages(archive, selected_languages)?;
     checkpoint(cancel)?;
-    let origins = CatalogOrigins::new(archive, entry, &sources)?;
+    let origins = entry.with_texts(archive, &sources)?;
     let input = OriginalCatalogInput::new(forge, &origins);
     let texts = Texts::parse(&sources)?;
     let registry = CatalogTextRegistry::default();

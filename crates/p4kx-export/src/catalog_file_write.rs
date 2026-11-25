@@ -7,35 +7,40 @@ use p4kx_extraction::{Archive, DataForgeEntry};
 
 use crate::build;
 use crate::options::{CatalogRun, CatalogStage};
-use crate::{CatalogError, CatalogFile, CatalogOptions, CatalogSummary, Compression};
+use crate::{CatalogError, CatalogFile, CatalogOutputOptions, CatalogSummary, Compression};
 
 /// Streams a catalog into a lazy created file and explicitly cleans failed unpublished output.
 ///
 /// # Errors
 /// Returns build/write failures or a separate cleanup failure retaining its original cause.
-pub fn write_catalog_file<'a>(
+pub fn write_catalog_file<'a, 'run, 'inputs: 'run>(
     archive: &Archive,
-    options: &CatalogOptions<'_>,
+    options: impl Into<CatalogOutputOptions<'run, 'inputs>>,
     compression: Compression,
     create: impl FnOnce() -> io::Result<CatalogFile<'a>>,
 ) -> Result<(CatalogSummary, CatalogFile<'a>), CatalogError> {
-    write_archive(archive, CatalogRun::new(options, None), compression, create)
+    write_archive(
+        archive,
+        CatalogRun::for_output(options, None),
+        compression,
+        create,
+    )
 }
 
 /// Writes a catalog file and reports each stage before it runs on the calling thread.
 ///
 /// # Errors
 /// Returns the same build, write or cleanup errors as [`write_catalog_file`].
-pub fn write_catalog_file_with_phases<'a>(
+pub fn write_catalog_file_with_phases<'a, 'run, 'inputs: 'run>(
     archive: &Archive,
-    options: &CatalogOptions<'_>,
+    options: impl Into<CatalogOutputOptions<'run, 'inputs>>,
     compression: Compression,
-    report: &dyn Fn(CatalogStage),
+    report: &'run dyn Fn(CatalogStage),
     create: impl FnOnce() -> io::Result<CatalogFile<'a>>,
 ) -> Result<(CatalogSummary, CatalogFile<'a>), CatalogError> {
     write_archive(
         archive,
-        CatalogRun::new(options, Some(report)),
+        CatalogRun::for_output(options, Some(report)),
         compression,
         create,
     )
@@ -57,17 +62,17 @@ fn write_archive<'a>(
 ///
 /// # Errors
 /// Returns build/write failures or a cleanup failure without hiding cancellation or health errors.
-pub fn write_catalog_file_from<'a>(
+pub fn write_catalog_file_from<'a, 'run, 'inputs: 'run>(
     archive: &Archive,
     entry: &DataForgeEntry,
-    options: &CatalogOptions<'_>,
+    options: impl Into<CatalogOutputOptions<'run, 'inputs>>,
     compression: Compression,
     create: impl FnOnce() -> io::Result<CatalogFile<'a>>,
 ) -> Result<(CatalogSummary, CatalogFile<'a>), CatalogError> {
     write_file_from(
         archive,
         entry,
-        CatalogRun::new(options, None),
+        CatalogRun::for_output(options, None),
         compression,
         create,
     )

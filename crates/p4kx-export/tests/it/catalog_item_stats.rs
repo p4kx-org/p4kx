@@ -78,7 +78,7 @@ fn catalog_from(archive: &Archive) -> TestResult<Value> {
         publication_mode: p4kx_export::CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))
     };
-    let built = build_catalog(archive, &options)?;
+    let built = build_catalog(archive, options.with_full_provenance())?;
     assert!(
         !built.summary().export_health().is_complete(),
         "the exact source errors remain visible alongside readable components"

@@ -118,8 +118,8 @@ fn compare_owner(
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let built =
-        build_catalog_from(archive, entry, &options).map_err(|_| "build selected board catalog")?;
+    let built = build_catalog_from(archive, entry, options.with_full_provenance())
+        .map_err(|_| "build selected board catalog")?;
     let catalog: Value = serde_json::from_slice(built.json()).map_err(|_| "read catalog JSON")?;
     crate::real_archive_shop_inventory_v3::verify_build(archive, &catalog)?;
     let origins = Origins::read(&catalog, entry.origin())?;

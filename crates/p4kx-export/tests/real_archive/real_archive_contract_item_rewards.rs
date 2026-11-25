@@ -46,7 +46,7 @@ fn selected_item_reward_generator_matches_its_original_occurrences() -> TestResu
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let built = build_catalog_from(&archive, &source, &options)
+    let built = build_catalog_from(&archive, &source, options.with_full_provenance())
         .map_err(|_| "build the selected Generator Catalog")?;
     let catalog: Json = serde_json::from_slice(built.json())?;
     verify_build(&archive, &catalog)?;

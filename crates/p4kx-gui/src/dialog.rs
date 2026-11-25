@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::catalog_export::{CATALOG_FILE, DIAGNOSTIC_CATALOG_FILE, MARKER_CATALOG_FILE};
 use crate::{ComparisonSide, QueryExportFormat};
 
 /// A dialog the host shows for the window.
@@ -30,6 +31,8 @@ pub enum Dialog {
     RecordExportFolder,
     /// Picks the file the P4KX catalog is written to.
     CatalogFile,
+    /// Picks the file of a catalog with full source proofs.
+    FullCatalogFile,
     /// Picks the file of an explicitly requested diagnostic P4KX catalog.
     DiagnosticCatalogFile,
     /// Picks the GLB file a model is exported to.
@@ -51,20 +54,28 @@ pub enum Dialog {
 }
 
 impl Dialog {
+    pub(crate) const fn catalog_file_name(self) -> Option<&'static str> {
+        match self {
+            Self::CatalogFile => Some(MARKER_CATALOG_FILE),
+            Self::FullCatalogFile => Some(CATALOG_FILE),
+            Self::DiagnosticCatalogFile => Some(DIAGNOSTIC_CATALOG_FILE),
+            _ => None,
+        }
+    }
+
     pub(crate) const fn is_parent_output(self) -> bool {
-        matches!(
-            self,
-            Self::ComparisonReport
-                | Self::QueryExport(_)
-                | Self::CatalogFile
-                | Self::DiagnosticCatalogFile
-                | Self::ModelFile
-                | Self::AssemblyFile
-                | Self::AssemblyPackage
-                | Self::CharacterFile
-                | Self::CharacterPackage
-                | Self::UiFile
-        )
+        self.catalog_file_name().is_some()
+            || matches!(
+                self,
+                Self::ComparisonReport
+                    | Self::QueryExport(_)
+                    | Self::ModelFile
+                    | Self::AssemblyFile
+                    | Self::AssemblyPackage
+                    | Self::CharacterFile
+                    | Self::CharacterPackage
+                    | Self::UiFile
+            )
     }
 
     pub(crate) const fn is_package_output(self) -> bool {

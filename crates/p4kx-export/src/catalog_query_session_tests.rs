@@ -4,7 +4,7 @@
 use std::error::Error;
 use std::path::Path;
 
-use p4kx_extraction::{Archive, CancelToken, DataForgeEntry, Language};
+use p4kx_extraction::{Archive, CancelToken, DataForgeEntry, Language, ProvenanceMode};
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, TestStruct, TestType, TestValue,
     write_build_manifest,
@@ -29,7 +29,8 @@ fn localized_and_unlocalized_queries_reuse_one_archive_bound_session() -> TestRe
         &archive,
         CatalogLanguageSelection::Selected(&languages),
         None,
-    )?;
+    )?
+    .with_provenance_mode(ProvenanceMode::Full);
     let build = session.build().ok_or("known fixture Build")?;
     assert_eq!(
         build.change_number(),
@@ -185,7 +186,7 @@ fn an_archive_change_observed_at_query_end_permanently_invalidates_the_session()
     Ok(())
 }
 
-fn open_fixture(folder: &Path) -> Result<Archive, Box<dyn Error>> {
+pub(super) fn open_fixture(folder: &Path) -> Result<Archive, Box<dyn Error>> {
     let category = TestRecord::new(
         0x1100_0000_0000_4000_8000_0000_0000_0001,
         "BlueprintCategoryRecord",
@@ -247,7 +248,7 @@ fn parsed_queries_share_one_physical_view_and_keep_checking_archive_freshness() 
                 "the same parsed DataForge"
             );
             assert!(
-                entry.origin_of(forge).is_some(),
+                entry.entry().origin_of(forge).is_some(),
                 "the retained view borrows the same decoded input",
             );
             Ok(())

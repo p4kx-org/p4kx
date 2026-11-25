@@ -38,7 +38,11 @@ fn complete(requested: usize) -> TestResult {
         let observed = source::check(&input, requested)?;
 
         let options = CatalogOptions::new(UNIX_EPOCH);
-        let built = p4kx_export::build_catalog_from(&input.archive, &input.entry, &options)?;
+        let built = p4kx_export::build_catalog_from(
+            &input.archive,
+            &input.entry,
+            options.with_full_provenance(),
+        )?;
         assert_eq!(
             built.summary().export_health().status,
             ExportHealthStatus::Complete,
@@ -68,7 +72,7 @@ fn writers(
         let (_, bytes) = p4kx_export::write_catalog_from(
             &input.archive,
             &input.entry,
-            options,
+            options.with_full_provenance(),
             compression,
             || Ok(Vec::new()),
         )?;

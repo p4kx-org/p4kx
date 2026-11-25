@@ -5,8 +5,8 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use p4kx_extraction::{
-    Archive, DataForgeEntry, DataForgeOrigin, IniEncoding, InputScope, Language, SourceInput,
-    SourceScope, SourceUse, SourceUses,
+    Archive, DataForgeEntry, DataForgeOrigin, IniEncoding, InputScope, Language, ProvenanceMode,
+    SourceInput, SourceScope, SourceUse, SourceUses,
 };
 
 use crate::CatalogError;
@@ -47,16 +47,26 @@ impl CatalogLocaleInput {
 }
 
 impl CatalogOrigins {
+    #[cfg(test)]
     pub(crate) fn new(
         archive: &Archive,
         entry: &DataForgeEntry,
         texts: &TextSources,
     ) -> Result<Self, CatalogError> {
+        Self::new_with_provenance_mode(archive, entry, texts, ProvenanceMode::Full)
+    }
+
+    pub(crate) fn new_with_provenance_mode(
+        archive: &Archive,
+        entry: &DataForgeEntry,
+        texts: &TextSources,
+        provenance_mode: ProvenanceMode,
+    ) -> Result<Self, CatalogError> {
         Self::from_inputs(
             archive,
             entry,
             Some(texts),
-            SourceUses::with_compact_coordinates(),
+            SourceUses::with_provenance_mode(provenance_mode),
         )
     }
 
@@ -64,7 +74,19 @@ impl CatalogOrigins {
         archive: &Archive,
         entry: &DataForgeEntry,
     ) -> Result<Self, CatalogError> {
-        Self::for_archive_records_with_uses(archive, entry, SourceUses::with_compact_coordinates())
+        Self::for_archive_records_with_provenance_mode(archive, entry, ProvenanceMode::Full)
+    }
+
+    pub(crate) fn for_archive_records_with_provenance_mode(
+        archive: &Archive,
+        entry: &DataForgeEntry,
+        provenance_mode: ProvenanceMode,
+    ) -> Result<Self, CatalogError> {
+        Self::for_archive_records_with_uses(
+            archive,
+            entry,
+            SourceUses::with_provenance_mode(provenance_mode),
+        )
     }
 
     pub(crate) fn for_archive_records_with_uses(

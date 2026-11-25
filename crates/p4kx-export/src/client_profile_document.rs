@@ -145,7 +145,7 @@ impl ClientProfileSettings {
     }
 }
 
-/// A standalone client profile result with its complete source inventory.
+/// A standalone client profile result with the requested source detail.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
@@ -170,7 +170,7 @@ impl ClientProfileSettingsReport {
         &self.settings
     }
 
-    /// Returns the inventory addressed by the profile fields.
+    /// Returns the source inventory, which is empty in marker mode.
     #[must_use]
     pub const fn provenance(&self) -> &SourceInventory {
         &self.provenance

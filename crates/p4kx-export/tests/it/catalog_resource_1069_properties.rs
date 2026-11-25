@@ -168,8 +168,8 @@ fn exact_unreadable_example(
 fn nonfinite_owned_values_keep_exact_bits_origin_order_and_repeatable_output() -> TestResult {
     let (_directory, archive) = origin::open(fixture::nonfinite_properties().build(), false)?;
     let options = origin::options();
-    let built = build_catalog(&archive, &options)?;
-    let repeated = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
+    let repeated = build_catalog(&archive, options.with_full_provenance())?;
     assert_eq!(
         built.json(),
         repeated.json(),

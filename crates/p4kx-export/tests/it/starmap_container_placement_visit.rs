@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::starmap::{
     ContainerPlacementEvent, ContainerPlacementRootVisit, ContainerRootStatus, DatasetAvailability,
-    visit_container_placements,
+    visit_container_placements, visit_container_placements_with_provenance_mode,
 };
 use p4kx_export::{CatalogError, build_catalog};
 use p4kx_extraction::CancelToken;
@@ -22,11 +23,16 @@ const UNRESOLVED: &str = "/placements/unresolvedContainerLinks/rows";
 #[test]
 fn full_container_visit_matches_normal_and_closes_sources_at_each_root() -> TestResult {
     let input = source_fixture(false)?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&input.archive, &fixture::options())?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(&input.archive, fixture::options().with_full_provenance())?.json(),
+    )?;
     let mut captured = Captured::default();
-    let summary =
-        visit_container_placements(&input.archive, None, |event| captured.observe(&event))?;
+    let summary = visit_container_placements_with_provenance_mode(
+        &input.archive,
+        full_proof::MODE,
+        None,
+        |event| captured.observe(&event),
+    )?;
     assert!(
         summary.is_complete(),
         "a verified missing Child still has conclusive coverage"

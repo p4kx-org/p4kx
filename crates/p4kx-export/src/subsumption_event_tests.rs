@@ -245,7 +245,8 @@ fn sdk_event_documents_match_synthetic_catalog_output() -> TestResult {
     let (_folder, archive) = fixture(false)?;
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let selected = read_subsumption_events(&archive, SubsumptionEventSelection::All, None)?;
     let expected = catalog
         .pointer("/definitions/subsumptionEvents/rows")

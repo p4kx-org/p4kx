@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::catalog_queries::{ResourceFloat32, ResourceFloat64, ResourceNumber};
-use p4kx_extraction::{Guid, SourceInventory, SourceValueState, SourcedValue};
+use p4kx_extraction::{Guid, ProvenanceMode, SourceInventory, SourceValueState, SourcedValue};
 use serde::Serialize;
 use serde_json::Value;
 
@@ -67,10 +67,28 @@ impl<'a> Wire<'a> {
         self.field("state")?.raw(&cell.state())?;
         self.field("containsEncryptedSource")?
             .raw(&cell.origin().contains_encrypted_source())?;
-        self.field("sourceUsesRefs")?
-            .raw(cell.origin().source_uses_refs())?;
-        self.field("sourceSetComplete")?
-            .raw(&cell.origin().source_set_complete())?;
+        match self.inventory.provenance_mode() {
+            ProvenanceMode::Full => {
+                self.field("sourceUsesRefs")?
+                    .raw(cell.origin().source_uses_refs())?;
+                self.field("sourceSetComplete")?
+                    .raw(&cell.origin().source_set_complete())?;
+            }
+            ProvenanceMode::MarkersOnly => {
+                assert_eq!(
+                    cell.origin().provenance_mode(),
+                    ProvenanceMode::MarkersOnly,
+                    "typed field origin follows the inventory's provenance profile"
+                );
+                assert!(
+                    self.expected.get("sourceUsesRefs").is_none()
+                        && self.expected.get("sourceSetComplete").is_none()
+                        && cell.origin().source_uses_refs().is_empty(),
+                    "markers keep the value without physical proof"
+                );
+            }
+            _ => return Err("unsupported provenance profile in typed parity test".into()),
+        }
         let payload = self.field("value")?;
         if let Some(value) = cell.value() {
             visit(value, payload)?;

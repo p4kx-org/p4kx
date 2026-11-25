@@ -106,7 +106,7 @@ fn canonical_header_and_literal_dollar_name_body_field_have_distinct_original_so
     assert_original_names(&tree);
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog_from(&archive, &entry, &options)?;
+    let built = build_catalog_from(&archive, &entry, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let row = fixture::row(&catalog, "definitions/resourceGroups", fixture::GROUP)?;
     let carrier = common::at(row, "/recordName")?;

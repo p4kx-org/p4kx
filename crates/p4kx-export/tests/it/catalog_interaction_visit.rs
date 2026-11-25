@@ -2,9 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::CatalogError;
-use p4kx_export::catalog_queries::equipment::interactions::{
-    InteractionSnapshot, visit_interactions, visit_interactions_from, with_interactions_from,
-};
+use p4kx_export::catalog_queries::equipment::interactions::InteractionSnapshot;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
     DatasetAvailability,
@@ -14,6 +12,7 @@ use p4kx_testkit::{DataForgeBuilder, TestEntry, TestRecord, TestType, TestValue}
 use serde_json::{Value, json};
 
 use super::{DcbOrigin, TestResult, common, fixture, kiosk, proof};
+use crate::sdk_full_proof as full_proof;
 
 const ROWS: &str = "/configurations/interactions/rows";
 const ORIGINAL: u32 = 0;
@@ -50,7 +49,12 @@ fn interaction_visits_match_normal_rows_and_their_physical_origins() -> TestResu
     let (_directory, archive) = localized_archive()?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog: Value = serde_json::from_slice(
-        p4kx_export::build_catalog_from(&archive, &entry, &common::options())?.json(),
+        p4kx_export::build_catalog_from(
+            &archive,
+            &entry,
+            common::options().with_full_provenance(),
+        )?
+        .json(),
     )?;
     assert_eq!(
         catalog
@@ -60,10 +64,8 @@ fn interaction_visits_match_normal_rows_and_their_physical_origins() -> TestResu
         "compare the completed Normal v3 output"
     );
     let mut all = Vec::new();
-    let summary = visit_interactions(
-        &archive,
+    let summary = full_proof::open(&archive, LOCALES, None)?.visit_interactions(
         CatalogRecordSelection::All,
-        LOCALES,
         None,
         |index, snapshot| -> TestResult {
             assert_eq!(snapshot.build(), archive.build(), "snapshot Build");
@@ -145,7 +147,7 @@ fn check_owner(index: u32, snapshot: &InteractionSnapshot<'_>, catalog: &Value) 
 }
 
 fn check_selected(archive: &Archive, entry: &DataForgeEntry, catalog: &Value) -> TestResult {
-    let session = CatalogQuerySession::from_entry(archive, entry, LOCALES, None)?;
+    let session = full_proof::from_entry(archive, entry, LOCALES, None)?;
     let mut selected = Vec::new();
     let by_guid = session.visit_interactions(
         CatalogRecordSelection::Guid(common::guid(fixture::OWNER).parse()?),
@@ -163,14 +165,13 @@ fn check_selected(archive: &Archive, entry: &DataForgeEntry, catalog: &Value) ->
     );
     assert_eq!(by_guid.row_count(), 4, "all same-GUID rows");
     let point = CatalogRecordSelection::RecordIndex(ALIAS);
-    let expected = with_interactions_from(archive, entry, point, LOCALES, None, |snapshot| {
-        serde_json::to_value(snapshot.source_inventory())
-    })??;
-    let by_index = visit_interactions_from(
-        archive,
-        entry,
+    let expected = full_proof::from_entry(archive, entry, LOCALES, None)?.with_interactions(
         point,
-        LOCALES,
+        None,
+        |snapshot| serde_json::to_value(snapshot.source_inventory()),
+    )??;
+    let by_index = full_proof::from_entry(archive, entry, LOCALES, None)?.visit_interactions(
+        point,
         None,
         |index, snapshot| -> TestResult {
             assert_eq!(index, ALIAS, "the requested physical owner");

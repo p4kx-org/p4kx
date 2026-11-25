@@ -8,7 +8,6 @@ use p4kx_extraction::{Archive, Build, CancelToken, DataForgeEntry, Guid, SourceI
 use super::read::{Query, ResolverInputs};
 use super::{Loadout, LoadoutDependencyCoverage, LoadoutOwnerKind, scope};
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
@@ -181,7 +180,7 @@ fn read_owner(
     want: Wanted,
     coverage: &mut CatalogRecordCoverage,
 ) -> Result<LoadoutOwnerSnapshot, CatalogError> {
-    let origins = CatalogOrigins::for_archive_records(query.archive, query.entry)?;
+    let origins = query.entry.records(query.archive)?;
     let input = OriginalCatalogInput::new(query.forge, &origins);
     let registry = CatalogTextRegistry::default();
     let projection = CatalogProjection::new(texts, &input, &registry).for_kind(Kind::Loadouts);

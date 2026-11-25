@@ -58,15 +58,19 @@ Archive owns physical declaration capture; extraction owns the common serializab
 contract consumed by export, media, assembly, Blender, CLI, GUI and MCP. Extend existing source
 and container identities, not a second traversal/registry system.
 
-Catalog v3 MUST expose containsEncryptedSource true/false/null and actual source-use references
-DIRECTLY on every exported source-backed field/data value, through the shared typed sourced-value
-wrapper. Cover nested members/list elements, localized variants, source-backed identities and link
-values. Consumers must not reconstruct the per-field flag from a global or row-only field. A row or
-catalog summary is additional. Mixed-input tests prove distinct fields in one row can have different
-markers, with the exact source/selector/conversion uses that justify each one. x-gameText protection
-remains an independent axis and encryption metadata alone grants no public publication permission.
+The default Catalog and its SDK queries retain the immediate `containsEncryptedSource`
+marker for each source-backed value. The Catalog file uses `format: "p4kx-catalog-markers"`
+and `formatVersion: 1`, with the version 3 dataset inside `catalog`. Each sourced value carries
+`state`, `value` and `containsEncryptedSource`. Consumers can use this marker directly on nested
+fields, list members, localized variants, identities and links.
 
-Catalog v3 carries shared sources, actual contribution sets and row/fact references plus the derived
+Explicit Full provenance writes the standalone Catalog v3 with its complete inventory and
+source-use references. Proof acceptance and mixed-input verification use Full to resolve the
+actual data, selector and conversion contributors for each field. A row or catalog summary is
+additional. `x-gameText` protection remains a separate axis, and encryption metadata alone grants
+no public publication permission.
+
+Full Catalog v3 carries shared sources, actual contribution sets and row/fact references plus the derived
 index. Localized values reference their actual language Entry, not every loaded locale. A standalone
 DCB and a localization Archive are separate actual origins; never claim the DCB came from whichever
 Archive was supplied for enrichment.
@@ -76,7 +80,7 @@ IDs from physical source identity, input scope, contributor role and original lo
 physical inputs registered in fixed order, parallel observations produce the same references.
 The `provenance.uses` rows remain authoritative for the coordinates and selectors.
 
-Every structured tool output has the same immediate per-field obligation. Existing compatible
+Other structured tool outputs have the same immediate per-field obligation. Existing compatible
 JSON wrappers may use a typed fieldOrigins map at exact field paths, with the already materialized
 containsEncryptedSource marker, actual sourceUsesRefs and sourceSetComplete. Row-only origin is
 insufficient. GUI details/previews and MCP structured results reuse these wrappers. Historical

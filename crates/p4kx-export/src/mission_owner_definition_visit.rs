@@ -8,11 +8,12 @@ use p4kx_extraction::{Archive, Build, CancelToken, DataForge, DataForgeEntry, So
 use super::{BrokerDefinition, TemplateDefinition, owner_definitions};
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogRecordCoverage, CatalogRecordSelection,
 };
-use crate::catalog_query_session::{CatalogQuerySession, ParsedCatalogQueries, checkpoint};
+use crate::catalog_query_session::{
+    CatalogQuerySession, CatalogQuerySource, ParsedCatalogQueries, checkpoint,
+};
 use crate::catalog_table::DatasetAvailability;
 use crate::mission_flow_owner::FlowOwnerKind;
 
@@ -149,7 +150,7 @@ impl ParsedCatalogQueries<'_> {
 
 fn visit_definitions<'source, E: From<CatalogError>>(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &'source DataForge<'source>,
     selection: MissionOwnerDefinitionSelection,
     cancel: Option<&CancelToken>,
@@ -160,7 +161,7 @@ fn visit_definitions<'source, E: From<CatalogError>>(
     let plan = owner_definitions::plan(forge, kind, records, cancel)?;
     let mut owner_count = 0;
     let coverage = plan.visit::<E>(cancel, |owner, coverage| {
-        let origins = CatalogOrigins::for_archive_records(archive, entry)?;
+        let origins = entry.records(archive)?;
         let input = OriginalCatalogInput::new(forge, &origins);
         let read = owner_definitions::read_owner(&input, owner, coverage, family, cancel)?;
         let row = match family {

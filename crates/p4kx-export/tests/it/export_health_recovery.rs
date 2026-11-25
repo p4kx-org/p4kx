@@ -88,7 +88,10 @@ pub(crate) fn remove_directory_record_and_end(bytes: &mut Vec<u8>) -> TestResult
 #[test]
 fn an_actual_recovered_directory_refuses_normal_in_memory_publication() -> TestResult {
     let (_directory, archive) = archive(true)?;
-    let result = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH));
+    let result = build_catalog(
+        &archive,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    );
     assert!(
         matches!(result, Err(CatalogError::IncompleteExport(_))),
         "a recovered subset cannot establish successful absence for any catalog kind"
@@ -103,7 +106,7 @@ fn recovered_diagnostic_output_has_one_global_marker_and_only_observed_counts() 
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let health = built.summary().export_health();
     assert!(
         !health.is_complete(),
@@ -223,7 +226,7 @@ fn recovered_normal_writes_preserve_fresh_and_existing_destinations() -> TestRes
             let result = write_catalog_from(
                 &archive,
                 &entry,
-                &CatalogOptions::new(UNIX_EPOCH),
+                CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
                 compression,
                 || {
                     created.set(true);
@@ -252,7 +255,10 @@ fn recovered_normal_writes_preserve_fresh_and_existing_destinations() -> TestRes
 #[test]
 fn allowing_recovery_with_a_healthy_directory_keeps_normal_publication_healthy() -> TestResult {
     let (_directory, archive) = archive(false)?;
-    let built = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
     let health = built.summary().export_health();
     assert!(
         health.is_complete(),

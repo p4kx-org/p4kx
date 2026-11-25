@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::equipment::with_ship_sources_from;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability,
@@ -35,7 +36,7 @@ fn missing_and_unreadable_atls_owners_have_distinct_source_coverage() -> TestRes
             (GeoOwner::Unreadable, [(index, true)]) => Some(*index),
             _ => return Err("the fixture must distinguish a missing and unreadable Actor".into()),
         };
-        let normal = build_catalog_from(&archive, &entry, &common::options());
+        let normal = build_catalog_from(&archive, &entry, common::options().with_full_provenance());
         let built = if unreadable.is_some() {
             assert!(
                 matches!(normal, Err(CatalogError::IncompleteExport(_))),
@@ -45,7 +46,7 @@ fn missing_and_unreadable_atls_owners_have_distinct_source_coverage() -> TestRes
                 publication_mode: CatalogPublicationMode::DiagnosticPartial,
                 ..common::options()
             };
-            build_catalog_from(&archive, &entry, &partial)?
+            build_catalog_from(&archive, &entry, partial.with_full_provenance())?
         } else {
             normal?
         };
@@ -107,7 +108,7 @@ fn an_unreadable_driver_mode_keeps_the_actor_and_its_unreadable_classification()
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let geo = fixture_record(&forge, "EntityClassDefinition.ARGO_ATLS_GEO")?;
-    let built = build_catalog_from(&archive, &entry, &common::options())?;
+    let built = build_catalog_from(&archive, &entry, common::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let owner = proof::rows(&catalog, "/ships")?
         .iter()
@@ -127,11 +128,14 @@ fn an_unreadable_driver_mode_keeps_the_actor_and_its_unreadable_classification()
         ),
         "the unresolved operator mode retains the original driver Record"
     );
-    with_ship_sources_from(
+    full_proof::from_entry(
         &archive,
         &entry,
-        CatalogRecordSelection::RecordIndex(geo.index()),
         CatalogLanguageSelection::Selected(&[]),
+        None,
+    )?
+    .with_ship_sources(
+        CatalogRecordSelection::RecordIndex(geo.index()),
         None,
         |snapshot| -> TestResult {
             let [row] = snapshot.rows() else {

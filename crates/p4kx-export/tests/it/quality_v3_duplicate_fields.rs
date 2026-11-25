@@ -54,13 +54,13 @@ fn quality_v3_one_retained_cell_cannot_excuse_two_identical_original_named_float
     let mut options = common::options();
     assert!(
         matches!(
-            build_catalog_from(&archive, &input, &options),
+            build_catalog_from(&archive, &input, options.with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "unrepresented duplicate authored slots require diagnostic publication"
     );
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog_from(&archive, &input, &options)?;
+    let built = build_catalog_from(&archive, &input, options.with_full_provenance())?;
     let catalog = serde_json::from_slice(built.json())?;
     assert_retained_and_uncovered(&catalog)
 }

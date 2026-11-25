@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::StarmapTraversalBudget;
 use p4kx_export::catalog_queries::starmap;
 use p4kx_export::catalog_queries::starmap::{
@@ -22,10 +23,11 @@ fn location_instances_share_rows_and_source_coordinates_with_the_catalog() -> Te
     let input = source()?;
     let root = entry_index(&input.archive, ROOT)?;
     let catalog = input.diagnostic()?.1;
-    let selected = starmap::read_location_instances(
+    let selected = starmap::read_location_instances_with_provenance_mode(
         &input.archive,
         ContainerPlacementSelection::SystemRoot(root),
         StarmapTraversalBudget::new(),
+        full_proof::MODE,
         None,
     )?;
     assert!(

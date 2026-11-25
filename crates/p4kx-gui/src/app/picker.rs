@@ -10,8 +10,7 @@ use crate::dialog::Dialog;
 use crate::output_target::ParentTicket;
 use crate::ui_file_dialog::UiFileDialog;
 use crate::{
-    CATALOG_FILE, CatalogText, CharacterText, ComparisonText, DIAGNOSTIC_CATALOG_FILE, Model,
-    QueryExportFormat, QueryText, Text,
+    CatalogText, CharacterText, ComparisonText, Model, QueryExportFormat, QueryText, Text,
 };
 
 #[derive(Debug)]
@@ -119,14 +118,10 @@ fn pick(
             .add_filter(filters.report, &["json"])
             .set_file_name("comparison.json")
             .save_file(),
-        Dialog::CatalogFile | Dialog::DiagnosticCatalogFile => picker
+        Dialog::CatalogFile | Dialog::FullCatalogFile | Dialog::DiagnosticCatalogFile => picker
             .add_filter(filters.catalog_compressed, &["zst"])
             .add_filter(filters.catalog, &["json"])
-            .set_file_name(if dialog == Dialog::DiagnosticCatalogFile {
-                DIAGNOSTIC_CATALOG_FILE
-            } else {
-                CATALOG_FILE
-            })
+            .set_file_name(dialog.catalog_file_name()?)
             .save_file(),
         Dialog::ModelFile | Dialog::AssemblyFile | Dialog::CharacterFile => model_file.save(picker),
         Dialog::AssemblyPackage | Dialog::CharacterPackage => model_file.pick_folder(picker),

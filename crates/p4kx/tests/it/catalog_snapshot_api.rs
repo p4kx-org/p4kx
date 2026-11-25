@@ -80,7 +80,7 @@ fn machine_summary_keeps_shared_item_variant_provenance() -> TestResult {
 
 fn run_catalog(archive: &Path, out: &Path) -> Result<(Value, Value), Box<dyn Error>> {
     let output = p4kx_testkit::p4kx()?
-        .arg("catalog")
+        .args(["catalog", "--provenance", "full"])
         .arg(archive)
         .arg("--out")
         .arg(out)

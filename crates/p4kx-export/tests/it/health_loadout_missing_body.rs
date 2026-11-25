@@ -212,7 +212,8 @@ fn each_filtered_original_caller_supplies_its_exact_missing_path_payload() -> Te
             publication_mode: CatalogPublicationMode::DiagnosticPartial,
             ..fixture::options()
         };
-        let built = build_catalog_from(&input.archive, &input.entry, &options)?;
+        let built =
+            build_catalog_from(&input.archive, &input.entry, options.with_full_provenance())?;
         let catalog: Value = serde_json::from_slice(built.json())?;
         filtered_example(&catalog, index)?;
     }

@@ -6,12 +6,13 @@
 use p4kx_extraction::{Archive, Build, CancelToken, DataForge, DataForgeEntry, SourceInventory};
 
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::unlocalized_record_query::plan::Plan;
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogRecordCoverage, CatalogRecordSelection,
 };
-use crate::catalog_query_session::{CatalogQuerySession, ParsedCatalogQueries, checkpoint};
+use crate::catalog_query_session::{
+    CatalogQuerySession, CatalogQuerySource, ParsedCatalogQueries, checkpoint,
+};
 use crate::catalog_table::DatasetAvailability;
 use crate::catalog_v3::industry_modules::dismantle_process_definition;
 use crate::record_observation::RecordObservation;
@@ -109,7 +110,7 @@ impl ParsedCatalogQueries<'_> {
 
 fn project<T>(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     selection: CatalogRecordSelection,
     cancel: Option<&CancelToken>,
@@ -134,7 +135,7 @@ fn project<T>(
             },
         )
     })?;
-    let origins = CatalogOrigins::for_archive_records(archive, entry)?;
+    let origins = entry.records(archive)?;
     let input = OriginalCatalogInput::new(forge, &origins);
     let mut rows = Vec::with_capacity(owners.len());
     for owner in owners {

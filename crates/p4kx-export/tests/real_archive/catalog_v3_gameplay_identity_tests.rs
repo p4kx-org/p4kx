@@ -128,7 +128,7 @@ fn canonical_property_physical_ties_keep_foreign_family_identity_guards() -> Tes
     let (_directory, archive) = fixture::open(&database, DcbOrigin::Plain)?;
     let mut options = fixture::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = p4kx_export::build_catalog(&archive, &options)?;
+    let built = p4kx_export::build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     assert_eq!(
         reader::rows(&catalog, KIND)?.len(),

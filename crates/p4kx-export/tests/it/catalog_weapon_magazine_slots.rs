@@ -159,7 +159,7 @@ fn catalog(
     let mut options = common::options();
     options.publication_mode = mode;
     Ok(serde_json::from_slice(
-        build_catalog(&archive, &options)?.json(),
+        build_catalog(&archive, options.with_full_provenance())?.json(),
     )?)
 }
 

@@ -41,7 +41,7 @@ fn selected_particle_entry_matches_catalog_cells_and_source_roles() -> TestResul
 
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let projected = catalog
         .pointer("/definitions/particleLibraries/rows")

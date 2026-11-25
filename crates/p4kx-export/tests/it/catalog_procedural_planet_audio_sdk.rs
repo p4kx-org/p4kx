@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::CatalogRecordSelection;
 use p4kx_export::catalog_queries::planet_audio::{
-    ProceduralPlanetAudioSnapshot, with_procedural_planet_audio, with_procedural_planet_audio_from,
+    ProceduralPlanetAudioSnapshot, with_procedural_planet_audio,
 };
 use p4kx_extraction::SourceValueState;
 use serde_json::{Value, json};
@@ -22,13 +23,15 @@ fn planet_audio_sdk_matches_the_canonical_table_and_ignores_an_unrelated_record(
         Vec::new(),
     )?;
     let (_, catalog) = fixture.diagnostic()?;
-    with_procedural_planet_audio_from(
+    full_proof::from_entry(
         &fixture.archive,
         &fixture.entry,
-        CatalogRecordSelection::All,
+        full_proof::NO_LANGUAGES,
         None,
-        |snapshot| check_parity(&snapshot, &catalog),
-    )??;
+    )?
+    .with_procedural_planet_audio(CatalogRecordSelection::All, None, |snapshot| {
+        check_parity(&snapshot, &catalog)
+    })??;
     with_procedural_planet_audio(
         &fixture.archive,
         CatalogRecordSelection::RecordIndex(1),

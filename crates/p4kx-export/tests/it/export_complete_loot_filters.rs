@@ -31,7 +31,7 @@ fn readable_filter_children_past_sixteen_levels_never_become_an_empty_authored_l
         let archive = Archive::open(&path)?;
         export_complete_loot_source::check(&archive, layers)?;
         let options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
-        let built = build_catalog(&archive, &options)?;
+        let built = build_catalog(&archive, options.with_full_provenance())?;
         let catalog: Value = serde_json::from_slice(built.json())?;
         assert_eq!(
             catalog.get("schemaVersion"),

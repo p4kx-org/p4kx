@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::collections::BTreeSet;
 
 use p4kx_export::{Kind, build_catalog};
@@ -94,8 +95,8 @@ fn availability_distinguishes_absent_families_from_healthy_empty_tables() -> Tes
 #[test]
 fn repeated_production_builds_serialize_the_same_prepared_contract() -> TestResult {
     let (_folder, archive) = fixture::open(&fixture::database(), fixture::DcbOrigin::Plain)?;
-    let first = build_catalog(&archive, &fixture::options())?;
-    let second = build_catalog(&archive, &fixture::options())?;
+    let first = build_catalog(&archive, fixture::options().with_full_provenance())?;
+    let second = build_catalog(&archive, fixture::options().with_full_provenance())?;
     assert_eq!(
         first.json(),
         second.json(),
@@ -171,15 +172,12 @@ fn assert_resource_backfill(catalog: &Value) -> TestResult {
 
 #[test]
 fn sdk_commodities_match_the_selected_catalog_rows_and_their_original_sources() -> TestResult {
-    use p4kx_export::catalog_queries::{
-        CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
-    };
+    use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 
     let (_folder, archive) = fixture::open(&fixture::database(), fixture::DcbOrigin::Encrypted)?;
-    let built = build_catalog(&archive, &fixture::options())?;
+    let built = build_catalog(&archive, fixture::options().with_full_provenance())?;
     let catalog = serde_json::from_slice(built.json())?;
-    let session =
-        CatalogQuerySession::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
+    let session = full_proof::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
     let parsed = session.parsed(None)?;
     let alpha = fixture::guid(fixture::ALPHA).parse()?;
     let fallback = fixture::guid(fixture::RESOURCE_FALLBACK).parse()?;

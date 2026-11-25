@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, ArchiveWatch, DataForge, Record};
+use p4kx_extraction::{Archive, ArchiveWatch, DataForge, ProvenanceMode, Record};
 use serde::Serialize;
 
 use crate::catalog_queries::crafting::{
@@ -53,7 +53,8 @@ fn installed_blueprint_reward_sdk_matches_original_target_and_sampled_sources() 
     let archive = open_archive()?;
     let watch = ArchiveWatch::new(&archive);
     let session = CatalogQuerySession::open(&archive, CatalogLanguageSelection::AllAvailable, None)
-        .map_err(|_| "installed reward SDK session open failed")?;
+        .map_err(|_| "installed reward SDK session open failed")?
+        .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session
         .parsed(None)
         .map_err(|_| "installed reward DataForge open failed")?;

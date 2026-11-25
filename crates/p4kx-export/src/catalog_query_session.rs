@@ -3,11 +3,15 @@
 
 use p4kx_extraction::{
     Archive, ArchiveWatch, Build, CancelToken, DataForge, DataForgeEntry, DataForgeLoadError,
-    DataForgeOrigin, Language,
+    DataForgeOrigin, Language, ProvenanceMode,
 };
 
 use crate::CatalogError;
 use crate::texts::CATALOG_LANGUAGES;
+
+#[path = "catalog_query_source.rs"]
+mod source;
+pub(crate) use source::CatalogQuerySource;
 
 /// Selects the localization payloads consulted by a catalog query.
 #[derive(Debug, Clone, Copy)]
@@ -41,6 +45,7 @@ pub struct CatalogQuerySession<'archive> {
     watch: ArchiveWatch,
     entry: QueryEntry<'archive>,
     languages: Vec<Language>,
+    provenance_mode: ProvenanceMode,
 }
 
 /// An opened DataForge view for several selective queries on the same session.
@@ -119,7 +124,21 @@ impl<'archive> CatalogQuerySession<'archive> {
             watch,
             entry,
             languages: languages.canonical_languages(),
+            provenance_mode: ProvenanceMode::MarkersOnly,
         })
+    }
+
+    /// Selects the source detail retained by this session's queries.
+    /// Sessions retain only markers by default.
+    pub const fn with_provenance_mode(mut self, provenance_mode: ProvenanceMode) -> Self {
+        self.provenance_mode = provenance_mode;
+        self
+    }
+
+    /// Returns the source detail retained by this session's queries.
+    #[must_use]
+    pub const fn provenance_mode(&self) -> ProvenanceMode {
+        self.provenance_mode
     }
 
     /// Returns the Build identified when the Archive was opened, when available.
@@ -163,7 +182,7 @@ impl<'archive> CatalogQuerySession<'archive> {
     pub(crate) fn project<T>(
         &self,
         cancel: Option<&CancelToken>,
-        project: impl FnOnce(&Archive, &DataForgeEntry) -> Result<T, CatalogError>,
+        project: impl FnOnce(&Archive, CatalogQuerySource<'_>) -> Result<T, CatalogError>,
     ) -> Result<T, CatalogError> {
         self.project_fallible(cancel, project)
     }
@@ -171,11 +190,12 @@ impl<'archive> CatalogQuerySession<'archive> {
     fn project_fallible<T, E: From<CatalogError>>(
         &self,
         cancel: Option<&CancelToken>,
-        project: impl FnOnce(&Archive, &DataForgeEntry) -> Result<T, E>,
+        project: impl FnOnce(&Archive, CatalogQuerySource<'_>) -> Result<T, E>,
     ) -> Result<T, E> {
         checkpoint(cancel)?;
         self.watch.check().map_err(CatalogError::from)?;
-        let result = project(self.archive, self.entry.get());
+        let source = CatalogQuerySource::new(self.entry.get(), self.provenance_mode);
+        let result = project(self.archive, source);
         self.watch.check().map_err(CatalogError::from)?;
         checkpoint(cancel)?;
         result
@@ -190,7 +210,11 @@ impl ParsedCatalogQueries<'_> {
     pub(crate) fn project<T>(
         &self,
         cancel: Option<&CancelToken>,
-        project: impl FnOnce(&Archive, &DataForgeEntry, &DataForge<'_>) -> Result<T, CatalogError>,
+        project: impl FnOnce(
+            &Archive,
+            CatalogQuerySource<'_>,
+            &DataForge<'_>,
+        ) -> Result<T, CatalogError>,
     ) -> Result<T, CatalogError> {
         self.session.project(cancel, |archive, entry| {
             project(archive, entry, &self.forge)
@@ -200,7 +224,7 @@ impl ParsedCatalogQueries<'_> {
     pub(crate) fn project_fallible<T, E: From<CatalogError>>(
         &self,
         cancel: Option<&CancelToken>,
-        project: impl FnOnce(&Archive, &DataForgeEntry, &DataForge<'_>) -> Result<T, E>,
+        project: impl FnOnce(&Archive, CatalogQuerySource<'_>, &DataForge<'_>) -> Result<T, E>,
     ) -> Result<T, E> {
         self.session.project_fallible(cancel, |archive, entry| {
             project(archive, entry, &self.forge)
@@ -234,3 +258,7 @@ mod tests;
 #[cfg(test)]
 #[path = "installed_sdk_witness.rs"]
 mod installed_sdk_witness;
+
+#[cfg(test)]
+#[path = "catalog_query_marker_tests.rs"]
+mod marker_tests;

@@ -1,17 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{
-    Archive, CancelToken, DataForge, DataForgeEntry, DataForgeError, Language, TreeBuilder,
-};
+use p4kx_extraction::{Archive, CancelToken, DataForge, DataForgeError, Language, TreeBuilder};
 
 use super::{ComponentDefinitionSnapshot, EquipmentDependencyCoverage, EquipmentSnapshot};
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection};
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::component_definition_sources::Definition;
 use crate::record_observation::RecordObservation;
@@ -19,7 +16,7 @@ use crate::texts::{TextSources, Texts};
 
 pub(super) struct Query<'query> {
     pub(super) archive: &'query Archive,
-    pub(super) entry: &'query DataForgeEntry,
+    pub(super) entry: CatalogQuerySource<'query>,
     pub(super) forge: &'query DataForge<'query>,
     pub(super) selection: CatalogRecordSelection,
     pub(super) languages: &'query [Language],
@@ -39,7 +36,7 @@ impl Query<'_> {
         let has_owner = !requested_languages.is_empty() && self.has_owner(F::SOURCE_TYPES)?;
         let selected_languages = if has_owner { requested_languages } else { &[] };
         let sources = TextSources::read_languages(self.archive, selected_languages)?;
-        let origins = CatalogOrigins::new(self.archive, self.entry, &sources)?;
+        let origins = self.entry.with_texts(self.archive, &sources)?;
         let input = OriginalCatalogInput::new(self.forge, &origins);
         let texts = Texts::parse(&sources)?;
         let registry = CatalogTextRegistry::default();

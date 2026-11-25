@@ -80,7 +80,7 @@ fn built() -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
         publication_mode: p4kx_export::CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))
     };
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog = serde_json::from_slice(built.json())?;
     Ok((built, catalog))
 }
@@ -149,7 +149,7 @@ fn a_catalog_without_unreadable_records_is_complete() -> TestResult {
 
     let built = build_catalog(
         &archive,
-        &CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000)),
+        CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000)).with_full_provenance(),
     )?;
 
     assert!(built.summary().is_complete(), "no failure");

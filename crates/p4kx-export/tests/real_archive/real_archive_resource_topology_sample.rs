@@ -262,7 +262,7 @@ fn build(archive: &Archive, entry: &DataForgeEntry, path: &str) -> TestResult<Va
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let built = build_catalog_from(archive, entry, &options)
+    let built = build_catalog_from(archive, entry, options.with_full_provenance())
         .map_err(|_| "build source-selected topology catalog")?;
     let catalog: Value =
         serde_json::from_slice(built.json()).map_err(|_| "read scoped catalog JSON")?;

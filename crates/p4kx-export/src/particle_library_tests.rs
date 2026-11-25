@@ -333,12 +333,12 @@ fn common_catalog_build_serializes_particle_health_and_diagnostic_siblings() -> 
     let (_folder, archive) = synthetic_archive(true)?;
     let normal = CatalogOptions::new(UNIX_EPOCH);
     assert!(matches!(
-        build_catalog(&archive, &normal),
+        build_catalog(&archive, normal.with_full_provenance()),
         Err(CatalogError::IncompleteExport(_))
     ));
     let mut diagnostic = normal;
     diagnostic.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &diagnostic)?;
+    let built = build_catalog(&archive, diagnostic.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let rows = catalog
         .pointer("/definitions/particleLibraries/rows")
@@ -365,7 +365,7 @@ fn common_catalog_build_serializes_particle_health_and_diagnostic_siblings() -> 
     );
     let filter = Filter::new("fixture-old.xml");
     diagnostic.filter = Some(&filter);
-    let filtered = build_catalog(&archive, &diagnostic)?;
+    let filtered = build_catalog(&archive, diagnostic.with_full_provenance())?;
     let filtered: Value = serde_json::from_slice(filtered.json())?;
     assert_eq!(
         filtered

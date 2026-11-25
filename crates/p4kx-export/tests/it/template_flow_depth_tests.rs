@@ -66,7 +66,11 @@ fn complete(branch: Branch, count: usize, tail: Tail) -> TestResult {
     let input = fixture::open(branch, count, tail)?;
     source::check(&input, branch, count, tail)?;
     let options = CatalogOptions::new(UNIX_EPOCH);
-    let built = p4kx_export::build_catalog_from(&input.archive, &input.entry, &options)?;
+    let built = p4kx_export::build_catalog_from(
+        &input.archive,
+        &input.entry,
+        options.with_full_provenance(),
+    )?;
     assert_eq!(
         built.summary().export_health().status,
         ExportHealthStatus::Complete,
@@ -93,7 +97,7 @@ fn writers(
         let (summary, bytes) = p4kx_export::write_catalog_from(
             &input.archive,
             &input.entry,
-            options,
+            options.with_full_provenance(),
             compression,
             || Ok(Vec::new()),
         )?;
@@ -120,13 +124,21 @@ fn unknown(count: usize) -> TestResult {
     let input = fixture::open(Branch::Not, count, Tail::Unknown)?;
     source::check(&input, Branch::Not, count, Tail::Unknown)?;
     let mut options = CatalogOptions::new(UNIX_EPOCH);
-    let result = p4kx_export::build_catalog_from(&input.archive, &input.entry, &options);
+    let result = p4kx_export::build_catalog_from(
+        &input.archive,
+        &input.entry,
+        options.with_full_provenance(),
+    );
     assert!(
         matches!(result, Err(CatalogError::IncompleteExport(_))),
         "unknown structs remain strict Normal refusal"
     );
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = p4kx_export::build_catalog_from(&input.archive, &input.entry, &options)?;
+    let built = p4kx_export::build_catalog_from(
+        &input.archive,
+        &input.entry,
+        options.with_full_provenance(),
+    )?;
     assert_eq!(
         built.summary().export_health().status,
         ExportHealthStatus::Incomplete,
@@ -172,7 +184,7 @@ fn mixed_original_and_or_not_preserve_order_null_and_empty_without_deduplication
     let built = p4kx_export::build_catalog_from(
         &input.archive,
         &input.entry,
-        &CatalogOptions::new(UNIX_EPOCH),
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
     )?;
     assert_eq!(
         built.summary().export_health().status,

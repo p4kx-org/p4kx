@@ -8,7 +8,6 @@ use p4kx_extraction::{Archive, Build, CancelToken, FieldOrigin, Guid, SourceInve
 
 use super::EquipmentDependencyCoverage;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, ParsedCatalogQueries,
@@ -124,7 +123,7 @@ impl ParsedCatalogQueries<'_> {
         cancel: Option<&CancelToken>,
     ) -> Result<PaintCompatibilitySnapshot, CatalogError> {
         self.project(cancel, |archive, entry, forge| {
-            let origins = CatalogOrigins::for_archive_records(archive, entry)?;
+            let origins = entry.records(archive)?;
             let input = OriginalCatalogInput::new(forge, &origins);
             snapshot(archive, &input, selection, cancel)
         })

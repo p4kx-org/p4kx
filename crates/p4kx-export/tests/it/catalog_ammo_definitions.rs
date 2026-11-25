@@ -33,8 +33,9 @@ const NONFINITE_IMPACT_RADIUS: f32 = f32::from_bits(0x7fc0_1234);
 fn ammo_definitions_share_source_with_weapon_routes_and_preserve_unlinked_rows() -> TestResult {
     let source = fixture::database(NONFINITE_IMPACT_RADIUS);
     let (_folder, archive) = common::open(&source, DcbOrigin::Encrypted)?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
     let [bullet, tachyon] = proof::rows(&catalog, &format!("{PATH}/rows"))? else {
         return Err("one selected row for each physical Ammo Record".into());
     };
@@ -71,12 +72,24 @@ fn ammo_definitions_round_trip_through_the_deterministic_catalog_writer() -> Tes
     let source = fixture::database(NONFINITE_IMPACT_RADIUS);
     let (_folder, archive) = common::open(&source, DcbOrigin::Encrypted)?;
     let options = common::options();
-    let (plain_summary, plain) =
-        p4kx_export::write_catalog(&archive, &options, Compression::None, || Ok(Vec::new()))?;
-    let (packed_summary, packed) =
-        p4kx_export::write_catalog(&archive, &options, Compression::ZSTD, || Ok(Vec::new()))?;
-    let (_, repeated) =
-        p4kx_export::write_catalog(&archive, &options, Compression::ZSTD, || Ok(Vec::new()))?;
+    let (plain_summary, plain) = p4kx_export::write_catalog(
+        &archive,
+        options.with_full_provenance(),
+        Compression::None,
+        || Ok(Vec::new()),
+    )?;
+    let (packed_summary, packed) = p4kx_export::write_catalog(
+        &archive,
+        options.with_full_provenance(),
+        Compression::ZSTD,
+        || Ok(Vec::new()),
+    )?;
+    let (_, repeated) = p4kx_export::write_catalog(
+        &archive,
+        options.with_full_provenance(),
+        Compression::ZSTD,
+        || Ok(Vec::new()),
+    )?;
     assert!(
         packed == repeated,
         "repeated catalog writes produce identical Zstd frames"
@@ -123,7 +136,8 @@ fn ammo_definition_rows_distinguish_filtered_dependencies_from_explicit_selectio
         filter: Some(&items),
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let [ammo] = proof::rows(&catalog, &format!("{PATH}/rows"))? else {
         return Err("one exact dependency Ammo Record".into());
     };
@@ -151,7 +165,8 @@ fn ammo_definition_rows_distinguish_filtered_dependencies_from_explicit_selectio
         filter: Some(&ammo),
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let rows = proof::rows(&catalog, &format!("{PATH}/rows"))?;
     assert_eq!(
         rows.len(),

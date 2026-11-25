@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::{
     BlueprintCategoryListSnapshot, CatalogRecordSelection, read_blueprint_category_lists,
     read_blueprint_category_lists_from,
@@ -17,10 +18,10 @@ use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 fn category_list_queries_match_the_catalog_and_close_encrypted_source_uses() -> TestResult {
     let (_folder, archive) = common::open(&fixture::clean(), DcbOrigin::Encrypted)?;
     let entry = DataForgeEntry::read(&archive)?;
-    let full = build_catalog_from(&archive, &entry, &common::options())?;
+    let full = build_catalog_from(&archive, &entry, common::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(full.json())?;
-    let snapshot =
-        read_blueprint_category_lists_from(&archive, &entry, CatalogRecordSelection::All, None)?;
+    let snapshot = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .read_blueprint_category_lists(CatalogRecordSelection::All, None)?;
     let expected = fixture::rows(&catalog)?;
     let projected = snapshot
         .rows
@@ -46,7 +47,8 @@ fn category_list_queries_match_the_catalog_and_close_encrypted_source_uses() -> 
         CatalogRecordSelection::Guid(source_guid),
         CatalogRecordSelection::RecordIndex(position),
     ] {
-        let selected = read_blueprint_category_lists_from(&archive, &entry, selection, None)?;
+        let selected = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+            .read_blueprint_category_lists(selection, None)?;
         assert_eq!(
             selected.rows.len(),
             1,
@@ -159,13 +161,13 @@ fn category_list_queries_are_independent_of_unreadable_localization_payloads() -
     let archive = Archive::open(path)?;
     assert!(
         matches!(
-            build_catalog(&archive, &common::options()),
+            build_catalog(&archive, common::options().with_full_provenance()),
             Err(CatalogError::LoadTexts(_))
         ),
         "the unrelated localization is present and actually unreadable"
     );
-    let selected =
-        read_blueprint_category_lists(&archive, CatalogRecordSelection::RecordIndex(0), None)?;
+    let selected = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?
+        .read_blueprint_category_lists(CatalogRecordSelection::RecordIndex(0), None)?;
     assert_eq!(
         selected.rows.len(),
         1,

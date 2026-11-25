@@ -11,7 +11,6 @@ use p4kx_extraction::{
 use super::read::Query;
 use super::{LoadoutDependencyCoverage, scope};
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::crafting::read_station;
 use crate::catalog_queries::unlocalized_record_query::plan::{crafter_admission, read_owner};
 use crate::catalog_queries::{
@@ -130,7 +129,7 @@ fn selected(
         coverage: mut loadout_coverage,
     } = scope::read_ship(query.forge, ship_record_index, query.cancel)?;
     let admitted = !wanted.is_empty();
-    let origins = CatalogOrigins::for_archive_records(query.archive, query.entry)?;
+    let origins = query.entry.records(query.archive)?;
     let (loadouts, dependencies) = query.resolve(&origins, wanted, &mut loadout_coverage)?;
     let mut crafter_coverage = CatalogRecordCoverage::default();
     let (host_state, rows) = match loadouts.as_slice() {

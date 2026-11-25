@@ -2,14 +2,14 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability,
-    MissionLocationTemplateSnapshot, with_mission_location_templates,
+    CatalogRecordSelection, DatasetAvailability, MissionLocationTemplateSnapshot,
 };
 use p4kx_extraction::SourceValueState;
 use p4kx_testkit::DataForgeBuilder;
 
 use crate::catalog_contracts::location_vocabulary::fixture as classification_fixture;
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
+use crate::sdk_full_proof as full_proof;
 
 #[path = "mission_location_sdk_arena.rs"]
 mod arena;
@@ -79,16 +79,11 @@ fn verify_fixture(
         (DcbOrigin::Unknown, None),
     ] {
         let (_directory, archive) = common::open(database, origin)?;
-        with_mission_location_templates(
-            &archive,
-            CatalogRecordSelection::All,
-            CatalogLanguageSelection::Selected(&[]),
-            None,
-            |snapshot| {
+        full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?
+            .with_mission_location_templates(CatalogRecordSelection::All, None, |snapshot| {
                 verify_snapshot(&snapshot, marker)?;
                 verify(&snapshot)
-            },
-        )??;
+            })??;
     }
     Ok(())
 }

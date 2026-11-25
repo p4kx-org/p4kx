@@ -3,12 +3,12 @@
 
 //! Selective access to original loose terrain definitions.
 
-use p4kx_extraction::{Archive, CancelToken};
+use p4kx_extraction::{Archive, CancelToken, ProvenanceMode};
 
 pub use super::geology_asset_query::{
     GeologyAssetSnapshot, GeologyGeometry, GeologyPlacement, GeologyReferences, GeologySubstrate,
     LooseRecordCandidate, LooseRecordLink, PlanetGeologyAsset, SunShadowMode, read_geology_assets,
-    read_geology_assets_from,
+    read_geology_assets_from, read_geology_assets_with_provenance_mode,
 };
 use super::loose_definitions::{self, LooseDefinitionSnapshot};
 use crate::catalog_query_session::checkpoint;
@@ -57,11 +57,25 @@ pub fn read_ecosystems(
     selection: LooseDefinitionSelection<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<EcosystemSnapshot, CatalogError> {
-    loose_definitions::read(
+    read_ecosystems_with_provenance_mode(archive, selection, ProvenanceMode::MarkersOnly, cancel)
+}
+
+/// Reads ecosystem definitions with the selected source detail.
+///
+/// # Errors
+/// Returns the errors of `read_ecosystems`.
+pub fn read_ecosystems_with_provenance_mode(
+    archive: &Archive,
+    selection: LooseDefinitionSelection<'_>,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<EcosystemSnapshot, CatalogError> {
+    loose_definitions::read_with_provenance_mode(
         archive,
         selection,
         cancel,
         Kind::Ecosystems,
+        provenance_mode,
         |capture, ledger, options| {
             let mut paths = Resolver::new(archive, capture, cancel);
             ecosystem::read_selected(archive, capture, ledger, options, &mut paths, selection)
@@ -79,11 +93,30 @@ pub fn read_shading_classes(
     selection: LooseDefinitionSelection<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<ShadingClassSnapshot, CatalogError> {
-    loose_definitions::read(
+    read_shading_classes_with_provenance_mode(
+        archive,
+        selection,
+        ProvenanceMode::MarkersOnly,
+        cancel,
+    )
+}
+
+/// Reads terrain shading classes with the selected source detail.
+///
+/// # Errors
+/// Returns the errors of `read_shading_classes`.
+pub fn read_shading_classes_with_provenance_mode(
+    archive: &Archive,
+    selection: LooseDefinitionSelection<'_>,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<ShadingClassSnapshot, CatalogError> {
+    loose_definitions::read_with_provenance_mode(
         archive,
         selection,
         cancel,
         Kind::ShadingClasses,
+        provenance_mode,
         |capture, ledger, options| {
             let mut paths = Resolver::new(archive, capture, cancel);
             shading_class::read_selected(archive, capture, ledger, options, &mut paths, selection)
@@ -101,11 +134,25 @@ pub fn read_geology_sets(
     selection: LooseDefinitionSelection<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<GeologySetSnapshot, CatalogError> {
-    loose_definitions::read(
+    read_geology_sets_with_provenance_mode(archive, selection, ProvenanceMode::MarkersOnly, cancel)
+}
+
+/// Reads geology sets with the selected source detail.
+///
+/// # Errors
+/// Returns the errors of `read_geology_sets`.
+pub fn read_geology_sets_with_provenance_mode(
+    archive: &Archive,
+    selection: LooseDefinitionSelection<'_>,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<GeologySetSnapshot, CatalogError> {
+    loose_definitions::read_with_provenance_mode(
         archive,
         selection,
         cancel,
         Kind::GeologySets,
+        provenance_mode,
         |capture, ledger, options| {
             let mut table =
                 geology_set::read_selected(archive, capture, ledger, options, selection)?;
@@ -140,11 +187,30 @@ pub fn read_geology_texture_sets(
     selection: LooseDefinitionSelection<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<GeologyTextureSetSnapshot, CatalogError> {
-    loose_definitions::read(
+    read_geology_texture_sets_with_provenance_mode(
+        archive,
+        selection,
+        ProvenanceMode::MarkersOnly,
+        cancel,
+    )
+}
+
+/// Reads geology texture sets with the selected source detail.
+///
+/// # Errors
+/// Returns the errors of `read_geology_texture_sets`.
+pub fn read_geology_texture_sets_with_provenance_mode(
+    archive: &Archive,
+    selection: LooseDefinitionSelection<'_>,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<GeologyTextureSetSnapshot, CatalogError> {
+    loose_definitions::read_with_provenance_mode(
         archive,
         selection,
         cancel,
         Kind::GeologyTextureSets,
+        provenance_mode,
         |capture, ledger, options| {
             let mut paths = Resolver::new(archive, capture, cancel);
             geology_texture_set::read_selected(

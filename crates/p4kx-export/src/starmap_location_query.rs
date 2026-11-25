@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, Build, CancelToken, SourceInventory};
+use p4kx_extraction::{Archive, Build, CancelToken, ProvenanceMode, SourceInventory};
 
 use super::{ContainerPlacementCoverage, ContainerPlacementSelection, SelectedPlacementRead};
 use crate::starmap_walk::PlacementTable;
@@ -47,6 +47,26 @@ pub fn read_location_instances(
     budget: StarmapTraversalBudget,
     cancel: Option<&CancelToken>,
 ) -> Result<LocationPlacementSnapshot, CatalogError> {
+    read_location_instances_with_provenance_mode(
+        archive,
+        selection,
+        budget,
+        ProvenanceMode::MarkersOnly,
+        cancel,
+    )
+}
+
+/// Reads location instances with the selected source detail.
+///
+/// # Errors
+/// Returns the errors of `read_location_instances`.
+pub fn read_location_instances_with_provenance_mode(
+    archive: &Archive,
+    selection: ContainerPlacementSelection<'_>,
+    budget: StarmapTraversalBudget,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<LocationPlacementSnapshot, CatalogError> {
     let SelectedPlacementRead {
         root_entry_index,
         rows,
@@ -56,6 +76,7 @@ pub fn read_location_instances(
         archive,
         selection,
         budget,
+        provenance_mode,
         cancel,
         PlacementTable::Locations,
     )?;

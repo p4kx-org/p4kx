@@ -3,13 +3,14 @@
 
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::catalog_queries::creatures::{PlanetCreature, read_creatures};
+use p4kx_export::catalog_queries::LooseDefinitionSnapshot;
+use p4kx_export::catalog_queries::creatures::{
+    PlanetCreature, read_creatures, read_creatures_with_provenance_mode,
+};
 use p4kx_export::catalog_queries::terrain::{
     CatalogJsonNumber, LooseArchivePathState, LooseDefinitionSelection as Selection,
     LooseRecordLink, PlanetGeologyAsset, SunShadowMode, read_geology_assets,
-};
-use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, LooseDefinitionSnapshot,
+    read_geology_assets_with_provenance_mode,
 };
 use p4kx_export::{CatalogError, CatalogOptions, build_catalog};
 use p4kx_extraction::{Archive, DataForgeEntry};
@@ -17,6 +18,8 @@ use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntity, TestEntry, enti
 use schemars::JsonSchema;
 use serde::Serialize;
 use serde_json::{Value, json};
+
+use crate::sdk_full_proof as full_proof;
 
 use super::{Route, TestResult};
 
@@ -40,10 +43,23 @@ const RAW: &str = r#"{"coordinates":[1.00,null]}"#;
 
 pub(super) fn read() -> TestResult<[Route; 2]> {
     let (_folder, archive) = open(normal_entries())?;
-    let full = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;
+    let full = build_catalog(
+        &archive,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
     let full: Value = serde_json::from_slice(full.json())?;
-    let geology = read_geology_assets(&archive, Selection::ArchivePath(GEO), None)?;
-    let creature = read_creatures(&archive, Selection::Guid(FAUNA_GUID.parse()?), None)?;
+    let geology = read_geology_assets_with_provenance_mode(
+        &archive,
+        Selection::ArchivePath(GEO),
+        full_proof::MODE,
+        None,
+    )?;
+    let creature = read_creatures_with_provenance_mode(
+        &archive,
+        Selection::Guid(FAUNA_GUID.parse()?),
+        full_proof::MODE,
+        None,
+    )?;
     let [asset] = geology.rows.as_slice() else {
         return Err("one original geology asset".into());
     };
@@ -54,12 +70,7 @@ pub(super) fn read() -> TestResult<[Route; 2]> {
     verify_creature(fauna)?;
 
     let entry = DataForgeEntry::read_until(&archive, &|| false)?;
-    let session = CatalogQuerySession::from_entry(
-        &archive,
-        &entry,
-        CatalogLanguageSelection::Selected(&[]),
-        None,
-    )?;
+    let session = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?;
     let parsed = session.parsed(None)?;
     let all_geology = parsed.read_geology_assets(Selection::All, None)?;
     let all_creatures = parsed.read_creatures(Selection::All, None)?;

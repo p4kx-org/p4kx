@@ -9,7 +9,9 @@ use crate::cataloging;
 use std::fs;
 use std::io::Read;
 
-use cataloging::{TestResult, building, ended, files_in, makers, many, opened, wait_until};
+use cataloging::{
+    TestResult, building, ended, files_in, makers, many, opened, start_full_catalog, wait_until,
+};
 use p4kx_export::{Kind, Language as TextLanguage, SizeWarning};
 use p4kx_gui::{Browser, CATALOG_FILE, CatalogExportStatus, Model};
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
@@ -55,7 +57,7 @@ fn the_catalog_is_written_and_summarised() -> TestResult {
     let (_dir, mut model, out) = opened(&makers())?;
     let file = out.join("p4kx-catalog.json");
 
-    assert!(model.start_catalog(file.clone(), || {}), "started");
+    assert!(start_full_catalog(&mut model, file.clone()), "started");
     let CatalogExportStatus::Finished(outcome) = ended(&mut model)? else {
         return Err("no summary".into());
     };
@@ -303,7 +305,11 @@ fn a_zst_file_name_writes_the_catalog_as_a_zstd_frame() -> TestResult {
     zstd::Decoder::new(frame.as_slice())?.read_to_end(&mut decoded)?;
     let without_time = |bytes: &[u8]| -> Result<serde_json::Value, Box<dyn std::error::Error>> {
         let mut json: serde_json::Value = serde_json::from_slice(bytes)?;
-        let source = json["source"].as_object_mut().ok_or("no source")?;
+        assert_eq!(json["format"], "p4kx-catalog-markers");
+        let source = json
+            .pointer_mut("/catalog/source")
+            .and_then(serde_json::Value::as_object_mut)
+            .ok_or("no source")?;
         source.remove("exportedAt").ok_or("no export time")?;
         Ok(json)
     };
@@ -354,7 +360,7 @@ fn the_suggested_catalog_file_is_the_compressed_one() {
 fn an_independent_resource_has_its_own_written_kind_and_source_health() -> TestResult {
     let (_dir, mut model, out) = opened(&cataloging::resources())?;
     let file = out.join("resources.json");
-    model.start_catalog(file.clone(), || {});
+    start_full_catalog(&mut model, file.clone());
     let CatalogExportStatus::Finished(outcome) = ended(&mut model)? else {
         return Err("the resource catalog did not finish".into());
     };

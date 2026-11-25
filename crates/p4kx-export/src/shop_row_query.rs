@@ -1,13 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, ArchiveWatch, Build, CancelToken, SourceInventory};
+use p4kx_extraction::{Archive, Build, CancelToken, SourceInventory};
 
 use super::shop_list::PreparedShop;
 use crate::catalog_queries::starmap_name_owners::NameInput;
 use crate::catalog_queries::{CatalogQuerySession, CatalogRecordCoverage, ParsedCatalogQueries};
 use crate::catalog_query_session::checkpoint;
-use crate::catalog_read::original::with_entry_capture;
+use p4kx_extraction::ProvenanceMode;
+
+use crate::catalog_read::original::with_entry_capture_mode;
 use crate::catalog_table::DatasetAvailability;
 use crate::contract::Shop;
 use crate::export_entry_counts::ExportEntryCounts;
@@ -113,44 +115,12 @@ pub struct ShopRowsSnapshot {
     pub name_surveys: usize,
 }
 
-/// Reads one physical shop using the normal catalog's registry, compatibility inventory and name joins.
-/// A selected row without a registry location needs no DataForge or system traversal.
-///
-/// # Errors
-/// Returns source-accounting, original input, cancellation or Archive change errors.
-pub fn read_shop(
-    archive: &Archive,
-    selection: ShopRegistrySelection,
-    budget: StarmapTraversalBudget,
-    cancel: Option<&CancelToken>,
-) -> Result<ShopRowSnapshot, CatalogError> {
-    checkpoint(cancel)?;
-    let watch = ArchiveWatch::new(archive);
-    watch.check()?;
-    let snapshot = project(archive, selection, budget, NameInput::Standalone, cancel)?;
-    watch.check()?;
-    checkpoint(cancel)?;
-    Ok(snapshot)
-}
+#[path = "shop_row_standalone.rs"]
+mod standalone;
 
-/// Reads physical Shops in request order using a shared original name and placement survey.
-///
-/// # Errors
-/// Returns source-accounting, original input, cancellation or Archive change errors.
-pub fn read_shops(
-    archive: &Archive,
-    selections: &[ShopRegistrySelection],
-    budget: StarmapTraversalBudget,
-    cancel: Option<&CancelToken>,
-) -> Result<ShopRowsSnapshot, CatalogError> {
-    checkpoint(cancel)?;
-    let watch = ArchiveWatch::new(archive);
-    watch.check()?;
-    let snapshot = project_rows(archive, selections, budget, NameInput::Standalone, cancel)?;
-    watch.check()?;
-    checkpoint(cancel)?;
-    Ok(snapshot)
-}
+pub use standalone::{
+    read_shop, read_shop_with_provenance_mode, read_shops, read_shops_with_provenance_mode,
+};
 
 impl CatalogQuerySession<'_> {
     /// Reads physical Shops in request order with at most one location survey.
@@ -168,7 +138,8 @@ impl CatalogQuerySession<'_> {
                 archive,
                 selections,
                 budget,
-                NameInput::Decoded(entry),
+                NameInput::Decoded(entry.entry()),
+                entry.provenance_mode(),
                 cancel,
             )
         })
@@ -189,7 +160,8 @@ impl CatalogQuerySession<'_> {
                 archive,
                 selection,
                 budget,
-                NameInput::Decoded(entry),
+                NameInput::Decoded(entry.entry()),
+                entry.provenance_mode(),
                 cancel,
             )
         })
@@ -212,7 +184,8 @@ impl ParsedCatalogQueries<'_> {
                 archive,
                 selections,
                 budget,
-                NameInput::Parsed(entry, forge),
+                NameInput::Parsed(entry.entry(), forge),
+                entry.provenance_mode(),
                 cancel,
             )
         })
@@ -233,7 +206,8 @@ impl ParsedCatalogQueries<'_> {
                 archive,
                 selection,
                 budget,
-                NameInput::Parsed(entry, forge),
+                NameInput::Parsed(entry.entry(), forge),
+                entry.provenance_mode(),
                 cancel,
             )
         })
@@ -245,12 +219,17 @@ fn project(
     selection: ShopRegistrySelection,
     budget: StarmapTraversalBudget,
     names_input: NameInput<'_, '_>,
+    provenance_mode: ProvenanceMode,
     cancel: Option<&CancelToken>,
 ) -> Result<ShopRowSnapshot, CatalogError> {
-    let (selected, source_inventory) =
-        in_capture(archive, budget, names_input, cancel, |lookup| {
-            read_selected(archive, selection, lookup, cancel)
-        })?;
+    let (selected, source_inventory) = in_capture(
+        archive,
+        budget,
+        names_input,
+        provenance_mode,
+        cancel,
+        |lookup| read_selected(archive, selection, lookup, cancel),
+    )?;
     Ok(ShopRowSnapshot {
         build: archive.build().cloned(),
         selection: selected.selection,
@@ -266,10 +245,16 @@ fn project_rows(
     selections: &[ShopRegistrySelection],
     budget: StarmapTraversalBudget,
     names_input: NameInput<'_, '_>,
+    provenance_mode: ProvenanceMode,
     cancel: Option<&CancelToken>,
 ) -> Result<ShopRowsSnapshot, CatalogError> {
-    let ((rows, name_surveys), source_inventory) =
-        in_capture(archive, budget, names_input, cancel, |lookup| {
+    let ((rows, name_surveys), source_inventory) = in_capture(
+        archive,
+        budget,
+        names_input,
+        provenance_mode,
+        cancel,
+        |lookup| {
             let mut rows = Vec::new();
             rows.try_reserve_exact(selections.len())
                 .map_err(CatalogError::SourceUseAllocation)?;
@@ -277,7 +262,8 @@ fn project_rows(
                 rows.push(read_selected(archive, selection, lookup, cancel)?);
             }
             Ok((rows, lookup.surveys()))
-        })?;
+        },
+    )?;
     Ok(ShopRowsSnapshot {
         build: archive.build().cloned(),
         rows,
@@ -290,10 +276,11 @@ fn in_capture<'query, 'data, T>(
     archive: &'query Archive,
     budget: StarmapTraversalBudget,
     names_input: NameInput<'query, 'data>,
+    provenance_mode: ProvenanceMode,
     cancel: Option<&'query CancelToken>,
     project: impl FnOnce(&mut placement::Lookup<'query, '_, 'data>) -> Result<T, CatalogError>,
 ) -> Result<(T, SourceInventory), CatalogError> {
-    with_entry_capture(archive, |capture| {
+    with_entry_capture_mode(archive, provenance_mode, |capture| {
         let mut lookup = placement::Lookup::new(archive, capture, budget, names_input, cancel);
         let result = project(&mut lookup)?;
         drop(lookup);

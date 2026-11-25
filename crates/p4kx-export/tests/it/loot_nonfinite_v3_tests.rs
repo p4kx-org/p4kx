@@ -13,7 +13,10 @@ fn finite_loot_numbers_have_a_valid_plain_and_compressed_source_control() -> Che
     for encoding in [Encoding::Stored, Encoding::Zstd] {
         let input = fixture::archive(encoding, Case::Finite)?;
         fixture::check_source(&input.archive, Case::Finite)?;
-        let built = p4kx_export::build_catalog(&input.archive, &CatalogOptions::new(UNIX_EPOCH))?;
+        let built = p4kx_export::build_catalog(
+            &input.archive,
+            CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+        )?;
         assert_eq!(
             built.summary().export_health().status,
             ExportHealthStatus::Complete,
@@ -36,7 +39,10 @@ fn compressed_loot_nonfinite_occurrences_have_exact_emitted_coverage() -> Checke
 fn check_complete(encoding: Encoding) -> Checked {
     let input = fixture::archive(encoding, Case::Nonfinite)?;
     fixture::check_source(&input.archive, Case::Nonfinite)?;
-    let built = p4kx_export::build_catalog(&input.archive, &CatalogOptions::new(UNIX_EPOCH))?;
+    let built = p4kx_export::build_catalog(
+        &input.archive,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
     assert_eq!(
         built.summary().export_health().status,
         ExportHealthStatus::Complete,
@@ -60,14 +66,17 @@ fn exact_numeric_coverage_does_not_waive_an_independent_unreadable_token() -> Ch
     fixture::check_source(&input.archive, Case::Unreadable)?;
     assert!(
         matches!(
-            p4kx_export::build_catalog(&input.archive, &CatalogOptions::new(UNIX_EPOCH)),
+            p4kx_export::build_catalog(
+                &input.archive,
+                CatalogOptions::new(UNIX_EPOCH).with_full_provenance()
+            ),
             Err(CatalogError::IncompleteExport(_))
         ),
         "numeric receipts do not prove an unreadable Bool"
     );
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = p4kx_export::build_catalog(&input.archive, &options)?;
+    let built = p4kx_export::build_catalog(&input.archive, options.with_full_provenance())?;
     assert_eq!(
         built.summary().export_health().status,
         ExportHealthStatus::Incomplete,

@@ -162,6 +162,7 @@ fn export() -> TestResult<Value> {
         common::open(&fixture::extend(super::database()), DcbOrigin::Encrypted)?;
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options).map_err(|error| error.to_string())?;
+    let built = build_catalog(&archive, options.with_full_provenance())
+        .map_err(|error| error.to_string())?;
     Ok(serde_json::from_slice(built.json())?)
 }

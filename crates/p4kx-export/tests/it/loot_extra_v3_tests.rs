@@ -15,7 +15,7 @@ use crate::loot_extra_v3_source as source;
 fn loot_v3_retains_every_extra_root_nested_and_array_fact() -> Checked {
     let input = fixture::archive(Case::Readable)?;
     let original = source::check(&input.archive, Case::Readable)?;
-    let built = p4kx_export::build_catalog(&input.archive, &options())?;
+    let built = p4kx_export::build_catalog(&input.archive, options().with_full_provenance())?;
     assert_eq!(
         built
             .summary()
@@ -48,7 +48,7 @@ fn loot_v3_retains_every_extra_root_nested_and_array_fact() -> Checked {
 fn loot_v3_preserves_null_and_error_occurrences_between_readable_slots() -> Checked {
     let input = fixture::archive(Case::Holes)?;
     let original = source::check(&input.archive, Case::Holes)?;
-    let built = p4kx_export::build_catalog(&input.archive, &options())?;
+    let built = p4kx_export::build_catalog(&input.archive, options().with_full_provenance())?;
     assert_eq!(
         built
             .summary()

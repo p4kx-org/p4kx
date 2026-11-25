@@ -34,7 +34,10 @@ fn guid(value: &Value) -> Result<Guid, Box<dyn Error>> {
 fn the_groups_read_without_a_catalog_are_the_variant_of_of_the_catalog() -> TestResult {
     let archive =
         Archive::open_with_key(real_archive_path()?, p4kx_testkit::real_archive_key().ok())?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;

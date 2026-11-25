@@ -65,7 +65,7 @@ fn verify_record(archive: &Archive, entry: &DataForgeEntry, tree: &RecordTree<'_
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let built = build_catalog_from(archive, entry, &options)
+    let built = build_catalog_from(archive, entry, options.with_full_provenance())
         .map_err(|_| "build selected planet audio catalog")?;
     let catalog: Json = serde_json::from_slice(built.json())?;
     verify_build(archive, &catalog)?;

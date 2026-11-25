@@ -24,7 +24,7 @@ fn durability_exports_original_flags_resistance_and_distortion_values() -> TestR
         ],
     ));
     let (_folder, archive) = common::open(&source, DcbOrigin::Encrypted)?;
-    let built = build_catalog(&archive, &common::options())?;
+    let built = build_catalog(&archive, common::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     assert_eq!(
         proof::at(&catalog, "/exportHealth/status")?,
@@ -116,7 +116,7 @@ fn durability_reports_unsupported_accumulator_without_collapsing_order() -> Test
     let (_folder, archive) = common::open(&source, DcbOrigin::Plain)?;
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let row = proof::at(&catalog, "/configurations/degradation/rows/0")?;
     let slots = proof::rows(row, "/accumulators/value")?;
@@ -149,7 +149,7 @@ fn durability_reports_unsupported_accumulator_without_collapsing_order() -> Test
     );
     assert!(
         matches!(
-            build_catalog(&archive, &common::options()),
+            build_catalog(&archive, common::options().with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "normal publication refuses an unsupported authored accumulator"

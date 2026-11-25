@@ -4,12 +4,10 @@
 use p4kx_export::build_catalog;
 use p4kx_export::catalog_queries::equipment::EquipmentSnapshot;
 use p4kx_export::catalog_queries::equipment::durability::{
-    DegradationSnapshot, DistortionSnapshot, DurabilitySnapshot, with_degradation_from,
-    with_distortion_from,
+    DegradationSnapshot, DistortionSnapshot, DurabilitySnapshot,
 };
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    ResourceFloat32,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability, ResourceFloat32,
 };
 use p4kx_extraction::DataForgeEntry;
 use serde::Serialize;
@@ -17,6 +15,7 @@ use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 #[path = "../catalog_schema/sdk_item_durability_fixture.rs"]
 mod fixture;
@@ -25,10 +24,10 @@ mod fixture;
 fn item_durability_queries_match_staged_and_resident_producer_rows() -> TestResult {
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&fixture::database(), origin)?;
-        let produced = build_catalog(&archive, &common::options())?;
+        let produced = build_catalog(&archive, common::options().with_full_provenance())?;
         let catalog: Value = serde_json::from_slice(produced.json())?;
         let entry = DataForgeEntry::read(&archive)?;
-        let session = CatalogQuerySession::from_entry(
+        let session = full_proof::from_entry(
             &archive,
             &entry,
             CatalogLanguageSelection::AllAvailable,
@@ -39,20 +38,12 @@ fn item_durability_queries_match_staged_and_resident_producer_rows() -> TestResu
         parsed.with_durability(CatalogRecordSelection::Guid(guid), None, |snapshot| {
             check_health(&snapshot, &catalog, encrypted)
         })??;
-        with_degradation_from(
-            &archive,
-            &entry,
-            CatalogRecordSelection::RecordIndex(0),
-            None,
-            |snapshot| check_degradation(&snapshot, &catalog),
-        )??;
-        with_distortion_from(
-            &archive,
-            &entry,
-            CatalogRecordSelection::RecordIndex(1),
-            None,
-            |snapshot| check_distortion(&snapshot, &catalog),
-        )??;
+        session.with_degradation(CatalogRecordSelection::RecordIndex(0), None, |snapshot| {
+            check_degradation(&snapshot, &catalog)
+        })??;
+        session.with_distortion(CatalogRecordSelection::RecordIndex(1), None, |snapshot| {
+            check_distortion(&snapshot, &catalog)
+        })??;
         parsed.with_distortion(CatalogRecordSelection::RecordIndex(0), None, |snapshot| {
             assert!(
                 snapshot.rows().is_empty(),

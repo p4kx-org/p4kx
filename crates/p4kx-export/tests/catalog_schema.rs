@@ -26,6 +26,8 @@ mod legacy_v2_inventory;
 mod legacy_v2_inventory_tests;
 #[path = "catalog_schema/legacy_v2_migration.rs"]
 mod legacy_v2_migration;
+#[path = "catalog_schema/marker_profile.rs"]
+mod marker_profile;
 #[path = "catalog_schema/mission_values.rs"]
 mod mission_values;
 #[path = "catalog_schema/quality_contract.rs"]
@@ -36,6 +38,8 @@ mod resource_groups;
 mod revision;
 #[path = "catalog_schema/schema_navigation.rs"]
 mod schema_navigation;
+#[path = "catalog_schema/sdk_full_proof.rs"]
+mod sdk_full_proof;
 
 use std::error::Error;
 use std::path::PathBuf;

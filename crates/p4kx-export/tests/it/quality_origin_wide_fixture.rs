@@ -36,7 +36,7 @@ pub(super) fn observed(
     let mut options = common::options();
     options.filter = filter;
     options.publication_mode = CatalogPublicationMode::Normal;
-    let built = p4kx_export::build_catalog_from(&archive, &entry, &options)?;
+    let built = p4kx_export::build_catalog_from(&archive, &entry, options.with_full_provenance())?;
     assert!(
         built.summary().is_complete(),
         "every fixture source is readable"

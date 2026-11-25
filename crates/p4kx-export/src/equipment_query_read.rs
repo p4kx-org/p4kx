@@ -13,12 +13,11 @@ use crate::CatalogError;
 use crate::Kind;
 use crate::build::catalog_queries::unlocalized_record_query::plan::{Owner, Plan};
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
 };
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::catalog_v3::catalog_item_alignment::AlignmentOptions;
 use crate::entity_selection::{self, Selected};
 use crate::guid_text::CatalogGuid;
@@ -54,7 +53,7 @@ pub(super) fn with_archive<P: Projector, T>(
 
 pub(super) fn with_parsed<P: Projector, T>(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     selection: CatalogRecordSelection,
     languages: &[Language],
@@ -74,7 +73,7 @@ pub(super) fn with_parsed<P: Projector, T>(
 
 pub(super) struct Query<'query> {
     pub(super) archive: &'query Archive,
-    pub(super) entry: &'query DataForgeEntry,
+    pub(super) entry: CatalogQuerySource<'query>,
     pub(super) forge: &'query DataForge<'query>,
     pub(super) selection: CatalogRecordSelection,
     pub(super) languages: &'query [Language],
@@ -106,7 +105,7 @@ impl<'query> Query<'query> {
         let item_projection = matches!(P::FAMILY, Family::Items | Family::ItemSources);
         let sources = self.text_sources(P::FAMILY, !plan.owners.is_empty(), selected_languages)?;
         checkpoint(self.cancel)?;
-        let origins = CatalogOrigins::new(self.archive, self.entry, &sources)?;
+        let origins = self.entry.with_texts(self.archive, &sources)?;
         let input = OriginalCatalogInput::new(self.forge, &origins);
         let texts = Texts::parse(&sources)?;
         let registry = CatalogTextRegistry::default();

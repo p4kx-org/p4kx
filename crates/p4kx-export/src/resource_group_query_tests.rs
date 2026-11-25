@@ -5,7 +5,8 @@ use std::ops::ControlFlow;
 use std::sync::{Arc, Mutex};
 
 use p4kx_extraction::{
-    Archive, CanonicalReadObserver, DataForgeEntry, DataForgeError, Language, Record, RecordTree,
+    Archive, CanonicalReadObserver, DataForgeEntry, DataForgeError, Language, ProvenanceMode,
+    Record, RecordTree,
 };
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
@@ -13,6 +14,7 @@ use super::parents::Observers;
 use super::request::Query;
 use super::snapshot::{ResourceGroupParentSnapshot, ResourceGroupSnapshot};
 use crate::catalog_queries::CatalogRecordSelection;
+use crate::catalog_query_session::CatalogQuerySource;
 
 #[path = "resource_group_query_trace_fixture.rs"]
 mod fixture;
@@ -97,7 +99,7 @@ fn observe(
     let capture = Arc::new(Capture::default());
     let query = Query {
         archive: &archive,
-        entry: &entry,
+        entry: CatalogQuerySource::new(&entry, ProvenanceMode::Full),
         forge: &forge,
         selection,
         languages: if matches!(projection, Projection::Parents) {

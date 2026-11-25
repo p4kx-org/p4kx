@@ -4,20 +4,19 @@
 use std::io::{self, Write};
 use std::path::Path;
 use std::process::ExitCode;
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use anyhow::{Context, Result};
 use p4kx_export::{
     CatalogError, CatalogFailures, CatalogFile, CatalogOptions, CatalogPublicationMode,
     CatalogStage, CatalogSummary, Compression, CraftingWarning, ExportDiagnosticSeverity,
-    ExportHealth, Filter, Kind, StarmapTraversalBudget, catalog_schema,
+    ExportHealth, Filter, Kind, StarmapTraversalBudget, catalog_marker_schema, catalog_schema,
     write_catalog_file_with_phases,
 };
-use p4kx_extraction::Archive;
+use p4kx_extraction::{Archive, ProvenanceMode};
 
 use super::catalog_json::summary_json;
 use super::catalog_size::warn_about_size;
-use crate::catalog_input::{InvalidExportTime, MissingCatalogArgs, compression};
+use crate::catalog_input::{MissingCatalogArgs, compression, export_time};
 use crate::cli::{CatalogArgs, CatalogCommand};
 use crate::exit;
 use crate::extract::cancel_on_interrupt;
@@ -31,20 +30,16 @@ mod refusal_progress;
 /// Writes a publishable catalog or an explicitly requested diagnostic catalog and prints its summary.
 /// Returns exit code 1 for incomplete diagnostic output; normal incomplete output is refused.
 pub(crate) fn run(args: &CatalogArgs, as_json: bool) -> Result<ExitCode> {
+    let provenance_mode = args.provenance.into();
     if matches!(args.command, Some(CatalogCommand::Schema)) {
-        print_schema()?;
+        print_schema(provenance_mode)?;
         return Ok(ExitCode::from(exit::SUCCESS));
     }
     let (Some(archive), Some(out)) = (&args.archive, &args.out) else {
         return Err(MissingCatalogArgs.into());
     };
     let compression = compression(out, args.zstd_level)?;
-    let exported_at = match args.exported_at {
-        None => SystemTime::now(),
-        Some(seconds) => UNIX_EPOCH
-            .checked_add(Duration::from_secs(seconds))
-            .ok_or_else(|| InvalidExportTime::of(seconds))?,
-    };
+    let exported_at = export_time(args.exported_at)?;
     let archive = crate::key::open(archive)?;
     let filter = args.filter.as_deref().map(Filter::parse).transpose()?;
     let cancel = cancel_on_interrupt()?;
@@ -74,7 +69,14 @@ pub(crate) fn run(args: &CatalogArgs, as_json: bool) -> Result<ExitCode> {
             let _ignored = writeln!(io::stderr().lock(), "catalog phase: {}", stage.as_str());
         }
     };
-    let written = write_file(&archive, &options, out, compression, &phase);
+    let written = write_file(
+        &archive,
+        &options,
+        out,
+        compression,
+        provenance_mode,
+        &phase,
+    );
     if !args.progress_phases {
         line.finish();
     }
@@ -82,7 +84,7 @@ pub(crate) fn run(args: &CatalogArgs, as_json: bool) -> Result<ExitCode> {
         report_outcome(&written);
     }
     let summary = &written?;
-    print_result(&archive, out, summary, as_json)?;
+    print_result(&archive, out, summary, as_json, provenance_mode)?;
     Ok(ExitCode::from(if summary.is_complete() {
         exit::SUCCESS
     } else {
@@ -142,6 +144,7 @@ fn print_result(
     out: &Path,
     summary: &CatalogSummary,
     as_json: bool,
+    provenance_mode: ProvenanceMode,
 ) -> Result<()> {
     if summary.export_health().publication_mode == CatalogPublicationMode::DiagnosticPartial {
         writeln!(
@@ -154,7 +157,7 @@ fn print_result(
     print_warnings(summary.warnings())?;
     warn_about_size(summary)?;
     let printed = if as_json {
-        json::print(&summary_json(archive, out, summary))
+        json::print(&summary_json(archive, out, summary, provenance_mode))
     } else {
         crate::catalog_summary::print(summary, out)
     };
@@ -172,14 +175,19 @@ fn write_file(
     options: &CatalogOptions<'_>,
     out: &Path,
     compression: Compression,
+    provenance_mode: ProvenanceMode,
     phase: &dyn Fn(CatalogStage),
 ) -> Result<CatalogSummary> {
     let uncancelled = p4kx_extraction::CancelToken::new();
     let cancel = options.cancel.unwrap_or(&uncancelled);
     let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
-    let written = write_catalog_file_with_phases(archive, options, compression, phase, || {
-        CatalogFile::create_protected(out, &protection, cancel)
-    });
+    let written = write_catalog_file_with_phases(
+        archive,
+        options.with_provenance_mode(provenance_mode),
+        compression,
+        phase,
+        || CatalogFile::create_protected(out, &protection, cancel),
+    );
     let (summary, file) = written.map_err(into_anyhow)?;
     file.commit()
         .with_context(|| format!("cannot write {}", out.display()))?;
@@ -208,8 +216,13 @@ fn print_warnings(warnings: &[CraftingWarning]) -> io::Result<()> {
     Ok(())
 }
 
-fn print_schema() -> Result<()> {
-    let mut text = serde_json::to_string_pretty(&catalog_schema())?;
+fn print_schema(provenance_mode: ProvenanceMode) -> Result<()> {
+    let schema = if provenance_mode == ProvenanceMode::MarkersOnly {
+        catalog_marker_schema()
+    } else {
+        catalog_schema()
+    };
+    let mut text = serde_json::to_string_pretty(&schema)?;
     text.push('\n');
     io::stdout().lock().write_all(text.as_bytes())?;
     Ok(())

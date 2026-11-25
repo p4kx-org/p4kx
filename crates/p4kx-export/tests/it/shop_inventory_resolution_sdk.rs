@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::shops::{
     InventoryCandidate, ResolutionStatus, ShopInventoryResolutionSnapshot, ShopResolutionSelection,
-    read_shop_inventory_resolutions,
+    read_shop_inventory_resolutions, read_shop_inventory_resolutions_with_provenance_mode,
 };
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog};
 use p4kx_extraction::Archive;
@@ -22,7 +23,7 @@ fn scoped_rows_match_canonical_shop_outcomes_and_field_origins() -> TestResult {
     let (_folder, archive) = super::archive()?;
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     assert_eq!(
         built.summary().shops().duplicate,
         1,
@@ -38,7 +39,12 @@ fn scoped_rows_match_canonical_shop_outcomes_and_field_origins() -> TestResult {
         "XML admission keeps the first valid row"
     );
     let table = health::at(&catalog, TABLE)?;
-    let snapshot = read_shop_inventory_resolutions(&archive, ShopResolutionSelection::All, None)?;
+    let snapshot = read_shop_inventory_resolutions_with_provenance_mode(
+        &archive,
+        ShopResolutionSelection::All,
+        full_proof::MODE,
+        None,
+    )?;
     let scoped = scoped_json(&snapshot);
     health::closure(&scoped)?;
     assert_eq!(
@@ -179,8 +185,12 @@ pub(super) fn assert_physical_duplicate_scope(
     canonical: &Value,
     key: &str,
 ) -> TestResult {
-    let snapshot =
-        read_shop_inventory_resolutions(archive, ShopResolutionSelection::Key(key), None)?;
+    let snapshot = read_shop_inventory_resolutions_with_provenance_mode(
+        archive,
+        ShopResolutionSelection::Key(key),
+        full_proof::MODE,
+        None,
+    )?;
     let [row] = snapshot.rows.as_slice() else {
         return Err("one requested registry key".into());
     };

@@ -36,7 +36,7 @@ fn catalog(archive: &Archive, mode: CatalogPublicationMode) -> TestResult<Value>
     let mut options = common::options();
     options.publication_mode = mode;
     Ok(serde_json::from_slice(
-        p4kx_export::build_catalog(archive, &options)?.json(),
+        p4kx_export::build_catalog(archive, options.with_full_provenance())?.json(),
     )?)
 }
 

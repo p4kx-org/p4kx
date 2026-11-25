@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::cell::Cell;
 
 use p4kx_export::catalog_queries::equipment::{ItemSnapshot, with_items};
@@ -52,8 +53,7 @@ fn check_sdk(
     expected_base: &Value,
 ) -> TestResult {
     let full_row = at_record(proof::rows(full, "/items")?, fixture::SELECTED_RECORD_INDEX)?;
-    with_items(
-        archive,
+    full_proof::open(archive, full_proof::NO_LANGUAGES, None)?.with_items(
         CatalogRecordSelection::RecordIndex(fixture::SELECTED_RECORD_INDEX),
         None,
         |snapshot| {
@@ -272,7 +272,7 @@ fn normal(archive: &Archive, filter: Option<&Filter>) -> TestResult<Value> {
         filter,
         ..common::options()
     };
-    let built = build_catalog(archive, &options)?;
+    let built = build_catalog(archive, options.with_full_provenance())?;
     Ok(serde_json::from_slice(built.json())?)
 }
 

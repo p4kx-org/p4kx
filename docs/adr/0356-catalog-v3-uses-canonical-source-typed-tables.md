@@ -146,10 +146,10 @@ companion encryption-origin decision. Per-source declaration, read success, cont
 selection completeness and publication health are separate facts. External files without verified
 byte-bound original provenance remain unknown. Source and per-fact references are authoritative;
 containsEncryptedSource is their conservative filter index. Every source-backed exported field/data
-value exposes this nullable marker directly alongside its actual source-use references, using a
-shared typed sourced-value wrapper. A row/global flag or a reference that requires consumers to
-recompute the field marker is insufficient. Per-field source/selector/conversion contributors remain
-precise; the row aggregate is supplementary. Include source-backed identity/text/reference values
+value exposes this nullable marker directly through a shared typed sourced-value wrapper.
+The default marker document wraps the v3 dataset in marker format v1 and retains the immediate
+marker on each value. Explicit Full writes the standalone v3 dataset and its actual source-use
+references for proof acceptance. An additional row aggregate is supplementary. Include source-backed identity/text/reference values
 and nested list members, not just top-level item statistics. Schema/control bookkeeping is not
 silently reclassified as game data. Consumers can classify each game value independently; x-gameText
 remains a separate protection axis.

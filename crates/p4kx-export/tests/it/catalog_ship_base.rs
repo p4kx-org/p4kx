@@ -62,7 +62,7 @@ fn build() -> Result<Built, Box<dyn Error>> {
     let dir = tempfile::tempdir()?;
     let archive =
         Archive::open_with_key(write_archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
-    let built = build_catalog(&archive, &catalog_options())?;
+    let built = build_catalog(&archive, catalog_options().with_full_provenance())?;
     let bases = build_ship_base(&archive, &ShipBaseOptions::new(UNIX_EPOCH + EXPORTED_AT))?;
     Ok(Built {
         catalog: serde_json::from_slice(built.json())?,
@@ -276,7 +276,7 @@ fn a_temp_or_display_ship_is_left_out_everywhere_and_an_item_keeps_its_display_w
     let dir = tempfile::tempdir()?;
     let archive =
         Archive::open_with_key(write_archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
-    let built = build_catalog(&archive, &catalog_options())?;
+    let built = build_catalog(&archive, catalog_options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let bases = build_ship_base(&archive, &ShipBaseOptions::new(UNIX_EPOCH + EXPORTED_AT))?;
     let entry = DataForgeEntry::read(&archive)?;

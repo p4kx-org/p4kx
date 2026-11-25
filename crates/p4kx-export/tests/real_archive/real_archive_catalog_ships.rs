@@ -92,7 +92,8 @@ fn catalog() -> Result<&'static Json, Box<dyn Error>> {
                 let archive =
                     Archive::open_with_key(real_archive_path()?, real_archive_key().ok())?;
                 let started = Instant::now();
-                let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+                let options = CatalogOptions::new(SystemTime::now());
+                let built = build_catalog(&archive, options.with_full_provenance())?;
                 print_line(&format!(
                     "catalog build {:.2} s, {} bytes",
                     started.elapsed().as_secs_f64(),

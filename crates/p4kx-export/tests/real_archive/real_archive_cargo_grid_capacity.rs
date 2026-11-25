@@ -153,7 +153,15 @@ fn catalog(
             let catalog: WireCatalog = serde_json::from_reader(&mut reader)?;
             Ok::<_, serde_json::Error>((catalog, reader.into_inner().byte_count()))
         },
-        |sink| write_catalog_from(archive, entry, &options, Compression::None, || Ok(sink)),
+        |sink| {
+            write_catalog_from(
+                archive,
+                entry,
+                options.with_full_provenance(),
+                Compression::None,
+                || Ok(sink),
+            )
+        },
     )?;
     if catalog.schema_version != SCHEMA_VERSION || bytes != summary.size() {
         return Err(

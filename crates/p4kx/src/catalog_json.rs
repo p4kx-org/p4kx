@@ -12,7 +12,7 @@ use p4kx_export::{
     ExportHealth, KindSummary, LoadoutSummary, PaintSummary, Playability, PlayabilityCounts,
     SCHEMA_VERSION, SizeWarning, StarmapSummary, UPLOAD_LIMIT, VariantCounts,
 };
-use p4kx_extraction::Archive;
+use p4kx_extraction::{Archive, ProvenanceMode};
 use serde::Serialize;
 
 use crate::catalog_failure_json::FailureJson;
@@ -28,7 +28,8 @@ pub(super) struct SummaryJson<'a> {
     archive_key: ArchiveKeyState,
     encrypted_entries_unread: u64,
     export_health: &'a ExportHealth,
-    provenance: &'a CatalogProvenance,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    provenance: Option<&'a CatalogProvenance>,
     size: u64,
     compressed_size: Option<u64>,
     upload_limit: u64,
@@ -298,6 +299,7 @@ pub(super) fn summary_json<'a>(
     archive: &Archive,
     out: &Path,
     summary: &'a CatalogSummary,
+    provenance_mode: ProvenanceMode,
 ) -> SummaryJson<'a> {
     SummaryJson {
         archive: json::path(archive.path()),
@@ -306,7 +308,8 @@ pub(super) fn summary_json<'a>(
         archive_key: summary.archive_key().state(),
         encrypted_entries_unread: summary.archive_key().entries_unread(),
         export_health: summary.export_health(),
-        provenance: summary.provenance(),
+        provenance: (provenance_mode != ProvenanceMode::MarkersOnly)
+            .then_some(summary.provenance()),
         size: summary.size(),
         compressed_size: summary.compressed_size(),
         upload_limit: UPLOAD_LIMIT,
@@ -360,40 +363,5 @@ pub(super) fn summary_json<'a>(
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn the_kind_of_every_warning_in_the_json_is_the_kind_the_library_names() {
-        let warnings = [
-            CraftingWarning::UnreadableRewardRecords(1),
-            CraftingWarning::UnknownModifierRanges {
-                count: 1,
-                details: vec!["c".to_owned()],
-            },
-            CraftingWarning::AmbiguousDismantle(2),
-            CraftingWarning::UnreadableVehicleFiles {
-                count: 1,
-                details: vec!["a".to_owned()],
-            },
-            CraftingWarning::UnplacedStarmapContainers(3),
-            CraftingWarning::UnreadableShopRegistry,
-            CraftingWarning::MissingShopRegistry,
-            CraftingWarning::UnreadableShopContainers(4),
-            CraftingWarning::UnreadableShopInventories {
-                count: 1,
-                details: vec!["b".to_owned()],
-            },
-            CraftingWarning::MissingShopInventories(5),
-            CraftingWarning::NoShopComponents,
-        ];
-        for warning in &warnings {
-            let json = serde_json::to_value(WarningJson::from(warning));
-            assert_eq!(
-                json.as_ref().ok().and_then(|json| json["kind"].as_str()),
-                Some(warning.kind()),
-                "{warning:?}"
-            );
-        }
-    }
-}
+#[path = "catalog_json_tests.rs"]
+mod tests;

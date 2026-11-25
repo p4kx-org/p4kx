@@ -22,7 +22,10 @@ const STATIONS: &str = "/definitions/crafters/rows";
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn the_crafting_stations_of_a_real_archive_carry_their_limits() -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, real_archive_key().ok())?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let crafters = catalog
         .pointer(STATIONS)
@@ -66,7 +69,10 @@ fn the_crafting_stations_of_a_real_archive_carry_their_limits() -> TestResult {
 fn the_crafters_of_a_real_archive_resolve_their_categories_and_report_nothing_unreadable()
 -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, real_archive_key().ok())?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let categories = catalog_v3_consumer::rows(&catalog, Kind::BlueprintCategories)?
         .iter()

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::catalog_queries::crafting;
-use p4kx_export::catalog_queries::{self, CatalogLanguageSelection, CatalogRecordSelection};
+use p4kx_export::catalog_queries::{self, CatalogRecordSelection};
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, Crafting, build_catalog, read_crafting};
 use p4kx_extraction::{Archive, DataForgeEntry, Filter};
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
@@ -12,6 +12,7 @@ use super::{fixture, walk};
 use crate::catalog_crafting_support::blueprint;
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::crafting_detail_fixture as detail;
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn multiple_original_global_owners_preserve_blueprint_defaults_and_dismantle_rules() -> TestResult {
@@ -28,27 +29,23 @@ fn multiple_original_global_owners_preserve_blueprint_defaults_and_dismantle_rul
     let interpreted = read_crafting(&forge, None, None)?;
     let mut options = CatalogOptions::new(std::time::UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     assert!(
         catalog.get("craftingGlobal").is_none(),
         "no merged compatibility root"
     );
     assert_blueprint_rules(&catalog, &interpreted)?;
     assert_filtered_rules(&archive, &entry)?;
-    crafting::with_global_params_from(
-        &archive,
-        &entry,
-        CatalogRecordSelection::All,
-        None,
-        |snapshot| {
+    full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .with_crafting_global_params(CatalogRecordSelection::All, None, |snapshot| {
             assert_eq!(
                 snapshot.rows().len(),
                 3,
                 "master, repair and baseline owners remain physical rows"
             );
             walk::snapshot(&snapshot, &catalog)
-        },
-    )??;
+        })??;
     Ok(())
 }
 
@@ -59,7 +56,8 @@ fn assert_filtered_rules(archive: &Archive, entry: &DataForgeEntry) -> TestResul
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(std::time::UNIX_EPOCH)
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(archive, options.with_full_provenance())?.json())?;
     assert_eq!(
         blueprint::definitions(&catalog)?.len(),
         1,
@@ -94,11 +92,8 @@ fn assert_selected_sdk_rules(
     entry: &DataForgeEntry,
     record_index: u32,
 ) -> TestResult {
-    catalog_queries::with_blueprints_from(
-        archive,
-        entry,
+    full_proof::from_entry(archive, entry, full_proof::NO_LANGUAGES, None)?.with_blueprints(
         CatalogRecordSelection::RecordIndex(record_index),
-        CatalogLanguageSelection::Selected(&[]),
         None,
         |snapshot| {
             let [row] = snapshot.presentations() else {
@@ -163,7 +158,10 @@ fn additional_nonfinite_original_fields_remain_publishable_without_a_catalog_kin
     let database =
         fixture::declarations(false).record(fixture::owner("FiniteCoverage", Vec::new()));
     let (_folder, archive) = common::open(&database, DcbOrigin::Plain)?;
-    let catalog = build_catalog(&archive, &CatalogOptions::new(std::time::UNIX_EPOCH))?;
+    let catalog = build_catalog(
+        &archive,
+        CatalogOptions::new(std::time::UNIX_EPOCH).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(catalog.json())?;
     let raw = common::at(
         &catalog,

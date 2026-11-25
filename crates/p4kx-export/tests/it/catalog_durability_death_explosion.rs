@@ -27,7 +27,9 @@ fn durability_death_explosion_keeps_authored_forms_and_exact_origin() -> TestRes
         let (_folder, archive) = common::open(&source, origin)?;
         let mut options = common::options();
         options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-        let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, options.with_full_provenance())?.json(),
+        )?;
         let [inline, base, linked, dangling, wrong, null] =
             proof::rows(&catalog, &format!("{DURABILITY}/rows"))?
         else {
@@ -70,14 +72,15 @@ fn durability_death_explosion_distinguishes_absence_and_unknown_concrete_type() 
     let (_folder, archive) = common::open(&source, DcbOrigin::Encrypted)?;
     assert!(
         matches!(
-            build_catalog(&archive, &common::options()),
+            build_catalog(&archive, common::options().with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "the unknown original shape is a projection loss"
     );
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let rows = proof::rows(&catalog, &format!("{DURABILITY}/rows"))?;
     let unknown = proof::cell(
         rows.last().ok_or("last diagnostic Health occurrence")?,

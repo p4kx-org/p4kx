@@ -255,7 +255,11 @@ fn scoped_catalog(
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    Ok(build_catalog_from(archive, entry, &options)?)
+    Ok(build_catalog_from(
+        archive,
+        entry,
+        options.with_full_provenance(),
+    )?)
 }
 
 #[test]

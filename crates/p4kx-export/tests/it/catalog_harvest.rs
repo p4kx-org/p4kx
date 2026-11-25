@@ -38,7 +38,7 @@ fn build_archive(
     let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     options.filter = filter;
-    let built = build_catalog(archive, &options)?;
+    let built = build_catalog(archive, options.with_full_provenance())?;
     let json = serde_json::from_slice(built.json())?;
     Ok((built, json))
 }
@@ -184,7 +184,7 @@ fn a_record_without_the_mass_multiplier_retains_its_absence() -> TestResult {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))
     };
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let params = entry(&catalog, "miningGlobalParams", PARAMS)?;
     assert_eq!(params["compositionMassMultiplier"]["state"], "absent");

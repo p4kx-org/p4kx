@@ -61,12 +61,18 @@ fn health(global_failure: bool) -> super::Result<ExportHealth> {
     let archive = Archive::open(path)?;
     assert!(
         matches!(
-            p4kx_export::build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH)),
+            p4kx_export::build_catalog(
+                &archive,
+                CatalogOptions::new(UNIX_EPOCH).with_full_provenance()
+            ),
             Err(CatalogError::IncompleteExport(_))
         ),
         "the real production Normal gate refuses the actual source defect"
     );
-    let built = p4kx_export::build_catalog(&archive, &audit_scope::options(UNIX_EPOCH))?;
+    let built = p4kx_export::build_catalog(
+        &archive,
+        audit_scope::options(UNIX_EPOCH).with_full_provenance(),
+    )?;
     assert_eq!(
         built.summary().export_health().publication_mode,
         CatalogPublicationMode::DiagnosticPartial,

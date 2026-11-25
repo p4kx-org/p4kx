@@ -19,7 +19,11 @@ fn health_reference_successful_targets_do_not_register_unretained_reference_payl
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..archive::options()
     };
-    let built = build_catalog_from(&original.archive, &original.entry, &options)?;
+    let built = build_catalog_from(
+        &original.archive,
+        &original.entry,
+        options.with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let manufacturers = check::rows(&catalog, "/definitions/manufacturers/rows")?;
     assert_eq!(

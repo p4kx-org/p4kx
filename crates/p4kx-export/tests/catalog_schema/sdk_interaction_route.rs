@@ -5,7 +5,7 @@ use std::borrow::Cow;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::equipment::interactions::{
-    InteractionSnapshot, SharedInteraction, with_interactions_from,
+    InteractionSnapshot, SharedInteraction,
 };
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_export::{CatalogOptions, build_catalog_from};
@@ -14,6 +14,7 @@ use p4kx_testkit::{ArchiveBuilder, TestEntry};
 use serde_json::{Value, json};
 
 use super::{Route, TestResult};
+use crate::sdk_full_proof as full_proof;
 
 #[path = "../it/catalog_inventory_interactions_fixture.rs"]
 mod fixture;
@@ -28,14 +29,18 @@ const DISPLAY: &str = "Fixture interaction";
 pub(super) fn read() -> TestResult<Route> {
     let (_folder, archive) = open()?;
     let entry = DataForgeEntry::read(&archive)?;
+    let options = CatalogOptions::new(UNIX_EPOCH);
     let catalog: Value = serde_json::from_slice(
-        build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?.json(),
+        build_catalog_from(&archive, &entry, options.with_full_provenance())?.json(),
     )?;
-    with_interactions_from(
+    let session = full_proof::from_entry(
         &archive,
         &entry,
-        CatalogRecordSelection::RecordIndex(OWNER),
         CatalogLanguageSelection::Selected(LANGUAGES),
+        None,
+    )?;
+    session.with_interactions(
+        CatalogRecordSelection::RecordIndex(OWNER),
         None,
         |snapshot| {
             check_table(&snapshot, &catalog)?;

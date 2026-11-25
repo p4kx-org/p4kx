@@ -25,7 +25,7 @@ fn ammo_geometry_keeps_typed_nested_fields_and_nominal_links() -> TestResult {
     let (_folder, archive) =
         common::open(&database("SGeometryActorModelTag"), DcbOrigin::Encrypted)?;
     verify_original_data(&archive)?;
-    let built = build_catalog(&archive, &common::options())?;
+    let built = build_catalog(&archive, common::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let root = proof::at(
         &catalog,

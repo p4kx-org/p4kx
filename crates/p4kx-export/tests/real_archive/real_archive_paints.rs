@@ -150,7 +150,10 @@ fn check_known_paints(catalog: &Value) -> TestResult {
 fn the_paints_of_a_real_archive_fit_their_ships() -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
     let started = Instant::now();
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let elapsed = started.elapsed();
     let catalog: Value = serde_json::from_slice(built.json())?;
     report(&built, elapsed);

@@ -9,7 +9,6 @@ use super::weapon::WeaponSourceSnapshot;
 use super::weapon_rows::WeaponSources;
 use crate::build::catalog_queries::unlocalized_record_query::plan::{Owner, Plan};
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
@@ -190,7 +189,7 @@ impl Query<'_> {
         options: &ReadOptions<'_>,
         visit: impl for<'item> FnOnce(WeaponSourceSnapshot<'item>) -> Result<(), E>,
     ) -> Result<(), E> {
-        let origins = CatalogOrigins::new(self.archive, self.entry, sources)?;
+        let origins = self.entry.with_texts(self.archive, sources)?;
         let input = OriginalCatalogInput::new(self.forge, &origins);
         let registry = CatalogTextRegistry::default();
         let projection =

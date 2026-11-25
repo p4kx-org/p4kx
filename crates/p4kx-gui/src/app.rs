@@ -15,6 +15,7 @@ mod picker_failure_tests;
 use std::path::{Path, PathBuf};
 
 use p4kx_export::CatalogPublicationMode;
+use p4kx_extraction::ProvenanceMode;
 use p4kx_settings::{Settings, WindowGeometry};
 
 use crate::smoke::Frames;
@@ -173,6 +174,15 @@ impl App {
                 let ctx = ui.ctx().clone();
                 self.model
                     .start_catalog(path, move || ctx.request_repaint());
+            }
+            Some((Dialog::FullCatalogFile, path)) => {
+                let ctx = ui.ctx().clone();
+                self.model.start_catalog_with_provenance_mode(
+                    path,
+                    CatalogExportOptions::default(),
+                    ProvenanceMode::Full,
+                    move || ctx.request_repaint(),
+                );
             }
             Some((Dialog::DiagnosticCatalogFile, path)) => {
                 let ctx = ui.ctx().clone();

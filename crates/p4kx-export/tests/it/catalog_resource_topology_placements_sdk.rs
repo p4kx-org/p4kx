@@ -1,16 +1,17 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_export::catalog_queries::CatalogLanguageSelection;
 use p4kx_export::catalog_queries::equipment::resource_topology::{
     ResourceTopologyDependencyRole, ResourceTopologyPlacementSnapshot, ResourceTopologyRootState,
     read_resource_topology_placements,
 };
-use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogQuerySession};
 use p4kx_testkit::TestEntity;
 use serde_json::{Value, json};
 
 use super::{catalog_from, fixture, proof};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn scoped_topology_matches_all_three_canonical_tables_and_source_uses() -> TestResult {
@@ -20,8 +21,7 @@ fn scoped_topology_matches_all_three_canonical_tables_and_source_uses() -> TestR
     ] {
         let (_directory, archive) = fixture::graph_archive_for(source)?;
         let catalog = catalog_from(&archive)?;
-        let session =
-            CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
+        let session = full_proof::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
         let parsed = session.parsed(None)?;
         for record in [0, 3] {
             let snapshot = parsed.read_resource_topology_placements(record, None)?;
@@ -130,7 +130,8 @@ fn scoped_topology_distinguishes_unselected_roots_and_repeated_guids() -> TestRe
         (0, ResourceTopologyRootState::NotAdmitted),
         (u32::MAX, ResourceTopologyRootState::MissingRecord),
     ] {
-        let snapshot = read_resource_topology_placements(&archive, index, None)?;
+        let snapshot = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?
+            .read_resource_topology_placements(index, None)?;
         assert_eq!(
             snapshot.root_state, expected,
             "the physical root selection is explicit"
@@ -146,7 +147,8 @@ fn scoped_topology_distinguishes_unselected_roots_and_repeated_guids() -> TestRe
             "an unselected root requires no declaration reads"
         );
     }
-    let snapshot = read_resource_topology_placements(&archive, 2, None)?;
+    let snapshot = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?
+        .read_resource_topology_placements(2, None)?;
     assert_eq!(
         snapshot.root_state,
         ResourceTopologyRootState::Resolved,

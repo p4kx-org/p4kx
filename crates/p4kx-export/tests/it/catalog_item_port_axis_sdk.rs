@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::CatalogPublicationMode;
 use p4kx_export::catalog_queries::{
-    self, AttachmentAxisOptionStatus, CatalogLanguageSelection, CatalogRecordSelection, ItemPort,
+    AttachmentAxisOptionStatus, CatalogLanguageSelection, CatalogRecordSelection, ItemPort,
     ItemPortSnapshot,
 };
 use p4kx_extraction::{Archive, DataForgeEntry, Filter, SourceInventory, SourceValueState};
@@ -41,11 +42,14 @@ fn item_port_axis_status_getter_matches_canonical_cells_and_original_sources() -
             let [expected] = proof::rows(&catalog, PORTS)? else {
                 return Err("one selected physical port-container row".into());
             };
-            catalog_queries::with_item_ports_from(
+            full_proof::from_entry(
                 &archive,
                 &entry,
-                CatalogRecordSelection::Guid(common::guid(OWNER).parse()?),
                 CatalogLanguageSelection::Selected(&[]),
+                None,
+            )?
+            .with_item_ports(
+                CatalogRecordSelection::Guid(common::guid(OWNER).parse()?),
                 None,
                 |snapshot| visit_axes(&snapshot, expected, statuses, labels, marker),
             )??;
@@ -60,7 +64,7 @@ fn canonical(archive: &Archive) -> TestResult<Value> {
     let mut options = common::options();
     options.filter = Some(&filter);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = p4kx_export::build_catalog(archive, &options)?;
+    let built = p4kx_export::build_catalog(archive, options.with_full_provenance())?;
     Ok(serde_json::from_slice(built.json())?)
 }
 

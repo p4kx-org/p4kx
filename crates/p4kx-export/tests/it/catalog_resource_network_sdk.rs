@@ -2,12 +2,10 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::catalog_queries::equipment::resource_network::{
-    self, ResourceComponentSnapshot, ResourceConnectionFields, ResourceConnectionSnapshot,
+    ResourceComponentSnapshot, ResourceConnectionFields, ResourceConnectionSnapshot,
     ResourceControlParameter,
 };
-use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
-};
+use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog};
 use p4kx_extraction::DataForgeEntry;
 use serde_json::{Value, json};
@@ -15,16 +13,18 @@ use serde_json::{Value, json};
 use super::fixture;
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn resource_queries_keep_the_producer_values_and_exact_physical_origins() -> TestResult {
     let database = fixture::database();
     for origin in [DcbOrigin::Plain, DcbOrigin::Encrypted] {
         let (_directory, archive) = common::open(&database, origin)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
         let entry = DataForgeEntry::read(&archive)?;
-        let session = CatalogQuerySession::from_entry(
+        let session = full_proof::from_entry(
             &archive,
             &entry,
             CatalogLanguageSelection::AllAvailable,
@@ -34,13 +34,9 @@ fn resource_queries_keep_the_producer_values_and_exact_physical_origins() -> Tes
         session.with_resource_components(selection, None, |snapshot| {
             check_components(&snapshot, &catalog)
         })??;
-        resource_network::with_resource_connections_from(
-            &archive,
-            &entry,
-            selection,
-            None,
-            |snapshot| check_connections(&snapshot, &catalog),
-        )??;
+        session.with_resource_connections(selection, None, |snapshot| {
+            check_connections(&snapshot, &catalog)
+        })??;
     }
     Ok(())
 }
@@ -114,10 +110,10 @@ fn invalid_resource_controls_preserve_their_diagnostic_and_scope() -> TestResult
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let selection = CatalogRecordSelection::RecordIndex(0);
-    let session =
-        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
+    let session = full_proof::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
     let parsed = session.parsed(None)?;
     parsed.with_resource_components(selection, None, |snapshot| -> TestResult {
         assert_eq!(

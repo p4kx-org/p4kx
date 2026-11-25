@@ -93,10 +93,7 @@ impl Selection {
         Some(
             if self.dialog.is_glb_output() && path.extension().is_none() {
                 path.with_extension("glb")
-            } else if matches!(
-                self.dialog,
-                Dialog::CatalogFile | Dialog::DiagnosticCatalogFile
-            ) {
+            } else if self.dialog.catalog_file_name().is_some() {
                 crate::catalog_export::normalised_catalog_file(path)
             } else {
                 path

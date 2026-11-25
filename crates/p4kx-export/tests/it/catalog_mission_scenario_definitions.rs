@@ -220,6 +220,7 @@ fn export(origin: DcbOrigin, filter: Option<&Filter>) -> TestResult<Value> {
     let (_folder, archive) = fixture::open(&database(), origin)?;
     let mut options = fixture::options();
     options.filter = filter;
-    let built = build_catalog(&archive, &options).map_err(|error| error.to_string())?;
+    let built = build_catalog(&archive, options.with_full_provenance())
+        .map_err(|error| error.to_string())?;
     Ok(serde_json::from_slice(built.json())?)
 }

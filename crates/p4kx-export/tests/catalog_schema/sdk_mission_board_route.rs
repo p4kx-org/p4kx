@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::catalog_queries::equipment::mission_boards::{
-    BoardDetails, MissionBoardSnapshot, with_mission_boards_from,
-};
+use p4kx_export::catalog_queries::equipment::mission_boards::{BoardDetails, MissionBoardSnapshot};
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
 };
@@ -29,11 +28,14 @@ pub(super) fn read() -> TestResult<Route> {
     let (_directory, archive) = open_fixture(&fixture::database())?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog: Value = serde_json::from_slice(
-        build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?.json(),
+        build_catalog_from(
+            &archive,
+            &entry,
+            CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+        )?
+        .json(),
     )?;
-    with_mission_boards_from(
-        &archive,
-        &entry,
+    full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?.with_mission_boards(
         CatalogRecordSelection::RecordIndex(BOARD_OWNER),
         None,
         |snapshot| {
@@ -164,7 +166,8 @@ fn board_provider_query_follows_physical_selection_for_owners_shared_with_items(
 {
     let (_directory, archive) = open_fixture(&fixture::shared_item_database())?;
     let session =
-        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
+        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?
+            .with_provenance_mode(full_proof::MODE);
     let parsed = session.parsed(None)?;
     parsed.with_mission_boards(
         CatalogRecordSelection::RecordIndex(BOARD_OWNER),

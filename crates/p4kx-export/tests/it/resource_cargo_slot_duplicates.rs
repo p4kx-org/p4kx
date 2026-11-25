@@ -17,7 +17,7 @@ fn duplicate_cargo_slot_names_keep_distinct_targets_and_original_local_positions
     assert_original_slots(&input)?;
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog_from(&archive, &input, &options)?;
+    let built = build_catalog_from(&archive, &input, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let rows = common::at(&catalog, "/definitions/resourceTypes/rows")?
         .as_array()

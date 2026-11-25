@@ -98,7 +98,7 @@ fn a_board_provider_can_share_its_physical_owner_with_a_selected_item() -> TestR
     let (_folder, archive) = common::open(&fixture::shared_item_database(), DcbOrigin::Encrypted)?;
     let mut options = common::options();
     options.publication_mode = p4kx_export::CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let items = at(&catalog, "/items")?
         .as_array()
@@ -124,6 +124,6 @@ fn export(origin: DcbOrigin, filter: Option<&Filter>) -> TestResult<Value> {
     let mut options = common::options();
     options.filter = filter;
     Ok(serde_json::from_slice(
-        build_catalog(&archive, &options)?.json(),
+        build_catalog(&archive, options.with_full_provenance())?.json(),
     )?)
 }

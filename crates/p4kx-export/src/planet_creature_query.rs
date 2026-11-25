@@ -3,7 +3,7 @@
 
 //! Selective access to original loose creature definitions.
 
-use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
+use p4kx_extraction::{Archive, CancelToken, DataForgeEntry, ProvenanceMode};
 
 use super::guid_linked_definition_read::GuidLinkedDefinitionRead;
 use super::{CatalogQuerySession, LooseDefinitionSnapshot, ParsedCatalogQueries};
@@ -33,7 +33,20 @@ pub fn read_creatures(
     selection: LooseDefinitionSelection<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<CreatureSnapshot, CatalogError> {
-    QUERY.read(archive, selection, cancel)
+    read_creatures_with_provenance_mode(archive, selection, ProvenanceMode::MarkersOnly, cancel)
+}
+
+/// Reads selected creature definitions with the requested source detail.
+///
+/// # Errors
+/// Returns the errors of `read_creatures`.
+pub fn read_creatures_with_provenance_mode(
+    archive: &Archive,
+    selection: LooseDefinitionSelection<'_>,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<CreatureSnapshot, CatalogError> {
+    QUERY.read(archive, selection, provenance_mode, cancel)
 }
 
 /// Reads selected creatures with an already decoded DataForge Entry.

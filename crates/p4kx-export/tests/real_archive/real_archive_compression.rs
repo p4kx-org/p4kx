@@ -47,7 +47,7 @@ fn the_catalog_of_a_real_archive_round_trips_at_every_compression_level() -> Tes
     let entry = DataForgeEntry::read(&archive)?;
     let options = CatalogOptions::new(SystemTime::now());
     let started = Instant::now();
-    let plain = build_catalog_from(&archive, &entry, &options)?;
+    let plain = build_catalog_from(&archive, &entry, options.with_full_provenance())?;
     let plain_took = started.elapsed();
     let channel = p4kx_channels::channel_name(&path).unwrap_or_default();
     print_line(&format!(
@@ -61,7 +61,7 @@ fn the_catalog_of_a_real_archive_round_trips_at_every_compression_level() -> Tes
         let (summary, frame) = write_catalog_from(
             &archive,
             &entry,
-            &options,
+            options.with_full_provenance(),
             Compression::Zstd { level },
             || Ok(Vec::new()),
         )?;

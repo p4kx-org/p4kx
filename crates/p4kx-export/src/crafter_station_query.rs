@@ -5,12 +5,13 @@ use p4kx_extraction::{Archive, Build, CancelToken, DataForge, DataForgeEntry, So
 
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::unlocalized_record_query::plan::{Owner, Plan};
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogRecordCoverage, CatalogRecordSelection,
 };
-use crate::catalog_query_session::{CatalogQuerySession, ParsedCatalogQueries, checkpoint};
+use crate::catalog_query_session::{
+    CatalogQuerySession, CatalogQuerySource, ParsedCatalogQueries, checkpoint,
+};
 use crate::catalog_table::DatasetAvailability;
 use crate::catalog_v3::industry_modules::crafter_definition;
 use crate::record_observation::RecordObservation;
@@ -108,7 +109,7 @@ impl ParsedCatalogQueries<'_> {
 
 fn project<T>(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     selection: CatalogRecordSelection,
     cancel: Option<&CancelToken>,
@@ -118,7 +119,7 @@ fn project<T>(
         owners,
         mut coverage,
     } = Plan::read_crafters(forge, selection, cancel)?;
-    let origins = CatalogOrigins::for_archive_records(archive, entry)?;
+    let origins = entry.records(archive)?;
     let input = OriginalCatalogInput::new(forge, &origins);
     let mut rows = Vec::new();
     for owner in owners {

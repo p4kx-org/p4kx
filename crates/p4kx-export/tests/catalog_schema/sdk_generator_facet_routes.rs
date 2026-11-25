@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    with_contract_generator_facets_from,
 };
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog_from};
 use p4kx_extraction::{DataForgeEntry, FieldOrigin, InputScope, SourceInventory, SourceValueState};
@@ -26,14 +26,11 @@ pub(super) fn read() -> TestResult<[Route; 2]> {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let catalog: Value =
-        serde_json::from_slice(build_catalog_from(&archive, &entry, &options)?.json())?;
-    with_contract_generator_facets_from(
-        &archive,
-        &entry,
-        CatalogRecordSelection::All,
-        None,
-        |snapshot| {
+    let catalog: Value = serde_json::from_slice(
+        build_catalog_from(&archive, &entry, options.with_full_provenance())?.json(),
+    )?;
+    full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .with_contract_generator_facets(CatalogRecordSelection::All, None, |snapshot| {
             for row in &snapshot.local_generators {
                 let scope = row.scope().ok_or("authored local scope")?;
                 assert_origin(scope.origin(), &snapshot.source_inventory);
@@ -64,8 +61,7 @@ pub(super) fn read() -> TestResult<[Route; 2]> {
                     &catalog,
                 )?,
             ])
-        },
-    )?
+        })?
 }
 
 fn assert_origin(origin: &FieldOrigin, inventory: &SourceInventory) {

@@ -28,7 +28,7 @@ fn weapon_action_wrappers_preserve_original_edges_and_entry_metadata() -> TestRe
     let database = fixture::database();
     let edges = original_edges(&database.build())?;
     let (_folder, archive) = common::open(&database, DcbOrigin::Encrypted)?;
-    let built = build_catalog(&archive, &common::options())?;
+    let built = build_catalog(&archive, common::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let row = proof::at(&catalog, "/configurations/weaponActions/rows/0")?;
     proof::present(row, "ownerRecordIndex", &json!(OWNER), Some(true))?;

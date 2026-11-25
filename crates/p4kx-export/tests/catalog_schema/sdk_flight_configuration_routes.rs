@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::equipment::flight::with_thrusters_from;
@@ -28,7 +29,8 @@ const ALL: CatalogRecordSelection = CatalogRecordSelection::All;
 pub(super) fn read() -> TestResult<Vec<Route>> {
     let (_folder, archive) = fixture::archive(false)?;
     let session =
-        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
+        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?
+            .with_provenance_mode(full_proof::MODE);
     let parsed = session.parsed(None)?;
     Ok(vec![
         parsed.with_flight_controllers(ALL, None, |snapshot| {
@@ -58,7 +60,8 @@ fn flight_configuration_queries_keep_physical_order_and_typed_values() -> TestRe
         &entry,
         CatalogLanguageSelection::AllAvailable,
         None,
-    )?;
+    )?
+    .with_provenance_mode(full_proof::MODE);
     let parsed = session.parsed(None)?;
     parsed.with_flight_controllers(guid_selection, None, |snapshot| {
         values::controllers(&snapshot)
@@ -107,7 +110,8 @@ fn flight_configuration_queries_bound_malformed_unrelated_owners() -> TestResult
         &entry,
         CatalogLanguageSelection::Selected(&[]),
         None,
-    )?;
+    )?
+    .with_provenance_mode(full_proof::MODE);
     let parsed = session.parsed(None)?;
     for (selection, expected_rows) in [
         (CatalogRecordSelection::RecordIndex(0), 1),
@@ -208,14 +212,16 @@ fn flight_configuration_queries_match_synthetic_producer_rows() -> TestResult<()
     let entry = DataForgeEntry::read(&archive)?;
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog_from(&archive, &entry, &options)?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog_from(&archive, &entry, options.with_full_provenance())?.json(),
+    )?;
     let session = CatalogQuerySession::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::Selected(&[]),
         None,
-    )?;
+    )?
+    .with_provenance_mode(full_proof::MODE);
     let parsed = session.parsed(None)?;
     parsed.with_flight_controllers(ALL, None, |snapshot| {
         parity(CONTROLLERS, &snapshot, &catalog)

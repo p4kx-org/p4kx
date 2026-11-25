@@ -2,8 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ContractKey,
-    ContractSnapshot,
+    CatalogLanguageSelection, CatalogRecordSelection, ContractKey, ContractSnapshot,
 };
 use p4kx_extraction::{Archive, DataForgeEntry, Language};
 use p4kx_testkit::{ArchiveBuilder, GlobalIniBuilder, TestEntry};
@@ -14,6 +13,7 @@ mod checks;
 mod fixture;
 
 use crate::catalog_contracts::TestResult;
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn retained_outside_aliases_publish_all_property_and_npc_texts() -> TestResult {
@@ -43,7 +43,7 @@ fn retained_outside_aliases_publish_all_property_and_npc_texts() -> TestResult {
     let [outside, selected] = positions.as_slice() else {
         return Err("two physical Generator aliases".into());
     };
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::Selected(&[Language::English]),

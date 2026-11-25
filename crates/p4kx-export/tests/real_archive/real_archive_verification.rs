@@ -88,7 +88,7 @@ const MINIMUM: [(Kind, usize); 45] = [
 fn built(archive: &Archive) -> Result<(CatalogSummary, Value), Box<dyn Error>> {
     let (summary, frame) = write_catalog(
         archive,
-        &CatalogOptions::new(SystemTime::now()),
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
         Compression::ZSTD,
         || Ok(Vec::new()),
     )?;

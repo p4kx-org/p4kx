@@ -6,7 +6,6 @@ use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
 use super::{CatalogRecordCoverage, CatalogRecordSelection, QualityDefinitionSnapshot};
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::{CatalogLanguageSelection, CatalogQuerySession, ParsedCatalogQueries};
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_table::CatalogTable;
@@ -88,7 +87,7 @@ impl ParsedCatalogQueries<'_> {
         inspect: impl FnOnce(QuantizationResourceSnapshot) -> T,
     ) -> Result<T, CatalogError> {
         self.project(cancel, |archive, entry, forge| {
-            let origins = CatalogOrigins::for_archive_records(archive, entry)?;
+            let origins = entry.records(archive)?;
             let input = OriginalCatalogInput::new(forge, &origins);
             let result = QualityDependencies::read(forge, &input, selection, cancel)?;
             let table = CatalogTable::new(forge, &[QUANTIZATIONS.type_name], result.rows);

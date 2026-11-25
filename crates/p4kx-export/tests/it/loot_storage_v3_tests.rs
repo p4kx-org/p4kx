@@ -34,7 +34,7 @@ fn check_input(input: Input, validator: &Validator) -> TestResult {
     let built = p4kx_export::build_catalog_from(
         &fixture.archive,
         &fixture.entry,
-        &CatalogOptions::new(UNIX_EPOCH),
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
     )?;
     assert_eq!(
         built.summary().export_health().status,

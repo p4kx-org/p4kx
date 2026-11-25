@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::equipment::{
-    AlignmentRole, LoadoutOwnerKind, LoadoutSnapshot, read_loadouts, read_loadouts_from,
-};
+use p4kx_export::catalog_queries::equipment::{AlignmentRole, LoadoutOwnerKind, LoadoutSnapshot};
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
 };
@@ -14,13 +12,20 @@ use serde_json::Value;
 use crate::commodity_v3_fixture::TestResult;
 use crate::loadouts_fixture::{self, ALPHA, EMPTY_LOADOUT};
 use crate::loadouts_support;
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn direct_loadouts_match_the_producer_and_preserve_nested_occurrences() -> TestResult {
     let (_folder, archive) = fixture()?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &loadouts_support::options(None))?.json())?;
-    let snapshot = read_loadouts(&archive, CatalogRecordSelection::All, None)?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(
+            &archive,
+            loadouts_support::options(None).with_full_provenance(),
+        )?
+        .json(),
+    )?;
+    let snapshot = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?
+        .read_loadouts(CatalogRecordSelection::All, None)?;
     assert_eq!(
         serde_json::to_value(&snapshot.rows)?,
         catalog["loadouts"],
@@ -64,12 +69,8 @@ fn selected_loadouts_preserve_sparse_and_empty_coverage() -> TestResult {
     let (_folder, archive) = fixture()?;
     let entry = DataForgeEntry::read(&archive)?;
     let first = record_index(&entry, ALPHA)?;
-    let selected = read_loadouts_from(
-        &archive,
-        &entry,
-        CatalogRecordSelection::RecordIndex(first),
-        None,
-    )?;
+    let selected = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .read_loadouts(CatalogRecordSelection::RecordIndex(first), None)?;
     assert_selected(&selected, first)?;
     let session = CatalogQuerySession::from_entry(
         &archive,

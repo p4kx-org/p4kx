@@ -92,7 +92,7 @@ fn actual_tags_roots_paths_and_selected_entity_fields_match_the_installed_build(
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let built = build_catalog_from(&archive, &entry, &options)
+    let built = build_catalog_from(&archive, &entry, options.with_full_provenance())
         .map_err(|error| Failure::source("catalog-build", error))?;
     let catalog: Value = serde_json::from_slice(built.json())
         .map_err(|error| Failure::source("catalog-json", error))?;

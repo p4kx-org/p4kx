@@ -30,7 +30,7 @@ fn durability_covers_only_the_emitted_original_number_with_equal_bits() -> TestR
     let (_folder, archive) = common::open(&source, DcbOrigin::Plain)?;
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog = serde_json::from_slice(built.json())?;
     let [row] = proof::rows(&catalog, &format!("{DURABILITY}/rows"))? else {
         return Err("only the emitted Health component supplies a row".into());
@@ -64,7 +64,7 @@ fn durability_covers_only_the_emitted_original_number_with_equal_bits() -> TestR
     );
     assert!(
         matches!(
-            build_catalog(&archive, &common::options()),
+            build_catalog(&archive, common::options().with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "normal publication still rejects the unrelated unsupported number"

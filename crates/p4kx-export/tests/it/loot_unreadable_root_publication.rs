@@ -3,10 +3,15 @@
 
 use std::cell::Cell;
 
+use p4kx_export::catalog_queries::loot::{
+    self, LootAncestorSelection, LootContainerQuery, LootContainerStatus,
+};
+use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogQuerySession};
 use p4kx_export::{
     CatalogError, CatalogPublicationMode, Compression, ExportHealth, ExportHealthStatus,
     ExportStageStatus, Kind, build_catalog_from, write_catalog_from,
 };
+use p4kx_extraction::{ProvenanceMode, SourceUseRole};
 use p4kx_testkit::TestEntry;
 use serde_json::{Value, json};
 
@@ -20,7 +25,11 @@ const SYSTEM: &str = "alpha";
 fn unreadable_selected_root_preserves_upstream_failure_and_unavailable_loot_document_scope()
 -> TestResult {
     let complete = source(false)?;
-    let previous = build_catalog_from(&complete.archive, &complete.entry, &fixture::options())?;
+    let previous = build_catalog_from(
+        &complete.archive,
+        &complete.entry,
+        fixture::options().with_full_provenance(),
+    )?;
     assert!(
         previous.summary().export_health().is_complete(),
         "readable counterpart is complete"
@@ -44,12 +53,70 @@ fn unreadable_selected_root_preserves_upstream_failure_and_unavailable_loot_docu
     proof::closure(&catalog)?;
     assert!(
         matches!(
-            build_catalog_from(&source.archive, &source.entry, &fixture::options()),
+            build_catalog_from(
+                &source.archive,
+                &source.entry,
+                fixture::options().with_full_provenance()
+            ),
             Err(CatalogError::IncompleteExport(_))
         ),
         "unreadable original refuses Normal publication"
     );
     verify_refusal(&source);
+    Ok(())
+}
+
+#[test]
+fn loot_query_keeps_encrypted_root_failure_without_marker_proof_refs() -> TestResult {
+    let fixture = source(true)?;
+    let root = entries::original(&fixture.archive, &entries::outer(SYSTEM))?;
+    let query = LootContainerQuery::new(
+        u32::try_from(root.index())?,
+        fixture::guid(0x5712).parse()?,
+        "Data/ObjectContainers/PU/synthetic/loottarget.socpak",
+        LootAncestorSelection::WithoutResolvedObject,
+    );
+    let markers = loot::read_loot_container(&fixture.archive, query, None)?;
+    let full = CatalogQuerySession::from_entry(
+        &fixture.archive,
+        &fixture.entry,
+        CatalogLanguageSelection::Selected(&[]),
+        None,
+    )?
+    .with_provenance_mode(ProvenanceMode::Full)
+    .read_loot_container(query, None)?;
+
+    assert_eq!(markers.status, LootContainerStatus::Unavailable);
+    assert_eq!(markers.status, full.status);
+    assert_eq!(markers.records, full.records);
+    let marker_survey = markers.placement_survey.ok_or("marker placement survey")?;
+    let full_survey = full.placement_survey.ok_or("full placement survey")?;
+    assert!(!marker_survey.source_set_complete());
+    assert_eq!(
+        marker_survey.source_set_complete(),
+        full_survey.source_set_complete()
+    );
+    assert_eq!(
+        marker_survey.contains_encrypted_source(),
+        full_survey.contains_encrypted_source()
+    );
+    assert!(
+        markers.failed_source_uses.is_empty(),
+        "marker result omits physical attempts"
+    );
+    assert_eq!(markers.source_inventory.iter_uses().count(), 0);
+    assert!(
+        !full.failed_source_uses.is_empty(),
+        "fixture must report a real failed attempt"
+    );
+    for attempt in &full.failed_source_uses {
+        assert!(
+            full.source_inventory
+                .iter_uses()
+                .any(|used| { used.id() == attempt && used.role() == SourceUseRole::Attempted }),
+            "the full proof contains each original attempt"
+        );
+    }
     Ok(())
 }
 
@@ -223,7 +290,7 @@ fn verify_refusal(source: &Fixture) {
     let result = write_catalog_from(
         &source.archive,
         &source.entry,
-        &fixture::options(),
+        fixture::options().with_full_provenance(),
         Compression::None,
         || {
             called.set(true);

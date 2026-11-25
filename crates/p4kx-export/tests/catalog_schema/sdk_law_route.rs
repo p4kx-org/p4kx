@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::catalog_queries::law::{LawFamily, LawRows, LawSnapshot, with_law, with_law_from};
+use p4kx_export::catalog_queries::law::{LawFamily, LawRows, LawSnapshot};
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
 };
@@ -42,14 +43,22 @@ pub(super) fn read() -> TestResult<[Route; 6]> {
     let (_dir, archive) = archive(FixtureMode::Canonical)?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog = serde_json::from_slice(
-        build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?.json(),
+        build_catalog_from(
+            &archive,
+            &entry,
+            CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+        )?
+        .json(),
     )?;
-    with_law_from(
+    full_proof::from_entry(
         &archive,
         &entry,
+        CatalogLanguageSelection::AllAvailable,
+        None,
+    )?
+    .with_law(
         LawFamily::All,
         CatalogRecordSelection::All,
-        CatalogLanguageSelection::AllAvailable,
         None,
         |snapshot| {
             check_text_and_payload(&snapshot, &catalog)?;
@@ -209,11 +218,14 @@ fn check_physical_alias(session: &CatalogQuerySession<'_>, other: u32) -> TestRe
 }
 
 fn check_security_scope(archive: &Archive) -> TestResult {
-    with_law(
+    full_proof::open(
         archive,
+        CatalogLanguageSelection::Selected(&[Language::English]),
+        None,
+    )?
+    .with_law(
         LawFamily::SecurityNetworkManifests,
         CatalogRecordSelection::All,
-        CatalogLanguageSelection::Selected(&[Language::English]),
         None,
         |snapshot| -> TestResult {
             assert!(

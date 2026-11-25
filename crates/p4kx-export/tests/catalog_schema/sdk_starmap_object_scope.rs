@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::starmap::{
     StarmapDefinitionFamily, StarmapDefinitionRows, StarmapDefinitionSelection,
-    StarmapDefinitionSnapshot, StarmapObjectDefinition, with_starmap_definitions,
+    StarmapDefinitionSnapshot, StarmapObjectDefinition,
 };
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_extraction::{DataForgeEntry, Language, SourceLocation};
@@ -117,12 +118,8 @@ fn starmap_object_scope_rejects_the_exact_out_of_pu_index() -> TestResult {
         StarmapDefinitionFamily::Objects,
         CatalogRecordSelection::RecordIndex(index),
     );
-    with_starmap_definitions(
-        &archive,
-        selection,
-        CatalogLanguageSelection::AllAvailable,
-        None,
-        |snapshot| -> TestResult {
+    full_proof::open(&archive, CatalogLanguageSelection::AllAvailable, None)?
+        .with_starmap_definitions(selection, None, |snapshot| -> TestResult {
             let StarmapDefinitionRows::Objects(rows) = snapshot.rows else {
                 return Err("typed starmap Objects selection".into());
             };
@@ -135,26 +132,24 @@ fn starmap_object_scope_rejects_the_exact_out_of_pu_index() -> TestResult {
                 "the excluded Record does not open the unreadable locale"
             );
             Ok(())
-        },
-    )??;
+        })??;
     let selection = StarmapDefinitionSelection::new(
         StarmapDefinitionFamily::Objects,
         CatalogRecordSelection::All,
     );
-    with_starmap_definitions(
+    full_proof::open(
         &archive,
-        selection,
         CatalogLanguageSelection::Selected(LANGUAGES),
         None,
-        |snapshot| {
-            let StarmapDefinitionRows::Objects(rows) = &snapshot.rows else {
-                return Err("typed starmap Objects selection".into());
-            };
-            assert_eq!(
-                snapshot.available_languages, LANGUAGES,
-                "the selected object reads only the requested text locale"
-            );
-            verify_pu_objects(&snapshot, rows)
-        },
     )?
+    .with_starmap_definitions(selection, None, |snapshot| {
+        let StarmapDefinitionRows::Objects(rows) = &snapshot.rows else {
+            return Err("typed starmap Objects selection".into());
+        };
+        assert_eq!(
+            snapshot.available_languages, LANGUAGES,
+            "the selected object reads only the requested text locale"
+        );
+        verify_pu_objects(&snapshot, rows)
+    })?
 }

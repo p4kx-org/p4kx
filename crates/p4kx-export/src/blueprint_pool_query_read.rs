@@ -3,22 +3,21 @@
 
 use std::sync::Arc;
 
-use p4kx_extraction::{Archive, CancelToken, CanonicalReadObserver, DataForge, DataForgeEntry};
+use p4kx_extraction::{Archive, CancelToken, CanonicalReadObserver, DataForge};
 
 use super::BlueprintPoolSnapshot;
 use crate::CatalogError;
 use crate::Kind;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::CatalogRecordSelection;
 use crate::catalog_queries::unlocalized_record_query::plan::Plan;
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::catalog_v3::industry_modules::{blueprint_pool_definition, blueprint_pool_tables};
 use crate::record_observation::RecordObservation;
 
 pub(super) fn with_parsed<T>(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     selection: CatalogRecordSelection,
     cancel: Option<&CancelToken>,
@@ -37,7 +36,7 @@ pub(super) fn with_parsed<T>(
 
 pub(super) struct Query<'query> {
     pub(super) archive: &'query Archive,
-    pub(super) entry: &'query DataForgeEntry,
+    pub(super) entry: CatalogQuerySource<'query>,
     pub(super) forge: &'query DataForge<'query>,
     pub(super) selection: CatalogRecordSelection,
     pub(super) cancel: Option<&'query CancelToken>,
@@ -56,7 +55,7 @@ impl Query<'_> {
             self.cancel,
             observer,
         )?;
-        let origins = CatalogOrigins::for_archive_records(self.archive, self.entry)?;
+        let origins = self.entry.records(self.archive)?;
         let input = OriginalCatalogInput::new(self.forge, &origins);
         let mut rows = Vec::new();
         for owner in plan.owners {

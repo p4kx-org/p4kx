@@ -17,12 +17,14 @@ use crate::loadouts_support::{loadout, port};
 fn default_loadouts_join_actual_physical_ports_and_item_components_under_filtering() -> TestResult {
     let (_folder, archive) = common::open(&database(Layout::Complete), DcbOrigin::Encrypted)?;
     let mut options = common::options();
-    let unfiltered: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let unfiltered: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     check_default(&unfiltered, "projected")?;
 
     let filter = Filter::new("*/align_owner");
     options.filter = Some(&filter);
-    let filtered: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let filtered: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let [only] = proof::rows(&filtered, super::ITEMS)? else {
         return Err("only the filtered owner has a catalog configuration".into());
     };
@@ -185,7 +187,7 @@ fn xml_catalog() -> TestResult<Value> {
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     Ok(serde_json::from_slice(
-        build_catalog(&archive, &options)?.json(),
+        build_catalog(&archive, options.with_full_provenance())?.json(),
     )?)
 }
 

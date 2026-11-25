@@ -22,7 +22,11 @@ enum Target {
 #[test]
 fn unique_unavailable_targets_keep_original_children_and_refuse_normal_publication() -> TestResult {
     let complete = source(Target::Empty)?;
-    let previous = build_catalog_from(&complete.archive, &complete.entry, &fixture::options())?;
+    let previous = build_catalog_from(
+        &complete.archive,
+        &complete.entry,
+        fixture::options().with_full_provenance(),
+    )?;
     for target in [Target::Unreadable, Target::Unparsed] {
         let source = source(target)?;
         let (partial, catalog) = source.diagnostic()?;
@@ -58,7 +62,11 @@ fn unique_unavailable_targets_keep_original_children_and_refuse_normal_publicati
         proof::closure(&catalog)?;
         assert!(
             matches!(
-                build_catalog_from(&source.archive, &source.entry, &fixture::options()),
+                build_catalog_from(
+                    &source.archive,
+                    &source.entry,
+                    fixture::options().with_full_provenance()
+                ),
                 Err(CatalogError::IncompleteExport(_))
             ),
             "original target failure is still required"
@@ -72,7 +80,11 @@ fn unique_unavailable_targets_keep_original_children_and_refuse_normal_publicati
 fn a_successfully_parsed_empty_target_stays_resolved_without_orphan_declaration_uses() -> TestResult
 {
     let source = source(Target::Empty)?;
-    let built = build_catalog_from(&source.archive, &source.entry, &fixture::options())?;
+    let built = build_catalog_from(
+        &source.archive,
+        &source.entry,
+        fixture::options().with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     assert!(
         built.summary().export_health().is_complete(),

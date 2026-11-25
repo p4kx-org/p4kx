@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::equipment::durability::{
-    TurretHealthSnapshot, with_turret_health_from,
-};
+use p4kx_export::catalog_queries::equipment::durability::TurretHealthSnapshot;
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DefinitionStatus,
+    CatalogLanguageSelection, CatalogRecordSelection, DefinitionStatus,
 };
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog};
 use p4kx_extraction::{DataForgeEntry, SourceValueState};
@@ -14,6 +12,7 @@ use serde_json::{Value, json};
 use super::{COMPONENT_ROWS, database};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn turret_component_sdk_preserves_physical_rows_references_and_provenance() -> TestResult {
@@ -22,21 +21,18 @@ fn turret_component_sdk_preserves_physical_rows_references_and_provenance() -> T
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let entry = DataForgeEntry::read(&archive)?;
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::AllAvailable,
         None,
     )?;
-    with_turret_health_from(
-        &archive,
-        &entry,
-        CatalogRecordSelection::RecordIndex(0),
-        None,
-        |snapshot| check_turrets(&snapshot, &catalog),
-    )??;
+    session.with_turret_health(CatalogRecordSelection::RecordIndex(0), None, |snapshot| {
+        check_turrets(&snapshot, &catalog)
+    })??;
     session.with_turret_health(CatalogRecordSelection::RecordIndex(1), None, |snapshot| {
         assert!(
             snapshot.rows().is_empty(),

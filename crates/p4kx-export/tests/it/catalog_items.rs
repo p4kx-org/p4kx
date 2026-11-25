@@ -39,7 +39,7 @@ fn catalog_with(options: &CatalogOptions<'_>) -> Result<(BuiltCatalog, Value), B
         write_archive(dir.path(), &[english()])?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let built = build_catalog(&archive, options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let json = serde_json::from_slice(built.json())?;
     Ok((built, json))
 }

@@ -26,7 +26,11 @@ const ENTRY_CONSUMERS: [&str; 3] = ["starmapObjects", "harvestableLocations", "l
 #[test]
 fn a_proved_missing_child_is_published_with_original_proof_and_warning() -> TestResult {
     let source = source(&[TARGET])?;
-    let built = build_catalog_from(&source.archive, &source.entry, &fixture::options())?;
+    let built = build_catalog_from(
+        &source.archive,
+        &source.entry,
+        fixture::options().with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     assert!(built.summary().export_health().is_complete());
     assert_eq!(catalog["exportHealth"]["publicationMode"], "normal");
@@ -38,7 +42,7 @@ fn a_proved_missing_child_is_published_with_original_proof_and_warning() -> Test
     let (summary, bytes) = write_catalog_from(
         &source.archive,
         &source.entry,
-        &fixture::options(),
+        fixture::options().with_full_provenance(),
         Compression::None,
         || Ok(Vec::new()),
     )?;
@@ -51,7 +55,11 @@ fn a_proved_missing_child_is_published_with_original_proof_and_warning() -> Test
 fn an_unsupported_child_still_prevents_publication_beside_a_proved_absence() -> TestResult {
     const UNSUPPORTED: &str = "C:/authoring/unsearchable.socpak";
     let complete = source(&[])?;
-    let previous = build_catalog_from(&complete.archive, &complete.entry, &fixture::options())?;
+    let previous = build_catalog_from(
+        &complete.archive,
+        &complete.entry,
+        fixture::options().with_full_provenance(),
+    )?;
     assert!(previous.summary().export_health().is_complete());
 
     let source = source(&[TARGET, UNSUPPORTED])?;
@@ -253,7 +261,7 @@ fn verify_writer_refusal(source: &Fixture, previous: &[u8]) -> TestResult {
         let result = write_catalog_from(
             &source.archive,
             &source.entry,
-            &fixture::options(),
+            fixture::options().with_full_provenance(),
             Compression::None,
             || {
                 called.set(true);

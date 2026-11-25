@@ -213,7 +213,7 @@ fn shop_inventory_resolution_exposes_each_original_status() -> TestResult {
     let alternatives = ambiguous_targets::assert_original(&archive)?;
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = p4kx_export::build_catalog(&archive, &options)?;
+    let built = p4kx_export::build_catalog(&archive, options.with_full_provenance())?;
     let summary = built.summary().shops();
     assert_eq!(
         summary.shops,

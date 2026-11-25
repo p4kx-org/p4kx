@@ -3,7 +3,9 @@
 
 use std::error::Error;
 
-use p4kx_extraction::{Archive, ArchiveWatch, DataForgeEntry, RecordTree, Step, Value};
+use p4kx_extraction::{
+    Archive, ArchiveWatch, DataForgeEntry, ProvenanceMode, RecordTree, Step, Value,
+};
 use p4kx_testkit::{real_archive_key, watchdog};
 
 use crate::Kind;
@@ -80,7 +82,8 @@ fn run(side: &Side) -> TestResult<u32> {
         CatalogLanguageSelection::Selected(&[]),
         None,
     )
-    .map_err(|_| "could not bind the scoped Loot SDK session")?;
+    .map_err(|_| "could not bind the scoped Loot SDK session")?
+    .with_provenance_mode(ProvenanceMode::Full);
     session
         .with_loot_definitions(
             LootDefinitionKind::Table,

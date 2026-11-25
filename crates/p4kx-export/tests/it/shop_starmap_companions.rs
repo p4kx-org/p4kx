@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::path::{Path, PathBuf};
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::catalog_queries::shops::read_shop;
+use p4kx_export::catalog_queries::shops::read_shop_with_provenance_mode;
 use p4kx_export::{
     CatalogError, CatalogOptions, CatalogPublicationMode, EntryOperation, ExportDiagnosticStage,
     ExportHealth, ExportSourceRole, Kind, StarmapTraversalBudget, build_catalog,
@@ -48,7 +49,7 @@ fn assert_companion_scope(hcd_fault: Option<Fault>, entity_fault: Option<Fault>)
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let output = build_catalog(&archive, &options)?;
+    let output = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(output.json())?;
     let [location] = health::rows(&catalog, "/placements/locationInstances/rows")? else {
         return Err("one authored location occurrence with both companion lookups".into());
@@ -58,9 +59,10 @@ fn assert_companion_scope(hcd_fault: Option<Fault>, entity_fault: Option<Fault>)
     assert_failure(output.summary().export_health(), ENTITY, entity_fault);
     assert_shop_evidence(&archive, &catalog, true)?;
     if hcd_fault.is_some() || entity_fault.is_some() {
-        let Err(CatalogError::IncompleteExport(refusal)) =
-            build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))
-        else {
+        let Err(CatalogError::IncompleteExport(refusal)) = build_catalog(
+            &archive,
+            CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+        ) else {
             return Err("strict publication must retain the real companion failure".into());
         };
         assert_failure(refusal.health(), HCD, hcd_fault);
@@ -78,14 +80,20 @@ fn unreadable_main_descriptor_still_prevents_a_complete_shop_name_survey() -> Te
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let output = build_catalog(&archive, &options)?;
+    let output = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(output.json())?;
     assert_shop_evidence(&archive, &catalog, false)
 }
 
 fn assert_shop_evidence(archive: &Archive, catalog: &Value, complete: bool) -> TestResult {
     let [_, selected, _] = physical_registry_nodes(archive)?;
-    let sdk = read_shop(archive, selected, StarmapTraversalBudget::new(), None)?;
+    let sdk = read_shop_with_provenance_mode(
+        archive,
+        selected,
+        StarmapTraversalBudget::new(),
+        full_proof::MODE,
+        None,
+    )?;
     let coverage = sdk
         .coverage
         .names

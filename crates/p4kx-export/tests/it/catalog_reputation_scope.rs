@@ -97,7 +97,7 @@ fn legacy_reputation_string_keys_still_resolve_as_protected_text() -> TestResult
             );
     }
     let (_folder, input) = archive::open(&database, DcbOrigin::Plain)?;
-    let built = p4kx_export::build_catalog(&input, &archive::options())?;
+    let built = p4kx_export::build_catalog(&input, archive::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     for table in ["reputationScopes", "reputationStandings"] {
         let row = proof::at(&catalog, &format!("/definitions/{table}/rows/0"))?;

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::catalog_queries::equipment::{
-    AmmoDefinitionSnapshot, AmmoSelection, with_ammo_definitions, with_ammo_definitions_from,
+    AmmoDefinitionSnapshot, AmmoSelection, with_ammo_definitions_from,
 };
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog};
@@ -12,6 +12,7 @@ use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 const AMMO_GUID: u128 = 0x91a0;
 const ALIAS: u32 = 1;
@@ -28,11 +29,16 @@ fn physical_ammo_definition_matches_the_canonical_row_and_localization() -> Test
             publication_mode: CatalogPublicationMode::DiagnosticPartial,
             ..common::options()
         };
-        let catalog = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
-        with_ammo_definitions(
+        let catalog = serde_json::from_slice(
+            build_catalog(&archive, options.with_full_provenance())?.json(),
+        )?;
+        full_proof::open(
             &archive,
-            CatalogRecordSelection::RecordIndex(ALIAS),
             CatalogLanguageSelection::Selected(LANGUAGES),
+            None,
+        )?
+        .with_ammo_definitions(
+            CatalogRecordSelection::RecordIndex(ALIAS),
             None,
             |snapshot| verify_row(&snapshot, &catalog, encrypted),
         )??;

@@ -29,8 +29,9 @@ fn explosive_components_export_distinct_original_trigger_and_ordnance_forms() ->
     let source = fixture::database(Case::Valid);
     check_valid_original(&source)?;
     let (_folder, archive) = common::open(&source, DcbOrigin::Encrypted)?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
     assert_eq!(
         catalog["exportHealth"]["status"], "complete",
         "all exact populated settings are retained"
@@ -331,7 +332,7 @@ fn configuration<'row>(
 fn diagnostic(archive: &Archive) -> TestResult<Value> {
     assert!(
         matches!(
-            build_catalog(archive, &common::options()),
+            build_catalog(archive, common::options().with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "normal publication refuses actual projection loss"
@@ -339,7 +340,7 @@ fn diagnostic(archive: &Archive) -> TestResult<Value> {
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     Ok(serde_json::from_slice(
-        build_catalog(archive, &options)?.json(),
+        build_catalog(archive, options.with_full_provenance())?.json(),
     )?)
 }
 

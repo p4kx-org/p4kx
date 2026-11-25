@@ -3,7 +3,6 @@
 
 use p4kx_export::catalog_queries::game_modes::{
     ResourceNetworkParametersSnapshot, with_resource_network_parameters,
-    with_resource_network_parameters_from,
 };
 use p4kx_export::catalog_queries::{CatalogRecordSelection, ResourceFloat32};
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog};
@@ -13,6 +12,7 @@ use serde_json::{Value, json};
 use super::fixture::{self, Layout};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 const DATASET: &str = "/configurations/resourceNetworkParameters";
 
@@ -26,20 +26,16 @@ fn network_sdk_matches_canonical_rules_despite_an_unsupported_radar_sibling() ->
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let radar = proof::at(&catalog, "/configurations/radarOptions/rows/0/params/value")?;
     proof::cell(radar, "radarOptionParams", "unsupported")?;
     let entry = DataForgeEntry::read(&archive)?;
-    with_resource_network_parameters_from(
-        &archive,
-        &entry,
-        CatalogRecordSelection::All,
-        None,
-        |snapshot| {
+    full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .with_resource_network_parameters(CatalogRecordSelection::All, None, |snapshot| {
             check_rules(&snapshot)?;
             parity(&snapshot, &catalog)
-        },
-    )??;
+        })??;
     Ok(())
 }
 

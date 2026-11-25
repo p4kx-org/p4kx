@@ -45,7 +45,7 @@ fn build(values: [bool; 2], mode: CatalogPublicationMode) -> Result<BuiltCatalog
         publication_mode: mode,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    Ok(build_catalog(&archive, &options)?)
+    Ok(build_catalog(&archive, options.with_full_provenance())?)
 }
 #[test]
 fn conflicting_physical_generators_refuse_normal_publication() -> TestResult {

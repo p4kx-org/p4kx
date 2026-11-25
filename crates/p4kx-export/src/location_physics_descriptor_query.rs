@@ -4,15 +4,15 @@
 use std::sync::{Arc, OnceLock};
 
 use p4kx_extraction::{
-    Archive, ArchiveWatch, Build, CancelToken, SourceInventory, SourceUse, SourceValue,
-    SourcedValue,
+    Archive, ArchiveWatch, Build, CancelToken, ProvenanceMode, SourceInventory, SourceUse,
+    SourceValue, SourcedValue,
 };
 use serde::Serialize;
 
 use super::{GridRead, LocationPhysicsGrid};
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_read::original::{
-    EntryCapture, EntryRead, EntryXml, PhysicalEntryRef, with_entry_capture,
+    EntryCapture, EntryRead, EntryXml, PhysicalEntryRef, with_entry_capture_mode,
 };
 use crate::entry_source::EntrySource;
 use crate::export_ledger::ExportLedger;
@@ -79,9 +79,27 @@ pub fn read_location_physics_descriptor(
     selection: LocationPhysicsDescriptorSelection,
     cancel: Option<&CancelToken>,
 ) -> Result<LocationPhysicsDescriptorSnapshot, CatalogError> {
+    read_location_physics_descriptor_with_provenance_mode(
+        archive,
+        selection,
+        ProvenanceMode::MarkersOnly,
+        cancel,
+    )
+}
+
+/// Reads a location physics descriptor with the selected source detail.
+///
+/// # Errors
+/// Returns the errors of `read_location_physics_descriptor`.
+pub fn read_location_physics_descriptor_with_provenance_mode(
+    archive: &Archive,
+    selection: LocationPhysicsDescriptorSelection,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<LocationPhysicsDescriptorSnapshot, CatalogError> {
     checkpoint(cancel)?;
     let watch = ArchiveWatch::new(archive);
-    with_entry_capture(archive, |capture| {
+    with_entry_capture_mode(archive, provenance_mode, |capture| {
         let response = read(archive, selection, capture, cancel)?;
         checkpoint(cancel)?;
         watch.check()?;

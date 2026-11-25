@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::location_vocabulary::{
     LocationVocabularyFamily as Family, LocationVocabularyRows, LocationVocabularySnapshot,
 };
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    with_location_entity_declarations,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability,
 };
 use p4kx_export::{CatalogOptions, build_catalog_from};
 use p4kx_extraction::{Archive, DataForgeEntry, Language, SourceLocation, SourceValueState};
@@ -53,9 +53,14 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     let (_directory, archive) = open(DataForgeStorage::Encrypted)?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog: Value = serde_json::from_slice(
-        build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?.json(),
+        build_catalog_from(
+            &archive,
+            &entry,
+            CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+        )?
+        .json(),
     )?;
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::Selected(&[]),
@@ -152,7 +157,7 @@ fn vocabulary_sdk_keeps_original_registry_slots_without_opening_unselected_bodie
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let class = forge.record(1).ok_or("original class Record")?;
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::Selected(&[Language::English]),
@@ -312,12 +317,8 @@ fn open(storage: DataForgeStorage) -> TestResult<(tempfile::TempDir, Archive)> {
 }
 
 pub(super) fn read_entities(archive: &Archive) -> TestResult<Route> {
-    with_location_entity_declarations(
-        archive,
-        CatalogRecordSelection::All,
-        None,
-        CatalogLanguageSelection::Selected(&[]),
-        None,
-        |snapshot| Route::queried_rows(LOCATION_ENTITIES, &snapshot.rows, None),
-    )?
+    full_proof::open(archive, CatalogLanguageSelection::Selected(&[]), None)?
+        .with_location_entity_declarations(CatalogRecordSelection::All, None, None, |snapshot| {
+            Route::queried_rows(LOCATION_ENTITIES, &snapshot.rows, None)
+        })?
 }

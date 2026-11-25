@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::climate::{
     CatalogJsonNumber, ClimateAssetSnapshot, LooseArchivePathState,
     LooseDefinitionSelection as Selection, PlanetClimateAsset, TerrainGuidLinkState,
-    read_climate_assets, read_climate_assets_from,
+    read_climate_assets_from, read_climate_assets_with_provenance_mode,
 };
 use p4kx_export::{CatalogError, CatalogOptions, build_catalog};
 use p4kx_extraction::{Archive, DataForgeEntry, FieldOrigin};
@@ -32,9 +33,17 @@ const ZERO: &str = "00000000-0000-0000-0000-000000000000";
 
 pub(super) fn read() -> TestResult<Route> {
     let (_folder, archive) = open(parity_entries())?;
-    let built = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
-    let scoped = read_climate_assets(&archive, Selection::ArchivePath(OWNER), None)?;
+    let scoped = read_climate_assets_with_provenance_mode(
+        &archive,
+        Selection::ArchivePath(OWNER),
+        full_proof::MODE,
+        None,
+    )?;
     verify_dependencies(&scoped)?;
     let expected = catalog
         .pointer(DATASET)
@@ -44,7 +53,8 @@ pub(super) fn read() -> TestResult<Route> {
         *expected,
         "exact selection has canonical values and origins"
     );
-    let all = read_climate_assets(&archive, Selection::All, None)?;
+    let all =
+        read_climate_assets_with_provenance_mode(&archive, Selection::All, full_proof::MODE, None)?;
     assert_eq!(
         table(&all),
         *expected,
@@ -52,8 +62,8 @@ pub(super) fn read() -> TestResult<Route> {
     );
 
     let forge = DataForgeEntry::read_until(&archive, &|| false)?;
-    let parsed =
-        read_climate_assets_from(&archive, &forge, Selection::Guid(OWNER_GUID.parse()?), None)?;
+    let parsed = full_proof::from_entry(&archive, &forge, full_proof::NO_LANGUAGES, None)?
+        .read_climate_assets(Selection::Guid(OWNER_GUID.parse()?), None)?;
     assert_eq!(
         table(&parsed),
         *expected,
@@ -203,13 +213,23 @@ fn exact_and_guid_selection_skip_unrelated_record_requirements() -> TestResult {
         .find(|entry| entry.path().eq_ignore_ascii_case(&stored))
         .ok_or("original owner directory Entry")?;
     let index = u32::try_from(entry.index())?;
-    let exact = read_climate_assets(&archive, Selection::EntryIndex(index), None)?;
+    let exact = read_climate_assets_with_provenance_mode(
+        &archive,
+        Selection::EntryIndex(index),
+        full_proof::MODE,
+        None,
+    )?;
     assert!(
         exact.is_selection_complete(),
         "the exact selected climate owner is readable without a DCB"
     );
     verify_empty_record_targets(only_row(&exact)?)?;
-    let selected = read_climate_assets(&archive, Selection::Guid(OWNER_GUID.parse()?), None)?;
+    let selected = read_climate_assets_with_provenance_mode(
+        &archive,
+        Selection::Guid(OWNER_GUID.parse()?),
+        full_proof::MODE,
+        None,
+    )?;
     assert_eq!(selected.entries.failed_selection_candidates, 2);
     assert!(
         !selected.is_selection_complete(),
@@ -222,7 +242,12 @@ fn exact_and_guid_selection_skip_unrelated_record_requirements() -> TestResult {
     );
     assert!(
         matches!(
-            read_climate_assets(&archive, Selection::ArchivePath(RECORD_OWNER), None),
+            read_climate_assets_with_provenance_mode(
+                &archive,
+                Selection::ArchivePath(RECORD_OWNER),
+                full_proof::MODE,
+                None
+            ),
             Err(CatalogError::Load(_))
         ),
         "a genuine nonzero Record selector exposes missing DataForge"

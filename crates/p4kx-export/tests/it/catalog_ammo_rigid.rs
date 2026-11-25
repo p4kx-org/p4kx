@@ -16,8 +16,9 @@ const RIGID_FIELD: &str = "fixtureRigidField";
 #[test]
 fn rigid_ammo_keeps_original_fields_and_completes_normal_catalog() -> TestResult {
     let (_folder, archive) = common::open(&database(), DcbOrigin::Encrypted)?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
     let [row] = proof::rows(&catalog, "/definitions/ammoDefinitions/rows")? else {
         return Err("one original Ammo definition".into());
     };

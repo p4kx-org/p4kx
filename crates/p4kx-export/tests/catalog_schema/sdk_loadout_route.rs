@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::CatalogRecordSelection;
-use p4kx_export::catalog_queries::equipment::{self, LoadoutOwnerKind};
+use p4kx_export::catalog_queries::equipment::LoadoutOwnerKind;
 use p4kx_extraction::{Archive, DataForgeEntry};
 
 use super::super::LOADOUTS;
@@ -20,12 +21,8 @@ pub(super) fn read() -> TestResult<Route> {
         Some(p4kx_testkit::test_key()),
     )?;
     let entry = DataForgeEntry::read(&archive)?;
-    let result = equipment::read_loadouts_from(
-        &archive,
-        &entry,
-        CatalogRecordSelection::RecordIndex(SHIP_RECORD),
-        None,
-    )?;
+    let result = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .read_loadouts(CatalogRecordSelection::RecordIndex(SHIP_RECORD), None)?;
     let [row] = result.rows.as_slice() else {
         return Err("one selected original Loadout".into());
     };

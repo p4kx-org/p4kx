@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::equipment;
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_extraction::{Archive, Language};
@@ -21,32 +22,31 @@ fn direct_ship_sdk_manufacturer_storage_and_text_resolvers_match_canonical() -> 
         let path = catalog_fixture::write_archive_with(folder.path(), &locales, maker)?;
         let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
         let catalog = fixture::catalog(&archive)?;
-        equipment::with_ship_sources(
+        full_proof::open(
             &archive,
-            CatalogRecordSelection::All,
             CatalogLanguageSelection::Selected(&[Language::English, Language::German]),
             None,
-            |snapshot| {
-                assert!(!snapshot.rows().is_empty(), "positive original Ship family");
-                for row in snapshot.rows() {
-                    let index = *row
-                        .source()
-                        .record_index()
-                        .value()
-                        .ok_or("physical Ship index")?;
-                    let canonical = proof::rows(&catalog, "/ships")?
-                        .iter()
-                        .find(|row| {
-                            row.pointer("/recordIndex/value")
-                                .and_then(serde_json::Value::as_u64)
-                                == Some(u64::from(index))
-                        })
-                        .ok_or("canonical physical Ship")?;
-                    source_sdk_walk::row(row, snapshot.source_inventory(), canonical)?;
-                }
-                verify_texts(&snapshot, &catalog)
-            },
-        )??;
+        )?
+        .with_ship_sources(CatalogRecordSelection::All, None, |snapshot| {
+            assert!(!snapshot.rows().is_empty(), "positive original Ship family");
+            for row in snapshot.rows() {
+                let index = *row
+                    .source()
+                    .record_index()
+                    .value()
+                    .ok_or("physical Ship index")?;
+                let canonical = proof::rows(&catalog, "/ships")?
+                    .iter()
+                    .find(|row| {
+                        row.pointer("/recordIndex/value")
+                            .and_then(serde_json::Value::as_u64)
+                            == Some(u64::from(index))
+                    })
+                    .ok_or("canonical physical Ship")?;
+                source_sdk_walk::row(row, snapshot.source_inventory(), canonical)?;
+            }
+            verify_texts(&snapshot, &catalog)
+        })??;
     }
     Ok(())
 }

@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogRecordSelection, ReputationRows, ReputationSelection,
-    ReputationSnapshot, with_reputation_from,
+    ReputationSnapshot,
 };
 use p4kx_export::{CatalogOptions, build_catalog_from};
 use p4kx_extraction::{
@@ -141,16 +142,19 @@ fn compare(
     inspect: impl FnOnce(ReputationSnapshot<'_>, &Value) -> TestResult<Route>,
 ) -> TestResult<Route> {
     let entry = DataForgeEntry::read(archive)?;
-    let built = build_catalog_from(archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?;
-    let catalog: Value = serde_json::from_slice(built.json())?;
-    with_reputation_from(
+    let built = build_catalog_from(
         archive,
         &entry,
-        selection,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
+    let catalog: Value = serde_json::from_slice(built.json())?;
+    full_proof::from_entry(
+        archive,
+        &entry,
         CatalogLanguageSelection::AllAvailable,
         None,
-        |snapshot| inspect(snapshot, &catalog),
     )?
+    .with_reputation(selection, None, |snapshot| inspect(snapshot, &catalog))?
 }
 
 fn witness<Row: JsonSchema + Serialize>(

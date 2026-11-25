@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::medical::{
-    MedicalItemTierSnapshot, with_medical_item_tier_configs, with_medical_item_tier_configs_from,
+    MedicalItemTierSnapshot, with_medical_item_tier_configs,
 };
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
@@ -32,22 +33,22 @@ pub(super) fn read() -> TestResult<Route> {
     let (_directory, archive) = open(&fixture::database(), SourceStorage::Encrypted)?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog: Value = serde_json::from_slice(
-        build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?.json(),
+        build_catalog_from(
+            &archive,
+            &entry,
+            CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+        )?
+        .json(),
     )?;
-    with_medical_item_tier_configs_from(
-        &archive,
-        &entry,
-        CatalogRecordSelection::All,
-        None,
-        |snapshot| {
+    full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .with_medical_item_tier_configs(CatalogRecordSelection::All, None, |snapshot| {
             verify_catalog(&snapshot, &catalog)?;
             Route::queried_rows(
                 MEDICAL_ITEM_TIER_CONFIGS,
                 &snapshot.rows,
                 "synthetic source and Catalog parity available; installed producer parity open",
             )
-        },
-    )?
+        })?
 }
 
 fn verify_catalog(snapshot: &MedicalItemTierSnapshot<'_>, catalog: &Value) -> TestResult {

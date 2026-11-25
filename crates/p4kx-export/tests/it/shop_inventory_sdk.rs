@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::DatasetAvailability;
 use p4kx_export::catalog_queries::shops::{
-    ShopInventorySelection, ShopInventoryToken, read_shop_inventories,
+    ShopInventoryDefinition, ShopInventorySelection, ShopInventoryToken,
+    read_shop_inventories_with_provenance_mode,
 };
 use p4kx_export::{CatalogError, CatalogOptions, CatalogPublicationMode, build_catalog};
 use p4kx_extraction::{Archive, CancelToken, SourceValueState};
@@ -30,8 +32,14 @@ fn shop_inventory_sdk_matches_the_canonical_definition_table() -> TestResult {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
-    let result = read_shop_inventories(&archive, ShopInventorySelection::All, None)?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
+    let result = read_shop_inventories_with_provenance_mode(
+        &archive,
+        ShopInventorySelection::All,
+        full_proof::MODE,
+        None,
+    )?;
     assert!(matches!(
         result.availability,
         DatasetAvailability::Available
@@ -55,7 +63,12 @@ fn shop_inventory_sdk_matches_the_canonical_definition_table() -> TestResult {
 #[test]
 fn shop_inventory_sdk_reads_selected_entries_without_dataforge_or_registry() -> TestResult {
     let (_directory, archive) = fixture(false)?;
-    let result = read_shop_inventories(&archive, ShopInventorySelection::ArchivePath(ALIAS), None)?;
+    let result = read_shop_inventories_with_provenance_mode(
+        &archive,
+        ShopInventorySelection::ArchivePath(ALIAS),
+        full_proof::MODE,
+        None,
+    )?;
     assert_eq!(result.coverage.entries.selected, 2);
     assert_eq!(result.coverage.entries.failed_required_reads, 0);
     let [first, second] = result.rows.as_slice() else {
@@ -63,35 +76,11 @@ fn shop_inventory_sdk_reads_selected_entries_without_dataforge_or_registry() -> 
     };
     assert!(first.identity().entry_index() < second.identity().entry_index());
     assert_ne!(first.identity().input_ref(), second.identity().input_ref());
-    let document = first
-        .document()
-        .value()
-        .ok_or("the original JSON document")?;
-    let lines = document
-        .fields()
-        .inventory()
-        .value()
-        .ok_or("inventory list")?;
-    let [line] = lines.as_slice() else {
-        return Err("one authored inventory line".into());
-    };
-    let line = line.value().ok_or("original inventory line")?;
-    let price = line
-        .buy_price()
-        .value()
-        .ok_or("original buy-price address")?;
-    let cell = document
-        .source()
-        .values()
-        .get(usize::try_from(price.get())?)
-        .ok_or("original price cell")?;
-    assert!(
-        matches!(cell.value(), Some(ShopInventoryToken::Number { token, .. }) if token == EXACT_PRICE),
-        "the original number token must retain every digit"
-    );
-    let chosen = read_shop_inventories(
+    assert_original_price(first)?;
+    let chosen = read_shop_inventories_with_provenance_mode(
         &archive,
         ShopInventorySelection::EntryIndex(second.identity().entry_index()),
+        full_proof::MODE,
         None,
     )?;
     assert_eq!(chosen.rows.len(), 1);
@@ -114,6 +103,33 @@ fn shop_inventory_sdk_reads_selected_entries_without_dataforge_or_registry() -> 
     Ok(())
 }
 
+fn assert_original_price(row: &ShopInventoryDefinition) -> TestResult {
+    let document = row.document().value().ok_or("the original JSON document")?;
+    let lines = document
+        .fields()
+        .inventory()
+        .value()
+        .ok_or("inventory list")?;
+    let [line] = lines.as_slice() else {
+        return Err("one authored inventory line".into());
+    };
+    let line = line.value().ok_or("original inventory line")?;
+    let price = line
+        .buy_price()
+        .value()
+        .ok_or("original buy-price address")?;
+    let cell = document
+        .source()
+        .values()
+        .get(usize::try_from(price.get())?)
+        .ok_or("original price cell")?;
+    assert!(
+        matches!(cell.value(), Some(ShopInventoryToken::Number { token, .. }) if token == EXACT_PRICE),
+        "the original number token must retain every digit"
+    );
+    Ok(())
+}
+
 #[test]
 fn shop_inventory_sdk_reports_distinct_empty_failed_and_absent_states() -> TestResult {
     let (_directory, archive) = fixture(false)?;
@@ -122,8 +138,12 @@ fn shop_inventory_sdk_reports_distinct_empty_failed_and_absent_states() -> TestR
         (KEYED, SourceValueState::Unreadable, 0, 1, 0),
         (BAD, SourceValueState::Invalid, 0, 0, 1),
     ] {
-        let selected =
-            read_shop_inventories(&archive, ShopInventorySelection::ArchivePath(path), None)?;
+        let selected = read_shop_inventories_with_provenance_mode(
+            &archive,
+            ShopInventorySelection::ArchivePath(path),
+            full_proof::MODE,
+            None,
+        )?;
         let [row] = selected.rows.as_slice() else {
             return Err("one observed physical Entry".into());
         };
@@ -138,8 +158,12 @@ fn shop_inventory_sdk_reports_distinct_empty_failed_and_absent_states() -> TestR
             projection_failures
         );
     }
-    let missing =
-        read_shop_inventories(&archive, ShopInventorySelection::EntryIndex(u32::MAX), None)?;
+    let missing = read_shop_inventories_with_provenance_mode(
+        &archive,
+        ShopInventorySelection::EntryIndex(u32::MAX),
+        full_proof::MODE,
+        None,
+    )?;
     assert!(matches!(missing.availability, DatasetAvailability::Absent));
     assert!(missing.coverage.directory.source_set_complete());
     let raw =
@@ -155,7 +179,12 @@ fn shop_inventory_sdk_reports_distinct_empty_failed_and_absent_states() -> TestR
     let cancel = CancelToken::new();
     cancel.cancel();
     assert!(matches!(
-        read_shop_inventories(&archive, ShopInventorySelection::All, Some(&cancel)),
+        read_shop_inventories_with_provenance_mode(
+            &archive,
+            ShopInventorySelection::All,
+            full_proof::MODE,
+            Some(&cancel)
+        ),
         Err(CatalogError::Cancelled)
     ));
     Ok(())

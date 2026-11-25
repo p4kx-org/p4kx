@@ -1,12 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::equipment::ResourceCapacity;
-use p4kx_export::catalog_queries::equipment::consumables::{
-    ConsumableSnapshot, with_consumables_from,
-};
+use p4kx_export::catalog_queries::equipment::consumables::ConsumableSnapshot;
 use p4kx_export::catalog_queries::equipment::mining_tools::{
     AttachableEffect, AttachableModifierSnapshot, MiningLaserSnapshot,
 };
@@ -50,14 +49,16 @@ fn mining_tools_and_consumables_match_synthetic_producer_rows() -> TestResult<()
     let entry = DataForgeEntry::read(&archive)?;
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog_from(&archive, &entry, &options)?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog_from(&archive, &entry, options.with_full_provenance())?.json(),
+    )?;
     let session = CatalogQuerySession::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::Selected(&[]),
         None,
-    )?;
+    )?
+    .with_provenance_mode(full_proof::MODE);
     let parsed = session.parsed(None)?;
     parsed.with_mining_lasers(ALL, None, |snapshot| {
         parity(MINING_LASERS, &snapshot, &catalog)
@@ -85,16 +86,16 @@ fn component_tools_keep_original_slots_and_independent_dependencies() -> TestRes
         &entry,
         CatalogLanguageSelection::AllAvailable,
         None,
-    )?;
+    )?
+    .with_provenance_mode(full_proof::MODE);
     let parsed = session.parsed(None)?;
     let global =
         parsed.with_mining_lasers(CatalogRecordSelection::Guid(guid), None, |snapshot| {
             check_lasers(&snapshot)
         })??;
     let item = CatalogRecordSelection::RecordIndex(fixture::ITEM);
-    let subtype = with_consumables_from(&archive, &entry, item, None, |snapshot| {
-        check_consumable(&snapshot)
-    })??;
+    let subtype = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .with_consumables(item, None, |snapshot| check_consumable(&snapshot))??;
     parsed.with_attachable_modifiers(item, None, |snapshot| check_effects(&snapshot))??;
     parsed.with_mining_laser_globals(
         CatalogRecordSelection::RecordIndex(global),

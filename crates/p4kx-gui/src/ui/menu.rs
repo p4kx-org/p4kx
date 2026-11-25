@@ -268,16 +268,15 @@ fn export_menu(ui: &mut Ui, model: &Model, requests: &mut Requests) -> Option<Pi
         {
             picked = Some(Pick::InteriorExport);
         }
-        let catalog = Button::new(entry(&texts.get(CatalogText::Action)));
-        if ui.add_enabled(model.catalog_available(), catalog).clicked() {
-            requests.dialog = Some(Dialog::CatalogFile);
-        }
-        let diagnostic = Button::new(entry(&texts.get(CatalogText::DiagnosticAction)));
-        if ui
-            .add_enabled(model.catalog_available(), diagnostic)
-            .clicked()
-        {
-            requests.dialog = Some(Dialog::DiagnosticCatalogFile);
+        for (label, dialog) in [
+            (CatalogText::Action, Dialog::CatalogFile),
+            (CatalogText::FullAction, Dialog::FullCatalogFile),
+            (CatalogText::DiagnosticAction, Dialog::DiagnosticCatalogFile),
+        ] {
+            let catalog = Button::new(entry(&texts.get(label)));
+            if ui.add_enabled(model.catalog_available(), catalog).clicked() {
+                requests.dialog = Some(dialog);
+            }
         }
     });
     label(&response.response, &title);

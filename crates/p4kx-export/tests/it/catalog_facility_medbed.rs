@@ -15,8 +15,9 @@ mod fixture;
 fn medbed_configuration_and_tier_sources_join_at_their_original_occurrences() -> TestResult {
     let (_directory, archive) = common::open(&fixture::database(), DcbOrigin::Encrypted)?;
     verify_original(&archive)?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
     let [component] = proof::rows(&catalog, "/configurations/facilities/rows")? else {
         return Err("one physical MedBed facility component".into());
     };

@@ -175,7 +175,7 @@ fn document(input: &p4kx_extraction::Archive, filter: Option<&Filter>) -> TestRe
     let mut options = archive::options();
     options.filter = filter;
     Ok(serde_json::from_slice(
-        build_catalog(input, &options)?.json(),
+        build_catalog(input, options.with_full_provenance())?.json(),
     )?)
 }
 

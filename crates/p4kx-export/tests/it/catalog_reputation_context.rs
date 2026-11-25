@@ -28,7 +28,7 @@ fn a_context_keeps_ordered_scope_slots_and_the_owned_display_properties() -> Tes
     let filter = Filter::new("*/reputation/contexts/*");
     let mut options = archive::options();
     options.filter = Some(&filter);
-    let built = build_catalog(&input, &options)?;
+    let built = build_catalog(&input, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let context = at(&catalog, "/definitions/reputationContexts/rows/0")?;
     assert!(catalog.get("reputationContexts").is_none());

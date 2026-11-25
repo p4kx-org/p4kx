@@ -14,7 +14,7 @@ const SETTINGS: &str = "AutoSpawnSettings";
 #[test]
 fn location_spawn_settings_preserve_source_bits_and_tag_order() -> TestResult {
     let (_directory, archive) = common::open(&database(), DcbOrigin::Encrypted)?;
-    let built = build_catalog(&archive, &common::options())?;
+    let built = build_catalog(&archive, common::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let spawn = at(
         &catalog,

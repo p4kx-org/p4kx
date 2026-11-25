@@ -45,7 +45,9 @@ pub struct GeneratorDefinition<'source> {
 }
 
 impl<'source> GeneratorDefinition<'source> {
-    /// The original physical input in this result's source inventory.
+    /// The result-local physical input identity.
+    ///
+    /// Resolve it through the source inventory in Full provenance.
     #[must_use]
     pub const fn input_ref(&self) -> &PhysicalSourceRef {
         &self.input_ref
@@ -101,7 +103,9 @@ pub struct ContractOccurrence {
 }
 
 impl ContractOccurrence {
-    /// The original physical input in the query's source inventory.
+    /// The result-local physical input identity.
+    ///
+    /// Resolve it through the source inventory in Full provenance.
     #[must_use]
     pub const fn input_ref(&self) -> &PhysicalSourceRef {
         &self.input_ref

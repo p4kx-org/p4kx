@@ -22,7 +22,10 @@ const LAYERS: [&str; 4] = ["subContract", "contract", "handler", "template"];
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn contracts_of_a_real_archive_state_their_facts_and_the_level_of_each() -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let contracts = v3::rows(&catalog)?;
     assert!(!contracts.is_empty(), "contracts");

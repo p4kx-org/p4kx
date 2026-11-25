@@ -6,7 +6,6 @@ use p4kx_extraction::{
 };
 
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, ParsedCatalogQueries,
 };
@@ -111,6 +110,7 @@ pub struct LootContainerSnapshot {
     /// Shared original basis of the all-system placement survey, when run.
     pub placement_survey: Option<FieldOrigin>,
     /// Failed Record header and descriptor attempt references in the source inventory.
+    /// Marker-only snapshots leave this empty.
     pub failed_source_uses: Vec<SourceUseRef>,
     /// Original directory and verified document inputs of the reached link search.
     pub entity_link_survey: Option<FieldOrigin>,
@@ -160,7 +160,7 @@ impl ParsedCatalogQueries<'_> {
         cancel: Option<&CancelToken>,
     ) -> Result<LootContainerSnapshot, CatalogError> {
         self.project(cancel, |archive, entry, forge| {
-            let origins = CatalogOrigins::for_archive_records(archive, entry)?;
+            let origins = entry.records(archive)?;
             let input = OriginalCatalogInput::new(forge, &origins);
             loot_containers::read_physical_container(archive, forge, &input, query, cancel)
         })

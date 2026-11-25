@@ -29,7 +29,7 @@ pub(super) fn read() -> TestResult<Route> {
             filter: selection,
             ..CatalogOptions::new(UNIX_EPOCH)
         };
-        let built = build_catalog(&archive, &options)?;
+        let built = build_catalog(&archive, options.with_full_provenance())?;
         let catalog: Value = serde_json::from_slice(built.json())?;
         assert_eq!(
             catalog.get("schemaVersion"),

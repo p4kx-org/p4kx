@@ -17,7 +17,11 @@ fn equal_visible_inventories_never_authorize_foreign_original_health_inputs() ->
     separate_registries(&first, &second)?;
     assert!(
         matches!(
-            build_catalog_from(&second.archive, &first.entry, &fixture::options()),
+            build_catalog_from(
+                &second.archive,
+                &first.entry,
+                fixture::options().with_full_provenance()
+            ),
             Err(CatalogError::SourceOriginMismatch)
         ),
         "equal bytes and visible inventories cannot retarget an original DCB into another Archive"

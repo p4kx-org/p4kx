@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::quality::QuantizationResourceSnapshot;
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability, ParsedCatalogQueries,
 };
 use p4kx_extraction::{InputScope, SourceLocation};
 use p4kx_testkit::DataForgeBuilder;
@@ -90,7 +90,7 @@ fn with_catalog(
 ) -> TestResult {
     let fixture = Fixture::open(&database.build(), input, Vec::new())?;
     let (_, catalog) = fixture.diagnostic()?;
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &fixture.archive,
         &fixture.entry,
         CatalogLanguageSelection::AllAvailable,

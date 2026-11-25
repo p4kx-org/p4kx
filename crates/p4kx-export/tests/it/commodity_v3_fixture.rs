@@ -80,7 +80,7 @@ pub(crate) const fn options() -> CatalogOptions<'static> {
 
 pub(crate) fn build(database: &DataForgeBuilder) -> TestResult<(BuiltCatalog, Value)> {
     let (_folder, archive) = open(database, DcbOrigin::Plain)?;
-    let built = build_catalog(&archive, &options())?;
+    let built = build_catalog(&archive, options().with_full_provenance())?;
     let catalog = serde_json::from_slice(built.json())?;
     Ok((built, catalog))
 }
@@ -90,7 +90,7 @@ pub(crate) fn unknown(database: &DataForgeBuilder) -> TestResult<Value> {
     let mut options = options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     Ok(serde_json::from_slice(
-        build_catalog(&archive, &options)?.json(),
+        build_catalog(&archive, options.with_full_provenance())?.json(),
     )?)
 }
 

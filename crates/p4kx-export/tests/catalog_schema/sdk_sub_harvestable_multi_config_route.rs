@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::loot::{LootDefinitionKind, LootDefinitionSnapshot};
@@ -41,14 +42,19 @@ const DEPENDENCY: u32 = 4;
 pub(super) fn read() -> TestResult<Route> {
     let (_folder, archive) = open(false)?;
     let entry = DataForgeEntry::read(&archive)?;
-    let producer = build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?;
+    let producer = build_catalog_from(
+        &archive,
+        &entry,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(producer.json())?;
     let session = CatalogQuerySession::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::Selected(&[]),
         None,
-    )?;
+    )?
+    .with_provenance_mode(full_proof::MODE);
     let parsed = session.parsed(None)?;
     let route =
         parsed.with_loot_definitions(FAMILY, CatalogRecordSelection::All, None, |snapshot| {
@@ -174,7 +180,8 @@ fn assert_failed_dependency() -> TestResult {
         &entry,
         CatalogLanguageSelection::Selected(&[]),
         None,
-    )?;
+    )?
+    .with_provenance_mode(full_proof::MODE);
     let parsed = session.parsed(None)?;
     for index in [LATER, EARLIER] {
         parsed.with_loot_definitions(

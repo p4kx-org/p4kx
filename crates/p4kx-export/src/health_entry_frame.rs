@@ -3,6 +3,8 @@
 
 use std::sync::Arc;
 
+use p4kx_extraction::ProvenanceMode;
+
 use p4kx_extraction::{Archive, ArchiveInputOrigin, EntryOrigin, SourceEvidenceError, SourceUses};
 
 use super::health_reference_receipt::ReferenceFrame;
@@ -117,11 +119,20 @@ impl<'input> EntryCapture<'input> {
     }
 }
 
+#[cfg(test)]
 pub(crate) fn with_entry_capture<T>(
     archive: &Archive,
     read: impl FnOnce(&EntryCapture<'_>) -> Result<T, CatalogError>,
 ) -> Result<T, CatalogError> {
-    let sources = SourceUses::with_compact_coordinates();
+    with_entry_capture_mode(archive, ProvenanceMode::Full, read)
+}
+
+pub(crate) fn with_entry_capture_mode<T>(
+    archive: &Archive,
+    provenance_mode: ProvenanceMode,
+    read: impl FnOnce(&EntryCapture<'_>) -> Result<T, CatalogError>,
+) -> Result<T, CatalogError> {
+    let sources = SourceUses::with_provenance_mode(provenance_mode);
     let frame = Arc::new(EntryFrame::new(archive, &sources));
     let texts = super::HealthTextCapture::new();
     read(&EntryCapture {

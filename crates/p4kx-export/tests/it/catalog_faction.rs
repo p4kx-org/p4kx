@@ -22,7 +22,7 @@ fn build(
     let (_folder, archive) = archive::open(database, origin)?;
     let mut options = archive::options();
     options.filter = filter;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let json = serde_json::from_slice(built.json())?;
     Ok((built, json))
 }
@@ -36,7 +36,7 @@ fn factions_export_exact_legal_behavior_ordered_links_and_unprojected_fields() -
     let database = fixture::complete();
     let (_folder, archive) = archive::open(&database, DcbOrigin::Plain)?;
     let options = archive::options();
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog = serde_json::from_slice(built.json())?;
     let rows = rows(&catalog)?;
     assert_eq!(
@@ -88,7 +88,7 @@ fn factions_export_exact_legal_behavior_ordered_links_and_unprojected_fields() -
         &json!(guid(fixture::REPUTATION))
     );
     assert!(
-        built.json() == build_catalog(&archive, &options)?.json(),
+        built.json() == build_catalog(&archive, options.with_full_provenance())?.json(),
         "the same source and export timestamp produce identical bytes"
     );
     Ok(())

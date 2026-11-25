@@ -23,7 +23,7 @@ pub(crate) fn build(
     let mut options = common::options();
     options.publication_mode = mode;
     options.filter = filter;
-    let built = p4kx_export::build_catalog(&archive, &options)?;
+    let built = p4kx_export::build_catalog(&archive, options.with_full_provenance())?;
     let catalog = serde_json::from_slice(built.json())?;
     Ok((built, catalog))
 }
@@ -50,7 +50,7 @@ pub(crate) fn assert_normal_refusal(database: &DataForgeBuilder) -> TestResult {
     let (_folder, archive) = common::open(database, DcbOrigin::Plain)?;
     assert!(
         matches!(
-            p4kx_export::build_catalog(&archive, &common::options()),
+            p4kx_export::build_catalog(&archive, common::options().with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "the actual required field violation must block normal publication"

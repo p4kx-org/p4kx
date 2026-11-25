@@ -37,9 +37,13 @@ fn actual_refusals_with_equal_storage_indices_keep_their_own_text_and_inventory(
 
 fn refused(file: &str, input: Input) -> TestResult<CatalogError> {
     let source = super::distinct_source(file, input)?;
-    build_catalog_from(&source.archive, &source.entry, &fixture::options())
-        .err()
-        .ok_or_else(|| "the original failing body must refuse normal publication".into())
+    build_catalog_from(
+        &source.archive,
+        &source.entry,
+        fixture::options().with_full_provenance(),
+    )
+    .err()
+    .ok_or_else(|| "the original failing body must refuse normal publication".into())
 }
 
 fn report(error: &CatalogError) -> TestResult<&CatalogRefusal> {

@@ -178,7 +178,7 @@ fn document(filter: Option<&Filter>) -> TestResult<Value> {
     let mut options = archive::options();
     options.filter = filter;
     Ok(serde_json::from_slice(
-        build_catalog(&input, &options)?.json(),
+        build_catalog(&input, options.with_full_provenance())?.json(),
     )?)
 }
 

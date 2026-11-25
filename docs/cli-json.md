@@ -1529,6 +1529,7 @@ Plain table output retains its existing fields and formatting.
 The following excerpt shows the publication contract; other summary fields and the per-kind
 health and diagnostic lists are omitted. The complete health object is identical to the catalog's
 `exportHealth`; its nested keys retain camelCase inside the CLI's snake_case summary.
+The summary includes the source-use inventory under `provenance` when `--provenance full` is selected.
 
 ```json
 {"archive": "Data.p4k", "out": "diagnostic.json.zst", "schema_version": 3,

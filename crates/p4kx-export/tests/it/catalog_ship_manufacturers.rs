@@ -23,7 +23,7 @@ fn catalog_of(maker: Maker) -> Result<Value, Box<dyn Error>> {
         catalog_fixture::write_archive_with(dir.path(), &[catalog_fixture::english()], maker)?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let built = p4kx_export::build_catalog(&archive, &options())?;
+    let built = p4kx_export::build_catalog(&archive, options().with_full_provenance())?;
     Ok(serde_json::from_slice(built.json())?)
 }
 
@@ -124,7 +124,8 @@ fn opposite_ship_manufacturers_preserve_both_component_selectors_and_targets() -
     let archive = opposite_manufacturer_archive(&dir.path().join("Data.p4k"))?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
-    let built = p4kx_export::build_catalog_from(&archive, &entry, &options())?;
+    let built =
+        p4kx_export::build_catalog_from(&archive, &entry, options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     for (ship_guid, vehicle_maker, attachment_maker, vehicle_slot, attach_slot) in [
         (SHIP_A, MAKER_A, MAKER_B, 1, 0),

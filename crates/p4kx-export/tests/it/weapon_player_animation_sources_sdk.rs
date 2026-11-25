@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::CatalogError;
 use p4kx_export::catalog_queries::equipment::weapon_animation_sources::{
     MannequinBranchVisit, MannequinFragmentStatus, WeaponAnimationSourcesSnapshot,
-    with_player_weapon_animation_sources_from,
 };
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, DatasetAvailability,
@@ -24,26 +24,26 @@ fn reached_weapon_animation_graph_matches_canonical_sources_and_origins() -> Tes
     for input in [Input::Plain, Input::Encrypted] {
         let fixture = Fixture::open(&data, input, documents())?;
         let (_, catalog) = fixture.diagnostic()?;
-        with_player_weapon_animation_sources_from(
+        full_proof::from_entry(
             &fixture.archive,
             &fixture.entry,
+            full_proof::NO_LANGUAGES,
             None,
-            |snapshot| -> TestResult {
-                assert_authored_graph(&snapshot, input)?;
-                let query = json!({
-                    "definitions": {"weaponAnimationSources": snapshot.sources},
-                    "provenance": snapshot.source_inventory,
-                });
-                let actual = origin::with_origins(origin::at(&query, GRAPH)?.clone(), &query)?;
-                let expected =
-                    origin::with_origins(origin::at(&catalog, GRAPH)?.clone(), &catalog)?;
-                assert_eq!(
-                    actual, expected,
-                    "all eight paths retain original ordering, values and physical use facts"
-                );
-                origin::closure(&query)
-            },
-        )??;
+        )?
+        .with_player_weapon_animation_sources(None, |snapshot| -> TestResult {
+            assert_authored_graph(&snapshot, input)?;
+            let query = json!({
+                "definitions": {"weaponAnimationSources": snapshot.sources},
+                "provenance": snapshot.source_inventory,
+            });
+            let actual = origin::with_origins(origin::at(&query, GRAPH)?.clone(), &query)?;
+            let expected = origin::with_origins(origin::at(&catalog, GRAPH)?.clone(), &catalog)?;
+            assert_eq!(
+                actual, expected,
+                "all eight paths retain original ordering, values and physical use facts"
+            );
+            origin::closure(&query)
+        })??;
     }
     Ok(())
 }

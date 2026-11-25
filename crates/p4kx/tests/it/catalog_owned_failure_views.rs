@@ -12,7 +12,7 @@ fn actual_cli_failure_mirror_uses_the_same_report_storage_and_original_source_ce
     let original = original(folder.path(), true)?;
     let out = folder.path().join("catalog.json");
     let output = p4kx_testkit::p4kx()?
-        .arg("catalog")
+        .args(["catalog", "--provenance", "full"])
         .arg(&original.archive)
         .arg("--out")
         .arg(&out)

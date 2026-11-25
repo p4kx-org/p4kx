@@ -305,7 +305,7 @@ fn catalog(filter: Option<&Filter>) -> TestResult<Value> {
     let mut options = common::options();
     options.filter = filter;
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     Ok(serde_json::from_slice(built.json())?)
 }
 

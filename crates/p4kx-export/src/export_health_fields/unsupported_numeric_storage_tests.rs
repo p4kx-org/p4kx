@@ -241,7 +241,10 @@ fn check_publication(case: Case) -> Checked {
         ))
         .write_to(&path)?;
     let archive = Archive::open(path)?;
-    let outcome = crate::build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH));
+    let outcome = crate::build_catalog(
+        &archive,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    );
     assert!(
         matches!(&outcome, Err(CatalogError::IncompleteExport(_))),
         "unsupported Resource shape {} owned by {} still blocks Normal publication: {:?}",
@@ -251,7 +254,7 @@ fn check_publication(case: Case) -> Checked {
     );
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = crate::build_catalog(&archive, &options)?;
+    let built = crate::build_catalog(&archive, options.with_full_provenance())?;
     let catalog: JsonValue = serde_json::from_slice(built.json())?;
     assert_eq!(
         catalog

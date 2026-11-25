@@ -17,7 +17,8 @@ fn cargo_grid_filtered_container_keeps_identity_without_projecting_capacity() ->
         filter: Some(&filter),
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let capacity = proof::at(only_grid(&catalog)?, "/capacity")?;
     assert_eq!(
         proof::at(capacity, "/status")?,

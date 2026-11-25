@@ -97,7 +97,7 @@ fn catalog(collision: Collision) -> TestResult<Value> {
     let bytes = fixture::database(collision).build();
     original(&bytes, collision)?;
     let (_folder, archive) = source::open_bytes(bytes, DcbOrigin::Plain)?;
-    let built = build_catalog(&archive, &source::options())?;
+    let built = build_catalog(&archive, source::options().with_full_provenance())?;
     Ok(serde_json::from_slice(built.json())?)
 }
 

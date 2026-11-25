@@ -3,11 +3,13 @@
 
 use std::time::UNIX_EPOCH;
 
+use p4kx_extraction::ProvenanceMode;
+
 use p4kx_extraction::{Archive, ArchiveWatch, Build, CancelToken, FieldOrigin, SourceInventory};
 
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_read::loose_definition::Selection;
-use crate::catalog_read::original::{EntryCapture, EntryReceipt, with_entry_capture};
+use crate::catalog_read::original::{EntryCapture, EntryReceipt, with_entry_capture_mode};
 use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::export_archive_health;
 use crate::export_entry_counts::ExportEntryCounts;
@@ -44,11 +46,12 @@ impl<Row> LooseDefinitionSnapshot<Row> {
     }
 }
 
-pub(super) fn read<Row>(
+pub(super) fn read_with_provenance_mode<Row>(
     archive: &Archive,
     selection: Selection<'_>,
     cancel: Option<&CancelToken>,
     kind: Kind,
+    provenance_mode: ProvenanceMode,
     read_rows: impl FnOnce(
         &EntryCapture<'_>,
         &mut ExportLedger,
@@ -58,7 +61,7 @@ pub(super) fn read<Row>(
     checkpoint(cancel)?;
     let watch = ArchiveWatch::new(archive);
     watch.check()?;
-    let snapshot = with_entry_capture(archive, |capture| {
+    let snapshot = with_entry_capture_mode(archive, provenance_mode, |capture| {
         let mut ledger = ExportLedger {
             archive_inventory_problem: export_archive_health::inventory(archive),
             ..ExportLedger::default()

@@ -9,6 +9,8 @@ use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
 
 use serde_json::{Value, json};
 
+use crate::sdk_full_proof as full_proof;
+
 use super::{
     COMPOSITION, ENTITY, HARVESTABLE, PARAMS, PRESET_PLACED, RESOURCE, TestResult, build,
     build_archive, entry, guid, write_archive,
@@ -21,7 +23,7 @@ fn provider_queries_match_the_canonical_source_link_and_skip_placements() -> Tes
         Archive::open_with_key(write_archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
     let (_, catalog) = build_archive(&archive, None)?;
     let decoded = DataForgeEntry::read(&archive)?;
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &archive,
         &decoded,
         CatalogLanguageSelection::AllAvailable,

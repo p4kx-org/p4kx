@@ -71,8 +71,8 @@ fn scoped_catalog(archive: &Archive, entry: &DataForgeEntry, scope: &str) -> Tes
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(SystemTime::now())
     };
-    let built =
-        build_catalog_from(archive, entry, &options).map_err(|_| "build scoped fuel catalog")?;
+    let built = build_catalog_from(archive, entry, options.with_full_provenance())
+        .map_err(|_| "build scoped fuel catalog")?;
     let catalog = serde_json::from_slice(built.json()).map_err(|_| "decode scoped fuel catalog")?;
     crate::real_archive_shop_inventory_v3::verify_build(archive, &catalog)?;
     Ok(catalog)

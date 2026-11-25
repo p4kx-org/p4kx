@@ -6,12 +6,11 @@ use p4kx_extraction::{Archive, CancelToken, DataForge, DataForgeEntry};
 use super::EquipmentSnapshot;
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::unlocalized_record_query::plan::Plan;
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ParsedCatalogQueries,
 };
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::catalog_v3::catalog_weapon_actions::RECOIL_DEFINITION;
 use crate::catalog_v3::weapon_action_recoil_definitions;
 use crate::record_observation::RecordObservation;
@@ -92,14 +91,14 @@ impl ParsedCatalogQueries<'_> {
 
 fn with_parsed<T>(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     selection: CatalogRecordSelection,
     cancel: Option<&CancelToken>,
     inspect: impl FnOnce(WeaponRecoilSnapshot<'_>) -> T,
 ) -> Result<T, CatalogError> {
     let mut plan = Plan::read_type(forge, RECOIL_DEFINITION, selection, cancel)?;
-    let origins = CatalogOrigins::for_archive_records(archive, entry)?;
+    let origins = entry.records(archive)?;
     let input = OriginalCatalogInput::new(forge, &origins);
     let mut rows = Vec::with_capacity(plan.owners.len());
     for owner in plan.owners {

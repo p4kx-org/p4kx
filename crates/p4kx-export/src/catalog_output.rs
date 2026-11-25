@@ -10,6 +10,7 @@ use zstd::Encoder;
 use crate::CatalogError;
 use crate::catalog_rows::spool::RowSpoolError;
 use crate::contract::Catalog;
+use crate::contract::document::CatalogDocument;
 use crate::options::{CatalogRun, CatalogStage};
 
 /// The zstd level a compressed catalog is written at.
@@ -71,11 +72,12 @@ pub(crate) fn emit<W: Write>(
 ) -> Result<Written<W>, CatalogError> {
     let cancel = run.options.cancel;
     let staged_row_bytes = staged_row_bytes(catalog);
+    let document = CatalogDocument::of(catalog, run.provenance_mode);
     match compression {
         Compression::None => {
             run.begin(CatalogStage::WriteJson);
             let mut counted = Counting::new(out, cancel);
-            write_json(catalog, &mut counted, cancel)?;
+            write_json(&document, &mut counted, cancel)?;
             Ok(Written {
                 size: counted.count,
                 sink: counted.inner,
@@ -85,12 +87,12 @@ pub(crate) fn emit<W: Write>(
         }
         Compression::Zstd { level } => {
             run.begin(CatalogStage::MeasureJson);
-            let length = measure(catalog, cancel)?;
+            let length = measure(&document, cancel)?;
             run.begin(CatalogStage::WriteJson);
             let encoder =
                 encoder(Counting::new(out, None), level, length).map_err(CatalogError::Write)?;
             let mut counted = Counting::new(encoder, cancel);
-            write_json(catalog, &mut counted, cancel)?;
+            write_json(&document, &mut counted, cancel)?;
             let size = counted.count;
             let packed = counted.inner.finish().map_err(CatalogError::Write)?;
             Ok(Written {
@@ -214,14 +216,14 @@ fn take_row_spool_failure(catalog: &Catalog<'_>) -> Option<RowSpoolError> {
 }
 
 fn write_json(
-    catalog: &Catalog<'_>,
+    document: &CatalogDocument<'_, '_>,
     out: &mut impl Write,
     cancel: Option<&CancelToken>,
 ) -> Result<(), CatalogError> {
     let mut buffered = BufWriter::with_capacity(BUFFER, out);
-    let written = serde_json::to_writer(&mut buffered, catalog)
+    let written = serde_json::to_writer(&mut buffered, document)
         .map_err(|error| {
-            let failure = take_row_spool_failure(catalog);
+            let failure = take_row_spool_failure(document.catalog());
             if let Some(failure) = failure {
                 return CatalogError::from(failure);
             }
@@ -275,9 +277,12 @@ impl<W: Write> Write for Counting<'_, W> {
     }
 }
 
-/// Serialises `catalog` into a sink and returns the length of its JSON, newline included.
-fn measure(catalog: &Catalog<'_>, cancel: Option<&CancelToken>) -> Result<u64, CatalogError> {
+/// Serialises `document` into a sink and returns the length of its JSON, newline included.
+fn measure(
+    document: &CatalogDocument<'_, '_>,
+    cancel: Option<&CancelToken>,
+) -> Result<u64, CatalogError> {
     let mut counted = Counting::new(io::sink(), cancel);
-    write_json(catalog, &mut counted, cancel)?;
+    write_json(document, &mut counted, cancel)?;
     Ok(counted.count)
 }

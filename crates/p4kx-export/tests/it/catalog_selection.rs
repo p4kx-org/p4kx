@@ -175,8 +175,8 @@ fn two_runs_write_identical_bytes() -> TestResult {
         fixture::write_archive(dir.path())?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let first = build_catalog(&archive, &fixture::options())?;
-    let second = build_catalog(&archive, &fixture::options())?;
+    let first = build_catalog(&archive, fixture::options().with_full_provenance())?;
+    let second = build_catalog(&archive, fixture::options().with_full_provenance())?;
     assert!(first.json() == second.json(), "byte-identical");
     assert!(
         first.json().ends_with(b"}\n"),
@@ -210,10 +210,11 @@ fn progress_reaches_every_record_and_cancellation_stops_the_build() -> TestResul
     )?;
     let result = build_catalog(
         &archive,
-        &CatalogOptions {
+        CatalogOptions {
             cancel: Some(&cancel),
             ..fixture::options()
-        },
+        }
+        .with_full_provenance(),
     );
     assert!(matches!(result, Err(CatalogError::Cancelled)), "cancelled");
     Ok(())
@@ -221,9 +222,6 @@ fn progress_reaches_every_record_and_cancellation_stops_the_build() -> TestResul
 
 #[test]
 fn ordered_scan_windows_keep_catalog_bytes_and_cancel_before_opening_output() -> TestResult {
-    use std::sync::atomic::{AtomicBool, Ordering};
-
-    use p4kx_export::{CatalogPhase, Compression, write_catalog};
     use rayon::ThreadPoolBuilder;
 
     let dir = tempfile::tempdir()?;
@@ -234,8 +232,8 @@ fn ordered_scan_windows_keep_catalog_bytes_and_cancel_before_opening_output() ->
     let sequential = ThreadPoolBuilder::new().num_threads(1).build()?;
     let parallel = ThreadPoolBuilder::new().num_threads(4).build()?;
     let options = fixture::options();
-    let first = sequential.install(|| build_catalog(&archive, &options))?;
-    let second = parallel.install(|| build_catalog(&archive, &options))?;
+    let first = sequential.install(|| build_catalog(&archive, options.with_full_provenance()))?;
+    let second = parallel.install(|| build_catalog(&archive, options.with_full_provenance()))?;
     assert!(
         first.json() == second.json(),
         "worker count preserves bytes across different scan windows"
@@ -254,6 +252,19 @@ fn ordered_scan_windows_keep_catalog_bytes_and_cancel_before_opening_output() ->
         "the late selection keeps its physical Record ordinal"
     );
 
+    verify_scan_cancellation(&archive, &parallel, options);
+    Ok(())
+}
+
+fn verify_scan_cancellation(
+    archive: &Archive,
+    pool: &rayon::ThreadPool,
+    options: CatalogOptions<'_>,
+) {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    use p4kx_export::{CatalogPhase, Compression, write_catalog};
+
     let cancel = CancelToken::new();
     let sink_opened = AtomicBool::new(false);
     let report = |progress: CatalogProgress| {
@@ -267,11 +278,16 @@ fn ordered_scan_windows_keep_catalog_bytes_and_cancel_before_opening_output() ->
         progress: Some(&report),
         ..options
     };
-    let result = parallel.install(|| {
-        write_catalog(&archive, &options, Compression::None, || {
-            sink_opened.store(true, Ordering::Relaxed);
-            Ok(std::io::sink())
-        })
+    let result = pool.install(|| {
+        write_catalog(
+            archive,
+            options.with_full_provenance(),
+            Compression::None,
+            || {
+                sink_opened.store(true, Ordering::Relaxed);
+                Ok(std::io::sink())
+            },
+        )
     });
     assert!(
         cancel.is_cancelled(),
@@ -279,7 +295,6 @@ fn ordered_scan_windows_keep_catalog_bytes_and_cancel_before_opening_output() ->
     );
     assert!(matches!(result, Err(CatalogError::Cancelled)), "typed stop");
     assert!(!sink_opened.load(Ordering::Relaxed), "no partial output");
-    Ok(())
 }
 
 #[test]
@@ -293,7 +308,7 @@ fn an_archive_without_dataforge_is_an_error() -> TestResult {
         ))
         .write_to(&path)?;
     let archive = Archive::open_with_key(&path, Some(p4kx_testkit::test_key()))?;
-    let result = build_catalog(&archive, &fixture::options());
+    let result = build_catalog(&archive, fixture::options().with_full_provenance());
     assert!(matches!(result, Err(CatalogError::Load(_))), "load error");
     Ok(())
 }

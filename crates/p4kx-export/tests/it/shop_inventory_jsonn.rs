@@ -143,7 +143,7 @@ fn catalog(attribute: &str, source: &str, json: &str, extra: &[&str]) -> TestRes
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
     let mut options = CatalogOptions::new(std::time::UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog = build_catalog(&archive, &options)?;
+    let catalog = build_catalog(&archive, options.with_full_provenance())?;
     Ok(serde_json::from_slice(catalog.json())?)
 }
 

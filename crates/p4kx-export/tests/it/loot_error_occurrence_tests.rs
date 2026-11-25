@@ -137,7 +137,10 @@ fn dangling_guid_remains_exact_without_inventing_a_successful_reference() -> Che
     for storage in [Storage::Plain, Storage::Encrypted] {
         let input = fixture::archive(Case::Dangling, storage)?;
         loot_error_occurrence_source::check(&input, Case::Dangling, storage)?;
-        let built = p4kx_export::build_catalog(&input.archive, &CatalogOptions::new(UNIX_EPOCH))?;
+        let built = p4kx_export::build_catalog(
+            &input.archive,
+            CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+        )?;
         assert_eq!(
             built.summary().export_health().status,
             ExportHealthStatus::Complete,
@@ -169,8 +172,10 @@ fn dangling_guid_remains_exact_without_inventing_a_successful_reference() -> Che
 }
 
 fn refuse_normal(input: &Fixture) -> Checked<CatalogError> {
-    let Err(refusal) = p4kx_export::build_catalog(&input.archive, &CatalogOptions::new(UNIX_EPOCH))
-    else {
+    let Err(refusal) = p4kx_export::build_catalog(
+        &input.archive,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    ) else {
         return Err("Normal must refuse the genuine source errors".into());
     };
     assert!(
@@ -183,7 +188,7 @@ fn refuse_normal(input: &Fixture) -> Checked<CatalogError> {
 fn diagnostic(input: &Fixture) -> Checked<BuiltCatalog> {
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = p4kx_export::build_catalog(&input.archive, &options)?;
+    let built = p4kx_export::build_catalog(&input.archive, options.with_full_provenance())?;
     assert_eq!(
         built.summary().export_health().status,
         ExportHealthStatus::Incomplete,

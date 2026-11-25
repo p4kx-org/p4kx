@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::mission_definitions::{
@@ -9,14 +10,14 @@ use p4kx_export::catalog_queries::mission_definitions::{
 use p4kx_export::catalog_queries::mission_properties::{
     MissionFlowOwnerRef, MissionPropertyOwnerFamily, MissionPropertyOwnerSnapshot,
     MissionPropertySelection, MissionPropertyVisitSummary, PropertySelection, TemplateSource,
-    visit_mission_properties, visit_mission_properties_from,
+    visit_mission_properties,
 };
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
+    CatalogLanguageSelection, CatalogRecordCoverage, CatalogRecordSelection,
     OriginalValueErrorFacts,
 };
 use p4kx_export::{CatalogError, CatalogOptions, build_catalog_from};
-use p4kx_extraction::{CancelToken, DataForgeEntry, PhysicalSourceKind};
+use p4kx_extraction::{Archive, CancelToken, DataForgeEntry, PhysicalSourceKind};
 use serde_json::{Value, json};
 
 use super::{TEMPLATE_GUID, TEMPLATE_RECORD, TestResult, fixture};
@@ -32,9 +33,14 @@ fn mission_visit_matches_normal_tables_and_owner_arenas() -> TestResult {
     let (_folder, archive) = fixture::open_with_skipped_owners(DISTINCT_NULL_TEMPLATE_GUID)?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog: Value = serde_json::from_slice(
-        build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?.json(),
+        build_catalog_from(
+            &archive,
+            &entry,
+            CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+        )?
+        .json(),
     )?;
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::AllAvailable,
@@ -183,20 +189,16 @@ fn mission_queries_distinguish_missing_targets_from_malformed_values() -> TestRe
     ] {
         let (_folder, archive) = fixture::open_with_broker_fault(fault)?;
         let entry = DataForgeEntry::read(&archive)?;
-        let session = CatalogQuerySession::from_entry(
+        let session = full_proof::from_entry(
             &archive,
             &entry,
             CatalogLanguageSelection::AllAvailable,
             None,
         )?;
         let expected_incomplete = if expected { &[][..] } else { &[broker_record] };
-        let catalog = if expected {
-            Some(serde_json::from_slice(
-                build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?.json(),
-            )?)
-        } else {
-            None
-        };
+        let catalog = expected
+            .then(|| full_catalog(&archive, &entry))
+            .transpose()?;
         let summary =
             session.visit_mission_properties(selection, None, |snapshot| -> TestResult {
                 assert_eq!(
@@ -230,6 +232,12 @@ fn mission_queries_distinguish_missing_targets_from_malformed_values() -> TestRe
     Ok(())
 }
 
+fn full_catalog(archive: &Archive, entry: &DataForgeEntry) -> TestResult<Value> {
+    let options = CatalogOptions::new(UNIX_EPOCH);
+    let catalog = build_catalog_from(archive, entry, options.with_full_provenance())?;
+    Ok(serde_json::from_slice(catalog.json())?)
+}
+
 fn check_retained_error(arena: &TemplateSource<'_>, complete: bool) {
     let mut errors = arena
         .values()
@@ -254,7 +262,7 @@ fn check_retained_error(arena: &TemplateSource<'_>, complete: bool) {
 fn mission_visit_selects_duplicate_guids_and_exact_physical_records() -> TestResult {
     let (_folder, archive) = fixture::open_with_skipped_owners(TEMPLATE_GUID)?;
     let entry = DataForgeEntry::read(&archive)?;
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::AllAvailable,
@@ -266,12 +274,8 @@ fn mission_visit_selects_duplicate_guids_and_exact_physical_records() -> TestRes
     let inventory = session.with_mission_properties(owner, None, |snapshot| {
         serde_json::to_value(snapshot.source_inventory)
     })??;
-    let selected = visit_mission_properties_from(
-        &archive,
-        &entry,
-        selection,
-        None,
-        |snapshot| -> TestResult {
+    let selected = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .visit_mission_properties(selection, None, |snapshot| -> TestResult {
             assert_eq!(
                 snapshot.source.owner.physical().record_index(),
                 TEMPLATE_ALIAS,
@@ -283,8 +287,7 @@ fn mission_visit_selects_duplicate_guids_and_exact_physical_records() -> TestRes
                 "owner closure retains the existing selected query's exact sources"
             );
             Ok(())
-        },
-    )?;
+        })?;
     assert_eq!(selected.owner_count, 1, "one physical occurrence");
 
     let mut duplicates = Vec::new();

@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::catalog_queries::starmap::{
-    DatasetAvailability, JumpInventorySnapshot, read_jump_inventory,
-};
+use p4kx_export::catalog_queries::starmap::{DatasetAvailability, JumpInventorySnapshot};
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, StarmapTraversalBudget, build_catalog};
 use p4kx_extraction::{Archive, EntryIssue, SourceValueState};
 use serde_json::{Value, json};
@@ -222,8 +221,14 @@ fn verify_parity(archive: &Archive) -> TestResult<JumpInventorySnapshot> {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let canonical: Value = serde_json::from_slice(build_catalog(archive, &options)?.json())?;
-    let query = read_jump_inventory(archive, StarmapTraversalBudget::new(), None)?;
+    let canonical: Value =
+        serde_json::from_slice(build_catalog(archive, options.with_full_provenance())?.json())?;
+    let query = p4kx_export::catalog_queries::starmap::read_jump_inventory_with_provenance_mode(
+        archive,
+        StarmapTraversalBudget::new(),
+        full_proof::MODE,
+        None,
+    )?;
     let endpoints = json!({"availability": query.endpoint_availability, "rows": query.endpoints});
     assert_eq!(
         canonical.pointer(ENDPOINTS),

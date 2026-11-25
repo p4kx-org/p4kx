@@ -5,16 +5,14 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use p4kx_extraction::{
-    Archive, CancelToken, CanonicalReadObserver, DataForge, DataForgeEntry, Record, RecordTree,
-    TreeBuilder,
+    Archive, CancelToken, CanonicalReadObserver, DataForge, Record, RecordTree, TreeBuilder,
 };
 
 use super::{BlueprintRewardSelection, BlueprintRewardSnapshot, BlueprintRewardSource};
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection};
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::catalog_v3::industry_modules::{blueprint_pool_tables, blueprint_reward_source};
 use crate::export_diagnostic::ExportDiagnosticSeverity;
 use crate::export_ledger::ExportLedger;
@@ -26,7 +24,7 @@ use pools::PoolAdmission;
 
 pub(super) fn with_parsed<T>(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     selection: BlueprintRewardSelection,
     cancel: Option<&CancelToken>,
@@ -44,7 +42,7 @@ pub(super) fn with_parsed<T>(
 
 pub(super) struct Query<'query> {
     pub(super) archive: &'query Archive,
-    pub(super) entry: &'query DataForgeEntry,
+    pub(super) entry: CatalogQuerySource<'query>,
     pub(super) forge: &'query DataForge<'query>,
     pub(super) selection: BlueprintRewardSelection,
     pub(super) cancel: Option<&'query CancelToken>,
@@ -56,7 +54,7 @@ impl Query<'_> {
         observer: Option<Arc<dyn CanonicalReadObserver>>,
         inspect: impl FnOnce(BlueprintRewardSnapshot<'_>) -> T,
     ) -> Result<T, CatalogError> {
-        let origins = CatalogOrigins::for_archive_records(self.archive, self.entry)?;
+        let origins = self.entry.records(self.archive)?;
         let input = OriginalCatalogInput::new(self.forge, &origins);
         let mut trees = TreeBuilder::new();
         trees.set_read_observer(observer.clone());

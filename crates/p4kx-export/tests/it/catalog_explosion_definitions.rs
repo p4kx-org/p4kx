@@ -43,8 +43,9 @@ fn explosion_definitions_export_unlinked_records_with_their_own_exact_numeric_pr
         );
     }
     let (_folder, archive) = common::open(&source, DcbOrigin::Encrypted)?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
     let definitions = proof::at(&catalog, PATH)?;
     assert_eq!(
         definitions["availability"], "available",
@@ -84,7 +85,8 @@ fn explosion_definitions_respect_filter_without_erasing_resolved_health_link() -
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let definitions = proof::at(&catalog, PATH)?;
     assert_eq!(
         definitions["availability"], "available",

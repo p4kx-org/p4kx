@@ -26,7 +26,10 @@ pub use crate::client_profile_settings::{
     ClientProfileSettings, ClientProfileSettingsReport, PhysicalEntryIdentity, ProfileDeclaration,
     ProfileDocument, ProfileElement, ProfileKind, ProfileState, ProfileText,
     read_client_profile_settings, read_client_profile_settings_for,
+    read_client_profile_settings_for_with_provenance_mode,
+    read_client_profile_settings_with_provenance_mode,
 };
+pub use crate::contract::marker_schema::catalog_marker_schema;
 pub use crate::contract::{SCHEMA_VERSION, catalog_schema};
 pub use crate::contract_entities::Ship;
 pub use crate::crafting::{Crafting, read_crafting};
@@ -48,7 +51,7 @@ pub use crate::localization_table::{
     write_observed_localization_table,
 };
 pub use crate::options::CatalogStage;
-pub use crate::options::{CatalogOptions, CatalogPhase, CatalogProgress};
+pub use crate::options::{CatalogOptions, CatalogOutputOptions, CatalogPhase, CatalogProgress};
 pub use crate::playability::{Playability, PlayabilityCounts, PlayabilitySummary};
 pub use crate::quantization_summary::QuantizationSummary;
 pub use crate::record_export::{

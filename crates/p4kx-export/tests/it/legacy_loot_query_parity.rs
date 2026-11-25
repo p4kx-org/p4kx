@@ -3,14 +3,14 @@
 
 use p4kx_export::catalog_queries::loot::LegacyLootSnapshot;
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability, ParsedCatalogQueries,
 };
 use serde::Serialize;
 use serde_json::{Value, json};
 
 use crate::health_origin_assertions as proof;
 use crate::health_origin_fixture::{Fixture, Input, TestResult};
+use crate::sdk_full_proof as full_proof;
 use crate::{loot_fixture, starmap_fixture};
 
 #[test]
@@ -19,7 +19,7 @@ fn legacy_loot_queries_keep_both_physical_owners_and_their_actual_datum_origins(
     for input in [Input::Plain, Input::Encrypted] {
         let fixture = loot_fixture::source_fixture(&bytes, input)?;
         let (_, catalog) = fixture.diagnostic()?;
-        let session = CatalogQuerySession::from_entry(
+        let session = full_proof::from_entry(
             &fixture.archive,
             &fixture.entry,
             CatalogLanguageSelection::Selected(&[]),

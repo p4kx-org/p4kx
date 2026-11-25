@@ -195,8 +195,10 @@ fn repeat_preparation_keeps_the_complete_catalog_bytes_deterministic() -> TestRe
     let options = crate::commodity_v3_fixture::options();
     let sequential = ThreadPoolBuilder::new().num_threads(1).build()?;
     let parallel = ThreadPoolBuilder::new().num_threads(2).build()?;
-    let first = sequential.install(|| p4kx_export::build_catalog(&archive, &options))?;
-    let second = parallel.install(|| p4kx_export::build_catalog(&archive, &options))?;
+    let first = sequential
+        .install(|| p4kx_export::build_catalog(&archive, options.with_full_provenance()))?;
+    let second = parallel
+        .install(|| p4kx_export::build_catalog(&archive, options.with_full_provenance()))?;
     assert_eq!(
         first.json(),
         second.json(),

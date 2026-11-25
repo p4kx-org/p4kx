@@ -29,7 +29,7 @@ fn broker_inside_and_overlapping_target_roots_use_the_same_original_fact_union()
         let built = p4kx_export::build_catalog_from(
             &source.archive,
             &source.entry,
-            &health_origin_fixture::options(),
+            health_origin_fixture::options().with_full_provenance(),
         )?;
         assert_eq!(
             built.summary().export_health().status,

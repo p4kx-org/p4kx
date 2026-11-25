@@ -12,7 +12,7 @@ mod fixture;
 #[test]
 fn sandbox_records_keep_the_original_owned_triggers_and_reward_amounts() -> TestResult {
     let (_folder, archive) = archive_fixture::open(&fixture::database(), DcbOrigin::Encrypted)?;
-    let built = build_catalog(&archive, &archive_fixture::options())?;
+    let built = build_catalog(&archive, archive_fixture::options().with_full_provenance())?;
     let catalog = serde_json::from_slice(built.json())?;
     let trigger = at(&catalog, "/definitions/reputationTriggerRecords/rows/0")?;
     assert_eq!(at(trigger, "/guid/value")?, &json!(guid(fixture::RECORD)));
@@ -71,7 +71,7 @@ fn filtered_sandbox_targets_keep_declared_availability_and_original_guid() -> Te
     let filter = Filter::new("reputation/triggers");
     let mut options = archive_fixture::options();
     options.filter = Some(&filter);
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let reward_path = "/definitions/reputationRewardAmounts";
     let rewards = at(&catalog, reward_path)?;
@@ -108,7 +108,7 @@ fn filtered_sandbox_targets_keep_declared_availability_and_original_guid() -> Te
 #[test]
 fn faction_owns_ordered_trigger_slots_and_links_reusable_definitions() -> TestResult {
     let (_folder, archive) = archive_fixture::open(&fixture::database(), DcbOrigin::Encrypted)?;
-    let built = build_catalog(&archive, &archive_fixture::options())?;
+    let built = build_catalog(&archive, archive_fixture::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let faction = at(&catalog, "/definitions/factionReputations/rows/0")?;
     let configuration = at(&catalog, "/configurations/reputationTriggers/rows/0")?;

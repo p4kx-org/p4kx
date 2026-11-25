@@ -14,7 +14,7 @@ fn the_real_broker_flow_document_has_required_closed_tagged_physical_owner_links
     let built = p4kx_export::build_catalog_from(
         &input.archive,
         &input.entry,
-        &health_origin_fixture::options(),
+        health_origin_fixture::options().with_full_provenance(),
     )?;
     let document: Value = serde_json::from_slice(built.json())?;
     let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;

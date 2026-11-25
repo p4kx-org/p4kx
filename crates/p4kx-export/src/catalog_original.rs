@@ -191,7 +191,9 @@ pub use health_entry_source_xml::SourceXmlAttribute;
 mod health_failed_entry;
 
 pub(crate) use health_entry_diagnosis::EntryDiagnosis;
+#[cfg(test)]
 pub(crate) use health_entry_frame::with_entry_capture;
+pub(crate) use health_entry_frame::with_entry_capture_mode;
 pub(crate) use health_entry_json::{EntryJson, JsonEvent};
 pub(crate) use health_entry_observation::FailedEntryObservation;
 pub(crate) use health_entry_read::{EntryRead, EntryReadError};

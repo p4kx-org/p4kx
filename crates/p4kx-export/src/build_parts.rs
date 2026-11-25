@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::Entities;
-use p4kx_extraction::{Archive, CancelToken, DataForge, SourceUses};
+use p4kx_extraction::{Archive, CancelToken, DataForge, DataForgeEntry, SourceUses};
 
 use crate::blueprint_catalog_rows::{self, BlueprintTables};
 use crate::build_derived::particle_library;
@@ -23,6 +23,7 @@ use crate::item::Item;
 use crate::options::{CatalogRun, CatalogStage};
 use crate::ship_store_slugs::{Resolved, StoreSlugs};
 use crate::starmap_report::StarmapReport;
+use crate::texts::TextSources;
 use crate::variant_use_sets::VariantSourceUseSets;
 use crate::{
     CatalogProvenance, CatalogSummary, CraftingWarning, LoadoutSummary, PaintSummary, ShopSummary,
@@ -76,6 +77,19 @@ impl Parts {
             compressed_size: written.compressed,
         }
     }
+}
+
+pub(super) fn read_catalog_sources<'entry>(
+    archive: &Archive,
+    entry: &'entry DataForgeEntry,
+    run: CatalogRun<'_, '_>,
+) -> Result<(DataForge<'entry>, TextSources), crate::CatalogError> {
+    run.begin(CatalogStage::ReadInputs);
+    run.begin(CatalogStage::OpenDataForge);
+    let forge = entry.open().map_err(crate::CatalogError::DataForge)?;
+    run.begin(CatalogStage::ReadLocalization);
+    let sources = TextSources::read(archive)?;
+    Ok((forge, sources))
 }
 
 pub(super) fn ship_store_slugs<'mapping>(
@@ -284,6 +298,11 @@ pub(super) fn freeze_provenance(
     run: CatalogRun<'_, '_>,
 ) -> Result<CatalogProvenance, crate::CatalogError> {
     run.begin(CatalogStage::Provenance);
+    if run.provenance_mode == p4kx_extraction::ProvenanceMode::MarkersOnly {
+        return Ok(CatalogProvenance::new(
+            uses.finish_with(|| run.check_cancelled())?,
+        ));
+    }
     let use_sets = VariantSourceUseSets::from_decisions(
         items
             .iter()

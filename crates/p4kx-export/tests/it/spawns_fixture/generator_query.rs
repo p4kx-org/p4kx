@@ -5,11 +5,11 @@ use std::error::Error;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogRecordSelection, ContractGeneratorDefinition,
-    ContractSnapshot, SourcePayload, SourceValueRef, with_contracts_from,
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
+    ContractGeneratorDefinition, ContractSnapshot, SourcePayload, SourceValueRef,
 };
 use p4kx_export::{CatalogOptions, build_catalog_from};
-use p4kx_extraction::{Archive, DataForgeEntry, InputScope, SourceLocation};
+use p4kx_extraction::{Archive, DataForgeEntry, InputScope, ProvenanceMode, SourceLocation};
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestEntry, TestInstance, TestRecord, TestValue,
 };
@@ -92,13 +92,22 @@ pub(crate) fn with_catalog_parity<T>(
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
     let input = DataForgeEntry::read(&archive)?;
     let catalog: Value = serde_json::from_slice(
-        build_catalog_from(&archive, &input, &CatalogOptions::new(UNIX_EPOCH))?.json(),
+        build_catalog_from(
+            &archive,
+            &input,
+            CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+        )?
+        .json(),
     )?;
-    with_contracts_from(
+    CatalogQuerySession::from_entry(
         &archive,
         &input,
-        CatalogRecordSelection::RecordIndex(record_index),
         CatalogLanguageSelection::Selected(&[]),
+        None,
+    )?
+    .with_provenance_mode(ProvenanceMode::Full)
+    .with_contracts(
+        CatalogRecordSelection::RecordIndex(record_index),
         None,
         |snapshot| {
             owner_evidence(&catalog, &snapshot, record_index)?;

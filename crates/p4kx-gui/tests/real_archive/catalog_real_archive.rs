@@ -9,7 +9,8 @@ use std::fs;
 use std::time::{Duration, Instant};
 
 use p4kx_export::{Kind, SizeWarning};
-use p4kx_gui::{CatalogExport, CatalogExportStatus, Language, Model};
+use p4kx_extraction::ProvenanceMode;
+use p4kx_gui::{CatalogExport, CatalogExportOptions, CatalogExportStatus, Language, Model};
 use p4kx_testkit::real_archive_path;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -37,7 +38,12 @@ fn the_catalog_of_a_real_archive_is_written_with_its_summary() -> TestResult {
     model.open(real_archive_path()?, || {});
     wait_until(&mut model, |model| model.browser().is_some())?;
 
-    if !model.start_catalog(file.clone(), || {}) {
+    if !model.start_catalog_with_provenance_mode(
+        file.clone(),
+        CatalogExportOptions::default(),
+        ProvenanceMode::Full,
+        || {},
+    ) {
         return Err("the catalog did not start".into());
     }
     wait_until(&mut model, |model| {

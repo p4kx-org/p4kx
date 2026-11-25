@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::CatalogRecordSelection;
-use p4kx_export::catalog_queries::equipment::{
-    WeaponSourceSnapshot, visit_weapon_sources_from, with_weapon_recoil_definitions,
-};
+use p4kx_export::catalog_queries::equipment::WeaponSourceSnapshot;
 use p4kx_extraction::{Archive, DataForgeEntry, InputScope};
 use p4kx_testkit::{ArchiveBuilder, TestEntry, test_key};
 
@@ -18,7 +17,7 @@ mod ammo_binding_witness;
 mod ammo_container_witness;
 
 pub(super) fn read_recoil(archive: &Archive) -> TestResult<Route> {
-    with_weapon_recoil_definitions(archive, CatalogRecordSelection::All, None, |snapshot| {
+    full_proof::open(archive, full_proof::NO_LANGUAGES, None)?.with_weapon_recoil_definitions(CatalogRecordSelection::All, None, |snapshot| {
         Route::queried_rows(
             WEAPON_RECOIL,
             snapshot.rows(),
@@ -47,22 +46,21 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
     };
     let catalog = ammo_binding_witness::normal(&archive, &entry)?;
     let mut routes = None;
-    let summary = visit_weapon_sources_from(
-        &archive,
-        &entry,
-        CatalogRecordSelection::All,
-        None,
-        |index, snapshot| -> TestResult<()> {
-            assert_eq!(
-                index,
-                owner.index(),
-                "the visitor retains the original weapon owner"
-            );
-            ammo_binding_witness::verify(&archive, &entry, &snapshot, &catalog)?;
-            routes = Some(verify(&snapshot, index)?);
-            Ok(())
-        },
-    )?;
+    let summary = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .visit_weapon_sources(
+            CatalogRecordSelection::All,
+            None,
+            |index, snapshot| -> TestResult<()> {
+                assert_eq!(
+                    index,
+                    owner.index(),
+                    "the visitor retains the original weapon owner"
+                );
+                ammo_binding_witness::verify(&archive, &entry, &snapshot, &catalog)?;
+                routes = Some(verify(&snapshot, index)?);
+                Ok(())
+            },
+        )?;
     assert_eq!(
         summary.owner_count(),
         1,

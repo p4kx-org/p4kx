@@ -201,7 +201,7 @@ pub(super) fn verify_refusal(source: &Fixture, previous: &[u8]) -> TestResult {
         let result = write_catalog_from(
             &source.archive,
             &source.entry,
-            &fixture::options(),
+            fixture::options().with_full_provenance(),
             Compression::None,
             || {
                 called.set(true);

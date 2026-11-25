@@ -33,7 +33,7 @@ fn authored_and_placement_parents_match_their_distinct_catalog_sources() -> Test
     let filter = Filter::parse("*/starmap/pu/*")?;
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.filter = Some(&filter);
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let child = snapshot
         .starmap_objects

@@ -57,7 +57,7 @@ fn original_reputation_owners_perks_and_triggers_match_the_scoped_catalog() -> T
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let built = build_catalog_from(&archive, &entry, &options)
+    let built = build_catalog_from(&archive, &entry, options.with_full_provenance())
         .map_err(|_| "build faction reputation catalog")?;
     for diagnostic in built.summary().export_health().diagnostics() {
         if diagnostic.severity != ExportDiagnosticSeverity::Information {

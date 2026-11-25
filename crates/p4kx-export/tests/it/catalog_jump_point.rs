@@ -25,7 +25,8 @@ fn global_jump_configurations_preserve_original_records_without_copying_into_end
     let mut options = common::options();
     let only_global = Filter::new("*/jump-global/*");
     options.filter = Some(&only_global);
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let [point, tunnel] = proof::rows(&catalog, GLOBAL_ROWS)? else {
         return Err("two independently selected global records".into());
     };
@@ -62,7 +63,9 @@ fn jump_point_configurations_preserve_physical_owner_and_native_fields() -> Test
         let filter = Filter::new("*/point");
         let mut options = common::options();
         options.filter = Some(&filter);
-        let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, options.with_full_provenance())?.json(),
+        )?;
         let [point] = proof::rows(&catalog, ROWS)? else {
             return Err("only the admitted owner contributes a jump-point component".into());
         };

@@ -6,7 +6,7 @@ use std::path::Path;
 use std::time::UNIX_EPOCH;
 
 use p4kx_extraction::cryxml::{self, Element};
-use p4kx_extraction::{Archive, ArchiveWatch, Filter, Guid};
+use p4kx_extraction::{Archive, ArchiveWatch, Filter, Guid, ProvenanceMode};
 use p4kx_testkit::{real_archive_key, real_archive_pair};
 use serde_json::Value;
 
@@ -14,7 +14,7 @@ use super::{TestResult, without_registry_ids};
 use crate::CatalogOptions;
 use crate::catalog_queries::subsumption_events::{
     SubsumptionEvent, SubsumptionEventDocument, SubsumptionEventLookup, SubsumptionEventSelection,
-    SubsumptionEventSnapshot, read_subsumption_events,
+    SubsumptionEventSnapshot, read_subsumption_events_with_provenance_mode,
 };
 use crate::catalog_read::original::with_entry_capture;
 use crate::catalog_v3::subsumption_event;
@@ -68,9 +68,10 @@ fn observe(path: &Path, requested: &str) -> TestResult<Observation> {
     .map_err(|_| "selected archive could not open")?;
     let watch = ArchiveWatch::new(&archive);
     watch.check().map_err(|_| "selected archive changed")?;
-    let snapshot = read_subsumption_events(
+    let snapshot = read_subsumption_events_with_provenance_mode(
         &archive,
         SubsumptionEventSelection::ArchivePath(requested),
+        ProvenanceMode::Full,
         None,
     )
     .map_err(|_| "selected event SDK query could not complete")?;

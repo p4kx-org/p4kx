@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    Archive, ArchiveWatch, DataForge, DataForgeEntry, PhysicalSourceKind, Record, SourceInventory,
+    Archive, ArchiveWatch, DataForge, DataForgeEntry, PhysicalSourceKind, ProvenanceMode, Record,
+    SourceInventory,
 };
 use p4kx_testkit::watchdog;
 use serde::Serialize;
@@ -54,7 +55,8 @@ fn installed_ship_source_matches_scoped_catalog_projection() -> TestResult {
         CatalogLanguageSelection::Selected(&[]),
         None,
     )
-    .map_err(|_| "bind installed Ship SDK session")?;
+    .map_err(|_| "bind installed Ship SDK session")?
+    .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session.parsed(None).map_err(|_| "open parsed Ship view")?;
     binding(&archive, &session, &parsed)?;
     let record = select(&parsed.forge)?;

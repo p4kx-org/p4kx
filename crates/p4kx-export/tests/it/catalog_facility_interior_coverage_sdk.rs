@@ -3,11 +3,11 @@
 
 use std::collections::BTreeSet;
 
-use p4kx_export::catalog_queries::equipment::read_facility_interior_coverage;
 use p4kx_extraction::SourceValueState;
 use serde_json::Value;
 
 use super::{TestResult, build, fixture, proof};
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn sdk_room_coverage_matches_one_physical_ship_and_avoids_models() -> TestResult {
@@ -19,7 +19,8 @@ fn sdk_room_coverage_matches_one_physical_ship_and_avoids_models() -> TestResult
     ] {
         let (_folder, archive) = fixture::archive(case)?;
         let canonical = build(&archive)?;
-        let sdk = read_facility_interior_coverage(&archive, 0, None)?;
+        let sdk = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?
+            .read_facility_interior_coverage(0, None)?;
         assert_eq!(
             sdk.root_state,
             SourceValueState::Present,

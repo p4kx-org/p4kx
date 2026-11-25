@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogRecordSelection, with_contracts,
 };
@@ -16,12 +17,7 @@ use super::query_source_fixture as fixture;
 fn contract_sdk_selected_root_keeps_outside_intro_without_unrelated_projectors() -> TestResult {
     let (_folder, archive) =
         commodity_v3_fixture::open_bytes(fixture::database(false, true), DcbOrigin::Plain)?;
-    with_contracts(
-        &archive,
-        CatalogRecordSelection::Guid(guid(fixture::ROOT).parse()?),
-        CatalogLanguageSelection::Selected(&[]),
-        None,
-        |snapshot| {
+    full_proof::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?.with_contracts(CatalogRecordSelection::Guid(guid(fixture::ROOT).parse()?), None, |snapshot| {
             assert_eq!(
                 snapshot.rows.len(),
                 2,
@@ -69,8 +65,7 @@ fn contract_sdk_selected_root_keeps_outside_intro_without_unrelated_projectors()
             );
             assert!(intro.origin().source_uses_refs().iter().any(|reference| snapshot.source_inventory.iter_uses().any(|used| used.id() == reference && matches!(used.location(), SourceLocation::Subresource { namespace, indices, .. } if namespace == "dataforgeValue" && indices.first() == Some(&2)))), "the joined value cites its actual outside source owner");
             Ok::<_, Box<dyn std::error::Error>>(())
-        },
-    )??;
+        })??;
     Ok(())
 }
 

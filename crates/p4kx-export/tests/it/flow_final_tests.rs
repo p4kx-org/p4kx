@@ -118,8 +118,11 @@ fn run(input: &Checked, case: Case, expected: ExportHealthStatus) -> TestResult 
         normal_refusal(input, &options);
         options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     }
-    let built =
-        p4kx_export::build_catalog_from(&input.fixture.archive, &input.fixture.entry, &options)?;
+    let built = p4kx_export::build_catalog_from(
+        &input.fixture.archive,
+        &input.fixture.entry,
+        options.with_full_provenance(),
+    )?;
     assert_eq!(
         built.summary().export_health().status,
         expected,
@@ -163,7 +166,7 @@ fn writers(
         let (summary, bytes) = p4kx_export::write_catalog_from(
             &input.fixture.archive,
             &input.fixture.entry,
-            options,
+            options.with_full_provenance(),
             compression,
             || Ok(Vec::new()),
         )?;
@@ -198,7 +201,11 @@ fn writers(
 fn normal_refusal(input: &Checked, options: &CatalogOptions<'_>) {
     assert!(
         matches!(
-            p4kx_export::build_catalog_from(&input.fixture.archive, &input.fixture.entry, options),
+            p4kx_export::build_catalog_from(
+                &input.fixture.archive,
+                &input.fixture.entry,
+                options.with_full_provenance()
+            ),
             Err(CatalogError::IncompleteExport(_))
         ),
         "required failure remains strict Normal refusal"
@@ -207,7 +214,7 @@ fn normal_refusal(input: &Checked, options: &CatalogOptions<'_>) {
     let result = p4kx_export::write_catalog_from(
         &input.fixture.archive,
         &input.fixture.entry,
-        options,
+        options.with_full_provenance(),
         Compression::None,
         || {
             created = true;

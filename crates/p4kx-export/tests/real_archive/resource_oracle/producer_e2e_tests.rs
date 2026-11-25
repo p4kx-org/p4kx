@@ -57,9 +57,13 @@ impl Written {
             publication_mode: CatalogPublicationMode::DiagnosticPartial,
             ..CatalogOptions::new(UNIX_EPOCH)
         };
-        let (_, bytes) = write_catalog_from(&archive, &entry, &options, Compression::None, || {
-            Ok(Vec::new())
-        })
+        let (_, bytes) = write_catalog_from(
+            &archive,
+            &entry,
+            options.with_full_provenance(),
+            Compression::None,
+            || Ok(Vec::new()),
+        )
         .map_err(|error| Failure::source("synthetic-producer", error))?;
         let catalog = serde_json::from_slice(&bytes)
             .map_err(|error| Failure::source("synthetic-producer-json", error))?;

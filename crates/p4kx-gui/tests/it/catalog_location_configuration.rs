@@ -11,7 +11,7 @@ use p4kx_testkit::{
 };
 use serde_json::{Value, json};
 
-use crate::cataloging::{TestResult, ended, opened};
+use crate::cataloging::{TestResult, ended, opened, start_full_catalog};
 
 const OWNER: &str = "MissionLocationTemplate";
 const LOCATION: &str = "MissionLocationData";
@@ -26,7 +26,7 @@ fn normal_gui_catalog_publishes_disabled_location_configuration() -> TestResult 
     let (_directory, mut model, output) = opened(&archive())?;
     let path = output.join("locations.json");
     assert!(
-        model.start_catalog(path.clone(), || {}),
+        start_full_catalog(&mut model, path.clone()),
         "the normal GUI worker starts"
     );
     let CatalogExportStatus::Finished(outcome) = ended(&mut model)? else {

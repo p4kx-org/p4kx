@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::equipment::loot_generation::{
-    LootGenerationSnapshot, with_loot_generation_components_from,
-};
+use p4kx_export::catalog_queries::equipment::loot_generation::LootGenerationSnapshot;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
 };
@@ -15,6 +13,7 @@ use serde_json::{Value, json};
 use crate::health_origin_fixture::{Fixture, Input, TestResult, options};
 use crate::loot_v3_graph::{self as graph, Graph};
 use crate::loot_v3_origin::{self as origin, ExpectedOrigin};
+use crate::sdk_full_proof as full_proof;
 
 const ENTITY: &str = "EntityClassDefinition";
 const COMPONENTS: &str = "Components";
@@ -40,7 +39,11 @@ fn loot_generation_reconciles_independent_owners_positions_and_existing_targets(
     let input = Input::Encrypted;
     let fixture = Fixture::open(&database(), input, Vec::new())?;
     check_original_slots(&fixture)?;
-    let built = build_catalog_from(&fixture.archive, &fixture.entry, &options())?;
+    let built = build_catalog_from(
+        &fixture.archive,
+        &fixture.entry,
+        options().with_full_provenance(),
+    )?;
     assert_eq!(
         built.summary().export_health().status,
         ExportHealthStatus::Complete
@@ -123,7 +126,11 @@ fn loot_generation_filter_excludes_other_holders_but_keeps_authored_references()
     let filter = Filter::parse("synthetic-outside-catalog/owner")?;
     let mut selected = options();
     selected.filter = Some(&filter);
-    let built = build_catalog_from(&fixture.archive, &fixture.entry, &selected)?;
+    let built = build_catalog_from(
+        &fixture.archive,
+        &fixture.entry,
+        selected.with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let chunks = rows(&catalog)?;
     assert_eq!(
@@ -192,9 +199,13 @@ fn sdk_loot_generation_selects_physical_aliases_and_preserves_encrypted_fields()
             );
         },
     )?;
-    with_loot_generation_components_from(
+    full_proof::from_entry(
         &fixture.archive,
         &fixture.entry,
+        full_proof::NO_LANGUAGES,
+        None,
+    )?
+    .with_loot_generation_components(
         CatalogRecordSelection::RecordIndex(0),
         None,
         |snapshot| verify_sdk_score(&snapshot, input),

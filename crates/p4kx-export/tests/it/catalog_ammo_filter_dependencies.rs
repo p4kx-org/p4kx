@@ -176,6 +176,6 @@ fn filtered(source: &DataForgeBuilder, item: &str) -> TestResult<Value> {
         filter: Some(&filter),
         ..common::options()
     };
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     Ok(serde_json::from_slice(built.json())?)
 }

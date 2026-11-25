@@ -34,7 +34,7 @@ pub(crate) fn build(
     let (_directory, archive) = origin::open(database.build(), false)?;
     let mut options = origin::options();
     options.publication_mode = publication_mode;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog = serde_json::from_slice(built.json())?;
     Ok((built, catalog))
 }

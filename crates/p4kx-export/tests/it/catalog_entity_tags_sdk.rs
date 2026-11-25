@@ -1,9 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::tags::{
-    EntityTagSnapshot, with_entity_tags, with_entity_tags_from,
-};
+use crate::sdk_full_proof as full_proof;
+use p4kx_export::catalog_queries::tags::{EntityTagSnapshot, with_entity_tags};
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordReference, CatalogRecordSelection,
     DatasetAvailability,
@@ -30,11 +29,10 @@ fn entity_tag_sdk_matches_catalog_rows_and_original_occurrence_evidence() -> Tes
     let entry = DataForgeEntry::read(&archive)?;
     let mut options = archive_fixture::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog_from(&archive, &entry, &options)?.json())?;
-    with_entity_tags_from(
-        &archive,
-        &entry,
+    let catalog: Value = serde_json::from_slice(
+        build_catalog_from(&archive, &entry, options.with_full_provenance())?.json(),
+    )?;
+    full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?.with_entity_tags(
         CatalogRecordSelection::All,
         None,
         |snapshot| {
@@ -144,7 +142,8 @@ fn entity_tag_sdk_keeps_aliases_and_selects_the_physical_owner() -> TestResult {
         &entry,
         CatalogLanguageSelection::Selected(&[]),
         None,
-    )?;
+    )?
+    .with_provenance_mode(full_proof::MODE);
     let parsed = session.parsed(None)?;
     for (selector, expected_indices) in [
         (

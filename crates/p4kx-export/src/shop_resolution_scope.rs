@@ -4,11 +4,13 @@
 use std::collections::BTreeSet;
 
 use p4kx_assembly::ArchiveFiles;
-use p4kx_extraction::{Archive, ArchiveWatch, Build, CancelToken, FieldOrigin, SourceInventory};
+use p4kx_extraction::{
+    Archive, ArchiveWatch, Build, CancelToken, FieldOrigin, ProvenanceMode, SourceInventory,
+};
 
 use super::{Lists, ShopDeclarations, record_registry, shop_list};
 use crate::catalog_query_session::checkpoint;
-use crate::catalog_read::original::{EntryCapture, with_entry_capture};
+use crate::catalog_read::original::{EntryCapture, with_entry_capture_mode};
 use crate::catalog_table::DatasetAvailability;
 use crate::export_entry_counts::ExportEntryCounts;
 use crate::export_ledger::{ExportLedger, SourceDisposition};
@@ -93,10 +95,28 @@ pub fn read_shop_inventory_resolutions(
     selection: ShopResolutionSelection<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<ShopInventoryResolutionSnapshot, CatalogError> {
+    read_shop_inventory_resolutions_with_provenance_mode(
+        archive,
+        selection,
+        ProvenanceMode::MarkersOnly,
+        cancel,
+    )
+}
+
+/// Reads shop inventory resolutions with the selected source detail.
+///
+/// # Errors
+/// Returns the errors of `read_shop_inventory_resolutions`.
+pub fn read_shop_inventory_resolutions_with_provenance_mode(
+    archive: &Archive,
+    selection: ShopResolutionSelection<'_>,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<ShopInventoryResolutionSnapshot, CatalogError> {
     checkpoint(cancel)?;
     let watch = ArchiveWatch::new(archive);
     watch.check()?;
-    let snapshot = with_entry_capture(archive, |capture| {
+    let snapshot = with_entry_capture_mode(archive, provenance_mode, |capture| {
         let resolved = read_scope(archive, selection, capture, cancel)?;
         let sources = export_health_entries::compile(resolved.ledger.entries)?;
         let entries = export_health_entries::counts(Kind::Shops, &sources.sources)?;

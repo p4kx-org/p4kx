@@ -5,7 +5,7 @@ use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
-    ReputationTriggerSnapshot, with_reputation_triggers_from,
+    ReputationTriggerSnapshot,
 };
 use p4kx_export::{CatalogOptions, build_catalog_from};
 use p4kx_extraction::{
@@ -16,24 +16,21 @@ use serde_json::{Value, json};
 
 use super::super::REPUTATION_TRIGGER_CONFIGURATIONS;
 use super::{Route, TestResult, reputation_sandbox_fixture as fixture};
+use crate::sdk_full_proof as full_proof;
 
 const FIXTURE_OWNER_INDEX: u32 = 0;
 
 pub(super) fn read() -> TestResult<Route> {
     let (_folder, archive) = archive(true)?;
     let entry = DataForgeEntry::read(&archive)?;
-    let built = build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?;
+    let options = CatalogOptions::new(UNIX_EPOCH);
+    let built = build_catalog_from(&archive, &entry, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
-    with_reputation_triggers_from(
-        &archive,
-        &entry,
-        CatalogRecordSelection::All,
-        None,
-        |snapshot| {
-            compare(&snapshot, &catalog)?;
-            Route::queried_rows(REPUTATION_TRIGGER_CONFIGURATIONS, &snapshot.rows, None)
-        },
-    )?
+    let session = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?;
+    session.with_reputation_triggers(CatalogRecordSelection::All, None, |snapshot| {
+        compare(&snapshot, &catalog)?;
+        Route::queried_rows(REPUTATION_TRIGGER_CONFIGURATIONS, &snapshot.rows, None)
+    })?
 }
 
 fn compare(snapshot: &ReputationTriggerSnapshot<'_>, catalog: &Value) -> TestResult<()> {

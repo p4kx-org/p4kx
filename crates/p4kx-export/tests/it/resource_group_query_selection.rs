@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::CatalogPublicationMode;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogRecordReference, CatalogRecordSelection, DefinitionStatus,
-    ResourceGroupParentSnapshot, ResourceGroupSnapshot, with_resource_group_parents,
-    with_resource_group_parents_from, with_resource_groups, with_resource_groups_from,
+    ResourceGroupParentSnapshot, ResourceGroupSnapshot,
 };
 use p4kx_extraction::{DataForgeEntry, SourceValueState, SourcedValue};
 use serde_json::Value;
@@ -18,21 +18,21 @@ fn direct_guid_aliases_and_physical_selection_match_their_canonical_rows() -> Te
     let (_folder, archive) = common::open(&fixture::graph(), DcbOrigin::Plain)?;
     let catalog = parity::catalog(&archive, CatalogPublicationMode::DiagnosticPartial)?;
     let entry = DataForgeEntry::read(&archive)?;
-    with_resource_groups(
-        &archive,
-        CatalogRecordSelection::Guid(common::guid(fixture::CHILD).parse()?),
-        CatalogLanguageSelection::Selected(&[]),
-        None,
-        |snapshot| selected_direct(&snapshot, &catalog, &[1, 5]),
-    )??;
-    with_resource_groups_from(
+    full_proof::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?
+        .with_resource_groups(
+            CatalogRecordSelection::Guid(common::guid(fixture::CHILD).parse()?),
+            None,
+            |snapshot| selected_direct(&snapshot, &catalog, &[1, 5]),
+        )??;
+    full_proof::from_entry(
         &archive,
         &entry,
-        CatalogRecordSelection::RecordIndex(5),
         CatalogLanguageSelection::Selected(&[]),
         None,
-        |snapshot| selected_direct(&snapshot, &catalog, &[5]),
-    )??;
+    )?
+    .with_resource_groups(CatalogRecordSelection::RecordIndex(5), None, |snapshot| {
+        selected_direct(&snapshot, &catalog, &[5])
+    })??;
     Ok(())
 }
 
@@ -41,21 +41,18 @@ fn parent_owner_selection_retains_the_entire_required_family_and_first_parent() 
     let (_folder, archive) = common::open(&fixture::graph(), DcbOrigin::Plain)?;
     let catalog = parity::catalog(&archive, CatalogPublicationMode::DiagnosticPartial)?;
     let entry = DataForgeEntry::read(&archive)?;
-    with_resource_group_parents(
-        &archive,
+    full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?.with_resource_group_parents(
         CatalogRecordSelection::Guid(common::guid(fixture::CHILD).parse()?),
         None,
         |snapshot| selected_parents(&snapshot, &catalog, &[1, 5], 0),
     )??;
-    with_resource_group_parents_from(
-        &archive,
-        &entry,
-        CatalogRecordSelection::RecordIndex(1),
-        None,
-        |snapshot| selected_parents(&snapshot, &catalog, &[1], 0),
-    )??;
-    with_resource_group_parents(
-        &archive,
+    full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .with_resource_group_parents(
+            CatalogRecordSelection::RecordIndex(1),
+            None,
+            |snapshot| selected_parents(&snapshot, &catalog, &[1], 0),
+        )??;
+    full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?.with_resource_group_parents(
         CatalogRecordSelection::RecordIndex(0),
         None,
         |snapshot| selected_parents(&snapshot, &catalog, &[0], 1),
@@ -156,25 +153,24 @@ fn selected_parents(
 fn original_memberships_keep_nulls_repetitions_wrong_family_dangling_and_self_edges() -> TestResult
 {
     let (_folder, archive) = common::open(&fixture::graph(), DcbOrigin::Plain)?;
-    with_resource_groups(
-        &archive,
-        CatalogRecordSelection::RecordIndex(0),
-        CatalogLanguageSelection::Selected(&[]),
-        None,
-        |snapshot| -> TestResult {
-            let [members] = snapshot.members() else {
-                return Err("one selected membership owner".into());
-            };
-            groups(members.groups().value().ok_or("original groups array")?)?;
-            resources(
-                members
-                    .resources()
-                    .value()
-                    .ok_or("original resource array")?,
-            )?;
-            Ok(())
-        },
-    )??;
+    full_proof::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?
+        .with_resource_groups(
+            CatalogRecordSelection::RecordIndex(0),
+            None,
+            |snapshot| -> TestResult {
+                let [members] = snapshot.members() else {
+                    return Err("one selected membership owner".into());
+                };
+                groups(members.groups().value().ok_or("original groups array")?)?;
+                resources(
+                    members
+                        .resources()
+                        .value()
+                        .ok_or("original resource array")?,
+                )?;
+                Ok(())
+            },
+        )??;
     Ok(())
 }
 

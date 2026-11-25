@@ -27,7 +27,7 @@ pub(crate) fn build(position: FaultPosition) -> TestResult<Value> {
     if partial {
         options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     }
-    let built = p4kx_export::build_catalog(&archive, &options)?;
+    let built = p4kx_export::build_catalog(&archive, options.with_full_provenance())?;
     Ok(serde_json::from_slice(built.json())?)
 }
 

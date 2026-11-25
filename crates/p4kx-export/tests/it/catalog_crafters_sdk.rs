@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::build_catalog;
-use p4kx_export::catalog_queries::crafting::{CrafterComponent, with_crafters};
+use p4kx_export::catalog_queries::crafting::CrafterComponent;
 use p4kx_export::catalog_queries::{CatalogRecordSelection, ResourceNumber};
 use p4kx_extraction::{Archive, SourceInventory};
 use serde_json::Value;
@@ -19,11 +20,10 @@ fn crafting_station_source_fields_and_sdk_rows_match() -> TestResult {
         write_archive(directory.path())?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let built = build_catalog(&archive, &options(None))?;
+    let built = build_catalog(&archive, options(None).with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let bench = crafter(&catalog, BENCH)?;
-    with_crafters(
-        &archive,
+    full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?.with_crafters(
         CatalogRecordSelection::Guid(guid(BENCH).parse()?),
         None,
         |snapshot| {

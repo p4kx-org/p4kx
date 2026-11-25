@@ -162,7 +162,7 @@ pub(crate) fn original_locale(
 pub(crate) fn export(archive: &Archive) -> TestResult<(BuiltCatalog, Value)> {
     let mut options = crate::commodity_v3_fixture::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(archive, &options)?;
+    let built = build_catalog(archive, options.with_full_provenance())?;
     let catalog = serde_json::from_slice(built.json())?;
     Ok((built, catalog))
 }

@@ -30,7 +30,7 @@ fn jump_drive_keeps_device_values_phase_and_link_origins() -> TestResult {
         let filter = Filter::new("*/fixture_jump");
         let mut options = common::options();
         options.filter = Some(&filter);
-        let built = build_catalog(&archive, &options)?;
+        let built = build_catalog(&archive, options.with_full_provenance())?;
         let catalog: Value = serde_json::from_slice(built.json())?;
         let row = proof::rows(&catalog, ROWS)?.first().ok_or("jump drive")?;
         proof::present(row, "sourceType", &json!(DEVICE), Some(encrypted))?;
@@ -72,14 +72,14 @@ fn jump_drive_reports_unsupported_phase_storage() -> TestResult {
     let (_folder, archive) = common::open(&database(true), DcbOrigin::Plain)?;
     assert!(
         matches!(
-            build_catalog(&archive, &common::options()),
+            build_catalog(&archive, common::options().with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "ordinary publication rejects a wrong phase declaration"
     );
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let row = proof::rows(&catalog, ROWS)?.first().ok_or("jump drive")?;
     let effects = proof::at(proof::cell(row, "effects", "present")?, "/value")?;

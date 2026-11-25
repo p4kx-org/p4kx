@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogRecordSelection, ContractSnapshot, with_contracts,
-};
+use p4kx_export::catalog_queries::{CatalogRecordSelection, ContractSnapshot};
 use p4kx_export::{CatalogPublicationMode, build_catalog};
 use p4kx_extraction::{DataForge, StructValue, Value as Raw};
 use serde_json::{Value, json};
@@ -11,6 +9,7 @@ use serde_json::{Value, json};
 use super::TestResult;
 use crate::commodity_v3_fixture::{self, DcbOrigin, guid};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 #[path = "catalog_contract_query_place_fixture.rs"]
 mod fixture;
@@ -45,7 +44,9 @@ fn contract_projections_follow_the_physically_resolved_locality() -> TestResult 
             publication_mode: CatalogPublicationMode::DiagnosticPartial,
             ..commodity_v3_fixture::options()
         };
-        let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, options.with_full_provenance())?.json(),
+        )?;
         let [contract] = proof::rows(&catalog, "/projections/contracts/rows")? else {
             return Err("one original contract".into());
         };
@@ -68,10 +69,8 @@ fn contract_projections_follow_the_physically_resolved_locality() -> TestResult 
             actual, expected,
             "the other physical Locality cannot supply a pickup place"
         );
-        with_contracts(
-            &archive,
+        full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?.with_contracts(
             CatalogRecordSelection::RecordIndex(0),
-            CatalogLanguageSelection::Selected(&[]),
             None,
             |snapshot| {
                 verify_snapshot(&snapshot, contract, has_place)?;
@@ -129,7 +128,7 @@ fn verify(case: fixture::Case, has_place: bool) -> TestResult {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..commodity_v3_fixture::options()
     };
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let canonical: Value = serde_json::from_slice(built.json())?;
     let [expected] = proof::rows(&canonical, "/projections/contracts/rows")? else {
         return Err("one canonical contract row".into());
@@ -143,10 +142,8 @@ fn verify(case: fixture::Case, has_place: bool) -> TestResult {
         CatalogRecordSelection::All,
         CatalogRecordSelection::Guid(guid(fixture::OWNER).parse()?),
     ] {
-        with_contracts(
-            &archive,
+        full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?.with_contracts(
             selection,
-            CatalogLanguageSelection::Selected(&[]),
             None,
             |snapshot| verify_snapshot(&snapshot, expected, has_place),
         )??;

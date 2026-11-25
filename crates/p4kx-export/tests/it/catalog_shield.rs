@@ -81,8 +81,9 @@ fn shield_generator_keeps_original_values_slots_and_independent_provenance() -> 
     let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&source, origin)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
         validator
             .validate(&catalog)
             .map_err(|error| format!("complete catalog schema: {error}"))?;
@@ -116,8 +117,9 @@ fn shield_generator_keeps_original_values_slots_and_independent_provenance() -> 
 #[test]
 fn shield_distinguishes_undeclared_and_invalid_arrays_from_authored_empty() -> TestResult {
     let (_absent_folder, archive) = common::open(&database(Layout::Absent), DcbOrigin::Encrypted)?;
-    let complete: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+    let complete: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
     let shield = proof::at(&complete, &format!("{ROWS}/0"))?;
     proof::cell(shield, "shieldResistance", "absent")?;
     proof::present(shield, "shieldAbsorption", &json!([]), Some(true))?;
@@ -126,14 +128,15 @@ fn shield_distinguishes_undeclared_and_invalid_arrays_from_authored_empty() -> T
         common::open(&database(Layout::Invalid), DcbOrigin::Encrypted)?;
     assert!(
         matches!(
-            build_catalog(&archive, &common::options()),
+            build_catalog(&archive, common::options().with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "wrong declared storage cannot produce a complete shield snapshot"
     );
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let partial: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let partial: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let shield = proof::at(&partial, &format!("{ROWS}/0"))?;
     let failed = proof::cell(shield, "shieldResistance", "invalid")?;
     assert!(

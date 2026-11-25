@@ -3,17 +3,14 @@
 
 use std::sync::Arc;
 
-use p4kx_extraction::{
-    Archive, CancelToken, CanonicalReadObserver, DataForge, DataForgeEntry, TreeBuilder,
-};
+use p4kx_extraction::{Archive, CancelToken, CanonicalReadObserver, DataForge, TreeBuilder};
 
 use super::rows::Projector;
 use super::snapshot::QualityDefinitionSnapshot;
 use super::{CatalogRecordCoverage, CatalogRecordSelection};
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::guid_text::CatalogGuid;
 use crate::record_observation::RecordObservation;
@@ -21,7 +18,7 @@ use crate::template_field_capture::TemplateFieldCapture;
 
 pub(super) struct Query<'query> {
     pub(super) archive: &'query Archive,
-    pub(super) entry: &'query DataForgeEntry,
+    pub(super) entry: CatalogQuerySource<'query>,
     pub(super) forge: &'query DataForge<'query>,
     pub(super) selection: CatalogRecordSelection,
     pub(super) cancel: Option<&'query CancelToken>,
@@ -34,7 +31,7 @@ impl Query<'_> {
         inspect: impl for<'source> FnOnce(QualityDefinitionSnapshot<P::Row<'source>>) -> T,
     ) -> Result<T, CatalogError> {
         checkpoint(self.cancel)?;
-        let origins = CatalogOrigins::for_archive_records(self.archive, self.entry)?;
+        let origins = self.entry.records(self.archive)?;
         let input = OriginalCatalogInput::new(self.forge, &origins);
         let mut coverage = CatalogRecordCoverage::default();
         let rows = self.read_rows::<P>(&input, &mut coverage)?;

@@ -22,8 +22,9 @@ const LANGUAGES: [(Language, &str); 3] = [
 #[test]
 fn ammo_presentation_retains_public_name_and_original_light_transform() -> TestResult {
     let (_folder, archive) = archive()?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
     let row = proof::at(&catalog, "/definitions/ammoDefinitions/rows/0")?;
     check_name(&catalog, row)?;
     check_transform(row)?;

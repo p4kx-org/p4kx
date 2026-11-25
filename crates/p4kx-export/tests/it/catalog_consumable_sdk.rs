@@ -9,8 +9,7 @@ use p4kx_export::catalog_queries::equipment::component_definitions::{
     ConsumableEffect, ConsumableSubtype, ConsumableSubtypeSnapshot, ConsumableTypeSnapshot,
 };
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DefinitionStatus,
-    ResourceFloat32,
+    CatalogLanguageSelection, CatalogRecordSelection, DefinitionStatus, ResourceFloat32,
 };
 use p4kx_extraction::{Language, SourceInventory, SourceValueState, SourcedValue};
 use serde_json::Value;
@@ -19,13 +18,14 @@ use super::{SUBTYPES, TYPES, fixture};
 use crate::canonical_header::wire::{Wire, visit_leaf};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn selected_consumable_definitions_keep_typed_slots_and_text_domains() -> TestResult {
     let (_folder, archive) = common::open(&fixture::database(), DcbOrigin::Encrypted)?;
-    let catalog = build_catalog(&archive, &common::options())?;
+    let catalog = build_catalog(&archive, common::options().with_full_provenance())?;
     let expected: Value = serde_json::from_slice(catalog.json())?;
-    let session = CatalogQuerySession::open(
+    let session = full_proof::open(
         &archive,
         CatalogLanguageSelection::Selected(&[Language::English]),
         None,

@@ -5,7 +5,7 @@ use std::fmt;
 use std::time::SystemTime;
 
 use p4kx_channels::PublicPatches;
-use p4kx_extraction::{CancelToken, Filter, SourceUses};
+use p4kx_extraction::{CancelToken, Filter, ProvenanceMode, SourceUses};
 
 use crate::export_ledger::ExportLedger;
 use crate::{CatalogError, StarmapTraversalBudget};
@@ -51,7 +51,7 @@ pub struct CatalogOptions<'a> {
     pub public_patches: Option<&'a PublicPatches>,
 }
 
-impl CatalogOptions<'_> {
+impl<'inputs> CatalogOptions<'inputs> {
     /// Returns options for a complete catalog exported at `exported_at`, without cancellation,
     /// progress, public patches or container traversal allowances.
     #[must_use]
@@ -65,6 +65,37 @@ impl CatalogOptions<'_> {
             progress: None,
             public_patches: None,
         }
+    }
+
+    /// Selects the standalone catalog with full provenance.
+    #[must_use]
+    pub const fn with_full_provenance(&self) -> CatalogOutputOptions<'_, 'inputs> {
+        self.with_provenance_mode(ProvenanceMode::Full)
+    }
+
+    /// Chooses the provenance profile for this catalog output.
+    #[must_use]
+    pub const fn with_provenance_mode(
+        &self,
+        provenance_mode: ProvenanceMode,
+    ) -> CatalogOutputOptions<'_, 'inputs> {
+        CatalogOutputOptions {
+            options: self,
+            provenance_mode,
+        }
+    }
+}
+
+/// The provenance profile and build options for a catalog output.
+#[derive(Clone, Copy)]
+pub struct CatalogOutputOptions<'run, 'inputs> {
+    pub(crate) options: &'run CatalogOptions<'inputs>,
+    pub(crate) provenance_mode: ProvenanceMode,
+}
+
+impl<'run, 'inputs> From<&'run CatalogOptions<'inputs>> for CatalogOutputOptions<'run, 'inputs> {
+    fn from(options: &'run CatalogOptions<'inputs>) -> Self {
+        options.with_provenance_mode(ProvenanceMode::MarkersOnly)
     }
 }
 
@@ -215,6 +246,7 @@ impl CatalogStage {
 #[derive(Clone, Copy)]
 pub(crate) struct CatalogRun<'run, 'inputs> {
     pub(crate) options: &'run CatalogOptions<'inputs>,
+    pub(crate) provenance_mode: ProvenanceMode,
     report: Option<&'run dyn Fn(CatalogStage)>,
     #[cfg(test)]
     retention: Option<&'run RetentionObserver<'run>>,
@@ -241,9 +273,21 @@ impl<'run, 'inputs> CatalogRun<'run, 'inputs> {
     ) -> Self {
         Self {
             options,
+            provenance_mode: ProvenanceMode::Full,
             report,
             #[cfg(test)]
             retention: None,
+        }
+    }
+
+    pub(crate) fn for_output(
+        output: impl Into<CatalogOutputOptions<'run, 'inputs>>,
+        report: Option<&'run dyn Fn(CatalogStage)>,
+    ) -> Self {
+        let output = output.into();
+        Self {
+            provenance_mode: output.provenance_mode,
+            ..Self::new(output.options, report)
         }
     }
 

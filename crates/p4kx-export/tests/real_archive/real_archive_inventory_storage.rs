@@ -29,7 +29,7 @@ fn inventory_occupancy_and_storage_trace_original_item_and_vehicle_owners() -> T
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(SystemTime::now())
     };
-    let built = p4kx_export::build_catalog_from(&archive, &entry, &options)?;
+    let built = p4kx_export::build_catalog_from(&archive, &entry, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     crate::real_archive_shop_inventory_v3::verify_build(&archive, &catalog)?;
     let forge = entry.open()?;

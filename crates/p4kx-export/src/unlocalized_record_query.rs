@@ -2,8 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    Archive, CancelToken, DataForge, DataForgeEntry, Record, RecordTree, SourceInventory,
-    TreeBuilder,
+    Archive, CancelToken, DataForge, Record, RecordTree, SourceInventory, TreeBuilder,
 };
 
 #[path = "catalog_record_plan.rs"]
@@ -11,8 +10,7 @@ pub(super) mod plan;
 
 use super::{CatalogRecordCoverage, CatalogRecordSelection};
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::entity_selection::{self, Selected};
 use crate::guid_text::{CatalogGuid, sort_by_guid};
@@ -30,7 +28,7 @@ pub(super) struct RecordRows<Row> {
 /// Projects one original DataForge family with the ordinary Catalog selection policy.
 pub(super) fn read<Row>(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     kind: Kind,
     selection: CatalogRecordSelection,
@@ -41,7 +39,7 @@ pub(super) fn read<Row>(
         &RecordObservation<'_, 'source>,
     ) -> Result<(Row, Vec<FieldError>), CatalogError>,
 ) -> Result<RecordRows<Row>, CatalogError> {
-    let origins = CatalogOrigins::for_archive_records(archive, entry)?;
+    let origins = entry.records(archive)?;
     let input = OriginalCatalogInput::new(forge, &origins);
     let mut coverage = CatalogRecordCoverage::default();
     let mut trees = TreeBuilder::new();

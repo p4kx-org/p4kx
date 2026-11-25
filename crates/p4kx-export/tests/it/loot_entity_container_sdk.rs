@@ -21,6 +21,7 @@ use super::{
 use crate::health_origin_assertions as proof;
 use crate::health_origin_entry_source as entries;
 use crate::health_origin_fixture::{self as fixture, Fixture, TestResult};
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn sdk_selects_physical_loot_document_aliases_from_the_same_catalog_scope() -> TestResult {
@@ -34,14 +35,15 @@ fn sdk_selects_physical_loot_document_aliases_from_the_same_catalog_scope() -> T
             format!(r#"<Entity objectContainer="{TARGET}"/>"#),
         ),
     ])?;
-    let published = build_catalog_from(&source.archive, &source.entry, &fixture::options())?;
+    let published = build_catalog_from(
+        &source.archive,
+        &source.entry,
+        fixture::options().with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(published.json())?;
     let expected = proof::rows(&catalog, "/declarations/lootEntityContainerDocuments/rows")?;
-    let all = read_loot_documents(
-        &source.archive,
-        LootDocumentQuery::new(LootDocumentSelection::All),
-        None,
-    )?;
+    let all = full_proof::open(&source.archive, full_proof::NO_LANGUAGES, None)?
+        .read_loot_documents(LootDocumentQuery::new(LootDocumentSelection::All), None)?;
     assert!(matches!(all.availability, DatasetAvailability::Available));
     assert_eq!(
         serde_json::to_value(&all.rows)?,
@@ -74,7 +76,8 @@ fn verify_exact_alias(archive: &Archive, outer: u32, inner: u32, expected: &Valu
         container_entry_index: outer,
         document_entry_index: inner,
     };
-    let selected = read_loot_documents(archive, LootDocumentQuery::new(selection), None)?;
+    let selected = full_proof::open(archive, full_proof::NO_LANGUAGES, None)?
+        .read_loot_documents(LootDocumentQuery::new(selection), None)?;
     assert_eq!(
         selected.coverage.reachability,
         LootDocumentReachability::Reached,
@@ -157,13 +160,13 @@ fn sdk_missing_outer_entry_needs_an_intact_directory() -> TestResult {
         TestContainer::new().build(),
     )])?;
     let count = u32::try_from(source.archive.entries().len())?;
-    let intact = read_loot_documents(
-        &source.archive,
-        LootDocumentQuery::new(LootDocumentSelection::Container {
-            container_entry_index: count,
-        }),
-        None,
-    )?;
+    let intact = full_proof::open(&source.archive, full_proof::NO_LANGUAGES, None)?
+        .read_loot_documents(
+            LootDocumentQuery::new(LootDocumentSelection::Container {
+                container_entry_index: count,
+            }),
+            None,
+        )?;
     assert!(matches!(intact.availability, DatasetAvailability::Absent));
     assert!(intact.coverage.directory_complete && intact.coverage.documents_complete);
     assert_eq!(
@@ -199,13 +202,13 @@ fn verify_recovered_missing_outer(source: Fixture, count: u32) -> TestResult {
             .any(|(_, issue)| matches!(issue, EntryIssue::Recovered)),
         "the source actually lost an original directory Entry"
     );
-    let recovered = read_loot_documents(
-        &archive,
-        LootDocumentQuery::new(LootDocumentSelection::Container {
-            container_entry_index: missing,
-        }),
-        None,
-    )?;
+    let recovered = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?
+        .read_loot_documents(
+            LootDocumentQuery::new(LootDocumentSelection::Container {
+                container_entry_index: missing,
+            }),
+            None,
+        )?;
     assert!(recovered.rows.is_empty(), "the lost entry supplies no row");
     assert!(
         matches!(recovered.availability, DatasetAvailability::Unavailable),
@@ -252,14 +255,14 @@ fn sdk_nested_ordinal_absence_keeps_the_actual_outer_payload_count() -> TestResu
         .ok_or("prepared outer container")?;
     let container = source.archive.open_container(outer)?;
     let count = u32::try_from(container.entries().len())?;
-    let selected = read_loot_documents(
-        &source.archive,
-        LootDocumentQuery::new(LootDocumentSelection::Document {
-            container_entry_index: u32::try_from(outer.index())?,
-            document_entry_index: count,
-        }),
-        None,
-    )?;
+    let selected = full_proof::open(&source.archive, full_proof::NO_LANGUAGES, None)?
+        .read_loot_documents(
+            LootDocumentQuery::new(LootDocumentSelection::Document {
+                container_entry_index: u32::try_from(outer.index())?,
+                document_entry_index: count,
+            }),
+            None,
+        )?;
     assert_eq!(
         selected.coverage.reachability,
         LootDocumentReachability::Reached
@@ -304,14 +307,14 @@ fn sdk_ineligible_nested_entry_keeps_its_original_path_selector() -> TestResult 
         .iter()
         .find(|entry| entry.path() == UNRELATED)
         .ok_or("exact member that does not qualify as EntXML")?;
-    let selected = read_loot_documents(
-        &source.archive,
-        LootDocumentQuery::new(LootDocumentSelection::Document {
-            container_entry_index: u32::try_from(outer.index())?,
-            document_entry_index: u32::try_from(inner.index())?,
-        }),
-        None,
-    )?;
+    let selected = full_proof::open(&source.archive, full_proof::NO_LANGUAGES, None)?
+        .read_loot_documents(
+            LootDocumentQuery::new(LootDocumentSelection::Document {
+                container_entry_index: u32::try_from(outer.index())?,
+                document_entry_index: u32::try_from(inner.index())?,
+            }),
+            None,
+        )?;
     assert!(matches!(selected.availability, DatasetAvailability::Absent));
     assert!(selected.coverage.documents_complete);
     assert_eq!(

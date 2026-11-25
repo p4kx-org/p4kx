@@ -3,22 +3,23 @@
 
 use p4kx_export::build_catalog;
 use p4kx_export::catalog_queries::CatalogRecordSelection;
-use p4kx_export::catalog_queries::equipment::{
-    AlignmentDependencyState, AlignmentRole, read_loadouts,
-};
+use p4kx_export::catalog_queries::equipment::{AlignmentDependencyState, AlignmentRole};
 use serde_json::{Value, json};
 
 use super::super::{Layout, OWNER, database};
 use super::check_default;
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::loadouts_support;
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn direct_loadout_aligns_exact_reached_roles_to_the_unfiltered_producer() -> TestResult {
     let (_folder, archive) = common::open(&database(Layout::Complete), DcbOrigin::Encrypted)?;
-    let producer: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
-    let snapshot = read_loadouts(&archive, CatalogRecordSelection::RecordIndex(0), None)?;
+    let producer: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
+    let snapshot = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?
+        .read_loadouts(CatalogRecordSelection::RecordIndex(0), None)?;
     let [owner] = snapshot.rows.as_slice() else {
         return Err("one selected Loadout root".into());
     };

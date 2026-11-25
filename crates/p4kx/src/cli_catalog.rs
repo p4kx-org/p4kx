@@ -3,7 +3,8 @@
 
 use std::path::PathBuf;
 
-use clap::{Args, Subcommand};
+use clap::{Args, Subcommand, ValueEnum};
+use p4kx_extraction::ProvenanceMode;
 
 /// Arguments of `p4kx catalog`.
 #[derive(Debug, Args)]
@@ -29,6 +30,9 @@ pub(crate) struct CatalogArgs {
     /// be read or projected; an incomplete result still exits with status 1.
     #[arg(long)]
     pub(crate) diagnostic_partial: bool,
+    /// Chooses marker-only provenance or complete proofs.
+    #[arg(long, global = true, value_enum, value_name = "MODE", default_value_t = CatalogProvenanceArg::MarkersOnly)]
+    pub(crate) provenance: CatalogProvenanceArg,
     /// Prints each export phase on its own stderr line, including when redirected.
     #[arg(long)]
     pub(crate) progress_phases: bool,
@@ -38,9 +42,24 @@ pub(crate) struct CatalogArgs {
     pub(crate) exported_at: Option<u64>,
 }
 
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub(crate) enum CatalogProvenanceArg {
+    Full,
+    MarkersOnly,
+}
+
+impl From<CatalogProvenanceArg> for ProvenanceMode {
+    fn from(mode: CatalogProvenanceArg) -> Self {
+        match mode {
+            CatalogProvenanceArg::Full => Self::Full,
+            CatalogProvenanceArg::MarkersOnly => Self::MarkersOnly,
+        }
+    }
+}
+
 /// The subcommands of `p4kx catalog`.
 #[derive(Debug, Subcommand)]
 pub(crate) enum CatalogCommand {
-    /// Prints the JSON Schema (draft 2020-12) of the P4KX catalog.
+    /// Prints the JSON Schema (draft 2020-12) of the selected catalog profile.
     Schema,
 }

@@ -1,15 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::build_catalog;
 use p4kx_export::catalog_queries::equipment::EquipmentSnapshot;
 use p4kx_export::catalog_queries::equipment::component_definitions::{
-    GlobalJumpConfigurationSnapshot, JumpTunnelForceSnapshot, with_jump_tunnel_forces_from,
+    GlobalJumpConfigurationSnapshot, JumpTunnelForceSnapshot,
 };
 use p4kx_export::catalog_queries::equipment::jump_points::JumpPointConfigurationSnapshot;
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    ResourceFloat32,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability, ResourceFloat32,
 };
 use p4kx_extraction::DataForgeEntry;
 use serde::Serialize;
@@ -24,10 +24,11 @@ mod fixture;
 #[test]
 fn jump_configuration_queries_match_original_rows_and_origins() -> TestResult {
     let (_folder, archive) = common::open(&fixture::database(), DcbOrigin::Encrypted)?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
     let entry = DataForgeEntry::read(&archive)?;
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::AllAvailable,
@@ -45,13 +46,10 @@ fn jump_configuration_queries_match_original_rows_and_origins() -> TestResult {
         None,
         |snapshot| check_globals(&snapshot, &catalog),
     )??;
-    with_jump_tunnel_forces_from(
-        &archive,
-        &entry,
-        CatalogRecordSelection::RecordIndex(3),
-        None,
-        |snapshot| check_tunnel(&snapshot, &catalog),
-    )??;
+    full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .with_jump_tunnel_forces(CatalogRecordSelection::RecordIndex(3), None, |snapshot| {
+            check_tunnel(&snapshot, &catalog)
+        })??;
     parsed.with_global_jump_point_configurations(
         CatalogRecordSelection::RecordIndex(3),
         None,

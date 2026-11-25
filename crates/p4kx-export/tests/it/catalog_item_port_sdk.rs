@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability, ItemPortSnapshot,
-    with_item_ports, with_item_ports_from,
+    with_item_ports,
 };
 use p4kx_export::{CatalogError, build_catalog};
 use p4kx_extraction::{CancelToken, DataForgeEntry, Filter};
@@ -19,15 +20,18 @@ fn selected_item_ports_keep_canonical_rows_and_direct_encrypted_origins() -> Tes
     let filter = Filter::parse("*align_owner*")?;
     let mut options = common::options();
     options.filter = Some(&filter);
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let expected = proof::rows(&catalog, PORTS)?;
     assert_eq!(expected.len(), 1, "exactly the selected owner's container");
-    with_item_ports_from(
+    full_proof::from_entry(
         &archive,
         &entry,
-        CatalogRecordSelection::Guid(common::guid(OWNER).parse()?),
         CatalogLanguageSelection::Selected(&[]),
+        None,
+    )?
+    .with_item_ports(
+        CatalogRecordSelection::Guid(common::guid(OWNER).parse()?),
         None,
         |snapshot| {
             assert!(matches!(
@@ -89,7 +93,7 @@ fn item_port_scope_retains_its_faults_and_excludes_unrelated_component_failures(
         let (_folder, archive) = common::open(&database(layout), common::DcbOrigin::Plain)?;
         assert!(
             matches!(
-                build_catalog(&archive, &common::options()),
+                build_catalog(&archive, common::options().with_full_provenance()),
                 Err(CatalogError::IncompleteExport(_))
             ),
             "the full export observes the invalid field"

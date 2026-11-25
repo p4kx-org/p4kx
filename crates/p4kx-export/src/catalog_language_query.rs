@@ -7,6 +7,8 @@ use p4kx_extraction::{
     Archive, ArchiveWatch, Build, CancelToken, LocalizationNote, SourceInventory, SourceUses,
 };
 
+use p4kx_extraction::ProvenanceMode;
+
 use crate::CatalogError;
 use crate::catalog_origins::CatalogLocaleOrigins;
 use crate::catalog_query_session::{CatalogLanguageSelection, checkpoint};
@@ -45,6 +47,26 @@ pub fn with_language_sources<T>(
     cancel: Option<&CancelToken>,
     inspect: impl FnOnce(LanguageSourcesSnapshot<'_>) -> T,
 ) -> Result<T, CatalogError> {
+    with_language_sources_with_provenance_mode(
+        archive,
+        selection,
+        ProvenanceMode::MarkersOnly,
+        cancel,
+        inspect,
+    )
+}
+
+/// Supplies original localization Entry metadata with the selected source detail.
+///
+/// # Errors
+/// Returns the errors of `with_language_sources`.
+pub fn with_language_sources_with_provenance_mode<T>(
+    archive: &Archive,
+    selection: CatalogLanguageSelection<'_>,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+    inspect: impl FnOnce(LanguageSourcesSnapshot<'_>) -> T,
+) -> Result<T, CatalogError> {
     checkpoint(cancel)?;
     let watch = ArchiveWatch::new(archive);
     watch.check()?;
@@ -54,7 +76,7 @@ pub fn with_language_sources<T>(
     let inputs = inputs?;
     checkpoint(cancel)?;
     let texts = Texts::parse(&inputs)?;
-    let registry = SourceUses::with_compact_coordinates();
+    let registry = SourceUses::with_provenance_mode(provenance_mode);
     let origins = CatalogLocaleOrigins::read(archive, &inputs, &registry)?;
     let sources = language_sources(&texts, &registry, &origins, &languages)?;
     let source_inventory = registry.finish_with(|| checkpoint(cancel))?;

@@ -5,7 +5,7 @@ use std::ops::ControlFlow;
 use std::sync::Arc;
 
 use p4kx_assembly::{ArchiveFiles, Entities};
-use p4kx_extraction::{Archive, DataForgeEntry};
+use p4kx_extraction::{Archive, DataForgeEntry, ProvenanceMode};
 
 use crate::archive_key_use::ArchiveKeyUse;
 use crate::build_derived::{add_contracts, add_loadouts, add_paints, add_tags};
@@ -25,7 +25,7 @@ use crate::contract::{Catalog, Completeness, KindCompleteness, SCHEMA_VERSION};
 use crate::options::{CatalogRun, CatalogStage, CatalogStage::FinalizeProjections};
 use crate::ship_store_slugs::StoreSlugs;
 use crate::shops::add_shops;
-use crate::texts::{TextSources, Texts};
+use crate::texts::Texts;
 use crate::{CatalogError, catalog_crafting};
 
 use super::parts::{self, Parts};
@@ -44,15 +44,12 @@ pub(super) fn assemble<R>(
 ) -> Result<ControlFlow<PendingRefusal, (Parts, R)>, CatalogError> {
     let options = run.options;
     run.check_cancelled()?;
-    run.begin(CatalogStage::ReadInputs);
-    run.begin(CatalogStage::OpenDataForge);
-    let forge = entry.open().map_err(CatalogError::DataForge)?;
-    run.begin(CatalogStage::ReadLocalization);
-    let sources = TextSources::read(archive)?;
+    let (forge, sources) = parts::read_catalog_sources(archive, entry, run)?;
     run.begin(CatalogStage::IndexLocalization);
     let texts = Texts::parse(&sources)?;
     run.begin(CatalogStage::InitializeOrigins);
-    let origins = CatalogOrigins::new(archive, entry, &sources)?;
+    let origins =
+        CatalogOrigins::new_with_provenance_mode(archive, entry, &sources, run.provenance_mode)?;
     let input = original_input::OriginalCatalogInput::new(&forge, &origins);
     let text_registry = CatalogTextRegistry::default();
     let projection = CatalogProjection::new(&texts, &input, &text_registry);
@@ -349,7 +346,7 @@ pub(super) fn assemble<R>(
             ),
         },
         texts: finished_texts.texts,
-        provenance,
+        provenance: (run.provenance_mode != ProvenanceMode::MarkersOnly).then_some(&provenance),
         paints: collected.paints,
         loadouts: collected.loadouts,
         mineable_elements: collected.mineable_elements,
@@ -379,7 +376,7 @@ pub(super) fn assemble<R>(
     Ok(ControlFlow::Continue((
         Parts {
             export_health: catalog.export_health,
-            provenance: catalog.provenance,
+            provenance,
             kinds,
             texts: text_summary,
             text_kind_coverage: finished_texts.kind_coverage,

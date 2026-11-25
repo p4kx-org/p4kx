@@ -6,6 +6,7 @@ use std::io::Read;
 use std::path::Path;
 
 use p4kx_export::{CatalogPublicationMode, Filter, Kind};
+use p4kx_extraction::ProvenanceMode;
 use p4kx_gui::{CatalogExportOptions, CatalogExportStatus};
 
 use crate::cataloging::{self, TestResult, ended, files_in, opened};
@@ -67,7 +68,12 @@ fn diagnostic_permission_is_explicit_per_job_and_is_carried_by_the_artifact() ->
                 ..CatalogExportOptions::default()
             };
             assert!(
-                model.start_catalog_with_options(file.clone(), options, || {}),
+                model.start_catalog_with_provenance_mode(
+                    file.clone(),
+                    options,
+                    ProvenanceMode::Full,
+                    || {}
+                ),
                 "explicit diagnostic job starts"
             );
             let CatalogExportStatus::Finished(outcome) = ended(&mut model)? else {
@@ -119,7 +125,12 @@ fn a_healthy_filter_publishes_with_separate_selection_completeness() -> TestResu
         ..CatalogExportOptions::default()
     };
     assert!(
-        model.start_catalog_with_options(file.clone(), options, || {}),
+        model.start_catalog_with_provenance_mode(
+            file.clone(),
+            options,
+            ProvenanceMode::Full,
+            || {}
+        ),
         "filtered job starts"
     );
     let CatalogExportStatus::Finished(outcome) = ended(&mut model)? else {

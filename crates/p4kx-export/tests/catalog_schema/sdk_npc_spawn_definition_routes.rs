@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
+use p4kx_export::catalog_queries::npc_spawns::with_npc_spawn_definitions_from;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::npc_spawns::{
     NpcSpawnDefinitionFamily as Family, NpcSpawnDefinitionRows, NpcSpawnDefinitionSnapshot,
-    with_npc_spawn_definitions_from,
 };
 use p4kx_export::catalog_queries::{
-    CanonicalRecordHeader, CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
+    CanonicalRecordHeader, CatalogLanguageSelection, CatalogRecordSelection,
 };
 use p4kx_export::{CatalogError, CatalogOptions, CatalogPublicationMode, build_catalog_from};
 use p4kx_extraction::{
@@ -43,9 +44,10 @@ pub(super) fn read() -> TestResult<Vec<Route>> {
     let entry = DataForgeEntry::read(&archive)?;
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog_from(&archive, &entry, &options)?.json())?;
-    let session = CatalogQuerySession::from_entry(
+    let catalog: Value = serde_json::from_slice(
+        build_catalog_from(&archive, &entry, options.with_full_provenance())?.json(),
+    )?;
+    let session = full_proof::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::AllAvailable,
@@ -165,8 +167,8 @@ fn npc_spawn_queries_preserve_duplicate_indices_and_exclude_other_families() -> 
     let entry = DataForgeEntry::read(&archive)?;
     let guid = format!("00000000-0000-0000-0000-{guid:012x}").parse()?;
     let select = |family, selection| {
-        with_npc_spawn_definitions_from(&archive, &entry, family, selection, None, |snapshot| {
-            match snapshot.rows {
+        full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+            .with_npc_spawn_definitions(family, selection, None, |snapshot| match snapshot.rows {
                 NpcSpawnDefinitionRows::ClassPools(rows) => {
                     rows.iter().map(|row| &row.source).map(index).collect()
                 }
@@ -174,8 +176,7 @@ fn npc_spawn_queries_preserve_duplicate_indices_and_exclude_other_families() -> 
                     rows.iter().map(|row| &row.source).map(index).collect()
                 }
                 _ => Err("unexpected selected NPC family".into()),
-            }
-        })?
+            })?
     };
     let canonical = ordinary_pool_indices(&archive, &entry, guid)?;
     verify_selection(select, guid, &canonical)?;
@@ -239,7 +240,11 @@ fn ordinary_pool_indices(
     entry: &DataForgeEntry,
     guid: p4kx_extraction::Guid,
 ) -> TestResult<Vec<u32>> {
-    let built = build_catalog_from(archive, entry, &CatalogOptions::new(UNIX_EPOCH))?;
+    let built = build_catalog_from(
+        archive,
+        entry,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let guid = json!(guid.to_string());
     catalog

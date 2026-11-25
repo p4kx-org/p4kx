@@ -22,7 +22,10 @@ type TestResult = Result<(), Box<dyn Error>>;
 
 fn catalog() -> Result<Value, Box<dyn Error>> {
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     Ok(serde_json::from_slice(built.json())?)
 }
 

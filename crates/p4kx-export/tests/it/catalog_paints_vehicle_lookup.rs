@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::equipment::paints::{
-    PaintCompatibilitySnapshot, PaintCompatibilityStatus, PaintSelection, read_paint_compatibility,
+    PaintCompatibilitySnapshot, PaintCompatibilityStatus, PaintSelection,
 };
 use p4kx_extraction::{
     Archive, DataForgeEntry, DataForgeOrigin, InputScope, OpenOptions, PhysicalSourceKind,
@@ -51,7 +52,8 @@ fn scoped_paint_distinguishes_verified_missing_unreadable_and_recovered_vehicle_
             write_vehicle_lookup_archive(directory.path(), input)?,
             OpenOptions::new().recover(true),
         )?;
-        let snapshot = read_paint_compatibility(&archive, PaintSelection::RecordIndex(0), None)?;
+        let snapshot = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?
+            .read_paint_compatibility(PaintSelection::RecordIndex(0), None)?;
         assert_eq!(snapshot.status, expected, "{input:?}");
         assert_eq!(snapshot.paint_record_indices, [0], "{input:?}");
         assert_eq!(snapshot.ship_record_indices, [1], "{input:?}");
@@ -87,7 +89,8 @@ fn scoped_paint_retains_each_authored_empty_vehicle_modification() -> TestResult
         let directory = tempfile::tempdir()?;
         let input = VehicleLookupInput::Present { modification };
         let archive = Archive::open(write_vehicle_lookup_archive(directory.path(), input)?)?;
-        let snapshot = read_paint_compatibility(&archive, PaintSelection::RecordIndex(0), None)?;
+        let snapshot = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?
+            .read_paint_compatibility(PaintSelection::RecordIndex(0), None)?;
         assert_eq!(
             snapshot.status,
             PaintCompatibilityStatus::Found,
@@ -195,7 +198,8 @@ fn scoped_paint_accepts_only_proved_explicit_patch_absence() -> TestResult {
             write_explicit_patch_archive(directory.path(), input)?,
             OpenOptions::new().recover(true),
         )?;
-        let snapshot = read_paint_compatibility(&archive, PaintSelection::RecordIndex(0), None)?;
+        let snapshot = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?
+            .read_paint_compatibility(PaintSelection::RecordIndex(0), None)?;
         assert_eq!(snapshot.paint_record_indices, [0], "{input:?}");
         assert_eq!(snapshot.ship_record_indices, [1], "{input:?}");
         assert_eq!(

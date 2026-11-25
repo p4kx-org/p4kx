@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogRecordSelection, MissionLocationTemplateSnapshot,
-    with_mission_location_templates,
 };
 use p4kx_extraction::{SourceLocation, SourceUseRole};
 use serde_json::Value;
@@ -26,13 +26,12 @@ fn mission_location_tag_descendants_retain_failed_ancestor_selection() -> TestRe
     for ancestor in Ancestor::ALL {
         let (_folder, archive) =
             commodity_v3_fixture::open(&fixture::database(ancestor), DcbOrigin::Plain)?;
-        with_mission_location_templates(
-            &archive,
-            CatalogRecordSelection::Guid(guid(LOCATION_A).parse()?),
-            CatalogLanguageSelection::Selected(&[]),
-            None,
-            |snapshot| verify_snapshot(&snapshot, ancestor),
-        )??;
+        full_proof::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?
+            .with_mission_location_templates(
+                CatalogRecordSelection::Guid(guid(LOCATION_A).parse()?),
+                None,
+                |snapshot| verify_snapshot(&snapshot, ancestor),
+            )??;
     }
     Ok(())
 }

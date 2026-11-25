@@ -50,7 +50,7 @@ fn build(filter: Option<&Filter>) -> Result<(BuiltCatalog, Value), Box<dyn Error
     let mut options = CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     options.filter = filter;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let json = serde_json::from_slice(built.json())?;
     Ok((built, json))
 }

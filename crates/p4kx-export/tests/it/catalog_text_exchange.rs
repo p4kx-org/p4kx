@@ -19,7 +19,7 @@ fn catalog() -> TestResult<Value> {
         .record(resource(4, "Shared", "@fixture_name", "@fixture_name"))
         .record(resource(5, "Bare", "fixture_name", PRIVATE_LITERAL));
     let (_directory, archive) = fixture::open(database.build(), false)?;
-    let built = build_catalog(&archive, &fixture::options())?;
+    let built = build_catalog(&archive, fixture::options().with_full_provenance())?;
     Ok(serde_json::from_slice(built.json())?)
 }
 

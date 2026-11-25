@@ -4,13 +4,13 @@
 use std::sync::Arc;
 
 use p4kx_extraction::{
-    Archive, ArchiveWatch, Build, CancelToken, FieldOrigin, SourceInventory, SourceUse,
-    SourceValue, SourcedValue,
+    Archive, ArchiveWatch, Build, CancelToken, FieldOrigin, ProvenanceMode, SourceInventory,
+    SourceUse, SourceValue, SourcedValue,
 };
 
 use super::ContainerRootStatus;
 use crate::catalog_query_session::checkpoint;
-use crate::catalog_read::original::{EntryCapture, PhysicalEntryRef, with_entry_capture};
+use crate::catalog_read::original::{EntryCapture, PhysicalEntryRef, with_entry_capture_mode};
 use crate::entry_source::EntrySource;
 use crate::starmap_index::{Index, SystemRootCandidates};
 use crate::{CatalogError, ExportAccountingError, HealthText, export_archive_health};
@@ -80,11 +80,23 @@ pub fn read_container_system_roots(
     archive: &Archive,
     cancel: Option<&CancelToken>,
 ) -> Result<ContainerSystemRootInventory, CatalogError> {
+    read_container_system_roots_with_provenance_mode(archive, ProvenanceMode::MarkersOnly, cancel)
+}
+
+/// Reads the container system roots with the selected source detail.
+///
+/// # Errors
+/// Returns the errors of `read_container_system_roots`.
+pub fn read_container_system_roots_with_provenance_mode(
+    archive: &Archive,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<ContainerSystemRootInventory, CatalogError> {
     checkpoint(cancel)?;
     let watch = ArchiveWatch::new(archive);
     let index = Index::new(archive);
     let choices = choose_roots(&index, cancel)?;
-    let inventory = capture_roots(archive, &index, &choices, cancel)?;
+    let inventory = capture_roots(archive, &index, &choices, provenance_mode, cancel)?;
     watch.check()?;
     checkpoint(cancel)?;
     Ok(inventory)
@@ -116,9 +128,10 @@ pub(super) fn capture_roots(
     archive: &Archive,
     index: &Index<'_>,
     choices: &[RootChoice<'_>],
+    provenance_mode: ProvenanceMode,
     cancel: Option<&CancelToken>,
 ) -> Result<ContainerSystemRootInventory, CatalogError> {
-    with_entry_capture(archive, |capture| {
+    with_entry_capture_mode(archive, provenance_mode, |capture| {
         let sources = capture.source_uses();
         let directory = sources.observe_root_directory_paths(archive)?;
         let directory_complete =

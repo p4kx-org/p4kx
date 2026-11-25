@@ -7,6 +7,8 @@
 pub enum CatalogText {
     /// The entry of the Export menu that asks for the catalog file.
     Action,
+    /// The export action for a catalog with full provenance.
+    FullAction,
     /// Explicitly requests a catalog intended for diagnosis rather than normal publication.
     DiagnosticAction,
     /// The progress title of an explicitly requested diagnostic catalog.
@@ -108,8 +110,9 @@ pub enum CatalogText {
 
 impl CatalogText {
     /// Every text, for checks of the Fluent files.
-    pub const ALL: [Self; 47] = [
+    pub const ALL: [Self; 48] = [
         Self::Action,
+        Self::FullAction,
         Self::DiagnosticAction,
         Self::DiagnosticRunningTitle,
         Self::DiagnosticSummaryTitle,
@@ -163,6 +166,7 @@ impl CatalogText {
     pub const fn id(self) -> &'static str {
         match self {
             Self::Action => "catalog-action",
+            Self::FullAction => "catalog-full-action",
             Self::DiagnosticAction => "catalog-diagnostic-action",
             Self::DiagnosticRunningTitle => "catalog-diagnostic-running-title",
             Self::DiagnosticSummaryTitle => "catalog-diagnostic-summary-title",

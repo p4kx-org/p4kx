@@ -23,7 +23,11 @@ fn raw_field_names_are_direct_payloads_of_their_actual_physical_declaration() ->
             publication_mode: CatalogPublicationMode::DiagnosticPartial,
             ..CatalogOptions::new(UNIX_EPOCH)
         };
-        let built = p4kx_export::build_catalog_from(&fixture.archive, &fixture.entry, &options)?;
+        let built = p4kx_export::build_catalog_from(
+            &fixture.archive,
+            &fixture.entry,
+            options.with_full_provenance(),
+        )?;
         let catalog: Value = serde_json::from_slice(built.json())?;
         let row = catalog
             .pointer("/definitions/lootPoolFilters/rows/0")

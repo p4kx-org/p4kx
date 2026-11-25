@@ -46,7 +46,7 @@ fn build(
     let mut options = CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     options.filter = filter;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let json = serde_json::from_slice(built.json())?;
     Ok((built, json))
 }
@@ -75,8 +75,8 @@ fn merging_shop_scans_in_archive_order_preserves_catalog_bytes() -> TestResult {
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     let serial = ThreadPoolBuilder::new().num_threads(1).build()?;
     let parallel = ThreadPoolBuilder::new().num_threads(4).build()?;
-    let one = serial.install(|| build_catalog(&archive, &options))?;
-    let four = parallel.install(|| build_catalog(&archive, &options))?;
+    let one = serial.install(|| build_catalog(&archive, options.with_full_provenance()))?;
+    let four = parallel.install(|| build_catalog(&archive, options.with_full_provenance()))?;
     assert!(
         one.json() == four.json(),
         "Shop data, health and provenance preserve archive order across worker counts"

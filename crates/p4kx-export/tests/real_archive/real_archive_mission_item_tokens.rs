@@ -65,7 +65,7 @@ fn build(archive: &Archive, entry: &DataForgeEntry, path: &str) -> TestResult<Va
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let built = build_catalog_from(archive, entry, &options)
+    let built = build_catalog_from(archive, entry, options.with_full_provenance())
         .map_err(|_| "build selected Generator catalog")?;
     let catalog = serde_json::from_slice(built.json()).map_err(|_| "read scoped catalog JSON")?;
     real_archive_shop_inventory_v3::verify_build(archive, &catalog)?;

@@ -37,7 +37,9 @@ fn secondary_ammo_does_not_depend_on_admission_by_another_weapon() -> TestResult
         let (_folder, archive) = common::open(&database, DcbOrigin::Encrypted)?;
         let mut options = common::options();
         options.filter = selected;
-        let catalog = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+        let catalog = serde_json::from_slice(
+            build_catalog(&archive, options.with_full_provenance())?.json(),
+        )?;
         let ammo = proof::rows(&catalog, "/definitions/ammoDefinitions/rows")?
             .iter()
             .find(|row| {

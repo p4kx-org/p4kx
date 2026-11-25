@@ -1,12 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::equipment::fuel::{
-    self, ResourceCapacity, ResourceContainerSnapshot,
-};
+use p4kx_export::catalog_queries::equipment::fuel::{ResourceCapacity, ResourceContainerSnapshot};
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ParsedCatalogQueries,
-    ResourceFloat32,
+    CatalogLanguageSelection, CatalogRecordSelection, ParsedCatalogQueries, ResourceFloat32,
 };
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog};
 use p4kx_extraction::DataForgeEntry;
@@ -15,16 +12,18 @@ use serde_json::{Value, json};
 use super::{CONTAINERS, INTAKES, TANKS, fixture};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn fuel_source_queries_keep_original_rows_links_and_origin() -> TestResult {
     let database = fixture::database(fixture::Layout::Full);
     for origin in [DcbOrigin::Plain, DcbOrigin::Encrypted] {
         let (_directory, archive) = common::open(&database, origin)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
         let entry = DataForgeEntry::read(&archive)?;
-        let session = CatalogQuerySession::from_entry(
+        let session = full_proof::from_entry(
             &archive,
             &entry,
             CatalogLanguageSelection::AllAvailable,
@@ -32,13 +31,9 @@ fn fuel_source_queries_keep_original_rows_links_and_origin() -> TestResult {
         )?;
         let parsed = session.parsed(None)?;
         check_components(&parsed, &catalog)?;
-        fuel::with_resource_containers_from(
-            &archive,
-            &entry,
-            CatalogRecordSelection::All,
-            None,
-            |snapshot| check_containers(&snapshot, &catalog),
-        )??;
+        session.with_resource_containers(CatalogRecordSelection::All, None, |snapshot| {
+            check_containers(&snapshot, &catalog)
+        })??;
     }
     Ok(())
 }
@@ -123,9 +118,9 @@ fn malformed_fuel_intake_isolated_from_other_owner_components() -> TestResult {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
-    let session =
-        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
+    let session = full_proof::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
     let selection = CatalogRecordSelection::RecordIndex(0);
     let parsed = session.parsed(None)?;
     parsed.with_fuel_intakes(selection, None, |snapshot| -> TestResult {

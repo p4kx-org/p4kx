@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::mission_broker_context::with_mission_broker_context_from;
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_export::{CatalogError, ExportDiagnosticStage, ExportHealthStatus, HealthText, Kind};
 
@@ -9,6 +8,7 @@ use crate::health_origin_fixture::{self, Fixture, Input, TestResult};
 use crate::mission_property_remaining_fixture::{self as fixture, Case};
 use crate::mission_property_remaining_origins;
 use crate::mission_property_remaining_source::{self as source, Original};
+use crate::sdk_full_proof as full_proof;
 
 struct Checked {
     input: Fixture,
@@ -68,7 +68,7 @@ fn run(checked: &Checked) -> TestResult {
             p4kx_export::build_catalog_from(
                 &checked.input.archive,
                 &checked.input.entry,
-                &health_origin_fixture::options(),
+                health_origin_fixture::options().with_full_provenance(),
             ),
             Err(CatalogError::IncompleteExport(_))
         ),
@@ -78,11 +78,14 @@ fn run(checked: &Checked) -> TestResult {
 }
 
 fn check_query_refusal(checked: &Checked, document: &serde_json::Value) -> TestResult {
-    with_mission_broker_context_from(
+    full_proof::from_entry(
         &checked.input.archive,
         &checked.input.entry,
-        CatalogRecordSelection::All,
         CatalogLanguageSelection::AllAvailable,
+        None,
+    )?
+    .with_mission_broker_context(
+        CatalogRecordSelection::All,
         None,
         |snapshot| -> TestResult {
             assert!(

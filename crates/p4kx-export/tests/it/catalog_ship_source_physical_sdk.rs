@@ -1,7 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::equipment::{self, ShipSource};
+use crate::sdk_full_proof as full_proof;
+use p4kx_export::catalog_queries::equipment::ShipSource;
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_export::{CatalogPublicationMode, build_catalog};
 use p4kx_extraction::DataForgeEntry;
@@ -19,31 +20,31 @@ fn direct_ship_sdk_nested_insurance_getters_keep_both_original_physical_owners()
     let entry = DataForgeEntry::read(&archive)?;
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
-    equipment::with_ship_sources_from(
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
+    full_proof::from_entry(
         &archive,
         &entry,
-        CatalogRecordSelection::All,
         CatalogLanguageSelection::Selected(&[]),
         None,
-        |snapshot| {
-            assert_eq!(
-                snapshot.rows().len(),
-                2,
-                "both same-GUID original records survive"
-            );
-            for ((row, case), canonical) in snapshot
-                .rows()
-                .iter()
-                .zip(&fixture::CASES)
-                .zip(proof::rows(&catalog, "/ships")?)
-            {
-                source_sdk_walk::row(row, snapshot.source_inventory(), canonical)?;
-                original_values(row, case)?;
-            }
-            Ok::<_, Box<dyn std::error::Error>>(())
-        },
-    )??;
+    )?
+    .with_ship_sources(CatalogRecordSelection::All, None, |snapshot| {
+        assert_eq!(
+            snapshot.rows().len(),
+            2,
+            "both same-GUID original records survive"
+        );
+        for ((row, case), canonical) in snapshot
+            .rows()
+            .iter()
+            .zip(&fixture::CASES)
+            .zip(proof::rows(&catalog, "/ships")?)
+        {
+            source_sdk_walk::row(row, snapshot.source_inventory(), canonical)?;
+            original_values(row, case)?;
+        }
+        Ok::<_, Box<dyn std::error::Error>>(())
+    })??;
     proof::closure(&catalog)
 }
 

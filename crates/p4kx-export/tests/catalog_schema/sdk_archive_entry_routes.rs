@@ -12,7 +12,7 @@ use p4kx_export::catalog_queries::particle_libraries::{
 use p4kx_export::catalog_queries::radar_audio::{RadarAudioSelection, read_radar_audio};
 use p4kx_export::catalog_queries::shops::{
     ResolutionStatus, ShopInventorySelection, ShopRegistrySelection, ShopResolutionSelection,
-    read_shop, read_shop_inventories, read_shop_inventory_resolutions,
+    read_shop_inventories, read_shop_inventory_resolutions, read_shop_with_provenance_mode,
 };
 use p4kx_export::catalog_queries::subsumption_events::{
     SubsumptionEventSelection, read_subsumption_events,
@@ -21,6 +21,8 @@ use p4kx_export::{CatalogOptions, StarmapTraversalBudget, build_catalog};
 use p4kx_extraction::{Archive, Language, find_entry};
 use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry, test_key};
 use serde_json::{Value, json};
+
+use crate::sdk_full_proof as full_proof;
 
 use super::super::{
     FLARE_LIBRARIES, LANGUAGE_POLICY, LANGUAGE_SOURCES, PARTICLE_LIBRARIES, RADAR_AUDIO,
@@ -62,7 +64,10 @@ pub(super) fn read_language_policy() -> TestResult<Route> {
         ))
         .write_to(&path)?;
     let archive = Archive::open(path)?;
-    let built = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
     let full: Value = serde_json::from_slice(built.json())?;
     assert_eq!(
         full.pointer(LANGUAGE_POLICY),
@@ -166,18 +171,24 @@ const INVENTORY_GUID: &str = "00000000-0000-4000-8000-000000000003";
 
 pub(super) fn read_physical_shop() -> TestResult<Route> {
     let (_folder, archive) = physical_shop_fixture()?;
-    let built = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;
+    let options = CatalogOptions::new(UNIX_EPOCH);
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let document: Value = serde_json::from_slice(built.json())?;
-    let [expected] = document
+    let rows = document
         .pointer(SHOPS)
         .and_then(Value::as_array)
-        .ok_or("normal Shop rows")?
-        .as_slice()
-    else {
+        .ok_or("normal Shop rows")?;
+    let [expected] = rows.as_slice() else {
         return Err("one normal Shop row".into());
     };
     let selected = registry_selection(&archive, &document, expected)?;
-    let snapshot = read_shop(&archive, selected, StarmapTraversalBudget::default(), None)?;
+    let snapshot = read_shop_with_provenance_mode(
+        &archive,
+        selected,
+        StarmapTraversalBudget::default(),
+        full_proof::MODE,
+        None,
+    )?;
     assert!(
         snapshot.coverage.registry_complete && snapshot.coverage.names.is_none(),
         "the selected registry row was read and has no location dependency"

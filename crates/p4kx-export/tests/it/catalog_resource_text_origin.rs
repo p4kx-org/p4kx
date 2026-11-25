@@ -32,7 +32,10 @@ fn built_catalog(name: &str, description: &str, english: &str) -> TestResult<Bui
         ))
         .write_to(&path)?;
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
-    Ok(build_catalog(&archive, &fixture::options())?)
+    Ok(build_catalog(
+        &archive,
+        fixture::options().with_full_provenance(),
+    )?)
 }
 
 pub(super) fn text_row<'a>(catalog: &'a Value, domain: &str, key: &str) -> TestResult<&'a Value> {

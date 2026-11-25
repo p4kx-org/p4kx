@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    Archive, DecimalU64, Entry, InputScope, SourceLocation, SourceValueState, SourcedValue,
+    Archive, DecimalU64, Entry, InputScope, ProvenanceMode, SourceLocation, SourceValueState,
+    SourcedValue,
 };
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
@@ -12,7 +13,7 @@ use super::TestResult;
 use crate::catalog_queries::DatasetAvailability;
 use crate::catalog_queries::planet_resources::{
     ExportEntryCounts, PlanetResource, PlanetResourceSelection, PlanetResourceSnapshot,
-    read_planet_resources,
+    read_planet_resources_with_provenance_mode,
 };
 use crate::catalog_read::original::{EntryRead, EntryReceipt, with_entry_capture};
 use crate::{CatalogError, ExportAccountingError, starmap_index};
@@ -69,9 +70,10 @@ fn installed_planet_resource_sdk_matches_one_physical_definition() -> TestResult
         return Err("one exact original resource Entry must qualify".into());
     };
     let original = original_json(archive, entry)?;
-    let snapshot = read_planet_resources(
+    let snapshot = read_planet_resources_with_provenance_mode(
         archive,
         PlanetResourceSelection::ArchivePath(&installed.path),
+        ProvenanceMode::Full,
         None,
     )?;
     let [row] = snapshot.rows.as_slice() else {
@@ -95,9 +97,10 @@ fn installed_planet_resource_sdk_proves_exact_path_absent() -> TestResult {
         installed.matching_directory_entries().next().is_none(),
         "no original Entry has the selected path"
     );
-    let snapshot = read_planet_resources(
+    let snapshot = read_planet_resources_with_provenance_mode(
         archive,
         PlanetResourceSelection::ArchivePath(&installed.path),
+        ProvenanceMode::Full,
         None,
     )?;
     assert_eq!(

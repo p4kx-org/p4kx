@@ -3,13 +3,14 @@
 
 use p4kx_export::catalog_queries::equipment;
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability,
 };
 use p4kx_export::{CatalogError, CatalogPublicationMode};
 use p4kx_extraction::{CancelToken, DataForgeEntry};
 
 use super::{Layout, attachments, bounds, catalog, common, database, entities, parity};
 use crate::commodity_v3_fixture::{DcbOrigin, TestResult};
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn attachment_visitor_preserves_guid_aliases_and_repeated_physical_cells() -> TestResult {
@@ -18,24 +19,14 @@ fn attachment_visitor_preserves_guid_aliases_and_repeated_physical_cells() -> Te
     let expected = catalog(&archive, CatalogPublicationMode::DiagnosticPartial)?;
     let entry = DataForgeEntry::read(&archive)?;
     let selection = CatalogRecordSelection::Guid(common::guid(attachments::OWNER).parse()?);
-    let aggregate = equipment::with_attachment_constraints_from(
-        &archive,
-        &entry,
-        selection,
-        None,
-        |snapshot| snapshot.coverage().clone(),
-    )?;
+    let aggregate = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .with_attachment_constraints(selection, None, |snapshot| snapshot.coverage().clone())?;
     let mut indices = Vec::new();
-    let summary = equipment::visit_attachment_constraints_from(
-        &archive,
-        &entry,
-        selection,
-        None,
-        |index, snapshot| -> TestResult {
+    let summary = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .visit_attachment_constraints(selection, None, |index, snapshot| -> TestResult {
             indices.push(index);
             parity::attachment(snapshot, &expected, Some(&[index]))
-        },
-    )?;
+        })?;
     assert_eq!(
         indices,
         [0, 1],
@@ -58,8 +49,7 @@ fn attachment_visitor_preserves_guid_aliases_and_repeated_physical_cells() -> Te
 fn bounds_visitor_keeps_canonical_occupancy_and_coverage_without_locales() -> TestResult {
     let (_folder, archive) = common::open(&bounds::complete(), DcbOrigin::Encrypted)?;
     let expected = catalog(&archive, CatalogPublicationMode::DiagnosticPartial)?;
-    let session =
-        CatalogQuerySession::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
+    let session = full_proof::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
     let parsed = session.parsed(None)?;
     let aggregate = parsed.with_item_bounds(CatalogRecordSelection::All, None, |snapshot| {
         snapshot.coverage().clone()
@@ -100,8 +90,7 @@ fn bounds_visitor_keeps_canonical_occupancy_and_coverage_without_locales() -> Te
 fn attachment_visits_agree_with_normal_and_stop_at_callback_cancellation() -> TestResult {
     let (_folder, archive) = common::open(&database(Layout::Complete), DcbOrigin::Plain)?;
     let expected = catalog(&archive, CatalogPublicationMode::Normal)?;
-    let session =
-        CatalogQuerySession::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
+    let session = full_proof::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
     let complete = session.visit_attachment_constraints(
         CatalogRecordSelection::All,
         None,

@@ -37,13 +37,13 @@ fn unsupported_research_graphs_keep_their_own_tier_and_original_errors() -> Test
     let mut options = common::options();
     assert!(
         matches!(
-            p4kx_export::build_catalog_from(&archive, &entry, &options),
+            p4kx_export::build_catalog_from(&archive, &entry, options.with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "original failed reads cannot be published as a complete catalog"
     );
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = p4kx_export::build_catalog_from(&archive, &entry, &options)?;
+    let built = p4kx_export::build_catalog_from(&archive, &entry, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     check_graph(&catalog)?;
     crate::commodity_v3_source_inventory::reference_closure(&catalog)

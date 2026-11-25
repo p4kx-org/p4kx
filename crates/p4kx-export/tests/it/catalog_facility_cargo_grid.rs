@@ -27,8 +27,9 @@ fn cargo_grid_authored_values_and_colocated_components_use_their_original_slots(
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_directory, archive) = common::open(&cargo_grid_facility_database(), origin)?;
         verify_original(&archive)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
         let grid = only_grid(&catalog)?;
         check_grid(grid, encrypted)?;
         check_additional_field(grid, encrypted)?;
@@ -47,8 +48,9 @@ fn cargo_grid_visible_mining_capacity_remains_available_at_both_placements() -> 
     let database = cargo_grid_facility_database_for(TestCargoGridLayout::MiningOnly);
     let (_directory, archive) = common::open(&database, DcbOrigin::Encrypted)?;
     verify_original(&archive)?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
     let grid = only_grid(&catalog)?;
     proof::present(grid, "miningOnly", &json!(true), Some(true))?;
     proof::present(grid, "invisible", &json!(false), Some(true))?;
@@ -73,8 +75,9 @@ fn cargo_grid_without_a_unique_supported_storage_has_no_scu() -> TestResult {
     ] {
         let database = cargo_grid_facility_database_for(layout);
         let (_directory, archive) = common::open(&database, DcbOrigin::Plain)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
         let capacity = proof::at(only_grid(&catalog)?, "/capacity")?;
         assert_eq!(proof::at(capacity, "/status")?, status, "{layout:?}");
         let scu = proof::cell(capacity, "scu", state)?;

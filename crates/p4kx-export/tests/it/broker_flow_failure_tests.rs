@@ -103,7 +103,7 @@ fn check_broker_replay(source: &Fixture, expected: &[u8]) -> TestResult {
     let (summary, packed) = write_catalog_from(
         &source.archive,
         &source.entry,
-        &options,
+        options.with_full_provenance(),
         Compression::Zstd { level: 1 },
         || Ok(Vec::new()),
     )?;

@@ -8,15 +8,15 @@ use p4kx_extraction::cryxml::{
     SourceReadOptions, SourceSyntax,
 };
 use p4kx_extraction::{
-    Archive, ArchiveWatch, Checksum, FieldOrigin, InputScope, PhysicalSourceKind, SourceEncryption,
-    SourceEncryptionState, SourceInventory, SourceLocation,
+    Archive, ArchiveWatch, Checksum, FieldOrigin, InputScope, PhysicalSourceKind, ProvenanceMode,
+    SourceEncryption, SourceEncryptionState, SourceInventory, SourceLocation,
 };
 use p4kx_testkit::{real_archive_key, real_archive_path};
 
 use super::TestResult;
 use crate::catalog_queries::radar_audio::{
     AuthoredXmlElement, AuthoredXmlText, RadarAudioBindingStatus, RadarAudioDatum, RadarAudioField,
-    RadarAudioNode, RadarAudioSelection, RadarAudioSnapshot, read_radar_audio,
+    RadarAudioNode, RadarAudioSelection, RadarAudioSnapshot, read_radar_audio_with_provenance_mode,
 };
 use crate::catalog_v3::radar_audio_configuration::includes;
 use crate::export_entry_counts::ExportEntryCounts;
@@ -60,7 +60,12 @@ fn installed_radar_audio_reconciles_ordered_sound_slots_and_selector_coverage() 
     );
 
     let index = u32::try_from(entry.index())?;
-    let snapshot = read_radar_audio(&archive, RadarAudioSelection::EntryIndex(index), None)?;
+    let snapshot = read_radar_audio_with_provenance_mode(
+        &archive,
+        RadarAudioSelection::EntryIndex(index),
+        ProvenanceMode::Full,
+        None,
+    )?;
     check_payload_scope(&archive, index, &snapshot)?;
     let [row] = snapshot.rows.as_slice() else {
         return Err("one projected installed source".into());

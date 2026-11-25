@@ -10,7 +10,6 @@ use super::rows::{Projector, ReadOptions};
 use super::snapshot::EquipmentSnapshot;
 use crate::build::catalog_queries::unlocalized_record_query::plan::{Owner, Plan};
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_queries::{
     CatalogRecordCoverage, CatalogRecordSelection, DatasetAvailability, ParsedCatalogQueries,
@@ -179,7 +178,7 @@ impl Query<'_> {
             languages,
             declared_availability,
         } = *inputs;
-        let origins = CatalogOrigins::new(self.archive, self.entry, sources)?;
+        let origins = self.entry.with_texts(self.archive, sources)?;
         let input = OriginalCatalogInput::new(self.forge, &origins);
         let registry = CatalogTextRegistry::default();
         let family = P::FAMILY;

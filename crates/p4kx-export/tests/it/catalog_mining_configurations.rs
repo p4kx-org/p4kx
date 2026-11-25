@@ -289,6 +289,6 @@ fn catalog(pattern: &str) -> TestResult<Value> {
     let filter = Filter::parse(pattern)?;
     let mut options = common::options();
     options.filter = Some(&filter);
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     Ok(serde_json::from_slice(built.json())?)
 }

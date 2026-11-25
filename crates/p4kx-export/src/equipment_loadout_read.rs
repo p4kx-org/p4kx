@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use p4kx_assembly::{ArchiveFiles, Entities};
-use p4kx_extraction::{Archive, CancelToken, DataForge, DataForgeEntry};
+use p4kx_extraction::{Archive, CancelToken, DataForge};
 
 use super::super::dependency_coverage::EquipmentDependencyCoverage;
 use super::{LoadoutDependencyCoverage, LoadoutSnapshot, scope};
@@ -12,7 +12,7 @@ use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection, DatasetAvailability};
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::contract_loadout::Loadout;
 use crate::export_ledger::ExportLedger;
 use crate::loadout::Wanted;
@@ -23,7 +23,7 @@ use crate::{CatalogError, Kind};
 
 pub(in crate::build::catalog_queries::equipment) struct Query<'query> {
     pub(in crate::build::catalog_queries::equipment) archive: &'query Archive,
-    pub(in crate::build::catalog_queries::equipment) entry: &'query DataForgeEntry,
+    pub(in crate::build::catalog_queries::equipment) entry: CatalogQuerySource<'query>,
     pub(in crate::build::catalog_queries::equipment) forge: &'query DataForge<'query>,
     pub(in crate::build::catalog_queries::equipment) selection: CatalogRecordSelection,
     pub(in crate::build::catalog_queries::equipment) cancel: Option<&'query CancelToken>,
@@ -49,7 +49,7 @@ impl Query<'_> {
             wanted,
             mut coverage,
         } = scope::read(self.forge, self.selection, self.cancel)?;
-        let origins = CatalogOrigins::for_archive_records(self.archive, self.entry)?;
+        let origins = self.entry.records(self.archive)?;
         let (rows, dependencies) = self.resolve(&origins, wanted, &mut coverage)?;
         scope::finish_coverage(&mut coverage);
         let source_inventory = origins.uses.finish_with(|| checkpoint(self.cancel))?;

@@ -1,23 +1,22 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, CancelToken, DataForge, DataForgeEntry, Language};
+use p4kx_extraction::{Archive, CancelToken, DataForge, Language};
 
 use super::super::unlocalized_record_query::plan::{Owner, Plan};
 use super::super::{CatalogRecordCoverage, CatalogRecordSelection, DatasetAvailability};
 use super::ItemRecoverySnapshot;
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::record_observation::RecordObservation;
 use crate::recovery::{self, RECOVERY, RecoveryProjection};
 use crate::texts::{TextSources, Texts};
 
 pub(super) struct Query<'query> {
     pub(super) archive: &'query Archive,
-    pub(super) entry: &'query DataForgeEntry,
+    pub(super) entry: CatalogQuerySource<'query>,
     pub(super) forge: &'query DataForge<'query>,
     pub(super) selection: CatalogRecordSelection,
     pub(super) requested_languages: &'query [Language],
@@ -38,7 +37,7 @@ impl<'query> Query<'query> {
         checkpoint(self.cancel)?;
         let sources = TextSources::read_languages(self.archive, languages)?;
         checkpoint(self.cancel)?;
-        let origins = CatalogOrigins::new(self.archive, self.entry, &sources)?;
+        let origins = self.entry.with_texts(self.archive, &sources)?;
         let input = OriginalCatalogInput::new(self.forge, &origins);
         let texts = Texts::parse(&sources)?;
         let registry = CatalogTextRegistry::default();

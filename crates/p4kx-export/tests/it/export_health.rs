@@ -29,7 +29,7 @@ fn retained_rows_keep_actual_field_failures_in_the_artifact() -> TestResult {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..fixture::options()
     };
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let summary = built.summary();
     assert!(
         summary.failures().is_empty(),
@@ -119,7 +119,7 @@ fn assert_failed_identity(health: &ExportHealth) {
 #[test]
 fn represented_optional_empty_and_dangling_states_do_not_invent_a_read_failure() -> TestResult {
     let (_root, archive) = fixture::archive(false)?;
-    let built = build_catalog(&archive, &fixture::options())?;
+    let built = build_catalog(&archive, fixture::options().with_full_provenance())?;
     let health = built.summary().export_health();
     assert!(
         health.is_complete(),
@@ -159,7 +159,7 @@ fn healthy_filtered_selection_and_enumerated_empty_kinds_publish_normally() -> T
         filter: Some(&filter),
         ..fixture::options()
     };
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let health = built.summary().export_health();
     assert!(
         health.is_complete(),
@@ -197,7 +197,7 @@ fn normal_mode_refuses_memory_and_fresh_or_existing_files_before_creation() -> T
     let (root, archive) = fixture::archive(true)?;
     assert!(
         matches!(
-            build_catalog(&archive, &fixture::options()),
+            build_catalog(&archive, fixture::options().with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "normal in-memory publication also refuses incomplete bytes"
@@ -212,11 +212,16 @@ fn normal_mode_refuses_memory_and_fresh_or_existing_files_before_creation() -> T
                 fs::write(&output, b"previous complete output")?;
             }
             let called = Cell::new(false);
-            let result =
-                write_catalog_from(&archive, &entry, &fixture::options(), compression, || {
+            let result = write_catalog_from(
+                &archive,
+                &entry,
+                fixture::options().with_full_provenance(),
+                compression,
+                || {
                     called.set(true);
                     CatalogFile::create(&output)
-                });
+                },
+            );
             assert!(
                 matches!(result, Err(CatalogError::IncompleteExport(_))),
                 "normal output refuses the same measured source fault"
@@ -239,7 +244,7 @@ fn normal_mode_refuses_memory_and_fresh_or_existing_files_before_creation() -> T
 #[test]
 fn a_leftover_entity_without_a_crafter_component_does_not_invent_a_successful_read() -> TestResult {
     let (_root, archive) = fixture::archive(false)?;
-    let built = build_catalog(&archive, &fixture::options())?;
+    let built = build_catalog(&archive, fixture::options().with_full_provenance())?;
     let crafters = built
         .summary()
         .export_health()
@@ -272,10 +277,15 @@ fn explicit_diagnostic_memory_plain_and_zstd_outputs_share_the_same_health() -> 
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..fixture::options()
     };
-    let memory = build_catalog(&archive, &options)?;
+    let memory = build_catalog(&archive, options.with_full_provenance())?;
     for compression in [Compression::None, Compression::ZSTD] {
-        let (summary, bytes) =
-            write_catalog_from(&archive, &entry, &options, compression, || Ok(Vec::new()))?;
+        let (summary, bytes) = write_catalog_from(
+            &archive,
+            &entry,
+            options.with_full_provenance(),
+            compression,
+            || Ok(Vec::new()),
+        )?;
         let decoded = if compression == Compression::None {
             bytes
         } else {
@@ -324,7 +334,7 @@ fn a_non_paint_physical_alias_does_not_become_a_selected_paint_input() -> TestRe
         .entry(TestEntry::zstd("Data\\Game2.dcb", database))
         .write_to(&path)?;
     let archive = Archive::open(&path)?;
-    let built = build_catalog(&archive, &fixture::options())?;
+    let built = build_catalog(&archive, fixture::options().with_full_provenance())?;
     let health = built.summary().export_health();
     let items = health.kind(Kind::Items).ok_or("item health")?;
     let paints = health.kind(Kind::Paints).ok_or("paint health")?;

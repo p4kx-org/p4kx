@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::item_recovery::{
@@ -30,37 +31,39 @@ const FIRST_READABLE_INDEX: u32 = 3;
 
 pub(super) fn read() -> TestResult<[Route; 3]> {
     let (_folder, archive) = archive(&full_database(), true)?;
-    let full = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;
-    let full: Value = serde_json::from_slice(full.json())?;
-    with_item_recovery(
+    let full = build_catalog(
         &archive,
-        CatalogRecordSelection::All,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
+    let full: Value = serde_json::from_slice(full.json())?;
+    full_proof::open(
+        &archive,
         CatalogLanguageSelection::Selected(&[Language::English]),
         None,
-        |snapshot| {
-            verify_policy(&snapshot)?;
-            Ok([
-                parity(
-                    &full,
-                    snapshot.availability,
-                    snapshot.economy.as_slice(),
-                    ITEM_RECOVERY_ECONOMY,
-                )?,
-                parity(
-                    &full,
-                    snapshot.availability,
-                    snapshot.overrides.as_slice(),
-                    ITEM_RECOVERY_OVERRIDES,
-                )?,
-                parity(
-                    &full,
-                    snapshot.availability,
-                    snapshot.policy.as_slice(),
-                    ITEM_RECOVERY_POLICY,
-                )?,
-            ])
-        },
     )?
+    .with_item_recovery(CatalogRecordSelection::All, None, |snapshot| {
+        verify_policy(&snapshot)?;
+        Ok([
+            parity(
+                &full,
+                snapshot.availability,
+                snapshot.economy.as_slice(),
+                ITEM_RECOVERY_ECONOMY,
+            )?,
+            parity(
+                &full,
+                snapshot.availability,
+                snapshot.overrides.as_slice(),
+                ITEM_RECOVERY_OVERRIDES,
+            )?,
+            parity(
+                &full,
+                snapshot.availability,
+                snapshot.policy.as_slice(),
+                ITEM_RECOVERY_POLICY,
+            )?,
+        ])
+    })?
 }
 
 fn parity<Row: Serialize + JsonSchema>(

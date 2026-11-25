@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogRecordSelection, MissionLocationTemplateSnapshot,
     with_mission_location_templates,
@@ -33,13 +34,12 @@ fn location_identity_flags_names_and_cluster_links_have_direct_original_cells() 
     ] {
         for case in fixture::ALL {
             let (_folder, archive) = common::open(&fixture::database(case), origin)?;
-            with_mission_location_templates(
-                &archive,
-                CatalogRecordSelection::Guid(common::guid(fixture::OWNER).parse()?),
-                CatalogLanguageSelection::Selected(&[]),
-                None,
-                |snapshot| proof::verify(&snapshot, case, marker),
-            )??;
+            full_proof::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?
+                .with_mission_location_templates(
+                    CatalogRecordSelection::Guid(common::guid(fixture::OWNER).parse()?),
+                    None,
+                    |snapshot| proof::verify(&snapshot, case, marker),
+                )??;
         }
     }
     Ok(())
@@ -48,13 +48,12 @@ fn location_identity_flags_names_and_cluster_links_have_direct_original_cells() 
 #[test]
 fn equal_location_guids_preserve_physical_ties_and_original_header_locations() -> TestResult {
     let (_folder, archive) = common::open(&fixture::duplicated(), DcbOrigin::Plain)?;
-    with_mission_location_templates(
-        &archive,
-        CatalogRecordSelection::Guid(common::guid(fixture::OWNER).parse()?),
-        CatalogLanguageSelection::Selected(&[]),
-        None,
-        |snapshot| duplicate_rows(&snapshot),
-    )??;
+    full_proof::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?
+        .with_mission_location_templates(
+            CatalogRecordSelection::Guid(common::guid(fixture::OWNER).parse()?),
+            None,
+            |snapshot| duplicate_rows(&snapshot),
+        )??;
     Ok(())
 }
 
@@ -97,7 +96,7 @@ fn malformed_location_flags_remain_diagnostic_and_refuse_normal_publication() ->
     )?;
     assert!(
         matches!(
-            build_catalog(&archive, &common::options()),
+            build_catalog(&archive, common::options().with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "normal publication cannot hide the original malformed Bool"
@@ -105,7 +104,7 @@ fn malformed_location_flags_remain_diagnostic_and_refuse_normal_publication() ->
     refusal_before_output(&archive, folder.path())?;
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let document: Value = serde_json::from_slice(built.json())?;
     let cell = document
         .pointer("/missionLocationTemplates/0/disabled")
@@ -163,7 +162,7 @@ fn refusal_before_output(archive: &Archive, directory: &Path) -> TestResult {
         let result = write_catalog_from(
             archive,
             &entry,
-            &common::options(),
+            common::options().with_full_provenance(),
             Compression::None,
             || {
                 called.set(true);

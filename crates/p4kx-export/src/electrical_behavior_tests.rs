@@ -51,7 +51,10 @@ fn electrical_behaviors_share_catalog_and_selected_sdk_projection() -> TestResul
             Ok::<_, Box<dyn std::error::Error>>(serde_json::to_value(snapshot.rows())?)
         },
     )??;
-    let catalog = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;
+    let catalog = build_catalog(
+        &archive,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
     let json: Value = serde_json::from_slice(catalog.json())?;
     let rows = json
         .pointer("/configurations/electricalBehaviors/rows")

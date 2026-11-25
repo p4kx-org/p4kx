@@ -8,12 +8,13 @@ use p4kx_extraction::{
 
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::unlocalized_record_query::plan::Plan;
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogRecordCoverage, CatalogRecordSelection,
 };
-use crate::catalog_query_session::{CatalogQuerySession, ParsedCatalogQueries, checkpoint};
+use crate::catalog_query_session::{
+    CatalogQuerySession, CatalogQuerySource, ParsedCatalogQueries, checkpoint,
+};
 use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::catalog_v3::tag_catalog::{self, Declaration};
 use crate::record_observation::RecordObservation;
@@ -159,7 +160,7 @@ impl ParsedCatalogQueries<'_> {
 
 fn project<T>(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     (family, selection): (TagDeclarationFamily, CatalogRecordSelection),
     cancel: Option<&CancelToken>,
@@ -175,7 +176,7 @@ fn project<T>(
         };
         Ok(family.includes(source_type))
     })?;
-    let origins = CatalogOrigins::for_archive_records(archive, entry)?;
+    let origins = entry.records(archive)?;
     let input = OriginalCatalogInput::new(forge, &origins);
     let mut definitions = Vec::new();
     let mut roots = Vec::new();

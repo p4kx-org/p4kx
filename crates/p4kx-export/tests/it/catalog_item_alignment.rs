@@ -33,8 +33,9 @@ fn physical_port_and_item_declarations_keep_their_independent_values() -> TestRe
     let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&database, origin)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
         validator
             .validate(&catalog)
             .map_err(|error| format!("catalog v3 alignment schema: {error}"))?;
@@ -138,13 +139,14 @@ fn unreadable_original_axis_keeps_its_physical_port_and_failure_state() -> TestR
     let mut options = common::options();
     assert!(
         matches!(
-            build_catalog(&archive, &options),
+            build_catalog(&archive, options.with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "the invalid original label prevents a complete export"
     );
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let future = proof::at(&catalog, &format!("{PORTS}/0/ports/value/1/value"))?;
     proof::present(future, "portOrdinal", &json!(1), Some(true))?;
     let axis = proof::at(future, "/attachAxesToAlign")?;

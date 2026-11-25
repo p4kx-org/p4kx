@@ -37,7 +37,7 @@ fn hackable_device_keeps_original_target_values_and_state_links() -> Result {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let built = build_catalog_from(&archive, &entry, &options)
+    let built = build_catalog_from(&archive, &entry, options.with_full_provenance())
         .map_err(|_| "build selected hackable Device catalog")?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let uses = indexed(&catalog, "/provenance/uses", "id")?;

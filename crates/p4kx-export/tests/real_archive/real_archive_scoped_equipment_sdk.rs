@@ -23,32 +23,25 @@ use crate::real_archive_verification::print_line;
 pub(crate) mod equipment_input;
 use equipment_input::{dataforge, literal_filter, physical_filter, record_index, with_archive};
 
+#[path = "real_archive_standalone_mining_sdk_cold.rs"]
+mod mining_cold;
 #[path = "vehicle_armor_sdk_cold.rs"]
 mod vehicle_armor_cold;
 
-#[path = "real_archive_standalone_mining_sdk_cold.rs"]
-mod mining_cold;
-
 #[path = "real_archive_contract_metadata_sdk_parity.rs"]
 mod contract_metadata_parity;
-
-#[path = "real_archive_location_vocabulary_sdk_parity.rs"]
-mod location_vocabulary_parity;
-
-#[path = "real_archive_loot_definition_sdk_parity.rs"]
-mod loot_definition_parity;
-
-#[path = "real_archive_jump_configuration_sdk_parity.rs"]
-mod jump_configuration_parity;
-
-#[path = "real_archive_resource_group_sdk_parity.rs"]
-mod resource_group_parity;
-
-#[path = "real_archive_terrain_definition_sdk_parity.rs"]
-mod terrain_definition_parity;
-
 #[path = "real_archive_electrical_behavior_sdk_parity.rs"]
 mod electrical_behavior_parity;
+#[path = "real_archive_jump_configuration_sdk_parity.rs"]
+mod jump_configuration_parity;
+#[path = "real_archive_location_vocabulary_sdk_parity.rs"]
+mod location_vocabulary_parity;
+#[path = "real_archive_loot_definition_sdk_parity.rs"]
+mod loot_definition_parity;
+#[path = "real_archive_resource_group_sdk_parity.rs"]
+mod resource_group_parity;
+#[path = "real_archive_terrain_definition_sdk_parity.rs"]
+mod terrain_definition_parity;
 
 #[path = "real_archive_npc_spawn_definition_sdk_parity.rs"]
 mod npc_spawn_definition_parity;
@@ -359,7 +352,7 @@ fn produce(archive: &Archive, input: &DataForgeEntry, filter: &Filter) -> TestRe
         filter: Some(filter),
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    build_catalog_from(archive, input, &options)
+    build_catalog_from(archive, input, options.with_full_provenance())
         .map_err(|_| "build the exact normal Catalog scope".into())
 }
 

@@ -1,16 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, CancelToken, DataForge, DataForgeEntry};
+use p4kx_extraction::{Archive, CancelToken, DataForge};
 
 use super::{
     LootDocumentAdmission, LootDocumentCoverage, LootDocumentQuery, LootDocumentReachability,
     LootDocumentSelection, LootDocumentSnapshot,
 };
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::DatasetAvailability;
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::catalog_read::original::EntryCapture;
 use crate::export_entry_counts::ExportEntryCounts;
 use crate::export_health_entries;
@@ -24,12 +23,12 @@ use crate::{CatalogError, ExportAccountingError, Kind};
 
 pub(super) fn run(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     query: LootDocumentQuery<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<LootDocumentSnapshot, CatalogError> {
-    let origins = CatalogOrigins::for_archive_records(archive, entry)?;
+    let origins = entry.records(archive)?;
     let original = OriginalCatalogInput::new(forge, &origins);
     let admission = scan(forge, &origins, query.catalog_filter, cancel)?;
     read(

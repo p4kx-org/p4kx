@@ -23,7 +23,8 @@ const MIN_RESOLVED: usize = 200;
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn every_mapped_store_slug_resolves_to_a_ship_of_the_archive() -> Result<(), Box<dyn Error>> {
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let options = CatalogOptions::new(SystemTime::now());
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let counts = built.summary().store_slugs();
     println!(

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ManufacturerSnapshot,
     with_manufacturers,
@@ -25,10 +26,10 @@ fn manufacturers_match_the_catalog_and_resolve_both_text_domains() -> TestResult
         .value("Localization", TestValue::Null),
     );
     let (_folder, archive) = archive_fixture::open(&database, DcbOrigin::Plain)?;
-    let built = build_catalog(&archive, &archive_fixture::options())?;
+    let built = build_catalog(&archive, archive_fixture::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let entry = DataForgeEntry::read(&archive)?;
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::AllAvailable,

@@ -164,7 +164,7 @@ fn catalog(
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     options.filter = Some(&filter);
     Ok(serde_json::from_slice(
-        build_catalog(&archive, &options)?.json(),
+        build_catalog(&archive, options.with_full_provenance())?.json(),
     )?)
 }
 

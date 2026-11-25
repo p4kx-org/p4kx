@@ -50,7 +50,7 @@ fn inverse_absence_uses_the_actual_owning_declaration_survey() -> TestResult {
     let filter = Filter::new("*/quantizer");
     let mut options = common::options();
     options.filter = Some(&filter);
-    let built = p4kx_export::build_catalog_from(&archive, &entry, &options)?;
+    let built = p4kx_export::build_catalog_from(&archive, &entry, options.with_full_provenance())?;
     assert!(built.summary().is_complete());
     let catalog: Value = serde_json::from_slice(built.json())?;
     let inverse = support::row(&catalog, support::INVERSE, 0)?;

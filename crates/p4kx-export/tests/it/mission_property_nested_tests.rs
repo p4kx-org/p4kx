@@ -39,7 +39,7 @@ fn run(case: Case) -> TestResult {
                 p4kx_export::build_catalog_from(
                     &input.archive,
                     &input.entry,
-                    &health_origin_fixture::options()
+                    health_origin_fixture::options().with_full_provenance()
                 ),
                 Err(CatalogError::IncompleteExport(_))
             ),

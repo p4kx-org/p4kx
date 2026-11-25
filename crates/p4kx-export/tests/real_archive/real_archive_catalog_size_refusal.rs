@@ -92,7 +92,7 @@ mod tests {
         let result = export::write_catalog_from(
             &archive,
             &entry,
-            &options,
+            options.with_full_provenance(),
             export::Compression::ZSTD,
             || {
                 output_requested.set(true);

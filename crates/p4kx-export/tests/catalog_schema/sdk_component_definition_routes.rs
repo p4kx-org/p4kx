@@ -6,9 +6,7 @@ use p4kx_export::catalog_queries::equipment::component_definitions::{
     with_damage_resistance_macros, with_mining_laser_globals, with_turret_health_modifiers,
 };
 use p4kx_export::catalog_queries::equipment::durability::with_turret_health;
-use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
-};
+use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_extraction::{Archive, Language};
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestEntity, TestEntry, TestInstance, TestRecord, TestStruct,
@@ -18,6 +16,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::{Route, TestResult};
+use crate::sdk_full_proof as full_proof;
 
 const TURRET: &str = "SCItemTurretParams";
 const TYPES: [&str; 5] = [
@@ -76,7 +75,7 @@ fn witness<Row: JsonSchema + Serialize>(
 #[test]
 fn component_definition_queries_keep_physical_aliases_and_language_scope() -> TestResult<()> {
     let (_folder, archive) = fixture()?;
-    let session = CatalogQuerySession::open(
+    let session = full_proof::open(
         &archive,
         CatalogLanguageSelection::Selected(&[Language::English]),
         None,

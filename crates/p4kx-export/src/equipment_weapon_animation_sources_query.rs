@@ -9,7 +9,6 @@ use p4kx_extraction::{Archive, Build, CancelToken, DataForgeEntry, SourceInvento
 use super::EquipmentDependencyCoverage;
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projections::weapon_reload;
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, DatasetAvailability, ParsedCatalogQueries,
@@ -109,7 +108,7 @@ impl ParsedCatalogQueries<'_> {
         inspect: impl FnOnce(WeaponAnimationSourcesSnapshot<'_>) -> T,
     ) -> Result<T, CatalogError> {
         self.project(cancel, |archive, entry, forge| {
-            let origins = CatalogOrigins::for_archive_records(archive, entry)?;
+            let origins = entry.records(archive)?;
             let input = OriginalCatalogInput::new(forge, &origins);
             let players = Entities::records_of_class(forge, "Player");
             checkpoint(cancel)?;

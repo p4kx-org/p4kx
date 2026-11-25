@@ -340,7 +340,11 @@ fn complete(source: &Original, expected: &str) -> TestResult {
     }
     for fixture in inputs {
         let options = health_origin_fixture::options();
-        let built = build_catalog_from(&fixture.archive, &fixture.entry, &options)?;
+        let built = build_catalog_from(
+            &fixture.archive,
+            &fixture.entry,
+            options.with_full_provenance(),
+        )?;
         let document: Json = serde_json::from_slice(built.json())?;
         let row =
             catalog_contracts::entry(&document, &health_origin_fixture::guid(CONTRACT), None)?;
@@ -363,7 +367,7 @@ fn writers(fixture: &Fixture, expected: &[u8]) -> TestResult {
         let (_, bytes) = write_catalog_from(
             &fixture.archive,
             &fixture.entry,
-            &health_origin_fixture::options(),
+            health_origin_fixture::options().with_full_provenance(),
             compression,
             || Ok(Vec::new()),
         )?;

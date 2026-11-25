@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 
 use p4kx_export::catalog_queries::equipment::{self, ItemDefinitionSnapshot};
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability,
 };
 use p4kx_export::{CatalogError, CatalogPublicationMode};
 use p4kx_extraction::{Archive, CancelToken, DataForgeEntry, Language};
@@ -14,6 +14,7 @@ use serde_json::Value;
 use super::{fixture, values, walk};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn item_definition_query_getters_match_complete_canonical_cells_for_all_origin_states() -> TestResult
@@ -23,11 +24,14 @@ fn item_definition_query_getters_match_complete_canonical_cells_for_all_origin_s
             let (_folder, archive) = common::open(&fixture::database(layout), origin)?;
             let entry = DataForgeEntry::read(&archive)?;
             let catalog = canonical(&archive)?;
-            equipment::with_item_definitions_from(
+            full_proof::from_entry(
                 &archive,
                 &entry,
-                CatalogRecordSelection::Guid(common::guid(fixture::OWNER).parse()?),
                 CatalogLanguageSelection::Selected(&[Language::English, Language::German]),
+                None,
+            )?
+            .with_item_definitions(
+                CatalogRecordSelection::Guid(common::guid(fixture::OWNER).parse()?),
                 None,
                 |snapshot| verify(&snapshot, &catalog, &[0, 1], layout, marker),
             )??;
@@ -44,7 +48,7 @@ fn item_definition_query_keeps_physical_alias_selection_in_a_reused_parsed_view(
             common::open(&fixture::database(fixture::Layout::Complete), origin)?;
         let entry = DataForgeEntry::read(&archive)?;
         let catalog = canonical(&archive)?;
-        let session = CatalogQuerySession::from_entry(
+        let session = full_proof::from_entry(
             &archive,
             &entry,
             CatalogLanguageSelection::Selected(&[Language::English, Language::German]),
@@ -67,12 +71,8 @@ fn item_definition_query_can_return_original_keys_without_loading_locales() -> T
         DcbOrigin::Plain,
     )?;
     let catalog = canonical(&archive)?;
-    equipment::with_item_definitions(
-        &archive,
-        CatalogRecordSelection::All,
-        CatalogLanguageSelection::Selected(&[]),
-        None,
-        |snapshot| {
+    full_proof::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?
+        .with_item_definitions(CatalogRecordSelection::All, None, |snapshot| {
             assert!(
                 snapshot.requested_languages().is_empty(),
                 "no locale was requested"
@@ -100,8 +100,7 @@ fn item_definition_query_can_return_original_keys_without_loading_locales() -> T
                 );
             }
             Ok::<_, Box<dyn std::error::Error>>(())
-        },
-    )??;
+        })??;
     Ok(())
 }
 
@@ -233,7 +232,7 @@ fn verify_texts(snapshot: &ItemDefinitionSnapshot<'_>, catalog: &Value) -> TestR
 fn canonical(archive: &Archive) -> TestResult<Value> {
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = p4kx_export::build_catalog(archive, &options)?;
+    let built = p4kx_export::build_catalog(archive, options.with_full_provenance())?;
     Ok(serde_json::from_slice(built.json())?)
 }
 

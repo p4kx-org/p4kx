@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    ParsedCatalogQueries, ReputationRewardAmountSnapshot, with_reputation_reward_amounts,
-    with_reputation_reward_amounts_from,
+    ParsedCatalogQueries, ReputationRewardAmountSnapshot,
 };
 use p4kx_export::{CatalogError, CatalogOptions, CatalogPublicationMode, build_catalog_from};
 use p4kx_extraction::{Archive, DataForgeEntry, InputScope, Language, SourceUseRole};
@@ -34,7 +34,7 @@ pub(super) fn read() -> TestResult<Route> {
     let normal = CatalogOptions::new(UNIX_EPOCH);
     assert!(
         matches!(
-            build_catalog_from(&archive, &entry, &normal),
+            build_catalog_from(&archive, &entry, normal.with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "normal publication refuses an ambiguous reward GUID"
@@ -43,18 +43,14 @@ pub(super) fn read() -> TestResult<Route> {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..normal
     };
-    let catalog: Value =
-        serde_json::from_slice(build_catalog_from(&archive, &entry, &options)?.json())?;
-    with_reputation_reward_amounts_from(
-        &archive,
-        &entry,
-        CatalogRecordSelection::All,
-        None,
-        |snapshot| {
+    let catalog: Value = serde_json::from_slice(
+        build_catalog_from(&archive, &entry, options.with_full_provenance())?.json(),
+    )?;
+    full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .with_reputation_reward_amounts(CatalogRecordSelection::All, None, |snapshot| {
             check_catalog_parity(&snapshot, &catalog)?;
             Route::queried_rows(REPUTATION_REWARD_AMOUNTS, &snapshot.rows, None)
-        },
-    )?
+        })?
 }
 
 fn check_catalog_parity(
@@ -198,31 +194,35 @@ fn reward_amount_queries_preserve_incompatible_source_width_and_health() -> Test
         .record(reward(DUPLICATE, "wide", TestValue::Int64(i64::MAX)))
         .build();
     let (_directory, archive) = fixture(database, Input::Plain)?;
-    with_reputation_reward_amounts(&archive, CatalogRecordSelection::All, None, |snapshot| {
-        let [row] = snapshot.rows.as_slice() else {
-            return Err("the retained incomplete reward row".into());
-        };
-        let index = row
-            .source()
-            .record_index()
-            .value()
-            .copied()
-            .ok_or("owner index")?;
-        assert!(
-            row.reputation_amount().value().is_none(),
-            "no narrowing to Int32"
-        );
-        assert_eq!(
-            snapshot.coverage.incomplete_fields,
-            [index],
-            "exact incomplete owner"
-        );
-        assert!(
-            row.authored_fields().roots().len() >= 2,
-            "the incompatible signed storage and the authored extra remain observable"
-        );
-        Ok(())
-    })?
+    full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?.with_reputation_reward_amounts(
+        CatalogRecordSelection::All,
+        None,
+        |snapshot| {
+            let [row] = snapshot.rows.as_slice() else {
+                return Err("the retained incomplete reward row".into());
+            };
+            let index = row
+                .source()
+                .record_index()
+                .value()
+                .copied()
+                .ok_or("owner index")?;
+            assert!(
+                row.reputation_amount().value().is_none(),
+                "no narrowing to Int32"
+            );
+            assert_eq!(
+                snapshot.coverage.incomplete_fields,
+                [index],
+                "exact incomplete owner"
+            );
+            assert!(
+                row.authored_fields().roots().len() >= 2,
+                "the incompatible signed storage and the authored extra remain observable"
+            );
+            Ok(())
+        },
+    )?
 }
 
 fn amounts(snapshot: &ReputationRewardAmountSnapshot<'_>) -> TestResult<Vec<i32>> {

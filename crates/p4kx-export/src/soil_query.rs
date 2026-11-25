@@ -3,7 +3,7 @@
 
 //! Selective access to original loose soil definitions.
 
-use p4kx_extraction::{Archive, CancelToken};
+use p4kx_extraction::{Archive, CancelToken, ProvenanceMode};
 
 use super::loose_definitions::{self, LooseDefinitionSnapshot};
 use crate::catalog_query_session::checkpoint;
@@ -40,11 +40,25 @@ pub fn read_soils(
     selection: LooseDefinitionSelection<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<SoilSnapshot, CatalogError> {
-    loose_definitions::read(
+    read_soils_with_provenance_mode(archive, selection, ProvenanceMode::MarkersOnly, cancel)
+}
+
+/// Reads soil definitions with the selected source detail.
+///
+/// # Errors
+/// Returns the errors of `read_soils`.
+pub fn read_soils_with_provenance_mode(
+    archive: &Archive,
+    selection: LooseDefinitionSelection<'_>,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<SoilSnapshot, CatalogError> {
+    loose_definitions::read_with_provenance_mode(
         archive,
         selection,
         cancel,
         Kind::Soils,
+        provenance_mode,
         |capture, ledger, options| {
             let mut table = soil::read_selected(archive, capture, ledger, options, selection)?;
             let wanted = planet_tech_definitions::requested_terrain_guids(
@@ -79,11 +93,30 @@ pub fn read_soil_texture_sets(
     selection: LooseDefinitionSelection<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<SoilTextureSetSnapshot, CatalogError> {
-    loose_definitions::read(
+    read_soil_texture_sets_with_provenance_mode(
+        archive,
+        selection,
+        ProvenanceMode::MarkersOnly,
+        cancel,
+    )
+}
+
+/// Reads soil texture sets with the selected source detail.
+///
+/// # Errors
+/// Returns the errors of `read_soil_texture_sets`.
+pub fn read_soil_texture_sets_with_provenance_mode(
+    archive: &Archive,
+    selection: LooseDefinitionSelection<'_>,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<SoilTextureSetSnapshot, CatalogError> {
+    loose_definitions::read_with_provenance_mode(
         archive,
         selection,
         cancel,
         Kind::SoilTextureSets,
+        provenance_mode,
         |capture, ledger, options| {
             let mut paths = loose_archive_path::Resolver::new(archive, capture, cancel);
             soil_texture_set::read_selected(

@@ -3,9 +3,7 @@
 
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ResourceGroupMembers,
-};
+use p4kx_export::catalog_queries::{CatalogRecordSelection, ResourceGroupMembers};
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog_from};
 use p4kx_extraction::{Archive, DataForgeEntry, SourcedValue};
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
@@ -17,6 +15,7 @@ use super::super::{
     RESOURCE_GROUP_MEMBERS, RESOURCE_GROUP_PARENTS, RESOURCE_GROUPS, RESOURCE_TYPES,
 };
 use super::{Route, TestResult};
+use crate::sdk_full_proof as full_proof;
 
 #[path = "../it/canonical_json.rs"]
 mod canonical_json;
@@ -36,14 +35,10 @@ pub(super) fn read() -> TestResult<[Route; 4]> {
     let entry = DataForgeEntry::read(&archive)?;
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog_from(&archive, &entry, &options)?.json())?;
-    let session = CatalogQuerySession::from_entry(
-        &archive,
-        &entry,
-        CatalogLanguageSelection::Selected(&[]),
-        None,
+    let catalog: Value = serde_json::from_slice(
+        build_catalog_from(&archive, &entry, options.with_full_provenance())?.json(),
     )?;
+    let session = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?;
     let parsed = session.parsed(None)?;
     let all = CatalogRecordSelection::All;
     let (groups, members, target) =

@@ -13,6 +13,7 @@ use serde_json::{Value, json};
 use super::{DcbOrigin, TestResult, fixture, proof, resolution, source};
 use crate::commodity_v3_fixture as common;
 use crate::health_origin_fixture::{self as archive_fixture, Fixture, Input};
+use crate::sdk_full_proof as full_proof;
 
 const ROWS: &str = "/projections/weaponMagazineResolutions/rows";
 
@@ -21,10 +22,10 @@ fn magazine_sdk_matches_canonical_own_and_linked_routes() -> TestResult {
     let builder = fixture::magazine_database(fixture::MagazineCase::Resolved);
     for (origin, marker) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&builder, origin)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
-        let session =
-            CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
+        let session = full_proof::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
         let parsed = session.parsed(None)?;
         for (index, expected) in [
             (source::DIRECT_INDEX, Expected::Own),
@@ -91,7 +92,7 @@ fn magazine_sdk_keeps_an_unreadable_reached_target_scoped_to_its_caller() -> Tes
             b"<LayerBackups/>",
         )],
     )?;
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &input.archive,
         &input.entry,
         CatalogLanguageSelection::Selected(&[]),
@@ -104,8 +105,9 @@ fn magazine_sdk_keeps_an_unreadable_reached_target_scoped_to_its_caller() -> Tes
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let catalog: Value =
-        serde_json::from_slice(build_catalog_from(&input.archive, &input.entry, &options)?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog_from(&input.archive, &input.entry, options.with_full_provenance())?.json(),
+    )?;
     parsed.with_weapon_magazine_dependencies(
         source::PERSONAL_INDEX,
         Some(&filter),

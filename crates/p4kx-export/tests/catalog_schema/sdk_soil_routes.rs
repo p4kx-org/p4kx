@@ -5,12 +5,15 @@ use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::soils::{
     CatalogJsonNumber, LooseArchivePathState, LooseDefinitionSelection as Selection, Soil,
-    SoilSnapshot, TerrainGuidLinkState, read_soil_texture_sets, read_soils,
+    SoilSnapshot, TerrainGuidLinkState, read_soil_texture_sets_with_provenance_mode, read_soils,
+    read_soils_with_provenance_mode,
 };
 use p4kx_export::{CatalogOptions, ExportDiagnosticCode, Kind, build_catalog};
 use p4kx_extraction::Archive;
 use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry};
 use serde_json::{Value, json};
+
+use crate::sdk_full_proof as full_proof;
 
 use super::{Route, TestResult};
 
@@ -29,9 +32,17 @@ const TARGET_GUID: &str = "dddddddd-0000-0000-0000-000000000002";
 
 pub(super) fn read() -> TestResult<[Route; 2]> {
     let (_folder, archive) = open(normal_entries())?;
-    let built = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
-    let soils = read_soils(&archive, Selection::ArchivePath(OWNER), None)?;
+    let soils = read_soils_with_provenance_mode(
+        &archive,
+        Selection::ArchivePath(OWNER),
+        full_proof::MODE,
+        None,
+    )?;
     let soil = verify_single_owner(&soils)?;
     verify_resolved_link(soil)?;
     assert_eq!(
@@ -39,7 +50,12 @@ pub(super) fn read() -> TestResult<[Route; 2]> {
         *catalog.pointer(SOILS).ok_or("normal soils table")?,
         "the selected single owner with no aliases matches the normal Catalog row"
     );
-    let sets = read_soil_texture_sets(&archive, Selection::Guid(TARGET_GUID.parse()?), None)?;
+    let sets = read_soil_texture_sets_with_provenance_mode(
+        &archive,
+        Selection::Guid(TARGET_GUID.parse()?),
+        full_proof::MODE,
+        None,
+    )?;
     let [set] = sets.rows.as_slice() else {
         return Err("one original soil texture set".into());
     };

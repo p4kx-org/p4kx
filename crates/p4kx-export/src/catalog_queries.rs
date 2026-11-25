@@ -194,6 +194,8 @@ pub mod radar_audio;
 #[path = "subsumption_event_query.rs"]
 pub mod subsumption_events;
 
+pub use p4kx_extraction::ProvenanceMode;
+
 pub use crate::canonical_record_header::{CanonicalRecordHeader, CatalogRecordSource};
 pub use crate::catalog_query_session::{
     CatalogLanguageSelection, CatalogQuerySession, ParsedCatalogQueries,

@@ -10,6 +10,7 @@ use super::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
     CatalogRecordSource, DatasetAvailability, ParsedCatalogQueries,
 };
+use crate::catalog_query_session::CatalogQuerySource;
 use crate::schema_fields::every_field_required;
 use crate::{CatalogError, Kind, blueprint_category};
 
@@ -111,7 +112,7 @@ impl ParsedCatalogQueries<'_> {
 
 fn read_archive(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     selection: CatalogRecordSelection,
     cancel: Option<&CancelToken>,

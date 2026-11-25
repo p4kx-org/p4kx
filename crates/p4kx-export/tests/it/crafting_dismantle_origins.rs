@@ -156,7 +156,11 @@ fn observed(guid: u128, product: Option<u128>) -> TestResult<(Value, Physical)> 
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let sources = original(&forge, guid, product)?;
-    let built = p4kx_export::build_catalog_from(&archive, &entry, &common::options())?;
+    let built = p4kx_export::build_catalog_from(
+        &archive,
+        &entry,
+        common::options().with_full_provenance(),
+    )?;
     assert!(
         built.summary().is_complete(),
         "every original source is healthy"

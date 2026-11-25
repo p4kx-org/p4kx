@@ -15,8 +15,9 @@ mod fixture;
 fn original_facility_capabilities_join_each_resolved_ship_placement() -> TestResult {
     let (_directory, archive) = common::open(&fixture::database(), DcbOrigin::Encrypted)?;
     verify_original(&archive)?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
     let [hanger, logout, empty] = proof::rows(&catalog, "/configurations/facilities/rows")? else {
         return Err("the three physical facility components".into());
     };

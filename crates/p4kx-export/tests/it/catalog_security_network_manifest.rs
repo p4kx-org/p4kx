@@ -15,7 +15,7 @@ const ROWS: &str = "/definitions/securityNetworkManifests/rows";
 #[test]
 fn manifest_retains_the_original_security_graph_and_field_origins() -> TestResult {
     let (_folder, input) = archive::open(&fixture::database(), DcbOrigin::Encrypted)?;
-    let built = build_catalog(&input, &archive::options())?;
+    let built = build_catalog(&input, archive::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let [row] = proof::rows(&catalog, ROWS)? else {
         return Err("one physical manifest row expected".into());
@@ -54,7 +54,8 @@ fn manifest_reference_to_a_filtered_target_preserves_its_physical_guid() -> Test
     let filter = Filter::new("selected/*");
     let mut options = archive::options();
     options.filter = Some(&filter);
-    let catalog: Value = serde_json::from_slice(build_catalog(&input, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&input, options.with_full_provenance())?.json())?;
     let [row] = proof::rows(&catalog, ROWS)? else {
         return Err("one selected manifest row expected".into());
     };

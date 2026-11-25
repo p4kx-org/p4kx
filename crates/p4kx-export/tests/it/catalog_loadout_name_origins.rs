@@ -10,6 +10,7 @@ use serde_json::{Value, json};
 
 use crate::health_origin_assertions as check;
 use crate::health_origin_fixture::{Fixture, Input, TestResult};
+use crate::sdk_full_proof as full_proof;
 
 const PATH: &str = "Data/synthetic/names.xml";
 const XML: &str = r#"<Loadout><Items><Item portName="shared"/></Items></Loadout>"#;
@@ -27,12 +28,13 @@ fn actual_name_cells_keep_mixed_physical_origins_and_sdk_parity() -> TestResult 
 fn compare_fixture(input: Input, encrypted_xml: bool) -> TestResult {
     let fixture = fixture(input, XML, encrypted_xml)?;
     let (_, catalog) = fixture.diagnostic()?;
-    let snapshot = read_loadouts_from(
+    let snapshot = full_proof::from_entry(
         &fixture.archive,
         &fixture.entry,
-        CatalogRecordSelection::All,
+        full_proof::NO_LANGUAGES,
         None,
-    )?;
+    )?
+    .read_loadouts(CatalogRecordSelection::All, None)?;
     let serialized = serde_json::to_value(&snapshot.rows)?;
     assert_eq!(
         Some(&serialized),
@@ -181,7 +183,7 @@ fn normal_publication_keeps_the_same_canonical_name_cells() -> TestResult {
     let normal = p4kx_export::build_catalog_from(
         &fixture.archive,
         &fixture.entry,
-        &crate::health_origin_fixture::options(),
+        crate::health_origin_fixture::options().with_full_provenance(),
     )?;
     let normal: Value = serde_json::from_slice(normal.json())?;
     let (_, diagnostic) = fixture.diagnostic()?;

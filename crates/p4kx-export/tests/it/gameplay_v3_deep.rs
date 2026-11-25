@@ -34,12 +34,16 @@ fn deeply_nested_gameplay_transformations_keep_their_original_order_and_bits() -
 fn complete(database: &DataForgeBuilder, depth: usize) -> TestResult {
     let (_folder, archive) = common::open(database, DcbOrigin::Plain)?;
     let options = common::options();
-    let built = export::build_catalog(&archive, &options)?;
+    let built = export::build_catalog(&archive, options.with_full_provenance())?;
     emitted(built.json(), depth)?;
     let plain: Value = serde_json::from_slice(built.json())?;
     accepted(&plain, database, depth)?;
-    let (summary, compressed) =
-        export::write_catalog(&archive, &options, Compression::ZSTD, || Ok(Vec::new()))?;
+    let (summary, compressed) = export::write_catalog(
+        &archive,
+        options.with_full_provenance(),
+        Compression::ZSTD,
+        || Ok(Vec::new()),
+    )?;
     let bytes = zstd::stream::decode_all(compressed.as_slice())?;
     let packed: Value = serde_json::from_slice(&bytes)?;
     assert_eq!(

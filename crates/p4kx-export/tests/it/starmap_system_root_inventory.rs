@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::starmap::{
     ContainerRootStatus, ContainerSystemRoot, ContainerSystemRootInventory, PhysicalEntryRef,
-    read_container_system_roots,
+    read_container_system_roots_with_provenance_mode,
 };
 use p4kx_export::{CatalogError, HealthText};
 use p4kx_extraction::{Archive, CancelToken, EntryIssue, OpenOptions, SourceLocation};
@@ -34,7 +35,8 @@ fn system_root_inventory_preserves_preferred_fallback_and_ambiguous_winning_path
         ZETA_ALTERNATIVE,
     ];
     let (_folder, archive) = open(&paths, false)?;
-    let survey = read_container_system_roots(&archive, None)?;
+    let survey =
+        read_container_system_roots_with_provenance_mode(&archive, full_proof::MODE, None)?;
     assert!(
         survey.directory_complete(),
         "the complete physical directory was observed"
@@ -82,7 +84,8 @@ fn system_root_inventory_preserves_observations_without_complete_recovered_membe
             .any(|(_, issue)| matches!(issue, EntryIssue::Recovered)),
         "the original root directory was recovered"
     );
-    let survey = read_container_system_roots(&archive, None)?;
+    let survey =
+        read_container_system_roots_with_provenance_mode(&archive, full_proof::MODE, None)?;
     assert!(
         !survey.directory_complete(),
         "recovering a prefix cannot prove directory membership"
@@ -110,7 +113,8 @@ fn system_root_inventory_preserves_observations_without_complete_recovered_membe
 #[test]
 fn system_root_inventory_distinguishes_complete_empty_from_cancellation() -> TestResult {
     let (_folder, archive) = open(&[NESTED], false)?;
-    let survey = read_container_system_roots(&archive, None)?;
+    let survey =
+        read_container_system_roots_with_provenance_mode(&archive, full_proof::MODE, None)?;
     assert!(
         survey.roots.is_empty(),
         "a nested system descriptor is never a root"
@@ -121,7 +125,11 @@ fn system_root_inventory_distinguishes_complete_empty_from_cancellation() -> Tes
     cancel.cancel();
     assert!(
         matches!(
-            read_container_system_roots(&archive, Some(&cancel)),
+            read_container_system_roots_with_provenance_mode(
+                &archive,
+                full_proof::MODE,
+                Some(&cancel)
+            ),
             Err(CatalogError::Cancelled)
         ),
         "a cancelled survey cannot establish a complete empty result"

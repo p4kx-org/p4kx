@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::SourceUses;
+use p4kx_extraction::{ProvenanceMode, SourceUses};
 
 use super::OriginalDatum;
 use super::health_diagnostic_cells::{ExportDiagnostic, ExportDiagnosticExample};
@@ -91,6 +91,7 @@ impl RetainedExample {
             None => DiagnosticSubject::absent(sources),
         };
         let mut body = self.body.finish(texts, sources)?;
+        let keep_proof = sources.provenance_mode() != ProvenanceMode::MarkersOnly;
         let failed_source_uses = match self.field_evidence {
             Some(evidence) => {
                 body.field = body.field.with_observed_origin(sources, &evidence.origin)?;
@@ -102,7 +103,7 @@ impl RetainedExample {
         Ok(ExportDiagnosticExample::new(
             subject,
             body,
-            failed_source_uses,
+            keep_proof.then_some(failed_source_uses),
         ))
     }
 }

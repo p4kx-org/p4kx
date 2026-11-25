@@ -33,7 +33,11 @@ fn loot_secondary_definitions_keep_exact_distinct_owners_and_encrypted_cells() -
     let input = Input::Encrypted;
     let fixture = Fixture::open(&database(), input, Vec::new())?;
     check_original(&fixture)?;
-    let built = build_catalog_from(&fixture.archive, &fixture.entry, &options())?;
+    let built = build_catalog_from(
+        &fixture.archive,
+        &fixture.entry,
+        options().with_full_provenance(),
+    )?;
     check_health(&built)?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let single = Graph::in_table(&catalog, SINGLE_KIND.name(), SINGLE_GUID)?;
@@ -91,7 +95,11 @@ fn loot_secondary_definitions_keep_reference_slots_when_target_body_is_filtered(
     let filter = Filter::parse("synthetic-selection/layers")?;
     let mut selected = options();
     selected.filter = Some(&filter);
-    let built = build_catalog_from(&fixture.archive, &fixture.entry, &selected)?;
+    let built = build_catalog_from(
+        &fixture.archive,
+        &fixture.entry,
+        selected.with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     check_layers(&catalog)?;
     for omitted in [SINGLE_KIND, THEME_KIND] {

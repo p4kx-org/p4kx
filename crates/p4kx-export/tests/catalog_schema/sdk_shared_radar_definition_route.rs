@@ -22,7 +22,8 @@ pub(super) fn read(archive: &Archive, parsed: &ParsedCatalogQueries<'_>) -> Test
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(archive, options.with_full_provenance())?.json())?;
     let route = parsed.with_radar_system_shared_params(
         CatalogRecordSelection::All,
         None,
@@ -164,7 +165,8 @@ fn check_filtered_target(
         filter: Some(&filter),
         ..options
     };
-    let filtered: Value = serde_json::from_slice(build_catalog(archive, &options)?.json())?;
+    let filtered: Value =
+        serde_json::from_slice(build_catalog(archive, options.with_full_provenance())?.json())?;
     parsed.with_radar_system_shared_params(
         CatalogRecordSelection::RecordIndex(fixture::RADAR_TARGET),
         None,

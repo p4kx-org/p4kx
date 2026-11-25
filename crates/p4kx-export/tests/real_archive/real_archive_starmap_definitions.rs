@@ -39,7 +39,7 @@ fn original_starmap_types_presets_and_amenities_match_the_catalog() -> TestResul
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(SystemTime::now())
     };
-    let built = build_catalog_from(&archive, &entry, &options)
+    let built = build_catalog_from(&archive, &entry, options.with_full_provenance())
         .map_err(|_| "build original starmap definitions")?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     crate::real_archive_shop_inventory_v3::verify_build(&archive, &catalog)?;

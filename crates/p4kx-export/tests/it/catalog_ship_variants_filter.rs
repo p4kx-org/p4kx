@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::equipment::{ShipSnapshot, ShipSource, with_ships};
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_export::{
@@ -47,10 +48,8 @@ fn filtered_ship_and_sdk_keep_the_same_original_base_and_sources() -> TestResult
         filtered_proof, full_proof,
         "a path filter preserves the complete physical decision and its source receipts"
     );
-    with_ships(
-        &archive,
+    full_proof::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?.with_ships(
         CatalogRecordSelection::RecordIndex(u32::try_from(physical)?),
-        CatalogLanguageSelection::Selected(&[]),
         None,
         |snapshot| check_sdk(&snapshot, &full_proof, base_index),
     )?
@@ -62,10 +61,11 @@ fn proved_missing_explicit_patch_excludes_only_its_original_ship() -> TestResult
     let filter = Filter::new(PATCH_PEERS);
     let built = build_catalog(
         &archive,
-        &CatalogOptions {
+        CatalogOptions {
             filter: Some(&filter),
             ..CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT)
-        },
+        }
+        .with_full_provenance(),
     )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     assert_eq!(
@@ -80,10 +80,8 @@ fn proved_missing_explicit_patch_excludes_only_its_original_ship() -> TestResult
     let variant = read_rows::entry(&catalog, "ships", PATCH_VARIANT_CLASS)?;
     let expected = canonical_variant(&catalog, variant)?;
 
-    with_ships(
-        &archive,
+    full_proof::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?.with_ships(
         CatalogRecordSelection::All,
-        CatalogLanguageSelection::Selected(&[]),
         None,
         |snapshot| {
             let omitted = sdk_ship(&snapshot, PATCH_OWNER_CLASS)?;
@@ -126,10 +124,11 @@ fn malformed_explicit_patch_keeps_the_original_cohort_unreadable() -> TestResult
     let filter = Filter::new(PATCH_PEERS);
     let Err(CatalogError::IncompleteExport(refusal)) = build_catalog(
         &archive,
-        &CatalogOptions {
+        CatalogOptions {
             filter: Some(&filter),
             ..CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT)
-        },
+        }
+        .with_full_provenance(),
     ) else {
         return Err(
             "Normal publication must refuse an unresolved same-definition candidate".into(),
@@ -189,11 +188,12 @@ fn sdk_ship<'snapshot, 'source>(
 fn normal(archive: &Archive, filter: Option<&Filter>) -> TestResult<Value> {
     let built = build_catalog(
         archive,
-        &CatalogOptions {
+        CatalogOptions {
             filter,
             publication_mode: CatalogPublicationMode::DiagnosticPartial,
             ..CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT)
-        },
+        }
+        .with_full_provenance(),
     )?;
     Ok(serde_json::from_slice(built.json())?)
 }

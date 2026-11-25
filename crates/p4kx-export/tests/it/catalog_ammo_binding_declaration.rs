@@ -15,14 +15,15 @@ fn ammo_container_bindings_reject_references_declared_for_another_family() -> Te
     let (_folder, archive) = common::open(&fixture, DcbOrigin::Encrypted)?;
     assert!(
         matches!(
-            build_catalog(&archive, &common::options()),
+            build_catalog(&archive, common::options().with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "an incompatible source declaration cannot publish a ready Ammo slot"
     );
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let [row, _] = bindings(&catalog)? else {
         return Err("both original container rows".into());
     };

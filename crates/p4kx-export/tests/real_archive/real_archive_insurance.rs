@@ -31,7 +31,10 @@ fn catalog() -> Result<&'static Value, Box<dyn Error>> {
             let read = || -> Result<Value, Box<dyn Error>> {
                 let archive =
                     Archive::open_with_key(real_archive_path()?, real_archive_key().ok())?;
-                let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+                let built = build_catalog(
+                    &archive,
+                    CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+                )?;
                 Ok(serde_json::from_slice(built.json())?)
             };
             read().map_err(|error| error.to_string())

@@ -23,7 +23,7 @@ fn build(filter: Option<&Filter>) -> Result<(BuiltCatalog, Value), Box<dyn Error
         Archive::open_with_key(write_archive(dir.path())?, Some(p4kx_testkit::test_key()))?;
     let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
     options.filter = filter;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let json = serde_json::from_slice(built.json())?;
     Ok((built, json))
 }

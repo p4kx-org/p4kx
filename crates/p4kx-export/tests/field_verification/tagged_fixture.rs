@@ -34,7 +34,7 @@ pub(crate) fn read() -> super::Result<Tagged> {
     let tree = source.tree()?;
     let mut options = p4kx_export::CatalogOptions::new(std::time::UNIX_EPOCH);
     options.publication_mode = p4kx_export::CatalogPublicationMode::DiagnosticPartial;
-    let built = p4kx_export::build_catalog(&archive, &options)?;
+    let built = p4kx_export::build_catalog(&archive, options.with_full_provenance())?;
     let schema = Schema::read(&forge, &["MissionProperty".to_owned()], &|| false)?;
     let mut observations = Observations::new();
     source::observe(

@@ -221,7 +221,10 @@ fn cooldown_layer(entry: &Json) -> TestResult<&str> {
 fn every_cooldown_field_reports_the_stored_value_and_the_level_that_states_it() -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
     let (expected, from_handler_params) = expected_fields(&archive)?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Json = serde_json::from_slice(built.json())?;
     let contracts = v3::rows(&catalog)?;
     let projections = v3::Projections::read(&catalog)?;

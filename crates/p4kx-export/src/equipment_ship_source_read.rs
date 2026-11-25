@@ -4,18 +4,15 @@
 use std::sync::Arc;
 
 use p4kx_assembly::{ArchiveFiles, Entities};
-use p4kx_extraction::{
-    Archive, CancelToken, DataForge, DataForgeEntry, DataForgeError, Language, SourceUses,
-};
+use p4kx_extraction::{Archive, CancelToken, DataForge, DataForgeError, Language};
 
 use super::ShipSourceDependencyCoverage;
 use super::{ShipSnapshot, ShipSourceSnapshot, complete};
 use crate::build::catalog_queries::unlocalized_record_query::plan::{Owner, Plan};
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection, DatasetAvailability};
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
@@ -29,7 +26,7 @@ use crate::{CatalogError, ExportAccountingError, Kind};
 
 pub(super) struct Query<'query> {
     pub(super) archive: &'query Archive,
-    pub(super) entry: &'query DataForgeEntry,
+    pub(super) entry: CatalogQuerySource<'query>,
     pub(super) forge: &'query DataForge<'query>,
     pub(super) selection: CatalogRecordSelection,
     pub(super) languages: &'query [Language],
@@ -97,7 +94,7 @@ impl<'query> Query<'query> {
         let languages = self.languages;
         let sources = TextSources::read_languages(self.archive, languages)?;
         checkpoint(self.cancel)?;
-        let origins = CatalogOrigins::new(self.archive, self.entry, &sources)?;
+        let origins = self.entry.with_texts(self.archive, &sources)?;
         let input = OriginalCatalogInput::new(self.forge, &origins);
         let texts = Texts::parse(&sources)?;
         let registry = CatalogTextRegistry::default();
@@ -150,8 +147,10 @@ impl<'query> Query<'query> {
     ) -> Result<T, CatalogError> {
         let mut dependencies = ShipSourceDependencyCoverage::default();
         dependencies.finish(self.archive, &ExportLedger::default())?;
-        let source_inventory =
-            SourceUses::with_compact_coordinates().finish_with(|| checkpoint(self.cancel))?;
+        let source_inventory = self
+            .entry
+            .registry()
+            .finish_with(|| checkpoint(self.cancel))?;
         checkpoint(self.cancel)?;
         Ok(inspect(ShipSourceSnapshot {
             build: self.archive.build().cloned(),

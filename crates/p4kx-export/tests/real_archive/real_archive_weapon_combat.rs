@@ -116,8 +116,7 @@ fn compare(archive: &Archive, entry: &DataForgeEntry, witness: &Witness<'_>) -> 
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let built =
-        build_catalog_from(archive, entry, &options).map_err(|_| "build bounded combat Catalog")?;
+    let built = build_catalog_from(archive, entry, options.with_full_provenance())?;
     let catalog: Value =
         serde_json::from_slice(built.json()).map_err(|_| "read bounded Catalog JSON")?;
     verify_build(archive, &catalog)?;

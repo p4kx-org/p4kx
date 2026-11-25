@@ -218,7 +218,10 @@ fn report(contracts: &[Contract]) -> TestResult {
 )]
 fn the_contracts_of_a_real_archive_resolve_titles_types_and_success_reputation() -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let contracts = contracts(&catalog)?;
     report(&contracts)?;

@@ -23,8 +23,8 @@ fn npc_definition_source_arena_keeps_reference_cycles_without_expansion() -> Tes
         .record(pool(SECOND, FIRST, "second"));
     let (_directory, archive) = common::open(&database, DcbOrigin::Plain)?;
     let options = common::options();
-    let first = build_catalog(&archive, &options)?;
-    let repeated = build_catalog(&archive, &options)?;
+    let first = build_catalog(&archive, options.with_full_provenance())?;
+    let repeated = build_catalog(&archive, options.with_full_provenance())?;
     assert_eq!(
         first.json(),
         repeated.json(),

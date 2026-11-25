@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::{CatalogError, CatalogPublicationMode, build_catalog};
 use serde_json::Value;
 
@@ -10,7 +11,7 @@ use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 #[test]
 fn exact_raw_numbers_satisfy_normal_publication_without_hiding_projection_failures() -> TestResult {
     let (_folder, archive) = common::open(&fixture::unique_database(false), DcbOrigin::Plain)?;
-    let built = build_catalog(&archive, &common::options())?;
+    let built = build_catalog(&archive, common::options().with_full_provenance())?;
     assert!(
         built.summary().export_health().is_complete(),
         "a readable exact source arena covers legal nonfinite values"
@@ -27,14 +28,14 @@ fn exact_raw_numbers_satisfy_normal_publication_without_hiding_projection_failur
     let (_folder, malformed) = common::open(&fixture::unique_database(true), DcbOrigin::Plain)?;
     assert!(
         matches!(
-            build_catalog(&malformed, &common::options()),
+            build_catalog(&malformed, common::options().with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "normal output refuses the actual Bool-to-number projection failure"
     );
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&malformed, &options)?;
+    let built = build_catalog(&malformed, options.with_full_provenance())?;
     assert!(
         !built.summary().export_health().is_complete(),
         "retained originals never manufacture complete semantic health"
@@ -53,17 +54,20 @@ fn additional_refining_original_nan_values_have_independent_coverage_without_typ
 -> TestResult {
     let database = refining_numbers();
     let (_folder, archive) = common::open(&database, DcbOrigin::Plain)?;
-    let built = build_catalog(&archive, &common::options())?;
+    let built = build_catalog(&archive, common::options().with_full_provenance())?;
     assert!(
         built.summary().export_health().is_complete(),
         "all original nonfinite occurrences have genuine emitted raw coverage"
     );
     let catalog: Value = serde_json::from_slice(built.json())?;
     let expected = common::at(&catalog, "/definitions/refiningProcesses/rows/0")?;
-    p4kx_export::catalog_queries::mining::with_refining_processes(
+    full_proof::open(
         &archive,
-        p4kx_export::catalog_queries::CatalogRecordSelection::RecordIndex(0),
         p4kx_export::catalog_queries::CatalogLanguageSelection::Selected(&[]),
+        None,
+    )?
+    .with_refining_processes(
+        p4kx_export::catalog_queries::CatalogRecordSelection::RecordIndex(0),
         None,
         |snapshot| -> TestResult {
             let [row] = snapshot.rows() else {

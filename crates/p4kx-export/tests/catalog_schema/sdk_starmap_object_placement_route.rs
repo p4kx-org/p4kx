@@ -5,6 +5,7 @@ use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::starmap::{
     StarmapObjectPlacementSnapshot, StarmapObjectPlacementStatus, read_starmap_object_placement,
+    read_starmap_object_placement_with_provenance_mode,
 };
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, StarmapTraversalBudget, build_catalog};
 use p4kx_extraction::Archive;
@@ -15,6 +16,7 @@ use p4kx_testkit::{
 use serde_json::Value;
 
 use super::{Route, TestResult};
+use crate::sdk_full_proof as full_proof;
 
 const DATASET: &str = "/placements/starmapPlacements";
 const RETAINED: u128 = 0x1166_5101;
@@ -30,7 +32,8 @@ pub(super) fn read() -> TestResult<Route> {
     let (_directory, archive) = open_fixture(true)?;
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
 
     let first = verify_repeated_placement(&archive, &catalog)?;
     verify_ambiguous_and_absent_placements(&archive, &catalog)?;
@@ -158,7 +161,13 @@ fn complete_query(
     index: u32,
     expected: StarmapObjectPlacementStatus,
 ) -> TestResult<StarmapObjectPlacementSnapshot> {
-    let snapshot = query(archive, index)?;
+    let snapshot = read_starmap_object_placement_with_provenance_mode(
+        archive,
+        index,
+        StarmapTraversalBudget::new(),
+        full_proof::MODE,
+        None,
+    )?;
     assert_eq!(
         snapshot.status, expected,
         "the physical selection has its canonical status"

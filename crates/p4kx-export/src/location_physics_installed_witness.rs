@@ -10,14 +10,15 @@ use std::time::UNIX_EPOCH;
 use p4kx_assembly::SocArchiveMember;
 use p4kx_extraction::cryxml::{SourceDocument, SourceReadOptions};
 use p4kx_extraction::{
-    Archive, ArchiveWatch, Build, Entry, InputScope, PhysicalSourceKind, SourceUseRole,
+    Archive, ArchiveWatch, Build, Entry, InputScope, PhysicalSourceKind, ProvenanceMode,
+    SourceUseRole,
 };
 use p4kx_testkit::{real_archive_key, watchdog};
 use serde::Deserialize;
 
 use super::{
     LocationPhysicsDescriptorSelection, LocationPhysicsDescriptorSnapshot,
-    LocationPhysicsDescriptorStatus, read_location_physics_descriptor,
+    LocationPhysicsDescriptorStatus, read_location_physics_descriptor_with_provenance_mode,
 };
 
 #[path = "location_physics_installed_stage.rs"]
@@ -125,8 +126,13 @@ fn check_side(side: &Side, grid_expected: bool, cargo_target: &str, scratch: &Pa
         side.descriptor.outer.index,
         side.descriptor.leaf.index,
     );
-    let snapshot = read_location_physics_descriptor(&archive, selection, None)
-        .map_err(|_| "physical location-grid SDK query failed")?;
+    let snapshot = read_location_physics_descriptor_with_provenance_mode(
+        &archive,
+        selection,
+        ProvenanceMode::Full,
+        None,
+    )
+    .map_err(|_| "physical location-grid SDK query failed")?;
     check_descriptor(&snapshot, side, grid_expected)?;
     let member = side.descriptor.read(&archive)?;
     let bytes = member

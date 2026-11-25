@@ -1,26 +1,24 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::equipment::ship_systems::with_shield_generators;
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    ResourceNumber,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability, ResourceNumber,
 };
 use p4kx_export::{CatalogOptions, CatalogPublicationMode};
 use p4kx_extraction::SourceValueState;
 use serde_json::{Value, json};
 
 use super::{DcbOrigin, Layout, ROWS, TestResult, common, database, proof};
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn shield_sdk_matches_canonical_rows_with_original_states_and_provenance() -> TestResult {
     for (mode, encryption) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&database(Layout::Full), mode)?;
         let catalog: Value = serde_json::from_slice(
-            p4kx_export::build_catalog(&archive, &common::options())?.json(),
+            p4kx_export::build_catalog(&archive, common::options().with_full_provenance())?.json(),
         )?;
-        with_shield_generators(
-            &archive,
+        full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?.with_shield_generators(
             CatalogRecordSelection::All,
             None,
             |snapshot| -> TestResult {
@@ -68,10 +66,10 @@ fn shield_sdk_keeps_a_wrong_storage_cell_and_reports_owner_coverage() -> TestRes
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let catalog: Value =
-        serde_json::from_slice(p4kx_export::build_catalog(&archive, &options)?.json())?;
-    let session =
-        CatalogQuerySession::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
+    let catalog: Value = serde_json::from_slice(
+        p4kx_export::build_catalog(&archive, options.with_full_provenance())?.json(),
+    )?;
+    let session = full_proof::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
     let parsed = session.parsed(None)?;
     parsed.with_shield_generators(
         CatalogRecordSelection::RecordIndex(1),

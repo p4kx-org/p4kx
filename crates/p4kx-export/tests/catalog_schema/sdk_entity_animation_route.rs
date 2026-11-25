@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::catalog_queries::equipment::entity_animation::{
-    EntityAnimationControllerSnapshot, with_entity_animation_controllers_from,
-};
+use p4kx_export::catalog_queries::equipment::entity_animation::EntityAnimationControllerSnapshot;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
 };
@@ -34,13 +33,15 @@ pub(super) fn read() -> TestResult<Route> {
         filter: Some(&filter),
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let catalog: Value =
-        serde_json::from_slice(build_catalog_from(&archive, &entry, &options)?.json())?;
-    with_entity_animation_controllers_from(&archive, &entry, OWNER_SELECTION, None, |snapshot| {
-        verify_fields(&snapshot)?;
-        parity(DATASET, &snapshot, &catalog)?;
-        Route::queried_rows(DATASET, snapshot.rows(), None)
-    })?
+    let catalog: Value = serde_json::from_slice(
+        build_catalog_from(&archive, &entry, options.with_full_provenance())?.json(),
+    )?;
+    full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .with_entity_animation_controllers(OWNER_SELECTION, None, |snapshot| {
+            verify_fields(&snapshot)?;
+            parity(DATASET, &snapshot, &catalog)?;
+            Route::queried_rows(DATASET, snapshot.rows(), None)
+        })?
 }
 
 fn verify_fields(snapshot: &EntityAnimationControllerSnapshot<'_>) -> TestResult<()> {
@@ -113,7 +114,8 @@ fn selected_animation_controller_skips_an_unrelated_unreadable_body() -> TestRes
         &entry,
         CatalogLanguageSelection::Selected(&[]),
         None,
-    )?;
+    )?
+    .with_provenance_mode(full_proof::MODE);
     let parsed = session.parsed(None)?;
     parsed.with_entity_animation_controllers(OWNER_SELECTION, None, |snapshot| {
         assert!(

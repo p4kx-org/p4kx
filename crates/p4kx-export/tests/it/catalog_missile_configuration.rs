@@ -17,10 +17,10 @@ const EXPLOSIVES: &str = "/configurations/explosives/rows";
 fn missile_configuration_preserves_distinct_phases_origins_and_shared_ordnance() -> TestResult {
     let database = fixture::database(fixture::Layout::Exact);
     let (_folder, archive) = common::open(&database, DcbOrigin::Encrypted)?;
-    let built = build_catalog(&archive, &common::options())?;
+    let built = build_catalog(&archive, common::options().with_full_provenance())?;
     assert_eq!(
         built.json(),
-        build_catalog(&archive, &common::options())?.json()
+        build_catalog(&archive, common::options().with_full_provenance())?.json()
     );
     let catalog: Value = serde_json::from_slice(built.json())?;
     let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
@@ -194,14 +194,14 @@ fn missile_configuration_diagnoses_wrong_class_or_enum_with_original_occurrences
         let (_folder, archive) = common::open(&fixture::database(layout), DcbOrigin::Plain)?;
         assert!(
             matches!(
-                build_catalog(&archive, &common::options()),
+                build_catalog(&archive, common::options().with_full_provenance()),
                 Err(CatalogError::IncompleteExport(_))
             ),
             "normal publication refuses a changed missile declaration"
         );
         let mut options = common::options();
         options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-        let built = build_catalog(&archive, &options)?;
+        let built = build_catalog(&archive, options.with_full_provenance())?;
         let catalog: Value = serde_json::from_slice(built.json())?;
         let row = proof::rows(&catalog, MISSILES)?
             .first()

@@ -20,13 +20,14 @@ use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
 
 use super::fixture::{self, Layout};
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn item_source_sdk_matches_physical_aliases_and_preserves_original_english_scope() -> TestResult {
     let (_folder, archive) = fixture::open(Layout::Aliases, DcbOrigin::Plain, true, false)?;
     let catalog = canonical(&archive)?;
     let entry = DataForgeEntry::read(&archive)?;
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::Selected(&[Language::German]),
@@ -41,9 +42,7 @@ fn item_source_sdk_matches_physical_aliases_and_preserves_original_english_scope
     parsed.with_item_sources(CatalogRecordSelection::RecordIndex(1), None, |snapshot| {
         verify_snapshot(&snapshot, &catalog, &[1])
     })??;
-    equipment::with_item_sources_from(
-        &archive,
-        &entry,
+    full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?.with_item_sources(
         CatalogRecordSelection::RecordIndex(0),
         None,
         |snapshot| verify_snapshot(&snapshot, &catalog, &[0]),
@@ -55,7 +54,7 @@ fn canonical(archive: &Archive) -> TestResult<Value> {
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     Ok(serde_json::from_slice(
-        p4kx_export::build_catalog(archive, &options)?.json(),
+        p4kx_export::build_catalog(archive, options.with_full_provenance())?.json(),
     )?)
 }
 

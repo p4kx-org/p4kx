@@ -29,7 +29,7 @@ fn resource_view_matches_wire_tables_and_original_owners() -> Result<(), Box<dyn
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let full = build_catalog_from(&archive, &entry, &options)?;
+    let full = build_catalog_from(&archive, &entry, options.with_full_provenance())?;
     let document: Value = serde_json::from_slice(full.json())?;
     compare_regions(&view, &document);
     assert!(
@@ -89,7 +89,7 @@ fn unrelated_reward_source_scan_leaves_the_scoped_resource_regions_equal()
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let full = build_catalog_from(&archive, &entry, &options)?;
+    let full = build_catalog_from(&archive, &entry, options.with_full_provenance())?;
     let document: Value = serde_json::from_slice(full.json())?;
     assert_eq!(
         document

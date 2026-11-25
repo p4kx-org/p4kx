@@ -3,16 +3,18 @@
 
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::catalog_queries::CatalogRecordSelection;
 use p4kx_export::catalog_queries::equipment::{
-    CapacityStatus, FacilityKind, FacilityOwner, FacilitySnapshot, with_facilities_from,
+    CapacityStatus, FacilityKind, FacilityOwner, FacilitySnapshot,
 };
+use p4kx_export::catalog_queries::{CatalogRecordSelection, ParsedCatalogQueries};
 use p4kx_export::{CatalogOptions, build_catalog_from};
 use p4kx_extraction::{Archive, DataForgeEntry};
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestEntry, cargo_grid_facility_database, test_key,
 };
 use serde_json::Value;
+
+use crate::sdk_full_proof as full_proof;
 
 use super::super::FACILITIES;
 use super::{Route, TestResult, facility_medbed_fixture as medical_bed};
@@ -63,14 +65,19 @@ pub(super) fn read() -> TestResult<Route> {
         let archive = Archive::open_with_key(path, Some(test_key()))?;
         let entry = DataForgeEntry::read(&archive)?;
         let catalog: Value = serde_json::from_slice(
-            build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?.json(),
+            build_catalog_from(
+                &archive,
+                &entry,
+                CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+            )?
+            .json(),
         )?;
+        let session = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?;
+        let parsed = session.parsed(None)?;
         if route.is_none() {
-            verify_other_selections(&archive, &entry, &catalog, record, kinds)?;
+            verify_other_selections(&parsed, &entry, &catalog, record, kinds)?;
         }
-        with_facilities_from(
-            &archive,
-            &entry,
+        parsed.with_facilities(
             CatalogRecordSelection::RecordIndex(record),
             None,
             |snapshot| -> TestResult {
@@ -93,7 +100,7 @@ pub(super) fn read() -> TestResult<Route> {
 }
 
 fn verify_other_selections(
-    archive: &Archive,
+    parsed: &ParsedCatalogQueries<'_>,
     entry: &DataForgeEntry,
     catalog: &Value,
     record: u32,
@@ -107,7 +114,7 @@ fn verify_other_selections(
         CatalogRecordSelection::Guid(owner.guid()),
         CatalogRecordSelection::All,
     ] {
-        with_facilities_from(archive, entry, selection, None, |snapshot| {
+        parsed.with_facilities(selection, None, |snapshot| {
             check(&snapshot, catalog, record, kinds)
         })??;
     }

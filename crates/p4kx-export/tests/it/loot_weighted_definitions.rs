@@ -40,7 +40,11 @@ fn weighted_loot_keeps_each_optional_slot_and_its_immediate_origin() -> TestResu
 
 fn catalog(bytes: &[u8], input: Input) -> TestResult<(BuiltCatalog, Value)> {
     let fixture = loot_fixture::source_fixture(bytes, input)?;
-    let built = build_catalog_from(&fixture.archive, &fixture.entry, &options())?;
+    let built = build_catalog_from(
+        &fixture.archive,
+        &fixture.entry,
+        options().with_full_provenance(),
+    )?;
     let catalog = serde_json::from_slice(built.json())?;
     Ok((built, catalog))
 }

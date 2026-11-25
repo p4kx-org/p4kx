@@ -151,7 +151,8 @@ fn export(origin: DcbOrigin, filter: Option<&Filter>) -> TestResult<Value> {
     let (_directory, archive) = common::open(&fixture::database(), origin)?;
     let mut options = common::options();
     options.filter = filter;
-    let built = build_catalog(&archive, &options).map_err(|error| error.to_string())?;
+    let built = build_catalog(&archive, options.with_full_provenance())
+        .map_err(|error| error.to_string())?;
     Ok(serde_json::from_slice(built.json())?)
 }
 
@@ -167,7 +168,7 @@ fn mission_location_templates_link_to_the_physical_classification() -> TestResul
         &fixture::template_database("MissionLocationData"),
         DcbOrigin::Encrypted,
     )?;
-    let built = build_catalog(&archive, &common::options())?;
+    let built = build_catalog(&archive, common::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let row = at(&catalog, "/missionLocationTemplates/0")?;
     let classification = at(row, "/classification")?;
@@ -212,7 +213,7 @@ fn mission_location_templates_report_the_rejected_class_declaration() -> TestRes
     )?;
     let mut options = common::options();
     options.publication_mode = p4kx_export::CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let row = at(&catalog, "/missionLocationTemplates/0")?;
     assert_eq!(at(row, "/classification/state")?, "unsupported");

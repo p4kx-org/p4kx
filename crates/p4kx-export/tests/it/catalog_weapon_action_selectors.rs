@@ -36,7 +36,7 @@ fn weapon_launchers_preserve_authored_selectors_by_physical_action_owner() -> Te
     let forge = DataForge::open(&bytes)?;
     let original = original_selectors(&forge)?;
     let (_folder, archive) = common::open(&builder, DcbOrigin::Encrypted)?;
-    let built = build_catalog(&archive, &common::options())?;
+    let built = build_catalog(&archive, common::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     check_ammo_binding(&catalog)?;
     let [first, repeated] = proof::rows(&catalog, "/configurations/weaponActions/rows")? else {

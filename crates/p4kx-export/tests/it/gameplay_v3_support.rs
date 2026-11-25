@@ -23,7 +23,7 @@ pub(crate) fn raw(
     let mut options = common::options();
     options.publication_mode = mode;
     options.filter = filter;
-    let result = p4kx_export::build_catalog(&archive, &options);
+    let result = p4kx_export::build_catalog(&archive, options.with_full_provenance());
     assert!(
         result.is_ok(),
         "the requested original-source export must return a catalog: {:?}",
@@ -83,7 +83,7 @@ pub(crate) fn refused(database: &DataForgeBuilder, filter: Option<&Filter>) -> T
     options.filter = filter;
     assert!(
         matches!(
-            p4kx_export::build_catalog(&archive, &options),
+            p4kx_export::build_catalog(&archive, options.with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "the actual source violation must refuse normal publication"

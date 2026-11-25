@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::CatalogRecordSelection;
 use p4kx_export::catalog_queries::equipment::{
     InventoryConfigurationSnapshot, with_inventory_configurations,
-    with_inventory_configurations_from,
 };
 use p4kx_export::{CatalogOptions, build_catalog_from};
 use p4kx_extraction::DataForgeEntry;
@@ -19,18 +19,20 @@ pub(super) fn read() -> TestResult<Route> {
     let (_folder, archive) = open(&entities::database(), DataForgeStorage::Encrypted)?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog: Value = serde_json::from_slice(
-        build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?.json(),
+        build_catalog_from(
+            &archive,
+            &entry,
+            CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+        )?
+        .json(),
     )?;
-    let (route, vehicle_record) = with_inventory_configurations_from(
-        &archive,
-        &entry,
-        CatalogRecordSelection::All,
-        None,
-        |snapshot| check(&snapshot, &catalog),
-    )??;
-    with_inventory_configurations_from(
-        &archive,
-        &entry,
+    let session = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?;
+    let parsed = session.parsed(None)?;
+    let (route, vehicle_record) =
+        parsed.with_inventory_configurations(CatalogRecordSelection::All, None, |snapshot| {
+            check(&snapshot, &catalog)
+        })??;
+    parsed.with_inventory_configurations(
         CatalogRecordSelection::RecordIndex(vehicle_record),
         None,
         |snapshot| -> TestResult {

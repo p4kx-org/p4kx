@@ -3,25 +3,22 @@
 
 use std::sync::Arc;
 
-use p4kx_extraction::{
-    Archive, CancelToken, CanonicalReadObserver, DataForge, DataForgeEntry, Language,
-};
+use p4kx_extraction::{Archive, CancelToken, CanonicalReadObserver, DataForge, Language};
 
 use super::plan::Plan;
 use super::project;
 use super::snapshot::BlueprintSnapshot;
 use crate::blueprint_catalog_rows;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_queries::CatalogRecordSelection;
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::texts::{TextSources, Texts};
 use crate::{CatalogError, Kind};
 
 pub(super) struct Query<'query> {
     pub(super) archive: &'query Archive,
-    pub(super) entry: &'query DataForgeEntry,
+    pub(super) entry: CatalogQuerySource<'query>,
     pub(super) forge: &'query DataForge<'query>,
     pub(super) selection: CatalogRecordSelection,
     pub(super) languages: &'query [Language],
@@ -47,7 +44,7 @@ impl Query<'_> {
         };
         let sources = TextSources::read_languages(self.archive, languages)?;
         checkpoint(self.cancel)?;
-        let origins = CatalogOrigins::new(self.archive, self.entry, &sources)?;
+        let origins = self.entry.with_texts(self.archive, &sources)?;
         let input = OriginalCatalogInput::new(self.forge, &origins);
         let texts = Texts::parse(&sources)?;
         let registry = CatalogTextRegistry::default();

@@ -5,10 +5,10 @@
 
 use std::sync::Arc;
 
-use p4kx_extraction::{Archive, ArchiveWatch, Build, CancelToken, SourceInventory};
+use p4kx_extraction::{Archive, ArchiveWatch, Build, CancelToken, ProvenanceMode, SourceInventory};
 
 use crate::catalog_query_session::checkpoint;
-use crate::catalog_read::original::{EntryCapture, with_entry_capture};
+use crate::catalog_read::original::{EntryCapture, with_entry_capture_mode};
 use crate::export_archive_health;
 use crate::export_ledger::ExportLedger;
 use crate::starmap_containers::unique_system_roots;
@@ -50,7 +50,7 @@ pub use crate::location_physics::{
     LocationPhysicsDeclaration, LocationPhysicsDescriptorSelection,
     LocationPhysicsDescriptorSnapshot, LocationPhysicsDescriptorStatus, LocationPhysicsFields,
     LocationPhysicsGrid, LocationPhysicsGridControls, LocationVoxelTarget,
-    read_location_physics_descriptor,
+    read_location_physics_descriptor, read_location_physics_descriptor_with_provenance_mode,
 };
 pub use crate::starmap_containers::instance::{ContainerInstance, ContainerInstanceKey};
 pub use crate::starmap_containers::jump_endpoint::JumpEndpoint;
@@ -69,23 +69,27 @@ pub use definitions::{
 
 pub use jump_inventory::{
     JumpConnectionInventory, JumpInventoryCoverage, JumpInventorySnapshot, read_jump_inventory,
+    read_jump_inventory_with_provenance_mode,
 };
 pub use locations::{
     AreaEntity, ChildLocation, EntXmlCandidate, EntXmlDocument, EntXmlLink, HarvestableComponent,
     HcdAttribute, HcdDocument, HcdLink, HcdSelectionFailure, LocationAttribute, LocationInstance,
     LocationMetadataElement, LocationPlacementSnapshot, LocationTag, read_location_instances,
+    read_location_instances_with_provenance_mode,
 };
 pub use object_placements::{
     StarmapObjectPlacementCoverage, StarmapObjectPlacementSnapshot, StarmapObjectPlacementStatus,
-    read_starmap_object_placement,
+    read_starmap_object_placement, read_starmap_object_placement_with_provenance_mode,
 };
 
 pub use container_visit::{
     ContainerPlacementEvent, ContainerPlacementRootCoverage, ContainerPlacementRootVisit,
     ContainerPlacementRowCounts, ContainerPlacementVisitSummary, visit_container_placements,
+    visit_container_placements_with_provenance_mode,
 };
 pub use system_roots::{
     ContainerSystemRoot, ContainerSystemRootInventory, read_container_system_roots,
+    read_container_system_roots_with_provenance_mode,
 };
 
 /// A canonical physical system root or a Child route within it.
@@ -165,55 +169,12 @@ pub struct ContainerPlacementSnapshot {
     pub source_inventory: SourceInventory,
 }
 
-/// Reads canonical container rows and unresolved links from one original system root.
-/// The queried occurrence selects emitted rows. The walker checks the reachable system graph.
-///
-/// # Errors
-/// Returns an error for cancellation, Archive changes or contradictory source evidence.
-pub fn read_container_placements(
-    archive: &Archive,
-    selection: ContainerPlacementSelection<'_>,
-    budget: StarmapTraversalBudget,
-    cancel: Option<&CancelToken>,
-) -> Result<ContainerPlacementSnapshot, CatalogError> {
-    let SelectedPlacementRead {
-        root_entry_index,
-        rows,
-        coverage,
-        source_inventory,
-    } = read_placements(
-        archive,
-        selection,
-        budget,
-        cancel,
-        PlacementTable::Containers,
-    )?;
-    let SelectedPlacementRows {
-        child_node_indices,
-        external_child_step_indices,
-        instances,
-        unresolved,
-        location_physics,
-        ..
-    } = rows;
-    let complete = coverage.is_complete() && !location_physics.unavailable;
-    let grids = location_physics.into_rows();
-    Ok(ContainerPlacementSnapshot {
-        build: archive.build().cloned(),
-        root_entry_index,
-        child_node_indices,
-        external_child_step_indices,
-        container_instances: instances,
-        unresolved_container_links: unresolved,
-        location_physics_availability: crate::location_physics::stage::availability(
-            complete,
-            !grids.is_empty(),
-        ),
-        location_physics_grids: grids,
-        coverage,
-        source_inventory,
-    })
-}
+#[path = "starmap_container_query.rs"]
+mod container_query;
+
+pub use container_query::{
+    read_container_placements, read_container_placements_with_provenance_mode,
+};
 
 pub(super) struct SelectedPlacementRead {
     pub(super) root_entry_index: u32,
@@ -226,13 +187,14 @@ pub(super) fn read_placements(
     archive: &Archive,
     selection: ContainerPlacementSelection<'_>,
     budget: StarmapTraversalBudget,
+    provenance_mode: ProvenanceMode,
     cancel: Option<&CancelToken>,
     table: PlacementTable,
 ) -> Result<SelectedPlacementRead, CatalogError> {
     checkpoint(cancel)?;
     let watch = ArchiveWatch::new(archive);
     let (root_entry_index, mut rows) = selection.selected_rows(table);
-    with_entry_capture(archive, |capture| {
+    with_entry_capture_mode(archive, provenance_mode, |capture| {
         let coverage = read_selected(
             archive,
             root_entry_index,

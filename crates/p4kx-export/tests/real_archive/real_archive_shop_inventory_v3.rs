@@ -14,13 +14,10 @@ use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
 use serde_json::value::RawValue;
 
-#[path = "shop_inventory_survey_report.rs"]
-mod survey_report;
-
 #[path = "shop_inventory_sdk_proof.rs"]
 mod sdk;
-
-use survey_report::report;
+#[path = "shop_inventory_survey_report.rs"]
+mod survey_report;
 
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 type TokenUses<'a> = HashMap<&'a str, &'a Value>;
@@ -60,7 +57,7 @@ fn physical_shop_inventories_and_resolution_targets_match_the_installed_build() 
     watch.check()?;
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = p4kx_export::build_catalog(&archive, &options)?;
+    let built = p4kx_export::build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     verify_build(&archive, &catalog)?;
 
@@ -96,7 +93,7 @@ fn physical_shop_inventories_and_resolution_targets_match_the_installed_build() 
         verify_decoded(original, row, &uses, &mut survey, decoded.as_deref())?;
     }
     watch.check()?;
-    report(&archive, definitions.len(), &relations, &survey)
+    survey_report::report(&archive, definitions.len(), &relations, &survey)
 }
 
 pub(super) fn verify_build(archive: &Archive, catalog: &Value) -> TestResult {

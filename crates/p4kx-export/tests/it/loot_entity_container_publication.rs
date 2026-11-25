@@ -38,7 +38,7 @@ fn proved_configless_container_absence_publishes_with_original_evidence_and_warn
     let (summary, file) = write_catalog_from(
         &source.archive,
         &source.entry,
-        &fixture::options(),
+        fixture::options().with_full_provenance(),
         Compression::None,
         || CatalogFile::create(&path),
     )?;
@@ -54,7 +54,11 @@ fn proved_configless_container_absence_publishes_with_original_evidence_and_warn
 #[test]
 fn absent_literal_with_brackets_requires_no_repair() -> TestResult {
     let source = source(Some("[authoring]/missing.socpak"))?;
-    let published = build_catalog_from(&source.archive, &source.entry, &fixture::options())?;
+    let published = build_catalog_from(
+        &source.archive,
+        &source.entry,
+        fixture::options().with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(published.json())?;
     let link = proof::at(
         &catalog,
@@ -72,7 +76,11 @@ fn absent_literal_with_brackets_requires_no_repair() -> TestResult {
 #[test]
 fn unsupported_container_selector_refuses_normal_before_output_creation() -> TestResult {
     let complete = source(None)?;
-    let previous = build_catalog_from(&complete.archive, &complete.entry, &fixture::options())?;
+    let previous = build_catalog_from(
+        &complete.archive,
+        &complete.entry,
+        fixture::options().with_full_provenance(),
+    )?;
     assert!(previous.summary().export_health().is_complete());
     let source = source(Some(UNSUPPORTED))?;
     let (partial, catalog) = source.diagnostic()?;
@@ -117,7 +125,11 @@ fn conflicting_proofs_for_the_same_absent_target_retain_both_authored_origins() 
     assert!(owners.contains(&&json!(ENTITY_DOCUMENT)));
     assert!(owners.contains(&&json!(COMPETING_DOCUMENT)));
     assert!(matches!(
-        build_catalog_from(&source.archive, &source.entry, &fixture::options()),
+        build_catalog_from(
+            &source.archive,
+            &source.entry,
+            fixture::options().with_full_provenance()
+        ),
         Err(CatalogError::IncompleteExport(_))
     ));
     proof::closure(&catalog)
@@ -157,7 +169,11 @@ fn repaired_authoring_paths_publish_with_original_literal_and_reach_the_exact_ta
     });
     let source =
         source_documents_and_targets(originals, [TestEntry::stored(ALIAS_TARGET, target)])?;
-    let published = build_catalog_from(&source.archive, &source.entry, &fixture::options())?;
+    let published = build_catalog_from(
+        &source.archive,
+        &source.entry,
+        fixture::options().with_full_provenance(),
+    )?;
     assert!(published.summary().export_health().is_complete());
     let catalog: Value = serde_json::from_slice(published.json())?;
     let documents = proof::rows(&catalog, "/declarations/lootEntityContainerDocuments/rows")?;
@@ -207,7 +223,11 @@ fn missing_or_malformed_authoring_paths_remain_unsupported_and_block_publication
         );
         assert_eq!(link.get("targetLookupRepair"), Some(&Value::Null));
         assert!(matches!(
-            build_catalog_from(&source.archive, &source.entry, &fixture::options()),
+            build_catalog_from(
+                &source.archive,
+                &source.entry,
+                fixture::options().with_full_provenance()
+            ),
             Err(CatalogError::IncompleteExport(_))
         ));
     }
@@ -245,7 +265,11 @@ fn repaired_lookup_with_duplicate_physical_targets_denies_traversal_and_publicat
         second.pointer("/value/entryIndex")
     );
     assert!(matches!(
-        build_catalog_from(&source.archive, &source.entry, &fixture::options()),
+        build_catalog_from(
+            &source.archive,
+            &source.entry,
+            fixture::options().with_full_provenance()
+        ),
         Err(CatalogError::IncompleteExport(_))
     ));
     proof::closure(&catalog)

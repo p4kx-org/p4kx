@@ -5,7 +5,8 @@ use std::ops::ControlFlow;
 use std::sync::{Arc, Mutex};
 
 use p4kx_extraction::{
-    Archive, CanonicalReadObserver, DataForgeEntry, DataForgeError, Record, RecordTree,
+    Archive, CanonicalReadObserver, DataForgeEntry, DataForgeError, ProvenanceMode, Record,
+    RecordTree,
 };
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, TestStruct, TestType, TestValue,
@@ -14,6 +15,7 @@ use p4kx_testkit::{
 use super::BlueprintPoolSnapshot;
 use super::pool_read::{self, Query};
 use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection, ParsedCatalogQueries};
+use crate::catalog_query_session::CatalogQuerySource;
 
 type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 
@@ -213,7 +215,7 @@ fn observe_database(
     let capture = Arc::new(Capture::default());
     let query = Query {
         archive: &archive,
-        entry: &entry,
+        entry: CatalogQuerySource::new(&entry, ProvenanceMode::Full),
         forge: &forge,
         selection,
         cancel: None,

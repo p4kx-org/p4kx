@@ -24,7 +24,7 @@ fn a_new_physical_weapon_action_descendant_keeps_its_inherited_body() -> TestRes
     let chain = assert_original_chain(&builder, NEW_ACTION, &[MELEE, ACTION])?;
     let source_ordinal = inherited_flag(&builder)?;
     let (_folder, archive) = common::open(&builder, DcbOrigin::Encrypted)?;
-    let built = build_catalog(&archive, &common::options())?;
+    let built = build_catalog(&archive, common::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let row = proof::at(&catalog, FIRST)?;
     let node = proof::at(row, "/actionNodes/3")?;

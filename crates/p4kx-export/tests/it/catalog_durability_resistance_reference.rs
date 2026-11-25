@@ -94,7 +94,7 @@ fn catalog() -> TestResult<Value> {
     let (_folder, archive) = common::open(&database(), DcbOrigin::Encrypted)?;
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     Ok(serde_json::from_slice(built.json())?)
 }
 

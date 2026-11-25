@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::error::Error;
 use std::time::UNIX_EPOCH;
 
@@ -8,8 +9,8 @@ use std::time::UNIX_EPOCH;
 mod views;
 
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ReputationSelection,
-    ReputationSnapshot, ResourceNumber, with_reputation_from,
+    CatalogLanguageSelection, CatalogRecordSelection, ReputationSelection, ReputationSnapshot,
+    ResourceNumber, with_reputation_from,
 };
 use p4kx_export::{CatalogError, CatalogOptions, build_catalog};
 use p4kx_extraction::{Archive, CancelToken, DataForgeEntry, Language};
@@ -29,10 +30,12 @@ fn reputation_queries_preserve_canonical_rows_and_scope_links() -> TestResult {
         write_archive(folder.path())?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let built = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
-    let session =
-        CatalogQuerySession::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
+    let session = full_proof::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
     let parsed = session.parsed(None)?;
     let high_index = parsed.with_reputation(ReputationSelection::all(), None, |snapshot| {
         let factions = snapshot

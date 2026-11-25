@@ -8,12 +8,12 @@ use std::process::ExitCode;
 use anyhow::{Context, Result};
 use p4kx_export::{
     ActionMapCounts, ActionMapFormat, ActionMapLabels, ActionMapProfile,
-    action_map_summary_origins, read_client_profile_settings, write_action_maps,
-    write_action_maps_with_origins,
+    action_map_summary_origins, read_client_profile_settings_with_provenance_mode,
+    write_action_maps, write_action_maps_with_origins,
 };
 use p4kx_extraction::{
     Archive, ArchiveWriteProtection, CancelToken, FieldOrigins, LocalizationSet,
-    OriginArtifactBinding, OriginDigestWriter, SourceInventory,
+    OriginArtifactBinding, OriginDigestWriter, ProvenanceMode, SourceInventory,
 };
 use serde::Serialize;
 
@@ -56,7 +56,8 @@ pub(crate) fn run(args: &ActionMapArgs, as_json: bool) -> Result<ExitCode> {
 
 fn settings(path: &Path) -> Result<ExitCode> {
     let archive = crate::key::open(path)?;
-    let report = read_client_profile_settings(&archive, None)?;
+    let report =
+        read_client_profile_settings_with_provenance_mode(&archive, ProvenanceMode::Full, None)?;
     json::print(&report)?;
     let code = if report.settings().has_failed_inputs() {
         crate::exit::PARTIAL_FAILURE

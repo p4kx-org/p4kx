@@ -20,7 +20,10 @@ use crate::catalog_v3_consumer;
 fn an_asteroid_composition_and_a_location_of_a_real_archive_are_linked() -> TestResult {
     let path = real_archive_path()?;
     let archive = Archive::open_with_key(&path, Some(p4kx_testkit::real_archive_key()?))?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let elements = guids(&catalog, "mineableElements")?;
     let compositions = guids(&catalog, "mineableCompositions")?;

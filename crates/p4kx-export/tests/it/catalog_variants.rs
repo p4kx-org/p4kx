@@ -33,10 +33,11 @@ fn build() -> Result<(BuiltCatalog, Value), Box<dyn Error>> {
     )?;
     let built = build_catalog(
         &archive,
-        &CatalogOptions {
+        CatalogOptions {
             publication_mode: CatalogPublicationMode::DiagnosticPartial,
             ..CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT)
-        },
+        }
+        .with_full_provenance(),
     )?;
     let json = serde_json::from_slice(built.json())?;
     Ok((built, json))
@@ -275,7 +276,7 @@ fn an_unreadable_item_component_cannot_prove_a_variant_link() -> TestResult {
     let ordinal = unreadable_component_ordinal(&archive)?;
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog = serde_json::from_slice(built.json())?;
     let class = "POWR_Key_Unreadable";
     for candidate in [

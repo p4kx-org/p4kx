@@ -3,7 +3,7 @@
 
 use std::path::{Path, PathBuf};
 
-use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogQuerySession};
+use p4kx_export::catalog_queries::CatalogLanguageSelection;
 use p4kx_export::mining_locations::{
     CompositionPart, DefinitionStatus, HarvestableElement, HarvestableOccurrenceRoute,
     MineableComposition, MineableElement, MiningLocationOptions, MiningLocationSnapshot,
@@ -13,11 +13,11 @@ use p4kx_export::{CatalogPublicationMode, build_catalog};
 use p4kx_extraction::{Archive, Guid, Language, SourceInventory, SourcedValue};
 use serde_json::{Value, json};
 
+use super::origins;
 use crate::commodity_v3_fixture::{self as common, TestResult, guid};
 use crate::harvest_fixture as fixture;
 use crate::health_origin_assertions as proof;
-
-use super::origins;
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn consumer_mining_joins_original_rows_and_refuses_unresolved_membership() -> TestResult {
@@ -34,7 +34,7 @@ fn check_mining_refresh(
         write_archive(folder.path())?,
         Some(p4kx_testkit::test_key()),
     )?;
-    let session = CatalogQuerySession::open(
+    let session = full_proof::open(
         &archive,
         CatalogLanguageSelection::Selected(&[Language::English]),
         None,
@@ -78,7 +78,8 @@ fn check_composition_parity(
 ) -> TestResult {
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value = serde_json::from_slice(build_catalog(archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(archive, options.with_full_provenance())?.json())?;
     let actual: Value = serde_json::from_slice(&serde_json::to_vec(composition)?)?;
     let index = composition
         .source

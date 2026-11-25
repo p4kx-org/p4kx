@@ -15,6 +15,7 @@ use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 const OWNER: u128 = 0xd653;
 const SHIELD: &str = "SCItemShieldGeneratorParams";
@@ -28,10 +29,10 @@ fn ship_system_queries_keep_all_physical_records_with_the_same_guid() -> TestRes
         .record(owner("Alpha", 8.0).record())
         .record(owner("Beta", 16.0).record());
     let (_folder, archive) = common::open(&database, DcbOrigin::Encrypted)?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
-    let session =
-        CatalogQuerySession::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
+    let session = full_proof::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
     let parsed = session.parsed(None)?;
     let guid = common::guid(OWNER).parse()?;
     for (selection, indices) in [
@@ -80,7 +81,7 @@ fn ship_system_queries_distinguish_absent_families_from_unreadable_candidates() 
 #[test]
 fn shield_query_retains_an_outside_owner_weak_pointer_with_complete_coverage() -> TestResult {
     let (_folder, archive) = common::open(&outside_owner_shield(), DcbOrigin::Encrypted)?;
-    let produced = build_catalog(&archive, &common::options())?;
+    let produced = build_catalog(&archive, common::options().with_full_provenance())?;
     assert!(
         produced.summary().export_health().is_complete(),
         "the outside-owner target is an informational original observation",
@@ -89,8 +90,7 @@ fn shield_query_retains_an_outside_owner_weak_pointer_with_complete_coverage() -
     let [expected] = proof::rows(&catalog, SHIELD_ROWS)? else {
         return Err("one canonical shield row with the original pointer".into());
     };
-    let session =
-        CatalogQuerySession::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
+    let session = full_proof::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
     let parsed = session.parsed(None)?;
     parsed.with_shield_generators(
         CatalogRecordSelection::All,

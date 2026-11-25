@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::catalog_queries::shops::{ShopRegistrySelection, read_shop};
-use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogQuerySession};
+use p4kx_export::catalog_queries::CatalogLanguageSelection;
+use p4kx_export::catalog_queries::shops::{
+    ShopRegistrySelection, read_shop, read_shop_with_provenance_mode,
+};
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, StarmapTraversalBudget};
 use p4kx_extraction::{Archive, SourceEncryption};
 use p4kx_testkit::{TestContainer, TestElement, TestEntry};
@@ -164,7 +167,7 @@ fn equivalent_inventory_paths_are_ambiguous_without_changing_legacy_shop_links()
     let [_, (_, legacy_item)] = originals;
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = p4kx_export::build_catalog(&archive, &options)?;
+    let built = p4kx_export::build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let legacy = health::rows(&catalog, "/shops")?
         .iter()
@@ -279,7 +282,13 @@ fn assert_last_file(catalog: &Value, shop: &Value, definition: &Value) -> TestRe
 
 fn assert_physical_shop_scope(archive: &Archive, catalog: &Value, normal: &Value) -> TestResult {
     let selection = registry_selection(archive, catalog, normal)?;
-    let snapshot = read_shop(archive, selection, StarmapTraversalBudget::default(), None)?;
+    let snapshot = read_shop_with_provenance_mode(
+        archive,
+        selection,
+        StarmapTraversalBudget::default(),
+        full_proof::MODE,
+        None,
+    )?;
     assert!(
         !snapshot.coverage.registry_complete,
         "the registry fixture includes an unrelated row with mismatched ID and name counts"
@@ -348,8 +357,7 @@ fn assert_session_shop_scope(
     normal: &Value,
 ) -> TestResult {
     let budget = StarmapTraversalBudget::default();
-    let session =
-        CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+    let session = full_proof::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
     let parsed = session.parsed(None)?;
     let normal = health::with_origins(normal.clone(), catalog)?;
     for snapshot in [

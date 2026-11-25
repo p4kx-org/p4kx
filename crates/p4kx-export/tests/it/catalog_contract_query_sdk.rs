@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ContractSnapshot,
     SourcePayload,
@@ -44,10 +45,11 @@ fn contract_sdk_all_matches_canonical_rows_and_titles() -> TestResult {
     )?;
     let mut options = commodity_v3_fixture::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let expected: Value = serde_json::from_slice(built.json())?;
     let session =
-        CatalogQuerySession::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
+        CatalogQuerySession::open(&archive, CatalogLanguageSelection::AllAvailable, None)?
+            .with_provenance_mode(full_proof::MODE);
     let parsed = session.parsed(None)?;
     parsed.with_contracts(CatalogRecordSelection::All, None, |snapshot| {
         assert_eq!(

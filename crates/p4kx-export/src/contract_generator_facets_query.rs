@@ -8,11 +8,12 @@ use p4kx_extraction::{
 use super::read;
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogRecordCoverage, CatalogRecordSelection, DatasetAvailability,
 };
-use crate::catalog_query_session::{CatalogQuerySession, ParsedCatalogQueries, checkpoint};
+use crate::catalog_query_session::{
+    CatalogQuerySession, CatalogQuerySource, ParsedCatalogQueries, checkpoint,
+};
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_v3::mission_sources::{
     contract_generator_facets, contract_scenario_requirements,
@@ -114,13 +115,13 @@ impl ParsedCatalogQueries<'_> {
 
 fn with_parsed<T>(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     selection: CatalogRecordSelection,
     cancel: Option<&CancelToken>,
     inspect: impl FnOnce(ContractGeneratorFacetSnapshot<'_>) -> T,
 ) -> Result<T, CatalogError> {
-    let origins = CatalogOrigins::for_archive_records(archive, entry)?;
+    let origins = entry.records(archive)?;
     let input = OriginalCatalogInput::new(forge, &origins);
     let mut local_generators = Vec::new();
     let mut scenario_requirements = Vec::new();

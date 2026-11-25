@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    Archive, ArchiveWatch, DataForge, RecordText, RecordTree, SourceValueState, SourcedValue, Step,
-    StructValue, Value, ValueError,
+    Archive, ArchiveWatch, DataForge, ProvenanceMode, RecordText, RecordTree, SourceValueState,
+    SourcedValue, Step, StructValue, Value, ValueError,
 };
 use p4kx_testkit::watchdog;
 use serde_json::Value as Json;
@@ -33,7 +33,8 @@ fn installed_blueprint_pool_sdk_matches_one_original_record() -> TestResult {
     let archive = open_archive()?;
     let watch = ArchiveWatch::new(&archive);
     let session = CatalogQuerySession::open(&archive, CatalogLanguageSelection::AllAvailable, None)
-        .map_err(|_| "installed pool SDK session open failed")?;
+        .map_err(|_| "installed pool SDK session open failed")?
+        .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session
         .parsed(None)
         .map_err(|_| "installed pool DataForge open failed")?;

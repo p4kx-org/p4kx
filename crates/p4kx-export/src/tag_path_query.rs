@@ -8,11 +8,12 @@ use p4kx_extraction::{
 
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogRecordFailure, CatalogRecordSelection,
 };
-use crate::catalog_query_session::{CatalogQuerySession, ParsedCatalogQueries, checkpoint};
+use crate::catalog_query_session::{
+    CatalogQuerySession, CatalogQuerySource, ParsedCatalogQueries, checkpoint,
+};
 use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::catalog_v3::tag_catalog::{self, TagConsumers};
 
@@ -118,13 +119,13 @@ impl ParsedCatalogQueries<'_> {
 
 fn project<T>(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     selection: CatalogRecordSelection,
     cancel: Option<&CancelToken>,
     inspect: impl FnOnce(TagPathSnapshot<'_>) -> T,
 ) -> Result<T, CatalogError> {
-    let origins = CatalogOrigins::for_archive_records(archive, entry)?;
+    let origins = entry.records(archive)?;
     let input = OriginalCatalogInput::new(forge, &origins);
     let (paths, issues, failures) = {
         let captured = tag_catalog::read(forge, &input, cancel, TagConsumers::default())?;

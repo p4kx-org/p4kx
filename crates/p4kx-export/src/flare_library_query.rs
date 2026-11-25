@@ -6,7 +6,7 @@
 use std::slice;
 
 use p4kx_extraction::{
-    Archive, ArchiveWatch, Build, CancelToken, Entry, FieldOrigin, SourceInventory,
+    Archive, ArchiveWatch, Build, CancelToken, Entry, FieldOrigin, ProvenanceMode, SourceInventory,
 };
 
 use crate::catalog_query_session::checkpoint;
@@ -14,7 +14,7 @@ pub use crate::catalog_read::authored_xml_tree::{
     AuthoredXmlDeclaration, AuthoredXmlElement, AuthoredXmlText,
 };
 pub use crate::catalog_read::loose_archive_path::{LooseArchivePath, LooseArchivePathState};
-use crate::catalog_read::original::{EntryCapture, EntryReceipt, with_entry_capture};
+use crate::catalog_read::original::{EntryCapture, EntryReceipt, with_entry_capture_mode};
 use crate::catalog_table::DatasetAvailability;
 use crate::catalog_v3::flare_library::{self, Selection};
 pub use crate::catalog_v3::flare_library::{
@@ -69,10 +69,28 @@ pub fn read_flare_libraries(
     selection: FlareLibrarySelection<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<FlareLibrarySnapshot, CatalogError> {
+    read_flare_libraries_with_provenance_mode(
+        archive,
+        selection,
+        ProvenanceMode::MarkersOnly,
+        cancel,
+    )
+}
+
+/// Reads flare libraries with the selected source detail.
+///
+/// # Errors
+/// Returns the errors of `read_flare_libraries`.
+pub fn read_flare_libraries_with_provenance_mode(
+    archive: &Archive,
+    selection: FlareLibrarySelection<'_>,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<FlareLibrarySnapshot, CatalogError> {
     checkpoint(cancel)?;
     let watch = ArchiveWatch::new(archive);
     watch.check()?;
-    let snapshot = with_entry_capture(archive, |capture| {
+    let snapshot = with_entry_capture_mode(archive, provenance_mode, |capture| {
         let inventory_problem = export_archive_health::inventory(archive);
         let mut ledger = ExportLedger {
             archive_inventory_problem: inventory_problem,

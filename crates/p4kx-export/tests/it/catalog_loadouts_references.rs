@@ -215,8 +215,11 @@ fn compare_reused_catalog(
     let options = loadouts_support::options(Some(&filter));
     let serial = ThreadPoolBuilder::new().num_threads(1).build()?;
     let parallel = ThreadPoolBuilder::new().num_threads(4).build()?;
-    let direct = serial.install(|| p4kx_export::build_catalog(archive, &options))?;
-    let reused = parallel.install(|| p4kx_export::build_catalog_from(archive, entry, &options))?;
+    let direct =
+        serial.install(|| p4kx_export::build_catalog(archive, options.with_full_provenance()))?;
+    let reused = parallel.install(|| {
+        p4kx_export::build_catalog_from(archive, entry, options.with_full_provenance())
+    })?;
     let reused_bytes = reused.json();
     let direct_bytes = direct.json();
     if reused_bytes != direct_bytes {

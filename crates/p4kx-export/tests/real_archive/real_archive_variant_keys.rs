@@ -46,7 +46,10 @@ fn entries<'c>(catalog: &'c Value, kind: &str) -> &'c [Value] {
 fn the_vehicle_definition_spellings_and_guids_of_a_real_archive() -> TestResult {
     let archive =
         Archive::open_with_key(real_archive_path()?, p4kx_testkit::real_archive_key().ok())?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let summary = built.summary().variants();
     print_line(&format!(

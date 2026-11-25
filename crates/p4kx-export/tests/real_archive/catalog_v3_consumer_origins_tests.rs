@@ -35,7 +35,7 @@ fn optional_presentation_values_and_unknown_origin_remain_real_values() -> TestR
     let (_directory, archive) = fixture::open(&database, fixture::DcbOrigin::Plain)?;
     let mut options = fixture::options();
     options.publication_mode = p4kx_export::CatalogPublicationMode::DiagnosticPartial;
-    let built = p4kx_export::build_catalog(&archive, &options)?;
+    let built = p4kx_export::build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     reader::presentations(&catalog)?;
     Ok(())
@@ -45,7 +45,7 @@ fn optional_presentation_values_and_unknown_origin_remain_real_values() -> TestR
 fn actual_encrypted_inputs_keep_direct_proof_through_acceptance_reads() -> TestResult {
     let database = fixture::database();
     let (_directory, archive) = fixture::open(&database, fixture::DcbOrigin::Encrypted)?;
-    let built = p4kx_export::build_catalog(&archive, &fixture::options())?;
+    let built = p4kx_export::build_catalog(&archive, fixture::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     for kind in [Kind::Commodities, Kind::ResourceTypes] {
         for row in reader::rows(&catalog, kind)? {
@@ -149,7 +149,7 @@ fn empty_literal_and_unknown_origin_controls_keep_their_payload() -> TestResult 
 fn empty_encrypted_origin_cannot_supply_a_known_witness() -> TestResult {
     let database = fixture::database();
     let (_directory, archive) = fixture::open(&database, fixture::DcbOrigin::Encrypted)?;
-    let built = p4kx_export::build_catalog(&archive, &fixture::options())?;
+    let built = p4kx_export::build_catalog(&archive, fixture::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let mut carrier = fixture::definition(&catalog, fixture::ALPHA)?
         .get("guid")
@@ -202,7 +202,7 @@ fn mixed_text_sources_keep_direct_markers_and_protection_in_one_row() -> TestRes
         fixture::open_bytes_with_entries(database.build(), fixture::DcbOrigin::Plain, [french])?;
     let mut options = fixture::options();
     options.publication_mode = p4kx_export::CatalogPublicationMode::DiagnosticPartial;
-    let built = p4kx_export::build_catalog(&archive, &options)?;
+    let built = p4kx_export::build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     reader::presentations(&catalog)?;
 

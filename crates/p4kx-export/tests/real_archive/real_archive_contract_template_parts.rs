@@ -191,7 +191,10 @@ fn node_type(value: &Value) -> Option<&str> {
 #[ignore = "real Archive: set P4KX_DATA_P4K and pass --ignored"]
 fn the_parts_of_the_contract_templates_of_a_real_archive_resolve() -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let unknown: Vec<&str> = built
         .summary()

@@ -3,13 +3,15 @@
 
 use p4kx_export::catalog_queries::terrain::{
     CatalogJsonNumber, GeologySet, LooseArchivePathState, LooseDefinitionSelection as Selection,
-    TerrainGuidLinkState, read_geology_sets, read_geology_texture_sets,
+    TerrainGuidLinkState, read_geology_sets, read_geology_sets_with_provenance_mode,
+    read_geology_texture_sets, read_geology_texture_sets_with_provenance_mode,
 };
 use p4kx_extraction::Archive;
 use p4kx_testkit::TestEntry;
 use serde_json::Value;
 
 use super::{Route, TestResult, open, parity};
+use crate::sdk_full_proof as full_proof;
 
 pub(super) const SETS: &str = "/definitions/geologySets";
 pub(super) const TEXTURE_SETS: &str = "/definitions/geologyTextureSets";
@@ -23,13 +25,22 @@ const TEXTURE_GUID: &str = "dddddddd-0000-0000-0000-000000000102";
 const ASSET_GUID: &str = "dddddddd-0000-0000-0000-000000000103";
 
 pub(super) fn read(archive: &Archive, catalog: &Value) -> TestResult<[Route; 2]> {
-    let sets = read_geology_sets(archive, Selection::ArchivePath(SET), None)?;
+    let sets = read_geology_sets_with_provenance_mode(
+        archive,
+        Selection::ArchivePath(SET),
+        full_proof::MODE,
+        None,
+    )?;
     let [set] = sets.rows.as_slice() else {
         return Err("one selected geology set".into());
     };
     verify_set(set)?;
-    let textures =
-        read_geology_texture_sets(archive, Selection::Guid(TEXTURE_GUID.parse()?), None)?;
+    let textures = read_geology_texture_sets_with_provenance_mode(
+        archive,
+        Selection::Guid(TEXTURE_GUID.parse()?),
+        full_proof::MODE,
+        None,
+    )?;
     let [texture_set] = textures.rows.as_slice() else {
         return Err("one selected geology texture set".into());
     };

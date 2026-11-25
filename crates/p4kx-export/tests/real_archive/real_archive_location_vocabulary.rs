@@ -5,9 +5,7 @@ use std::collections::BTreeSet;
 use std::error::Error;
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::{
-    CatalogOptions, CatalogPublicationMode, Kind, build_catalog_from, is_kind_leftover,
-};
+use p4kx_export::{CatalogOptions, CatalogPublicationMode, Kind, build_catalog_from};
 use p4kx_extraction::{
     Archive, ArchiveWatch, DataForge, DataForgeEntry, Filter, RecordTree, TreeBuilder,
     Value as Original,
@@ -155,8 +153,7 @@ fn selected_catalog(archive: &Archive, entry: &DataForgeEntry, path: &str) -> Te
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let built = build_catalog_from(archive, entry, &options)
-        .map_err(|_| "build source-selected location vocabulary")?;
+    let built = build_catalog_from(archive, entry, options.with_full_provenance())?;
     let catalog = serde_json::from_slice(built.json()).map_err(|_| "read catalog JSON")?;
     crate::real_archive_shop_inventory_v3::verify_build(archive, &catalog)?;
     Ok(catalog)
@@ -271,7 +268,7 @@ fn classification_owners(forge: &DataForge<'_>, watch: &ArchiveWatch) -> TestRes
             .to_ascii_lowercase()
             .starts_with("libs/foundry/records/missiondata/pu_locations/")
             || path.contains(['*', '?'])
-            || is_kind_leftover(Kind::MissionLocationTemplates, path, name)
+            || p4kx_export::is_kind_leftover(Kind::MissionLocationTemplates, path, name)
         {
             continue;
         }

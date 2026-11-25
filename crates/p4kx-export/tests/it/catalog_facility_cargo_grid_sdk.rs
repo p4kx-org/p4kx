@@ -13,6 +13,7 @@ use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 const GRID: u32 = 1;
 const CONTAINER: u32 = 2;
@@ -23,12 +24,14 @@ fn one_cargo_grid_owner_matches_its_canonical_configuration_and_inventory_rows()
     let database = cargo_grid_facility_database();
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_directory, archive) = common::open(&database, origin)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
         let decoded = DataForgeEntry::read(&archive)?;
-        with_cargo_grids_from(&archive, &decoded, GRID, None, |snapshot| {
-            verify_owner(&snapshot, &catalog, encrypted)
-        })??;
+        full_proof::from_entry(&archive, &decoded, full_proof::NO_LANGUAGES, None)?
+            .with_cargo_grids(GRID, None, |snapshot| {
+                verify_owner(&snapshot, &catalog, encrypted)
+            })??;
     }
     Ok(())
 }

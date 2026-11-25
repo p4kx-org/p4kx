@@ -111,7 +111,7 @@ fn compare(
     let (summary, mut file) = p4kx_export::write_catalog_from(
         archive,
         dcb,
-        &options,
+        options.with_full_provenance(),
         Compression::None,
         tempfile::tempfile,
     )

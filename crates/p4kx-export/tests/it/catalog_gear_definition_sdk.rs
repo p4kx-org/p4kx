@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::equipment::component_definitions::{
     DamageResistanceMacroBody, DurabilityResistanceEntry, MiningLaserGlobalDefinition,
 };
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ParsedCatalogQueries,
-    ResourceFloat32,
+    CatalogLanguageSelection, CatalogRecordSelection, ParsedCatalogQueries, ResourceFloat32,
 };
 use p4kx_export::{CatalogPublicationMode, build_catalog_from};
 use p4kx_extraction::{Archive, DataForgeEntry, SourcedValue};
@@ -28,9 +28,9 @@ fn gear_definition_queries_keep_typed_catalog_values_and_origins() -> TestResult
     let entry = DataForgeEntry::read(&archive)?;
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog_from(&archive, &entry, &options)?;
+    let built = build_catalog_from(&archive, &entry, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::Selected(&[]),

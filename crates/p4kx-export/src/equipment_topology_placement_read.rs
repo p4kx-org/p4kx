@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, CancelToken, DataForge, DataForgeEntry, DataForgeError};
+use p4kx_extraction::{Archive, CancelToken, DataForge, DataForgeError};
 
 use super::super::super::loadout_query::read::Query as LoadoutQuery;
 use super::{ResourceTopologyPlacementSnapshot, ResourceTopologyRootState};
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection};
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::catalog_v3::resource_topology_projection;
 use crate::contract_loadout::EntityKind;
 use crate::entity_selection::{self, Selected};
@@ -24,12 +23,12 @@ mod sources;
 
 pub(super) fn run(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     ship_record_index: u32,
     cancel: Option<&CancelToken>,
 ) -> Result<ResourceTopologyPlacementSnapshot, CatalogError> {
-    let origins = CatalogOrigins::for_archive_records(archive, entry)?;
+    let origins = entry.records(archive)?;
     let input = OriginalCatalogInput::new(forge, &origins);
     let locale = TextSources::read_languages(archive, &[])?;
     let texts = Texts::parse(&locale)?;

@@ -1,28 +1,24 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::equipment::ship_systems::with_quantum_drives_from;
 use p4kx_export::catalog_queries::{CatalogRecordSelection, ResourceNumber};
 use p4kx_extraction::DataForgeEntry;
 use serde_json::{Value, json};
 
 use super::{DcbOrigin, Layout, ROWS, TestResult, common, fixture, proof};
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn quantum_sdk_keeps_physical_slots_and_all_bound_source_profiles() -> TestResult {
     for (mode, encryption) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&fixture::database(Layout::Full), mode)?;
         let catalog: Value = serde_json::from_slice(
-            p4kx_export::build_catalog(&archive, &common::options())?.json(),
+            p4kx_export::build_catalog(&archive, common::options().with_full_provenance())?.json(),
         )?;
         let entry = DataForgeEntry::read(&archive)?;
         let selection = CatalogRecordSelection::Guid(common::guid(fixture::OWNER).parse()?);
-        with_quantum_drives_from(
-            &archive,
-            &entry,
-            selection,
-            None,
-            |snapshot| -> TestResult {
+        full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+            .with_quantum_drives(selection, None, |snapshot| -> TestResult {
                 let rows = snapshot.rows();
                 let canonical = proof::rows(&catalog, ROWS)?;
                 assert_eq!(rows.len(), 2, "both selected original component slots");
@@ -55,8 +51,7 @@ fn quantum_sdk_keeps_physical_slots_and_all_bound_source_profiles() -> TestResul
                     );
                 }
                 Ok(())
-            },
-        )??;
+            })??;
     }
     Ok(())
 }
@@ -69,36 +64,36 @@ fn quantum_sdk_keeps_an_invalid_profile_and_reports_incomplete_coverage() -> Tes
     )?;
     let mut options = common::options();
     options.publication_mode = p4kx_export::CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value =
-        serde_json::from_slice(p4kx_export::build_catalog(&archive, &options)?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        p4kx_export::build_catalog(&archive, options.with_full_provenance())?.json(),
+    )?;
     let entry = DataForgeEntry::read(&archive)?;
-    with_quantum_drives_from(
-        &archive,
-        &entry,
-        CatalogRecordSelection::RecordIndex(0),
-        None,
-        |snapshot| -> TestResult {
-            let [row] = snapshot.rows() else {
-                return Err("one original quantum drive with an invalid spline slot".into());
-            };
-            assert_eq!(
-                snapshot.coverage().incomplete_fields,
-                [0],
-                "the malformed field is attributed to its physical owner",
-            );
-            let row = serde_json::from_slice(&serde_json::to_vec(row)?)?;
-            proof::cell(&row, "spline", "invalid")?;
-            let sdk = json!({"provenance": snapshot.source_inventory()});
-            let [expected] = proof::rows(&catalog, ROWS)? else {
-                return Err("one diagnostic quantum drive row".into());
-            };
-            assert_eq!(
-                proof::with_origins(row, &sdk)?,
-                proof::with_origins(expected.clone(), &catalog)?,
-                "the diagnostic catalog and query retain the invalid cell and its sources",
-            );
-            Ok(())
-        },
-    )??;
+    full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .with_quantum_drives(
+            CatalogRecordSelection::RecordIndex(0),
+            None,
+            |snapshot| -> TestResult {
+                let [row] = snapshot.rows() else {
+                    return Err("one original quantum drive with an invalid spline slot".into());
+                };
+                assert_eq!(
+                    snapshot.coverage().incomplete_fields,
+                    [0],
+                    "the malformed field is attributed to its physical owner",
+                );
+                let row = serde_json::from_slice(&serde_json::to_vec(row)?)?;
+                proof::cell(&row, "spline", "invalid")?;
+                let sdk = json!({"provenance": snapshot.source_inventory()});
+                let [expected] = proof::rows(&catalog, ROWS)? else {
+                    return Err("one diagnostic quantum drive row".into());
+                };
+                assert_eq!(
+                    proof::with_origins(row, &sdk)?,
+                    proof::with_origins(expected.clone(), &catalog)?,
+                    "the diagnostic catalog and query retain the invalid cell and its sources",
+                );
+                Ok(())
+            },
+        )??;
     Ok(())
 }

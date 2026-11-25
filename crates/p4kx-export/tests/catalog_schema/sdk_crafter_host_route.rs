@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::catalog_queries::crafting::{CrafterHostSnapshot, read_crafter_hosts_from};
+use p4kx_export::catalog_queries::crafting::CrafterHostSnapshot;
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog_from};
 use p4kx_extraction::{Archive, DataForgeEntry, SourceValueState};
 use p4kx_testkit::{
@@ -29,7 +30,7 @@ pub(super) fn read() -> TestResult<Route> {
     let entry = DataForgeEntry::read(&archive)?;
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog_from(&archive, &entry, &options)?;
+    let built = build_catalog_from(&archive, &entry, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let table = catalog
         .pointer(DATASET)
@@ -50,7 +51,8 @@ pub(super) fn read() -> TestResult<Route> {
         .filter(|row| row.pointer("/shipRecordIndex/value") == Some(&json!(HOST)))
         .collect();
 
-    let snapshot = read_crafter_hosts_from(&archive, &entry, HOST, None)?;
+    let snapshot = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .read_crafter_hosts(HOST, None)?;
     verify_mounts(&snapshot)?;
     assert_eq!(
         &serde_json::to_value(snapshot.availability)?,
@@ -73,14 +75,16 @@ pub(super) fn read() -> TestResult<Route> {
 fn single_host_empty_scope_and_missing_scope_are_distinct() -> TestResult<()> {
     let (_directory, archive) = open()?;
     let entry = DataForgeEntry::read(&archive)?;
-    let empty = read_crafter_hosts_from(&archive, &entry, EMPTY_SHIP, None)?;
+    let empty = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .read_crafter_hosts(EMPTY_SHIP, None)?;
     assert_eq!(
         empty.host_state,
         SourceValueState::Present,
         "the empty ship Loadout was resolved"
     );
     assert!(empty.rows.is_empty(), "no mount was authored");
-    let not_ship = read_crafter_hosts_from(&archive, &entry, MOUNTED, None)?;
+    let not_ship = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .read_crafter_hosts(MOUNTED, None)?;
     assert_eq!(
         not_ship.host_state,
         SourceValueState::Absent,
@@ -90,14 +94,16 @@ fn single_host_empty_scope_and_missing_scope_are_distinct() -> TestResult<()> {
         not_ship.rows.is_empty(),
         "an Item does not admit a ship host"
     );
-    let missing = read_crafter_hosts_from(&archive, &entry, u32::MAX, None)?;
+    let missing = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .read_crafter_hosts(u32::MAX, None)?;
     assert_eq!(
         missing.host_state,
         SourceValueState::Absent,
         "the selected Record does not exist"
     );
     assert!(missing.rows.is_empty(), "no unrelated ship is resolved");
-    let broken = read_crafter_hosts_from(&archive, &entry, BROKEN_SHIP, None)?;
+    let broken = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .read_crafter_hosts(BROKEN_SHIP, None)?;
     assert_eq!(
         broken.host_state,
         SourceValueState::Unreadable,

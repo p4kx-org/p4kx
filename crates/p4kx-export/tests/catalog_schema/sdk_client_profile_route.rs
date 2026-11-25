@@ -6,7 +6,7 @@ use std::time::UNIX_EPOCH;
 
 use p4kx_export::{
     CatalogOptions, ProfileDocument, ProfileKind, ProfileState, build_catalog,
-    read_client_profile_settings_for,
+    read_client_profile_settings_for_with_provenance_mode,
 };
 use p4kx_extraction::{Archive, Filter, InputScope, SourceInventory, SourceUseRole};
 use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, TestStruct, test_key};
@@ -14,6 +14,7 @@ use serde_json::Value;
 
 use super::super::CLIENT_PROFILE_DOCUMENTS;
 use super::{Route, TestResult};
+use crate::sdk_full_proof as full_proof;
 
 const GENERAL: &str = "Data/Libs/Config/Profiles/default/attributes.xml";
 const VIRTUAL_REALITY: &str = "Data/Libs/Config/Profiles/default/attributesVR.xml";
@@ -21,7 +22,12 @@ const VIRTUAL_REALITY: &str = "Data/Libs/Config/Profiles/default/attributesVR.xm
 pub(super) fn read() -> TestResult<Route> {
     let directory = tempfile::tempdir()?;
     let archive = fixture(directory.path())?;
-    let report = read_client_profile_settings_for(&archive, ProfileKind::VirtualReality, None)?;
+    let report = read_client_profile_settings_for_with_provenance_mode(
+        &archive,
+        ProfileKind::VirtualReality,
+        full_proof::MODE,
+        None,
+    )?;
     let documents = report.settings().documents();
     let [general, virtual_reality] = documents else {
         return Err("the two canonical profile documents must be retained".into());
@@ -92,10 +98,11 @@ fn verify_filtered_catalog(archive: &Archive, documents: &[ProfileDocument]) -> 
     let filter = Filter::parse(VIRTUAL_REALITY)?;
     let catalog = build_catalog(
         archive,
-        &CatalogOptions {
+        CatalogOptions {
             filter: Some(&filter),
             ..CatalogOptions::new(UNIX_EPOCH)
-        },
+        }
+        .with_full_provenance(),
     )?;
     let document: Value = serde_json::from_slice(catalog.json())?;
     let queried = serde_json::to_value(documents)?;

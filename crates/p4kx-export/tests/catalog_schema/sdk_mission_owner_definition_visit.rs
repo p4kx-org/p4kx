@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::collections::BTreeSet;
 use std::time::UNIX_EPOCH;
 
@@ -30,15 +31,16 @@ const BROKERS: MissionOwnerDefinitionSelection =
 fn mission_owner_definition_visit_preserves_normal_rows_and_original_source_joins() -> TestResult {
     let (_folder, archive) = fixture::open_with_skipped_owners(DISTINCT_NULL_TEMPLATE_GUID)?;
     let entry = DataForgeEntry::read(&archive)?;
-    let normal: Value = serde_json::from_slice(
-        build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?.json(),
-    )?;
+    let options = CatalogOptions::new(UNIX_EPOCH);
+    let export = build_catalog_from(&archive, &entry, options.with_full_provenance())?;
+    let normal: Value = serde_json::from_slice(export.json())?;
     let session = CatalogQuerySession::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::AllAvailable,
         None,
-    )?;
+    )?
+    .with_provenance_mode(full_proof::MODE);
     let parsed = session.parsed(None)?;
     for (family, selection, path) in [
         (

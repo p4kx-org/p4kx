@@ -31,6 +31,7 @@ mod installed_witness;
 pub use descriptor_query::{
     LocationPhysicsDescriptorSelection, LocationPhysicsDescriptorSnapshot,
     LocationPhysicsDescriptorStatus, read_location_physics_descriptor,
+    read_location_physics_descriptor_with_provenance_mode,
 };
 pub use rows::{
     LocationPhysicsDeclaration, LocationPhysicsFields, LocationPhysicsGrid,

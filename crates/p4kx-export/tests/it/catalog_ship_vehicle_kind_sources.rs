@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::catalog_queries::equipment::with_ship_sources;
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_export::{ShipBaseOptions, build_ship_base};
 use p4kx_extraction::Archive;
@@ -239,10 +239,8 @@ fn verify_parity(archive: &Archive, catalog: &Value, kind: &Value) -> TestResult
         json!(base.vehicle_kind),
         "the Catalog keeps the standalone vehicle classification"
     );
-    with_ship_sources(
-        archive,
+    full_proof::open(archive, CatalogLanguageSelection::Selected(&[]), None)?.with_ship_sources(
         CatalogRecordSelection::All,
-        CatalogLanguageSelection::Selected(&[]),
         None,
         |snapshot| -> TestResult {
             let [row] = snapshot.rows() else {

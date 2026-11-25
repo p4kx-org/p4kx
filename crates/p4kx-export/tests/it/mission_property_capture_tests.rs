@@ -30,7 +30,7 @@ fn readable_empty_generator_sets_remain_successful() -> TestResult {
     let built = p4kx_export::build_catalog_from(
         &input.archive,
         &input.entry,
-        &health_origin_fixture::options(),
+        health_origin_fixture::options().with_full_provenance(),
     )?;
     assert_eq!(
         built.summary().export_health().status,
@@ -61,7 +61,7 @@ fn run(case: Case) -> TestResult {
                 p4kx_export::build_catalog_from(
                     &input.archive,
                     &input.entry,
-                    &health_origin_fixture::options()
+                    health_origin_fixture::options().with_full_provenance()
                 ),
                 Err(CatalogError::IncompleteExport(_))
             ),

@@ -29,7 +29,10 @@ fn resource_dependencies_match_canonical_rows_and_close_both_display_names() -> 
         &archive,
         MiningLocationOptions::new(Language::English, None),
     )?;
-    let built = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     check_dependencies(&snapshot, &catalog)?;
     Ok(())

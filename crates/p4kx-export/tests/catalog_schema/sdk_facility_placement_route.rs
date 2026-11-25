@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::equipment::{
     AlignmentDependencyState, FacilityConfigurationKind, FacilityInstance,
-    LoadoutFacilityPlacementSnapshot, read_loadout_facility_placements_from,
+    LoadoutFacilityPlacementSnapshot,
 };
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog_from};
 use p4kx_extraction::{Archive, DataForgeEntry, SourceLocation, SourceUseRole, SourceValueState};
@@ -40,7 +41,8 @@ fn read_facilities() -> TestResult<Route> {
     let archive = Archive::open_with_key(path, Some(test_key()))?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog = normal_placements(&archive, &entry)?;
-    let snapshot = read_loadout_facility_placements_from(&archive, &entry, SHIP_RECORD, None)?;
+    let snapshot = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .read_loadout_facility_placements(SHIP_RECORD, None)?;
     compare(
         &snapshot,
         &catalog,
@@ -64,10 +66,11 @@ fn read_facilities() -> TestResult<Route> {
             .contains(&SHIP_RECORD),
         "the omitted dangling Reference remains reported in the original Loadout coverage",
     );
-    let docked = read_loadout_facility_placements_from(&archive, &entry, DOCKED_RECORD, None)?;
+    let docked = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .read_loadout_facility_placements(DOCKED_RECORD, None)?;
     compare(&docked, &catalog, DOCKED_RECORD, &[&[], &[0]])?;
-    let unselected =
-        read_loadout_facility_placements_from(&archive, &entry, UNSELECTED_RECORD, None)?;
+    let unselected = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .read_loadout_facility_placements(UNSELECTED_RECORD, None)?;
     assert_eq!(
         unselected.loadout_state,
         SourceValueState::Absent,
@@ -95,8 +98,9 @@ fn normal_placements(archive: &Archive, entry: &DataForgeEntry) -> TestResult<Ve
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let catalog: Value =
-        serde_json::from_slice(build_catalog_from(archive, entry, &options)?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog_from(archive, entry, options.with_full_provenance())?.json(),
+    )?;
     catalog
         .pointer("/placements/facilityInstances/rows")
         .and_then(Value::as_array)
@@ -190,7 +194,8 @@ fn check_encrypted_ancestor() -> TestResult {
     let (_directory, archive) = fixture::encrypted_xml_archive()?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog = normal_placements(&archive, &entry)?;
-    let snapshot = read_loadout_facility_placements_from(&archive, &entry, SHIP_RECORD, None)?;
+    let snapshot = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .read_loadout_facility_placements(SHIP_RECORD, None)?;
     compare(&snapshot, &catalog, SHIP_RECORD, &[&[0], &[0, 0], &[1, 0]])?;
     let [deck, seat, rack_seat] = snapshot.rows.as_slice() else {
         return Err("the deck, its seat and the seat below the empty rack".into());

@@ -2,12 +2,13 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    Archive, ArchiveWatch, CancelToken, Entry, Filter, SourceUse, SourceValue, SourcedValue,
+    Archive, ArchiveWatch, CancelToken, Entry, Filter, ProvenanceMode, SourceUse, SourceValue,
+    SourcedValue,
 };
 
 use crate::catalog_read::authored_xml_tree as tree;
 use crate::catalog_read::original::{
-    EntryCapture, EntryDiagnosis, EntryRead, EntrySourceXml, with_entry_capture,
+    EntryCapture, EntryDiagnosis, EntryRead, EntrySourceXml, with_entry_capture_mode,
 };
 use crate::entry_source::EntrySource;
 use crate::export_diagnostic::ExportDiagnosticCode;
@@ -31,7 +32,7 @@ const KIND: Kind = Kind::ClientProfileSettings;
 const GENERAL: &str = "Data/Libs/Config/Profiles/default/attributes.xml";
 const VR: &str = "Data/Libs/Config/Profiles/default/attributesVR.xml";
 
-/// Reads the authored client profile documents in one root Archive.
+/// Reads the authored client profiles with encryption markers.
 ///
 /// # Errors
 /// Returns an error if the Archive changes, source accounting fails or the caller cancels.
@@ -39,30 +40,66 @@ pub fn read_client_profile_settings(
     archive: &Archive,
     cancel: Option<&CancelToken>,
 ) -> Result<ClientProfileSettingsReport, CatalogError> {
-    read_profile_report(archive, |_| true, cancel)
+    read_client_profile_settings_with_provenance_mode(archive, ProvenanceMode::MarkersOnly, cancel)
 }
 
-/// Reads one profile's payload and retains both directory selection outcomes.
+/// Reads the authored client profiles with the requested provenance detail.
 ///
 /// # Errors
-/// Returns the same errors as [`read_client_profile_settings`].
+/// Returns the errors of [`read_client_profile_settings`].
+pub fn read_client_profile_settings_with_provenance_mode(
+    archive: &Archive,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<ClientProfileSettingsReport, CatalogError> {
+    read_profile_report(archive, |_| true, provenance_mode, cancel)
+}
+
+/// Reads one profile's payload with encryption markers and both directory selection outcomes.
+///
+/// # Errors
+/// Returns the errors of [`read_client_profile_settings`].
 pub fn read_client_profile_settings_for(
     archive: &Archive,
     kind: ProfileKind,
     cancel: Option<&CancelToken>,
 ) -> Result<ClientProfileSettingsReport, CatalogError> {
-    read_profile_report(archive, |candidate| candidate == kind, cancel)
+    read_client_profile_settings_for_with_provenance_mode(
+        archive,
+        kind,
+        ProvenanceMode::MarkersOnly,
+        cancel,
+    )
+}
+
+/// Reads one profile's payload with the requested provenance detail.
+///
+/// # Errors
+/// Returns the errors of [`read_client_profile_settings_for`].
+pub fn read_client_profile_settings_for_with_provenance_mode(
+    archive: &Archive,
+    kind: ProfileKind,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<ClientProfileSettingsReport, CatalogError> {
+    read_profile_report(
+        archive,
+        |candidate| candidate == kind,
+        provenance_mode,
+        cancel,
+    )
 }
 
 fn read_profile_report(
     archive: &Archive,
     selected: impl Fn(ProfileKind) -> bool,
+    provenance_mode: ProvenanceMode,
     cancel: Option<&CancelToken>,
 ) -> Result<ClientProfileSettingsReport, CatalogError> {
     check_cancel(cancel)?;
     let watch = ArchiveWatch::new(archive);
     watch.check()?;
-    let report = with_entry_capture(archive, |capture| {
+    let report = with_entry_capture_mode(archive, provenance_mode, |capture| {
         let settings = read_selected(
             archive,
             capture,

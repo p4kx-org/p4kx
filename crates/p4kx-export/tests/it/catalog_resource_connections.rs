@@ -18,8 +18,9 @@ fn power_and_heat_connections_preserve_distinct_authored_fields_and_origin() -> 
     let schema = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&database, origin)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
         schema
             .validate(&catalog)
             .map_err(|error| format!("catalog schema: {error}"))?;

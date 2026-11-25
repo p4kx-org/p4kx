@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::build_catalog;
 use p4kx_export::catalog_queries::equipment::weapon_procedural::{
     WeaponProceduralAnimationSnapshot, WeaponProceduralClipSnapshot,
-    with_weapon_procedural_animations_from, with_weapon_procedural_clips,
 };
 use p4kx_export::catalog_queries::{CatalogRecordSelection, DatasetAvailability};
 use p4kx_extraction::DataForgeEntry;
@@ -25,11 +25,12 @@ fn weapon_procedural_sdk_matches_original_rows_and_origins() -> TestResult {
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&database, origin)?;
         let entry = DataForgeEntry::read(&archive)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
         let guids = CatalogRecordSelection::Guid(common::guid(fixture::ANIMATION_GUID).parse()?);
-        let clip =
-            with_weapon_procedural_animations_from(&archive, &entry, guids, None, |snapshot| {
+        let clip = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+            .with_weapon_procedural_animations(guids, None, |snapshot| {
                 let clip = check_animations(&snapshot, encrypted)?;
                 let scoped = json!({
                     "definitions": { "weaponProceduralAnimations": {
@@ -41,8 +42,7 @@ fn weapon_procedural_sdk_matches_original_rows_and_origins() -> TestResult {
                 compare(&catalog, &scoped, ANIMATIONS)?;
                 Ok::<_, Box<dyn std::error::Error>>(clip)
             })??;
-        with_weapon_procedural_clips(
-            &archive,
+        full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?.with_weapon_procedural_clips(
             CatalogRecordSelection::RecordIndex(clip),
             None,
             |snapshot| {

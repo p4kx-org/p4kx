@@ -16,7 +16,7 @@ fn inventory_records_keep_original_open_restrictions_and_closed_units() -> TestR
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_directory, archive) = common::open(&database, origin)?;
         let catalog: Value = serde_json::from_slice(
-            p4kx_export::build_catalog(&archive, &common::options())?.json(),
+            p4kx_export::build_catalog(&archive, common::options().with_full_provenance())?.json(),
         )?;
         let rows = proof::rows(&catalog, "/definitions/inventoryContainers/rows")?;
         assert_eq!(
@@ -168,8 +168,9 @@ fn inventory_owner_rows_keep_references_bounds_and_storage_policies_separate() -
         publication_mode: p4kx_export::CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let catalog: Value =
-        serde_json::from_slice(p4kx_export::build_catalog(&archive, &options)?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        p4kx_export::build_catalog(&archive, options.with_full_provenance())?.json(),
+    )?;
     check_storage_owners(&catalog)?;
     check_bounds(&catalog)?;
     jsonschema::validator_for(&p4kx_export::catalog_schema())?
@@ -187,7 +188,7 @@ fn inventory_dimensions_keep_valid_ui_override_beside_invalid_and_absent_members
         publication_mode: p4kx_export::CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let built = p4kx_export::build_catalog(&archive, &options)?;
+    let built = p4kx_export::build_catalog(&archive, options.with_full_provenance())?;
     assert!(
         !built.summary().export_health().is_complete(),
         "the invalid original dimension is accounted for"

@@ -1,13 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, ArchiveWatch, Build, CancelToken, SourceInventory};
+use p4kx_extraction::{Archive, ArchiveWatch, Build, CancelToken, ProvenanceMode, SourceInventory};
 
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::starmap_name_owners;
 use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection};
 use crate::catalog_query_session::checkpoint;
-use crate::catalog_read::original::{EntryCapture, with_entry_capture};
+use crate::catalog_read::original::{EntryCapture, with_entry_capture_mode};
 use crate::catalog_table::DatasetAvailability;
 use crate::catalog_v3::starmap_placement::StarmapPlacement;
 use crate::export_archive_health;
@@ -132,9 +132,29 @@ pub fn read_starmap_object_placement(
     budget: StarmapTraversalBudget,
     cancel: Option<&CancelToken>,
 ) -> Result<StarmapObjectPlacementSnapshot, CatalogError> {
+    read_starmap_object_placement_with_provenance_mode(
+        archive,
+        record_index,
+        budget,
+        ProvenanceMode::MarkersOnly,
+        cancel,
+    )
+}
+
+/// Reads a starmap object placement with the selected source detail.
+///
+/// # Errors
+/// Returns the errors of `read_starmap_object_placement`.
+pub fn read_starmap_object_placement_with_provenance_mode(
+    archive: &Archive,
+    record_index: u32,
+    budget: StarmapTraversalBudget,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<StarmapObjectPlacementSnapshot, CatalogError> {
     checkpoint(cancel)?;
     let watch = ArchiveWatch::new(archive);
-    with_entry_capture(archive, |capture| {
+    with_entry_capture_mode(archive, provenance_mode, |capture| {
         let owner = read_owner(archive, capture, record_index, cancel)?;
         let (status, rows, traversal) = match &owner.admitted {
             Some(guid) => read_placement(

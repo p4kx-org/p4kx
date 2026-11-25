@@ -32,7 +32,7 @@ fn interaction_catalog_joins_original_component_and_target_slots() -> TestResult
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(SystemTime::now())
     };
-    let built = p4kx_export::build_catalog_from(&archive, &entry, &options)?;
+    let built = p4kx_export::build_catalog_from(&archive, &entry, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     crate::real_archive_shop_inventory_v3::verify_build(&archive, &catalog)?;
     verify(&entry, &catalog)?;

@@ -161,7 +161,10 @@ fn check_binary(row: &RadarAudioConfiguration) -> TestResult {
 }
 
 fn check_catalog(archive: &Archive, sdk: &[RadarAudioConfiguration]) -> TestResult {
-    let catalog = build_catalog(archive, &CatalogOptions::new(UNIX_EPOCH))?;
+    let catalog = build_catalog(
+        archive,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
     let json: Value = serde_json::from_slice(catalog.json())?;
     let rows = json
         .pointer("/configurations/radarAudio/rows")
@@ -223,7 +226,10 @@ fn malformed_radar_bodies_fail_required_projection() -> TestResult {
     ));
     assert_eq!(snapshot.entries.failed_projections, 3);
     assert!(matches!(
-        build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH)),
+        build_catalog(
+            &archive,
+            CatalogOptions::new(UNIX_EPOCH).with_full_provenance()
+        ),
         Err(CatalogError::IncompleteExport(_))
     ));
     Ok(())

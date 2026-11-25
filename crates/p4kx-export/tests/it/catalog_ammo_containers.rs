@@ -23,8 +23,9 @@ fn ammo_containers_preserve_ordered_settings_and_physical_binding_slots() -> Tes
         &fixture::database(fixture::Case::Valid),
         DcbOrigin::Encrypted,
     )?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
     let [first, second] = proof::rows(&catalog, CONFIGURATIONS)? else {
         return Err("both original container component occurrences".into());
     };
@@ -78,7 +79,8 @@ fn ammo_container_bindings_keep_headers_when_definition_filter_excludes_the_targ
         filter: Some(&filter),
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     assert!(
         proof::rows(&catalog, DEFINITIONS)?.is_empty(),
         "binding cannot auto-select Ammo"
@@ -103,7 +105,8 @@ fn ammo_container_bindings_distinguish_dangling_and_wrong_type_references() -> T
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let [row, _] = bindings(&catalog)? else {
         return Err("unavailable variants retain the original container".into());
     };

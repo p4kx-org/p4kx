@@ -146,7 +146,7 @@ fn weapon_action_preserves_other_admitted_source_bodies_in_normal_publication() 
     let builder = fixture::database_for(Case::AuthoredBody);
     let original = original_melee_flag(&builder)?;
     let (_folder, archive) = common::open(&builder, DcbOrigin::Encrypted)?;
-    let built = build_catalog(&archive, &common::options())?;
+    let built = build_catalog(&archive, common::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let node = proof::at(
         &catalog,
@@ -251,6 +251,6 @@ fn diagnostic(builder: &DataForgeBuilder) -> TestResult<Value> {
     let (_folder, archive) = common::open(builder, DcbOrigin::Plain)?;
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     Ok(serde_json::from_slice(built.json())?)
 }

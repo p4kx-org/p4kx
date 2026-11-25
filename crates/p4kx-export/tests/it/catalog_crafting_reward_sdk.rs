@@ -14,6 +14,7 @@ use serde_json::Value;
 use crate::canonical_header::{originals, wire::Wire};
 use crate::catalog_resources::resource_consumer_walk;
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
+use crate::sdk_full_proof as full_proof;
 
 #[path = "../../src/blueprint_reward_query_fixture.rs"]
 mod fixture;
@@ -36,8 +37,10 @@ fn reward_source_getters_match_canonical_physical_occurrences_for_all_origins() 
         let aliases = BlueprintRewardSelection::TargetPools(CatalogRecordSelection::Guid(
             common::guid(fixture::POOL).parse()?,
         ));
+        let session = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?;
+        let parsed = session.parsed(None)?;
         for selection in [source, inverse, aliases] {
-            crafting::with_reward_sources(&archive, selection, None, |snapshot| {
+            parsed.with_blueprint_reward_sources(selection, None, |snapshot| {
                 verify(&snapshot, &catalog, marker)
             })??;
         }
@@ -49,7 +52,7 @@ fn canonical(archive: &Archive) -> TestResult<Value> {
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     Ok(serde_json::from_slice(
-        build_catalog(archive, &options)?.json(),
+        build_catalog(archive, options.with_full_provenance())?.json(),
     )?)
 }
 
@@ -98,12 +101,13 @@ fn visit(row: &BlueprintRewardSource<'_>, wire: Wire<'_>) -> TestResult {
 fn normal_readable_reward_survey_and_all_public_wrappers_keep_same_meaning() -> TestResult {
     let (_folder, archive) = common::open(&fixture::database(false), DcbOrigin::Plain)?;
     let built = build_catalog(&archive, &common::options())?;
-    let catalog: Value = serde_json::from_slice(built.json())?;
+    let wire: Value = serde_json::from_slice(built.json())?;
+    let catalog = wire.get("catalog").ok_or("marker catalog body")?;
     let entry = DataForgeEntry::read(&archive)?;
     let selection = BlueprintRewardSelection::SourceOwners(CatalogRecordSelection::RecordIndex(
         fixture::SOURCE,
     ));
-    let check = |snapshot: BlueprintRewardSnapshot<'_>| verify_normal(&snapshot, &catalog);
+    let check = |snapshot: BlueprintRewardSnapshot<'_>| verify_normal(&snapshot, catalog);
     crafting::with_reward_sources_from(&archive, &entry, selection, None, check)??;
     let session = CatalogQuerySession::from_entry(
         &archive,
@@ -203,6 +207,10 @@ fn verify_markers(row: &BlueprintRewardSource<'_>, marker: Option<bool>) {
 }
 
 fn verify_normal(snapshot: &BlueprintRewardSnapshot<'_>, catalog: &Value) -> TestResult {
+    assert!(
+        snapshot.source_inventory().iter_sources().next().is_none(),
+        "the default reward query retains no physical sources"
+    );
     assert_eq!(
         snapshot.rows().len(),
         4,

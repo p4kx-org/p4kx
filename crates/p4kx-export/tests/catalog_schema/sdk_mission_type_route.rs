@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::{
@@ -23,15 +24,16 @@ pub(super) fn read() -> TestResult<Route> {
     fixture::write(&path, TestType::Locale)?;
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
     let entry = DataForgeEntry::read(&archive)?;
-    let catalog: Value = serde_json::from_slice(
-        build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?.json(),
-    )?;
+    let options = CatalogOptions::new(UNIX_EPOCH);
+    let export = build_catalog_from(&archive, &entry, options.with_full_provenance())?;
+    let catalog: Value = serde_json::from_slice(export.json())?;
     let session = CatalogQuerySession::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::AllAvailable,
         None,
-    )?;
+    )?
+    .with_provenance_mode(full_proof::MODE);
     let parsed = session.parsed(None)?;
     parsed.with_mission_types(CatalogRecordSelection::RecordIndex(1), None, |snapshot| {
         let [row] = snapshot.rows.as_slice() else {

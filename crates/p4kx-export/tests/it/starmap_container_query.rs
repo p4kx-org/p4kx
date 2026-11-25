@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::StarmapTraversalBudget;
 use p4kx_export::catalog_queries::starmap::{
     ContainerInstanceKey, ContainerPlacementSelection, ContainerPlacementSnapshot,
     ContainerRootStatus, ContainerTargetReadStatus, ContainerTargetStatus,
-    read_container_placements,
+    read_container_placements_with_provenance_mode,
 };
 use p4kx_extraction::Archive;
 use p4kx_testkit::{TestContainer, TestElement, TestEntry};
@@ -113,13 +114,14 @@ fn an_exact_occurrence_keeps_the_whole_route_and_selected_system_health() -> Tes
     assert_complete_system(&selected);
     let mut longer = vec![u32::MAX];
     longer.extend_from_slice(last.child_node_indices());
-    let impossible = read_container_placements(
+    let impossible = read_container_placements_with_provenance_mode(
         &source.archive,
         ContainerPlacementSelection::Occurrence {
             root_entry_index: root,
             child_node_indices: &longer,
         },
         StarmapTraversalBudget::new(),
+        full_proof::MODE,
         None,
     )?;
     assert!(
@@ -186,10 +188,11 @@ fn assert_complete_system(snapshot: &ContainerPlacementSnapshot) {
 }
 
 fn read_root(archive: &Archive, root: u32) -> TestResult<ContainerPlacementSnapshot> {
-    Ok(read_container_placements(
+    Ok(read_container_placements_with_provenance_mode(
         archive,
         ContainerPlacementSelection::SystemRoot(root),
         StarmapTraversalBudget::new(),
+        full_proof::MODE,
         None,
     )?)
 }
@@ -198,7 +201,7 @@ fn read_occurrence(
     archive: &Archive,
     key: &ContainerInstanceKey,
 ) -> TestResult<ContainerPlacementSnapshot> {
-    let selected = read_container_placements(
+    let selected = read_container_placements_with_provenance_mode(
         archive,
         ContainerPlacementSelection::ExactOccurrence {
             root_entry_index: key.root_entry_index(),
@@ -206,6 +209,7 @@ fn read_occurrence(
             external_child_step_indices: key.external_child_step_indices(),
         },
         StarmapTraversalBudget::new(),
+        full_proof::MODE,
         None,
     )?;
     assert_eq!(

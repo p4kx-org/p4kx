@@ -4,6 +4,7 @@
 #[path = "catalog_ship_cargo_mixed_mounts.rs"]
 mod mixed_mounts;
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::equipment;
@@ -110,7 +111,7 @@ fn assert_cargo(
     );
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog = p4kx_export::build_catalog_from(archive, entry, &options)?;
+    let catalog = p4kx_export::build_catalog_from(archive, entry, options.with_full_provenance())?;
     let json: Value = serde_json::from_slice(catalog.json())?;
     let [row] = json
         .pointer("/projections/shipBaseFacts/rows")
@@ -143,59 +144,58 @@ fn assert_sdk_cargo(
     expected_scu: Option<f64>,
     expected_issues: usize,
 ) -> TestResult {
-    equipment::with_ship_sources_from(
+    full_proof::from_entry(
         archive,
         entry,
-        CatalogRecordSelection::All,
         CatalogLanguageSelection::Selected(&[]),
         None,
-        |snapshot| {
-            let [ship] = snapshot.rows() else {
-                return Err("one SDK ship".into());
-            };
-            let cargo = ship.cargo();
-            assert_eq!(
-                row["cargo"],
-                serde_json::to_value(cargo)?,
-                "SDK and producer share the full sourced row"
-            );
-            assert_eq!(
-                row["shipRecordIndex"],
-                serde_json::to_value(ship.source().record_index())?,
-                "the canonical row and SDK identify the same physical ship"
-            );
-            assert_eq!(cargo.scu().value().copied(), expected_scu, "SDK quantity");
-            assert_eq!(
-                cargo.grids_with_issue().value().copied(),
-                Some(u64::try_from(expected_issues)?),
-                "SDK issue count"
-            );
-            assert_eq!(
-                cargo.scu().origin().contains_encrypted_source(),
-                Some(true),
-                "known contributors are in the encrypted original"
-            );
-            assert!(
-                !cargo.scu().origin().source_set_complete(),
-                "positive mounts do not prove all exclusion decisions"
-            );
-            let [left, right, remaining @ ..] = cargo.mounts() else {
-                return Err("both mounts".into());
-            };
-            let half = expected_scu.map(|value| value / 2.0);
-            for (mount, port, ordinal) in [(left, "grid_left", 0), (right, "grid_right", 1)] {
-                assert_mount(
-                    mount,
-                    (port, ordinal),
-                    ship.source().record_index().value().copied(),
-                    half,
-                    snapshot.source_inventory(),
-                )?;
-            }
-            assert_missing_grid(remaining);
-            Ok::<(), Box<dyn std::error::Error>>(())
-        },
-    )??;
+    )?
+    .with_ship_sources(CatalogRecordSelection::All, None, |snapshot| {
+        let [ship] = snapshot.rows() else {
+            return Err("one SDK ship".into());
+        };
+        let cargo = ship.cargo();
+        assert_eq!(
+            row["cargo"],
+            serde_json::to_value(cargo)?,
+            "SDK and producer share the full sourced row"
+        );
+        assert_eq!(
+            row["shipRecordIndex"],
+            serde_json::to_value(ship.source().record_index())?,
+            "the canonical row and SDK identify the same physical ship"
+        );
+        assert_eq!(cargo.scu().value().copied(), expected_scu, "SDK quantity");
+        assert_eq!(
+            cargo.grids_with_issue().value().copied(),
+            Some(u64::try_from(expected_issues)?),
+            "SDK issue count"
+        );
+        assert_eq!(
+            cargo.scu().origin().contains_encrypted_source(),
+            Some(true),
+            "known contributors are in the encrypted original"
+        );
+        assert!(
+            !cargo.scu().origin().source_set_complete(),
+            "positive mounts do not prove all exclusion decisions"
+        );
+        let [left, right, remaining @ ..] = cargo.mounts() else {
+            return Err("both mounts".into());
+        };
+        let half = expected_scu.map(|value| value / 2.0);
+        for (mount, port, ordinal) in [(left, "grid_left", 0), (right, "grid_right", 1)] {
+            assert_mount(
+                mount,
+                (port, ordinal),
+                ship.source().record_index().value().copied(),
+                half,
+                snapshot.source_inventory(),
+            )?;
+        }
+        assert_missing_grid(remaining);
+        Ok::<(), Box<dyn std::error::Error>>(())
+    })??;
     Ok(())
 }
 

@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, CancelToken, DataForge, DataForgeEntry, TreeBuilder};
+use p4kx_extraction::{Archive, CancelToken, DataForge, TreeBuilder};
 
 use super::{LootDefinitionKind, LootDefinitionSnapshot};
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::unlocalized_record_query::plan::{Owner, Plan};
 use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection};
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::loot_definition_catalog;
 use crate::guid_text::sort_by_guid;
@@ -18,7 +17,7 @@ use crate::{CatalogError, CraftingWarning};
 
 pub(super) struct Query<'query> {
     pub(super) archive: &'query Archive,
-    pub(super) entry: &'query DataForgeEntry,
+    pub(super) entry: CatalogQuerySource<'query>,
     pub(super) forge: &'query DataForge<'query>,
     pub(super) family: LootDefinitionKind,
     pub(super) selection: CatalogRecordSelection,
@@ -37,7 +36,7 @@ impl<'source> Query<'source> {
             self.cancel,
             None,
         )?;
-        let origins = CatalogOrigins::for_archive_records(self.archive, self.entry)?;
+        let origins = self.entry.records(self.archive)?;
         let input = OriginalCatalogInput::new(self.forge, &origins);
         let rows = self.read(plan.owners, &input, &mut plan.coverage)?;
         let table = CatalogTable::new(

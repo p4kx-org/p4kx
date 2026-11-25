@@ -46,7 +46,11 @@ fn complete(branch: Branch, count: usize, tail: Tail) -> TestResult {
     }
     for (input, kind) in inputs {
         let options = crate::health_origin_fixture::options();
-        let built = p4kx_export::build_catalog_from(&input.archive, &input.entry, &options)?;
+        let built = p4kx_export::build_catalog_from(
+            &input.archive,
+            &input.entry,
+            options.with_full_provenance(),
+        )?;
         assert_eq!(
             built.summary().export_health().status,
             ExportHealthStatus::Complete,
@@ -88,7 +92,7 @@ fn writers(input: &Fixture, options: &CatalogOptions<'_>, expected: &[u8]) -> Te
         let (summary, bytes) = p4kx_export::write_catalog_from(
             &input.archive,
             &input.entry,
-            options,
+            options.with_full_provenance(),
             compression,
             || Ok(Vec::new()),
         )?;
@@ -123,7 +127,11 @@ fn late_readable_broker_unknown_keeps_raw_and_failed_required_interpretation() -
         refusal(&input);
 
         options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-        let built = p4kx_export::build_catalog_from(&input.archive, &input.entry, &options)?;
+        let built = p4kx_export::build_catalog_from(
+            &input.archive,
+            &input.entry,
+            options.with_full_provenance(),
+        )?;
         assert_eq!(
             built.summary().export_health().status,
             ExportHealthStatus::Incomplete,
@@ -188,7 +196,11 @@ pub(crate) fn refusal(input: &Fixture) {
     let options = crate::health_origin_fixture::options();
     assert!(
         matches!(
-            p4kx_export::build_catalog_from(&input.archive, &input.entry, &options),
+            p4kx_export::build_catalog_from(
+                &input.archive,
+                &input.entry,
+                options.with_full_provenance()
+            ),
             Err(CatalogError::IncompleteExport(_))
         ),
         "the same unsupported required meaning refuses Normal"
@@ -198,7 +210,7 @@ pub(crate) fn refusal(input: &Fixture) {
         let result = p4kx_export::write_catalog_from(
             &input.archive,
             &input.entry,
-            &options,
+            options.with_full_provenance(),
             compression,
             || {
                 created = true;

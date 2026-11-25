@@ -22,6 +22,7 @@ use crate::canonical_header::{originals, wire::Wire};
 use crate::catalog_resources::resource_consumer_walk;
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::crafting_detail_fixture as detail;
+use crate::sdk_full_proof as full_proof;
 
 const DANGLING: u128 = 0x6800_0000_0000_4000_8000_0000_0000_0001;
 const NAN_BITS: u32 = 0x7fc0_0042;
@@ -36,13 +37,12 @@ fn physical_pool_aliases_match_the_canonical_producer_and_keep_weight_bits() -> 
         let (_folder, archive) = common::open(&database(), origin)?;
         let entry = DataForgeEntry::read(&archive)?;
         let catalog = canonical(&archive)?;
-        crafting::with_pools_from(
-            &archive,
-            &entry,
-            CatalogRecordSelection::Guid(common::guid(detail::POOL).parse()?),
-            None,
-            |snapshot| verify_selection(&snapshot, &catalog, marker),
-        )??;
+        full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+            .with_blueprint_pools(
+                CatalogRecordSelection::Guid(common::guid(detail::POOL).parse()?),
+                None,
+                |snapshot| verify_selection(&snapshot, &catalog, marker),
+            )??;
     }
     Ok(())
 }
@@ -58,7 +58,7 @@ fn pool_sessions_do_not_open_requested_unreadable_english() -> TestResult {
         )
         .write_to(&path)?;
     let archive = Archive::open(path)?;
-    let session = CatalogQuerySession::open(
+    let session = full_proof::open(
         &archive,
         CatalogLanguageSelection::Selected(&[Language::English]),
         None,
@@ -66,6 +66,7 @@ fn pool_sessions_do_not_open_requested_unreadable_english() -> TestResult {
     let verify = |snapshot: BlueprintPoolSnapshot<'_>| {
         assert_eq!(snapshot.rows().len(), 1, "one selected physical pool");
         assert_eq!(snapshot.weights().len(), 1, "one weight projection");
+        assert!(snapshot.source_inventory().iter_sources().next().is_some());
         assert_eq!(
             snapshot.rows()[0].source().record_index().value(),
             snapshot.weights()[0].pool().record_index().value(),
@@ -314,7 +315,7 @@ fn canonical(archive: &Archive) -> TestResult<Value> {
         ..CatalogOptions::new(std::time::UNIX_EPOCH)
     };
     Ok(serde_json::from_slice(
-        build_catalog(archive, &options)?.json(),
+        build_catalog(archive, options.with_full_provenance())?.json(),
     )?)
 }
 

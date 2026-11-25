@@ -42,7 +42,7 @@ fn durability_keeps_health_only_and_every_original_component_occurrence() -> Tes
     let source = good_database();
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&source, origin)?;
-        let built = build_catalog(&archive, &common::options())?;
+        let built = build_catalog(&archive, common::options().with_full_provenance())?;
         assert!(
             built.summary().staged_row_bytes() > 0,
             "complete Health rows contribute their compressed staging bytes"
@@ -96,7 +96,7 @@ fn durability_diagnoses_wrong_width_and_preserves_unreadable_health_separately()
     let (_folder, archive) = common::open(&source, DcbOrigin::Plain)?;
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog = serde_json::from_slice(built.json())?;
     let rows = proof::rows(&catalog, &format!("{DURABILITY}/rows"))?;
     let [wrong_type, unreadable] = rows else {
@@ -134,7 +134,7 @@ fn durability_diagnoses_wrong_width_and_preserves_unreadable_health_separately()
     );
     assert!(
         matches!(
-            build_catalog(&archive, &common::options()),
+            build_catalog(&archive, common::options().with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "normal export refuses malformed Health"

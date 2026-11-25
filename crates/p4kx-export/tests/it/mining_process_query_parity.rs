@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::mining::{MiningGlobalSnapshot, RefiningProcessSnapshot};
-use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
-};
+use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_export::{CatalogPublicationMode, build_catalog};
 use serde_json::Value;
 
@@ -22,7 +21,7 @@ fn complete_mining_and_refining_getters_match_canonical_wire_for_all_source_stat
         let (_folder, archive) = common::open(&fixture::database(false), origin)?;
         let mut options = common::options();
         options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-        let built = build_catalog(&archive, &options)?;
+        let built = build_catalog(&archive, options.with_full_provenance())?;
         let catalog: Value = serde_json::from_slice(built.json())?;
         assert!(
             catalog.get("refiningProcesses").is_none(),
@@ -32,8 +31,7 @@ fn complete_mining_and_refining_getters_match_canonical_wire_for_all_source_stat
             catalog.get("miningGlobalParams").is_none(),
             "no duplicate legacy global wire"
         );
-        let session =
-            CatalogQuerySession::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
+        let session = full_proof::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
         let parsed = session.parsed(None)?;
         parsed.with_mining_global_params(CatalogRecordSelection::All, None, |snapshot| {
             globals(&snapshot, &catalog, marker)

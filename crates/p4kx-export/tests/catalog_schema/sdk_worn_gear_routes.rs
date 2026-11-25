@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::equipment::worn_gear::{SuitArmorSnapshot, with_suit_armor_from};
@@ -25,7 +26,8 @@ const ALL: CatalogRecordSelection = CatalogRecordSelection::All;
 pub(super) fn read() -> TestResult<[Route; 4]> {
     let (_directory, archive) = fixture::archive()?;
     let session =
-        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
+        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?
+            .with_provenance_mode(full_proof::MODE);
     let parsed = session.parsed(None)?;
     Ok([
         parsed.with_suit_armor(ALL, None, |snapshot| {
@@ -55,7 +57,8 @@ fn worn_gear_queries_keep_original_positions_and_resolve_a_macro_separately() ->
         &entry,
         CatalogLanguageSelection::AllAvailable,
         None,
-    )?;
+    )?
+    .with_provenance_mode(full_proof::MODE);
     let parsed = session.parsed(None)?;
     let target =
         parsed.with_suit_armor(CatalogRecordSelection::Guid(guid), None, |snapshot| {
@@ -144,14 +147,16 @@ fn worn_gear_queries_match_synthetic_producer_rows() -> TestResult<()> {
     let entry = DataForgeEntry::read(&archive)?;
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog_from(&archive, &entry, &options)?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog_from(&archive, &entry, options.with_full_provenance())?.json(),
+    )?;
     let session = CatalogQuerySession::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::Selected(&[]),
         None,
-    )?;
+    )?
+    .with_provenance_mode(full_proof::MODE);
     let parsed = session.parsed(None)?;
     parsed.with_suit_armor(ALL, None, |snapshot| {
         parity(SUIT_ARMOR, &snapshot, &catalog)

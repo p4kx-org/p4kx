@@ -86,7 +86,10 @@ fn times_the_crafting_phase_of_a_real_archive() -> TestResult {
         crafting.warnings
     );
     let started = Instant::now();
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     println!(
         "build_catalog: {:?}, {} bytes",
         started.elapsed(),

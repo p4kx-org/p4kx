@@ -52,18 +52,23 @@ fn measure_writer(
 ) -> support::TestResult<(CatalogSummary, Option<sections::Census>)> {
     if std::env::var_os("P4KX_CATALOG_SECTION_CENSUS").is_some_and(|value| value == "1") {
         let (summary, census) = sections::transfer(|writer| {
-            write_catalog_from(archive, entry, options, Compression::ZSTD, || Ok(writer))
-        })?;
-        Ok((summary, Some(census)))
-    } else {
-        let (summary, _) =
             write_catalog_from(
                 archive,
                 entry,
-                options,
+                options.with_full_provenance(),
                 Compression::ZSTD,
-                || Ok(io::sink()),
-            )?;
+                || Ok(writer),
+            )
+        })?;
+        Ok((summary, Some(census)))
+    } else {
+        let (summary, _) = write_catalog_from(
+            archive,
+            entry,
+            options.with_full_provenance(),
+            Compression::ZSTD,
+            || Ok(io::sink()),
+        )?;
         Ok((summary, None))
     }
 }

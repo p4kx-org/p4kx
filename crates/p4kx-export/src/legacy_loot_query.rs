@@ -2,19 +2,18 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    Archive, Build, CancelToken, DataForge, DataForgeEntry, Record, RecordTree, SourceInventory,
+    Archive, Build, CancelToken, DataForge, Record, RecordTree, SourceInventory,
 };
 
 use crate::CatalogError;
 use crate::Kind;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::unlocalized_record_query::plan::Plan;
 use crate::catalog_queries::{
     CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection, DatasetAvailability,
     ParsedCatalogQueries,
 };
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::catalog_table::CatalogTable;
 use crate::contract_loot_legacy::{LegacyLootArchetype, LegacyLootTable};
 use crate::guid_text::CatalogGuid;
@@ -123,7 +122,7 @@ impl ParsedCatalogQueries<'_> {
 
 struct Query<'read, 'source> {
     archive: &'read Archive,
-    entry: &'read DataForgeEntry,
+    entry: CatalogQuerySource<'read>,
     forge: &'source DataForge<'source>,
     cancel: Option<&'read CancelToken>,
 }
@@ -144,7 +143,7 @@ impl<'source> Query<'_, 'source> {
         incomplete: impl Fn(&Row) -> bool,
     ) -> Result<LegacyLootSnapshot<Row>, CatalogError> {
         let mut plan = Plan::read(self.forge, kind, selection, self.cancel, None)?;
-        let origins = CatalogOrigins::for_archive_records(self.archive, self.entry)?;
+        let origins = self.entry.records(self.archive)?;
         let input = OriginalCatalogInput::new(self.forge, &origins);
         let mut rows = Vec::new();
         for owner in plan.owners {

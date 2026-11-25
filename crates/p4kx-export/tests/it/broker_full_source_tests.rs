@@ -39,7 +39,7 @@ fn one_physical_broker_arena_retains_every_original_root_and_value() -> TestResu
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..health_origin_fixture::options()
     };
-    let built = build_catalog_from(&archive, &input, &options)?;
+    let built = build_catalog_from(&archive, &input, options.with_full_provenance())?;
     let document: Json = serde_json::from_slice(built.json())?;
     let graph = Broker::for_guid(&document, &identity)?;
     arena(&tree, &graph)?;

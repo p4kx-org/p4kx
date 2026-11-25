@@ -87,7 +87,7 @@ fn explosive_components_match_actual_item_slots_and_sensor_source_fields() -> Te
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(SystemTime::now())
     };
-    let built = build_catalog_from(&archive, &entry, &options)
+    let built = build_catalog_from(&archive, &entry, options.with_full_provenance())
         .map_err(|_| "build selected Item catalog")?;
     let catalog: Value = serde_json::from_slice(built.json()).map_err(|_| "read catalog JSON")?;
     let forge = entry.open().map_err(|_| "open original DataForge")?;

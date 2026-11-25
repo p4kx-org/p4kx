@@ -211,7 +211,7 @@ fn catalog(input: &Fixture) -> TestResult<Value> {
     let built = p4kx_export::build_catalog_from(
         &input.archive,
         &input.entry,
-        &CatalogOptions::new(UNIX_EPOCH),
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
     )?;
     assert_eq!(
         built.summary().export_health().status,

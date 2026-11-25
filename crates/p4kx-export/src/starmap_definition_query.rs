@@ -7,14 +7,13 @@ use p4kx_extraction::{
 };
 
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_queries::unlocalized_record_query::plan::{Owner, Plan};
 use crate::catalog_queries::{
     CanonicalText, CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage,
     CatalogRecordSelection, DatasetAvailability, GameTextRef, ParsedCatalogQueries, PublicNameRef,
 };
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::catalog_v3::starmap_definition_kinds::{
     StarmapDefinitionPick, StarmapDefinitionTables, StarmapDefinitions,
 };
@@ -219,7 +218,7 @@ impl Query<'_> {
     fn read<T>(
         &self,
         archive: &Archive,
-        entry: &DataForgeEntry,
+        entry: CatalogQuerySource<'_>,
         forge: &DataForge<'_>,
         inspect: impl FnOnce(StarmapDefinitionSnapshot<'_>) -> T,
     ) -> Result<T, CatalogError> {
@@ -236,7 +235,7 @@ impl Query<'_> {
         };
         let sources = TextSources::read_languages(archive, languages)?;
         checkpoint(self.cancel)?;
-        let origins = CatalogOrigins::new(archive, entry, &sources)?;
+        let origins = entry.with_texts(archive, &sources)?;
         let input = OriginalCatalogInput::new(forge, &origins);
         let texts = Texts::parse(&sources)?;
         let registry = CatalogTextRegistry::default();

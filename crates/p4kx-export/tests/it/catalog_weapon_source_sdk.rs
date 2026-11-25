@@ -14,6 +14,7 @@ use serde_json::{Value, json};
 use super::fixture::{self, Case};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 const WEAPON: u32 = 3;
 const UNREADABLE: u32 = 4;
@@ -27,10 +28,14 @@ fn physical_weapon_rows_match_canonical_actions_containers_and_bindings() -> Tes
     let database = fixture::build(Case::Unique);
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&database, origin)?;
-        let catalog = serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
-        with_weapon_sources(&archive, WEAPON, None, |snapshot| {
-            verify_rows(&snapshot, &catalog, encrypted)
-        })??;
+        let catalog = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
+        full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?.with_weapon_sources(
+            WEAPON,
+            None,
+            |snapshot| verify_rows(&snapshot, &catalog, encrypted),
+        )??;
     }
     Ok(())
 }

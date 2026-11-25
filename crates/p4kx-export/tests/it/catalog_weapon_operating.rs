@@ -18,7 +18,7 @@ fn weapon_operating_configuration_keeps_authored_states_and_provenance() -> Test
             filter: Some(&filter),
             ..common::options()
         };
-        let built = build_catalog(&archive, &options)?;
+        let built = build_catalog(&archive, options.with_full_provenance())?;
         let catalog: Value = serde_json::from_slice(built.json())?;
         let row = proof::at(&catalog, "/configurations/weaponActions/rows/0")?;
         let configuration = proof::at(row, "/operatingConfiguration")?;

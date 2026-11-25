@@ -5,13 +5,15 @@ use std::ops::ControlFlow;
 use std::sync::{Arc, Mutex};
 
 use p4kx_extraction::{
-    Archive, CanonicalReadObserver, DataForgeEntry, DataForgeError, Guid, Record, RecordTree,
+    Archive, CanonicalReadObserver, DataForgeEntry, DataForgeError, Guid, ProvenanceMode, Record,
+    RecordTree,
 };
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
 use super::read::Query;
 use super::rows::{Distributions, Projector, Quantizations};
 use super::{CatalogRecordCoverage, CatalogRecordSelection};
+use crate::catalog_query_session::CatalogQuerySource;
 
 #[path = "quality_query_trace_fixture.rs"]
 mod fixture;
@@ -59,7 +61,7 @@ fn observe<P: Projector>(
     let capture = Arc::new(Capture::default());
     let mut summary = Query {
         archive: &archive,
-        entry: &entry,
+        entry: CatalogQuerySource::new(&entry, ProvenanceMode::Full),
         forge: &forge,
         selection,
         cancel: None,

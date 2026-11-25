@@ -150,7 +150,7 @@ pub(crate) fn build(
     let mut options = archive_fixture::options();
     options.publication_mode = mode;
     options.filter = filter;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let json = serde_json::from_slice(built.json())?;
     Ok((built, json))
 }

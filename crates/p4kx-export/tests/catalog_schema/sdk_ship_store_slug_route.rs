@@ -64,7 +64,7 @@ fn check_unreadable_sources() -> TestResult<()> {
     options.filter = None;
     assert!(
         matches!(
-            p4kx_export::build_catalog_from(&archive, &entry, &options),
+            p4kx_export::build_catalog_from(&archive, &entry, options.with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "the unfiltered Normal export rejects an unreadable required Ship"
@@ -87,7 +87,7 @@ fn verify_rows<T>(
         p4kx_export::catalog_queries::equipment::ShipStoreSlugSnapshot<'_>,
     ) -> TestResult<T>,
 ) -> TestResult<(usize, T)> {
-    let built = p4kx_export::build_catalog_from(archive, entry, options)?;
+    let built = p4kx_export::build_catalog_from(archive, entry, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     if options.filter.is_none()
         && matches!(options.publication_mode, CatalogPublicationMode::Normal)

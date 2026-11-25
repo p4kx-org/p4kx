@@ -2,12 +2,9 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::catalog_queries::equipment::EquipmentSnapshot;
-use p4kx_export::catalog_queries::equipment::cargo_globals::{
-    with_cargo_loading_globals, with_cargo_loading_globals_from, with_shop_commodity_globals,
-    with_shop_commodity_globals_from,
-};
+
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
+    CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
 };
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog};
 use p4kx_extraction::{Archive, DataForgeEntry, SourceValueState, SourcedValue};
@@ -15,6 +12,7 @@ use serde::Serialize;
 use serde_json::{Value, json};
 
 use super::{DcbOrigin, LOADING_ROWS, SHOP_ROWS, TestResult, common, fixture, proof};
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn typed_cargo_global_queries_match_canonical_rows_and_physical_evidence() -> TestResult {
@@ -26,14 +24,19 @@ fn typed_cargo_global_queries_match_canonical_rows_and_physical_evidence() -> Te
         let (_folder, archive) =
             common::open(&fixture::database(fixture::Layout::Authored), origin)?;
         let catalog = canonical(&archive)?;
-        verify_loading(&archive, &catalog, marker)?;
-        verify_shop(&archive, &catalog, marker)?;
+        let session = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?;
+        verify_loading(&session, &catalog, marker)?;
+        verify_shop(&session, &catalog, marker)?;
     }
     Ok(())
 }
 
-fn verify_loading(archive: &Archive, catalog: &Value, marker: Option<bool>) -> TestResult {
-    with_cargo_loading_globals(archive, CatalogRecordSelection::All, None, |snapshot| {
+fn verify_loading(
+    session: &CatalogQuerySession<'_>,
+    catalog: &Value,
+    marker: Option<bool>,
+) -> TestResult {
+    session.with_cargo_loading_globals(CatalogRecordSelection::All, None, |snapshot| {
         let [row, _] = snapshot.rows() else {
             return Err("two loading configuration rows".into());
         };
@@ -91,8 +94,12 @@ fn verify_loading(archive: &Archive, catalog: &Value, marker: Option<bool>) -> T
     Ok(())
 }
 
-fn verify_shop(archive: &Archive, catalog: &Value, marker: Option<bool>) -> TestResult {
-    with_shop_commodity_globals(archive, CatalogRecordSelection::All, None, |snapshot| {
+fn verify_shop(
+    session: &CatalogQuerySession<'_>,
+    catalog: &Value,
+    marker: Option<bool>,
+) -> TestResult {
+    session.with_shop_commodity_globals(CatalogRecordSelection::All, None, |snapshot| {
         let [row] = snapshot.rows() else {
             return Err("one commodity configuration row".into());
         };
@@ -136,7 +143,8 @@ fn cargo_global_selection_keeps_physical_aliases() -> TestResult {
     let catalog = canonical(&archive)?;
     let entry = DataForgeEntry::read(&archive)?;
     let guid = CatalogRecordSelection::Guid(common::guid(fixture::SHARED_LOADING_GUID).parse()?);
-    with_cargo_loading_globals_from(&archive, &entry, guid, None, |snapshot| {
+    let session = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?;
+    session.with_cargo_loading_globals(guid, None, |snapshot| {
         let [first, second] = snapshot.rows() else {
             return Err("both physical aliases within the selected GUID".into());
         };
@@ -144,8 +152,7 @@ fn cargo_global_selection_keeps_physical_aliases() -> TestResult {
         assert_eq!(second.source().record_index().value(), Some(&1));
         parity(&snapshot, &catalog, LOADING_ROWS)
     })??;
-    let session =
-        CatalogQuerySession::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
+
     session.with_cargo_loading_globals(
         CatalogRecordSelection::RecordIndex(2),
         None,
@@ -165,9 +172,7 @@ fn cargo_global_selection_keeps_physical_aliases() -> TestResult {
     parsed.with_shop_commodity_globals(CatalogRecordSelection::All, None, |snapshot| {
         parity(&snapshot, &catalog, SHOP_ROWS)
     })??;
-    with_shop_commodity_globals_from(
-        &archive,
-        &entry,
+    session.with_shop_commodity_globals(
         CatalogRecordSelection::RecordIndex(2),
         None,
         |snapshot| parity(&snapshot, &catalog, SHOP_ROWS),
@@ -182,8 +187,8 @@ fn cargo_global_selection_keeps_partial_cells() -> TestResult {
         DcbOrigin::Encrypted,
     )?;
     let catalog = canonical(&archive)?;
-    with_cargo_loading_globals(
-        &archive,
+    let session = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?;
+    session.with_cargo_loading_globals(
         CatalogRecordSelection::RecordIndex(1),
         None,
         |snapshot| {
@@ -211,7 +216,7 @@ fn canonical(archive: &Archive) -> TestResult<Value> {
         ..common::options()
     };
     Ok(serde_json::from_slice(
-        build_catalog(archive, &options)?.json(),
+        build_catalog(archive, options.with_full_provenance())?.json(),
     )?)
 }
 

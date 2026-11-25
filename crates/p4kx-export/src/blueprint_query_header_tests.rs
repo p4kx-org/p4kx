@@ -3,13 +3,14 @@
 
 use std::sync::Arc;
 
-use p4kx_extraction::{Archive, DataForgeEntry};
+use p4kx_extraction::{Archive, DataForgeEntry, ProvenanceMode};
 use p4kx_testkit::{ArchiveBuilder, TestEntry, TestRecord, TestStruct};
 
 use super::super::read::Query;
 use super::{Capture, TestResult, fixture};
 use crate::catalog_queries::CatalogRecordSelection;
 use crate::catalog_queries::crafting;
+use crate::catalog_query_session::CatalogQuerySource;
 
 #[test]
 fn unreadable_global_header_makes_dependent_choices_incomplete() -> TestResult {
@@ -63,7 +64,7 @@ fn observe_header(
     let capture = Arc::new(Capture::default());
     let query = Query {
         archive: &archive,
-        entry: &entry,
+        entry: CatalogQuerySource::new(&entry, ProvenanceMode::Full),
         forge: &forge,
         selection: CatalogRecordSelection::RecordIndex(0),
         languages: &[],

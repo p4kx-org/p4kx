@@ -30,6 +30,7 @@ mod catalog_facility_cargo_grid;
 mod catalog_failures;
 mod catalog_health_origins;
 mod catalog_key;
+mod catalog_marker_profile;
 mod catalog_snapshot_api;
 mod catalog_snapshot_inventory;
 mod catalog_support;

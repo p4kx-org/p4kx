@@ -13,6 +13,7 @@ use serde_json::{Value, json};
 use super::{ROWS, fixture};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 const AMMO: &str = "/definitions/ammoDefinitions/rows";
 
@@ -47,10 +48,14 @@ fn queried_external_magazine_routes_and_reached_ammo_match_the_catalog() -> Test
         let (_folder, archive) = common::open(&database, origin)?;
         let mut options = common::options();
         options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-        let catalog = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
-        with_projectile_ammo(&archive, weapon, None, |snapshot| {
-            assert_projection(&snapshot, &catalog, magazine, ammo, encrypted)
-        })??;
+        let catalog = serde_json::from_slice(
+            build_catalog(&archive, options.with_full_provenance())?.json(),
+        )?;
+        full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?.with_projectile_ammo(
+            weapon,
+            None,
+            |snapshot| assert_projection(&snapshot, &catalog, magazine, ammo, encrypted),
+        )??;
     }
     Ok(())
 }

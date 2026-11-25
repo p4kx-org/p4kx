@@ -1,8 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::equipment::interactions::with_interactions_from;
-use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
+use p4kx_export::catalog_queries::CatalogRecordSelection;
 use p4kx_export::{CatalogPublicationMode, build_catalog_from};
 use p4kx_extraction::{Archive, DataForgeEntry, SourceValueState};
 use p4kx_testkit::{DataForgeBuilder, TestEntity, TestInstance, TestStruct, TestType, TestValue};
@@ -10,6 +9,7 @@ use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 const COMPONENT: &str = "KioskInteractionEntityComponentParams";
 const FLAG: &str = "supportWalkToAlignInVR";
@@ -38,8 +38,9 @@ fn kiosk_flag_preserves_original_presence_and_has_catalog_sdk_parity() -> TestRe
         if state == SourceValueState::Invalid {
             options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
         }
-        let catalog: Value =
-            serde_json::from_slice(build_catalog_from(&archive, &entry, &options)?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog_from(&archive, &entry, options.with_full_provenance())?.json(),
+        )?;
         let [row] = proof::rows(&catalog, "/configurations/interactions/rows")? else {
             return Err("expected one physical kiosk component".into());
         };
@@ -71,11 +72,9 @@ fn check_sdk_row(
     state: SourceValueState,
     expected_value: Option<bool>,
 ) -> TestResult {
-    with_interactions_from(
-        archive,
-        entry,
+    let session = full_proof::from_entry(archive, entry, full_proof::NO_LANGUAGES, None)?;
+    session.with_interactions(
         CatalogRecordSelection::RecordIndex(0),
-        CatalogLanguageSelection::Selected(&[]),
         None,
         |snapshot| -> TestResult {
             let [component] = snapshot.rows() else {

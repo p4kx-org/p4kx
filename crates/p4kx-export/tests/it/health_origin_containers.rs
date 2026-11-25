@@ -86,10 +86,18 @@ fn loot_route(copies: usize) -> TestResult<Fixture> {
 fn ambiguous_external_loot_selection_blocks_normal_and_retains_selector_and_candidates()
 -> TestResult {
     let unique = loot_route(1)?;
-    build_catalog_from(&unique.archive, &unique.entry, &fixture::options())?;
+    build_catalog_from(
+        &unique.archive,
+        &unique.entry,
+        fixture::options().with_full_provenance(),
+    )?;
 
     let duplicate = loot_route(2)?;
-    let result = build_catalog_from(&duplicate.archive, &duplicate.entry, &fixture::options());
+    let result = build_catalog_from(
+        &duplicate.archive,
+        &duplicate.entry,
+        fixture::options().with_full_provenance(),
+    );
     let Err(CatalogError::IncompleteExport(refusal)) = result else {
         return Err("normal publication must refuse the duplicate candidate set".into());
     };

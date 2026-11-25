@@ -108,7 +108,15 @@ fn compare_archive(archive: &Archive) -> TestResult {
             let wire: WireCatalog = serde_json::from_reader(&mut reader)?;
             Ok::<_, serde_json::Error>((wire, reader.into_inner().byte_count()))
         },
-        |sink| write_catalog_from(archive, &entry, &options, Compression::None, || Ok(sink)),
+        |sink| {
+            write_catalog_from(
+                archive,
+                &entry,
+                options.with_full_provenance(),
+                Compression::None,
+                || Ok(sink),
+            )
+        },
     )
     .map_err(|_| "project and decode the scoped cargo catalog")?;
     if bytes != summary.size() || wire.schema_version != SCHEMA_VERSION {

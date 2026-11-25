@@ -112,7 +112,7 @@ fn selected(
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let built = build_catalog_from(archive, entry, &options)
+    let built = build_catalog_from(archive, entry, options.with_full_provenance())
         .map_err(|_| "build catalog for one selected original Record")?;
     Ok(serde_json::from_slice(built.json())?)
 }

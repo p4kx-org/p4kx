@@ -44,8 +44,9 @@ fn cargo_globals_keep_original_numbers_box_names_and_physical_source_uses() -> T
     let forge = DataForge::open(&bytes)?;
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&source, origin)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
         assert_eq!(
             proof::at(&catalog, "/schemaVersion")?,
             &json!(3),
@@ -86,7 +87,8 @@ fn cargo_globals_reports_both_physical_records_when_a_guid_is_ambiguous() -> Tes
         &fixture::database(fixture::Layout::DuplicateIdentity),
         DcbOrigin::Encrypted,
     )?;
-    let Err(CatalogError::IncompleteExport(refusal)) = build_catalog(&archive, &common::options())
+    let Err(CatalogError::IncompleteExport(refusal)) =
+        build_catalog(&archive, common::options().with_full_provenance())
     else {
         return Err("normal publication must refuse ambiguous cargo identity".into());
     };
@@ -115,7 +117,8 @@ fn cargo_globals_reports_both_physical_records_when_a_guid_is_ambiguous() -> Tes
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let [first, second] = proof::rows(&catalog, LOADING_ROWS)? else {
         return Err("diagnostic publication must retain both cargo Records".into());
     };
@@ -139,7 +142,8 @@ fn cargo_globals_filter_selects_physical_record_and_preserves_family_availabilit
         filter: Some(&filter),
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let [row] = proof::rows(&catalog, LOADING_ROWS)? else {
         return Err("the filter must select just the physical matching Record".into());
     };
@@ -185,7 +189,7 @@ fn cargo_globals_keeps_an_invalid_box_member_in_the_diagnostic_source_arena() ->
     )?;
     assert!(
         matches!(
-            build_catalog(&archive, &common::options()),
+            build_catalog(&archive, common::options().with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "ordinary publication rejects a wrong box timing storage type"
@@ -194,7 +198,8 @@ fn cargo_globals_keeps_an_invalid_box_member_in_the_diagnostic_source_arena() ->
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let row = proof::rows(&catalog, LOADING_ROWS)?
         .first()
         .ok_or("first cargo Record")?;

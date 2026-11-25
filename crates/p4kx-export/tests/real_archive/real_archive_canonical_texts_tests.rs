@@ -51,7 +51,7 @@ impl Fixture {
 
     fn from_database(database: &DataForgeBuilder) -> TestResult<Self> {
         let (_folder, archive) = source::open(database, DcbOrigin::Plain)?;
-        let built = p4kx_export::build_catalog(&archive, &source::options())?;
+        let built = p4kx_export::build_catalog(&archive, source::options().with_full_provenance())?;
         let catalog = serde_json::from_slice(built.json())?;
         let locales = LocalizationSet::read(&archive, &[Language::English, Language::German])?;
         Ok(Self {

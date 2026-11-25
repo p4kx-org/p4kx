@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability,
     DisplayTransformationPayload, GameplayPropertySnapshot, read_gameplay_properties,
@@ -18,14 +19,14 @@ use crate::{gameplay_v3_support as support, gameplay_v3_values as values};
 fn selected_gameplay_fields_match_catalog_values_and_original_source_uses() -> TestResult {
     let (_folder, archive) = common::open(&values::simple(), DcbOrigin::Encrypted)?;
     let entry = DataForgeEntry::read(&archive)?;
-    let snapshot = read_gameplay_properties_from(
+    let snapshot = full_proof::from_entry(
         &archive,
         &entry,
-        CatalogRecordSelection::All,
         CatalogLanguageSelection::AllAvailable,
         None,
-    )?;
-    let full = build_catalog_from(&archive, &entry, &common::options())?;
+    )?
+    .read_gameplay_properties(CatalogRecordSelection::All, None)?;
+    let full = build_catalog_from(&archive, &entry, common::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(full.json())?;
     assert_eq!(snapshot.rows.len(), 1);
     let (row, expected) = (&snapshot.rows[0], support::row(&catalog, 0)?);
@@ -210,7 +211,8 @@ fn scopes_without_admitted_gameplay_properties_skip_localization_payloads() -> T
         (CatalogRecordSelection::RecordIndex(leftover.index()), 1),
         (CatalogRecordSelection::Guid(leftover.guid()), 1),
     ] {
-        let result = read_gameplay_properties_from(&archive, &entry, record, selection, None)?;
+        let result = full_proof::from_entry(&archive, &entry, selection, None)?
+            .read_gameplay_properties(record, None)?;
         assert!(result.rows.is_empty(), "no projected gameplay property");
         assert!(matches!(
             result.availability,

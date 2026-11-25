@@ -3,13 +3,14 @@
 
 use p4kx_export::catalog_queries::{
     BlueprintPresentation, BlueprintSnapshot, CatalogGuid, CatalogLanguageSelection,
-    CatalogQuerySession, CatalogRecordSelection, with_blueprints,
+    CatalogRecordSelection, with_blueprints,
 };
 use p4kx_export::{CatalogPublicationMode, build_catalog};
 use p4kx_extraction::{CancelToken, DataForgeEntry, SourcedValue};
 use serde_json::Value;
 
 use crate::canonical_header::json::assert_canonical;
+use crate::sdk_full_proof as full_proof;
 
 use super::blueprint_consumer_walk::{visit_definition, visit_presentation, visit_tier};
 use super::blueprint_query_archive as archive_fixture;
@@ -26,10 +27,10 @@ fn selected_blueprints_match_full_canonical_rows_and_all_origin_states() -> Test
         let (_folder, archive) = archive_fixture::open(&fixture::database(), origin, true)?;
         let mut options = common::options();
         options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-        let built = build_catalog(&archive, &options)?;
+        let built = build_catalog(&archive, options.with_full_provenance())?;
         let catalog: Value = serde_json::from_slice(built.json())?;
         let entry = DataForgeEntry::read(&archive)?;
-        let session = CatalogQuerySession::from_entry(
+        let session = full_proof::from_entry(
             &archive,
             &entry,
             CatalogLanguageSelection::AllAvailable,

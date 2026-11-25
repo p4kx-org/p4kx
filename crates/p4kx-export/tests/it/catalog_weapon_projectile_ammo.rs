@@ -18,7 +18,6 @@ mod countermeasure_emitters;
 mod fixture;
 #[path = "catalog_weapon_source_sdk.rs"]
 mod sdk;
-
 use fixture::Case;
 
 const ROWS: &str = "/projections/weaponProjectileAmmoSelections/rows";
@@ -396,6 +395,6 @@ fn build(case: Case, origin: DcbOrigin, filter: Option<&Filter>) -> TestResult<V
     let mut options = common::options();
     options.filter = filter;
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     Ok(serde_json::from_slice(built.json())?)
 }

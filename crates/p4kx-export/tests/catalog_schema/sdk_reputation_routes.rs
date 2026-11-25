@@ -1,11 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, ReputationRows, ReputationSelection, with_reputation_from,
-};
+use p4kx_export::catalog_queries::{CatalogLanguageSelection, ReputationRows, ReputationSelection};
 use p4kx_export::{CatalogOptions, build_catalog_from};
 use p4kx_extraction::{Archive, DataForgeEntry, FieldOrigin, InputScope, SourceInventory};
 use schemars::JsonSchema;
@@ -22,52 +21,55 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
         Some(p4kx_testkit::test_key()),
     )?;
     let entry = DataForgeEntry::read(&archive)?;
-    let built = build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?;
-    let catalog: Value = serde_json::from_slice(built.json())?;
-    with_reputation_from(
+    let built = build_catalog_from(
         &archive,
         &entry,
-        ReputationSelection::all(),
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
+    let catalog: Value = serde_json::from_slice(built.json())?;
+    full_proof::from_entry(
+        &archive,
+        &entry,
         CatalogLanguageSelection::AllAvailable,
         None,
-        |snapshot| {
-            let factions = snapshot
-                .faction_reputations
-                .ok_or("faction reputation result")?;
-            let scopes = snapshot.scopes.ok_or("scope result")?;
-            let standings = snapshot.standings.ok_or("standing result")?;
-            let [faction, ..] = factions.rows.as_slice() else {
-                return Err("the selected faction reputation fixture".into());
-            };
-            let [scope] = scopes.rows.as_slice() else {
-                return Err("the selected scope fixture".into());
-            };
-            let [standing, ..] = standings.rows.as_slice() else {
-                return Err("the selected standing fixture".into());
-            };
-            let slots = scope.standings().ok_or("ordered original standing slots")?;
-            let relations = faction.relations();
-            let hostile = relations
-                .hostility_params()
-                .value()
-                .ok_or("original hostile standing rule")?;
-            for origin in [
-                faction.display_name().origin(),
-                relations.allies().origin(),
-                hostile.scope().origin(),
-                hostile.standing().origin(),
-                slots.origin(),
-                standing.min_reputation().origin(),
-            ] {
-                check_original_origin(origin, &snapshot.source_inventory);
-            }
-            Ok([
-                witness(FACTION_REPUTATIONS, &factions, &catalog)?,
-                witness(REPUTATION_SCOPES, &scopes, &catalog)?,
-                witness(REPUTATION_STANDINGS, &standings, &catalog)?,
-            ])
-        },
     )?
+    .with_reputation(ReputationSelection::all(), None, |snapshot| {
+        let factions = snapshot
+            .faction_reputations
+            .ok_or("faction reputation result")?;
+        let scopes = snapshot.scopes.ok_or("scope result")?;
+        let standings = snapshot.standings.ok_or("standing result")?;
+        let [faction, ..] = factions.rows.as_slice() else {
+            return Err("the selected faction reputation fixture".into());
+        };
+        let [scope] = scopes.rows.as_slice() else {
+            return Err("the selected scope fixture".into());
+        };
+        let [standing, ..] = standings.rows.as_slice() else {
+            return Err("the selected standing fixture".into());
+        };
+        let slots = scope.standings().ok_or("ordered original standing slots")?;
+        let relations = faction.relations();
+        let hostile = relations
+            .hostility_params()
+            .value()
+            .ok_or("original hostile standing rule")?;
+        for origin in [
+            faction.display_name().origin(),
+            relations.allies().origin(),
+            hostile.scope().origin(),
+            hostile.standing().origin(),
+            slots.origin(),
+            standing.min_reputation().origin(),
+        ] {
+            check_original_origin(origin, &snapshot.source_inventory);
+        }
+        Ok([
+            witness(FACTION_REPUTATIONS, &factions, &catalog)?,
+            witness(REPUTATION_SCOPES, &scopes, &catalog)?,
+            witness(REPUTATION_STANDINGS, &standings, &catalog)?,
+        ])
+    })?
 }
 
 fn check_original_origin(origin: &FieldOrigin, inventory: &SourceInventory) {

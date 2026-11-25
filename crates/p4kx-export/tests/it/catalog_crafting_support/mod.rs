@@ -155,5 +155,5 @@ fn build_data(
         progress,
         ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))
     };
-    Ok(build_catalog(&archive, &options)?)
+    Ok(build_catalog(&archive, options.with_full_provenance())?)
 }

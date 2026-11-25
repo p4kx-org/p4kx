@@ -291,7 +291,7 @@ fn assert_original(bytes: &[u8]) -> TestResult {
 
 fn run(archive: &Path, out: &Path, args: &[&str]) -> Result<std::process::Output, Box<dyn Error>> {
     Ok(p4kx_testkit::p4kx()?
-        .arg("catalog")
+        .args(["catalog", "--provenance", "full"])
         .arg(archive)
         .arg("--out")
         .arg(out)

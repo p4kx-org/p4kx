@@ -67,7 +67,7 @@ fn json_catalog(archive: &Archive, filter: Option<&Filter>) -> TestResult<Value>
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     options.filter = filter;
-    let catalog = build_catalog(archive, &options)?;
+    let catalog = build_catalog(archive, options.with_full_provenance())?;
     Ok(serde_json::from_slice(catalog.json())?)
 }
 
@@ -224,7 +224,10 @@ fn planet_resources_keep_readable_siblings_and_filter_scope() -> TestResult {
     )?;
     assert!(
         matches!(
-            build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH)),
+            build_catalog(
+                &archive,
+                CatalogOptions::new(UNIX_EPOCH).with_full_provenance()
+            ),
             Err(CatalogError::IncompleteExport(_))
         ),
         "invalid JSON blocks normal publication"
@@ -338,7 +341,7 @@ fn planet_resources_support_absent_families_and_cancellation() -> TestResult {
     options.cancel = Some(&cancel);
     assert!(
         matches!(
-            build_catalog(&archive, &options),
+            build_catalog(&archive, options.with_full_provenance()),
             Err(CatalogError::Cancelled)
         ),
         "accepted cancellation reaches the shared build"

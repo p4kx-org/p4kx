@@ -4,7 +4,9 @@
 use std::time::UNIX_EPOCH;
 
 use p4kx_assembly::Entities;
-use p4kx_extraction::{Archive, ArchiveWatch, Build, CancelToken, DataForgeEntry, SourceInventory};
+use p4kx_extraction::{
+    Archive, ArchiveWatch, Build, CancelToken, DataForgeEntry, ProvenanceMode, SourceInventory,
+};
 use serde::Serialize;
 
 use crate::build::original_input::OriginalCatalogInput;
@@ -88,13 +90,27 @@ pub fn read_jump_inventory(
     budget: StarmapTraversalBudget,
     cancel: Option<&CancelToken>,
 ) -> Result<JumpInventorySnapshot, CatalogError> {
+    read_jump_inventory_with_provenance_mode(archive, budget, ProvenanceMode::MarkersOnly, cancel)
+}
+
+/// Reads the starmap jump inventory with the selected source detail.
+///
+/// # Errors
+/// Returns the errors of `read_jump_inventory`.
+pub fn read_jump_inventory_with_provenance_mode(
+    archive: &Archive,
+    budget: StarmapTraversalBudget,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<JumpInventorySnapshot, CatalogError> {
     checkpoint(cancel)?;
     let watch = ArchiveWatch::new(archive);
     let entry =
         DataForgeEntry::read_until(archive, &|| cancel.is_some_and(CancelToken::is_cancelled))
             .map_err(load_error)?;
     let forge = entry.open().map_err(CatalogError::DataForge)?;
-    let origins = CatalogOrigins::for_archive_records(archive, &entry)?;
+    let origins =
+        CatalogOrigins::for_archive_records_with_provenance_mode(archive, &entry, provenance_mode)?;
     let input = OriginalCatalogInput::new(&forge, &origins);
     let capture = EntryCapture::for_input(&input);
     let options = CatalogOptions {

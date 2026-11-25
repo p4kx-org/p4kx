@@ -8,8 +8,9 @@ use p4kx_extraction::{
 use super::{CatalogLanguageSelection, CatalogRecordCoverage, CatalogRecordSelection};
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
-use crate::catalog_query_session::{CatalogQuerySession, ParsedCatalogQueries, checkpoint};
+use crate::catalog_query_session::{
+    CatalogQuerySession, CatalogQuerySource, ParsedCatalogQueries, checkpoint,
+};
 use crate::catalog_table::{CatalogTable, DatasetAvailability};
 use crate::mission_generator::GeneratorDefinition;
 
@@ -125,14 +126,14 @@ impl ParsedCatalogQueries<'_> {
 
 fn with_parsed<T>(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     selection: CatalogRecordSelection,
     requested_languages: &[Language],
     cancel: Option<&CancelToken>,
     inspect: impl FnOnce(ContractGeneratorSnapshot<'_>) -> T,
 ) -> Result<T, CatalogError> {
-    let origins = CatalogOrigins::for_archive_records(archive, entry)?;
+    let origins = entry.records(archive)?;
     let input = OriginalCatalogInput::new(forge, &origins);
     let selected = read::read(forge, &input, selection, cancel)?;
     let table = CatalogTable::new(forge, &["ContractGenerator"], selected.rows);

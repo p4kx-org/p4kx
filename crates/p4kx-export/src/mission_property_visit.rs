@@ -11,13 +11,12 @@ use super::{
 };
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::unlocalized_record_query::plan::read_owner as read_record;
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
     ParsedCatalogQueries,
 };
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::catalog_table::DatasetAvailability;
 use crate::guid_text::CatalogGuid;
 use crate::mission_flow_owner::FlowOwnerKind;
@@ -133,7 +132,7 @@ impl ParsedCatalogQueries<'_> {
 
 fn visit_owners<'source, E: From<CatalogError>>(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &'source DataForge<'source>,
     selection: CatalogRecordSelection,
     cancel: Option<&CancelToken>,
@@ -154,7 +153,7 @@ fn visit_owners<'source, E: From<CatalogError>>(
         let Some(owner) = read_record(&mut trees, &record, &mut summary.coverage)? else {
             continue;
         };
-        let origins = CatalogOrigins::for_archive_records(archive, entry)?;
+        let origins = entry.records(archive)?;
         let input = OriginalCatalogInput::new(forge, &origins);
         let scoped = read_owner(&input, family, &owner.record, &owner.tree, cancel)?;
         let snapshot = MissionPropertyOwnerSnapshot {

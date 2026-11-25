@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogQuerySession};
@@ -23,14 +24,19 @@ pub(super) fn read() -> TestResult<Route> {
     let directory = tempfile::tempdir()?;
     let archive = fixture::archive(&directory.path().join("Data.p4k"))?;
     let entry = DataForgeEntry::read(&archive)?;
-    let built = build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?;
+    let built = build_catalog_from(
+        &archive,
+        &entry,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let session = CatalogQuerySession::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::Selected(&[Language::English]),
         None,
-    )?;
+    )?
+    .with_provenance_mode(full_proof::MODE);
     let snapshot = session
         .parsed(None)?
         .read_mining_locations(MiningLocationOptions::new(Language::English, None))?;

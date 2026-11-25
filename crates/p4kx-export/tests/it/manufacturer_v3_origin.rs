@@ -142,7 +142,7 @@ fn every_available_language_retains_its_own_winning_payload_and_crypto_index() -
     let (_directory, archive) = crate::resource_origin_fixture::open(database.build(), true)?;
     let mut options = crate::resource_origin_fixture::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let name = fixture::text(&catalog, "publicNames", "name")?;
     assert_winning_forms(name)?;

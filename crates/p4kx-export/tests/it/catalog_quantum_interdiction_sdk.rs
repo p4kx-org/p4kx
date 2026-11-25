@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::equipment::ship_systems::{
-    QuantumInterdictionGeneratorSnapshot, with_quantum_interdiction_generators,
-    with_quantum_interdiction_generators_from,
+    QuantumInterdictionGeneratorSnapshot, with_quantum_interdiction_generators_from,
 };
 use p4kx_export::catalog_queries::{CatalogRecordSelection, ResourceNumber};
 use p4kx_extraction::DataForgeEntry;
@@ -15,37 +15,36 @@ use super::{CatalogError, DcbOrigin, ROWS, TestResult, build_catalog, common, fi
 fn quantum_interdiction_sdk_preserves_original_graph_and_encryption() -> TestResult {
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&fixture::database(false), origin)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
         let [expected] = proof::rows(&catalog, ROWS)? else {
             return Err("one canonical interdiction generator is expected".into());
         };
-        with_quantum_interdiction_generators(
-            &archive,
-            CatalogRecordSelection::All,
-            None,
-            |snapshot| verify(&snapshot, &catalog, expected, encrypted),
-        )??;
+        full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?
+            .with_quantum_interdiction_generators(
+                CatalogRecordSelection::All,
+                None,
+                |snapshot| verify(&snapshot, &catalog, expected, encrypted),
+            )??;
         let entry = DataForgeEntry::read(&archive)?;
-        with_quantum_interdiction_generators_from(
-            &archive,
-            &entry,
-            CatalogRecordSelection::RecordIndex(0),
-            None,
-            |snapshot| verify(&snapshot, &catalog, expected, encrypted),
-        )??;
-        with_quantum_interdiction_generators_from(
-            &archive,
-            &entry,
-            CatalogRecordSelection::RecordIndex(1),
-            None,
-            |snapshot| {
-                assert!(
-                    snapshot.rows().is_empty(),
-                    "a tag Record is not a device owner"
-                );
-            },
-        )?;
+        full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+            .with_quantum_interdiction_generators(
+                CatalogRecordSelection::RecordIndex(0),
+                None,
+                |snapshot| verify(&snapshot, &catalog, expected, encrypted),
+            )??;
+        full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+            .with_quantum_interdiction_generators(
+                CatalogRecordSelection::RecordIndex(1),
+                None,
+                |snapshot| {
+                    assert!(
+                        snapshot.rows().is_empty(),
+                        "a tag Record is not a device owner"
+                    );
+                },
+            )?;
     }
     Ok(())
 }

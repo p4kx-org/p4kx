@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::equipment;
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_export::{CatalogPublicationMode, build_catalog};
 use p4kx_extraction::{DataForgeEntry, Language};
@@ -17,6 +16,7 @@ mod fixture;
 mod sdk;
 #[path = "item_source_sdk_coverage_tests.rs"]
 mod sdk_coverage;
+use crate::sdk_full_proof as full_proof;
 use fixture::Layout;
 
 #[test]
@@ -210,7 +210,7 @@ fn catalog(
     let mut options = common::options();
     options.publication_mode = mode;
     Ok(serde_json::from_slice(
-        build_catalog(&archive, &options)?.json(),
+        build_catalog(&archive, options.with_full_provenance())?.json(),
     )?)
 }
 
@@ -309,7 +309,7 @@ const fn complete_mode(origin: DcbOrigin) -> CatalogPublicationMode {
 fn unreadable_original_definition_still_refuses_normal_publication() -> TestResult {
     let (_folder, archive) =
         fixture::open(Layout::UnreadableFirst, DcbOrigin::Plain, false, false)?;
-    let result = build_catalog(&archive, &common::options());
+    let result = build_catalog(&archive, common::options().with_full_provenance());
     assert!(
         matches!(result, Err(p4kx_export::CatalogError::IncompleteExport(_))),
         "the actual original read failure still guards normal publication"
@@ -323,24 +323,25 @@ fn foreign_source_attachment_all_new_getters_match_the_actual_canonical_producer
         let (_folder, archive) = fixture::open(Layout::Foreign, origin, false, false)?;
         let mut options = common::options();
         options.publication_mode = complete_mode(origin);
-        let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, options.with_full_provenance())?.json(),
+        )?;
         let entry = DataForgeEntry::read(&archive)?;
-        equipment::with_item_definitions_from(
+        full_proof::from_entry(
             &archive,
             &entry,
-            CatalogRecordSelection::All,
             CatalogLanguageSelection::Selected(&[Language::English, Language::German]),
             None,
-            |snapshot| {
-                let [row] = snapshot.rows() else {
-                    return Err("one physical source Item".into());
-                };
-                let [canonical] = proof::rows(&catalog, "/definitions/items/rows")? else {
-                    return Err("one actual canonical original".into());
-                };
-                super::equipment_sdk::walk::definition(row, snapshot.source_inventory(), canonical)
-            },
-        )??;
+        )?
+        .with_item_definitions(CatalogRecordSelection::All, None, |snapshot| {
+            let [row] = snapshot.rows() else {
+                return Err("one physical source Item".into());
+            };
+            let [canonical] = proof::rows(&catalog, "/definitions/items/rows")? else {
+                return Err("one actual canonical original".into());
+            };
+            super::equipment_sdk::walk::definition(row, snapshot.source_inventory(), canonical)
+        })??;
     }
     Ok(())
 }

@@ -143,7 +143,7 @@ fn with_original(
 fn diagnostic(archive: &Archive) -> TestResult<Value> {
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(archive, &options)?;
+    let built = build_catalog(archive, options.with_full_provenance())?;
     Ok(serde_json::from_slice(built.json())?)
 }
 

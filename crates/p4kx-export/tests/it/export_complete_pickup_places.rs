@@ -32,7 +32,7 @@ fn every_original_pickup_place_survives_without_changing_ranking_or_fallback() -
     );
     let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     assert_eq!(
         pickup_guids(catalog_contracts::entry(&catalog, B, None)?)?,

@@ -4,12 +4,12 @@
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::CatalogRecordSelection;
-use p4kx_export::catalog_queries::contract_scenarios::with_contract_scenarios_from;
 use p4kx_export::{CatalogOptions, Filter, build_catalog_from};
 use p4kx_extraction::{Archive, DataForgeEntry, SourceInventory};
 use serde_json::Value;
 
 use super::{Route, TestResult};
+use crate::sdk_full_proof as full_proof;
 
 use super::super::reputation_fixture as fixture;
 
@@ -36,11 +36,11 @@ pub(super) fn read() -> TestResult<Route> {
     let filter = Filter::new("contractscenarios");
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.filter = Some(&filter);
-    let catalog: Value =
-        serde_json::from_slice(build_catalog_from(&archive, &entry, &options)?.json())?;
-    with_contract_scenarios_from(
-        &archive,
-        &entry,
+    let catalog: Value = serde_json::from_slice(
+        build_catalog_from(&archive, &entry, options.with_full_provenance())?.json(),
+    )?;
+    let session = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?;
+    session.with_contract_scenarios(
         CatalogRecordSelection::RecordIndex(record.index()),
         None,
         |snapshot| -> TestResult<Route> {

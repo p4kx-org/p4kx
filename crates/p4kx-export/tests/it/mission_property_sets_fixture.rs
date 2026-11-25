@@ -135,7 +135,7 @@ fn build_database(
         filter: filter.as_ref(),
         ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))
     };
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     Ok(Report {
         document: serde_json::from_slice(built.json())?,
         failures: built

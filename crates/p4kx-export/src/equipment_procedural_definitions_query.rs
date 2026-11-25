@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, CancelToken, DataForge, DataForgeEntry, RecordTree};
+use p4kx_extraction::{Archive, CancelToken, DataForge, RecordTree};
 
 use super::EquipmentSnapshot;
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::CatalogRecordSelection;
 use crate::catalog_queries::unlocalized_record_query::plan::Plan;
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::catalog_read::scoped_source_read::ScopedSourceRead;
 use crate::catalog_table::CatalogTable;
 use crate::record_observation::RecordObservation;
@@ -23,7 +22,7 @@ pub(super) type Project<'source, Row> = fn(
 
 pub(super) fn with_parsed<'source, Row, T>(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &'source DataForge<'source>,
     selection: CatalogRecordSelection,
     (source_type, project): (&str, Project<'source, Row>),
@@ -31,7 +30,7 @@ pub(super) fn with_parsed<'source, Row, T>(
     inspect: impl FnOnce(EquipmentSnapshot<'source, Row>) -> T,
 ) -> Result<T, CatalogError> {
     let mut plan = Plan::read_type(forge, source_type, selection, cancel)?;
-    let origins = CatalogOrigins::for_archive_records(archive, entry)?;
+    let origins = entry.records(archive)?;
     let input = OriginalCatalogInput::new(forge, &origins);
     let mut rows = Vec::with_capacity(plan.owners.len());
     for owner in plan.owners {

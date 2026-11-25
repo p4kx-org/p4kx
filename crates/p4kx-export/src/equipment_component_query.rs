@@ -1,14 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{Archive, CancelToken, DataForge, DataForgeEntry};
+use p4kx_extraction::{Archive, CancelToken, DataForge};
 
 use super::EquipmentSnapshot;
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::CatalogRecordSelection;
-use crate::catalog_query_session::checkpoint;
+use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::catalog_v3::component_sources::PhysicalComponent;
 
 macro_rules! equipment_component_query {
@@ -90,13 +89,13 @@ pub(super) use equipment_component_query;
 
 pub(super) fn with_parsed<F: PhysicalComponent, T>(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     selection: CatalogRecordSelection,
     cancel: Option<&CancelToken>,
     inspect: impl for<'source> FnOnce(EquipmentSnapshot<'source, F::Row<'source>>) -> T,
 ) -> Result<T, CatalogError> {
-    let origins = CatalogOrigins::for_archive_records(archive, entry)?;
+    let origins = entry.records(archive)?;
     let input = OriginalCatalogInput::new(forge, &origins);
     let (table, coverage) = F::query(forge, &input, selection, cancel)?;
     let source_inventory = origins.uses.finish_with(|| checkpoint(cancel))?;

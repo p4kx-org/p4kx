@@ -3,7 +3,7 @@
 
 use crate::dialog::Dialog;
 use crate::output_target::{OutputScope, Witness};
-use crate::{AssemblyExportForm, CATALOG_FILE, DIAGNOSTIC_CATALOG_FILE, Model};
+use crate::{AssemblyExportForm, Model};
 
 pub(super) fn scope(model: &Model, dialog: Dialog) -> Option<OutputScope> {
     if dialog == Dialog::ComparisonReport {
@@ -41,9 +41,7 @@ pub(super) fn scope(model: &Model, dialog: Dialog) -> Option<OutputScope> {
             Witness::of(result.forge()).at(result.generation(), 0)
         }
         Dialog::UiFile => source.clone(),
-        Dialog::CatalogFile | Dialog::DiagnosticCatalogFile if model.catalog_available() => {
-            source.clone()
-        }
+        _ if dialog.catalog_file_name().is_some() && model.catalog_available() => source.clone(),
         _ => return None,
     };
     let picture = if dialog == Dialog::UiFile {
@@ -67,10 +65,8 @@ pub(super) fn name(model: &Model, dialog: Dialog) -> Option<String> {
         Dialog::CharacterFile => model.characters().export_setup()?.proposed_name(),
         Dialog::CharacterPackage => model.characters().export_setup()?.name().to_owned(),
         Dialog::UiFile => model.ui().proposed_file_name(),
-        Dialog::CatalogFile => CATALOG_FILE.to_owned(),
-        Dialog::DiagnosticCatalogFile => DIAGNOSTIC_CATALOG_FILE.to_owned(),
         Dialog::QueryExport(format) => format!("query.{}", format.extension()),
         Dialog::ComparisonReport => "comparison.json".to_owned(),
-        _ => return None,
+        _ => return dialog.catalog_file_name().map(str::to_owned),
     })
 }

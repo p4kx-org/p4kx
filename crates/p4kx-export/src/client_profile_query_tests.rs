@@ -5,14 +5,16 @@ use std::fs::OpenOptions;
 use std::io::Write;
 use std::time::UNIX_EPOCH;
 
-use p4kx_extraction::{CancelToken, Filter, InputScope, SourceUseRole};
+use p4kx_extraction::{CancelToken, Filter, InputScope, ProvenanceMode, SourceUseRole};
 use p4kx_testkit::{TestEntry, test_key};
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use super::{GENERAL, GENERAL_XML, TestResult, VR, archive, at, catalog};
 use crate::{
     CatalogError, CatalogOptions, ProfileKind, ProfileState, build_catalog,
     read_client_profile_settings, read_client_profile_settings_for,
+    read_client_profile_settings_for_with_provenance_mode,
+    read_client_profile_settings_with_provenance_mode,
 };
 
 const PROFILES: &str = "/configurations/clientProfileSettings";
@@ -33,10 +35,16 @@ fn typed_profile_queries_match_full_and_filtered_catalog_rows() -> TestResult {
         filter: Some(&filter),
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let full = read_client_profile_settings(&archive, None)?;
-    let vr = read_client_profile_settings_for(&archive, ProfileKind::VirtualReality, None)?;
+    let full =
+        read_client_profile_settings_with_provenance_mode(&archive, ProvenanceMode::Full, None)?;
+    let vr = read_client_profile_settings_for_with_provenance_mode(
+        &archive,
+        ProfileKind::VirtualReality,
+        ProvenanceMode::Full,
+        None,
+    )?;
     for (options, report) in [(&complete, &full), (&filtered, &vr)] {
-        let built = build_catalog(&archive, options)?;
+        let built = build_catalog(&archive, options.with_full_provenance())?;
         let wire: Value = serde_json::from_slice(built.json())?;
         assert_eq!(
             &serde_json::to_value(report.settings())?,
@@ -79,7 +87,12 @@ fn narrow_profile_query_retains_typed_values_without_opening_other_payloads() ->
         ],
         None,
     )?;
-    let report = read_client_profile_settings_for(&archive, ProfileKind::General, None)?;
+    let report = read_client_profile_settings_for_with_provenance_mode(
+        &archive,
+        ProfileKind::General,
+        ProvenanceMode::Full,
+        None,
+    )?;
     assert_eq!(
         report.build(),
         archive.build(),
@@ -115,6 +128,60 @@ fn narrow_profile_query_retains_typed_values_without_opening_other_payloads() ->
                 && (row.scope() == InputScope::Payload || row.role() == SourceUseRole::Attempted)
         }),
         "the encrypted unreadable sibling contributes only directory evidence"
+    );
+    Ok(())
+}
+
+#[test]
+fn profile_queries_default_to_an_encrypted_value_without_proof_inventory() -> TestResult {
+    let (_directory, archive) = archive(
+        vec![TestEntry::stored(VR, GENERAL_XML).encrypted()],
+        Some(test_key()),
+    )?;
+    let value_path = "/settings/documents/1/elements/1/declarations/1/value/value";
+    for report in [
+        read_client_profile_settings(&archive, None)?,
+        read_client_profile_settings_for(&archive, ProfileKind::VirtualReality, None)?,
+    ] {
+        let encoded = serde_json::to_value(&report)?;
+        assert_eq!(
+            at(&encoded, value_path)?,
+            &json!({"state": "present", "value": " 001&2 ", "containsEncryptedSource": true}),
+            "both defaults retain the authored value and encryption without proof references"
+        );
+        assert_eq!(
+            at(&encoded, "/provenance")?,
+            &json!({"sources": [], "uses": []}),
+            "marker results retain no proof inventory"
+        );
+    }
+    let full = read_client_profile_settings_for_with_provenance_mode(
+        &archive,
+        ProfileKind::VirtualReality,
+        ProvenanceMode::Full,
+        None,
+    )?;
+    let encoded = serde_json::to_value(&full)?;
+    let field = at(&encoded, value_path)?;
+    assert_eq!(
+        (field.get("value"), field.get("containsEncryptedSource")),
+        (Some(&json!(" 001&2 ")), Some(&json!(true))),
+        "full provenance retains the same authored value and encryption"
+    );
+    assert_eq!(
+        field.get("sourceSetComplete"),
+        Some(&json!(true)),
+        "the encrypted declaration has complete direct evidence"
+    );
+    let references = super::rows(field, "/sourceUsesRefs")?;
+    let [reference] = references else {
+        return Err("expected one source use for the original value".into());
+    };
+    assert!(
+        full.provenance().iter_uses().any(|used| {
+            Some(used.id().as_str()) == reference.as_str() && used.scope() == InputScope::Payload
+        }),
+        "full provenance resolves the original payload use in its own inventory"
     );
     Ok(())
 }

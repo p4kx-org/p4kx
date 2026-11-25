@@ -8,7 +8,6 @@ use p4kx_extraction::{CancelToken, CanonicalReadObserver};
 use super::request::Query;
 use super::snapshot::ResourceGroupSnapshot;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_queries::CatalogRecordCoverage;
 use crate::catalog_queries::unlocalized_record_query::plan::{Owner, Plan};
@@ -58,7 +57,7 @@ impl Query<'_> {
         };
         let sources = TextSources::read_languages(self.archive, languages)?;
         checkpoint(self.cancel)?;
-        let origins = CatalogOrigins::new(self.archive, self.entry, &sources)?;
+        let origins = self.entry.with_texts(self.archive, &sources)?;
         let input = OriginalCatalogInput::new(self.forge, &origins);
         let texts = Texts::parse(&sources)?;
         let registry = CatalogTextRegistry::default();

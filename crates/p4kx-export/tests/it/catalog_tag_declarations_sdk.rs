@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::tags::{
-    TagDeclarationFamily, TagDeclarationSnapshot, with_tag_declarations, with_tag_declarations_from,
+    TagDeclarationFamily, TagDeclarationSnapshot, with_tag_declarations,
 };
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
@@ -22,16 +23,16 @@ fn tag_declaration_sdk_matches_the_encrypted_catalog_graph() -> TestResult {
     let entry = DataForgeEntry::read(&archive)?;
     let mut options = archive_fixture::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog_from(&archive, &entry, &options)?.json())?;
-    with_tag_declarations_from(
-        &archive,
-        &entry,
-        TagDeclarationFamily::All,
-        CatalogRecordSelection::All,
-        None,
-        |snapshot| verify_graph(&snapshot, &catalog),
-    )?
+    let catalog: Value = serde_json::from_slice(
+        build_catalog_from(&archive, &entry, options.with_full_provenance())?.json(),
+    )?;
+    full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .with_tag_declarations(
+            TagDeclarationFamily::All,
+            CatalogRecordSelection::All,
+            None,
+            |snapshot| verify_graph(&snapshot, &catalog),
+        )?
 }
 
 fn verify_graph(snapshot: &TagDeclarationSnapshot<'_>, catalog: &Value) -> TestResult {
@@ -177,8 +178,7 @@ fn tag_declaration_sdk_distinguishes_absent_families_from_empty_selection() -> T
         (fixture::schema(), "available"),
     ] {
         let (_directory, archive) = archive_fixture::open(&database, DcbOrigin::Plain)?;
-        with_tag_declarations(
-            &archive,
+        full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?.with_tag_declarations(
             TagDeclarationFamily::All,
             CatalogRecordSelection::RecordIndex(u32::MAX),
             None,

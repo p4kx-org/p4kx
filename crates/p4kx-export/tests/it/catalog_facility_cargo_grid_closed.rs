@@ -24,8 +24,9 @@ fn cargo_grid_closed_container_uses_its_authored_unit() -> TestResult {
     ] {
         let database = cargo_grid_facility_database_for(TestCargoGridLayout::Closed(authored));
         let (_directory, archive) = common::open(&database, DcbOrigin::Encrypted)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
         let capacity = proof::at(only_grid(&catalog)?, "/capacity")?;
         let scu = if let Some(expected) = expected {
             assert_eq!(

@@ -5,10 +5,12 @@
 
 use std::slice;
 
-use p4kx_extraction::{Archive, ArchiveWatch, Build, CancelToken, FieldOrigin, SourceInventory};
+use p4kx_extraction::{
+    Archive, ArchiveWatch, Build, CancelToken, FieldOrigin, ProvenanceMode, SourceInventory,
+};
 
 use crate::catalog_query_session::checkpoint;
-use crate::catalog_read::original::{EntryCapture, EntryReceipt, with_entry_capture};
+use crate::catalog_read::original::{EntryCapture, EntryReceipt, with_entry_capture_mode};
 pub use crate::catalog_read::original::{PhysicalEntryIdentity, PhysicalEntryRef};
 use crate::catalog_table::DatasetAvailability;
 pub use crate::contract_shops::{Shop, ShopItemGuids, ShopRegistryFields};
@@ -27,10 +29,12 @@ pub use crate::shop_inventory_source::{
 pub use crate::shops::resolution_scope::{
     ShopInventoryResolutionCoverage, ShopInventoryResolutionSnapshot, ShopResolutionDiscovery,
     ShopResolutionSelection, read_shop_inventory_resolutions,
+    read_shop_inventory_resolutions_with_provenance_mode,
 };
 pub use crate::shops::row_query::{
     ShopNameCoverage, ShopRegistrySelection, ShopRowCoverage, ShopRowResult, ShopRowSnapshot,
-    ShopRowsSnapshot, read_shop, read_shops,
+    ShopRowsSnapshot, read_shop, read_shop_with_provenance_mode, read_shops,
+    read_shops_with_provenance_mode,
 };
 use crate::{CatalogError, Kind, export_health_entries, shop_inventories, starmap_index};
 
@@ -86,6 +90,24 @@ pub fn read_shop_inventories(
     selection: ShopInventorySelection<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<ShopInventorySnapshot, CatalogError> {
+    read_shop_inventories_with_provenance_mode(
+        archive,
+        selection,
+        ProvenanceMode::MarkersOnly,
+        cancel,
+    )
+}
+
+/// Reads shop inventories with the selected source detail.
+///
+/// # Errors
+/// Returns the errors of `read_shop_inventories`.
+pub fn read_shop_inventories_with_provenance_mode(
+    archive: &Archive,
+    selection: ShopInventorySelection<'_>,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<ShopInventorySnapshot, CatalogError> {
     checkpoint(cancel)?;
     let watch = ArchiveWatch::new(archive);
     watch.check()?;
@@ -101,7 +123,7 @@ pub fn read_shop_inventories(
             (archive.entries(), Some(starmap_index::key(path)))
         }
     };
-    let snapshot = with_entry_capture(archive, |capture| {
+    let snapshot = with_entry_capture_mode(archive, provenance_mode, |capture| {
         let (mut table, ledger, complete) = shop_inventories::read_definitions(
             archive,
             candidates,

@@ -9,9 +9,10 @@ use p4kx_extraction::{
 use super::{CatalogLanguageSelection, CatalogRecordSelection};
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
-use crate::catalog_query_session::{CatalogQuerySession, ParsedCatalogQueries, checkpoint};
+use crate::catalog_query_session::{
+    CatalogQuerySession, CatalogQuerySource, ParsedCatalogQueries, checkpoint,
+};
 use crate::catalog_table::DatasetAvailability;
 use crate::catalog_text_contract::{CanonicalText, GameTextRef, PublicNameRef};
 use crate::texts::{TextSources, Texts};
@@ -185,14 +186,14 @@ impl ParsedCatalogQueries<'_> {
 
 fn with_parsed<T>(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     selection: plan::Lookup,
     languages: &[Language],
     cancel: Option<&CancelToken>,
     inspect: impl FnOnce(ContractSnapshot<'_>) -> T,
 ) -> Result<T, CatalogError> {
-    let mut origins = CatalogOrigins::for_archive_records(archive, entry)?;
+    let mut origins = entry.records(archive)?;
     let plan = plan::Plan::read(
         forge,
         &OriginalCatalogInput::new(forge, &origins),

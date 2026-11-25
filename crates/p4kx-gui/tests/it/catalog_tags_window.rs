@@ -8,6 +8,7 @@ use std::fs;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use p4kx_export::{CatalogSummary, Filter, Kind};
+use p4kx_extraction::ProvenanceMode;
 use p4kx_gui::{CatalogExportOptions, CatalogExportStatus, Language, Model, ui};
 use serde_json::{Value, json};
 
@@ -38,12 +39,13 @@ fn check_language(language: Language, tags: &str, manufacturers: &str) -> TestRe
     model.set_language(language);
     let file = out.join("filtered-tags.json");
     assert!(
-        model.start_catalog_with_options(
+        model.start_catalog_with_provenance_mode(
             file.clone(),
             CatalogExportOptions {
                 filter: Some(Filter::new("included")),
                 ..CatalogExportOptions::default()
             },
+            ProvenanceMode::Full,
             || {},
         ),
         "the filtered normal catalog starts"

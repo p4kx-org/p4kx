@@ -14,6 +14,7 @@ use p4kx_testkit::{
 use serde_json::{Value, json};
 
 use super::{Route, TestResult};
+use crate::sdk_full_proof as full_proof;
 
 pub(in super::super) const DATASET: &str = "/definitions/crafters";
 
@@ -27,40 +28,35 @@ pub(super) fn read() -> TestResult<Route> {
     let entry = DataForgeEntry::read(&archive)?;
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog_from(&archive, &entry, &options)?;
+    let built = build_catalog_from(&archive, &entry, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
-    with_crafters_from(
-        &archive,
-        &entry,
-        CatalogRecordSelection::All,
-        None,
-        |snapshot| {
-            let [first, second] = snapshot.rows.as_slice() else {
-                return Err("exactly two admitted physical crafting owners".into());
-            };
-            verify_primary(first)?;
-            assert_eq!(
-                first.source().guid().value(),
-                second.source().guid().value(),
-                "nominal duplicates survive"
-            );
-            assert_eq!(
-                second.source().record_index().value(),
-                Some(&1),
-                "physical order resolves the serialization tie"
-            );
-            assert_eq!(
-                catalog.pointer(DATASET),
-                Some(&json!({"availability": snapshot.availability, "rows": snapshot.rows})),
-                "both canonical rows match the Catalog producer including source uses"
-            );
-            Route::queried_rows(
-                DATASET,
-                &snapshot.rows,
-                "exact synthetic producer and scope parity available; installed producer parity open",
-            )
-        },
-    )?
+    let session = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?;
+    session.with_crafters(CatalogRecordSelection::All, None, |snapshot| {
+        let [first, second] = snapshot.rows.as_slice() else {
+            return Err("exactly two admitted physical crafting owners".into());
+        };
+        verify_primary(first)?;
+        assert_eq!(
+            first.source().guid().value(),
+            second.source().guid().value(),
+            "nominal duplicates survive"
+        );
+        assert_eq!(
+            second.source().record_index().value(),
+            Some(&1),
+            "physical order resolves the serialization tie"
+        );
+        assert_eq!(
+            catalog.pointer(DATASET),
+            Some(&json!({"availability": snapshot.availability, "rows": snapshot.rows})),
+            "both canonical rows match the Catalog producer including source uses"
+        );
+        Route::queried_rows(
+            DATASET,
+            &snapshot.rows,
+            "exact synthetic producer and scope parity available; installed producer parity open",
+        )
+    })?
 }
 
 #[test]

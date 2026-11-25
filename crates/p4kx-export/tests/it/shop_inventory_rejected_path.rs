@@ -47,7 +47,7 @@ fn rejected_populated_path_stays_visible_without_false_completeness() -> TestRes
         let (_dir, archive) = actual_rejected_prefab(rejected)?;
         let mut options = CatalogOptions::new(UNIX_EPOCH);
         options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-        let built = p4kx_export::build_catalog(&archive, &options)?;
+        let built = p4kx_export::build_catalog(&archive, options.with_full_provenance())?;
         let catalog: Value = serde_json::from_slice(built.json())?;
         let rows = health::rows(&catalog, "/declarations/shopInventoryResolution/rows")?;
         let row = resolution_row(rows, &key(0))?;

@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::equipment::component_definitions::{
-    TurretHealthModifier, with_turret_health_modifiers,
-};
+use p4kx_export::catalog_queries::equipment::component_definitions::TurretHealthModifier;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ResourceFloat32,
 };
@@ -12,6 +10,7 @@ use p4kx_testkit::DataForgeBuilder;
 
 use super::{DEFINITION, DERIVED, DERIVED_OWNER, DERIVED_TARGET, MISSING, MODIFIER, OWNER};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
+use crate::sdk_full_proof as full_proof;
 
 const ENTITY_TYPE: &str = "EntityClassDefinition";
 
@@ -195,8 +194,7 @@ fn guid(value: u128) -> TestResult<Guid> {
 
 pub(super) fn check_derived(fixture: &DataForgeBuilder, index: u32) -> TestResult {
     let (_folder, archive) = common::open(fixture, DcbOrigin::Encrypted)?;
-    with_turret_health_modifiers(
-        &archive,
+    full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?.with_turret_health_modifiers(
         CatalogRecordSelection::RecordIndex(index),
         None,
         |snapshot| -> TestResult {

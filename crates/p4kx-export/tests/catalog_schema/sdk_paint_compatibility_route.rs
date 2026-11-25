@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::equipment::paints::{
-    PaintCompatibilitySnapshot, PaintCompatibilityStatus, PaintSelection, read_paint_compatibility,
+    PaintCompatibilitySnapshot, PaintCompatibilityStatus, PaintSelection,
 };
 use p4kx_export::{CatalogOptions, build_catalog};
 use p4kx_extraction::{Archive, DataForge, DataForgeEntry, Guid, InputScope, SourceUseRole, Step};
@@ -31,7 +32,8 @@ pub(super) fn read() -> TestResult<Route> {
         .entry(TestEntry::stored("Data/Game2.dcb", database().build()))
         .write_to(&path)?;
     let archive = Archive::open(path)?;
-    let snapshot = read_paint_compatibility(&archive, PaintSelection::RecordIndex(0), None)?;
+    let snapshot = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?
+        .read_paint_compatibility(PaintSelection::RecordIndex(0), None)?;
     assert_eq!(
         snapshot.status,
         PaintCompatibilityStatus::Found,
@@ -57,7 +59,10 @@ pub(super) fn read() -> TestResult<Route> {
     let source = DataForgeEntry::read(&archive)?;
     verify_inputs(&snapshot, &source.open()?)?;
 
-    let normal = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;
+    let normal = build_catalog(
+        &archive,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
     let document: Value = serde_json::from_slice(normal.json())?;
     let rows = document
         .get("paints")

@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::CatalogRecordSelection;
-use p4kx_export::catalog_queries::equipment::{self, WeaponSourceSnapshot};
+use p4kx_export::catalog_queries::equipment::WeaponSourceSnapshot;
 use p4kx_extraction::{Archive, DataForgeEntry, InputScope, SourceInventory, SourceLocation};
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 use serde_json::{Value, json};
@@ -32,20 +33,19 @@ pub(super) fn read() -> TestResult<Route> {
     let entry = DataForgeEntry::read(&archive)?;
     let catalog = ammo_binding_witness::normal(&archive, &entry)?;
     let mut route = None;
-    let summary = equipment::visit_weapon_sources_from(
-        &archive,
-        &entry,
-        CatalogRecordSelection::All,
-        None,
-        |index, snapshot| -> TestResult<()> {
-            assert_eq!(
-                index, OWNER,
-                "the visitor keeps the physical container owner"
-            );
-            route = Some(verify(&snapshot, &catalog)?);
-            Ok(())
-        },
-    )?;
+    let summary = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .visit_weapon_sources(
+            CatalogRecordSelection::All,
+            None,
+            |index, snapshot| -> TestResult<()> {
+                assert_eq!(
+                    index, OWNER,
+                    "the visitor keeps the physical container owner"
+                );
+                route = Some(verify(&snapshot, &catalog)?);
+                Ok(())
+            },
+        )?;
     assert_eq!(
         summary.owner_count(),
         1,

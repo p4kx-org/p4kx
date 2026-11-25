@@ -17,8 +17,9 @@ mod visit;
 fn interaction_components_preserve_slots_states_and_original_weak_links() -> TestResult {
     let (_directory, archive) = common::open(&fixture::database(), DcbOrigin::Encrypted)?;
     original_default_state(&archive)?;
-    let catalog: Value =
-        serde_json::from_slice(p4kx_export::build_catalog(&archive, &common::options())?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        p4kx_export::build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
     let rows = proof::rows(&catalog, "/configurations/interactions/rows")?;
     assert_eq!(rows.len(), 2, "one row per physical interaction component");
     check_interactable(&rows[0])?;

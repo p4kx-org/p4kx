@@ -87,7 +87,7 @@ fn assert_inventory_survives(size: usize, reference: &str) -> TestResult {
 
     let mut options = CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000));
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let food = shop(&catalog, FOOD)?;
     assert_eq!(

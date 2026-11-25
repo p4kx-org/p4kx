@@ -21,7 +21,7 @@ fn readable_class_array_in_sequence_cannot_receive_healthy_normal_publication() 
     let database = fixture::database(TestType::Class(schema::BASE.to_owned()), Case::TwoOwned);
     source::check(&database, DataType::Class, Case::TwoOwned)?;
     let (_folder, archive) = common::open(&database, DcbOrigin::Plain)?;
-    match p4kx_export::build_catalog(&archive, &common::options()) {
+    match p4kx_export::build_catalog(&archive, common::options().with_full_provenance()) {
         Err(CatalogError::IncompleteExport(refusal)) => diagnosis(refusal.health()),
         Ok(built) => Err(format!(
             "readable Class declaration received a normal catalog with {:?} health",

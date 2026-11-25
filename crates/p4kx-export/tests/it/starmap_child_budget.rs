@@ -21,24 +21,13 @@ const SHARED: &str = "Data/ObjectContainers/PU/system/synthetic/shared.socpak";
 #[test]
 fn selected_child_budgets_preserve_partial_health_and_last_complete_output() -> TestResult {
     let source = source()?;
-    let complete = build_catalog_from(&source.archive, &source.entry, &fixture::options())?;
+    let complete = build_catalog_from(
+        &source.archive,
+        &source.entry,
+        fixture::options().with_full_provenance(),
+    )?;
     assert!(complete.summary().export_health().is_complete());
-    let catalog: Value = serde_json::from_slice(complete.json())?;
-    let instances = proof::rows(&catalog, "/placements/containerInstances/rows")?;
-    let positions: Vec<_> = instances
-        .iter()
-        .map(|row| row["worldPosition"]["value"].clone())
-        .collect();
-    assert_eq!(
-        positions,
-        vec![
-            json!([0.0, 0.0, 0.0]),
-            json!([10.0, 0.0, 0.0]),
-            json!([20.0, 0.0, 0.0])
-        ],
-        "one physical tile keeps both independently authored occurrences"
-    );
-    proof::closure(&catalog)?;
+    verify_complete_positions(complete.json())?;
     for (budget, retained) in [
         (StarmapTraversalBudget::new().with_source_children(2), 3),
         (
@@ -56,14 +45,22 @@ fn selected_child_budgets_preserve_partial_health_and_last_complete_output() -> 
             ..fixture::options()
         };
         assert!(matches!(
-            build_catalog_from(&source.archive, &source.entry, &options),
+            build_catalog_from(
+                &source.archive,
+                &source.entry,
+                options.with_full_provenance()
+            ),
             Err(CatalogError::IncompleteExport(_))
         ));
         let diagnostic = CatalogOptions {
             publication_mode: CatalogPublicationMode::DiagnosticPartial,
             ..options
         };
-        let partial = build_catalog_from(&source.archive, &source.entry, &diagnostic)?;
+        let partial = build_catalog_from(
+            &source.archive,
+            &source.entry,
+            diagnostic.with_full_provenance(),
+        )?;
         assert!(!partial.summary().export_health().is_complete());
         let rows: Value = serde_json::from_slice(partial.json())?;
         assert_eq!(
@@ -74,6 +71,28 @@ fn selected_child_budgets_preserve_partial_health_and_last_complete_output() -> 
         verify_refusal(&source, &options, complete.json())?;
     }
     Ok(())
+}
+
+fn verify_complete_positions(json: &[u8]) -> TestResult {
+    let catalog: Value = serde_json::from_slice(json)?;
+    let instances = proof::rows(&catalog, "/placements/containerInstances/rows")?;
+    let positions = instances
+        .iter()
+        .map(|row| {
+            row.pointer("/worldPosition/value")
+                .ok_or("missing world position")
+        })
+        .collect::<Result<Vec<_>, _>>()?;
+    assert_eq!(
+        positions,
+        [
+            &json!([0.0, 0.0, 0.0]),
+            &json!([10.0, 0.0, 0.0]),
+            &json!([20.0, 0.0, 0.0]),
+        ],
+        "one physical tile keeps both independently authored occurrences"
+    );
+    proof::closure(&catalog)
 }
 
 #[test]
@@ -93,7 +112,11 @@ fn zero_child_allowances_accept_an_empty_system() -> TestResult {
             .with_placed_children_per_system(0),
         ..fixture::options()
     };
-    let complete = build_catalog_from(&source.archive, &source.entry, &options)?;
+    let complete = build_catalog_from(
+        &source.archive,
+        &source.entry,
+        options.with_full_provenance(),
+    )?;
     assert!(
         complete.summary().export_health().is_complete(),
         "zero work can satisfy a zero allowance"
@@ -121,7 +144,11 @@ fn cancellation_precedes_an_exhausted_child_allowance() -> TestResult {
     };
     assert!(
         matches!(
-            build_catalog_from(&source.archive, &source.entry, &options),
+            build_catalog_from(
+                &source.archive,
+                &source.entry,
+                options.with_full_provenance()
+            ),
             Err(CatalogError::Cancelled)
         ),
         "cancellation never becomes a partial quota result"
@@ -174,7 +201,7 @@ fn verify_refusal(source: &Fixture, options: &CatalogOptions<'_>, previous: &[u8
         let result = write_catalog_from(
             &source.archive,
             &source.entry,
-            options,
+            options.with_full_provenance(),
             Compression::None,
             || {
                 called.set(true);

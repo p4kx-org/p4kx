@@ -29,7 +29,7 @@ fn catalog_emp_preserves_exact_parameters_links_and_per_field_origins() -> TestR
     let positions = enumerate(tree.root());
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&source, origin)?;
-        let built = build_catalog(&archive, &common::options())?;
+        let built = build_catalog(&archive, common::options().with_full_provenance())?;
         let catalog: Value = serde_json::from_slice(built.json())?;
         let rows = proof::rows(&catalog, ROWS)?;
         assert_eq!(rows.len(), 2, "two physical EMP occurrences");
@@ -88,12 +88,12 @@ fn catalog_emp_distinguishes_missing_family_field_and_readable_wrong_storage() -
     let source = fixture::database(Layout::WrongDeclaration);
     let (_folder, archive) = common::open(&source, DcbOrigin::Encrypted)?;
     assert!(matches!(
-        build_catalog(&archive, &common::options()),
+        build_catalog(&archive, common::options().with_full_provenance()),
         Err(CatalogError::IncompleteExport(_))
     ));
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let row = proof::at(&catalog, "/configurations/emp/rows/0")?;
     proof::cell(row, "pressure", "invalid")?;

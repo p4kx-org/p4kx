@@ -221,7 +221,7 @@ fn catalog(filter: &str) -> TestResult<(BuiltCatalog, Value)> {
     let filter = Filter::new(filter);
     let mut options = common::options();
     options.filter = Some(&filter);
-    let catalog = build_catalog(&archive, &options)?;
+    let catalog = build_catalog(&archive, options.with_full_provenance())?;
     let value = serde_json::from_slice(catalog.json())?;
     let schema = catalog_schema();
     assert!(
@@ -230,7 +230,7 @@ fn catalog(filter: &str) -> TestResult<(BuiltCatalog, Value)> {
     );
     assert_eq!(
         catalog.json(),
-        build_catalog(&archive, &options)?.json(),
+        build_catalog(&archive, options.with_full_provenance())?.json(),
         "same source and selection reproduce exact catalog bytes"
     );
     Ok((catalog, value))

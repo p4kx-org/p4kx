@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::equipment::{
     WeaponAction, WeaponRecoilSnapshot, with_weapon_recoil_definitions_from,
 };
@@ -38,9 +39,10 @@ fn weapon_recoil_sdk_joins_original_actions_and_matches_the_canonical_rows() -> 
             filter: Some(&filter),
             ..common::options()
         };
-        let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
-        let session =
-            CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, options.with_full_provenance())?.json(),
+        )?;
+        let session = full_proof::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
         let parsed = session.parsed(None)?;
         let target =
             parsed.with_weapon_sources(WEAPON, None, |snapshot| -> TestResult<u32> {

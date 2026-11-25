@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::{
     self, CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
     DatasetAvailability, ItemPortSnapshot,
@@ -23,16 +24,14 @@ fn item_port_visitor_retains_canonical_rows_and_owner_local_origins() -> TestRes
         )],
     )?;
     let entry = DataForgeEntry::read(&archive)?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
     let languages = CatalogLanguageSelection::Selected(&[Language::French]);
     let mut indices = Vec::new();
     let mut observed = Vec::new();
-    let summary = catalog_queries::visit_item_ports_from(
-        &archive,
-        &entry,
+    let summary = full_proof::from_entry(&archive, &entry, languages, None)?.visit_item_ports(
         CatalogRecordSelection::All,
-        languages,
         None,
         |index, snapshot| -> TestResult {
             indices.push(index);

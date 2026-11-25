@@ -335,6 +335,6 @@ fn document(
         options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     }
     Ok(serde_json::from_slice(
-        build_catalog(input, &options)?.json(),
+        build_catalog(input, options.with_full_provenance())?.json(),
     )?)
 }

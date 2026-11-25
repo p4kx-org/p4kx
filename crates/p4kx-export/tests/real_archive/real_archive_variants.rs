@@ -240,7 +240,10 @@ fn print_family(catalog: &Value, needle: &str) {
 fn the_variant_groups_of_a_real_archive_resolve_within_their_kind() -> TestResult {
     let archive =
         Archive::open_with_key(real_archive_path()?, p4kx_testkit::real_archive_key().ok())?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let summary = built.summary().variants();
     print_line(&format!(

@@ -37,7 +37,11 @@ fn legacy_quantum_profile_inventory_reconciles_original_reference_slots() -> sup
     let archive = Archive::open(path)?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
-    let built = build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?;
+    let built = build_catalog_from(
+        &archive,
+        &entry,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
     let mut catalog: Value = serde_json::from_slice(built.json())?;
     let mut inventory = baseline::inventory();
     inventory

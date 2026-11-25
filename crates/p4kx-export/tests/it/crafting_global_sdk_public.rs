@@ -14,6 +14,7 @@ use serde_json::Value;
 use super::{fixture, walk};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 #[test]
 fn crafting_globals_getters_match_actual_canonical_rows_in_all_origin_states() -> TestResult {
@@ -24,7 +25,8 @@ fn crafting_globals_getters_match_actual_canonical_rows_in_all_origin_states() -
     ] {
         let (_folder, archive) = common::open(&fixture::database(), origin)?;
         let catalog = canonical(&archive)?;
-        crafting::with_global_params(&archive, CatalogRecordSelection::All, None, |snapshot| {
+        let session = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?;
+        session.with_crafting_global_params(CatalogRecordSelection::All, None, |snapshot| {
             assert_eq!(
                 snapshot.rows().len(),
                 2,
@@ -82,7 +84,7 @@ fn crafting_global_entry_session_and_parsed_selection_keep_original_slots() -> T
     let (_folder, archive) = common::open(&fixture::database(), DcbOrigin::Plain)?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog = canonical(&archive)?;
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::AllAvailable,
@@ -128,9 +130,7 @@ fn crafting_global_entry_session_and_parsed_selection_keep_original_slots() -> T
             walk::snapshot(&snapshot, &catalog)
         },
     )??;
-    crafting::with_global_params_from(
-        &archive,
-        &entry,
+    session.with_crafting_global_params(
         CatalogRecordSelection::RecordIndex(0),
         None,
         |snapshot| walk::snapshot(&snapshot, &catalog),
@@ -188,6 +188,6 @@ fn canonical(archive: &Archive) -> TestResult<Value> {
     let mut options = CatalogOptions::new(std::time::UNIX_EPOCH);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     Ok(serde_json::from_slice(
-        build_catalog(archive, &options)?.json(),
+        build_catalog(archive, options.with_full_provenance())?.json(),
     )?)
 }

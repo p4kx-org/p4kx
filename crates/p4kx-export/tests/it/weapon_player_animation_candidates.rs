@@ -95,7 +95,7 @@ fn check_compressed_replay(fixture: &Fixture, expected: &[u8]) -> TestResult {
     let (_, packed) = write_catalog_from(
         &fixture.archive,
         &fixture.entry,
-        &options,
+        options.with_full_provenance(),
         Compression::Zstd { level: 1 },
         || Ok(Vec::new()),
     )?;

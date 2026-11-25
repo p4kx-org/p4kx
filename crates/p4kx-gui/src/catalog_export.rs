@@ -17,8 +17,10 @@ pub(crate) use name::{is_gzip, normalised_catalog_file};
 
 use crate::read_gate::ReadGate;
 
-/// The default file name for a compressed P4KX catalog.
+/// The proposed file name for a P4KX catalog with full source proofs.
 pub const CATALOG_FILE: &str = "p4kx-catalog.json.zst";
+
+pub(crate) const MARKER_CATALOG_FILE: &str = "p4kx-catalog.markers.json.zst";
 
 /// The distinct filename proposed for explicitly requested diagnostic catalogs.
 pub const DIAGNOSTIC_CATALOG_FILE: &str = "p4kx-catalog.diagnostic.json.zst";

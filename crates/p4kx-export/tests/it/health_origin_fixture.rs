@@ -72,7 +72,7 @@ impl Fixture {
             publication_mode: CatalogPublicationMode::DiagnosticPartial,
             ..options()
         };
-        let built = build_catalog_from(&self.archive, &self.entry, &options)?;
+        let built = build_catalog_from(&self.archive, &self.entry, options.with_full_provenance())?;
         let catalog = serde_json::from_slice(built.json())?;
         Ok((built, catalog))
     }

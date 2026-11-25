@@ -6,14 +6,15 @@
 use std::slice;
 
 use p4kx_extraction::{
-    Archive, ArchiveWatch, Build, CancelToken, Entry, FieldOrigin, Guid, SourceInventory,
+    Archive, ArchiveWatch, Build, CancelToken, Entry, FieldOrigin, Guid, ProvenanceMode,
+    SourceInventory,
 };
 
 use crate::catalog_query_session::checkpoint;
 pub use crate::catalog_read::authored_xml_tree::{
     AuthoredXmlDeclaration, AuthoredXmlElement, AuthoredXmlText,
 };
-use crate::catalog_read::original::{EntryCapture, EntryReceipt, with_entry_capture};
+use crate::catalog_read::original::{EntryCapture, EntryReceipt, with_entry_capture_mode};
 use crate::catalog_table::DatasetAvailability;
 use crate::catalog_v3::subsumption_event::{self, Selection};
 pub use crate::catalog_v3::subsumption_event::{
@@ -85,10 +86,30 @@ pub fn read_subsumption_events(
     selection: SubsumptionEventSelection<'_>,
     cancel: Option<&CancelToken>,
 ) -> Result<SubsumptionEventSnapshot, CatalogError> {
+    read_subsumption_events_with_provenance_mode(
+        archive,
+        selection,
+        ProvenanceMode::MarkersOnly,
+        cancel,
+    )
+}
+
+/// Reads Subsumption events with the selected source detail.
+///
+/// # Errors
+/// Returns the errors of `read_subsumption_events`.
+pub fn read_subsumption_events_with_provenance_mode(
+    archive: &Archive,
+    selection: SubsumptionEventSelection<'_>,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<SubsumptionEventSnapshot, CatalogError> {
     checkpoint(cancel)?;
     let watch = ArchiveWatch::new(archive);
     watch.check()?;
-    let snapshot = with_entry_capture(archive, |capture| read(archive, capture, selection, cancel));
+    let snapshot = with_entry_capture_mode(archive, provenance_mode, |capture| {
+        read(archive, capture, selection, cancel)
+    });
     watch.check()?;
     checkpoint(cancel)?;
     snapshot

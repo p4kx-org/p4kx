@@ -11,8 +11,9 @@ use super::unlocalized_record_query::plan::{Owner, Plan};
 use super::{CatalogLanguageSelection, CatalogRecordCoverage, CatalogRecordSelection};
 use crate::CatalogError;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
-use crate::catalog_query_session::{CatalogQuerySession, ParsedCatalogQueries, checkpoint};
+use crate::catalog_query_session::{
+    CatalogQuerySession, CatalogQuerySource, ParsedCatalogQueries, checkpoint,
+};
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_table::DatasetAvailability;
 use crate::catalog_template_modules::template_prepared_owner::PreparedOwner;
@@ -181,7 +182,7 @@ impl ParsedCatalogQueries<'_> {
 
 fn read<'source>(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &'source DataForge<'source>,
     selection: MissionPropertySelection,
     cancel: Option<&CancelToken>,
@@ -198,7 +199,7 @@ fn read<'source>(
         None,
     )?;
     sort_by_guid(&mut owners, |owner| CatalogGuid(owner.record.guid()));
-    let origins = CatalogOrigins::for_archive_records(archive, entry)?;
+    let origins = entry.records(archive)?;
     let input = OriginalCatalogInput::new(forge, &origins);
     let mut sources = Vec::with_capacity(owners.len());
     let mut rows = Vec::new();

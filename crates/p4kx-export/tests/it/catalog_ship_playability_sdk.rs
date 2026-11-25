@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::collections::BTreeSet;
 
 use p4kx_export::CatalogPublicationMode;
@@ -8,8 +9,7 @@ use serde_json::{Value, json};
 
 use super::{
     Archive, CatalogLanguageSelection, CatalogOptions, CatalogRecordSelection, Corrupt,
-    EXPORTED_AT, Playability, TestResult, UNIX_EPOCH, build_catalog, with_ship_sources,
-    write_archive_with,
+    EXPORTED_AT, Playability, TestResult, UNIX_EPOCH, build_catalog, write_archive_with,
 };
 use crate::health_origin_assertions as proof;
 use crate::playability_fixture::write_archive_with_crew_alias;
@@ -116,7 +116,7 @@ fn catalog(
         ..CatalogOptions::new(UNIX_EPOCH + EXPORTED_AT)
     };
     Ok(serde_json::from_slice(
-        build_catalog(archive, &options)?.json(),
+        build_catalog(archive, options.with_full_provenance())?.json(),
     )?)
 }
 
@@ -202,10 +202,8 @@ fn compare_sdk(
     producer: &Value,
     failed: &BTreeSet<u32>,
 ) -> TestResult {
-    with_ship_sources(
-        archive,
+    full_proof::open(archive, CatalogLanguageSelection::Selected(&[]), None)?.with_ship_sources(
         CatalogRecordSelection::RecordIndex(index),
-        CatalogLanguageSelection::Selected(&[]),
         None,
         |snapshot| -> TestResult {
             let [row] = snapshot.rows() else {

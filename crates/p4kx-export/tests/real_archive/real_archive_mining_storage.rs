@@ -206,13 +206,14 @@ fn scoped_catalog(
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
+    let profile = options.with_full_provenance();
     let (summary, (catalog, bytes)) = pipe::transfer(
         |reader| {
             let mut reader = BufReader::new(CountingReader::new(reader));
             let catalog: WireCatalog = serde_json::from_reader(&mut reader)?;
             Ok::<_, serde_json::Error>((catalog, reader.into_inner().byte_count()))
         },
-        |sink| write_catalog_from(archive, entry, &options, Compression::None, || Ok(sink)),
+        |sink| write_catalog_from(archive, entry, profile, Compression::None, || Ok(sink)),
     )
     .map_err(|_| "write and decode the scoped mining storage catalog")?;
     if catalog.schema_version != SCHEMA_VERSION || bytes != summary.size() {

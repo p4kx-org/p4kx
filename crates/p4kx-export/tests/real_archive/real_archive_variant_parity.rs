@@ -37,10 +37,13 @@ pub(super) fn scoped_normal(
     let (_, document) = pipe::transfer(
         |reader| origins.read_scope(BufReader::new(reader), &sections),
         |writer| {
-            let (summary, sink) =
-                write_catalog_from(archive, entry, &options, Compression::None, || {
-                    Ok(BufWriter::new(writer))
-                })?;
+            let (summary, sink) = write_catalog_from(
+                archive,
+                entry,
+                options.with_full_provenance(),
+                Compression::None,
+                || Ok(BufWriter::new(writer)),
+            )?;
             let writer = sink
                 .into_inner()
                 .map_err(|error| CatalogError::Write(error.into_error()))?;

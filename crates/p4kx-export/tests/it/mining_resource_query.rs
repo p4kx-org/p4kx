@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, CompositionPart,
-    MineableCompositionSnapshot, MineableElementSnapshot, ResourceNumber, ResourceTypeSnapshot,
-    with_mineable_compositions, with_mineable_elements, with_resource_types,
+    CatalogLanguageSelection, CatalogRecordSelection, CompositionPart, MineableCompositionSnapshot,
+    MineableElementSnapshot, ResourceNumber, ResourceTypeSnapshot, with_mineable_compositions,
+    with_mineable_elements, with_resource_types,
 };
 use p4kx_export::{CatalogPublicationMode, build_catalog};
 use p4kx_extraction::{
@@ -30,10 +31,10 @@ fn direct_mining_and_resource_queries_preserve_canonical_rows_and_all_origin_sta
         let (_folder, archive) = archive_fixture::open(&fixture::database(), origin, true)?;
         let mut options = common::options();
         options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-        let built = build_catalog(&archive, &options)?;
+        let built = build_catalog(&archive, options.with_full_provenance())?;
         let catalog: Value = serde_json::from_slice(built.json())?;
         let entry = DataForgeEntry::read(&archive)?;
-        let session = CatalogQuerySession::from_entry(
+        let session = full_proof::from_entry(
             &archive,
             &entry,
             CatalogLanguageSelection::AllAvailable,

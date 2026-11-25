@@ -93,7 +93,8 @@ fn scenario_faction_lookup_uses_only_the_observed_reputation_field() -> TestResu
     let filter = Filter::new("contractscenarios");
     let mut options = fixture::options();
     options.filter = Some(&filter);
-    let built = build_catalog(&archive, &options).map_err(|error| error.to_string())?;
+    let built = build_catalog(&archive, options.with_full_provenance())
+        .map_err(|error| error.to_string())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let row = at(
         &catalog,
@@ -123,7 +124,8 @@ fn scoped_scenario_dependency_keeps_the_actual_dangling_reputation_diagnostic() 
     let filter = Filter::new("contractscenarios");
     let mut options = fixture::options();
     options.filter = Some(&filter);
-    let built = build_catalog(&archive, &options).map_err(|error| error.to_string())?;
+    let built = build_catalog(&archive, options.with_full_provenance())
+        .map_err(|error| error.to_string())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let row = at(
         &catalog,
@@ -184,8 +186,9 @@ fn scenario_does_not_read_a_faction_field_from_an_incompatible_first_physical_al
     let mut options = fixture::options();
     options.filter = Some(&filter);
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog_from(&archive, &entry, &options)?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog_from(&archive, &entry, options.with_full_provenance())?.json(),
+    )?;
     let tier = at(
         &catalog,
         "/contractScenarios/0/factionRewardTiers/value/0/value",
@@ -206,7 +209,8 @@ fn scenario_does_not_read_a_faction_field_from_an_incompatible_first_physical_al
 #[test]
 fn a_faction_selected_alongside_its_scenario_retains_the_complete_original_fields() -> TestResult {
     let (_folder, archive) = fixture::open(&database(REPUTATION), DcbOrigin::Encrypted)?;
-    let built = build_catalog(&archive, &fixture::options()).map_err(|error| error.to_string())?;
+    let built = build_catalog(&archive, fixture::options().with_full_provenance())
+        .map_err(|error| error.to_string())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let row = at(
         &catalog,

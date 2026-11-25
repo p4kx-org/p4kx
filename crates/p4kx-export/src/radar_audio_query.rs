@@ -7,14 +7,14 @@ use std::slice;
 
 pub use p4kx_extraction::sound::radar_audio::{RadarAudioElement, RadarAudioField};
 use p4kx_extraction::{
-    Archive, ArchiveWatch, Build, CancelToken, Entry, FieldOrigin, SourceInventory,
+    Archive, ArchiveWatch, Build, CancelToken, Entry, FieldOrigin, ProvenanceMode, SourceInventory,
 };
 
 use crate::catalog_query_session::checkpoint;
 pub use crate::catalog_read::authored_xml_tree::{
     AuthoredXmlDeclaration, AuthoredXmlElement, AuthoredXmlText,
 };
-use crate::catalog_read::original::{EntryCapture, EntryReceipt, with_entry_capture};
+use crate::catalog_read::original::{EntryCapture, EntryReceipt, with_entry_capture_mode};
 use crate::catalog_table::DatasetAvailability;
 use crate::catalog_v3::radar_audio_configuration;
 pub use crate::catalog_v3::radar_audio_configuration::{
@@ -67,10 +67,23 @@ pub fn read_radar_audio(
     selection: RadarAudioSelection,
     cancel: Option<&CancelToken>,
 ) -> Result<RadarAudioSnapshot, CatalogError> {
+    read_radar_audio_with_provenance_mode(archive, selection, ProvenanceMode::MarkersOnly, cancel)
+}
+
+/// Reads radar audio with the selected source detail.
+///
+/// # Errors
+/// Returns the errors of `read_radar_audio`.
+pub fn read_radar_audio_with_provenance_mode(
+    archive: &Archive,
+    selection: RadarAudioSelection,
+    provenance_mode: ProvenanceMode,
+    cancel: Option<&CancelToken>,
+) -> Result<RadarAudioSnapshot, CatalogError> {
     checkpoint(cancel)?;
     let watch = ArchiveWatch::new(archive);
     watch.check()?;
-    let snapshot = with_entry_capture(archive, |capture| {
+    let snapshot = with_entry_capture_mode(archive, provenance_mode, |capture| {
         let inventory_problem = export_archive_health::inventory(archive);
         let mut ledger = ExportLedger {
             archive_inventory_problem: inventory_problem,

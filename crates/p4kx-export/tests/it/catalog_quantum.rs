@@ -36,9 +36,10 @@ fn quantum_drive_profiles_keep_distinct_source_values_and_physical_owners() -> T
     let field = field_position(tree.root(), "Components")?;
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&source, origin)?;
-        let built = build_catalog(&archive, &common::options())?;
+        let built = build_catalog(&archive, common::options().with_full_provenance())?;
         assert!(
-            built.json() == build_catalog(&archive, &common::options())?.json(),
+            built.json()
+                == build_catalog(&archive, common::options().with_full_provenance())?.json(),
             "fixed source and export time produce byte-identical output"
         );
         let catalog: Value = serde_json::from_slice(built.json())?;
@@ -78,7 +79,7 @@ fn quantum_drive_absence_empty_class_and_invalid_storage_remain_distinct() -> Te
         (Layout::WithoutStandard, "standard", "spline"),
     ] {
         let (_folder, archive) = common::open(&fixture::database(layout), DcbOrigin::Encrypted)?;
-        let built = build_catalog(&archive, &common::options())?;
+        let built = build_catalog(&archive, common::options().with_full_provenance())?;
         let catalog: Value = serde_json::from_slice(built.json())?;
         let row = proof::rows(&catalog, ROWS)?.first().ok_or("quantum row")?;
         proof::cell(row, missing, "absent")?;
@@ -105,14 +106,14 @@ fn quantum_drive_absence_empty_class_and_invalid_storage_remain_distinct() -> Te
     )?;
     assert!(
         matches!(
-            build_catalog(&archive, &common::options()),
+            build_catalog(&archive, common::options().with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "wrong declared storage makes the ordinary export incomplete"
     );
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let row = proof::rows(&catalog, ROWS)?.first().ok_or("quantum row")?;
     let invalid = proof::cell(row, "spline", "invalid")?;

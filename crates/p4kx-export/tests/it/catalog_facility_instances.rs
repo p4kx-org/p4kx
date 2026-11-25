@@ -17,7 +17,8 @@ fn ship_facility_instances_preserve_repeated_nested_and_docked_loadout_positions
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let ship = loadout(&catalog, fixture::SHIP)?;
     let docked = loadout(&catalog, fixture::DOCKED)?;
     assert_eq!(
@@ -53,7 +54,8 @@ fn facility_path_keeps_encrypted_ancestor_separate_from_clear_child_and_definiti
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let rows = proof::rows(&catalog, "/placements/facilityInstances/rows")?;
     let ship_rows = instances_of(rows, fixture::SHIP);
     let [storage, nested, rack_seat] = ship_rows.as_slice() else {

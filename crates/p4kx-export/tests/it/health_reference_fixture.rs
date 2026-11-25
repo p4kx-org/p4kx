@@ -67,6 +67,10 @@ pub(crate) fn document(bytes: &[u8], input: Input) -> TestResult<Value> {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..fixture::options()
     };
-    let built = build_catalog_from(&original.archive, &original.entry, &options)?;
+    let built = build_catalog_from(
+        &original.archive,
+        &original.entry,
+        options.with_full_provenance(),
+    )?;
     Ok(serde_json::from_slice(built.json())?)
 }

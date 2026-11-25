@@ -42,7 +42,10 @@ fn the_quality_quantizations_of_a_real_archive_link_to_resource_types() -> TestR
         real_archive_path()?,
         Some(p4kx_testkit::real_archive_key()?),
     )?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let entries = list(&catalog, "qualityQuantizations")?;
     assert!(entries.len() >= MIN_RECORDS, "{} Records", entries.len());

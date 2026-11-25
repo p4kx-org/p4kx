@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::CatalogRecordSelection;
-use p4kx_export::catalog_queries::equipment::{ItemSnapshot, with_items};
+use p4kx_export::catalog_queries::equipment::ItemSnapshot;
 use p4kx_extraction::{
     DataForge, DataForgeError, SourceLocation, SourceUseDescription, SourceUseRole,
     SourceValueState,
@@ -49,9 +50,11 @@ fn disjoint_headers_cannot_make_a_known_item_variant_incomplete() -> TestResult 
             CatalogRecordSelection::RecordIndex(fixture::SELECTED_RECORD_INDEX),
             CatalogRecordSelection::All,
         ] {
-            with_items(&archive, selection, None, |snapshot| {
-                check_exclusion(&snapshot, fault)
-            })??;
+            full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?.with_items(
+                selection,
+                None,
+                |snapshot| check_exclusion(&snapshot, fault),
+            )??;
         }
     }
     Ok(())
@@ -99,8 +102,7 @@ fn relevant_header_failures_keep_their_original_attempts_and_no_variant_winner()
     for fault in [Fault::FileName, Fault::SourceType] {
         let bytes = fixture_bytes(fault, Scope::PossibleItem)?;
         let (_folder, archive) = common::open_bytes(bytes, DcbOrigin::Encrypted)?;
-        with_items(
-            &archive,
+        full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?.with_items(
             CatalogRecordSelection::RecordIndex(fixture::SELECTED_RECORD_INDEX),
             None,
             |snapshot| check_relevant_failure(&snapshot, fault),

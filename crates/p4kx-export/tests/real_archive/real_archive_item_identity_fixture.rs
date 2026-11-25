@@ -26,7 +26,8 @@ pub(super) fn read(origin: DcbOrigin, cross_family: bool) -> TestResult<Fixture>
     if matches!(origin, DcbOrigin::Unknown) {
         options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     }
-    let catalog = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     Ok(Fixture {
         archive,
         catalog,

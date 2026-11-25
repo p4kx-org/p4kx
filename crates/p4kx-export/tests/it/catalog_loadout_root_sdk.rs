@@ -3,12 +3,13 @@
 
 use p4kx_export::build_catalog;
 use p4kx_export::catalog_queries::CatalogRecordSelection;
-use p4kx_export::catalog_queries::equipment::{LoadoutOwnerKind, read_loadouts};
+use p4kx_export::catalog_queries::equipment::LoadoutOwnerKind;
 use p4kx_testkit::{DataForgeBuilder, TestEntity, TestPort, TestRecord, TestStruct, entity_schema};
 use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
+use crate::sdk_full_proof as full_proof;
 
 const ITEM_GUID: u128 = 0xf0;
 const SHIP_GUID: u128 = 0x10;
@@ -18,9 +19,11 @@ fn loadout_root_identity_survives_item_staging_and_matches_the_sdk() -> TestResu
     let database = root_database();
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&database, origin)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
-        let selected = read_loadouts(&archive, CatalogRecordSelection::All, None)?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
+        let selected = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?
+            .read_loadouts(CatalogRecordSelection::All, None)?;
         let [ship, item] = selected.rows.as_slice() else {
             return Err("one retained Ship and one staged Item".into());
         };
@@ -73,7 +76,8 @@ fn loadout_owner_kind_retains_the_known_absent_name_selector() -> TestResult {
         .without_name(),
     );
     let (_folder, archive) = common::open(&database, DcbOrigin::Plain)?;
-    let selected = read_loadouts(&archive, CatalogRecordSelection::RecordIndex(0), None)?;
+    let selected = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?
+        .read_loadouts(CatalogRecordSelection::RecordIndex(0), None)?;
     assert_eq!(selected.coverage.skipped_leftovers, 0);
     let output = json!({"loadouts": selected.rows, "provenance": selected.source_inventory});
     let [row] = proof::rows(&output, "/loadouts")? else {

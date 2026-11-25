@@ -119,7 +119,7 @@ fn output(archive: &Archive, filter: Option<&Filter>) -> Result<Value, Box<dyn s
     options.filter = filter;
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     Ok(serde_json::from_slice(
-        build_catalog(archive, &options)?.json(),
+        build_catalog(archive, options.with_full_provenance())?.json(),
     )?)
 }
 

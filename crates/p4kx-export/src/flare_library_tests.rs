@@ -237,7 +237,7 @@ fn flare_parameters_preserve_finite_empty_invalid_and_directory_link_outcomes() 
 fn authored_flare_rows_match_the_full_catalog_table() -> TestResult {
     let (_folder, archive) = fixture()?;
     let options = CatalogOptions::new(UNIX_EPOCH);
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let selected = read_flare_libraries(&archive, FlareLibrarySelection::All, None)?;
     let rows = catalog
@@ -291,11 +291,11 @@ fn required_flare_failures_are_counted_and_refuse_normal_publication() -> TestRe
 
     let mut options = CatalogOptions::new(UNIX_EPOCH);
     assert!(matches!(
-        build_catalog(&archive, &options),
+        build_catalog(&archive, options.with_full_provenance()),
         Err(CatalogError::IncompleteExport(_))
     ));
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let health = catalog
         .pointer("/exportHealth/kinds")

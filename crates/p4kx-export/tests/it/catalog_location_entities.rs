@@ -2,16 +2,17 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    HaulingTargetBinding, LocationEntityDeclaration, LocationEntityDeclarationSnapshot,
-    LocationEntityKind, ParsedCatalogQueries, SourceArenaOutput, SourcePayload,
-    SourceRecordReference, SourceValueRef, with_location_entity_declarations,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability, HaulingTargetBinding,
+    LocationEntityDeclaration, LocationEntityDeclarationSnapshot, LocationEntityKind,
+    ParsedCatalogQueries, SourceArenaOutput, SourcePayload, SourceRecordReference, SourceValueRef,
+    with_location_entity_declarations,
 };
 use p4kx_export::{CatalogPublicationMode, Filter, build_catalog};
 use p4kx_extraction::{Language, SourceValueState};
 use serde_json::Value;
 
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult, at, guid};
+use crate::sdk_full_proof as full_proof;
 
 #[path = "location_entity_fixture.rs"]
 mod fixture;
@@ -25,9 +26,10 @@ fn location_entity_declarations_match_catalog_and_preserve_source_slots() -> Tes
     let (_folder, archive) = common::open(&database(), DcbOrigin::Plain)?;
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let expected = at(&catalog, &format!("{TABLE}/rows"))?;
-    let parsed = CatalogQuerySession::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
+    let parsed = full_proof::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
     parsed.with_location_entity_declarations(
         CatalogRecordSelection::All,
         None,
@@ -268,7 +270,7 @@ fn location_entity_sdk_selects_duplicates_and_keeps_empty_filtered_availability(
 fn hauling_override_bindings_join_original_arrays_to_location_entities() -> TestResult {
     let database = hauling_database();
     let (_folder, archive) = common::open(&database, DcbOrigin::Encrypted)?;
-    let query = CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
+    let query = full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?;
     let parsed = query.parsed(None)?;
     parsed.with_contract_generators(
         CatalogRecordSelection::Guid(guid(GENERATOR).parse()?),

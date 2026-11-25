@@ -3,7 +3,7 @@
 
 use p4kx_export::build_catalog;
 use p4kx_export::catalog_queries::location_vocabulary::{
-    ContractScopeSnapshot, with_contract_scopes, with_contract_scopes_from,
+    ContractScopeSnapshot, with_contract_scopes,
 };
 use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_extraction::{DataForgeEntry, SourceValueState};
@@ -11,6 +11,7 @@ use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as origin;
+use crate::sdk_full_proof as full_proof;
 
 #[path = "catalog_contract_scope_sdk_fixture.rs"]
 mod fixture;
@@ -23,17 +24,19 @@ fn contract_scope_sdk_matches_all_canonical_slots_and_public_text() -> TestResul
         &fixture::database(fixture::Layout::Complete),
         DcbOrigin::Encrypted,
     )?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
     let entry = DataForgeEntry::read(&archive)?;
-    with_contract_scopes_from(
+    full_proof::from_entry(
         &archive,
         &entry,
-        CatalogRecordSelection::All,
         CatalogLanguageSelection::AllAvailable,
         None,
-        |snapshot| check_parity(&snapshot, &catalog),
-    )??;
+    )?
+    .with_contract_scopes(CatalogRecordSelection::All, None, |snapshot| {
+        check_parity(&snapshot, &catalog)
+    })??;
     Ok(())
 }
 

@@ -22,7 +22,7 @@ const MISSING: u128 = 0x1074_00ff;
 #[test]
 fn disabled_location_keeps_all_authored_limits_and_security_reference() -> TestResult {
     let (_directory, archive) = common::open(&database(), DcbOrigin::Encrypted)?;
-    let built = build_catalog(&archive, &common::options())?;
+    let built = build_catalog(&archive, common::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let location = at(&catalog, "/missionLocationTemplates/0")?;
     assert_eq!(

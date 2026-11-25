@@ -99,7 +99,10 @@ fn contracts_of_a_real_archive_list_their_hauling_orders() -> TestResult {
         p4kx_testkit::real_archive_path()?,
         Some(p4kx_testkit::real_archive_key()?),
     )?;
-    let built = p4kx_export::build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = p4kx_export::build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let contracts = crate::real_archive_contracts::v3::rows(&catalog)?;
     let subtypes = commodity_subtypes(&catalog)?;

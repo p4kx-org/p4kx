@@ -18,7 +18,7 @@ const ROWS: &str = "/configurations/quantumInterdiction/rows";
 fn quantum_interdiction_preserves_jammer_pulse_weak_interactions_and_visual_graph() -> TestResult {
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&fixture::database(false), origin)?;
-        let built = build_catalog(&archive, &common::options())?;
+        let built = build_catalog(&archive, common::options().with_full_provenance())?;
         let catalog: Value = serde_json::from_slice(built.json())?;
         let schema = p4kx_export::catalog_schema();
         let validator = jsonschema::validator_for(&schema)?;
@@ -76,14 +76,14 @@ fn quantum_interdiction_does_not_accept_a_foreign_declared_jammer_pointer() -> T
     let (_folder, archive) = common::open(&fixture::database(true), DcbOrigin::Plain)?;
     assert!(
         matches!(
-            build_catalog(&archive, &common::options()),
+            build_catalog(&archive, common::options().with_full_provenance()),
             Err(CatalogError::IncompleteExport(_))
         ),
         "the foreign nominal declaration prevents complete publication"
     );
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = build_catalog(&archive, &options)?;
+    let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let row = proof::rows(&catalog, ROWS)?.first().ok_or("QIG row")?;
     proof::cell(row, "jammerSettings", "unsupported")?;

@@ -51,7 +51,10 @@ fn catalog() -> super::Result<Value> {
         .entry(TestEntry::stored("Data/Game2.dcb", database.build()))
         .write_to(&path)?;
     let archive = Archive::open(path)?;
-    let built = p4kx_export::build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;
+    let built = p4kx_export::build_catalog(
+        &archive,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
     assert!(
         built.summary().export_health().is_complete(),
         "the source fixture is a genuinely healthy actual producer"

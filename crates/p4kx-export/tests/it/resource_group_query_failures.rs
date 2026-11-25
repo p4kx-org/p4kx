@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::CatalogPublicationMode;
-use p4kx_export::catalog_queries::{
-    CatalogRecordSelection, ResourceGroupParentSnapshot, with_resource_group_parents,
-};
+use p4kx_export::catalog_queries::{CatalogRecordSelection, ResourceGroupParentSnapshot};
 use p4kx_extraction::{SourceLocation, SourceUseDescription, SourceUseRole};
 use serde_json::Value;
 
@@ -21,12 +20,12 @@ fn parent_prefix_knowledge_distinguishes_earlier_and_later_field_failures() -> T
         for before in [false, true] {
             let (_folder, archive) = common::open(&fixture::fault(before), origin)?;
             let catalog = parity::catalog(&archive, CatalogPublicationMode::DiagnosticPartial)?;
-            with_resource_group_parents(
-                &archive,
-                CatalogRecordSelection::Guid(common::guid(fixture::CHILD).parse()?),
-                None,
-                |snapshot| field_failure(&snapshot, &catalog, before, marker),
-            )??;
+            full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?
+                .with_resource_group_parents(
+                    CatalogRecordSelection::Guid(common::guid(fixture::CHILD).parse()?),
+                    None,
+                    |snapshot| field_failure(&snapshot, &catalog, before, marker),
+                )??;
         }
     }
     Ok(())
@@ -92,8 +91,7 @@ fn reachable_unreadable_early_path_keeps_parent_choice_and_exact_failed_metadata
     let (_folder, archive) =
         common::open_bytes(fixture::unreadable_first_path()?, DcbOrigin::Plain)?;
     let catalog = parity::catalog(&archive, CatalogPublicationMode::DiagnosticPartial)?;
-    with_resource_group_parents(
-        &archive,
+    full_proof::open(&archive, full_proof::NO_LANGUAGES, None)?.with_resource_group_parents(
         CatalogRecordSelection::Guid(common::guid(fixture::CHILD).parse()?),
         None,
         |snapshot| -> TestResult {

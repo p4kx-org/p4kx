@@ -20,7 +20,7 @@ fn diagnostic_identities_distinguish_authored_guids_target_headers_and_original_
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..fixture::options()
     };
-    let built = build_catalog_from(&input.archive, &input.entry, &options)?;
+    let built = build_catalog_from(&input.archive, &input.entry, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let references = check::rows(&catalog, "/exportHealth/unresolvedReferences")?;
     let dangling = by_status(references, "dangling")?;

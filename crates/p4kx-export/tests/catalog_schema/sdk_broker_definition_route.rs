@@ -15,6 +15,7 @@ use p4kx_testkit::{
 use serde_json::{Value, json};
 
 use super::{Route, TestResult};
+use crate::sdk_full_proof as full_proof;
 
 pub(in super::super) const DATASET: &str = "/definitions/missionBrokerEntries";
 
@@ -131,10 +132,11 @@ fn broker_definitions_apply_canonical_admission_to_all_and_guid() -> TestResult 
         .record(1)
         .ok_or("explicit leftover Record")?
         .guid();
+    let options = CatalogOptions::new(UNIX_EPOCH);
     let catalog = serde_json::from_slice::<Value>(
-        p4kx_export::build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?.json(),
+        p4kx_export::build_catalog_from(&archive, &entry, options.with_full_provenance())?.json(),
     )?;
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::AllAvailable,

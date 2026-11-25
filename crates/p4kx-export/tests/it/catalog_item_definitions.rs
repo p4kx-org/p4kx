@@ -130,7 +130,7 @@ fn purchase_only_names_preserve_order_empty_keys_and_language_origins() -> TestR
         .build();
     let ordinals = original_purchase_names(&bytes)?;
     let (_folder, archive) = common::open_bytes(bytes, DcbOrigin::Plain)?;
-    let built = build_catalog(&archive, &common::options())?;
+    let built = build_catalog(&archive, common::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     assert_eq!(
         proof::at(&catalog, "/schemaVersion")?,
@@ -396,6 +396,5 @@ fn class(name: &str) -> TestType {
 
 #[path = "equipment_source_sdk.rs"]
 pub(crate) mod equipment_sdk;
-
 #[path = "item_source_projection_tests.rs"]
 mod source_projection;

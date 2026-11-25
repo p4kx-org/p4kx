@@ -132,7 +132,7 @@ fn catalog(archive: &Archive, patches: Option<&PublicPatches>) -> TestResult<Val
         public_patches: patches,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let result = build_catalog(archive, &options)?;
+    let result = build_catalog(archive, options.with_full_provenance())?;
     Ok(serde_json::from_slice(result.json())?)
 }
 

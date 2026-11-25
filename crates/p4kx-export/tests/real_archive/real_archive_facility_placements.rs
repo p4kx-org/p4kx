@@ -109,7 +109,7 @@ fn build(archive: &Archive, entry: &DataForgeEntry, filter: &Filter) -> Result<(
         filter: Some(filter),
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let (built, normal) = match build_catalog_from(archive, entry, &options) {
+    let (built, normal) = match build_catalog_from(archive, entry, options.with_full_provenance()) {
         Ok(built) => (built, true),
         Err(CatalogError::IncompleteExport(refusal)) => {
             let health = refusal.health();
@@ -139,7 +139,7 @@ fn build(archive: &Archive, entry: &DataForgeEntry, filter: &Filter) -> Result<(
                 ..options
             };
             (
-                build_catalog_from(archive, entry, &options)
+                build_catalog_from(archive, entry, options.with_full_provenance())
                     .map_err(|_| "build filtered diagnostic catalog")?,
                 false,
             )

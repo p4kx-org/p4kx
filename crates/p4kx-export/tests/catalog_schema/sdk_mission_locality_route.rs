@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::{
     CatalogRecordSelection, MissionLocalitySnapshot, SourceRecordReference,
-    with_mission_localities_from,
 };
 use p4kx_export::{CatalogOptions, build_catalog_from};
 use p4kx_extraction::{Archive, DataForgeEntry, InputScope, SourceInventory, SourceLocation};
@@ -21,7 +21,12 @@ pub(super) fn read() -> TestResult<Route> {
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog: Value = serde_json::from_slice(
-        build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?.json(),
+        build_catalog_from(
+            &archive,
+            &entry,
+            CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+        )?
+        .json(),
     )?;
     let expected = catalog.pointer(DATASET).ok_or("canonical locality table")?;
     let index = serde_json::from_value::<u32>(
@@ -30,12 +35,7 @@ pub(super) fn read() -> TestResult<Route> {
             .ok_or("physical locality index")?
             .clone(),
     )?;
-    with_mission_localities_from(
-        &archive,
-        &entry,
-        CatalogRecordSelection::RecordIndex(index),
-        None,
-        |snapshot| {
+    full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?.with_mission_localities(CatalogRecordSelection::RecordIndex(index), None, |snapshot| {
             verify_slots(&snapshot, index)?;
             assert_eq!(
                 &json!({"availability": snapshot.availability, "rows": snapshot.rows}),
@@ -47,8 +47,7 @@ pub(super) fn read() -> TestResult<Route> {
                 &snapshot.rows,
                 "encrypted synthetic producer and source parity available; installed producer parity open",
             )
-        },
-    )?
+        })?
 }
 
 fn verify_slots(snapshot: &MissionLocalitySnapshot<'_>, index: u32) -> TestResult {

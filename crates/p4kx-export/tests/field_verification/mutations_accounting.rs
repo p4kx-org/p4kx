@@ -162,7 +162,7 @@ fn a_successful_public_mapper_cannot_hide_a_populated_nested_block() -> super::R
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
     let built = p4kx_export::build_catalog(
         &archive,
-        &p4kx_export::CatalogOptions::new(std::time::UNIX_EPOCH),
+        p4kx_export::CatalogOptions::new(std::time::UNIX_EPOCH).with_full_provenance(),
     )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let loaded = DataForgeEntry::read(&archive)?;

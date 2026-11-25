@@ -121,6 +121,9 @@ fn fixture(storage: TestType) -> Result<Value, Box<dyn Error>> {
     let path = directory.path().join("Data.p4k");
     original::write(&path, storage)?;
     let archive = Archive::open_with_key(&path, Some(p4kx_testkit::test_key()))?;
-    let output = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;
+    let output = build_catalog(
+        &archive,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
     Ok(serde_json::from_slice(output.json())?)
 }

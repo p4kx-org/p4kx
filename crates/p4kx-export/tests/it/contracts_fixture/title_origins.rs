@@ -107,7 +107,7 @@ fn build(fixture: &Fixture) -> TestResult<Value> {
     let built = p4kx_export::build_catalog_from(
         &fixture.archive,
         &fixture.entry,
-        &health_origin_fixture::options(),
+        health_origin_fixture::options().with_full_provenance(),
     )?;
     assert!(
         built.summary().is_complete(),

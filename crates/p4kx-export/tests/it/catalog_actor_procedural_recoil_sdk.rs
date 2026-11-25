@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::equipment::actor_procedural_recoil::{
     ActorProceduralRecoilConfigSnapshot, ActorProceduralRecoilModifierSnapshot,
 };
@@ -25,8 +26,9 @@ fn actor_recoil_sdk_matches_unreachable_original_tables_and_their_sources() -> T
     let database = fixture::database_with_actor_recoil();
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&database, origin)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
         let operating = proof::at(
             &catalog,
             "/configurations/weaponActions/rows/0/operatingConfiguration/actorProceduralRecoilConfig/value",
@@ -35,8 +37,7 @@ fn actor_recoil_sdk_matches_unreachable_original_tables_and_their_sources() -> T
             operating["status"], "dangling",
             "the weapon does not reach these definitions"
         );
-        let session =
-            CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
+        let session = full_proof::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
         let parsed = session.parsed(None)?;
         let target = parsed.with_actor_procedural_recoil_configs(
             CatalogRecordSelection::All,

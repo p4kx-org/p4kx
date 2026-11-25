@@ -44,9 +44,13 @@ fn actual_normal_refusal_retains_its_own_inventory_and_unrelated_errors_do_not_i
 -> TestResult {
     let source = Fixture::open(&fixture::broken_lists(1, false), Input::Plain, Vec::new())?;
     support::broken_subject(&source)?;
-    let error = build_catalog_from(&source.archive, &source.entry, &fixture::options())
-        .err()
-        .ok_or("actual normal refusal")?;
+    let error = build_catalog_from(
+        &source.archive,
+        &source.entry,
+        fixture::options().with_full_provenance(),
+    )
+    .err()
+    .ok_or("actual normal refusal")?;
     let CatalogError::IncompleteExport(refusal) = &error else {
         return Err("the genuine source failure remains typed IncompleteExport".into());
     };
@@ -61,10 +65,11 @@ fn actual_normal_refusal_retains_its_own_inventory_and_unrelated_errors_do_not_i
     token.cancel();
     let cancelled = build_catalog(
         &source.archive,
-        &CatalogOptions {
+        CatalogOptions {
             cancel: Some(&token),
             ..fixture::options()
-        },
+        }
+        .with_full_provenance(),
     )
     .err()
     .ok_or("actual early cancellation")?;

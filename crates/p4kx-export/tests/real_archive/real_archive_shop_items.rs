@@ -45,7 +45,10 @@ pub(crate) fn guids_of(catalog: &Value) -> Result<HashSet<&str>, Box<dyn Error>>
 )]
 fn shops_get_item_lists_from_the_inventories_their_containers_name() -> TestResult {
     let archive = Archive::open_with_key(real_archive_path()?, Some(real_archive_key()?))?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let shops = catalog["shops"].as_array().ok_or("shops")?;
     let summary = built.summary().shops();

@@ -92,7 +92,7 @@ fn catalog_rejects_invalid_zstd_levels_before_opening_the_archive() -> TestResul
         let out = dir.path().join(name);
         fs::write(&out, b"existing catalog")?;
 
-        let output = p4kx(&["catalog"])?
+        let output = p4kx(&["catalog", "--provenance", "full"])?
             .arg(&archive)
             .arg("--out")
             .arg(&out)
@@ -135,7 +135,7 @@ fn catalog_to_a_gz_name_is_refused_instead_of_writing_plain_json() -> TestResult
     let archive = write_archive(dir.path())?;
     let out = dir.path().join("p4kx-catalog.json.gz");
 
-    let output = p4kx(&["catalog"])?
+    let output = p4kx(&["catalog", "--provenance", "full"])?
         .arg(&archive)
         .arg("--out")
         .arg(&out)

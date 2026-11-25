@@ -117,7 +117,7 @@ fn ship_name_has_english_german_and_french_display_forms() -> TestResult {
         ],
     )?;
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
-    let built = build_catalog(&archive, &options())?;
+    let built = build_catalog(&archive, options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let name = &catalog["ships"][0]["name"]["value"];
     let row = catalog

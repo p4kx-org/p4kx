@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::catalog_queries::{
     CatalogGuid, CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
     ContractSnapshot, ParsedCatalogQueries, SourcePayload,
@@ -29,7 +30,8 @@ fn contract_sdk_negative_reverse_survey_has_the_actual_false_outcome_witness() -
     });
     let (_folder, archive) = commodity_v3_fixture::open_bytes(bytes, DcbOrigin::Plain)?;
     let session =
-        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
+        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?
+            .with_provenance_mode(full_proof::MODE);
     let parsed = session.parsed(None)?;
     let negative = negative_outcome(&parsed)?;
     parsed.with_contracts(CatalogRecordSelection::RecordIndex(SELECTED), None, |snapshot| {
@@ -68,7 +70,8 @@ fn contract_sdk_unreadable_reverse_owner_keeps_empty_intros_incomplete_and_unkno
     );
     let (_folder, archive) = commodity_v3_fixture::open_bytes(bytes, DcbOrigin::Plain)?;
     let session =
-        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
+        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?
+            .with_provenance_mode(full_proof::MODE);
     session.with_contracts(CatalogRecordSelection::RecordIndex(SELECTED), None, |snapshot| {
         let origin = empty_intro(&snapshot)?.origin();
         assert!(!origin.source_set_complete(), "an unreadable reverse source cannot prove absence of a grant");

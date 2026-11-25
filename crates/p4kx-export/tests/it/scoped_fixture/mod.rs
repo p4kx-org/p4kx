@@ -97,10 +97,11 @@ fn build_mode(
     let archive = Archive::open(&path)?;
     let built = build_catalog(
         &archive,
-        &CatalogOptions {
+        CatalogOptions {
             publication_mode,
             ..CatalogOptions::new(UNIX_EPOCH + Duration::from_secs(1_792_000_000))
-        },
+        }
+        .with_full_provenance(),
     )?;
     Ok(Report {
         document: serde_json::from_slice(built.json())?,

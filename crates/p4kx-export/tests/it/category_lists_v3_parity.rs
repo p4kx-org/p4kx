@@ -90,7 +90,7 @@ fn build(database: &DataForgeBuilder) -> TestResult<(BuiltCatalog, Value)> {
         .write_to(&path)?;
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
     let options = common::options();
-    let built = p4kx_export::build_catalog(&archive, &options)?;
+    let built = p4kx_export::build_catalog(&archive, options.with_full_provenance())?;
     let catalog = serde_json::from_slice(built.json())?;
     Ok((built, catalog))
 }

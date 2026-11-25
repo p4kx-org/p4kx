@@ -9,10 +9,10 @@ use p4kx_extraction::{
 };
 
 use super::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_query_session::{
-    CatalogLanguageSelection, CatalogQuerySession, ParsedCatalogQueries, checkpoint,
+    CatalogLanguageSelection, CatalogQuerySession, CatalogQuerySource, ParsedCatalogQueries,
+    checkpoint,
 };
 use crate::catalog_read::original::EntryCapture;
 use crate::catalog_v3::catalog_harvest_modules::harvest_provider;
@@ -113,7 +113,7 @@ impl ParsedCatalogQueries<'_> {
 
 fn read_archive(
     archive: &Archive,
-    entry: &DataForgeEntry,
+    entry: CatalogQuerySource<'_>,
     forge: &DataForge<'_>,
     options: MiningLocationOptions<'_>,
     languages: &[Language],
@@ -121,7 +121,7 @@ fn read_archive(
     let cancel = options.cancel;
     let sources = TextSources::read_languages(archive, languages)?;
     let texts = Texts::parse(&sources)?;
-    let origins = CatalogOrigins::new(archive, entry, &sources)?;
+    let origins = entry.with_texts(archive, &sources)?;
     let input = OriginalCatalogInput::new(forge, &origins);
     let registry = CatalogTextRegistry::default();
     let projection = CatalogProjection::new(&texts, &input, &registry);

@@ -16,7 +16,7 @@ use crate::health_origin_assertions as health;
 fn a_crafted_commodity_keeps_its_resource_link_and_the_separate_backfill_proof() -> TestResult {
     let database = limit_fixture::crafted_database();
     let (_directory, archive) = fixture::open(&database, DcbOrigin::Encrypted)?;
-    let built = p4kx_export::build_catalog(&archive, &fixture::options())?;
+    let built = p4kx_export::build_catalog(&archive, fixture::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let fallback = fixture::RESOURCE_FALLBACK;
     let entity = limit_fixture::CRAFTED_COMMODITY;
@@ -128,7 +128,7 @@ fn wide_blueprint_backfill_keeps_every_original_selection_use() -> TestResult {
         ] {
             let mut options = fixture::options();
             options.publication_mode = mode;
-            let built = p4kx_export::build_catalog(&archive, &options)?;
+            let built = p4kx_export::build_catalog(&archive, options.with_full_provenance())?;
             let catalog: Value = serde_json::from_slice(built.json())?;
             payload::assert_complete(&catalog)?;
             assert_eq!(catalog["exportHealth"]["publicationMode"], label);

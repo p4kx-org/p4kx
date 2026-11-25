@@ -41,7 +41,7 @@ fn category_v3_preserves_blueprint_ingredients_legacy_unlink_and_original_commod
         .entry(crafting_fixture::german())
         .write_to(&path)?;
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
-    let built = p4kx_export::build_catalog(&archive, &common::options())?;
+    let built = p4kx_export::build_catalog(&archive, common::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     assert_blueprints(&catalog)?;
     assert_backfill(&catalog, magazine_index)?;

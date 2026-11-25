@@ -62,7 +62,7 @@ fn observed_variant(identity: Identity, key: Key, order: Order) -> TestResult<Op
     check_originals(&archive, identity, order)?;
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let built = p4kx_export::build_catalog(&archive, &options)?;
+    let built = p4kx_export::build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     assert_physical_ship(&catalog, fixture::BASE_CLASS, 111.0, 50.0)?;
     let (mass, health) = match key {

@@ -4,7 +4,6 @@
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::CatalogRecordSelection;
-use p4kx_export::catalog_queries::equipment::loot_generation::with_loot_generation_components_from;
 use p4kx_export::{CatalogOptions, build_catalog_from};
 use p4kx_extraction::{Archive, DataForgeEntry};
 use p4kx_testkit::{
@@ -12,6 +11,8 @@ use p4kx_testkit::{
     TestValue, entity_schema,
 };
 use serde_json::Value;
+
+use crate::sdk_full_proof as full_proof;
 
 use super::super::LOOT_GENERATION;
 use super::component_parity::parity;
@@ -23,18 +24,14 @@ pub(super) fn read() -> TestResult<Route> {
     let (_directory, archive) = fixture()?;
     let entry = DataForgeEntry::read(&archive)?;
     let options = CatalogOptions::new(UNIX_EPOCH);
-    let catalog: Value =
-        serde_json::from_slice(build_catalog_from(&archive, &entry, &options)?.json())?;
-    with_loot_generation_components_from(
-        &archive,
-        &entry,
-        CatalogRecordSelection::All,
-        None,
-        |snapshot| {
+    let catalog: Value = serde_json::from_slice(
+        build_catalog_from(&archive, &entry, options.with_full_provenance())?.json(),
+    )?;
+    full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .with_loot_generation_components(CatalogRecordSelection::All, None, |snapshot| {
             parity(LOOT_GENERATION, &snapshot, &catalog)?;
             Route::queried_rows(LOOT_GENERATION, snapshot.rows(), None)
-        },
-    )?
+        })?
 }
 
 fn fixture() -> TestResult<(tempfile::TempDir, Archive)> {

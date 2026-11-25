@@ -162,7 +162,11 @@ fn refusal(input: &Fixture) {
     let options = health_origin_fixture::options();
     assert!(
         matches!(
-            p4kx_export::build_catalog_from(&input.archive, &input.entry, &options),
+            p4kx_export::build_catalog_from(
+                &input.archive,
+                &input.entry,
+                options.with_full_provenance()
+            ),
             Err(CatalogError::IncompleteExport(_))
         ),
         "the same required original failure refuses Normal publication"
@@ -172,7 +176,7 @@ fn refusal(input: &Fixture) {
         let result = p4kx_export::write_catalog_from(
             &input.archive,
             &input.entry,
-            &options,
+            options.with_full_provenance(),
             compression,
             || {
                 created = true;

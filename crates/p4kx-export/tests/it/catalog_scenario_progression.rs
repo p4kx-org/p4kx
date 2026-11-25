@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use p4kx_export::build_catalog_from;
 use p4kx_export::catalog_queries::CatalogRecordSelection;
-use p4kx_export::catalog_queries::contract_scenarios::with_contract_scenarios_from;
 use p4kx_extraction::DataForgeEntry;
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 use serde_json::{Value, json};
@@ -16,7 +16,7 @@ use crate::reputation_fixture::{FACTION, LEGACY_FACTION, MISSING, PLAIN_A, PLAIN
 fn equal_guid_and_path_scenarios_keep_distinct_physical_owners_and_numbers() -> TestResult {
     let (_folder, archive) = common::open(&scenario_aliases(), DcbOrigin::Encrypted)?;
     let entry = DataForgeEntry::read(&archive)?;
-    let built = build_catalog_from(&archive, &entry, &common::options())?;
+    let built = build_catalog_from(&archive, &entry, common::options().with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let [first, second] = proof::rows(&catalog, "/contractScenarios")? else {
         return Err("exactly two physical owners share the same GUID and path".into());
@@ -33,27 +33,26 @@ fn equal_guid_and_path_scenarios_keep_distinct_physical_owners_and_numbers() -> 
             threshold_bits,
             "each physical owner keeps its own original multiplier"
         );
-        with_contract_scenarios_from(
-            &archive,
-            &entry,
-            CatalogRecordSelection::RecordIndex(index),
-            None,
-            |snapshot| -> TestResult {
-                let [selected] = snapshot.rows.as_slice() else {
-                    return Err("one physical scenario selected by index".into());
-                };
-                assert_eq!(
-                    &serde_json::to_value(selected)?,
-                    row,
-                    "the scoped SDK returns the same exact physical Catalog row"
-                );
-                assert!(
-                    snapshot.coverage.incomplete_fields.is_empty(),
-                    "all original multiplier and identity fields remain complete"
-                );
-                Ok(())
-            },
-        )??;
+        full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+            .with_contract_scenarios(
+                CatalogRecordSelection::RecordIndex(index),
+                None,
+                |snapshot| -> TestResult {
+                    let [selected] = snapshot.rows.as_slice() else {
+                        return Err("one physical scenario selected by index".into());
+                    };
+                    assert_eq!(
+                        &serde_json::to_value(selected)?,
+                        row,
+                        "the scoped SDK returns the same exact physical Catalog row"
+                    );
+                    assert!(
+                        snapshot.coverage.incomplete_fields.is_empty(),
+                        "all original multiplier and identity fields remain complete"
+                    );
+                    Ok(())
+                },
+            )??;
     }
     proof::closure(&catalog)
 }

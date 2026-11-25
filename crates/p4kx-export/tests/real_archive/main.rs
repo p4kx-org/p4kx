@@ -102,6 +102,7 @@ mod real_archive_loot_document_sdk;
 mod real_archive_loot_generation_components;
 mod real_archive_loot_harvest_sdk_parity;
 mod real_archive_loot_source_shapes;
+mod real_archive_marker_sdk_ab;
 mod real_archive_medical_tier_sdk;
 mod real_archive_mining;
 mod real_archive_mining_configurations;

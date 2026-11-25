@@ -74,7 +74,7 @@ fn publish(
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let export = build_catalog_from(archive, entry, &options)?;
+    let export = build_catalog_from(archive, entry, options.with_full_provenance())?;
     Ok(serde_json::from_slice(export.json())?)
 }
 

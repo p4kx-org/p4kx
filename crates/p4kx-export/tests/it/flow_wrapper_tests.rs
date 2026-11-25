@@ -23,7 +23,11 @@ use self::fixture::Case;
 fn flow_wrappers_export_all_slots_weights_and_local_links_for_both_owner_families() -> TestResult {
     for kind in [Input::Plain, Input::Encrypted, Input::Standalone] {
         let fixture = fixture::open(Case::Mixed, kind, true)?;
-        let built = build_catalog_from(&fixture.archive, &fixture.entry, &source::options())?;
+        let built = build_catalog_from(
+            &fixture.archive,
+            &fixture.entry,
+            source::options().with_full_provenance(),
+        )?;
         assert!(
             built.summary().export_health().is_complete(),
             "readable new action kinds publish"
@@ -118,7 +122,11 @@ fn flow_wrappers_visit_deep_original_graphs_without_a_fixed_cutoff() -> TestResu
     };
     assert!(
         matches!(
-            build_catalog_from(&fixture.archive, &fixture.entry, &options),
+            build_catalog_from(
+                &fixture.archive,
+                &fixture.entry,
+                options.with_full_provenance()
+            ),
             Err(CatalogError::Cancelled)
         ),
         "actual writer respects cancellation"
@@ -235,7 +243,11 @@ fn released_v2_action_union_remains_a_historical_boundary() -> TestResult {
 
 fn complete(case: Case) -> TestResult<(Value, Fixture)> {
     let fixture = fixture::open(case, Input::Plain, false)?;
-    let built = build_catalog_from(&fixture.archive, &fixture.entry, &source::options())?;
+    let built = build_catalog_from(
+        &fixture.archive,
+        &fixture.entry,
+        source::options().with_full_provenance(),
+    )?;
     assert!(
         built.summary().export_health().is_complete(),
         "readable typed action graph"
@@ -247,7 +259,11 @@ fn refused(case: Case, expected: ExportDiagnosticCode) -> TestResult<(Value, Fix
     let fixture = fixture::open(case, Input::Encrypted, false)?;
     assert!(
         matches!(
-            build_catalog_from(&fixture.archive, &fixture.entry, &source::options()),
+            build_catalog_from(
+                &fixture.archive,
+                &fixture.entry,
+                source::options().with_full_provenance()
+            ),
             Err(CatalogError::IncompleteExport(_))
         ),
         "wrong source never publishes as complete"

@@ -101,10 +101,7 @@ impl HeaderReadReceipt {
 
     pub(super) fn merge(&self, other: &Self) -> Result<(), ExportAccountingError> {
         self.check_inventory(&other.inventory)?;
-        if !std::ptr::eq(
-            self.frame.index.description(),
-            other.frame.index.description(),
-        ) {
+        if self.frame.index.description() != other.frame.index.description() {
             return Err(ExportAccountingError::UnboundHealthSubject);
         }
         if self.key.index() != other.key.index()

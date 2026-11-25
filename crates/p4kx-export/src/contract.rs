@@ -41,6 +41,11 @@ pub(crate) use crate::npc_spawn_model::PublishedNpcPool;
 
 pub(crate) use crate::resource_type_contract::ResourceType;
 pub(crate) use crate::schema_fields::every_field_required;
+
+#[path = "catalog_document.rs"]
+pub(crate) mod document;
+#[path = "catalog_marker_schema.rs"]
+pub(crate) mod marker_schema;
 pub(crate) use crate::spawn_model::{LocationQuery, ShipSpawnPool};
 
 /// The version of the catalog shape and its closed payload unions.
@@ -76,7 +81,9 @@ pub(crate) struct Catalog<'a> {
     /// Explicit derived choices using the canonical definitions' source facts.
     pub(crate) projections: CatalogProjections<'a>,
     /// Physical source observations and actual contribution uses.
-    pub(crate) provenance: CatalogProvenance,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "CatalogProvenance")]
+    pub(crate) provenance: Option<&'a CatalogProvenance>,
     /// Public short-name and protected game-text tables.
     pub(crate) texts: CatalogTexts<'a>,
     /// The paints with the ships they fit, ordered by the GUID of the item.

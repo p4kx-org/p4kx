@@ -9,7 +9,6 @@ use p4kx_extraction::{CancelToken, CanonicalReadObserver, Record, RecordTree, Tr
 use super::request::Query;
 use super::snapshot::ResourceGroupParentSnapshot;
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::CatalogRecordCoverage;
 use crate::catalog_queries::unlocalized_record_query::plan::Plan;
 use crate::catalog_query_session::checkpoint;
@@ -70,7 +69,7 @@ impl Query<'_> {
             self.cancel,
             observers.owners,
         )?;
-        let origins = CatalogOrigins::for_archive_records(self.archive, self.entry)?;
+        let origins = self.entry.records(self.archive)?;
         let input = OriginalCatalogInput::new(self.forge, &origins);
         let survey = if plan.owners.is_empty() {
             Survey::default()

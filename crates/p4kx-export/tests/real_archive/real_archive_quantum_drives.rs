@@ -151,8 +151,8 @@ fn verify_catalog(
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let built =
-        build_catalog_from(archive, entry, &options).map_err(|_| "build selected Item catalog")?;
+    let built = build_catalog_from(archive, entry, options.with_full_provenance())
+        .map_err(|_| "build selected Item catalog")?;
     if matches!(selection, Selection::Representative) {
         let health = built.summary().export_health();
         let items = health.kind(Kind::Items).ok_or("selected Item health")?;

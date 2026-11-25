@@ -17,8 +17,9 @@ fn radar_uses_its_own_sourced_options_per_physical_mode() -> TestResult {
     let schema = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
     for (origin, encrypted) in [(DcbOrigin::Plain, false), (DcbOrigin::Encrypted, true)] {
         let (_folder, archive) = common::open(&fixture::database(Layout::Complete), origin)?;
-        let catalog: Value =
-            serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, common::options().with_full_provenance())?.json(),
+        )?;
         schema
             .validate(&catalog)
             .map_err(|error| format!("catalog schema: {error}"))?;
@@ -59,7 +60,8 @@ fn historical_radar_field_is_absent_and_parent_filter_still_applies() -> TestRes
         filter: Some(&filter),
         ..common::options()
     };
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let [selected] = proof::rows(&catalog, ROWS)? else {
         return Err("exactly the filtered physical GameMode".into());
     };
@@ -84,7 +86,7 @@ fn malformed_radar_declarations_affect_health_and_retain_original_data() -> Test
         let (_folder, archive) = common::open(&fixture::database(layout), DcbOrigin::Encrypted)?;
         assert!(
             matches!(
-                build_catalog(&archive, &common::options()),
+                build_catalog(&archive, common::options().with_full_provenance()),
                 Err(CatalogError::IncompleteExport(_))
             ),
             "normal publication rejects malformed radar storage"
@@ -93,7 +95,9 @@ fn malformed_radar_declarations_affect_health_and_retain_original_data() -> Test
             publication_mode: CatalogPublicationMode::DiagnosticPartial,
             ..common::options()
         };
-        let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+        let catalog: Value = serde_json::from_slice(
+            build_catalog(&archive, options.with_full_provenance())?.json(),
+        )?;
         let first = proof::rows(&catalog, ROWS)?.first().ok_or("radar row")?;
         if matches!(layout, Layout::WrongPingStorage) {
             let radar = proof::at(first, TYPED)?;

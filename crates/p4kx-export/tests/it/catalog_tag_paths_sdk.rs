@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::tags::{TagPathSnapshot, with_tag_paths, with_tag_paths_from};
+use crate::sdk_full_proof as full_proof;
+use p4kx_export::catalog_queries::tags::{TagPathSnapshot, with_tag_paths};
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability, ProvenanceMode,
 };
 use p4kx_export::{CatalogError, CatalogPublicationMode, build_catalog_from};
 use p4kx_extraction::{CancelToken, DataForgeEntry};
@@ -23,15 +24,56 @@ fn tag_path_sdk_matches_the_encrypted_catalog_and_original_lineage() -> TestResu
     let entry = DataForgeEntry::read(&archive)?;
     let mut options = archive_fixture::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog_from(&archive, &entry, &options)?.json())?;
-    with_tag_paths_from(
-        &archive,
-        &entry,
+    let catalog: Value = serde_json::from_slice(
+        build_catalog_from(&archive, &entry, options.with_full_provenance())?.json(),
+    )?;
+    with_tag_paths(&archive, CatalogRecordSelection::All, None, |snapshot| {
+        verify_default_paths(&snapshot, &catalog)
+    })??;
+    full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?.with_tag_paths(
         CatalogRecordSelection::All,
         None,
         |snapshot| verify_graph(&snapshot, &catalog),
     )?
+}
+
+fn verify_default_paths(snapshot: &TagPathSnapshot<'_>, catalog: &Value) -> TestResult {
+    assert!(
+        snapshot.graph_inventory_complete(),
+        "the default query reads the complete fixture tag graph"
+    );
+    assert_eq!(
+        snapshot.source_inventory.provenance_mode(),
+        ProvenanceMode::MarkersOnly,
+        "the standalone tag path query defaults to markers-only provenance"
+    );
+    assert!(
+        snapshot.source_inventory.iter_uses().next().is_none(),
+        "the default tag path query retains no physical source uses"
+    );
+    let canonical = at(catalog, "/projections/tagPaths/rows")?
+        .as_array()
+        .ok_or("canonical Tag paths")?;
+    assert_eq!(
+        snapshot.rows.len(),
+        canonical.len(),
+        "the default query preserves the canonical tag path count"
+    );
+    for (actual, expected) in snapshot.rows.iter().zip(canonical) {
+        let row = serde_json::to_value(actual)?;
+        for path in ["/path/value", "/path/containsEncryptedSource"] {
+            assert_eq!(
+                row.pointer(path),
+                expected.pointer(path),
+                "the default query preserves canonical tag path field {path}"
+            );
+        }
+        assert!(
+            row.pointer("/path/sourceUsesRefs").is_none(),
+            "the default tag path wire omits physical source references"
+        );
+    }
+    Ok(())
 }
 
 fn verify_graph(snapshot: &TagPathSnapshot<'_>, catalog: &Value) -> TestResult {
@@ -95,7 +137,7 @@ fn tag_path_sdk_selects_the_first_guid_winner_or_one_physical_path() -> TestResu
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
     let leaf = forge.record(1).ok_or("original leaf Record")?.guid();
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &archive,
         &entry,
         CatalogLanguageSelection::AllAvailable,

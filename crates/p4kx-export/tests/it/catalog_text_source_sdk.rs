@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::CatalogLanguageSelection;
-use p4kx_export::catalog_queries::localization::{SourceIniEncoding, with_language_sources};
+use p4kx_export::catalog_queries::localization::{
+    SourceIniEncoding, with_language_sources, with_language_sources_with_provenance_mode,
+};
 use p4kx_export::{CatalogError, CatalogOptions, build_catalog};
 use p4kx_extraction::{Archive, CancelToken, Language, SourceValueState};
 use p4kx_testkit::{ArchiveBuilder, TestEntry, test_key};
@@ -16,11 +19,17 @@ use crate::health_origin_assertions as proof;
 #[test]
 fn language_source_sdk_matches_the_canonical_catalog() -> TestResult {
     let (_directory, archive) = fixture(Some(database()))?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?.json())?;
-    with_language_sources(
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(
+            &archive,
+            CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+        )?
+        .json(),
+    )?;
+    with_language_sources_with_provenance_mode(
         &archive,
         CatalogLanguageSelection::AllAvailable,
+        full_proof::MODE,
         None,
         |snapshot| -> TestResult {
             assert_eq!(snapshot.sources.len(), Language::ALL.len());

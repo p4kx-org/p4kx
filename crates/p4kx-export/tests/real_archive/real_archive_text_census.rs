@@ -33,10 +33,15 @@ pub(super) fn write_catalog(
 ) -> TestResult<(CatalogSummary, Value)> {
     let paths = catalog_paths();
     let (summary, capture) = pipe::transfer(&paths, |sink| {
-        p4kx_export::write_catalog(archive, options, Compression::None, || {
-            before_write();
-            Ok(sink)
-        })
+        p4kx_export::write_catalog(
+            archive,
+            options.with_full_provenance(),
+            Compression::None,
+            || {
+                before_write();
+                Ok(sink)
+            },
+        )
     })?;
     if capture.bytes != summary.size() {
         return Err("text census byte count differs from the catalog writer".into());

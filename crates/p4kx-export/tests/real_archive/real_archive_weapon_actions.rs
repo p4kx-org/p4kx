@@ -149,7 +149,7 @@ fn compare(
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let catalog = build_catalog_from(archive, entry, &options)
+    let catalog = build_catalog_from(archive, entry, options.with_full_provenance())
         .map_err(|_| "build selected weapon owner catalog")?;
     let catalog: Value = serde_json::from_slice(catalog.json()).map_err(|_| "read catalog JSON")?;
     compare_owner(&tree, entry.origin(), &catalog, coverage)
@@ -217,7 +217,7 @@ fn weapon_action_inventory_detects_an_omitted_authored_occurrence() -> TestResul
         .record(synthetic::OWNER)
         .ok_or("synthetic weapon owner")?;
     let tree = record.tree().map_err(|_| "read synthetic weapon owner")?;
-    let catalog = build_catalog_from(&archive, &entry, &fixture::options())?;
+    let catalog = build_catalog_from(&archive, &entry, fixture::options().with_full_provenance())?;
     let mut catalog: Value = serde_json::from_slice(catalog.json())?;
     compare_owner(&tree, entry.origin(), &catalog, &mut BTreeMap::new())?;
 

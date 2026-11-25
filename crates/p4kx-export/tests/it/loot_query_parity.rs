@@ -2,26 +2,28 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::build_catalog_from;
-use p4kx_export::catalog_queries::loot::{
-    LootDefinitionKind, LootDefinitionSnapshot, with_loot_definitions_from,
-};
+use p4kx_export::catalog_queries::loot::{LootDefinitionKind, LootDefinitionSnapshot};
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability, ParsedCatalogQueries,
 };
 use serde_json::{Value, json};
 
 use crate::health_origin_assertions as proof;
 use crate::health_origin_fixture::{Fixture, Input, TestResult, options};
+use crate::sdk_full_proof as full_proof;
 use crate::{loot_fixture, starmap_fixture};
 
 #[test]
 fn loot_sdk_queries_physical_owners_and_their_same_catalog_views() -> TestResult {
     let source = loot_fixture::database_with_loot_aliases().build();
     let fixture = loot_fixture::source_fixture(&source, Input::Encrypted)?;
-    let built = build_catalog_from(&fixture.archive, &fixture.entry, &options())?;
+    let built = build_catalog_from(
+        &fixture.archive,
+        &fixture.entry,
+        options().with_full_provenance(),
+    )?;
     let catalog = serde_json::from_slice(built.json())?;
-    let session = CatalogQuerySession::from_entry(
+    let session = full_proof::from_entry(
         &fixture.archive,
         &fixture.entry,
         CatalogLanguageSelection::AllAvailable,
@@ -111,9 +113,13 @@ fn assert_archetype(fixture: &Fixture, catalog: &Value) -> TestResult {
         .records()
         .find(|record| record.type_name().ok() == Some("LootArchetypeV3Record"))
         .ok_or("physical archetype owner")?;
-    with_loot_definitions_from(
+    full_proof::from_entry(
         &fixture.archive,
         &fixture.entry,
+        full_proof::NO_LANGUAGES,
+        None,
+    )?
+    .with_loot_definitions(
         LootDefinitionKind::Archetype,
         CatalogRecordSelection::RecordIndex(record.index()),
         None,

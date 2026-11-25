@@ -78,7 +78,10 @@ fn on_disk(archive: &Archive, elements: &[Value]) -> Result<OnDisk, Box<dyn Erro
 )]
 fn verify(path: &Path) -> TestResult {
     let archive = Archive::open_with_key(path, Some(p4kx_testkit::real_archive_key()?))?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     let catalog: Value = serde_json::from_slice(built.json())?;
     let elements = list(&catalog, "mineableElements")?;
     let processes = list(&catalog, "refiningProcesses")?;
@@ -232,7 +235,10 @@ fn real_catalog() -> Result<Value, Box<dyn Error>> {
         real_archive_path()?,
         Some(p4kx_testkit::real_archive_key()?),
     )?;
-    let built = build_catalog(&archive, &CatalogOptions::new(SystemTime::now()))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(SystemTime::now()).with_full_provenance(),
+    )?;
     Ok(serde_json::from_slice(built.json())?)
 }
 

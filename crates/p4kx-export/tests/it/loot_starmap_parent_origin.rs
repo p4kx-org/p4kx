@@ -4,7 +4,7 @@
 use std::collections::BTreeSet;
 
 use p4kx_export::catalog_queries::loot::{
-    LootAncestorSelection, LootContainerQuery, LootContainerStatus, read_loot_container,
+    LootAncestorSelection, LootContainerQuery, LootContainerStatus,
 };
 use p4kx_extraction::find_entry;
 
@@ -17,6 +17,7 @@ use super::field_origin::{CONFIG, LITERAL, main_system, normal_catalog, source, 
 use super::{ALIAS_TARGET, ROOT};
 use crate::health_origin_assertions as proof;
 use crate::health_origin_fixture::{self as fixture, Fixture, Input, TestResult};
+use crate::sdk_full_proof as full_proof;
 
 const PLANET: u128 = 0x4101;
 const MARKER: u128 = 0x4102;
@@ -41,7 +42,8 @@ fn physical_loot_query_matches_the_published_row_and_its_author() -> TestResult 
         ALIAS_TARGET,
         LootAncestorSelection::RecordIndex(0),
     );
-    let selected = read_loot_container(&fixture.archive, requested, None)?;
+    let selected = full_proof::open(&fixture.archive, full_proof::NO_LANGUAGES, None)?
+        .read_loot_container(requested, None)?;
     assert_eq!(
         selected.status,
         LootContainerStatus::Found,

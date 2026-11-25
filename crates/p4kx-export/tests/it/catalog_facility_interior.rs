@@ -149,7 +149,7 @@ fn catalog_keeps_repeated_stream_declarations_at_distinct_original_nodes() -> Te
 
 fn build(archive: &Archive) -> TestResult<Value> {
     Ok(serde_json::from_slice(
-        build_catalog(archive, &common::options())?.json(),
+        build_catalog(archive, common::options().with_full_provenance())?.json(),
     )?)
 }
 

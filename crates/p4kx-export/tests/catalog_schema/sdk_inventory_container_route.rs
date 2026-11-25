@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::equipment::{
-    InventoryContainerSnapshot, with_inventory_containers, with_inventory_containers_from,
+    InventoryContainerSnapshot, with_inventory_containers,
 };
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
@@ -47,22 +48,22 @@ pub(super) fn read() -> TestResult<Route> {
     let (_folder, archive) = open(&fixture::database(), DataForgeStorage::Encrypted)?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog: Value = serde_json::from_slice(
-        build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?.json(),
+        build_catalog_from(
+            &archive,
+            &entry,
+            CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+        )?
+        .json(),
     )?;
-    with_inventory_containers_from(
-        &archive,
-        &entry,
-        CatalogRecordSelection::All,
-        None,
-        |snapshot| {
+    full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .with_inventory_containers(CatalogRecordSelection::All, None, |snapshot| {
             check_catalog(&snapshot, &catalog)?;
             Route::queried_rows(
                 INVENTORY_CONTAINERS,
                 snapshot.rows(),
                 "synthetic source and producer parity witnessed; installed producer parity open",
             )
-        },
-    )?
+        })?
 }
 
 fn check_catalog(snapshot: &InventoryContainerSnapshot<'_>, catalog: &Value) -> TestResult {
@@ -170,7 +171,8 @@ fn inventory_sdk_retains_physical_aliases_and_selects_only_requested_records() -
         &entry,
         CatalogLanguageSelection::Selected(&[Language::English]),
         None,
-    )?;
+    )?
+    .with_provenance_mode(full_proof::MODE);
     let parsed = session.parsed(None)?;
     let guid = forge.record(0).ok_or("first inventory source")?.guid();
     let alias_index = parsed.with_inventory_containers(

@@ -7,7 +7,6 @@ use p4kx_extraction::{
 
 use super::{LoadoutDependencyCoverage, read::Query, scope};
 use crate::build::original_input::OriginalCatalogInput;
-use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
@@ -133,7 +132,7 @@ fn selected(
     query: &Query<'_>,
     ship_record_index: u32,
 ) -> Result<FacilityInteriorCoverageSnapshot, CatalogError> {
-    let origins = CatalogOrigins::for_archive_records(query.archive, query.entry)?;
+    let origins = query.entry.records(query.archive)?;
     let input = OriginalCatalogInput::new(query.forge, &origins);
     let locales = TextSources::read_languages(query.archive, &[])?;
     let texts = Texts::parse(&locales)?;

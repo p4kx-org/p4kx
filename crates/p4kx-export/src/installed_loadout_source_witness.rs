@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    Archive, ArchiveWatch, DataForge, DataForgeOrigin, PhysicalSource, Record,
+    Archive, ArchiveWatch, DataForge, DataForgeOrigin, PhysicalSource, ProvenanceMode, Record,
     SourceEncryptionState, SourceInventory, SourceLocation, SourceUseRole, SourcedValue,
 };
 use p4kx_testkit::watchdog;
@@ -54,7 +54,8 @@ fn installed_loadout_sdk_matches_one_original_port_name() -> TestResult {
     let watch = ArchiveWatch::new(&archive);
     let session =
         CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)
-            .map_err(|_| "open installed Loadout SDK session")?;
+            .map_err(|_| "open installed Loadout SDK session")?
+            .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session
         .parsed(None)
         .map_err(|_| "open parsed Loadout view")?;

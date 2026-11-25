@@ -20,8 +20,9 @@ const MATERIAL_PATH: &str = "fixture/Materials/Finish.mtl";
 fn ammo_geometry_preserves_separate_authored_node_arenas() -> TestResult {
     let (_folder, archive) = common::open(&database(pointer(ROOT)), DcbOrigin::Encrypted)?;
     assert_original_geometry(&archive)?;
-    let catalog: Value =
-        serde_json::from_slice(build_catalog(&archive, &common::options())?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog(&archive, common::options().with_full_provenance())?.json(),
+    )?;
     let row = proof::at(&catalog, "/definitions/ammoDefinitions/rows/0")?;
     let source = proof::at(
         proof::cell(row, "geometryResourceParams", "present")?,
@@ -39,7 +40,8 @@ fn ammo_geometry_rejects_the_same_payload_in_a_non_pointer_root() -> TestResult 
     assert_original_geometry(&archive)?;
     let mut options = common::options();
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-    let catalog: Value = serde_json::from_slice(build_catalog(&archive, &options)?.json())?;
+    let catalog: Value =
+        serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
     let row = proof::at(&catalog, "/definitions/ammoDefinitions/rows/0")?;
     let rejected = proof::cell(row, "geometryResourceParams", "invalid")?;
     let uses = proof::uses(&catalog, rejected)?;

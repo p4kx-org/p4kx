@@ -51,13 +51,13 @@ impl CapturedFixture {
         options.filter = filter;
         assert!(
             matches!(
-                build_catalog_from(&self.archive, &self.input, &options),
+                build_catalog_from(&self.archive, &self.input, options.with_full_provenance()),
                 Err(CatalogError::IncompleteExport(_))
             ),
             "the required original token diagnosis blocks actual normal publication"
         );
         options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-        let built = build_catalog_from(&self.archive, &self.input, &options)?;
+        let built = build_catalog_from(&self.archive, &self.input, options.with_full_provenance())?;
         let catalog = serde_json::from_slice(built.json())?;
         assert_eq!(
             support::at(&catalog, "/exportHealth/status")?,

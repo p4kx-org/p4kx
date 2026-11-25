@@ -23,7 +23,10 @@ fn a_fully_read_zero_byte_shop_source_publishes_with_the_legacy_warning() -> Tes
         let entry = TestEntry::stored(INVENTORY, Vec::new());
         let entry = if encrypted { entry.encrypted() } else { entry };
         let (_folder, archive) = fixture(Some(entry))?;
-        let built = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;
+        let built = build_catalog(
+            &archive,
+            CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+        )?;
         assert!(
             built.summary().export_health().is_complete(),
             "verified empty source is complete"
@@ -65,7 +68,10 @@ fn a_fully_read_zero_byte_shop_source_publishes_with_the_legacy_warning() -> Tes
 #[test]
 fn an_authored_empty_array_is_a_resolved_inventory() -> TestResult {
     let (_folder, archive) = fixture(Some(TestEntry::stored(INVENTORY, r#"{"Inventory":[]}"#)))?;
-    let built = build_catalog(&archive, &CatalogOptions::new(UNIX_EPOCH))?;
+    let built = build_catalog(
+        &archive,
+        CatalogOptions::new(UNIX_EPOCH).with_full_provenance(),
+    )?;
     let catalog = serde_json::from_slice(built.json())?;
     let (shop, resolution) = one_shop(&catalog)?;
     assert_eq!(
@@ -116,13 +122,13 @@ fn invalid_json_failed_reads_and_missing_targets_still_block_normal_publication(
         let mut options = CatalogOptions::new(UNIX_EPOCH);
         assert!(
             matches!(
-                build_catalog(&archive, &options),
+                build_catalog(&archive, options.with_full_provenance()),
                 Err(CatalogError::IncompleteExport(_))
             ),
             "an unusable or unavailable source still fails normal publication"
         );
         options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
-        let built = build_catalog(&archive, &options)?;
+        let built = build_catalog(&archive, options.with_full_provenance())?;
         let catalog = serde_json::from_slice(built.json())?;
         let (shop, resolution) = one_shop(&catalog)?;
         assert_no_list(

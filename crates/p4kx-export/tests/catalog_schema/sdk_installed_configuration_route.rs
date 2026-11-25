@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::sdk_full_proof as full_proof;
 use std::time::UNIX_EPOCH;
 
 use p4kx_export::catalog_queries::equipment::{
     FlightConfigurationKind, InstalledConfiguration, InstalledConfigurationSnapshot,
-    read_installed_configurations_from,
 };
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog_from};
 use p4kx_extraction::{Archive, DataForgeEntry, SourceInventory, SourceValueState};
@@ -49,13 +49,16 @@ pub(super) fn read() -> TestResult<Route> {
         publication_mode: CatalogPublicationMode::DiagnosticPartial,
         ..CatalogOptions::new(UNIX_EPOCH)
     };
-    let catalog: Value =
-        serde_json::from_slice(build_catalog_from(&archive, &entry, &options)?.json())?;
+    let catalog: Value = serde_json::from_slice(
+        build_catalog_from(&archive, &entry, options.with_full_provenance())?.json(),
+    )?;
     check_competing_alias(&catalog)?;
-    let snapshot = read_installed_configurations_from(&archive, &entry, SHIP_RECORD, None)?;
+    let snapshot = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .read_installed_configurations(SHIP_RECORD, None)?;
     compare(&snapshot, &catalog, SHIP_RECORD)?;
     check_occurrences(&snapshot)?;
-    let docked = read_installed_configurations_from(&archive, &entry, DOCKED_RECORD, None)?;
+    let docked = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
+        .read_installed_configurations(DOCKED_RECORD, None)?;
     compare(&docked, &catalog, DOCKED_RECORD)?;
     assert_eq!(
         docked.rows.len(),
@@ -88,7 +91,8 @@ fn broken_ship() -> TestRecord {
 }
 
 fn check_broken_sibling(archive: &Archive, entry: &DataForgeEntry, catalog: &Value) -> TestResult {
-    let snapshot = read_installed_configurations_from(archive, entry, BROKEN_SHIP_RECORD, None)?;
+    let snapshot = full_proof::from_entry(archive, entry, full_proof::NO_LANGUAGES, None)?
+        .read_installed_configurations(BROKEN_SHIP_RECORD, None)?;
     compare(&snapshot, catalog, BROKEN_SHIP_RECORD)?;
     let [root] = snapshot.rows.as_slice() else {
         return Err("the valid Thruster survives its damaged sibling".into());
@@ -239,7 +243,8 @@ fn check_occurrence(
 }
 
 fn refuse_non_ship(archive: &Archive, entry: &DataForgeEntry) -> TestResult {
-    let refused = read_installed_configurations_from(archive, entry, UNSELECTED_RECORD, None)?;
+    let refused = full_proof::from_entry(archive, entry, full_proof::NO_LANGUAGES, None)?
+        .read_installed_configurations(UNSELECTED_RECORD, None)?;
     assert_eq!(
         refused.loadout_state,
         SourceValueState::Absent,

@@ -54,7 +54,7 @@ fn game_mode_radar_options_match_original_value_and_origin_in_both_builds() -> T
             publication_mode: CatalogPublicationMode::DiagnosticPartial,
             ..CatalogOptions::new(UNIX_EPOCH)
         };
-        let built = build_catalog_from(&archive, &entry, &options)
+        let built = build_catalog_from(&archive, &entry, options.with_full_provenance())
             .map_err(|_| "build owner-filtered radar Catalog")?;
         let catalog: Value = serde_json::from_slice(built.json())?;
         real_archive_shop_inventory_v3::verify_build(&archive, &catalog)?;
