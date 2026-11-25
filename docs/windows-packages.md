@@ -381,6 +381,17 @@ both architectures in the corresponding Release workflow.
 [Dynamic chain verification](https://github.com/p4kx-org/p4kx/actions/runs/45576709270/job/139077413013) ·
 [Detached observer controls](https://github.com/p4kx-org/p4kx/actions/runs/45576709479)
 
+The matching AMD64 original consumer passed native MSI lifecycle and
+portable/installed execution on merge `4d334e716cbc87e27525e8e095410a19103c51f5`.
+The detached Finish caller returned in 99,910 ms and exited zero under
+its supervisor. The original replay worker exited zero and completed all
+200 journal events with no active phase. The final observer receipt
+records native Lifecycle success. The candidate published its executed
+Windows AMD64 payload.
+[Native consumer](https://github.com/p4kx-org/p4kx/actions/runs/45576709479/job/139102930100) ·
+[Original Finish evidence](https://github.com/p4kx-org/p4kx/actions/runs/45576709479/artifacts/15008347409) ·
+[Executed payload](https://github.com/p4kx-org/p4kx/actions/runs/45576709479/artifacts/15008217762)
+
 The real consumer records the prepared allowance, source hashes, checkpoints and parent controls
 on the runner. It refreshes admission under the original deadline before launching the installer.
 The cancellation-aware diagnostic upload collects those local files after the terminal evidence
