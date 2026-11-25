@@ -322,6 +322,18 @@ installed and portable execution evidence and uploaded both executed release pay
 [AMD64 terminal receipt](https://github.com/p4kx-org/p4kx/actions/runs/45447246086/artifacts/14949192760) ·
 [ARM64 terminal receipt](https://github.com/p4kx-org/p4kx/actions/runs/45447246086/artifacts/14951115024)
 
+Release run `45530796171` for PR head `ac572e896` bound both target builds to
+merge revision `27da392284eed8c67cf58c15ea473089d6c0a20c`. The second ARM64
+attempt passed the original installer lifecycle and uploaded the executed package.
+AMD64 attempts two and three remained in `WaitFinish` until cancellation. GitHub
+reported a 45-minute maximum and recorded both cancellations after 55 minutes.
+The third attempt enabled runner diagnostics. Its ordinary job-log endpoint returned
+HTTP 404, and collection did not produce a terminal MSI receipt. The blocking operation
+remains undetermined.
+[ARM64 job](https://github.com/p4kx-org/p4kx/actions/runs/45530796171/job/138968074349) ·
+[ARM64 terminal evidence](https://github.com/p4kx-org/p4kx/actions/runs/45530796171/artifacts/14990526867) ·
+[AMD64 diagnostic job](https://github.com/p4kx-org/p4kx/actions/runs/45530796171/job/138990048543)
+
 For release acceptance, repeat the native lifecycle checks with the actual release candidate
 and bind both its MSI and portable ZIP to the candidate revision and run attempt. Record the
 Windows AMD64 desktop and WASAPI checks separately from the hosted package evidence.

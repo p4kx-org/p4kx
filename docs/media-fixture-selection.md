@@ -219,6 +219,16 @@ Rust producer. The game-side shader permutation and parameter binding
 require a separate runtime witness.
 [Release add-on](https://github.com/p4kx-org/p4kx/actions/runs/45315878218/artifacts/14884972989)
 
+A supplementary neutral-light comparison retained the visible material outputs from
+both ordinary imports of that same 15,479-triangle Liberator subset at LOD 0 and
+mip 2. Blender 5.3.0 used a fixed orthographic camera, identical neutral lighting and
+exposure, and Cycles CPU with one thread and eight samples at 192 × 192. Both scene-linear
+RGBA EXRs shared all 773 solid foreground pixels. The mean linear RGB was
+`(0.9122, 0.7172, 0.5839)` for the package and `(0.6697, 0.5413, 0.4493)` for the GLB.
+The mean absolute RGB-channel difference was `0.18456`. This comparison measures the
+combined appearance of the exported materials in Blender. The game draw and active
+detail inputs require separate runtime evidence.
+
 ### Independently bound installed shader operations
 
 The installed LIVE and PTU token vocabularies were independently bound to each engine's
