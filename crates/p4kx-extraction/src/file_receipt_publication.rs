@@ -8,6 +8,7 @@ use crate::origin_file_io::{self, StageDisposition};
 use crate::output_file::StagedOutput;
 use crate::{
     CancelToken, ConflictPolicy, OriginArtifactBinding, OriginArtifactDigest, OriginDigestWriter,
+    OwnedFileToken,
 };
 
 use super::lock::{Contention, ReceiptLock, invalid, protection_error, regular_file};
@@ -46,7 +47,28 @@ impl FileReceipt<'_> {
         self.publish_companion_checked(held, digest, || self.check_committed_target(), describe)
     }
 
-    pub(super) fn publish_companion_checked(
+    pub(super) fn publish_owned_companion(
+        &self,
+        held: &ReceiptLock<'_>,
+        digest: OriginArtifactDigest,
+        owner: &OwnedFileToken,
+        checkpoint: impl FnOnce() -> io::Result<()>,
+        describe: impl FnOnce(&mut dyn Write, &OriginArtifactBinding) -> io::Result<()>,
+    ) -> io::Result<()> {
+        self.publish_companion_checked(
+            held,
+            digest,
+            || {
+                checkpoint()?;
+                owner
+                    .ensure_renamed_writable(&self.artifact, self.cancel.flag())
+                    .map_err(protection_error)
+            },
+            describe,
+        )
+    }
+
+    fn publish_companion_checked(
         &self,
         held: &ReceiptLock<'_>,
         digest: OriginArtifactDigest,
@@ -103,7 +125,7 @@ impl FileReceipt<'_> {
             if let Some(kept) = self.retained(&held, bytes, policy)? {
                 return Ok(kept);
             }
-            let digest = origin_file_io::write_staged(
+            let (digest, owner) = origin_file_io::write_staged_retaining_owner(
                 &self.artifact,
                 self.protection,
                 Some(&self.cancel),
@@ -123,7 +145,7 @@ impl FileReceipt<'_> {
             };
             committed = true;
             let size = digest.byte_length();
-            self.publish_companion(&held, digest, describe)?;
+            self.publish_owned_companion(&held, digest, &owner, || Ok(()), describe)?;
             Ok(FilePublication::Written { size })
         })();
         held.finish_io(result, committed)

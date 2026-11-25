@@ -109,3 +109,57 @@ fn cancellation_before_publication_keeps_existing_receipt_and_payload() -> io::R
     );
     Ok(())
 }
+
+#[derive(Clone, Copy, Debug)]
+enum Publication {
+    Stream,
+    Bytes(ConflictPolicy),
+}
+
+#[test]
+fn a_different_regular_file_cannot_receive_a_direct_publication_receipt() -> io::Result<()> {
+    for publication in [
+        Publication::Stream,
+        Publication::Bytes(ConflictPolicy::Overwrite),
+        Publication::Bytes(ConflictPolicy::Skip),
+    ] {
+        refuse_displaced_output(publication)?;
+    }
+    Ok(())
+}
+
+fn refuse_displaced_output(publication: Publication) -> io::Result<()> {
+    const OTHER: &[u8] = b"another regular file";
+    let directory = tempfile::tempdir()?;
+    let artifact = directory.path().join("measured.txtp");
+    let displaced = directory.path().join("displaced.txtp");
+    let receipt = FileReceipt::new(&artifact, None, None)?;
+    let replace = |writer: &mut dyn Write, binding: &OriginArtifactBinding| {
+        describe(writer, binding)?;
+        fs::rename(&artifact, &displaced)?;
+        fs::write(&artifact, OTHER)
+    };
+    let result = match publication {
+        Publication::Stream => receipt.publish(
+            |writer| writer.write_all(ORIGINAL),
+            |writer, binding, ()| replace(writer, binding),
+        ),
+        Publication::Bytes(policy) => receipt.publish_bytes(ORIGINAL, policy, replace).map(|_| ()),
+    };
+    assert!(
+        result.is_err(),
+        "{publication:?} must refuse the changed file identity"
+    );
+    assert_eq!(fs::read(&artifact)?, OTHER);
+    assert_eq!(fs::read(&displaced)?, ORIGINAL);
+    assert!(
+        !receipt.path().exists(),
+        "{publication:?} cannot publish a stale receipt"
+    );
+    assert_eq!(
+        fs::read_dir(directory.path())?.count(),
+        2,
+        "only the output names remain"
+    );
+    Ok(())
+}

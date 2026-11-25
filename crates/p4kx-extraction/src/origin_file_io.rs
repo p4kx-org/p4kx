@@ -10,7 +10,10 @@ use tempfile::TempPath;
 
 use crate::file_receipt::OrdinaryReplacement;
 use crate::output_file::StagedOutput;
-use crate::{ArchiveWriteProtection, CancelToken, WriteProtectionError, check_protected_output};
+use crate::{
+    ArchiveWriteProtection, CancelToken, OwnedFileToken, WriteProtectionError,
+    check_protected_output,
+};
 
 /// Atomically writes an I/O stream under the job's source protection.
 /// A committed replacement retires owned origin companions under the directory lock.
@@ -82,6 +85,16 @@ pub(crate) fn write_staged<T, Output>(
     write: impl FnOnce(&mut BufWriter<File>) -> io::Result<T>,
     place: impl FnOnce(T, &StagedOutput<'_>) -> io::Result<StageDisposition<Output>>,
 ) -> io::Result<Output> {
+    write_staged_retaining_owner(out, protection, cancel, write, place).map(|(output, _)| output)
+}
+
+pub(crate) fn write_staged_retaining_owner<T, Output>(
+    out: &Path,
+    protection: Option<&ArchiveWriteProtection>,
+    cancel: Option<&CancelToken>,
+    write: impl FnOnce(&mut BufWriter<File>) -> io::Result<T>,
+    place: impl FnOnce(T, &StagedOutput<'_>) -> io::Result<StageDisposition<Output>>,
+) -> io::Result<(Output, OwnedFileToken)> {
     let uncancelled = CancelToken::new();
     let actual_cancel = cancel.unwrap_or(&uncancelled);
     let check =
@@ -104,12 +117,12 @@ pub(crate) fn write_staged<T, Output>(
         place(value, &staged)
     });
     match result {
-        Ok(StageDisposition::Moved(value)) => Ok(value),
+        Ok(StageDisposition::Moved(value)) => Ok((value, ownership)),
         Ok(StageDisposition::Cleanup(value)) => {
             ownership
                 .remove(&temporary, actual_cancel.flag())
                 .map_err(io::Error::other)?;
-            Ok(value)
+            Ok((value, ownership))
         }
         Err(write) => Err(match ownership.remove(&temporary, actual_cancel.flag()) {
             Ok(()) => write,

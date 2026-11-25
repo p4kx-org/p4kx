@@ -10,7 +10,7 @@ use crate::{
     OriginDigestWriter, check_protected_output,
 };
 
-use crate::origin_file_io;
+use crate::origin_file_io::{self, StageDisposition};
 
 #[path = "file_receipt_directory.rs"]
 mod directory;
@@ -175,7 +175,7 @@ impl<'source> FileReceipt<'source> {
         describe: impl FnOnce(&mut dyn Write, &OriginArtifactBinding, &T) -> io::Result<()>,
     ) -> io::Result<T> {
         let mut held = None;
-        let staged = origin_file_io::write_replacing_before(
+        let staged = origin_file_io::write_staged_retaining_owner(
             &self.artifact,
             self.protection,
             Some(&self.cancel),
@@ -184,12 +184,14 @@ impl<'source> FileReceipt<'source> {
                 let result = write(&mut measured)?;
                 Ok((result, measured.finish()?))
             },
-            |staged| {
+            |written, staged| {
                 let lease = held.insert(self.acquire(Contention::Refuse)?);
                 self.check_target()?;
                 staged.check().map_err(protection_error)?;
                 self.invalidate(ExistingCompanions::RequireOwned)?;
-                lease.check(&self.cancel)
+                lease.check(&self.cancel)?;
+                origin_file_io::replace_staged(staged)?;
+                Ok(StageDisposition::Moved(written))
             },
         );
         let Some(held) = held else {
@@ -200,10 +202,14 @@ impl<'source> FileReceipt<'source> {
             });
         };
         let committed = staged.is_ok();
-        let result = staged.and_then(|(result, digest)| {
-            self.publish_companion(&held, digest, |writer, binding| {
-                describe(writer, binding, &result)
-            })?;
+        let result = staged.and_then(|((result, digest), owner)| {
+            self.publish_owned_companion(
+                &held,
+                digest,
+                &owner,
+                || Ok(()),
+                |writer, binding| describe(writer, binding, &result),
+            )?;
             Ok(result)
         });
         held.finish_io(result, committed)

@@ -118,15 +118,11 @@ impl FileReceipt<'_> {
         match self.place_staged(&held, staged, policy, &mut check, invalidated) {
             Ok(Some(companion)) => {
                 let receipt = match companion {
-                    CompanionPlacement::Publish => Some(self.publish_companion_checked(
+                    CompanionPlacement::Publish => Some(self.publish_owned_companion(
                         &held,
                         digest,
-                        || {
-                            check()?;
-                            staged
-                                .check_committed(&self.artifact)
-                                .map_err(protection_error)
-                        },
+                        staged.owner(),
+                        check,
                         describe,
                     )),
                     CompanionPlacement::PreserveForeign => None,

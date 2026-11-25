@@ -256,9 +256,8 @@ impl<'a> StagedOutput<'a> {
         check_protected_output(self.output, self.protection, self.cancel)
     }
 
-    pub(crate) fn check_committed(&self, final_path: &Path) -> Result<(), WriteProtectionError> {
+    pub(crate) const fn owner(&self) -> &OwnedFileToken {
         self.ownership
-            .ensure_renamed_writable(final_path, cancel_flag(self.cancel))
     }
 }
 
