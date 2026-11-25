@@ -156,6 +156,7 @@ mod real_archive_standalone_mining_sdk_parity;
 mod real_archive_starmap;
 mod real_archive_starmap_definitions;
 mod real_archive_store_slugs;
+mod real_archive_tag_sdk_parity;
 mod real_archive_tags;
 mod real_archive_text_oracle;
 mod real_archive_texts;
