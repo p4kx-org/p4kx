@@ -4,10 +4,8 @@
 use serde::de::DeserializeSeed;
 use serde_json::{Value, json};
 
-use super::super::digest_runs::DigestRuns;
-use super::{
-    DigestIndex, OrderedRows, OriginDigest, StreamOrigins, TestResult, fingerprint, wire_slot,
-};
+use super::super::digest_runs::{DigestRuns, OriginDigest};
+use super::{OrderedRows, StreamOrigins, TestResult, fingerprint, wire_slot};
 
 fn compare_json(
     seed: impl for<'de> DeserializeSeed<'de, Value = Value>,
@@ -69,12 +67,12 @@ fn streamed_source_membership_refuses_conflicts_missing_and_unordered_ids() -> T
     let mut runs = DigestRuns::new(scratch.path());
     for (id, row) in [(second_id, &second), (first_id, &first)] {
         runs.push(OriginDigest {
-            id: OriginDigest::id_hash(id),
+            id: id.into(),
             payload: fingerprint(row.clone())?,
         })?;
     }
-    let index = DigestIndex::open(runs.finish()?)?;
-    let seed = StreamOrigins(&index);
+    let run = runs.finish()?;
+    let seed = StreamOrigins(&run);
     assert_eq!(
         compare_json(seed, &json!([first, unrelated, second]))?,
         json!(2),
@@ -93,6 +91,42 @@ fn streamed_source_membership_refuses_conflicts_missing_and_unordered_ids() -> T
             "invalid source inventory is refused: {changed}"
         );
     }
+    Ok(())
+}
+
+#[test]
+fn streamed_source_comparison_handles_sparse_origins_after_external_merges() -> TestResult {
+    use std::io::Write as _;
+
+    const ORIGINS: usize = 250_000;
+    const SPACING: usize = 20;
+    let scratch = tempfile::tempdir()?;
+    let mut runs = DigestRuns::new(scratch.path());
+    let mut input = Vec::new();
+    input.write_all(b"[")?;
+    for number in 0..ORIGINS {
+        let id = format!("u10:a0.32:payload:payload:metadata:{number:06}");
+        let wire = json!({"id": &id, "field": "numeric", "value": number});
+        if number != 0 {
+            input.write_all(b",")?;
+        }
+        serde_json::to_writer(&mut input, &wire)?;
+        if number.is_multiple_of(SPACING) {
+            runs.push(OriginDigest {
+                id: id.into_boxed_str(),
+                payload: fingerprint(wire)?,
+            })?;
+        }
+    }
+    input.write_all(b"]")?;
+    let run = runs.finish()?;
+    let mut decoder = serde_json::Deserializer::from_reader(input.as_slice());
+    assert_eq!(
+        StreamOrigins(&run).deserialize(&mut decoder)?,
+        json!(ORIGINS / SPACING),
+        "sparse selected IDs survive a complete buffered wire comparison"
+    );
+    decoder.end()?;
     Ok(())
 }
 

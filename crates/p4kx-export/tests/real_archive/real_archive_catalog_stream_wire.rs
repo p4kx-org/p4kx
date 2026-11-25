@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::cell::RefCell;
-use std::cmp::Ordering;
 use std::fmt;
-use std::fs::File;
-use std::io::{self, BufReader};
 
 use serde::de::{DeserializeSeed, Deserializer, Error as _, SeqAccess, Visitor};
 use serde_json::Value;
@@ -14,8 +10,7 @@ use sha2::{Digest as _, Sha256};
 use super::super::TestResult;
 use super::super::digest_parity::{PhysicalSlot, fingerprint};
 use super::super::selected_origins::SelectOrigin;
-use super::digest_index::DigestIndex;
-use super::digest_runs::{Fingerprint, OriginDigest};
+use super::digest_runs::{DigestRun, Fingerprint};
 
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 enum RowOrder {
@@ -267,7 +262,7 @@ fn wire_slot(row: &Value) -> TestResult<PhysicalSlot> {
 }
 
 #[derive(Clone, Copy)]
-pub(in super::super) struct StreamOrigins<'scope>(pub(super) &'scope DigestIndex);
+pub(in super::super) struct StreamOrigins<'scope>(pub(super) &'scope DigestRun);
 
 impl<'de> DeserializeSeed<'de> for StreamOrigins<'_> {
     type Value = Value;
@@ -285,15 +280,18 @@ impl<'de> Visitor<'de> for StreamOrigins<'_> {
     }
 
     fn visit_seq<A: SeqAccess<'de>>(self, mut sequence: A) -> Result<Value, A::Error> {
-        let state = RefCell::new(OriginProbe::new(self.0).map_err(A::Error::custom)?);
-        let selects = |id: &str| state.borrow_mut().select(id);
+        let mut cursor = self.0.cursor().map_err(A::Error::custom)?;
         let mut compared = 0_u64;
-        while let Some(row) = sequence.next_element_seed(SelectOrigin(&selects))? {
-            let mut probe = state.borrow_mut();
-            if let Some(error) = probe.error.take() {
-                return Err(A::Error::custom(error));
-            }
-            match (probe.expected.take(), row) {
+        loop {
+            let mut expected = None;
+            let mut select = |id: &str| {
+                expected = cursor.observe(id)?;
+                Ok(expected.is_some())
+            };
+            let Some(row) = sequence.next_element_seed(SelectOrigin(&mut select))? else {
+                break;
+            };
+            match (expected, row) {
                 (Some(expected), Some((_, row))) => {
                     if fingerprint(row).map_err(A::Error::custom)? != expected {
                         return Err(A::Error::custom(
@@ -314,51 +312,6 @@ impl<'de> Visitor<'de> for StreamOrigins<'_> {
             ));
         }
         Ok(Value::from(compared))
-    }
-}
-
-struct OriginProbe<'scope> {
-    index: &'scope DigestIndex,
-    file: BufReader<File>,
-    previous: String,
-    expected: Option<Fingerprint>,
-    error: Option<io::Error>,
-}
-
-impl<'scope> OriginProbe<'scope> {
-    fn new(index: &'scope DigestIndex) -> io::Result<Self> {
-        Ok(Self {
-            index,
-            file: index.reader()?,
-            previous: String::new(),
-            expected: None,
-            error: None,
-        })
-    }
-
-    fn select(&mut self, id: &str) -> bool {
-        match self.observe(id) {
-            Ok(expected) => {
-                self.expected = expected;
-                self.expected.is_some()
-            }
-            Err(error) => {
-                self.error = Some(error);
-                false
-            }
-        }
-    }
-
-    fn observe(&mut self, id: &str) -> io::Result<Option<Fingerprint>> {
-        if self.previous.as_str().cmp(id) != Ordering::Less {
-            return Err(io::Error::other(
-                "Catalog source observation IDs are unordered or duplicated",
-            ));
-        }
-        self.previous.clear();
-        self.previous.push_str(id);
-        self.index
-            .lookup(&mut self.file, &OriginDigest::id_hash(id))
     }
 }
 

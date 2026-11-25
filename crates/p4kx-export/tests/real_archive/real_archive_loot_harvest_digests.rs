@@ -139,8 +139,8 @@ impl<'directory> LootHarvestDigests<'directory> {
             capture_inventory(
                 inventory,
                 referenced,
-                |id, row| spill(&mut self.original.uses, &id, row),
-                |id, row| spill(&mut self.original.sources, &id, row),
+                |id, row| spill(&mut self.original.uses, id, row),
+                |id, row| spill(&mut self.original.sources, id, row),
             )
             .map_err(|error| format!("{}: {error}", dataset.path()))?;
         }

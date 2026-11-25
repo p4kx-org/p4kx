@@ -90,8 +90,8 @@ impl<'directory> StreamedMissionDigests<'directory> {
         capture_inventory(
             &snapshot.source_inventory,
             references,
-            |id, row| spill(&mut self.comparison.uses, &id, row),
-            |id, row| spill(&mut self.comparison.sources, &id, row),
+            |id, row| spill(&mut self.comparison.uses, id, row),
+            |id, row| spill(&mut self.comparison.sources, id, row),
         )
     }
 }

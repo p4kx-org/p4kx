@@ -347,9 +347,9 @@ impl<'de> Visitor<'de> for DigestedOrigins<'_> {
     }
 
     fn visit_seq<A: SeqAccess<'de>>(self, mut sequence: A) -> Result<Value, A::Error> {
-        let includes = |id: &str| self.0.contains_key(id);
+        let mut includes = |id: &str| Ok(self.0.contains_key(id));
         let mut compared = HashSet::new();
-        while let Some(row) = sequence.next_element_seed(SelectOrigin(&includes))? {
+        while let Some(row) = sequence.next_element_seed(SelectOrigin(&mut includes))? {
             let Some((id, row)) = row else { continue };
             let (key, expected) = self
                 .0

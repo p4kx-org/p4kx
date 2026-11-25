@@ -16,8 +16,6 @@ use crate::catalog_capture::CatalogCapture;
 
 #[path = "real_archive_catalog_definition_digests.rs"]
 mod definitions;
-#[path = "real_archive_catalog_digest_index.rs"]
-mod digest_index;
 #[path = "real_archive_catalog_digest_runs.rs"]
 mod digest_runs;
 #[path = "real_archive_loot_harvest_digests.rs"]
@@ -35,7 +33,6 @@ pub(crate) use mission::{MissionDisposition, StreamedMissionDigests};
 pub(crate) use placement::StreamedPlacementDigests;
 
 pub(crate) use definitions::StreamedDefinitionDigests;
-use digest_index::DigestIndex;
 use digest_runs::{DigestRuns, OriginDigest};
 pub(crate) use wire::DefinitionOwner;
 use wire::OrderedRows;
@@ -93,15 +90,15 @@ impl<'directory, const TABLES: usize> StreamedComponentDigests<'directory, TABLE
         capture_inventory(
             inventory,
             references,
-            |id, row| spill(&mut self.uses, &id, row),
-            |id, row| spill(&mut self.sources, &id, row),
+            |id, row| spill(&mut self.uses, id, row),
+            |id, row| spill(&mut self.sources, id, row),
         )
     }
 }
 
-fn spill(runs: &mut DigestRuns<'_>, id: &str, row: Value) -> TestResult {
+fn spill(runs: &mut DigestRuns<'_>, id: impl Into<Box<str>>, row: Value) -> TestResult {
     runs.push(OriginDigest {
-        id: OriginDigest::id_hash(id),
+        id: id.into(),
         payload: fingerprint(row)?,
     })?;
     Ok(())
@@ -155,8 +152,8 @@ impl BoundMeasurement {
     ) -> TestResult<Counts<TABLES>> {
         self.watch.check()?;
         let rows = evidence.rows.map(OrderedRows::finish);
-        let uses = DigestIndex::open(evidence.uses.finish()?)?;
-        let sources = DigestIndex::open(evidence.sources.finish()?)?;
+        let uses = evidence.uses.finish()?;
+        let sources = evidence.sources.finish()?;
         let have_rows = rows.iter().any(|row| row.count != 0);
         if (uses.count() != 0) != have_rows || (sources.count() != 0) != have_rows {
             return Err("the streamed component scope has incomplete original evidence".into());

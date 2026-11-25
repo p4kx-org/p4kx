@@ -12,8 +12,7 @@ use serde_json::Value;
 
 use super::super::digest_parity::{capture_physical_sources, fingerprint};
 use super::super::{BoundMeasurement, Counts, TestResult, collect_references, wire_row};
-use super::digest_index::DigestIndex;
-use super::digest_runs::{DigestRuns, OriginDigest};
+use super::digest_runs::{DigestRuns, Fingerprint, OriginDigest};
 use super::wire::{OrderedRows, encounter_key};
 use super::{StreamedComponentDigests, spill};
 
@@ -72,19 +71,16 @@ impl<'directory> StreamedPlacementDigests<'directory> {
 
     fn retain_root_origins(&mut self, inventory: &SourceInventory) -> TestResult {
         let pending = std::mem::replace(&mut self.root_use_ids, DigestRuns::new(self.directory));
-        let wanted = DigestIndex::open(pending.finish()?)?;
+        let wanted = pending.finish()?;
         if wanted.count() == 0 && self.root_source_ids.is_empty() {
             return Ok(());
         }
         let mut sources: HashSet<_> = self.root_source_ids.iter().map(String::as_str).collect();
-        let mut reader = wanted.reader()?;
+        let mut cursor = wanted.cursor()?;
         let mut found = 0u64;
         for used in inventory.iter_uses() {
             let id = used.id().as_str();
-            if wanted
-                .lookup(&mut reader, &OriginDigest::id_hash(id))?
-                .is_none()
-            {
+            if cursor.observe(id)?.is_none() {
                 continue;
             }
             if !matches!(
@@ -111,7 +107,7 @@ impl<'directory> StreamedPlacementDigests<'directory> {
             .into());
         }
         capture_physical_sources(inventory, sources.into_iter().collect(), |id, source| {
-            spill(&mut self.comparison.sources, &id, source)
+            spill(&mut self.comparison.sources, id, source)
         })?;
         self.root_source_ids.clear();
         Ok(())
@@ -132,8 +128,10 @@ fn retain_row(
         return Err("a canonical placement row lacks contributing sources".into());
     }
     for reference in references {
-        let id = OriginDigest::id_hash(reference);
-        use_ids.push(OriginDigest { id, payload: id })?;
+        use_ids.push(OriginDigest {
+            id: reference.into(),
+            payload: Fingerprint::default(),
+        })?;
     }
     collect_input_refs(&wire, source_ids)?;
     ordered.append_encounter_row(key, fingerprint(wire)?)
@@ -169,9 +167,7 @@ impl BoundMeasurement {
         availability: DatasetAvailability,
         evidence: StreamedPlacementDigests<'_>,
     ) -> TestResult<Counts<2>> {
-        if !evidence.root_source_ids.is_empty()
-            || evidence.root_use_ids.finish()?.metadata()?.len() != 0
-        {
+        if !evidence.root_source_ids.is_empty() || evidence.root_use_ids.finish()?.count() != 0 {
             return Err("the placement stream ended without a complete root inventory".into());
         }
         self.verify_streamed_component_tables(TABLES, [availability; 2], evidence.comparison)

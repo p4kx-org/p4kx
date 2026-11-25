@@ -172,8 +172,8 @@ fn spill_inventory<const TABLES: usize>(
     capture_inventory(
         inventory,
         references,
-        |id, row| spill(&mut custody.uses, &id, row),
-        |id, row| spill(&mut custody.sources, &id, row),
+        |id, row| spill(&mut custody.uses, id, row),
+        |id, row| spill(&mut custody.sources, id, row),
     )
 }
 

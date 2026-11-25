@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::fmt;
+use std::io;
 
 use serde::de::{DeserializeSeed, Deserializer, IgnoredAny, MapAccess, SeqAccess, Visitor};
 use serde_json::{Map, Value};
@@ -27,8 +28,8 @@ impl<'de> Visitor<'de> for SelectedOrigins<'_> {
     fn visit_seq<A: SeqAccess<'de>>(self, mut sequence: A) -> Result<Value, A::Error> {
         use serde::de::Error as _;
         let mut selected = Map::new();
-        let includes = |id: &str| self.0.contains_key(id);
-        while let Some(row) = sequence.next_element_seed(SelectOrigin(&includes))? {
+        let mut includes = |id: &str| Ok(self.0.contains_key(id));
+        while let Some(row) = sequence.next_element_seed(SelectOrigin(&mut includes))? {
             if let Some((id, row)) = row
                 && selected.insert(id, row).is_some()
             {
@@ -41,8 +42,7 @@ impl<'de> Visitor<'de> for SelectedOrigins<'_> {
     }
 }
 
-#[derive(Clone, Copy)]
-pub(super) struct SelectOrigin<'scope>(pub(super) &'scope dyn Fn(&str) -> bool);
+pub(super) struct SelectOrigin<'scope>(pub(super) &'scope mut dyn FnMut(&str) -> io::Result<bool>);
 
 impl<'de> DeserializeSeed<'de> for SelectOrigin<'_> {
     type Value = Option<(String, Value)>;
@@ -139,7 +139,7 @@ impl Visitor<'_> for ReadField {
     }
 }
 
-struct SelectId<'scope>(&'scope dyn Fn(&str) -> bool);
+struct SelectId<'scope>(&'scope mut dyn FnMut(&str) -> io::Result<bool>);
 
 enum OriginId {
     Missing,
@@ -163,7 +163,7 @@ impl Visitor<'_> for SelectId<'_> {
     }
 
     fn visit_str<E: serde::de::Error>(self, id: &str) -> Result<OriginId, E> {
-        Ok(if (self.0)(id) {
+        Ok(if (self.0)(id).map_err(E::custom)? {
             OriginId::Selected(id.to_owned())
         } else {
             OriginId::Unselected
