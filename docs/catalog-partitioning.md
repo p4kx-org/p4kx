@@ -272,7 +272,7 @@ for local refresh.
 | Resolved ship and Item ports with XML overrides and equipped items | `equipment::read_loadouts` for one owner or `visit_loadouts` for a streamed refresh |
 
 Use a shared `CatalogQuerySession` and parsed view where the routes support it.
-`ContractSnapshot::location_queries` contains the referenced authored rules. The game
+The full and summary results contain the referenced authored rules in `location_queries`. The game
 chooses concrete locations during mission execution. Resolve protected rank names using
 `snapshot.game_text()` in the selected locales. Change cache identity when the
 Archive, Build, locale or cache format changes. Replace entries only after

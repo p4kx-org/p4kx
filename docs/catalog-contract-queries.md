@@ -98,6 +98,25 @@ still reads each required whole Generator and performs the canonical dependency,
 joins. The ordinary contract queries supply the complete derived and original-source projections.
 The session's provenance policy applies to summaries as it does to the other typed queries.
 
+### Installed LIVE comparison
+
+An SDK comparison at source revision 2dabe115f used LIVE Build 13220821 and one Windows
+AMD64 verifier binary. Each run opened a fresh process, selected All and English, used
+MarkersOnly, and set one Rayon worker. The verifier used an opt-level 1 export test build
+with debug information disabled and serde_json at opt-level 3. The operating-system file
+cache was left in place.
+
+| Query | Whole process | SDK excluding callback | Peak private commit |
+| --- | ---: | ---: | ---: |
+| `with_contracts` | 268.00 s | 263.31 s | 1,488,257,024 bytes |
+| `with_contract_summaries` | 90.76 s | 86.12 s | 1,164,017,664 bytes |
+
+Both queries returned 5,188 contract rows and 1,886 authored location rules with the same
+coverage. Separate hashing runs agreed on the ordered physical and logical contract identities,
+the seven summary fields, the authored location rules and the applicable protected text
+lookups. The figures measure the SDK query, including preparation in the whole-process
+column. Integrated consumer refresh, cache and slot processing have separate costs.
+
 ## Coverage and cache updates
 
 The result separates selected-owner coverage, reverse-survey scope, related Generator owners,
