@@ -343,6 +343,13 @@ verified the Flatpak Documents grants and the deb and Flatpak lifecycle.
 [AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45359023253/job/138344687384) ·
 [ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45359023253/job/138344687148)
 
+Release merge `27da392284eed8c67cf58c15ea473089d6c0a20c` for PR #1117 head
+`ac572e896` passed the native package checks on AMD64 and ARM64. Each job
+executed the four package launchers with the matching native test archive and
+passed the software desktop frames and Documents portal grants.
+[AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45530796171/job/138990050234) ·
+[ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45530796171/job/138990050604)
+
 The tagged v0.5.0 candidate requires its own hosted Linux package evidence on both CPUs.
 
 For a branch-only native Linux validation, dispatch the existing `release.yml` workflow with
