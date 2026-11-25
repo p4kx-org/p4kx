@@ -16,9 +16,6 @@ pub(super) const DATASETS: [&str; 2] = [
     "/definitions/actorProceduralRecoilModifiers",
 ];
 
-const REMAINING: &str =
-    "synthetic producer parity witnessed; installed parity and memory evidence open";
-
 pub(super) fn read() -> TestResult<[Route; 2]> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("sdk_actor_recoil.p4k");
@@ -48,7 +45,7 @@ pub(super) fn read() -> TestResult<[Route; 2]> {
             ],
             "the schema witness retains both physical configuration occurrences"
         );
-        Route::queried_rows(DATASETS[0], rows.rows(), REMAINING)
+        Route::queried_rows(DATASETS[0], rows.rows(), None)
     })??;
     let modifiers = parsed.with_actor_procedural_recoil_modifiers(selection, None, |rows| {
         let [row] = rows.rows() else {
@@ -59,7 +56,7 @@ pub(super) fn read() -> TestResult<[Route; 2]> {
             Some(&fixture::ACTOR_MODIFIER_INDEX),
             "the schema witness reads the original modifier Record"
         );
-        Route::queried_rows(DATASETS[1], rows.rows(), REMAINING)
+        Route::queried_rows(DATASETS[1], rows.rows(), None)
     })??;
     Ok([configs, modifiers])
 }

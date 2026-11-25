@@ -8,7 +8,7 @@ use p4kx_extraction::{
     SourceInventory,
 };
 
-use super::unlocalized_record_query::plan::{Owner, Plan};
+use super::unlocalized_record_query::plan::{OrderedOwnerPlan, Plan, rule_allows};
 use super::{CatalogLanguageSelection, CatalogRecordCoverage, CatalogRecordSelection};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
@@ -33,6 +33,8 @@ pub use crate::template_configuration::{MissionFlowRef, MissionPropertyRef};
 pub use crate::template_definition::TemplateDefinition;
 #[path = "mission_owner_definition_query.rs"]
 mod owner_definitions;
+#[path = "mission_owner_definition_visit.rs"]
+pub mod owner_visit;
 
 pub use item_definition::{MissionItemDefinition, MissionStringVariant, MissionStringVariants};
 pub use mission_scenario_definition::MissionScenarioDefinition;
@@ -67,22 +69,32 @@ impl MissionDefinitionFamily {
             Self::MissionBrokerEntries => Kind::MissionBrokerEntries,
         }
     }
+}
 
-    fn plan<'source>(
-        self,
+enum DefinitionPlan<'source> {
+    Scenarios(Plan<'source>),
+    Modules(Plan<'source>),
+    Items(Plan<'source>),
+    ContractTemplates(OrderedOwnerPlan<'source>),
+    MissionBrokerEntries(OrderedOwnerPlan<'source>),
+}
+
+impl<'source> DefinitionPlan<'source> {
+    fn select(
         forge: &'source DataForge<'source>,
-        selection: CatalogRecordSelection,
+        selection: MissionDefinitionSelection,
         cancel: Option<&CancelToken>,
-    ) -> Result<Plan<'source>, CatalogError> {
-        let kind = self.kind();
-        match self {
-            Self::ContractTemplates | Self::MissionBrokerEntries => {
-                owner_definitions::plan(forge, kind, selection, cancel)
-            }
-            Self::Scenarios | Self::Modules | Self::Items => {
-                Plan::read(forge, kind, selection, cancel, None)
-            }
-        }
+    ) -> Result<Self, CatalogError> {
+        let kind = selection.family.kind();
+        let prepared = || Plan::read(forge, kind, selection.records, cancel, None);
+        let ordered = || owner_definitions::plan(forge, kind, selection.records, cancel);
+        Ok(match selection.family {
+            MissionDefinitionFamily::Scenarios => Self::Scenarios(prepared()?),
+            MissionDefinitionFamily::Modules => Self::Modules(prepared()?),
+            MissionDefinitionFamily::Items => Self::Items(prepared()?),
+            MissionDefinitionFamily::ContractTemplates => Self::ContractTemplates(ordered()?),
+            MissionDefinitionFamily::MissionBrokerEntries => Self::MissionBrokerEntries(ordered()?),
+        })
     }
 }
 
@@ -243,16 +255,11 @@ fn project<T>(
     inspect: impl FnOnce(MissionDefinitionSnapshot<'_>) -> T,
 ) -> Result<T, CatalogError> {
     let kind = selection.family.kind();
-    let Plan {
-        owners,
-        mut coverage,
-    } = selection.family.plan(forge, selection.records, cancel)?;
-    let languages =
-        if matches!(selection.family, MissionDefinitionFamily::Items) && !owners.is_empty() {
-            requested_languages
-        } else {
-            &[]
-        };
+    let plan = DefinitionPlan::select(forge, selection, cancel)?;
+    let languages = match &plan {
+        DefinitionPlan::Items(plan) if !plan.owners.is_empty() => requested_languages,
+        _ => &[],
+    };
     let sources = TextSources::read_languages(archive, languages)?;
     checkpoint(cancel)?;
     let origins = CatalogOrigins::new(archive, entry, &sources)?;
@@ -260,14 +267,11 @@ fn project<T>(
     let texts = Texts::parse(&sources)?;
     let registry = CatalogTextRegistry::default();
     let projection = CatalogProjection::new(&texts, &input, &registry).for_kind(kind);
-    let (availability, rows) = read_rows(
-        selection.family,
-        forge,
-        owners,
-        &projection,
-        &mut coverage,
-        cancel,
-    )?;
+    let DefinitionRows {
+        availability,
+        rows,
+        coverage,
+    } = read_rows(plan, forge, &projection, cancel)?;
     let text_rows = projection.finish_rows()?;
     let available_languages = languages
         .iter()
@@ -289,55 +293,58 @@ fn project<T>(
     }))
 }
 
+struct DefinitionRows<'source> {
+    availability: DatasetAvailability,
+    rows: MissionDefinitionRows<'source>,
+    coverage: CatalogRecordCoverage,
+}
+
 fn read_rows<'source>(
-    family: MissionDefinitionFamily,
+    plan: DefinitionPlan<'source>,
     forge: &DataForge<'_>,
-    owners: Vec<Owner<'source>>,
     projection: &CatalogProjection<'_, 'source>,
-    coverage: &mut CatalogRecordCoverage,
     cancel: Option<&CancelToken>,
-) -> Result<(DatasetAvailability, MissionDefinitionRows<'source>), CatalogError> {
-    let result = match family {
-        MissionDefinitionFamily::Scenarios => {
+) -> Result<DefinitionRows<'source>, CatalogError> {
+    let result = match plan {
+        DefinitionPlan::Scenarios(plan) => {
             let read = mission_scenario_definition::read;
-            let rows = prepared(owners, projection, coverage, cancel, read)?;
+            let (rows, coverage) = prepared(plan, projection, cancel, read)?;
             split(
-                mission_scenario_definition::table(forge, rows),
+                (mission_scenario_definition::table(forge, rows), coverage),
                 MissionDefinitionRows::Scenarios,
             )
         }
-        MissionDefinitionFamily::Modules => {
+        DefinitionPlan::Modules(plan) => {
             let read = module_declaration::read;
-            let rows = prepared(owners, projection, coverage, cancel, read)?;
+            let (rows, coverage) = prepared(plan, projection, cancel, read)?;
             split(
-                module_declaration::table(forge, rows),
+                (module_declaration::table(forge, rows), coverage),
                 MissionDefinitionRows::Modules,
             )
         }
-        MissionDefinitionFamily::Items => {
-            let rows = prepared(owners, projection, coverage, cancel, item_definition::read)?;
+        DefinitionPlan::Items(plan) => {
+            let read = item_definition::read;
+            let (rows, coverage) = prepared(plan, projection, cancel, read)?;
             split(
-                item_definition::table(forge, rows),
+                (item_definition::table(forge, rows), coverage),
                 MissionDefinitionRows::Items,
             )
         }
-        MissionDefinitionFamily::ContractTemplates => split(
+        DefinitionPlan::ContractTemplates(plan) => split(
             owner_definitions::read(
                 forge,
-                owners,
+                plan,
                 projection.original(),
-                coverage,
                 FlowOwnerKind::ContractTemplate,
                 cancel,
             )?,
             MissionDefinitionRows::ContractTemplates,
         ),
-        MissionDefinitionFamily::MissionBrokerEntries => split(
+        DefinitionPlan::MissionBrokerEntries(plan) => split(
             owner_definitions::read(
                 forge,
-                owners,
+                plan,
                 projection.original(),
-                coverage,
                 FlowOwnerKind::MissionBrokerEntry,
                 cancel,
             )?,
@@ -347,17 +354,20 @@ fn read_rows<'source>(
     Ok(result)
 }
 
-fn split<Row, Selected>(
-    table: CatalogTable<Row>,
-    select: impl FnOnce(Vec<Row>) -> Selected,
-) -> (DatasetAvailability, Selected) {
-    (table.availability, select(table.rows))
+fn split<'source, Row>(
+    (table, coverage): (CatalogTable<Row>, CatalogRecordCoverage),
+    select: impl FnOnce(Vec<Row>) -> MissionDefinitionRows<'source>,
+) -> DefinitionRows<'source> {
+    DefinitionRows {
+        availability: table.availability,
+        rows: select(table.rows),
+        coverage,
+    }
 }
 
 fn prepared<'source, Row>(
-    owners: Vec<Owner<'source>>,
+    plan: Plan<'source>,
     projection: &CatalogProjection<'_, 'source>,
-    coverage: &mut CatalogRecordCoverage,
     cancel: Option<&CancelToken>,
     mut read: impl FnMut(
         &RecordTree<'source>,
@@ -366,7 +376,11 @@ fn prepared<'source, Row>(
         Option<&CancelToken>,
     )
         -> Result<(PreparedDefinition<'source, Row>, Vec<FieldError>), CatalogError>,
-) -> Result<Vec<PreparedDefinition<'source, Row>>, CatalogError> {
+) -> Result<(Vec<PreparedDefinition<'source, Row>>, CatalogRecordCoverage), CatalogError> {
+    let Plan {
+        owners,
+        mut coverage,
+    } = plan;
     let mut rows = Vec::with_capacity(owners.len());
     for owner in owners {
         checkpoint(cancel)?;
@@ -380,5 +394,5 @@ fn prepared<'source, Row>(
         }
         rows.push(row);
     }
-    Ok(rows)
+    Ok((rows, coverage))
 }

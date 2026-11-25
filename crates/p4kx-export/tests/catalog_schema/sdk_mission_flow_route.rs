@@ -20,6 +20,8 @@ use super::{Route, TestResult};
 mod fixture;
 use fixture::open;
 
+#[path = "sdk_mission_owner_definition_visit.rs"]
+mod definition_visit;
 #[path = "sdk_mission_property_visit.rs"]
 mod visit;
 

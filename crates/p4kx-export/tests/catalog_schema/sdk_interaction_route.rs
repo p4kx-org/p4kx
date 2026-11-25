@@ -39,11 +39,7 @@ pub(super) fn read() -> TestResult<Route> {
         None,
         |snapshot| {
             check_table(&snapshot, &catalog)?;
-            Route::queried_rows(
-                DATASET,
-                snapshot.rows(),
-                "both component kinds have synthetic producer parity; installed parity open",
-            )
+            Route::queried_rows(DATASET, snapshot.rows(), None)
         },
     )?
 }

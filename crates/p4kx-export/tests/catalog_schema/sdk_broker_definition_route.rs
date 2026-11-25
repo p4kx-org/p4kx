@@ -5,8 +5,13 @@ use p4kx_export::catalog_queries::mission_definitions::{
     BrokerDefinition, MissionDefinitionFamily, MissionDefinitionRows, MissionDefinitionSelection,
 };
 use p4kx_export::catalog_queries::mission_properties::{SourcePayload, TemplateSourceRoot};
-use p4kx_export::catalog_queries::{CatalogRecordSelection, ParsedCatalogQueries};
-use p4kx_extraction::Archive;
+use p4kx_export::catalog_queries::{
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ParsedCatalogQueries,
+};
+use p4kx_extraction::{Archive, DataForgeEntry};
+use p4kx_testkit::{
+    ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, TestStruct, TestType, TestValue,
+};
 use serde_json::{Value, json};
 
 use super::{Route, TestResult};
@@ -118,8 +123,6 @@ fn broker_definitions_apply_canonical_admission_to_all_and_guid() -> TestResult 
     use std::time::UNIX_EPOCH;
 
     use p4kx_export::CatalogOptions;
-    use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogQuerySession};
-    use p4kx_extraction::DataForgeEntry;
 
     let (_directory, archive) = broker_admission_fixture()?;
     let entry = DataForgeEntry::read(&archive)?;
@@ -215,28 +218,81 @@ fn check_broker_selection(
     })?
 }
 
-fn broker_admission_fixture() -> TestResult<(tempfile::TempDir, Archive)> {
-    use p4kx_testkit::{
-        ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, TestStruct, TestType, TestValue,
-    };
+#[test]
+fn broker_definitions_keep_guid_row_order_and_physical_fault_order() -> TestResult {
+    let (_directory, archive) = broker_fixture([
+        broker_record(6, "DamagedLateGuid").with_instance_index(u16::MAX),
+        broker_record(3, "FirstAlias"),
+        broker_record(1, "DamagedEarlyGuid").with_instance_index(u16::MAX),
+        broker_record(2, "Second"),
+        broker_record(3, "SecondAlias"),
+        broker_record(6, "Dev_Damaged").with_instance_index(u16::MAX),
+    ])?;
+    let session =
+        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?;
+    let parsed = session.parsed(None)?;
+    let guid = "00000000-0000-0000-0000-000000000006".parse()?;
+    for (records, expected_rows, expected_faults, skipped) in [
+        (CatalogRecordSelection::All, &[3, 1, 4][..], &[0, 2][..], 1),
+        (CatalogRecordSelection::Guid(guid), &[][..], &[0][..], 1),
+        (CatalogRecordSelection::RecordIndex(5), &[][..], &[5][..], 0),
+    ] {
+        let selection =
+            MissionDefinitionSelection::new(MissionDefinitionFamily::MissionBrokerEntries, records);
+        parsed.with_mission_definitions(selection, None, |snapshot| -> TestResult {
+            let MissionDefinitionRows::MissionBrokerEntries(rows) = &snapshot.rows else {
+                return Err("expected canonical Broker definitions".into());
+            };
+            let positions: Vec<_> = rows
+                .iter()
+                .map(|row| row.header().record_index().value().copied())
+                .collect::<Option<_>>()
+                .ok_or("readable physical Record positions")?;
+            assert_eq!(positions, expected_rows, "GUID order with physical ties");
+            assert_eq!(
+                snapshot.coverage.unreadable_bodies, expected_faults,
+                "faults preserve original Record order",
+            );
+            assert_eq!(
+                snapshot.coverage.skipped_leftovers, skipped,
+                "canonical admission excludes the development owner before reading its body",
+            );
+            Ok(())
+        })??;
+    }
+    Ok(())
+}
 
-    const BROKER: &str = "MissionBrokerEntry";
-    let record = |guid, label: &str| {
-        TestRecord::new(
-            guid,
-            BROKER,
-            format!("{BROKER}.{label}"),
-            format!("libs/foundry/records/missionbroker/{label}.xml"),
-        )
-        .value("title", TestValue::text("@fixture_broker_title"))
-    };
-    let database = DataForgeBuilder::new()
+fn broker_admission_fixture() -> TestResult<(tempfile::TempDir, Archive)> {
+    broker_fixture([
+        broker_record(1, "First"),
+        broker_record(1, "Dev_Excluded"),
+        broker_record(2, "Second"),
+    ])
+}
+
+const BROKER: &str = "MissionBrokerEntry";
+
+fn broker_record(guid: u128, label: &str) -> TestRecord {
+    TestRecord::new(
+        guid,
+        BROKER,
+        format!("{BROKER}.{label}"),
+        format!("libs/foundry/records/missionbroker/{label}.xml"),
+    )
+    .value("title", TestValue::text("@fixture_broker_title"))
+}
+
+fn broker_fixture(
+    records: impl IntoIterator<Item = TestRecord>,
+) -> TestResult<(tempfile::TempDir, Archive)> {
+    let mut database = DataForgeBuilder::new()
         .version(8)
-        .structure(TestStruct::new(BROKER).field("title", TestType::Locale))
-        .record(record(1, "First"))
-        .record(record(1, "Dev_Excluded"))
-        .record(record(2, "Second"))
-        .build();
+        .structure(TestStruct::new(BROKER).field("title", TestType::Locale));
+    for record in records {
+        database = database.record(record);
+    }
+    let database = database.build();
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("fixture.p4k");
     ArchiveBuilder::new()

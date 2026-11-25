@@ -16,9 +16,6 @@ const ANIMATIONS: &str = "/definitions/weaponProceduralAnimations";
 const CLIPS: &str = "/definitions/weaponProceduralClips";
 pub(super) const DATASETS: [&str; 2] = [ANIMATIONS, CLIPS];
 
-const REMAINING: &str =
-    "synthetic producer parity witnessed; installed parity and memory evidence open";
-
 pub(super) fn read() -> TestResult<[Route; 2]> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("sdk_weapon_procedural.p4k");
@@ -50,7 +47,7 @@ pub(super) fn read() -> TestResult<[Route; 2]> {
                 ],
                 "both physical animation rows keep the original Record order"
             );
-            Route::queried_rows(ANIMATIONS, snapshot.rows(), REMAINING)
+            Route::queried_rows(ANIMATIONS, snapshot.rows(), None)
         },
     )??;
     let clips = parsed.with_weapon_procedural_clips(
@@ -65,7 +62,7 @@ pub(super) fn read() -> TestResult<[Route; 2]> {
                 Some(&fixture::CLIP_INDEX),
                 "the scoped witness returns the selected physical clip"
             );
-            Route::queried_rows(CLIPS, snapshot.rows(), REMAINING)
+            Route::queried_rows(CLIPS, snapshot.rows(), None)
         },
     )??;
     Ok([animations, clips])

@@ -5,8 +5,8 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use p4kx_extraction::{
-    CancelToken, CanonicalReadObserver, DataForge, DataForgeError, DataType, Record, RecordTree,
-    Struct, TreeBuilder,
+    CancelToken, CanonicalReadObserver, DataForge, DataType, Record, RecordTree, Struct,
+    TreeBuilder,
 };
 
 use crate::catalog_queries::unlocalized_record_query;
@@ -18,6 +18,12 @@ use crate::{CatalogError, Kind};
 
 #[path = "catalog_record_entity_candidates.rs"]
 mod entity_candidates;
+#[path = "catalog_record_owner.rs"]
+mod record_owner;
+
+pub(in crate::build::catalog_queries) use record_owner::{
+    OrderedOwnerPlan, read_owner, rule_allows,
+};
 
 use entity_candidates::entity_candidates;
 
@@ -153,18 +159,7 @@ impl<'source> Plan<'source> {
         observer: Option<Arc<dyn CanonicalReadObserver>>,
     ) -> Result<Self, CatalogError> {
         Self::read_with(forge, selection, cancel, observer, |record, _, coverage| {
-            let path = record.record_path();
-            if path.as_ref().is_ok_and(|path| !rule.matches_path(path)) {
-                return Ok(false);
-            }
-            match record.type_name() {
-                Ok(source_type) if source_type != rule.type_name => Ok(false),
-                Ok(_) if path.is_ok() => Ok(true),
-                _ => {
-                    coverage.unreadable_headers.push(record.index());
-                    Ok(false)
-                }
-            }
+            Ok(rule_allows(record, rule, coverage))
         })
     }
 
@@ -372,22 +367,4 @@ pub(in crate::build::catalog_queries) fn crafter_admission<'source>(
             Ok(false)
         },
     )
-}
-
-pub(in crate::build::catalog_queries) fn read_owner<'source>(
-    trees: &mut TreeBuilder<'source>,
-    record: &Record<'source>,
-    coverage: &mut CatalogRecordCoverage,
-) -> Result<Option<Owner<'source>>, CatalogError> {
-    match trees.build(record) {
-        Ok(tree) => Ok(Some(Owner {
-            record: *record,
-            tree,
-        })),
-        Err(DataForgeError::ObservationStopped) => Err(CatalogError::Cancelled),
-        Err(_) => {
-            coverage.unreadable_bodies.push(record.index());
-            Ok(None)
-        }
-    }
 }

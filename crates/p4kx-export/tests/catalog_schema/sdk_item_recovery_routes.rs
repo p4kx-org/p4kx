@@ -74,11 +74,7 @@ fn parity<Row: Serialize + JsonSchema>(
         Some(&json!({"availability": availability, "rows": rows})),
         "selected original policy projection matches Catalog at {dataset}"
     );
-    Route::queried_rows(
-        dataset,
-        rows,
-        "synthetic producer and source parity available; installed producer parity open",
-    )
+    Route::queried_rows(dataset, rows, None)
 }
 
 fn verify_policy(snapshot: &ItemRecoverySnapshot<'_>) -> TestResult {

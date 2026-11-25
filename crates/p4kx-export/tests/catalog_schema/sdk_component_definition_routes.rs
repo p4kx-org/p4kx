@@ -19,8 +19,6 @@ use serde::Serialize;
 
 use super::{Route, TestResult};
 
-const REMAINING: &str =
-    "typed schema and selected LIVE/PTU source samples witnessed; complete producer parity open";
 const TURRET: &str = "SCItemTurretParams";
 const TYPES: [&str; 5] = [
     "DamageResistanceMacro",
@@ -72,7 +70,7 @@ fn witness<Row: JsonSchema + Serialize>(
         snapshot.definition_discovery().is_complete(),
         "the fixture dependency scope is complete"
     );
-    Route::queried_rows(dataset, snapshot.rows(), REMAINING)
+    Route::queried_rows(dataset, snapshot.rows(), None)
 }
 
 #[test]

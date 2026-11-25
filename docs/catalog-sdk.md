@@ -876,6 +876,40 @@ Normal Catalog admission and count excluded development leftovers. `Guid`
 retains each admitted physical Record sharing that GUID. `RecordIndex` can also
 inspect an excluded original Record when its type and path match the family.
 
+Use `mission_definitions::owner_visit::visit_mission_owner_definitions` for an
+owner-at-a-time read of Contract Templates or Mission Broker Entries. The
+`_from` variant accepts a decoded Entry of the same Archive. Catalog query
+sessions and parsed queries expose the same method.
+
+```rust
+use p4kx_export::catalog_queries::CatalogRecordSelection;
+use p4kx_export::catalog_queries::mission_definitions::owner_visit::{
+    MissionOwnerDefinitionRow, MissionOwnerDefinitionSelection,
+};
+
+let selection = MissionOwnerDefinitionSelection::MissionBrokerEntries(CatalogRecordSelection::All);
+let summary = parsed.visit_mission_owner_definitions(selection, Some(&cancel), |snapshot| {
+    if let MissionOwnerDefinitionRow::MissionBrokerEntry(broker) = &snapshot.row {
+        stage_broker(broker, &snapshot.source_inventory)?;
+    }
+    Ok::<(), ConsumerError>(())
+})?;
+```
+
+The callback borrows the canonical definition, including its source arena
+and flow and property links, together with that owner's source inventory.
+Resolve the row's source-use references in that inventory and retain the
+contributing uses and physical source ancestry when staging the row. Rows are
+visited in canonical GUID order, with physical Record order for equal GUIDs.
+The selection policies match the materialized query.
+
+Supply a consumer error type that implements `From<CatalogError>` and stage
+changes inside the callback. Publish them after a successful visit with the
+expected availability, owner count and coverage. A callback error, cancellation
+or Archive change prevents a terminal summary. A readable owner with partial
+fields is available to the callback with `fields_complete` set to `false` and
+its Record index in terminal `incomplete_fields`.
+
 Contract Template and Mission Broker Entry definitions expose the physical header,
 the original source arena and links to that owner's flow and property declarations.
 Read those linked declarations with `mission_properties::with_mission_properties`.
@@ -1611,6 +1645,28 @@ Record links retain header evidence. The query reads the admitted policy
 bodies and requested locales and reports unreadable candidates through
 `coverage`. Copy any values needed beyond the callback, and publish changes
 after the query succeeds.
+
+### Installed Item Recovery verification
+
+The Windows AMD64 verifier at `7e54dec59bc0399fc5c5242147f6c46f49823f27` read the complete
+Item Recovery scope with all available locales in a fresh process for each Build. Both returned
+one economy, override and policy row for the same physical Record, with ten notification texts.
+
+| Build | Elapsed ms | Peak private bytes | Peak working set bytes |
+| --- | ---: | ---: | ---: |
+| LIVE `13220821` | 8,046 | 1,091,620,864 | 1,021,710,336 |
+| PTU `13260598` | 8,270 | 1,114,910,720 | 1,031,933,952 |
+
+`installed_item_recovery_matches_one_complete_catalog` compared those three complete tables,
+the selected notification texts and their contributing source identities against the matching
+retained Normal Catalog from producer `24c08bcbff2299b88eff84bf3f7e8f592760b99b`.
+The LIVE and PTU comparisons matched 1,016 and 1,020 contributing source uses respectively,
+each across twelve physical sources. Their separate replay peaks were 1,634,037,760 and
+1,662,300,160 bytes of private commit. Both Archive stamps and retained frame digests matched.
+
+Set `P4KX_DATA_P4K` and `P4KX_NEW_SDK_BUILD` for `installed_item_recovery_cold_query`. The
+parity check also needs `P4KX_CATALOG_MEASUREMENT_DIR` and
+`P4KX_ITEM_RECOVERY_CATALOG_PRODUCER_REVISION` for the corresponding completed Normal run.
 
 ## Authored hacking chips and devices
 
@@ -2539,22 +2595,26 @@ families. The queries read neither Item bodies nor localization and leave modifi
 bodies unopened when reading a configuration. Check header, body and field
 coverage alongside the family's availability.
 
-One retained LIVE `13220821` process compared all four SDK tables with the same-Build
-Normal Catalog. The Archive identity stayed stable and the retained frame hash
-was verified.
+The Windows AMD64 verifier at `5976b21ebfe85f2c5152b3e0ce3be769ded77d79` compared
+all four SDK tables with each matching Normal Catalog from producer
+`24c08bcbff2299b88eff84bf3f7e8f592760b99b`. The Archive identity stayed stable
+and the retained frame hash was verified for both Builds.
 
-| Catalog definition | LIVE rows compared |
-| --- | ---: |
-| `actorProceduralRecoilConfigs` | 33 |
-| `actorProceduralRecoilModifiers` | 33 |
-| `weaponProceduralAnimations` | 57 |
-| `weaponProceduralClips` | 287 |
+| Catalog definition | LIVE `13220821` rows | PTU `13260598` rows |
+| --- | ---: | ---: |
+| `actorProceduralRecoilConfigs` | 33 | 33 |
+| `actorProceduralRecoilModifiers` | 33 | 33 |
+| `weaponProceduralAnimations` | 57 | 57 |
+| `weaponProceduralClips` | 287 | 287 |
 
-The ordered rows matched, including 261,601 reachable uses from one physical
-source. The complete comparison took 3,696.182 seconds and peaked at
-1,091,645,440 bytes of private commit and 1,024,065,536 bytes of working set.
-The verifier revision was `5976b21ebfe85f2c5152b3e0ce3be769ded77d79` and the
-Normal producer revision was `24c08bcbff2299b88eff84bf3f7e8f592760b99b`.
+The ordered rows matched, including 261,601 contributing source uses from one
+physical source on each Build. The eight separate cold queries also completed
+below 2 GB.
+
+| Build | Retained comparison (s) | Peak private bytes | Peak working set bytes |
+| --- | ---: | ---: | ---: |
+| LIVE `13220821` | 3,696.182 | 1,091,645,440 | 1,024,065,536 |
+| PTU `13260598` | 3,576.380 | 1,114,599,424 | 1,033,732,096 |
 
 ## Weapon combat bases
 
@@ -3456,14 +3516,19 @@ executable was built from the test overlay with Git tree
 `d245a55901713a9d4953c2b1953e015e29f93abd` over
 `7f78af9a2636d137461bab9e101f8cd9bddeed65`.
 
-### Component definition LIVE comparison
+### Component definition comparisons
 
 Verifier `ac572e896cfaf9e13b27e41f4eabec9164e4c36c` compared all five definition
-tables with the sealed same-Build LIVE `13220821` Normal Catalog from producer
-`24c08bcbff2299b88eff84bf3f7e8f592760b99b`. It matched 104 ordered rows and
-11,105 referenced uses from 12 physical sources. The Archive stayed stable and
-the frame hash matched its receipt. The 4,012.130-second comparison peaked at
-1,235,394,560 bytes of private commit and 1,134,284,800 bytes of working set.
+tables with the sealed same-Build Normal Catalogs from producer
+`24c08bcbff2299b88eff84bf3f7e8f592760b99b`. Both matched 104 ordered rows and
+11,105 contributing uses from 12 physical sources, including the selected
+locale values. Each Archive stayed stable and its retained frame hash matched
+its measurement receipt.
+
+| Build | Retained comparison (s) | Peak private bytes | Peak working set bytes |
+| --- | ---: | ---: | ---: |
+| LIVE `13220821` | 4,012.130 | 1,235,394,560 | 1,134,284,800 |
+| PTU `13260598` | 4,063.266 | 1,250,463,744 | 1,149,874,176 |
 
 ## Verify dataset coverage
 

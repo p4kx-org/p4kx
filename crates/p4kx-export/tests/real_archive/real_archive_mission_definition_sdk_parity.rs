@@ -134,14 +134,14 @@ struct DefinitionPosition {
     record_index: u32,
 }
 
-fn require_record_order<'source, Row>(
-    rows: &[Row],
-    header: impl for<'row> Fn(&'row Row) -> &'row CanonicalRecordHeader<'source>,
-) -> TestResult {
-    let mut previous = None;
-    let mut indices = HashSet::new();
-    for row in rows {
-        let header = header(row);
+#[derive(Default)]
+struct DefinitionOrder {
+    previous: Option<DefinitionPosition>,
+    indices: HashSet<u32>,
+}
+
+impl DefinitionOrder {
+    fn observe(&mut self, header: &CanonicalRecordHeader<'_>) -> TestResult {
         let current = DefinitionPosition {
             guid: header
                 .guid()
@@ -153,10 +153,26 @@ fn require_record_order<'source, Row>(
                 .value()
                 .ok_or("missing mission definition Record index")?,
         };
-        if !indices.insert(current.record_index) || previous.is_some_and(|prior| prior >= current) {
+        if !self.indices.insert(current.record_index)
+            || self
+                .previous
+                .as_ref()
+                .is_some_and(|previous| previous >= &current)
+        {
             return Err("mission definitions repeat a physical Record or differ from canonical GUID and Record order".into());
         }
-        previous = Some(current);
+        self.previous = Some(current);
+        Ok(())
+    }
+}
+
+fn require_record_order<'source, Row>(
+    rows: &[Row],
+    header: impl for<'row> Fn(&'row Row) -> &'row CanonicalRecordHeader<'source>,
+) -> TestResult {
+    let mut order = DefinitionOrder::default();
+    for row in rows {
+        order.observe(header(row))?;
     }
     Ok(())
 }

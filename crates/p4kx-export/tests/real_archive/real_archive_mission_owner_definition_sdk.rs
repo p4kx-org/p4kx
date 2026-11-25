@@ -22,6 +22,9 @@ use crate::real_archive_mission_configuration_sdk::parse_dispositions;
 use crate::real_archive_scoped_equipment_sdk::{component_family_parity, equipment_input};
 use crate::real_archive_verification::print_line;
 
+#[path = "real_archive_mission_owner_definition_visitor_sdk.rs"]
+mod visitor;
+
 const PRODUCER: &str = "P4KX_MISSION_OWNER_DEFINITION_CATALOG_PRODUCER_REVISION";
 const CENSUS: &str = "P4KX_MISSION_OWNER_DEFINITION_SDK_EXPECTED_OWNERS";
 const DATASET: &str = "P4KX_MISSION_OWNER_DEFINITION_SDK_COLD_DATASET";

@@ -522,9 +522,16 @@ installed Archive and Build manifest had matching observations before and after 
 | --- | ---: | ---: | ---: |
 | LIVE `13220821` | 1,791.078 | 35,879,813,120 | 38,465,208,320 |
 
+Windows reported the lifetime memory peaks after exit. Across 1,730 host samples,
+the lowest available physical memory was 23,320,309,760 bytes and the lowest
+commit headroom was 51,839,676,416 bytes. The host had 100,573,523,968 bytes of
+physical RAM and recorded 218,075 additional page reads and four additional
+page writes during the run. The larger process peak leaves an estimated
+30,254,268,416 bytes for the OS and other processes on a 64 GiB system.
+
 The writer measured 1,469,260,866 compressed bytes and 78,149,434,545 decoded bytes.
 It reported 1,919,532,693 peak temporary bytes. Windows counted 1,919,542,435 process write
-bytes and reported the lifetime memory peaks after exit. The compressed frame SHA-256 was
+bytes. The compressed frame SHA-256 was
 `eff6ccfcecb0eb7cdc6254d0a33ad5777f8d8f2df112851108261bdd347ff40e`.
 
 ## Measuring a complete export
