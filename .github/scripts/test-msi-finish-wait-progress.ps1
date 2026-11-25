@@ -91,6 +91,39 @@ function Assert-P4kxFinishSupervisorNegativeReceipt([string]$Root) {
     }
     'PASS: supervisor failures preserve bound negative results and cannot satisfy the native Finish collector.'
 }
+function Assert-P4kxFinishWaitSetupBudget([string]$Root) {
+    $realFactory = ${function:New-P4kxPackageProcess}
+    $factory = @{resume_utc=$null;returned_utc=$null}
+    function New-P4kxPackageProcess {
+        param([string]$Executable, [string[]]$Arguments, [string]$Directory)
+        $delay = [int][Math]::Ceiling(($factory.resume_utc - [DateTimeOffset]::UtcNow).TotalMilliseconds)
+        if ($delay -gt 0) { Start-Sleep -Milliseconds $delay }
+        $factory.returned_utc = [DateTimeOffset]::UtcNow
+        & $realFactory @PSBoundParameters
+    }
+
+    $path = [IO.Directory]::CreateDirectory((Join-Path $Root 'slow-wait-setup')).FullName
+    $cutoff = [DateTimeOffset]::UtcNow.AddMilliseconds(1500)
+    $factory.resume_utc = $cutoff.AddMilliseconds(50)
+    $context = @{request=@{target='aarch64-pc-windows-msvc';mode='Lifecycle'};directory=$path;
+        digest=('c'*64);collection_cutoff=$cutoff}
+    $launch = @{supervisor_pid=123;supervisor_started_utc_ticks=456}
+    $failure = $null
+    try { Wait-P4kxMsiFinishReceipt $context $launch 6>$null }
+    catch { $failure = $_.Exception.Message }
+    $receipt = Read-P4kxDetachedReceipt (Join-Path $path 'wait-result.json')
+    Assert-P4kxWaitProgress ($failure -ceq 'The bound Finish supervisor produced no result within the original allowance.' -and
+        $factory.returned_utc -ge $cutoff -and $receipt.deadline_utc -ceq $cutoff.ToString('o') -and
+        $null -eq $receipt.result_sha256) 'Late setup lost the original negative wait and deadline.'
+    Assert-P4kxWaitProgress ($receipt.portal_stages.stage -cnotcontains 'portalStart.end' -and
+        -not [IO.File]::Exists((Join-Path $path 'wait-probe-stdout.log'))) 'The owned wait probe launched after its original allowance.'
+
+    $factory.resume_utc = [DateTimeOffset]::UtcNow.AddMilliseconds(3100)
+    $args = @('-NoLogo','-NoProfile','-NonInteractive','-Command',"[Console]::WriteLine('fixture')")
+    $result = Invoke-P4kxPortalProcess ([Environment]::ProcessPath) $args $path 'unbounded-setup' -Milliseconds 3000
+    Assert-P4kxWaitProgress ($result.exit_code -eq 0 -and $result.stdout.Trim() -ceq 'fixture') 'The existing Portal capture allowance changed for a caller without the deadline.'
+    'PASS: late WaitFinish setup launches no probe, with original negative receipt and unchanged Portal defaults.'
+}
 if ([IO.Directory]::Exists($Directory)) { throw 'Wait progress requires a fresh synthetic directory.' }
 $root = [IO.Directory]::CreateDirectory($Directory).FullName
 $oldActions = $env:GITHUB_ACTIONS
@@ -150,3 +183,4 @@ try {
 }
 'PASS: ARM64 lifecycle callback isolation, unchanged other routes and original deadline.'
 Assert-P4kxFinishSupervisorNegativeReceipt $root
+Assert-P4kxFinishWaitSetupBudget $root

@@ -91,9 +91,11 @@ function Test-P4kxMsiFinishReceiptPresence {
     }
     try {
         $probe = Invoke-P4kxPortalProcess ([Environment]::ProcessPath) $arguments $Context.directory 'wait-probe' `
-            -Milliseconds ([int][Math]::Ceiling($remaining)) -CleanupMilliseconds 1000 -MaximumBytes 1024 -Observation $observation -OnProgress $progress
+            -Milliseconds ([int][Math]::Ceiling($remaining)) -DeadlineUtc $Context.collection_cutoff `
+            -CleanupMilliseconds 1000 -MaximumBytes 1024 -Observation $observation -OnProgress $progress
     } catch {
-        if ($observation.timed_out -ne $true -or $observation.exited -ne $true -or
+        if ($observation.timed_out -ne $true -or
+            ($observation.started -ne $false -and $observation.exited -ne $true) -or
             $_.Exception -isnot [AggregateException] -or $_.Exception.InnerExceptions.Count -ne 1) { throw }
         return $false
     }

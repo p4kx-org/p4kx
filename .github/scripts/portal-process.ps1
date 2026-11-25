@@ -93,12 +93,20 @@ function Invoke-P4kxPortalProcess {
     Replays each captured stream after its log is saved and the owned child exits.
     .PARAMETER OnProgress
     Observes bounded capture chunks and predefined wrapper stages synchronously.
+    .PARAMETER DeadlineUtc
+    Charges process setup to the existing allowance and refuses launch at the UTC deadline.
     #>
     param([string]$Executable, [string[]]$Arguments, [string]$Directory, [string]$Name,
         [int]$Milliseconds = 5000, [int]$MaximumBytes = 131072, [hashtable]$Environment = @{},
         [scriptblock]$OnOutput=$null, [hashtable]$Observation=@{}, [ValidateRange(1,5000)][int]$CleanupMilliseconds=5000,
-        [scriptblock]$OnProgress=$null)
+        [scriptblock]$OnProgress=$null, [Nullable[DateTimeOffset]]$DeadlineUtc=$null)
     if ($Milliseconds -le 0 -or $MaximumBytes -le 0 -or $Name -cnotmatch '^[a-z0-9-]+$') { throw 'Invalid portal measurement bounds or name.' }
+    $timer = $null
+    if ($null -ne $DeadlineUtc) {
+        $timer = [Diagnostics.Stopwatch]::StartNew()
+        $wallRemaining = ($DeadlineUtc - [DateTimeOffset]::UtcNow).TotalMilliseconds
+        $Milliseconds = [int][Math]::Max(0, [Math]::Min($Milliseconds, [Math]::Floor($wallRemaining)))
+    }
     $process = New-P4kxPackageProcess $Executable $Arguments $Directory
     foreach ($entry in $Environment.GetEnumerator()) { $process.StartInfo.Environment[$entry.Key] = [string]$entry.Value }
     $channels = @()
@@ -108,13 +116,18 @@ function Invoke-P4kxPortalProcess {
     $Observation['timed_out'] = $false
     try {
         Send-P4kxPortalProgress $OnProgress 'stage' 'portalStart.begin' $failures
+        if ($null -ne $timer -and ($timer.Elapsed.TotalMilliseconds -ge $Milliseconds -or
+            [DateTimeOffset]::UtcNow -ge $DeadlineUtc)) {
+            $Observation['timed_out'] = $true
+            throw 'Portal measurement timed out.'
+        }
         [void]$process.Start()
         $started = $true
         Send-P4kxPortalProgress $OnProgress 'stage' 'portalStart.end' $failures
         Send-P4kxPortalProgress $OnProgress 'stage' 'portalInputClose.begin' $failures
         $process.StandardInput.Close()
         Send-P4kxPortalProgress $OnProgress 'stage' 'portalInputClose.end' $failures
-        $timer = [Diagnostics.Stopwatch]::StartNew()
+        if ($null -eq $timer) { $timer = [Diagnostics.Stopwatch]::StartNew() }
         $channels = New-P4kxPortalChannels $process
         Send-P4kxPortalProgress $OnProgress 'stage' 'portalCapture.begin' $failures
         Receive-P4kxPortalChannels $channels $timer $Milliseconds $MaximumBytes $OnProgress $failures $Observation
