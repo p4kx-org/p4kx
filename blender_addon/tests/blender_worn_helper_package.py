@@ -124,8 +124,8 @@ def verify_package(folder: Path, *, carrier: str, offset: float) -> dict[str, ob
     require(satchel.parent_bone == SPINE, "rigid mesh is attached to the wrong skeleton bone")
     require(helper.parent == satchel, "original locator is outside its rigid mesh hierarchy")
 
-    expected_locator = Vector((0.0, -offset, 1.6))
-    expected_center = expected_locator + Vector((0.0, 0.5, 0.0))
+    expected_locator = Vector((0.0, 0.1, 1.5 + offset))
+    expected_center = expected_locator - Vector((0.0, 0.0, 0.5))
     center = evaluated_world(satchel).translation.copy()
     locator = evaluated_world(helper).translation.copy()
     require_position(center, expected_center, "rest rigid mesh")

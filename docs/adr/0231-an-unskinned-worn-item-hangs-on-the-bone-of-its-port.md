@@ -11,10 +11,12 @@ offset. The helper is a bone of the core's skin (below `Spine3`), not of the bod
 backpack model has no bone weights, so the Armour wrote it as a root node at the origin, between
 the feet.
 
-The bone has the pose of a Z-up skeleton, a turn of 180 degrees about the vertical. The item helper
-`backpack_attach_1_loc` is stored with the axes of a Y-up helper: the same turn followed by 90
-degrees about X. Placing the helper on the bone without that turn lays the backpack on its back;
-with it, the backpack stands upright with a tilt of five degrees, its outer side behind the wearer.
+The holder bone and the item locator use authored transforms in the model coordinate system.
+In LIVE `13220821`, the DOOM and Palatino Deadlock locators have the same orientation within
+float rounding. Each locator's primary and companion matrices agree. The fixed extra 90-degree
+X turn makes both rigid shells lie nearly horizontally in the export. Aligning the authored
+locator directly with the holder's port places both shells upright. The Deadlock side views
+show that orientation in the game. The DOOM export gives the same result at details 0 and 2.
 
 ## Decision
 
@@ -25,9 +27,11 @@ with it, the backpack stands upright with a tilt of five degrees, its outer side
   the helper is looked up among the bones of the holding piece (the body skeleton for the body);
   the piece hangs on the bone of the body skeleton with that name, else on its nearest ancestor
   that the skeleton has, as a rigid child of that bone node in the GLB, so it follows the bone.
-- Its transform below that bone is the bone's bind pose to the helper's, the turn of 90 degrees
-  about X from the frame of a bone to the frame of a helper, the offset of the port, and the
-  inverse of the item helper.
+- A valid item locator aligns directly with the holder's authored port. The transform below the
+  target skeleton bone is the inverse of its bind pose, the holder helper's bind pose, the
+  port's authored offset and the inverse of the item locator.
+- With no usable item locator, the rigid item uses the 90-degree X turn between the holder helper
+  pose and the port offset. Unusable declared locators retain their named diagnostics.
 - A helper that is no bone of its holder is listed as `helper_not_found` and the piece stays at the
   origin. A placed piece is no longer listed as `not_skinned`.
 - Skinned pieces, and pieces that are not worn armour or clothing such as holstered weapons, are

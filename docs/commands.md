@@ -372,7 +372,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   be resolved, or whose model is missing or unreadable, is skipped and listed; with `--json` the report has
   the shape described in [docs/cli-json.md](cli-json.md). `p4kx armour bodies` lists the
   variants.
-  In a Loadout, a rigid piece follows the skeleton bone resolved from its holder port helper. When `--piece`
+  In a Loadout, a rigid piece follows the skeleton bone resolved from its holder port helper.
+  A valid item locator aligns directly with the holder's authored port and offset. A rigid part
+  with no usable item locator uses the 90-degree X fallback described in ADR-0231. When `--piece`
   replaces a holder, each retained rigid attachment resolves its original slot against the
   current holder's physical port. A new rigid piece needs one demonstrably free, visible,
   compatible port. `worn_mount_unresolved` reports competing, occupied or unproven slots and

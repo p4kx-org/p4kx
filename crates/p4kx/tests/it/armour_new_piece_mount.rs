@@ -57,7 +57,7 @@ fn assert_mount(out: &Path) -> TestResult {
     let (translation, _, _) = child.transform().decomposed();
     for (actual, expected) in translation
         .into_iter()
-        .zip([0.0, 0.6, -SATCHEL_HELPER_Z + 0.8])
+        .zip([0.0, 0.5 + 0.8 - SATCHEL_HELPER_Z, -0.1])
     {
         assert!(
             (actual - expected).abs() < 1e-5,

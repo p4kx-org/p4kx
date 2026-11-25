@@ -360,8 +360,15 @@ Blender 5.3 checks the expected positions of both rigid pieces and their locator
 their spine parent and one drawn vertex following a pose while the pelvis stays fixed.
 The original fixture uses a 0.2 m port offset. The replacement uses its own 0.8 m offset.
 
-A Windows AMD64 check on Blender 5.3.0 (`02f0899d78e3`) also used a synthetic tagged
-tree and a fixture-only selector evaluator. The normal exporter retained the root
+With direct item-locator alignment, the normal Blender 5.3.0 (`02f0899d78e3`)
+import places the original and replacement locators at `(0.00, 0.10, 1.70)` m and
+`(0.00, 0.10, 2.30)` m. Both remain aligned with their port through the evaluated
+spine pose. On LIVE `13220821` the same GLB export aligns the original Deadlock
+and DOOM locators with their authored `Spine3`-relative holders. The main shells
+measure about 0.62 m and 0.57 m tall, respectively, in the rest pose.
+
+A Windows AMD64 check of the preceding mount convention on Blender 5.3.0
+(`02f0899d78e3`) used a synthetic tagged tree and a fixture-only selector evaluator. The normal exporter retained the root
 on `spine` and reported the unresolved selector. With the fixture's explicit matches,
 the same tree selected helper ordinals `[1, 0]`, preserved the source positions of the
 selected helper fields, and attached the satchel to `head` using its authored item

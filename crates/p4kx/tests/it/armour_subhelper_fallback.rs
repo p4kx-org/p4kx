@@ -228,7 +228,7 @@ fn check_root_mount(glb: &CheckedGlb, rows: &[Value], holder: u32) -> TestResult
     assert!(
         translation
             .into_iter()
-            .zip([0.0, 0.6, -SATCHEL_HELPER_Z + 0.2])
+            .zip([0.0, 0.5 + 0.2 - SATCHEL_HELPER_Z, -0.1])
             .all(|(actual, expected)| (actual - expected).abs() < 1e-5),
         "the rigid piece retains the root offset and item alignment: {translation:?}"
     );

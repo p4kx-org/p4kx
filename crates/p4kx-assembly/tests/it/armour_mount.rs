@@ -9,14 +9,18 @@ use p4kx_assembly::{ArchiveModels, Armour, AssemblyOptions, BodyVariant, Loadout
 use p4kx_extraction::{Archive, DataForgeEntry, SourceEncryptionState, SourceLocation};
 use p4kx_gltf::GlbOptions;
 use p4kx_testkit::{
-    CheckedGlb, MOUNT_BONE, MOUNT_COURIER, MOUNT_DRIFTER, SATCHEL_HELPER_Z, check_glb,
-    mounted_item_entries, mounted_overlay_entries,
+    CheckedGlb, MOUNT_BONE, MOUNT_COURIER, MOUNT_DRIFTER, SATCHEL_HELPER_Z, TestEntry, check_glb,
+    mounted_item_entries, mounted_item_frame_entries, mounted_overlay_entries,
 };
 
 use crate::assembly_support::{TestResult, fixture};
 
 fn wear(character: &str) -> Result<Armour, Box<dyn Error>> {
-    let fixture = fixture(mounted_item_entries())?;
+    wear_with_entries(character, mounted_item_entries())
+}
+
+fn wear_with_entries(character: &str, entries: Vec<TestEntry>) -> Result<Armour, Box<dyn Error>> {
+    let fixture = fixture(entries)?;
     let archive = Archive::open(&fixture.path)?;
     let entry = DataForgeEntry::read(&archive)?;
     let forge = entry.open()?;
@@ -74,26 +78,64 @@ fn a_backpack_hangs_on_the_bone_its_port_names_and_follows_it() -> TestResult {
     );
     let (translation, rotation) = placement(&glb, "satchel")?;
     assert!(
-        close(&translation, &[0.0, 0.6, -SATCHEL_HELPER_Z + 0.2]),
+        close(&translation, &[0.0, 0.5 + 0.2 - SATCHEL_HELPER_Z, -0.1]),
         "the bone, the port's offset and the satchel's own helper: {translation:?}"
     );
     assert!(
-        close(
-            &rotation,
-            &[
-                std::f32::consts::FRAC_1_SQRT_2,
-                0.0,
-                0.0,
-                std::f32::consts::FRAC_1_SQRT_2
-            ]
-        ),
-        "the helper's axes are turned onto the bone's: {rotation:?}"
+        close(&rotation, &[0.0, 0.0, 0.0, 1.0]),
+        "coincident helper axes need no turn: {rotation:?}"
     );
     assert_eq!(
         parent_name(&glb, "satchel_loc"),
         Some("satchel"),
         "its helper stays below it"
     );
+    Ok(())
+}
+
+#[test]
+fn the_authored_locator_aligns_with_a_rotated_port() -> TestResult {
+    let armour = wear_with_entries(MOUNT_COURIER, mounted_item_frame_entries("satchel_loc"))?;
+    let glb = glb_of(&armour)?;
+
+    assert_eq!(parent_name(&glb, "satchel"), Some(MOUNT_BONE));
+    assert_eq!(parent_name(&glb, "satchel_loc"), Some("satchel"));
+    let (translation, rotation) = placement(&glb, "satchel")?;
+    assert!(
+        close(&translation, &[0.0, 0.7, -0.1 - SATCHEL_HELPER_Z]),
+        "the port rotation acts on the inverse locator translation: {translation:?}"
+    );
+    assert!(
+        close(&rotation, &[0.5, -0.5, -0.5, 0.5]),
+        "the X port turn precedes the inverse Y locator turn in glTF axes: {rotation:?}"
+    );
+    Ok(())
+}
+
+#[test]
+fn an_absent_or_missing_locator_keeps_the_bone_quarter_turn() -> TestResult {
+    for (locator, missing) in [("", false), ("missing_satchel_locator", true)] {
+        let armour = wear_with_entries(MOUNT_COURIER, mounted_item_frame_entries(locator))?;
+        let glb = glb_of(&armour)?;
+        assert_eq!(parent_name(&glb, "satchel"), Some(MOUNT_BONE));
+        let (translation, rotation) = placement(&glb, "satchel")?;
+        assert!(
+            close(&translation, &[0.0, 0.6, 0.2]),
+            "the bone quarter-turn acts on the port offset for {locator:?}: {translation:?}"
+        );
+        assert!(
+            close(&rotation, &[1.0, 0.0, 0.0, 0.0]),
+            "the bone and port each turn about X for {locator:?}: {rotation:?}"
+        );
+        assert_eq!(
+            armour
+                .issues()
+                .iter()
+                .any(|issue| { issue.kind().code() == "item_offset_helper_not_found" }),
+            missing,
+            "only an authored locator missing from the model is diagnosed"
+        );
+    }
     Ok(())
 }
 
@@ -173,7 +215,7 @@ fn a_replaced_holder_uses_its_current_port_for_a_retained_or_explicit_piece() ->
         assert_eq!(parent_name(&glb, "satchel"), Some(MOUNT_BONE));
         let (translation, _) = placement(&glb, "satchel")?;
         assert!(
-            close(&translation, &[0.0, 0.6, -SATCHEL_HELPER_Z + 0.8]),
+            close(&translation, &[0.0, 0.5 + 0.8 - SATCHEL_HELPER_Z, -0.1]),
             "the new torso's port contributes the replacement offset: {translation:?}"
         );
         assert!(

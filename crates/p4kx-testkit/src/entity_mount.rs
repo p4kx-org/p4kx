@@ -31,8 +31,7 @@ const IDENTITY: [[f32; 4]; 3] = [
     [0.0, 0.0, 1.0, 0.0],
 ];
 
-fn satchel_model() -> TestModel {
-    let mut helper = IDENTITY;
+fn satchel_model(mut helper: [[f32; 4]; 3]) -> TestModel {
     helper[2][3] = SATCHEL_HELPER_Z;
     TestModel::cube().with_nodes(vec![
         TestNode {
@@ -157,7 +156,23 @@ fn unresolved_helper_port(port: TestPort) -> TestPort {
 }
 
 fn mounted_entries(database: &DataForgeBuilder) -> Vec<TestEntry> {
-    let satchel = satchel_model();
+    mounted_entries_with_satchel(database, &satchel_model(IDENTITY))
+}
+
+/// Returns a worn satchel with perpendicular port and locator rotation axes.
+#[must_use]
+pub fn mounted_item_frame_entries(item_helper: &str) -> Vec<TestEntry> {
+    let port = rigid_satchel_port()
+        .helper("cloth", [0.0, 0.1, 0.2], [90.0, 0.0, 0.0])
+        .item_helper(item_helper);
+    let locator = [[0.0, -1.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0], IDENTITY[2]];
+    mounted_entries_with_satchel(&database_with_carrier(port), &satchel_model(locator))
+}
+
+fn mounted_entries_with_satchel(
+    database: &DataForgeBuilder,
+    satchel: &TestModel,
+) -> Vec<TestEntry> {
     let mut entries = vec![TestEntry::zstd("Data\\Game2.dcb", database.build())];
     entries.extend(armour_files());
     entries.push(TestEntry::stored(

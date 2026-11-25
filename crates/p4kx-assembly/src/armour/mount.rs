@@ -13,9 +13,8 @@ use super::read_models::Loaded;
 use crate::placement::{self, bone_placement, is_unskinned, offset_transform};
 use crate::{Issue, IssueKind, PortPlacementSource};
 
-/// The turn about X in degrees from the frame of a bone, which has Z up, to the frame of the
-/// helper of an item, which has Y up (ADR-0231).
-const BONE_TO_HELPER: [f32; 3] = [90.0, 0.0, 0.0];
+/// The positive X quarter-turn for a worn item without a usable locator.
+const UNLOCATED_BONE_TO_HELPER: [f32; 3] = [90.0, 0.0, 0.0];
 
 #[derive(Debug, Clone)]
 pub(super) struct Placed {
@@ -184,17 +183,25 @@ fn mounted(
         Ok(placement) => (placement, None),
         Err(kind) => (None, Some(kind)),
     };
-    let at_port = inverse
-        .then(&held.transform)
-        .then(&offset_transform([0.0; 3], BONE_TO_HELPER))
-        .then(&offset_transform(mount.position(), mount.rotation()));
+    let holder_frame = inverse.then(&held.transform);
+    let port_offset = offset_transform(mount.position(), mount.rotation());
     let port = PortPlacementSource::worn(mount.port, mount.offset_fields, own.is_some());
-    let (transform, locator) = own.map_or((at_port, None), |placement| {
-        (
-            at_port.then(&placement.inverse),
-            wearable.and_then(|model| model.node_source(placement.node)),
-        )
-    });
+    let (transform, locator) = own.map_or_else(
+        || {
+            (
+                holder_frame
+                    .then(&offset_transform([0.0; 3], UNLOCATED_BONE_TO_HELPER))
+                    .then(&port_offset),
+                None,
+            )
+        },
+        |placement| {
+            (
+                holder_frame.then(&port_offset).then(&placement.inverse),
+                wearable.and_then(|model| model.node_source(placement.node)),
+            )
+        },
+    );
     let placed = Placed {
         frame: RigMount::new(bone, transform),
         source: WornMountSource::new(
