@@ -510,6 +510,23 @@ section inventory entries per Build.
 
 The final release candidate requires its own producer and replay measurements.
 
+### Packaged Normal measurement with updated field provenance
+
+The Windows AMD64 CLI built from merge revision `27da392284eed8c67cf58c15ea473089d6c0a20c`
+completed an unfiltered Normal export on LIVE `13220821`. It used an explicit Archive key
+file, one worker, Zstandard level 3 and a fixed Unix-epoch export time. The executable and the
+installed Archive and Build manifest had matching observations before and after the run.
+[Native Windows AMD64 package](https://github.com/p4kx-org/p4kx/actions/runs/45530796171/job/138925533389)
+
+| Build | Wall time (s) | Peak working set (B) | Peak private commit (B) |
+| --- | ---: | ---: | ---: |
+| LIVE `13220821` | 1,791.078 | 35,879,813,120 | 38,465,208,320 |
+
+The writer measured 1,469,260,866 compressed bytes and 78,149,434,545 decoded bytes.
+It reported 1,919,532,693 peak temporary bytes. Windows counted 1,919,542,435 process write
+bytes and reported the lifetime memory peaks after exit. The compressed frame SHA-256 was
+`eff6ccfcecb0eb7cdc6254d0a33ad5777f8d8f2df112851108261bdd347ff40e`.
+
 ## Measuring a complete export
 
 The installed regression checks verify decoded and stored byte counts against the actual writer
