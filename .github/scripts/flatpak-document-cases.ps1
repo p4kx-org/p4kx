@@ -20,8 +20,9 @@ function Assert-P4kxDocumentSandboxTest {
 
 function Invoke-P4kxDocumentCaseExtract {
     param($Case, [string]$Source, [string]$Output, [string]$Name,
-        [ValidateSet('None', 'Installation', 'SourceMembership', 'ExistingSource')][string]$Expected = 'None')
-    return Invoke-P4kxFlatpakDocumentCommand $Case.prefix @('extract', $Source, '--filter', 'Data/hello.txt', '--conflict', 'overwrite', '--out', $Output) $Case.directory $Name $Expected
+        [ValidateSet('None', 'Installation', 'SourceMembership', 'ExistingSource')][string]$Expected = 'None',
+        [string]$Entry = 'Data/hello.txt')
+    return Invoke-P4kxFlatpakDocumentCommand $Case.prefix @('extract', $Source, '--filter', $Entry, '--conflict', 'overwrite', '--out', $Output) $Case.directory $Name $Expected
 }
 
 function Assert-P4kxDocumentHello {
@@ -31,7 +32,7 @@ function Assert-P4kxDocumentHello {
 }
 
 function Assert-P4kxDocumentFileOrigin {
-    param($Case, [string]$Artifact, [string]$Receipt)
+    param([string]$Artifact, [string]$Receipt, [string]$ExpectedHash)
     $file = Get-Item -LiteralPath $Artifact
     $origin = @(Get-Content -LiteralPath $Receipt | ConvertFrom-Json)
     if ($origin.Count -lt 2 -or $origin[0].type -cne 'header' -or $origin[-1].type -cne 'end') {
@@ -41,7 +42,7 @@ function Assert-P4kxDocumentFileOrigin {
     $leasePaths = @(Get-ChildItem -LiteralPath $file.DirectoryName -Force -Filter '.p4kx-origin.lease*')
     if ($binding.type -cne 'file' -or $binding.path.encoding -cne 'utf8' -or $binding.path.value -cne $file.Name -or
         $binding.byteLength -cne $file.Length.ToString([Globalization.CultureInfo]::InvariantCulture) -or
-        $binding.sha256 -cne $Case.hello_hash.ToLowerInvariant() -or $leasePaths.Count -ne 0) {
+        $binding.sha256 -cne $ExpectedHash.ToLowerInvariant() -or $leasePaths.Count -ne 0) {
         throw 'The writable Documents grant did not leave the exact origin binding and retire its lease.'
     }
 }
@@ -52,15 +53,19 @@ function Assert-P4kxDocumentOriginLease {
     $artifact = Join-Path $directory 'hello.txt'
     $receipt = $artifact + '.p4kx-origin.jsonl'
     $lease = Join-Path $directory '.p4kx-origin.lease'
-    Assert-P4kxDocumentFileOrigin $Case $artifact $receipt
+    Assert-P4kxDocumentFileOrigin $artifact $receipt $Case.hello_hash
 
+    $next = Join-Path $directory 'empty.txt'
+    $nextReceipt = $next + '.p4kx-origin.jsonl'
+    $nextEntry = 'Data/empty.txt'
     $prior = (Get-FileHash -LiteralPath $receipt -Algorithm SHA256).Hash
     $owned = [IO.File]::Open($lease, [IO.FileMode]::CreateNew)
     try {
-        $arguments = @('extract', $Source, '--filter', 'Data/hello.txt', '--conflict', 'overwrite', '--out', $Outside)
+        $arguments = @('extract', $Source, '--filter', $nextEntry, '--conflict', 'overwrite', '--out', $Outside)
         $contended = Invoke-P4kxPortalProcess flatpak ($Case.prefix + $arguments) $Case.directory 'held-origin-lease' -Milliseconds 10000 -MaximumBytes 64KB
-        if ($contended.exit_code -eq 0 -or -not $contended.stderr.Contains('the origin publication lease already exists') -or
-            (Get-FileHash -LiteralPath $receipt -Algorithm SHA256).Hash -cne $prior) {
+        if ($contended.exit_code -ne 1 -or -not $contended.stderr.Contains('the origin publication lease already exists') -or
+            (Get-FileHash -LiteralPath $receipt -Algorithm SHA256).Hash -cne $prior -or
+            (Test-Path -LiteralPath $next) -or (Test-Path -LiteralPath $nextReceipt)) {
             throw 'The granted path did not refuse the backing directory lease and keep the prior receipt.'
         }
         Assert-P4kxDocumentHello $Case $Case.outside
@@ -69,17 +74,14 @@ function Assert-P4kxDocumentOriginLease {
         [IO.File]::Delete($lease)
     }
 
-    $previous = [IO.File]::Open($receipt, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete)
-    try {
-        $priorIdentity = (Invoke-P4kxLinuxTool stat @('--dereference', '--format=%d:%i', $receipt) | Out-String).Trim()
-        $null = Invoke-P4kxDocumentCaseExtract $Case $Source $Outside 'outside-replace'
-        $replacementIdentity = (Invoke-P4kxLinuxTool stat @('--dereference', '--format=%d:%i', $receipt) | Out-String).Trim()
-        if ($replacementIdentity -ceq $priorIdentity) { throw 'The prior receipt survived the granted replacement.' }
-    } finally {
-        $previous.Dispose()
+    $null = Invoke-P4kxDocumentCaseExtract $Case $Source $Outside 'outside-after-lease' -Entry $nextEntry
+    if ((Get-Item -LiteralPath $next).Length -ne 0 -or
+        (Get-FileHash -LiteralPath $receipt -Algorithm SHA256).Hash -cne $prior) {
+        throw 'Releasing the lease did not admit only the new empty entry.'
     }
+    $emptyHash = [Convert]::ToHexString([Security.Cryptography.SHA256]::HashData([byte[]]@()))
+    Assert-P4kxDocumentFileOrigin $next $nextReceipt $emptyHash
     Assert-P4kxDocumentHello $Case $Case.outside
-    Assert-P4kxDocumentFileOrigin $Case $artifact $receipt
 }
 
 function Assert-P4kxDocumentInsideEmpty {

@@ -82,17 +82,14 @@ impl<'source> ReceiptLock<'source> {
         permit
             .ensure_namespace_writable(&local.path, cancel.flag())
             .map_err(protection_error)?;
+        if lock_metadata(&local.path)?.is_some() {
+            return Err(occupied_lease(&local.path));
+        }
         let created =
             create_output_file(&local.path, protection, cancel.flag()).map_err(|error| {
                 let cause = error.into_io_error();
                 if cause.kind() == io::ErrorKind::AlreadyExists {
-                    io::Error::new(
-                        io::ErrorKind::WouldBlock,
-                        format!(
-                            "the origin publication lease already exists at {}",
-                            local.path.display()
-                        ),
-                    )
+                    occupied_lease(&local.path)
                 } else {
                     cause
                 }
@@ -200,6 +197,16 @@ impl Drop for LocalLease {
 fn local_leases() -> MutexGuard<'static, HashMap<PathBuf, (Contention, thread::ThreadId)>> {
     LOCAL_LEASES.lock().unwrap_or_else(PoisonError::into_inner)
 }
+fn occupied_lease(path: &Path) -> io::Error {
+    io::Error::new(
+        io::ErrorKind::WouldBlock,
+        format!(
+            "the origin publication lease already exists at {}",
+            path.display()
+        ),
+    )
+}
+
 fn retained_lock(path: &Path, source: io::Error) -> io::Error {
     io::Error::new(
         source.kind(),

@@ -43,14 +43,14 @@ impl FileReceipt<'_> {
         digest: OriginArtifactDigest,
         describe: impl FnOnce(&mut dyn Write, &OriginArtifactBinding) -> io::Result<()>,
     ) -> io::Result<()> {
-        self.publish_companion_checked(held, digest, || Ok(()), describe)
+        self.publish_companion_checked(held, digest, || self.check_committed_target(), describe)
     }
 
     pub(super) fn publish_companion_checked(
         &self,
         held: &ReceiptLock<'_>,
         digest: OriginArtifactDigest,
-        checkpoint: impl FnOnce() -> io::Result<()>,
+        check_committed: impl FnOnce() -> io::Result<()>,
         describe: impl FnOnce(&mut dyn Write, &OriginArtifactBinding) -> io::Result<()>,
     ) -> io::Result<()> {
         let binding = OriginArtifactBinding::File {
@@ -63,9 +63,8 @@ impl FileReceipt<'_> {
             Some(&self.cancel),
             |writer| describe(writer, &binding),
             |_| {
-                checkpoint()?;
                 held.check(&self.cancel)?;
-                self.check_committed_target()
+                check_committed()
             },
         )
     }

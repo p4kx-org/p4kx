@@ -72,14 +72,34 @@ impl OwnedFileToken {
         path: &Path,
         cancel: &AtomicBool,
     ) -> Result<(), WriteProtectionError> {
+        self.host = self.renamed_host(path, cancel)?;
+        Ok(())
+    }
+
+    /// Checks that a separately authorised rename still names the owned descriptor.
+    ///
+    /// # Errors
+    /// Returns protection or identity refusal without rebinding the token.
+    pub fn ensure_renamed_writable(
+        &self,
+        path: &Path,
+        cancel: &AtomicBool,
+    ) -> Result<(), WriteProtectionError> {
+        self.renamed_host(path, cancel).map(|_| ())
+    }
+
+    fn renamed_host(
+        &self,
+        path: &Path,
+        cancel: &AtomicBool,
+    ) -> Result<PathBuf, WriteProtectionError> {
         let host = crate::namespace_target::checked(path, self.protection.as_ref(), cancel)?;
         self.matches(path)?;
         match &self.protection {
             Some(protection) => protection.ensure_owned_host(path, &host, self)?,
             None => crate::registry::check_known(&host)?,
         }
-        self.host = host;
-        Ok(())
+        Ok(host)
     }
 
     /// Removes only the matching created filename without changing hardlink target data.

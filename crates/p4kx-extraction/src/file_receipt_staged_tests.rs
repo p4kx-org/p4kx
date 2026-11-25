@@ -16,6 +16,9 @@ use crate::{
 
 use super::StagedReceiptPublication;
 
+#[path = "file_receipt_staged_identity_tests.rs"]
+mod identity;
+
 const OLD: &[u8] = b"previous DDS";
 const NEW: &[u8] = b"new merged DDS";
 

@@ -73,6 +73,11 @@ they are not installed in the host's system service directories or shipped as P4
 | Host hardlink through another document grant | Explicit overwrite is refused as source-overwrite or target-identity uncertainty; source hash stays unchanged. |
 | Forged underlying host-path xattr | Underlying value and observed host-FUSE value are recorded separately; normal source/target checks still run. |
 
+The separate export grant verifies the companion's basename, byte length and SHA-256 against
+the host artifact, and checks that the exclusive publication lease is retired. A second fresh
+Entry in the same directory must fail with exit 1 while the host holds the lease. The first
+artifact and receipt stay unchanged, and the second Entry and its receipt are written after release.
+
 The hardlink test compares actual host device/inode identities, records both FUSE proxy identities
 and requires different document IDs. Proxy inequality never proves distinct host files. The test
 uses `--conflict overwrite`, so the default skip policy cannot manufacture a refusal result.

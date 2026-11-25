@@ -118,9 +118,17 @@ impl FileReceipt<'_> {
         match self.place_staged(&held, staged, policy, &mut check, invalidated) {
             Ok(Some(companion)) => {
                 let receipt = match companion {
-                    CompanionPlacement::Publish => {
-                        Some(self.publish_companion_checked(&held, digest, check, describe))
-                    }
+                    CompanionPlacement::Publish => Some(self.publish_companion_checked(
+                        &held,
+                        digest,
+                        || {
+                            check()?;
+                            staged
+                                .check_committed(&self.artifact)
+                                .map_err(protection_error)
+                        },
+                        describe,
+                    )),
                     CompanionPlacement::PreserveForeign => None,
                 };
                 let retirement = held.retire();

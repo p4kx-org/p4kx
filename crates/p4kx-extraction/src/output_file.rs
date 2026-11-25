@@ -255,6 +255,11 @@ impl<'a> StagedOutput<'a> {
             .ensure_writable(self.temporary, cancel_flag(self.cancel))?;
         check_protected_output(self.output, self.protection, self.cancel)
     }
+
+    pub(crate) fn check_committed(&self, final_path: &Path) -> Result<(), WriteProtectionError> {
+        self.ownership
+            .ensure_renamed_writable(final_path, cancel_flag(self.cancel))
+    }
 }
 
 fn create_temporary(
