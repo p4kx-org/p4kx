@@ -20,13 +20,13 @@ function Assert-BlenderReceiptRefused {
 $artifactId = '52'
 $addonHash = 'a' * 64
 $pin = Get-P4kxMacosBlenderPin
-$stable = Get-P4kxCurrentMacosReleaseVersion
+$releaseRunnerVersion = Get-P4kxMacosReleaseRunnerVersion
 $platform = Get-P4kxPlatform -Target 'aarch64-apple-darwin'
 foreach ($case in @(
     @{ name = 'tag minimum'; role = 'minimum'; version = '26.7.2'; build = '25G123'; run = '12'; artifact = $artifactId },
-    @{ name = 'tag current'; role = 'current'; version = $stable; build = '26B123'; run = '12'; artifact = $artifactId },
+    @{ name = 'tag current'; role = 'current'; version = $releaseRunnerVersion; build = '26A434'; run = '12'; artifact = $artifactId },
     @{ name = 'dry-run minimum'; role = 'minimum'; version = '26.7.2'; build = '25G123'; run = '13'; artifact = '53' },
-    @{ name = 'dry-run current'; role = 'current'; version = "$(([version]$stable).Major).0.1"; build = '26A434'; run = '13'; artifact = '53' }
+    @{ name = 'dry-run current'; role = 'current'; version = "$(([version]$releaseRunnerVersion).Major).2.1"; build = '26B131'; run = '13'; artifact = '53' }
 )) {
     $role = $case.role
     $runtime = @{
@@ -81,18 +81,18 @@ foreach ($case in @(
         Assert-BlenderReceiptRefused $changed $role $case.artifact $addonHash "$($case.name) $($mutation.name)"
     }
     if ($case.name -ceq 'tag current') {
-        Assert-P4kxMacosHostedRole $runtime.runtime_host $platform current -RequireStableRelease
+        Assert-P4kxMacosHostedRole $runtime.runtime_host $platform current -RequireReleaseRunnerVersion
     }
     if ($case.name -ceq 'dry-run current') {
-        $stableRefused = $false
+        $differentVersionRefused = $false
         try {
-            Assert-P4kxMacosHostedRole $runtime.runtime_host $platform current -RequireStableRelease
+            Assert-P4kxMacosHostedRole $runtime.runtime_host $platform current -RequireReleaseRunnerVersion
         }
         catch {
-            if ($_.Exception.Message -cnotmatch 'Tagged release requires the current stable macOS') { throw }
-            $stableRefused = $true
+            if ($_.Exception.Message -cnotmatch 'Tagged release requires the pinned macOS') { throw }
+            $differentVersionRefused = $true
         }
-        if (!$stableRefused) { throw 'A non-stable dry-run host satisfied the exact tagged release gate.' }
+        if (!$differentVersionRefused) { throw 'A different same-major dry-run host satisfied the exact tagged release gate.' }
     }
 }
 Write-Output 'Native macOS Blender receipt controls passed for both roles on dry runs and tags.'

@@ -10,8 +10,8 @@ acceptance. Delivery requires the evidence below.
   `aarch64-apple-darwin`, with macOS 26 Tahoe as the minimum. Declare the deployment target in
   the build and the minimum OS in the app bundle. Verify the actual packaged Mach-O architecture
   and deployment target for every shipped executable and any bundled libraries.
-- Exercise the v0.5.0 workflows on the minimum OS and the current stable macOS release. P4KX
-  runs as a native ARM64 process. Wine and CrossOver supply optional game installations.
+- Exercise the v0.5.0 workflows on the minimum OS and the approved macOS 27 runner.
+  P4KX runs as a native ARM64 process. Wine and CrossOver supply optional game installations.
   Standalone Archives and manually selected installations work without either runtime.
 - Keep Archive browsing, Comparison, Extraction, conversions, Catalog and Media Exports, and
   read-only MCP operations available through their existing entry points and shared contracts.
@@ -86,8 +86,8 @@ executions to the same DMG and application digests. Both hosted consumers instal
 add-on ZIP in pinned native Blender 5.2 LTS and pass the synthetic import on tagged releases,
 release pull requests and full dry runs. The macOS release record retains the actual host and
 Blender versions, Blender distribution and executable digests, add-on artifact identity and
-ZIP digest. Tagged release assembly also requires the exact current stable macOS version and
-publishes the same add-on artifact used for the smoke and attestation.
+ZIP digest. Tagged release assembly requires the exact approved macOS 27 runner version
+and publishes the same add-on artifact used for the smoke and attestation.
 
 ### Hosted package evidence
 
@@ -96,9 +96,10 @@ For PR #1117 head `ac572e896` at merge revision
 mounted the DMG read-only, ran the relocated bundle and verified the exact release
 add-on ZIP in native Blender 5.2.4. The `macos-26` guest reported macOS
 26.7.2 (25G332). The `xcode-27` guest reported macOS 27.0.1 (26A434).
-Package assembly accepted the paired receipts. Use `xcode-27` for pull-request
-verification until GitHub provides an Apple Silicon guest with the required
-stable release. Tagged assembly requires macOS 27.2.1 from the current guest.
+Package assembly accepted the paired receipts. The approved hosted baseline for
+pull-request verification and tagged releases is macOS 27.0.1. Update the release
+pin after GitHub supplies the newer Apple Silicon guest and verifies it with the
+same package and add-on checks. The recorded run establishes only the observed OS builds.
 [Minimum guest](https://github.com/p4kx-org/p4kx/actions/runs/45530796171/job/138990049485) ·
 [Current pull-request guest](https://github.com/p4kx-org/p4kx/actions/runs/45530796171/job/138990049813) ·
 [Hosted package assembly](https://github.com/p4kx-org/p4kx/actions/runs/45530796171/job/138990050506)

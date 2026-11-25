@@ -8,21 +8,21 @@ function Assert-P4kxMacosHostEvidence {
     }
 }
 
-function Get-P4kxCurrentMacosReleaseVersion {
-    return '27.2.1'
+function Get-P4kxMacosReleaseRunnerVersion {
+    return '27.0.1'
 }
 
 function Assert-P4kxMacosHostedRole {
-    param($HostEvidence, $Platform, [ValidateSet('minimum', 'current')][string]$Role, [switch]$RequireStableRelease)
+    param($HostEvidence, $Platform, [ValidateSet('minimum', 'current')][string]$Role, [switch]$RequireReleaseRunnerVersion)
 
     Assert-P4kxMacosHostEvidence -HostEvidence $HostEvidence -Platform $Platform
-    $currentStable = Get-P4kxCurrentMacosReleaseVersion
-    $expectedMajor = if ($Role -ceq 'minimum') { ([version]$Platform.deployment_target).Major } else { ([version]$currentStable).Major }
+    $releaseRunnerVersion = Get-P4kxMacosReleaseRunnerVersion
+    $expectedMajor = if ($Role -ceq 'minimum') { ([version]$Platform.deployment_target).Major } else { ([version]$releaseRunnerVersion).Major }
     if (([version]$HostEvidence.os_version).Major -ne $expectedMajor) {
         throw "The $Role macOS package smoke requires macOS $expectedMajor."
     }
-    if ($RequireStableRelease -and $HostEvidence.os_version -cne $currentStable) {
-        throw "Tagged release requires the current stable macOS $currentStable package smoke. The runner reported $($HostEvidence.os_version)."
+    if ($RequireReleaseRunnerVersion -and $HostEvidence.os_version -cne $releaseRunnerVersion) {
+        throw "Tagged release requires the pinned macOS $releaseRunnerVersion package smoke. The runner reported $($HostEvidence.os_version)."
     }
 }
 

@@ -159,11 +159,11 @@ and preserve device-verification states. A missing target/package/binary fails p
 The top-level archive digest must match the actual portable ZIP on Windows, tar.gz on Linux or DMG on macOS.
 Each package's execution proof carries its own digest. On macOS it includes the signed executable
 hashes, Mach-O deployment target and signing receipt for the final DMG. Hosted Apple Silicon
-consumers verify the exact DMG on macOS 26 and the current stable macOS release.
-Tagged assembly compares the exact current runner version with the release pin in
-[macOS host evidence](../.github/scripts/macos-host-evidence.ps1). Check this pin against
-[Apple's current macOS release](https://support.apple.com/en-us/100100) before tagging.
-Dry runs record the actual version of their macOS 27 runner.
+consumers verify the exact DMG on macOS 26 and the approved macOS 27 runner.
+Tagged assembly compares the observed runner version with the release pin in
+[macOS host evidence](../.github/scripts/macos-host-evidence.ps1). The current approval
+covers the `xcode-27` guest running macOS 27.0.1. Dry runs record the actual macOS
+version and build. Update the pin when GitHub supplies and verifies the newer guest.
 Windows runtime evidence additionally covers both the portable ZIP and installed MSI payload,
 with package hashes and the exact release EXE hashes. Missing, skipped or mismatched packaged
 runtime evidence fails preflight. [Windows packages](windows-packages.md) describes lifecycle,

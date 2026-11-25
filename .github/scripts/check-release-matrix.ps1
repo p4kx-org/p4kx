@@ -52,7 +52,7 @@ foreach ($row in $contract.targets) {
     Assert-P4kxPackageRuntime $runtime $row $AssetDirectory $Version
     if ($RequireStableMacosRelease -and $row.os -ceq 'macos') {
         $current = @($runtime.package_smokes)[0].current_hosted_smoke
-        Assert-P4kxMacosHostedRole $current.runtime_host $row current -RequireStableRelease
+        Assert-P4kxMacosHostedRole $current.runtime_host $row current -RequireReleaseRunnerVersion
     }
     if ($null -ne $desktopReceipts -and (Test-P4kxWindowsDesktopTarget $row)) {
         Assert-P4kxWindowsDesktopEvidence -Runtime $runtime -Platform $row -Version $Version -Revision $Revision -ReleaseRunId $ReleaseRunId -Records $desktopReceipts
