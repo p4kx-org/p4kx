@@ -15,7 +15,7 @@ use super::super::{
 };
 use super::digest_runs::{DigestRuns, Fingerprint};
 use super::wire::{DefinitionOwner, OrderedRows};
-use super::{StreamedComponentDigests, spill};
+use super::{StreamedComponentDigests, StreamedRowPaths, spill};
 
 pub(crate) struct StreamedDefinitionDigests<'directory, const TABLES: usize> {
     owners: [DefinitionOwner; TABLES],
@@ -132,6 +132,22 @@ impl<'directory, const TABLES: usize> StreamedDefinitionDigests<'directory, TABL
         self,
         measurement: &BoundMeasurement,
         paths: [&str; TABLES],
+    ) -> TestResult<Counts<TABLES>> {
+        self.compare_paths(measurement, StreamedRowPaths::Tables(paths))
+    }
+
+    pub(crate) fn compare_arrays(
+        self,
+        measurement: &BoundMeasurement,
+        paths: [&str; TABLES],
+    ) -> TestResult<Counts<TABLES>> {
+        self.compare_paths(measurement, StreamedRowPaths::Arrays(paths))
+    }
+
+    fn compare_paths(
+        self,
+        measurement: &BoundMeasurement,
+        paths: StreamedRowPaths<'_, TABLES>,
     ) -> TestResult<Counts<TABLES>> {
         let availability = self
             .available

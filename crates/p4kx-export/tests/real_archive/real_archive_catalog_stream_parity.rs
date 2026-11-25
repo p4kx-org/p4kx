@@ -132,7 +132,7 @@ impl BoundMeasurement {
         verify_extra: impl FnOnce(&Value) -> TestResult,
     ) -> TestResult<Counts<TABLES>> {
         self.verify_streamed_scope(
-            paths,
+            StreamedRowPaths::Tables(paths),
             availability,
             evidence,
             None,
@@ -143,7 +143,7 @@ impl BoundMeasurement {
 
     fn verify_streamed_scope<const TABLES: usize>(
         &self,
-        paths: [&str; TABLES],
+        paths: StreamedRowPaths<'_, TABLES>,
         availability: [DatasetAvailability; TABLES],
         evidence: StreamedComponentDigests<'_, TABLES>,
         texts: Option<&ScopedTextProof>,
@@ -159,7 +159,7 @@ impl BoundMeasurement {
             return Err("the streamed component scope has incomplete original evidence".into());
         }
         let mut capture = measurement::normal_capture();
-        project_tables(&mut capture, &paths, &availability, &rows)?;
+        paths.project(&mut capture, &availability, &rows)?;
         capture.project(USES, Projection::StreamOrigins(StreamOrigins(&uses)));
         capture.project(SOURCES, Projection::StreamOrigins(StreamOrigins(&sources)));
         if let Some(texts) = texts {
@@ -171,7 +171,7 @@ impl BoundMeasurement {
         if let Some(texts) = texts {
             texts.verify(&catalog)?;
         }
-        verify_tables(&catalog, &paths, &availability, &rows)?;
+        paths.verify(&catalog, &availability, &rows)?;
         if catalog.pointer(USES) != Some(&Value::from(uses.count()))
             || catalog.pointer(SOURCES) != Some(&Value::from(sources.count()))
         {
@@ -183,6 +183,52 @@ impl BoundMeasurement {
             source_uses: usize::try_from(uses.count())?,
             physical_sources: usize::try_from(sources.count())?,
         })
+    }
+}
+
+enum StreamedRowPaths<'scope, const TABLES: usize> {
+    Tables([&'scope str; TABLES]),
+    Arrays([&'scope str; TABLES]),
+}
+
+impl<const TABLES: usize> StreamedRowPaths<'_, TABLES> {
+    fn project(
+        &self,
+        capture: &mut CatalogCapture<Projection<'_>>,
+        availability: &[DatasetAvailability; TABLES],
+        rows: &[RowDigest; TABLES],
+    ) -> TestResult {
+        match self {
+            Self::Tables(paths) => project_tables(capture, paths, availability, rows),
+            Self::Arrays(paths) => {
+                for ((path, row), state) in paths.iter().zip(rows).zip(availability) {
+                    require_availability(path, *state, row.count)?;
+                    capture.project(path, Projection::StreamRows(*row));
+                }
+                Ok(())
+            }
+        }
+    }
+
+    fn verify(
+        &self,
+        catalog: &Value,
+        availability: &[DatasetAvailability; TABLES],
+        rows: &[RowDigest; TABLES],
+    ) -> TestResult {
+        match self {
+            Self::Tables(paths) => verify_tables(catalog, paths, availability, rows),
+            Self::Arrays(paths) => {
+                for (path, row) in paths.iter().zip(rows) {
+                    if catalog.pointer(path) != Some(&Value::from(row.count)) {
+                        return Err(
+                            format!("{path}: streamed Catalog array row count differs").into()
+                        );
+                    }
+                }
+                Ok(())
+            }
+        }
     }
 }
 
@@ -285,4 +331,53 @@ fn test_row_digest(row: &Value) -> TestResult<RowDigest> {
     let mut ordered = OrderedRows::default();
     ordered.append(slot, fingerprint(row.clone())?)?;
     Ok(ordered.finish())
+}
+
+#[test]
+fn streamed_loadout_array_checks_canonical_physical_owners() -> TestResult {
+    use serde_json::json;
+
+    let owner = DefinitionOwner::Loadout;
+    let entity_guid = json!({"state":"present","value":"00000000-0000-0000-0000-000000000007"});
+    let first = json!({
+        "entityGuid": &entity_guid,
+        "sourceRecordIndex":{"state":"present","value":3}
+    });
+    let second = json!({
+        "entityGuid": &entity_guid,
+        "sourceRecordIndex":{"state":"present","value":8}
+    });
+    let mut expected = OrderedRows::with_definition(owner);
+    for row in [&first, &second] {
+        expected.append_encounter_row(owner.key(row)?, fingerprint(row.clone())?)?;
+    }
+    let rows = [expected.finish()];
+    let paths = StreamedRowPaths::Arrays(["/loadouts"]);
+    let available = [DatasetAvailability::Available];
+    let mut capture = measurement::normal_capture();
+    paths.project(&mut capture, &available, &rows)?;
+
+    let complete = serde_json::to_vec(&json!({"loadouts":[first, second]}))?;
+    let decoded = capture.read(complete.as_slice())?;
+    paths.verify(&decoded, &available, &rows)?;
+    let missing = capture.read(b"{}".as_slice())?;
+    assert!(
+        paths.verify(&missing, &available, &rows).is_err(),
+        "a missing Loadout array differs from a matching array"
+    );
+    for changed in [
+        json!({"loadouts":{"rows":[first, second]}}),
+        json!({"loadouts":[second, first]}),
+        json!({"loadouts":[first, first]}),
+        json!({"loadouts":[first, {"recordIndex":8}]}),
+        json!({"loadouts":[first, {"sourceRecordIndex":8}]}),
+        json!({"loadouts":[first, {"sourceRecordIndex":{"state":"absent","value":8}}]}),
+    ] {
+        let bytes = serde_json::to_vec(&changed)?;
+        assert!(
+            capture.read(bytes.as_slice()).is_err(),
+            "the physical Loadout array is exact: {changed}"
+        );
+    }
+    Ok(())
 }

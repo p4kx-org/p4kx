@@ -92,6 +92,7 @@ mod real_archive_language_sources_sdk;
 mod real_archive_law_definitions;
 mod real_archive_law_sdk;
 mod real_archive_leftovers;
+mod real_archive_loadout_visitor_sdk;
 mod real_archive_loadouts;
 mod real_archive_location_configuration;
 mod real_archive_location_entities;

@@ -188,6 +188,7 @@ impl<'de> Visitor<'de> for RowDigest {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum DefinitionOwner {
     Record,
+    Loadout,
     NestedRecord,
     Entry,
     CommodityPresentation,
@@ -207,7 +208,7 @@ impl DefinitionOwner {
                 let id = reference.as_str().ok_or("invalid Commodity header use")?;
                 Sha256::digest(id.as_bytes())
             }
-            Self::Record | Self::NestedRecord | Self::Entry => {
+            Self::Record | Self::Loadout | Self::NestedRecord | Self::Entry => {
                 Sha256::digest(self.physical_index(row)?.to_be_bytes())
             }
         };
@@ -217,6 +218,7 @@ impl DefinitionOwner {
     pub(crate) fn physical_index(self, row: &Value) -> TestResult<u32> {
         let position = match self {
             Self::Record => present_index(row.get("recordIndex")),
+            Self::Loadout => present_index(row.get("sourceRecordIndex")),
             Self::NestedRecord => present_index(row.pointer("/source/recordIndex")),
             Self::CommodityPresentation => None,
             Self::Entry => row.pointer("/identity/entryIndex"),
