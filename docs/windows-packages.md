@@ -392,6 +392,14 @@ Windows AMD64 payload.
 [Original Finish evidence](https://github.com/p4kx-org/p4kx/actions/runs/45576709479/artifacts/15008347409) ·
 [Executed payload](https://github.com/p4kx-org/p4kx/actions/runs/45576709479/artifacts/15008217762)
 
+The matching ARM64 job was cancelled 55 minutes after GitHub started it. The last
+reported step was WaitFinish. The native portable checks and Finish supervisor
+launch completed. GitHub reported its 45-minute limit. Its job-log endpoint
+returned HTTP 404 and the run produced no original terminal MSI receipt or
+executed ARM64 payload. The last reported step alone cannot establish the
+installer's outcome or the operation that stalled.
+[Native ARM64 consumer](https://github.com/p4kx-org/p4kx/actions/runs/45576709479/job/139102930087)
+
 The real consumer records the prepared allowance, source hashes, checkpoints and parent controls
 on the runner. It refreshes admission under the original deadline before launching the installer.
 The cancellation-aware diagnostic upload collects those local files after the terminal evidence
