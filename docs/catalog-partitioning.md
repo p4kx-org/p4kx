@@ -588,6 +588,21 @@ The compressed frame SHA-256 values were
 `eff6ccfcecb0eb7cdc6254d0a33ad5777f8d8f2df112851108261bdd347ff40e` for LIVE and
 `7e3619c0b2055a7ce6915cab2bf10f40c32f66797c79ec2810998f3f8393d70c` for PTU.
 
+The archive-free verifier replayed each sealed frame twice. It verified the compressed digest
+before and after the run, the complete decoded byte count, v3 structure, source-use closure,
+and the selected row inventories without opening the game Archive.
+
+| Build | Physical sources | Source uses | Sourced cells | Replay elapsed ms | Peak private bytes | Peak working set bytes |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 95,261 | 120,328,885 | 84,917,157 | 4,420,201 | 17,111,363,584 | 16,703,672,320 |
+| PTU `13260598` | 116,775 | 125,297,240 | 89,165,995 | 4,710,955 | 17,111,736,320 | 16,721,633,280 |
+
+The verifier executable SHA-256 was
+`2cc97819308078eb8a5603c8d37b6de9b0901ca5d95e8f350288a57ccdc5d738`.
+The full decoded SHA-256 values were
+`ca8a18cf99249b94e81f41a4efef8b99dd48657066acc0a95ce343ef896a820a` for LIVE and
+`1dc8e6f09663d3266c055cc8a8a996c6890fabbfc64faf5b6b9678b02de36e0e` for PTU.
+
 ## Measuring a complete export
 
 The installed regression checks verify decoded and stored byte counts against the actual writer
