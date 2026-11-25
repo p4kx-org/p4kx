@@ -262,13 +262,14 @@ for local refresh.
 | Consumer data | Selective SDK route |
 | --- | --- |
 | Fundorte and their resource joins | `read_mining_locations` |
-| Contracts by owner or by contract and sub-contract identity | `with_contracts` or `with_contract(ContractKey)` |
+| Contract summaries with titles, offer and location rules, sharing and rewards | `with_contract_summaries` or `with_contract_summary(ContractKey)` |
+| Full contract projections by owner or logical identity | `with_contracts` or `with_contract(ContractKey)` |
 | Contract blueprint reward pool contents | `with_blueprint_pools` for the pool GUIDs in `blueprint_rewards` |
 | Authored mission location templates | `with_mission_location_templates` |
 | Faction reputation, scopes, standing thresholds and rank names | `with_reputation` with the faction selection and `ReputationSelection::ranks()` |
 | Authored reputation reward amounts | `with_reputation_reward_amounts`, with per-contract gains from `reputation_gains` |
-| Resolved ship and Item ports, sizes, tags and equipped items | `equipment::read_loadouts` for the selected physical owner |
-| Original port rules and candidate attachment constraints | `with_item_ports` and `equipment::with_attachment_constraints` |
+| Declared port rules and candidate attachment constraints | `equipment::visit_declared_equipment` for both families with the physical Ship or Item owner |
+| Resolved ship and Item ports with XML overrides and equipped items | `equipment::read_loadouts` for one owner or `visit_loadouts` for a streamed refresh |
 
 Use a shared `CatalogQuerySession` and parsed view where the routes support it.
 `ContractSnapshot::location_queries` contains the referenced authored rules. The game
@@ -680,6 +681,23 @@ took 8.86 seconds in Full and 5.45 seconds in Marker mode. The Loadout owner
 query took 4.51 and 4.57 seconds, respectively. These are timings for one run
 order. The query harness measured in-memory results and the full-catalogue
 size is measured separately.
+
+### Bounded resolved Loadout visitor timing on LIVE 13220821
+
+A diagnostic harness based on signed `7ca457080` exercised the normal SDK
+visitor on installed LIVE `13220821`. Both fresh Windows AMD64 processes kept
+one worker and stopped at the same first 128 owners in canonical order,
+including 127 emitted rows. The Marker callback counted typed rows. The Full
+callback also serialized each selected row and reconciled its source uses.
+
+| Route | Process seconds | Outside callback seconds | Callback seconds | Peak private commit (B) |
+| --- | ---: | ---: | ---: | ---: |
+| MarkersOnly typed census | 54.452 | 51.645 | <0.001 | 1,091,764,224 |
+| Full row and source-use closure | 69.243 | 54.182 | 12.517 | 1,318,268,928 |
+
+The first owner reached the callback in about 29 seconds in both processes.
+This bounded run isolates work before and inside the callback. The all-owner
+SDK refresh retains a separate elapsed-time and memory check under #1166.
 
 ## Measuring a complete export
 

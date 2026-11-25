@@ -389,7 +389,9 @@ file. Use the physical index from the opened Archive to read an individual file.
 The snapshot uses the same rows as `definitions.shopInventories`. It keeps the original JSON
 token order and numeric digits, typed navigation to inventory fields and per-value origins.
 A verified empty file retains an absent document. An invalid or unreadable selected Entry
-retains its own document state and scoped failure count. An indexed lookup cites the selected
+retains its own document state and scoped failure count. `coverage.failures` identifies each
+failed Entry by physical index, stage and diagnostic code. Key-required and wrong-key failures
+retain their original reason. An indexed lookup cites the selected
 Entry path and position or, for an out-of-range index, the admitted root directory count.
 Path and full inventory searches cite the paths they consulted. The query opens neither the
 shop registry nor DataForge.
@@ -771,6 +773,24 @@ preserve physical aliases. Only selected owner bodies and demanded requested ref
 read; ResourceType/group/world discovery and a complete Catalog are unnecessary. Examine sourced
 states and owner/dependency coverage and publish caches only after outer success. See the
 [complete contract](catalog-mining-refining.md).
+
+## Declared ship and item equipment
+
+Use `equipment::visit_declared_equipment`, its decoded-Entry variant, or the
+parsed session method to build a declared equipment index in one traversal.
+Select all Ship and Item Records, every physical occurrence of a GUID, or one
+physical Record index. Each callback carries the original Record identity and
+canonical kind, the ordered port containers and the attachment declarations.
+It also carries coverage, requested port labels and an owner-local source
+inventory. Readable owners without declarations still have an identity row.
+
+The port rows include authored type and subtype restrictions, sizes, tags and
+rules. The attachment rows carry the original type, subtype, size and tags.
+Their values describe authored constraints. Use `equipment::visit_loadouts`
+when the consumer needs resolved XML ports, Modification overrides or default
+equipped items. The declared visitor reads no vehicle XML or shop inventory.
+Commit consumer-owned cache changes after the traversal succeeds and its coverage
+meets the requested scope.
 
 ## Authored item ports
 
