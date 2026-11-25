@@ -94,6 +94,9 @@ jobs:
           New-Item -ItemType Directory -Force $previous | Out-Null
           gh release download v0.2.0 --repo p4kx-org/p4kx --pattern P4K-Extractor-0.2.0-x86_64.msi --dir $previous
           if ($LASTEXITCODE -ne 0) { throw 'Exact historical AMD64 MSI download failed.' }
+      - name: Verify bounded packaged process output collection
+        timeout-minutes: 1
+        run: .github/scripts/test-package-process.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'contracts/package-process')
       - name: Pure exact-PATH validator and run-all mocks
         run: |
           .github/scripts/test-msi-feedback-workflow.ps1

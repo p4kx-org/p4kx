@@ -379,6 +379,31 @@ artifact and job log were unavailable at that observation. The underlying
 cause remains unresolved.
 [ARM64 execution](https://github.com/p4kx-org/p4kx/actions/runs/45633605773/job/139302848822)
 
+Release run `45650794879`, attempt 1, checked merge
+`3ac8351b831f99a3b79f9d2b544e3531b42df258` for signed PR head `7ca457080`.
+AMD64 completed the original lifecycle and published the executed packages.
+On ARM64, the early original checkpoints verified the raw Registry capture,
+the first install returning code 0, and entry into the installed runtime
+checks. All three snapshot callers exited successfully.
+[AMD64 execution](https://github.com/p4kx-org/p4kx/actions/runs/45650794879/job/139353629226)
+[ARM64 phase checkpoints](https://github.com/p4kx-org/p4kx/actions/runs/45650794879/artifacts/15043871004)
+
+At the GitHub API response time 2026-11-25 17:24:56 UTC, the original ARM64
+job remained in progress after 45 minutes 26 seconds, with Finish waiting
+for 41 minutes 58 seconds. GitHub concluded the job `cancelled` at 17:34:30 UTC,
+55 minutes after it started. The PR head stayed unchanged and GitHub continued
+to show Finish as in progress. Its Check Run annotation records that the job
+exceeded its maximum execution time of 45 minutes. The job log returned HTTP 404 after cancellation,
+and the final receipt remained absent. Subsequent original lifecycle phases
+and the blocking operation remain unresolved.
+[ARM64 execution](https://github.com/p4kx-org/p4kx/actions/runs/45650794879/job/139353629186)
+
+Packaged command checks share one monotonic allowance for the child process and
+its redirected stdout and stderr. A Windows synthetic test holds an inherited
+writer open after the command exits and verifies that collection returns a
+timeout while the writer is still alive. It also verifies success output,
+the combined UTF-8 log, the original nonzero exit code and process cleanup.
+
 For release acceptance, repeat the native lifecycle checks with the actual release candidate
 and bind both its MSI and portable ZIP to the candidate revision and run attempt. Record the
 Windows AMD64 desktop and WASAPI checks separately from the hosted package evidence.
