@@ -25,12 +25,15 @@ mod compare_rows;
 
 #[path = "real_archive_catalog_digest_parity.rs"]
 mod digest_parity;
+#[path = "real_archive_json_digest.rs"]
+mod json_digest;
 #[path = "real_archive_catalog_measurement.rs"]
 mod measurement;
 #[path = "real_archive_catalog_stream_parity.rs"]
 mod stream_parity;
 
 pub(crate) use digest_parity::{DigestedInventory, DigestedTable, PhysicalSlot};
+pub(crate) use json_digest::update_json_digest;
 pub(crate) use measurement::{with_bound_measurement, with_bound_measurement_from_producer};
 pub(crate) use stream_parity::{
     DefinitionOwner, LootHarvestDataset, LootHarvestDigests, MissionDisposition,

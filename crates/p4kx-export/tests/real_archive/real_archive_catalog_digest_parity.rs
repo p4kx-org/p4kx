@@ -17,8 +17,8 @@ use sha2::{Digest as _, Sha256};
 
 use super::compare_rows::Projection;
 use super::selected_origins::SelectOrigin;
-use super::wire_row;
 use super::{BoundMeasurement, Counts, SOURCES, TestResult, USES, collect_references, measurement};
+use super::{update_json_digest, wire_row};
 
 pub(super) type WireDigest = [u8; 32];
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
@@ -29,7 +29,9 @@ pub(crate) struct PhysicalSlot {
 
 pub(super) fn fingerprint(mut value: Value) -> serde_json::Result<WireDigest> {
     value.sort_all_objects();
-    Ok(Sha256::digest(serde_json::to_vec(&value)?).into())
+    let mut digest = Sha256::new();
+    update_json_digest(&mut digest, &value)?;
+    Ok(digest.finalize().into())
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]

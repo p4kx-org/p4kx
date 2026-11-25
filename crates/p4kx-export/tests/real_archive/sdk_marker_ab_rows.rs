@@ -2,7 +2,6 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::fmt::{self, Write as _};
-use std::io::{self, Write};
 
 use p4kx_extraction::{FieldOrigin, SourceInventory};
 use serde::Serialize;
@@ -10,7 +9,7 @@ use serde_json::{Map, Value};
 use sha2::{Digest, Sha256};
 
 use super::{ProbeMode, Workload};
-use crate::real_archive_catalog_table_parity::{TestResult, wire_row};
+use crate::real_archive_catalog_table_parity::{TestResult, update_json_digest, wire_row};
 
 #[path = "sdk_marker_ab_encoding.rs"]
 mod encoding;
@@ -231,7 +230,7 @@ impl MarkerEvidence {
 }
 
 fn record_digest(hash: &mut Sha256, value: &impl Serialize) -> TestResult {
-    serde_json::to_writer(DigestWrite(hash), value).map_err(|_| "hash one technical SDK value")?;
+    update_json_digest(hash, value).map_err(|_| "hash one technical SDK value")?;
     hash.update([0]);
     Ok(())
 }
@@ -243,19 +242,6 @@ fn finish_lower(hash: Sha256) -> Result<String, fmt::Error> {
         write!(output, "{byte:02x}")?;
     }
     Ok(output)
-}
-
-struct DigestWrite<'hash>(&'hash mut Sha256);
-
-impl Write for DigestWrite<'_> {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        self.0.update(bytes);
-        Ok(bytes.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
-    }
 }
 
 #[cfg(test)]
