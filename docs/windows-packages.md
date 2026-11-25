@@ -463,6 +463,14 @@ executed ARM64 payload. The last reported step alone cannot establish the
 installer's outcome or the operation that stalled.
 [Native ARM64 consumer](https://github.com/p4kx-org/p4kx/actions/runs/45576709479/job/139102930087)
 
+For PR #1117 head fd3160449, both native consumers passed the bounded output tests with
+inherited CLI and GUI writers and inherited MCP stderr. Both also completed the original
+portable execution and Windows Installer lifecycle. WaitFinish took 75 seconds on AMD64 and
+86 seconds on ARM64. The final observer and executed payload uploads succeeded for both.
+The operation responsible for the earlier hosted cancellation remains unknown.
+[AMD64 execution](https://github.com/p4kx-org/p4kx/actions/runs/45669055539/job/139426076930) ·
+[ARM64 execution](https://github.com/p4kx-org/p4kx/actions/runs/45669055539/job/139426076867)
+
 The real consumer records the prepared allowance, source hashes, checkpoints and parent controls
 on the runner. It refreshes admission under the original deadline before launching the installer.
 The cancellation-aware diagnostic upload collects those local files after the terminal evidence
