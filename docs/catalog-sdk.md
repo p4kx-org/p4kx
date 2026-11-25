@@ -3496,6 +3496,28 @@ stayed below 2,000,000,000 bytes.
 | LIVE `13220821` | 104 | 575,025 | 1,265,541,120 | 1,251,733,504 |
 | PTU `13260598` | 106 | 612,834 | 1,331,302,400 | 1,317,150,720 |
 
+### Loot and Harvest LIVE comparison
+
+The Windows AMD64 verifier at `56e65a9bbd0370283c0d68f1fd3346f822ea6883`
+compared all eight paths with the sealed LIVE `13220821` Normal Catalog
+from producer `27da392284eed8c67cf58c15ea473089d6c0a20c`. The Archive stamp
+stayed stable and the retained frame hash matched its measurement receipt.
+
+| Dataset | Matched rows |
+| --- | ---: |
+| Hierarchical contextual data presets | 0 (Absent) |
+| Sub-harvestable configurations | 118 |
+| Sub-harvestable multi-config definitions | 104 |
+| Loot tables | 54 |
+| Loot archetypes | 34 |
+| Legacy loot tables | 161 |
+| Legacy loot archetypes | 233 |
+| Sub-harvestable slot preset projection | 104 |
+
+The comparison matched 688,154 contributing source uses from one physical
+source. It took 3,980.811 seconds with peaks of 1,349,705,728 bytes of private
+commit and 1,343,963,136 bytes of working set.
+
 ### Component definition cold queries
 
 The Windows AMD64 cold verifier ran each of five standalone SDK queries
