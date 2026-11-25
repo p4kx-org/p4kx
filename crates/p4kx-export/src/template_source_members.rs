@@ -152,7 +152,8 @@ impl<'fields, 'scope, 'read, 'source> TemplateMembers<'fields, 'scope, 'read, 's
 
     pub(crate) fn roots(
         &self,
-    ) -> impl Iterator<Item = &'fields OriginalValueFact<'scope, 'read, 'source>> + '_ {
+    ) -> impl ExactSizeIterator<Item = &'fields OriginalValueFact<'scope, 'read, 'source>> + '_
+    {
         self.spans.iter().map(|span| span.root)
     }
 

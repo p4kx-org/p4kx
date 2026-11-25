@@ -18,20 +18,17 @@ pub(crate) fn container<'source>(
     let payload = match fact.value() {
         Value::Struct(source) => struct_payload(members, fact, source)?,
         Value::Array(array) => {
-            let elements = array
-                .iter()
-                .enumerate()
-                .map(|(index, _)| {
-                    let child = fields.child(
-                        Some(fact.ordinal()),
-                        OriginalValueEdge::Element {
-                            ordinal: u64::try_from(index)
-                                .map_err(|_| ExportAccountingError::CounterOverflow)?,
-                        },
-                    )?;
-                    members.value_ref(child)
-                })
-                .collect::<Result<_, CatalogError>>()?;
+            let mut elements = Vec::with_capacity(array.len());
+            for index in 0..array.len() {
+                let child = fields.child(
+                    Some(fact.ordinal()),
+                    OriginalValueEdge::Element {
+                        ordinal: u64::try_from(index)
+                            .map_err(|_| ExportAccountingError::CounterOverflow)?,
+                    },
+                )?;
+                elements.push(members.value_ref(child)?);
+            }
             SourcePayload::Array { elements }
         }
         _ => return Ok(None),
@@ -63,21 +60,21 @@ fn struct_payload<'source>(
             true,
         )?
         .into_cell(fields.sources());
-    let children = source
-        .fields()
-        .iter()
-        .enumerate()
-        .map(|(index, _)| {
-            let child = fields.child(
-                Some(fact.ordinal()),
-                OriginalValueEdge::Field {
-                    ordinal: u64::try_from(index)
-                        .map_err(|_| ExportAccountingError::CounterOverflow)?,
-                },
-            )?;
-            source_value_catalog::read_field(child, members.value_ref(child)?, fields.sources())
-        })
-        .collect::<Result<_, CatalogError>>()?;
+    let mut children = Vec::with_capacity(source.fields().len());
+    for index in 0..source.fields().len() {
+        let child = fields.child(
+            Some(fact.ordinal()),
+            OriginalValueEdge::Field {
+                ordinal: u64::try_from(index)
+                    .map_err(|_| ExportAccountingError::CounterOverflow)?,
+            },
+        )?;
+        children.push(source_value_catalog::read_field(
+            child,
+            members.value_ref(child)?,
+            fields.sources(),
+        )?);
+    }
     Ok(SourcePayload::Struct {
         source_type,
         fields: children,
@@ -96,21 +93,20 @@ pub(crate) fn read<'fields, 'scope, 'read, 'source>(
     >,
 ) -> Result<TemplateSource<'source>, CatalogError> {
     let sources = members.fields().sources();
-    let roots = members
-        .roots()
-        .map(|fact| {
-            let OriginalValueEdge::Field { ordinal } = fact.edge() else {
-                return Err(ExportAccountingError::ConflictingSourceDatum.into());
-            };
-            Ok(TemplateSourceRoot {
-                source_position: OriginalFieldPosition {
-                    parent_ordinal: fact.parent_ordinal().map(DecimalU64::new),
-                    field_index: DecimalU64::new(ordinal),
-                },
-                field: source_value_catalog::read_field(fact, members.value_ref(fact)?, sources)?,
-            })
-        })
-        .collect::<Result<_, CatalogError>>()?;
+    let retained_roots = members.roots();
+    let mut roots = Vec::with_capacity(retained_roots.len());
+    for fact in retained_roots {
+        let OriginalValueEdge::Field { ordinal } = fact.edge() else {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        };
+        roots.push(TemplateSourceRoot {
+            source_position: OriginalFieldPosition {
+                parent_ordinal: fact.parent_ordinal().map(DecimalU64::new),
+                field_index: DecimalU64::new(ordinal),
+            },
+            field: source_value_catalog::read_field(fact, members.value_ref(fact)?, sources)?,
+        });
+    }
     let mut values = Vec::with_capacity(members.value_count());
     for fact in members.values() {
         members.fields().check_cancel()?;
