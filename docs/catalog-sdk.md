@@ -2784,19 +2784,20 @@ after accounting for the verified canonical exclusions.
 | LIVE `13220821` | 16,747 | 30,066 | 1,091,502,080 | 1,022,038,016 | 262,359 |
 | PTU `13260598` | 17,524 | 31,521 | 1,114,439,680 | 1,031,843,840 | 285,355 |
 
-The same verifier compared every interaction row and its contributing
-provenance with the matching sealed Normal exports from producer revision
+Verifier `1114c40cd222c428cc917d05e64f214835b38789` compared every interaction
+row and its contributing provenance with the matching sealed Normal exports
+from producer revision
 `24c08bcbff2299b88eff84bf3f7e8f592760b99b`. Both comparisons used an empty
 locale selection. The scoped English fixture separately checks the protected
 text and its exact source uses.
 
 | Build | Matched rows | Contributing uses | Peak private commit (bytes) | Peak working set (bytes) | Elapsed (ms) |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| LIVE `13220821` | 30,066 | 34,120,354 | 1,091,547,136 | 1,023,258,624 | 4,647,925 |
-| PTU `13260598` | 31,521 | 36,137,915 | 1,114,513,408 | 1,042,198,528 | 4,819,388 |
+| LIVE `13220821` | 30,066 | 34,120,354 | 1,091,485,696 | 1,052,872,704 | 4,837,122 |
+| PTU `13260598` | 31,521 | 36,137,915 | 1,114,509,312 | 1,033,232,384 | 4,888,600 |
 
-The installed measurements here bind the dedicated visitor in verifier `691a8791`.
-The shared Equipment visitor has its own retained comparisons.
+Both retained runs verified the frame hash and a stable Archive. These
+measurements cover the dedicated interaction visitor.
 
 ## Paint compatibility
 
@@ -3454,6 +3455,15 @@ Each run used one worker and verified a stable Archive stamp. The cold
 executable was built from the test overlay with Git tree
 `d245a55901713a9d4953c2b1953e015e29f93abd` over
 `7f78af9a2636d137461bab9e101f8cd9bddeed65`.
+
+### Component definition LIVE comparison
+
+Verifier `ac572e896cfaf9e13b27e41f4eabec9164e4c36c` compared all five definition
+tables with the sealed same-Build LIVE `13220821` Normal Catalog from producer
+`24c08bcbff2299b88eff84bf3f7e8f592760b99b`. It matched 104 ordered rows and
+11,105 referenced uses from 12 physical sources. The Archive stayed stable and
+the frame hash matched its receipt. The 4,012.130-second comparison peaked at
+1,235,394,560 bytes of private commit and 1,134,284,800 bytes of working set.
 
 ## Verify dataset coverage
 
