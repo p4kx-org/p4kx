@@ -11,6 +11,7 @@ use super::{Fixture, TestResult, tree};
 
 const DDS: &str = "Data/Textures/rock_diff.dds";
 const RECEIPT: &str = "Data/Textures/rock_diff.dds.p4kx-origin.jsonl";
+const WAV_RECEIPT: &str = "Data/Sounds/Media/5.wav.p4kx-origin.jsonl";
 
 #[test]
 fn a_converted_folder_equals_what_extraction_with_conversion_writes() -> TestResult {
@@ -32,6 +33,18 @@ fn a_converted_folder_equals_what_extraction_with_conversion_writes() -> TestRes
     let loose_receipt = written.remove(RECEIPT).ok_or("loose DDS receipt")?;
     let dds = written.get(DDS).ok_or("the written DDS")?;
     check_dds_origin_pair(dds, &archive_receipt, &loose_receipt)?;
+    let archive_wav = archived.remove(WAV_RECEIPT).ok_or("Archive WAV receipt")?;
+    let folder_wav = written.remove(WAV_RECEIPT).ok_or("folder WAV receipt")?;
+    assert_eq!(
+        pcm_encryption(&archive_wav)?,
+        Some(false),
+        "plain Archive payload"
+    );
+    assert_eq!(
+        pcm_encryption(&folder_wav)?,
+        None,
+        "observed file with unknown P4K encryption"
+    );
     assert_eq!(written, archived, "identical payload files");
     assert!(
         written
@@ -72,4 +85,33 @@ fn loose_merge_replaces_old_archive_proof_for_identical_payload_bytes() -> TestR
     );
     let loose_receipt = fs::read(target.join(RECEIPT))?;
     check_dds_origin_pair(&written, &archive_receipt, &loose_receipt)
+}
+
+fn pcm_encryption(bytes: &[u8]) -> Result<Option<bool>, Box<dyn std::error::Error>> {
+    for line in std::str::from_utf8(bytes)?.lines() {
+        let row: serde_json::Value = serde_json::from_str(line)?;
+        if row
+            .pointer("/address/field")
+            .and_then(serde_json::Value::as_str)
+            == Some("pcmSamples")
+        {
+            assert_eq!(
+                row.get("sourceSetComplete")
+                    .and_then(serde_json::Value::as_bool),
+                Some(true),
+                "original observed WEM"
+            );
+            assert!(
+                row.get("sourceUsesRefs")
+                    .and_then(serde_json::Value::as_array)
+                    .is_some_and(|refs| !refs.is_empty()),
+                "the WEM supplies original samples"
+            );
+            return Ok(row
+                .get("containsEncryptedSource")
+                .ok_or("encryption state")?
+                .as_bool());
+        }
+    }
+    Err("missing WAV sample field".into())
 }

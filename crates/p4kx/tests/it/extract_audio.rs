@@ -120,7 +120,7 @@ fn convert_writes_ogg_and_wav_and_unpacks_the_soundbank_by_default() -> TestResu
 
     assert_eq!(
         names(&media(&fixture))?,
-        ["500.ogg", "600.wav", "700.wem"],
+        ["500.ogg", "600.wav", "600.wav.p4kx-origin.jsonl", "700.wem"],
         "loose sounds"
     );
     assert!(
@@ -165,7 +165,7 @@ fn audio_wav_and_raw_choose_the_format() -> TestResult {
         .code(1);
     assert_eq!(
         names(&media(&fixture))?,
-        ["500.wav", "600.wav", "700.wem"],
+        ["500.wav", "600.wav", "600.wav.p4kx-origin.jsonl", "700.wem"],
         "WAV"
     );
     assert_eq!(
@@ -222,6 +222,36 @@ fn the_json_report_lists_the_sounds_that_were_not_converted() -> TestResult {
 
     let report: serde_json::Value = serde_json::from_slice(&output)?;
     assert_eq!(report["converted"], 3, "{report}");
+    let [wav] = report
+        .get("sound_artifacts")
+        .and_then(serde_json::Value::as_array)
+        .ok_or("WAV artifacts")?
+        .as_slice()
+    else {
+        return Err("one new linear WAV companion in the report".into());
+    };
+    assert_eq!(
+        wav.get("path").and_then(serde_json::Value::as_str),
+        Some("Data/Sounds/wwise/Media/600.wav"),
+        "target-relative WAV path"
+    );
+    let companion = wav
+        .get("origin_receipt")
+        .and_then(serde_json::Value::as_str)
+        .ok_or("target-relative receipt")?;
+    let receipt = fs::read_to_string(fixture.out.join(companion))?;
+    let binding: serde_json::Value =
+        serde_json::from_str(receipt.lines().next().ok_or("binding")?)?;
+    let written_digest = binding
+        .pointer("/binding/sha256")
+        .ok_or("bound artifact digest")?;
+    let reported_digest = wav
+        .pointer("/digest/sha256")
+        .ok_or("reported artifact digest")?;
+    assert_eq!(
+        written_digest, reported_digest,
+        "JSON reports the measured binding"
+    );
     let unconverted = report["unconverted"].as_array().ok_or("unconverted")?;
     let paths: Vec<_> = unconverted.iter().map(|failure| &failure["path"]).collect();
     assert_eq!(paths, [XMA, BANK], "{report}");

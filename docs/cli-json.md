@@ -3102,6 +3102,11 @@ origin companion. Each has a target-relative `path`, `origin_receipt` and the ac
 artifact's `digest`. An emitted alpha DDS has its own receipt. The summary omits this
 field when the run published no merged DDS companion.
 
+`sound_artifacts` lists newly converted loose PCM and ADPCM WAV files with a
+portable origin companion. Entries carry the target-relative `path` and
+`origin_receipt` and the measured `digest` of the written WAV. The report omits
+this field when the run published no WAV companion.
+
 An Entry whose path has a part that is no valid file name on Linux and Windows, a path that is too
 long for Windows or that differs only in case from an earlier written Entry is listed in `failed`
 with the part and the rule it breaks

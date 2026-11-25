@@ -12,8 +12,8 @@ use serde::Serialize;
 use thiserror::Error;
 
 use crate::{
-    ConversionError, NameRule, OriginArtifactDigest, PathLimit, RecordExportReport,
-    SourceEvidenceError, TextureArtifacts,
+    ConversionError, ConvertedSoundArtifact, NameRule, OriginArtifactDigest, PathLimit,
+    RecordExportReport, SourceEvidenceError, TextureArtifacts,
 };
 
 /// Why one Entry of an Extraction was not written.
@@ -230,6 +230,7 @@ pub struct ExtractionReport {
     pub(crate) dataforge_left_out: Vec<String>,
     pub(crate) texture_artifacts: Vec<TextureArtifacts>,
     pub(crate) merged_texture_artifacts: Vec<MergedTextureArtifact>,
+    pub(crate) sound_artifacts: Vec<ConvertedSoundArtifact>,
 }
 
 impl ExtractionReport {
@@ -243,6 +244,12 @@ impl ExtractionReport {
     #[must_use]
     pub fn merged_texture_artifacts(&self) -> &[MergedTextureArtifact] {
         &self.merged_texture_artifacts
+    }
+
+    /// Returns the sounds committed with their source-origin companions.
+    #[must_use]
+    pub fn sound_artifacts(&self) -> &[ConvertedSoundArtifact] {
+        &self.sound_artifacts
     }
 
     /// Returns the number of Entries written.

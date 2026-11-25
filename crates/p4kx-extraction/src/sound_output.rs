@@ -3,16 +3,48 @@
 
 use std::fs::File;
 use std::io::{self, BufWriter, Write};
+use std::path::Path;
 
 use p4kx_archive::Checksum;
 use p4kx_audio::AudioError;
 
 use crate::counting::Counting;
+use crate::source::SourceEntry;
 use crate::texture_convert::Step;
 use crate::texture_outputs::step_of;
 use crate::tracker::Tracker;
 use crate::write::{Chunk, Destination, EntryWriter, Outcome, write_error};
-use crate::{ConflictPolicy, ExtractionError};
+use crate::{ConflictPolicy, ConvertedSoundArtifact, ExtractionError, OwnedFileToken, SourceInput};
+
+#[path = "sound_linear_output.rs"]
+mod linear;
+
+pub(crate) struct LooseSound<'a> {
+    entry: SourceEntry<'a>,
+    input: Option<SourceInput<'a>>,
+}
+
+impl<'a> LooseSound<'a> {
+    pub(crate) const fn new(entry: SourceEntry<'a>, input: Option<SourceInput<'a>>) -> Self {
+        Self { entry, input }
+    }
+}
+
+pub(crate) struct SoundOutput {
+    pub(crate) step: Step,
+    pub(crate) artifact: Option<ConvertedSoundArtifact>,
+    pub(crate) receipt_failure: Option<ExtractionError>,
+}
+
+impl SoundOutput {
+    pub(crate) const fn of(step: Step) -> Self {
+        Self {
+            step,
+            artifact: None,
+            receipt_failure: None,
+        }
+    }
+}
 
 const WRITE_BUFFER_LEN: usize = 256 * 1024;
 
@@ -48,24 +80,55 @@ impl EntryWriter<'_> {
         write: impl FnOnce(&mut Sink<'_>) -> Result<(), AudioError>,
         chunk: &mut [u8],
     ) -> Result<Result<Step, AudioError>, ExtractionError> {
+        self.stage_converted(
+            destination,
+            write,
+            |temporary, ownership, ()| {
+                self.put_in_place(
+                    temporary,
+                    ownership,
+                    &destination.file,
+                    Ok(Chunk::End),
+                    Outcome::Converted,
+                )
+                .map(|outcome| SoundOutput::of(step_of(&outcome)))
+            },
+            chunk,
+        )
+        .map(|result| result.map(|output| output.step))
+    }
+
+    fn stage_converted<T>(
+        &self,
+        destination: &Destination,
+        write: impl FnOnce(&mut Sink<'_>) -> Result<T, AudioError>,
+        publish: impl FnOnce(&Path, &OwnedFileToken, T) -> Result<SoundOutput, ExtractionError>,
+        chunk: &mut [u8],
+    ) -> Result<Result<SoundOutput, AudioError>, ExtractionError> {
         if destination.existing.is_some() && self.policy == ConflictPolicy::Skip {
-            return Ok(Ok(Step::Kept));
+            return Ok(Ok(SoundOutput::of(Step::Kept)));
         }
         if self.tracker.should_stop() {
-            return Ok(Ok(Step::Cancelled));
+            return Ok(Ok(SoundOutput::of(Step::Cancelled)));
         }
         let (temporary, file, ownership) = self.temporary(&destination.folder)?;
         let mut sink = Sink {
             writer: Counting::new(BufWriter::with_capacity(WRITE_BUFFER_LEN, file)),
             tracker: self.tracker,
         };
-        let written =
-            write(&mut sink).and_then(|()| sink.writer.flush().map_err(AudioError::Write));
-        let (len, crc) = (sink.writer.len(), sink.writer.crc());
+        let written = write(&mut sink).and_then(|written| {
+            sink.writer.flush().map_err(AudioError::Write)?;
+            Ok(written)
+        });
+        let checksum = (sink.writer.len(), Checksum::Crc32c(sink.writer.crc()));
         drop(sink);
         let decided = match written {
-            Ok(()) => self.decide(destination, || (len, Checksum::Crc32c(crc)), chunk),
-            Err(AudioError::Write(_)) if self.tracker.should_stop() => Ok(Some(Outcome::Cancelled)),
+            Ok(written) => match self.decide(destination, || checksum, chunk) {
+                Ok(None) => return publish(&temporary, &ownership, written).map(Ok),
+                Ok(Some(outcome)) => Ok(step_of(&outcome)),
+                Err(error) => Err(error),
+            },
+            Err(AudioError::Write(_)) if self.tracker.should_stop() => Ok(Step::Cancelled),
             Err(AudioError::Write(source)) => Err(write_error(destination.file.clone(), source)),
             Err(error) => {
                 return match ownership
@@ -79,35 +142,21 @@ impl EntryWriter<'_> {
                 };
             }
         };
-        match decided {
-            Ok(None) => Ok(Ok(step_of(&self.put_in_place(
-                &temporary,
-                &ownership,
-                &destination.file,
-                Ok(Chunk::End),
-                Outcome::Converted,
-            )?))),
-            Ok(Some(outcome)) => crate::output_cleanup::extraction(
-                Ok(Ok(step_of(&outcome))),
-                &ownership,
-                &temporary,
-                self.cancel,
-            ),
+        let decided = match decided {
             Err(error)
                 if self.tracker.should_stop()
                     && !crate::guard_cancellation::retained_output(&error) =>
             {
-                crate::output_cleanup::extraction(
-                    Ok(Ok(Step::Cancelled)),
-                    &ownership,
-                    &temporary,
-                    self.cancel,
-                )
+                Ok(Step::Cancelled)
             }
-            Err(error) => {
-                crate::output_cleanup::extraction(Err(error), &ownership, &temporary, self.cancel)
-            }
-        }
+            result => result,
+        };
+        crate::output_cleanup::extraction(
+            decided.map(|step| Ok(SoundOutput::of(step))),
+            &ownership,
+            &temporary,
+            self.cancel,
+        )
     }
 }
 

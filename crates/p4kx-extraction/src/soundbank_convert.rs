@@ -50,6 +50,7 @@ impl Unpacked {
             outcome,
             unconverted: self.unconverted,
             cancelled: self.cancelled,
+            artifact: None,
         }
     }
 }
@@ -76,7 +77,7 @@ impl EntryWriter<'_> {
             .ok_or(ExtractionError::UnsafePath)?;
         let wem_folder = relative_path(stem)?;
         let destination = self.destination(entry)?;
-        if !self.read_sound(entry, buffers, credited)? {
+        if self.read_sound(entry, buffers, credited)?.is_none() {
             return Ok(Converted::of(Outcome::Cancelled));
         }
         let Buffers { chunk, data, .. } = buffers;
@@ -154,13 +155,14 @@ impl EntryWriter<'_> {
                 stem: &stem,
                 name: &name,
                 prefetch: wem.is_prefetch(),
+                loose: None,
             };
             match self.write_sound(wem.bytes(), &sound, chunk) {
                 Ok(end) => {
-                    unpacked.converted |= end.converted && end.step == Step::Written;
-                    unpacked.steps.push(end.step);
+                    unpacked.converted |= end.converted && end.output.step == Step::Written;
+                    unpacked.steps.push(end.output.step);
                     unpacked.unconverted.extend(end.unconverted);
-                    if end.step == Step::Cancelled {
+                    if end.output.step == Step::Cancelled {
                         unpacked.cancelled = bank
                             .wems()
                             .skip(position)

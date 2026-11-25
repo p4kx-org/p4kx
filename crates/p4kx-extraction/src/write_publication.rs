@@ -14,6 +14,14 @@ use crate::output_file::StagedOutput;
 use crate::{ConflictPolicy, ExtractionError};
 
 impl EntryWriter<'_> {
+    /// Refuses publication after the extraction or its Archive watch stops.
+    pub(crate) fn receipt_checkpoint(&self) -> io::Result<()> {
+        if self.tracker.should_stop() {
+            return Err(io::ErrorKind::Interrupted.into());
+        }
+        Ok(())
+    }
+
     /// Renames `temporary` to `destination` once `copied` reached the end of the data, or removes
     /// it; returns `done` once the file is in place.
     pub(crate) fn put_in_place(

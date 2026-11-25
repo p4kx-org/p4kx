@@ -5,7 +5,7 @@ use std::io;
 use std::path::Path;
 
 use super::{MergedEvidence, Source, Step};
-use crate::file_receipt::{self, StagedReceiptPublication};
+use crate::file_receipt::{self, StagedReceiptPublication, finish_staged_receipt};
 use crate::output_file::StagedOutput;
 use crate::textures::DdsMergeOrigins;
 use crate::write::{EntryWriter, write_error};
@@ -72,12 +72,7 @@ impl EntryWriter<'_> {
         let publication = receipt.publish_staged(
             staged,
             evidence.digest,
-            || {
-                if self.tracker.should_stop() {
-                    return Err(io::Error::from(io::ErrorKind::Interrupted));
-                }
-                Ok(())
-            },
+            || self.receipt_checkpoint(),
             |writer, binding| origins.write(writer, binding),
         );
         match publication {
@@ -95,7 +90,7 @@ impl EntryWriter<'_> {
                     self.tracker.written.record(&companion, owner);
                     output.artifact = Some(artifact);
                 }
-                finish_receipt(receipt, retirement)
+                finish_staged_receipt(receipt, retirement)
                     .map_err(|error| write_error(companion_file, error))
             }
         }
@@ -107,20 +102,4 @@ fn report_path(relative: &Path) -> Result<String, ExtractionError> {
         .to_str()
         .map(|path| path.replace('\\', "/"))
         .ok_or(ExtractionError::UnsafePath)
-}
-
-fn finish_receipt(receipt: io::Result<()>, retirement: io::Result<()>) -> io::Result<()> {
-    match (receipt, retirement) {
-        (Err(primary), Err(cleanup)) => Err(io::Error::other(ReceiptFailure { primary, cleanup })),
-        (Err(error), Ok(())) | (Ok(()), Err(error)) => Err(error),
-        (Ok(()), Ok(())) => Ok(()),
-    }
-}
-
-#[derive(Debug, thiserror::Error)]
-#[error("the committed texture receipt failed and its lock could not be retired: {cleanup}")]
-struct ReceiptFailure {
-    #[source]
-    primary: io::Error,
-    cleanup: io::Error,
 }

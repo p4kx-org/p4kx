@@ -50,7 +50,7 @@ use lock::{Contention, ReceiptLock, invalid, protection_error, regular_file};
 pub(crate) use lock::{is_origin_lock_name, origin_lock_collision};
 pub(crate) use ordinary::{OrdinaryReplacement, retained_lock_failure};
 pub use publication::FilePublication;
-pub(crate) use staged::StagedReceiptPublication;
+pub(crate) use staged::{StagedReceiptPublication, finish_staged_receipt};
 use target_path::{BindTarget, TargetLeaf, bind_target, lexical_receipt, sibling_receipt, target};
 
 pub(crate) const COMPANION_SUFFIX: &str = ".p4kx-origin.jsonl";

@@ -4,16 +4,18 @@
 use std::io::{self, Write};
 use std::ops::Range;
 
+use p4kx_audio::Wem;
+
 use crate::origin_companion::write_selected_origin_companion;
 use crate::{
     FieldOrigin, FieldOrigins, FieldPath, InputScope, OriginArtifactBinding, OriginOutputAddress,
-    SourceEvidenceError, SourceInventory, SourceInventorySelection, SourceLocation, SourceScope,
-    SourceUse, SourceUseRole, SourceUses,
+    SourceEvidenceError, SourceInput, SourceInventory, SourceInventorySelection, SourceLocation,
+    SourceScope, SourceUse, SourceUseRole, SourceUses,
 };
 
-use super::{Sound, SoundInput, WemOriginField, WemOriginPlan};
+use super::{WemOriginField, WemOriginPlan};
 
-pub(super) struct SoundOrigins {
+pub(crate) struct SoundOrigins {
     inventory: SourceInventory,
     fields: Vec<(OriginOutputAddress, FieldOrigin)>,
     summary: FieldOrigins,
@@ -46,7 +48,7 @@ impl SoundOrigins {
         )
     }
 
-    pub(super) fn write(
+    pub(crate) fn write(
         &self,
         writer: &mut dyn Write,
         binding: &OriginArtifactBinding,
@@ -73,22 +75,24 @@ impl SoundOrigins {
 pub(super) struct SoundEvidence<'uses, 'sound> {
     pub(super) uses: &'uses SourceUses,
     pub(super) payload: Option<SourceScope>,
-    sound: &'sound Sound,
+    input: Option<SourceInput<'sound>>,
     plan: WemOriginPlan<'sound>,
 }
 
 impl<'uses, 'sound> SoundEvidence<'uses, 'sound> {
-    pub(super) fn observe(sound: &'sound Sound, uses: &'uses SourceUses) -> io::Result<Self> {
-        let payload = sound
-            .source_input()
+    pub(super) fn observe(
+        wem: &'sound Wem<impl AsRef<[u8]>>,
+        input: Option<SourceInput<'sound>>,
+        uses: &'uses SourceUses,
+    ) -> io::Result<Self> {
+        let payload = input
             .map(|input| uses.observe(input, InputScope::Payload))
             .transpose()
             .map_err(io::Error::other)?;
-        let wem = sound.wem();
         Ok(Self {
             uses,
             payload,
-            sound,
+            input,
             plan: WemOriginPlan::new(wem.info_source(), wem.codec(), wem.sample_count()),
         })
     }
@@ -106,12 +110,15 @@ impl<'uses, 'sound> SoundEvidence<'uses, 'sound> {
     }
 
     pub(super) fn name_origin(&self) -> io::Result<FieldOrigin> {
-        let (Some(payload), Some(input)) = (&self.payload, &self.sound.original) else {
+        let Some(payload) = &self.payload else {
             return Ok(self.uses.origin(&[], false));
         };
-        let name_scope = match input {
-            SoundInput::Archive(_) => InputScope::ArchiveDirectoryMetadata,
-            SoundInput::File(_) => InputScope::FileMetadata,
+        let name_scope = match self.input {
+            Some(SourceInput::Archive(_) | SourceInput::ArchiveView(_)) => {
+                InputScope::ArchiveDirectoryMetadata
+            }
+            Some(SourceInput::File(_)) => InputScope::FileMetadata,
+            _ => return Ok(self.uses.origin(&[], false)),
         };
         let original = payload
             .for_scope(name_scope)

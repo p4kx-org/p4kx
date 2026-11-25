@@ -4,22 +4,22 @@
 use std::io;
 use std::ops::Range;
 
-use p4kx_audio::{Codec, LinearWavWrite};
+use p4kx_audio::{Codec, LinearWavWrite, Wem};
 
 use super::WavWrite;
 use crate::sound::origins::range_use;
-use crate::{Sound, SourceLocation, SourceScope, SourceUse, SourceUseRole};
+use crate::{SourceLocation, SourceScope, SourceUse, SourceUseRole};
 
 pub(super) fn shape(
     payload: &SourceScope,
-    sound: &Sound,
+    wem: &Wem<impl AsRef<[u8]>>,
     written: &WavWrite,
     uses: &mut Vec<SourceUse>,
 ) -> io::Result<()> {
     let selector = SourceUseRole::Selector;
     match written {
         WavWrite::Linear(written) => {
-            if written.source_audio_bytes > sound.wem().data().len() as u64 {
+            if written.source_audio_bytes > wem.data().len() as u64 {
                 return Err(io::Error::other(
                     "WAV used bytes outside the selected WEM DATA chunk",
                 ));
@@ -55,14 +55,14 @@ pub(super) fn shape(
 
 pub(super) fn samples(
     payload: &SourceScope,
-    sound: &Sound,
+    wem: &Wem<impl AsRef<[u8]>>,
     written: &WavWrite,
     uses: &mut Vec<SourceUse>,
 ) -> io::Result<()> {
     let conversion = SourceUseRole::Conversion;
     let selector = SourceUseRole::Selector;
     match written {
-        WavWrite::Linear(written) => linear_samples(payload, sound, *written, uses),
+        WavWrite::Linear(written) => linear_samples(payload, wem, *written, uses),
         WavWrite::Opus(written) => {
             let ranges = &written.ranges;
             append(
@@ -134,21 +134,21 @@ fn append(
 
 fn linear_samples(
     payload: &SourceScope,
-    sound: &Sound,
+    wem: &Wem<impl AsRef<[u8]>>,
     written: LinearWavWrite,
     uses: &mut Vec<SourceUse>,
 ) -> io::Result<()> {
-    if written.source_audio_bytes == 0 && !sound.wem().data().is_empty() {
+    if written.source_audio_bytes == 0 && !wem.data().is_empty() {
         return Ok(());
     }
-    let start = sound.wem().info_source().data_body_offset();
+    let start = wem.info_source().data_body_offset();
     let end = start
         .checked_add(written.source_audio_bytes)
         .ok_or_else(|| io::Error::other("WEM sample extent overflows"))?;
     if let Some(stride) = written.ima_sub_block_bytes {
         uses.extend(ima_source(payload, start, written, stride)?);
     } else {
-        let namespace = if sound.wem().codec() == Codec::Pcm {
+        let namespace = if wem.codec() == Codec::Pcm {
             "wemPcmFrames"
         } else {
             "wemAdpcmBlocks"

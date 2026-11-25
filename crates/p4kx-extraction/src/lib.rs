@@ -370,7 +370,7 @@ pub use record_report::{
 pub use report::{EntryFailure, ExtractionError, ExtractionReport, MergedTextureArtifact};
 pub use resolved_texts::LanguageTexts;
 pub use selection::{UnknownEntries, select_entries};
-pub use sound::{MAX_SOUND_LEN, OggFileReceipt, Sound};
+pub use sound::{ConvertedSoundArtifact, MAX_SOUND_LEN, OggFileReceipt, Sound};
 pub use source_provenance::*;
 pub use target::{
     create_default_target, create_default_target_protected, default_target_name, utc_rfc3339,

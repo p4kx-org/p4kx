@@ -8,6 +8,7 @@ mod animation_listing;
 mod archive_change;
 mod archive_default_material;
 mod build_manifest_origin;
+mod bulk_wav_origin;
 mod conflict_policy;
 mod conversion;
 mod coverage;

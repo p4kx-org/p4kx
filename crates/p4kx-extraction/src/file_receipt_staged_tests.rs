@@ -10,8 +10,8 @@ use crate::guard_cancellation;
 use crate::origin_file_io::{self, StageDisposition};
 use crate::write;
 use crate::{
-    CancelToken, FileReceipt, OriginArtifactBinding, OriginArtifactName, OriginDigestWriter,
-    SourceUses, write_origin_companion,
+    CancelToken, ConflictPolicy, FileReceipt, OriginArtifactBinding, OriginArtifactName,
+    OriginDigestWriter, SourceUses, write_origin_companion,
 };
 
 use super::StagedReceiptPublication;
@@ -122,6 +122,54 @@ fn stage_check_at_receipt_commit_may_cancel_after_artifact_replacement() -> io::
         "the cancelled companion is absent"
     );
     assert_eq!(fs::read_dir(folder.path())?.count(), 1, "only the new DDS");
+    Ok(())
+}
+
+#[test]
+fn skip_keeps_the_artifact_and_receipt_installed_during_staging() -> io::Result<()> {
+    let folder = tempfile::tempdir()?;
+    let output = folder.path().join("fixture.wav");
+    let receipt = FileReceipt::for_staged_replacement(&output, None, CancelToken::new())?;
+    let publication = origin_file_io::write_staged(
+        &output,
+        None,
+        None,
+        |writer| {
+            let mut measured = OriginDigestWriter::new(writer);
+            measured.write_all(NEW)?;
+            measured.finish()
+        },
+        |digest, staged| {
+            write_prior(&output, &receipt)?;
+            let before = fs::read(receipt.path())?;
+            let result = receipt.publish_staged_with_policy(
+                staged,
+                digest,
+                ConflictPolicy::Skip,
+                || Ok(()),
+                |_, _| panic!("the competing artifact owns its receipt"),
+            );
+
+            assert!(result.is_none(), "{result:?}");
+            assert_eq!(
+                fs::read(receipt.path())?,
+                before,
+                "the competing artifact keeps its proof"
+            );
+            Ok(StageDisposition::Cleanup(()))
+        },
+    );
+    publication?;
+    assert_eq!(
+        fs::read(&output)?,
+        OLD,
+        "the competing artifact keeps its bytes"
+    );
+    assert_eq!(
+        fs::read_dir(folder.path())?.count(),
+        2,
+        "only the existing pair"
+    );
     Ok(())
 }
 

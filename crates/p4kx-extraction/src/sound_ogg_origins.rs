@@ -19,7 +19,7 @@ use sources::OggSources;
 
 pub(super) fn capture(sound: &Sound, written: &OggWrite) -> io::Result<SoundOrigins> {
     let uses = SourceUses::new();
-    let evidence = SoundEvidence::observe(sound, &uses)?;
+    let evidence = SoundEvidence::observe(sound.wem(), sound.source_input(), &uses)?;
     let sources = OggSources::capture(sound, written, &evidence)?;
     let loops = LoopOrigins::capture(sound, written.report(), &evidence, &sources)?;
     let comments = evidence.combine([&sources.comments_and_setup, &loops.selection])?;

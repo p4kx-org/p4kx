@@ -16,6 +16,7 @@ mod publication;
 #[path = "sound_wav_receipt.rs"]
 mod wav_receipt;
 pub use wav_receipt::WavFileReceipt;
+pub(crate) use wav_receipt::capture_linear_wav;
 
 #[path = "radar_audio.rs"]
 pub mod radar_audio;
@@ -43,16 +44,33 @@ pub use wem_origin_plan::{
     WemFormatField, WemOriginError, WemOriginField, WemOriginPlan, WemOriginSite,
 };
 
+use serde::Serialize;
+
 use crate::entry_content::find_entry;
 use crate::output_file::{read_error, write_error, write_replacing_protected};
 use crate::source_protection::SourceProtection;
 use crate::texture_parts::is_same_file;
-use crate::{ConversionError, FileStamp, ObservedFileOrigin, SourceInput, UnknownEntries};
+use crate::{
+    ConversionError, FileStamp, ObservedFileOrigin, OriginArtifactDigest, SourceInput,
+    UnknownEntries,
+};
 
 /// The largest WEM read into memory, far above the largest sound of a real Archive.
 pub const MAX_SOUND_LEN: u64 = 512 << 20;
 
 const MAX_UP_FRONT_RESERVATION: u64 = 64 << 20;
+
+/// A converted sound published with its source-origin companion.
+#[derive(Debug, Serialize)]
+#[non_exhaustive]
+pub struct ConvertedSoundArtifact {
+    /// The sound path relative to the extraction target, with forward slash separators.
+    pub path: String,
+    /// The companion path relative to the extraction target, with forward slash separators.
+    pub origin_receipt: String,
+    /// The byte length and SHA-256 of the committed sound.
+    pub digest: OriginArtifactDigest,
+}
 
 /// A Wwise WEM sound read from an Entry of an Archive or from a file on disk.
 #[derive(Debug)]

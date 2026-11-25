@@ -214,6 +214,16 @@ decoded packet. Opus records the replayed packet-size words from its
 selected seek table when one exists. A loose WEM retains its original
 file identity with unknown Archive encryption.
 
+## WAV in extraction and folder conversion
+
+Bulk conversion of loose PCM and ADPCM WEM files writes the same WAV fields
+and sample ranges as standalone conversion. The sibling companion records the
+physical Archive Entry or the observed standalone file that supplied the WEM.
+This includes linear WAV files selected automatically under `--audio ogg`.
+The `sound_artifacts` JSON field points to companions for newly committed WAV
+files. Existing artifacts retained by the conflict policy retain their
+associated companion.
+
 ## Standalone Ogg
 
 The companion for [Ogg conversion](cli-json.md#p4kx-audio-ogg-archive-entry---out-file---json)

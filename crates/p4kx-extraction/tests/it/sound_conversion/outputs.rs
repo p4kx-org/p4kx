@@ -20,7 +20,7 @@ fn ogg_rebuilds_vorbis_decodes_other_codecs_to_wav_and_unpacks_the_soundbank() -
 
     assert_eq!(
         fixture.names(MEDIA)?,
-        ["500.ogg", "600.wav", "700.wem"],
+        ["500.ogg", "600.wav", "600.wav.p4kx-origin.jsonl", "700.wem"],
         "loose sounds"
     );
     assert!(
@@ -98,7 +98,7 @@ fn wav_decodes_every_sound() -> TestResult {
 
     assert_eq!(
         fixture.names(MEDIA)?,
-        ["500.wav", "600.wav", "700.wem"],
+        ["500.wav", "600.wav", "600.wav.p4kx-origin.jsonl", "700.wem"],
         "loose sounds"
     );
     assert_eq!(

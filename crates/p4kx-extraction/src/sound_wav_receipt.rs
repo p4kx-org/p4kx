@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io::Write;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+
+use p4kx_audio::{LinearWavWrite, Wem};
 
 use crate::output_file::write_error;
 use crate::{
-    ConversionError, FieldOrigins, SourceEvidenceError, SourceInventorySelection, WavReport,
+    ConversionError, FieldOrigins, SourceEvidenceError, SourceInput, SourceInventorySelection,
+    WavReport,
 };
 
 use super::Sound;
@@ -77,7 +80,7 @@ impl Sound {
             |writer, companion| {
                 let written = convert(writer)?;
                 let report = written.report();
-                let origins = origins::capture(self, &written)
+                let origins = origins::capture(self.wem(), self.source_input(), &written)
                     .map_err(|source| write_error(companion, source))?;
                 Ok(SoundWrite {
                     report,
@@ -93,4 +96,12 @@ impl Sound {
             origins: publication.written.origins,
         })
     }
+}
+
+pub(crate) fn capture_linear_wav(
+    wem: &Wem<impl AsRef<[u8]>>,
+    input: Option<SourceInput<'_>>,
+    written: LinearWavWrite,
+) -> io::Result<SoundOrigins> {
+    origins::capture(wem, input, &WavWrite::Linear(written))
 }
