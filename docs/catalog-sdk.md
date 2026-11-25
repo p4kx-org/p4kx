@@ -3401,6 +3401,19 @@ The peaks cover the typed queries and the retained Catalog replay. The
 verifier executable SHA-256 was
 `0bc4d9a475361f84cb2a24f857bbddccdd08dcb433db6cfbe7055f362182ae3f`.
 
+### Loot and Harvest cold queries
+
+The Windows AMD64 verifier at `56e65a9bbd0370283c0d68f1fd3346f822ea6883`
+ran seven cold queries against each installed Build. The multi-config query
+also covered the slot-preset projection and checked the field-origin markers
+on its rows. Each run used one worker, kept the Archive stamp stable and
+stayed below 2,000,000,000 bytes.
+
+| Build | Slot preset rows | Inventory uses for multi-config and slot rows | Peak private bytes across all seven queries | Peak working set bytes across all seven queries |
+| --- | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 104 | 575,025 | 1,265,541,120 | 1,251,733,504 |
+| PTU `13260598` | 106 | 612,834 | 1,331,302,400 | 1,317,150,720 |
+
 ## Verify dataset coverage
 
 The SDK coverage audit checks canonical dataset boundaries against calls to the public typed
