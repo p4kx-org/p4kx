@@ -102,7 +102,8 @@ fn installed_economy_definitions_match_one_complete_catalog() -> TestResult {
     let producer = env::var(PRODUCER)?;
     let expected = Census::parse(&env::var(EXPECTED)?)?;
     with_bound_measurement_from_producer(&producer, |archive, measurement| {
-        let mut evidence = Evidence::retained(archive, expected);
+        let directory = tempfile::tempdir()?;
+        let mut evidence = Evidence::retained(archive, expected, directory.path());
         {
             let session =
                 CatalogQuerySession::open(archive, CatalogLanguageSelection::AllAvailable, None)?;

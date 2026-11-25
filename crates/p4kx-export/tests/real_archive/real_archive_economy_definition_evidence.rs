@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{BTreeMap, HashMap, HashSet};
+use std::collections::HashSet;
+use std::path::Path;
 
 use p4kx_export::catalog_queries::commodities::CommoditySnapshot;
 use p4kx_export::catalog_queries::{CatalogRecordCoverage, DatasetAvailability};
 use p4kx_extraction::{Archive, Build, Language, SourceInventory};
 use serde::Serialize;
-use serde_json::Value;
 
 use crate::real_archive_catalog_table_parity::{
-    BoundMeasurement, Counts, Origins, ScopedTextProof, Table, TestResult, capture_rows,
+    BoundMeasurement, Counts, DefinitionOwner, StreamedDefinitionDigests, TestResult,
 };
 use crate::real_archive_verification::print_line;
 
@@ -59,14 +59,7 @@ pub(super) struct RecordScope<'read> {
 pub(super) struct Evidence<'archive> {
     archive: &'archive Archive,
     expected: Census,
-    retained: Option<Retained>,
-}
-
-#[derive(Default)]
-struct Retained {
-    tables: BTreeMap<Family, Table>,
-    origins: Origins,
-    texts: ScopedTextProof,
+    retained: Option<StreamedDefinitionDigests<'archive, COUNT>>,
 }
 
 impl<'archive> Evidence<'archive> {
@@ -78,9 +71,19 @@ impl<'archive> Evidence<'archive> {
         }
     }
 
-    pub(super) fn retained(archive: &'archive Archive, expected: Census) -> Self {
+    pub(super) fn retained(
+        archive: &'archive Archive,
+        expected: Census,
+        directory: &'archive Path,
+    ) -> Self {
         Self {
-            retained: Some(Retained::default()),
+            retained: Some(StreamedDefinitionDigests::new(
+                directory,
+                FAMILIES.map(|family| match family {
+                    Family::CommodityPresentation => DefinitionOwner::CommodityPresentation,
+                    _ => DefinitionOwner::Record,
+                }),
+            )),
             ..Self::cold(archive, expected)
         }
     }
@@ -99,7 +102,7 @@ impl<'archive> Evidence<'archive> {
                 return Err(format!("{} repeats a physical Record index", family.path()).into());
             }
         }
-        self.observe(family, scope, rows, physical_record)
+        self.observe(family, scope, rows)
     }
 
     pub(super) fn presentation(
@@ -107,7 +110,8 @@ impl<'archive> Evidence<'archive> {
         scope: &RecordScope<'_>,
         snapshot: &CommoditySnapshot<'_>,
     ) -> TestResult {
-        let mut physical = HashMap::new();
+        let mut record_indices = HashSet::new();
+        let mut header_uses = HashSet::new();
         for (definition, presentation) in snapshot.definitions.iter().zip(&snapshot.presentations) {
             let header = definition.source();
             let original = header.guid();
@@ -123,7 +127,8 @@ impl<'archive> Evidence<'archive> {
                 || original.value().copied() != projected.value().map(|guid| guid.get())
                 || original.origin() != projected.origin()
                 || !projected.origin().source_set_complete()
-                || physical.insert(reference.as_str(), *record).is_some()
+                || !record_indices.insert(*record)
+                || !header_uses.insert(reference.as_str())
             {
                 return Err(
                     "the Commodity definition and presentation use different physical GUID headers"
@@ -131,8 +136,8 @@ impl<'archive> Evidence<'archive> {
                 );
             }
         }
-        if physical.len() != snapshot.presentations.len()
-            || physical.len() != snapshot.definitions.len()
+        if record_indices.len() != snapshot.presentations.len()
+            || record_indices.len() != snapshot.definitions.len()
         {
             return Err("a Commodity definition or presentation lacks its paired row".into());
         }
@@ -140,12 +145,6 @@ impl<'archive> Evidence<'archive> {
             Family::CommodityPresentation,
             scope,
             &snapshot.presentations,
-            |row| {
-                physical
-                    .get(presentation_source(row)?)
-                    .copied()
-                    .ok_or_else(|| "no matching original Commodity GUID header use".into())
-            },
         )
     }
 
@@ -154,7 +153,6 @@ impl<'archive> Evidence<'archive> {
         family: Family,
         scope: &RecordScope<'_>,
         rows: &[Row],
-        physical: impl Fn(&Value) -> TestResult<u32>,
     ) -> TestResult {
         let path = family.path();
         let count = rows.len();
@@ -175,16 +173,7 @@ impl<'archive> Evidence<'archive> {
             ).into());
         }
         if let Some(retained) = &mut self.retained {
-            let table = capture_rows(
-                scope.availability,
-                rows,
-                scope.inventory,
-                &mut retained.origins,
-                physical,
-            )?;
-            if retained.tables.insert(family, table).is_some() {
-                return Err(format!("{path}: SDK dataset repeated").into());
-            }
+            retained.retain(family as usize, scope.availability, rows, scope.inventory)?;
         }
         print_line(&format!(
             "Economy definition SDK: dataset={path} availability={:?} rows={count} inventoryUses={uses} inventorySources={sources} skippedLeftovers={}",
@@ -209,39 +198,15 @@ impl<'archive> Evidence<'archive> {
             return Err("the localized economy query has inconsistent language scope".into());
         }
         if let Some(retained) = &mut self.retained {
-            retained
-                .texts
-                .retain(public, protected, inventory, &mut retained.origins)?;
+            retained.retain_texts(public, protected, inventory)?;
         }
         Ok(())
     }
 
     pub(super) fn compare(self, measurement: &BoundMeasurement) -> TestResult<Counts<COUNT>> {
-        let Some(Retained {
-            mut tables,
-            origins,
-            texts,
-        }) = self.retained
-        else {
-            return Err("the retained economy proof was not captured".into());
-        };
-        let tables: [Table; COUNT] = FAMILIES
-            .into_iter()
-            .map(|family| {
-                tables
-                    .remove(&family)
-                    .ok_or("missing selected economy route")
-            })
-            .collect::<Result<Vec<_>, _>>()?
-            .try_into()
-            .map_err(|_| "the retained economy routes are incomplete")?;
-        measurement.verify_table_scope(
-            FAMILIES.map(Family::path),
-            &tables,
-            &[],
-            &origins,
-            Some(&texts),
-        )
+        self.retained
+            .ok_or_else(|| "the retained economy proof was not captured".into())
+            .and_then(|retained| retained.compare(measurement, FAMILIES.map(Family::path)))
     }
 }
 
@@ -266,55 +231,4 @@ const fn known(availability: DatasetAvailability, count: usize) -> bool {
         (availability, count),
         (DatasetAvailability::Available, _) | (DatasetAvailability::Absent, 0)
     )
-}
-
-fn physical_record(row: &Value) -> TestResult<u32> {
-    if row.pointer("/recordIndex/state").and_then(Value::as_str) != Some("present") {
-        return Err("the serialized Record index is unreadable".into());
-    }
-    row.pointer("/recordIndex/value")
-        .and_then(Value::as_u64)
-        .and_then(|index| u32::try_from(index).ok())
-        .ok_or_else(|| "the serialized physical Record index is invalid".into())
-}
-
-fn presentation_source(row: &Value) -> TestResult<&str> {
-    let guid = row
-        .get("commodityGuid")
-        .ok_or("the Commodity presentation lacks its identity")?;
-    let Some([reference]) = guid
-        .get("sourceUsesRefs")
-        .and_then(Value::as_array)
-        .map(Vec::as_slice)
-    else {
-        return Err(
-            "the Commodity presentation identity does not have one original header use".into(),
-        );
-    };
-    reference
-        .as_str()
-        .ok_or_else(|| "the Commodity presentation header reference is invalid".into())
-}
-
-#[test]
-fn commodity_presentation_identity_uses_the_physical_header() -> TestResult {
-    use serde_json::json;
-
-    let first = json!({"commodityGuid":{"value":"same","sourceUsesRefs":["first"]}});
-    let second = json!({"commodityGuid":{"value":"same","sourceUsesRefs":["second"]}});
-    let ambiguous = json!({"commodityGuid":{"value":"same","sourceUsesRefs":["first","second"]}});
-    assert_ne!(
-        presentation_source(&first)?,
-        presentation_source(&second)?,
-        "nominal duplicates have distinct owners"
-    );
-    assert!(
-        presentation_source(&ambiguous).is_err(),
-        "a single direct GUID header use is required"
-    );
-    assert!(
-        presentation_source(&json!({"commodityGuid":{"value":"same"}})).is_err(),
-        "a GUID value alone cannot claim an original owner"
-    );
-    Ok(())
 }

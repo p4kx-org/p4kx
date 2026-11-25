@@ -14,6 +14,8 @@ use super::digest_parity::{PhysicalSlot, capture_inventory, fingerprint, row_fin
 use super::{BoundMeasurement, Counts, SOURCES, ScopedTextProof, TestResult, USES, measurement};
 use crate::catalog_capture::CatalogCapture;
 
+#[path = "real_archive_catalog_definition_digests.rs"]
+mod definitions;
 #[path = "real_archive_catalog_digest_index.rs"]
 mod digest_index;
 #[path = "real_archive_catalog_digest_runs.rs"]
@@ -26,20 +28,18 @@ mod mission;
 mod placement;
 #[path = "real_archive_catalog_stream_wire.rs"]
 mod wire;
-#[path = "real_archive_world_definition_stream.rs"]
-mod world;
 
 pub(crate) use loot_harvest::{LootHarvestDataset, LootHarvestDigests};
 pub(super) use mission::MissionDispositionRows;
 pub(crate) use mission::{MissionDisposition, StreamedMissionDigests};
 pub(crate) use placement::StreamedPlacementDigests;
 
+pub(crate) use definitions::StreamedDefinitionDigests;
 use digest_index::DigestIndex;
 use digest_runs::{DigestRuns, OriginDigest};
 pub(crate) use wire::DefinitionOwner;
 use wire::OrderedRows;
 pub(super) use wire::{RowDigest, StreamOrigins};
-pub(crate) use world::WorldDefinitionDigests;
 
 pub(crate) struct StreamedComponentDigests<'directory, const TABLES: usize = 1> {
     rows: [OrderedRows; TABLES],

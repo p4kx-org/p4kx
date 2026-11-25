@@ -65,9 +65,6 @@ impl OrderedRows {
         }
     }
 
-    pub(super) fn append_definition(&mut self, index: u32, row: Fingerprint) -> TestResult {
-        self.append_encounter_row(Sha256::digest(index.to_be_bytes()).into(), row)
-    }
     pub(super) fn in_encounter_order() -> Self {
         Self::with_encounter(EncounterRow::Placement)
     }
@@ -162,8 +159,8 @@ impl<'de> Visitor<'de> for RowDigest {
                     ordered.append(slot, fingerprint(row).map_err(A::Error::custom)?)
                 }
                 RowOrder::Definition(owner) => {
-                    let index = owner.physical_index(&row).map_err(A::Error::custom)?;
-                    ordered.append_definition(index, fingerprint(row).map_err(A::Error::custom)?)
+                    let key = owner.key(&row).map_err(A::Error::custom)?;
+                    ordered.append_encounter_row(key, fingerprint(row).map_err(A::Error::custom)?)
                 }
                 RowOrder::Encounter(shape) => {
                     let (key, row) = shape.project(row).map_err(A::Error::custom)?;
@@ -197,9 +194,28 @@ impl<'de> Visitor<'de> for RowDigest {
 pub(crate) enum DefinitionOwner {
     Record,
     Entry,
+    CommodityPresentation,
 }
 
 impl DefinitionOwner {
+    pub(super) fn key(self, row: &Value) -> TestResult<Fingerprint> {
+        let digest = match self {
+            Self::CommodityPresentation => {
+                let Some([reference]) = row
+                    .pointer("/commodityGuid/sourceUsesRefs")
+                    .and_then(Value::as_array)
+                    .map(Vec::as_slice)
+                else {
+                    return Err("the Commodity identity lacks one original header use".into());
+                };
+                let id = reference.as_str().ok_or("invalid Commodity header use")?;
+                Sha256::digest(id.as_bytes())
+            }
+            Self::Record | Self::Entry => Sha256::digest(self.physical_index(row)?.to_be_bytes()),
+        };
+        Ok(digest.into())
+    }
+
     pub(crate) fn physical_index(self, row: &Value) -> TestResult<u32> {
         let position = match self {
             Self::Record
@@ -207,7 +223,7 @@ impl DefinitionOwner {
             {
                 row.pointer("/recordIndex/value")
             }
-            Self::Record => None,
+            Self::Record | Self::CommodityPresentation => None,
             Self::Entry => row.pointer("/identity/entryIndex"),
         };
         position

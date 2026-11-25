@@ -65,6 +65,25 @@ fn kind_health_rejects_missing_duplicate_extra_and_inconsistent_rows() -> TestRe
 }
 
 #[test]
+fn indexed_replay_requires_entry_accounting_for_each_kind() -> TestResult {
+    let mut document = catalog();
+    path(&mut document, "/exportHealth/kinds/0")?
+        .as_object_mut()
+        .ok_or("kind health object")?
+        .remove("sourceEntries")
+        .ok_or("fixture sourceEntries")?;
+    let raw = compact_fixture(&document)?;
+    let Err(error) = index(raw.as_slice()) else {
+        return Err("indexed replay accepted absent Entry accounting".into());
+    };
+    assert!(
+        error.to_string().contains("missing field `sourceEntries`"),
+        "missing Entry accounting must fail the indexed reader: {error}"
+    );
+    Ok(())
+}
+
+#[test]
 fn complete_selection_refuses_unknown_and_duplicate_kind_keys() -> TestResult {
     let mut document = catalog();
     path(&mut document, "/completeness")?

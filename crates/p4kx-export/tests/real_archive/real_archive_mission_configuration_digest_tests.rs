@@ -6,6 +6,8 @@ use std::collections::HashSet;
 use serde::Serialize;
 use serde_json::{Value, json};
 
+use crate::real_archive_catalog_size::replay::bindings::Receipt;
+
 use super::{
     ArenaRow, EncounterRow, HEALTH, MissionDisposition, MissionDispositionRows, OrderedRows,
     Projection, TestResult, fingerprint, retain, verify_health,
@@ -96,21 +98,27 @@ fn sample_arena(index: u32, use_id: &str) -> Value {
 
 #[test]
 fn mission_dispositions_reject_a_changed_family_skip_count() -> TestResult {
-    use crate::catalog_capture::CatalogCapture;
+    use crate::real_archive_catalog_table_parity::measurement;
 
-    let mut capture = CatalogCapture::default();
+    let mut capture = measurement::normal_capture();
     capture.project(
         HEALTH,
         Projection::MissionDispositions(MissionDispositionRows),
     );
-    let bytes = serde_json::to_vec(&json!({
-        "exportHealth": {"kinds": [
-            sample_health("pools", 2, 9),
-            sample_health("contractTemplates", 3, 0),
-            sample_health("missionBrokerEntries", 5, 2)
-        ]}
-    }))?;
+    let document = mission_health_document();
+    let bytes = serde_json::to_vec(&document)?;
     let catalog = capture.read(bytes.as_slice())?;
+    let receipt = receipt_for_mission_health(&document)?;
+    assert!(
+        document
+            .pointer("/exportHealth/kinds/1/sourceEntries")
+            .is_some()
+            && catalog
+                .pointer("/exportHealth/kinds/0/sourceEntries")
+                .is_none(),
+        "the mission projection retains disposition fields from the full health row"
+    );
+    receipt.binding()?.check_catalog(&catalog)?;
     let templates = MissionDisposition {
         owners: 3,
         skipped: 0,
@@ -142,12 +150,72 @@ fn mission_dispositions_reject_a_changed_family_skip_count() -> TestResult {
     Ok(())
 }
 
+fn mission_health_document() -> Value {
+    use crate::real_archive_catalog_size::replay::bindings::catalog_selection_names;
+
+    let completeness = catalog_selection_names()
+        .map(|kind| (kind.to_owned(), json!({"status": "complete"})))
+        .collect::<serde_json::Map<String, Value>>();
+    json!({
+        "schemaVersion": p4kx_export::SCHEMA_VERSION,
+        "source": {
+            "channel": "LIVE",
+            "build": {
+                "branch": "fixture",
+                "version": "0.0.0",
+                "changeNumber": "1",
+                "buildId": "fixture"
+            },
+            "archiveSize": 47,
+            "archiveModified": "2026-11-12T07:12:02Z"
+        },
+        "completeness": completeness,
+        "exportHealth": {
+            "publicationMode": "normal",
+            "status": "complete",
+            "read": "complete",
+            "projection": "complete",
+            "kinds": [
+                sample_health("pools", 2, 9),
+                sample_health("contractTemplates", 3, 0),
+                sample_health("missionBrokerEntries", 5, 2)
+            ]
+        }
+    })
+}
+
+fn receipt_for_mission_health(document: &Value) -> TestResult<Receipt> {
+    let original_build = document.pointer("/source/build").ok_or("fixture Build")?;
+    let mut measured_build = original_build
+        .as_object()
+        .ok_or("fixture Build object")?
+        .clone();
+    measured_build.insert("channel".to_owned(), json!("LIVE"));
+    let archive = json!({
+        "manifestSha256": "a".repeat(64),
+        "build": measured_build,
+        "archiveBytes": 47,
+        "archiveCreatedUtc": "2026-11-12T07:12:01Z",
+        "archiveModifiedUtc": "2026-11-12T07:12:02Z"
+    });
+    Ok(serde_json::from_value(json!({
+        "channel": "LIVE", "archiveBefore": archive, "archiveAfter": archive
+    }))?)
+}
+
 fn sample_health(kind: &str, owners: usize, skipped: usize) -> Value {
     json!({
         "kind": kind,
         "sourceInventoryComplete": true,
         "writtenRows": owners,
         "intentionallySkippedRows": 0,
+        "sourceEntries": {
+            "selected": 0,
+            "projected": 0,
+            "intentionallySkipped": 0,
+            "failedRequiredReads": 0,
+            "failedProjections": 0,
+        },
         "sourceRecords": {
             "selected": owners + skipped,
             "readSuccessful": owners,

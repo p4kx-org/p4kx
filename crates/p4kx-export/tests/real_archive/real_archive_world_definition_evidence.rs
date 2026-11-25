@@ -12,7 +12,7 @@ use p4kx_extraction::{Archive, Build, SourceInventory};
 use serde::Serialize;
 
 use crate::real_archive_catalog_table_parity::{
-    BoundMeasurement, Counts, DefinitionOwner, TestResult, WorldDefinitionDigests,
+    BoundMeasurement, Counts, DefinitionOwner, StreamedDefinitionDigests, TestResult,
 };
 use crate::real_archive_verification::print_line;
 
@@ -55,7 +55,7 @@ pub(super) struct RecordScope<'read> {
 pub(super) struct Proof<'archive> {
     archive: &'archive Archive,
     expected: Expected,
-    retained: Option<WorldDefinitionDigests<'archive, COUNT>>,
+    retained: Option<StreamedDefinitionDigests<'archive, COUNT>>,
 }
 
 impl<'archive> Proof<'archive> {
@@ -73,7 +73,7 @@ impl<'archive> Proof<'archive> {
         directory: &'archive Path,
     ) -> Self {
         Self {
-            retained: Some(WorldDefinitionDigests::new(
+            retained: Some(StreamedDefinitionDigests::new(
                 directory,
                 FAMILIES.map(|family| match family {
                     Family::Soils | Family::SoilTextureSets | Family::PlanetResources => {

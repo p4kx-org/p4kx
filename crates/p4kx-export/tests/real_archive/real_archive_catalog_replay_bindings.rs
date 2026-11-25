@@ -109,7 +109,7 @@ struct CatalogMetadata {
     schema_version: u32,
     source: CatalogSource,
     completeness: BTreeMap<String, Selection>,
-    export_health: Publication,
+    export_health: PublicationState,
 }
 
 #[derive(Deserialize)]
@@ -129,14 +129,21 @@ struct Selection {
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct Publication {
+    #[serde(flatten)]
+    state: PublicationState,
+    kinds: Option<Vec<health::KindReport>>,
+    selected_kind_records: Option<u64>,
+    written_rows: Option<u64>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct PublicationState {
     #[serde(rename = "publicationMode")]
     mode: String,
     status: String,
     read: String,
     projection: String,
-    kinds: Option<Vec<health::KindReport>>,
-    selected_kind_records: Option<u64>,
-    written_rows: Option<u64>,
 }
 
 impl Publication {
@@ -162,7 +169,7 @@ impl Binding {
             pass.schema_version,
             &pass.source,
             &pass.completeness,
-            &pass.export_health,
+            &pass.export_health.state,
         )?;
         pass.export_health.check_accounting()
     }
@@ -216,7 +223,7 @@ impl Binding {
         schema_version: u32,
         source: &CatalogSource,
         completeness: &BTreeMap<String, Selection>,
-        publication: &Publication,
+        publication: &PublicationState,
     ) -> TestResult {
         if schema_version != SCHEMA_VERSION {
             return Err("replay requires catalog schema v3".into());
