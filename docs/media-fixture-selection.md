@@ -391,6 +391,14 @@ placement preserves that difference. Trimming the spaces around the selector
 in a diagnostic query isolated the nominated nested helper. The game's
 selector matching and fallback behavior remain unverified for this Record.
 
+Two series of LIVE Deadlock captures show the equipped backpack upright. The
+corrected export places the two authored attachment alternatives 5.83 cm apart.
+The side and elevated views exposed the backpack and parts of the collar. They
+did not yield independent rigid `Spine3` landmarks for separating those two
+placements. The camera positions agreed between the Hangar and Levski coordinate
+frames to within 1 cm per axis. The camera angle and the posed torso could not
+be independently calibrated from the repeated floor details and visible collar.
+
 The [static relay fixture](static-relay-blender-verification.md) checks full helper rotation
 in an ordinary entity package imported by native Blender.
 
