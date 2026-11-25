@@ -5,8 +5,7 @@ use std::env;
 
 use p4kx_export::catalog_queries::equipment::EquipmentSnapshot;
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability, ParsedCatalogQueries,
 };
 use p4kx_extraction::Archive;
 use serde::Serialize;
@@ -39,10 +38,9 @@ fn installed_contract_metadata_matches_one_complete_catalog() -> TestResult {
         |archive, measurement| {
             let mut origins = Origins::default();
             let tables = {
-                let session = CatalogQuerySession::open(
+                let session = equipment_input::full_source_session(
                     archive,
                     CatalogLanguageSelection::Selected(&[]),
-                    None,
                 )?;
                 let parsed = session.parsed(None)?;
                 [
@@ -72,7 +70,7 @@ fn installed_contract_metadata_cold_query() -> TestResult {
     }
     equipment_input::with_archive(|archive| {
         let session =
-            CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+            equipment_input::full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
         let parsed = session.parsed(None)?;
         let _ = query(archive, &parsed, &path, None)?;
         Ok(())

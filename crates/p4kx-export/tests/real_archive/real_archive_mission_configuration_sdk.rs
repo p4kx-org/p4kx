@@ -7,9 +7,11 @@ use std::mem;
 use p4kx_export::catalog_queries::mission_properties::{
     DeclarationBinding, FlowSelection, MissionFlowOwnerRef, MissionPropertyOwnerSnapshot,
     MissionPropertyVisitSummary, SourceFieldRef, SourceValueRef, TemplateSource,
-    visit_mission_properties_from,
 };
-use p4kx_export::catalog_queries::{CatalogRecordSelection, DatasetAvailability};
+use p4kx_export::catalog_queries::{
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
+    ProvenanceMode,
+};
 use p4kx_extraction::{Archive, DataForgeEntry, SourceLocation};
 
 use crate::real_archive_catalog_table_parity::{
@@ -77,9 +79,14 @@ fn read_all(
     let input = DataForgeEntry::read(archive).map_err(|_| "read the bound DataForge Entry")?;
     let original = OriginalScope::read(&input, expected)?;
     let mut census = Census::default();
-    let summary = visit_mission_properties_from(
+    let session = CatalogQuerySession::from_entry(
         archive,
         &input,
+        CatalogLanguageSelection::Selected(&[]),
+        None,
+    )?
+    .with_provenance_mode(ProvenanceMode::Full);
+    let summary = session.visit_mission_properties(
         CatalogRecordSelection::All,
         None,
         |snapshot| -> TestResult {

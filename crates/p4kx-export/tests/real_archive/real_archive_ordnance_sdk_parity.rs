@@ -8,8 +8,7 @@ use p4kx_export::catalog_queries::equipment::ordnance::{
     ExplosionDefinition, MissileConfiguration,
 };
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability, ParsedCatalogQueries,
 };
 use p4kx_extraction::Archive;
 use serde::Serialize;
@@ -187,10 +186,9 @@ fn installed_ordnance_matches_one_complete_catalog() -> TestResult {
         |archive, measurement| {
             let mut origins = Origins::default();
             let tables = {
-                let session = CatalogQuerySession::open(
+                let session = equipment_input::full_source_session(
                     archive,
                     CatalogLanguageSelection::Selected(&[]),
-                    None,
                 )?;
                 let parsed = session.parsed(None)?;
                 let [missiles, definitions] = FAMILIES;
@@ -224,7 +222,7 @@ fn installed_ordnance_cold_query() -> TestResult {
         .ok_or("configure one exact ordnance dataset path")?;
     equipment_input::with_archive(|archive| {
         let session =
-            CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+            equipment_input::full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
         let parsed = session.parsed(None)?;
         let _ = family.query(archive, &parsed, None)?;
         Ok(())

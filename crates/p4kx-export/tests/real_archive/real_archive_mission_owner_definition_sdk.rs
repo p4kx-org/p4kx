@@ -8,7 +8,7 @@ use p4kx_export::catalog_queries::mission_definitions::{
     MissionDefinitionSnapshot, TemplateDefinition,
 };
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogRecordSelection, ParsedCatalogQueries,
 };
 use p4kx_extraction::Archive;
 use serde::Serialize;
@@ -72,7 +72,7 @@ fn installed_mission_owner_definition_cold_query() -> TestResult {
         .ok_or("configure one exact Template or Broker definition path")?;
     equipment_input::with_archive(|archive| {
         let session =
-            CatalogQuerySession::open(archive, CatalogLanguageSelection::AllAvailable, None)?;
+            equipment_input::full_source_session(archive, CatalogLanguageSelection::AllAvailable)?;
         read_family(archive, &session.parsed(None)?, family, disposition, None)
     })
 }
@@ -87,8 +87,10 @@ fn installed_mission_owner_definitions_match_one_complete_catalog() -> TestResul
         let mut proof =
             StreamedDefinitionDigests::new(scratch.path(), [DefinitionOwner::Record; COUNT]);
         {
-            let session =
-                CatalogQuerySession::open(archive, CatalogLanguageSelection::AllAvailable, None)?;
+            let session = equipment_input::full_source_session(
+                archive,
+                CatalogLanguageSelection::AllAvailable,
+            )?;
             let parsed = session.parsed(None)?;
             for (table, (family, disposition)) in FAMILIES.into_iter().zip(expected).enumerate() {
                 read_family(

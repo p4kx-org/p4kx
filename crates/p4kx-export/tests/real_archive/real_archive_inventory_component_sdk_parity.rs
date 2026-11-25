@@ -5,8 +5,8 @@ use std::env;
 
 use p4kx_export::catalog_queries::equipment::EquipmentVisitSummary;
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
-    DatasetAvailability, ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogRecordCoverage, CatalogRecordSelection, DatasetAvailability,
+    ParsedCatalogQueries,
 };
 use p4kx_extraction::{Archive, Build};
 use serde::Serialize;
@@ -111,7 +111,7 @@ fn with_parsed<T>(
         .build()
         .ok_or("the installed Archive lacks a Build")?;
     let session =
-        CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+        equipment_input::full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
     inspect(&session.parsed(None)?, build)
 }
 

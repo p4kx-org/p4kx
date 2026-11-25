@@ -4,8 +4,8 @@
 use std::env;
 
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
-    DatasetAvailability, ParsedCatalogQueries, ResourceGroupParentSnapshot, ResourceGroupSnapshot,
+    CatalogLanguageSelection, CatalogRecordCoverage, CatalogRecordSelection, DatasetAvailability,
+    ParsedCatalogQueries, ResourceGroupParentSnapshot, ResourceGroupSnapshot,
 };
 use p4kx_extraction::{Archive, Build, SourceInventory};
 use serde_json::Value;
@@ -28,8 +28,10 @@ fn installed_resource_group_tables_match_one_complete_catalog() -> TestResult {
     real_archive_catalog_table_parity::with_bound_measurement_from_producer(
         &revision,
         |archive, measurement| {
-            let session =
-                CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+            let session = equipment_input::full_source_session(
+                archive,
+                CatalogLanguageSelection::Selected(&[]),
+            )?;
             let parsed = session.parsed(None)?;
             let mut origins = Origins::default();
             let (definitions, members) = with_direct(archive, &parsed, |sdk| {
@@ -92,7 +94,7 @@ fn installed_resource_group_cold_query() -> TestResult {
     };
     equipment_input::with_archive(|archive| {
         let session =
-            CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+            equipment_input::full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
         let parsed = session.parsed(None)?;
         match scope {
             ColdScope::Direct => with_direct(archive, &parsed, |sdk| {

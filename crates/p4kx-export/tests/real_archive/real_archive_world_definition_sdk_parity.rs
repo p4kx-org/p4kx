@@ -3,15 +3,15 @@
 
 use std::env;
 
-use p4kx_export::catalog_queries::equipment::planet_audio::{self, ProceduralPlanetAudioSnapshot};
+use p4kx_export::catalog_queries::equipment::planet_audio::ProceduralPlanetAudioSnapshot;
 use p4kx_export::catalog_queries::planet_resources::{self, PlanetResourceSelection};
 use p4kx_export::catalog_queries::soils::{self, LooseDefinitionSelection};
 use p4kx_export::catalog_queries::starmap::{
-    self, StarmapDefinitionFamily, StarmapDefinitionRows, StarmapDefinitionSelection,
+    StarmapDefinitionFamily, StarmapDefinitionRows, StarmapDefinitionSelection,
     StarmapDefinitionSnapshot,
 };
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
+    CatalogLanguageSelection, CatalogRecordSelection, ProvenanceMode,
 };
 use p4kx_extraction::Archive;
 
@@ -108,22 +108,24 @@ fn read_cold(archive: &Archive, family: Family, proof: &mut Proof<'_>) -> TestRe
         Family::Soils | Family::SoilTextureSets => read_soil(archive, family, proof),
         Family::PlanetResources => proof.loose(
             family,
-            &planet_resources::read_planet_resources(archive, PlanetResourceSelection::All, None)?,
+            &planet_resources::read_planet_resources_with_provenance_mode(
+                archive,
+                PlanetResourceSelection::All,
+                ProvenanceMode::Full,
+                None,
+            )?,
             |row| row.identity().entry_index(),
         ),
-        Family::ProceduralPlanetAudio => planet_audio::with_procedural_planet_audio(
-            archive,
-            CatalogRecordSelection::All,
-            None,
-            |snapshot| observe_audio(&snapshot, proof),
-        )?,
-        _ => starmap::with_starmap_definitions(
-            archive,
-            family.starmap_selection()?,
-            CatalogLanguageSelection::AllAvailable,
-            None,
-            |snapshot| observe_starmap(family, &snapshot, proof),
-        )?,
+        Family::ProceduralPlanetAudio => {
+            equipment_input::full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?
+                .with_procedural_planet_audio(CatalogRecordSelection::All, None, |snapshot| {
+                    observe_audio(&snapshot, proof)
+                })?
+        }
+        _ => equipment_input::full_source_session(archive, CatalogLanguageSelection::AllAvailable)?
+            .with_starmap_definitions(family.starmap_selection()?, None, |snapshot| {
+                observe_starmap(family, &snapshot, proof)
+            })?,
     }
 }
 
@@ -148,7 +150,8 @@ fn installed_world_definitions_match_one_complete_catalog() -> TestResult {
 fn retain(archive: &Archive, proof: &mut Proof<'_>) -> TestResult {
     read_soil(archive, Family::Soils, proof)?;
     read_soil(archive, Family::SoilTextureSets, proof)?;
-    let session = CatalogQuerySession::open(archive, CatalogLanguageSelection::AllAvailable, None)?;
+    let session =
+        equipment_input::full_source_session(archive, CatalogLanguageSelection::AllAvailable)?;
     let parsed = session.parsed(None)?;
     let resources = parsed.read_planet_resources(PlanetResourceSelection::All, None)?;
     proof.loose(Family::PlanetResources, &resources, |row| {
@@ -169,12 +172,22 @@ fn read_soil(archive: &Archive, family: Family, proof: &mut Proof<'_>) -> TestRe
     match family {
         Family::Soils => proof.loose(
             family,
-            &soils::read_soils(archive, LooseDefinitionSelection::All, None)?,
+            &soils::read_soils_with_provenance_mode(
+                archive,
+                LooseDefinitionSelection::All,
+                ProvenanceMode::Full,
+                None,
+            )?,
             |row| row.identity.entry_index(),
         ),
         Family::SoilTextureSets => proof.loose(
             family,
-            &soils::read_soil_texture_sets(archive, LooseDefinitionSelection::All, None)?,
+            &soils::read_soil_texture_sets_with_provenance_mode(
+                archive,
+                LooseDefinitionSelection::All,
+                ProvenanceMode::Full,
+                None,
+            )?,
             |row| row.identity.entry_index(),
         ),
         _ => Err("expected one Archive soil definition family".into()),

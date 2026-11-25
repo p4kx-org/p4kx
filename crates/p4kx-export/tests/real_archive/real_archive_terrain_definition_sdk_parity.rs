@@ -5,8 +5,8 @@ use std::env;
 
 use p4kx_export::catalog_queries::terrain::LooseDefinitionSelection;
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, DatasetAvailability, LooseDefinitionSnapshot,
-    ParsedCatalogQueries, climate, creatures, terrain,
+    CatalogLanguageSelection, DatasetAvailability, LooseDefinitionSnapshot, ParsedCatalogQueries,
+    ProvenanceMode, climate, creatures, terrain,
 };
 use p4kx_extraction::Archive;
 use serde::Serialize;
@@ -71,10 +71,9 @@ fn installed_terrain_definitions_match_one_complete_catalog() -> TestResult {
             let mut tables = Vec::with_capacity(TABLE_COUNT);
             retain_tables(archive, None, ARCHIVE_ONLY, &mut origins, &mut tables)?;
             {
-                let session = CatalogQuerySession::open(
+                let session = equipment_input::full_source_session(
                     archive,
                     CatalogLanguageSelection::Selected(&[]),
-                    None,
                 )?;
                 let parsed = session.parsed(None)?;
                 retain_tables(
@@ -143,49 +142,54 @@ fn read_family(
     evidence: Evidence<'_>,
 ) -> TestResult<Option<Table>> {
     let all = LooseDefinitionSelection::All;
+    let mode = ProvenanceMode::Full;
     match family {
         Family::Ecosystems => observe(
             archive,
             family,
-            &terrain::read_ecosystems(archive, all, None)?,
+            &terrain::read_ecosystems_with_provenance_mode(archive, all, mode, None)?,
             evidence,
         ),
         Family::ShadingClasses => observe(
             archive,
             family,
-            &terrain::read_shading_classes(archive, all, None)?,
+            &terrain::read_shading_classes_with_provenance_mode(archive, all, mode, None)?,
             evidence,
         ),
         Family::GeologySets => observe(
             archive,
             family,
-            &terrain::read_geology_sets(archive, all, None)?,
+            &terrain::read_geology_sets_with_provenance_mode(archive, all, mode, None)?,
             evidence,
         ),
         Family::GeologyTextureSets => observe(
             archive,
             family,
-            &terrain::read_geology_texture_sets(archive, all, None)?,
+            &terrain::read_geology_texture_sets_with_provenance_mode(archive, all, mode, None)?,
             evidence,
         ),
         Family::GeologyAssets => {
             let sdk = match parsed {
                 Some(queries) => queries.read_geology_assets(all, None)?,
-                None => terrain::read_geology_assets(archive, all, None)?,
+                None => {
+                    terrain::read_geology_assets_with_provenance_mode(archive, all, mode, None)?
+                }
             };
             observe(archive, family, &sdk, evidence)
         }
         Family::Creatures => {
             let sdk = match parsed {
                 Some(queries) => queries.read_creatures(all, None)?,
-                None => creatures::read_creatures(archive, all, None)?,
+                None => creatures::read_creatures_with_provenance_mode(archive, all, mode, None)?,
             };
             observe(archive, family, &sdk, evidence)
         }
         Family::ClimateAssets => {
             let sdk = match parsed {
                 Some(queries) => queries.read_climate_assets(all, None)?,
-                None => climate::read_climate_assets(archive, all, None)?,
+                None => {
+                    climate::read_climate_assets_with_provenance_mode(archive, all, mode, None)?
+                }
             };
             observe(archive, family, &sdk, evidence)
         }

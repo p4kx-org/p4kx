@@ -5,10 +5,11 @@ use std::env;
 use std::io;
 
 use p4kx_export::CatalogError;
+use p4kx_export::catalog_queries::ProvenanceMode;
 use p4kx_export::catalog_queries::starmap::{
     ContainerInstanceKey, ContainerPlacementEvent, ContainerPlacementRootVisit,
     ContainerPlacementRowCounts, ContainerPlacementVisitSummary, ContainerTargetReadStatus,
-    ContainerTargetStatus, DatasetAvailability, visit_container_placements,
+    ContainerTargetStatus, DatasetAvailability, visit_container_placements_with_provenance_mode,
 };
 use p4kx_extraction::{Archive, SourcedValue};
 
@@ -54,12 +55,17 @@ fn read_all(
     mut inspect: impl FnMut(&ContainerPlacementEvent<'_>) -> TestResult,
 ) -> TestResult<ContainerPlacementVisitSummary> {
     let mut observed = Census::default();
-    let summary = visit_container_placements(archive, None, |event| {
-        observed
-            .inspect(&event)
-            .and_then(|()| inspect(&event))
-            .map_err(|error| CatalogError::Write(io::Error::other(error.to_string())))
-    })?;
+    let summary = visit_container_placements_with_provenance_mode(
+        archive,
+        ProvenanceMode::Full,
+        None,
+        |event| {
+            observed
+                .inspect(&event)
+                .and_then(|()| inspect(&event))
+                .map_err(|error| CatalogError::Write(io::Error::other(error.to_string())))
+        },
+    )?;
     observed.finish(archive, &summary)?;
     print_line(&format!(
         "container placement SDK: availability={:?} roots={} instances={} unresolvedLinks={} descriptorReadOccurrences={} largestRootDescriptors={} verifiedMissing={} sourceUseOccurrences={} physicalSourceOccurrences={}",

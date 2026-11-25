@@ -5,8 +5,8 @@ use std::collections::HashSet;
 use std::env;
 
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
-    CatalogRecordSource, DatasetAvailability, ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogRecordCoverage, CatalogRecordSelection, CatalogRecordSource,
+    DatasetAvailability, ParsedCatalogQueries,
 };
 use p4kx_extraction::{Archive, Build, Guid, SourceInventory, SourcedValue};
 use serde::Serialize;
@@ -211,10 +211,9 @@ fn installed_crafting_metadata_matches_one_complete_catalog() -> TestResult {
         |archive, measurement| {
             let mut origins = Origins::default();
             let tables = {
-                let session = CatalogQuerySession::open(
+                let session = equipment_input::full_source_session(
                     archive,
                     CatalogLanguageSelection::Selected(&[]),
-                    None,
                 )?;
                 let parsed = session.parsed(None)?;
                 let mut capture = |family: Family| -> TestResult<Table> {
@@ -252,7 +251,7 @@ fn installed_crafting_metadata_cold_query() -> TestResult {
         .ok_or("configure one exact crafting metadata dataset path")?;
     equipment_input::with_archive(|archive| {
         let session =
-            CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+            equipment_input::full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
         let parsed = session.parsed(None)?;
         let _ = family.query(archive, &parsed, None)?;
         Ok(())

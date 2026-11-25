@@ -8,8 +8,8 @@ use p4kx_export::catalog_queries::loot::{
     LegacyLootSnapshot, LootDefinitionKind, LootDefinitionSnapshot,
 };
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
-    DatasetAvailability, ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogRecordCoverage, CatalogRecordSelection, DatasetAvailability,
+    ParsedCatalogQueries,
 };
 use p4kx_extraction::{Archive, Build, FieldPath, SourceInventory};
 use serde::Serialize;
@@ -47,8 +47,10 @@ fn installed_loot_harvest_matches_one_complete_catalog() -> TestResult {
             retained: Some(LootHarvestDigests::new(directory.path())),
         };
         {
-            let session =
-                CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+            let session = equipment_input::full_source_session(
+                archive,
+                CatalogLanguageSelection::Selected(&[]),
+            )?;
             let parsed = session.parsed(None)?;
             for dataset in RETAINED_QUERIES {
                 observe(&parsed, dataset, &mut proof)?;
@@ -78,7 +80,7 @@ fn installed_loot_harvest_cold_query() -> TestResult {
     let expected = Census::read()?;
     equipment_input::with_archive(|archive| {
         let session =
-            CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+            equipment_input::full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
         let parsed = session.parsed(None)?;
         let mut proof = Proof {
             archive,

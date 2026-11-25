@@ -3,10 +3,11 @@
 
 use std::io::Read;
 
-use p4kx_export::catalog_queries::CatalogLanguageSelection;
 use p4kx_export::catalog_queries::localization::{
-    CatalogLanguageSource, LanguageSourcesSnapshot, SourceIniEncoding, with_language_sources,
+    CatalogLanguageSource, LanguageSourcesSnapshot, SourceIniEncoding,
+    with_language_sources_with_provenance_mode,
 };
+use p4kx_export::catalog_queries::{CatalogLanguageSelection, ProvenanceMode};
 use p4kx_extraction::{
     Archive, ArchiveWatch, Entry, FieldOrigin, IniEncoding, IniText, InputScope, Language,
     PhysicalSourceKind, SourceEncryption, SourceInventory, SourceLocation, SourceUseRole,
@@ -29,9 +30,10 @@ fn language_source_sdk_matches_original_archive_entries() -> TestResult {
         let archive = Archive::open_with_key(path, Some(key.clone()))
             .map_err(|_| "open installed localization Archive")?;
         let watch = ArchiveWatch::new(&archive);
-        let (present, absent) = with_language_sources(
+        let (present, absent) = with_language_sources_with_provenance_mode(
             &archive,
             CatalogLanguageSelection::AllAvailable,
+            ProvenanceMode::Full,
             None,
             |result| verify(&archive, &result),
         )??;

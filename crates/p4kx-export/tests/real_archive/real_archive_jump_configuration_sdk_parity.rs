@@ -6,8 +6,7 @@ use std::env;
 use p4kx_export::catalog_queries::equipment::EquipmentSnapshot;
 use p4kx_export::catalog_queries::equipment::component_definitions::ComponentDefinitionSnapshot;
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability, ParsedCatalogQueries,
 };
 use p4kx_extraction::Archive;
 use serde::Serialize;
@@ -84,8 +83,10 @@ fn installed_jump_configurations_match_one_complete_catalog() -> TestResult {
     real_archive_catalog_table_parity::with_bound_measurement_from_producer(
         &revision,
         |archive, measurement| {
-            let session =
-                CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+            let session = equipment_input::full_source_session(
+                archive,
+                CatalogLanguageSelection::Selected(&[]),
+            )?;
             let parsed = session.parsed(None)?;
             let mut origins = Origins::default();
             let mut tables = Vec::with_capacity(FAMILIES.len());
@@ -119,7 +120,7 @@ fn installed_jump_configuration_cold_query() -> TestResult {
         .ok_or("expected one exact Jump configuration dataset path")?;
     equipment_input::with_archive(|archive| {
         let session =
-            CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+            equipment_input::full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
         let parsed = session.parsed(None)?;
         read_family(archive, &parsed, family, Evidence::Cold)?;
         Ok(())

@@ -6,7 +6,7 @@ use std::env;
 use p4kx_export::catalog_queries::commodities::CommoditySnapshot;
 use p4kx_export::catalog_queries::quality::QualityDefinitionSnapshot;
 use p4kx_export::catalog_queries::{
-    CanonicalRecordHeader, CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
+    CanonicalRecordHeader, CatalogLanguageSelection, CatalogRecordSelection,
     GameplayPropertySnapshot, ManufacturerSnapshot, ParsedCatalogQueries,
 };
 use serde::Serialize;
@@ -89,7 +89,7 @@ fn installed_economy_definitions_cold_query() -> TestResult {
         .ok_or("configure one exact economy dataset path")?;
     let expected = Census::parse(&env::var(EXPECTED)?)?;
     equipment_input::with_archive(|archive| {
-        let session = CatalogQuerySession::open(archive, family.languages(), None)?;
+        let session = equipment_input::full_source_session(archive, family.languages())?;
         let parsed = session.parsed(None)?;
         let mut evidence = Evidence::cold(archive, expected);
         observe(&parsed, family, &mut evidence)
@@ -105,8 +105,10 @@ fn installed_economy_definitions_match_one_complete_catalog() -> TestResult {
         let directory = tempfile::tempdir()?;
         let mut evidence = Evidence::retained(archive, expected, directory.path());
         {
-            let session =
-                CatalogQuerySession::open(archive, CatalogLanguageSelection::AllAvailable, None)?;
+            let session = equipment_input::full_source_session(
+                archive,
+                CatalogLanguageSelection::AllAvailable,
+            )?;
             let parsed = session.parsed(None)?;
             for family in QUERIES {
                 observe(&parsed, family, &mut evidence)?;

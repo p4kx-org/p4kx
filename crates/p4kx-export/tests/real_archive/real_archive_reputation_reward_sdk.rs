@@ -6,8 +6,7 @@ use std::cmp::Ordering;
 
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    ReputationRewardAmountDefinition, ReputationRewardAmountSnapshot,
-    with_reputation_reward_amounts,
+    ProvenanceMode, ReputationRewardAmountDefinition, ReputationRewardAmountSnapshot,
 };
 use p4kx_extraction::{
     Archive, ArchiveWatch, DataForge, DataForgeEntry, DataForgeOrigin, FieldOrigin, InputScope,
@@ -19,6 +18,7 @@ use crate::real_archive_catalog_table_parity::{
     Origins, Table, TestResult, capture_rows, first_difference, verify_tables,
 };
 use crate::real_archive_reputation_sandbox;
+use crate::real_archive_scoped_equipment_sdk::equipment_input;
 use crate::real_archive_verification::print_line;
 
 const TABLE: &str = "/definitions/reputationRewardAmounts";
@@ -44,7 +44,8 @@ fn installed_reputation_reward_sdk_matches_original_signed_records() -> TestResu
         &entry,
         CatalogLanguageSelection::Selected(&[]),
         None,
-    )?;
+    )?
+    .with_provenance_mode(ProvenanceMode::Full);
     let parsed = queries.parsed(None)?;
     let counts =
         parsed.with_reputation_reward_amounts(CatalogRecordSelection::All, None, |sdk| {
@@ -93,7 +94,9 @@ fn installed_reputation_reward_sdk_matches_the_same_complete_catalog() -> TestRe
 fn capture_sdk(archive: &Archive, origins: &mut Origins) -> TestResult<[Table; 1]> {
     verify_build(archive)?;
     let expected = expected_counts()?;
-    with_reputation_reward_amounts(archive, CatalogRecordSelection::All, None, |sdk| {
+    let session =
+        equipment_input::full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
+    session.with_reputation_reward_amounts(CatalogRecordSelection::All, None, |sdk| {
         verify_snapshot(archive, &sdk)?;
         let mut counts = Signed::default();
         for row in &sdk.rows {

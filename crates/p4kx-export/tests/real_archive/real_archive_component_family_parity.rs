@@ -6,8 +6,7 @@ use std::env;
 
 use p4kx_export::catalog_queries::equipment::{ComponentOwner, EquipmentSnapshot};
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, DatasetAvailability,
-    ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogRecordCoverage, DatasetAvailability, ParsedCatalogQueries,
 };
 use p4kx_extraction::{Archive, Build, SourceInventory, SourcedValue};
 use serde::Serialize;
@@ -66,7 +65,7 @@ pub(super) fn verify_cold<F: PhysicalComponentFamily, const N: usize>(
         .ok_or_else(|| format!("expected one exact {} dataset path", F::DOMAIN))?;
     equipment_input::with_archive(|archive| {
         let session =
-            CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+            equipment_input::full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
         let parsed = session.parsed(None)?;
         let witness = QueryWitness {
             archive,
@@ -95,7 +94,7 @@ fn retained_inputs<F: PhysicalComponentFamily, const N: usize>(
     families: [F; N],
 ) -> TestResult<RetainedInputs<N>> {
     let session =
-        CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+        equipment_input::full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
     let parsed = session.parsed(None)?;
     let mut tables = families.map(|_| DigestedTable::default());
     let mut availability = [DatasetAvailability::Unavailable; N];

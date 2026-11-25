@@ -6,11 +6,10 @@ use std::env;
 
 use p4kx_export::catalog_queries::equipment::{
     AmmoBinding, AmmoContainer, WeaponActions, WeaponSourceSnapshot, WeaponSourceVisitSummary,
-    visit_weapon_sources,
 };
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
-    DatasetAvailability, ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogRecordCoverage, CatalogRecordSelection, DatasetAvailability,
+    ParsedCatalogQueries,
 };
 use p4kx_extraction::{Archive, SourcedValue};
 
@@ -95,8 +94,9 @@ fn installed_weapon_source_visit_cold() -> TestResult {
         let mut scan = DirectScan::default();
         let mut source_use_occurrences = 0;
         let mut physical_source_occurrences = 0;
-        let summary = visit_weapon_sources(
-            archive,
+        let session =
+            equipment_input::full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
+        let summary = session.visit_weapon_sources(
             CatalogRecordSelection::All,
             None,
             |_, snapshot| -> TestResult {
@@ -121,7 +121,7 @@ fn installed_weapon_source_visit_cold() -> TestResult {
 
 fn expected_tables(archive: &Archive) -> TestResult<ExpectedTables> {
     let session =
-        CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+        equipment_input::full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
     let parsed = session.parsed(None)?;
     let mut expected = ExpectedTables::default();
     let mut scan = DirectScan::default();

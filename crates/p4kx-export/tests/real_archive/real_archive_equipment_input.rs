@@ -5,10 +5,20 @@ use std::collections::BTreeSet;
 use std::env;
 
 use p4kx_assembly::ENTITY_TYPE;
+use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogQuerySession, ProvenanceMode};
 use p4kx_extraction::{Archive, ArchiveWatch, DataForge, DataForgeEntry, Filter};
 use p4kx_testkit::{real_archive_key, real_archive_path};
 
 use crate::real_archive_catalog_table_parity::TestResult;
+
+/// Opens a session for Archive tests that verify original source evidence.
+pub(crate) fn full_source_session<'archive>(
+    archive: &'archive Archive,
+    languages: CatalogLanguageSelection<'_>,
+) -> TestResult<CatalogQuerySession<'archive>> {
+    Ok(CatalogQuerySession::open(archive, languages, None)?
+        .with_provenance_mode(ProvenanceMode::Full))
+}
 
 pub(crate) fn with_archive(check: impl FnOnce(&Archive) -> TestResult) -> TestResult {
     let path = real_archive_path().map_err(|_| "configure the installed Archive path")?;

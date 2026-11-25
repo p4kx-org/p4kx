@@ -8,8 +8,7 @@ use p4kx_export::catalog_queries::mission_definitions::owner_visit::{
     MissionOwnerDefinitionRow, MissionOwnerDefinitionSelection, MissionOwnerDefinitionSnapshot,
 };
 use p4kx_export::catalog_queries::{
-    CanonicalRecordHeader, CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
-    DatasetAvailability,
+    CanonicalRecordHeader, CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability,
 };
 use p4kx_extraction::{Archive, SourceInventory};
 use serde::Serialize;
@@ -91,7 +90,7 @@ fn visit_definitions(
     mut inspect: impl FnMut(Value, &SourceInventory) -> TestResult,
 ) -> TestResult<(DatasetAvailability, OwnerObservations)> {
     let session =
-        CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+        equipment_input::full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
     let records = CatalogRecordSelection::All;
     let selection = match family {
         Family::Templates => MissionOwnerDefinitionSelection::ContractTemplates(records),

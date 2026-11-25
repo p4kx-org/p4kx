@@ -10,8 +10,8 @@ use p4kx_export::catalog_queries::mission_definitions::{
     MissionScenarioDefinition,
 };
 use p4kx_export::catalog_queries::{
-    CanonicalRecordHeader, CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
-    DatasetAvailability, ParsedCatalogQueries,
+    CanonicalRecordHeader, CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability,
+    ParsedCatalogQueries,
 };
 use p4kx_extraction::Archive;
 use serde::Serialize;
@@ -258,10 +258,9 @@ fn installed_mission_definitions_match_one_complete_catalog() -> TestResult {
         |archive, measurement| {
             let mut origins = Origins::default();
             let tables = {
-                let session = CatalogQuerySession::open(
+                let session = equipment_input::full_source_session(
                     archive,
                     CatalogLanguageSelection::AllAvailable,
-                    None,
                 )?;
                 let parsed = session.parsed(None)?;
                 let [scenarios, modules, items] = FAMILIES;
@@ -298,7 +297,7 @@ fn installed_mission_definition_cold_query() -> TestResult {
         .ok_or("configure one exact mission definition dataset path")?;
     equipment_input::with_archive(|archive| {
         let session =
-            CatalogQuerySession::open(archive, CatalogLanguageSelection::AllAvailable, None)?;
+            equipment_input::full_source_session(archive, CatalogLanguageSelection::AllAvailable)?;
         let parsed = session.parsed(None)?;
         let _ = family.query(archive, &parsed, None)?;
         Ok(())

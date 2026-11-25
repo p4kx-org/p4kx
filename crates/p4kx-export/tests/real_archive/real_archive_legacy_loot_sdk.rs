@@ -6,7 +6,7 @@ use std::time::UNIX_EPOCH;
 use p4kx_export::catalog_queries::loot::LegacyLootSnapshot;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    ParsedCatalogQueries,
+    ParsedCatalogQueries, ProvenanceMode,
 };
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog_from};
 use p4kx_extraction::{Archive, ArchiveWatch, DataForgeEntry, Filter};
@@ -50,7 +50,8 @@ fn installed_legacy_loot_sdk_matches_each_physical_producer_row() -> TestResult 
         &entry,
         CatalogLanguageSelection::Selected(&[]),
         None,
-    )?;
+    )?
+    .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session.parsed(None)?;
     let results = [Family::Table, Family::Archetype].map(|family| {
         let sample = source::select(&forge, &watch, family)?;

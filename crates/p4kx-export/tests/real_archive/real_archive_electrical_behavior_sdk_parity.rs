@@ -3,9 +3,9 @@
 
 use std::env;
 
-use p4kx_export::catalog_queries::weather::{self, ElectricalBehaviorSnapshot};
+use p4kx_export::catalog_queries::weather::ElectricalBehaviorSnapshot;
 use p4kx_export::catalog_queries::{
-    CatalogRecordCoverage, CatalogRecordSelection, DatasetAvailability,
+    CatalogLanguageSelection, CatalogRecordCoverage, CatalogRecordSelection, DatasetAvailability,
 };
 use p4kx_extraction::Archive;
 use serde_json::Value;
@@ -73,7 +73,9 @@ fn read_all<T>(
     archive: &Archive,
     inspect: impl FnOnce(&ElectricalBehaviorSnapshot<'_>) -> TestResult<T>,
 ) -> TestResult<T> {
-    weather::with_electrical_behaviors(archive, CatalogRecordSelection::All, None, |snapshot| {
+    let session =
+        equipment_input::full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
+    session.with_electrical_behaviors(CatalogRecordSelection::All, None, |snapshot| {
         if snapshot.build().is_none() || snapshot.build() != archive.build() {
             return Err("the weather query must report the matching installed Build".into());
         }

@@ -136,9 +136,9 @@ mod tests {
         );
         assert!(
             lines.iter().any(|line| line.ends_with(
-                "kind=shopInventories role=DerivedInput operation=ShopInventory code=SourceReadFailure stage=SourceRead entry_status=Present count=1"
+                "kind=shopInventories role=DerivedInput operation=ShopInventory code=ArchiveKeyRequired stage=SourceRead entry_status=Present count=1"
             )),
-            "unreadable payloads retain their physically present Entry status"
+            "key-required payloads retain their physically present Entry status"
         );
         assert!(
             lines.iter().any(|line| line.ends_with(

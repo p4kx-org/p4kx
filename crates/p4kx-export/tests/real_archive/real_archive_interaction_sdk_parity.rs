@@ -4,7 +4,7 @@
 use std::env;
 
 use p4kx_export::catalog_queries::equipment::interactions::{
-    InteractionSnapshot, InteractionVisitSummary, visit_interactions,
+    InteractionSnapshot, InteractionVisitSummary,
 };
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogRecordCoverage, CatalogRecordSelection, DatasetAvailability,
@@ -68,10 +68,10 @@ fn read_all(
     mut inspect: impl FnMut(&InteractionSnapshot<'_>) -> TestResult,
 ) -> TestResult<InteractionVisitSummary> {
     let mut observed = VisitCensus::default();
-    let summary = visit_interactions(
-        archive,
+    let session =
+        equipment_input::full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
+    let summary = session.visit_interactions(
         CatalogRecordSelection::All,
-        CatalogLanguageSelection::Selected(&[]),
         None,
         |index, snapshot| -> TestResult {
             observed.inspect(archive, index, snapshot)?;

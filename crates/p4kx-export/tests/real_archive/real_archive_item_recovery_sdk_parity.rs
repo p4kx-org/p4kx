@@ -3,7 +3,7 @@
 
 use std::env;
 
-use p4kx_export::catalog_queries::item_recovery::{ItemRecoverySnapshot, with_item_recovery};
+use p4kx_export::catalog_queries::item_recovery::ItemRecoverySnapshot;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability,
 };
@@ -41,10 +41,10 @@ fn installed_item_recovery_cold_query() -> TestResult {
 }
 
 fn read(archive: &Archive, measurement: Option<&BoundMeasurement>) -> TestResult {
-    with_item_recovery(
-        archive,
+    let session =
+        equipment_input::full_source_session(archive, CatalogLanguageSelection::AllAvailable)?;
+    session.with_item_recovery(
         CatalogRecordSelection::All,
-        CatalogLanguageSelection::AllAvailable,
         None,
         |snapshot| {
             let count = validate(archive, &snapshot)?;

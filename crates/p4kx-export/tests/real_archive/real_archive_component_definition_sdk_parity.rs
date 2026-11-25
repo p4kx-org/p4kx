@@ -8,8 +8,8 @@ use p4kx_export::catalog_queries::equipment::component_definitions::{
     ComponentDefinitionSnapshot, ConsumableSubtype,
 };
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    GameTextRef, ParsedCatalogQueries, PublicNameRef,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability, GameTextRef,
+    ParsedCatalogQueries, PublicNameRef,
 };
 use p4kx_extraction::Archive;
 use serde::Serialize;
@@ -85,7 +85,7 @@ fn installed_component_definition_cold_query() -> TestResult {
         CatalogLanguageSelection::Selected(&[])
     };
     equipment_input::with_archive(|archive| {
-        let session = CatalogQuerySession::open(archive, languages, None)?;
+        let session = equipment_input::full_source_session(archive, languages)?;
         read_family(archive, &session.parsed(None)?, family, None)
     })
 }
@@ -98,8 +98,10 @@ fn installed_component_definitions_match_one_complete_catalog() -> TestResult {
         let scratch = tempfile::tempdir()?;
         let mut proof = StreamedDefinitionDigests::new(scratch.path(), FAMILIES.map(Family::owner));
         {
-            let session =
-                CatalogQuerySession::open(archive, CatalogLanguageSelection::AllAvailable, None)?;
+            let session = equipment_input::full_source_session(
+                archive,
+                CatalogLanguageSelection::AllAvailable,
+            )?;
             let parsed = session.parsed(None)?;
             for (table, family) in FAMILIES.into_iter().enumerate() {
                 read_family(

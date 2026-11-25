@@ -3,8 +3,10 @@
 
 use std::{env, slice};
 
-use p4kx_export::catalog_queries::equipment::{self, LoadoutOwnerSnapshot};
-use p4kx_export::catalog_queries::{CatalogRecordSelection, DatasetAvailability};
+use p4kx_export::catalog_queries::equipment::LoadoutOwnerSnapshot;
+use p4kx_export::catalog_queries::{
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability,
+};
 use p4kx_extraction::{Archive, Guid};
 use serde_json::Value;
 
@@ -147,7 +149,9 @@ fn visit(
     let mut observed = Census::default();
     let mut previous = None;
     let mut reported_issue_owners = Vec::new();
-    let summary = equipment::visit_loadouts(archive, selection, None, |snapshot| -> TestResult {
+    let session =
+        equipment_input::full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
+    let summary = session.visit_loadouts(selection, None, |snapshot| -> TestResult {
         let position = (snapshot.entity_guid.to_string(), snapshot.record_index);
         if previous.as_ref().is_some_and(|last| last >= &position) {
             return Err("Loadout owners are duplicated or outside canonical GUID order".into());

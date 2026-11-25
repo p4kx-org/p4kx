@@ -127,8 +127,10 @@ fn installed_reputation_and_factions_match_one_complete_catalog() -> TestResult 
     with_bound_measurement_from_producer(&producer, |archive, measurement| {
         let mut proof = Proof::retained(archive, expected);
         {
-            let session =
-                CatalogQuerySession::open(archive, CatalogLanguageSelection::AllAvailable, None)?;
+            let session = equipment_input::full_source_session(
+                archive,
+                CatalogLanguageSelection::AllAvailable,
+            )?;
             let parsed = session.parsed(None)?;
             reputation(&parsed, ReputationSelection::all(), &mut proof)?;
             for family in SUPPLEMENTARY {

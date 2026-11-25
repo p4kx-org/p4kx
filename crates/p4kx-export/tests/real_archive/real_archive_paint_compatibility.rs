@@ -4,7 +4,7 @@
 use p4kx_export::catalog_queries::equipment::paints::{
     PaintCompatibilitySnapshot, PaintCompatibilityStatus, PaintSelection,
 };
-use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogQuerySession};
+use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogQuerySession, ProvenanceMode};
 use p4kx_extraction::{
     DataForge, DataForgeEntry, DataForgeOrigin, FieldOrigin, Guid, InputScope, PhysicalSourceKind,
     SourceInventory,
@@ -30,7 +30,8 @@ fn installed_paint_compatibility_keeps_original_record_evidence() -> TestResult 
             CatalogLanguageSelection::Selected(&[]),
             None,
         )
-        .map_err(|_| "open the original Paint query session")?;
+        .map_err(|_| "open the original Paint query session")?
+        .with_provenance_mode(ProvenanceMode::Full);
         let snapshot = session
             .read_paint_compatibility(PaintSelection::RecordIndex(original.paint_index), None)
             .map_err(|_| "read the selected original Paint compatibility")?;

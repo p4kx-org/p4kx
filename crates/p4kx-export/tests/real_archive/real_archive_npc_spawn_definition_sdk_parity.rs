@@ -6,8 +6,8 @@ use std::env;
 
 use p4kx_export::catalog_queries::npc_spawns::{NpcSpawnDefinitionFamily, NpcSpawnDefinitionRows};
 use p4kx_export::catalog_queries::{
-    CanonicalRecordHeader, CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage,
-    CatalogRecordSelection, DatasetAvailability, ParsedCatalogQueries,
+    CanonicalRecordHeader, CatalogLanguageSelection, CatalogRecordCoverage, CatalogRecordSelection,
+    DatasetAvailability, ParsedCatalogQueries,
 };
 use p4kx_extraction::{Archive, SourceInventory};
 use serde::Serialize;
@@ -68,7 +68,7 @@ fn installed_npc_spawn_definitions_match_one_complete_catalog() -> TestResult {
 
 fn retained_inputs(archive: &Archive) -> TestResult<([Table; FAMILIES.len()], Origins)> {
     let session =
-        CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+        equipment_input::full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
     let parsed = session.parsed(None)?;
     let mut origins = Origins::default();
     let mut tables = Vec::with_capacity(FAMILIES.len());
@@ -94,7 +94,7 @@ fn installed_npc_spawn_definition_cold_query() -> TestResult {
         .ok_or("expected one exact NPC spawn definition dataset path")?;
     equipment_input::with_archive(|archive| {
         let session =
-            CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+            equipment_input::full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
         let parsed = session.parsed(None)?;
         let _ = read_family(archive, &parsed, family, None)?;
         Ok(())

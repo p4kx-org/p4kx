@@ -5,8 +5,8 @@ use std::env;
 
 use p4kx_export::catalog_queries::tags::{TagDeclarationFamily, TagDeclarationRows};
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
-    DatasetAvailability, ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogRecordCoverage, CatalogRecordSelection, DatasetAvailability,
+    ParsedCatalogQueries,
 };
 use p4kx_extraction::{Archive, Build, SourceInventory};
 use serde::Serialize;
@@ -38,7 +38,7 @@ fn installed_tag_cold_query() -> TestResult {
         .ok_or("expected one canonical tag dataset path")?;
     equipment_input::with_archive(|archive| {
         let session =
-            CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+            equipment_input::full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
         scope.read(archive, &session.parsed(None)?, None)
     })
 }
@@ -56,10 +56,9 @@ fn installed_tags_match_one_complete_catalog() -> TestResult {
                 [DefinitionOwner::Record; SCOPES.len()],
             );
             {
-                let session = CatalogQuerySession::open(
+                let session = equipment_input::full_source_session(
                     archive,
                     CatalogLanguageSelection::Selected(&[]),
-                    None,
                 )?;
                 let parsed = session.parsed(None)?;
                 for scope in SCOPES {

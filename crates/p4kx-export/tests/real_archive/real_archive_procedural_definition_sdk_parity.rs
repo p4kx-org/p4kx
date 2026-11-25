@@ -5,8 +5,7 @@ use std::env;
 
 use p4kx_export::catalog_queries::equipment::EquipmentSnapshot;
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability, ParsedCatalogQueries,
 };
 use p4kx_extraction::Archive;
 use serde::Serialize;
@@ -62,7 +61,7 @@ fn installed_procedural_definitions_cold_query() -> TestResult {
         .ok_or("configure one exact Actor or Weapon Procedural definition dataset path")?;
     equipment_input::with_archive(|archive| {
         let session =
-            CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+            equipment_input::full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
         let parsed = session.parsed(None)?;
         read_family(archive, &parsed, family, None)
     })
@@ -77,8 +76,10 @@ fn installed_procedural_definitions_match_one_complete_catalog() -> TestResult {
         let mut proof =
             StreamedDefinitionDigests::new(scratch.path(), [DefinitionOwner::NestedRecord; COUNT]);
         {
-            let session =
-                CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+            let session = equipment_input::full_source_session(
+                archive,
+                CatalogLanguageSelection::Selected(&[]),
+            )?;
             let parsed = session.parsed(None)?;
             for (table, family) in FAMILIES.into_iter().enumerate() {
                 read_family(
