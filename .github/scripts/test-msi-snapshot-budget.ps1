@@ -7,8 +7,9 @@ $root=[IO.Path]::GetFullPath($Directory)
 $scripts=Join-Path $root 'source/.github/scripts'
 New-Item -ItemType Directory -Path $scripts | Out-Null
 New-Item -ItemType Directory -Path (Join-Path $root 'source/.config') | Out-Null
-$names=@(Get-P4kxMsiObserverSources | ForEach-Object name)
-foreach ($name in $names) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $scripts $name) }
+$predicateName='msi-observer-finish-predicate.ps1'
+$names=@(Get-P4kxMsiObserverSources | ForEach-Object name) + $predicateName
+foreach ($name in ($names | Select-Object -Unique)) { Copy-Item -LiteralPath (Join-Path $PSScriptRoot $name) -Destination (Join-Path $scripts $name) }
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot '../../.config/platforms.json') -Destination (Join-Path $root 'source/.config/platforms.json')
 $processPath=Join-Path $scripts 'msi-observer-process.ps1'
 $text=[IO.File]::ReadAllText($processPath).Replace(([string][char]13+[char]10),[string][char]10)
@@ -154,6 +155,16 @@ try {
     }
     $journal=Read-P4kxMsiPhaseJournal (Join-Path $output 'diagnostics/phase-journal.jsonl')
     Assert-Snapshot ($journal.events -eq 4 -and $journal.active.Count -eq 0 -and $journal.terminal -ceq 'end') 'Original harmless journal did not close after explicit release.'
+    $predicatePath=Join-Path $scripts $predicateName
+    $originalPredicate=[IO.File]::ReadAllBytes($predicatePath)
+    $refusal=$null
+    try {
+        [IO.File]::AppendAllText($predicatePath,[string][char]10)
+        Assert-P4kxMsiObserverBinding $request $observer
+    } catch { $refusal=$_.Exception.Message }
+    finally { [IO.File]::WriteAllBytes($predicatePath,$originalPredicate) }
+    Assert-Snapshot ($refusal -ceq 'MSI observer source bytes or inventory differ.') 'The observer admitted a changed Finish predicate or refused it at the wrong boundary.'
+    Assert-P4kxMsiObserverBinding $request $observer
     @{role='harmless-snapshot-budget-control';blocked_elapsed_ms=$elapsed;only_snapshot_stopped=$true;finish_blocked_elapsed_ms=$finishElapsed;only_finish_stopped=$true;unblocked_capture_returned=$true;
         original_closed_after_release=$true;live_parent_state_begin_before_worker_return=$live.received;live_original_parent_alive=$live.original_alive;completed_success=$false;native_completion_unproven=$true;mutation_authority=$false} | ConvertTo-Json -Compress
 } finally {
