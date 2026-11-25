@@ -2539,6 +2539,23 @@ families. The queries read neither Item bodies nor localization and leave modifi
 bodies unopened when reading a configuration. Check header, body and field
 coverage alongside the family's availability.
 
+One retained LIVE `13220821` process compared all four SDK tables with the same-Build
+Normal Catalog. The Archive identity stayed stable and the retained frame hash
+was verified.
+
+| Catalog definition | LIVE rows compared |
+| --- | ---: |
+| `actorProceduralRecoilConfigs` | 33 |
+| `actorProceduralRecoilModifiers` | 33 |
+| `weaponProceduralAnimations` | 57 |
+| `weaponProceduralClips` | 287 |
+
+The ordered rows matched, including 261,601 reachable uses from one physical
+source. The complete comparison took 3,696.182 seconds and peaked at
+1,091,645,440 bytes of private commit and 1,024,065,536 bytes of working set.
+The verifier revision was `5976b21ebfe85f2c5152b3e0ce3be769ded77d79` and the
+Normal producer revision was `24c08bcbff2299b88eff84bf3f7e8f592760b99b`.
+
 ## Weapon combat bases
 
 Use `equipment::with_weapon_combat_bases`, its decoded-Entry form or the corresponding
