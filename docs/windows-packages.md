@@ -207,6 +207,12 @@ before package evidence and payload publication. The detached observer controls
 exercise the intermediate Finish probes and their watchdog receipts in harmless
 native workers.
 
+On hosted ARM64, a best-effort upload preserves the original phase checkpoints
+and caller results for phases 01 through 03 before the Finish supervisor starts.
+This artifact contains the compact observation metadata. The upload has a
+one-minute limit inside the existing job budget, and release acceptance still
+requires the original terminal result and native runtime checks.
+
 The diagnostic-only `MSI feedback runner-fuse probe` workflow runs native AMD64 and ARM64
 complete/timeout controls through the same phase writer. Its separate verifier downloads the
 actual artifacts and checks the service's failed-step and timeout annotations, source revision,
@@ -358,6 +364,20 @@ supervisor. GitHub marked `WaitFinish` cancelled after 41 seconds, before its
 configured limit. The collection and executed-payload steps were skipped.
 The ordinary logs were unavailable and the cancellation cause is undetermined.
 [AMD64 execution](https://github.com/p4kx-org/p4kx/actions/runs/45611267510/job/139217186742)
+
+Release run `45633605773`, attempt 1, checked merge
+`e59c7410f6411302e8101f180751177dd0d6adfb` for signed PR head `fe054ccf9`.
+Both Windows build jobs completed. AMD64 completed the original Finish,
+collected its lifecycle receipt and published the executed packages.
+[AMD64 execution](https://github.com/p4kx-org/p4kx/actions/runs/45633605773/job/139302848720)
+
+On ARM64, the Build and Finish supervisor start succeeded. At the GitHub API
+response time `2026-11-25T15:55:56Z`, the native job had been active for
+46 minutes 13 seconds and the Finish wait for 43 minutes 20 seconds. Both
+remained in progress after the configured deadlines. The original final
+artifact and job log were unavailable at that observation. The underlying
+cause remains unresolved.
+[ARM64 execution](https://github.com/p4kx-org/p4kx/actions/runs/45633605773/job/139302848822)
 
 For release acceptance, repeat the native lifecycle checks with the actual release candidate
 and bind both its MSI and portable ZIP to the candidate revision and run attempt. Record the
