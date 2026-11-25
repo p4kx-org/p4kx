@@ -350,6 +350,25 @@ passed the software desktop frames and Documents portal grants.
 [AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45530796171/job/138990050234) ·
 [ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45530796171/job/138990050604)
 
+At PR #1117 merge `4d334e716cbc87e27525e8e095410a19103c51f5`,
+both native CPUs validated their target-bound test archive and ran the
+same two per-process Nextest partitions with Rust 1.100.0 and Nextest
+0.9.151. Each CPU passed 6,317 tests on the first partition, 6,273 on
+the second and the additional X11 and 2× Wayland software GUI checks.
+The partitions use synthetic fixtures and run separately from the
+native package consumers.
+[AMD64 CI](https://github.com/p4kx-org/p4kx/actions/runs/45576709391/job/139081257150) ·
+[ARM64 CI](https://github.com/p4kx-org/p4kx/actions/runs/45576709391/job/139081717988)
+
+At that same merge, both package consumers wrote the selected file
+through the writable Flatpak Documents grant. They rejected its
+origin receipt during host identity validation. The replacement
+implementations validate their retained file descriptor before placing
+the receipt. The two native package jobs still need to verify that
+behavior on real Documents grants.
+[AMD64 package evidence](https://github.com/p4kx-org/p4kx/actions/runs/45576709479/job/139096347560) ·
+[ARM64 package evidence](https://github.com/p4kx-org/p4kx/actions/runs/45576709479/job/139096347666)
+
 The tagged v0.5.0 candidate requires its own hosted Linux package evidence on both CPUs.
 
 For a branch-only native Linux validation, dispatch the existing `release.yml` workflow with
