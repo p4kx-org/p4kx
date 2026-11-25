@@ -249,3 +249,6 @@ fn admitted_empty_item_has_no_row_and_absent_selection_has_no_owner() -> TestRes
     }
     Ok(())
 }
+
+#[path = "catalog_loadout_owner_selection_sdk.rs"]
+mod owner_selection;

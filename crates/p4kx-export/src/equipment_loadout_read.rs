@@ -25,7 +25,6 @@ pub(in crate::build::catalog_queries::equipment) struct Query<'query> {
     pub(in crate::build::catalog_queries::equipment) archive: &'query Archive,
     pub(in crate::build::catalog_queries::equipment) entry: CatalogQuerySource<'query>,
     pub(in crate::build::catalog_queries::equipment) forge: &'query DataForge<'query>,
-    pub(in crate::build::catalog_queries::equipment) selection: CatalogRecordSelection,
     pub(in crate::build::catalog_queries::equipment) cancel: Option<&'query CancelToken>,
 }
 
@@ -44,11 +43,14 @@ impl<'source> ResolverInputs<'source> {
 }
 
 impl Query<'_> {
-    pub(super) fn run(self) -> Result<LoadoutSnapshot, CatalogError> {
+    pub(super) fn run(
+        self,
+        selection: CatalogRecordSelection,
+    ) -> Result<LoadoutSnapshot, CatalogError> {
         let scope::Scope {
             wanted,
             mut coverage,
-        } = scope::read(self.forge, self.selection, self.cancel)?;
+        } = scope::read(self.forge, selection, self.cancel)?;
         let origins = self.entry.records(self.archive)?;
         let (rows, dependencies) = self.resolve(&origins, wanted, &mut coverage)?;
         scope::finish_coverage(&mut coverage);

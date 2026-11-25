@@ -13,8 +13,8 @@ use super::{LoadoutDependencyCoverage, scope};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
-    DatasetAvailability, ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, DatasetAvailability,
+    ParsedCatalogQueries,
 };
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_table::CatalogTable;
@@ -115,7 +115,6 @@ impl ParsedCatalogQueries<'_> {
                     archive,
                     entry,
                     forge,
-                    selection: CatalogRecordSelection::RecordIndex(ship_record_index),
                     cancel,
                 },
                 ship_record_index,

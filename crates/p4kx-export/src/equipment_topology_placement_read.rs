@@ -7,7 +7,7 @@ use super::super::super::loadout_query::read::Query as LoadoutQuery;
 use super::{ResourceTopologyPlacementSnapshot, ResourceTopologyRootState};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
-use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection};
+use crate::catalog_queries::CatalogRecordCoverage;
 use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::catalog_v3::resource_topology_projection;
 use crate::contract_loadout::EntityKind;
@@ -41,7 +41,6 @@ pub(super) fn run(
         archive,
         entry,
         forge,
-        selection: CatalogRecordSelection::RecordIndex(ship_record_index),
         cancel,
     };
     let (mut rows, mut loadout_dependencies) = query.resolve_rows(

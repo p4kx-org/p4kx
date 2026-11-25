@@ -9,8 +9,7 @@ use super::{LoadoutDependencyCoverage, read::Query, scope};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
-    ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, ParsedCatalogQueries,
 };
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_v3::facility_loadout_placements::{
@@ -119,7 +118,6 @@ impl ParsedCatalogQueries<'_> {
                     archive,
                     entry,
                     forge,
-                    selection: CatalogRecordSelection::RecordIndex(ship_record_index),
                     cancel,
                 },
                 ship_record_index,

@@ -4,7 +4,7 @@
 use p4kx_extraction::DataForge;
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 
-use super::read;
+use super::{LoadoutOwnerSelection, read, read_visit};
 use crate::Kind;
 use crate::catalog_queries::CatalogRecordSelection;
 use crate::entity_selection::{self, Selected};
@@ -46,6 +46,41 @@ fn unrelated_original_decoder_error_preserves_proved_loadout_absence() -> TestRe
         .record(owner().value("FixtureUnrelated", TestValue::Raw(vec![2])))
         .build();
     assert_scope(&bytes, 1, &[])
+}
+
+#[test]
+fn ship_roots_skip_standalone_item_admission_fields() -> TestResult {
+    let bytes = DataForgeBuilder::new()
+        .structure(TestStruct::new(ENTITY).field("Components", TestType::Bool))
+        .record(owner().value("Components", TestValue::Bool(true)))
+        .record(TestRecord::new(
+            2,
+            ENTITY,
+            "EntityClassDefinition.LoadoutShip",
+            "libs/foundry/records/entities/spaceships/loadout_ship.xml",
+        ))
+        .build();
+    let forge = DataForge::open(&bytes)?;
+    let all = read(&forge, CatalogRecordSelection::All, None)?;
+    assert_eq!(
+        all.coverage.incomplete_fields,
+        [0],
+        "the standalone Item has malformed admission fields"
+    );
+    let ships = read_visit(&forge, LoadoutOwnerSelection::Ships, None)?;
+    let [ship] = ships.owners.wanted.as_slice() else {
+        return Err("one admitted Ship".into());
+    };
+    assert_eq!(ship.record_index, 1, "the Ship remains an admitted root");
+    assert!(
+        ships.owners.coverage.incomplete_fields.is_empty(),
+        "Item admission is outside this selection"
+    );
+    assert!(
+        ships.missing_record_indices.is_empty(),
+        "only explicit batches report absent indices"
+    );
+    Ok(())
 }
 
 fn assert_scope(bytes: &[u8], errors: usize, incomplete: &[u32]) -> TestResult {

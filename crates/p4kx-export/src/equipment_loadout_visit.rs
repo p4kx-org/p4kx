@@ -6,7 +6,7 @@
 use p4kx_extraction::{Archive, Build, CancelToken, DataForgeEntry, Guid, SourceInventory};
 
 use super::read::{Query, ResolverInputs};
-use super::{Loadout, LoadoutDependencyCoverage, LoadoutOwnerKind, scope};
+use super::{Loadout, LoadoutDependencyCoverage, LoadoutOwnerKind, LoadoutOwnerSelection, scope};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_queries::{
@@ -53,6 +53,8 @@ pub struct LoadoutVisitSummary {
     pub row_count: usize,
     /// Original owner admission and read coverage.
     pub coverage: CatalogRecordCoverage,
+    /// Explicit batch indices absent from this DataForge, in ascending order.
+    pub missing_record_indices: Vec<u32>,
     /// Whether all consulted resolver and alignment scopes completed.
     pub dependencies_complete: bool,
 }
@@ -71,8 +73,27 @@ pub fn visit_loadouts<E: From<CatalogError>>(
     cancel: Option<&CancelToken>,
     visit: impl FnMut(&LoadoutOwnerSnapshot) -> Result<(), E>,
 ) -> Result<LoadoutVisitSummary, E> {
+    visit_loadout_owners(
+        archive,
+        LoadoutOwnerSelection::Records(selection),
+        cancel,
+        visit,
+    )
+}
+
+/// Visits resolved Loadout owners selected by root kind or physical Record identity.
+/// Commit staged consumer changes after terminal success and coverage checks.
+///
+/// # Errors
+/// Returns input, Archive-change, cancellation or visitor errors.
+pub fn visit_loadout_owners<E: From<CatalogError>>(
+    archive: &Archive,
+    selection: LoadoutOwnerSelection<'_>,
+    cancel: Option<&CancelToken>,
+    visit: impl FnMut(&LoadoutOwnerSnapshot) -> Result<(), E>,
+) -> Result<LoadoutVisitSummary, E> {
     CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), cancel)?
-        .visit_loadouts(selection, cancel, visit)
+        .visit_loadout_owners(selection, cancel, visit)
 }
 
 /// Visits selected Loadout owners using a decoded Entry from the same Archive.
@@ -87,13 +108,33 @@ pub fn visit_loadouts_from<E: From<CatalogError>>(
     cancel: Option<&CancelToken>,
     visit: impl FnMut(&LoadoutOwnerSnapshot) -> Result<(), E>,
 ) -> Result<LoadoutVisitSummary, E> {
+    visit_loadout_owners_from(
+        archive,
+        entry,
+        LoadoutOwnerSelection::Records(selection),
+        cancel,
+        visit,
+    )
+}
+
+/// Visits resolved Loadout owners using a decoded Entry of the same Archive.
+///
+/// # Errors
+/// Returns the errors of `visit_loadout_owners` or an origin mismatch.
+pub fn visit_loadout_owners_from<E: From<CatalogError>>(
+    archive: &Archive,
+    entry: &DataForgeEntry,
+    selection: LoadoutOwnerSelection<'_>,
+    cancel: Option<&CancelToken>,
+    visit: impl FnMut(&LoadoutOwnerSnapshot) -> Result<(), E>,
+) -> Result<LoadoutVisitSummary, E> {
     CatalogQuerySession::from_entry(
         archive,
         entry,
         CatalogLanguageSelection::Selected(&[]),
         cancel,
     )?
-    .visit_loadouts(selection, cancel, visit)
+    .visit_loadout_owners(selection, cancel, visit)
 }
 
 impl CatalogQuerySession<'_> {
@@ -108,8 +149,21 @@ impl CatalogQuerySession<'_> {
         cancel: Option<&CancelToken>,
         visit: impl FnMut(&LoadoutOwnerSnapshot) -> Result<(), E>,
     ) -> Result<LoadoutVisitSummary, E> {
+        self.visit_loadout_owners(LoadoutOwnerSelection::Records(selection), cancel, visit)
+    }
+
+    /// Visits selected resolved Loadout owners from this reusable Archive session.
+    ///
+    /// # Errors
+    /// Returns the errors of `visit_loadout_owners`.
+    pub fn visit_loadout_owners<E: From<CatalogError>>(
+        &self,
+        selection: LoadoutOwnerSelection<'_>,
+        cancel: Option<&CancelToken>,
+        visit: impl FnMut(&LoadoutOwnerSnapshot) -> Result<(), E>,
+    ) -> Result<LoadoutVisitSummary, E> {
         self.parsed(cancel)?
-            .visit_loadouts(selection, cancel, visit)
+            .visit_loadout_owners(selection, cancel, visit)
     }
 }
 
@@ -125,15 +179,28 @@ impl ParsedCatalogQueries<'_> {
         cancel: Option<&CancelToken>,
         visit: impl FnMut(&LoadoutOwnerSnapshot) -> Result<(), E>,
     ) -> Result<LoadoutVisitSummary, E> {
+        self.visit_loadout_owners(LoadoutOwnerSelection::Records(selection), cancel, visit)
+    }
+
+    /// Visits selected resolved Loadout owners using this parsed DataForge.
+    ///
+    /// # Errors
+    /// Returns the errors of `visit_loadout_owners`.
+    pub fn visit_loadout_owners<E: From<CatalogError>>(
+        &self,
+        selection: LoadoutOwnerSelection<'_>,
+        cancel: Option<&CancelToken>,
+        visit: impl FnMut(&LoadoutOwnerSnapshot) -> Result<(), E>,
+    ) -> Result<LoadoutVisitSummary, E> {
         self.project_fallible(cancel, |archive, entry, forge| {
             visit_owners(
                 &Query {
                     archive,
                     entry,
                     forge,
-                    selection,
                     cancel,
                 },
+                selection,
                 visit,
             )
         })
@@ -142,16 +209,20 @@ impl ParsedCatalogQueries<'_> {
 
 fn visit_owners<E: From<CatalogError>>(
     query: &Query<'_>,
+    selection: LoadoutOwnerSelection<'_>,
     mut visit: impl FnMut(&LoadoutOwnerSnapshot) -> Result<(), E>,
 ) -> Result<LoadoutVisitSummary, E> {
-    let scope::Scope { wanted, coverage } =
-        scope::read(query.forge, query.selection, query.cancel)?;
+    let scope::VisitScope {
+        owners: scope::Scope { wanted, coverage },
+        missing_record_indices,
+    } = scope::read_visit(query.forge, selection, query.cancel)?;
     let mut summary = LoadoutVisitSummary {
         build: query.archive.build().cloned(),
         availability: query.availability(0),
         owner_count: 0,
         row_count: 0,
         coverage,
+        missing_record_indices,
         dependencies_complete: crate::export_archive_health::inventory(query.archive).is_none(),
     };
     if !wanted.is_empty() {

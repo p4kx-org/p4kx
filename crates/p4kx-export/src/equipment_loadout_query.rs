@@ -46,7 +46,11 @@ mod scope;
 #[path = "equipment_loadout_visit.rs"]
 mod visit;
 
-pub use visit::{LoadoutOwnerSnapshot, LoadoutVisitSummary, visit_loadouts, visit_loadouts_from};
+pub use scope::LoadoutOwnerSelection;
+pub use visit::{
+    LoadoutOwnerSnapshot, LoadoutVisitSummary, visit_loadout_owners, visit_loadout_owners_from,
+    visit_loadouts, visit_loadouts_from,
+};
 
 pub use crate::contract_loadout::{EntityKind as LoadoutOwnerKind, Loadout, LoadoutPort, PortType};
 pub use crate::loadout::alignment::direct::{
@@ -156,10 +160,9 @@ impl ParsedCatalogQueries<'_> {
                 archive,
                 entry,
                 forge,
-                selection,
                 cancel,
             }
-            .run()
+            .run(selection)
         })
     }
 }

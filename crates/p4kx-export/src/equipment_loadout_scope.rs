@@ -11,9 +11,42 @@ use crate::guid_text::CatalogGuid;
 use crate::loadout::{PortAdmission, Wanted};
 use crate::{CatalogError, Kind};
 
+/// Selects the physical roots of a resolved Loadout visit.
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+pub enum LoadoutOwnerSelection<'records> {
+    /// Selects Ship and Item roots by the ordinary Catalog Record policy.
+    Records(CatalogRecordSelection),
+    /// Selects all admitted Ship roots and their reached dependencies.
+    Ships,
+    /// Selects each supplied physical Record index once.
+    RecordIndices(&'records [u32]),
+}
+
 pub(super) struct Scope {
     pub(super) wanted: Vec<Wanted>,
     pub(super) coverage: CatalogRecordCoverage,
+}
+
+pub(super) struct VisitScope {
+    pub(super) owners: Scope,
+    pub(super) missing_record_indices: Vec<u32>,
+}
+
+#[derive(Clone, Copy)]
+enum RootKinds {
+    ShipsAndItems,
+    Ships,
+}
+
+impl RootKinds {
+    const fn entity_kind(self, kind: Kind) -> Option<EntityKind> {
+        match kind {
+            Kind::Ships => Some(EntityKind::Ship),
+            Kind::Items if matches!(self, Self::ShipsAndItems) => Some(EntityKind::Item),
+            _ => None,
+        }
+    }
 }
 
 pub(super) fn read(
@@ -21,13 +54,25 @@ pub(super) fn read(
     selection: CatalogRecordSelection,
     cancel: Option<&CancelToken>,
 ) -> Result<Scope, CatalogError> {
+    Ok(read_visit(forge, LoadoutOwnerSelection::Records(selection), cancel)?.owners)
+}
+
+pub(super) fn read_visit(
+    forge: &DataForge<'_>,
+    selection: LoadoutOwnerSelection<'_>,
+    cancel: Option<&CancelToken>,
+) -> Result<VisitScope, CatalogError> {
+    let kinds = match selection {
+        LoadoutOwnerSelection::Ships => RootKinds::Ships,
+        _ => RootKinds::ShipsAndItems,
+    };
     let mut coverage = CatalogRecordCoverage::default();
     let mut ships = Vec::new();
     let mut items = Vec::new();
     let mut trees = TreeBuilder::new();
-    selection.for_each(forge, cancel, |record| {
+    let missing_record_indices = visit_records(forge, selection, cancel, |record| {
         checkpoint(cancel)?;
-        let Some(kind) = classify(record, &mut coverage) else {
+        let Some(kind) = classify(record, kinds, &mut coverage) else {
             return Ok(());
         };
         let wanted = Wanted {
@@ -54,10 +99,43 @@ pub(super) fn read(
         Ok(())
     })?;
     ships.extend(items);
-    Ok(Scope {
-        wanted: ships,
-        coverage,
+    Ok(VisitScope {
+        owners: Scope {
+            wanted: ships,
+            coverage,
+        },
+        missing_record_indices,
     })
+}
+
+fn visit_records<'source>(
+    forge: &'source DataForge<'_>,
+    selection: LoadoutOwnerSelection<'_>,
+    cancel: Option<&CancelToken>,
+    mut visit: impl FnMut(&Record<'source>) -> Result<(), CatalogError>,
+) -> Result<Vec<u32>, CatalogError> {
+    match selection {
+        LoadoutOwnerSelection::Records(selection) => selection.for_each(forge, cancel, visit)?,
+        LoadoutOwnerSelection::Ships => {
+            CatalogRecordSelection::All.for_each(forge, cancel, visit)?;
+        }
+        LoadoutOwnerSelection::RecordIndices(indices) => {
+            let mut indices = indices.to_vec();
+            indices.sort_unstable();
+            indices.dedup();
+            let mut missing = Vec::new();
+            for index in indices {
+                checkpoint(cancel)?;
+                if let Some(record) = forge.record(index) {
+                    visit(&record)?;
+                } else {
+                    missing.push(index);
+                }
+            }
+            return Ok(missing);
+        }
+    }
+    Ok(Vec::new())
 }
 
 pub(super) fn finish_coverage(coverage: &mut CatalogRecordCoverage) {
@@ -75,18 +153,23 @@ pub(super) fn read_ship(
     let wanted = forge
         .record(index)
         .and_then(|record| {
-            (classify(&record, &mut coverage) == Some(EntityKind::Ship)).then(|| Wanted {
-                record_index: record.index(),
-                guid: CatalogGuid(record.guid()),
-                kind: EntityKind::Ship,
-            })
+            (classify(&record, RootKinds::ShipsAndItems, &mut coverage) == Some(EntityKind::Ship))
+                .then(|| Wanted {
+                    record_index: record.index(),
+                    guid: CatalogGuid(record.guid()),
+                    kind: EntityKind::Ship,
+                })
         })
         .into_iter()
         .collect();
     Ok(Scope { wanted, coverage })
 }
 
-fn classify(record: &Record<'_>, coverage: &mut CatalogRecordCoverage) -> Option<EntityKind> {
+fn classify(
+    record: &Record<'_>,
+    kinds: RootKinds,
+    coverage: &mut CatalogRecordCoverage,
+) -> Option<EntityKind> {
     let selection = record.type_name().and_then(|kind| {
         if kind == p4kx_assembly::ENTITY_TYPE {
             entity_selection::select(record, None)
@@ -95,9 +178,8 @@ fn classify(record: &Record<'_>, coverage: &mut CatalogRecordCoverage) -> Option
         }
     });
     match selection {
-        Ok(Some(Selected::Entity(Kind::Ships))) => Some(EntityKind::Ship),
-        Ok(Some(Selected::Entity(Kind::Items))) => Some(EntityKind::Item),
-        Ok(Some(Selected::Leftover(Kind::Ships | Kind::Items))) => {
+        Ok(Some(Selected::Entity(kind))) => kinds.entity_kind(kind),
+        Ok(Some(Selected::Leftover(kind))) if kinds.entity_kind(kind).is_some() => {
             coverage.skipped_leftovers += 1;
             None
         }

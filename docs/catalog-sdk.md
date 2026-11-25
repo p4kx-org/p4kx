@@ -2425,8 +2425,14 @@ emits one, and the original source inventory and dependency diagnostics for that
 owner. The scan reuses the entity and XML directory indexes. It releases the
 owner's resolved row and source inventory before resolving the next owner.
 
-The visitor accepts the same all-owner, GUID and physical Record selections as
-`read_loadouts`. A Ship can have an empty row. An admitted Item that resolves to
+The original visitor accepts the same all-owner, GUID and physical Record selections as
+`read_loadouts`. Use `visit_loadout_owners(LoadoutOwnerSelection::Ships, ...)` for Ship roots,
+including their resolved default equipment and nested Item ports. This selection skips standalone
+Item root admission. Use `RecordIndices(&indices)` to resolve a batch of physical owners in a
+single visit. Duplicate indices are resolved once and the canonical GUID order and physical ties
+are preserved. Check `missing_record_indices` for absent batch indices before committing cache
+changes. The new visitor is available on both session views and as `equipment::visit_loadout_owners`
+or `visit_loadout_owners_from`. The ordinary Catalog selection is available through `Records`. A Ship can have an empty row. An admitted Item that resolves to
 no ports carries its identity and succeeds without a row. An admitted owner
 with a failed resolution can supply diagnostics without a row. Docked vehicles
 retain their root occurrence and can be visited independently.
