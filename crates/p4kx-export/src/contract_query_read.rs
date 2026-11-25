@@ -3,8 +3,8 @@
 
 use p4kx_extraction::{CancelToken, DataForge};
 
-use super::ContractQueryCoverage;
 use super::plan::Plan;
+use super::{ContractQueryCoverage, ContractSummary};
 use crate::CatalogError;
 use crate::catalog_projection::CatalogProjection;
 use crate::contract_missions::ContractEntry;
@@ -14,13 +14,20 @@ use crate::mission_generator::GeneratorDefinition;
 use crate::mission_intros::{Grants, PendingContract};
 use crate::mission_property_set::{MissionPropertySet, MissionPropertySets};
 use crate::mission_titles::MissionTitles;
-use crate::missions::record_read::{ContractPiece, Piece};
+use crate::missions::record_read::{ContractPiece, GeneratorFacets, Piece};
 use crate::npc_spawn_model::PublishedNpcPool;
 use crate::spawn_model::{LocationQuery, ShipSpawnPool};
 use crate::spawn_pools::SpawnPools;
 
+#[derive(Clone, Copy)]
+pub(super) enum Retention {
+    Details,
+    Summaries,
+}
+
 #[derive(Default)]
 pub(super) struct Projected<'source> {
+    pub(super) summaries: Vec<ContractSummary<'source>>,
     pub(super) rows: Vec<ContractEntry<'source>>,
     pub(super) titles: Vec<MissionTitles<'source>>,
     pub(super) generators: Vec<GeneratorDefinition<'source>>,
@@ -34,6 +41,7 @@ pub(super) struct Projected<'source> {
 }
 
 pub(super) struct Transaction<'source> {
+    pub(super) retention: Retention,
     pub(super) pending: Vec<PendingContract<'source>>,
     pub(super) grants: Grants,
     pub(super) sets: MissionPropertySets<'source>,
@@ -45,6 +53,7 @@ pub(super) fn read<'source>(
     forge: &'source DataForge<'source>,
     projection: &CatalogProjection<'_, 'source>,
     plan: Plan<'source>,
+    retention: Retention,
     cancel: Option<&CancelToken>,
 ) -> Result<Projected<'source>, CatalogError> {
     let Plan {
@@ -62,13 +71,18 @@ pub(super) fn read<'source>(
         return Ok(output);
     }
     let mut transaction = Transaction {
+        retention,
         pending: Vec::new(),
         grants,
         sets: MissionPropertySets::default(),
         pools: SpawnPools::default(),
         ledger: ExportLedger::default(),
     };
-    let mut interpreter = super::interpret::Interpreter::new(forge, projection, cancel)?;
+    let facets = match retention {
+        Retention::Details => GeneratorFacets::Contracts,
+        Retention::Summaries => GeneratorFacets::Summaries,
+    };
+    let mut interpreter = super::interpret::Interpreter::new(forge, projection, cancel, facets)?;
     for (position, tree) in generators {
         interpreter.generator(
             &tree,
@@ -79,7 +93,7 @@ pub(super) fn read<'source>(
         )?;
     }
     let (pools, failures, ledger) = interpreter.finish();
-    transaction.pools.merge(pools);
+    transaction.merge_pools(pools);
     transaction.ledger.merge(ledger);
     coverage.projection_failures.extend(failures);
     super::finish::finish(
@@ -123,8 +137,19 @@ pub(super) fn take_observed<'source>(
 impl<'source> Transaction<'source> {
     fn take(&mut self, piece: ContractPiece<'source>) -> Result<(), CatalogError> {
         self.sets.merge(piece.property_sets)?;
-        self.pools.merge(piece.pools);
+        self.merge_pools(piece.pools);
         self.pending.extend(piece.contracts);
         self.grants.merge(piece.grants)
+    }
+
+    fn merge_pools(&mut self, pools: SpawnPools<'source>) {
+        let pools = match self.retention {
+            Retention::Details => pools,
+            Retention::Summaries => SpawnPools {
+                locations: pools.locations,
+                ..SpawnPools::default()
+            },
+        };
+        self.pools.merge(pools);
     }
 }

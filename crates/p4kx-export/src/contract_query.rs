@@ -35,10 +35,13 @@ mod plan;
 mod read;
 #[path = "contract_query_rows.rs"]
 mod rows;
+#[path = "contract_summary_query.rs"]
+mod summary;
 #[path = "contract_query_survey.rs"]
 mod survey;
 
 pub use key::{ContractKey, with_contract, with_contract_from};
+pub use summary::{ContractSummaries, ContractSummary};
 
 pub use coverage::{
     ContractDependencyCoverage, ContractDiagnosticExample, ContractQueryCoverage,
@@ -193,6 +196,51 @@ fn with_parsed<T>(
     cancel: Option<&CancelToken>,
     inspect: impl FnOnce(ContractSnapshot<'_>) -> T,
 ) -> Result<T, CatalogError> {
+    read_parsed(
+        archive,
+        entry,
+        forge,
+        QueryRequest {
+            selection,
+            retention: read::Retention::Details,
+        },
+        languages,
+        cancel,
+        |query| inspect(query.into_full()),
+    )
+}
+
+struct QueryOutput<'source> {
+    build: Option<Build>,
+    availability: DatasetAvailability,
+    projected: read::Projected<'source>,
+    public_names: Vec<CanonicalText<'source, PublicNameRef>>,
+    game_texts: Vec<CanonicalText<'source, GameTextRef>>,
+    requested_languages: Vec<Language>,
+    available_languages: Vec<Language>,
+    localization_notes: Vec<LocalizationNote>,
+    source_inventory: SourceInventory,
+}
+
+#[derive(Clone, Copy)]
+struct QueryRequest {
+    selection: plan::Lookup,
+    retention: read::Retention,
+}
+
+fn read_parsed<T>(
+    archive: &Archive,
+    entry: CatalogQuerySource<'_>,
+    forge: &DataForge<'_>,
+    request: QueryRequest,
+    languages: &[Language],
+    cancel: Option<&CancelToken>,
+    inspect: impl FnOnce(QueryOutput<'_>) -> T,
+) -> Result<T, CatalogError> {
+    let QueryRequest {
+        selection,
+        retention,
+    } = request;
     let mut origins = entry.records(archive)?;
     let plan = plan::Plan::read(
         forge,
@@ -208,24 +256,16 @@ fn with_parsed<T>(
     let texts = Texts::parse(&sources)?;
     let registry = CatalogTextRegistry::default();
     let projection = CatalogProjection::new(&texts, &input, &registry);
-    let output = read::read(forge, &projection, plan, cancel)?;
+    let projected = read::read(forge, &projection, plan, retention, cancel)?;
     let text_rows = projection.finish_rows()?;
     let source_inventory = origins.uses.finish_with(|| checkpoint(cancel))?;
     checkpoint(cancel)?;
-    Ok(inspect(ContractSnapshot {
+    Ok(inspect(QueryOutput {
         build: archive.build().cloned(),
         availability: DatasetAvailability::from_source_declarations(forge, |name| {
             name == "ContractGenerator"
         }),
-        rows: output.rows,
-        mission_titles: output.titles,
-        generators: output.generators,
-        dependency_generators: output.dependency_generators,
-        mission_property_sets: output.property_sets,
-        ship_spawns: output.ships,
-        npc_spawns: output.npcs,
-        entity_spawns: output.entities,
-        location_queries: output.locations,
+        projected,
         public_names: text_rows.public_names,
         game_texts: text_rows.game_texts,
         requested_languages: languages.to_vec(),
@@ -236,6 +276,30 @@ fn with_parsed<T>(
             .collect(),
         localization_notes: texts.notes().to_vec(),
         source_inventory,
-        coverage: output.coverage,
     }))
+}
+
+impl<'source> QueryOutput<'source> {
+    fn into_full(self) -> ContractSnapshot<'source> {
+        ContractSnapshot {
+            build: self.build,
+            availability: self.availability,
+            rows: self.projected.rows,
+            mission_titles: self.projected.titles,
+            generators: self.projected.generators,
+            dependency_generators: self.projected.dependency_generators,
+            mission_property_sets: self.projected.property_sets,
+            ship_spawns: self.projected.ships,
+            npc_spawns: self.projected.npcs,
+            entity_spawns: self.projected.entities,
+            location_queries: self.projected.locations,
+            public_names: self.public_names,
+            game_texts: self.game_texts,
+            requested_languages: self.requested_languages,
+            available_languages: self.available_languages,
+            localization_notes: self.localization_notes,
+            source_inventory: self.source_inventory,
+            coverage: self.projected.coverage,
+        }
+    }
 }

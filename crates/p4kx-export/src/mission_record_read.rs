@@ -163,7 +163,9 @@ fn piece<'f>(
 
 #[path = "mission_record_projection.rs"]
 mod projection;
-pub(crate) use projection::{ContractAttempt, project_tree, try_project_contracts_tree};
+pub(crate) use projection::{
+    ContractAttempt, GeneratorFacets, project_tree, try_project_contracts_tree,
+};
 
 fn failed<'f>(
     admission: &RecordObservation<'_, 'f>,

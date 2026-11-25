@@ -60,6 +60,22 @@ fn retained_outside_aliases_publish_all_property_and_npc_texts() -> TestResult {
         None,
     );
     parsed.with_contract(key, None, |snapshot| verify(&snapshot, *outside, *selected))??;
+    parsed.with_contract_summary(key, None, |summary| {
+        assert_eq!(
+            summary.rows.len(),
+            1,
+            "omitting property publication preserves the selected contract"
+        );
+        assert_eq!(
+            summary.coverage.dependencies.related_generators,
+            [*outside],
+            "the outside alias remains part of the canonical compact query"
+        );
+        assert!(
+            summary.game_texts.is_empty(),
+            "the exclusive property and NPC localizations were not published in the summary"
+        );
+    })?;
     Ok(())
 }
 

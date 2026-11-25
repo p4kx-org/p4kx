@@ -13,7 +13,9 @@ use crate::export_ledger::ExportLedger;
 use crate::mission_entry_source::MissionEntryContext;
 use crate::mission_index::{MissionIndex, read::CachedTree};
 use crate::mission_places::Places;
-use crate::missions::record_read::{ContractAttempt, Piece, try_project_contracts_tree};
+use crate::missions::record_read::{
+    ContractAttempt, GeneratorFacets, Piece, try_project_contracts_tree,
+};
 use crate::record_observation::RecordObservation;
 use crate::spawn_pools::SpawnPools;
 use crate::{CatalogError, CatalogReadFailure, ExportAccountingError, Kind};
@@ -24,6 +26,7 @@ pub(super) struct Interpreter<'context, 'source> {
     tags: CapturedTags<'context, 'source>,
     index: MissionIndex<'source>,
     dependencies: Dependencies<'source>,
+    facets: GeneratorFacets,
     cancel: Option<&'context CancelToken>,
 }
 
@@ -32,6 +35,7 @@ impl<'context, 'source> Interpreter<'context, 'source> {
         forge: &'source DataForge<'source>,
         projection: &'context CatalogProjection<'context, 'source>,
         cancel: Option<&'context CancelToken>,
+        facets: GeneratorFacets,
     ) -> Result<Self, CatalogError> {
         let captured = tag_catalog::read(
             forge,
@@ -60,6 +64,7 @@ impl<'context, 'source> Interpreter<'context, 'source> {
             tags: captured.context,
             index,
             dependencies,
+            facets,
             cancel,
         })
     }
@@ -149,6 +154,7 @@ impl<'context, 'source> Interpreter<'context, 'source> {
             &context,
             role,
             self.cancel,
+            self.facets,
         )
     }
 

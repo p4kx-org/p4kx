@@ -6,6 +6,8 @@ use p4kx_extraction::{Filter, RecordTree};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_read::original::OriginalFlowFields;
+use crate::mission_generator::completion_tag_results::ContractCompletionTagResult;
+use crate::mission_generator::item_properties::{self, GeneratorMissionItemProperty};
 use crate::mission_generator::{GeneratorDefinition, completion_tag_results, item_reward_results};
 use crate::record_read::ReadError;
 use crate::source_fields::{FieldCapture, FieldError};
@@ -16,6 +18,17 @@ pub(crate) struct DefinitionProjection<'source> {
     pub(crate) definition: GeneratorDefinition<'source>,
     pub(crate) item_error: Option<ReadError>,
     pub(crate) notes: Vec<FieldError>,
+}
+
+pub(crate) struct OccurrenceFacts {
+    pub(crate) item_error: Option<ReadError>,
+    pub(crate) notes: Vec<FieldError>,
+}
+
+struct DefinitionFacts {
+    occurrence: OccurrenceFacts,
+    completion_tag_results: Vec<ContractCompletionTagResult>,
+    mission_item_properties: Vec<GeneratorMissionItemProperty>,
 }
 
 pub(crate) fn matches_path(path: &str, filter: Option<&Filter>) -> bool {
@@ -29,13 +42,11 @@ pub(crate) fn read<'source>(
     source: SourceArenaOutput<'source>,
     capture: &dyn FieldCapture<'source>,
 ) -> Result<DefinitionProjection<'source>, CatalogError> {
-    let mut notes = Vec::new();
-    let completion_tag_results = completion_tag_results::read(fields, capture, &mut notes)?;
-    let (mission_item_properties, item_error) =
-        match crate::mission_generator::item_properties::read(fields, capture) {
-            Ok(items) => (items, None),
-            Err(error) => (Vec::new(), Some(error)),
-        };
+    let DefinitionFacts {
+        occurrence: OccurrenceFacts { item_error, notes },
+        completion_tag_results,
+        mission_item_properties,
+    } = read_facts(fields, capture)?;
     Ok(DefinitionProjection {
         definition: GeneratorDefinition {
             input_ref: fields.input_ref().clone(),
@@ -52,5 +63,30 @@ pub(crate) fn read<'source>(
         },
         item_error,
         notes,
+    })
+}
+
+/// Validates the source declarations that participate in canonical occurrence admission.
+pub(crate) fn occurrence_facts<'source>(
+    fields: &OriginalFlowFields<'_, '_, 'source>,
+    capture: &dyn FieldCapture<'source>,
+) -> Result<OccurrenceFacts, CatalogError> {
+    Ok(read_facts(fields, capture)?.occurrence)
+}
+
+fn read_facts<'source>(
+    fields: &OriginalFlowFields<'_, '_, 'source>,
+    capture: &dyn FieldCapture<'source>,
+) -> Result<DefinitionFacts, CatalogError> {
+    let mut notes = Vec::new();
+    let completion_tag_results = completion_tag_results::read(fields, capture, &mut notes)?;
+    let (mission_item_properties, item_error) = match item_properties::read(fields, capture) {
+        Ok(items) => (items, None),
+        Err(error) => (Vec::new(), Some(error)),
+    };
+    Ok(DefinitionFacts {
+        occurrence: OccurrenceFacts { item_error, notes },
+        completion_tag_results,
+        mission_item_properties,
     })
 }

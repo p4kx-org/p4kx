@@ -36,6 +36,9 @@ mod places;
 #[path = "catalog_contract_query_scope.rs"]
 mod scope;
 
+#[path = "catalog_contract_query_summaries.rs"]
+mod summaries;
+
 #[test]
 fn contract_sdk_all_matches_canonical_rows_and_titles() -> TestResult {
     let folder = tempfile::tempdir()?;

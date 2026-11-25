@@ -81,6 +81,23 @@ admitted logical contract does not open localization or world/media payloads. Co
 joins use only starmap name/type facets; container placement, SOC scenes and world coordinates
 are separate domain queries.
 
+## Contract summaries
+
+`with_contract_summaries(selection, cancel, callback)` and
+`with_contract_summary(ContractKey, cancel, callback)` on both session views return the same
+canonical winner and ordering for each selected parent or sub-contract. Each summary contains
+its original logical IDs and physical Generator record index, blueprint rewards, giver faction,
+offered locations, layered sharing flag, authored location-query links, reputation gains and
+canonical localized title. The result includes the shared authored location-query rows, protected
+text lookups and coverage. Blueprint rewards link to their original pool IDs. Runtime results of
+location rules are outside this Archive query.
+
+The summary projection skips building Generator source arenas, retains neither ship, NPC nor
+entity spawn pools across Generator transactions, and skips property-set text publication. It
+still reads each required whole Generator and performs the canonical dependency, intro and alias
+joins. The ordinary contract queries supply the complete derived and original-source projections.
+The session's provenance policy applies to summaries as it does to the other typed queries.
+
 ## Coverage and cache updates
 
 The result separates selected-owner coverage, reverse-survey scope, related Generator owners,
