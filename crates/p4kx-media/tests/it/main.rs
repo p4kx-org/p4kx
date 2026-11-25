@@ -123,6 +123,7 @@ mod material_provider_sources;
 mod material_provider_status;
 mod material_streamed;
 mod material_support;
+mod mixed_media_generation;
 mod model_cdf_material_reference;
 mod model_cdf_rig_placement;
 mod model_character_provider;
