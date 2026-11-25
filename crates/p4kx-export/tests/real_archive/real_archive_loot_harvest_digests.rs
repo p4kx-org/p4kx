@@ -135,15 +135,19 @@ impl<'directory> LootHarvestDigests<'directory> {
                 .ok_or("missing Loot array rows")?
         };
         let referenced = retain_rows(dataset, rows, ordered)?;
-        if dataset.has_authored_evidence() && !rows.is_empty() && referenced.is_empty() {
-            return Err(format!("{} has no contributing source uses", dataset.path()).into());
+        if referenced.is_empty() {
+            if dataset.has_authored_evidence() && !rows.is_empty() {
+                return Err(format!("{} has no contributing source uses", dataset.path()).into());
+            }
+        } else {
+            capture_inventory(
+                inventory,
+                referenced,
+                |id, row| spill(&mut self.original.uses, &id, row),
+                |id, row| spill(&mut self.original.sources, &id, row),
+            )
+            .map_err(|error| format!("{}: {error}", dataset.path()))?;
         }
-        capture_inventory(
-            inventory,
-            referenced,
-            |id, row| spill(&mut self.original.uses, &id, row),
-            |id, row| spill(&mut self.original.sources, &id, row),
-        )?;
         self.visited.push(dataset);
         Ok(())
     }
@@ -265,6 +269,88 @@ fn loot_harvest_comparison_retains_physical_and_projected_identity() -> TestResu
         loot_harvest_key(EncounterRow::HarvestSlotPreset, first)?,
         loot_harvest_key(EncounterRow::HarvestSlotPreset, second)?,
         "projected GUID aliases retain their authored record paths",
+    );
+    Ok(())
+}
+
+#[test]
+fn loot_harvest_comparison_accepts_empty_and_value_only_routes() -> TestResult {
+    use p4kx_extraction::SourceUses;
+    use serde_json::json;
+
+    let directory = tempfile::tempdir()?;
+    let mut proof = LootHarvestDigests::new(directory.path());
+    let inventory = SourceUses::new().freeze()?;
+    let no_rows: &[Value] = &[];
+    proof.retain(
+        LootHarvestDataset::ContextPresets,
+        DatasetAvailability::Absent,
+        no_rows,
+        &inventory,
+    )?;
+    proof.retain(
+        LootHarvestDataset::HarvestConfigs,
+        DatasetAvailability::Available,
+        no_rows,
+        &inventory,
+    )?;
+    let slot = [json!({"guid":"slot", "recordPath":"slot-presets/one"})];
+    proof.retain(
+        LootHarvestDataset::SlotPresets,
+        DatasetAvailability::Available,
+        &slot,
+        &inventory,
+    )?;
+    assert_eq!(
+        proof.visited.len(),
+        3,
+        "empty source closures keep their exact route populations in the comparison"
+    );
+    Ok(())
+}
+
+#[test]
+fn loot_harvest_comparison_requires_every_claimed_source() -> TestResult {
+    use p4kx_extraction::SourceUses;
+    use serde_json::json;
+
+    let directory = tempfile::tempdir()?;
+    let mut proof = LootHarvestDigests::new(directory.path());
+    let inventory = SourceUses::new().freeze()?;
+    let authored = [json!({"recordIndex":{"state":"present","value":5}})];
+    let result = proof.retain(
+        LootHarvestDataset::HarvestConfigs,
+        DatasetAvailability::Available,
+        &authored,
+        &inventory,
+    );
+    let Err(error) = result else {
+        return Err("an authored route accepted rows without contributors".into());
+    };
+    assert_eq!(
+        error.to_string(),
+        "/definitions/subHarvestableConfigs has no contributing source uses",
+        "a nonempty original route needs row-level source uses",
+    );
+
+    let slot = [json!({
+        "guid":"slot",
+        "recordPath":"slot-presets/one",
+        "fieldOrigins":{"/guid":{"sourceUsesRefs":["missing"]}}
+    })];
+    let result = proof.retain(
+        LootHarvestDataset::SlotPresets,
+        DatasetAvailability::Available,
+        &slot,
+        &inventory,
+    );
+    let Err(error) = result else {
+        return Err("a projection accepted a dangling source-use reference".into());
+    };
+    assert_eq!(
+        error.to_string(),
+        "/subHarvestableMultiConfigs: a value lacks its referenced SDK source use",
+        "every emitted projection source use is resolved when present",
     );
     Ok(())
 }
