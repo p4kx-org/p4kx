@@ -620,6 +620,45 @@ Its private commit peak was 17,111,584,768 bytes and its working set peak was
 `4b19edfe7dbb155612f5af02fc21eb1c19ae8582a13a571f36a97481b40e6adc`.
 The producer and replay are the PTU Full baseline for this revision.
 
+### Packaged Catalog provenance mode comparison on LIVE 13220821
+
+The Windows AMD64 CLI from merge `e59c7410f6411302e8101f180751177dd0d6adfb`
+read the same LIVE `13220821` Archive in two fresh processes. The executable
+SHA-256 was `6c2e74e917908920e588cc0953ec0b73cc532b404ccd2b043d28b0b32cacfb5e`.
+Both used one worker, Zstandard level 3, a fixed export time and a 12 GiB
+desktop reserve on the same Windows host. MarkersOnly completed first.
+An interrupted Full attempt preserved the reserve and the repeat completed
+with the same settings.
+[Native Windows AMD64 package](https://github.com/p4kx-org/p4kx/actions/runs/45633605773/job/139273515249)
+
+| Measurement | Full | MarkersOnly |
+| --- | ---: | ---: |
+| Compressed bytes | 1,469,191,847 | 80,376,902 |
+| Decoded bytes | 78,149,430,408 | 9,131,844,670 |
+| Private commit peak (B) | 38,457,364,480 | 8,765,751,296 |
+| Working set peak (B) | 35,868,237,824 | 8,329,465,856 |
+| Minimum available host memory (B) | 13,352,439,808 | 39,803,142,144 |
+| Peak temporary output and spools (B) | 1,919,463,674 | 218,457,199 |
+| Process elapsed seconds | 1,972.305 | 709.319 |
+
+MarkersOnly reduced compressed size by 94.53% and peak private commit by
+77.21% in this pair. The unfiltered Marker Catalog still used more than the
+2 GB budget for selective consumers.
+
+The archive-free replay verified each stored frame and decoded byte count.
+After unwrapping the Marker envelope and excluding Full-only proof members,
+both streams had 1,100,150,803 retained tokens and the same SHA-256
+`555985a56721d1e5da50e9b5e14f98f36e969d320d794a3ac86ccdfaca1009ad`.
+All 905,999 encrypted, 79,612,651 unencrypted and 4,060,095 unknown immediate
+markers matched. The schemas exported by the same CLI contained the same 118
+`x-gameText` annotations. Media assets use separate outputs.
+
+The current Basetool upload accepts LIVE schema v2. The Marker envelope
+`p4kx-catalog-markers` v1 contains the v3 values, and its compressed and decoded
+sizes exceed the current 64,000,000-byte and 1,000,000,000-byte limits.
+The complete Marker Catalog therefore cannot use the current upload.
+The reduced consumer projection and its actual import are tracked in #1177.
+
 ### SDK provenance mode comparison on LIVE 13220821
 
 The SDK test program built from signed revision
