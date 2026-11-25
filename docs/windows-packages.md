@@ -372,6 +372,15 @@ mutations of the actual downloaded artifacts. Any outer interruption leaves nati
 unproven, whether a final parent result exists or not. The fixture can establish cancellation and
 feedback behavior; it cannot establish the cause of an MSI timeout or permit external cleanup.
 
+For PR #1117 head `a61eb3de5`, both independent verifier jobs passed. They confirmed
+the native AMD64 and ARM64 runner annotations and original downloaded feedback for
+the deliberate timeout cases alongside both complete controls and the chain's
+inner-watchdog cases. The detached observer controls also passed on
+both architectures in the corresponding Release workflow.
+[Runner fuse verification](https://github.com/p4kx-org/p4kx/actions/runs/45576709279/job/139077396882) ·
+[Dynamic chain verification](https://github.com/p4kx-org/p4kx/actions/runs/45576709270/job/139077413013) ·
+[Detached observer controls](https://github.com/p4kx-org/p4kx/actions/runs/45576709479)
+
 The real consumer records the prepared allowance, source hashes, checkpoints and parent controls
 on the runner. It refreshes admission under the original deadline before launching the installer.
 The cancellation-aware diagnostic upload collects those local files after the terminal evidence
