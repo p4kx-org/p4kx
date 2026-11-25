@@ -115,35 +115,27 @@ unchanged runner tracking fingerprint. Their scope is process observation and ow
 MSI package acceptance still requires the original installation and runtime proofs.
 The control's checkpoint and completion artifacts retain `native_completion_unproven: true`.
 
-The Windows MSI lifecycle runs its original diagnostic parent in a tracked hidden console.
-A separate diagnostic upload captures its original request, launch handle and script inventory
-before the first snapshot. It includes the parent-start receipt when that file is already
-available. Upload errors are recorded as diagnostics.
-An immediate checkpoint uploads a bounded copy of the original file journal and source metadata
-before the completion step. It carries an unproven verdict. The completion step observes the
-same process until it returns or its original allowance expires. Its runner step reserves one
-additional minute for owned-process cleanup and the completion receipt. The original process
-deadlines remain in force. Acceptance requires the original successful result, its closed
-journal, final cleanup, matching input and source receipts, and the installed runtime checks.
-A compact final artifact contains the original checkpoint and observer verdict. The ten-minute
-worker cap, thirty-five-minute absolute deadline
-and forty-five-minute job limit remain in force. Expiry can stop only the bound parent.
-Evidence of that stop leaves the installer and descendant cleanup unproven.
+The Windows MSI lifecycle launches its original diagnostic parent in a tracked hidden console.
+The consumer records the bound request, launch handle and script inventory locally. An immediate
+checkpoint copies the original journal and source metadata. On ARM64 a second checkpoint
+observes the Registry capture boundary. A third checkpoint observes the first install
+outcome on both architectures. A checkpoint records the phase observed in the original
+journal and carries an unproven lifecycle verdict. The original files remain in the local
+checkpoint and snapshot directories for diagnostic upload.
 
-The immediate snapshot uses a separate captured child with up to 100 seconds for capture and
-bounded cleanup within the original absolute deadline. Its runner step has two minutes and its
-upload step has one. The snapshot stores the original copies in the checkpoint directory and the
-caller progress and logs in the snapshot directory. The independent harmless controls retain
-their timed observations of runner step behavior.
+A separate Finish supervisor observes the original lifecycle. The WaitFinish step uses a
+bounded probe to find its terminal receipt and binds the observed digest to the original
+request and supervisor. The ARM64 lifecycle wait retains its probe milestones in the wait
+receipt. CollectFinish requires those bound receipts, the original successful result, the
+closed journal and final cleanup. The terminal evidence upload must succeed before the
+executed release payload can be recorded. The last diagnostic upload collects the early
+checkpoints and worker logs if the job reaches that step.
 
-While the isolated Finish supervisor observes the original MSI lifecycle, two optional
-probes capture progress at sequences 4 and 5. Each probe gets 42 seconds of child capture
-time and up to three seconds for cleanup of its directly owned probe process. The
-installer and original supervisor retain their existing lifecycle. Each boundary writes
-an atomic JSON marker with the probe sequence and run identity. The upload retains the
-watchdog and available markers even when the worker times out before producing a
-checkpoint. These files describe progress and timeout state. The final lifecycle
-verdict still requires the original supervisor result and its validation.
+The ten-minute worker cap, thirty-five-minute diagnostic deadline and forty-five-minute
+job limit also apply to the native release consumer. The observer step reserves one minute
+for owned-process cleanup and its receipt. Deadline cleanup can stop the bound parent.
+A stopped parent leaves the installer and descendant cleanup unproven. The separate
+harmless native controls measure the observer and runner boundaries.
 
 Before checksums and release notes are assembled, `check-release-matrix.ps1` requires:
 
