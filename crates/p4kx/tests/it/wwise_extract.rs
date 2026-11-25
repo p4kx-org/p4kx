@@ -340,7 +340,6 @@ fn txtp_writes_one_file_per_event_next_to_the_sounds() -> TestResult {
     assert_eq!(
         names(&fixture.out)?,
         [
-            ".p4kx-origin.lock",
             "Play_Single.txtp",
             "Play_Single.txtp.p4kx-origin.jsonl",
             "Play_Single.wav",

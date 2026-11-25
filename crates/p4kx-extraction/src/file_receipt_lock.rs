@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::ffi::OsStr;
-use std::fs::{self, Metadata, OpenOptions};
-use std::io;
+use std::fs::{self, Metadata};
+use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
 use std::sync::{LazyLock, Mutex, MutexGuard, PoisonError};
 use std::thread;
 use std::time::Duration;
 
-use p4kx_guard::{AliasUncertainty, is_redirected_metadata};
+use p4kx_guard::is_redirected_metadata;
 use same_file::Handle;
 
 use crate::{
@@ -27,14 +27,15 @@ use collision::lock_metadata;
 pub(crate) use collision::origin_lock_collision;
 
 pub(super) const LOCK_NAME: &str = ".p4kx-origin.lock";
+pub(super) const LEASE_NAME: &str = ".p4kx-origin.lease";
 
 pub(crate) fn is_origin_lock_name(name: &OsStr) -> bool {
-    name.eq_ignore_ascii_case(LOCK_NAME)
+    name.eq_ignore_ascii_case(LEASE_NAME) || name.eq_ignore_ascii_case(LOCK_NAME)
 }
 
 const LOCK_RETRY: Duration = Duration::from_millis(10);
-static RECEIPT_PUBLISHERS: LazyLock<Mutex<HashSet<PathBuf>>> =
-    LazyLock::new(|| Mutex::new(HashSet::new()));
+static LOCAL_LEASES: LazyLock<Mutex<HashMap<PathBuf, (Contention, thread::ThreadId)>>> =
+    LazyLock::new(|| Mutex::new(HashMap::new()));
 
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub(super) enum Contention {
@@ -42,18 +43,18 @@ pub(super) enum Contention {
     Wait,
 }
 
-pub(super) struct ReceiptLock {
+pub(super) struct ReceiptLock<'source> {
     file: Handle,
-    path: PathBuf,
     permit: OwnedDirectoryPermit,
-    publishes_receipt: bool,
-    ephemeral: Option<OwnedFileToken>,
+    ownership: Option<OwnedFileToken>,
+    local: LocalLease,
+    protection: Option<&'source ArchiveWriteProtection>,
 }
 
-impl ReceiptLock {
+impl<'source> ReceiptLock<'source> {
     pub(super) fn acquire(
         directory: &Path,
-        protection: Option<&ArchiveWriteProtection>,
+        protection: Option<&'source ArchiveWriteProtection>,
         cancel: &CancelToken,
     ) -> io::Result<Self> {
         Self::acquire_with(directory, protection, cancel, Contention::Refuse)
@@ -61,159 +62,144 @@ impl ReceiptLock {
 
     pub(super) fn acquire_with(
         directory: &Path,
-        protection: Option<&ArchiveWriteProtection>,
+        protection: Option<&'source ArchiveWriteProtection>,
         cancel: &CancelToken,
         contention: Contention,
     ) -> io::Result<Self> {
         let permit = crate::validated_output_directory(directory, None, cancel.flag(), |root| {
-            lock_metadata(&root.join(LOCK_NAME)).map(|_| ())
+            let marker = root.join(LOCK_NAME);
+            if let Some(metadata) = lock_metadata(&marker)? {
+                if metadata.len() != 0 {
+                    return Err(invalid("the legacy origin lock marker must be empty"));
+                }
+                check_protected_output(&marker, protection, Some(cancel))
+                    .map_err(protection_error)?;
+            }
+            lock_metadata(&root.join(LEASE_NAME)).map(|_| ())
         })
         .map_err(OwnedOutputError::into_io_error)?;
-        let path = permit.path().join(LOCK_NAME);
-        let candidate = lock_file(&path, &permit, protection, cancel, contention)?;
-        let publishes_receipt = contention == Contention::Refuse;
-        if publishes_receipt {
-            receipt_publishers().insert(path.clone());
-        }
-        Ok(Self {
-            file: candidate.file,
-            path,
+        let local = LocalLease::reserve(permit.path().join(LEASE_NAME), cancel, contention)?;
+        permit
+            .ensure_namespace_writable(&local.path, cancel.flag())
+            .map_err(protection_error)?;
+        let created =
+            create_output_file(&local.path, protection, cancel.flag()).map_err(|error| {
+                let cause = error.into_io_error();
+                if cause.kind() == io::ErrorKind::AlreadyExists {
+                    io::Error::new(
+                        io::ErrorKind::WouldBlock,
+                        format!(
+                            "the origin publication lease already exists at {}",
+                            local.path.display()
+                        ),
+                    )
+                } else {
+                    cause
+                }
+            })?;
+        let (file, ownership) = created.into_parts();
+        let file = Handle::from_file(file).map_err(|error| retained_lock(&local.path, error))?;
+        let result = Self {
+            file,
             permit,
-            publishes_receipt,
-            ephemeral: candidate.ephemeral,
-        })
+            ownership: Some(ownership),
+            local,
+            protection,
+        };
+        match result.check(cancel) {
+            Ok(()) => Ok(result),
+            Err(error) => result.finish_io(Err(error), false),
+        }
     }
 
-    pub(super) fn retire(mut self, protection: Option<&ArchiveWriteProtection>) -> io::Result<()> {
-        if let Some(ownership) = self.ephemeral.take() {
+    pub(super) fn retire(mut self) -> io::Result<()> {
+        self.retire_owned()
+    }
+
+    fn retire_owned(&mut self) -> io::Result<()> {
+        if let Some(ownership) = self.ownership.take() {
             self.check(&CancelToken::new())?;
-            lock_retirement::rename_and_remove(&self.path, &self.permit, ownership, protection)?;
+            lock_retirement::rename_and_remove(
+                &self.local.path,
+                &self.permit,
+                ownership,
+                self.protection,
+            )?;
         }
         Ok(())
     }
 
+    pub(super) fn finish_io<T>(self, result: io::Result<T>, committed: bool) -> io::Result<T> {
+        use super::ordinary::LockFinishFailure;
+
+        let Err(cleanup) = self.retire() else {
+            return result;
+        };
+        Err(io::Error::other(match (result, committed) {
+            (Ok(_), true) => LockFinishFailure::Committed { cleanup },
+            (Ok(_), false) => LockFinishFailure::Unplaced { cleanup },
+            (Err(primary), true) => LockFinishFailure::Receipt { primary, cleanup },
+            (Err(primary), false) => LockFinishFailure::Uncommitted { primary, cleanup },
+        }))
+    }
+
     pub(super) fn check(&self, cancel: &CancelToken) -> io::Result<()> {
         self.permit
-            .ensure_namespace_writable(&self.path, cancel.flag())
+            .ensure_namespace_writable(&self.local.path, cancel.flag())
             .map_err(protection_error)?;
-        validate_lock(&self.file, &self.path)
+        validate_lock(&self.file, &self.local.path)
     }
 }
 
-impl Drop for ReceiptLock {
+impl Drop for ReceiptLock<'_> {
     fn drop(&mut self) {
-        if self.publishes_receipt {
-            receipt_publishers().remove(&self.path);
+        if let Err(error) = self.retire_owned() {
+            let _ = writeln!(
+                io::stderr(),
+                "could not retire the abandoned origin publication lease: {error}"
+            );
         }
     }
 }
 
-fn receipt_publishers() -> MutexGuard<'static, HashSet<PathBuf>> {
-    RECEIPT_PUBLISHERS
-        .lock()
-        .unwrap_or_else(PoisonError::into_inner)
+struct LocalLease {
+    path: PathBuf,
 }
 
-struct LockCandidate {
-    file: Handle,
-    ephemeral: Option<OwnedFileToken>,
-}
-
-fn lock_file(
-    path: &Path,
-    permit: &OwnedDirectoryPermit,
-    protection: Option<&ArchiveWriteProtection>,
-    cancel: &CancelToken,
-    contention: Contention,
-) -> io::Result<LockCandidate> {
-    let mut pending: Option<LockCandidate> = None;
-    loop {
-        if cancel.is_cancelled() {
-            let cause = io::Error::from(io::ErrorKind::Interrupted);
-            return Err(if pending.is_some() {
-                retained_lock(path, cause)
-            } else {
-                cause
-            });
-        }
-        let admitted = permit
-            .ensure_namespace_writable(path, cancel.flag())
-            .map_err(protection_error);
-        if let Err(cause) = admitted {
-            return Err(if pending.is_some() {
-                retained_lock(path, cause)
-            } else {
-                cause
-            });
-        }
-        let candidate = if let Some(candidate) = pending.take() {
-            candidate
-        } else if let Some(candidate) = open_candidate(path, protection, cancel, contention)? {
-            candidate
-        } else {
-            continue;
-        };
-        match candidate.file.as_file().try_lock().map_err(io::Error::from) {
-            Ok(()) if candidate.admit(path, protection, cancel)? => return Ok(candidate),
-            Ok(()) => {}
-            Err(error)
-                if error.kind() == io::ErrorKind::WouldBlock && contention == Contention::Wait =>
+impl LocalLease {
+    fn reserve(path: PathBuf, cancel: &CancelToken, contention: Contention) -> io::Result<Self> {
+        let thread_id = thread::current().id();
+        loop {
+            if cancel.is_cancelled() {
+                return Err(io::Error::from(io::ErrorKind::Interrupted));
+            }
             {
-                if candidate.ephemeral.is_some() {
-                    pending = Some(candidate);
-                } else {
-                    drop(candidate);
-                    if receipt_publishers().contains(path) {
-                        return Err(error);
+                let mut leases = local_leases();
+                match leases.get(&path) {
+                    None => {
+                        leases.insert(path.clone(), (contention, thread_id));
+                        drop(leases);
+                        return Ok(Self { path });
                     }
+                    Some(&(Contention::Wait, owner))
+                        if contention == Contention::Wait && owner != thread_id => {}
+                    Some(_) => return Err(io::Error::from(io::ErrorKind::WouldBlock)),
                 }
-                thread::sleep(LOCK_RETRY);
             }
-            Err(error) => {
-                return Err(if candidate.ephemeral.is_some() {
-                    retained_lock(path, error)
-                } else {
-                    error
-                });
-            }
+            thread::sleep(LOCK_RETRY);
         }
     }
 }
 
-impl LockCandidate {
-    fn admit(
-        &self,
-        path: &Path,
-        protection: Option<&ArchiveWriteProtection>,
-        cancel: &CancelToken,
-    ) -> io::Result<bool> {
-        if !self.still_named(path)? {
-            return Ok(false);
-        }
-        let Err(error) = check_protected_output(path, protection, Some(cancel)) else {
-            return Ok(true);
-        };
-        if lock_target_disappeared(path, &error) && !self.still_named(path)? {
-            return Ok(false);
-        }
-        let error = protection_error(error);
-        Err(if self.ephemeral.is_some() {
-            retained_lock(path, error)
-        } else {
-            error
-        })
-    }
-    fn still_named(&self, path: &Path) -> io::Result<bool> {
-        match same_lock(&self.file, path) {
-            Ok(false) if self.ephemeral.is_some() => Err(invalid(
-                "a newly created ordinary origin lock changed identity",
-            )),
-            Err(cause) if self.ephemeral.is_some() => Err(retained_lock(path, cause)),
-            result => result,
-        }
+impl Drop for LocalLease {
+    fn drop(&mut self) {
+        local_leases().remove(&self.path);
     }
 }
 
+fn local_leases() -> MutexGuard<'static, HashMap<PathBuf, (Contention, thread::ThreadId)>> {
+    LOCAL_LEASES.lock().unwrap_or_else(PoisonError::into_inner)
+}
 fn retained_lock(path: &Path, source: io::Error) -> io::Error {
     io::Error::new(
         source.kind(),
@@ -230,86 +216,6 @@ pub(super) struct RetainedLock {
     path: PathBuf,
     #[source]
     source: io::Error,
-}
-
-fn open_candidate(
-    path: &Path,
-    protection: Option<&ArchiveWriteProtection>,
-    cancel: &CancelToken,
-    contention: Contention,
-) -> io::Result<Option<LockCandidate>> {
-    let opened = if lock_metadata(path)?.is_some() {
-        OpenOptions::new()
-            .read(true)
-            .write(true)
-            .open(path)
-            .map(|file| (file, None))
-    } else if contention == Contention::Wait {
-        match create_output_file(path, protection, cancel.flag()) {
-            Ok(created) => {
-                let (file, ownership) = created.into_parts();
-                Ok((file, Some(ownership)))
-            }
-            Err(OwnedOutputError::Protection(error)) if lock_target_disappeared(path, &error) => {
-                return Ok(None);
-            }
-            Err(OwnedOutputError::Io { source, .. })
-                if source.kind() == io::ErrorKind::AlreadyExists =>
-            {
-                return Ok(None);
-            }
-            Err(error) => Err(error.into_io_error()),
-        }
-    } else {
-        if let Err(error) = check_protected_output(path, protection, Some(cancel)) {
-            if lock_target_disappeared(path, &error) {
-                return Ok(None);
-            }
-            return Err(protection_error(error));
-        }
-        OpenOptions::new()
-            .read(true)
-            .write(true)
-            .create_new(true)
-            .open(path)
-            .map(|file| (file, None))
-    };
-    match opened {
-        Ok((file, ephemeral)) => {
-            let file = Handle::from_file(file).map_err(|error| {
-                if ephemeral.is_some() {
-                    retained_lock(path, error)
-                } else {
-                    error
-                }
-            })?;
-            Ok(Some(LockCandidate { file, ephemeral }))
-        }
-        Err(error)
-            if matches!(
-                error.kind(),
-                io::ErrorKind::AlreadyExists | io::ErrorKind::NotFound
-            ) =>
-        {
-            Ok(None)
-        }
-        Err(error) => Err(error),
-    }
-}
-
-fn lock_target_disappeared(path: &Path, error: &WriteProtectionError) -> bool {
-    use std::error::Error as _;
-
-    matches!(
-        error,
-        WriteProtectionError::TargetIdentity { target, cause }
-            if target == path
-                && cause.reason() == AliasUncertainty::HostFileIdentity
-                && cause
-                    .source()
-                    .and_then(|error| error.downcast_ref::<io::Error>())
-                    .is_some_and(|error| error.kind() == io::ErrorKind::NotFound)
-    )
 }
 
 fn validate_lock(file: &Handle, path: &Path) -> io::Result<()> {

@@ -39,7 +39,7 @@ pub enum FilePublication {
 impl FileReceipt<'_> {
     pub(super) fn publish_companion(
         &self,
-        held: &ReceiptLock,
+        held: &ReceiptLock<'_>,
         digest: OriginArtifactDigest,
         describe: impl FnOnce(&mut dyn Write, &OriginArtifactBinding) -> io::Result<()>,
     ) -> io::Result<()> {
@@ -48,7 +48,7 @@ impl FileReceipt<'_> {
 
     pub(super) fn publish_companion_checked(
         &self,
-        held: &ReceiptLock,
+        held: &ReceiptLock<'_>,
         digest: OriginArtifactDigest,
         checkpoint: impl FnOnce() -> io::Result<()>,
         describe: impl FnOnce(&mut dyn Write, &OriginArtifactBinding) -> io::Result<()>,
@@ -98,36 +98,41 @@ impl FileReceipt<'_> {
     ) -> io::Result<FilePublication> {
         check_cancelled(&self.cancel)?;
         let held = self.acquire(Contention::Refuse)?;
-        self.check_target()?;
-        if let Some(kept) = self.retained(&held, bytes, policy)? {
-            return Ok(kept);
-        }
-        let digest = origin_file_io::write_staged(
-            &self.artifact,
-            self.protection,
-            Some(&self.cancel),
-            |writer| {
-                let mut measured = OriginDigestWriter::new(writer);
-                measured.write_all(bytes)?;
-                measured.finish()
-            },
-            |digest, staged| self.place_bytes(&held, staged, policy, digest),
-        )?;
-        let Some(digest) = digest else {
-            return self
-                .retained(&held, bytes, ConflictPolicy::Skip)?
-                .ok_or_else(|| {
-                    io::Error::new(io::ErrorKind::NotFound, "the retained target disappeared")
-                });
-        };
-        let size = digest.byte_length();
-        self.publish_companion(&held, digest, describe)?;
-        Ok(FilePublication::Written { size })
+        let mut committed = false;
+        let result = (|| {
+            self.check_target()?;
+            if let Some(kept) = self.retained(&held, bytes, policy)? {
+                return Ok(kept);
+            }
+            let digest = origin_file_io::write_staged(
+                &self.artifact,
+                self.protection,
+                Some(&self.cancel),
+                |writer| {
+                    let mut measured = OriginDigestWriter::new(writer);
+                    measured.write_all(bytes)?;
+                    measured.finish()
+                },
+                |digest, staged| self.place_bytes(&held, staged, policy, digest),
+            )?;
+            let Some(digest) = digest else {
+                return self
+                    .retained(&held, bytes, ConflictPolicy::Skip)?
+                    .ok_or_else(|| {
+                        io::Error::new(io::ErrorKind::NotFound, "the retained target disappeared")
+                    });
+            };
+            committed = true;
+            let size = digest.byte_length();
+            self.publish_companion(&held, digest, describe)?;
+            Ok(FilePublication::Written { size })
+        })();
+        held.finish_io(result, committed)
     }
 
     fn retained(
         &self,
-        held: &ReceiptLock,
+        held: &ReceiptLock<'_>,
         bytes: &[u8],
         policy: ConflictPolicy,
     ) -> io::Result<Option<FilePublication>> {
@@ -158,7 +163,7 @@ impl FileReceipt<'_> {
 
     fn place_bytes(
         &self,
-        held: &ReceiptLock,
+        held: &ReceiptLock<'_>,
         staged: &StagedOutput<'_>,
         policy: ConflictPolicy,
         digest: OriginArtifactDigest,

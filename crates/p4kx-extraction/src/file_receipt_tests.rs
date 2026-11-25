@@ -128,10 +128,12 @@ fn contending_file_publication_cannot_invalidate_or_replace_the_previous_receipt
 #[test]
 fn arbitrary_receipt_destinations_cannot_replace_an_artifact_or_the_lock() -> TestResult {
     let dir = tempfile::tempdir()?;
-    let lock = dir.path().join(".P4KX-ORIGIN.LOCK");
-    assert!(StdoutReceipt::new(&lock, None).is_err());
-    assert!(FileReceipt::new(&lock, None, None).is_err());
-    assert!(!lock.exists());
+    for reserved in [".P4KX-ORIGIN.LOCK", ".P4KX-ORIGIN.LEASE"] {
+        let path = dir.path().join(reserved);
+        assert!(StdoutReceipt::new(&path, None).is_err(), "{reserved}");
+        assert!(FileReceipt::new(&path, None, None).is_err(), "{reserved}");
+        assert!(!path.exists(), "the reserved name was not created");
+    }
 
     let source = dir.path().join("source.xml");
     fs::write(&source, PAYLOAD)?;

@@ -32,6 +32,8 @@ mod ordinary;
 mod publication;
 #[path = "file_receipt_staged.rs"]
 mod staged;
+#[path = "stdout_receipt.rs"]
+mod stdout;
 #[path = "file_receipt_target.rs"]
 mod target_path;
 
@@ -51,7 +53,8 @@ pub(crate) use lock::{is_origin_lock_name, origin_lock_collision};
 pub(crate) use ordinary::{OrdinaryReplacement, is_owned_native_companion, retained_lock_failure};
 pub use publication::FilePublication;
 pub(crate) use staged::{StagedReceiptPublication, finish_staged_receipt};
-use target_path::{BindTarget, TargetLeaf, bind_target, lexical_receipt, sibling_receipt, target};
+pub use stdout::StdoutReceipt;
+use target_path::{BindTarget, TargetLeaf, bind_target, lexical_receipt, sibling_receipt};
 
 pub(crate) const COMPANION_SUFFIX: &str = ".p4kx-origin.jsonl";
 const DIRECTORY_NAME: &str = COMPANION_SUFFIX;
@@ -172,7 +175,7 @@ impl<'source> FileReceipt<'source> {
         describe: impl FnOnce(&mut dyn Write, &OriginArtifactBinding, &T) -> io::Result<()>,
     ) -> io::Result<T> {
         let mut held = None;
-        let (result, digest) = origin_file_io::write_replacing_before(
+        let staged = origin_file_io::write_replacing_before(
             &self.artifact,
             self.protection,
             Some(&self.cancel),
@@ -182,23 +185,31 @@ impl<'source> FileReceipt<'source> {
                 Ok((result, measured.finish()?))
             },
             |staged| {
-                let lock = self.acquire(Contention::Refuse)?;
+                let lease = held.insert(self.acquire(Contention::Refuse)?);
                 self.check_target()?;
                 staged.check().map_err(protection_error)?;
                 self.invalidate(ExistingCompanions::RequireOwned)?;
-                held = Some(lock);
-                Ok(())
+                lease.check(&self.cancel)
             },
-        )?;
-        let held =
-            held.ok_or_else(|| io::Error::other("artifact committed without the origin lock"))?;
-        self.publish_companion(&held, digest, |writer, binding| {
-            describe(writer, binding, &result)
-        })?;
-        Ok(result)
+        );
+        let Some(held) = held else {
+            return staged.and_then(|_| {
+                Err(io::Error::other(
+                    "artifact committed without the origin lock",
+                ))
+            });
+        };
+        let committed = staged.is_ok();
+        let result = staged.and_then(|(result, digest)| {
+            self.publish_companion(&held, digest, |writer, binding| {
+                describe(writer, binding, &result)
+            })?;
+            Ok(result)
+        });
+        held.finish_io(result, committed)
     }
 
-    fn acquire(&self, contention: Contention) -> io::Result<ReceiptLock> {
+    fn acquire(&self, contention: Contention) -> io::Result<ReceiptLock<'source>> {
         let directory = self
             .artifact
             .parent()
@@ -314,75 +325,6 @@ impl ExistingCompanions {
             result => result,
         }
     }
-}
-
-/// A guarded destination for an explicit durable stdout receipt.
-pub struct StdoutReceipt<'source> {
-    path: PathBuf,
-    protection: Option<&'source ArchiveWriteProtection>,
-    cancel: CancelToken,
-}
-
-impl<'source> StdoutReceipt<'source> {
-    /// Binds a durable receipt path before the raw stream is written.
-    ///
-    /// # Errors
-    ///
-    /// Returns path, target ownership or output protection errors.
-    pub fn new(
-        path: &Path,
-        protection: Option<&'source ArchiveWriteProtection>,
-    ) -> io::Result<Self> {
-        let cancel = CancelToken::new();
-        let path = target(path, protection, &cancel)?;
-        check_stdout_target(&path)?;
-        Ok(Self {
-            path,
-            protection,
-            cancel,
-        })
-    }
-
-    /// Publishes a completed receipt without changing the raw stdout bytes.
-    ///
-    /// # Errors
-    ///
-    /// Returns a write, output protection or ownership error.
-    pub fn publish(
-        &self,
-        describe: impl FnOnce(&mut dyn Write) -> io::Result<()>,
-    ) -> io::Result<()> {
-        let mut held = None;
-        let result = origin_file_io::write_replacing_before(
-            &self.path,
-            self.protection,
-            Some(&self.cancel),
-            |writer| describe(writer),
-            |_| {
-                let directory = self
-                    .path
-                    .parent()
-                    .ok_or_else(|| invalid("the receipt has no directory"))?;
-                let lock = ReceiptLock::acquire(directory, self.protection, &self.cancel)?;
-                if target(&self.path, self.protection, &self.cancel)? != self.path {
-                    return Err(invalid("the receipt spelling changed before publication"));
-                }
-                check_stdout_target(&self.path)?;
-                held = Some(lock);
-                Ok(())
-            },
-        );
-        drop(held);
-        result
-    }
-}
-
-fn check_stdout_target(path: &Path) -> io::Result<()> {
-    if regular_file(&sibling_receipt(path)?)?.is_some() {
-        return Err(invalid("the receipt target has its own artifact companion"));
-    }
-    header::check_existing(path, ReceiptOwner::Stdout)?;
-    Ok(())
 }
 
 fn check(

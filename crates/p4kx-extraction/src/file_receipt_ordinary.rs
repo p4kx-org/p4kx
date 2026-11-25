@@ -29,7 +29,7 @@ pub(crate) fn retained_lock_failure(error: &io::Error) -> bool {
 
 pub(crate) struct OrdinaryReplacement<'source> {
     receipt: FileReceipt<'source>,
-    held: ReceiptLock,
+    held: ReceiptLock<'source>,
     mode: BindTarget,
 }
 
@@ -82,7 +82,9 @@ impl<'source> OrdinaryReplacement<'source> {
         } else {
             self.receipt.check_target()?;
         }
-        self.receipt.invalidate(ExistingCompanions::PreserveForeign)
+        self.receipt
+            .invalidate(ExistingCompanions::PreserveForeign)?;
+        self.held.check(&self.receipt.cancel)
     }
 
     pub(crate) fn invalidate_for_companion(&self) -> io::Result<()> {
@@ -106,7 +108,7 @@ impl<'source> OrdinaryReplacement<'source> {
         describe: impl FnOnce(&mut dyn Write, &OriginArtifactBinding) -> io::Result<()>,
     ) -> Result<T, ConversionError> {
         let publication = self.receipt.publish_companion(&self.held, digest, describe);
-        let retirement = self.held.retire(self.receipt.receipt_protection);
+        let retirement = self.held.retire();
         match (publication, retirement) {
             (Ok(()), Ok(())) => Ok(value),
             (Err(source), Ok(())) => Err(write_error(self.receipt.path(), source)),
@@ -159,7 +161,7 @@ impl<'source> OrdinaryReplacement<'source> {
         placement: Placement,
         map: impl FnOnce(LockFinishFailure<E>) -> E,
     ) -> Result<T, E> {
-        let Err(cleanup) = self.held.retire(self.receipt.receipt_protection) else {
+        let Err(cleanup) = self.held.retire() else {
             return result;
         };
         Err(map(match (result, placement) {
@@ -206,7 +208,7 @@ enum Placement {
 }
 
 #[derive(Debug, thiserror::Error)]
-enum LockFinishFailure<E> {
+pub(super) enum LockFinishFailure<E> {
     #[error("output committed but its receipt and lock retirement failed: {cleanup}")]
     Receipt {
         #[source]
@@ -239,14 +241,14 @@ mod tests {
     use std::io;
 
     use super::{LockFinishFailure, OrdinaryReplacement, retained_lock_failure};
-    use crate::file_receipt::lock::LOCK_NAME;
+    use crate::file_receipt::lock::LEASE_NAME;
     use crate::write::Outcome;
 
     #[test]
     fn a_late_keep_reports_retirement_failure_without_claiming_replacement() -> io::Result<()> {
         let directory = tempfile::tempdir()?;
         let output = directory.path().join("output.bin");
-        let lock = directory.path().join(LOCK_NAME);
+        let lock = directory.path().join(LEASE_NAME);
         let replacement = OrdinaryReplacement::new(&output, None, None)?;
         fs::rename(&lock, directory.path().join("original-lock"))?;
         fs::write(&lock, b"foreign")?;
@@ -277,7 +279,7 @@ mod tests {
         for committed in [false, true] {
             let dir = tempfile::tempdir()?;
             let path = dir.path().join("output.bin");
-            let lock = dir.path().join(LOCK_NAME);
+            let lock = dir.path().join(LEASE_NAME);
             let replaced = dir.path().join("original-lock");
             let replacement = OrdinaryReplacement::new(&path, None, None)?;
             fs::rename(&lock, &replaced)?;

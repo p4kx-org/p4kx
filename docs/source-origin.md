@@ -38,8 +38,10 @@ companion describes the tool's observation of the input and output.
 
 ## File publication
 
-Cooperating writers use `.p4kx-origin.lock` to serialize publication in each
-destination directory. Receipt writers that create the lock retain it there.
+Cooperating writers exclusively create `.p4kx-origin.lease` to serialize
+publication in each destination directory. The same namespace reservation
+applies through native paths and writable Documents portal grants. Existing
+empty regular `.p4kx-origin.lock` markers remain reserved and untouched.
 The tool stages each file independently. Once the artifact is ready
 to replace its previous version, the tool removes the previous companion before
 replacing the artifact, even when the emitted bytes are identical. An interruption
@@ -59,10 +61,10 @@ directory's publication lock. A directory or redirect at the reserved lock name
 causes a destination conflict when a replacement needs the lock. A native file name ending
 in `.p4kx-origin.jsonl` remains usable when the path is free of an owned companion.
 
-Temporary replacement locks are moved out of the shared name before removal.
-Existing receipt locks remain in place. If retirement fails, the error states
-whether the artifact was committed. Conflict policies that keep existing bytes
-also keep their proof.
+The writer moves its lease out of the shared name before removal. If a process
+ends without releasing its lease, another writer refuses the existing name
+and preserves the file. If retirement fails, the error states whether the artifact
+was committed. Conflict policies that keep existing bytes also keep their proof.
 
 An ordinary replacement of a symbolic link changes its directory entry. The
 writer preserves the referent and receipts proven to address other names.

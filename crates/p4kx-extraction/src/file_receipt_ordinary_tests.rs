@@ -64,16 +64,18 @@ fn ordinary_writers_retire_an_owned_receipt_even_when_bytes_are_identical() -> T
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("target.bin");
     let owner = FileReceipt::new(&path, None, None)?;
+    let lock = dir.path().join(super::lock::LOCK_NAME);
+    fs::write(&lock, b"")?;
+    let previous_lock = same_file::Handle::from_path(&lock)?;
     for replace in ordinary_writers() {
         publish_file(&owner)?;
         assert!(owner.path().is_file(), "a prior complete companion");
-        let lock = dir.path().join(super::lock::LOCK_NAME);
-        let previous_lock = same_file::Handle::from_path(&lock)?;
+        assert!(!dir.path().join(super::lock::LEASE_NAME).exists());
         replace(&path)?;
         assert_eq!(
             same_file::Handle::from_path(&lock)?,
             previous_lock,
-            "an ordinary replacement retains the existing receipt lock"
+            "an ordinary replacement preserves the legacy marker"
         );
         assert_eq!(
             fs::read(&path)?,

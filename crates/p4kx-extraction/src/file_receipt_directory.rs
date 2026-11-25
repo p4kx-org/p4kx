@@ -15,7 +15,8 @@ use super::directory_table;
 use super::directory_wire::{self, CommittedArtifact};
 use super::header::{self, ReceiptOwner};
 use super::lock::{ReceiptLock, invalid, regular_file};
-use super::{DIRECTORY_NAME, check, sibling_receipt, target};
+use super::target_path::target;
+use super::{DIRECTORY_NAME, check, sibling_receipt};
 use crate::origin_file_io;
 use crate::output_file::{self, write_error};
 use crate::{
@@ -27,7 +28,7 @@ use crate::{
 pub struct DirectoryReceipt<'source> {
     directory: PathBuf,
     receipt: PathBuf,
-    lock: ReceiptLock,
+    lock: ReceiptLock<'source>,
     protection: Option<&'source ArchiveWriteProtection>,
     cancel: CancelToken,
     state: Mutex<PublicationState>,
@@ -78,7 +79,7 @@ impl CommitGuard<'_> {
 
 /// Proof that one artifact was committed by the owning directory session.
 pub struct DirectoryCommit<'owner> {
-    lock: &'owner ReceiptLock,
+    lock: &'owner ReceiptLock<'owner>,
     artifact: CommittedArtifact,
 }
 
@@ -105,7 +106,10 @@ impl<'source> DirectoryReceipt<'source> {
         let cancel = CancelToken::new();
         check(&receipt, protection, &cancel)?;
         let lock = ReceiptLock::acquire(&directory, protection, &cancel)?;
-        let previous = directory_table::lookup(&receipt, None)?.is_some();
+        let previous = match directory_table::lookup(&receipt, None) {
+            Ok(previous) => previous.is_some(),
+            Err(error) => return lock.finish_io(Err(error), false),
+        };
         Ok(Self {
             directory,
             receipt,
@@ -236,6 +240,16 @@ impl<'source> DirectoryReceipt<'source> {
         Ok(true)
     }
 
+    pub(crate) fn finish<T>(self, result: io::Result<T>) -> io::Result<T> {
+        let committed = self
+            .state
+            .into_inner()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .committed
+            != 0;
+        self.lock.finish_io(result, committed)
+    }
+
     fn reserve_artifact(&self, basename: &OsStr) -> io::Result<Reservation> {
         OriginArtifactName::from_basename(basename)?;
         let actual = target(
@@ -327,6 +341,7 @@ impl<'source> DirectoryReceipt<'source> {
         if sibling_exists {
             fs::remove_file(sibling)?;
         }
+        self.lock.check(&self.cancel)?;
         Ok(CommitGuard {
             state,
             staged_identity_hash,

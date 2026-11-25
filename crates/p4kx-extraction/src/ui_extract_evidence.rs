@@ -8,27 +8,15 @@ use p4kx_gfx::{ObservedAssets, TagSite};
 use super::ui_bitmap_decode::BitmapRead;
 use super::ui_bitmap_sources;
 use super::ui_extract::{ObservedUiExtraction, UiAssetFailure, UiAssetKind, UiExtraction};
-use crate::output_file::write_error;
 use crate::ui_jobs::{ArtifactFields, CommittedUiAsset, JobResult, Outcome};
 use crate::{
-    ConversionError, DirectoryCommit, DirectoryReceipt, FieldOrigin, FieldOrigins, FieldPath,
-    OriginOutputAddress, SourceUse, SourceUseRole, SourceUses, UiMovie, UiMovieEvidence,
-    UiSourceSite as Site,
+    DirectoryCommit, DirectoryReceipt, FieldOrigin, FieldOrigins, FieldPath, OriginOutputAddress,
+    SourceUse, SourceUseRole, SourceUses, UiMovie, UiMovieEvidence, UiSourceSite as Site,
 };
 
 use SourceUseRole::{Conversion, Payload, Selector};
 
 pub(super) fn complete<'owner>(
-    movie: &UiMovie<'_>,
-    publication: &'owner DirectoryReceipt<'_>,
-    observed: ObservedAssets<'_>,
-    jobs: Vec<JobResult<'owner, '_>>,
-) -> Result<ObservedUiExtraction, ConversionError> {
-    finish(movie, publication, observed, jobs)
-        .map_err(|source| write_error(publication.path(), source))
-}
-
-fn finish<'owner>(
     movie: &UiMovie<'_>,
     publication: &'owner DirectoryReceipt<'_>,
     observed: ObservedAssets<'_>,

@@ -170,7 +170,11 @@ impl<'archive> UiMovie<'archive> {
             .par_iter()
             .map(|job| self.run_job(&observed.assets, job, &output, &budget, &files))
             .collect();
-        ui_extract_evidence::complete(self, &publication, observed, outcomes)
+        let result = ui_extract_evidence::complete(self, &publication, observed, outcomes);
+        let receipt = publication.path().to_path_buf();
+        publication
+            .finish(result)
+            .map_err(|source| write_error(&receipt, source))
     }
 
     pub(crate) fn asset_error(&self, id: u16, source: GfxError) -> ConversionError {

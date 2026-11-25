@@ -5,7 +5,7 @@ use std::fs;
 use std::io::{self, Write};
 use std::path::Path;
 
-use crate::file_receipt::lock::LOCK_NAME;
+use crate::file_receipt::lock::LEASE_NAME;
 use crate::guard_cancellation;
 use crate::origin_file_io::{self, StageDisposition};
 use crate::write;
@@ -48,7 +48,7 @@ fn stage_cancellation_before_replacement_preserves_artifact_and_receipt() -> io:
         "the old byte binding remains"
     );
     assert!(
-        !folder.path().join(LOCK_NAME).exists(),
+        !folder.path().join(LEASE_NAME).exists(),
         "the ephemeral lock is retired"
     );
     assert_eq!(fs::read_dir(folder.path())?.count(), 2, "only the old pair");
@@ -174,6 +174,56 @@ fn skip_keeps_the_artifact_and_receipt_installed_during_staging() -> io::Result<
     Ok(())
 }
 
+#[test]
+fn replaced_lease_after_invalidation_blocks_the_artifact_rename() -> io::Result<()> {
+    let folder = tempfile::tempdir()?;
+    let output = folder.path().join("fixture.dds");
+    let lease = folder.path().join(LEASE_NAME);
+    let displaced = folder.path().join("displaced-lease");
+    let receipt = FileReceipt::new(&output, None, None)?;
+    write_prior(&output, &receipt)?;
+
+    let mut before_invalidation = true;
+    let placed = stage(
+        &output,
+        &receipt,
+        || {
+            if !std::mem::take(&mut before_invalidation) {
+                fs::rename(&lease, &displaced)?;
+                fs::File::create_new(&lease)?;
+            }
+            Ok(())
+        },
+        |_, _| unreachable!("a replacement with a lost lease cannot publish a receipt"),
+    )?;
+    let StagedReceiptPublication::Uncommitted(error) = placed else {
+        return Err(io::Error::other(
+            "the lease substitution must block the replacement",
+        ));
+    };
+    assert!(
+        crate::file_receipt::retained_lock_failure(&error),
+        "the lease cleanup failure remains observable: {error:?}"
+    );
+    assert_eq!(fs::read(&output)?, OLD, "the old artifact remains in place");
+    assert!(
+        !receipt.path().exists(),
+        "the invalidated receipt stays absent"
+    );
+    assert_eq!(fs::read(lease)?, b"", "the competing lease remains");
+    assert_eq!(
+        fs::read(displaced)?,
+        b"",
+        "the displaced owned lease remains"
+    );
+    assert_eq!(
+        fs::read_dir(folder.path())?.count(),
+        3,
+        "no staging files remain"
+    );
+    Ok(())
+}
+
 fn stage(
     output: &Path,
     receipt: &FileReceipt<'_>,
@@ -282,7 +332,7 @@ fn a_foreign_companion_refuses_replacement_of_the_prior_artifact() -> io::Result
 fn cancellation_keeps_a_typed_lock_retirement_failure() -> io::Result<()> {
     let folder = tempfile::tempdir()?;
     let output = folder.path().join("fixture.dds");
-    let lock = folder.path().join(LOCK_NAME);
+    let lock = folder.path().join(LEASE_NAME);
     let moved = folder.path().join("displaced-lock");
     let cancel = CancelToken::new();
     let receipt = FileReceipt::new_with_cancel(&output, None, None, cancel.clone())?;

@@ -108,7 +108,6 @@ impl FileReceipt<'_> {
             Ok(held) => held,
             Err(error) => return Some(StagedReceiptPublication::Uncommitted(error)),
         };
-        let protection = self.receipt_protection.or(self.protection);
         let mut check = || {
             checkpoint()?;
             if self.cancel.is_cancelled() {
@@ -124,18 +123,18 @@ impl FileReceipt<'_> {
                     }
                     CompanionPlacement::PreserveForeign => None,
                 };
-                let retirement = held.retire(protection);
+                let retirement = held.retire();
                 Some(StagedReceiptPublication::Committed {
                     receipt,
                     retirement,
                 })
             }
             Ok(None) => held
-                .retire(protection)
+                .retire()
                 .err()
                 .map(StagedReceiptPublication::Uncommitted),
             Err(primary) => {
-                let error = match held.retire(protection) {
+                let error = match held.retire() {
                     Ok(()) => primary,
                     Err(cleanup) => io::Error::other(RetirementFailure { primary, cleanup }),
                 };
@@ -146,7 +145,7 @@ impl FileReceipt<'_> {
 
     fn place_staged(
         &self,
-        held: &ReceiptLock,
+        held: &ReceiptLock<'_>,
         staged: &StagedOutput<'_>,
         policy: ConflictPolicy,
         mut checkpoint: impl FnMut() -> io::Result<()>,
@@ -179,6 +178,7 @@ impl FileReceipt<'_> {
         let companion = self.companion_placement()?;
         invalidated();
         checkpoint()?;
+        held.check(&self.cancel)?;
         if policy == ConflictPolicy::Skip {
             staged.check().map_err(protection_error)?;
             origin_file_io::install_without_replacing(staged, &self.artifact)

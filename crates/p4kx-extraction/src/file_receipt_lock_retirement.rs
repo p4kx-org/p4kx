@@ -11,7 +11,7 @@ use crate::{
     create_output_file,
 };
 
-use super::lock::{LOCK_NAME, protection_error};
+use super::lock::{LEASE_NAME, protection_error};
 
 static RETIREMENT: AtomicU64 = AtomicU64::new(0);
 static CLEANUP: AtomicBool = AtomicBool::new(false);
@@ -66,7 +66,7 @@ fn reserve_sibling(
 ) -> io::Result<(PathBuf, OwnedFileToken)> {
     loop {
         let id = RETIREMENT.fetch_add(1, Ordering::Relaxed);
-        let retired = lock.with_file_name(format!("{LOCK_NAME}.{}.{id}.part", std::process::id()));
+        let retired = lock.with_file_name(format!("{LEASE_NAME}.{}.{id}.part", std::process::id()));
         match create_output_file(&retired, protection, &CLEANUP) {
             Ok(created) => {
                 let (file, token) = created.into_parts();
