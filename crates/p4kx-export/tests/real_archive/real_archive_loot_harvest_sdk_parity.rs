@@ -11,7 +11,7 @@ use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
     DatasetAvailability, ParsedCatalogQueries,
 };
-use p4kx_extraction::{Archive, Build, SourceInventory};
+use p4kx_extraction::{Archive, Build, FieldPath, SourceInventory};
 use serde::Serialize;
 
 use crate::real_archive_catalog_table_parity::{
@@ -60,7 +60,7 @@ fn installed_loot_harvest_matches_one_complete_catalog() -> TestResult {
         let count = evidence.compare(measurement)?;
         let rows = [count.original.rows.as_slice(), count.arrays.as_slice()].concat();
         print_line(&format!(
-            "complete loot and harvest SDK parity: rows={rows:?} sourceUses={} physicalSources={} slotPresetEvidence=values",
+            "complete loot and harvest SDK parity: rows={rows:?} sourceUses={} physicalSources={} slotPresetEvidence=source",
             count.original.source_uses, count.original.physical_sources,
         ));
         Ok(())
@@ -222,6 +222,33 @@ fn verify_slot_preset_owners(snapshot: &LootDefinitionSnapshot<'_>) -> TestResul
             return Err("a projected slot preset has no unique original GUID and path".into());
         }
     }
+    verify_slot_preset_origins(snapshot)
+}
+
+fn verify_slot_preset_origins(snapshot: &LootDefinitionSnapshot<'_>) -> TestResult {
+    for (pointer, is_header) in [
+        ("/guid", true),
+        ("/className", true),
+        ("/recordPath", true),
+        ("/defaultConfigGuid", false),
+        ("/ignoreAttachableTags", false),
+        ("/taggedConfigs", false),
+    ] {
+        let path = FieldPath::parse(pointer)?;
+        for row in &snapshot.sub_harvestable_multi_configs {
+            let origin = row.field_origins.get(&path).ok_or_else(|| {
+                format!("{} has no slot preset origin at {pointer}", row.record_path)
+            })?;
+            if is_header && (!origin.source_set_complete() || origin.source_uses_refs().is_empty())
+            {
+                return Err(format!(
+                    "{} has no complete slot preset header origin at {pointer}",
+                    row.record_path,
+                )
+                .into());
+            }
+        }
+    }
     Ok(())
 }
 
@@ -293,7 +320,7 @@ impl Proof<'_> {
             || !coverage.unreadable_headers.is_empty()
             || !coverage.unreadable_bodies.is_empty()
             || !coverage.incomplete_fields.is_empty()
-            || (dataset.has_authored_evidence() && count != 0 && (uses == 0 || sources == 0))
+            || (count != 0 && (uses == 0 || sources == 0))
         {
             return Err(format!(
                 "{path}: expected {expected} rows and {leftovers} exclusions, observed {count} {:?}, skipped={}, unreadableHeaders={} unreadableBodies={} incompleteFields={} inventoryUses={uses} inventorySources={sources}",
@@ -304,13 +331,9 @@ impl Proof<'_> {
         if let Some(proof) = &mut self.retained {
             proof.retain(dataset, scope.availability, rows, scope.inventory)?;
         }
-        let evidence = if dataset.has_authored_evidence() {
-            "source"
-        } else {
-            "values"
-        };
+
         print_line(&format!(
-            "Loot and harvest SDK: dataset={path} availability={:?} rowEvidence={evidence} rows={count} inventoryUses={uses} inventorySources={sources} skippedLeftovers={leftovers}",
+            "Loot and harvest SDK: dataset={path} availability={:?} rowEvidence=source rows={count} inventoryUses={uses} inventorySources={sources} skippedLeftovers={leftovers}",
             scope.availability,
         ));
         Ok(())

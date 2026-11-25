@@ -66,10 +66,6 @@ impl LootHarvestDataset {
         }
     }
 
-    pub(crate) const fn has_authored_evidence(self) -> bool {
-        !matches!(self, Self::SlotPresets)
-    }
-
     const fn shape(self) -> EncounterRow {
         match self {
             Self::WeightedTables | Self::WeightedArchetypes => EncounterRow::LootWeighted,
@@ -136,7 +132,7 @@ impl<'directory> LootHarvestDigests<'directory> {
         };
         let referenced = retain_rows(dataset, rows, ordered)?;
         if referenced.is_empty() {
-            if dataset.has_authored_evidence() && !rows.is_empty() {
+            if !rows.is_empty() {
                 return Err(format!("{} has no contributing source uses", dataset.path()).into());
             }
         } else {
@@ -274,9 +270,8 @@ fn loot_harvest_comparison_retains_physical_and_projected_identity() -> TestResu
 }
 
 #[test]
-fn loot_harvest_comparison_accepts_empty_and_value_only_routes() -> TestResult {
+fn loot_harvest_comparison_accepts_empty_routes() -> TestResult {
     use p4kx_extraction::SourceUses;
-    use serde_json::json;
 
     let directory = tempfile::tempdir()?;
     let mut proof = LootHarvestDigests::new(directory.path());
@@ -294,11 +289,10 @@ fn loot_harvest_comparison_accepts_empty_and_value_only_routes() -> TestResult {
         no_rows,
         &inventory,
     )?;
-    let slot = [json!({"guid":"slot", "recordPath":"slot-presets/one"})];
     proof.retain(
         LootHarvestDataset::SlotPresets,
         DatasetAvailability::Available,
-        &slot,
+        no_rows,
         &inventory,
     )?;
     assert_eq!(
@@ -331,6 +325,22 @@ fn loot_harvest_comparison_requires_every_claimed_source() -> TestResult {
         error.to_string(),
         "/definitions/subHarvestableConfigs has no contributing source uses",
         "a nonempty original route needs row-level source uses",
+    );
+
+    let value_only_slot = [json!({"guid":"slot", "recordPath":"slot-presets/one"})];
+    let result = proof.retain(
+        LootHarvestDataset::SlotPresets,
+        DatasetAvailability::Available,
+        &value_only_slot,
+        &inventory,
+    );
+    let Err(error) = result else {
+        return Err("a slot preset accepted a value-only row".into());
+    };
+    assert_eq!(
+        error.to_string(),
+        "/subHarvestableMultiConfigs has no contributing source uses",
+        "a nonempty projection needs field-level source uses",
     );
 
     let slot = [json!({
