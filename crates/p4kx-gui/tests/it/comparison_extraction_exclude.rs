@@ -5,8 +5,10 @@
 
 use std::error::Error;
 
+use crate::common::files_below;
 use crate::comparing::{Pair, TestResult, pair, write};
-use crate::comparison_extraction::{compared, poll_until, written};
+use crate::comparison_extraction::{compared, poll_until};
+use crate::extraction_outputs::assert_receipted_outputs;
 
 use p4kx_gui::{ComparisonSide, Extraction, ExtractionScope, Model, TargetKind};
 use p4kx_testkit::{ArchiveBuilder, SplitDds, TestEntry, TestTextureFormat};
@@ -83,12 +85,7 @@ fn the_exclusion_leaves_matching_changes_out() -> TestResult {
     assert!(start(&mut model, &out, "CRC\n\nengine/ADDED", false)?);
     finish(&mut model)?;
 
-    assert_eq!(
-        written(&out)?.into_keys().collect::<Vec<_>>(),
-        ["Data\\Libs\\size.xml"],
-        "case and separator kind do not matter, blank lines are ignored"
-    );
-    Ok(())
+    assert_receipted_outputs(&out, &["Data\\Libs\\size.xml"])
 }
 
 #[test]
@@ -100,11 +97,7 @@ fn the_exclusion_narrows_what_the_filter_of_the_comparison_selected() -> TestRes
     assert!(start(&mut model, &out, "size", false)?);
     finish(&mut model)?;
 
-    assert_eq!(
-        written(&out)?.into_keys().collect::<Vec<_>>(),
-        ["Data\\Libs\\crc.xml"]
-    );
-    Ok(())
+    assert_receipted_outputs(&out, &["Data\\Libs\\crc.xml"])
 }
 
 #[test]
@@ -149,12 +142,7 @@ fn an_excluded_texture_header_leaves_out_its_parts_too() -> TestResult {
     assert!(start(&mut model, &out, "*panel_diff.dds", false)?);
     finish(&mut model)?;
 
-    assert_eq!(
-        written(&out)?.into_keys().collect::<Vec<_>>(),
-        ["readme.txt"],
-        "no stray part of the texture"
-    );
-    Ok(())
+    assert_receipted_outputs(&out, &["readme.txt"])
 }
 
 #[test]
@@ -178,13 +166,15 @@ fn an_excluded_part_of_a_kept_texture_is_reported_and_still_builds_it() -> TestR
         1,
         "the part is named in the summary"
     );
-    let files = written(&out)?;
+    let files = files_below(&out)?;
     assert!(
-        files.contains_key("Data\\Textures\\panel_diff.dds"),
+        files.iter().any(|path| path == PANEL),
         "the texture is merged from all its parts: {files:?}"
     );
     assert!(
-        !files.contains_key("Data\\Textures\\panel_diff.dds.1"),
+        !files
+            .iter()
+            .any(|path| path == "Data\\Textures\\panel_diff.dds.1"),
         "the part is not written: {files:?}"
     );
     Ok(())

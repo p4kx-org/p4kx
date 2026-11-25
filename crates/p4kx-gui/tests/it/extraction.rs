@@ -4,13 +4,14 @@
 //! Extraction from the window driven headless: scope and target.
 
 use crate::common;
+use crate::extraction_outputs::assert_receipted_outputs;
 
 use crate::waiting::wait_polling;
 use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use common::{TestResult, check, extract_into, files_below, finished, setup};
+use common::{TestResult, check, extract_into, finished, setup};
 use p4kx_gui::{ExtractionScope, Model, TargetKind};
 
 fn only_folder(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
@@ -43,11 +44,7 @@ fn selected_entries_go_into_a_new_sc_export_folder_named_like_the_cli() -> TestR
     );
     assert_eq!(summary.target(), target, "the summary names the target");
     assert_eq!(summary.extracted(), 2, "two Entries were checked");
-    assert_eq!(
-        files_below(&target)?,
-        ["Data\\Objects\\ship.cgf", "readme.txt"],
-        "only the checked Entries"
-    );
+    assert_receipted_outputs(&target, &["Data\\Objects\\ship.cgf", "readme.txt"])?;
     assert_eq!(fs::read(target.join("readme.txt"))?, b"readme", "data");
     Ok(())
 }
@@ -83,12 +80,10 @@ fn shown_entries_are_those_of_the_search() -> TestResult {
     let summary = finished(&mut model)?;
 
     assert_eq!(summary.extracted(), 2, "both matches");
-    assert_eq!(
-        files_below(&out)?,
-        ["Data\\Objects\\anchor.cgf", "Data\\Objects\\ship.cgf"],
-        "only the shown Entries, straight into the existing folder"
-    );
-    Ok(())
+    assert_receipted_outputs(
+        &out,
+        &["Data\\Objects\\anchor.cgf", "Data\\Objects\\ship.cgf"],
+    )
 }
 
 #[test]

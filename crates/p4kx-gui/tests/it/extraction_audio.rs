@@ -4,6 +4,7 @@
 //! The sound formats of the Extraction setup, driven headless through `egui_kittest`.
 
 use crate::common::settle;
+use crate::extraction_outputs::assert_receipted_outputs;
 use crate::waiting::wait_for_model;
 use std::error::Error;
 use std::fs;
@@ -102,14 +103,6 @@ fn extract_shown(harness: &mut Harness<'_, Model>, clicks: &[&str]) -> TestResul
     })
 }
 
-fn names(folder: &Path) -> Result<Vec<String>, Box<dyn Error>> {
-    let mut names: Vec<String> = fs::read_dir(folder)?
-        .map(|entry| entry.map(|entry| entry.file_name().to_string_lossy().into_owned()))
-        .collect::<Result<_, _>>()?;
-    names.sort();
-    Ok(names)
-}
-
 fn media(out: &Path) -> PathBuf {
     out.join("Data/Sounds/wwise/Media")
 }
@@ -130,17 +123,8 @@ fn the_default_writes_ogg_and_wav_unpacks_soundbanks_and_lists_the_undecodable_s
     harness.get_by_label(&format!(
         "{XMA}: cannot convert the sound: {XMA}: converting XMA2 to WAV is not supported"
     ));
-    assert_eq!(
-        names(&media(&out))?,
-        ["500.ogg", "600.wav", "700.wem"],
-        "loose sounds"
-    );
-    assert_eq!(
-        names(&bank_folder(&out))?,
-        ["10.ogg", "20.wav"],
-        "the soundbank's WEMs"
-    );
-    Ok(())
+    assert_receipted_outputs(&media(&out), &["500.ogg", "600.wav", "700.wem"])?;
+    assert_receipted_outputs(&bank_folder(&out), &["10.ogg", "20.wav"])
 }
 
 #[test]
@@ -149,12 +133,8 @@ fn choosing_wav_writes_wav_and_is_remembered() -> TestResult {
 
     extract_shown(&mut harness, &[WAV])?;
 
-    assert_eq!(
-        names(&media(&out))?,
-        ["500.wav", "600.wav", "700.wem"],
-        "WAV"
-    );
-    assert_eq!(names(&bank_folder(&out))?, ["10.wav", "20.wav"], "WAV");
+    assert_receipted_outputs(&media(&out), &["500.wav", "600.wav", "700.wem"])?;
+    assert_receipted_outputs(&bank_folder(&out), &["10.wav", "20.wav"])?;
     assert_eq!(
         harness.state().extraction_audio(),
         ExtractionAudio::Wav,
@@ -181,17 +161,8 @@ fn the_setup_starts_with_the_stored_format() -> TestResult {
     settle(&mut harness);
     extract_shown(&mut harness, &[])?;
 
-    assert_eq!(
-        names(&media(&out))?,
-        ["500.wem", "600.wem", "700.wem"],
-        "unchanged"
-    );
-    assert_eq!(
-        names(&bank_folder(&out))?,
-        ["10.wem", "20.wem"],
-        "unpacked unchanged"
-    );
-    Ok(())
+    assert_receipted_outputs(&media(&out), &["500.wem", "600.wem", "700.wem"])?;
+    assert_receipted_outputs(&bank_folder(&out), &["10.wem", "20.wem"])
 }
 
 #[test]

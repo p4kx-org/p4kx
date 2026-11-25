@@ -5,9 +5,9 @@
 //! a pair of synthetic Archives.
 
 use crate::comparing;
+use crate::extraction_outputs::assert_receipted_outputs;
 use crate::waiting::wait_for_model;
 
-use std::collections::BTreeSet;
 use std::error::Error;
 use std::fs;
 use std::path::Path;
@@ -70,22 +70,6 @@ fn compared(
     Ok(harness)
 }
 
-fn files(out: &Path) -> Result<BTreeSet<String>, Box<dyn Error>> {
-    let mut found = BTreeSet::new();
-    let mut folders = vec![out.to_path_buf()];
-    while let Some(folder) = folders.pop() {
-        for item in fs::read_dir(&folder)? {
-            let path = item?.path();
-            if path.is_dir() {
-                folders.push(path);
-            } else {
-                found.insert(path.strip_prefix(out)?.to_string_lossy().replace('/', "\\"));
-            }
-        }
-    }
-    Ok(found)
-}
-
 #[test]
 fn both_sides_offer_their_changes_as_ghost_actions_with_counts() -> TestResult {
     let pair = pair()?;
@@ -122,16 +106,14 @@ fn the_new_side_extracts_through_the_setup_and_shows_the_summary() -> TestResult
 
     harness.get_by_label("Extraction finished");
     harness.get_by_label("Extracted 3, skipped 0, failed 0, cancelled 0");
-    assert_eq!(
-        files(&out)?,
-        BTreeSet::from([
-            "Data\\Libs\\crc.xml".to_owned(),
-            "Data\\Libs\\size.xml".to_owned(),
-            "Engine\\added.cfg".to_owned(),
-        ]),
-        "the added and changed Entries of the new side"
-    );
-    Ok(())
+    assert_receipted_outputs(
+        &out,
+        &[
+            "Data\\Libs\\crc.xml",
+            "Data\\Libs\\size.xml",
+            "Engine\\added.cfg",
+        ],
+    )
 }
 
 #[test]
@@ -152,15 +134,7 @@ fn the_old_side_never_extracts_the_removed_entry() -> TestResult {
     harness.step();
     settle(&mut harness, ended)?;
 
-    assert_eq!(
-        files(&out)?,
-        BTreeSet::from([
-            "Data\\Libs\\crc.xml".to_owned(),
-            "Data\\Libs\\size.xml".to_owned(),
-        ]),
-        "the removed Entry is not part of it"
-    );
-    Ok(())
+    assert_receipted_outputs(&out, &["Data\\Libs\\crc.xml", "Data\\Libs\\size.xml"])
 }
 
 #[test]
