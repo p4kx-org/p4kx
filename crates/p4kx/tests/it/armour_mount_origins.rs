@@ -12,6 +12,8 @@ use p4kx_testkit::{
 };
 use serde_json::Value;
 
+#[path = "armour_mesh_origins.rs"]
+mod mesh_origins;
 #[path = "armour_subhelper_fallback.rs"]
 mod subhelper_fallback;
 
@@ -103,6 +105,7 @@ fn check_proof(bytes: &[u8], text: &str, encrypted: Option<bool>) -> TestResult 
         .map(serde_json::from_str::<Value>)
         .collect::<Result<Vec<_>, _>>()?;
     check_artifact_binding(bytes, &rows)?;
+    mesh_origins::check_geometry(bytes, &rows, "satchel.cgfm", encrypted)?;
     let (parent_path, translation_path) = exact_mount_paths(&check_glb(bytes)?)?;
     let parent = contributors(&rows, &parent_path, encrypted)?;
     let pose = contributors(&rows, &translation_path, encrypted)?;
@@ -183,6 +186,13 @@ fn mounted_armour_glb_receipt_binds_physical_port_and_applied_model_fields() -> 
         );
         let bytes = fs::read(&out)?;
         check_proof(&bytes, &fs::read_to_string(&receipt)?, encrypted)?;
+        if encrypted.is_none() {
+            assert_eq!(
+                bytes,
+                mesh_origins::unobserved_glb(&archive, Some(MOUNT_COURIER))?,
+                "mount and mesh capture preserve the ordinary rigged GLB"
+            );
+        }
         if let Some(prior) = &prior {
             assert_eq!(
                 &bytes, prior,

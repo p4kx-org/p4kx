@@ -29,10 +29,7 @@ fn unresolved_nested_worn_helper_warns_and_exports_only_the_root_transform() -> 
     check_diagnostic(&report, holder, PORT)?;
     let bytes = fs::read(&out)?;
     let glb = check_glb(&bytes)?;
-    let rows = fs::read_to_string(out.with_file_name("armour.glb.p4kx-origin.jsonl"))?
-        .lines()
-        .map(serde_json::from_str::<Value>)
-        .collect::<Result<Vec<_>, _>>()?;
+    let rows = read_origin_rows(&out)?;
     check_artifact_binding(&bytes, &rows)?;
     check_root_mount(&glb, &rows, holder)
 }
@@ -65,11 +62,26 @@ fn unresolved_worn_helper_without_root_keeps_its_original_diagnostic() -> TestRe
             .all(|coordinate| coordinate.abs() < f32::EPSILON),
         "the scene-root piece keeps its origin"
     );
+    let rows = read_origin_rows(&out)?;
+    check_artifact_binding(&bytes, &rows)?;
+    let satchel_path = format!("/nodes/{}/", satchel.index());
     assert!(
-        !out.with_file_name("armour.glb.p4kx-origin.jsonl").exists(),
-        "without a mount there is no mount provenance receipt"
+        rows.iter().all(|row| !row
+            .pointer("/address/path")
+            .and_then(Value::as_str)
+            .is_some_and(|path| path.starts_with(&satchel_path))),
+        "the unmounted satchel has no worn mount evidence"
     );
     Ok(())
+}
+
+fn read_origin_rows(output: &Path) -> Result<Vec<Value>, Box<dyn Error>> {
+    Ok(
+        fs::read_to_string(output.with_extension("glb.p4kx-origin.jsonl"))?
+            .lines()
+            .map(serde_json::from_str)
+            .collect::<Result<Vec<_>, _>>()?,
+    )
 }
 
 #[test]

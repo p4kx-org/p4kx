@@ -90,6 +90,22 @@ impl Armour {
         emission: &RiggedGlbEmission,
     ) -> Result<WornMountOrigins, WornMountOriginError> {
         let uses = SourceUses::new();
+        let fields = self.worn_mount_fields(emission, &uses)?;
+        Ok(WornMountOrigins {
+            inventory: uses.freeze()?,
+            fields,
+        })
+    }
+
+    /// Projects each emitted worn-mount field into the given original-source registry.
+    ///
+    /// # Errors
+    /// Returns an error if the source evidence or GLB field paths cannot be represented.
+    pub fn worn_mount_fields(
+        &self,
+        emission: &RiggedGlbEmission,
+        uses: &SourceUses,
+    ) -> Result<Vec<(FieldPath, FieldOrigin)>, WornMountOriginError> {
         let mut fields = Vec::new();
         for &address in emission.json_addresses() {
             let RiggedJsonAddress::MountedNode {
@@ -105,7 +121,7 @@ impl Armour {
             let Some(source) = self.parts().get(part).and_then(|part| part.mount_source()) else {
                 continue;
             };
-            let origins = mount_origins(&uses, source)?;
+            let origins = mount_origins(uses, source)?;
             fields.push((node_path(bone, "children", Some(child))?, origins.parent));
             for (field, written) in ["translation", "rotation", "scale"].into_iter().zip(trs) {
                 if written {
@@ -113,10 +129,7 @@ impl Armour {
                 }
             }
         }
-        Ok(WornMountOrigins {
-            inventory: uses.freeze()?,
-            fields,
-        })
+        Ok(fields)
     }
 }
 

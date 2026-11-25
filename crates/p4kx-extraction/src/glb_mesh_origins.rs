@@ -15,7 +15,7 @@ use p4kx_model::MeshOrigin;
 pub struct GlbMeshOrigins {
     uses: SourceUses,
     fields: Vec<(OriginOutputAddress, FieldOrigin)>,
-    contributors: Vec<SourceUse>,
+    containers: Vec<SourceUse>,
 }
 
 impl Default for GlbMeshOrigins {
@@ -28,11 +28,39 @@ impl GlbMeshOrigins {
     /// Starts a field-origin capture for one GLB.
     #[must_use]
     pub fn new() -> Self {
+        Self::with_uses(SourceUses::with_compact_use_refs())
+    }
+
+    /// Starts a capture using expanded source-use references.
+    #[must_use]
+    pub fn with_expanded_use_refs() -> Self {
+        Self::with_uses(SourceUses::new())
+    }
+
+    const fn with_uses(uses: SourceUses) -> Self {
         Self {
-            uses: SourceUses::with_compact_use_refs(),
+            uses,
             fields: Vec::new(),
-            contributors: Vec::new(),
+            containers: Vec::new(),
         }
+    }
+
+    /// Returns the original registry for additional field projections.
+    #[must_use]
+    pub const fn source_uses(&self) -> &SourceUses {
+        &self.uses
+    }
+
+    /// Adds origins for distinct emitted JSON fields captured in this registry.
+    pub fn include_json_fields(
+        &mut self,
+        fields: impl IntoIterator<Item = (FieldPath, FieldOrigin)>,
+    ) {
+        self.fields.extend(
+            fields
+                .into_iter()
+                .map(|(path, origin)| (OriginOutputAddress::GlbJsonField { path }, origin)),
+        );
     }
 
     /// Retains original Container inputs that were opened to build the scene.
@@ -48,7 +76,7 @@ impl GlbMeshOrigins {
                     SourceCoordinateOmission::Unavailable,
                 )
                 .map_err(io::Error::other)?;
-            self.contributors.push(source);
+            self.containers.push(source);
         }
         Ok(())
     }
@@ -84,7 +112,7 @@ impl GlbMeshOrigins {
             })
             .transpose()?;
         let count_origin = self.uses.origin(contribution.as_slice(), false);
-        self.contributors.extend(contribution);
+
         let path =
             FieldPath::parse(&format!("/accessors/{accessor}/count")).map_err(io::Error::other)?;
         self.fields
@@ -103,7 +131,14 @@ impl GlbMeshOrigins {
     /// # Errors
     /// Returns an error if the physical evidence cannot be frozen.
     pub fn finish(self) -> io::Result<FrozenGlbMeshOrigins> {
-        let artifact = self.uses.origin(&self.contributors, false);
+        let containers = self.uses.origin(&self.containers, false);
+        let artifact = self
+            .uses
+            .origin_with_origins(
+                std::iter::once(&containers).chain(self.fields.iter().map(|(_, origin)| origin)),
+                false,
+            )
+            .map_err(io::Error::other)?;
         Ok(FrozenGlbMeshOrigins {
             inventory: self.uses.freeze().map_err(io::Error::other)?,
             artifact,

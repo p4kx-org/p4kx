@@ -374,7 +374,9 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   listed as `layers_without_diffuse`. A piece with no geometry for the variant, one that cannot
   be resolved, or whose model is missing or unreadable, is skipped and listed; with `--json` the report has
   the shape described in [docs/cli-json.md](cli-json.md). `p4kx armour bodies` lists the
-  variants.
+  variants. Each Armour GLB has a digest-bound sibling `<file>.p4kx-origin.jsonl`.
+  It records observed geometry for emitted POSITION accessor counts and the original sources of
+  rigid mount fields when present. The whole-artifact marker reflects this partial coverage.
   In a Loadout, a rigid piece follows the skeleton bone resolved from its holder port helper.
   A valid item locator aligns directly with the holder's authored port and offset. A rigid part
   with no usable item locator uses the 90-degree X fallback described in ADR-0231. When `--piece`
