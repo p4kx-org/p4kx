@@ -114,6 +114,38 @@ private bytes and an empty scratch directory. The paired pass completed in 1,877
 45,537,599,488 host bytes available. The native test driver used an optimized test profile
 for streaming the complete retained document.
 
+## PTU 13248297 comparison
+
+The retained comparator identifies the 20 November PTU as change `13248297`,
+internal version `5.0.202.10025`. The earlier comparison Archive has no available
+Build manifest. The unfiltered directory comparison reports 888 added, 45 removed
+and 1,387 changed Entries. The saved reports and scoped extracts support the
+findings below. The installed PTU has advanced to `13273298`.
+
+The DataForge comparison reports one added Struct, `LightningTargetMode_InternalPlanet`,
+with zero changed existing Structs, Properties or enums. Independent reads found
+two instances across three inspected `ElectricalBehavior` Records under
+`lightning.effects[].targetModes[]`. The subtype declares `minimumInterval`,
+`referenceInterval`, `scaleMultiplier` and `intensity` as `Single`, and `length` and
+`distanceRange` as `Range`. It inherits `enable` as `Bool`. The Catalog and selective
+SDK preserve all of these fields and their origins in `configurations.electricalBehaviors`.
+[Weather configurations](catalog-weather.md)
+
+| Area | Source evidence and exporter coverage |
+| --- | --- |
+| Wwise media resolution | One added weather bank has four decoded Sound sources declared `Embedded`, no DIDX section and one added loose WEM matching each media ID. Commit `0981fea42` retains the independent embedded lookup and emits the same-Archive loose candidates when the complete DIDX lookup finds no match for that ID. [Bank metadata](media-bank-metadata.md) |
+| CIG audio control | The changed `Data/Libs/CIGAudio/CIGAudioData.bin` uses the existing CryXml representation. The scoped installed check reconciled 1,949 projected roles, including 52 input links and 51 output links, with independent original routes and immediate source uses. [Audio control](media-audio-control.md#cig-audio-graph) |
+| Contracts | Four `ContractGenerator` Records changed. The Nyx noticeboard changes a single class Reference to an ordered pair and removes two size targets. The other changed owners have release flags, a location-property prerequisite or spawn tags. The original filter forms already have typed readers. The English INI changes an existing remote-location label. [Contract queries](catalog-contract-queries.md) |
+| Nyx and Starchitect | `Data/ObjectContainers/PU/system/nyx/nyx1.socpak` and Starchitect Tile SOCPAKs changed. The existing placement, EntXML and HCD readers cover the original declarations. The file-level comparison has insufficient evidence to identify both new location categories, relate the Forager's Guide display to source Records, or attest to generated creature and resource placement. [Loot source data](catalog-loot-source.md) |
+| VR defaults | The retained `Data/Libs/Config/Profiles/default/attributesVR.xml` adds `HmdWheelAttachMode` and `HmdWheelScale`, taking the ordered settings from 41 to 43. The existing profile reader covers both declarations and their origins. [Client profile settings](client-profile-settings.md) |
+| Vehicle and interior assets | Three Cutter rear landing-gear geometry members and the Lorville CBD interior SOCPAK changed. These are directory-level content deltas. The Ursa Rover audio-controls XML also changed. The scoped comparison does not establish whether any of these changes altered the input shape read by P4KX. [SOC scene companions](soc-scene.md) |
+
+The scoped `ContractGenerator`, Harvestable and Mineable Record comparisons report
+zero unreadable Records. The latter two scopes report zero Record changes against
+the earlier Archive. Live contract availability, lightning frequency and runtime
+targets, audible rain, the Medivac alarm, VOIP, effective VR settings and
+terrain rendering require independent runtime evidence.
+
 ## PTU 13215521 comparison
 
 The installed PTU manifest identifies change `13215521`. The checks use installed LIVE

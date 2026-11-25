@@ -223,7 +223,7 @@ fn bank_field_groups() -> [FieldGroup; 15] {
         ),
         FieldGroup::new(
             "bank-sound-fields",
-            "Original HIRC Sound source, node properties, original priority flags, FX, routing, positioning and advanced playback fields, physical DIDX candidates for embedded and prefetch media, and owning-directory loose WEM references for streamed and prefetch media.",
+            "Original HIRC Sound source, node properties, original priority flags, FX, routing, positioning and advanced playback fields. Physical DIDX candidates for embedded and prefetch media. Owning-directory loose WEM candidates for streamed and prefetch media, and for embedded media when the complete DIDX lookup finds no match.",
         ),
         FieldGroup::new(
             "bank-name-index",
