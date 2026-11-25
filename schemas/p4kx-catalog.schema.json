@@ -30272,6 +30272,9 @@
         "authoredFields": {
           "$ref": "#/$defs/SourceArenaOutput"
         },
+        "autoConsumeIfPlayerAtLocation": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
         "className": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
@@ -30305,6 +30308,7 @@
       },
       "required": [
         "authoredFields",
+        "autoConsumeIfPlayerAtLocation",
         "className",
         "fileName",
         "guid",

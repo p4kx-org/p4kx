@@ -119,11 +119,13 @@ to the matching row from the same build. The original link retains its own state
 | --- | --- | --- |
 | `numberOfResourceSlotsPerEntity` | `numberOfResourceSlotsPerEntity` | Signed Int32 count with its individual origin, including zero. |
 | `resourceSlotTag` | `resourceSlotTag` | Original Tag Reference where declared. |
+| `autoConsumeIfPlayerAtLocation` | `autoConsumeIfPlayerAtLocation` | Original Bool for player-at-location consumption, including explicit false. |
 
-Each member distinguishes absent, null and unreadable source states independently. Additional fields
-remain in the row's `authoredFields` arena. `completeness.locationResourceSlots` describes selection
-and the table's `availability` describes the source declaration. The rows describe authored slot
-definitions. Locating instances in the world requires placement data.
+Each member distinguishes absent, null, unreadable and incompatible source states independently.
+An older layout that lacks the consumption flag reports it as absent. Additional fields
+and incompatible stored values remain in the row's `authoredFields` arena.
+`completeness.locationResourceSlots` describes selection and the table's `availability` describes
+the source declaration. Locating instances in the world requires placement data.
 
 ### Joining an objective module
 

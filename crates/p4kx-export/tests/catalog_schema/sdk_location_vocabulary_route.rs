@@ -112,6 +112,13 @@ fn verify_family(
                 Some(true),
                 "resource slot count is encrypted at source"
             );
+            let auto_consume = slot.auto_consume_if_player_at_location();
+            assert_eq!(auto_consume.value(), Some(&false), "authored false");
+            assert_eq!(
+                auto_consume.origin().contains_encrypted_source(),
+                Some(true),
+                "resource slot consumption flag is encrypted at source"
+            );
             compare(path, snapshot.availability, rows, catalog)
         }
         LocationVocabularyRows::ClassRegistries(rows)
@@ -269,8 +276,13 @@ enum DataForgeStorage {
 fn database() -> DataForgeBuilder {
     const SLOT: &str = "LocationResourceSlot";
     const COUNT: &str = "numberOfResourceSlotsPerEntity";
+    const AUTO_CONSUME: &str = "autoConsumeIfPlayerAtLocation";
     fixture::template_database("MissionLocationData")
-        .structure(TestStruct::new(SLOT).field(COUNT, TestType::Int32))
+        .structure(
+            TestStruct::new(SLOT)
+                .field(COUNT, TestType::Int32)
+                .field(AUTO_CONSUME, TestType::Bool),
+        )
         .record(
             TestRecord::new(
                 0x1086_2000,
@@ -278,7 +290,8 @@ fn database() -> DataForgeBuilder {
                 "LocationResourceSlot.Fixture",
                 "libs/foundry/records/fixture_location/resource_slots/fixture.xml",
             )
-            .value(COUNT, TestValue::Int32(3)),
+            .value(COUNT, TestValue::Int32(3))
+            .value(AUTO_CONSUME, TestValue::Bool(false)),
         )
 }
 

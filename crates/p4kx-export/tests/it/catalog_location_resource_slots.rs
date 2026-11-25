@@ -1,11 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::{Filter, build_catalog};
+use p4kx_export::{CatalogPublicationMode, Filter, build_catalog};
 use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 use serde_json::{Value, json};
-
-const TAG_FIELD: &str = "resourceSlotTag";
 
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult, at, guid};
 
@@ -14,7 +12,9 @@ const SLOT: u128 = 41;
 const ALT_SLOT: u128 = 42;
 const TAG: u128 = 43;
 const MISSING: u128 = 44;
+const TAG_FIELD: &str = "resourceSlotTag";
 const COUNT: &str = "numberOfResourceSlotsPerEntity";
+const AUTO_CONSUME: &str = "autoConsumeIfPlayerAtLocation";
 const SLOTS: &str = "/definitions/locationResourceSlots/rows";
 
 #[derive(Clone, Copy)]
@@ -22,6 +22,7 @@ enum Layout {
     Tag,
     Count,
     DuplicateGuid,
+    IncompatibleFlag,
 }
 
 #[test]
@@ -50,23 +51,18 @@ fn slot_definitions_keep_both_authored_layouts_and_member_origins() -> TestResul
         "legacy schema lacks the count"
     );
 
+    assert_eq!(
+        at(legacy_rows, "/0/autoConsumeIfPlayerAtLocation/state")?,
+        "absent",
+        "legacy schema lacks the consumption flag"
+    );
+
     let current = export(Layout::Count, None)?;
     let current_rows = at(&current, SLOTS)?;
-    for (index, expected) in [0, -3].into_iter().enumerate() {
+    for (index, (expected_count, expected_flag)) in [(0, false), (-3, true)].into_iter().enumerate()
+    {
         let row = at(current_rows, &format!("/{index}"))?;
-        let count = at(row, "/numberOfResourceSlotsPerEntity")?;
-        assert_eq!(at(count, "/value")?, expected, "raw signed Int32");
-        assert_eq!(at(count, "/containsEncryptedSource")?, true, "count origin");
-        assert_eq!(
-            at(row, "/resourceSlotTag/state")?,
-            "absent",
-            "current Tag declaration removed"
-        );
-        assert_eq!(
-            at(row, "/authoredFields/roots")?.as_array().map(Vec::len),
-            Some(1),
-            "only the unprojected original member stays in the arena"
-        );
+        verify_current_slot_row(row, expected_count, expected_flag)?;
     }
     for catalog in [legacy, current] {
         let validator = jsonschema::validator_for(&p4kx_export::catalog_schema())?;
@@ -75,6 +71,92 @@ fn slot_definitions_keep_both_authored_layouts_and_member_origins() -> TestResul
         }
         crate::commodity_v3_source_inventory::reference_closure(&catalog)?;
     }
+    Ok(())
+}
+
+fn verify_current_slot_row(row: &Value, expected_count: i32, expected_flag: bool) -> TestResult {
+    let auto_consume = at(row, "/autoConsumeIfPlayerAtLocation")?;
+    assert_eq!(
+        at(auto_consume, "/state")?,
+        "present",
+        "authored Bool state"
+    );
+    assert_eq!(
+        at(auto_consume, "/value")?,
+        expected_flag,
+        "authored boolean retains false and true"
+    );
+    assert_eq!(
+        at(auto_consume, "/containsEncryptedSource")?,
+        true,
+        "flag origin follows the encrypted DataForge input"
+    );
+    assert_eq!(
+        at(auto_consume, "/sourceSetComplete")?,
+        true,
+        "complete original flag evidence"
+    );
+    let count = at(row, "/numberOfResourceSlotsPerEntity")?;
+    assert_eq!(at(count, "/value")?, expected_count, "raw signed Int32");
+    assert_eq!(at(count, "/containsEncryptedSource")?, true, "count origin");
+    assert_eq!(
+        at(row, "/resourceSlotTag/state")?,
+        "absent",
+        "current Tag declaration removed"
+    );
+    let roots = at(row, "/authoredFields/roots")?
+        .as_array()
+        .ok_or("original arena roots")?;
+    let [root] = roots.as_slice() else {
+        return Err("only the unprojected original member stays in the arena".into());
+    };
+    assert_eq!(
+        at(root, "/name/value")?,
+        "fixtureUnknown",
+        "the unrelated original member survives projection"
+    );
+    Ok(())
+}
+
+#[test]
+fn incompatible_consumption_flag_retains_its_original_storage_and_value() -> TestResult {
+    let catalog = export(Layout::IncompatibleFlag, None)?;
+    let row = at(at(&catalog, SLOTS)?, "/0")?;
+    let cell = at(row, "/autoConsumeIfPlayerAtLocation")?;
+    assert_eq!(
+        at(cell, "/state")?,
+        "invalid",
+        "Int32 is incompatible with the authored Bool"
+    );
+    assert_eq!(
+        at(cell, "/value")?,
+        &Value::Null,
+        "invalid storage has no typed Bool payload"
+    );
+    assert_eq!(
+        at(cell, "/containsEncryptedSource")?,
+        true,
+        "invalid cell still cites its original source"
+    );
+    let roots = at(row, "/authoredFields/roots")?
+        .as_array()
+        .ok_or("original arena roots")?;
+    let root = roots
+        .iter()
+        .find(|root| root.pointer("/name/value").and_then(Value::as_str) == Some(AUTO_CONSUME))
+        .ok_or("incompatible original arena field")?;
+    let value_index = at(root, "/value/valueIndex")?
+        .as_str()
+        .ok_or("arena value index")?;
+    let original = at(
+        row,
+        &format!("/authoredFields/values/{value_index}/value/value/value"),
+    )?;
+    assert_eq!(
+        original,
+        &json!({"type": "int32", "value": -4}),
+        "the raw arena retains the incompatible signed value"
+    );
     Ok(())
 }
 
@@ -218,11 +300,14 @@ fn export(layout: Layout, filter: Option<&Filter>) -> TestResult<Value> {
     let (_directory, archive) = common::open(&database(layout), DcbOrigin::Encrypted)?;
     let mut options = common::options();
     options.filter = filter;
+    if matches!(layout, Layout::IncompatibleFlag) {
+        options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
+    }
     let built = build_catalog(&archive, &options)?;
     Ok(serde_json::from_slice(built.json())?)
 }
 
-fn database(layout: Layout) -> DataForgeBuilder {
+fn add_slots(layout: Layout, builder: DataForgeBuilder) -> DataForgeBuilder {
     let slot = TestStruct::new(SLOT_TYPE).field("fixtureUnknown", TestType::Bool);
     let (slot, member, first, second) = match layout {
         Layout::Tag => (
@@ -231,7 +316,7 @@ fn database(layout: Layout) -> DataForgeBuilder {
             TestValue::Reference(TAG),
             TestValue::Null,
         ),
-        Layout::Count | Layout::DuplicateGuid => (
+        Layout::Count | Layout::DuplicateGuid | Layout::IncompatibleFlag => (
             slot.field(COUNT, TestType::Int32),
             COUNT,
             TestValue::Int32(0),
@@ -243,24 +328,37 @@ fn database(layout: Layout) -> DataForgeBuilder {
     } else {
         ALT_SLOT
     };
-    DataForgeBuilder::new()
+    let first =
+        TestRecord::new(SLOT, SLOT_TYPE, "First", "fixture/slots/first.xml").value(member, first);
+    let second = TestRecord::new(second_guid, SLOT_TYPE, "Second", "fixture/slots/second.xml")
+        .value(member, second);
+    let (slot, first, second) = match layout {
+        Layout::Tag => (slot, first, second),
+        Layout::Count | Layout::DuplicateGuid => (
+            slot.field(AUTO_CONSUME, TestType::Bool),
+            first.value(AUTO_CONSUME, TestValue::Bool(false)),
+            second.value(AUTO_CONSUME, TestValue::Bool(true)),
+        ),
+        Layout::IncompatibleFlag => (
+            slot.field(AUTO_CONSUME, TestType::Int32),
+            first.value(AUTO_CONSUME, TestValue::Int32(-4)),
+            second.value(AUTO_CONSUME, TestValue::Int32(2)),
+        ),
+    };
+    builder.structure(slot).record(first).record(second)
+}
+
+fn database(layout: Layout) -> DataForgeBuilder {
+    let builder = DataForgeBuilder::new()
         .version(8)
         .structure(TestStruct::new("Tag"))
-        .structure(slot)
         .record(TestRecord::new(
             TAG,
             "Tag",
             "FixtureTag",
             "fixture/tags/tag.xml",
-        ))
-        .record(
-            TestRecord::new(SLOT, SLOT_TYPE, "First", "fixture/slots/first.xml")
-                .value(member, first),
-        )
-        .record(
-            TestRecord::new(second_guid, SLOT_TYPE, "Second", "fixture/slots/second.xml")
-                .value(member, second),
-        )
+        ));
+    add_slots(layout, builder)
         .structure(TestStruct::new("ModuleDeclarationType_Base"))
         .structure(
             TestStruct::new("ModuleDeclarationType_Mission")

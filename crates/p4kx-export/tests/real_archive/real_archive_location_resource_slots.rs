@@ -17,6 +17,7 @@ use crate::real_archive_verification::print_line;
 
 const SLOT: &str = "LocationResourceSlot";
 const COUNT: &str = "numberOfResourceSlotsPerEntity";
+const AUTO_CONSUME: &str = "autoConsumeIfPlayerAtLocation";
 const TAG: &str = "resourceSlotTag";
 const TARGET: &str = "requiredResourceSlot";
 const FAMILY: Family = Family {
@@ -151,8 +152,19 @@ fn verify_slot(
     } else {
         verify_state(count, count_cell)?;
     }
+    let auto_consume = tree.field(AUTO_CONSUME);
+    let auto_consume_cell = field(row, AUTO_CONSUME)?;
+    if let Some(Original::Bool(value)) = auto_consume {
+        assert_eq!(
+            consumer::present(auto_consume_cell)?,
+            &json!(value),
+            "exact authored consumption flag"
+        );
+    } else {
+        verify_state(auto_consume, auto_consume_cell)?;
+    }
     verify_link(forge, "Tag", tree.field(TAG), field(row, TAG)?)?;
-    for name in [COUNT, TAG] {
+    for name in [COUNT, AUTO_CONSUME, TAG] {
         if let Some(source) = tree.field(name) {
             origins.occurrence(
                 field(row, name)?,

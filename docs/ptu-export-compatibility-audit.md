@@ -26,8 +26,11 @@ The Record comparison reports zero moved or unreadable Records. Five ContractGen
 and six ContractTemplate Records changed. The authored changes include item matching,
 drop-off target types, courier text and spawn or location selection. The new
 `deliveryitemport_recovercomponent` `LocationResourceSlot` is referenced by two changed
-location-entity declarations. The existing selective SDK read all 67 resource slots
-with complete coverage and 1,072 contributing source uses from one physical source.
+location-entity declarations. A scoped Catalog verifies the Recover Component target and
+its slot by physical Record identity. The selective SDK compares all 67 typed
+`autoConsumeIfPlayerAtLocation` values with their original Bool and verifies complete
+field origins. A Normal Catalog filtered to the new slot retains its explicit `false`
+and points to the original field occurrence.
 [Location configuration](catalog-location-configuration.md)
 
 | Area | Source evidence and exporter coverage |
@@ -40,9 +43,11 @@ with complete coverage and 1,072 contributing source uses from one physical sour
 
 The CRC-verified Nyx I descriptor has five `Child` names matching the extraction site or hub
 pattern and twelve matching medium settlement. These 17 entries declare class
-`MissionLocationTemplate`, `locationType` 3 and a present `classGuid`. The existing placement
-reader retains those fields. Name matching establishes these observed occurrences and
-leaves the template's classification and the Forager's Guide presentation as separate sources.
+`MissionLocationTemplate`, `locationType` 3 and the same `classGuid`. The existing placement
+reader retains those fields. A reference query resolves the shared GUID to the
+`MissionLocationTemplate` EntityClassDefinition in `Data/Game2.dcb`. The observed
+placement names identify the selected occurrences. The Forager's Guide presentation
+requires a separate game-side observation.
 
 The English Model-K2 descriptions change their content under existing keys.
 Crash fixes, server mission progression, effective payouts and engine rendering

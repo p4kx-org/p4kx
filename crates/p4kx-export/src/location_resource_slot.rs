@@ -23,6 +23,7 @@ pub struct LocationResourceSlot<'source> {
     #[serde(flatten)]
     source: CanonicalRecordHeader<'source>,
     number_of_resource_slots_per_entity: SourcedValue<i32>,
+    auto_consume_if_player_at_location: SourcedValue<bool>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     resource_slot_tag: SourcedValue<Box<SourceRecordReference<'source>>>,
     authored_fields: SourceArenaOutput<'source>,
@@ -39,6 +40,12 @@ impl<'source> LocationResourceSlot<'source> {
     #[must_use]
     pub const fn number_of_resource_slots_per_entity(&self) -> &SourcedValue<i32> {
         &self.number_of_resource_slots_per_entity
+    }
+
+    /// Borrows the authored player-at-location consumption flag.
+    #[must_use]
+    pub const fn auto_consume_if_player_at_location(&self) -> &SourcedValue<bool> {
+        &self.auto_consume_if_player_at_location
     }
 
     /// Borrows the original resource slot Tag Reference.
@@ -60,17 +67,24 @@ impl<'source> LocationResourceSlot<'source> {
     ) -> Result<Self, CatalogError> {
         let number_of_resource_slots_per_entity =
             fields.int32("numberOfResourceSlotsPerEntity", notes)?;
+        let auto_consume_if_player_at_location =
+            fields.boolean("autoConsumeIfPlayerAtLocation", notes)?;
         let resource_slot_tag = fields.record_link_to("resourceSlotTag", "Tag", notes)?;
         let authored_fields = fields.authored_members_except([
             (
                 "numberOfResourceSlotsPerEntity",
                 number_of_resource_slots_per_entity.state(),
             ),
+            (
+                "autoConsumeIfPlayerAtLocation",
+                auto_consume_if_player_at_location.state(),
+            ),
             ("resourceSlotTag", resource_slot_tag.state()),
         ])?;
         Ok(Self {
             source,
             number_of_resource_slots_per_entity,
+            auto_consume_if_player_at_location,
             resource_slot_tag,
             authored_fields,
         })
