@@ -620,6 +620,28 @@ Its private commit peak was 17,111,584,768 bytes and its working set peak was
 `4b19edfe7dbb155612f5af02fc21eb1c19ae8582a13a571f36a97481b40e6adc`.
 The producer and replay are the PTU Full baseline for this revision.
 
+### SDK provenance mode comparison on LIVE 13220821
+
+The SDK test program built from signed revision
+`fe054ccf90bb7eb114148f1c93700e44b1aef225` opened the same installed LIVE
+Archive in four fresh Windows AMD64 processes with one worker each. For each
+scope it ran Full first and MarkersOnly second. Both modes returned identical
+values, coverage and immediate encryption markers. The installed cases had 14
+unencrypted markers in the Loadout owner result and 151,556 in TagPaths.
+The synthetic mode tests cover encrypted and unknown markers too.
+
+| Scope | Rows | Full peak private bytes | Marker peak private bytes | Full source references |
+| --- | ---: | ---: | ---: | ---: |
+| Loadout owner | 1 | 1,091,801,088 | 1,091,735,552 | 91 |
+| TagPaths | 18,961 | 1,091,801,088 | 1,091,735,552 | 1,725,098 |
+
+Both queries stayed below 2 GB and used 65,536 fewer private bytes in Marker
+mode. The Marker results contained zero source references. In this run TagPaths
+took 8.86 seconds in Full and 5.45 seconds in Marker mode. The Loadout owner
+query took 4.51 and 4.57 seconds, respectively. These are timings for one run
+order. The query harness measured in-memory results and the full-catalogue
+size is measured separately.
+
 ## Measuring a complete export
 
 The installed regression checks verify decoded and stored byte counts against the actual writer
