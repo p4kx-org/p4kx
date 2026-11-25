@@ -334,6 +334,16 @@ remains undetermined.
 [ARM64 terminal evidence](https://github.com/p4kx-org/p4kx/actions/runs/45530796171/artifacts/14990526867) ·
 [AMD64 diagnostic job](https://github.com/p4kx-org/p4kx/actions/runs/45530796171/job/138990048543)
 
+Release run `45557170432` for PR head `a8f48d4ea` started the original Finish
+supervisor on both native Windows targets. Both jobs were cancelled with
+`WaitFinish` still reported in progress. `CollectFinish` and executed-payload
+recording remained pending. The ordinary job-log endpoint returned HTTP 404
+(`BlobNotFound`) for each job after cancellation. The local synthetic Finish
+test covered positive and negative receipts and expiration during probe setup.
+The operation that blocked the hosted runs remains undetermined.
+[AMD64 job](https://github.com/p4kx-org/p4kx/actions/runs/45557170432/job/139031674324) ·
+[ARM64 job](https://github.com/p4kx-org/p4kx/actions/runs/45557170432/job/139031674357)
+
 For release acceptance, repeat the native lifecycle checks with the actual release candidate
 and bind both its MSI and portable ZIP to the candidate revision and run attempt. Record the
 Windows AMD64 desktop and WASAPI checks separately from the hosted package evidence.
