@@ -83,6 +83,7 @@ mod real_archive_item_alignment;
 mod real_archive_item_components;
 mod real_archive_item_durability;
 mod real_archive_item_recovery;
+mod real_archive_item_recovery_sdk_parity;
 mod real_archive_item_stats;
 mod real_archive_items;
 mod real_archive_jump_drives;
