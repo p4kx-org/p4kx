@@ -542,6 +542,14 @@ physical duplicates, ordered nested containers, exact raw and chunk bytes, hashe
 floats, capability refusal, honest counts, budgets, cancellation, corruption and generation-boundary
 failures. A real two-process test verifies exclusion and recovery after a killed writer.
 
+A second fixture uses all nine production providers in one mixed generation.
+Two fresh exports validate the Index schema and produce byte-identical Index,
+provider streams, manifests, field-origin streams and artifacts. The test
+checks the digests, distinct payloads with the same path in different
+containers, a compiled shader cache with explicit unsupported decoding, and
+the converted texture and audio payloads. An `IfChanged` run retains the
+verified generation.
+
 The ignored real-Archive test reads `P4KX_DATA_P4K` and deterministically selects small unencrypted
 root Entries, refusing more than 64 Entries or 8 MiB of decoded data. It injects a verification-only
 provider through the public registry: the shared service retains the selected raw payloads and the

@@ -3414,6 +3414,26 @@ stayed below 2,000,000,000 bytes.
 | LIVE `13220821` | 104 | 575,025 | 1,265,541,120 | 1,251,733,504 |
 | PTU `13260598` | 106 | 612,834 | 1,331,302,400 | 1,317,150,720 |
 
+### Component definition cold queries
+
+The Windows AMD64 cold verifier ran each of five standalone SDK queries
+against LIVE `13220821` and PTU `13260598`. Both Builds returned 12
+damage-resistance macros, two mining-laser globals, one turret health modifier,
+six consumable types and 83 consumable subtypes. The turret query completed
+physical discovery on both Builds. The subtype query resolved ten public names
+and ten protected effect descriptions and opened all 11 requested locales on
+each Build.
+
+| Build | Peak private bytes across the five queries | Peak working set bytes across the five queries |
+| --- | ---: | ---: |
+| LIVE | 1,091,608,576 | 1,038,618,624 |
+| PTU | 1,114,984,448 | 1,032,249,344 |
+
+Each run used one worker and verified a stable Archive stamp. The cold
+executable was built from the test overlay with Git tree
+`d245a55901713a9d4953c2b1953e015e29f93abd` over
+`7f78af9a2636d137461bab9e101f8cd9bddeed65`.
+
 ## Verify dataset coverage
 
 The SDK coverage audit checks canonical dataset boundaries against calls to the public typed
