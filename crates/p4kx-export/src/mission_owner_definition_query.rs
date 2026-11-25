@@ -3,14 +3,40 @@
 
 use p4kx_extraction::{CancelToken, DataForge};
 
-use super::{CatalogRecordCoverage, Owner};
-use crate::CatalogError;
+use super::{CatalogRecordCoverage, CatalogRecordSelection, Owner, Plan};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_template_modules::mission_owner_definition::{self, MissionOwnerDefinition};
 use crate::guid_text::{CatalogGuid, sort_by_guid};
 use crate::mission_flow_owner::FlowOwnerKind;
+use crate::record_read::{self, RecordAdmission};
+use crate::{CatalogError, Kind};
+
+pub(super) fn plan<'source>(
+    forge: &'source DataForge<'source>,
+    kind: Kind,
+    selection: CatalogRecordSelection,
+    cancel: Option<&CancelToken>,
+) -> Result<Plan<'source>, CatalogError> {
+    if matches!(selection, CatalogRecordSelection::RecordIndex(_)) {
+        return Plan::read_rule(forge, kind.records(), selection, cancel, None);
+    }
+    Plan::read_with(forge, selection, cancel, None, |record, _, coverage| {
+        Ok(match record_read::classify(record, kind) {
+            Ok(RecordAdmission::Selected) => true,
+            Ok(RecordAdmission::Leftover) => {
+                coverage.skipped_leftovers += 1;
+                false
+            }
+            Ok(RecordAdmission::Other) => false,
+            Err(_) => {
+                coverage.unreadable_headers.push(record.index());
+                false
+            }
+        })
+    })
+}
 
 pub(super) fn read<'source, Row: From<MissionOwnerDefinition<'source>>>(
     forge: &DataForge<'_>,

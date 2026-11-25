@@ -268,7 +268,7 @@ fn require_value(arena: &TemplateSource<'_>, value: SourceValueRef) -> TestResul
     Ok(())
 }
 
-fn parse_dispositions(encoded: &str) -> TestResult<[MissionDisposition; 2]> {
+pub(super) fn parse_dispositions(encoded: &str) -> TestResult<[MissionDisposition; 2]> {
     let (templates, brokers) = encoded
         .split_once(',')
         .ok_or("expected Template and Broker counts")?;

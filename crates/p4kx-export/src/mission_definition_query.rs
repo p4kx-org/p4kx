@@ -77,7 +77,7 @@ impl MissionDefinitionFamily {
         let kind = self.kind();
         match self {
             Self::ContractTemplates | Self::MissionBrokerEntries => {
-                Plan::read_rule(forge, kind.records(), selection, cancel, None)
+                owner_definitions::plan(forge, kind, selection, cancel)
             }
             Self::Scenarios | Self::Modules | Self::Items => {
                 Plan::read(forge, kind, selection, cancel, None)
@@ -93,6 +93,8 @@ pub struct MissionDefinitionSelection {
     /// Original definition family to read.
     pub family: MissionDefinitionFamily,
     /// Physical owner selection within the chosen family.
+    /// For Templates and Brokers, `All` and `Guid` use canonical admission and an exact `RecordIndex`
+    /// also admits an in-scope development leftover.
     pub records: CatalogRecordSelection,
 }
 

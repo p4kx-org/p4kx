@@ -871,6 +871,10 @@ to read `definitions.missionScenarios`, `definitions.missionModuleDeclarations`,
 `definitions.missionBrokerEntries`. Choose a `MissionDefinitionFamily` and a physical
 Record selection in `MissionDefinitionSelection`. The result preserves canonical
 row order, original source coordinates and coverage for the selected family.
+For Contract Templates and Mission Broker Entries, `All` and `Guid` follow
+Normal Catalog admission and count excluded development leftovers. `Guid`
+retains each admitted physical Record sharing that GUID. `RecordIndex` can also
+inspect an excluded original Record when its type and path match the family.
 
 Contract Template and Mission Broker Entry definitions expose the physical header,
 the original source arena and links to that owner's flow and property declarations.

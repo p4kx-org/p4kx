@@ -6,6 +6,7 @@ use p4kx_export::catalog_queries::mission_definitions::{
 };
 use p4kx_export::catalog_queries::mission_properties::{SourcePayload, TemplateSourceRoot};
 use p4kx_export::catalog_queries::{CatalogRecordSelection, ParsedCatalogQueries};
+use p4kx_extraction::Archive;
 use serde_json::{Value, json};
 
 use super::{Route, TestResult};
@@ -110,4 +111,137 @@ fn check_title(broker: &BrokerDefinition<'_>) -> TestResult {
         "the title key retains its encrypted DataForge source",
     );
     Ok(())
+}
+
+#[test]
+fn broker_definitions_apply_canonical_admission_to_all_and_guid() -> TestResult {
+    use std::time::UNIX_EPOCH;
+
+    use p4kx_export::CatalogOptions;
+    use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogQuerySession};
+    use p4kx_extraction::DataForgeEntry;
+
+    let (_directory, archive) = broker_admission_fixture()?;
+    let entry = DataForgeEntry::read(&archive)?;
+    let guid = entry
+        .open()?
+        .record(1)
+        .ok_or("explicit leftover Record")?
+        .guid();
+    let catalog = serde_json::from_slice::<Value>(
+        p4kx_export::build_catalog_from(&archive, &entry, &CatalogOptions::new(UNIX_EPOCH))?.json(),
+    )?;
+    let session = CatalogQuerySession::from_entry(
+        &archive,
+        &entry,
+        CatalogLanguageSelection::AllAvailable,
+        None,
+    )?;
+    let parsed = session.parsed(None)?;
+    let normal = catalog
+        .pointer(DATASET)
+        .ok_or("complete Normal Broker definition table")?;
+    check_broker_selection(
+        &parsed,
+        CatalogRecordSelection::All,
+        &[0, 2],
+        1,
+        Some(normal),
+    )?;
+    let first = normal
+        .pointer("/rows/0")
+        .ok_or("the admitted GUID's Normal row")?;
+    let scoped = json!({"availability": normal.get("availability"), "rows": [first]});
+    check_broker_selection(
+        &parsed,
+        CatalogRecordSelection::Guid(guid),
+        &[0],
+        1,
+        Some(&scoped),
+    )?;
+    check_broker_selection(
+        &parsed,
+        CatalogRecordSelection::RecordIndex(1),
+        &[1],
+        0,
+        None,
+    )
+}
+
+fn check_broker_selection(
+    parsed: &ParsedCatalogQueries<'_>,
+    selection: CatalogRecordSelection,
+    expected_indices: &[u32],
+    expected_skipped: usize,
+    normal: Option<&Value>,
+) -> TestResult {
+    let selection =
+        MissionDefinitionSelection::new(MissionDefinitionFamily::MissionBrokerEntries, selection);
+    parsed.with_mission_definitions(selection, None, |snapshot| {
+        let MissionDefinitionRows::MissionBrokerEntries(rows) = &snapshot.rows else {
+            return Err("expected canonical Broker definitions".into());
+        };
+        let indices: Vec<u32> = rows
+            .iter()
+            .map(|value| {
+                value
+                    .header()
+                    .record_index()
+                    .value()
+                    .copied()
+                    .ok_or("missing physical Record")
+            })
+            .collect::<Result<_, _>>()?;
+        assert_eq!(
+            indices, expected_indices,
+            "canonical admission retains the matching physical Records in order"
+        );
+        assert_eq!(
+            snapshot.coverage.skipped_leftovers, expected_skipped,
+            "only canonical selections apply the leftover policy"
+        );
+        assert!(
+            snapshot.available_languages.is_empty() && snapshot.game_texts.is_empty(),
+            "the authored Broker title remains an untranslated arena value"
+        );
+        if let Some(expected) = normal {
+            assert_eq!(
+                &json!({"availability": snapshot.availability, "rows": rows}),
+                expected,
+                "the admitted SDK rows and their original source arenas equal Normal output"
+            );
+        }
+        Ok(())
+    })?
+}
+
+fn broker_admission_fixture() -> TestResult<(tempfile::TempDir, Archive)> {
+    use p4kx_testkit::{
+        ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, TestStruct, TestType, TestValue,
+    };
+
+    const BROKER: &str = "MissionBrokerEntry";
+    let record = |guid, label: &str| {
+        TestRecord::new(
+            guid,
+            BROKER,
+            format!("{BROKER}.{label}"),
+            format!("libs/foundry/records/missionbroker/{label}.xml"),
+        )
+        .value("title", TestValue::text("@fixture_broker_title"))
+    };
+    let database = DataForgeBuilder::new()
+        .version(8)
+        .structure(TestStruct::new(BROKER).field("title", TestType::Locale))
+        .record(record(1, "First"))
+        .record(record(1, "Dev_Excluded"))
+        .record(record(2, "Second"))
+        .build();
+    let directory = tempfile::tempdir()?;
+    let path = directory.path().join("fixture.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored("Data/Game2.dcb", database).encrypted())
+        .write_to(&path)?;
+    let archive = Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?;
+    Ok((directory, archive))
 }

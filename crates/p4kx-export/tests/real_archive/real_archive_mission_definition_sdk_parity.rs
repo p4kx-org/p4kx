@@ -21,6 +21,9 @@ use crate::real_archive_catalog_table_parity::{self, Origins, Table, TestResult}
 use crate::real_archive_scoped_equipment_sdk::{component_family_parity, equipment_input};
 use crate::real_archive_verification::print_line;
 
+#[path = "real_archive_mission_owner_definition_sdk.rs"]
+mod owner_definitions;
+
 #[derive(Clone, Copy)]
 enum Family {
     Scenarios,
