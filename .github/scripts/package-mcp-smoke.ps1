@@ -28,9 +28,15 @@ function Receive-P4kxMcpResponse {
 function Invoke-P4kxPackageMcpSmoke {
     param([string]$Executable, [string]$Archive, [string]$Directory, [string]$ExpectedText, [string[]]$ArgumentPrefix = @())
     $process = New-P4kxPackageProcess -Executable $Executable -Arguments ($ArgumentPrefix + @('--archive', $Archive)) -Directory $Directory
+    $started = $false
+    $outputReader = $null
+    $errorReader = $null
     try {
-        [void]$process.Start()
-        $stderr = $process.StandardError.ReadToEndAsync()
+        $started = $process.Start()
+        if (-not $started) { throw 'MCP did not start.' }
+        $outputReader = $process.StandardOutput
+        $errorReader = $process.StandardError
+        $stderr = $errorReader.ReadToEndAsync()
         Send-P4kxMcpMessage $process @{jsonrpc='2.0'; id=1; method='initialize'; params=@{
             protocolVersion='2025-11-25'; capabilities=@{}; clientInfo=@{name='p4kx-package-smoke'; version='1.0.0'}
         }}
@@ -47,12 +53,14 @@ function Invoke-P4kxPackageMcpSmoke {
         if (-not [String]::Equals($read.structuredContent.text, $ExpectedText, [StringComparison]::Ordinal)) { throw 'MCP synthetic Entry text differs.' }
         $read | ConvertTo-Json -Depth 12 | Set-Content (Join-Path $Directory 'mcp-read.json') -Encoding utf8NoBOM
         $process.StandardInput.Close()
-        if (-not $process.WaitForExit(10000)) { $process.Kill($true); $process.WaitForExit(); throw 'MCP did not exit after stdin closed.' }
+        $timer = [Diagnostics.Stopwatch]::StartNew()
+        $exitTimeout = 'MCP did not exit after stdin closed.'
+        $pipeTimeout = 'MCP stderr did not reach EOF after stdin closed.'
+        Wait-P4kxPackageCompletion $process $timer 10000 @($stderr) $exitTimeout $pipeTimeout
         $stderr.GetAwaiter().GetResult() | Set-Content (Join-Path $Directory 'mcp-stderr.log') -Encoding utf8NoBOM
         if ($process.ExitCode -ne 0) { throw "MCP exited $($process.ExitCode)." }
     }
     finally {
-        if ($process.Id -and -not $process.HasExited) { $process.Kill($true); $process.WaitForExit() }
-        $process.Dispose()
+        Close-P4kxPackageProcess $process $started 'MCP' $outputReader $errorReader
     }
 }

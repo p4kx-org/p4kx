@@ -25,52 +25,78 @@ function New-P4kxPackageProcess {
     return $process
 }
 
-function Invoke-P4kxPackageProcess {
-    param([string]$Executable, [string[]]$Arguments, [string]$Directory, [string]$Log,
-        [ValidateRange(1,2147483)][int]$Seconds = 120)
-    $process = New-P4kxPackageProcess -Executable $Executable -Arguments $Arguments -Directory $Directory
-    $budget = [long]$Seconds * 1000
+function Wait-P4kxPackageCompletion {
+    param([Diagnostics.Process]$Process, [Diagnostics.Stopwatch]$Timer, [long]$Milliseconds,
+        [Threading.Tasks.Task[]]$OutputTasks, [string]$ExitTimeout, [string]$OutputTimeout)
+    $remaining = [int][Math]::Max(0L, $Milliseconds - $Timer.ElapsedMilliseconds)
+    if (-not $Process.WaitForExit($remaining)) { throw $ExitTimeout }
+    $remaining = [int][Math]::Max(0L, $Milliseconds - $Timer.ElapsedMilliseconds)
+    if (-not [Threading.Tasks.Task]::WaitAll($OutputTasks, $remaining)) { throw $OutputTimeout }
+}
+
+function Close-P4kxPackageProcess {
+    param([Diagnostics.Process]$Process, [bool]$Started, [string]$Name,
+        [IO.StreamReader]$OutputReader, [IO.StreamReader]$ErrorReader)
+    try {
+        if ($Started -and -not $Process.HasExited) {
+            try { $Process.Kill($true) }
+            catch [InvalidOperationException], [ComponentModel.Win32Exception] {
+                if (-not $Process.HasExited) { throw }
+            }
+            if (-not $Process.WaitForExit(5000)) {
+                throw "$Name did not stop after its watchdog."
+            }
+        }
+    }
+    finally {
+        if ($null -ne $OutputReader) { $OutputReader.Dispose() }
+        if ($null -ne $ErrorReader) { $ErrorReader.Dispose() }
+        $Process.Dispose()
+    }
+}
+
+function Invoke-P4kxPackageCapture {
+    param([Diagnostics.Process]$Process, [long]$Milliseconds, [string]$Log,
+        [string]$Name, [string]$ExitTimeout, [string]$OutputTimeout)
     $timer = [Diagnostics.Stopwatch]::StartNew()
     $started = $false
     $outputReader = $null
     $errorReader = $null
     try {
-        $started = $process.Start()
-        if (-not $started) { throw "Packaged application did not start: $Executable" }
-        $outputReader = $process.StandardOutput
-        $errorReader = $process.StandardError
+        $started = $Process.Start()
+        if (-not $started) { throw "$Name did not start." }
+        $outputReader = $Process.StandardOutput
+        $errorReader = $Process.StandardError
         $stdout = $outputReader.ReadToEndAsync()
         $stderr = $errorReader.ReadToEndAsync()
-        $remaining = [int][Math]::Max(0L, $budget - $timer.ElapsedMilliseconds)
-        if (-not $process.WaitForExit($remaining)) {
-            throw "Packaged application timed out: $Executable"
-        }
-        $remaining = [int][Math]::Max(0L, $budget - $timer.ElapsedMilliseconds)
-        if (-not [Threading.Tasks.Task]::WaitAll([Threading.Tasks.Task[]]@($stdout, $stderr), $remaining)) {
-            throw "Packaged application timed out: $Executable; stdout/stderr did not reach EOF"
-        }
+        Wait-P4kxPackageCompletion $Process $timer $Milliseconds @($stdout, $stderr) $ExitTimeout $OutputTimeout
         $output = $stdout.GetAwaiter().GetResult()
         $errors = $stderr.GetAwaiter().GetResult()
         $output + $errors | Set-Content -LiteralPath $Log -Encoding utf8NoBOM
-        if ($process.ExitCode -ne 0) { throw "Packaged application exited $($process.ExitCode): $Executable; see $Log" }
-        return $output
+        return @{ stdout = $output; exit_code = $Process.ExitCode }
     }
     finally {
-        try {
-            if ($started -and -not $process.HasExited) {
-                try { $process.Kill($true) }
-                catch [InvalidOperationException], [ComponentModel.Win32Exception] {
-                    if (-not $process.HasExited) { throw }
-                }
-                if (-not $process.WaitForExit(5000)) {
-                    throw "Packaged application did not stop after its watchdog: $Executable"
-                }
-            }
-        }
-        finally {
-            if ($null -ne $outputReader) { $outputReader.Dispose() }
-            if ($null -ne $errorReader) { $errorReader.Dispose() }
-            $process.Dispose()
-        }
+        Close-P4kxPackageProcess $Process $started $Name $outputReader $errorReader
     }
+}
+
+function Invoke-P4kxPackageProcess {
+    param([string]$Executable, [string[]]$Arguments, [string]$Directory, [string]$Log,
+        [ValidateRange(1,2147483)][int]$Seconds = 120)
+    $process = New-P4kxPackageProcess -Executable $Executable -Arguments $Arguments -Directory $Directory
+    $timeout = "Packaged application timed out: $Executable"
+    $result = Invoke-P4kxPackageCapture $process ([long]$Seconds * 1000) $Log "Packaged application $Executable" $timeout "$timeout; stdout/stderr did not reach EOF"
+    if ($result.exit_code -ne 0) { throw "Packaged application exited $($result.exit_code): $Executable; see $Log" }
+    return $result.stdout
+}
+
+function Invoke-P4kxPackageGuiSmoke {
+    param([string]$Executable, [string[]]$Arguments, [string]$Directory, [string]$Os)
+    $process = New-P4kxPackageProcess $Executable $Arguments $Directory
+    $process.StartInfo.Environment['P4KX_SMOKE_FRAMES'] = '3'
+    if ($Os -ceq 'macos') { $process.StartInfo.Environment['WGPU_BACKEND'] = 'metal' }
+    $timeout = 'Packaged GUI frame smoke timed out.'
+    $pipeTimeout = 'Packaged GUI frame smoke timed out waiting for stdout/stderr EOF.'
+    $result = Invoke-P4kxPackageCapture $process 120000 (Join-Path $Directory 'gui.log') 'Packaged GUI' $timeout $pipeTimeout
+    if ($result.exit_code -ne 0) { throw "Packaged GUI exited $($result.exit_code)." }
 }

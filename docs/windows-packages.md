@@ -403,6 +403,9 @@ its redirected stdout and stderr. A Windows synthetic test holds an inherited
 writer open after the command exits and verifies that collection returns a
 timeout while the writer is still alive. It also verifies success output,
 the combined UTF-8 log, the original nonzero exit code and process cleanup.
+The package GUI check uses the same rule for its 120-second allowance. The
+MCP check keeps the JSON-RPC response deadlines and bounds process exit and
+stderr capture within ten seconds after closing stdin.
 
 For release acceptance, repeat the native lifecycle checks with the actual release candidate
 and bind both its MSI and portable ZIP to the candidate revision and run attempt. Record the

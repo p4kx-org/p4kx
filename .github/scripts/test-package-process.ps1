@@ -1,6 +1,6 @@
 param(
     [Parameter(Mandatory)][string]$Directory,
-    [ValidateSet('success','failure','hang','inherit','hold')][string]$Fixture
+    [ValidateSet('success','failure','hang','inherit','hold','gui')][string]$Fixture
 )
 $ErrorActionPreference = 'Stop'
 
@@ -8,6 +8,12 @@ if ($Fixture -ceq 'success' -or $Fixture -ceq 'failure') {
     [Console]::Out.Write('synthetic stdout')
     [Console]::Error.Write('synthetic stderr')
     if ($Fixture -ceq 'failure') { exit 37 }
+    exit 0
+}
+if ($Fixture -ceq 'gui') {
+    if ($env:P4KX_SMOKE_FRAMES -cne '3' -or $env:WGPU_BACKEND -cne 'metal') { exit 9 }
+    [Console]::Out.Write('synthetic frames completed')
+    [Console]::Error.Write('synthetic GUI diagnostic')
     exit 0
 }
 if ($Fixture -ceq 'hang') {
@@ -116,4 +122,10 @@ finally {
         finally { $holder.Dispose() }
     }
 }
-'PASS: separate stdout and logs, exit 37, owned-process timeout, inherited-writer timeout and cooperative release.'
+$guiArguments = @('-NoLogo','-NoProfile','-NonInteractive','-File',$PSCommandPath,
+    '-Directory',$Directory,'-Fixture','gui')
+Invoke-P4kxPackageGuiSmoke ([Environment]::ProcessPath) $guiArguments $Directory 'macos'
+if ([IO.File]::ReadAllText((Join-Path $Directory 'gui.log')).TrimEnd() -cne 'synthetic frames completedsynthetic GUI diagnostic') {
+    throw 'The GUI wrapper did not retain its configured environment and combined log.'
+}
+'PASS: stdout/logs, exit 37, owned-process and inherited-writer timeouts, and GUI environment/logs.'

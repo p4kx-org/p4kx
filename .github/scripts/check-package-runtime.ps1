@@ -63,18 +63,7 @@ $mcp = $commands['p4kx-mcp']
 $null = Invoke-P4kxPackageProcess $mcp.executable (Get-P4kxPackageArguments $mcp @('--help')) $directory (Join-Path $directory 'mcp-help.log')
 Invoke-P4kxPackageMcpSmoke $mcp.executable $archive $directory $expected $mcp.prefix
 $window = $commands['p4kx-gui']
-$gui = New-P4kxPackageProcess $window.executable $window.prefix $directory
-try {
-    $gui.StartInfo.Environment['P4KX_SMOKE_FRAMES'] = '3'
-    if ($row.os -ceq 'macos') { $gui.StartInfo.Environment['WGPU_BACKEND'] = 'metal' }
-    [void]$gui.Start()
-    $stdout = $gui.StandardOutput.ReadToEndAsync()
-    $stderr = $gui.StandardError.ReadToEndAsync()
-    if (-not $gui.WaitForExit(120000)) { $gui.Kill($true); $gui.WaitForExit(); throw 'Packaged GUI frame smoke timed out.' }
-    $stdout.GetAwaiter().GetResult() + $stderr.GetAwaiter().GetResult() | Set-Content (Join-Path $directory 'gui.log') -Encoding utf8NoBOM
-    if ($gui.ExitCode -ne 0) { throw "Packaged GUI exited $($gui.ExitCode)." }
-}
-finally { $gui.Dispose() }
+Invoke-P4kxPackageGuiSmoke $window.executable $window.prefix $directory $row.os
 [ordered]@{
     target=$Target; package=$Package; binaries=$binaries
     runtime=@{cli_list='success'; cli_extract='success'; cli_convert='success'; mcp_tools='success'; mcp_read='success'; gui_frames='success'}
