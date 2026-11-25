@@ -33,7 +33,7 @@ The release version, defaulting to the workspace version.
 The full source commit digest, defaulting to GITHUB_SHA or the current commit.
 
 .PARAMETER TagAttestations
-Selects attestation instructions after the tagged workflow has verified completion of both attestation jobs.
+Requires the exact tagged publication assets and verified attestations before emitting checksums.
 
 .EXAMPLE
 ./assemble-release.ps1 -AssetDirectory assets -NotesPath release-notes.md -OutputNotesPath notes.md -Repository p4kx-org/p4kx
@@ -104,10 +104,25 @@ function Get-HashLine([System.IO.FileInfo]$File, [scriptblock]$Hasher) {
     '{0}  {1}' -f [System.Convert]::ToHexStringLower($hash), $File.Name
 }
 
-$files = @(Get-ChildItem -LiteralPath $AssetDirectory -File | Sort-Object Name)
+$checksumNames = @($sha256Name, $sha3Name)
+$files = if ($TagAttestations) {
+    . (Join-Path $PSScriptRoot 'release-asset-inventory.ps1')
+    $plan = @(Get-P4kxTaggedReleaseBundlePlan $Version)
+    Get-P4kxTaggedReleaseFiles $AssetDirectory $plan $checksumNames | Sort-Object Name
+} else {
+    Get-ChildItem -LiteralPath $AssetDirectory -File | Where-Object Name -CNotIn $checksumNames | Sort-Object Name
+}
 if (-not $files) { throw "No assets in '$AssetDirectory'." }
 
-$sha256Lines = $files | ForEach-Object { Get-HashLine $_ { param($s) [System.Security.Cryptography.SHA256]::HashData($s) } }
+$digests = [Collections.Generic.Dictionary[string, string]]::new([StringComparer]::Ordinal)
+foreach ($file in $files) {
+    $digests.Add($file.Name, (Get-FileHash -LiteralPath $file.FullName -Algorithm SHA256).Hash.ToLowerInvariant())
+}
+if ($TagAttestations) {
+    . (Join-Path $PSScriptRoot 'release-attestation-evidence.ps1')
+    Assert-P4kxTaggedReleaseAttestations $AssetDirectory $plan $digests $Repository $Version $Revision $ReleaseRunId
+}
+$sha256Lines = $files | ForEach-Object { '{0}  {1}' -f $digests[$_.Name], $_.Name }
 $sha3Lines = $files | ForEach-Object { Get-HashLine $_ { param($s) [System.Security.Cryptography.SHA3_512]::HashData($s) } }
 Set-Content -LiteralPath (Join-Path $AssetDirectory $sha256Name) -Value $sha256Lines -Encoding utf8NoBOM
 Set-Content -LiteralPath (Join-Path $AssetDirectory $sha3Name) -Value $sha3Lines -Encoding utf8NoBOM

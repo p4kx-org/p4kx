@@ -181,7 +181,12 @@ parts of the final release gate. Tag publication requires a completed VirusTotal
 exact SHA-256 of each of the thirteen native packages. The assembly job compares the scan receipt
 against the package bytes, source revision, version and workflow run. The receipt stays with the
 workflow evidence and the release notes link the reports. Pending, missing or failed reports
-prevent publication. Pull requests and operating-system-specific dry runs do not contact VirusTotal.
+prevent publication. Tagged assembly also requires the exact native and add-on asset inventory.
+It verifies each build provenance and SBOM bundle against the expected signing workflow
+and run. The verified subject names and SHA-256 values must match the assembled files.
+Each CycloneDX predicate must match its published SBOM. Both checksum files cover the
+assembled assets and are excluded from their own input lists.
+Pull requests and operating-system-specific dry runs do not contact VirusTotal.
 A full manual branch run records scan availability in its notes.
 
 All hosted checks use synthetic data. Real Archive tests stay ignored/local or explicitly

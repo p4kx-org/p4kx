@@ -360,7 +360,9 @@ everything; nobody uploads assets by hand.
    the report receipt. Pending, missing or failed reports stop publication. The release notes link
    the completed reports.
 5. The build provenance of every asset and each target's package SBOMs are attested
-   (Sigstore, via GitHub Artifact Attestations). The bundles become Release assets.
+   (Sigstore, via GitHub Artifact Attestations). Tagged assembly requires the exact
+   publication asset set and validates every bundle's signer, workflow run, subject names
+   and SHA-256 digests. Each signed CycloneDX predicate must match its published SBOM.
 6. `SHA256SUMS.txt` and `SHA3-512SUMS.txt` list every other asset, as plain text files that open
    in any text editor. The Release notes are the
    `CHANGELOG.md` section, the VirusTotal result, the verification commands, and GitHub's generated

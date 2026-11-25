@@ -134,7 +134,10 @@ function Test-P4kxIntakeSigner($Certificate, [string]$RunId, [string]$Event, [st
         $Certificate.subjectAlternativeName.value -cin @("$signer@$env:GITHUB_REF", "$signer@$env:GITHUB_SHA")
 }
 
-function Assert-P4kxIntakeAttestation([string]$Subject, [string]$Bundle, [string]$Workflow, [string]$TrustedRoot, [string]$RunId, [string]$Event) {
+function Assert-P4kxIntakeAttestation(
+    [string]$Subject, [string]$Bundle, [string]$Workflow, [string]$TrustedRoot, [string]$RunId, [string]$Event,
+    [string]$PredicateType, [switch]$PassThru
+) {
     $arguments = @(
         'attestation', 'verify', $Subject,
         '--repo', $env:GITHUB_REPOSITORY,
@@ -147,15 +150,22 @@ function Assert-P4kxIntakeAttestation([string]$Subject, [string]$Bundle, [string
         '--deny-self-hosted-runners',
         '--format', 'json'
     )
+    if ($PredicateType) { $arguments += @('--predicate-type', $PredicateType) }
     $result = & gh @arguments
     if ($LASTEXITCODE -ne 0) {
         throw "Could not verify signed provenance for '$([IO.Path]::GetFileName($Subject))'."
     }
-    $verified = @($result | ConvertFrom-Json)
-    foreach ($bundle in $verified) {
-        if (Test-P4kxIntakeSigner $bundle.verificationResult.signature.certificate $RunId $Event $Workflow) {
-            return
+    $verified = @($result | ConvertFrom-Json -Depth 100)
+    for ($position = 0; $position -lt $verified.Count; $position++) {
+        $certificate = $verified[$position].verificationResult.signature.certificate
+        if (-not (Test-P4kxIntakeSigner $certificate $RunId $Event $Workflow)) { continue }
+        if ($PassThru) {
+            $json = [Text.Json.Nodes.JsonNode]::Parse(($result -join [Environment]::NewLine))
+            $statement = $json[$position]['verificationResult']['statement']
+            if ($null -eq $statement) { throw 'The verified attestation has no statement.' }
+            return $statement.ToJsonString()
         }
+        return
     }
     throw "Signed provenance for '$([IO.Path]::GetFileName($Subject))' has the wrong workflow run identity."
 }

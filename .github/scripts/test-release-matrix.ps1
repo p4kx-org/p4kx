@@ -192,7 +192,7 @@ $record = @{
 }
 ConvertTo-Json -InputObject @($record) -Depth 15 | Set-Content -LiteralPath $receipt -Encoding utf8NoBOM
 Remove-Item -LiteralPath (Join-Path $notesAssets 'SHA256SUMS.txt'),(Join-Path $notesAssets 'SHA3-512SUMS.txt')
-& $assembler @assembly @desktop
+& (Join-Path $PSScriptRoot 'test-tagged-release-asset-admission.ps1') -Assembly $assembly -Desktop $desktop -FixtureDirectory $notesFixture
 $macosProofPath = Join-Path $notesAssets "P4KX-$version-aarch64-apple-darwin-runtime.json"
 $macosRuntime = Get-Content -LiteralPath $macosProofPath -Raw | ConvertFrom-Json
 $macosRuntime.package_smokes[0].current_hosted_smoke.runtime_host.os_version = '27.2.1'
