@@ -404,6 +404,19 @@ attempted payload. Missing coordinates and loose animation inputs receive unknow
 origins. Baked channel and key counts and skipped controller IDs carry explicit
 unknown origins. Skipped morph-weight counts receive an origin when present.
 
+## Interior GLB
+
+`p4kx interior glb` publishes a sibling `<output>.p4kx-origin.jsonl` through the guarded
+file writer. Its artifact record binds the exact produced GLB and retains the observed
+container payloads used to reach the requested scene. The artifact's source set is
+incomplete because the opened container chain alone cannot establish all scene,
+geometry, material and light contributions.
+
+The JSON report adds `originReceipt`, `fieldOrigins` and `provenance`. Each `containers`
+element identifies the stored path from the actual owning directory. The inner path
+inherits the encryption of its containing Entries. Unproved derived counts and issues
+keep explicit unknown field origins.
+
 ## CHF GLB
 
 `p4kx chf glb` writes a sibling `<output>.p4kx-origin.jsonl` companion. Its
@@ -445,6 +458,16 @@ variant occurrence and the fitted paint's tag field. For a compatible explicit r
 also retains the observed required tags, including an effective vehicle XML assignment.
 The material library and palette Record GUID link to the actual selected payloads and
 retained selectors. Unknown contributors keep their field's source set incomplete.
+
+## GUI assembly GLB
+
+Entity and Interior GLB exports write a sibling `<output>.p4kx-origin.jsonl`. The receipt
+binds the committed GLB bytes, the explicitly opened container chain, and observed
+POSITION accessor counts with their producing Archive geometry chunks. A count keeps
+incomplete coverage when the export has no proof of all contributing values. The
+receipt does not establish complete material, light, transform or container-declaration
+coverage. An origin publication failure after the GLB has been committed is reported
+as a failed export without a stale receipt.
 
 ## Rigid worn mounts
 

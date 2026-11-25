@@ -163,3 +163,36 @@ fn refuse_displaced_output(publication: Publication) -> io::Result<()> {
     );
     Ok(())
 }
+
+#[test]
+fn the_commit_observer_disambiguates_a_cancelled_receipt_after_artifact_placement() -> io::Result<()>
+{
+    let directory = tempfile::tempdir()?;
+    let target = directory.path().join("committed.glb");
+    let cancel = CancelToken::new();
+    let receipt = FileReceipt::new_with_cancel(&target, None, None, cancel.clone())?;
+    let observed = std::cell::Cell::new(false);
+    let failure = receipt.publish_observing_commit(
+        |writer| writer.write_all(b"placed artifact"),
+        || {
+            observed.set(true);
+            cancel.cancel();
+        },
+        |_, _, &()| Ok(()),
+    );
+    assert!(observed.get(), "the callback runs after artifact placement");
+    assert!(
+        failure.is_err(),
+        "late cancellation reports incomplete publication"
+    );
+    assert_eq!(
+        fs::read(target)?,
+        b"placed artifact",
+        "the GLB was already committed"
+    );
+    assert!(
+        !receipt.path().exists(),
+        "there is no mismatched origin companion"
+    );
+    Ok(())
+}

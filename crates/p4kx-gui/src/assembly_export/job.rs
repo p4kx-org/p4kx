@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 mod failure;
+mod glb_publication;
 mod package;
 mod run;
 pub(super) mod stop;
@@ -163,7 +164,7 @@ pub enum AssemblyExportStatus<'a> {
     Finished(&'a AssemblyExportSummary),
     /// The export was cancelled; no file was written.
     Cancelled,
-    /// No file was written, for the reason given.
+    /// The export failed, for the reason given.
     Failed(&'a ModelExportFailure),
 }
 

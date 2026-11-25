@@ -1,18 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io::Write;
+use std::io::{self, Write};
 use std::sync::Arc;
 
 use p4kx_extraction::{ArchiveDefaultMaterial, ModelArchiveSource};
 use p4kx_gltf::{
-    GlbOptions, GlbSummary, GltfError, Scene, SceneNode, ScenePart, TextureLoader, write_scene_glb,
-    write_scene_glb_with,
+    GlbOptions, GlbSummary, GltfError, MeshVertexMap, Scene, SceneNode, ScenePart, TextureLoader,
+    write_scene_glb, write_scene_glb_with,
 };
 use p4kx_model::{MaterialStatus, Model, Transform};
 
 use super::{Interior, InteriorPart};
 use crate::ModelProvider;
+use crate::assembly::scene;
 
 fn parts_models(parts: &[InteriorPart]) -> impl Iterator<Item = (&Model, &MaterialStatus)> {
     parts
@@ -137,5 +138,29 @@ impl Interior {
         let mut scene = Scene::new();
         self.add_to_scene(&mut scene, None, Transform::IDENTITY)?;
         write_scene_glb_with(&scene, options, textures, out)
+    }
+
+    /// Writes the Interior GLB and visits emitted meshes with their producing model sources.
+    ///
+    /// # Errors
+    /// Returns scene and write failures, or an error from the visitor.
+    pub fn write_glb_with_vertex_origins(
+        &self,
+        options: &GlbOptions,
+        textures: &dyn TextureLoader,
+        out: &mut impl Write,
+        visitor: &mut impl FnMut(MeshVertexMap<'_>, &Model, &[ModelArchiveSource]) -> io::Result<()>,
+    ) -> Result<GlbSummary, GltfError> {
+        let mut scene = Scene::new();
+        let mut sources = Vec::with_capacity(self.parts.len());
+        self.add_to_scene_observing_models(
+            &mut scene,
+            None,
+            Transform::IDENTITY,
+            &mut |_, origin| {
+                sources.push(origin);
+            },
+        )?;
+        scene::write_scene_with_vertex_origins(&scene, &sources, options, textures, out, visitor)
     }
 }

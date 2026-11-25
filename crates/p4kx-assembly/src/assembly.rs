@@ -21,7 +21,7 @@ mod default_material;
 #[path = "assembly_part_inputs.rs"]
 mod part_inputs;
 #[path = "assembly_scene.rs"]
-mod scene;
+pub(super) mod scene;
 
 /// The most parts an Assembly holds; further parts of the Loadout are left out.
 pub const MAX_ASSEMBLY_PARTS: usize = 1 << 14;

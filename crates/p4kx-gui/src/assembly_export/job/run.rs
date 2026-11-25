@@ -7,11 +7,11 @@ use p4kx_assembly::{
     LoadoutChanges,
 };
 use p4kx_extraction::{
-    Archive, ArchiveWriteProtection, CancelToken, ConversionError, DataForge, DataForgeEntry,
-    GlbSummary, GltfError, Guid, PathIndex, write_replacing_protected,
+    Archive, CancelToken, ConversionError, DataForge, DataForgeEntry, GlbSummary, Guid, PathIndex,
 };
 
-use super::stop::{Observed, Stoppable, StoppableTextures};
+use super::glb_publication::{self, Scene};
+use super::stop::Stoppable;
 use super::{AssemblyExportStage, Ended, Request, Shared, Subject, failure_of, package};
 use crate::assembly_export::{AssemblyExportForm, AssemblyExportSummary};
 use crate::entities::{ResolveFailure, resolve};
@@ -167,27 +167,13 @@ fn write_glb(
     (assembly, archive_models): (&Assembly, &ArchiveModels<'_>),
     (changes, cancel, shared): (&LoadoutChanges, &CancelToken, &Shared),
 ) -> Ended {
-    let protection = match ArchiveWriteProtection::new(index.path(), cancel.flag()) {
-        Ok(protection) => protection,
-        Err(error) if error.is_cancelled() => return Ended::Cancelled,
-        Err(error) => return Ended::Failed(ModelExportFailure::Refused(error)),
-    };
-    let written =
-        write_replacing_protected(&request.file, Some(&protection), Some(cancel), |writer| {
-            let mut observed = Observed {
-                inner: writer,
-                cancel,
-                written: &shared.done,
-            };
-            let textures = archive_models.textures();
-            let textures = StoppableTextures {
-                textures: &textures,
-                cancel,
-            };
-            assembly
-                .write_glb_with(&request.options(), &textures, &mut observed)
-                .map_err(|error| glb_error(error, request, cancel))
-        });
+    let written = glb_publication::publish(
+        index,
+        request,
+        Scene::Entity(assembly),
+        archive_models,
+        (cancel, shared),
+    );
     ended(index, written, |written| {
         AssemblyExportSummary::new(
             (request.file.clone(), request.name.clone()),
@@ -303,27 +289,16 @@ fn container(
     if request.form == AssemblyExportForm::Package {
         return package::write_interior(index, request, &interior, (&archive_models, cancel));
     }
-    let protection = match ArchiveWriteProtection::new(index.path(), cancel.flag()) {
-        Ok(protection) => protection,
-        Err(error) if error.is_cancelled() => return Ended::Cancelled,
-        Err(error) => return Ended::Failed(ModelExportFailure::Refused(error)),
-    };
-    let written =
-        write_replacing_protected(&request.file, Some(&protection), Some(cancel), |writer| {
-            let mut observed = Observed {
-                inner: writer,
-                cancel,
-                written: &shared.done,
-            };
-            let textures = archive_models.textures();
-            let textures = StoppableTextures {
-                textures: &textures,
-                cancel,
-            };
-            interior
-                .write_glb_with(&request.options(), &textures, &mut observed)
-                .map_err(|error| glb_error(error, request, cancel))
-        });
+    let written = glb_publication::publish(
+        index,
+        request,
+        Scene::Interior {
+            interior: &interior,
+            opened: &opened,
+        },
+        &archive_models,
+        (cancel, shared),
+    );
     ended(index, written, |written| {
         AssemblyExportSummary::of_interior(
             (request.file.clone(), request.name.clone()),
@@ -361,20 +336,6 @@ fn open_in(
     layer
         .open_container(entry)
         .map_err(|error| failure_of(index, &error))
-}
-
-fn glb_error(error: GltfError, request: &Request, cancel: &CancelToken) -> ConversionError {
-    match error {
-        GltfError::Write(_) if cancel.is_cancelled() => ConversionError::Cancelled,
-        GltfError::Write(source) => ConversionError::Write {
-            path: request.file.clone(),
-            source,
-        },
-        source => ConversionError::Glb {
-            file: request.name.clone(),
-            source,
-        },
-    }
 }
 
 fn ended(

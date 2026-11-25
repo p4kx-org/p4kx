@@ -8,7 +8,7 @@ use anyhow::Result;
 use p4kx_assembly::{Interior, InteriorOptions, Issue};
 use p4kx_extraction::{
     Archive, ArchiveDefaultMaterial, ConversionError, DefaultMaterialReceipt, GlbOptions,
-    GlbSummary, GltfError, MaterialMode, is_same_file, write_replacing_protected,
+    GlbSummary, GltfError, MaterialMode, is_same_file,
 };
 use serde::Serialize;
 use thiserror::Error;
@@ -16,9 +16,15 @@ use thiserror::Error;
 use crate::cli_interior::{InteriorGlbArgs, InteriorMaterialsArg};
 use crate::container_selection;
 use crate::entity_glb_json::IssueJson;
+use crate::file_receipt::FileReceipt;
 use crate::json;
 use crate::layers_json::LayersJson;
 use crate::query_table::one_line;
+
+#[path = "interior_glb_origins.rs"]
+mod origins;
+
+use origins::Origins;
 
 /// The output of `p4kx interior glb` is the Archive it reads.
 #[derive(Debug, Error)]
@@ -30,6 +36,10 @@ struct GlbJson<'a> {
     archive: String,
     containers: &'a [String],
     out: String,
+    #[serde(rename = "originReceipt")]
+    origin_receipt: String,
+    #[serde(flatten)]
+    origins: &'a Origins,
     lod: u32,
     parts: usize,
     containers_opened: usize,
@@ -89,45 +99,15 @@ pub(crate) fn run(args: &InteriorGlbArgs, as_json: bool) -> Result<()> {
     let entry = chain.last().map_or("", String::as_str);
     let options = InteriorOptions::default().with_lod(args.lod);
     let interior = crate::interior_forge::build(&layers, entry, &options)?;
-    let summary = write(&interior, args, entry, &protection, &cancel)?;
-    let skipped = interior
-        .issues()
-        .iter()
-        .filter(|issue| issue.kind().skips())
-        .count();
-    if as_json {
-        json::print(&GlbJson {
-            archive: json::path(&args.archive),
-            containers: &chain,
-            out: json::path(&args.out),
-            lod: args.lod,
-            parts: interior.parts().len(),
-            containers_opened: interior.containers(),
-            model_parts: interior.model_parts(),
-            modelled_parts: interior.modelled_parts(),
-            props: interior.props(),
-            lights: summary.lights,
-            nodes: summary.nodes,
-            meshes: summary.meshes,
-            primitives: summary.primitives,
-            materials: summary.materials,
-            default_material_ids: summary.default_material_ids,
-            default_material: interior
-                .default_material(args.lod)
-                .map(ArchiveDefaultMaterial::receipt),
-            hidden_primitives: summary.hidden_primitives,
-            lod_fallbacks: summary.lod_fallbacks,
-            shared_meshes: summary.shared_meshes,
-            shared_materials: summary.shared_materials,
-            shared_textures: summary.shared_textures,
-            vertices: summary.vertices,
-            triangles: summary.triangles,
-            bytes: summary.bytes,
-            skipped,
-            layers: LayersJson::from(&interior.unresolved_layers()),
-            issues: interior.issues().iter().map(IssueJson::from).collect(),
+    let origins = Origins::capture(&layers, &chain, &interior, args.lod)?;
+    let receipt = FileReceipt::for_staged_replacement(&args.out, Some(&protection), cancel)
+        .map_err(|source| ConversionError::Write {
+            path: args.out.clone(),
+            source,
         })?;
-        return Ok(());
+    let summary = write(&interior, args, entry, &receipt, &origins)?;
+    if as_json {
+        return print_json(args, &chain, &interior, &summary, receipt.path(), &origins);
     }
     match print_report(&interior, &summary, &args.out, entry) {
         Err(error) if error.kind() != io::ErrorKind::BrokenPipe => Err(error.into()),
@@ -135,13 +115,61 @@ pub(crate) fn run(args: &InteriorGlbArgs, as_json: bool) -> Result<()> {
     }
 }
 
+fn print_json(
+    args: &InteriorGlbArgs,
+    chain: &[String],
+    interior: &Interior,
+    summary: &GlbSummary,
+    receipt: &Path,
+    origins: &Origins,
+) -> Result<()> {
+    json::print(&GlbJson {
+        archive: json::path(&args.archive),
+        containers: chain,
+        out: json::path(&args.out),
+        origin_receipt: json::path(receipt),
+        origins,
+        lod: args.lod,
+        parts: interior.parts().len(),
+        containers_opened: interior.containers(),
+        model_parts: interior.model_parts(),
+        modelled_parts: interior.modelled_parts(),
+        props: interior.props(),
+        lights: summary.lights,
+        nodes: summary.nodes,
+        meshes: summary.meshes,
+        primitives: summary.primitives,
+        materials: summary.materials,
+        default_material_ids: summary.default_material_ids,
+        default_material: interior
+            .default_material(args.lod)
+            .map(ArchiveDefaultMaterial::receipt),
+        hidden_primitives: summary.hidden_primitives,
+        lod_fallbacks: summary.lod_fallbacks,
+        shared_meshes: summary.shared_meshes,
+        shared_materials: summary.shared_materials,
+        shared_textures: summary.shared_textures,
+        vertices: summary.vertices,
+        triangles: summary.triangles,
+        bytes: summary.bytes,
+        skipped: interior
+            .issues()
+            .iter()
+            .filter(|issue| issue.kind().skips())
+            .count(),
+        layers: LayersJson::from(&interior.unresolved_layers()),
+        issues: interior.issues().iter().map(IssueJson::from).collect(),
+    })?;
+    Ok(())
+}
+
 fn write(
     interior: &Interior,
     args: &InteriorGlbArgs,
     entry: &str,
-    protection: &p4kx_extraction::ArchiveWriteProtection,
-    cancel: &p4kx_extraction::CancelToken,
-) -> Result<GlbSummary> {
+    receipt: &FileReceipt<'_>,
+    origins: &Origins,
+) -> Result<GlbSummary, ConversionError> {
     let mode = match args.materials {
         InteriorMaterialsArg::Colours => MaterialMode::Colours,
     };
@@ -151,26 +179,25 @@ fn write(
     if args.no_vertex_colours {
         options = options.without_vertex_colours();
     }
-    let out: &Path = &args.out;
-    Ok(write_replacing_protected(
-        out,
-        Some(protection),
-        Some(cancel),
-        |writer| {
-            interior
-                .write_glb(&options, writer)
-                .map_err(|error| match error {
-                    GltfError::Write(source) => ConversionError::Write {
-                        path: out.to_path_buf(),
-                        source,
-                    },
-                    source => ConversionError::Glb {
-                        file: entry.to_owned(),
-                        source,
-                    },
-                })
-        },
-    )?)
+    receipt
+        .publish(
+            |mut writer| {
+                interior
+                    .write_glb(&options, &mut writer)
+                    .map_err(io::Error::other)
+            },
+            |writer, binding, _| origins.write_companion(writer, binding),
+        )
+        .map_err(|error| match error.downcast::<GltfError>() {
+            Ok(GltfError::Write(source)) | Err(source) => ConversionError::Write {
+                path: args.out.clone(),
+                source,
+            },
+            Ok(source) => ConversionError::Glb {
+                file: entry.to_owned(),
+                source,
+            },
+        })
 }
 
 fn print_issue(out: &mut impl Write, issue: &Issue) -> io::Result<()> {

@@ -110,8 +110,11 @@ impl<'source> FileReceipt<'source> {
         .check_companion_target()
     }
 
-    /// Binds a planned staged replacement whose existing leaf may be a link.
-    pub(crate) fn for_staged_replacement(
+    /// Binds a staged replacement and its companion without following an existing output link.
+    ///
+    /// # Errors
+    /// Returns path, target ownership or output protection errors.
+    pub fn for_staged_replacement(
         output: &Path,
         protection: Option<&'source ArchiveWriteProtection>,
         cancel: CancelToken,
@@ -174,6 +177,19 @@ impl<'source> FileReceipt<'source> {
         write: impl FnOnce(&mut dyn Write) -> io::Result<T>,
         describe: impl FnOnce(&mut dyn Write, &OriginArtifactBinding, &T) -> io::Result<()>,
     ) -> io::Result<T> {
+        self.publish_observing_commit(write, || {}, describe)
+    }
+
+    /// Reports the artifact's commit before publishing its companion.
+    ///
+    /// # Errors
+    /// Returns a write, output protection, ownership or receipt failure.
+    pub fn publish_observing_commit<T>(
+        &self,
+        write: impl FnOnce(&mut dyn Write) -> io::Result<T>,
+        observe_commit: impl FnOnce(),
+        describe: impl FnOnce(&mut dyn Write, &OriginArtifactBinding, &T) -> io::Result<()>,
+    ) -> io::Result<T> {
         let mut held = None;
         let staged = origin_file_io::write_staged_retaining_owner(
             &self.artifact,
@@ -203,6 +219,7 @@ impl<'source> FileReceipt<'source> {
         };
         let committed = staged.is_ok();
         let result = staged.and_then(|((result, digest), owner)| {
+            observe_commit();
             self.publish_owned_companion(
                 &held,
                 digest,

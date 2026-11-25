@@ -35,16 +35,7 @@ impl Assembly {
                 *slot = origin;
             }
         })?;
-        write_scene_glb_observed(&scene, options, Some(textures), out, &mut |map| {
-            let owned = map.scene_node.and_then(|node| {
-                let scene_node = scene.nodes().get(node)?;
-                let model = scene_node.part?.model;
-                Some((model, *sources.get(node)?))
-            });
-            let (model, sources) =
-                owned.ok_or_else(|| io::Error::other("scene mesh lost its producer node"))?;
-            visitor(map, model, sources)
-        })
+        write_scene_with_vertex_origins(&scene, &sources, options, textures, out, visitor)
     }
 
     fn scene_with<'a>(
@@ -84,4 +75,24 @@ impl Assembly {
         }
         Ok(scene)
     }
+}
+
+pub(crate) fn write_scene_with_vertex_origins(
+    scene: &Scene<'_>,
+    sources: &[&[ModelArchiveSource]],
+    options: &GlbOptions,
+    textures: &dyn TextureLoader,
+    out: &mut impl io::Write,
+    visitor: &mut impl FnMut(MeshVertexMap<'_>, &Model, &[ModelArchiveSource]) -> io::Result<()>,
+) -> Result<GlbSummary, GltfError> {
+    write_scene_glb_observed(scene, options, Some(textures), out, &mut |map| {
+        let owned = map.scene_node.and_then(|node| {
+            let scene_node = scene.nodes().get(node)?;
+            let model = scene_node.part?.model;
+            Some((model, *sources.get(node)?))
+        });
+        let (model, sources) =
+            owned.ok_or_else(|| io::Error::other("scene mesh lost its producer node"))?;
+        visitor(map, model, sources)
+    })
 }
