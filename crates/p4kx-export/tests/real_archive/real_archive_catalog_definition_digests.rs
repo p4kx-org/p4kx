@@ -13,7 +13,7 @@ use super::super::digest_parity::{capture_inventory, fingerprint};
 use super::super::{
     BoundMeasurement, Counts, ScopedTextProof, TestResult, collect_references, wire_row,
 };
-use super::digest_runs::DigestRuns;
+use super::digest_runs::{DigestRuns, Fingerprint};
 use super::wire::{DefinitionOwner, OrderedRows};
 use super::{StreamedComponentDigests, spill};
 
@@ -45,6 +45,40 @@ impl<'directory, const TABLES: usize> StreamedDefinitionDigests<'directory, TABL
         rows: &[impl Serialize],
         inventory: &SourceInventory,
     ) -> TestResult {
+        self.record_availability(table, availability)?;
+        let mut identities = HashSet::new();
+        let mut references = HashSet::new();
+        for row in rows {
+            let id = self.append_row(table, wire_row(row)?, &mut references)?;
+            if !identities.insert(id) {
+                return Err("the serialized definition family repeats a physical owner".into());
+            }
+        }
+        if !rows.is_empty() && references.is_empty() {
+            return Err("the definition table has no contributing source uses".into());
+        }
+        spill_inventory(&mut self.rows, inventory, references)
+    }
+
+    pub(crate) fn retain_visited_row(
+        &mut self,
+        table: usize,
+        row: Value,
+        inventory: &SourceInventory,
+    ) -> TestResult {
+        let mut references = HashSet::new();
+        self.append_row(table, row, &mut references)?;
+        if references.is_empty() {
+            return Err("the visited definition lacks contributing source uses".into());
+        }
+        spill_inventory(&mut self.rows, inventory, references)
+    }
+
+    pub(crate) fn record_availability(
+        &mut self,
+        table: usize,
+        availability: DatasetAvailability,
+    ) -> TestResult {
         let state = self
             .available
             .get_mut(table)
@@ -52,7 +86,16 @@ impl<'directory, const TABLES: usize> StreamedDefinitionDigests<'directory, TABL
         if state.replace(availability).is_some() {
             return Err("a definition family was retained twice".into());
         }
-        let owner = *self
+        Ok(())
+    }
+
+    fn append_row(
+        &mut self,
+        table: usize,
+        wire: Value,
+        references: &mut HashSet<String>,
+    ) -> TestResult<Fingerprint> {
+        let owner = self
             .owners
             .get(table)
             .ok_or("missing definition identity")?;
@@ -61,21 +104,10 @@ impl<'directory, const TABLES: usize> StreamedDefinitionDigests<'directory, TABL
             .rows
             .get_mut(table)
             .ok_or("missing definition rows")?;
-        let mut identities = HashSet::new();
-        let mut references = HashSet::new();
-        for row in rows {
-            let wire = wire_row(row)?;
-            let id = owner.key(&wire)?;
-            if !identities.insert(id) {
-                return Err("the serialized definition family repeats a physical owner".into());
-            }
-            add_references(&wire, &mut references);
-            ordered.append_encounter_row(id, fingerprint(wire)?)?;
-        }
-        if !rows.is_empty() && references.is_empty() {
-            return Err("the definition table has no contributing source uses".into());
-        }
-        spill_inventory(&mut self.rows, inventory, references)
+        let id = owner.key(&wire)?;
+        add_references(&wire, references);
+        ordered.append_encounter_row(id, fingerprint(wire)?)?;
+        Ok(id)
     }
 
     pub(crate) fn retain_texts(
