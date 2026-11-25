@@ -3,6 +3,9 @@
 
 //! Bounded WEM reads and original input evidence.
 
+#[path = "sound_publication.rs"]
+mod publication;
+
 #[path = "sound_wav_receipt.rs"]
 mod wav_receipt;
 pub use wav_receipt::WavFileReceipt;

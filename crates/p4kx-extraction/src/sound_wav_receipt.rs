@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io::{self, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
-use crate::file_receipt::{self, OrdinaryReplacement};
-use crate::output_file::{self, write_error};
+use crate::output_file::write_error;
 use crate::{
-    ConversionError, FieldOrigins, OriginDigestWriter, SourceEvidenceError,
-    SourceInventorySelection, WavReport,
+    ConversionError, FieldOrigins, SourceEvidenceError, SourceInventorySelection, WavReport,
 };
 
 use super::Sound;
+use super::publication::SoundWrite;
 
 #[path = "sound_wav_origins.rs"]
 mod origins;
@@ -73,62 +72,25 @@ impl Sound {
         out: &Path,
         convert: impl FnOnce(&mut dyn Write) -> Result<WavWrite, ConversionError>,
     ) -> Result<WavFileReceipt, ConversionError> {
-        self.refuse_input_as_output(out)?;
-        let companion =
-            file_receipt::companion_path(out).map_err(|source| write_error(out, source))?;
-        self.refuse_input_as_output(&companion)?;
-        let protection = self.protection.context()?;
-        let mut held = None;
-        let written = output_file::write_replacing_protected_before(
+        let publication = self.publish_sound(
             out,
-            protection,
-            None,
-            |writer| {
-                let mut measured = OriginDigestWriter::new(writer);
-                let result = convert(&mut measured)?;
-                let report = result.report();
-                let digest = measured
-                    .finish()
-                    .map_err(|source| write_error(out, source))?;
-                if digest.byte_length() != report.size {
-                    return Err(write_error(
-                        out,
-                        io::Error::other("WAV size differs from its write report"),
-                    ));
-                }
-                let origins = WavOrigins::capture(self, &result)
-                    .map_err(|source| write_error(&companion, source))?;
-                Ok((report, digest, origins))
-            },
-            |staged| {
-                let replacement = OrdinaryReplacement::new(out, protection, None)
-                    .map_err(|source| write_error(out, source))?;
-                let replacement = held.insert(replacement);
-                staged.check()?;
-                replacement
-                    .invalidate_for_companion()
-                    .map_err(|source| write_error(&companion, source))
-            },
-        );
-        let replacement = held.ok_or_else(|| {
-            write_error(
-                out,
-                io::Error::other("WAV committed without a receipt lock"),
-            )
-        });
-        match (written, replacement) {
-            (Ok(((report, digest, origins), ())), Ok(replacement)) => {
-                replacement.finish_companion(out, (), digest, |writer, binding| {
-                    origins.write(writer, binding)
-                })?;
-                Ok(WavFileReceipt {
+            |writer, companion| {
+                let written = convert(writer)?;
+                let report = written.report();
+                let origins = WavOrigins::capture(self, &written)
+                    .map_err(|source| write_error(companion, source))?;
+                Ok(SoundWrite {
                     report,
-                    companion,
+                    byte_length: report.size,
                     origins,
                 })
-            }
-            (Err(error), Ok(replacement)) => replacement.finish_conversion(out, Err(error)),
-            (Err(error), Err(_)) | (Ok(_), Err(error)) => Err(error),
-        }
+            },
+            WavOrigins::write,
+        )?;
+        Ok(WavFileReceipt {
+            report: publication.written.report,
+            companion: publication.companion,
+            origins: publication.written.origins,
+        })
     }
 }
