@@ -13,6 +13,7 @@ use p4kx_testkit::{
 };
 use serde_json::Value;
 
+mod chunks;
 mod material;
 
 type TestResult = Result<(), Box<dyn Error>>;

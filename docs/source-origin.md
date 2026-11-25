@@ -380,6 +380,11 @@ Single-material libraries, fallback and unbound references report unknown.
 The opaque artifact row includes the observed geometry contributions and remains
 incomplete while other layout, material, texture and animation inputs are unresolved.
 
+The `--json` report carries `fieldOrigins` and `provenance` for the fields of
+its `unknown_chunks` rows. The paths use the row number in the filtered report.
+A numeric type ID cites the original chunk table word in the archive Entry
+that supplied it. Loose model inputs report unknown origin.
+
 ## CHF GLB
 
 `p4kx chf glb` writes a sibling `<output>.p4kx-origin.jsonl` companion. Its

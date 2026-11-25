@@ -7,10 +7,11 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use p4kx_assembly::animation_choice;
 use p4kx_extraction::model::{LodSelection, Model};
-use p4kx_extraction::model_info::file_name;
+use p4kx_extraction::model_info::{file_name, write_chunk_origins};
 use p4kx_extraction::{
-    AnimationSet, ArchiveTextures, ChunkInfo, GlbGeometryPublication, GlbOptions, GlbSummary,
-    LibraryInfo, MaterialMode, ModelSource, PathIndex, UnreadInfo,
+    AnimationSet, ArchiveTextures, ChunkInfo, FieldOrigins, FieldPath, GlbGeometryPublication,
+    GlbOptions, GlbSummary, LibraryInfo, MaterialMode, ModelSource, PathIndex, SourceInventory,
+    SourceUses, UnreadInfo,
 };
 use serde::Serialize;
 
@@ -46,7 +47,36 @@ struct GlbJson<'a> {
     library: LibraryInfo<'a>,
     animations: Vec<WrittenJson>,
     unread_animations: Vec<UnreadInfo>,
+    #[serde(flatten)]
+    unknown_chunks: UnknownChunkReport,
+}
+
+#[derive(Serialize)]
+struct UnknownChunkReport {
     unknown_chunks: Vec<ChunkInfo>,
+    #[serde(rename = "fieldOrigins")]
+    field_origins: FieldOrigins,
+    provenance: SourceInventory,
+}
+
+impl UnknownChunkReport {
+    fn capture(source: &ModelSource) -> Result<Self> {
+        let mut unknown_chunks = Vec::new();
+        let mut field_origins = FieldOrigins::new();
+        let uses = SourceUses::with_compact_use_refs();
+        let mut path = FieldPath::parse("/unknown_chunks")?;
+        for (row, (position, chunk)) in source.model().unknown_chunks_with_positions().enumerate() {
+            path.push_index(row)?;
+            write_chunk_origins(source, position, &path, &uses, &mut field_origins)?;
+            unknown_chunks.push(ChunkInfo::of(chunk));
+            path.pop();
+        }
+        Ok(Self {
+            unknown_chunks,
+            field_origins,
+            provenance: uses.freeze()?,
+        })
+    }
 }
 
 const NO_ARCHIVE: &str = "textures are read from an Archive; give the model as ARCHIVE ENTRY. The materials keep their plain colours";
@@ -275,6 +305,6 @@ fn glb_json<'a>(
         library: LibraryInfo::of(source.model()),
         animations: summary.animations.iter().map(WrittenJson::of).collect(),
         unread_animations: animations.unread.iter().map(UnreadInfo::of).collect(),
-        unknown_chunks: source.model().unknown_chunks().map(ChunkInfo::of).collect(),
+        unknown_chunks: UnknownChunkReport::capture(source)?,
     })
 }

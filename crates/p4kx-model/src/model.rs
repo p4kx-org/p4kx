@@ -362,9 +362,15 @@ impl Model {
 
     /// Returns the chunks of unknown type, which the model skipped.
     pub fn unknown_chunks(&self) -> impl Iterator<Item = &ModelChunk> {
+        self.unknown_chunks_with_positions().map(|(_, chunk)| chunk)
+    }
+
+    /// Returns each skipped unknown chunk with its position in the model-wide chunk list.
+    pub fn unknown_chunks_with_positions(&self) -> impl Iterator<Item = (usize, &ModelChunk)> {
         self.chunks
             .iter()
-            .filter(|chunk| chunk.usage == ChunkUsage::Unknown)
+            .enumerate()
+            .filter(|(_, chunk)| chunk.usage == ChunkUsage::Unknown)
     }
 
     /// Returns the material IDs the submeshes of every level of detail use, ascending.

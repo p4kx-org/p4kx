@@ -3059,7 +3059,9 @@ model's files, a `--lod` the model lacks, a name `--anim` finds no animation for
 file that is corrupt or not supported, an `--anim-from` one included, with 3.
 
 The `originReceipt` field names the digest-bound sibling origin companion. Both
-output modes publish the companion. See [standalone model GLB origins](source-origin.md#standalone-model-glb).
+output modes publish the companion. The `fieldOrigins` and `provenance`
+members record the original fields of each `unknown_chunks` row. See
+[standalone model GLB origins](source-origin.md#standalone-model-glb).
 
 ## `p4kx extract … --json`
 
