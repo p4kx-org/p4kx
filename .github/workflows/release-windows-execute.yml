@@ -197,8 +197,8 @@ jobs:
         timeout-minutes: 1
         continue-on-error: true
         run: .github/scripts/invoke-msi-observer.ps1 -Stage Snapshot -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -Sequence 3 -WaitMilliseconds 0 -OriginalInstallBoundary
-      - name: Upload original ARM64 MSI phase diagnostics before Finish
-        if: ${{ always() && !cancelled() && matrix.arch == 'arm64' && steps.msi-launch.outcome == 'success' }}
+      - name: Upload original MSI phase diagnostics before Finish
+        if: ${{ always() && !cancelled() && steps.msi-launch.outcome == 'success' }}
         timeout-minutes: 1
         continue-on-error: true
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

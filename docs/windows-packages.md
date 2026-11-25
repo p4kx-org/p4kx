@@ -473,6 +473,8 @@ The operation responsible for the earlier hosted cancellation remains unknown.
 
 The real consumer records the prepared allowance, source hashes, checkpoints and parent controls
 on the runner. It refreshes admission under the original deadline before launching the installer.
+Before Finish starts, each native target uploads a checkpoint with the six allowed diagnostic
+JSON receipts. The checkpoint remains available if the runner stops reporting during Finish.
 The cancellation-aware diagnostic upload collects those local files after the terminal evidence
 and package publication steps. A runner failure before the upload can prevent delivery.
 The first install snapshot emits one bounded observation in its existing console stream after
