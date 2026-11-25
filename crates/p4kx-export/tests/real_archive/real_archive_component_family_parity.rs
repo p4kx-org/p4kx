@@ -263,6 +263,16 @@ pub(crate) fn require_complete(
     rows: usize,
     coverage: &CatalogRecordCoverage,
 ) -> TestResult {
+    require_reported_fields(path, availability, rows, coverage, &[])
+}
+
+pub(crate) fn require_reported_fields(
+    path: &str,
+    availability: DatasetAvailability,
+    rows: usize,
+    coverage: &CatalogRecordCoverage,
+    reported_issue_owners: &[u32],
+) -> TestResult {
     match availability {
         DatasetAvailability::Available => {}
         DatasetAvailability::Absent if rows == 0 => {}
@@ -274,13 +284,14 @@ pub(crate) fn require_complete(
     }
     if !coverage.unreadable_headers.is_empty()
         || !coverage.unreadable_bodies.is_empty()
-        || !coverage.incomplete_fields.is_empty()
+        || coverage.incomplete_fields != reported_issue_owners
     {
         return Err(format!(
-            "{path}: incomplete component query coverage (unreadableHeaders={} unreadableBodies={} incompleteFields={})",
+            "{path}: incomplete component query coverage (unreadableHeaders={} unreadableBodies={} incompleteFields={} reportedIssueOwners={})",
             coverage.unreadable_headers.len(),
             coverage.unreadable_bodies.len(),
             coverage.incomplete_fields.len(),
+            reported_issue_owners.len(),
         )
         .into());
     }
@@ -326,4 +337,31 @@ fn component_coverage_distinguishes_empty_absent_and_incomplete() {
         require_complete(path, DatasetAvailability::Available, 1, &coverage).is_err(),
         "an incompletely projected field cannot establish complete coverage",
     );
+}
+
+#[test]
+fn reported_issue_owners_explain_only_matching_field_coverage() -> TestResult {
+    let path = "/loadouts";
+    let availability = DatasetAvailability::Available;
+    let mut coverage = CatalogRecordCoverage::default();
+    coverage.incomplete_fields = vec![7, 12];
+    require_reported_fields(path, availability, 3, &coverage, &[7, 12])?;
+    for reported in [&[7][..], &[7, 13], &[7, 12, 18]] {
+        assert!(
+            require_reported_fields(path, availability, 3, &coverage, reported).is_err(),
+            "coverage indices must match the represented issues exactly",
+        );
+    }
+    coverage.unreadable_headers.push(7);
+    assert!(
+        require_reported_fields(path, availability, 3, &coverage, &[7, 12]).is_err(),
+        "an unreadable header blocks coverage even for an owner with a reported issue",
+    );
+    coverage.unreadable_headers.clear();
+    coverage.unreadable_bodies.push(12);
+    assert!(
+        require_reported_fields(path, availability, 3, &coverage, &[7, 12]).is_err(),
+        "an unreadable body blocks coverage even for an owner with a reported issue",
+    );
+    Ok(())
 }

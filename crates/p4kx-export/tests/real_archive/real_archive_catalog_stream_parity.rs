@@ -186,6 +186,7 @@ impl BoundMeasurement {
     }
 }
 
+#[derive(Clone, Copy)]
 enum StreamedRowPaths<'scope, const TABLES: usize> {
     Tables([&'scope str; TABLES]),
     Arrays([&'scope str; TABLES]),

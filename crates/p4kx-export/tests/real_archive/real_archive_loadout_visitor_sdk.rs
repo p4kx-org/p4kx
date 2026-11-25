@@ -87,13 +87,14 @@ fn cold_narrow(
     guid: Guid,
     indices: &[u32],
 ) -> TestResult {
-    if indices.is_empty() || indices.windows(2).any(|pair| pair[0] >= pair[1]) {
+    if indices.is_empty() || !indices.is_sorted_by(|left, right| left < right) {
         return Err("configure a nonempty, strictly ordered Loadout Record inventory".into());
     }
     let expected = Census {
         owners: indices.len(),
         rows: indices.len(),
         skipped: 0,
+        rows_with_issues: 0,
     };
     let mut offset = 0;
     cold_visit(route, selection, expected, |owner| {
@@ -125,8 +126,13 @@ fn cold_visit(
             Ok(())
         })?;
         print_line(&format!(
-            "Loadout visitor SDK: route={route} availability={availability:?} owners={} rows={} skippedLeftovers={} maximumOwnerUses={} maximumOwnerPhysicalSources={}",
-            expected.owners, expected.rows, expected.skipped, sources.0, sources.1,
+            "Loadout visitor SDK: route={route} availability={availability:?} owners={} rows={} skippedLeftovers={} rowsWithIssues={} maximumOwnerUses={} maximumOwnerPhysicalSources={}",
+            expected.owners,
+            expected.rows,
+            expected.skipped,
+            expected.rows_with_issues,
+            sources.0,
+            sources.1,
         ));
         Ok(())
     })
@@ -140,16 +146,27 @@ fn visit(
 ) -> TestResult<DatasetAvailability> {
     let mut observed = Census::default();
     let mut previous = None;
+    let mut reported_issue_owners = Vec::new();
     let summary = equipment::visit_loadouts(archive, selection, None, |snapshot| -> TestResult {
         let position = (snapshot.entity_guid.to_string(), snapshot.record_index);
         if previous.as_ref().is_some_and(|last| last >= &position) {
             return Err("Loadout owners are duplicated or outside canonical GUID order".into());
         }
-        let row = snapshot.row.as_ref().map(wire_row).transpose()?;
-        if let Some(row) = row {
+        if !snapshot.dependencies.is_complete() {
+            return Err(format!(
+                "Loadout owner {} has incomplete resolver or alignment dependencies",
+                snapshot.record_index,
+            )
+            .into());
+        }
+        if let Some(loadout) = &snapshot.row {
+            let row = wire_row(loadout)?;
             check_identity(snapshot, &row, &position.0)?;
             inspect(snapshot, row)?;
             observed.rows += 1;
+            if !loadout.issues().is_empty() {
+                reported_issue_owners.push(snapshot.record_index);
+            }
         }
         previous = Some(position);
         observed.owners += 1;
@@ -158,13 +175,16 @@ fn visit(
     if summary.build.is_none() || summary.build.as_ref() != archive.build() {
         return Err("Loadout visitor returned a different Archive Build".into());
     }
-    component_family_parity::require_complete(
+    reported_issue_owners.sort_unstable();
+    component_family_parity::require_reported_fields(
         LOADOUTS,
         summary.availability,
         summary.row_count,
         &summary.coverage,
+        &reported_issue_owners,
     )?;
     observed.skipped = summary.coverage.skipped_leftovers;
+    observed.rows_with_issues = reported_issue_owners.len();
     if summary.owner_count != observed.owners
         || summary.row_count != observed.rows
         || !summary.dependencies_complete
@@ -194,6 +214,7 @@ struct Census {
     owners: usize,
     rows: usize,
     skipped: usize,
+    rows_with_issues: usize,
 }
 
 impl Census {
@@ -202,18 +223,103 @@ impl Census {
             .split(',')
             .map(str::parse::<usize>)
             .collect::<Result<Vec<_>, _>>()?;
-        let [owners, rows, skipped] = counts.as_slice() else {
-            return Err("configure exact Loadout owner, row and skipped counts".into());
+        let [owners, rows, skipped, rows_with_issues] = counts.as_slice() else {
+            return Err("configure exact Loadout owner, row, skipped and issue-row counts".into());
         };
-        if *rows == 0 || rows > owners {
+        if *rows == 0 || rows > owners || rows_with_issues > rows {
             return Err(
-                "configure a positive Loadout row count within the physical owner census".into(),
+                "configure positive Loadout rows within the owner census and issue rows within all rows".into(),
             );
         }
         Ok(Self {
             owners: *owners,
             rows: *rows,
             skipped: *skipped,
+            rows_with_issues: *rows_with_issues,
         })
     }
+}
+
+#[test]
+fn census_requires_an_independent_issue_count() -> TestResult {
+    assert_eq!(
+        Census::parse("4,3,0,2")?.rows_with_issues,
+        2,
+        "the fourth count describes loadout rows with represented issues",
+    );
+    assert!(
+        Census::parse("4,3,0").is_err(),
+        "the broad census requires an explicit issue-row count",
+    );
+    assert!(
+        Census::parse("4,3,0,4").is_err(),
+        "issue owners cannot exceed emitted rows",
+    );
+    Ok(())
+}
+
+#[test]
+fn visitor_verifies_a_represented_issue_and_rejects_an_unreadable_dependency() -> TestResult {
+    let expected = Census {
+        owners: 1,
+        rows: 1,
+        skipped: 0,
+        rows_with_issues: 1,
+    };
+    let (_folder, archive) = issue_fixture(false)?;
+    visit(&archive, CatalogRecordSelection::All, expected, |_, row| {
+        assert_eq!(
+            row.get("issues"),
+            Some(&serde_json::json!(["unknown_class"])),
+            "a missing attachment target is represented by the canonical row",
+        );
+        Ok(())
+    })?;
+
+    let (_folder, archive) = issue_fixture(true)?;
+    let result = visit(&archive, CatalogRecordSelection::All, expected, |_, _| {
+        Ok(())
+    });
+    assert!(
+        result.is_err_and(|error| error
+            .to_string()
+            .contains("incomplete resolver or alignment")),
+        "an incomplete original dependency blocks an issue-bearing row",
+    );
+    Ok(())
+}
+
+fn issue_fixture(malformed_vehicle: bool) -> TestResult<(tempfile::TempDir, Archive)> {
+    use p4kx_testkit::{
+        ArchiveBuilder, DataForgeBuilder, TestEntity, TestEntry, TestLoadout, TestLoadoutEntry,
+        TestPort, entity_schema, write_build_manifest,
+    };
+
+    let folder = tempfile::tempdir()?;
+    let path = folder.path().join("Data.p4k");
+    write_build_manifest(folder.path(), "fixture", "1.2.3", "456", "issue-fixture")?;
+    let mut ship = TestEntity::new(
+        0x10,
+        "ACME_Issue",
+        "libs/foundry/records/entities/spaceships/acme_issue.xml",
+    )
+    .port(TestPort::new("slot"))
+    .loadout(TestLoadout::Manual(vec![TestLoadoutEntry::class(
+        "slot", "Unknown",
+    )]));
+    let mut input = ArchiveBuilder::new();
+    if malformed_vehicle {
+        let vehicle = "Scripts/Entities/Vehicles/Implementations/Xml/ACME_Issue.xml";
+        ship = ship.vehicle(vehicle, "");
+        input = input.entry(TestEntry::zstd(
+            format!("Data/{vehicle}"),
+            b"CryXmlB\0not really".to_vec(),
+        ));
+    }
+    let forge = entity_schema(DataForgeBuilder::new()).record(ship.record());
+    input
+        .entry(TestEntry::zstd("Data\\Game2.dcb", forge.build()))
+        .write_to(&path)?;
+    let archive = Archive::open(&path)?;
+    Ok((folder, archive))
 }
