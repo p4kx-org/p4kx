@@ -4,7 +4,7 @@
 //! A synthetic Archive with factions, reputation scopes, standings and contexts, mission types
 //! and localities, and a contract scenario.
 
-mod structures;
+pub(super) mod structures;
 
 use std::error::Error;
 use std::path::{Path, PathBuf};
@@ -103,7 +103,14 @@ fn faction(guid: u128, name: &str, bare: bool) -> TestRecord {
         )
 }
 
-fn standing(guid: u128, name: &str, minimum: i64, gated: bool, hours: f32) -> TestRecord {
+pub(crate) fn standing(
+    guid: u128,
+    name: &str,
+    minimum: i64,
+    gated: bool,
+    hours: f32,
+    display_name: &str,
+) -> TestRecord {
     record(
         guid,
         "SReputationStandingParams",
@@ -118,7 +125,7 @@ fn standing(guid: u128, name: &str, minimum: i64, gated: bool, hours: f32) -> Te
         "description",
         TestValue::text("Synthetic standing description"),
     )
-    .value("displayName", TestValue::text("@LOC_PLACEHOLDER"))
+    .value("displayName", TestValue::text(display_name))
     .value("perkDescription", TestValue::text("@fixture_standing_perk"))
     .value("icon", TestValue::text("ui/fixture/standing.dds"))
     .value("missionBoardIcon", TestValue::text("ui/fixture/board.dds"))
@@ -128,9 +135,9 @@ fn standing(guid: u128, name: &str, minimum: i64, gated: bool, hours: f32) -> Te
     .value("gated", TestValue::Bool(gated))
 }
 
-fn scope() -> TestRecord {
+pub(crate) fn scope(guid: u128) -> TestRecord {
     record(
-        SCOPE,
+        guid,
         "SReputationScopeParams",
         "FactionReputationScope",
         "reputation/scopes/factionreputationscope",
@@ -228,18 +235,38 @@ fn scenario() -> TestRecord {
     )
 }
 
+fn mission_locality() -> TestRecord {
+    record(
+        LOCALITY,
+        "MissionLocality",
+        "pyro",
+        "missiondata/pu_missionlocality/pyro",
+    )
+    .value(
+        "availableLocations",
+        TestValue::Array(vec![
+            TestValue::Reference(PLAIN_A),
+            TestValue::Reference(MISSING),
+            TestValue::Null,
+            TestValue::Reference(PLAIN_B),
+            TestValue::Reference(PLAIN_A),
+        ]),
+    )
+}
+
 fn database(high_drift_hours: f32) -> DataForgeBuilder {
     [
         faction(FACTION, "Acme", false),
         faction(FACTION_BARE, "Bare", true),
         faction(FACTION_TEST, "Test_Corp", true),
-        scope(),
+        scope(SCOPE),
         standing(
             STANDING_LOW,
             "ReputationStanding_Faction_B0_00",
             0,
             false,
             -0.0,
+            "@LOC_PLACEHOLDER",
         ),
         standing(
             STANDING_HIGH,
@@ -247,8 +274,16 @@ fn database(high_drift_hours: f32) -> DataForgeBuilder {
             4_500,
             true,
             high_drift_hours,
+            "@LOC_PLACEHOLDER",
         ),
-        standing(STANDING_TEST, "ReputationStanding_Test", 1, false, 3.0),
+        standing(
+            STANDING_TEST,
+            "ReputationStanding_Test",
+            1,
+            false,
+            3.0,
+            "@LOC_PLACEHOLDER",
+        ),
         context(),
         record(
             MISSION_TYPE,
@@ -257,22 +292,7 @@ fn database(high_drift_hours: f32) -> DataForgeBuilder {
             "missiontype/missiontype.job",
         )
         .value("LocalisedTypeName", TestValue::text("@type_job")),
-        record(
-            LOCALITY,
-            "MissionLocality",
-            "pyro",
-            "missiondata/pu_missionlocality/pyro",
-        )
-        .value(
-            "availableLocations",
-            TestValue::Array(vec![
-                TestValue::Reference(PLAIN_A),
-                TestValue::Reference(MISSING),
-                TestValue::Null,
-                TestValue::Reference(PLAIN_B),
-                TestValue::Reference(PLAIN_A),
-            ]),
-        ),
+        mission_locality(),
         record(PLAIN_A, "Placeholder", "a", "misc/a"),
         record(PLAIN_B, "Placeholder", "b", "misc/b"),
         record(

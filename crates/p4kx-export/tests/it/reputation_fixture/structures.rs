@@ -55,34 +55,40 @@ fn faction_structs() -> [TestStruct; 6] {
     ]
 }
 
+pub(crate) fn rank_structs() -> [TestStruct; 3] {
+    [
+        TestStruct::new("SReputationScopeParams")
+            .field("scopeName", TestType::String)
+            .field("displayName", TestType::Locale)
+            .field("description", TestType::Locale)
+            .field("icon", TestType::String)
+            .field("standingMap", class("SReputationStandingMapParams")),
+        TestStruct::new("SReputationStandingMapParams")
+            .field("reputationCeiling", TestType::Int64)
+            .field("initialReputation", TestType::Int64)
+            .array(
+                "standings",
+                TestType::ReferenceTo("SReputationStandingParams".to_owned()),
+            ),
+        TestStruct::new("SReputationStandingParams")
+            .field("name", TestType::String)
+            .field("description", TestType::String)
+            .field("perkDescription", TestType::Locale)
+            .field("icon", TestType::String)
+            .field("missionBoardIcon", TestType::String)
+            .field("displayName", TestType::Locale)
+            .field("minReputation", TestType::Int64)
+            .field("driftReputation", TestType::Int64)
+            .field("driftTimeHours", TestType::Single)
+            .field("gated", TestType::Bool),
+    ]
+}
+
 fn reputation_structs() -> Vec<TestStruct> {
     faction_structs()
         .into_iter()
+        .chain(rank_structs())
         .chain([
-            TestStruct::new("SReputationScopeParams")
-                .field("scopeName", TestType::String)
-                .field("displayName", TestType::Locale)
-                .field("description", TestType::Locale)
-                .field("icon", TestType::String)
-                .field("standingMap", class("SReputationStandingMapParams")),
-            TestStruct::new("SReputationStandingMapParams")
-                .field("reputationCeiling", TestType::Int64)
-                .field("initialReputation", TestType::Int64)
-                .array(
-                    "standings",
-                    TestType::ReferenceTo("SReputationStandingParams".to_owned()),
-                ),
-            TestStruct::new("SReputationStandingParams")
-                .field("name", TestType::String)
-                .field("description", TestType::String)
-                .field("perkDescription", TestType::Locale)
-                .field("icon", TestType::String)
-                .field("missionBoardIcon", TestType::String)
-                .field("displayName", TestType::Locale)
-                .field("minReputation", TestType::Int64)
-                .field("driftReputation", TestType::Int64)
-                .field("driftTimeHours", TestType::Single)
-                .field("gated", TestType::Bool),
             TestStruct::new("SReputationContextUI")
                 .field("primaryScopeContext", class("SReputationScopeContextUI"))
                 .array("scopeContextList", class("SReputationScopeContextUI")),
