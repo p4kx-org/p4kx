@@ -820,6 +820,29 @@ the original graph observations, and the graph outcome counts explain
 dangling or cut edges independently of the returned rows. Check
 `graph_inventory_complete()` before treating a missing row as an absence.
 
+### Installed Tag cold queries
+
+The Windows AMD64 verifier at `8db10c610d05c52fa77e725b9fc97e99b88e7b9a`
+ran each complete Tag query in a fresh process with one worker. It used the
+installed Archive and preserved the same verified Archive and Build stamps
+throughout. Each result cited one physical source and skipped zero owners.
+
+| Dataset | LIVE `13220821` rows | PTU `13260598` rows |
+| --- | ---: | ---: |
+| `/definitions/tags` | 18,961 | 19,688 |
+| `/declarations/tagRoots` | 1 | 1 |
+| `/projections/tagPaths` | 18,961 | 19,688 |
+
+| Build | Largest private commit (B) | Largest working set (B) |
+| --- | ---: | ---: |
+| LIVE `13220821` | 1,091,600,384 | 1,038,782,464 |
+| PTU `13260598` | 1,114,959,872 | 1,045,348,352 |
+
+The six queries took 6.039–10.458 seconds. The executable SHA-256 was
+`27a81c331df0ede8f2bd66c1a26f19a615d5884e7133cf88fedc8e0f1a7191d`.
+The cold tests measure the SDK scope. The retained comparison checks the same
+tables and contributing source inventories against the complete Catalog.
+
 ## Original Entity tag declarations
 
 Use `catalog_queries::tags::with_entity_tags` or a parsed session's
