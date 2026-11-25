@@ -25,27 +25,30 @@ try {
 } finally { $self.Dispose() }
 $owned = $null
 try {
-    $null = Get-P4kxMsiSnapshotBudget $context.cutoff.ToString('o')
-    Write-P4kxMsiSupervisorProgress finishSupervisorCaller begin $context.digest
-    $owned = Start-P4kxMsiFinishProcess $context 'invoke-msi-observer.ps1' caller @('-Stage','Finish','-WaitMilliseconds','0')
-    Write-P4kxMsiSupervisorProgress finishSupervisorCaller end $context.digest
-    $result.caller_pid = $owned.Id
-    $remaining = [int][Math]::Max(0,[Math]::Ceiling(($context.cutoff - [DateTimeOffset]::UtcNow).TotalMilliseconds))
-    if ($owned.WaitForExit($remaining)) { $result.observed_exit_utc = [DateTimeOffset]::UtcNow.ToString('o') }
-    else { $result.timed_out = $true }
-} finally {
-    if ($null -ne $owned) {
-        try {
-            if (-not $owned.HasExited) {
-                $owned.Kill($false)
-                [void]$owned.WaitForExit(1000)
-            }
-            $result.caller_exited = $owned.HasExited
-            if ($owned.HasExited) { $result.caller_exit_code = $owned.ExitCode }
-        } finally { $owned.Dispose() }
+    try {
+        $null = Get-P4kxMsiSnapshotBudget $context.cutoff.ToString('o')
+        Write-P4kxMsiSupervisorProgress finishSupervisorCaller begin $context.digest
+        $owned = Start-P4kxMsiFinishProcess $context 'invoke-msi-observer.ps1' caller @('-Stage','Finish','-WaitMilliseconds','0')
+        Write-P4kxMsiSupervisorProgress finishSupervisorCaller end $context.digest
+        $result.caller_pid = $owned.Id
+        $remaining = [int][Math]::Max(0,[Math]::Ceiling(($context.cutoff - [DateTimeOffset]::UtcNow).TotalMilliseconds))
+        if ($owned.WaitForExit($remaining)) { $result.observed_exit_utc = [DateTimeOffset]::UtcNow.ToString('o') }
+        else { $result.timed_out = $true }
+    } finally {
+        if ($null -ne $owned) {
+            try {
+                if (-not $owned.HasExited) {
+                    $owned.Kill($false)
+                    [void]$owned.WaitForExit(1000)
+                }
+                $result.caller_exited = $owned.HasExited
+                if ($owned.HasExited) { $result.caller_exit_code = $owned.ExitCode }
+            } finally { $owned.Dispose() }
+        }
     }
     $caller = Join-Path $context.root 'snapshots/09/caller-result.json'
     if ([IO.File]::Exists($caller)) { $result.caller_result_sha256 = Get-P4kxDetachedDigest $caller }
+} finally {
     Write-P4kxMsiSupervisorProgress finishSupervisorReceipt begin $context.digest
     Write-P4kxDetachedReceipt (Join-Path $context.directory 'result.json') $result
     Write-P4kxMsiSupervisorProgress finishSupervisorReceipt end $context.digest
