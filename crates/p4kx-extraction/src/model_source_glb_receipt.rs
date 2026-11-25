@@ -10,13 +10,16 @@ use p4kx_gltf::{
     TextureLoader,
 };
 use p4kx_model::ModelFile;
+use thiserror::Error;
 
 use crate::model_geometry_scope::ModelGeometryScope;
+use crate::model_observed::Observed;
 use crate::model_source::{ArchiveDefaultMaterial, ModelSource};
 use crate::output_file::write_error;
 use crate::{
     AnimationSet, CancelToken, ConversionError, FieldOrigin, FieldPath, FileReceipt,
-    OriginOutputAddress, SourceUse, SourceUseRole, SourceUses, write_origin_companion,
+    OriginOutputAddress, SourceUse, SourceUseRole, SourceUses, WriteProtectionError,
+    write_origin_companion,
 };
 
 /// The written standalone GLB summary and its geometry-origin companion.
@@ -41,14 +44,42 @@ impl ModelSource {
         out: &Path,
         textures: Option<&dyn TextureLoader>,
     ) -> Result<GlbGeometryPublication, ConversionError> {
+        self.write_glb_with_geometry_receipt_observed(
+            animations,
+            options,
+            out,
+            textures,
+            &CancelToken::new(),
+            &|_, _| {},
+        )
+    }
+
+    /// Publishes the GLB and its digest-bound receipt with cancellation and GLB write progress.
+    ///
+    /// # Errors
+    /// Returns the GLB or receipt write error, or cancellation before the GLB commits.
+    pub fn write_glb_with_geometry_receipt_observed(
+        &self,
+        animations: &AnimationSet,
+        options: &GlbOptions,
+        out: &Path,
+        textures: Option<&dyn TextureLoader>,
+        cancel: &CancelToken,
+        progress: &dyn Fn(u64, u64),
+    ) -> Result<GlbGeometryPublication, ConversionError> {
         self.refuse_glb_input(out, animations)?;
+        if cancel.is_cancelled() {
+            return Err(ConversionError::Cancelled);
+        }
         let protection = self.protection.context()?;
-        let receipt = FileReceipt::for_staged_replacement(out, protection, CancelToken::new())
-            .map_err(|error| write_error(out, error))?;
+        let receipt = FileReceipt::for_staged_replacement(out, protection, cancel.clone())
+            .map_err(|error| self.geometry_publication_error(out, error, false, cancel))?;
         self.refuse_glb_input(receipt.path(), animations)?;
+        let mut committed = false;
         let summary = receipt
-            .publish(
-                |mut writer| {
+            .publish_observing_commit(
+                |writer| {
+                    let mut writer = Observed::new(writer, cancel, progress);
                     let mut origins = GeometryOrigins::new(self);
                     let fallback = self
                         .default_material()
@@ -65,6 +96,7 @@ impl ModelSource {
                     .map_err(io::Error::other)?;
                     Ok((summary, origins))
                 },
+                || committed = true,
                 |writer, binding, (_, origins)| {
                     let aggregate = origins.uses.origin(&origins.contributions, false);
                     let inventory = origins.uses.freeze().map_err(io::Error::other)?;
@@ -77,15 +109,63 @@ impl ModelSource {
                     )
                 },
             )
-            .map_err(|error| match error.downcast::<GltfError>() {
-                Ok(error) => self.glb_write_error(out, error),
-                Err(error) => write_error(out, error),
-            })?
+            .map_err(|error| self.geometry_publication_error(out, error, committed, cancel))?
             .0;
         Ok(GlbGeometryPublication {
             summary,
             receipt: receipt.path().to_path_buf(),
         })
+    }
+
+    fn geometry_publication_error(
+        &self,
+        out: &Path,
+        error: io::Error,
+        committed: bool,
+        cancel: &CancelToken,
+    ) -> ConversionError {
+        if committed {
+            return write_error(out, io::Error::other(CommittedGlbPublication(error)));
+        }
+        match error.downcast::<GltfError>() {
+            Ok(error) => self.glb_write_error(out, error),
+            Err(error) => publication_io_error(out, error, cancel),
+        }
+    }
+}
+
+fn publication_io_error(out: &Path, error: io::Error, cancel: &CancelToken) -> ConversionError {
+    if let Some(protection) = error
+        .get_ref()
+        .and_then(|inner| inner.downcast_ref::<WriteProtectionError>())
+    {
+        return if protection.is_cancelled() {
+            ConversionError::Cancelled
+        } else {
+            ConversionError::Installation(protection.clone())
+        };
+    }
+    if cancel.is_cancelled() && error.kind() == io::ErrorKind::Interrupted {
+        return ConversionError::Cancelled;
+    }
+    write_error(out, error)
+}
+
+#[derive(Debug, Error)]
+#[error("the GLB was committed, but origin publication did not finish: {0}")]
+struct CommittedGlbPublication(#[source] io::Error);
+
+impl ConversionError {
+    /// Returns whether a standalone model GLB committed before publication failed.
+    #[must_use]
+    pub fn standalone_glb_was_committed(&self) -> bool {
+        matches!(
+            self,
+            Self::Write { source, .. }
+                if source.get_ref().is_some_and(
+                    <dyn std::error::Error + Send + Sync>::is::<CommittedGlbPublication>,
+                )
+        )
     }
 }
 

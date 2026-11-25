@@ -42,5 +42,9 @@ fn a_cancel_after_the_model_was_read_ends_cancelled_and_writes_no_file() -> Test
         "cancelled, not {status:?}"
     );
     assert!(!file.exists(), "no file");
+    assert!(
+        !file.with_extension("glb.p4kx-origin.jsonl").exists(),
+        "cancelled export publishes no origin receipt"
+    );
     Ok(())
 }

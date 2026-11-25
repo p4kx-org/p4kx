@@ -18,6 +18,10 @@ use super::{ModelExportFailure, ModelExportSummary};
 use crate::model::describe;
 use crate::{EntryIndex, NoEntries};
 
+#[cfg(test)]
+#[path = "job_tests.rs"]
+mod tests;
+
 /// What an Export as GLB writes and where.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Request {
@@ -96,11 +100,11 @@ impl Shared {
 pub enum ModelExportStatus<'a> {
     /// The export runs; the progress so far.
     Running(ModelExportProgress),
-    /// The file was written.
+    /// The file and its origin receipt were published.
     Finished(&'a ModelExportSummary),
     /// The export was cancelled; no file was written.
     Cancelled,
-    /// No file was written, for the reason given.
+    /// The GLB or its origin receipt could not be published.
     Failed(&'a ModelExportFailure),
 }
 
@@ -325,7 +329,7 @@ fn write(
     };
     let textures = ArchiveTextures::new(paths);
     let loader = (request.materials == ModelMaterials::Textures).then_some(&textures);
-    let written = read.source.write_glb_observed(
+    let publication = read.source.write_glb_with_geometry_receipt_observed(
         &read.animations,
         &request.options(),
         &request.file,
@@ -333,12 +337,12 @@ fn write(
         cancel,
         &progress,
     );
-    match written {
-        Ok(written) => Ended::Written(Box::new(ModelExportSummary::new(
+    match publication {
+        Ok(publication) => Ended::Written(Box::new(ModelExportSummary::new(
             request.file.clone(),
             request.lod,
             read.source.model(),
-            (written, &read.animations),
+            (publication, &read.animations),
             request.animations.is_some(),
         ))),
         Err(ConversionError::Cancelled) => Ended::Cancelled,
@@ -347,6 +351,9 @@ fn write(
 }
 
 fn failed(index: &EntryIndex, error: &ConversionError) -> Ended {
+    if error.standalone_glb_was_committed() {
+        return Ended::Failed(ModelExportFailure::Failed(describe(error)));
+    }
     if index.watch().check().is_err() {
         return Ended::Failed(ModelExportFailure::ArchiveChanged);
     }

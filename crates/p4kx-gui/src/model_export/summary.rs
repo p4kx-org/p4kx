@@ -4,7 +4,9 @@
 use std::path::{Path, PathBuf};
 
 use p4kx_extraction::model::{MaterialStatus, Model};
-use p4kx_extraction::{AnimationSet, GlbSummary, Guid, TextureRole, WriteProtectionError};
+use p4kx_extraction::{
+    AnimationSet, GlbGeometryPublication, GlbSummary, Guid, TextureRole, WriteProtectionError,
+};
 
 use crate::model_info::{MAX_LISTED_ANIMATIONS, printable};
 use crate::{ChunkNote, ModelInfo, NoEntries};
@@ -13,6 +15,7 @@ use crate::{ChunkNote, ModelInfo, NoEntries};
 #[derive(Debug, Clone, PartialEq)]
 pub struct ModelExportSummary {
     file: PathBuf,
+    origin_receipt: PathBuf,
     name: String,
     lod: u32,
     written: GlbSummary,
@@ -117,13 +120,19 @@ impl ModelExportSummary {
         file: PathBuf,
         lod: u32,
         model: &Model,
-        (written, animations): (GlbSummary, &AnimationSet),
+        (publication, animations): (GlbGeometryPublication, &AnimationSet),
         animations_asked: bool,
     ) -> Self {
+        let GlbGeometryPublication {
+            summary: written,
+            receipt: origin_receipt,
+            ..
+        } = publication;
         let info = ModelInfo::of(model);
         let unmatched = unmatched(&written, animations);
         Self {
             file,
+            origin_receipt,
             name: info.name,
             lod,
             unread_total: info.chunks.skipped + info.chunks.unknown,
@@ -200,6 +209,12 @@ impl ModelExportSummary {
     #[must_use]
     pub fn file(&self) -> &Path {
         &self.file
+    }
+
+    /// Returns the digest-bound origin receipt beside the GLB.
+    #[must_use]
+    pub fn origin_receipt(&self) -> &Path {
+        &self.origin_receipt
     }
 
     /// Returns the file name of the model.

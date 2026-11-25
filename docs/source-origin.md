@@ -368,7 +368,11 @@ roles and the physical Entry behind every matching source-use reference.
 
 ## Standalone model GLB
 
-`p4kx model glb` publishes a digest-bound sibling `<file>.p4kx-origin.jsonl`.
+`p4kx model glb` and **Export as GLB** in the GUI model window publish a
+digest-bound sibling `<file>.p4kx-origin.jsonl` using the same writer.
+The GUI reports an export as finished once both files are published. A failure
+publishing the companion after the GLB commits reports that the GLB was written
+and leaves no stale receipt.
 The `glbJsonField` pointers at `/accessors/N/count` identify emitted primitive index
 accessor counts. When the writer has the original IVO submesh, the receipt binds
 the count to its exact four-byte word in the selected geometry Entry. Loose models

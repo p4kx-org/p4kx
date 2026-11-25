@@ -114,12 +114,18 @@ fn fixture(language: Language, case: Case) -> Result<Window, Box<dyn Error>> {
         .write_to(&archive_path)?;
     let archive = Archive::open(&archive_path)?;
     let source = ModelSource::from_archive(&archive, testkit::MATERIAL_REFERENCE_MODEL)?;
-    let written = source.write_glb(&GlbOptions::default(), &folder.path().join("fixture.glb"))?;
+    let animations = AnimationSet::default();
+    let publication = source.write_glb_with_geometry_receipt(
+        &animations,
+        &GlbOptions::default(),
+        &folder.path().join("fixture.glb"),
+        None,
+    )?;
     let summary = ModelExportSummary::new(
         PathBuf::from("fixture.glb"),
         0,
         source.model(),
-        (written, &AnimationSet::default()),
+        (publication, &animations),
         false,
     );
     Ok(Window {

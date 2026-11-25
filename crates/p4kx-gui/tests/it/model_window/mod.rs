@@ -8,6 +8,7 @@ mod animation_render;
 mod animations;
 mod export;
 mod export_cancel;
+mod export_origins;
 mod export_window;
 mod info;
 mod info_lod_source_render;
