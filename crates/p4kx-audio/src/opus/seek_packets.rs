@@ -66,6 +66,17 @@ pub(super) enum SeekPackets<'a, R> {
 }
 
 impl<R: Read + Seek> SeekPackets<'_, R> {
+    pub(super) const fn checked_seek_end(&self) -> Option<u64> {
+        if let Self::Framed(FramedPackets {
+            framing: Framed::Table(table),
+            ..
+        }) = self
+        {
+            Some(table.start)
+        } else {
+            None
+        }
+    }
     pub(super) fn embedded(
         &mut self,
         channels: u16,

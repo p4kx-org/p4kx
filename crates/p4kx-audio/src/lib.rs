@@ -272,14 +272,16 @@ pub use hirc_voice_property::VoiceProperty;
 pub use loops::Loop;
 pub use media_class::{BankDeclaredLengthSource, BankMediaClassSource, MediaClass};
 pub use ogg::OggWriter;
-pub use opus::{OpusError, WemOpusOgg, WemOpusRanges, WemOpusWav, WemOpusWriteError};
+pub use opus::{
+    OpusError, WemOpusOgg, WemOpusRanges, WemOpusWav, WemOpusWavEvidence, WemOpusWriteError,
+};
 pub use riff::{ByteOrder, WemSourceChunk};
 pub use soundbank::{BankHeader, EmbeddedWem, EmbeddedWemSource, Section, Soundbank};
 pub use vorbis::{
     Codebooks, OggReport, VorbisError, WemVorbisOgg, WemVorbisRanges, WemVorbisWav,
-    WemVorbisWriteError,
+    WemVorbisWavEvidence, WemVorbisWriteError,
 };
-pub use wav::{LinearWavWrite, WavReport};
+pub use wav::{LinearWavWrite, WavOutputRanges, WavReport};
 pub use wem::{Wem, WemChunk};
 pub use wem_cue::{WemCue, WemCuePoint};
 pub use wem_info_source::{

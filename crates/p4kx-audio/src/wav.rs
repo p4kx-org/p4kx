@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::io::Write;
+use std::ops::Range;
 
 use crate::adpcm::Layout;
 use crate::loops::SMPL_CHUNK_LEN;
@@ -45,6 +46,25 @@ pub struct LinearWavWrite {
     pub ima_sub_block_bytes: Option<u64>,
     /// First PCM sample byte in the output.
     pub output_audio_start: u64,
+}
+
+/// Byte ranges relative to the start of a successfully written WAV.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct WavOutputRanges {
+    /// RIFF header, format and control chunks, and the DATA chunk header.
+    pub header: Range<u64>,
+    /// Interleaved little-endian PCM sample bytes.
+    pub samples: Range<u64>,
+}
+
+impl WavOutputRanges {
+    pub(crate) const fn new(header_len: usize, report: WavReport) -> Self {
+        Self {
+            header: 0..header_len as u64,
+            samples: header_len as u64..report.size,
+        }
+    }
 }
 
 impl<B: AsRef<[u8]>> Wem<B> {

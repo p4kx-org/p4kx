@@ -18,8 +18,8 @@ use crate::{AudioError, Codec, WemMetadata, WemReadError};
 #[path = "seek_wav.rs"]
 mod wav;
 
-pub use wav::WemVorbisWav;
 pub(crate) use wav::prepare as prepare_wav;
+pub use wav::{WemVorbisWav, WemVorbisWavEvidence};
 
 /// Physical input extents for one prepared Wwise Vorbis conversion.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -141,6 +141,7 @@ fn prepare<'source, R: Read + Seek>(
         input,
         data: data.body_offset..data.body_end_exclusive(),
         order: riff.order,
+        replayed_end: header.audio_offset,
     };
     let mut setup = Vec::new();
     let setup_packet = source.prepare(&header, &mut setup).map_err(read_error)?;

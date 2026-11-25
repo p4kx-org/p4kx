@@ -1,12 +1,15 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::io::Cursor;
 use std::ops::Range;
 use std::time::Duration;
 
 use crate::read_at::SliceSource;
 use crate::riff::{Chunk, Chunks, RiffHeader, slice_range};
-use crate::{AudioError, ByteOrder, Codec, Loop, WemInfoSource, WemMetadata};
+use crate::{
+    AudioError, ByteOrder, Codec, Loop, WemInfoSource, WemMetadata, WemReadError, WemSource,
+};
 
 const NANOS_PER_SECOND: u64 = 1_000_000_000;
 
@@ -102,6 +105,15 @@ impl<B: AsRef<[u8]>> Wem<B> {
 
     pub(crate) fn bytes(&self) -> &[u8] {
         self.bytes.as_ref()
+    }
+
+    /// Borrows the complete original WEM as a seekable source.
+    ///
+    /// # Errors
+    /// Returns a format error if the borrowed bytes have an invalid RIFF header.
+    pub fn seekable_source(&self) -> Result<WemSource<Cursor<&[u8]>>, WemReadError> {
+        let bytes = self.bytes();
+        WemSource::open(Cursor::new(bytes), bytes.len() as u64)
     }
 
     /// Returns the bytes the WEM was parsed from.

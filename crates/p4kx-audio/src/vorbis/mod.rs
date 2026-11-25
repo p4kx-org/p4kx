@@ -19,7 +19,9 @@ use std::time::Duration;
 
 pub use codebook::Codebooks;
 pub use error::VorbisError;
-pub use seek::{WemVorbisOgg, WemVorbisRanges, WemVorbisWav, WemVorbisWriteError};
+pub use seek::{
+    WemVorbisOgg, WemVorbisRanges, WemVorbisWav, WemVorbisWavEvidence, WemVorbisWriteError,
+};
 pub(crate) use seek::{prepare_ogg, prepare_wav};
 
 use self::header::Header;

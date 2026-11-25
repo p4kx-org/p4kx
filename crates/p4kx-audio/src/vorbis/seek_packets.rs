@@ -16,6 +16,7 @@ pub(super) struct SeekAudio<'source, R> {
     pub(super) input: &'source mut SeekSource<R>,
     pub(super) data: Range<u64>,
     pub(super) order: ByteOrder,
+    pub(super) replayed_end: usize,
 }
 
 impl<R: Read + Seek> SeekAudio<'_, R> {
@@ -39,12 +40,7 @@ impl<R: Read + Seek> SeekAudio<'_, R> {
     }
 
     fn packets(&mut self, offset: usize) -> SeekPackets<'_, R> {
-        SeekPackets {
-            input: self.input,
-            data: self.data.clone(),
-            order: self.order,
-            offset,
-        }
+        SeekPackets::new(self.input, self.data.clone(), self.order, offset)
     }
 }
 
@@ -56,8 +52,15 @@ impl<R: Read + Seek> AudioSource for SeekAudio<'_, R> {
         header: &'a Header,
         setup: &'a Setup,
     ) -> impl AudioRead<Self::InputError> + 'a {
+        self.replayed_end = header.audio_offset;
         SeekRebuilt {
-            packets: self.packets(header.audio_offset),
+            packets: SeekPackets::new(
+                self.input,
+                self.data.clone(),
+                self.order,
+                header.audio_offset,
+            ),
+            replayed_end: &mut self.replayed_end,
             rebuild: PacketRebuild::new(header, &setup.long_modes),
             current: Vec::new(),
             next: Vec::new(),
@@ -74,7 +77,20 @@ struct SeekPackets<'source, R> {
     offset: usize,
 }
 
-impl<R: Read + Seek> SeekPackets<'_, R> {
+impl<'source, R: Read + Seek> SeekPackets<'source, R> {
+    const fn new(
+        input: &'source mut SeekSource<R>,
+        data: Range<u64>,
+        order: ByteOrder,
+        offset: usize,
+    ) -> Self {
+        Self {
+            input,
+            data,
+            order,
+            offset,
+        }
+    }
     fn length(&self) -> usize {
         usize::try_from(self.data.end - self.data.start).unwrap_or(usize::MAX)
     }
@@ -130,6 +146,7 @@ impl<R: Read + Seek> SeekPackets<'_, R> {
 
 struct SeekRebuilt<'a, R> {
     packets: SeekPackets<'a, R>,
+    replayed_end: &'a mut usize,
     rebuild: PacketRebuild<'a>,
     current: Vec<u8>,
     next: Vec<u8>,
@@ -153,6 +170,7 @@ impl<R: Read + Seek> AudioRead<io::Error> for SeekRebuilt<'_, R> {
             return Ok(None);
         };
         self.next_offset = self.packets.next_nonempty(&mut self.next)?;
+        *self.replayed_end = self.packets.offset;
         let current = Packet {
             offset,
             payload: &self.current,

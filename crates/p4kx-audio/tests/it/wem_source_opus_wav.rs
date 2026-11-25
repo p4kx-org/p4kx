@@ -7,6 +7,8 @@ use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
 use p4kx_audio::{Wem, WemOpusWriteError, WemReadError, WemSource};
 use p4kx_testkit::{TestOpus, TestOpusFraming};
 
+use super::wav::assert_output_ranges;
+
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 #[test]
@@ -56,8 +58,22 @@ fn check_replay(bytes: &[u8]) -> TestResult {
     );
     trace.last_byte.set(0);
     trace.readable_end.set(ranges.emitted_data.end);
+    trace
+        .table_end
+        .set(ranges.seek_table.as_ref().map(|table| table.end));
     let mut actual = Vec::new();
-    plan.write(&mut actual)?;
+    let evidence = plan.write_with_evidence(&mut actual)?;
+    assert_eq!(evidence.report, expected_report, "successful write report");
+    assert_eq!(evidence.ranges, ranges, "same validated source ranges");
+    assert_eq!(
+        evidence.replayed_seek_table,
+        ranges
+            .seek_table
+            .as_ref()
+            .map(|table| table.start..trace.last_table_byte.get()),
+        "the successful conversion reports only the seek words read during replay"
+    );
+    assert_output_ranges(&actual, &evidence.output, evidence.report)?;
     assert_eq!(
         actual, expected,
         "streamed WAV matches the standalone decoded bytes"
@@ -97,6 +113,8 @@ fn seekable_opus_wav_reports_read_and_write_failures_independently() -> TestResu
 struct Trace {
     last_byte: Cell<u64>,
     readable_end: Cell<u64>,
+    table_end: Cell<Option<u64>>,
+    last_table_byte: Cell<u64>,
 }
 
 impl Trace {
@@ -104,6 +122,8 @@ impl Trace {
         Self {
             last_byte: Cell::new(0),
             readable_end: Cell::new(readable_end),
+            table_end: Cell::new(None),
+            last_table_byte: Cell::new(0),
         }
     }
 
@@ -136,6 +156,16 @@ impl Read for BoundedRead<'_> {
             ));
         }
         let read = self.cursor.read(output)?;
+        if self
+            .trace
+            .table_end
+            .get()
+            .is_some_and(|table_end| end <= table_end)
+        {
+            self.trace
+                .last_table_byte
+                .set(self.trace.last_table_byte.get().max(self.cursor.position()));
+        }
         self.trace
             .last_byte
             .set(self.trace.last_byte.get().max(self.cursor.position()));

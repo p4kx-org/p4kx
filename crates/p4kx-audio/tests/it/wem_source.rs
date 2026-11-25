@@ -15,6 +15,26 @@ mod pcm_wav;
 type TestResult = Result<(), Box<dyn Error>>;
 
 #[test]
+fn borrowed_wem_source_retains_original_metadata_and_tail_occurrences() -> TestResult {
+    let bytes = TestWem::pcm(TestCodec::Pcm, 1, 48_000, &[0, 1])
+        .tail_chunk(*b"JUNK", [0xde, 0xad])
+        .bytes();
+    let original = Wem::parse(bytes)?;
+    let mut source = original.seekable_source()?;
+    assert_eq!(
+        source.read_metadata()?.data_chunk(),
+        original.metadata().data_chunk(),
+        "the borrowed source keeps the original selected DATA location"
+    );
+    let chunks = source.chunks().collect::<Result<Vec<_>, _>>()?;
+    assert!(
+        chunks.iter().any(|chunk| chunk.id == *b"JUNK"),
+        "the borrow covers the complete RIFF, including post-DATA chunks"
+    );
+    Ok(())
+}
+
+#[test]
 fn wem_source_reads_metadata_and_directory_without_reading_a_large_data_body() -> TestResult {
     let data_len = (512_u32 << 20) + 4;
     let source_len = 44 + u64::from(data_len);

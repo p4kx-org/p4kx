@@ -7,7 +7,23 @@ use std::ops::Range;
 use super::{PreparedVorbis, WemVorbisRanges, WemVorbisWriteError};
 use crate::read_at::SeekSource;
 use crate::riff::RiffHeader;
-use crate::{AudioError, Codec, WavReport, WemMetadata, WemReadError};
+use crate::{AudioError, Codec, WavOutputRanges, WavReport, WemMetadata, WemReadError};
+
+/// Original source ranges and output layout of a successful Vorbis WAV write.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct WemVorbisWavEvidence {
+    /// Sample layout and size of the written WAV.
+    pub report: WavReport,
+    /// Written header and sample byte ranges.
+    pub output: WavOutputRanges,
+    /// Original extents checked during preparation.
+    pub ranges: WemVorbisRanges,
+    /// Original audio packet prefix supplied to the PCM decoder, including packet framing.
+    pub decoded_audio_packets: Range<u64>,
+    /// Original audio prefix read during PCM replay, including lookahead and packet framing.
+    pub replayed_audio_packets: Range<u64>,
+}
 
 /// Prepared 16-bit PCM WAV output bound to the original Wwise Vorbis packets.
 pub struct WemVorbisWav<'source, R> {
@@ -48,7 +64,18 @@ impl<R: Read + Seek> WemVorbisWav<'_, R> {
     ///
     /// # Errors
     /// Returns the original input, format or output failure. The sink can be partially written.
-    pub fn write(mut self, output: &mut (impl Write + ?Sized)) -> Result<(), WemVorbisWriteError> {
+    pub fn write(self, output: &mut (impl Write + ?Sized)) -> Result<(), WemVorbisWriteError> {
+        self.write_with_evidence(output).map(|_| ())
+    }
+
+    /// Writes the WAV and returns evidence for the completed output.
+    ///
+    /// # Errors
+    /// Returns the original input, format or output failure. The sink can be partially written.
+    pub fn write_with_evidence(
+        mut self,
+        output: &mut (impl Write + ?Sized),
+    ) -> Result<WemVorbisWavEvidence, WemVorbisWriteError> {
         output
             .write_all(&self.header)
             .map_err(WemVorbisWriteError::Output)?;
@@ -61,7 +88,14 @@ impl<R: Read + Seek> WemVorbisWav<'_, R> {
         if actual != expected {
             return Err(WemVorbisWriteError::ReplayRangeChanged { expected, actual });
         }
-        Ok(())
+        let replayed_end = source.source.data.start + source.source.replayed_end as u64;
+        Ok(WemVorbisWavEvidence {
+            report: self.report,
+            output: WavOutputRanges::new(self.header.len(), self.report),
+            decoded_audio_packets: self.decoded_audio_packets,
+            replayed_audio_packets: source.ranges.audio_packets.start..replayed_end,
+            ranges: self.source.ranges,
+        })
     }
 }
 

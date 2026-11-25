@@ -14,7 +14,10 @@ use super::stream::{self, PacketCount, PacketSource, WriteError};
 use crate::read_at::{ReadAt, SeekSource};
 use crate::riff::RiffHeader;
 use crate::wem_metadata_read::selected_chunks;
-use crate::{AudioError, Codec, OggReport, WavReport, WemMetadata, WemReadError, WemSourceChunk};
+use crate::{
+    AudioError, Codec, OggReport, WavOutputRanges, WavReport, WemMetadata, WemReadError,
+    WemSourceChunk,
+};
 
 /// Original WEM-relative ranges used for a seekable Opus conversion.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,6 +33,20 @@ pub struct WemOpusRanges {
     pub checked_data: Range<u64>,
     /// Checked prefix containing every emitted packet, including source framing or page bytes.
     pub emitted_data: Range<u64>,
+}
+
+/// Original source ranges and output layout of a successful Opus WAV write.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct WemOpusWavEvidence {
+    /// Sample layout and size of the written WAV.
+    pub report: WavReport,
+    /// Written header and sample byte ranges.
+    pub output: WavOutputRanges,
+    /// Checked input extents and the DATA prefix consumed during PCM replay.
+    pub ranges: WemOpusRanges,
+    /// Original seek-table size words read during PCM replay, when present.
+    pub replayed_seek_table: Option<Range<u64>>,
 }
 
 /// Failure during a prepared seekable Opus output.
@@ -144,6 +161,17 @@ impl<R: Read + Seek> WemOpusWav<'_, R> {
     /// # Errors
     /// Returns the original read, decode or sink failure, which can leave the sink partially written.
     pub fn write(self, output: &mut (impl Write + ?Sized)) -> Result<(), WemOpusWriteError> {
+        self.write_with_evidence(output).map(|_| ())
+    }
+
+    /// Writes the WAV and returns evidence for the completed output.
+    ///
+    /// # Errors
+    /// Returns the original read, decode or sink failure, which can leave the sink partially written.
+    pub fn write_with_evidence(
+        self,
+        output: &mut (impl Write + ?Sized),
+    ) -> Result<WemOpusWavEvidence, WemOpusWriteError> {
         let source = self.source;
         let mut packets = source.binding.audio_packets(source.input)?;
         output
@@ -155,7 +183,18 @@ impl<R: Read + Seek> WemOpusWav<'_, R> {
         if actual != expected {
             return Err(WemOpusWriteError::ReplayRangeChanged { expected, actual });
         }
-        Ok(())
+        let replayed_seek_table = source
+            .ranges
+            .seek_table
+            .as_ref()
+            .zip(packets.checked_seek_end())
+            .map(|(range, end)| range.start..end);
+        Ok(WemOpusWavEvidence {
+            report: self.report,
+            output: WavOutputRanges::new(self.wav_header.len(), self.report),
+            ranges: source.ranges,
+            replayed_seek_table,
+        })
     }
 }
 

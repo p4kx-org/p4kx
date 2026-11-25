@@ -8,6 +8,8 @@ use std::ops::Range;
 use p4kx_audio::{AudioError, ByteOrder, Wem, WemReadError, WemSource, WemVorbisWriteError};
 use p4kx_testkit::{TestCodebook, TestVorbis};
 
+use super::wav::assert_output_ranges;
+
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 #[test]
@@ -219,12 +221,26 @@ fn assert_wav_parity(fixture: &TestVorbis, decoded_packets: usize) -> TestResult
         &(audio_start..decoded_end),
         "only packets supplied to the decoder"
     );
+    let ranges = planned.ranges().clone();
     probe.furthest.set(0);
     let mut actual = Vec::new();
-    planned.write(&mut actual)?;
+    let evidence = planned.write_with_evidence(&mut actual)?;
     assert_eq!(actual, expected, "standalone WAV bytes");
+    assert_eq!(evidence.report, report, "successful write report");
+    assert_eq!(evidence.ranges, ranges, "same validated source ranges");
+    assert_eq!(
+        evidence.decoded_audio_packets,
+        audio_start..decoded_end,
+        "the written samples use only the decoded prefix"
+    );
     let expected_read_end = if decoded_packets == 0 { 0 } else { checked_end };
     assert_eq!(probe.furthest.get(), expected_read_end, "bounded lookahead");
+    assert_eq!(
+        evidence.replayed_audio_packets,
+        audio_start..expected_read_end.max(audio_start),
+        "only the successful replay's audio reads contribute to this range"
+    );
+    assert_output_ranges(&actual, &evidence.output, evidence.report)?;
     Ok(())
 }
 

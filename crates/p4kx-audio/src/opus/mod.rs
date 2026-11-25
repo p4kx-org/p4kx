@@ -17,7 +17,7 @@ use std::io::Write;
 
 pub use error::OpusError;
 pub(crate) use header::TAG_SWITCH;
-pub use seek::{WemOpusOgg, WemOpusRanges, WemOpusWav, WemOpusWriteError};
+pub use seek::{WemOpusOgg, WemOpusRanges, WemOpusWav, WemOpusWavEvidence, WemOpusWriteError};
 pub(crate) use seek::{prepare_ogg, prepare_wav};
 
 use self::header::{Header, StreamHeader};
