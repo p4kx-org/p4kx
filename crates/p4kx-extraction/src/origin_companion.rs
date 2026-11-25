@@ -11,7 +11,7 @@ pub(crate) mod spool;
 
 use crate::{
     DecimalU64, FieldOrigin, FieldPath, OriginArtifactDigest, OriginArtifactName, PhysicalSource,
-    SourceInventory, SourceUseDescription,
+    SourceInventory, SourceInventorySelection, SourceUseDescription,
 };
 
 /// Format name of the portable standalone field-origin companion.
@@ -277,14 +277,42 @@ pub fn write_origin_companion<'receipt>(
 ) -> io::Result<()> {
     row(&mut writer, &OriginCompanionRow::header(binding))?;
     write_inventory(&mut writer, inventory)?;
+    let count = write_fields(&mut writer, fields)?;
+    write_end(&mut writer, inventory, count)
+}
+
+pub(crate) fn write_selected_origin_companion<'receipt>(
+    mut writer: impl Write,
+    binding: &'receipt OriginArtifactBinding,
+    inventory: &SourceInventorySelection<'_>,
+    fields: impl IntoIterator<Item = (&'receipt OriginOutputAddress, &'receipt FieldOrigin)>,
+) -> io::Result<()> {
+    row(&mut writer, &OriginCompanionRow::header(binding))?;
+    write_sources(&mut writer, inventory.iter_sources())?;
+    for source_use in inventory.iter_uses() {
+        row(&mut writer, &OriginCompanionRow::SourceUse { source_use })?;
+    }
+    let count = write_fields(&mut writer, fields)?;
+    write_end_counts(
+        &mut writer,
+        inventory.iter_sources().len() as u64,
+        inventory.iter_uses().len() as u64,
+        count,
+    )
+}
+
+fn write_fields<'receipt>(
+    writer: &mut impl Write,
+    fields: impl IntoIterator<Item = (&'receipt OriginOutputAddress, &'receipt FieldOrigin)>,
+) -> io::Result<u64> {
     let mut count = 0_u64;
     for (address, origin) in fields {
-        row(&mut writer, &OriginCompanionRow::Field { address, origin })?;
+        row(writer, &OriginCompanionRow::Field { address, origin })?;
         count = count
             .checked_add(1)
             .ok_or_else(|| io::Error::other("origin field count exceeds u64"))?;
     }
-    write_end(&mut writer, inventory, count)
+    Ok(count)
 }
 
 pub(crate) fn row(writer: &mut impl Write, row: &OriginCompanionRow<'_>) -> io::Result<()> {

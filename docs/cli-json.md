@@ -2004,7 +2004,10 @@ source and use identifiers resolve in `provenance`.
 
 For PCM, IMA ADPCM and PTADPCM input, `originReceipt` names the sibling
 `<file>.p4kx-origin.jsonl` bound to the written byte length and SHA-256.
-The same companion is published without `--json`.
+The same companion is published without `--json`. The JSON summary binds `/sample_count`
+to the frame extent used by the writer and `/size` to the emitted RIFF size. The `/loop` origin
+records the decision to admit or omit the loop in the WAV. A retained loop has separate
+origins for its start, exclusive end and frame count.
 
 ## `p4kx audio ogg <archive> <entry> --out <file> --json`
 

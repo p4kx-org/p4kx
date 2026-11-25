@@ -2,10 +2,10 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use anyhow::{Result, bail};
-use p4kx_extraction::sound::{WemOriginField, WemOriginPlan};
+use p4kx_extraction::sound::{WavFileReceipt, WemOriginField, WemOriginPlan};
 use p4kx_extraction::{
-    FieldOrigins, FieldPath, InputScope, Sound, SourceInput, SourceInventory, SourceLocation,
-    SourceUseRole, SourceUses,
+    FieldOrigins, FieldPath, InputScope, Sound, SourceInput, SourceInventory,
+    SourceInventorySelection, SourceLocation, SourceUseRole, SourceUses,
 };
 use serde::Serialize;
 
@@ -35,11 +35,11 @@ const CONVERSION_FORMAT_FIELDS: [(&str, WemOriginField); 2] = [
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-pub(super) struct Report<T> {
+pub(super) struct Report<T, F = FieldOrigins, P = SourceInventory> {
     #[serde(flatten)]
     summary: T,
-    field_origins: FieldOrigins,
-    provenance: SourceInventory,
+    field_origins: F,
+    provenance: P,
 }
 
 pub(super) fn report<'sound>(
@@ -51,6 +51,17 @@ pub(super) fn report<'sound>(
 
 pub(super) fn conversion_report<T>(sound: &Sound, summary: T) -> Result<Report<T>> {
     capture(sound, summary, CONVERSION_FORMAT_FIELDS)
+}
+
+pub(super) fn wav_report<T>(
+    receipt: &WavFileReceipt,
+    summary: T,
+) -> Result<Report<T, &FieldOrigins, SourceInventorySelection<'_>>> {
+    Ok(Report {
+        summary,
+        field_origins: receipt.summary_origins(),
+        provenance: receipt.summary_provenance()?,
+    })
 }
 
 fn capture<T>(

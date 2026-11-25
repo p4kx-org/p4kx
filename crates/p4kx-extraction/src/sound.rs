@@ -5,6 +5,7 @@
 
 #[path = "sound_wav_receipt.rs"]
 mod wav_receipt;
+pub use wav_receipt::WavFileReceipt;
 
 #[path = "radar_audio.rs"]
 pub mod radar_audio;

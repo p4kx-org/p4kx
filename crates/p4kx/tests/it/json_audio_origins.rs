@@ -15,6 +15,8 @@ use super::{SOUND, TestResult};
 mod ogg;
 #[path = "wav_receipt.rs"]
 mod wav_receipt;
+#[path = "audio_wav_summary_origins.rs"]
+mod wav_summary_origins;
 
 const SELECTED_FORMAT_BODY: u64 = 44;
 

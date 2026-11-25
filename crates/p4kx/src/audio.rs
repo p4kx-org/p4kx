@@ -158,12 +158,16 @@ fn format_duration(duration: Duration) -> String {
 }
 
 fn wav(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
-    let (report, companion) = if sound.wem().supports_linear_wav() {
-        let (report, companion) = sound.write_linear_wav_with_receipt(out)?;
-        (report, Some(companion))
-    } else {
-        (sound.write_wav_to_file(out)?, None)
+    let observed = sound
+        .wem()
+        .supports_linear_wav()
+        .then(|| sound.write_linear_wav_with_receipt(out))
+        .transpose()?;
+    let report = match &observed {
+        Some(receipt) => receipt.report,
+        None => sound.write_wav_to_file(out)?,
     };
+    let companion = observed.as_ref().map(|receipt| &receipt.companion);
     if as_json {
         let origin_receipt = if let Some(companion) = companion {
             let basename = companion
@@ -185,7 +189,11 @@ fn wav(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
                 .loop_points
                 .map(|points| loop_json(points.start, points.end)),
         };
-        json::print(&info_origins::conversion_report(sound, summary)?)?;
+        if let Some(receipt) = &observed {
+            json::print(&info_origins::wav_report(receipt, summary)?)?;
+        } else {
+            json::print(&info_origins::conversion_report(sound, summary)?)?;
+        }
     } else {
         writeln!(
             io::stdout().lock(),

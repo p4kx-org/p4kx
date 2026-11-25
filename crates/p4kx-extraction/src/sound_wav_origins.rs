@@ -5,16 +5,18 @@ use std::io::{self, Write};
 
 use p4kx_audio::{Codec, LinearWavWrite};
 
-use crate::sound::{Sound, WemFormatField, WemOriginField, WemOriginPlan};
+use crate::origin_companion::write_selected_origin_companion;
+use crate::sound::{Sound, SoundInput, WemFormatField, WemOriginField, WemOriginPlan};
 use crate::{
-    DecimalU64, FieldOrigin, InputScope, OriginArtifactBinding, OriginOutputAddress,
-    OriginWavField, SourceInventory, SourceLocation, SourceScope, SourceUse, SourceUseRole,
-    SourceUses, write_origin_companion,
+    DecimalU64, FieldOrigin, FieldOrigins, FieldPath, InputScope, OriginArtifactBinding,
+    OriginOutputAddress, OriginWavField, SourceEvidenceError, SourceInventory,
+    SourceInventorySelection, SourceLocation, SourceScope, SourceUse, SourceUseRole, SourceUses,
 };
 
 pub(super) struct WavOrigins {
     inventory: SourceInventory,
     fields: Vec<(OriginOutputAddress, FieldOrigin)>,
+    summary: FieldOrigins,
 }
 
 impl WavOrigins {
@@ -35,10 +37,26 @@ impl WavOrigins {
         };
         evidence.header(sound, written)?;
         evidence.signal(sound, written)?;
+        let summary = evidence.summary(sound, written)?;
         Ok(Self {
             inventory: uses.freeze().map_err(io::Error::other)?,
             fields: evidence.fields,
+            summary,
         })
+    }
+
+    pub(super) const fn summary_origins(&self) -> &FieldOrigins {
+        &self.summary
+    }
+
+    pub(super) fn summary_provenance(
+        &self,
+    ) -> Result<SourceInventorySelection<'_>, SourceEvidenceError> {
+        self.inventory.select_uses(
+            self.summary
+                .iter()
+                .flat_map(|(_, origin)| origin.source_uses_refs()),
+        )
     }
 
     pub(super) fn write(
@@ -46,10 +64,18 @@ impl WavOrigins {
         writer: &mut dyn Write,
         binding: &OriginArtifactBinding,
     ) -> io::Result<()> {
-        write_origin_companion(
+        let inventory = self
+            .inventory
+            .select_uses(
+                self.fields
+                    .iter()
+                    .flat_map(|(_, origin)| origin.source_uses_refs()),
+            )
+            .map_err(io::Error::other)?;
+        write_selected_origin_companion(
             writer,
             binding,
-            &self.inventory,
+            &inventory,
             self.fields
                 .iter()
                 .map(|(address, origin)| (address, origin)),
@@ -196,6 +222,81 @@ impl WavEvidence<'_, '_> {
         Ok(uses)
     }
 
+    fn summary(&self, sound: &Sound, written: LinearWavWrite) -> io::Result<FieldOrigins> {
+        use OriginWavField::{Channels, DataLength, RiffLength, SampleRate};
+
+        let mut fields = FieldOrigins::new();
+        for (name, field) in [
+            ("/channels", Channels),
+            ("/sample_rate", SampleRate),
+            ("/sample_count", DataLength),
+            ("/size", RiffLength),
+        ] {
+            let origin = self
+                .fields
+                .iter()
+                .find_map(|(address, origin)| match address {
+                    OriginOutputAddress::WavBytes { field: actual, .. } if *actual == field => {
+                        Some(origin)
+                    }
+                    _ => None,
+                })
+                .ok_or_else(|| io::Error::other(format!("missing WAV field for {name}")))?;
+            insert_summary(&mut fields, name, origin.clone())?;
+        }
+        insert_summary(&mut fields, "/sound", self.name_origin(sound)?)?;
+        self.summary_loop(sound, written, &mut fields)?;
+        Ok(fields)
+    }
+
+    fn name_origin(&self, sound: &Sound) -> io::Result<FieldOrigin> {
+        let (Some(payload), Some(input)) = (self.payload, &sound.original) else {
+            return Ok(self.uses.origin(&[], false));
+        };
+        let name_scope = match input {
+            SoundInput::Archive(_) => InputScope::ArchiveDirectoryMetadata,
+            SoundInput::File(_) => InputScope::FileMetadata,
+        };
+        let original = payload
+            .for_scope(name_scope)
+            .at(
+                SourceLocation::Metadata {
+                    field: "path".to_owned(),
+                },
+                SourceUseRole::Payload,
+            )
+            .map_err(io::Error::other)?;
+        Ok(self.uses.origin(&[original], true))
+    }
+
+    fn summary_loop(
+        &self,
+        sound: &Sound,
+        written: LinearWavWrite,
+        fields: &mut FieldOrigins,
+    ) -> io::Result<()> {
+        let mut selection = self.planned(WemOriginField::Loop)?;
+        if sound.wem().loop_points().is_some() {
+            selection.extend(self.shape(sound, written)?);
+            selection.extend(self.planned(WemOriginField::LoopStart)?);
+            selection.extend(self.planned(WemOriginField::LoopEnd)?);
+        }
+        let complete = self.payload.is_some();
+        let origin = self.uses.origin(&selection, complete);
+        if written.report.loop_points.is_some() {
+            for (path, field) in [
+                ("/loop/start", WemOriginField::LoopStart),
+                ("/loop/end", WemOriginField::LoopEnd),
+                ("/loop/frames", WemOriginField::LoopFrames),
+            ] {
+                let mut inputs = self.planned(field)?;
+                inputs.extend(selection.iter().cloned());
+                insert_summary(fields, path, self.uses.origin(&inputs, complete))?;
+            }
+        }
+        insert_summary(fields, "/loop", origin)
+    }
+
     fn planned(&self, field: WemOriginField) -> io::Result<Vec<SourceUse>> {
         let Some(payload) = self.payload else {
             return Ok(Vec::new());
@@ -228,6 +329,11 @@ impl WavEvidence<'_, '_> {
         self.fields
             .push((address, self.uses.origin(sources, complete)));
     }
+}
+
+fn insert_summary(fields: &mut FieldOrigins, name: &str, origin: FieldOrigin) -> io::Result<()> {
+    let path = FieldPath::parse(name).map_err(io::Error::other)?;
+    fields.insert(path, origin).map_err(io::Error::other)
 }
 
 /// Binds byte runs for the history, index and nibbles of each used IMA sub-block.
