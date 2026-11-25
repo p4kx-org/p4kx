@@ -25,9 +25,5 @@ pub(super) fn read() -> TestResult<Route> {
         PlanetResourceSelection::ArchivePath(RESOURCE),
         None,
     )?;
-    Route::queried_rows(
-        "/definitions/planetResources",
-        &snapshot.rows,
-        "selective source reader and synthetic catalog parity available; installed parity remains open",
-    )
+    Route::queried_rows("/definitions/planetResources", &snapshot.rows, None)
 }

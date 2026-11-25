@@ -3348,6 +3348,31 @@ Reputation and factions used signed verifier source
 `6c917387ba663a8f06643d1de9fe64fcbe0d6877` and executable SHA-256
 `d8be9805427c93f78fd6090e5d45e03c0fbca9d86eb6abd43c4e135eb9e52b18`.
 
+### World definitions
+
+The retained comparisons use one Windows AMD64 worker and the complete Normal
+Catalog for the same installed Build. They compare Starmap objects, types,
+presets and amenities, soil definitions, soil texture sets, planet resources
+and procedural planet audio in that order. An absent dataset remains distinct
+from an available empty dataset. LIVE had no Starmap presets, soils, soil
+texture sets or planet resources. Both archives had 30 Starmap object leftovers.
+
+| Build | Ordered row counts | Source uses | Physical sources | Elapsed ms | Peak private bytes | Peak working set bytes |
+| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 2,094, 21, 0, 25, 0, 0, 0, 2 | 492,373 | 12 | 1,864,872 | 1,360,826,368 | 1,266,413,568 |
+| PTU `13260598` | 2,094, 22, 3, 31, 9, 2, 24, 2 | 496,579 | 48 | 2,004,311 | 1,373,339,648 | 1,267,765,248 |
+
+The retained verifier source was `be4c401b02dbcb91e54396397b439108cb4c3404`.
+The producer revisions were `23addc5e164f65a28a6f258302b30453b331edce` on
+LIVE and `93d92ca20bef8a8c3731339214a3301124ade7ba` on PTU. The retained
+frame digests and installed Archive stamps matched in both runs.
+
+The 16 cold runs opened one route per process with verifier source
+`b7863d56c089f4ed19d9fd847b20d933392b7952` and the same two installed Builds.
+The largest cold private commit was 1,114,873,856 bytes and the largest
+working set was 1,111,523,328 bytes. Each cold run passed the strict
+2,000,000,000-byte process limit.
+
 ### Economy definitions and mission configuration
 
 The Windows AMD64 verifier at `1114c40cd222c428cc917d05e64f214835b38789`

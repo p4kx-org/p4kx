@@ -139,11 +139,7 @@ fn verify_table<Row: JsonSchema + Serialize>(
             .ok_or("canonical starmap definition table")?,
         "the scoped rows retain the exact canonical fields and origins"
     );
-    Route::queried_rows(
-        dataset,
-        rows,
-        "encrypted synthetic producer and source parity available; installed producer parity open",
-    )
+    Route::queried_rows(dataset, rows, None)
 }
 
 fn verify_encrypted_header(header: &CanonicalRecordHeader<'_>) {

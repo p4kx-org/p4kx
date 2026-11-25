@@ -26,10 +26,6 @@ pub(super) fn read() -> TestResult<Route> {
         .write_to(&path)?;
     let archive = Archive::open(path)?;
     with_procedural_planet_audio(&archive, CatalogRecordSelection::All, None, |snapshot| {
-        Route::queried_rows(
-            "/definitions/proceduralPlanetAudio",
-            snapshot.rows(),
-            "synthetic producer parity witnessed; same-build installed producer parity open",
-        )
+        Route::queried_rows("/definitions/proceduralPlanetAudio", snapshot.rows(), None)
     })?
 }

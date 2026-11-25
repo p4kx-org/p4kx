@@ -26,8 +26,6 @@ const DAMAGED_TARGET: &str = "Data/Libs/Planets/soil_sets/damaged.soiltextureset
 const MEDIA: &str = "Data/Textures/fixture/terrain.dds";
 const OWNER_GUID: &str = "dddddddd-0000-0000-0000-000000000001";
 const TARGET_GUID: &str = "dddddddd-0000-0000-0000-000000000002";
-const NOTE: &str =
-    "encrypted synthetic producer and source parity available; installed producer parity open";
 
 pub(super) fn read() -> TestResult<[Route; 2]> {
     let (_folder, archive) = open(normal_entries())?;
@@ -65,8 +63,8 @@ pub(super) fn read() -> TestResult<[Route; 2]> {
         "the canonical texture-set table matches without reading media"
     );
     Ok([
-        Route::queried_rows(SOILS, &soils.rows, NOTE)?,
-        Route::queried_rows(TEXTURE_SETS, &sets.rows, NOTE)?,
+        Route::queried_rows(SOILS, &soils.rows, None)?,
+        Route::queried_rows(TEXTURE_SETS, &sets.rows, None)?,
     ])
 }
 
