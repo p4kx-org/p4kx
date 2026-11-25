@@ -13,6 +13,7 @@ use p4kx_testkit::{
 };
 use serde_json::Value;
 
+mod animation;
 mod chunks;
 mod library;
 mod material;
@@ -311,4 +312,22 @@ fn origin_row<'a>(report: &'a Value, path: &str, id: &Value) -> Result<&'a Value
         .and_then(Value::as_array)
         .and_then(|rows| rows.iter().find(|row| row.get("id") == Some(id)))
         .ok_or_else(|| format!("unresolved origin {id} in {path}").into())
+}
+
+fn field_uses<'a>(report: &'a Value, path: &str) -> Result<Vec<&'a Value>, Box<dyn Error>> {
+    field_origin(report, path)?
+        .get("sourceUsesRefs")
+        .and_then(Value::as_array)
+        .ok_or("field source uses")?
+        .iter()
+        .map(|id| origin_row(report, "/provenance/uses", id))
+        .collect()
+}
+
+fn entry_path<'a>(report: &'a Value, source_use: &Value) -> Result<&'a str, Box<dyn Error>> {
+    let id = source_use.get("source").ok_or("physical source id")?;
+    origin_row(report, "/provenance/sources", id)?
+        .pointer("/path/value")
+        .and_then(Value::as_str)
+        .ok_or_else(|| "source Entry path".into())
 }

@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::model_info::animation_origin_sites::AnimationChunkSites;
 use p4kx_extraction::{
     AnimationFlagRun, ArchiveAnimationAdmission, FieldOrigin, InputScope, SourceCoordinateOmission,
     SourceDetails, SourceEncryption, SourceEvidenceError, SourceInput, SourceLocation, SourceScope,
@@ -8,7 +9,6 @@ use p4kx_extraction::{
 };
 
 use crate::content_origin::EntryPageSources;
-use crate::model_animation_sites::ChunkSites;
 
 #[derive(Clone, Copy)]
 pub(crate) enum Navigation<'a> {
@@ -75,7 +75,7 @@ fn record_admission(
         .into_iter()
         .flatten()
     {
-        let sites = ChunkSites::of(&scope, chunk)?;
+        let sites = AnimationChunkSites::of(&scope, chunk)?;
         complete &= sites.complete;
         uses.extend(sites.selectors);
     }

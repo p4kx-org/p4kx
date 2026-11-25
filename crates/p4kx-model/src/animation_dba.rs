@@ -109,7 +109,7 @@ impl Dba {
         })
     }
 
-    /// Reads a DBA and retains the original position of each decoded clip and track.
+    /// Reads a DBA and retains the original decoded clip, track and rejected name positions.
     ///
     /// # Errors
     /// As [`Self::read`].
@@ -237,7 +237,7 @@ fn read_database<T>(
                     .push(project(animation, ordinal, ordinals, coordinates));
             }
             Err(reason) => {
-                if let Some(chunks) = chunks.filter(|_| matches!(capture, PositionCapture::Clip)) {
+                if let Some(chunks) = chunks {
                     dba.skipped_coordinates.push(UnreadClipCoordinates {
                         chunks: Arc::clone(chunks),
                         ordinal,

@@ -10,10 +10,10 @@ use p4kx_extraction::{
 
 use crate::content_origin::EntryPageSources;
 use crate::error::ToolError;
-use crate::model_animation_sites::{self, ChunkSites};
 use crate::model_item_page::{self, EvidenceError, ModelItemPage};
 use crate::model_shapes::{ModelItemOrigins, ModelItemsResult};
 use crate::models;
+use p4kx_extraction::model_info::animation_origin_sites::{self, AnimationChunkSites};
 
 pub(crate) fn list(request: &ModelItemPage<'_>, path: &str) -> Result<ModelItemsResult, ToolError> {
     let index = request.opened.index();
@@ -100,10 +100,10 @@ fn write_row(
         return model_item_page::put(fields, path, "reason", unknown);
     };
     let metadata = coordinates.metadata_chunk();
-    let selectors = ChunkSites::of(entry.payload_scope(), metadata)?;
+    let selectors = AnimationChunkSites::of(entry.payload_scope(), metadata)?;
     let site = |field, bytes, role| {
-        model_animation_sites::clip_site(
-            entry,
+        animation_origin_sites::clip_site(
+            entry.payload_scope(),
             coordinates.ordinal(),
             metadata.ordinal(),
             field,

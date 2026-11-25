@@ -394,6 +394,16 @@ attempted Entry to the inventory without assigning it to material values.
 Loose inputs use explicit unknown markers. The report's `materials` count
 describes what the GLB writer emitted.
 
+The report binds each animation name, additive flag and duration to the selected
+CAF or original DBA clip. Its animation rows include selected clips with zero
+written channels, so the report row index can differ from the GLB animation index.
+Duration uses the clip timing words and the original key when it extends past the
+authored end. Unread rows retain the observed source path, authored name and
+additive rejection flag where available. An observed failed decode contributes an
+attempted payload. Missing coordinates and loose animation inputs receive unknown
+origins. Baked channel and key counts and skipped controller IDs carry explicit
+unknown origins. Skipped morph-weight counts receive an origin when present.
+
 ## CHF GLB
 
 `p4kx chf glb` writes a sibling `<output>.p4kx-origin.jsonl` companion. Its

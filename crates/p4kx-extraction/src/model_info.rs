@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! What `p4kx model info --json` and `p4kx chunks list --json` say, as serialisable shapes.
+//! Model report shapes and their original field positions.
 
 use std::borrow::Cow;
 use std::io;
@@ -16,12 +16,16 @@ use crate::model_info_materials::receipt::MaterialFieldReceipt;
 use crate::model_info_materials::{DefaultMaterialInfo, LibraryInfo, MaterialInfo};
 use crate::{AnimationListing, AnimationSet, ModelSource};
 
+#[path = "animation_origin_sites.rs"]
+pub mod animation_origin_sites;
 #[path = "model_bone_origins.rs"]
 mod bone_origins;
 #[path = "model_chunk_origins.rs"]
 mod chunk_origins;
 #[path = "model_field_origins.rs"]
 mod field_origins;
+#[path = "glb_animation_origins.rs"]
+mod glb_animation_origins;
 
 #[path = "model_mesh_info.rs"]
 mod mesh_info;
@@ -37,6 +41,7 @@ mod submesh_origins;
 pub use bone_origins::{ModelBoneOrigins, primary_skeleton_selection_uses};
 pub use chunk_origins::{model_chunk_count_origin, write_chunk_origins, write_chunk_type_origin};
 use field_origins::ModelFieldOrigins;
+pub use glb_animation_origins::write_glb_animation_origins;
 pub use mesh_info::MeshInfo;
 pub use node_origins::ModelNodeOrigins;
 pub use overview_mesh_origins::ModelOverviewMeshOrigins;

@@ -1,115 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::ops::Range;
-
-use p4kx_extraction::model::{AnimationChunkCoordinates, ModelBoneSources};
+use p4kx_extraction::model::ModelBoneSources;
 use p4kx_extraction::model_info::primary_skeleton_selection_uses;
 use p4kx_extraction::{SourceEvidenceError, SourceLocation, SourceScope, SourceUse, SourceUseRole};
 
 use crate::content_origin::EntryPageSources;
 use crate::model_item_page::ModelItemPage;
-
-pub(crate) struct ChunkSites {
-    pub(crate) selectors: Vec<SourceUse>,
-    pub(crate) complete: bool,
-}
-
-impl ChunkSites {
-    pub(crate) fn of(
-        scope: &SourceScope,
-        chunk: &AnimationChunkCoordinates,
-    ) -> Result<Self, SourceEvidenceError> {
-        let mut selectors = Vec::new();
-        for (field, start, end) in [
-            ("signature", 0, 4),
-            ("rowCount", 8, 12),
-            ("tableOffset", 12, 16),
-        ] {
-            selectors.push(site(
-                scope,
-                "cryEngineChunkHeader",
-                field,
-                vec![start, end],
-                SourceUseRole::Selector,
-            )?);
-        }
-        if let Some(prefix) = chunk.type_prefix() {
-            let first = prefix.first_word();
-            selectors.push(site(
-                scope,
-                "cryEngineChunkTable",
-                "animationTypePrefix",
-                vec![
-                    first.start,
-                    first.end,
-                    prefix.stride(),
-                    prefix.count() as u64,
-                ],
-                SourceUseRole::Selector,
-            )?);
-        }
-        if let Some(row) = chunk.row() {
-            for (field, bytes) in [
-                ("type", &row.kind),
-                ("version", &row.version),
-                ("offset", &row.offset),
-            ] {
-                selectors.push(site(
-                    scope,
-                    "cryEngineChunkTable",
-                    field,
-                    vec![chunk.ordinal() as u64, bytes.start, bytes.end],
-                    SourceUseRole::Selector,
-                )?);
-            }
-        }
-        Ok(Self {
-            selectors,
-            complete: chunk.row().is_some() && chunk.type_prefix().is_some(),
-        })
-    }
-}
-
-pub(crate) fn clip_site(
-    entry: &EntryPageSources,
-    clip: usize,
-    chunk: usize,
-    field: &str,
-    bytes: Range<u64>,
-    role: SourceUseRole,
-) -> Result<SourceUse, SourceEvidenceError> {
-    site(
-        entry.payload_scope(),
-        "cryEngineAnimation",
-        field,
-        vec![clip as u64, chunk as u64, bytes.start, bytes.end],
-        role,
-    )
-}
-
-pub(crate) fn frame_site(
-    entry: &EntryPageSources,
-    clip: usize,
-    chunk: usize,
-    controller: usize,
-    channel: &str,
-    bytes: Range<u64>,
-) -> Result<SourceUse, SourceEvidenceError> {
-    site(
-        entry.payload_scope(),
-        "cryEngineAnimationFrame",
-        channel,
-        vec![
-            clip as u64,
-            chunk as u64,
-            controller as u64,
-            bytes.start,
-            bytes.end,
-        ],
-        SourceUseRole::Conversion,
-    )
-}
 
 pub(crate) struct SkeletonSites {
     pub(crate) uses: Vec<SourceUse>,

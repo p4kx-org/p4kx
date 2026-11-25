@@ -4,8 +4,12 @@
 use p4kx_archive::EntryOrigin;
 use p4kx_model::{Animation, AnimationClipCoordinates, PositionedAnimation};
 
-use crate::animation_select::Gathered;
-use crate::{AnimationSet, PositionedUnreadAnimation};
+use super::positioned_unread_animation::UnreadClipEvidence;
+use super::{open_entry, with_extras};
+use crate::animation_load::load_with_positions;
+use crate::animation_select::{self, Gathered, ReadEvidence};
+use crate::animation_set::{folder_entries, source_of};
+use crate::{AnimationChoice, AnimationSet, ConversionError, PathIndex, PositionedUnreadAnimation};
 
 /// The selected animations and their bound Archive reads.
 #[derive(Debug, Clone, Default)]
@@ -14,9 +18,40 @@ pub struct ArchiveAnimationRead {
     archive_sources: Vec<Option<EntryOrigin>>,
     clip_evidence: Vec<ArchiveClipEvidence>,
     matched_specs: Vec<Vec<String>>,
+    unread_evidence: Vec<UnreadClipEvidence>,
 }
 
 impl ArchiveAnimationRead {
+    /// Reads the normal standalone model selection with clip and unread source evidence.
+    ///
+    /// # Errors
+    /// Returns the same errors as [`AnimationSet::from_archive`].
+    pub fn for_model(
+        index: &PathIndex<'_>,
+        model_entry: &str,
+        choice: &AnimationChoice,
+        extra: &[String],
+    ) -> Result<Self, ConversionError> {
+        let sources = folder_entries(index, model_entry)
+            .into_iter()
+            .map(source_of)
+            .collect();
+        let sources = with_extras(index, sources, choice, extra)?;
+        animation_select::read_observing(
+            sources,
+            choice,
+            |label| open_entry(index, label, None),
+            |file, label, kind, _| load_with_positions(file, label, kind),
+            ReadEvidence::SelectedAndUnread,
+            |_, _| {},
+        )
+        .map(Self::from)
+    }
+
+    pub(crate) fn unread_evidence(&self, index: usize) -> Option<&UnreadClipEvidence> {
+        self.unread_evidence.get(index)
+    }
+
     /// Returns the selected animations in source order.
     #[must_use]
     pub const fn set(&self) -> &AnimationSet {
@@ -69,21 +104,23 @@ impl From<Gathered<PositionedAnimation>> for ArchiveAnimationRead {
             });
             clips.push(clip.into_animation());
         }
+        let (unread, unread_evidence) = gathered
+            .unread
+            .into_iter()
+            .map(PositionedUnreadAnimation::into_parts)
+            .unzip();
         Self {
             set: AnimationSet {
                 animations: clips,
                 origins: gathered.origins,
                 inputs: Vec::new(),
-                unread: gathered
-                    .unread
-                    .into_iter()
-                    .map(PositionedUnreadAnimation::into_unread)
-                    .collect(),
+                unread,
                 files: gathered.files,
             },
             archive_sources: gathered.archive_sources,
             clip_evidence,
             matched_specs: gathered.matched_specs,
+            unread_evidence,
         }
     }
 }
@@ -96,6 +133,7 @@ impl From<Gathered<Animation>> for ArchiveAnimationRead {
             archive_sources,
             clip_evidence: Vec::new(),
             matched_specs: Vec::new(),
+            unread_evidence: Vec::new(),
         }
     }
 }

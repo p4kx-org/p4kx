@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::error::Error;
 use std::fs;
 use std::path::Path;
 
@@ -10,7 +9,7 @@ use p4kx_extraction::{Archive, GlbOptions, ModelSource, PathIndex};
 use p4kx_testkit::{ArchiveBuilder, TestEntry, TestModel, TestMtl, TestMtlMaterial, test_key};
 use serde_json::{Value, json};
 
-use super::{BASE, MODEL, TestResult, field_origin, origin_row, report};
+use super::{BASE, MODEL, TestResult, entry_path, field_origin, field_uses, report};
 
 const LIBRARY: &str = "Data/Objects/Test/CuBe.mtl";
 const PALETTE: &str = "palette.synthetic";
@@ -317,22 +316,4 @@ fn assert_palette_inputs(report: &Value) -> TestResult {
         "both original operands are bound"
     );
     Ok(())
-}
-
-fn field_uses<'a>(report: &'a Value, path: &str) -> Result<Vec<&'a Value>, Box<dyn Error>> {
-    field_origin(report, path)?
-        .get("sourceUsesRefs")
-        .and_then(Value::as_array)
-        .ok_or("field source uses")?
-        .iter()
-        .map(|id| origin_row(report, "/provenance/uses", id))
-        .collect()
-}
-
-fn entry_path<'a>(report: &'a Value, source_use: &Value) -> Result<&'a str, Box<dyn Error>> {
-    let id = source_use.get("source").ok_or("physical source id")?;
-    origin_row(report, "/provenance/sources", id)?
-        .pointer("/path/value")
-        .and_then(Value::as_str)
-        .ok_or_else(|| "source Entry path".into())
 }

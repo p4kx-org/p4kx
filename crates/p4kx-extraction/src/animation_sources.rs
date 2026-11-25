@@ -154,7 +154,7 @@ fn read_model(
         |label| open_entry(index, label, None),
         |source, label, kind, _| match evidence {
             ReadEvidence::UnreadClips => load_unread_clips(source, label, kind),
-            ReadEvidence::Off | ReadEvidence::MatchedSpecs => {
+            ReadEvidence::Off | ReadEvidence::MatchedSpecs | ReadEvidence::SelectedAndUnread => {
                 load_with_positions(source, label, kind)
             }
         },

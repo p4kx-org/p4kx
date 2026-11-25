@@ -49,11 +49,15 @@ pub(crate) enum ReadEvidence {
     Off,
     MatchedSpecs,
     UnreadClips,
+    SelectedAndUnread,
 }
 
 impl<'a> Wanted<'a> {
     const fn captures_unread(&self) -> bool {
-        matches!(self.evidence, ReadEvidence::UnreadClips)
+        matches!(
+            self.evidence,
+            ReadEvidence::UnreadClips | ReadEvidence::SelectedAndUnread
+        )
     }
 
     fn of(choice: &'a AnimationChoice, evidence: ReadEvidence) -> Self {
@@ -87,6 +91,19 @@ impl<'a> Wanted<'a> {
             || kind == Kind::Dba
             || !self.hits(stem(&source.label), &source.label).is_empty()
     }
+
+    fn missing(&self, sources: &[Source], matched: &HashSet<&str>) -> Vec<String> {
+        self.specs
+            .iter()
+            .filter(|spec| {
+                !matched.contains(**spec)
+                    && !sources
+                        .iter()
+                        .any(|source| source.whole && names(spec, "", &source.label))
+            })
+            .map(|spec| (*spec).to_owned())
+            .collect()
+    }
 }
 
 /// Sorts and merges `sources`, reads those the choice wants and collects the animations.
@@ -114,29 +131,36 @@ pub(crate) fn read_observing<T: Described + Send>(
         .filter_map(|source| {
             let kind = kind(&source.label)?;
             wanted.reads(source, kind).then(|| {
+                let mut origin = None;
                 let loaded = open(&source.label).and_then(|file| {
+                    origin = file.archive_origin().cloned();
                     load(&file, &source.label, kind, source.explicit)
-                        .map(|loaded| (file.archive_origin().cloned(), loaded))
                 });
-                (source, loaded)
+                (source, origin, loaded)
             })
         })
         .collect();
     let mut set = Gathered::default();
     let mut matched: HashSet<&str> = HashSet::new();
-    for (source, result) in results {
-        let (origin, loaded) = match result {
+    for (source, origin, result) in results {
+        let loaded = match result {
             Ok(loaded) => loaded,
             Err(error) if is_fatal(source, &error) => return Err(error),
             Err(error) => {
-                set.unread.push(unread_source(&source.label, &error));
+                let row = unread_source(&source.label, &error);
+                set.unread.push(row.with_origin(origin.as_ref()));
                 continue;
             }
         };
         observe(origin.as_ref(), &loaded);
         set.files += 1;
 
-        set.unread.extend(loaded.unread);
+        set.unread.extend(
+            loaded
+                .unread
+                .into_iter()
+                .map(|row| row.with_origin(origin.as_ref())),
+        );
         keep(
             &mut set,
             &mut matched,
@@ -146,17 +170,7 @@ pub(crate) fn read_observing<T: Described + Send>(
             loaded.animations,
         );
     }
-    let missing: Vec<String> = wanted
-        .specs
-        .iter()
-        .filter(|spec| {
-            !matched.contains(**spec)
-                && !sources
-                    .iter()
-                    .any(|source| source.whole && names(spec, "", &source.label))
-        })
-        .map(|spec| (*spec).to_owned())
-        .collect();
+    let missing = wanted.missing(&sources, &matched);
     if missing.is_empty() {
         Ok(set)
     } else {
@@ -196,14 +210,15 @@ fn keep<'a, T: Described>(
             } else {
                 None
             };
-            set.unread.push(PositionedUnreadAnimation::new(
+            let row = PositionedUnreadAnimation::new(
                 UnreadAnimation {
                     source: source.label.clone(),
                     name: Some(animation.name().to_owned()),
                     reason: ADDITIVE_REASON.to_owned(),
                 },
                 coordinates,
-            ));
+            );
+            set.unread.push(row.with_origin(origin));
         } else if source.whole || !wanted.by_name || !hits.is_empty() {
             if matches!(wanted.evidence, ReadEvidence::MatchedSpecs) {
                 set.matched_specs

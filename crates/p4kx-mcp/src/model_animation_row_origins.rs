@@ -3,14 +3,15 @@
 
 use std::ops::Range;
 
-use p4kx_extraction::model::{AnimationClipCoordinates, AnimationFrameChannel};
+use p4kx_extraction::model::AnimationClipCoordinates;
+use p4kx_extraction::model_info::animation_origin_sites::{self, AnimationChunkSites};
 use p4kx_extraction::{
     ArchivePositionedAnimation, FieldOrigin, FieldOrigins, FieldPath, SourceEvidenceError,
     SourceUse, SourceUseRole,
 };
 
 use crate::content_origin::EntryPageSources;
-use crate::model_animation_sites::{self, ChunkSites, SkeletonSites};
+use crate::model_animation_sites::SkeletonSites;
 use crate::model_item_page::{self, EvidenceError};
 
 pub(crate) struct ItemUses {
@@ -46,8 +47,8 @@ pub(crate) struct RowSites<'a> {
     entry: &'a EntryPageSources,
     clip: &'a ArchivePositionedAnimation,
     coords: Option<&'a AnimationClipCoordinates>,
-    metadata: Option<ChunkSites>,
-    data: Option<ChunkSites>,
+    metadata: Option<AnimationChunkSites>,
+    data: Option<AnimationChunkSites>,
 }
 
 impl<'a> RowSites<'a> {
@@ -57,10 +58,10 @@ impl<'a> RowSites<'a> {
     ) -> Result<Self, SourceEvidenceError> {
         let coords = clip.animation().coordinates();
         let metadata = coords
-            .map(|coords| ChunkSites::of(entry.payload_scope(), coords.metadata_chunk()))
+            .map(|coords| AnimationChunkSites::of(entry.payload_scope(), coords.metadata_chunk()))
             .transpose()?;
         let data = coords
-            .map(|coords| ChunkSites::of(entry.payload_scope(), coords.data_chunk()))
+            .map(|coords| AnimationChunkSites::of(entry.payload_scope(), coords.data_chunk()))
             .transpose()?;
         Ok(Self {
             entry,
@@ -131,7 +132,7 @@ impl<'a> RowSites<'a> {
         fields: &mut FieldOrigins,
         path: &FieldPath,
         coords: &AnimationClipCoordinates,
-        selection: &ChunkSites,
+        selection: &AnimationChunkSites,
         source: FieldOrigin,
         aggregate: &mut ItemUses,
     ) -> Result<(), EvidenceError> {
@@ -174,7 +175,7 @@ impl<'a> RowSites<'a> {
         fields: &mut FieldOrigins,
         path: &FieldPath,
         coords: &AnimationClipCoordinates,
-        selection: &ChunkSites,
+        selection: &AnimationChunkSites,
         skeleton: &SkeletonSites,
         aggregate: &mut ItemUses,
     ) -> Result<(), EvidenceError> {
@@ -218,58 +219,24 @@ impl<'a> RowSites<'a> {
     fn duration(
         &self,
         coords: &AnimationClipCoordinates,
-        metadata: &ChunkSites,
-        data: &ChunkSites,
+        metadata: &AnimationChunkSites,
+        data: &AnimationChunkSites,
         aggregate: &mut ItemUses,
     ) -> Result<FieldOrigin, SourceEvidenceError> {
-        let chunk = coords.metadata_chunk().ordinal();
-        let mut uses = self.with_site(
+        let sites = animation_origin_sites::duration_sites(
+            self.entry.payload_scope(),
+            self.clip.animation().clip_ordinal(),
+            coords,
+            self.clip.animation().animation().end_frame,
             metadata,
-            chunk,
-            "frames_per_second",
-            coords.frame_rate(),
-            SourceUseRole::Conversion,
+            data,
         )?;
-        uses.push(self.site(
-            chunk,
-            "end_frame",
-            coords.end_frame(),
-            SourceUseRole::Conversion,
-        )?);
-        let end = self.clip.animation().animation().end_frame;
-        let last = coords
-            .last_frame()
-            .filter(|frame| u32::from(frame.frame()) > end);
-        let mut complete = metadata.complete;
-        if let Some(last) = last {
-            uses.extend_from_slice(&data.selectors);
-            let channel = match last.channel() {
-                AnimationFrameChannel::Rotation => "rotation",
-                AnimationFrameChannel::Translation => "translation",
-                _ => return Ok(aggregate.origin(self.entry, &uses, false)),
-            };
-            uses.push(model_animation_sites::frame_site(
-                self.entry,
-                self.clip.animation().clip_ordinal(),
-                coords.data_chunk().ordinal(),
-                last.controller(),
-                channel,
-                last.bytes(),
-            )?);
-            uses.push(self.site(
-                coords.data_chunk().ordinal(),
-                "frameChannelDescriptor",
-                last.descriptor(),
-                SourceUseRole::Selector,
-            )?);
-            complete &= data.complete;
-        }
-        Ok(aggregate.origin(self.entry, &uses, complete))
+        Ok(aggregate.origin(self.entry, &sites.uses, sites.complete))
     }
 
     fn with_site(
         &self,
-        selection: &ChunkSites,
+        selection: &AnimationChunkSites,
         chunk: usize,
         field: &str,
         bytes: Range<u64>,
@@ -287,8 +254,8 @@ impl<'a> RowSites<'a> {
         bytes: Range<u64>,
         role: SourceUseRole,
     ) -> Result<SourceUse, SourceEvidenceError> {
-        model_animation_sites::clip_site(
-            self.entry,
+        animation_origin_sites::clip_site(
+            self.entry.payload_scope(),
             self.clip.animation().clip_ordinal(),
             chunk,
             field,

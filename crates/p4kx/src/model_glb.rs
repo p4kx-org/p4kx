@@ -7,15 +7,15 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use p4kx_assembly::animation_choice;
 use p4kx_extraction::model::{LodSelection, Model};
-use p4kx_extraction::model_info::{file_name, write_chunk_origins};
+use p4kx_extraction::model_info::{file_name, write_chunk_origins, write_glb_animation_origins};
 use p4kx_extraction::{
-    AnimationSet, ArchiveTextures, ChunkInfo, FieldOrigins, FieldPath, GlbGeometryPublication,
-    GlbOptions, GlbSummary, LibraryInfo, MaterialMode, ModelSource, PathIndex, SourceInventory,
-    SourceUses, UnreadInfo,
+    AnimationChoice, AnimationSet, ArchiveAnimationRead, ArchiveTextures, ChunkInfo, FieldOrigins,
+    FieldPath, GlbGeometryPublication, GlbOptions, GlbSummary, LibraryInfo, MaterialMode,
+    ModelSource, PathIndex, SourceInventory, SourceUses, UnreadInfo,
 };
 use serde::Serialize;
 
-use crate::cli_model::{MaterialsArg, ModelAction};
+use crate::cli_model::{MaterialsArg, ModelAction, ModelFileSource};
 use crate::json;
 use crate::model::{archive_animations, disk_animations};
 use crate::model_animations::{WrittenJson, write_notes as write_animation_notes};
@@ -60,7 +60,12 @@ struct GlbReportOrigins {
 }
 
 impl GlbReportOrigins {
-    fn capture(source: &ModelSource) -> Result<Self> {
+    fn capture(
+        source: &ModelSource,
+        animations: &AnimationSet,
+        summary: &GlbSummary,
+        observed: Option<&ArchiveAnimationRead>,
+    ) -> Result<Self> {
         let mut unknown_chunks = Vec::new();
         let uses = SourceUses::with_compact_use_refs();
         let mut field_origins = source.model_and_library_report_origins(
@@ -75,12 +80,25 @@ impl GlbReportOrigins {
             unknown_chunks.push(ChunkInfo::of(chunk));
             path.pop();
         }
+        write_glb_animation_origins(
+            observed,
+            animations,
+            &summary.animations,
+            &uses,
+            &mut field_origins,
+        )?;
         Ok(Self {
             unknown_chunks,
             field_origins,
             provenance: uses.freeze()?,
         })
     }
+}
+
+#[derive(Clone, Copy)]
+enum ReportMode<'a> {
+    Text,
+    Json(Option<&'a ArchiveAnimationRead>),
 }
 
 const NO_ARCHIVE: &str = "textures are read from an Archive; give the model as ARCHIVE ENTRY. The materials keep their plain colours";
@@ -123,24 +141,60 @@ pub(crate) fn run(action: &ModelAction, as_json: bool) -> Result<()> {
     let lods = LodSelection::Only(*lod);
     let choice = animation_choice(animations);
     if let Some(entry) = &source.entry {
-        let archive = crate::key::open(&source.path)?;
-        let index = PathIndex::new(&archive);
-        let model = if as_json {
-            ModelSource::from_index_with_drawn_material_summary_origins(&index, entry, lods)?
-        } else {
-            ModelSource::from_index_with(&index, entry, lods)?
-        };
-        let found = archive_animations(&index, entry, source, choice.as_ref())?;
-        let textures = ArchiveTextures::new(&index);
-        let written =
-            model.write_glb_with_geometry_receipt(&found, &options, out, Some(&textures))?;
-        report(&model, &found, &options, &written, out, true, as_json)
+        export_archive(source, entry, &options, out, choice.as_ref(), as_json)
     } else {
         let model = ModelSource::from_file_with(&source.path, lods)?;
         let found = disk_animations(source, choice.as_ref())?;
         let written = model.write_glb_with_geometry_receipt(&found, &options, out, None)?;
-        report(&model, &found, &options, &written, out, false, as_json)
+        let mode = if as_json {
+            ReportMode::Json(None)
+        } else {
+            ReportMode::Text
+        };
+        report(&model, &found, &options, &written, out, false, mode)
     }
+}
+
+fn export_archive(
+    source: &ModelFileSource,
+    entry: &str,
+    options: &GlbOptions,
+    out: &Path,
+    choice: Option<&AnimationChoice>,
+    as_json: bool,
+) -> Result<()> {
+    let lods = LodSelection::Only(options.lod);
+    let archive = crate::key::open(&source.path)?;
+    let index = PathIndex::new(&archive);
+    let model = if as_json {
+        ModelSource::from_index_with_drawn_material_summary_origins(&index, entry, lods)?
+    } else {
+        ModelSource::from_index_with(&index, entry, lods)?
+    };
+    let observed = if as_json {
+        choice
+            .map(|choice| {
+                ArchiveAnimationRead::for_model(&index, entry, choice, &source.animation_sources)
+            })
+            .transpose()?
+    } else {
+        None
+    };
+    let ordinary;
+    let found = if let Some(observed) = &observed {
+        observed.set()
+    } else {
+        ordinary = archive_animations(&index, entry, source, choice)?;
+        &ordinary
+    };
+    let textures = ArchiveTextures::new(&index);
+    let written = model.write_glb_with_geometry_receipt(found, options, out, Some(&textures))?;
+    let mode = if as_json {
+        ReportMode::Json(observed.as_ref())
+    } else {
+        ReportMode::Text
+    };
+    report(&model, found, options, &written, out, true, mode)
 }
 
 fn report(
@@ -150,13 +204,15 @@ fn report(
     written: &GlbGeometryPublication,
     out: &Path,
     from_archive: bool,
-    as_json: bool,
+    mode: ReportMode<'_>,
 ) -> Result<()> {
     let model = source.model();
     let summary = &written.summary;
-    if as_json {
+    if let ReportMode::Json(observed) = mode {
         let no_archive = options.materials == MaterialMode::Textures && !from_archive;
-        json::print(&glb_json(source, animations, out, written, no_archive)?)?;
+        json::print(&glb_json(
+            source, animations, out, written, no_archive, observed,
+        )?)?;
         return Ok(());
     }
     let mut stdout = BufWriter::new(io::stdout().lock());
@@ -274,6 +330,7 @@ fn glb_json<'a>(
     out: &Path,
     written: &'a GlbGeometryPublication,
     no_archive: bool,
+    observed: Option<&ArchiveAnimationRead>,
 ) -> Result<GlbJson<'a>> {
     let summary = &written.summary;
     let receipt = written
@@ -313,6 +370,6 @@ fn glb_json<'a>(
         library: LibraryInfo::of(source.model()),
         animations: summary.animations.iter().map(WrittenJson::of).collect(),
         unread_animations: animations.unread.iter().map(UnreadInfo::of).collect(),
-        origins: GlbReportOrigins::capture(source)?,
+        origins: GlbReportOrigins::capture(source, animations, summary, observed)?,
     })
 }
