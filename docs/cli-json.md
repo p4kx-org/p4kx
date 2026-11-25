@@ -2673,7 +2673,7 @@ names only at run time, and the 3D scenes and run-time pictures of a screen, whi
 box), `canvases` the canvases composed (the screen's own and the
 nested ones). `unsupported` lists per element type and reason (`no renderer for this element
 type`, `automatic size taken as the size of the parent`, `<layout> children are laid out as an
-overlay` for spacer containers, `list rows come from run-time data: none drawn at rest`, `list
+overlay` for spacer containers, `list rows require a run-time array supplied by the game`, `list
 rows repeat the template without the values of their rows`, `fading edges of the overflow are not
 drawn`, `gradient backgrounds are drawn in the plain colour of the background`, `borders that
 differ are drawn straight on a box with rounded corners`, `the turn and scale of the parent are

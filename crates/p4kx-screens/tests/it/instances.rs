@@ -148,7 +148,10 @@ fn a_list_with_run_time_rows_is_empty_at_rest_and_says_so() -> TestResult {
         .iter()
         .find(|entry| entry.element == "WidgetList")
         .ok_or("the list is not reported")?;
-    assert!(note.reason.contains("run-time"), "{}", note.reason);
+    assert_eq!(
+        note.reason,
+        "list rows require a run-time array supplied by the game"
+    );
     let missing = composed
         .report()
         .content_omissions

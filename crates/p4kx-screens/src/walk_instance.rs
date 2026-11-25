@@ -119,7 +119,7 @@ impl Walk<'_, '_, '_, '_> {
                 let (code, reason) = if source.is_some() {
                     (
                         ContentOmissionCode::RuntimeArray,
-                        "list rows come from run-time data: none drawn at rest",
+                        "list rows require a run-time array supplied by the game",
                     )
                 } else {
                     (
