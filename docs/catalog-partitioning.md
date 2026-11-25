@@ -236,6 +236,50 @@ Measure cold generation or import, changed Build, unchanged cache, failure
 recovery and peak process and system memory. Keep this gate separate from the
 full Catalog upload and interchange checks.
 
+### Embedded consumer trial
+
+A maintainer trial based on VerseKit 5.6.1 embedded P4KX
+`8637591ab1d69a1d72fd7f672fbc36f13d999cb4` with Rust 1.100.0. The reported inputs
+were LIVE `13220821` and PTU `13238477` and `13260598`. For Fundorte, the
+`read_mining_locations` result yielded the same cache bytes as the v2 full Catalog
+path. The consumer read the `finite` member of v3 numeric values. Preserve an
+unavailable numeric value as unknown when that member is absent or null.
+
+| Reported flow without the game running | Selective test time | Selective private memory | 0.4.2 time | 0.4.2 private memory |
+| --- | ---: | ---: | ---: | ---: |
+| Cold startup | 25.8 s | 1,043 MB | 21.9 s | 1,534 MB |
+| LIVE-to-PTU refresh | 22.0 s | 1,092 MB | 26.4 s | 1,560 MB |
+| Warm cache | 0.1 s | Unreported | 0.1 s | Unreported |
+
+These are reported integrated application measurements for the tested scope. Helper
+peaks, minimum host RAM, scratch writes and the exact consumer commit remain unverified.
+With a deliberately truncated Archive and a populated cache, the trial reported errors
+from each module and byte-identical previous cache files. The filtered v3 Catalog calls
+for contracts, mission locations and reputation returned the incomplete-Catalog error.
+`DiagnosticPartial` is the explicit diagnostic export mode. Use the selective readers
+for local refresh.
+
+| Consumer data | Selective SDK route |
+| --- | --- |
+| Fundorte and their resource joins | `read_mining_locations` |
+| Contracts by owner or by contract and sub-contract identity | `with_contracts` or `with_contract(ContractKey)` |
+| Contract blueprint reward pool contents | `with_blueprint_pools` for the pool GUIDs in `blueprint_rewards` |
+| Authored mission location templates | `with_mission_location_templates` |
+| Faction reputation, scopes, standing thresholds and rank names | `with_reputation` with the faction selection and `ReputationSelection::ranks()` |
+| Authored reputation reward amounts | `with_reputation_reward_amounts`, with per-contract gains from `reputation_gains` |
+| Resolved ship and Item ports, sizes, tags and equipped items | `equipment::read_loadouts` for the selected physical owner |
+| Original port rules and candidate attachment constraints | `with_item_ports` and `equipment::with_attachment_constraints` |
+
+Use a shared `CatalogQuerySession` and parsed view where the routes support it.
+`ContractSnapshot::location_queries` contains the referenced authored rules. The game
+chooses concrete locations during mission execution. Resolve protected rank names using
+`snapshot.game_text()` in the selected locales. Change cache identity when the
+Archive, Build, locale or cache format changes. Replace entries only after
+outer query success and accepted coverage. The trial covers Fundorte and the cache
+failure path. Integrated refresh and memory checks for contracts, reputation, location
+templates and ports remain required.
+[Contract queries](catalog-contract-queries.md) · [Selective SDK](catalog-sdk.md)
+
 ## Proposed domains
 
 | Domain | Canonical data | Example cross-domain links |
