@@ -47,39 +47,39 @@
     },
     {
       "name": "zstd-dev",
-      "version": "1.5.7-r2",
+      "version": "1.6.0-r1",
       "origin": "zstd",
-      "recipe_commit": "3c6e2ee2b16f403d53eab39c4426eb61f003c322",
+      "recipe_commit": "7977bff716a0f7cf852fc81277b36d6e6e8d47b3",
       "license": "BSD-3-Clause OR GPL-2.0-or-later",
-      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/zstd-dev-1.5.7-r2.apk",
-      "sha256": "a956233bf93dc4f3cc814257938c4f185b83797e473b6656ae2dbb85d7fc3866"
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/zstd-dev-1.6.0-r1.apk",
+      "sha256": "14732974e0090b51fedb8c6b6bcda40fe5fd644a6350b0a0b36f2fcf9241edaa"
     },
     {
       "name": "zstd",
-      "version": "1.5.7-r2",
+      "version": "1.6.0-r1",
       "origin": "zstd",
-      "recipe_commit": "3c6e2ee2b16f403d53eab39c4426eb61f003c322",
+      "recipe_commit": "7977bff716a0f7cf852fc81277b36d6e6e8d47b3",
       "license": "BSD-3-Clause OR GPL-2.0-or-later",
-      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/zstd-1.5.7-r2.apk",
-      "sha256": "ab338dd697633382d1232c7077e137e6f966e074102f2f195adb492b34243fe6"
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/zstd-1.6.0-r1.apk",
+      "sha256": "6e448afc904dd86c440b260ee295329b66cc168c2d27fb461304a79764f0c5e8"
     },
     {
       "name": "zstd-libs",
-      "version": "1.5.7-r2",
+      "version": "1.6.0-r1",
       "origin": "zstd",
-      "recipe_commit": "3c6e2ee2b16f403d53eab39c4426eb61f003c322",
+      "recipe_commit": "7977bff716a0f7cf852fc81277b36d6e6e8d47b3",
       "license": "BSD-3-Clause OR GPL-2.0-or-later",
-      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/zstd-libs-1.5.7-r2.apk",
-      "sha256": "d5fcc58f7f071a5658d97b09838668e4443203217631992915b8e60656904104"
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/zstd-libs-1.6.0-r1.apk",
+      "sha256": "6b4ba996d4d41a361bd7d1fd2cd0fedd2436d3cec5fc944d7b489ad7f5621960"
     },
     {
       "name": "zstd-static",
-      "version": "1.5.7-r2",
+      "version": "1.6.0-r1",
       "origin": "zstd",
-      "recipe_commit": "3c6e2ee2b16f403d53eab39c4426eb61f003c322",
+      "recipe_commit": "7977bff716a0f7cf852fc81277b36d6e6e8d47b3",
       "license": "BSD-3-Clause OR GPL-2.0-or-later",
-      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/zstd-static-1.5.7-r2.apk",
-      "sha256": "d76fd1febaf9630d348d9e7c4ad6d8d00479087bb311b8827fb62de0e0e08bfb"
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/x86_64/zstd-static-1.6.0-r1.apk",
+      "sha256": "d7ffe743ca0edd36558371773397026aa741cbf16e7b75d2611a12638a6bd242"
     },
     {
       "name": "mimalloc2",
@@ -184,39 +184,39 @@
     },
     {
       "name": "zstd-dev",
-      "version": "1.5.7-r2",
+      "version": "1.6.0-r1",
       "origin": "zstd",
-      "recipe_commit": "3c6e2ee2b16f403d53eab39c4426eb61f003c322",
+      "recipe_commit": "7977bff716a0f7cf852fc81277b36d6e6e8d47b3",
       "license": "BSD-3-Clause OR GPL-2.0-or-later",
-      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/zstd-dev-1.5.7-r2.apk",
-      "sha256": "20b55b2e5e7854542dcb9bddb948029d12cfbda9f01e66b9fadc38968262a3a6"
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/zstd-dev-1.6.0-r1.apk",
+      "sha256": "6f11c891e07a80abf88145888ec866cea32eb315eaa43cda051c9bed6a234399"
     },
     {
       "name": "zstd",
-      "version": "1.5.7-r2",
+      "version": "1.6.0-r1",
       "origin": "zstd",
-      "recipe_commit": "3c6e2ee2b16f403d53eab39c4426eb61f003c322",
+      "recipe_commit": "7977bff716a0f7cf852fc81277b36d6e6e8d47b3",
       "license": "BSD-3-Clause OR GPL-2.0-or-later",
-      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/zstd-1.5.7-r2.apk",
-      "sha256": "c7e0fc52225ec3ee23c4e2e464b5cb11bcd57f2e96b24d90fcf92fc9cec261b4"
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/zstd-1.6.0-r1.apk",
+      "sha256": "c224e350bce36d2d6a31abbee5d368bb0ccdf97138d11701838855d2a1b4524a"
     },
     {
       "name": "zstd-libs",
-      "version": "1.5.7-r2",
+      "version": "1.6.0-r1",
       "origin": "zstd",
-      "recipe_commit": "3c6e2ee2b16f403d53eab39c4426eb61f003c322",
+      "recipe_commit": "7977bff716a0f7cf852fc81277b36d6e6e8d47b3",
       "license": "BSD-3-Clause OR GPL-2.0-or-later",
-      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/zstd-libs-1.5.7-r2.apk",
-      "sha256": "50a998e56e4bf31504996e49c1b4a23eed5e0cd4e24b8a1356a54daf1a6eabbe"
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/zstd-libs-1.6.0-r1.apk",
+      "sha256": "621c9247644e398fd3d32bba10fbf68c18f05b7941f1d055c4d48311fbfa9673"
     },
     {
       "name": "zstd-static",
-      "version": "1.5.7-r2",
+      "version": "1.6.0-r1",
       "origin": "zstd",
-      "recipe_commit": "3c6e2ee2b16f403d53eab39c4426eb61f003c322",
+      "recipe_commit": "7977bff716a0f7cf852fc81277b36d6e6e8d47b3",
       "license": "BSD-3-Clause OR GPL-2.0-or-later",
-      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/zstd-static-1.5.7-r2.apk",
-      "sha256": "a4c81cff4018928fbc3bf58519c4a916690b42fe860bf04378649425275ef75d"
+      "url": "https://dl-cdn.alpinelinux.org/alpine/v3.23/main/aarch64/zstd-static-1.6.0-r1.apk",
+      "sha256": "6dc56165e93a507235cb08a53829d39acddc2558fd2d01eb5f42ecf1d9d7769d"
     },
     {
       "name": "mimalloc2",

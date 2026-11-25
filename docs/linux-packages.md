@@ -57,7 +57,11 @@ CrossOver-Wurzeln werden zwischen diesen beiden Orten geprüft. Für Lutris oder
 Installationen prüft P4KX anschließend direkte Unterordner von `~/Games`. P4KX prüft die
 exakte Schreibweise jedes Pfadbestandteils zuerst und akzeptiert andernfalls nur einen
 eindeutigen Treffer ohne Beachtung der ASCII-Groß- und Kleinschreibung. Eine mehrdeutige
-oder unvollständige Suche wird gemeldet. [Suchpfade und Prioritäten](channel-discovery.md#inputs-and-priority)
+oder unvollständige Suche wird gemeldet.
+Unter Flatpak kann die Suche nur Präfixe sehen, die in der Sandbox lesbar sind.
+Wähle bei mehreren Installationen mit `--user --arch=x86_64` oder
+`--user --arch=aarch64` die passende native Variante.
+[Suchpfade und Prioritäten](channel-discovery.md#inputs-and-priority) · [Flatpak-Freigaben](#profiles-audio-and-sandbox-access)
 
 ### Profil und Flatpak-Dateizugriff
 
@@ -177,7 +181,10 @@ Native Bottles roots, configured CrossOver bottle roots and Flatpak Bottles root
 P4KX then checks immediate `~/Games` children for Lutris or custom installs. Each component
 uses an exact spelling first, then a unique ASCII case-insensitive match. Ambiguous or
 incomplete discovery is reported.
-[Search roots and priority](channel-discovery.md#inputs-and-priority), [Profile folders](profile-folders.md)
+Flatpak discovery can only read prefixes visible inside the sandbox. For a user-installed
+bundle, select a specific architecture with `--user --arch=x86_64` or
+`--user --arch=aarch64` before the application ID.
+[Search roots and priority](channel-discovery.md#inputs-and-priority), [Profile folders](profile-folders.md), [Flatpak file grants](#profiles-audio-and-sandbox-access)
 
 ## Upgrade and remove installed packages
 
@@ -368,6 +375,14 @@ the receipt. The two native package jobs still need to verify that
 behavior on real Documents grants.
 [AMD64 package evidence](https://github.com/p4kx-org/p4kx/actions/runs/45576709479/job/139096347560) ·
 [ARM64 package evidence](https://github.com/p4kx-org/p4kx/actions/runs/45576709479/job/139096347666)
+
+Release run `45595367669` completed the Linux AMD64 producer. The ARM64
+producer stopped while building the static AppImage runtime because the pinned
+Alpine Zstandard package URL returned HTTP 404. The native package consumers
+on both CPUs require the complete producer matrix and were skipped.
+[AMD64 producer](https://github.com/p4kx-org/p4kx/actions/runs/45595367669/artifacts/15015038853) ·
+[ARM64 producer](https://github.com/p4kx-org/p4kx/actions/runs/45595367669/job/139140250867) ·
+[Native execution](https://github.com/p4kx-org/p4kx/actions/runs/45595367669/job/139160223476)
 
 The tagged v0.5.0 candidate requires its own hosted Linux package evidence on both CPUs.
 

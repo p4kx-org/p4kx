@@ -65,10 +65,10 @@
         "sha256": "a884a6785cbc0cbeffbf9fb4a970f8835efc27419a7d8dc15a72cadd3efb3ee8",
         "archive_root": "aports-254024f3b0572339fd24fae8865a4e313239ba71"
       },
-      "3c6e2ee2b16f403d53eab39c4426eb61f003c322": {
-        "url": "https://github.com/alpinelinux/aports/archive/3c6e2ee2b16f403d53eab39c4426eb61f003c322.tar.gz",
-        "sha256": "819f75ff266145a14d916546122a26907384cc610ff46caf1905a208dc700f16",
-        "archive_root": "aports-3c6e2ee2b16f403d53eab39c4426eb61f003c322"
+      "7977bff716a0f7cf852fc81277b36d6e6e8d47b3": {
+        "url": "https://gitlab.alpinelinux.org/api/v4/projects/alpine%2Faports/repository/archive.tar.gz?sha=7977bff716a0f7cf852fc81277b36d6e6e8d47b3",
+        "sha256": "8e143b23db1af1f019520049238227fba667dc154a04d7df118be844eb6a3972",
+        "archive_root": "aports-7977bff716a0f7cf852fc81277b36d6e6e8d47b3-7977bff716a0f7cf852fc81277b36d6e6e8d47b3"
       },
       "7fa6e7fd3465c5ff89cc33a56d20bf4d59105aaf": {
         "url": "https://github.com/alpinelinux/aports/archive/7fa6e7fd3465c5ff89cc33a56d20bf4d59105aaf.tar.gz",
