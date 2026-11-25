@@ -3,6 +3,7 @@
 
 use std::ops::Deref;
 
+use crate::loadout_file_read::LoadoutFileBytes;
 use crate::loadout_file_trace::FileTrace;
 use crate::resolver_observation::{self, LoadoutReadEvent, Observation};
 use crate::{
@@ -31,7 +32,7 @@ pub struct LoadoutFileIdentity<'a> {
 }
 
 pub(crate) struct Document {
-    bytes: Vec<u8>,
+    bytes: LoadoutFileBytes,
     observed: Option<ObservedDocument>,
     vehicle_source: Option<crate::LoadoutFileSource>,
 }
@@ -81,7 +82,9 @@ pub(crate) fn read(
                 let (source, outcome) = files.read_observed(request).into_parts();
                 (Some(source), outcome)
             }
-            LoadoutDocumentKind::XmlLoadout => (None, files.read(request)),
+            LoadoutDocumentKind::XmlLoadout => {
+                (None, files.read(request).map(LoadoutFileBytes::Owned))
+            }
         };
         return outcome.map(|bytes| Document {
             bytes,
@@ -90,7 +93,7 @@ pub(crate) fn read(
         });
     };
     let (source, outcome) = files.read_observed(request).into_parts();
-    let document = trace.capture(source, kind, &outcome, request);
+    let document = trace.capture(source, kind, outcome.as_ref().map(|_| ()), request);
     resolver_observation::notify(
         observation,
         LoadoutReadEvent::FileRead {

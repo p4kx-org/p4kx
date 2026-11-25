@@ -41,6 +41,7 @@ impl<'f> LoadoutResolver<'f> {
             let observation = self.observation.clone();
             let forge = self.entities.forge();
             let forge_origin = self.forge_origin.as_ref();
+            let record_cache = self.record_cache;
             let read: Vec<(Record<'f>, SpecResult)> = missing
                 .into_par_iter()
                 .map_init(TreeBuilder::new, |builder, record| {
@@ -52,6 +53,7 @@ impl<'f> LoadoutResolver<'f> {
                             &record,
                             observation.as_deref(),
                             origin,
+                            record_cache,
                         )),
                     )
                 })

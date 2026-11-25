@@ -3,12 +3,14 @@
 
 use std::collections::HashMap;
 use std::io::Read;
-use std::sync::OnceLock;
+use std::num::NonZeroUsize;
+use std::sync::{Arc, Mutex, OnceLock};
 
 use p4kx_archive::{Archive, Entry};
 use thiserror::Error;
 
-use crate::loadout_file_read;
+use crate::bounded_read_cache::BoundedReadCache;
+use crate::loadout_file_read::{self, LoadoutFileBytes};
 use crate::{LoadoutFileIdentity, LoadoutFileRead, LoadoutFileSource};
 
 /// The largest XML Loadout file that is read, 16 MiB.
@@ -81,6 +83,16 @@ pub struct ArchiveFiles<'a> {
     archive: &'a Archive,
     index: OnceLock<HashMap<String, usize>>,
     verify_entries: bool,
+    xml_read_cache: Option<Mutex<XmlReadCache>>,
+}
+
+type XmlReadCache = BoundedReadCache<XmlReadKey, Arc<Vec<u8>>>;
+
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+struct XmlReadKey {
+    entry_index: usize,
+    key_generation: u64,
+    verified: bool,
 }
 
 impl<'a> ArchiveFiles<'a> {
@@ -91,7 +103,16 @@ impl<'a> ArchiveFiles<'a> {
             archive,
             index: OnceLock::new(),
             verify_entries: false,
+            xml_read_cache: None,
         }
+    }
+
+    /// Retains successful observed XML reads for this opened Archive.
+    /// The budget covers retained Entry count and allocated decoded byte capacity.
+    #[must_use]
+    pub fn with_xml_read_cache(mut self, max_entries: NonZeroUsize, max_bytes: usize) -> Self {
+        self.xml_read_cache = Some(Mutex::new(BoundedReadCache::new(max_entries, max_bytes)));
+        self
     }
 
     /// Verifies each selected document's checksums and decoded extent while reading it once.
@@ -163,8 +184,8 @@ impl LoadoutFiles for ArchiveFiles<'_> {
                 Err(LoadoutFileError::SourceEvidenceUnavailable),
             );
         };
-        let source = LoadoutFileSource::archive(original);
-        LoadoutFileRead::new(source, self.read_entry(entry))
+        let outcome = self.read_observed_entry(entry, original.entry().index());
+        LoadoutFileRead::with_bytes(LoadoutFileSource::archive(original), outcome)
     }
 
     fn identity(&self, path: &str) -> Option<LoadoutFileIdentity<'_>> {
@@ -178,6 +199,38 @@ impl LoadoutFiles for ArchiveFiles<'_> {
 }
 
 impl ArchiveFiles<'_> {
+    fn read_observed_entry(
+        &self,
+        entry: &Entry,
+        entry_index: usize,
+    ) -> Result<LoadoutFileBytes, LoadoutFileError> {
+        let Some(cache) = &self.xml_read_cache else {
+            return self.read_entry(entry).map(LoadoutFileBytes::Owned);
+        };
+        let key = XmlReadKey {
+            entry_index,
+            key_generation: self.archive.key_generation(),
+            verified: self.verify_entries,
+        };
+        if let Some(bytes) = cache
+            .lock()
+            .ok()
+            .and_then(|cache| cache.get(key).map(Arc::clone))
+            && self.archive.key_generation() == key.key_generation
+        {
+            return Ok(LoadoutFileBytes::Shared(bytes));
+        }
+        let bytes = self.read_entry(entry)?;
+        if let Ok(mut cache) = cache.lock()
+            && self.archive.key_generation() == key.key_generation
+        {
+            let bytes = Arc::new(bytes);
+            cache.insert(key, bytes.capacity(), Arc::clone(&bytes));
+            return Ok(LoadoutFileBytes::Shared(bytes));
+        }
+        Ok(LoadoutFileBytes::Owned(bytes))
+    }
+
     fn read_entry(&self, entry: &Entry) -> Result<Vec<u8>, LoadoutFileError> {
         if self.verify_entries {
             return loadout_file_read::verified_bytes(self.archive, entry, &|| false);
@@ -213,3 +266,7 @@ fn key(path: &str) -> String {
         })
         .collect()
 }
+
+#[cfg(test)]
+#[path = "archive_xml_read_cache_tests.rs"]
+mod tests;

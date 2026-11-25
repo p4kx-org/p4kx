@@ -1,9 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::num::NonZeroUsize;
 use std::sync::Arc;
 
-use p4kx_assembly::{ArchiveFiles, Entities};
+use p4kx_assembly::{ArchiveFiles, Entities, LoadoutRecordCache, LoadoutRecordReader};
 use p4kx_extraction::{Archive, CancelToken, DataForge};
 
 use super::super::dependency_coverage::EquipmentDependencyCoverage;
@@ -13,6 +14,7 @@ use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
 use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection, DatasetAvailability};
 use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
+use crate::catalog_v3::catalog_item_alignment::AlignmentOptions;
 use crate::contract_loadout::Loadout;
 use crate::export_ledger::ExportLedger;
 use crate::loadout::Wanted;
@@ -28,9 +30,20 @@ pub(in crate::build::catalog_queries::equipment) struct Query<'query> {
     pub(in crate::build::catalog_queries::equipment) cancel: Option<&'query CancelToken>,
 }
 
+const VISIT_RECORD_CACHE_ENTRIES: NonZeroUsize = NonZeroUsize::MIN.saturating_add(2_048 - 1);
+const VISIT_RECORD_CACHE_BYTES: usize = 32 << 20;
+const VISIT_XML_CACHE_ENTRIES: NonZeroUsize = NonZeroUsize::MIN.saturating_add(256 - 1);
+const VISIT_XML_CACHE_BYTES: usize = 8 << 20;
+
 pub(super) struct ResolverInputs<'source> {
     files: ArchiveFiles<'source>,
     entities: Arc<Entities<'source>>,
+    shared: Option<VisitResolverInputs<'source>>,
+}
+
+struct VisitResolverInputs<'source> {
+    records: LoadoutRecordCache<'source>,
+    options: AlignmentOptions<'source>,
 }
 
 impl<'source> ResolverInputs<'source> {
@@ -38,7 +51,44 @@ impl<'source> ResolverInputs<'source> {
         Self {
             files: ArchiveFiles::new(archive),
             entities: Arc::new(Entities::new(forge)),
+            shared: None,
         }
+    }
+
+    pub(super) fn for_visit(
+        archive: &'source Archive,
+        forge: &'source DataForge<'source>,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Self, CatalogError> {
+        let mut inputs = Self::new(archive, forge);
+        inputs.files = inputs
+            .files
+            .with_xml_read_cache(VISIT_XML_CACHE_ENTRIES, VISIT_XML_CACHE_BYTES);
+        inputs.shared = Some(VisitResolverInputs {
+            records: LoadoutRecordCache::new(
+                forge,
+                VISIT_RECORD_CACHE_ENTRIES,
+                VISIT_RECORD_CACHE_BYTES,
+            ),
+            options: AlignmentOptions::read(forge, cancel)?,
+        });
+        Ok(inputs)
+    }
+
+    pub(super) fn configure_alignment<'read>(
+        &'read self,
+        alignment: DirectAlignment<'read>,
+    ) -> DirectAlignment<'read> {
+        match &self.shared {
+            Some(shared) => alignment.with_shared_inputs(&shared.options, &shared.records),
+            None => alignment,
+        }
+    }
+
+    fn record_reader(&self) -> Option<&dyn LoadoutRecordReader> {
+        self.shared
+            .as_ref()
+            .map(|shared| &shared.records as &dyn LoadoutRecordReader)
     }
 }
 
@@ -145,6 +195,7 @@ impl Query<'_> {
             ResolverEvidence {
                 seed: &seed,
                 alignment,
+                record_reader: sources.record_reader(),
             },
             input,
             self.cancel,

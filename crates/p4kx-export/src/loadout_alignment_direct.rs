@@ -4,15 +4,15 @@
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 
-use p4kx_assembly::PortDefinitionPosition;
+use p4kx_assembly::{LoadoutRecordReader, PortDefinitionPosition};
 use p4kx_extraction::{CancelToken, RecordTree};
 
 use super::AlignmentLookup;
 use crate::catalog_projection::CatalogProjection;
 use crate::catalog_read::scoped_source_read::ScopedSourceRead;
 use crate::catalog_v3::catalog_item_alignment::{
-    AttachmentDefinitionLink, ItemAttachmentComponent, ItemPortContainer, PortDefinitionLink,
-    ScopedTopologyAlignment,
+    AlignmentOptions, AttachmentDefinitionLink, ItemAttachmentComponent, ItemPortContainer,
+    PortDefinitionLink, ScopedTopologyAlignment,
 };
 use crate::record_observation::RecordObservation;
 
@@ -116,6 +116,16 @@ impl<'source> DirectAlignment<'source> {
             reader: DemandReader::new(projection, cancel),
             rows: BTreeMap::new(),
         }
+    }
+
+    /// Shares immutable reads and enum options across owner projections.
+    pub(crate) fn with_shared_inputs(
+        mut self,
+        options: &'source AlignmentOptions<'source>,
+        records: &'source dyn LoadoutRecordReader,
+    ) -> Self {
+        self.reader = self.reader.with_shared_inputs(options, records);
+        self
     }
 
     /// Returns the original dependencies reached in physical order.

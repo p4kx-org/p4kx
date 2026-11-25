@@ -5,15 +5,15 @@ use std::ops::ControlFlow;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use p4kx_dataforge::{Guid, Record, RecordTree, TreeBuilder};
+use p4kx_dataforge::{DataForgeError, Guid, Record, RecordTree, TreeBuilder};
 
 pub(crate) use crate::resolver_path_read::parse_spec;
 
 use crate::{
     Entities, LoadoutClassSelection, LoadoutError, LoadoutFileObservation, LoadoutPath,
-    LoadoutPathObserver, LoadoutRequest, LoadoutResolver, LoadoutSelection, LoadoutTargetGuid,
-    LoadoutXmlRecordSelector, RecordLoadoutEffect, VehicleImplementation, XmlLoadoutClassSite,
-    XmlLoadoutPathSite, XmlPortReplacement,
+    LoadoutPathObserver, LoadoutRecordReader, LoadoutRequest, LoadoutResolver, LoadoutSelection,
+    LoadoutTargetGuid, LoadoutXmlRecordSelector, RecordLoadoutEffect, VehicleImplementation,
+    XmlLoadoutClassSite, XmlLoadoutPathSite, XmlPortReplacement,
 };
 
 #[path = "loadout_read_event.rs"]
@@ -258,12 +258,20 @@ pub(crate) fn canonical<'f>(
     if observation.is_some_and(Observation::stopped) {
         return Err(LoadoutError::ObservationStopped);
     }
-    let outcome = builder.build(record);
+    observe_canonical(record, observation, builder.build(record), |tree| tree)
+}
+
+fn observe_canonical<'source, T>(
+    record: &Record<'source>,
+    observation: Option<&Observation<'_>>,
+    outcome: Result<T, DataForgeError>,
+    borrow: impl FnOnce(&T) -> &RecordTree<'source>,
+) -> Result<T, LoadoutError> {
     notify(
         observation,
         LoadoutReadEvent::CanonicalRead {
             record,
-            outcome: outcome.as_ref(),
+            outcome: outcome.as_ref().map(borrow),
         },
     )?;
     outcome.map_err(|error| LoadoutError::UnreadableRecord {
@@ -312,6 +320,7 @@ pub(crate) fn read_spec<'f>(
     record: &Record<'f>,
     observation: Option<&Observation<'_>>,
     forge_origin: Option<&Arc<p4kx_extraction::DataForgeOrigin>>,
+    record_cache: Option<&dyn LoadoutRecordReader>,
 ) -> Result<crate::spec::EntitySpec, LoadoutError> {
     if observation.is_some_and(Observation::stopped) {
         return Err(LoadoutError::ObservationStopped);
@@ -333,13 +342,18 @@ pub(crate) fn read_spec<'f>(
         )?;
         return Err(error);
     }
+    if let Some(outcome) = record_cache.and_then(|cache| cache.read(record).transpose())
+        && outcome.as_ref().map_or(true, |tree| tree.is_from(record))
+    {
+        let tree = observe_canonical(record, observation, outcome, |tree| tree.as_ref())?;
+        return parse_spec(record, &tree, observation, forge_origin);
+    }
     let tree = canonical(builder, record, observation)?;
     parse_spec(record, &tree, observation, forge_origin)
 }
 
 impl LoadoutResolver<'_> {
-    /// Returns how many Records were read one at a time while a tree was built, outside the
-    /// parallel prefetch.
+    /// Returns how many Record specs were read one at a time outside parallel prefetch.
     #[doc(hidden)]
     #[must_use]
     pub const fn serial_reads(&self) -> usize {

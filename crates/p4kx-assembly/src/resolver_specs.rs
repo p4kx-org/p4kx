@@ -8,9 +8,35 @@ use p4kx_dataforge::{Guid, Record};
 
 use crate::resolver::SpecResult;
 use crate::resolver_observation::{self, LoadoutReadEvent};
-use crate::{EntityNode, LoadoutError, LoadoutResolver};
+use crate::spec::TargetSpec;
+use crate::{EntityNode, LoadoutError, LoadoutRecordReader, LoadoutResolver};
 
 impl<'f> LoadoutResolver<'f> {
+    /// Reuses immutable Record trees while observing this resolver's own source operations.
+    #[must_use]
+    pub fn with_record_cache(mut self, cache: &'f dyn LoadoutRecordReader) -> Self {
+        self.record_cache = Some(cache);
+        self
+    }
+
+    /// Returns the Record a target names, or `None` when there is none.
+    pub(crate) fn record_of(&self, target: &TargetSpec) -> Option<Record<'f>> {
+        match target {
+            TargetSpec::Reference(reference) => {
+                self.entities.forge().record_by_guid(reference.guid())
+            }
+            TargetSpec::ClassName(name) => self.entities.by_class_name(name.value()),
+            TargetSpec::None | TargetSpec::Invalid(_) => None,
+        }
+    }
+
+    /// Returns how many Records have been read into specs so far.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn records_read(&self) -> usize {
+        self.specs.len()
+    }
+
     pub(crate) fn spec(&mut self, guid: Guid) -> SpecResult {
         self.entities.forge().record_by_guid(guid).map_or_else(
             || {
@@ -43,6 +69,7 @@ impl<'f> LoadoutResolver<'f> {
             self.forge_origin
                 .as_ref()
                 .filter(|_| record.is_from(self.entities.forge())),
+            self.record_cache,
         ));
         self.specs.insert(record.index(), Arc::clone(&spec));
         spec

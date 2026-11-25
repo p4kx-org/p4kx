@@ -66,6 +66,7 @@ pub(crate) fn loadouts<'f>(
     let mut outside = HashSet::new();
     let mut alignment = AlignmentIndex::new(sources.alignment)?;
     let evidence = resolution::ResolverEvidence {
+        record_reader: None,
         seed: sources.ledger,
         alignment: &mut alignment,
     };

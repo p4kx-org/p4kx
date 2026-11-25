@@ -3,13 +3,17 @@
 
 use std::error::Error;
 
-use p4kx_export::catalog_queries::equipment::{Loadout, LoadoutOwnerSnapshot, visit_loadouts_from};
+use p4kx_export::catalog_queries::equipment::{
+    Loadout, LoadoutOwnerSelection, LoadoutOwnerSnapshot, visit_loadouts_from,
+};
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ProvenanceMode,
 };
 use p4kx_export::{CatalogError, build_catalog};
 use p4kx_extraction::{Archive, CancelToken, DataForgeEntry, Guid};
-use p4kx_testkit::{DataForgeBuilder, TestEntity, entity_schema};
+use p4kx_testkit::{
+    ArchiveBuilder, DataForgeBuilder, TestEntity, TestEntry, TestLoadout, TestPort, entity_schema,
+};
 use serde_json::{Value, json};
 
 use super::{fixture, record_index};
@@ -106,6 +110,94 @@ fn assert_owner_scope(snapshot: &LoadoutOwnerSnapshot) -> TestResult {
         );
     }
     Ok(())
+}
+
+#[test]
+fn shared_loadout_inputs_preserve_nested_rows_and_owner_evidence() -> TestResult {
+    let (_folder, archive) = shared_xml_fixture()?;
+    for mode in [ProvenanceMode::Full, ProvenanceMode::MarkersOnly] {
+        let session = CatalogQuerySession::open(&archive, full_proof::NO_LANGUAGES, None)?
+            .with_provenance_mode(mode);
+        let parsed = session.parsed(None)?;
+        let expected = [0, 1]
+            .map(|index| parsed.read_loadouts(CatalogRecordSelection::RecordIndex(index), None));
+        let [first, second] = expected;
+        let expected = [first?, second?];
+        let mut seen = Vec::new();
+        let summary = parsed.visit_loadout_owners::<Box<dyn Error>>(
+            LoadoutOwnerSelection::Ships,
+            None,
+            |snapshot| {
+                let index = usize::try_from(snapshot.record_index)?;
+                let cold = expected.get(index).ok_or("a physical fixture Ship")?;
+                let row = snapshot.row.as_ref().ok_or("a resolved Ship row")?;
+                assert!(
+                    row.ports().iter().any(|port| !port.ports().is_empty()),
+                    "the shared XML retains the mounted rack and its child ports"
+                );
+                assert_eq!(
+                    serde_json::to_value(row)?,
+                    serde_json::to_value(cold.rows.first().ok_or("an uncached Ship row")?)?
+                );
+                assert_eq!(
+                    serde_json::to_value(&snapshot.source_inventory)?,
+                    serde_json::to_value(&cold.source_inventory)?,
+                    "each owner receives its complete independent source inventory"
+                );
+                assert!(snapshot.dependencies.is_complete());
+                seen.push(snapshot.record_index);
+                Ok(())
+            },
+        )?;
+        assert_eq!(seen, [0, 1]);
+        assert_eq!(summary.row_count, 2);
+        assert!(summary.dependencies_complete);
+    }
+    Ok(())
+}
+
+fn shared_xml_fixture() -> TestResult<(tempfile::TempDir, Archive)> {
+    let mut database = entity_schema(DataForgeBuilder::new().version(8));
+    for (id, name) in [(0x31, "ACME_First"), (0x32, "ACME_Second")] {
+        database = database.record(
+            TestEntity::new(
+                id,
+                name,
+                format!("libs/foundry/records/entities/spaceships/{name}.xml"),
+            )
+            .loadout(TestLoadout::Xml("synthetic/shared.xml".to_owned()))
+            .record(),
+        );
+    }
+    database = database.record(
+        TestEntity::new(
+            0x33,
+            "ACME_Rack",
+            "libs/foundry/records/entities/scitem/ships/rack.xml",
+        )
+        .port(TestPort::new("nested"))
+        .record(),
+    );
+    let folder = tempfile::tempdir()?;
+    let path = folder.path().join("Data.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored("Data/Game2.dcb", database.build()).encrypted())
+        .entry(TestEntry::stored(
+            "Data/synthetic/shared.xml",
+            r#"<Loadout><Loadouts><Include loadout="synthetic/child.xml"/></Loadouts></Loadout>"#,
+        ))
+        .entry(
+            TestEntry::stored(
+                "Data/synthetic/child.xml",
+                r#"<Loadout><Items><Item portName="rack" itemName="ACME_Rack"/></Items></Loadout>"#,
+            )
+            .encrypted(),
+        )
+        .write_to(&path)?;
+    Ok((
+        folder,
+        Archive::open_with_key(path, Some(p4kx_testkit::test_key()))?,
+    ))
 }
 
 #[test]

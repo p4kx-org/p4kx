@@ -3,6 +3,8 @@
 
 use std::fmt::Display;
 use std::io::{self, Read, Write};
+use std::ops::Deref;
+use std::sync::Arc;
 
 use p4kx_archive::{Archive, Entry};
 use p4kx_extraction::{OriginDigestWriter, VerifiedEntryPayload};
@@ -16,7 +18,33 @@ const READ_BLOCK_BYTES: usize = 64 << 10;
 #[must_use]
 pub struct LoadoutFileRead {
     source: LoadoutFileSource,
-    outcome: Result<Vec<u8>, LoadoutFileError>,
+    outcome: Result<LoadoutFileBytes, LoadoutFileError>,
+}
+
+#[derive(Debug)]
+pub(crate) enum LoadoutFileBytes {
+    Owned(Vec<u8>),
+    Shared(Arc<Vec<u8>>),
+}
+
+impl LoadoutFileBytes {
+    fn into_vec(self) -> Vec<u8> {
+        match self {
+            Self::Owned(bytes) => bytes,
+            Self::Shared(bytes) => Arc::unwrap_or_clone(bytes),
+        }
+    }
+}
+
+impl Deref for LoadoutFileBytes {
+    type Target = [u8];
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Self::Owned(bytes) => bytes.as_slice(),
+            Self::Shared(bytes) => bytes.as_slice(),
+        }
+    }
 }
 
 impl LoadoutFileRead {
@@ -25,9 +53,16 @@ impl LoadoutFileRead {
         Self::new(LoadoutFileSource::unbound(path), outcome)
     }
 
-    pub(crate) const fn new(
+    pub(crate) fn new(
         source: LoadoutFileSource,
         outcome: Result<Vec<u8>, LoadoutFileError>,
+    ) -> Self {
+        Self::with_bytes(source, outcome.map(LoadoutFileBytes::Owned))
+    }
+
+    pub(crate) const fn with_bytes(
+        source: LoadoutFileSource,
+        outcome: Result<LoadoutFileBytes, LoadoutFileError>,
     ) -> Self {
         Self { source, outcome }
     }
@@ -104,11 +139,16 @@ impl LoadoutFileRead {
     ///
     /// Returns the original file-read failure.
     pub fn into_result(self) -> Result<Vec<u8>, LoadoutFileError> {
-        self.outcome
+        self.outcome.map(LoadoutFileBytes::into_vec)
     }
 
     /// Moves the unchanged source and its original outcome into the intrinsic reader.
-    pub(crate) fn into_parts(self) -> (LoadoutFileSource, Result<Vec<u8>, LoadoutFileError>) {
+    pub(crate) fn into_parts(
+        self,
+    ) -> (
+        LoadoutFileSource,
+        Result<LoadoutFileBytes, LoadoutFileError>,
+    ) {
         (self.source, self.outcome)
     }
 }

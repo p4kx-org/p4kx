@@ -3,7 +3,7 @@
 
 use std::sync::Arc;
 
-use p4kx_assembly::{ArchiveFiles, Entities, LoadoutResolver};
+use p4kx_assembly::{ArchiveFiles, Entities, LoadoutRecordReader, LoadoutResolver};
 use p4kx_extraction::{CancelToken, DataForge};
 
 use super::alignment::AlignmentLookup;
@@ -37,12 +37,19 @@ pub(crate) fn read_rows<'source>(
     if cancel.is_some_and(CancelToken::is_cancelled) {
         return Err(CatalogError::Cancelled);
     }
-    let ResolverEvidence { seed, alignment } = sources;
+    let ResolverEvidence {
+        seed,
+        alignment,
+        record_reader,
+    } = sources;
     let capture = Arc::new(Capture::for_input(input, seed, cancel, Kind::Loadouts));
     let mut resolver =
         LoadoutResolver::with_observed_entities(Arc::clone(entities), capture.clone())
             .with_files(files)
             .stopping_at_docked_vehicles();
+    if let Some(reader) = record_reader {
+        resolver = resolver.with_record_cache(reader);
+    }
     let mut reader = PortReader::with_alignment(alignment, files.archive());
     let failures = resolve_ordered(
         wanted,
@@ -76,6 +83,7 @@ pub(crate) struct SelectedSources<'rows, 'source> {
 pub(crate) struct ResolverEvidence<'scope> {
     pub(crate) seed: &'scope ExportLedger,
     pub(crate) alignment: &'scope mut dyn AlignmentLookup,
+    pub(crate) record_reader: Option<&'scope dyn LoadoutRecordReader>,
 }
 
 pub(super) fn resolve_ordered<'source>(

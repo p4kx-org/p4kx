@@ -17,11 +17,12 @@ use crate::plan::Plan;
 use crate::resolver_observation::{self, Cache, LoadoutReadEvent, Observation};
 use crate::resolver_vehicle::VehicleCacheKey;
 use crate::resolver_xml::XmlCache;
-use crate::spec::{EntitySpec, EntrySpec, LoadoutSpec, TargetSpec};
+use crate::spec::{EntitySpec, EntrySpec, LoadoutSpec};
 use crate::walk::Walk;
 use crate::{
     ChangeError, ChangedLoadout, Entities, EntityNode, ItemFacts, LandingGear, LoadoutChanges,
-    LoadoutError, LoadoutFiles, LoadoutXmlClassUse, VehicleImplementation, Wearable,
+    LoadoutError, LoadoutFiles, LoadoutRecordReader, LoadoutXmlClassUse, VehicleImplementation,
+    Wearable,
 };
 
 #[path = "resolver_specs.rs"]
@@ -67,6 +68,7 @@ pub struct LoadoutResolver<'f> {
     pub(crate) vehicles: HashMap<VehicleCacheKey, CachedDocument<VehicleResult>>,
     pub(crate) landing: HashMap<Guid, Result<Arc<[LandingGear]>, LoadoutError>>,
     pub(crate) builder: TreeBuilder<'f>,
+    pub(crate) record_cache: Option<&'f dyn LoadoutRecordReader>,
     pub(crate) observation: Option<Arc<Observation<'f>>>,
     pub(crate) read_sources: HashMap<(Cache, Guid), Record<'f>>,
     pub(crate) assortments: HashMap<Guid, Assorted>,
@@ -111,6 +113,7 @@ impl<'f> LoadoutResolver<'f> {
             vehicles: HashMap::new(),
             landing: HashMap::new(),
             builder: TreeBuilder::new(),
+            record_cache: None,
             observation: None,
             read_sources: HashMap::new(),
             assortments: HashMap::new(),
@@ -379,23 +382,5 @@ impl<'f> LoadoutResolver<'f> {
             Some(LoadoutSpec::Assortments(guids)) => Ok(self.assortment_entries(guids)),
             Some(LoadoutSpec::Xml(path)) => self.xml_entries(path),
         }
-    }
-
-    /// Returns the Record a target names, or `None` when there is none.
-    pub(crate) fn record_of(&self, target: &TargetSpec) -> Option<Record<'f>> {
-        match target {
-            TargetSpec::Reference(reference) => {
-                self.entities.forge().record_by_guid(reference.guid())
-            }
-            TargetSpec::ClassName(name) => self.entities.by_class_name(name.value()),
-            TargetSpec::None | TargetSpec::Invalid(_) => None,
-        }
-    }
-
-    /// Returns how many Records have been read into specs so far.
-    #[doc(hidden)]
-    #[must_use]
-    pub fn records_read(&self) -> usize {
-        self.specs.len()
     }
 }

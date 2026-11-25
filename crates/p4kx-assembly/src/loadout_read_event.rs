@@ -58,11 +58,11 @@ pub enum LoadoutReadEvent<'r, 'f> {
         /// The actual cycle or input-limit failure.
         error: &'r LoadoutError,
     },
-    /// A canonical dependency read completed before optional projection helpers run.
+    /// An original canonical dependency result was supplied to the current observer.
     CanonicalRead {
         /// The physical dependency Record.
         record: &'r Record<'f>,
-        /// The actual canonical result.
+        /// The complete canonical result, which can come from a shared Record cache.
         outcome: Result<&'r RecordTree<'f>, &'r DataForgeError>,
     },
     /// A caller supplied the canonical root tree instead of decoding it again.

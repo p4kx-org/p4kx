@@ -28,14 +28,10 @@ impl FileTrace {
         &mut self,
         source: LoadoutFileSource,
         kind: LoadoutDocumentKind,
-        outcome: &Result<Vec<u8>, LoadoutFileError>,
+        outcome: Result<(), &LoadoutFileError>,
         request: &LoadoutPath,
     ) -> LoadoutFileObservation {
-        let document = LoadoutFileObservation::new(
-            source,
-            kind,
-            outcome.as_ref().map(|_| ()).map_err(Clone::clone),
-        );
+        let document = LoadoutFileObservation::new(source, kind, outcome.map_err(Clone::clone));
         self.documents.push(CapturedDocument {
             observation: document.clone(),
             request: request.clone(),

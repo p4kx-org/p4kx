@@ -228,7 +228,11 @@ fn visit_owners<E: From<CatalogError>>(
     if !wanted.is_empty() {
         let locale = TextSources::read_languages(query.archive, &[])?;
         let texts = Texts::parse(&locale)?;
-        let inputs = ResolverInputs::new(query.archive, query.forge);
+        let inputs = if wanted.len() > 1 {
+            ResolverInputs::for_visit(query.archive, query.forge, query.cancel)?
+        } else {
+            ResolverInputs::new(query.archive, query.forge)
+        };
         for (_, want) in resolution::in_catalog_order(wanted.into_iter()) {
             checkpoint(query.cancel)?;
             let snapshot = read_owner(query, &inputs, &texts, want, &mut summary.coverage)?;
@@ -255,7 +259,7 @@ fn read_owner(
     let input = OriginalCatalogInput::new(query.forge, &origins);
     let registry = CatalogTextRegistry::default();
     let projection = CatalogProjection::new(texts, &input, &registry).for_kind(Kind::Loadouts);
-    let mut alignment = DirectAlignment::new(&projection, query.cancel);
+    let mut alignment = inputs.configure_alignment(DirectAlignment::new(&projection, query.cancel));
     let mut row = None;
     let dependencies = query.resolve_prepared_rows(
         &input,

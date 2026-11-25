@@ -2422,8 +2422,14 @@ parsed view's `visit_loadouts` method for a large owner selection. The visitor
 follows the canonical GUID order and preserves distinct physical Records and
 stable ties. It receives one admitted owner, the canonical row when resolution
 emits one, and the original source inventory and dependency diagnostics for that
-owner. The scan reuses the entity and XML directory indexes. It releases the
-owner's resolved row and source inventory before resolving the next owner.
+owner. The scan reuses the entity and XML directory indexes. Visits of multiple
+owners also reuse completed canonical Entity trees and decoded XML payloads
+from the same inputs. The per-visit cache keeps up to 2,048 Record trees within
+a 32 MiB estimated retained-tree budget and 256 XML payloads within 8 MiB of
+decoded byte capacity. Eviction permits a later read of the same input. Each
+owner still receives its own original source observations, file dependencies
+and alignment coverage. The visit releases the owner's resolved row and source
+inventory before resolving the next owner.
 
 The original visitor accepts the same all-owner, GUID and physical Record selections as
 `read_loadouts`. Use `visit_loadout_owners(LoadoutOwnerSelection::Ships, ...)` for Ship roots,
