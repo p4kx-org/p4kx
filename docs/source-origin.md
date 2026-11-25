@@ -382,8 +382,17 @@ incomplete while other layout, material, texture and animation inputs are unreso
 
 The `--json` report carries `fieldOrigins` and `provenance` for the fields of
 its `unknown_chunks` rows. The paths use the row number in the filtered report.
-A numeric type ID cites the original chunk table word in the archive Entry
-that supplied it. Loose model inputs report unknown origin.
+A numeric type ID cites the observed chunk-table word in its owning Archive
+Entry. Unbound chunk fields, including loose model inputs, report unknown origin.
+
+The same report identifies the selected Archive directory path at `/model`
+and the original model's library-name field at `/library/path`. Loaded
+material fields describe the observed MTL payload and the model selector
+used to find it. Resolved target and status fields keep partial evidence
+where lookup decisions are unavailable. A failed library read adds its
+attempted Entry to the inventory without assigning it to material values.
+Loose inputs use explicit unknown markers. The report's `materials` count
+describes what the GLB writer emitted.
 
 ## CHF GLB
 

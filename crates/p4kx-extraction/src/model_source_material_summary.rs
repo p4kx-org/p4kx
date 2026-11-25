@@ -9,6 +9,9 @@ use crate::{
     TextureVerdicts,
 };
 
+#[path = "model_source_library_report_origins.rs"]
+mod library_report;
+
 impl Coordinates {
     pub(super) const fn keeps_material_field(self, field: MaterialReadField) -> bool {
         use MaterialReadField::{LibraryDefaultPalette, LibrarySingle, LibraryTotal};
@@ -69,7 +72,7 @@ impl ModelSource {
             read.library.as_ref(),
             uses,
             library,
-            count,
+            Some(count),
         )
     }
 }

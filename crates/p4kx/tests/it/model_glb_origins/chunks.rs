@@ -1,15 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::error::Error;
 use std::fs;
 use std::ops::Range;
-use std::path::Path;
 
-use p4kx_testkit::{ArchiveBuilder, TestEntry, TestModel, test_key};
+use p4kx_testkit::{ArchiveBuilder, TestEntry, TestModel};
 use serde_json::{Value, json};
 
-use super::{BASE, MODEL, TestResult};
+use super::{BASE, MODEL, TestResult, field_origin, origin_row, report};
 
 const MODEL_UNKNOWN_TYPE: u32 = 0x00C0_FFEE;
 const GEOMETRY_UNKNOWN_TYPE: u32 = 0x00C0_FFEF;
@@ -59,21 +57,6 @@ fn model_bytes() -> (Vec<u8>, Vec<u8>) {
         .with_chunk(MODEL_UNKNOWN_TYPE, [7; 12])
         .with_geometry_chunk(GEOMETRY_UNKNOWN_TYPE, [8; 12]);
     (model.cgf(), model.cgfm())
-}
-
-fn report(input: &Path, entry: Option<&str>, output: &Path) -> Result<Value, Box<dyn Error>> {
-    let mut command = p4kx_testkit::p4kx()?;
-    command.arg("--json");
-    if entry.is_some() {
-        command.args(["--key", &test_key().to_hex()]);
-    }
-    command.args(["model", "glb"]).arg(input);
-    if let Some(entry) = entry {
-        command.arg(entry);
-    }
-    let result = command.arg("--out").arg(output).output()?;
-    assert!(result.status.success(), "standalone GLB report: {result:?}");
-    Ok(serde_json::from_slice(&result.stdout)?)
 }
 
 fn assert_emitted_chunks(report: &Value) {
@@ -162,19 +145,4 @@ fn assert_type_word(
         "decoded original word at {path}"
     );
     Ok(())
-}
-
-fn field_origin<'a>(report: &'a Value, path: &str) -> Result<&'a Value, Box<dyn Error>> {
-    report
-        .get("fieldOrigins")
-        .and_then(|fields| fields.get(path))
-        .ok_or_else(|| format!("missing field origin at {path}").into())
-}
-
-fn origin_row<'a>(report: &'a Value, path: &str, id: &Value) -> Result<&'a Value, Box<dyn Error>> {
-    report
-        .pointer(path)
-        .and_then(Value::as_array)
-        .and_then(|rows| rows.iter().find(|row| row.get("id") == Some(id)))
-        .ok_or_else(|| format!("unresolved origin {id} in {path}").into())
 }

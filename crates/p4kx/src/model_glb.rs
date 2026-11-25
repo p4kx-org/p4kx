@@ -48,22 +48,26 @@ struct GlbJson<'a> {
     animations: Vec<WrittenJson>,
     unread_animations: Vec<UnreadInfo>,
     #[serde(flatten)]
-    unknown_chunks: UnknownChunkReport,
+    origins: GlbReportOrigins,
 }
 
 #[derive(Serialize)]
-struct UnknownChunkReport {
+struct GlbReportOrigins {
     unknown_chunks: Vec<ChunkInfo>,
     #[serde(rename = "fieldOrigins")]
     field_origins: FieldOrigins,
     provenance: SourceInventory,
 }
 
-impl UnknownChunkReport {
+impl GlbReportOrigins {
     fn capture(source: &ModelSource) -> Result<Self> {
         let mut unknown_chunks = Vec::new();
-        let mut field_origins = FieldOrigins::new();
         let uses = SourceUses::with_compact_use_refs();
+        let mut field_origins = source.model_and_library_report_origins(
+            &uses,
+            &FieldPath::parse("/model")?,
+            &FieldPath::parse("/library")?,
+        )?;
         let mut path = FieldPath::parse("/unknown_chunks")?;
         for (row, (position, chunk)) in source.model().unknown_chunks_with_positions().enumerate() {
             path.push_index(row)?;
@@ -121,7 +125,11 @@ pub(crate) fn run(action: &ModelAction, as_json: bool) -> Result<()> {
     if let Some(entry) = &source.entry {
         let archive = crate::key::open(&source.path)?;
         let index = PathIndex::new(&archive);
-        let model = ModelSource::from_index_with(&index, entry, lods)?;
+        let model = if as_json {
+            ModelSource::from_index_with_drawn_material_summary_origins(&index, entry, lods)?
+        } else {
+            ModelSource::from_index_with(&index, entry, lods)?
+        };
         let found = archive_animations(&index, entry, source, choice.as_ref())?;
         let textures = ArchiveTextures::new(&index);
         let written =
@@ -305,6 +313,6 @@ fn glb_json<'a>(
         library: LibraryInfo::of(source.model()),
         animations: summary.animations.iter().map(WrittenJson::of).collect(),
         unread_animations: animations.unread.iter().map(UnreadInfo::of).collect(),
-        unknown_chunks: UnknownChunkReport::capture(source)?,
+        origins: GlbReportOrigins::capture(source)?,
     })
 }

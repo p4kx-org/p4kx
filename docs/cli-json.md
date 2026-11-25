@@ -3060,7 +3060,9 @@ file that is corrupt or not supported, an `--anim-from` one included, with 3.
 
 The `originReceipt` field names the digest-bound sibling origin companion. Both
 output modes publish the companion. The `fieldOrigins` and `provenance`
-members record the original fields of each `unknown_chunks` row. See
+members record the original model name, material library fields, and each
+`unknown_chunks` row. The material library evidence describes the loaded
+source. The `materials` count describes the written GLB. See
 [standalone model GLB origins](source-origin.md#standalone-model-glb).
 
 ## `p4kx extract … --json`

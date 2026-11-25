@@ -16,7 +16,7 @@ impl Observations {
         library_entry: Option<&EntryOrigin>,
         uses: &SourceUses,
         library_path: &FieldPath,
-        count_path: &FieldPath,
+        count_path: Option<&FieldPath>,
     ) -> Result<FieldOrigins, ConversionError> {
         use MaterialReadField::{LibraryDefaultPalette, LibrarySingle, LibraryTotal};
         let project = || {
@@ -36,7 +36,9 @@ impl Observations {
                 path.push_field(name)?;
                 output.put(path.as_str(), 0, &[original])?;
             }
-            output.put(count_path.as_str(), 0, &[LibraryTotal])?;
+            if let Some(count_path) = count_path {
+                output.put(count_path.as_str(), 0, &[LibraryTotal])?;
+            }
             let shared = uses.shared_origin(output.selector.as_slice(), output.complete);
             let mut path = library_path.clone();
             path.push_field("authored")?;

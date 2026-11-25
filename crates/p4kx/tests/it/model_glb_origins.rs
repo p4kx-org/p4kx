@@ -14,6 +14,7 @@ use p4kx_testkit::{
 use serde_json::Value;
 
 mod chunks;
+mod library;
 mod material;
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -280,4 +281,34 @@ fn original_range<'a, 'bytes>(
         .get(start..end)
         .ok_or("observed word lies in the selected Entry")?;
     Ok((use_row, bytes))
+}
+
+fn report(input: &Path, entry: Option<&str>, output: &Path) -> Result<Value, Box<dyn Error>> {
+    let mut command = p4kx_testkit::p4kx()?;
+    command.arg("--json");
+    if entry.is_some() {
+        command.args(["--key", &test_key().to_hex()]);
+    }
+    command.args(["model", "glb"]).arg(input);
+    if let Some(entry) = entry {
+        command.arg(entry);
+    }
+    let result = command.arg("--out").arg(output).output()?;
+    assert!(result.status.success(), "standalone GLB report: {result:?}");
+    Ok(serde_json::from_slice(&result.stdout)?)
+}
+
+fn field_origin<'a>(report: &'a Value, path: &str) -> Result<&'a Value, Box<dyn Error>> {
+    report
+        .get("fieldOrigins")
+        .and_then(|fields| fields.get(path))
+        .ok_or_else(|| format!("missing field origin at {path}").into())
+}
+
+fn origin_row<'a>(report: &'a Value, path: &str, id: &Value) -> Result<&'a Value, Box<dyn Error>> {
+    report
+        .pointer(path)
+        .and_then(Value::as_array)
+        .and_then(|rows| rows.iter().find(|row| row.get("id") == Some(id)))
+        .ok_or_else(|| format!("unresolved origin {id} in {path}").into())
 }
