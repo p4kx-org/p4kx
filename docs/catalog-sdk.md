@@ -2448,6 +2448,25 @@ committing a staged consumer result. Visitor errors and cancellation stop later
 callbacks. The session checks the bound Archive again before returning success.
 
 
+The Ship-scope verifier on installed LIVE `13220821` compared resolver input
+reuse on and off at signed revision `0ff026d07`. It ran fresh Windows AMD64
+processes with Rust 1.100.0, one Rayon worker and Marker provenance. It used
+the test profile with `p4kx-export` at optimization level 1 and `serde_json`
+at level 3. The operating system file cache was left in place.
+
+| Selection and input reuse | Elapsed s | Peak private bytes | Peak working-set bytes |
+| --- | ---: | ---: | ---: |
+| Ships with shared inputs | 899.546 | 1,091,772,416 | 1,024,266,240 |
+| Input reuse disabled by the verifier | 1,015.841 | 1,091,702,784 | 1,024,122,880 |
+| Ships and Items with shared inputs | 1,062.033 | 1,091,813,376 | 1,024,188,416 |
+
+Both runs delivered 1,033 Ship rows and reported complete owner dependency
+scopes. The canonical row, per-owner dependency and selection coverage
+digests matched. Both reported 67 incomplete field positions and 80 skipped
+leftovers. The broader visit admitted 10,955 owners and delivered 10,812 rows.
+Its 1,033 Ship rows and their owner dependency digests matched the Ship
+selection.
+
 On installed LIVE `13220821`, the signed `be4719c55` debug verifier ran each
 selection in a fresh Windows AMD64 process. The GUID and physical Record index
 selected the same one-row owner with 30 source uses from one physical source.
