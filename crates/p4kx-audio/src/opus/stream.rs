@@ -8,6 +8,7 @@ use super::header::{self, StreamHeader};
 use super::packets;
 use super::{OPUS_RATE, OpusError};
 use crate::loops::insert_comments;
+use crate::ogg::WrittenOgg;
 use crate::{AudioError, Codec, Loop, OggReport, OggWriter};
 
 const SERIAL: u32 = 0x5034_4B4F;
@@ -96,7 +97,7 @@ pub(super) fn write<S: PacketSource>(
     source: &mut S,
     points: Option<Loop>,
     out: &mut (impl Write + ?Sized),
-) -> Result<OggReport, WriteError<S::Error>> {
+) -> Result<WrittenOgg, WriteError<S::Error>> {
     let mut ogg = OggWriter::new(out, SERIAL);
     let mut packet = Vec::new();
     match &header.head {
@@ -105,6 +106,7 @@ pub(super) fn write<S: PacketSource>(
     }
     ogg.write_packet(&packet, 0).map_err(WriteError::Output)?;
     ogg.end_page().map_err(WriteError::Output)?;
+    let identification_end = ogg.written_len();
     packet.clear();
     let points = points.filter(|points| points.fits(count.frames));
     let loop_points = if let Some(tags) = &header.tags {
@@ -116,6 +118,7 @@ pub(super) fn write<S: PacketSource>(
     };
     ogg.write_packet(&packet, 0).map_err(WriteError::Output)?;
     ogg.end_page().map_err(WriteError::Output)?;
+    let header_end = ogg.written_len();
     let end = count.granule_end();
     let mut granule = 0_u64;
     let mut index = 0;
@@ -141,7 +144,7 @@ pub(super) fn write<S: PacketSource>(
         index += 1;
     }
     let size = ogg.finish().map_err(WriteError::Output)?;
-    Ok(OggReport {
+    let report = OggReport {
         codec: Codec::Opus,
         channels: u16::try_from(header.layout.mapping.len()).unwrap_or(u16::MAX),
         sample_rate: OPUS_RATE,
@@ -149,5 +152,6 @@ pub(super) fn write<S: PacketSource>(
         size,
         codebooks: None,
         loop_points,
-    })
+    };
+    Ok(WrittenOgg::new(report, identification_end, header_end))
 }

@@ -9,7 +9,7 @@ use lewton::samples::InterleavedSamples;
 
 use super::VorbisError;
 use super::header::Header;
-use super::stream::{AudioRead, AudioSource, Headers, StreamError};
+use super::stream::{AudioPass, AudioRead, AudioSource, Headers, StreamError};
 use crate::{AudioError, WavReport, Wem};
 
 const PANICKED: &str = "the decoder failed";
@@ -39,7 +39,7 @@ impl Headers {
     ) -> Result<usize, StreamError<S::InputError>> {
         let channels = usize::from(header.channels).max(1);
         let decoder = &self.decoder;
-        let mut audio = source.audio(header, &self.setup);
+        let mut audio = source.audio(header, &self.setup, AudioPass::Replay);
         let mut window = PreviousWindowRight::new();
         let mut packet = Vec::new();
         let mut bytes = Vec::new();

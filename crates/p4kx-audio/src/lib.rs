@@ -271,15 +271,16 @@ pub use hirc_switch_container::{BankSwitchContainerFields, BankSwitchExtent};
 pub use hirc_voice_property::VoiceProperty;
 pub use loops::Loop;
 pub use media_class::{BankDeclaredLengthSource, BankMediaClassSource, MediaClass};
-pub use ogg::OggWriter;
+pub use ogg::{OggOutputRanges, OggWriter};
 pub use opus::{
-    OpusError, WemOpusOgg, WemOpusRanges, WemOpusWav, WemOpusWavEvidence, WemOpusWriteError,
+    EmbeddedOpusHeaderPages, OpusError, SwitchOpusPreSkip, WemOpusOgg, WemOpusOggEvidence,
+    WemOpusRanges, WemOpusWav, WemOpusWavEvidence, WemOpusWriteError,
 };
 pub use riff::{ByteOrder, WemSourceChunk};
 pub use soundbank::{BankHeader, EmbeddedWem, EmbeddedWemSource, Section, Soundbank};
 pub use vorbis::{
-    Codebooks, OggReport, VorbisError, WemVorbisOgg, WemVorbisRanges, WemVorbisWav,
-    WemVorbisWavEvidence, WemVorbisWriteError,
+    Codebooks, OggReport, VorbisError, WemVorbisOgg, WemVorbisOggEvidence, WemVorbisRanges,
+    WemVorbisWav, WemVorbisWavEvidence, WemVorbisWriteError,
 };
 pub use wav::{LinearWavWrite, WavOutputRanges, WavReport};
 pub use wem::{Wem, WemChunk};

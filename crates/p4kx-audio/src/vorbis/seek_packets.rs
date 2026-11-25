@@ -8,7 +8,7 @@ use super::VorbisError;
 use super::header::Header;
 use super::packets::{PACKET_HEADER_LEN, Packet, PacketRebuild, Rebuilt, payload_range};
 use super::setup::Setup;
-use super::stream::{AudioRead, AudioSource, StreamError};
+use super::stream::{AudioPass, AudioRead, AudioSource, StreamError};
 use crate::ByteOrder;
 use crate::read_at::SeekSource;
 
@@ -16,6 +16,7 @@ pub(super) struct SeekAudio<'source, R> {
     pub(super) input: &'source mut SeekSource<R>,
     pub(super) data: Range<u64>,
     pub(super) order: ByteOrder,
+    pub(super) codebook_end: usize,
     pub(super) replayed_end: usize,
 }
 
@@ -51,8 +52,15 @@ impl<R: Read + Seek> AudioSource for SeekAudio<'_, R> {
         &'a mut self,
         header: &'a Header,
         setup: &'a Setup,
+        pass: AudioPass,
     ) -> impl AudioRead<Self::InputError> + 'a {
-        self.replayed_end = header.audio_offset;
+        let observed_end = match pass {
+            AudioPass::CodebookSelection => &mut self.codebook_end,
+            AudioPass::Replay => {
+                self.replayed_end = header.audio_offset;
+                &mut self.replayed_end
+            }
+        };
         SeekRebuilt {
             packets: SeekPackets::new(
                 self.input,
@@ -60,7 +68,7 @@ impl<R: Read + Seek> AudioSource for SeekAudio<'_, R> {
                 self.order,
                 header.audio_offset,
             ),
-            replayed_end: &mut self.replayed_end,
+            observed_end,
             rebuild: PacketRebuild::new(header, &setup.long_modes),
             current: Vec::new(),
             next: Vec::new(),
@@ -146,7 +154,7 @@ impl<'source, R: Read + Seek> SeekPackets<'source, R> {
 
 struct SeekRebuilt<'a, R> {
     packets: SeekPackets<'a, R>,
-    replayed_end: &'a mut usize,
+    observed_end: &'a mut usize,
     rebuild: PacketRebuild<'a>,
     current: Vec<u8>,
     next: Vec<u8>,
@@ -167,10 +175,11 @@ impl<R: Read + Seek> AudioRead<io::Error> for SeekRebuilt<'_, R> {
             self.packets.next_nonempty(&mut self.current)?
         };
         let Some(offset) = current_offset else {
+            *self.observed_end = (*self.observed_end).max(self.packets.offset);
             return Ok(None);
         };
         self.next_offset = self.packets.next_nonempty(&mut self.next)?;
-        *self.replayed_end = self.packets.offset;
+        *self.observed_end = (*self.observed_end).max(self.packets.offset);
         let current = Packet {
             offset,
             payload: &self.current,

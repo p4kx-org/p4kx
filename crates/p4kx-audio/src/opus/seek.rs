@@ -7,16 +7,17 @@ use std::ops::Range;
 use thiserror::Error;
 
 use super::OpusError;
-use super::header::{Format, SWITCH_FMT_LEN, StreamHeader};
+use super::header::{EmbeddedOpusHeaderPages, Format, SWITCH_FMT_LEN, StreamHeader};
 use super::pcm;
-use super::seek_packets::{Binding, Framing};
+use super::seek_packets::{Binding, Framing, SwitchOpusPreSkip};
 use super::stream::{self, PacketCount, PacketSource, WriteError};
+use crate::ogg::WrittenOgg;
 use crate::read_at::{ReadAt, SeekSource};
 use crate::riff::RiffHeader;
 use crate::wem_metadata_read::selected_chunks;
 use crate::{
-    AudioError, Codec, OggReport, WavOutputRanges, WavReport, WemMetadata, WemReadError,
-    WemSourceChunk,
+    AudioError, Codec, OggOutputRanges, OggReport, WavOutputRanges, WavReport, WemMetadata,
+    WemReadError, WemSourceChunk,
 };
 
 /// Original WEM-relative ranges used for a seekable Opus conversion.
@@ -33,6 +34,26 @@ pub struct WemOpusRanges {
     pub checked_data: Range<u64>,
     /// Checked prefix containing every emitted packet, including source framing or page bytes.
     pub emitted_data: Range<u64>,
+}
+
+/// Original source ranges and output layout of a successful Ogg Opus write.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct WemOpusOggEvidence {
+    /// Codec, layout, duration and size of the written Ogg stream.
+    pub report: OggReport,
+    /// Complete output page ranges.
+    pub output: OggOutputRanges,
+    /// Checked input extents selected during preparation.
+    pub ranges: WemOpusRanges,
+    /// Original seek-table size words read during Ogg replay, when present.
+    pub replayed_seek_table: Option<Range<u64>>,
+    /// Checked original embedded identification and comment page ranges, when present.
+    pub embedded_header_pages: Option<EmbeddedOpusHeaderPages>,
+    /// Original first-packet header inputs when Switch pre-skip was inferred.
+    pub switch_pre_skip: Option<SwitchOpusPreSkip>,
+    /// WEM-relative original audio packet bytes replayed, including framing or full checked pages.
+    pub replayed_audio_packets: Range<u64>,
 }
 
 /// Original source ranges and output layout of a successful Opus WAV write.
@@ -59,7 +80,7 @@ pub enum WemOpusWriteError {
     /// The converted bytes could not be written.
     #[error("cannot write the converted Opus audio")]
     Output(#[source] io::Error),
-    /// PCM replay consumed a different original packet extent than preparation selected.
+    /// Replay consumed a different original packet extent than preparation selected.
     #[error("Opus replay used {actual} packet bytes, expected {expected}")]
     ReplayRangeChanged {
         /// Number of bytes selected during preparation.
@@ -95,6 +116,8 @@ struct PreparedOpus<'source, R> {
     header: StreamHeader,
     count: PacketCount,
     ranges: WemOpusRanges,
+    embedded_header_pages: Option<EmbeddedOpusHeaderPages>,
+    switch_pre_skip: Option<SwitchOpusPreSkip>,
 }
 
 impl<R> WemOpusOgg<'_, R> {
@@ -122,16 +145,61 @@ impl<R: Read + Seek> WemOpusOgg<'_, R> {
     ///
     /// # Errors
     /// Returns original input or sink failure. A failure can leave the sink partially written.
-    pub fn write(self, output: &mut (impl Write + ?Sized)) -> Result<OggReport, WemOpusWriteError> {
-        let source = self.0;
-        let mut packets = source.binding.audio_packets(source.input)?;
-        Ok(stream::write(
-            &source.header,
-            &source.count,
+    pub fn write(
+        mut self,
+        output: &mut (impl Write + ?Sized),
+    ) -> Result<OggReport, WemOpusWriteError> {
+        self.0.write_ogg(output).map(|(written, _)| written.report)
+    }
+
+    /// Writes the Ogg stream and returns exact input and output extents.
+    ///
+    /// # Errors
+    /// Returns original input, changed replay extent or sink failure. A failure can leave the sink
+    /// partially written.
+    pub fn write_with_evidence(
+        mut self,
+        output: &mut (impl Write + ?Sized),
+    ) -> Result<WemOpusOggEvidence, WemOpusWriteError> {
+        let source = &mut self.0;
+        let (written, replay) = source.write_ogg(output)?;
+        check_replay_extent(source.count.emitted_end, replay.data.end)?;
+        let data_start = source.binding.data.start;
+        Ok(WemOpusOggEvidence {
+            report: written.report,
+            output: written.output,
+            ranges: self.0.ranges,
+            embedded_header_pages: self.0.embedded_header_pages,
+            switch_pre_skip: self.0.switch_pre_skip,
+            replayed_seek_table: replay.seek_table,
+            replayed_audio_packets: data_start + replay.data.start..data_start + replay.data.end,
+        })
+    }
+}
+
+struct OggReplay {
+    data: Range<u64>,
+    seek_table: Option<Range<u64>>,
+}
+
+impl<R: Read + Seek> PreparedOpus<'_, R> {
+    fn write_ogg(
+        &mut self,
+        output: &mut (impl Write + ?Sized),
+    ) -> Result<(WrittenOgg, OggReplay), WemOpusWriteError> {
+        let mut packets = self.binding.audio_packets(self.input)?;
+        let written = stream::write(
+            &self.header,
+            &self.count,
             &mut packets,
-            source.metadata.loop_points(),
+            self.metadata.loop_points(),
             output,
-        )?)
+        )?;
+        let replay = OggReplay {
+            data: packets.replayed_audio_start()..packets.checked_end(),
+            seek_table: packets.replayed_seek_table(self.ranges.seek_table.as_ref()),
+        };
+        Ok((written, replay))
     }
 }
 
@@ -178,17 +246,8 @@ impl<R: Read + Seek> WemOpusWav<'_, R> {
             .write_all(&self.wav_header)
             .map_err(WemOpusWriteError::Output)?;
         pcm::write(&source.header, &source.count, &mut packets, output)?;
-        let actual = packets.checked_end();
-        let expected = source.count.emitted_end;
-        if actual != expected {
-            return Err(WemOpusWriteError::ReplayRangeChanged { expected, actual });
-        }
-        let replayed_seek_table = source
-            .ranges
-            .seek_table
-            .as_ref()
-            .zip(packets.checked_seek_end())
-            .map(|(range, end)| range.start..end);
+        check_replay_extent(source.count.emitted_end, packets.checked_end())?;
+        let replayed_seek_table = packets.replayed_seek_table(source.ranges.seek_table.as_ref());
         Ok(WemOpusWavEvidence {
             report: self.report,
             output: WavOutputRanges::new(self.wav_header.len(), self.report),
@@ -196,6 +255,13 @@ impl<R: Read + Seek> WemOpusWav<'_, R> {
             replayed_seek_table,
         })
     }
+}
+
+const fn check_replay_extent(expected: u64, actual: u64) -> Result<(), WemOpusWriteError> {
+    if actual != expected {
+        return Err(WemOpusWriteError::ReplayRangeChanged { expected, actual });
+    }
+    Ok(())
 }
 
 pub(crate) fn prepare_ogg<'source, R: Read + Seek>(
@@ -258,16 +324,18 @@ fn prepare<'source, R: Read + Seek>(
         Format::Ogg { declared } => (None, None, declared),
     };
     let mut packets = binding.packets(input);
-    let (header, embedded_headers) = if let Some(header) = header {
+    let start = binding.data.start;
+    let (header, embedded_header_pages) = if let Some(header) = header {
         (header, None)
     } else {
-        let header = packets.embedded(metadata.channels(), declared)?;
-        let end = binding.data.start + packets.checked_end();
-        (header, Some(binding.data.start..end))
+        let (header, pages) = packets.embedded(metadata.channels(), declared)?;
+        (header, Some(pages.at(start)))
     };
+    let embedded_headers = embedded_header_pages
+        .as_ref()
+        .map(|_| start..start + packets.checked_end());
     header.check_channels(metadata.channels())?;
     let count = PacketCount::read(&header, &mut packets)?;
-    let start = binding.data.start;
     let ranges = WemOpusRanges {
         format,
         seek_table,
@@ -275,6 +343,7 @@ fn prepare<'source, R: Read + Seek>(
         checked_data: start..start + packets.checked_end(),
         emitted_data: start..start + count.emitted_end,
     };
+    let switch_pre_skip = packets.switch_pre_skip();
     Ok(PreparedOpus {
         input,
         metadata,
@@ -282,6 +351,8 @@ fn prepare<'source, R: Read + Seek>(
         header,
         count,
         ranges,
+        embedded_header_pages,
+        switch_pre_skip,
     })
 }
 

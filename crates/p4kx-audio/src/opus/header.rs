@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
+
 use super::layout::Layout;
 use super::ogg_read::{OggPackets, PageSource};
 use super::packets::{Framing, PACKET_SIZE_LEN};
@@ -30,6 +32,28 @@ pub(super) struct StreamHeader {
     pub(super) head: Option<Vec<u8>>,
     pub(super) tags: Option<Vec<u8>>,
     pub(super) output_gain: i16,
+}
+
+/// Checked original WEM page ranges of the embedded Opus header packets.
+///
+/// Each range includes the full CRC-checked pages and may overlap the other.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct EmbeddedOpusHeaderPages {
+    /// Pages containing the original identification packet.
+    pub identification: Range<u64>,
+    /// Pages containing the original comment packet.
+    pub comments: Range<u64>,
+}
+
+impl EmbeddedOpusHeaderPages {
+    pub(super) fn at(self, offset: u64) -> Self {
+        let absolute = |range: Range<u64>| offset + range.start..offset + range.end;
+        Self {
+            identification: absolute(self.identification),
+            comments: absolute(self.comments),
+        }
+    }
 }
 
 pub(super) enum Format {
@@ -186,7 +210,8 @@ impl<'a> Header<'a> {
                 (packets, Framing::Switch, info)
             }
             Format::Ogg { declared } => {
-                let info = StreamHeader::embedded(&mut OggPackets::new(data), channels, declared)?;
+                let (info, _) =
+                    StreamHeader::embedded(&mut OggPackets::new(data), channels, declared)?;
                 (data, Framing::Ogg, info)
             }
         };
@@ -215,31 +240,40 @@ impl StreamHeader {
         packets: &mut OggPackets<S>,
         channels: u16,
         declared: Option<u64>,
-    ) -> Result<Self, S::Error> {
+    ) -> Result<(Self, EmbeddedOpusHeaderPages), S::Error> {
         let head = packets
-            .next_packet()?
-            .ok_or(OpusError::InvalidOgg("the OpusHead packet is missing"))?
-            .to_vec();
+            .next_packet_with_pages()?
+            .ok_or(OpusError::InvalidOgg("the OpusHead packet is missing"))?;
+        let identification = head.pages;
+        let head = head.bytes.to_vec();
         let (pre_skip, layout) = read_head(&head, channels)?;
         let output_gain = head
             .get(16..18)
             .and_then(<[u8]>::first_chunk::<2>)
             .map_or(0, |gain| i16::from_le_bytes(*gain));
         let tags = packets
-            .next_packet()?
-            .ok_or(OpusError::InvalidOgg("the OpusTags packet is missing"))?
-            .to_vec();
+            .next_packet_with_pages()?
+            .ok_or(OpusError::InvalidOgg("the OpusTags packet is missing"))?;
+        let comments = tags.pages;
+        let tags = tags.bytes.to_vec();
         if !tags.starts_with(b"OpusTags") {
             return Err(OpusError::InvalidOgg("the OpusTags packet is missing").into());
         }
-        Ok(Self {
+        let header = Self {
             layout,
             pre_skip: Some(pre_skip),
             declared,
             head: Some(head),
             tags: Some(tags),
             output_gain,
-        })
+        };
+        Ok((
+            header,
+            EmbeddedOpusHeaderPages {
+                identification,
+                comments,
+            },
+        ))
     }
 
     pub(super) fn check_channels(&self, channels: u16) -> Result<(), OpusError> {

@@ -2,6 +2,9 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::io::{self, Write};
+use std::ops::Range;
+
+use crate::OggReport;
 
 const PAGE_TARGET: usize = 4096;
 const MAX_SEGMENTS: usize = 255;
@@ -12,6 +15,36 @@ const FLAG_FIRST: u8 = 0x02;
 const FLAG_LAST: u8 = 0x04;
 const NO_GRANULE: u64 = u64::MAX;
 const CRC_TABLE: [u32; 256] = crc_table();
+
+/// Complete Ogg page groups, relative to the beginning of the converted stream.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct OggOutputRanges {
+    /// Pages containing the identification packet.
+    pub identification: Range<u64>,
+    /// Pages containing the comment packet and any setup packet.
+    pub comments_and_setup: Range<u64>,
+    /// Audio pages including the end-of-stream page.
+    pub audio: Range<u64>,
+}
+
+pub(crate) struct WrittenOgg {
+    pub(crate) report: OggReport,
+    pub(crate) output: OggOutputRanges,
+}
+
+impl WrittenOgg {
+    pub(crate) const fn new(report: OggReport, identification_end: u64, header_end: u64) -> Self {
+        Self {
+            output: OggOutputRanges {
+                identification: 0..identification_end,
+                comments_and_setup: identification_end..header_end,
+                audio: header_end..report.size,
+            },
+            report,
+        }
+    }
+}
 
 /// Writes packets of one logical bitstream as Ogg pages: pages of about 4 KiB, packets split
 /// across pages where needed, the first page marked BOS and the last EOS.
@@ -102,6 +135,10 @@ impl<W: Write> OggWriter<W> {
         self.write_page(true)?;
         self.out.flush()?;
         Ok(self.written)
+    }
+
+    pub(crate) const fn written_len(&self) -> u64 {
+        self.written
     }
 
     fn push_segment(&mut self, segment: &[u8]) {

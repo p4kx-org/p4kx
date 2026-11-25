@@ -20,14 +20,15 @@ use std::time::Duration;
 pub use codebook::Codebooks;
 pub use error::VorbisError;
 pub use seek::{
-    WemVorbisOgg, WemVorbisRanges, WemVorbisWav, WemVorbisWavEvidence, WemVorbisWriteError,
+    WemVorbisOgg, WemVorbisOggEvidence, WemVorbisRanges, WemVorbisWav, WemVorbisWavEvidence,
+    WemVorbisWriteError,
 };
 pub(crate) use seek::{prepare_ogg, prepare_wav};
 
 use self::header::Header;
 use self::packets::{AudioPackets, Packets, Rebuilt};
 use self::setup::Setup;
-use self::stream::{AudioRead, AudioSource, Headers, StreamError};
+use self::stream::{AudioPass, AudioRead, AudioSource, Headers, StreamError};
 use crate::riff::{Chunk, Chunks};
 use crate::wem::playing_time;
 use crate::{AudioError, ByteOrder, Codec, Loop, Wem};
@@ -117,6 +118,7 @@ impl<B: AsRef<[u8]>> Wem<B> {
         sound
             .headers
             .write(&mut stream.source(), &stream.header, out)
+            .map(|written| written.report)
             .map_err(StreamError::into_audio)
     }
 
@@ -197,6 +199,7 @@ impl AudioSource for SliceAudio<'_> {
         &'a mut self,
         header: &'a Header,
         setup: &'a Setup,
+        _pass: AudioPass,
     ) -> impl AudioRead<Self::InputError> + 'a {
         AudioPackets::new(self.data, self.order, header, &setup.long_modes)
     }

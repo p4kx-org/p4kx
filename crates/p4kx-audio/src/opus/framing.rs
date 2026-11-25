@@ -7,6 +7,7 @@ use std::ops::Range;
 pub(crate) const MAX_PACKET_SAMPLES: u32 = 5760;
 const MAX_FRAME_LEN: usize = 1275;
 const MAX_OPUS_FRAMES: u8 = 48;
+const FRAME_COUNT_FOLLOWS: u8 = 3;
 /// The largest packet a WEM may hold, Ogg-framed or not.
 pub(crate) const MAX_PACKET_LEN: usize = 1 << 16;
 
@@ -16,8 +17,8 @@ pub(crate) fn packet_samples(packet: &[u8]) -> Result<u32, &'static str> {
     let &toc = packet.first().ok_or("the packet is empty")?;
     let frames = match toc & 0x03 {
         0 => 1,
-        1 | 2 => 2,
-        _ => u32::from(packet.get(1).ok_or("the frame count is missing")? & 0x3F),
+        FRAME_COUNT_FOLLOWS => u32::from(packet.get(1).ok_or("the frame count is missing")? & 0x3F),
+        _ => 2,
     };
     if frames == 0 {
         return Err("the packet holds no frame");
@@ -27,6 +28,14 @@ pub(crate) fn packet_samples(packet: &[u8]) -> Result<u32, &'static str> {
         return Err("the packet is longer than 120 ms");
     }
     Ok(samples)
+}
+
+pub(super) const fn duration_header_len(toc: u8) -> u64 {
+    if toc & 0x03 == FRAME_COUNT_FOLLOWS {
+        2
+    } else {
+        1
+    }
 }
 
 const fn frame_samples(toc: u8) -> u32 {

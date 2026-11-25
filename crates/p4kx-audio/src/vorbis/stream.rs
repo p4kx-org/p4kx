@@ -9,6 +9,7 @@ use super::packets::Rebuilt;
 use super::setup::{self, Setup};
 use super::validate::{self, Decoder, Fit};
 use super::{Codebooks, OggReport, VorbisError};
+use crate::ogg::WrittenOgg;
 use crate::{AudioError, Codec, Loop, OggWriter};
 
 const SERIAL: u32 = 0x5034_4B58;
@@ -38,6 +39,11 @@ pub(super) trait AudioRead<E> {
     fn next_packet(&mut self, out: &mut Vec<u8>) -> Result<Option<Rebuilt>, StreamError<E>>;
 }
 
+pub(super) enum AudioPass {
+    CodebookSelection,
+    Replay,
+}
+
 pub(super) trait AudioSource {
     type InputError;
 
@@ -45,6 +51,7 @@ pub(super) trait AudioSource {
         &'a mut self,
         header: &'a Header,
         setup: &'a Setup,
+        pass: AudioPass,
     ) -> impl AudioRead<Self::InputError> + 'a;
 }
 
@@ -82,11 +89,11 @@ impl Headers {
                 &ident,
                 &comment,
                 &setup_header,
-                source.audio(header, &setup),
+                source.audio(header, &setup, AudioPass::CodebookSelection),
             )?;
             Ok((setup, fit, decoder))
         })?;
-        let extent = audio_extent(header, source.audio(header, &setup))?;
+        let extent = audio_extent(header, source.audio(header, &setup, AudioPass::Replay))?;
         let sample_count = extent.sample_count;
         let loop_points = loop_points.filter(|points| points.fits(sample_count));
         if loop_points.is_some() {
@@ -110,16 +117,18 @@ impl Headers {
         source: &mut S,
         header: &Header,
         out: &mut (impl Write + ?Sized),
-    ) -> Result<OggReport, StreamError<S::InputError>> {
+    ) -> Result<WrittenOgg, StreamError<S::InputError>> {
         let mut ogg = OggWriter::new(out, SERIAL);
         let output = |error| StreamError::Audio(AudioError::Write(error));
         ogg.write_packet(&self.ident, 0).map_err(output)?;
         ogg.end_page().map_err(output)?;
+        let identification_end = ogg.written_len();
         ogg.write_packet(&self.comment, 0).map_err(output)?;
         ogg.write_packet(&self.setup_header, 0).map_err(output)?;
         ogg.end_page().map_err(output)?;
+        let header_end = ogg.written_len();
 
-        let mut audio = source.audio(header, &self.setup);
+        let mut audio = source.audio(header, &self.setup, AudioPass::Replay);
         let mut packet = Vec::new();
         let mut previous = 0;
         let mut granule = 0;
@@ -134,7 +143,7 @@ impl Headers {
             previous = rebuilt.granule;
         }
         let size = ogg.finish().map_err(output)?;
-        Ok(OggReport {
+        let report = OggReport {
             codec: Codec::Vorbis,
             channels: u16::from(header.channels),
             sample_rate: header.sample_rate,
@@ -142,7 +151,8 @@ impl Headers {
             size,
             codebooks: Some(self.codebooks),
             loop_points: self.loop_points,
-        })
+        };
+        Ok(WrittenOgg::new(report, identification_end, header_end))
     }
 }
 

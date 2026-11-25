@@ -10,10 +10,11 @@ use super::OggReport;
 use super::header::{self, AVERAGE_BYTES_OFFSET, Header, VORB_LEN};
 use super::seek_packets::SeekAudio;
 use super::stream::{Headers, StreamError};
+use crate::ogg::WrittenOgg;
 use crate::read_at::{ReadAt, SeekSource};
 use crate::riff::RiffHeader;
 use crate::wem_metadata_read::selected_chunks;
-use crate::{AudioError, Codec, WemMetadata, WemReadError};
+use crate::{AudioError, Codec, OggOutputRanges, WemMetadata, WemReadError};
 
 #[path = "seek_wav.rs"]
 mod wav;
@@ -35,6 +36,22 @@ pub struct WemVorbisRanges {
     pub audio_packets: Range<u64>,
 }
 
+/// Original source ranges and output layout of a successful Ogg Vorbis write.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct WemVorbisOggEvidence {
+    /// Codec, layout, duration and size of the written Ogg stream.
+    pub report: OggReport,
+    /// Complete output page ranges.
+    pub output: OggOutputRanges,
+    /// Checked input extents selected during preparation.
+    pub ranges: WemVorbisRanges,
+    /// Original packet prefix read across codebook selection attempts, including lookahead.
+    pub codebook_audio_packets: Range<u64>,
+    /// Original packet range read during the Ogg write, including framing and lookahead.
+    pub replayed_audio_packets: Range<u64>,
+}
+
 /// Failure during a prepared seekable Vorbis write.
 #[derive(Debug, Error)]
 #[non_exhaustive]
@@ -48,7 +65,7 @@ pub enum WemVorbisWriteError {
     /// The converted bytes could not be written.
     #[error("cannot write the converted Vorbis audio")]
     Output(#[source] io::Error),
-    /// PCM replay used a different packet range from the prepared source.
+    /// Replay used a different packet range from the prepared source.
     #[error("Vorbis replay ended at WEM byte {actual}, expected {expected}")]
     ReplayRangeChanged {
         /// Expected exclusive end in source-relative bytes.
@@ -108,10 +125,42 @@ impl<R: Read + Seek> WemVorbisOgg<'_, R> {
         mut self,
         output: &mut (impl Write + ?Sized),
     ) -> Result<OggReport, WemVorbisWriteError> {
-        let prepared = &mut self.0;
-        Ok(prepared
-            .headers
-            .write(&mut prepared.source, &prepared.header, output)?)
+        self.0.write_ogg(output).map(|written| written.report)
+    }
+
+    /// Writes the Ogg stream and returns exact input and output extents.
+    ///
+    /// # Errors
+    /// Returns original input, format, changed replay extent or sink failure. The sink can be
+    /// partially written.
+    pub fn write_with_evidence(
+        mut self,
+        output: &mut (impl Write + ?Sized),
+    ) -> Result<WemVorbisOggEvidence, WemVorbisWriteError> {
+        let written = self.0.write_ogg(output)?;
+        let source = self.0.source;
+        let audio_start = self.0.ranges.audio_packets.start;
+        let actual = source.data.start + source.replayed_end as u64;
+        let expected = self.0.ranges.audio_packets.end;
+        if actual != expected {
+            return Err(WemVorbisWriteError::ReplayRangeChanged { expected, actual });
+        }
+        Ok(WemVorbisOggEvidence {
+            report: written.report,
+            output: written.output,
+            ranges: self.0.ranges,
+            codebook_audio_packets: audio_start..source.data.start + source.codebook_end as u64,
+            replayed_audio_packets: audio_start..actual,
+        })
+    }
+}
+
+impl<R: Read + Seek> PreparedVorbis<'_, R> {
+    fn write_ogg(
+        &mut self,
+        output: &mut (impl Write + ?Sized),
+    ) -> Result<WrittenOgg, WemVorbisWriteError> {
+        Ok(self.headers.write(&mut self.source, &self.header, output)?)
     }
 }
 
@@ -141,6 +190,7 @@ fn prepare<'source, R: Read + Seek>(
         input,
         data: data.body_offset..data.body_end_exclusive(),
         order: riff.order,
+        codebook_end: header.audio_offset,
         replayed_end: header.audio_offset,
     };
     let mut setup = Vec::new();

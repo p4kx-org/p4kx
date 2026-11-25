@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
+
 use super::OpusError;
 use super::framing::MAX_PACKET_LEN;
 use crate::ogg::crc_update;
@@ -28,10 +30,16 @@ pub(super) trait PageSource {
     fn page(&self) -> &[u8];
 }
 
+pub(super) struct PagePacket<'a> {
+    pub(super) bytes: &'a [u8],
+    pub(super) pages: Range<u64>,
+}
+
 /// Checked packets from one logical Ogg stream, with one reusable assembly buffer.
 pub(super) struct OggPackets<S> {
     source: S,
     next_page: u64,
+    packet_page_start: u64,
     segments: usize,
     segment: usize,
     body_offset: usize,
@@ -52,6 +60,7 @@ impl<S: PageSource> OggPackets<S> {
         Self {
             source,
             next_page: 0,
+            packet_page_start: 0,
             segments: 0,
             segment: 0,
             body_offset: 0,
@@ -67,6 +76,10 @@ impl<S: PageSource> OggPackets<S> {
     }
 
     pub(super) fn next_packet(&mut self) -> Result<Option<&[u8]>, S::Error> {
+        Ok(self.next_packet_with_pages()?.map(|packet| packet.bytes))
+    }
+
+    pub(super) fn next_packet_with_pages(&mut self) -> Result<Option<PagePacket<'_>>, S::Error> {
         if !self.open {
             self.packet.clear();
         }
@@ -85,12 +98,18 @@ impl<S: PageSource> OggPackets<S> {
                 if self.packet.len() + len > MAX_PACKET_LEN {
                     return Err(OpusError::InvalidOgg("a packet exceeds 64 KiB").into());
                 }
+                if !self.open {
+                    self.packet_page_start = self.next_page - page.len() as u64;
+                }
                 self.packet.extend_from_slice(segment);
                 self.segment += 1;
                 self.body_offset = end;
                 self.open = value == u8::MAX;
                 if !self.open {
-                    return Ok(Some(&self.packet));
+                    return Ok(Some(PagePacket {
+                        bytes: &self.packet,
+                        pages: self.packet_page_start..self.next_page,
+                    }));
                 }
             }
             if self.last_page || self.next_page >= self.source.length() {

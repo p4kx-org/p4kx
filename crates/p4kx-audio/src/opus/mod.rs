@@ -16,9 +16,14 @@ mod stream;
 use std::io::Write;
 
 pub use error::OpusError;
+pub use header::EmbeddedOpusHeaderPages;
 pub(crate) use header::TAG_SWITCH;
-pub use seek::{WemOpusOgg, WemOpusRanges, WemOpusWav, WemOpusWavEvidence, WemOpusWriteError};
+pub use seek::{
+    WemOpusOgg, WemOpusOggEvidence, WemOpusRanges, WemOpusWav, WemOpusWavEvidence,
+    WemOpusWriteError,
+};
 pub(crate) use seek::{prepare_ogg, prepare_wav};
+pub use seek_packets::SwitchOpusPreSkip;
 
 use self::header::{Header, StreamHeader};
 use self::packets::{Framing, Packets};
@@ -49,6 +54,7 @@ impl<B: AsRef<[u8]>> Wem<B> {
             self.loop_points(),
             out,
         )
+        .map(|written| written.report)
         .map_err(WriteError::into_audio)
     }
 
