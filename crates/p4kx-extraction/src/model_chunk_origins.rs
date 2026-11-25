@@ -11,6 +11,40 @@ use crate::{
     FieldOrigin, FieldOrigins, FieldPath, ModelSource, SourceUse, SourceUseRole, SourceUses,
 };
 
+/// Reports the original chunk counts of the model and its admitted companion files.
+///
+/// # Errors
+/// Returns a source evidence error.
+pub fn model_chunk_count_origin(
+    source: &ModelSource,
+    uses: &SourceUses,
+) -> io::Result<FieldOrigin> {
+    let mut contributors = Vec::new();
+    for read in source.archive_sources() {
+        let Some(scope) = ModelGeometryScope::from_model_read(uses, read)? else {
+            continue;
+        };
+        contributors.push(scope.directory_path_selector()?);
+        for field in [
+            ChunkHeaderField::Signature,
+            ChunkHeaderField::Version,
+            ChunkHeaderField::TableOffset,
+        ] {
+            contributors.push(
+                field
+                    .observe(scope.scope(), SourceUseRole::Selector)
+                    .map_err(io::Error::other)?,
+            );
+        }
+        contributors.push(
+            ChunkHeaderField::RowCount
+                .observe(scope.scope(), SourceUseRole::Conversion)
+                .map_err(io::Error::other)?,
+        );
+    }
+    Ok(uses.origin(&contributors, false))
+}
+
 /// Writes chunk identity, file role and reader-use origins at the output path.
 ///
 /// # Errors

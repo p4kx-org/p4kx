@@ -23,12 +23,18 @@ impl ModelGeometryScope {
         model: &ModelSource,
         file: ModelFile,
     ) -> io::Result<Option<Self>> {
-        let Some(entry) = model
+        model
             .archive_sources()
             .iter()
             .find(|source| source.file() == file)
-            .and_then(ModelArchiveSource::origin)
-        else {
+            .map_or_else(|| Ok(None), |source| Self::from_model_read(uses, source))
+    }
+
+    pub(crate) fn from_model_read(
+        uses: &SourceUses,
+        source: &ModelArchiveSource,
+    ) -> io::Result<Option<Self>> {
+        let Some(entry) = source.origin() else {
             return Ok(None);
         };
         Ok(Some(Self {

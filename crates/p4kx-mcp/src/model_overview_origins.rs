@@ -2,7 +2,9 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::model::ModelFile;
-use p4kx_extraction::model_info::{ModelBoneOrigins, ModelNodeOrigins, ModelOverviewMeshOrigins};
+use p4kx_extraction::model_info::{
+    self, ModelBoneOrigins, ModelNodeOrigins, ModelOverviewMeshOrigins,
+};
 use p4kx_extraction::{
     FieldOrigin, FieldOrigins, FieldPath, ModelArchiveSource, ModelSource, SourceUseRole,
     model_material_selector,
@@ -85,13 +87,15 @@ fn write_counts(
     let bones = ModelBoneOrigins::capture(source, &entry.uses).map_err(EvidenceError::Bone)?;
     model_item_page::put(fields, &counts, "nodes", nodes.collection_origin())?;
     model_item_page::put(fields, &counts, "bones", bones.collection_origin())?;
+    let chunks =
+        model_info::model_chunk_count_origin(source, &entry.uses).map_err(EvidenceError::Chunk)?;
+    model_item_page::put(fields, &counts, "chunks", chunks)?;
     for name in [
         "materials",
         "lods",
         "meshes",
         "animations",
         "unread_animations",
-        "chunks",
     ] {
         let mut field = counts.clone();
         field.push_field(name)?;

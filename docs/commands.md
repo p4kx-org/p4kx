@@ -1057,7 +1057,11 @@ the per-file ordinal. These facts come from the Archive Entry that supplies the 
 including geometry companions. File role evidence identifies the original Entry lookup and
 table header, including the primary Entry path used to derive a companion lookup. The usage
 marker identifies the chunk kind and container selectors and carries an incomplete contributor
-set. A row with an unbound file uses the unknown marker.
+set. A row with an unbound file uses the unknown marker. The total, cursor and
+`get_model_info` chunk count cite the original table header of each admitted file, including
+readable companions that declare zero rows. These counts carry incomplete file-selection
+evidence. An item page aggregates the origins of its returned chunk rows. An empty page
+uses the observed table-count inputs that bound its range.
 
 For `list_model_items` with `section: "animations"`, each row has source and encryption
 markers for its values. CAF names use the selected directory path. DBA names use the original

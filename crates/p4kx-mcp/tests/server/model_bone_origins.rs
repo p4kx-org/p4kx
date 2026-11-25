@@ -207,6 +207,7 @@ fn assert_model_items_schema(tools: &[Value]) -> TestResult {
         Some(&json!([
             "animations",
             "bones",
+            "chunks",
             "materials",
             "meshes",
             "nodes",

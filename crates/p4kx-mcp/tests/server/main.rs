@@ -83,6 +83,7 @@ mod model_animation_origins;
 mod model_animations;
 mod model_bone_origin_checks;
 mod model_bone_origins;
+mod model_chunk_navigation_origins;
 mod model_item_origin_checks;
 mod model_material_origins;
 mod model_mesh_origins;

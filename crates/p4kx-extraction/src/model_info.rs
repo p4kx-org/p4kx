@@ -35,7 +35,7 @@ mod overview_mesh_origins;
 mod submesh_origins;
 
 pub use bone_origins::{ModelBoneOrigins, primary_skeleton_selection_uses};
-pub use chunk_origins::{write_chunk_origins, write_chunk_type_origin};
+pub use chunk_origins::{model_chunk_count_origin, write_chunk_origins, write_chunk_type_origin};
 use field_origins::ModelFieldOrigins;
 pub use mesh_info::MeshInfo;
 pub use node_origins::ModelNodeOrigins;
