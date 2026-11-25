@@ -20,6 +20,9 @@ use crate::interior_glb::{InteriorOutputIsArchive, open};
 use crate::json;
 use crate::query_table::one_line;
 
+#[path = "interior_package_report_origins.rs"]
+mod report_origins;
+
 #[derive(Serialize)]
 struct PackageJson<'a> {
     archive: String,
@@ -95,14 +98,14 @@ pub(crate) fn run(args: &InteriorPackageArgs, as_json: bool) -> Result<()> {
         &scene, &models, &loader, &glb, &info, &args.out, &context,
     )?;
     if as_json {
-        json::print(&PackageJson::of(
+        let report = PackageJson::of(
             &json::path(&args.archive),
             &chain,
             &interior,
             args,
             &summary,
-        ))?;
-        return Ok(());
+        );
+        return report_origins::print(report, &layers);
     }
     match print_report(&summary, args, entry) {
         Err(error) if error.kind() != io::ErrorKind::BrokenPipe => Err(error.into()),

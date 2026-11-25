@@ -143,6 +143,7 @@ mod query_file;
 mod query_rows;
 mod query_table;
 mod renamed_report;
+mod scene_report_origins;
 mod ships;
 mod socpak;
 mod test_build;

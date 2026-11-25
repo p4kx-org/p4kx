@@ -563,6 +563,11 @@ New kinds may be added in later versions.
 
 ## `p4kx entity package <archive> <entity> --out <folder> --json`
 
+The report's `fieldOrigins` and `provenance` identify the original DataForge Record that
+supplied `entity` and `guid`. Output options have an empty tool-authored source set.
+Generated statistics and other values without exact observed contributors carry
+incomplete origin coverage.
+
 ```json
 {"archive": "…", "entity": "AEGS_Gladius", "guid": "…", "out": "…", "lod": 0, "texture_mip": 0,
  "nodes": 83, "drawn_nodes": 56, "containers": 0, "objects": 0, "lights": 0, "meshes": 31,
@@ -695,6 +700,11 @@ for occurrence ownership, source coordinates and origin fields. Missing or ambig
 container paths cause exit code 2 before the source file is written.
 
 ## `p4kx interior package <archive> <container>... --out <folder> --json`
+
+`fieldOrigins` and `provenance` bind each canonical container path to the original
+Archive directory entry selected by the command. A path reflects the encryption of any
+outer Container that supplied its directory. Generated counts have incomplete origin
+coverage.
 
 ```json
 {"archive": "…", "containers": ["Data\\ObjectContainers\\Ships\\DRAK\\Cutlass\\base_int_body_main.socpak"],
@@ -836,10 +846,16 @@ candidate survey could not be established leaves the affected contributor set in
 
 `--materials textures` (default `colours`) and `--texture-mip N` embed the textures as for
 `p4kx chf glb`, counted in `textured_materials`, `textures` and `texture_pixels`.
-An export that mounts a rigid worn item publishes a digest-bound `<out>.p4kx-origin.jsonl`.
-Its GLB addresses identify the actual child entry under a bone and the transformation fields
-written for the mounted model root. The source uses include the original port declaration and
-observed model placement fields. Coverage is partial, so an unproven encryption state stays `null`.
+The JSON report adds a `fieldOrigins` map and its shared `provenance` inventory. The selected
+Entity Loadout class is tied to the original DataForge Record. Known worn model and material
+selectors and the observed base rig contribute to their report fields. Inferred body selection,
+XML Loadout paths and other unresolved fields carry incomplete coverage. An explicit `--body`
+is a tool-authored selection.
+
+All Armour GLB exports publish a digest-bound `<out>.p4kx-origin.jsonl`. It binds observed
+POSITION accessor counts to their original geometry chunks. Mounted items also bind the
+actual child entry under a bone and the written transform to the original port and observed
+model placement fields. An unproven encryption state stays `null`.
 `unresolved_layers` and `first_unresolved_layer` (absent when there is none) are those of
 `p4kx entity glb`, for the material libraries of the parts. `files` of `loadout` lists the XML
 Loadout files the Loadout is made of in the order they are laid over each other: an Entity whose

@@ -31,6 +31,9 @@ use crate::query_table::one_line;
 #[path = "armour_glb_output.rs"]
 mod output;
 
+#[path = "armour_glb_report_origins.rs"]
+mod report_origins;
+
 #[derive(Serialize)]
 struct PartJson<'a> {
     name: &'a str,
@@ -136,8 +139,7 @@ pub(crate) fn run(args: &ArmourGlbArgs, as_json: bool) -> Result<()> {
         layers: &layers,
     };
     if as_json {
-        json::print(&report(&done, args))?;
-        return Ok(());
+        return report_origins::print(&done, args, &forge, entry.origin());
     }
     print_text(&done, args, &found, &folders)
 }

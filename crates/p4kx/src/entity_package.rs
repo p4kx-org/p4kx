@@ -23,6 +23,9 @@ use crate::extract::cancel_on_interrupt;
 use crate::json;
 use crate::query_table::one_line;
 
+#[path = "entity_package_report_origins.rs"]
+mod report_origins;
+
 #[derive(Serialize)]
 struct PackageJson<'a> {
     archive: String,
@@ -112,14 +115,14 @@ pub(crate) fn run(args: &EntityPackageArgs, as_json: bool) -> Result<()> {
     let context = context.with_entity_effects_source(&entry, &forge);
     let summary = write(args, &info, &archive, &models, &assembly, context)?;
     if as_json {
-        json::print(&PackageJson::of(
+        let report = PackageJson::of(
             &json::path(archive.path()),
             tree,
             args,
             (&info, &summary),
             &applied,
-        ))?;
-        return Ok(());
+        );
+        return report_origins::print(report, &forge, &record, entry.origin(), tree);
     }
     match print_report(&summary, args, &info, tree.class_name()) {
         Err(error) if error.kind() != io::ErrorKind::BrokenPipe => Err(error.into()),

@@ -3,14 +3,15 @@
 
 use std::io::{self, Write};
 
-use anyhow::{Result, ensure};
+use anyhow::Result;
 use p4kx_assembly::Interior;
 use p4kx_extraction::{
-    Archive, FieldOrigin, FieldOrigins, FieldPath, InputScope, OriginArtifactBinding,
-    OriginOutputAddress, SourceCoordinateOmission, SourceInput, SourceInventory, SourceLocation,
-    SourceUse, SourceUseRole, SourceUses, write_origin_companion,
+    Archive, FieldOrigin, FieldOrigins, FieldPath, OriginArtifactBinding, OriginOutputAddress,
+    SourceCoordinateOmission, SourceInventory, SourceUseRole, SourceUses, write_origin_companion,
 };
 use serde::Serialize;
+
+use crate::scene_report_origins;
 
 #[derive(Serialize)]
 pub(super) struct Origins {
@@ -28,32 +29,16 @@ impl Origins {
         interior: &Interior,
         lod: u32,
     ) -> Result<Self> {
-        ensure!(
-            layers.len() == chain.len() + 1,
-            "opened container path count differs"
-        );
         let uses = SourceUses::with_compact_use_refs();
         let mut fields = FieldOrigins::new();
-        let mut path_uses = Vec::with_capacity(chain.len());
         let mut artifact_uses = Vec::with_capacity(chain.len());
-        let mut complete = true;
-        for (index, (layer, path)) in layers.iter().skip(1).zip(chain).enumerate() {
-            let origin = if let Some(bound) = observe_container(&uses, layer, path)? {
-                let origin = uses.origin(std::slice::from_ref(&bound.path), bound.complete);
-                complete &= bound.complete;
-                path_uses.push(bound.path);
-                artifact_uses.push(bound.conversion);
-                origin
-            } else {
-                complete = false;
-                uses.origin(&[], false)
-            };
-            fields.insert(FieldPath::parse(&format!("/containers/{index}"))?, origin)?;
-        }
-        fields.insert(
-            FieldPath::parse("/containers")?,
-            uses.origin(&path_uses, complete),
-        )?;
+        scene_report_origins::container_paths(&uses, &mut fields, layers, chain, |payload| {
+            artifact_uses.push(payload.at_opaque(
+                SourceUseRole::Conversion,
+                SourceCoordinateOmission::Unavailable,
+            )?);
+            Ok(())
+        })?;
         unknown_report_fields(&uses, &mut fields, interior, lod)?;
         let artifact = uses.origin(&artifact_uses, false);
         Ok(Self {
@@ -75,42 +60,6 @@ impl Origins {
             [(&OriginOutputAddress::OpaquePayload, &self.artifact)],
         )
     }
-}
-
-struct ContainerUses {
-    path: SourceUse,
-    conversion: SourceUse,
-    complete: bool,
-}
-
-fn observe_container(
-    uses: &SourceUses,
-    layer: &Archive,
-    path: &str,
-) -> Result<Option<ContainerUses>> {
-    let Some(entry) = layer.container_input_origin() else {
-        return Ok(None);
-    };
-    ensure!(
-        entry.entry().path() == path,
-        "opened container path differs from its original Entry"
-    );
-    let payload = uses.observe(SourceInput::Archive(&entry), InputScope::Payload)?;
-    let path = payload.for_scope(InputScope::ArchiveDirectoryMetadata).at(
-        SourceLocation::Metadata {
-            field: "path".into(),
-        },
-        SourceUseRole::Payload,
-    )?;
-    let conversion = payload.at_opaque(
-        SourceUseRole::Conversion,
-        SourceCoordinateOmission::Unavailable,
-    )?;
-    Ok(Some(ContainerUses {
-        path,
-        conversion,
-        complete: entry.ancestors().all(|ancestor| ancestor.is_some()),
-    }))
 }
 
 fn unknown_report_fields(

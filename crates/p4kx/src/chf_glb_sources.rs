@@ -19,6 +19,7 @@ use serde::Serialize;
 
 use crate::cli::ChfGlbArgs;
 use crate::file_receipt::FileReceipt;
+use crate::scene_report_origins;
 
 #[path = "chf_glb_artifact_origins.rs"]
 mod artifact;
@@ -384,7 +385,7 @@ impl GlbPublication {
     pub(super) fn cover(&mut self, report: &impl Serialize) -> Result<()> {
         let report = serde_json::to_value(report)?;
         let unknown = SourceUses::new().origin(&[], false);
-        report::cover(
+        scene_report_origins::cover_leaves(
             &mut self.field_origins,
             &report,
             &mut FieldPath::root(),

@@ -282,7 +282,7 @@ fn assert_origin_flags(
     Ok(())
 }
 
-fn assert_container_chain(report: &Value, encrypted: bool) -> TestResult {
+pub(super) fn assert_container_chain(report: &Value, encrypted: bool) -> TestResult {
     assert_eq!(
         *required(report, "/containers")?,
         serde_json::json!([INTERIOR_ROOT, r"modules\cockpit.socpak"]),

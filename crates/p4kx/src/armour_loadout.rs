@@ -116,6 +116,8 @@ pub(crate) struct LoadoutJson<'a> {
     pub(crate) name: &'a str,
     pub(crate) source: LoadoutSource,
     pub(crate) class_name: Option<String>,
+    #[serde(skip)]
+    pub(crate) record_index: Option<u32>,
     pub(crate) files: Vec<String>,
     #[serde(rename = "outfit", skip_serializing_if = "Option::is_none")]
     pub(crate) outfits: Option<OutfitsJson>,
@@ -209,6 +211,11 @@ impl<'a> Selection<'a> {
                 source: found.source,
                 class_name: (found.source == LoadoutSource::Entity)
                     .then(|| found.tree.class_name().to_owned()),
+                record_index: if found.source == LoadoutSource::Entity {
+                    found.tree.record_index()
+                } else {
+                    None
+                },
                 files: found.files,
                 outfits: found.outfits.as_ref().map(OutfitsJson::from),
             }),

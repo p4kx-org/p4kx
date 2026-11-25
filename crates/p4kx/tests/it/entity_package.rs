@@ -12,6 +12,9 @@ use p4kx_testkit::{
 };
 use serde_json::Value;
 
+#[path = "entity_package_report_origins.rs"]
+mod report_origins;
+
 const LIVERY_LIBRARIES: [&str; 2] = [
     "Data/Objects/Test/livery.mtl",
     "Data/Objects/Test/livery_default.mtl",

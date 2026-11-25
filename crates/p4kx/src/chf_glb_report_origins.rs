@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use anyhow::Result;
-use p4kx_extraction::{FieldOrigins, FieldPath, SourceUses};
+use p4kx_extraction::{FieldOrigins, SourceUses};
 
 use super::parts::Parts;
 use super::{Contributors, field};
@@ -162,35 +162,6 @@ fn part_fields(
             &format!("/parts/{index}/morph_targets"),
             part.morphs.origin(uses),
         )?;
-    }
-    Ok(())
-}
-
-pub(super) fn cover(
-    fields: &mut FieldOrigins,
-    value: &serde_json::Value,
-    path: &mut FieldPath,
-    inherited: &p4kx_extraction::FieldOrigin,
-) -> Result<()> {
-    use serde_json::Value;
-    let origin = fields.get(path).unwrap_or(inherited).clone();
-    match value {
-        Value::Object(members) if !members.is_empty() => {
-            for (name, member) in members {
-                path.push_field(name)?;
-                cover(fields, member, path, &origin)?;
-                path.pop();
-            }
-        }
-        Value::Array(items) if !items.is_empty() => {
-            for (index, item) in items.iter().enumerate() {
-                path.push_index(index)?;
-                cover(fields, item, path, &origin)?;
-                path.pop();
-            }
-        }
-        _ if fields.get(path).is_none() => fields.insert(path.clone(), origin)?,
-        _ => {}
     }
     Ok(())
 }
