@@ -3,6 +3,13 @@
 
 //! Bounded WEM reads and original input evidence.
 
+#[path = "sound_conversion_error.rs"]
+mod conversion_error;
+#[path = "sound_ogg_receipt.rs"]
+mod ogg_receipt;
+pub use ogg_receipt::OggFileReceipt;
+#[path = "sound_origins.rs"]
+mod origins;
 #[path = "sound_publication.rs"]
 mod publication;
 

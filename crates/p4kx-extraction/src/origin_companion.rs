@@ -59,6 +59,19 @@ pub enum OriginXmlField {
     Text,
 }
 
+/// The Ogg page group represented by one emitted byte range.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub enum OriginOggField {
+    /// Pages containing the identification packet.
+    Identification,
+    /// Pages containing comments and any setup packet.
+    CommentsAndSetup,
+    /// Audio pages including the end-of-stream page.
+    Audio,
+}
+
 /// The typed value represented by one emitted WAV byte range.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -151,6 +164,15 @@ pub enum OriginOutputAddress {
         start: DecimalU64,
         /// First byte past the emitted mip.
         end_exclusive: DecimalU64,
+    },
+    /// One group of complete pages in the emitted Ogg stream.
+    OggBytes {
+        /// First byte in the emitted group.
+        start: DecimalU64,
+        /// First byte past the emitted group.
+        end_exclusive: DecimalU64,
+        /// Category of the emitted group.
+        field: OriginOggField,
     },
     /// One typed field in the emitted WAV.
     WavBytes {

@@ -10,11 +10,11 @@ use crate::{
 };
 
 use super::Sound;
+use super::origins::SoundOrigins;
 use super::publication::SoundWrite;
 
 #[path = "sound_wav_origins.rs"]
 mod origins;
-use origins::WavOrigins;
 
 #[path = "sound_wav_write.rs"]
 mod written;
@@ -28,7 +28,7 @@ pub struct WavFileReceipt {
     pub report: WavReport,
     /// Published sibling origin companion.
     pub companion: PathBuf,
-    origins: WavOrigins,
+    origins: SoundOrigins,
 }
 
 impl WavFileReceipt {
@@ -77,7 +77,7 @@ impl Sound {
             |writer, companion| {
                 let written = convert(writer)?;
                 let report = written.report();
-                let origins = WavOrigins::capture(self, &written)
+                let origins = origins::capture(self, &written)
                     .map_err(|source| write_error(companion, source))?;
                 Ok(SoundWrite {
                     report,
@@ -85,7 +85,7 @@ impl Sound {
                     origins,
                 })
             },
-            WavOrigins::write,
+            SoundOrigins::write,
         )?;
         Ok(WavFileReceipt {
             report: publication.written.report,

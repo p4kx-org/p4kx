@@ -214,6 +214,21 @@ decoded packet. Opus records the replayed packet-size words from its
 selected seek table when one exists. A loose WEM retains its original
 file identity with unknown Archive encryption.
 
+## Standalone Ogg
+
+The companion for [Ogg conversion](cli-json.md#p4kx-audio-ogg-archive-entry---out-file---json)
+uses contiguous half-open `oggBytes` ranges for the identification pages,
+the comment and setup pages and the audio pages through EOS.
+
+For Wwise Vorbis, the setup contribution includes the original setup
+packet and the packet prefix used to select its codebooks. The audio range
+uses the replayed packets. Opus records the replayed packet-size words when
+it uses a seek table, the original embedded header pages when present and
+the exact framing and duration bytes used to derive Switch Opus pre-skip.
+An original embedded Ogg page can contribute to more than one output range.
+The summary records its own source uses for the written sample count,
+playback rate, duration, codebook choice, size and loop.
+
 ## Hologram rendering
 
 `p4kx ui hologram` publishes `<file>.p4kx-origin.jsonl` alongside the PNG.

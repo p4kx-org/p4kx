@@ -283,6 +283,26 @@
       "$ref": "#/$defs/ArtifactName",
       "description": "One relative artifact basename in its exact native spelling."
     },
+    "OriginOggField": {
+      "description": "The Ogg page group represented by one emitted byte range.",
+      "oneOf": [
+        {
+          "const": "identification",
+          "description": "Pages containing the identification packet.",
+          "type": "string"
+        },
+        {
+          "const": "commentsAndSetup",
+          "description": "Pages containing comments and any setup packet.",
+          "type": "string"
+        },
+        {
+          "const": "audio",
+          "description": "Audio pages including the end-of-stream page.",
+          "type": "string"
+        }
+      ]
+    },
     "OriginOutputAddress": {
       "description": "The exact datum within a bound standalone artifact.",
       "oneOf": [
@@ -448,6 +468,35 @@
             "surface",
             "start",
             "endExclusive"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
+          "description": "One group of complete pages in the emitted Ogg stream.",
+          "properties": {
+            "endExclusive": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "First byte past the emitted group."
+            },
+            "field": {
+              "$ref": "#/$defs/OriginOggField",
+              "description": "Category of the emitted group."
+            },
+            "start": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "First byte in the emitted group."
+            },
+            "type": {
+              "const": "oggBytes",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "start",
+            "endExclusive",
+            "field"
           ],
           "type": "object"
         },

@@ -46,8 +46,8 @@ pub use crate::observed_file_origin::read_observed_file_limit;
 pub use crate::origin_artifact::{OriginArtifactDigest, OriginArtifactName, OriginDigestWriter};
 pub use crate::origin_companion::spool::{OriginCompanionSpool, StagedOriginCompanion};
 pub use crate::origin_companion::{
-    OriginArtifactBinding, OriginCompanionRow, OriginOutputAddress, OriginWavField, OriginXmlField,
-    SOURCE_ORIGIN_FORMAT, SOURCE_ORIGIN_VERSION, write_origin_companion,
+    OriginArtifactBinding, OriginCompanionRow, OriginOggField, OriginOutputAddress, OriginWavField,
+    OriginXmlField, SOURCE_ORIGIN_FORMAT, SOURCE_ORIGIN_VERSION, write_origin_companion,
 };
 pub use crate::origin_file_io::write_replacing_io_protected;
 pub use crate::origin_reader_limits::OriginReaderLimits;

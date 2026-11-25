@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use anyhow::{Result, bail};
-use p4kx_extraction::sound::{WavFileReceipt, WemOriginField, WemOriginPlan};
+use p4kx_extraction::sound::{WemOriginField, WemOriginPlan};
 use p4kx_extraction::{
     FieldOrigins, FieldPath, InputScope, Sound, SourceInput, SourceInventory,
     SourceInventorySelection, SourceLocation, SourceUseRole, SourceUses,
@@ -53,15 +53,16 @@ pub(super) fn conversion_report<T>(sound: &Sound, summary: T) -> Result<Report<T
     capture(sound, summary, CONVERSION_FORMAT_FIELDS)
 }
 
-pub(super) fn wav_report<T>(
-    receipt: &WavFileReceipt,
+pub(super) const fn converted_report<'evidence, T>(
     summary: T,
-) -> Result<Report<T, &FieldOrigins, SourceInventorySelection<'_>>> {
-    Ok(Report {
+    field_origins: &'evidence FieldOrigins,
+    provenance: SourceInventorySelection<'evidence>,
+) -> Report<T, &'evidence FieldOrigins, SourceInventorySelection<'evidence>> {
+    Report {
         summary,
-        field_origins: receipt.summary_origins(),
-        provenance: receipt.summary_provenance()?,
-    })
+        field_origins,
+        provenance,
+    }
 }
 
 fn capture<T>(

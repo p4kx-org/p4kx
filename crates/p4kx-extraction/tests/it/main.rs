@@ -60,6 +60,7 @@ mod record_export_nested;
 mod run_control;
 mod sound;
 mod sound_conversion;
+mod sound_ogg_receipt;
 mod source_encryption_controls;
 mod source_minimal_context;
 mod source_minimal_prefix;

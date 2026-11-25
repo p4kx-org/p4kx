@@ -3,9 +3,11 @@
 
 use std::error::Error;
 use std::fs;
+use std::io::{self, Write};
 use std::ops::Range;
 use std::path::Path;
 
+use p4kx_extraction::OriginDigestWriter;
 use p4kx_testkit::{
     ArchiveBuilder, TestCodebook, TestEntry, TestOpus, TestOpusFraming, TestVorbis,
 };
@@ -100,15 +102,85 @@ fn ogg_json(path: &Path, input: Input, out: &Path) -> Result<Value, Box<dyn Erro
         Some(u64::try_from(bytes.len())?),
         "the summary retains the output size"
     );
-    assert_eq!(
-        document
-            .get("fieldOrigins")
-            .and_then(Value::as_object)
-            .map(serde_json::Map::len),
-        Some(3),
-        "the summary attests the three original format and name fields"
-    );
+    for field in [
+        "/codec",
+        "/channels",
+        "/sample_rate",
+        "/sample_count",
+        "/duration_seconds",
+        "/codebooks",
+        "/size",
+        "/loop",
+    ] {
+        contributors(&document, field, input.payload_marker())?;
+    }
+    check_companion(out, &document, &bytes, input)?;
     Ok(document)
+}
+
+fn check_companion(out: &Path, document: &Value, bytes: &[u8], input: Input) -> TestResult {
+    let name = out
+        .file_name()
+        .and_then(|name| name.to_str())
+        .ok_or("Ogg fixture output")?;
+    let companion = format!("{name}.p4kx-origin.jsonl");
+    assert_eq!(
+        document.get("originReceipt").and_then(Value::as_str),
+        Some(companion.as_str()),
+        "the report names the sibling"
+    );
+    let rows = fs::read_to_string(out.with_file_name(companion))?
+        .lines()
+        .map(serde_json::from_str)
+        .collect::<Result<Vec<Value>, _>>()?;
+    let mut measured = OriginDigestWriter::new(io::sink());
+    measured.write_all(bytes)?;
+    let digest = measured.finish()?;
+    let header = rows.first().ok_or("Ogg origin header")?;
+    assert_eq!(
+        header.pointer("/binding/sha256").and_then(Value::as_str),
+        Some(digest.sha256()),
+        "the companion binds the exact written stream"
+    );
+    check_ranges(&rows, input.payload_marker(), digest.byte_length())
+}
+
+fn check_ranges(rows: &[Value], encrypted: Option<bool>, byte_length: u64) -> TestResult {
+    let mut boundary = 0;
+    for field in ["identification", "commentsAndSetup", "audio"] {
+        let marker = rows
+            .iter()
+            .find(|row| row.pointer("/address/field").and_then(Value::as_str) == Some(field))
+            .ok_or_else(|| format!("missing Ogg byte field {field}"))?;
+        assert_eq!(
+            marker.pointer("/address/type").and_then(Value::as_str),
+            Some("oggBytes"),
+            "{field}"
+        );
+        assert_eq!(
+            marker.get("containsEncryptedSource"),
+            Some(&serde_json::json!(encrypted)),
+            "{field}"
+        );
+        let start = marker
+            .pointer("/address/start")
+            .and_then(Value::as_str)
+            .ok_or("Ogg field start")?
+            .parse::<u64>()?;
+        let end = marker
+            .pointer("/address/endExclusive")
+            .and_then(Value::as_str)
+            .ok_or("Ogg field end")?
+            .parse::<u64>()?;
+        assert_eq!(
+            start, boundary,
+            "{field} starts at the preceding page boundary"
+        );
+        assert!(end > start, "{field} occupies at least one page");
+        boundary = end;
+    }
+    assert_eq!(boundary, byte_length, "the last field includes EOS");
+    Ok(())
 }
 
 fn check_opus_rate(document: &Value, source: &Value) -> TestResult {

@@ -57,6 +57,8 @@ struct WavJson<'a> {
 struct OggJson<'a> {
     sound: &'a str,
     output: String,
+    #[serde(rename = "originReceipt")]
+    origin_receipt: String,
     codec: &'static str,
     channels: u16,
     sample_rate: u32,
@@ -80,7 +82,7 @@ pub(crate) fn run(args: &AudioArgs, as_json: bool) -> Result<()> {
             };
             wav(&sound, out, as_json)
         }
-        AudioAction::Ogg { source, out } => ogg(&open(source, as_json)?, out, as_json),
+        AudioAction::Ogg { source, out } => ogg(&open(source, true)?, out, as_json),
     }
 }
 
@@ -157,6 +159,13 @@ fn format_duration(duration: Duration) -> String {
     format!("{}.{:03} s", millis / 1000, millis % 1000)
 }
 
+fn companion_basename(path: &Path) -> Result<String> {
+    let basename = path
+        .file_name()
+        .ok_or_else(|| io::Error::other("missing origin companion basename"))?;
+    Ok(json::path(Path::new(basename)))
+}
+
 fn wav(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
     let observed = sound
         .supports_wav_receipt()
@@ -166,16 +175,9 @@ fn wav(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
         Some(receipt) => receipt.report,
         None => sound.write_wav_to_file(out)?,
     };
-    let companion = observed.as_ref().map(|receipt| &receipt.companion);
+    let companion = observed.as_ref().map(|receipt| receipt.companion.as_path());
     if as_json {
-        let origin_receipt = if let Some(companion) = companion {
-            let basename = companion
-                .file_name()
-                .ok_or_else(|| io::Error::other("missing origin companion basename"))?;
-            Some(json::path(Path::new(basename)))
-        } else {
-            None
-        };
+        let origin_receipt = companion.map(companion_basename).transpose()?;
         let summary = WavJson {
             sound: sound.name(),
             output: json::path(out),
@@ -189,7 +191,11 @@ fn wav(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
                 .map(|points| loop_json(points.start, points.end)),
         };
         if let Some(receipt) = &observed {
-            json::print(&info_origins::wav_report(receipt, summary)?)?;
+            json::print(&info_origins::converted_report(
+                summary,
+                receipt.summary_origins(),
+                receipt.summary_provenance()?,
+            ))?;
         } else {
             json::print(&info_origins::conversion_report(sound, summary)?)?;
         }
@@ -213,12 +219,14 @@ fn wav(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
 }
 
 fn ogg(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
-    let report = sound.write_ogg_to_file(out)?;
+    let receipt = sound.write_ogg_with_receipt(out)?;
+    let report = receipt.report;
     let duration = report.duration();
     if as_json {
         let summary = OggJson {
             sound: sound.name(),
             output: json::path(out),
+            origin_receipt: companion_basename(&receipt.companion)?,
             codec: report.codec.id(),
             channels: report.channels,
             sample_rate: report.sample_rate,
@@ -230,10 +238,15 @@ fn ogg(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
                 .loop_points
                 .map(|points| loop_json(points.start, points.end)),
         };
-        json::print(&info_origins::conversion_report(sound, summary)?)?;
+        json::print(&info_origins::converted_report(
+            summary,
+            receipt.summary_origins(),
+            receipt.summary_provenance()?,
+        ))?;
     } else {
+        let mut stdout = io::stdout().lock();
         writeln!(
-            io::stdout().lock(),
+            stdout,
             "wrote {} as Ogg {} to {}, {}, {} bytes",
             sound.name(),
             if report.codec == Codec::Opus {
@@ -245,6 +258,7 @@ fn ogg(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
             format_duration(duration),
             report.size
         )?;
+        writeln!(stdout, "source origins: {}", receipt.companion.display())?;
     }
     Ok(())
 }

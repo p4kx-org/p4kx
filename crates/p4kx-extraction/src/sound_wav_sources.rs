@@ -7,6 +7,7 @@ use std::ops::Range;
 use p4kx_audio::{Codec, LinearWavWrite};
 
 use super::WavWrite;
+use crate::sound::origins::range_use;
 use crate::{Sound, SourceLocation, SourceScope, SourceUse, SourceUseRole};
 
 pub(super) fn shape(
@@ -129,25 +130,6 @@ fn append(
         uses.push(range_use(payload, namespace, field, range, role)?);
     }
     Ok(())
-}
-
-fn range_use(
-    payload: &SourceScope,
-    namespace: &str,
-    field: &str,
-    range: &Range<u64>,
-    role: SourceUseRole,
-) -> io::Result<SourceUse> {
-    payload
-        .at(
-            SourceLocation::Subresource {
-                namespace: namespace.into(),
-                indices: vec![range.start, range.end],
-                field: field.into(),
-            },
-            role,
-        )
-        .map_err(io::Error::other)
 }
 
 fn linear_samples(
