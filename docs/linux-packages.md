@@ -384,6 +384,16 @@ on both CPUs require the complete producer matrix and were skipped.
 [ARM64 producer](https://github.com/p4kx-org/p4kx/actions/runs/45595367669/job/139140250867) ·
 [Native execution](https://github.com/p4kx-org/p4kx/actions/runs/45595367669/job/139160223476)
 
+At PR #1117 merge `7b08ee65fea2e0bd08ea8e244f2bbc14c17f5d7e` for signed
+head `a4723c395`, both native Linux package consumers passed. They exercised
+direct AppImage FUSE launch and explicit extract-and-run on AMD64 and ARM64.
+Each installed Flatpak used real API 5 Documents grants, published extracted
+bytes with their origin receipt, and rejected a competing publication lease.
+After lease release, the next export succeeded. The stock API 4 session
+recorded the expected prerequisite refusal. The PR package version was `0.4.2`.
+[AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45611267510/job/139216272963) ·
+[ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45611267510/job/139216273107)
+
 The tagged v0.5.0 candidate requires its own hosted Linux package evidence on both CPUs.
 
 For a branch-only native Linux validation, dispatch the existing `release.yml` workflow with

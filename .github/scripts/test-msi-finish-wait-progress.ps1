@@ -132,7 +132,8 @@ try {
     foreach ($case in @(
         @{name='native-arm-lifecycle';target='aarch64-pc-windows-msvc';mode='Lifecycle';direct=$true},
         @{name='native-arm-control';target='aarch64-pc-windows-msvc';mode='Control';direct=$false},
-        @{name='native-amd-lifecycle';target='x86_64-pc-windows-msvc';mode='Lifecycle';direct=$false}
+        @{name='native-amd-lifecycle';target='x86_64-pc-windows-msvc';mode='Lifecycle';direct=$true},
+        @{name='native-amd-control';target='x86_64-pc-windows-msvc';mode='Control';direct=$false}
     )) {
         $path = [IO.Directory]::CreateDirectory((Join-Path $root $case.name)).FullName
         $terminal = Join-Path $path 'result.json'
@@ -178,7 +179,9 @@ try {
 } finally {
     $env:GITHUB_ACTIONS = $oldActions
 }
-'PASS: ARM64 lifecycle direct process result, original deadline and Portal routes.'
+'PASS: both Windows lifecycle targets use the direct process result, and both Control targets use Portal.'
 Assert-P4kxFinishSupervisorNegativeReceipt $root
 Assert-P4kxFinishWaitSetupBudget $root
-& (Join-Path $PSScriptRoot 'test-msi-finish-owned-probe.ps1') -Directory (Join-Path $root 'native-owned-probe')
+foreach ($target in @('aarch64-pc-windows-msvc','x86_64-pc-windows-msvc')) {
+    & (Join-Path $PSScriptRoot 'test-msi-finish-owned-probe.ps1') -Target $target -Directory (Join-Path $root $target)
+}

@@ -125,8 +125,10 @@ checkpoint and snapshot directories for diagnostic upload.
 
 A separate Finish supervisor observes the original lifecycle. The WaitFinish step uses a
 bounded probe to find its terminal receipt and binds the observed digest to the original
-request and supervisor. The ARM64 lifecycle wait retains its probe milestones in the wait
-receipt. CollectFinish requires those bound receipts, the original successful result, the
+request and supervisor. On both Windows CPUs, the Lifecycle wait checks its own probe's
+exit status under the original deadline. The wait receipt records the probe status and PID.
+The synthetic Control mode uses its Portal observation. CollectFinish requires the bound
+receipts, the original successful result, the
 closed journal and final cleanup. The terminal evidence upload must succeed before the
 executed release payload can be recorded. The last diagnostic upload collects the early
 checkpoints and worker logs if the job reaches that step.

@@ -105,8 +105,7 @@ function Wait-P4kxMsiFinishReceipt($Context, $Launch) {
     $resultDigest = $null
     $budget = ($Context.collection_cutoff - [DateTimeOffset]::UtcNow).TotalMilliseconds
     $clock = [Diagnostics.Stopwatch]::StartNew()
-    $direct = if ($Context.request.target -ceq 'aarch64-pc-windows-msvc' -and
-        $Context.request.mode -ceq 'Lifecycle') { @{} } else { $null }
+    $direct = if ($Context.request.mode -ceq 'Lifecycle') { @{} } else { $null }
     Write-P4kxMsiObserverProgress finishWaitPoll begin -RequestDigest $Context.digest
     $found = if ($null -ne $direct) {
         Test-P4kxMsiFinishDirectReceiptPresence $Context $receiptPath $clock $budget $direct

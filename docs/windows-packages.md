@@ -344,6 +344,21 @@ The operation that blocked the hosted runs remains undetermined.
 [AMD64 job](https://github.com/p4kx-org/p4kx/actions/runs/45557170432/job/139031674324) ·
 [ARM64 job](https://github.com/p4kx-org/p4kx/actions/runs/45557170432/job/139031674357)
 
+Release run `45611267510`, attempt 1, checked merge
+`7b08ee65fea2e0bd08ea8e244f2bbc14c17f5d7e` for signed PR head `a4723c395`.
+The Windows ARM64 job completed `WaitFinish` in 87 seconds and collected the
+successful original MSI result. It published the original Finish receipt and
+the executed MSI and portable ZIP evidence.
+[ARM64 execution](https://github.com/p4kx-org/p4kx/actions/runs/45611267510/job/139217186721) ·
+[Original Finish receipt](https://github.com/p4kx-org/p4kx/actions/runs/45611267510/artifacts/15023990683) ·
+[Executed ARM64 packages](https://github.com/p4kx-org/p4kx/actions/runs/45611267510/artifacts/15023861004)
+
+The native AMD64 job passed portable execution and launched the Finish
+supervisor. GitHub marked `WaitFinish` cancelled after 41 seconds, before its
+configured limit. The collection and executed-payload steps were skipped.
+The ordinary logs were unavailable and the cancellation cause is undetermined.
+[AMD64 execution](https://github.com/p4kx-org/p4kx/actions/runs/45611267510/job/139217186742)
+
 For release acceptance, repeat the native lifecycle checks with the actual release candidate
 and bind both its MSI and portable ZIP to the candidate revision and run attempt. Record the
 Windows AMD64 desktop and WASAPI checks separately from the hosted package evidence.
