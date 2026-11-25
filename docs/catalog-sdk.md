@@ -2400,6 +2400,21 @@ committing a staged consumer result. Visitor errors and cancellation stop later
 callbacks. The session checks the bound Archive again before returning success.
 
 
+On installed LIVE `13220821`, the signed `be4719c55` debug verifier ran each
+selection in a fresh Windows AMD64 process. The GUID and physical Record index
+selected the same one-row owner with 30 source uses from one physical source.
+
+| Selection | Result | Elapsed s | Peak private bytes | Peak working-set bytes |
+| --- | --- | ---: | ---: | ---: |
+| GUID | Complete | 8.320 | 1,091,813,376 | 1,024,466,944 |
+| Record index | Complete | 7.759 | 1,091,801,088 | 1,024,356,352 |
+| All | Measurement deadline | 1,800.164 | 1,895,276,544 | 1,775,017,984 |
+
+The all-owner process reached the measurement time limit before returning the
+terminal census for its 10,955 expected owners. These peaks establish the
+resource use of the observed interval. Complete Loadout parity against the
+same-Build Normal Catalog requires a terminal comparison.
+
 ## Direct ammunition definitions
 
 `catalog_queries::equipment::with_ammo_definitions` reads independently admitted physical

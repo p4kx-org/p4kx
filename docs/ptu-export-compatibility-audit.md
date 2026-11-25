@@ -33,6 +33,20 @@ field origins. A Normal Catalog filtered to the new slot retains its explicit `f
 and points to the original field occurrence.
 [Location configuration](catalog-location-configuration.md)
 
+The same comparison changed 69 EntityClassDefinition Records. It found 21 loadout
+field changes, including 16 inside nested loadout entries, and no changed
+`AttachmentImplementation` or `SubHelpers` field in those Records. The packaged
+Windows AMD64 entry comparison independently reread the three changed CryXmlB
+files under `Data/Scripts/Loadouts/Character`. One file adds one nested `Items`
+child to each of five existing `Item` rows and preserves all five parent rows'
+attributes. Each of the other two files removes a top-level item and adds a nested item.
+The two rows differ in port, item and tag. Their `ownership`, `gameFlags` and
+`entitlementUrnOverride` values agree. All six original Entry sizes and
+checksums match the directory comparison. The three diffs contain no tagged
+attachment helper declaration. The behavior of competing helpers still needs
+an original placement observation.
+[Windows AMD64 package](https://github.com/p4kx-org/p4kx/actions/runs/45576709479/artifacts/15007173314)
+
 | Area | Source evidence and exporter coverage |
 | --- | --- |
 | Gatala Fungi and Pouchweed | Nine changed trigger occurrences resolve to seven distinct authored ATL triggers and Wwise Events. The scoped probe verifies both original Entries, `SC_INT_PT_HARV.xml` and `INT_PT_HARV.bnk`, and resolves each Event in the bank's 59 readable HIRC objects. The Gatala harvestable base also changes its two existing `AttachDef.Localization` fields. The original field walker and audio readers admit these shapes. [Audio control](media-audio-control.md) |
