@@ -2353,6 +2353,27 @@ selector for an owner with a named DataForge root port. Set `P4KX_DATA_P4K` and
 cargo test --locked -p p4kx-export --lib -- catalog_query_session::installed_sdk_witness::loadout_source::installed_loadout_sdk_matches_one_original_port_name --ignored --exact
 ```
 
+### Visit Loadout owners incrementally
+
+Use `equipment::visit_loadouts`, `equipment::visit_loadouts_from`, or a session or
+parsed view's `visit_loadouts` method for a large owner selection. The visitor
+follows the canonical GUID order and preserves distinct physical Records and
+stable ties. It receives one admitted owner, the canonical row when resolution
+emits one, and the original source inventory and dependency diagnostics for that
+owner. The scan reuses the entity and XML directory indexes. It releases the
+owner's resolved row and source inventory before resolving the next owner.
+
+The visitor accepts the same all-owner, GUID and physical Record selections as
+`read_loadouts`. A Ship can have an empty row. An admitted Item that resolves to
+no ports carries its identity and succeeds without a row. An admitted owner
+with a failed resolution can supply diagnostics without a row. Docked vehicles
+retain their root occurrence and can be visited independently.
+
+Check `coverage` and `dependencies_complete` on the terminal summary before
+committing a staged consumer result. Visitor errors and cancellation stop later
+callbacks. The session checks the bound Archive again before returning success.
+
+
 ## Direct ammunition definitions
 
 `catalog_queries::equipment::with_ammo_definitions` reads independently admitted physical

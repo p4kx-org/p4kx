@@ -146,3 +146,6 @@ mod root_identity;
 
 #[path = "catalog_loadout_name_origins.rs"]
 mod name_origins;
+
+#[path = "catalog_loadout_visit_sdk.rs"]
+mod visit;

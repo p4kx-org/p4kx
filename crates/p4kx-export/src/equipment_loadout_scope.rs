@@ -60,6 +60,11 @@ pub(super) fn read(
     })
 }
 
+pub(super) fn finish_coverage(coverage: &mut CatalogRecordCoverage) {
+    coverage.incomplete_fields.sort_unstable();
+    coverage.incomplete_fields.dedup();
+}
+
 pub(super) fn read_ship(
     forge: &DataForge<'_>,
     index: u32,

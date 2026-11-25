@@ -29,6 +29,20 @@ pub(in crate::build::catalog_queries::equipment) struct Query<'query> {
     pub(in crate::build::catalog_queries::equipment) cancel: Option<&'query CancelToken>,
 }
 
+pub(super) struct ResolverInputs<'source> {
+    files: ArchiveFiles<'source>,
+    entities: Arc<Entities<'source>>,
+}
+
+impl<'source> ResolverInputs<'source> {
+    pub(super) fn new(archive: &'source Archive, forge: &'source DataForge<'source>) -> Self {
+        Self {
+            files: ArchiveFiles::new(archive),
+            entities: Arc::new(Entities::new(forge)),
+        }
+    }
+}
+
 impl Query<'_> {
     pub(super) fn run(self) -> Result<LoadoutSnapshot, CatalogError> {
         let scope::Scope {
@@ -37,17 +51,10 @@ impl Query<'_> {
         } = scope::read(self.forge, self.selection, self.cancel)?;
         let origins = CatalogOrigins::for_archive_records(self.archive, self.entry)?;
         let (rows, dependencies) = self.resolve(&origins, wanted, &mut coverage)?;
-        coverage.incomplete_fields.sort_unstable();
-        coverage.incomplete_fields.dedup();
+        scope::finish_coverage(&mut coverage);
         let source_inventory = origins.uses.finish_with(|| checkpoint(self.cancel))?;
         checkpoint(self.cancel)?;
-        let availability = if rows.is_empty() {
-            DatasetAvailability::from_source_declarations(self.forge, |name| {
-                name == p4kx_assembly::ENTITY_TYPE
-            })
-        } else {
-            DatasetAvailability::Available
-        };
+        let availability = self.availability(rows.len());
         Ok(LoadoutSnapshot {
             build: self.archive.build().cloned(),
             availability,
@@ -56,6 +63,16 @@ impl Query<'_> {
             coverage,
             dependencies,
         })
+    }
+
+    pub(super) fn availability(&self, row_count: usize) -> DatasetAvailability {
+        if row_count == 0 {
+            DatasetAvailability::from_source_declarations(self.forge, |name| {
+                name == p4kx_assembly::ENTITY_TYPE
+            })
+        } else {
+            DatasetAvailability::Available
+        }
     }
 
     pub(super) fn resolve(
@@ -81,10 +98,9 @@ impl Query<'_> {
         coverage: &mut CatalogRecordCoverage,
         alignment: &mut DirectAlignment<'_>,
     ) -> Result<(Vec<Loadout>, LoadoutDependencyCoverage), CatalogError> {
-        let mut resolver = EquipmentDependencyCoverage::default();
-        let seed = ExportLedger::default();
         if wanted.is_empty() {
-            resolver.finish(self.archive, &seed)?;
+            let mut resolver = EquipmentDependencyCoverage::default();
+            resolver.finish(self.archive, &ExportLedger::default())?;
             return Ok((
                 Vec::new(),
                 LoadoutDependencyCoverage {
@@ -93,13 +109,37 @@ impl Query<'_> {
                 },
             ));
         }
-        let files = ArchiveFiles::new(self.archive);
-        let entities = Arc::new(Entities::new(self.forge));
+        let inputs = ResolverInputs::new(self.archive, self.forge);
         let mut rows = Vec::new();
-        let read = resolution::read_rows(
-            &files,
-            &entities,
+        let dependencies = self.resolve_prepared_rows(
+            input,
+            &inputs,
             wanted.into_iter(),
+            coverage,
+            alignment,
+            |row| {
+                rows.push(row);
+                Ok(())
+            },
+        )?;
+        Ok((rows, dependencies))
+    }
+
+    pub(super) fn resolve_prepared_rows(
+        &self,
+        input: &OriginalCatalogInput<'_, '_>,
+        sources: &ResolverInputs<'_>,
+        wanted: impl Iterator<Item = Wanted>,
+        coverage: &mut CatalogRecordCoverage,
+        alignment: &mut DirectAlignment<'_>,
+        mut accept: impl FnMut(Loadout) -> Result<(), CatalogError>,
+    ) -> Result<LoadoutDependencyCoverage, CatalogError> {
+        let mut resolver = EquipmentDependencyCoverage::default();
+        let seed = ExportLedger::default();
+        let read = resolution::read_rows(
+            &sources.files,
+            &sources.entities,
+            wanted,
             ResolverEvidence {
                 seed: &seed,
                 alignment,
@@ -110,8 +150,7 @@ impl Query<'_> {
                 if !row.port_inventory_complete || !row.issues.is_empty() {
                     coverage.incomplete_fields.push(row.root_record_index);
                 }
-                rows.push(row);
-                Ok(())
+                accept(row)
             },
         )?;
         for failure in read.failures {
@@ -120,12 +159,9 @@ impl Query<'_> {
             resolver.record_failure(index);
         }
         resolver.finish(self.archive, &read.ledger)?;
-        Ok((
-            rows,
-            LoadoutDependencyCoverage {
-                resolver,
-                alignment: alignment.dependencies().collect(),
-            },
-        ))
+        Ok(LoadoutDependencyCoverage {
+            resolver,
+            alignment: alignment.dependencies().collect(),
+        })
     }
 }

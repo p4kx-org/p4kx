@@ -84,10 +84,8 @@ pub(super) fn resolve_ordered<'source>(
     mut read: impl FnMut(Wanted) -> Result<Option<Loadout>, CatalogReadFailure<'source>>,
     mut accept: impl FnMut(Loadout) -> Result<(), CatalogError>,
 ) -> Result<Vec<CatalogReadFailure<'source>>, CatalogError> {
-    let mut ordered: Vec<_> = wanted.enumerate().collect();
-    guid_text::sort_by_guid(&mut ordered, |(_, want)| want.guid);
     let mut failures = Vec::new();
-    for (position, want) in ordered {
+    for (position, want) in in_catalog_order(wanted) {
         checkpoint(cancel)?;
         match read(want) {
             Ok(Some(entry)) => accept(entry)?,
@@ -98,6 +96,12 @@ pub(super) fn resolve_ordered<'source>(
     // Equal-GUID failures are deduplicated in input order by the collector.
     failures.sort_unstable_by_key(|(position, _)| *position);
     Ok(failures.into_iter().map(|(_, failure)| failure).collect())
+}
+
+pub(crate) fn in_catalog_order(wanted: impl Iterator<Item = Wanted>) -> Vec<(usize, Wanted)> {
+    let mut ordered: Vec<_> = wanted.enumerate().collect();
+    guid_text::sort_by_guid(&mut ordered, |(_, want)| want.guid);
+    ordered
 }
 
 pub(super) fn read_with<'f: 'worker, 'worker>(

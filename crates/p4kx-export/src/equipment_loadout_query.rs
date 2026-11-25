@@ -43,6 +43,10 @@ pub use installed_configurations::{
 
 #[path = "equipment_loadout_scope.rs"]
 mod scope;
+#[path = "equipment_loadout_visit.rs"]
+mod visit;
+
+pub use visit::{LoadoutOwnerSnapshot, LoadoutVisitSummary, visit_loadouts, visit_loadouts_from};
 
 pub use crate::contract_loadout::{EntityKind as LoadoutOwnerKind, Loadout, LoadoutPort, PortType};
 pub use crate::loadout::alignment::direct::{

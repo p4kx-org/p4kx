@@ -104,11 +104,12 @@ pub use loadout_query::{
     FacilityPlacementDependency, FlightConfigurationKind, FlightConfigurationLink,
     InstalledConfiguration, InstalledConfigurationDependency, InstalledConfigurationSnapshot,
     InteriorCoverageDependency, InteriorRoomCoverage, Loadout, LoadoutDependencyCoverage,
-    LoadoutFacilityPlacementSnapshot, LoadoutOwnerKind, LoadoutPort, LoadoutSnapshot, PortType,
-    read_crafter_hosts, read_crafter_hosts_from, read_facility_interior_coverage,
-    read_facility_interior_coverage_from, read_installed_configurations,
-    read_installed_configurations_from, read_loadout_facility_placements,
-    read_loadout_facility_placements_from, read_loadouts, read_loadouts_from,
+    LoadoutFacilityPlacementSnapshot, LoadoutOwnerKind, LoadoutOwnerSnapshot, LoadoutPort,
+    LoadoutSnapshot, LoadoutVisitSummary, PortType, read_crafter_hosts, read_crafter_hosts_from,
+    read_facility_interior_coverage, read_facility_interior_coverage_from,
+    read_installed_configurations, read_installed_configurations_from,
+    read_loadout_facility_placements, read_loadout_facility_placements_from, read_loadouts,
+    read_loadouts_from, visit_loadouts, visit_loadouts_from,
 };
 
 #[path = "equipment_ammo_query.rs"]
