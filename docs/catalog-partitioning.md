@@ -513,26 +513,36 @@ The final release candidate requires its own producer and replay measurements.
 ### Packaged Normal measurement with updated field provenance
 
 The Windows AMD64 CLI built from merge revision `27da392284eed8c67cf58c15ea473089d6c0a20c`
-completed an unfiltered Normal export on LIVE `13220821`. It used an explicit Archive key
-file, one worker, Zstandard level 3 and a fixed Unix-epoch export time. The executable and the
-installed Archive and Build manifest had matching observations before and after the run.
+completed unfiltered Normal exports on LIVE and PTU. It used an explicit Archive key file, one
+worker, Zstandard level 3 and a fixed Unix-epoch export time. The executable and the installed
+Archive and Build manifest matched their observations before and after each run.
 [Native Windows AMD64 package](https://github.com/p4kx-org/p4kx/actions/runs/45530796171/job/138925533389)
 
 | Build | Wall time (s) | Peak working set (B) | Peak private commit (B) |
 | --- | ---: | ---: | ---: |
 | LIVE `13220821` | 1,791.078 | 35,879,813,120 | 38,465,208,320 |
+| PTU `13260598` | 2,070.426 | 36,745,424,896 | 39,515,660,288 |
 
-Windows reported the lifetime memory peaks after exit. Across 1,730 host samples,
-the lowest available physical memory was 23,320,309,760 bytes and the lowest
-commit headroom was 51,839,676,416 bytes. The host had 100,573,523,968 bytes of
-physical RAM and recorded 218,075 additional page reads and four additional
-page writes during the run. The larger process peak leaves an estimated
-30,254,268,416 bytes for the OS and other processes on a 64 GiB system.
+Windows reported the lifetime memory peaks after exit. Both runs used an interactive Windows
+11 Pro 26H2 session (build `26300.9974`) on an AMD Ryzen 9 9950X3D host with
+100,573,523,968 bytes of physical RAM. The larger private peak leaves 29,203,816,448 bytes
+on a 64 GiB system before accounting for other processes and the OS.
 
-The writer measured 1,469,260,866 compressed bytes and 78,149,434,545 decoded bytes.
-It reported 1,919,532,693 peak temporary bytes. Windows counted 1,919,542,435 process write
-bytes. The compressed frame SHA-256 was
-`eff6ccfcecb0eb7cdc6254d0a33ad5777f8d8f2df112851108261bdd347ff40e`.
+| Build | Host samples | Minimum available RAM (B) | Minimum commit headroom (B) | Page reads | Page writes |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 1,730 | 23,320,309,760 | 51,839,676,416 | 218,075 | 4 |
+| PTU `13260598` | 1,995 | 20,344,823,808 | 47,874,867,200 | 49,927 | 27 |
+
+| Build | Compressed bytes | Writer's decoded bytes | Peak temporary bytes | Process write bytes |
+| --- | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 1,469,260,866 | 78,149,434,545 | 1,919,532,693 | 1,919,542,435 |
+| PTU `13260598` | 1,721,110,756 | 80,905,935,181 | 2,220,213,289 | 2,220,223,341 |
+
+The Windows AMD64 executable SHA-256 was
+`51509c2938a19b75c9717c1d09973db522f29467d57f3b0cb96412eb618a739c`.
+The compressed frame SHA-256 values were
+`eff6ccfcecb0eb7cdc6254d0a33ad5777f8d8f2df112851108261bdd347ff40e` for LIVE and
+`7e3619c0b2055a7ce6915cab2bf10f40c32f66797c79ec2810998f3f8393d70c` for PTU.
 
 ## Measuring a complete export
 
