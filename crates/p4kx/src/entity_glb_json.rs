@@ -9,7 +9,9 @@ use anyhow::Result;
 use p4kx_assembly::{
     Assembly, ChangedLoadout, CreatureAnimations, CreatureClips, EntityNode, Issue, LoadoutChanges,
 };
-use p4kx_extraction::{ArchiveDefaultMaterial, DefaultMaterialReceipt, GlbSummary};
+use p4kx_extraction::{
+    ArchiveDefaultMaterial, DataForge, DataForgeOrigin, DefaultMaterialReceipt, GlbSummary, Record,
+};
 use serde::Serialize;
 
 use crate::cli_entity::EntityGlbArgs;
@@ -21,8 +23,11 @@ use crate::model_animations::WrittenJson;
 
 #[path = "entity_glb_animation_sources.rs"]
 mod animation_sources;
+#[path = "entity_glb_report_origins.rs"]
+mod report_origins;
 
 use animation_sources::AnimationSourcesJson;
+use report_origins::Origins;
 
 /// What the JSON report of one `entity glb` run is built from.
 pub(crate) struct GlbReport<'a> {
@@ -38,11 +43,28 @@ pub(crate) struct GlbReport<'a> {
 }
 
 impl GlbReport<'_> {
-    /// Prints the report to stdout.
-    pub(crate) fn print(&self) -> Result<()> {
+    /// Prints the report and the original evidence of its selected Record to stdout.
+    pub(crate) fn print(
+        &self,
+        forge: &DataForge<'_>,
+        selected: &Record<'_>,
+        original: &DataForgeOrigin,
+    ) -> Result<()> {
+        let report = self.report();
+        let origins = Origins::capture(
+            forge,
+            selected,
+            original,
+            self.tree,
+            report.interior.is_some(),
+        )?;
+        Ok(json::print(&SourcedReport { report, origins })?)
+    }
+
+    fn report(&self) -> GlbJson<'_> {
         let (args, tree, assembly, summary) = (self.args, self.tree, self.assembly, self.summary);
         let (applied, changes) = (self.applied, self.changes);
-        Ok(json::print(&GlbJson {
+        GlbJson {
             archive: json::path(self.archive),
             entity: tree.class_name(),
             guid: tree.guid().to_string(),
@@ -99,8 +121,16 @@ impl GlbReport<'_> {
                 .as_ref()
                 .map(AnimationSourcesJson::from),
             issues: issues_json(assembly, self.animations),
-        })?)
+        }
     }
+}
+
+#[derive(Serialize)]
+struct SourcedReport<'a> {
+    #[serde(flatten)]
+    report: GlbJson<'a>,
+    #[serde(flatten)]
+    origins: Origins,
 }
 
 #[derive(Serialize)]

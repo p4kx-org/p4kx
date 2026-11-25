@@ -77,7 +77,7 @@ pub(crate) fn run(args: &EntityGlbArgs, as_json: bool) -> Result<()> {
             changes: &changes,
             animations: (&found, &animated),
         }
-        .print();
+        .print(&forge, &record, entry.origin());
     }
     let printed = print_report(&assembly, &summary, &args.out, tree, &changes)
         .and_then(|()| print_animations(&summary, &found, &animated));

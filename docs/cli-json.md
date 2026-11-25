@@ -380,8 +380,15 @@ order is attached. The same Archive always gives the same document.
  "skinned_meshes": 0, "lod_fallbacks": 0, "shared_meshes": 33, "shared_materials": 103,
  "shared_textures": 0, "vertices": 744831,
  "triangles": 818426, "bytes": 44750744, "skipped": 0, "unresolved_layers": 0,
- "placements": [Placement, …], "animations": [Animation, …], "issues": [Issue, …]}
+ "placements": [Placement, …], "animations": [Animation, …], "issues": [Issue, …],
+ "fieldOrigins": {"/entity": {…}, "/guid": {…}, "/nodes": {…}}, "provenance": {…}}
 ```
+
+`fieldOrigins` addresses `/entity` and `/guid` in the selected physical DataForge Record and
+`provenance` lists their original sources and uses. Report counters, including the nested Interior
+counts when emitted, carry `containsEncryptedSource: null` and `sourceSetComplete: false` until
+their own contributors can be established. These metadata fields leave the GLB and the existing
+JSON values unchanged.
 
 `unresolved_layers` counts the layer files of the material libraries of all parts, their bone
 attachments and the Interior that the Archive lacks, that cannot be read or that exceed the load
