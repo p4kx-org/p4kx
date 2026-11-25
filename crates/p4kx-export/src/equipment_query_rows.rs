@@ -61,6 +61,7 @@ pub(super) enum Family {
     ItemSources,
     Attachments,
     ItemPorts,
+    DeclaredEquipment,
     Bounds,
     CargoGrids,
     Facilities,
@@ -86,6 +87,7 @@ impl Family {
             self,
             Self::Definitions
                 | Self::ItemPorts
+                | Self::DeclaredEquipment
                 | Self::AmmoDefinitions
                 | Self::Factions
                 | Self::ContractScopes
@@ -109,6 +111,7 @@ impl Family {
             | Self::ItemSources
             | Self::Attachments
             | Self::ItemPorts
+            | Self::DeclaredEquipment
             | Self::Bounds
             | Self::CargoGrids
             | Self::Facilities
@@ -125,7 +128,7 @@ impl Family {
             return DatasetAvailability::Available;
         }
         let types = match self {
-            Self::Definitions | Self::Items | Self::ItemSources => {
+            Self::Definitions | Self::Items | Self::ItemSources | Self::DeclaredEquipment => {
                 &[p4kx_assembly::ENTITY_TYPE][..]
             }
             Self::Attachments => &[ATTACHABLE][..],

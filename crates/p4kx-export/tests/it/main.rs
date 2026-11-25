@@ -139,6 +139,7 @@ mod crafting_fixture;
 mod crafting_research;
 mod crafting_research_fixture;
 mod equipment;
+mod equipment_declared_visit;
 mod export_complete_loot_filters;
 mod export_complete_loot_fixture;
 mod export_complete_loot_source;

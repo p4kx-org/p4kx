@@ -64,8 +64,8 @@ pub(crate) fn read_item_ports_scoped<'source>(
 
 #[path = "catalog_configuration_scope.rs"]
 mod scope;
-pub(crate) use self::scope::read_interactions;
 use self::scope::{ConfigurationOwner, Scope};
+pub(crate) use self::scope::{read_declared_equipment, read_interactions};
 
 pub(crate) fn read_attachment_constraints<'source>(
     tree: &RecordTree<'source>,

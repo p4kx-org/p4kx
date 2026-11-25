@@ -13,6 +13,7 @@ impl<'source> Plan<'source> {
     pub(in crate::build::catalog_queries) fn visit_entities<E: From<CatalogError>>(
         forge: &'source DataForge<'source>,
         selection: CatalogRecordSelection,
+        kinds: Option<&'static [Kind]>,
         cancel: Option<&CancelToken>,
         visit: impl FnMut(Owner<'source>, &mut CatalogRecordCoverage) -> Result<(), E>,
     ) -> Result<CatalogRecordCoverage, E> {
@@ -21,7 +22,7 @@ impl<'source> Plan<'source> {
             selection,
             cancel,
             None,
-            entity_candidates(forge, |_, _| true),
+            entity_candidates(forge, kinds, |_, _| true),
             visit,
         )
     }
@@ -29,6 +30,7 @@ impl<'source> Plan<'source> {
 
 pub(super) fn entity_candidates<'source, Candidate>(
     forge: &'source DataForge<'source>,
+    kinds: Option<&'static [Kind]>,
     mut may_match: Candidate,
 ) -> impl FnMut(
     &Record<'source>,
@@ -50,8 +52,12 @@ where
         });
         match classified {
             Err(_) => coverage.unreadable_headers.push(record.index()),
-            Ok(Some(Selected::Leftover(_))) => coverage.skipped_leftovers += 1,
-            Ok(Some(Selected::Entity(kind))) => {
+            Ok(Some(Selected::Leftover(kind)))
+                if kinds.is_none_or(|kinds| kinds.contains(&kind)) =>
+            {
+                coverage.skipped_leftovers += 1;
+            }
+            Ok(Some(Selected::Entity(kind))) if kinds.is_none_or(|kinds| kinds.contains(&kind)) => {
                 if kind != Kind::Crafters {
                     return Ok(may_match(record, trees));
                 }
@@ -63,7 +69,7 @@ where
                     Err(_) => coverage.unreadable_headers.push(record.index()),
                 }
             }
-            Ok(None) => {}
+            Ok(_) => {}
         }
         Ok(false)
     }

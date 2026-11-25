@@ -17,7 +17,8 @@ use crate::catalog_v3::authored_fields::Observed;
 use crate::catalog_v3::catalog_facility::{CARGO_GRID_SOURCE_TYPE, FacilityKind};
 use crate::catalog_v3::catalog_interactions::{InteractionConfiguration, InteractionKind};
 use crate::catalog_v3::catalog_item_alignment::{
-    ATTACHABLE, AttachmentTarget, CONTAINER, ItemAlignmentKind, attachment_target,
+    ATTACHABLE, AttachmentTarget, CONTAINER, ItemAlignmentKind, ItemAlignmentRows,
+    attachment_target,
 };
 use crate::catalog_v3::item_alignment_options::AlignmentOptions;
 use crate::catalog_v3::item_component_owner::ComponentOwner;
@@ -33,6 +34,7 @@ pub(super) enum Scope {
     Interactions,
     Ports,
     Attachments,
+    PortsAndAttachments,
     Bounds,
     CargoGrids,
     Facilities,
@@ -69,6 +71,24 @@ pub(crate) fn read_interactions<'source>(
     Ok(read.map(|rows| rows.interactions))
 }
 
+pub(crate) fn read_declared_equipment<'source>(
+    tree: &RecordTree<'source>,
+    projection: &CatalogProjection<'_, 'source>,
+    admission: &RecordObservation<'_, 'source>,
+    options: &AlignmentOptions<'_>,
+    cancel: Option<&CancelToken>,
+) -> Result<ScopedSourceRead<ItemAlignmentRows<'source>>, CatalogError> {
+    let read = read_scope(
+        tree,
+        projection,
+        admission,
+        options,
+        cancel,
+        Scope::PortsAndAttachments,
+    )?;
+    Ok(read.map(|rows| rows.alignment))
+}
+
 impl Scope {
     pub(super) fn configuration(
         self,
@@ -79,6 +99,14 @@ impl Scope {
             return (value.type_name() == CONTAINER).then_some(ConfigurationKind::Alignment {
                 alignment: ItemAlignmentKind::Port,
                 occupancy: false,
+            });
+        }
+        if matches!(self, Self::PortsAndAttachments) {
+            return ItemAlignmentKind::of(value, input).map(|alignment| {
+                ConfigurationKind::Alignment {
+                    alignment,
+                    occupancy: false,
+                }
             });
         }
         if matches!(self, Self::InventoryConfigurations) {
@@ -167,7 +195,10 @@ impl Scope {
             Self::Fuel(requested) => {
                 matches!(kind, ConfigurationKind::Fuel(actual) if actual == requested)
             }
-            Self::Interactions | Self::Ports | Self::InventoryConfigurations => false,
+            Self::Interactions
+            | Self::Ports
+            | Self::PortsAndAttachments
+            | Self::InventoryConfigurations => false,
         }
     }
 
@@ -233,8 +264,10 @@ impl Scope {
             let complete = match value {
                 Value::Error(_) => false,
                 Value::Struct(component)
-                    if matches!(self, Self::Attachments | Self::Bounds)
-                        && component.type_name() == ATTACHABLE =>
+                    if matches!(
+                        self,
+                        Self::Attachments | Self::PortsAndAttachments | Self::Bounds
+                    ) && component.type_name() == ATTACHABLE =>
                 {
                     self.attachment_complete(component, input)
                 }
@@ -307,7 +340,7 @@ impl Scope {
             Self::ResourceTopology(declaration) => {
                 rows.topology.project(declaration, owner, source, notes)
             }
-            Self::Ports | Self::Attachments => {
+            Self::Ports | Self::Attachments | Self::PortsAndAttachments => {
                 let ConfigurationKind::Alignment { alignment, .. } = configuration else {
                     return Err(ExportAccountingError::ConflictingSourceDatum.into());
                 };

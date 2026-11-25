@@ -58,6 +58,15 @@ pub(crate) struct ItemAlignmentRows<'source> {
 }
 
 impl<'source> ItemAlignmentRows<'source> {
+    pub(crate) fn into_declarations(
+        self,
+    ) -> (
+        Vec<ItemPortContainer<'source>>,
+        Vec<ItemAttachmentComponent<'source>>,
+    ) {
+        (self.ports, self.attachments)
+    }
+
     pub(crate) fn into_port_containers(self) -> Vec<ItemPortContainer<'source>> {
         self.ports
     }

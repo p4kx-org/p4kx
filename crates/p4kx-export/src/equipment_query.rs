@@ -124,6 +124,8 @@ mod cargo;
 mod cargo_read;
 #[path = "equipment_configuration_visit.rs"]
 mod configuration_visit;
+#[path = "equipment_declared_visit.rs"]
+mod declared;
 #[path = "equipment_item_query.rs"]
 mod definitions;
 #[path = "equipment_facility_query.rs"]
@@ -218,6 +220,10 @@ pub use cargo::{
 pub use configuration_visit::{
     visit_attachment_constraints, visit_attachment_constraints_from, visit_item_bounds,
     visit_item_bounds_from,
+};
+pub use declared::{
+    DeclaredEquipment, DeclaredEquipmentSnapshot, visit_declared_equipment,
+    visit_declared_equipment_from,
 };
 pub use definitions::{with_item_definitions, with_item_definitions_from};
 pub use facilities::{

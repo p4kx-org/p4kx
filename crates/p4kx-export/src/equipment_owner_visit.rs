@@ -16,7 +16,7 @@ use crate::catalog_queries::{
 };
 use crate::catalog_query_session::checkpoint;
 use crate::texts::{TextSources, Texts};
-use crate::{CatalogError, ExportAccountingError};
+use crate::{CatalogError, ExportAccountingError, Kind};
 
 /// Outcome of visiting a selected physical equipment family.
 #[derive(Debug)]
@@ -57,6 +57,7 @@ impl EquipmentVisitSummary {
 #[derive(Clone, Copy)]
 pub(super) enum EntityScope {
     All,
+    Kinds(&'static [Kind]),
     Components(&'static [&'static str]),
 }
 
@@ -67,7 +68,16 @@ impl EntityScope {
         visit: impl FnMut(Owner<'archive>, &mut CatalogRecordCoverage) -> Result<(), E>,
     ) -> Result<CatalogRecordCoverage, E> {
         match self {
-            Self::All => Plan::visit_entities(query.forge, query.selection, query.cancel, visit),
+            Self::All => {
+                Plan::visit_entities(query.forge, query.selection, None, query.cancel, visit)
+            }
+            Self::Kinds(kinds) => Plan::visit_entities(
+                query.forge,
+                query.selection,
+                Some(kinds),
+                query.cancel,
+                visit,
+            ),
             Self::Components(types) => Plan::visit_entity_components(
                 query.forge,
                 types,

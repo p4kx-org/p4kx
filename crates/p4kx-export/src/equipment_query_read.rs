@@ -209,6 +209,7 @@ impl<'query> Query<'query> {
             )?,
             Family::Attachments
             | Family::ItemPorts
+            | Family::DeclaredEquipment
             | Family::Bounds
             | Family::CargoGrids
             | Family::Facilities => {
@@ -249,7 +250,10 @@ impl<'query> Query<'query> {
         item_filter: Option<&'options Filter>,
     ) -> Result<ReadOptions<'options>, CatalogError> {
         Ok(ReadOptions {
-            alignment: if matches!(family, Family::Attachments | Family::ItemPorts) {
+            alignment: if matches!(
+                family,
+                Family::Attachments | Family::ItemPorts | Family::DeclaredEquipment
+            ) {
                 AlignmentOptions::read(self.forge, self.cancel)?
             } else {
                 AlignmentOptions::default()
@@ -288,6 +292,7 @@ fn order(family: Family, owners: &mut [Owner<'_>]) {
         }),
         Family::Attachments
         | Family::ItemPorts
+        | Family::DeclaredEquipment
         | Family::Bounds
         | Family::CargoGrids
         | Family::Facilities

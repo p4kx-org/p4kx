@@ -83,7 +83,7 @@ impl<'source> Plan<'source> {
             selection,
             cancel,
             None,
-            entity_candidates(forge, may_match),
+            entity_candidates(forge, None, may_match),
             visit,
         )
     }
@@ -132,7 +132,7 @@ impl<'source> Plan<'source> {
             selection,
             cancel,
             observer,
-            entity_candidates(forge, may_match),
+            entity_candidates(forge, None, may_match),
         )
     }
 
