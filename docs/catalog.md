@@ -2756,6 +2756,8 @@ and are recorded in export health.
 `definitions.shopInventories` has `meaning: "offlineDesignTime"`. It covers every direct
 `.json` Entry in `Data\\Scripts\\ShopInventories`, including orphan and placeholder files.
 This physical selection is global under a Record filter and independent of the shop registry.
+A required read failure in this table prevents Normal publication. Its diagnostics distinguish
+`archiveKeyRequired`, `wrongArchiveKey` and other read failures.
 Rows are ordered by normalized path and physical directory index. The original `sourcePath`,
 normalized path, `inputRef` and `entryIndex` keep each file independently addressable.
 

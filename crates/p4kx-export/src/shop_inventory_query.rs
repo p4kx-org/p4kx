@@ -10,7 +10,9 @@ use p4kx_extraction::{
 };
 
 use crate::catalog_query_session::checkpoint;
-use crate::catalog_read::original::{EntryCapture, EntryReceipt, with_entry_capture_mode};
+use crate::catalog_read::original::{
+    EntryCapture, EntryReceipt, FailedEntryObservation, with_entry_capture_mode,
+};
 pub use crate::catalog_read::original::{PhysicalEntryIdentity, PhysicalEntryRef};
 use crate::catalog_table::DatasetAvailability;
 pub use crate::contract_shops::{Shop, ShopItemGuids, ShopRegistryFields};
@@ -36,7 +38,10 @@ pub use crate::shops::row_query::{
     ShopRowsSnapshot, read_shop, read_shop_with_provenance_mode, read_shops,
     read_shops_with_provenance_mode,
 };
-use crate::{CatalogError, Kind, export_health_entries, shop_inventories, starmap_index};
+use crate::{
+    CatalogError, ExportAccountingError, ExportDiagnosticCode, ExportDiagnosticStage, Kind,
+};
+use crate::{export_health_entries, shop_inventories, starmap_index};
 
 /// Selects original shop inventory Entries in one Archive.
 #[derive(Debug, Clone, Copy)]
@@ -58,6 +63,20 @@ pub struct ShopInventoryCoverage {
     pub directory: FieldOrigin,
     /// Read and projection outcomes for the selected Entries.
     pub entries: ExportEntryCounts,
+    /// Read and projection failures in physical Entry order.
+    pub failures: Vec<ShopInventoryFailure>,
+}
+
+/// The diagnosed failure of a selected original inventory file.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ShopInventoryFailure {
+    /// The physical directory index in the queried Archive.
+    pub entry_index: u32,
+    /// The failed source or projection stage.
+    pub stage: ExportDiagnosticStage,
+    /// The specific reason retained from the original operation.
+    pub code: ExportDiagnosticCode,
 }
 
 /// Shop inventory definitions and their scoped source inventory.
@@ -138,18 +157,44 @@ pub fn read_shop_inventories_with_provenance_mode(
         }
         let evidence = export_health_entries::compile(ledger.entries)?;
         let entries = export_health_entries::counts(Kind::ShopInventories, &evidence.sources)?;
+        let failures = inventory_failures(&evidence.failed)?;
         let source_inventory = registry.finish_with(|| checkpoint(cancel))?;
         Ok(ShopInventorySnapshot {
             build: archive.build().cloned(),
             availability: table.availability,
             rows: table.rows,
             source_inventory,
-            coverage: ShopInventoryCoverage { directory, entries },
+            coverage: ShopInventoryCoverage {
+                directory,
+                entries,
+                failures,
+            },
         })
     });
     watch.check()?;
     checkpoint(cancel)?;
     snapshot
+}
+
+fn inventory_failures(
+    observations: &[FailedEntryObservation],
+) -> Result<Vec<ShopInventoryFailure>, ExportAccountingError> {
+    observations
+        .iter()
+        .map(|failure| {
+            let index = failure
+                .source
+                .entry_index
+                .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
+            let entry_index =
+                u32::try_from(index).map_err(|_| ExportAccountingError::CounterOverflow)?;
+            Ok(ShopInventoryFailure {
+                entry_index,
+                stage: failure.stage,
+                code: failure.code,
+            })
+        })
+        .collect()
 }
 
 fn selection_origin(

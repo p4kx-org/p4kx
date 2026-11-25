@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::fmt;
+
 use p4kx_extraction::{SourceInventory, SourceUses};
 
 use crate::options::CatalogRun;
-use crate::{CatalogError, CatalogProvenance, ExportHealth};
+use crate::{CatalogError, CatalogProvenance, ExportDiagnosticCode, ExportHealth, Kind};
 
 use super::parts;
 
@@ -33,6 +35,30 @@ impl CatalogRefusal {
     #[must_use]
     pub fn source_inventory(&self) -> &SourceInventory {
         self.provenance.inventory()
+    }
+}
+
+impl fmt::Display for CatalogRefusal {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(
+            "catalog export is incomplete; explicit diagnostic partial export is required",
+        )?;
+        for diagnostic in self.health.diagnostics() {
+            if diagnostic.kind != Some(Kind::ShopInventories) {
+                continue;
+            }
+            let reason = match diagnostic.code {
+                ExportDiagnosticCode::ArchiveKeyRequired => "an Archive key is required",
+                ExportDiagnosticCode::WrongArchiveKey => "the Archive key was rejected",
+                _ => continue,
+            };
+            write!(
+                formatter,
+                ". Required reads in definitions.shopInventories blocked because {reason} ({})",
+                diagnostic.count,
+            )?;
+        }
+        Ok(())
     }
 }
 

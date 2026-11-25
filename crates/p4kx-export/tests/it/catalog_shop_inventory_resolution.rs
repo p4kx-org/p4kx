@@ -23,6 +23,8 @@ mod duplicate_physical;
 mod empty_source;
 #[path = "shop_inventory_jsonn.rs"]
 mod jsonn;
+#[path = "shop_inventory_key_failures.rs"]
+mod key_failures;
 #[path = "shop_inventory_rejected_path.rs"]
 mod rejected_path;
 #[path = "shop_inventory_resolution_sdk.rs"]

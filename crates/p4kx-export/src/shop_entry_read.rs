@@ -11,9 +11,13 @@ use crate::export_diagnostic::ExportDiagnosticCode;
 
 impl EntryReadError {
     /// Returns the technical diagnosis of the actual Entry read failure.
-    pub(crate) const fn diagnosis(&self) -> EntryDiagnosis {
+    pub(crate) fn diagnosis(&self) -> EntryDiagnosis {
         let code = match self {
             Self::Limit { .. } => ExportDiagnosticCode::FieldWalkLimit,
+            Self::Open(error) if error.is_key_required() => {
+                ExportDiagnosticCode::ArchiveKeyRequired
+            }
+            Self::Open(error) if error.is_wrong_key() => ExportDiagnosticCode::WrongArchiveKey,
             Self::Open(_) | Self::Read(_) => ExportDiagnosticCode::SourceReadFailure,
         };
         diagnosis(code, "content")

@@ -59,7 +59,7 @@ pub enum CatalogError {
     #[error(transparent)]
     Accounting(#[from] crate::ExportAccountingError),
     /// Normal publication was refused before any output was created.
-    #[error("catalog export is incomplete; explicit diagnostic partial export is required")]
+    #[error("{0}")]
     IncompleteExport(CatalogRefusal),
     /// The DataForge Entry cannot be found or read.
     #[error(transparent)]

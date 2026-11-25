@@ -49,6 +49,10 @@ pub enum ExportDiagnosticCode {
     FieldWalkLimit,
     /// Canonical source reading failed.
     SourceReadFailure,
+    /// An encrypted Archive Entry could not be opened without a key.
+    ArchiveKeyRequired,
+    /// An encrypted Archive Entry could not be opened with the rejected key.
+    WrongArchiveKey,
     /// Typed source projection failed.
     ProjectionFailure,
     /// A secondary derived projection failed.

@@ -17141,6 +17141,14 @@
           "value": "sourceReadFailure"
         },
         {
+          "description": "An encrypted Archive Entry could not be opened without a key.",
+          "value": "archiveKeyRequired"
+        },
+        {
+          "description": "An encrypted Archive Entry could not be opened with the rejected key.",
+          "value": "wrongArchiveKey"
+        },
+        {
           "description": "Typed source projection failed.",
           "value": "projectionFailure"
         },
