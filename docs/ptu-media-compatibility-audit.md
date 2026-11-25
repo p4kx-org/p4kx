@@ -84,9 +84,31 @@ identical SHA-256 hashes.
 | PTU `13260598` | 7,328 | 56,608 | 974,409,728 | 979,394,560 | 7.542 |
 
 Process peaks are the largest lifetime values across the five CLI invocations
-for each Build. Portable provenance for the produced WAV remains open under
-[#1125](https://github.com/p4kx-org/p4kx/issues/1125). The complete Media export
-has its own current-Build verification under [#1088](https://github.com/p4kx-org/p4kx/issues/1088).
+for each Build. These measurements covered the WAV bytes and summary.
+
+### Packaged WAV origin verification on LIVE 13220821 and PTU 13273298
+
+The Windows AMD64 portable CLI from merge revision
+`4d334e716cbc87e27525e8e095410a19103c51f5` read one physical root Vorbis
+WEM Entry per installed Build. The independent verifier checked the
+original directory identity, CRC-verified source, RIFF format words,
+successful output and identical repeated WAV digests. Each WAV named a
+complete sibling origin companion. Its binding matched the file name,
+size and SHA-256. The PCM and data-length addresses matched the actual
+output ranges. The sample origin cited the selected unencrypted WEM
+DATA range. The written frame-count summary used the same source
+references as the companion's data-length field.
+[Windows AMD64 package artifact](https://github.com/p4kx-org/p4kx/actions/runs/45576709479/artifacts/15007173314)
+
+| Build | WEM bytes | WAV bytes | Peak private commit (B) | Peak working set (B) | Elapsed (s) |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| LIVE `13220821` | 24,625 | 178,524 | 953,905,152 | 959,049,728 | 9.230 |
+| PTU `13273298` | 7,328 | 56,608 | 974,409,728 | 979,304,448 | 10.775 |
+
+Both runs confirmed unchanged Archive and Build stamps. Each peak is
+the maximum Windows lifetime counter across five native CLI calls.
+The full Media export has its own current-Build verification under
+[#1088](https://github.com/p4kx-org/p4kx/issues/1088).
 
 ## Confirmed defects and distinctions
 
