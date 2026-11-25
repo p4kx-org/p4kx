@@ -571,6 +571,24 @@ The private commit peak leaves an estimated 15,951,486,976 bytes for the OS
 and other processes on a 16 GiB system. This measures the mining SDK harness
 on the available host. Paging, scratch writes and the integrated application's
 total footprint need their own counters.
+The Windows AMD64 harness at `4557f2851fd18beac00e829dd2e459165af132f6`
+also exercised LIVE `13220821` and PTU `13260598`. The executable SHA-256 was
+`e56384e1cf1c3d3d349d80564b0af1f97dc7e3228220aab530d72323f38c9ced`.
+The same process retained its previous snapshot across the changed-Build read.
+The cold phase took 139.628 seconds and the changed-Build refresh took 141.867
+seconds. The warm request reused the PTU snapshot in under one millisecond.
+Cancellation and unavailable input both retained the PTU snapshot. Both Archive
+and Build stamps matched before and after the run.
+
+Windows reported lifetime peaks of 1,238,855,680 bytes of private commit and
+1,222,098,944 bytes of working set. The run took 295.830 seconds, with 247
+process samples, a minimum 25,831,206,912 bytes of available RAM and zero
+sampled temporary bytes. Windows counted 2,925 process-write bytes. Shared-host
+paging advanced by 132,054 reads and 56 writes while the independent Catalog
+checks were running. The private peak leaves an estimated 15,941,013,504 bytes
+for the OS and other processes on a 16 GiB system.
+[Reported integrated consumer trial](catalog-partitioning.md#embedded-consumer-trial)
+
 Installed parity reads the same Build's measured normal Catalog directly from
 the compressed artifact. Both checks matched the mineable elements,
 compositions, provider presets, harvestable locations, reachable resources,
