@@ -2,6 +2,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'msi-observer-evidence.ps1')
 . (Join-Path $PSScriptRoot 'msi-observer-snapshot-caller.ps1')
 . (Join-Path $PSScriptRoot 'msi-observer-progress.ps1')
+. (Join-Path $PSScriptRoot 'msi-observer-finish-predicate.ps1')
 
 function Get-P4kxMsiFinishContext([string]$Directory) {
     $root = [IO.Path]::GetFullPath($Directory)
@@ -65,8 +66,7 @@ function Read-P4kxMsiFinishLaunch($Context) {
 }
 
 function Test-P4kxMsiFinishReceiptPresence {
-    param($Context, [string]$ReceiptPath, [double]$MonotonicRemaining,
-        [Collections.Generic.List[object]]$PortalStages, [Diagnostics.Stopwatch]$Clock)
+    param($Context, [string]$ReceiptPath, [double]$MonotonicRemaining)
     $wallRemaining = ($Context.collection_cutoff - [DateTimeOffset]::UtcNow).TotalMilliseconds
     $remaining = [Math]::Min($wallRemaining, $MonotonicRemaining)
     if ($remaining -le 0) { return $false }
@@ -77,12 +77,6 @@ function Test-P4kxMsiFinishReceiptPresence {
     $progress = {
         param([string]$Stream, [string]$Chunk)
         if ($Stream -ceq 'stage' -and $Chunk -cmatch '^portal(Start|InputClose|Capture|Cleanup)\.(begin|end)\z') {
-            if ($null -ne $PortalStages) {
-                if ($PortalStages.Count -lt 8) {
-                    $PortalStages.Add(@{stage=$Chunk;elapsed_ms=$Clock.ElapsedMilliseconds})
-                }
-                return
-            }
             Write-P4kxMsiObserverProgress ('finishWaitPortal' + $Matches[1]) $Matches[2] -RequestDigest $Context.digest
             if ($env:GITHUB_ACTIONS -ceq 'true' -and $Chunk -ceq 'portalCapture.begin') {
                 Write-Host '::notice title=Native MSI Finish progress::WaitFinish owned probe entered capture. Observation only.'
@@ -111,11 +105,14 @@ function Wait-P4kxMsiFinishReceipt($Context, $Launch) {
     $resultDigest = $null
     $budget = ($Context.collection_cutoff - [DateTimeOffset]::UtcNow).TotalMilliseconds
     $clock = [Diagnostics.Stopwatch]::StartNew()
-    # Keep hosted output and durable writes outside the ARM64 lifecycle probe callback.
-    $portalStages = if ($Context.request.target -ceq 'aarch64-pc-windows-msvc' -and
-        $Context.request.mode -ceq 'Lifecycle') { ,([Collections.Generic.List[object]]::new()) } else { $null }
+    $direct = if ($Context.request.target -ceq 'aarch64-pc-windows-msvc' -and
+        $Context.request.mode -ceq 'Lifecycle') { @{} } else { $null }
     Write-P4kxMsiObserverProgress finishWaitPoll begin -RequestDigest $Context.digest
-    $found = Test-P4kxMsiFinishReceiptPresence $Context $receiptPath ($budget - $clock.Elapsed.TotalMilliseconds) $portalStages $clock
+    $found = if ($null -ne $direct) {
+        Test-P4kxMsiFinishDirectReceiptPresence $Context $receiptPath $clock $budget $direct
+    } else {
+        Test-P4kxMsiFinishReceiptPresence $Context $receiptPath ($budget - $clock.Elapsed.TotalMilliseconds)
+    }
     Write-P4kxMsiObserverProgress finishWaitPoll end -RequestDigest $Context.digest
     if ($found) {
         Write-P4kxMsiObserverProgress finishWaitDigest begin -RequestDigest $Context.digest
@@ -133,7 +130,7 @@ function Wait-P4kxMsiFinishReceipt($Context, $Launch) {
         deadline_utc=$Context.collection_cutoff.ToString('o');observed_utc=$observedAt.ToString('o')
         result_sha256=$resultDigest;mutation_authority=$false
     }
-    if ($null -ne $portalStages) { $wait.portal_stages = $portalStages.ToArray() }
+    if ($null -ne $direct) { $wait.direct_probe = $direct }
     Write-P4kxDetachedReceipt (Join-Path $Context.directory 'wait-result.json') $wait
     Write-P4kxMsiObserverProgress finishWaitReceipt end -RequestDigest $Context.digest
     if (-not $resultDigest) { throw 'The bound Finish supervisor produced no result within the original allowance.' }

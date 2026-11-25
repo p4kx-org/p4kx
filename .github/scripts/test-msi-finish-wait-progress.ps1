@@ -115,7 +115,7 @@ function Assert-P4kxFinishWaitSetupBudget([string]$Root) {
     Assert-P4kxWaitProgress ($failure -ceq 'The bound Finish supervisor produced no result within the original allowance.' -and
         $factory.returned_utc -ge $cutoff -and $receipt.deadline_utc -ceq $cutoff.ToString('o') -and
         $null -eq $receipt.result_sha256) 'Late setup lost the original negative wait and deadline.'
-    Assert-P4kxWaitProgress ($receipt.portal_stages.stage -cnotcontains 'portalStart.end' -and
+    Assert-P4kxWaitProgress ($receipt.direct_probe.started -eq $false -and $receipt.direct_probe.timed_out -eq $true -and
         -not [IO.File]::Exists((Join-Path $path 'wait-probe-stdout.log'))) 'The owned wait probe launched after its original allowance.'
 
     $factory.resume_utc = [DateTimeOffset]::UtcNow.AddMilliseconds(3100)
@@ -128,13 +128,11 @@ if ([IO.Directory]::Exists($Directory)) { throw 'Wait progress requires a fresh 
 $root = [IO.Directory]::CreateDirectory($Directory).FullName
 $oldActions = $env:GITHUB_ACTIONS
 $env:GITHUB_ACTIONS = 'true'
-$expected = @('portalStart.begin','portalStart.end','portalInputClose.begin','portalInputClose.end',
-    'portalCapture.begin','portalCapture.end','portalCleanup.begin','portalCleanup.end')
 try {
     foreach ($case in @(
-        @{name='native-arm-lifecycle';target='aarch64-pc-windows-msvc';mode='Lifecycle';buffer=$true},
-        @{name='native-arm-control';target='aarch64-pc-windows-msvc';mode='Control';buffer=$false},
-        @{name='native-amd-lifecycle';target='x86_64-pc-windows-msvc';mode='Lifecycle';buffer=$false}
+        @{name='native-arm-lifecycle';target='aarch64-pc-windows-msvc';mode='Lifecycle';direct=$true},
+        @{name='native-arm-control';target='aarch64-pc-windows-msvc';mode='Control';direct=$false},
+        @{name='native-amd-lifecycle';target='x86_64-pc-windows-msvc';mode='Lifecycle';direct=$false}
     )) {
         $path = [IO.Directory]::CreateDirectory((Join-Path $root $case.name)).FullName
         $terminal = Join-Path $path 'result.json'
@@ -151,17 +149,15 @@ try {
             $wait.request_sha256 -ceq $context.digest -and $wait.supervisor_pid -eq $launch.supervisor_pid -and
             $wait.supervisor_started_utc_ticks -eq $launch.supervisor_started_utc_ticks -and
             $wait.mutation_authority -eq $false) "$($case.name) changed the terminal binding or deadline."
-        if ($case.buffer) {
+        if ($case.direct) {
             Assert-P4kxWaitProgress (-not $console.Contains('finishWaitPortal') -and
-                -not $console.Contains('WaitFinish owned probe entered capture.')) 'The buffered callback reached the host.'
-            Assert-P4kxWaitProgress (($wait.portal_stages.stage -join ' ') -ceq ($expected -join ' ')) 'The wait did not retain all eight fixed transitions.'
-            $previous = [long]0
-            foreach ($stage in $wait.portal_stages) {
-                Assert-P4kxWaitProgress ($stage.elapsed_ms -ge $previous) 'Portal transitions are outside monotonic order.'
-                $previous = $stage.elapsed_ms
-            }
+                -not $console.Contains('WaitFinish owned probe entered capture.')) 'The direct probe wrote Portal progress.'
+            Assert-P4kxWaitProgress ($wait.direct_probe.signal_contract -ceq 'direct-process-only' -and
+                $wait.direct_probe.pid -gt 0 -and $wait.direct_probe.started -eq $true -and
+                $wait.direct_probe.exited -eq $true -and $wait.direct_probe.exit_code -eq 0 -and
+                $wait.direct_probe.timed_out -eq $false) 'The wait lacks its owned process exit observation.'
         } else {
-            Assert-P4kxWaitProgress (-not $wait.Contains('portal_stages') -and $console.Contains('finishWaitPortalCapture') -and
+            Assert-P4kxWaitProgress (-not $wait.Contains('direct_probe') -and $console.Contains('finishWaitPortalCapture') -and
                 $console.Contains('WaitFinish owned probe entered capture.')) "$($case.name) changed its console contract."
         }
     }
@@ -176,11 +172,13 @@ try {
     $expired = Read-P4kxDetachedReceipt (Join-Path $path 'wait-result.json')
     Assert-P4kxWaitProgress ($failure -ceq 'The bound Finish supervisor produced no result within the original allowance.' -and
         $expired.deadline_utc -ceq $context.collection_cutoff.ToString('o') -and
-        $null -eq $expired.result_sha256 -and $expired.portal_stages.Count -eq 0 -and
+        $null -eq $expired.result_sha256 -and $expired.direct_probe.started -eq $false -and
+        $expired.direct_probe.timed_out -eq $true -and
         -not [IO.File]::Exists((Join-Path $path 'wait-probe-stdout.log'))) 'An expired wait launched a probe or accepted a result.'
 } finally {
     $env:GITHUB_ACTIONS = $oldActions
 }
-'PASS: ARM64 lifecycle callback isolation, unchanged other routes and original deadline.'
+'PASS: ARM64 lifecycle direct process result, original deadline and Portal routes.'
 Assert-P4kxFinishSupervisorNegativeReceipt $root
 Assert-P4kxFinishWaitSetupBudget $root
+& (Join-Path $PSScriptRoot 'test-msi-finish-owned-probe.ps1') -Directory (Join-Path $root 'native-owned-probe')
