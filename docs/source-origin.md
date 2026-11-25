@@ -192,18 +192,27 @@ values identify the exact canvas Record fields used to derive them.
 Explicit dimensions and command options have their own tool-authored origins.
 A report value whose contributors cannot be established has a null marker.
 
-## Standalone PCM and ADPCM WAV
+## Standalone WAV
 
 The WAV sibling companion addresses each source-based header or loop value
 and the sample body as a `wavBytes` field with a half-open output range.
-WEM source uses distinguish the selected format, the data length used for
-frame admission and the actual bytes consumed by the successful decoder.
+The CLI summary records the source uses for the written frame count, RIFF
+size and loop separately from the companion's output byte ranges.
+
+For PCM and ADPCM, the companion identifies the selected format, the data
+length used to admit frames and the sample bytes used by the writer.
 `wemImaAdpcmByteRuns` indices record a decoded WEM base offset, occurrence
 count, byte stride, field offset and field length. They omit each IMA
 sub-block's reserved byte. The byte containing the final used nibble is
 retained. A truncated trailing sample frame or discarded block does not
-contribute audio bytes. A loose WEM retains its original file identity
-with unknown Archive encryption.
+contribute audio bytes.
+
+For Wwise Vorbis and Opus, the companion distinguishes original packet
+ranges checked during preparation from the ranges replayed for PCM.
+Vorbis records the packet lookahead used to reconstruct the final
+decoded packet. Opus records the replayed packet-size words from its
+selected seek table when one exists. A loose WEM retains its original
+file identity with unknown Archive encryption.
 
 ## Hologram rendering
 

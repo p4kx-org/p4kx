@@ -18,7 +18,7 @@ use std::path::{Path, PathBuf};
 
 use p4kx_archive::{Archive, Entry, EntryOrigin};
 pub use p4kx_audio::wwise_id;
-use p4kx_audio::{AudioError, OggReport, WavReport, Wem};
+use p4kx_audio::{AudioError, Codec, OggReport, WavReport, Wem};
 pub use p4kx_audio::{
     ByteOrder, WemChunkCursor, WemChunkEntry, WemCodecSource, WemCue, WemCuePoint, WemCueText,
     WemCueTextRegion, WemInfoSource, WemInspection, WemList, WemListItem, WemListPayload,
@@ -64,7 +64,7 @@ enum SoundInput {
 enum FileObservation {
     None,
     All,
-    LinearWav,
+    Wav,
 }
 
 impl Sound {
@@ -153,12 +153,12 @@ impl Sound {
         Self::read_file(path, FileObservation::All)
     }
 
-    /// Reads a WEM file and observes its identity when it can produce a PCM or ADPCM WAV companion.
+    /// Reads a WEM file and observes its identity when it can produce a WAV companion.
     ///
     /// # Errors
     /// Returns the same errors as [`Self::from_file_observed`].
     pub fn from_file_observed_for_wav(path: &Path) -> Result<Self, ConversionError> {
-        Self::read_file(path, FileObservation::LinearWav)
+        Self::read_file(path, FileObservation::Wav)
     }
 
     fn read_file(path: &Path, observation: FileObservation) -> Result<Self, ConversionError> {
@@ -187,7 +187,7 @@ impl Sound {
         let observes_source = match observation {
             FileObservation::None => false,
             FileObservation::All => true,
-            FileObservation::LinearWav => sound.wem.supports_linear_wav(),
+            FileObservation::Wav => sound.supports_wav_receipt(),
         };
         if observes_source {
             sound.original = ObservedFileOrigin::of_read(
@@ -244,6 +244,12 @@ impl Sound {
     #[must_use]
     pub fn name(&self) -> &str {
         &self.name
+    }
+
+    /// Returns whether this sound can use the WAV receipt writer.
+    #[must_use]
+    pub const fn supports_wav_receipt(&self) -> bool {
+        self.wem.supports_linear_wav() || matches!(self.wem.codec(), Codec::Vorbis | Codec::Opus)
     }
 
     /// Returns the parsed WEM.

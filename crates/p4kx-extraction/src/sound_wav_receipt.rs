@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use crate::file_receipt::{self, OrdinaryReplacement};
@@ -16,6 +16,10 @@ use super::Sound;
 #[path = "sound_wav_origins.rs"]
 mod origins;
 use origins::WavOrigins;
+
+#[path = "sound_wav_write.rs"]
+mod written;
+use written::WavWrite;
 
 /// Summary and immediate source evidence for a published WAV and its companion.
 #[non_exhaustive]
@@ -53,6 +57,22 @@ impl Sound {
         &self,
         out: &Path,
     ) -> Result<WavFileReceipt, ConversionError> {
+        self.write_wav_receipt(out, |writer| WavWrite::linear(self, out, writer))
+    }
+
+    /// Writes a supported WAV and publishes its bound source-origin companion.
+    ///
+    /// # Errors
+    /// Returns the conversion failure or an artifact or companion publication failure.
+    pub fn write_wav_with_receipt(&self, out: &Path) -> Result<WavFileReceipt, ConversionError> {
+        self.write_wav_receipt(out, |writer| WavWrite::convert(self, out, writer))
+    }
+
+    fn write_wav_receipt(
+        &self,
+        out: &Path,
+        convert: impl FnOnce(&mut dyn Write) -> Result<WavWrite, ConversionError>,
+    ) -> Result<WavFileReceipt, ConversionError> {
         self.refuse_input_as_output(out)?;
         let companion =
             file_receipt::companion_path(out).map_err(|source| write_error(out, source))?;
@@ -65,22 +85,20 @@ impl Sound {
             None,
             |writer| {
                 let mut measured = OriginDigestWriter::new(writer);
-                let result = self
-                    .wem
-                    .write_linear_wav(&mut measured)
-                    .map_err(|source| self.audio_error(out, source))?;
+                let result = convert(&mut measured)?;
+                let report = result.report();
                 let digest = measured
                     .finish()
                     .map_err(|source| write_error(out, source))?;
-                if digest.byte_length() != result.report.size {
+                if digest.byte_length() != report.size {
                     return Err(write_error(
                         out,
                         io::Error::other("WAV size differs from its write report"),
                     ));
                 }
-                let origins = WavOrigins::capture(self, result)
+                let origins = WavOrigins::capture(self, &result)
                     .map_err(|source| write_error(&companion, source))?;
-                Ok((result.report, digest, origins))
+                Ok((report, digest, origins))
             },
             |staged| {
                 let replacement = OrdinaryReplacement::new(out, protection, None)

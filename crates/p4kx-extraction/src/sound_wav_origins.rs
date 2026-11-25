@@ -3,7 +3,7 @@
 
 use std::io::{self, Write};
 
-use p4kx_audio::{Codec, LinearWavWrite};
+use p4kx_audio::Codec;
 
 use crate::origin_companion::write_selected_origin_companion;
 use crate::sound::{Sound, SoundInput, WemFormatField, WemOriginField, WemOriginPlan};
@@ -13,6 +13,11 @@ use crate::{
     SourceInventorySelection, SourceLocation, SourceScope, SourceUse, SourceUseRole, SourceUses,
 };
 
+use super::written::WavWrite;
+
+#[path = "sound_wav_sources.rs"]
+mod sources;
+
 pub(super) struct WavOrigins {
     inventory: SourceInventory,
     fields: Vec<(OriginOutputAddress, FieldOrigin)>,
@@ -20,7 +25,7 @@ pub(super) struct WavOrigins {
 }
 
 impl WavOrigins {
-    pub(super) fn capture(sound: &Sound, written: LinearWavWrite) -> io::Result<Self> {
+    pub(super) fn capture(sound: &Sound, written: &WavWrite) -> io::Result<Self> {
         let uses = SourceUses::new();
         let payload = sound
             .source_input()
@@ -91,7 +96,7 @@ struct WavEvidence<'uses, 'info> {
 }
 
 impl WavEvidence<'_, '_> {
-    fn header(&mut self, sound: &Sound, written: LinearWavWrite) -> io::Result<()> {
+    fn header(&mut self, sound: &Sound, written: &WavWrite) -> io::Result<()> {
         const PCM_FORMAT_END: u64 = 36;
         const EXTENSIBLE_FORMAT_END: u64 = 60;
 
@@ -119,7 +124,7 @@ impl WavEvidence<'_, '_> {
         self.field(BlockAlign, 32, 34, &channels);
         self.insert(BitsPerSample, 34, 36, &[], true);
 
-        let loop_base = if written.report.channels > 2 {
+        let loop_base = if written.report().channels > 2 {
             let mut mask = self.planned(WemOriginField::Format(WemFormatField::ChannelMask {
                 layout_present: sound.wem().metadata().channel_layout().is_some(),
             }))?;
@@ -129,7 +134,7 @@ impl WavEvidence<'_, '_> {
         } else {
             PCM_FORMAT_END
         };
-        if written.report.loop_points.is_some() {
+        if written.report().loop_points.is_some() {
             self.loops(loop_base, &shape, &rate)?;
         }
         Ok(())
@@ -151,52 +156,26 @@ impl WavEvidence<'_, '_> {
         Ok(())
     }
 
-    fn signal(&mut self, sound: &Sound, written: LinearWavWrite) -> io::Result<()> {
+    fn signal(&mut self, sound: &Sound, written: &WavWrite) -> io::Result<()> {
         use OriginWavField::{DataLength, PcmSamples};
 
         let mut shape = self.shape(sound, written)?;
-        let offset = written.output_audio_start;
+        let offset = written.output_audio_start();
         let length_at = offset
             .checked_sub(4)
             .ok_or_else(|| io::Error::other("WAV has no data length word"))?;
         self.field(DataLength, length_at, offset, &shape);
-        if let Some(payload) = self.payload
-            && (written.source_audio_bytes != 0 || sound.wem().data().is_empty())
-        {
-            let start = sound.wem().info_source().data_body_offset();
-            let end = start
-                .checked_add(written.source_audio_bytes)
-                .ok_or_else(|| io::Error::other("WEM sample extent overflows"))?;
-            if let Some(stride) = written.ima_sub_block_bytes {
-                shape.extend(ima_source(payload, start, written, stride)?);
-            } else {
-                let namespace = if sound.wem().codec() == Codec::Pcm {
-                    "wemPcmFrames"
-                } else {
-                    "wemAdpcmBlocks"
-                };
-                shape.push(
-                    payload
-                        .at(
-                            SourceLocation::Subresource {
-                                namespace: namespace.to_owned(),
-                                indices: vec![start, end],
-                                field: "decodedAudio".into(),
-                            },
-                            SourceUseRole::Conversion,
-                        )
-                        .map_err(io::Error::other)?,
-                );
-            }
+        if let Some(payload) = self.payload {
+            sources::samples(payload, sound, written, &mut shape)?;
         }
-        self.field(PcmSamples, offset, written.report.size, &shape);
+        self.field(PcmSamples, offset, written.report().size, &shape);
         Ok(())
     }
 
-    fn shape(&self, sound: &Sound, written: LinearWavWrite) -> io::Result<Vec<SourceUse>> {
+    fn shape(&self, sound: &Sound, written: &WavWrite) -> io::Result<Vec<SourceUse>> {
         let mut uses = self.planned(WemOriginField::Channels)?;
         uses.extend(self.planned(WemOriginField::Codec)?);
-        if sound.wem().codec() != Codec::Pcm {
+        if matches!(written, WavWrite::Linear(_)) && sound.wem().codec() != Codec::Pcm {
             uses.extend(self.planned(WemOriginField::Format(WemFormatField::BlockAlign))?);
         }
         if let Some(payload) = self.payload {
@@ -213,16 +192,12 @@ impl WavEvidence<'_, '_> {
                     )
                     .map_err(io::Error::other)?,
             );
-            if written.source_audio_bytes > sound.wem().data().len() as u64 {
-                return Err(io::Error::other(
-                    "WAV used bytes outside the selected WEM DATA chunk",
-                ));
-            }
+            sources::shape(payload, sound, written, &mut uses)?;
         }
         Ok(uses)
     }
 
-    fn summary(&self, sound: &Sound, written: LinearWavWrite) -> io::Result<FieldOrigins> {
+    fn summary(&self, sound: &Sound, written: &WavWrite) -> io::Result<FieldOrigins> {
         use OriginWavField::{Channels, DataLength, RiffLength, SampleRate};
 
         let mut fields = FieldOrigins::new();
@@ -272,7 +247,7 @@ impl WavEvidence<'_, '_> {
     fn summary_loop(
         &self,
         sound: &Sound,
-        written: LinearWavWrite,
+        written: &WavWrite,
         fields: &mut FieldOrigins,
     ) -> io::Result<()> {
         let mut selection = self.planned(WemOriginField::Loop)?;
@@ -283,7 +258,7 @@ impl WavEvidence<'_, '_> {
         }
         let complete = self.payload.is_some();
         let origin = self.uses.origin(&selection, complete);
-        if written.report.loop_points.is_some() {
+        if written.report().loop_points.is_some() {
             for (path, field) in [
                 ("/loop/start", WemOriginField::LoopStart),
                 ("/loop/end", WemOriginField::LoopEnd),
@@ -334,49 +309,4 @@ impl WavEvidence<'_, '_> {
 fn insert_summary(fields: &mut FieldOrigins, name: &str, origin: FieldOrigin) -> io::Result<()> {
     let path = FieldPath::parse(name).map_err(io::Error::other)?;
     fields.insert(path, origin).map_err(io::Error::other)
-}
-
-/// Binds byte runs for the history, index and nibbles of each used IMA sub-block.
-fn ima_source(
-    payload: &SourceScope,
-    start: u64,
-    written: LinearWavWrite,
-    stride: u64,
-) -> io::Result<Vec<SourceUse>> {
-    const IMA_USED_HEADER_BYTES: u64 = 3;
-    const IMA_HEADER_BYTES: u64 = 4;
-    let channels = u64::from(written.report.channels);
-    let block = channels * stride;
-    let tail = written.source_audio_bytes % block;
-    let whole = written.source_audio_bytes - tail;
-    let complete = (start, whole / stride, stride);
-    let partial = (
-        start + whole,
-        if tail > 0 { channels } else { 0 },
-        tail / channels,
-    );
-    let mut sources = Vec::new();
-    for (position, count, step) in [complete, partial] {
-        if count == 0 {
-            continue;
-        }
-        for (offset, length) in [
-            (0, IMA_USED_HEADER_BYTES),
-            (IMA_HEADER_BYTES, step - IMA_HEADER_BYTES),
-        ] {
-            sources.push(
-                payload
-                    .at(
-                        SourceLocation::Subresource {
-                            namespace: "wemImaAdpcmByteRuns".into(),
-                            indices: vec![position, count, step, offset, length],
-                            field: "decodedAudio".into(),
-                        },
-                        SourceUseRole::Conversion,
-                    )
-                    .map_err(io::Error::other)?,
-            );
-        }
-    }
-    Ok(sources)
 }

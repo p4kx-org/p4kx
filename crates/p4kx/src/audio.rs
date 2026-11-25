@@ -159,9 +159,8 @@ fn format_duration(duration: Duration) -> String {
 
 fn wav(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
     let observed = sound
-        .wem()
-        .supports_linear_wav()
-        .then(|| sound.write_linear_wav_with_receipt(out))
+        .supports_wav_receipt()
+        .then(|| sound.write_wav_with_receipt(out))
         .transpose()?;
     let report = match &observed {
         Some(receipt) => receipt.report,

@@ -2002,12 +2002,15 @@ WAV header. Opus keeps the effective playback rate. The immediate encryption mar
 to those input bytes. A standalone WEM has unknown Archive encryption. The corresponding
 source and use identifiers resolve in `provenance`.
 
-For PCM, IMA ADPCM and PTADPCM input, `originReceipt` names the sibling
+For PCM, IMA ADPCM, PTADPCM, Wwise Vorbis and Opus input, `originReceipt` names the sibling
 `<file>.p4kx-origin.jsonl` bound to the written byte length and SHA-256.
 The same companion is published without `--json`. The JSON summary binds `/sample_count`
 to the frame extent used by the writer and `/size` to the emitted RIFF size. The `/loop` origin
 records the decision to admit or omit the loop in the WAV. A retained loop has separate
 origins for its start, exclusive end and frame count.
+Wwise Vorbis and Opus receipts distinguish the packet data checked while preparing the
+conversion from bytes consumed during PCM replay. Vorbis tracks lookahead and Opus keeps
+the original seek words and page framing when used.
 
 ## `p4kx audio ogg <archive> <entry> --out <file> --json`
 

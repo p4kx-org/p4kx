@@ -12,28 +12,39 @@ use serde_json::{Value, json};
 
 use super::{SOUND, TestResult};
 
+#[path = "wav_compressed_receipt.rs"]
+mod compressed;
+
 #[test]
 fn selective_file_observation_matches_the_wav_companion_supported_codecs() -> TestResult {
     let directory = tempfile::tempdir()?;
     let pcm = directory.path().join("linear.wem");
     let vorbis = directory.path().join("vorbis.wem");
+    let unsupported = directory.path().join("unsupported.wem");
     fs::write(&pcm, TestWem::pcm(TestCodec::Pcm, 1, 48_000, &[1]).bytes())?;
     fs::write(
         &vorbis,
         TestWem::encoded(TestCodec::Vorbis, 1, 48_000, 10).bytes(),
     )?;
 
+    fs::write(
+        &unsupported,
+        TestWem::encoded(TestCodec::Tag(0x1234), 1, 48_000, 10).bytes(),
+    )?;
+    for source in [&pcm, &vorbis] {
+        assert!(
+            Sound::from_file_observed_for_wav(source)?
+                .source_input()
+                .is_some(),
+            "supported WAV observes its original source"
+        );
+    }
     assert!(
-        Sound::from_file_observed_for_wav(&pcm)?
+        Sound::from_file_observed_for_wav(&unsupported)?
             .source_input()
-            .is_some()
+            .is_none(),
+        "unsupported codec does not gather provenance before failing"
     );
-    assert!(
-        Sound::from_file_observed_for_wav(&vorbis)?
-            .source_input()
-            .is_none()
-    );
-    assert!(Sound::from_file_observed(&vorbis)?.source_input().is_some());
     Ok(())
 }
 
