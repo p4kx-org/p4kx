@@ -498,8 +498,14 @@ before and after each run.
 
 Windows reported both process lifetime peaks after exit. Both private peaks
 meet the strict 40,000,000,000-byte producer limit on the measured host.
-The independent full provenance replay and exact final release-candidate
-measurement are separate acceptance checks.
+The independent Windows AMD64 verifier from source revision
+`4dbb7572f55b2056488a4f07686db26d9b73e267` replayed the sealed LIVE frame.
+Two passes checked its decoded SHA-256, structural references and 254
+section inventory entries. The replay resolved 95,261 physical sources,
+120,213,061 source uses and 84,837,272 sourced cells. It took 3,784.553 seconds
+with a peak private commit of 17,111,412,736 bytes and a peak working set
+of 16,720,453,632 bytes. The exact final release candidate has separate
+producer and replay measurements.
 
 ## Measuring a complete export
 
