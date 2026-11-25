@@ -843,6 +843,32 @@ The six queries took 6.039–10.458 seconds. The executable SHA-256 was
 The cold tests measure the SDK scope. The retained comparison checks the same
 tables and contributing source inventories against the complete Catalog.
 
+### Installed Tag retained parity
+
+The Windows AMD64 verifier at `00e050aa9f487b54a3c4310981f299612e454d7e`
+compared the same three complete SDK tables against the retained, unfiltered
+Normal Catalog from `27da392284eed8c67cf58c15ea473089d6c0a20c` and the
+installed LIVE Build `13220821`. In canonical table order it matched 18,961
+Tag definitions, one root declaration and 18,961 Tag paths. The comparison
+verified row digests, 284,425 distinct contributing source uses and one
+physical source from a 78,149,434,545-byte decoded frame.
+
+The one-worker readback completed in 644.916 s with 1,091,432,448 bytes
+of peak private commit and 1,029,189,632 bytes of peak working set.
+Minimum sampled host RAM available was 35,967,827,968 bytes. The verifier
+process recorded 141,143,604 bytes of Windows write transfers, including
+temporary comparison data.
+
+The Rust verifier exited successfully. Its launcher's case-sensitive
+summary label check rejected the transcript. A separate readback verified
+the original transcript, successful exit, process peaks, stable Archive
+and Build, signed verifier, and complete compressed input. With the exact
+capitalization, the transcript reader accepted the three family counts
+and rejected a deliberately mismatched summary count. The original
+launcher receipt remains available unchanged. The retained `13260598`
+frame still needs a matching installed Archive, and the current PTU
+Build needs its own complete Normal frame.
+
 ## Original Entity tag declarations
 
 Use `catalog_queries::tags::with_entity_tags` or a parsed session's
