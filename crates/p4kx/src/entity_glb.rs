@@ -111,29 +111,6 @@ fn write(
         .map_or_else(String::new, |root| root.class_name().to_owned());
     let out: &Path = &args.out;
     let textures = models.textures();
-    if let Some(paint) = assembly.paint_provenance()? {
-        let receipt =
-            FileReceipt::new_with_cancel(out, Some(protection), Some(protection), cancel.clone())?;
-        return Ok(receipt
-            .publish(
-                |mut writer| {
-                    paint
-                        .write_glb_animated_with(animated, &options, &textures, &mut writer)
-                        .map_err(|error| match error {
-                            GltfError::Write(source) => source,
-                            source => io::Error::other(source),
-                        })
-                },
-                |writer, binding, _| paint.write_glb_companion(writer, binding),
-            )
-            .map_err(|error| match error.downcast::<GltfError>() {
-                Ok(source) => ConversionError::Glb { file: name, source },
-                Err(source) => ConversionError::Write {
-                    path: out.to_path_buf(),
-                    source,
-                },
-            })?);
-    }
     publish_mesh_origins(
         assembly,
         animated,
@@ -158,21 +135,25 @@ fn publish_mesh_origins(
         path: out.to_path_buf(),
         source,
     };
-    let receipt = FileReceipt::for_staged_replacement(out, Some(protection), cancel.clone())
-        .map_err(write_error)?;
+    let mut origins = GlbMeshOrigins::new();
+    let paint = assembly.observe_glb_paint(&mut origins)?;
+    let receipt = if paint.is_some() {
+        FileReceipt::new_with_cancel(out, Some(protection), Some(protection), cancel.clone())?
+    } else {
+        FileReceipt::for_staged_replacement(out, Some(protection), cancel.clone())
+            .map_err(write_error)?
+    };
     let (summary, _) = receipt
         .publish(
             |mut writer| {
-                let mut origins = GlbMeshOrigins::new();
                 let summary = assembly
-                    .write_glb_animated_with_vertex_origins(
+                    .write_glb_animated_with_mesh_origins(
                         animated,
                         options,
                         textures,
                         &mut writer,
-                        &mut |mesh, _, sources| {
-                            origins.observe_mesh(mesh.position_accessor, mesh.origin, sources)
-                        },
+                        paint.as_ref(),
+                        &mut origins,
                     )
                     .map_err(io::Error::other)?;
                 Ok((summary, origins.finish()?))

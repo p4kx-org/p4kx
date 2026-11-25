@@ -5,19 +5,28 @@ use std::io::{self, Write};
 
 use p4kx_dataforge::Guid;
 use p4kx_extraction::{
-    EntryOrigin, FieldOrigins, FieldOriginsError, FieldPath, FieldPathError, OriginArtifactBinding,
-    OriginOutputAddress, SourceEvidenceError, SourceInventory, SourceLocation,
+    EntryOrigin, FieldOrigins, FieldOriginsError, FieldPath, FieldPathError, GlbMeshOrigins,
+    OriginArtifactBinding, OriginOutputAddress, SourceEvidenceError, SourceInventory,
+    SourceLocation, SourceUses,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
 use thiserror::Error;
 
-use crate::Assembly;
+use crate::{Assembly, Part};
 
 #[path = "paint_provenance_capture.rs"]
 mod capture;
 
-pub(crate) const GLB_ASSET_KEY: &str = "p4kxPaintAppearance";
+const GLB_ASSET_KEY: &str = "p4kxPaintAppearance";
+
+pub(crate) fn glb_paint_extras(appearance: &PaintAppearanceValues) -> serde_json::Value {
+    serde_json::json!({ (GLB_ASSET_KEY): appearance })
+}
+
+fn glb_paint_path(path: &FieldPath) -> Result<FieldPath, FieldPathError> {
+    FieldPath::parse(&format!("/asset/extras/{GLB_ASSET_KEY}{}", path.as_str()))
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
@@ -159,9 +168,7 @@ impl PaintProvenance<'_> {
             .field_origins
             .iter()
             .map(|(path, origin)| {
-                let path =
-                    FieldPath::parse(&format!("/asset/extras/{GLB_ASSET_KEY}{}", path.as_str()))
-                        .map_err(io::Error::other)?;
+                let path = glb_paint_path(path).map_err(io::Error::other)?;
                 Ok((OriginOutputAddress::GlbJsonField { path }, origin))
             })
             .collect::<io::Result<_>>()?;
@@ -180,10 +187,48 @@ impl Assembly {
     /// # Errors
     /// Returns an error if the retained evidence cannot be represented.
     pub fn paint_provenance(&self) -> Result<Option<PaintProvenance<'_>>, PaintProvenanceError> {
-        let root = self.root().filter(|part| part.model().is_some());
-        let Some((selection, part)) = self.paint.as_ref().zip(root) else {
+        let Some((selection, part)) = self.paint_inputs() else {
             return Ok(None);
         };
-        capture::capture(self, selection, part)
+        let uses = SourceUses::with_compact_use_refs();
+        let Some((appearance, field_origins)) = capture::capture(self, selection, part, &uses)?
+        else {
+            return Ok(None);
+        };
+        Ok(Some(PaintProvenance {
+            assembly: self,
+            appearance,
+            field_origins,
+            source_inventory: uses.freeze()?,
+        }))
+    }
+
+    /// Captures the painted asset fields before registering emitted meshes.
+    ///
+    /// # Errors
+    /// Returns an error if the retained paint evidence cannot be represented.
+    pub fn observe_glb_paint(
+        &self,
+        origins: &mut GlbMeshOrigins,
+    ) -> Result<Option<PaintAppearanceValues>, PaintProvenanceError> {
+        let Some((selection, part)) = self.paint_inputs() else {
+            return Ok(None);
+        };
+        let Some((appearance, fields)) =
+            capture::capture(self, selection, part, origins.source_uses())?
+        else {
+            return Ok(None);
+        };
+        let addressed = fields
+            .iter()
+            .map(|(path, origin)| Ok((glb_paint_path(path)?, origin.clone())))
+            .collect::<Result<Vec<_>, FieldPathError>>()?;
+        origins.include_json_fields(addressed);
+        Ok(Some(appearance))
+    }
+
+    fn paint_inputs(&self) -> Option<(&PaintSelection, &Part)> {
+        let root = self.root().filter(|part| part.model().is_some());
+        self.paint.as_deref().zip(root)
     }
 }

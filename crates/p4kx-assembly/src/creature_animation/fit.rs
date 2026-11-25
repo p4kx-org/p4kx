@@ -12,7 +12,7 @@ use p4kx_model::{Animation, Bone};
 use crate::animation_budget::{KeyFit, ValueBudget};
 use crate::armour::MAX_ANIMATION_VALUES;
 use crate::armour::unused::summarise;
-use crate::paint_provenance::GLB_ASSET_KEY;
+use crate::paint_provenance::glb_paint_extras;
 use crate::{Assembly, Issue, IssueKind, PaintProvenance, creature_rig};
 
 /// Why an additive clip is left out: glTF cannot say that its keys are offsets.
@@ -179,7 +179,7 @@ impl PaintProvenance<'_> {
         textures: &dyn TextureLoader,
         out: &mut impl Write,
     ) -> Result<GlbSummary, GltfError> {
-        let extras = serde_json::json!({ (GLB_ASSET_KEY): self.appearance() });
+        let extras = glb_paint_extras(self.appearance());
         let scene = self
             .assembly
             .scene()?

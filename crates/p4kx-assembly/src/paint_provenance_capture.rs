@@ -8,33 +8,27 @@ use p4kx_extraction::{
 };
 
 use super::{
-    PaintAppearanceValues, PaintProvenance, PaintProvenanceError, PaintSelection,
-    PaintSelectionInput, VariantKind,
+    PaintAppearanceValues, PaintProvenanceError, PaintSelection, PaintSelectionInput, VariantKind,
 };
 use crate::vehicle_paint::record_header as header;
 use crate::{Assembly, PaletteSelection, PaletteSource, Part};
 
-pub(super) fn capture<'assembly>(
-    assembly: &'assembly Assembly,
+pub(super) fn capture(
+    assembly: &Assembly,
     selection: &PaintSelection,
     part: &Part,
-) -> Result<Option<PaintProvenance<'assembly>>, PaintProvenanceError> {
-    let uses = SourceUses::with_compact_use_refs();
-    let Some(forge) = forge_scope(&uses, assembly.forge_origin.as_deref())? else {
+    uses: &SourceUses,
+) -> Result<Option<(PaintAppearanceValues, FieldOrigins)>, PaintProvenanceError> {
+    let Some(forge) = forge_scope(uses, assembly.forge_origin.as_deref())? else {
         return Ok(None);
     };
     let mut capture = Capture {
-        uses: &uses,
+        uses,
         forge: &forge,
         fields: FieldOrigins::new(),
     };
     let appearance = capture.appearance(selection, part)?;
-    Ok(Some(PaintProvenance {
-        assembly,
-        appearance,
-        field_origins: capture.fields,
-        source_inventory: uses.freeze()?,
-    }))
+    Ok(Some((appearance, capture.fields)))
 }
 
 struct Capture<'capture> {

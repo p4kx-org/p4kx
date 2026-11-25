@@ -13,6 +13,8 @@ use crate::assembly_support::{TestResult, fixture};
 
 #[path = "assembly_vehicle_paint_cdf.rs"]
 mod cdf;
+#[path = "assembly_vehicle_paint_glb.rs"]
+mod glb;
 #[path = "assembly_vehicle_paint_material.rs"]
 mod material;
 #[path = "assembly_vehicle_paint_patch.rs"]
@@ -329,9 +331,18 @@ fn assemble_entries(
 ) -> Result<Assembly, Box<dyn std::error::Error>> {
     let fixture = fixture(entries)?;
     let archive = Archive::open_with_key(&fixture.path, Some(test_key()))?;
-    let entry = DataForgeEntry::read(&archive)?;
+    assemble_archive(&archive, entity, changes, base_material)
+}
+
+fn assemble_archive(
+    archive: &Archive,
+    entity: &str,
+    changes: &LoadoutChanges,
+    base_material: Option<&str>,
+) -> Result<Assembly, Box<dyn std::error::Error>> {
+    let entry = DataForgeEntry::read(archive)?;
     let forge = entry.open()?;
-    let files = ArchiveFiles::new(&archive);
+    let files = ArchiveFiles::new(archive);
     let mut resolver = LoadoutResolver::new(&forge)
         .with_forge_entry(&entry)
         .with_files(&files);
@@ -347,7 +358,7 @@ fn assemble_entries(
     );
     Ok(Assembly::build_with_palettes(
         &tree,
-        &ArchiveModels::new(&archive),
+        &ArchiveModels::new(archive),
         &ForgePalettes::new(&forge).with_entry(&entry),
         &AssemblyOptions::default(),
     )?)

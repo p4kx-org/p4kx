@@ -7,6 +7,7 @@ use std::path::Path;
 
 use p4kx_extraction::OriginDigestWriter;
 use p4kx_testkit::check_glb;
+use p4kx_testkit::gltf::mesh::Semantic;
 use serde_json::Value;
 
 use super::{PaintFixture, TestResult, manifest};
@@ -40,7 +41,81 @@ pub(super) fn check_export(fixture: &PaintFixture, out: &Path, package: &Path) -
     check_fields(&appearance, proof, &rows)?;
     check_selection_sources(fixture, &rows)?;
     check_palette_sources(fixture, &rows)?;
-    check_material_sources(fixture, &rows)
+    check_material_sources(fixture, &rows)?;
+    check_mesh_origins(&bytes, &rows)
+}
+
+fn check_mesh_origins(bytes: &[u8], rows: &[Value]) -> TestResult {
+    let checked = check_glb(bytes)?;
+    let positions = checked
+        .document
+        .meshes()
+        .flat_map(|mesh| mesh.primitives())
+        .find_map(|primitive| primitive.get(&Semantic::Positions))
+        .ok_or("painted hull positions")?;
+    let path = format!("/accessors/{}/count", positions.index());
+    let field = rows
+        .iter()
+        .find(|row| {
+            row.pointer("/address/path").and_then(Value::as_str) == Some(path.as_str())
+                && row.pointer("/address/type").and_then(Value::as_str) == Some("glbJsonField")
+        })
+        .ok_or("painted hull position count origin")?;
+    let uses = uses_of(field, rows)?;
+    let contributor = uses
+        .into_iter()
+        .find(|usage| {
+            text(usage, "scope") == Some("payload")
+                && text(usage, "role") == Some("conversion")
+                && usage.pointer("/location/namespace").and_then(Value::as_str)
+                    == Some("modelChunk")
+                && usage.pointer("/location/field").and_then(Value::as_str) == Some("geometry")
+        })
+        .ok_or("position count uses an original geometry chunk")?;
+    let source_id = contributor
+        .get("source")
+        .ok_or("position count source ID")?;
+    let source = rows
+        .iter()
+        .filter_map(|row| row.get("source"))
+        .find(|entry| entry.get("id") == Some(source_id))
+        .and_then(|entry| entry.pointer("/path/value").and_then(Value::as_str))
+        .ok_or("position count source path")?
+        .replace('\\', "/")
+        .to_ascii_lowercase();
+    assert!(
+        matches!(
+            source.as_str(),
+            "data/objects/test/hull.cgf" | "data/objects/test/hull.cgfm"
+        ),
+        "position count binds the actual painted hull model, got {source}"
+    );
+    check_painted_payload(rows, contributor)
+}
+
+fn check_painted_payload(rows: &[Value], contributor: &Value) -> TestResult {
+    let artifact = rows
+        .iter()
+        .find(|row| row.pointer("/address/type").and_then(Value::as_str) == Some("opaquePayload"))
+        .ok_or("painted payload origin")?;
+    let contributors = uses_of(artifact, rows)?;
+    assert!(
+        contributors.contains(&contributor),
+        "the digest-bound payload includes the selected mesh geometry"
+    );
+    assert_eq!(
+        artifact
+            .get("containsEncryptedSource")
+            .and_then(Value::as_bool),
+        Some(true),
+        "the same payload includes the encrypted paint selection"
+    );
+    assert_eq!(
+        artifact.get("sourceSetComplete").and_then(Value::as_bool),
+        Some(false),
+        "paint and mesh origins cover only part of the emitted GLB"
+    );
+    Ok(())
 }
 
 fn glb_appearance(fixture: &PaintFixture, bytes: &[u8]) -> TestResult<Value> {

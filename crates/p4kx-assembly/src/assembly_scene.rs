@@ -3,14 +3,15 @@
 
 use std::io;
 
-use p4kx_extraction::{ArchiveDefaultMaterial, ModelArchiveSource};
+use p4kx_extraction::{ArchiveDefaultMaterial, GlbMeshOrigins, ModelArchiveSource};
 use p4kx_gltf::{
     GlbOptions, GlbSummary, GltfError, MeshVertexMap, Scene, SceneNode, ScenePart, TextureLoader,
     write_scene_glb_observed,
 };
 use p4kx_model::Model;
 
-use crate::{Assembly, CreatureAnimations, creature_rig};
+use crate::paint_provenance::glb_paint_extras;
+use crate::{Assembly, CreatureAnimations, PaintAppearanceValues, creature_rig};
 
 impl Assembly {
     pub(crate) fn scene(&self) -> Result<Scene<'_>, GltfError> {
@@ -49,6 +50,44 @@ impl Assembly {
         out: &mut impl io::Write,
         visitor: &mut impl FnMut(MeshVertexMap<'_>, &Model, &[ModelArchiveSource]) -> io::Result<()>,
     ) -> Result<GlbSummary, GltfError> {
+        self.write_glb_animated_observed(animations, options, textures, out, None, visitor)
+    }
+
+    /// Writes the Assembly with its fitted paint and captures emitted mesh origins.
+    ///
+    /// # Errors
+    /// Returns scene, write, or source observation failures.
+    pub fn write_glb_animated_with_mesh_origins(
+        &self,
+        animations: &CreatureAnimations<'_>,
+        options: &GlbOptions,
+        textures: &dyn TextureLoader,
+        out: &mut impl io::Write,
+        paint: Option<&PaintAppearanceValues>,
+        origins: &mut GlbMeshOrigins,
+    ) -> Result<GlbSummary, GltfError> {
+        let extras = paint.map(glb_paint_extras);
+        self.write_glb_animated_observed(
+            animations,
+            options,
+            textures,
+            out,
+            extras.as_ref(),
+            &mut |mesh, _, sources| {
+                origins.observe_mesh(mesh.position_accessor, mesh.origin, sources)
+            },
+        )
+    }
+
+    fn write_glb_animated_observed(
+        &self,
+        animations: &CreatureAnimations<'_>,
+        options: &GlbOptions,
+        textures: &dyn TextureLoader,
+        out: &mut impl io::Write,
+        extras: Option<&serde_json::Value>,
+        visitor: &mut impl FnMut(MeshVertexMap<'_>, &Model, &[ModelArchiveSource]) -> io::Result<()>,
+    ) -> Result<GlbSummary, GltfError> {
         let mut sources: Vec<&[ModelArchiveSource]> = Vec::new();
         let scene = self
             .scene_with(|node, origin| {
@@ -58,6 +97,11 @@ impl Assembly {
                 }
             })?
             .with_animations(animations.animations().iter().copied());
+        let scene = if let Some(extras) = extras {
+            scene.with_asset_extras(extras)
+        } else {
+            scene
+        };
         write_scene_with_vertex_origins(&scene, &sources, options, textures, out, visitor)
     }
 
