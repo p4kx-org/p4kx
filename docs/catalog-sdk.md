@@ -3571,6 +3571,23 @@ The peaks cover the typed queries and the retained Catalog replay. The
 verifier executable SHA-256 was
 `0bc4d9a475361f84cb2a24f857bbddccdd08dcb433db6cfbe7055f362182ae3f`.
 
+### Installed Mission Owner Definition visitor parity
+
+The Windows AMD64 verifier at `00e050aa9f487b54a3c4310981f299612e454d7e`
+used `visit_mission_owner_definitions` on installed LIVE `13220821` and
+compared both tables against the complete Normal frame from
+`27da392284eed8c67cf58c15ea473089d6c0a20c`. It matched 497 Contract
+Templates and 2,428 Mission Broker Entries in canonical order with their
+canonical row payloads. The verifier compared 6,064,858 distinct
+contributing source uses and one physical source against that frame.
+
+The exact one-worker process completed in 805.117 s with a 1,112,264,704-byte
+peak private commit and 1,043,263,488-byte peak working set. Minimum sampled
+host RAM available was 36,252,774,400 bytes. Windows recorded 4,722,132,583
+bytes of process write transfers, including temporary comparison data.
+These counters include the retained replay. The materialized whole Broker
+table and the current PTU frame are separate measurement scopes.
+
 ### Loot and Harvest cold queries
 
 The Windows AMD64 verifier at `56e65a9bbd0370283c0d68f1fd3346f822ea6883`
