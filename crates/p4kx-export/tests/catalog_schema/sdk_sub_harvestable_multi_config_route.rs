@@ -9,7 +9,7 @@ use p4kx_export::catalog_queries::{
     ParsedCatalogQueries,
 };
 use p4kx_export::{CatalogOptions, CraftingWarning, build_catalog_from};
-use p4kx_extraction::{Archive, DataForgeEntry};
+use p4kx_extraction::{Archive, DataForgeEntry, SourceInventory};
 use p4kx_testkit::{
     ArchiveBuilder, DataForgeBuilder, TestEntry, TestInstance, TestRecord, TestStruct, TestType,
     TestValue,
@@ -17,6 +17,9 @@ use p4kx_testkit::{
 use serde_json::Value;
 
 use super::{Route, TestResult};
+
+#[path = "sdk_harvest_projection_origins.rs"]
+mod origins;
 
 pub(super) const DATASET: &str = "/subHarvestableMultiConfigs";
 const FAMILY: LootDefinitionKind = LootDefinitionKind::SubHarvestableMultiConfig;
@@ -49,16 +52,18 @@ pub(super) fn read() -> TestResult<Route> {
     let parsed = session.parsed(None)?;
     let route =
         parsed.with_loot_definitions(FAMILY, CatalogRecordSelection::All, None, |snapshot| {
-            assert_producer_parity(&snapshot, &catalog)
+            assert_producer_parity(&snapshot, &catalog, producer.summary().source_inventory())
         })??;
     assert_physical_selection(&parsed)?;
     assert_failed_dependency()?;
+    origins::assert_schema()?;
     Ok(route)
 }
 
 fn assert_producer_parity(
     snapshot: &LootDefinitionSnapshot<'_>,
     catalog: &Value,
+    sources: &SourceInventory,
 ) -> TestResult<Route> {
     let rows = &snapshot.sub_harvestable_multi_configs;
     let projected = serde_json::to_value(rows)?;
@@ -85,10 +90,13 @@ fn assert_producer_parity(
         "all dependencies of the admitted owners are readable"
     );
     assert_preset(snapshot, Some("Selected"))?;
+    origins::assert_local_origins(snapshot)?;
+    origins::assert_dependency_origins(snapshot)?;
+    origins::assert_normal_source_closure(snapshot, sources)?;
     Route::queried_rows(
         DATASET,
         rows,
-        "synthetic physical selection and pinned installed row parity witnessed, with installed source closure and final-candidate verification open",
+        "synthetic physical selection and field origins witnessed, with installed parity on the final candidate open",
     )
 }
 
@@ -168,12 +176,17 @@ fn assert_failed_dependency() -> TestResult {
         None,
     )?;
     let parsed = session.parsed(None)?;
-    parsed.with_loot_definitions(
-        FAMILY,
-        CatalogRecordSelection::RecordIndex(LATER),
-        None,
-        assert_unreadable_preset,
-    )??;
+    for index in [LATER, EARLIER] {
+        parsed.with_loot_definitions(
+            FAMILY,
+            CatalogRecordSelection::RecordIndex(index),
+            None,
+            |snapshot| {
+                origins::assert_preset_failure(&snapshot, index == LATER)?;
+                assert_unreadable_preset(snapshot)
+            },
+        )??;
+    }
     parsed.with_loot_definitions(
         FAMILY,
         CatalogRecordSelection::RecordIndex(OFF_PATH),
@@ -266,6 +279,10 @@ fn open(unreadable_preset: bool) -> TestResult<(tempfile::TempDir, Archive)> {
         PRESET,
         "HarvestablePreset.Selected",
         "synthetic/preset.xml",
+    )
+    .value(
+        "entityClass",
+        TestValue::Reference(origins::FALLBACK_ENTITY),
     );
     let preset = if unreadable_preset {
         preset.with_instance_index(u16::MAX)
@@ -283,19 +300,28 @@ fn open(unreadable_preset: bool) -> TestResult<(tempfile::TempDir, Archive)> {
                 .field("subConfig", class(SINGLE)),
         )
         .structure(TestStruct::new(SINGLE).field("subConfigManual", class(MANUAL)))
-        .structure(TestStruct::new(MANUAL).array("subHarvestables", class(ENTRY)))
+        .structure(
+            TestStruct::new(MANUAL)
+                .array("subHarvestables", TestType::StrongPointer(ENTRY.to_owned())),
+        )
         .structure(
             TestStruct::new(ENTRY)
                 .field("harvestable", TestType::Reference)
-                .field("relativeProbability", TestType::Single),
+                .field("relativeProbability", TestType::Single)
+                .field("harvestableSetup", TestType::Reference)
+                .field("harvestableEntityClass", TestType::Reference),
         )
-        .structure(TestStruct::new(PRESET).field("fixture", TestType::Bool))
+        .structure(
+            TestStruct::new(PRESET)
+                .field("fixture", TestType::Bool)
+                .field("entityClass", TestType::Reference),
+        )
         .record(record(3, "Later", &format!("{SLOT_PATH}/later.xml")))
         .record(record(1, "Outside", "synthetic/harvest/outside.xml"))
         .record(record(2, "Earlier", &format!("{SLOT_PATH}/earlier.xml")))
         .record(record(4, "Dev", &format!("{SLOT_PATH}/dev/leftover.xml")))
-        .record(preset)
-        .build();
+        .record(preset);
+    let data = origins::add_dependencies(data).build();
     ArchiveBuilder::new()
         .entry(TestEntry::stored("Data/Game2.dcb", data))
         .write_to(&path)?;
@@ -306,9 +332,21 @@ fn record(guid: u128, name: &str, path: &str) -> TestRecord {
     let slot = TestValue::Struct(
         TestInstance::new(ENTRY)
             .value("harvestable", TestValue::Reference(PRESET_GUID))
-            .value("relativeProbability", TestValue::Single(2.5)),
+            .value("relativeProbability", TestValue::Single(2.5))
+            .value("harvestableSetup", TestValue::Null)
+            .value(
+                "harvestableEntityClass",
+                if guid == 3 {
+                    TestValue::Reference(origins::DIRECT_ENTITY)
+                } else {
+                    TestValue::Null
+                },
+            ),
     );
-    let manual = TestInstance::new(MANUAL).value("subHarvestables", TestValue::Array(vec![slot]));
+    let manual = TestInstance::new(MANUAL).value(
+        "subHarvestables",
+        TestValue::Array(vec![TestValue::Null, slot]),
+    );
     let config = TestInstance::new(SINGLE).value("subConfigManual", TestValue::Struct(manual));
     let tagged = TestValue::Struct(
         TestInstance::new(TAGGED)

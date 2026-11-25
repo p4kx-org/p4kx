@@ -2,70 +2,117 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::BTreeSet;
+use std::iter::once;
 use std::sync::{Mutex, PoisonError};
 
-use p4kx_extraction::{DataForge, RecordTree, StructValue, TreeBuilder};
+use p4kx_extraction::{FieldOrigin, SourceUses};
 
+use crate::CatalogError;
 use crate::contract_harvest::HarvestableLink;
 use crate::crafting_warning::CraftingWarning;
 use crate::guid_text::CatalogGuid;
 use crate::memo::Memo;
-use crate::record_fields::{class_name, component, reference};
+
+#[path = "harvest_link_read.rs"]
+mod read;
+pub(crate) use read::DependencyReader;
+use read::{Dependency, MiningFacts, PresetFacts, mining, preset};
 
 pub(crate) const MINEABLE_PARAMS: &str = "MineableParams";
 
-/// What a `HarvestablePreset` Record says: its name and the entity it spawns.
-#[derive(Clone, Copy)]
-struct PresetFacts<'f> {
-    class_name: Option<&'f str>,
-    entity: Option<CatalogGuid>,
+/// A slot's already projected authored reference and its exact local contributors.
+#[derive(Clone)]
+pub(crate) struct SelectedReference {
+    pub(crate) guid: Option<CatalogGuid>,
+    pub(crate) origin: FieldOrigin,
 }
 
-/// What the `MineableParams` of an entity link to.
-#[derive(Clone, Copy)]
-struct MiningFacts {
-    composition: Option<CatalogGuid>,
-    global_params: Option<CatalogGuid>,
+/// A resolved link and origins for its four dependency-derived fields.
+pub(crate) struct ResolvedLink<'source> {
+    pub(crate) value: HarvestableLink<'source>,
+    pub(crate) origins: [(&'static str, FieldOrigin); 4],
 }
 
-/// Follows a harvestable from its `HarvestablePreset` Record to the entity and the mining
-/// parameters of the entity, each Record read once. A Record that is missing or cannot be built
-/// is kept for [`Links::warning`].
+/// Follows selected preset and mining dependencies within one original inventory.
 #[derive(Default)]
-pub(crate) struct Links<'f> {
-    presets: Memo<PresetFacts<'f>>,
-    minings: Memo<MiningFacts>,
+pub(crate) struct Links<'source> {
+    presets: Memo<Dependency<PresetFacts<'source>>>,
+    minings: Memo<Dependency<MiningFacts>>,
     unreadable: Mutex<BTreeSet<String>>,
 }
 
-impl<'f> Links<'f> {
-    /// Returns what the element `element` spawns, from its References `harvestable` and
-    /// `harvestableEntityClass`; `None` when it names neither.
-    pub(crate) fn of_element(
+impl<'source> Links<'source> {
+    /// Resolves the direct Entity override or the selected preset fallback for one slot.
+    pub(crate) fn of_references(
         &self,
-        trees: &mut TreeBuilder<'f>,
-        forge: &'f DataForge<'f>,
-        element: &StructValue<'f>,
-    ) -> Option<HarvestableLink<'f>> {
-        let preset_guid = reference(Some(element), "harvestable");
-        let element_entity = reference(Some(element), "harvestableEntityClass");
-        if preset_guid.is_none() && element_entity.is_none() {
-            return None;
+        reader: &mut DependencyReader<'_, 'source>,
+        preset_ref: &SelectedReference,
+        entity_ref: SelectedReference,
+    ) -> Result<Option<ResolvedLink<'source>>, CatalogError> {
+        if preset_ref.guid.is_none() && entity_ref.guid.is_none() {
+            return Ok(None);
         }
-        let preset = preset_guid.map(|guid| self.preset(trees, forge, guid));
-        let entity_guid = element_entity.or_else(|| preset.and_then(|facts| facts.entity));
-        let mining = entity_guid.map(|guid| self.mining(trees, forge, guid));
-        Some(HarvestableLink {
-            preset_guid,
-            preset_class_name: preset.and_then(|facts| facts.class_name),
-            entity_guid,
-            mineable_composition_guid: mining.and_then(|facts| facts.composition),
-            mining_global_params_guid: mining.and_then(|facts| facts.global_params),
-        })
+
+        let preset = preset_ref
+            .guid
+            .map(|guid| {
+                self.presets.get_or_try_make(guid.0, || {
+                    reader.selected(guid, "HarvestablePreset", &self.unreadable, preset)
+                })
+            })
+            .transpose()?;
+        let preset_facts = preset.as_ref().and_then(|preset| preset.facts.as_ref());
+        let sources = &reader.input.origins().uses;
+        let preset_origin = sources.origin_with_origins(
+            once(&preset_ref.origin)
+                .chain(preset.iter().map(|preset| &preset.selection))
+                .chain(preset_facts.map(|facts| &facts.class_origin)),
+            true,
+        )?;
+        let entity = selected_entity(sources, entity_ref, &preset_ref.origin, preset.as_ref())?;
+
+        let mining = entity
+            .guid
+            .map(|guid| {
+                self.minings.get_or_try_make(guid.0, || {
+                    reader.selected(guid, "entity", &self.unreadable, mining)
+                })
+            })
+            .transpose()?;
+        let facts = mining.as_ref().and_then(|mining| mining.facts.as_ref());
+        let mining_routes =
+            once(&entity.origin).chain(mining.iter().map(|mining| &mining.selection));
+        let composition = facts.map(|facts| &facts.composition);
+        let global_params = facts.map(|facts| &facts.global_params);
+        let composition_origin = sources.origin_with_origins(
+            mining_routes
+                .clone()
+                .chain(composition.map(|field| &field.origin)),
+            true,
+        )?;
+        let global_origin = sources.origin_with_origins(
+            mining_routes.chain(global_params.map(|field| &field.origin)),
+            true,
+        )?;
+
+        Ok(Some(ResolvedLink {
+            value: HarvestableLink {
+                preset_guid: preset_ref.guid,
+                preset_class_name: preset_facts.and_then(|facts| facts.class_name),
+                entity_guid: entity.guid,
+                mineable_composition_guid: composition.and_then(|field| field.guid),
+                mining_global_params_guid: global_params.and_then(|field| field.guid),
+            },
+            origins: [
+                ("presetClassName", preset_origin),
+                ("entityGuid", entity.origin),
+                ("mineableCompositionGuid", composition_origin),
+                ("miningGlobalParamsGuid", global_origin),
+            ],
+        }))
     }
 
-    /// Returns the warning for the Records that were missing or could not be built, `None` when
-    /// every Record was read.
+    /// Returns the warning for selected Records whose original body could not be read.
     pub(crate) fn warning(&self) -> Option<CraftingWarning> {
         let details: Vec<String> = self
             .unreadable
@@ -82,61 +129,30 @@ impl<'f> Links<'f> {
             details,
         })
     }
+}
 
-    fn preset(
-        &self,
-        trees: &mut TreeBuilder<'f>,
-        forge: &'f DataForge<'f>,
-        guid: CatalogGuid,
-    ) -> PresetFacts<'f> {
-        self.presets.get_or_make(guid.0, || {
-            let tree = self.record_tree(trees, forge, guid, "HarvestablePreset");
-            PresetFacts {
-                class_name: tree.as_ref().map(class_name),
-                entity: tree
-                    .as_ref()
-                    .and_then(|tree| reference(Some(tree.root()), "entityClass")),
-            }
-        })
+fn selected_entity(
+    sources: &SourceUses,
+    direct: SelectedReference,
+    local_preset: &FieldOrigin,
+    preset: Option<&Dependency<PresetFacts<'_>>>,
+) -> Result<SelectedReference, CatalogError> {
+    if direct.guid.is_some() {
+        return Ok(direct);
     }
-
-    fn mining(
-        &self,
-        trees: &mut TreeBuilder<'f>,
-        forge: &'f DataForge<'f>,
-        guid: CatalogGuid,
-    ) -> MiningFacts {
-        self.minings.get_or_make(guid.0, || {
-            let tree = self.record_tree(trees, forge, guid, "entity");
-            let params = tree
-                .as_ref()
-                .and_then(|tree| component(tree, MINEABLE_PARAMS));
-            MiningFacts {
-                composition: reference(params, "composition"),
-                global_params: reference(params, "globalParams"),
-            }
-        })
-    }
-
-    /// Builds the Record `guid` of the role `role`, or notes why it cannot be.
-    fn record_tree(
-        &self,
-        trees: &mut TreeBuilder<'f>,
-        forge: &'f DataForge<'f>,
-        guid: CatalogGuid,
-        role: &str,
-    ) -> Option<RecordTree<'f>> {
-        let reason = match forge.record_by_guid(guid.0) {
-            None => "is not in the DataForge",
-            Some(record) => match trees.build(&record) {
-                Ok(tree) => return Some(tree),
-                Err(_) => "cannot be read",
-            },
-        };
-        self.unreadable
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .insert(format!("{role} {} {reason}", guid.0));
-        None
-    }
+    let fallback = preset
+        .and_then(|preset| preset.facts.as_ref())
+        .map(|facts| facts.entity.resolve(sources))
+        .transpose()?;
+    let origin = sources.origin_with_origins(
+        once(&direct.origin)
+            .chain(once(local_preset))
+            .chain(preset.map(|preset| &preset.selection))
+            .chain(fallback.iter().map(|reference| &reference.origin)),
+        true,
+    )?;
+    Ok(SelectedReference {
+        guid: fallback.and_then(|reference| reference.guid),
+        origin,
+    })
 }

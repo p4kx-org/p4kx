@@ -8,9 +8,11 @@ use crate::build::original_input::OriginalCatalogInput;
 use crate::canonical_record_header::CanonicalRecordHeader;
 use crate::catalog_number_capture::NumberCapture;
 use crate::catalog_read::original::{OriginalFlowFields, OriginalValueSite};
+use crate::contract_harvest_config::SubHarvestableMultiConfig;
 use crate::contract_loot::{LootArchetype, LootTable};
 use crate::export_field_error;
 use crate::guid_text::CatalogGuid;
+use crate::harvest_config::{self, SlotDependencies};
 use crate::loot_records;
 
 use super::definition::LootDefinition;
@@ -50,6 +52,29 @@ pub(crate) fn read_archetype<'source>(
 ) -> Result<(LootDefinition<'source>, LootArchetype<'source>), CatalogError> {
     read_projected(record, tree, input, cancel, |facts| {
         loot_records::loot_archetype(tree, facts)
+    })
+}
+
+/// Reads the original multi-config and projects an admitted slot preset from its same facts.
+pub(crate) fn read_multi_config<'source>(
+    record: &Record<'source>,
+    tree: &RecordTree<'source>,
+    dependencies: &mut SlotDependencies<'_, 'source>,
+) -> Result<
+    (
+        LootDefinition<'source>,
+        Option<SubHarvestableMultiConfig<'source>>,
+    ),
+    CatalogError,
+> {
+    let input = dependencies.reader.input;
+    let cancel = dependencies.reader.cancel;
+    if !harvest_config::admits(tree) {
+        return Ok((read(record, tree, input, cancel)?, None));
+    }
+    let header = input.record_context(record)?;
+    read_projected(record, tree, input, cancel, |facts| {
+        harvest_config::slotpreset_config(dependencies, tree, facts, &header).map(Some)
     })
 }
 

@@ -146,6 +146,7 @@ pub(super) fn multi_configs() -> serde_json::Value {
         "className": "SlotPreset_Cave",
         "recordPath": "libs/foundry/records/harvestable/slotpresets/caves/slotpreset_cave",
         "defaultConfigGuid": null,
+        "fieldOrigins": {},
         "ignoreAttachableTags": false,
         "taggedConfigs": [{
             "name": "Rock",

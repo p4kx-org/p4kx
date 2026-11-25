@@ -174,7 +174,7 @@ mod guid_text;
 mod harvest_config;
 mod harvest_link;
 mod harvest_locations;
-mod harvest_preset;
+mod harvest_projection_fields;
 mod harvest_source;
 mod item;
 mod item_class;

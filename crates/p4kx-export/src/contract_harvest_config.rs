@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::FieldOrigins;
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -29,6 +30,8 @@ pub struct SubHarvestableMultiConfig<'a> {
     pub ignore_attachable_tags: Option<bool>,
     /// The configs by tag, from `taggedConfigs` in stored order.
     pub tagged_configs: Vec<TaggedConfig<'a>>,
+    /// Origins at relative pointers in this projection row.
+    pub field_origins: FieldOrigins,
 }
 
 /// One config of a [`SubHarvestableMultiConfig`] and the tags it applies to.

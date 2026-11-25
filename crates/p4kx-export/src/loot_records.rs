@@ -5,12 +5,10 @@ use p4kx_extraction::{RecordTree, StructValue};
 
 use crate::CatalogError;
 use crate::catalog_read::original::OriginalFlowFields;
-use crate::contract_loot::{LootArchetype, LootConfig, LootTable, LootTableEntry};
+use crate::contract_loot::{LootArchetype, LootTable, LootTableEntry};
 use crate::guid_text::CatalogGuid;
-use crate::loot_entry::{
-    archetype_entries, dupe_limit, optional_integer, optional_number, quantity, weight,
-};
-use crate::record_fields::{class_name, integer, number, reference, structs, structure, text};
+use crate::loot_entry::{archetype_entries, dupe_limit, optional_integer, optional_number, weight};
+use crate::record_fields::{class_name, reference, structs, structure, text};
 
 /// Returns the loot table the Record tree `tree` describes.
 pub(crate) fn loot_table<'f>(
@@ -68,24 +66,5 @@ pub(crate) fn loot_archetype<'f>(
         record_path: tree.record_path(),
         record_index: tree.record_index(),
         entries: archetype_entries(archetype, source)?,
-    })
-}
-
-/// Returns the loot the struct `config` (a `LootConfig`) generates, `None` for no struct.
-pub(crate) fn loot_config(config: Option<&StructValue<'_>>) -> Option<LootConfig> {
-    let config = config?;
-    let value = Some(config);
-    let constraints = structure(value, "lootConstraints");
-    Some(LootConfig {
-        loot_table_guid: reference(value, "lootTable"),
-        loot_table_v3_guid: reference(value, "lootTableV3"),
-        pool_filter_guid: reference(constraints, "poolFilter"),
-        total_results_limit: integer(constraints, "totalResultsLimit"),
-        chance_to_generate: number(constraints, "chanceToGenerate"),
-        chance_to_generate_additional_inventories: number(
-            constraints,
-            "chanceToGenerateAdditionalAttachedInventories",
-        ),
-        fullness: quantity(structure(constraints, "fullnessFactorRange")),
     })
 }

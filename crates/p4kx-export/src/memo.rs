@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::HashMap;
+use std::convert::Infallible;
 use std::sync::{Mutex, PoisonError};
 
 use p4kx_extraction::Guid;
@@ -19,25 +20,37 @@ impl<V> Default for Memo<V> {
     }
 }
 
-impl<V: Copy> Memo<V> {
+impl<V: Clone> Memo<V> {
     /// Returns the value held for `guid`, else the value `make` returns, which is then held. Two
     /// threads that miss at once both make it; the values are equal.
     pub(crate) fn get_or_make(&self, guid: Guid, make: impl FnOnce() -> V) -> V {
+        match self.get_or_try_make(guid, || Ok::<_, Infallible>(make())) {
+            Ok(value) => value,
+            Err(error) => match error {},
+        }
+    }
+
+    /// Returns an observed value by GUID and retains successful observations.
+    pub(crate) fn get_or_try_make<E>(
+        &self,
+        guid: Guid,
+        make: impl FnOnce() -> Result<V, E>,
+    ) -> Result<V, E> {
         let held = self
             .held
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .get(&guid)
-            .copied();
+            .cloned();
         if let Some(value) = held {
-            return value;
+            return Ok(value);
         }
-        let value = make();
+        let value = make()?;
         self.held
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .insert(guid, value);
-        value
+            .insert(guid, value.clone());
+        Ok(value)
     }
 }
 

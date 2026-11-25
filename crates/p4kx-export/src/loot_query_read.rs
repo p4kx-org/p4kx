@@ -12,8 +12,8 @@ use crate::catalog_query_session::checkpoint;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::loot_definition_catalog;
 use crate::guid_text::sort_by_guid;
-use crate::harvest_config;
-use crate::harvest_link::Links;
+use crate::harvest_config::SlotDependencies;
+use crate::harvest_link::{DependencyReader, Links};
 use crate::{CatalogError, CraftingWarning};
 
 pub(super) struct Query<'query> {
@@ -92,17 +92,25 @@ impl<'source> Query<'source> {
                     rows.archetypes.push(archetype);
                     definition
                 }
+                LootDefinitionKind::SubHarvestableMultiConfig => {
+                    let (definition, projection) = loot_definition_catalog::read_multi_config(
+                        &owner.record,
+                        &owner.tree,
+                        &mut SlotDependencies {
+                            reader: DependencyReader {
+                                trees: &mut harvest_trees,
+                                forge: self.forge,
+                                input,
+                                cancel: self.cancel,
+                            },
+                            links: &harvest_links,
+                        },
+                    )?;
+                    rows.sub_harvestable_multi_configs.extend(projection);
+                    definition
+                }
                 _ => loot_definition_catalog::read(&owner.record, &owner.tree, input, self.cancel)?,
             };
-            if self.family == LootDefinitionKind::SubHarvestableMultiConfig {
-                rows.sub_harvestable_multi_configs
-                    .extend(harvest_config::slotpreset_config(
-                        &mut harvest_trees,
-                        &owner.tree,
-                        self.forge,
-                        &harvest_links,
-                    ));
-            }
             if definition.incomplete_fields {
                 coverage.incomplete_fields.push(owner.record.index());
             }

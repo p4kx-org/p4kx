@@ -18488,6 +18488,113 @@
       ],
       "type": "object"
     },
+    "FieldOrigin": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        }
+      ],
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        }
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs"
+      ],
+      "type": "object"
+    },
+    "FieldOrigins": {
+      "additionalProperties": false,
+      "description": "Immediate per-value origins addressed inside one complete unchanged output record.",
+      "patternProperties": {
+        "^(?:/(?:[^~]|~[01])*)?$": {
+          "$ref": "#/$defs/FieldOrigin"
+        }
+      },
+      "type": "object"
+    },
     "FileSource": {
       "description": "Observed standalone-file facts without a claim of original P4K lineage.",
       "properties": {
@@ -143248,6 +143355,10 @@
           ],
           "description": "The GUID of the Record the default config links to when it is a reference; `null` for none\nor a config of another form."
         },
+        "fieldOrigins": {
+          "$ref": "#/$defs/FieldOrigins",
+          "description": "Origins at relative pointers in this projection row."
+        },
         "guid": {
           "$ref": "#/$defs/Guid",
           "description": "The GUID of the Record."
@@ -143274,6 +143385,7 @@
       "required": [
         "className",
         "defaultConfigGuid",
+        "fieldOrigins",
         "guid",
         "ignoreAttachableTags",
         "recordPath",

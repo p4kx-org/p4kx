@@ -17,7 +17,7 @@ mod tables;
 
 pub use definition::LootDefinition;
 pub use kind::LootDefinitionKind;
-pub(crate) use read::{read, read_archetype, read_projected, read_table};
+pub(crate) use read::{read, read_archetype, read_multi_config, read_projected, read_table};
 pub(crate) use tables::{LootDefinitionTables, LootDefinitions};
 
 pub(crate) const fn has_authored_arena(kind: Kind) -> bool {
