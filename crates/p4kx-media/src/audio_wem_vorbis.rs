@@ -255,6 +255,7 @@ impl VorbisOrigins {
         prove_framed(
             proof,
             proof.combine([WemOriginField::Channels])?,
+            WemOriginField::SampleRate,
             &self.frames,
             &self.artifact,
             has_loop,

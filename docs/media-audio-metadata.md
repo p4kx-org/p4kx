@@ -141,7 +141,11 @@ the entire checked packet range in `checked_audio_packets`, including packet loo
 `source_range` ends with the last packet supplied to the PCM decoder. Opus source rows add
 `opus_inputs` with the selected format prefix, checked DATA range and any selected seek words or
 embedded header pages. The emitted Opus source range can end before the checked range after an
-authored sample trim. Artifact origins retain the selected inputs and ranges independently. Embedded
+authored sample trim. The Switch framing word and duration-header bytes have distinct
+source uses when the codec infers pre-skip. Embedded identification pages contribute to the
+Opus channel and frame counts. Copied comment pages contribute to the Ogg artifact. The
+fixed Opus output rate has a source use for the codec selection. Artifact origins retain
+the selected inputs and ranges independently. Embedded
 ranges are absolute within the retained bank, with the DIDX section and triplet as
 subresource indices. Equal output bytes of the same format can share one file, while the conversion rows and
 artifact-manifest occurrences retain their own physical source uses and encryption markers.

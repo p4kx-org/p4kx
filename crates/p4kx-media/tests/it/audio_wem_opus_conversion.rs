@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::fs;
+use std::ops::Range;
 use std::path::Path;
 
 use p4kx_extraction::sound::{WemOpusRanges, WemSource};
@@ -27,6 +28,20 @@ fn requested_opus_ogg_keeps_the_checked_and_emitted_ranges_of_an_encrypted_bank_
 fn requested_opus_wav_keeps_the_checked_and_consumed_ranges_of_an_encrypted_bank_wem() -> TestResult
 {
     check_export(Output::Wav)
+}
+
+#[path = "audio_wem_opus_origins.rs"]
+mod precise_origins;
+
+fn has_opus_site(uses: &[&Value], field: &str, extent: &Range<u64>, role: &str) -> bool {
+    let expected = json!({
+        "type":"subresource", "namespace":"wemOpusInput", "field":field,
+        "indices":["1","0", extent.start.to_string(), extent.end.to_string()]
+    });
+    uses.iter().any(|source| {
+        source.get("location") == Some(&expected)
+            && source.get("role").and_then(Value::as_str) == Some(role)
+    })
 }
 
 #[derive(Clone, Copy)]
@@ -217,15 +232,8 @@ fn check_origin(origins: &Origins, ordinal: usize, ranges: &WemOpusRanges) -> Te
         ("checkedPackets", &ranges.checked_data),
         ("emittedPackets", &ranges.emitted_data),
     ] {
-        let expected = json!({
-            "type":"subresource", "namespace":"wemOpusInput", "field":field,
-            "indices":["1","0", span.start.to_string(), span.end.to_string()]
-        });
         assert!(
-            uses.iter().any(|source| {
-                source.get("location") == Some(&expected)
-                    && source.get("role") == Some(&json!("conversion"))
-            }),
+            has_opus_site(&uses, field, span, "conversion"),
             "{field} has its original encrypted bank source"
         );
     }

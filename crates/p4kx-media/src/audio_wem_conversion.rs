@@ -247,7 +247,11 @@ impl<'source, 'info, 'writer, 'run> ConversionOrigins<'source, 'info, 'writer, '
         origins::subtree(&mut self.prepared, path, evidence, self.writer)
     }
 
-    fn common_success(&mut self, channels: OriginContributions) -> Result<(), MediaError> {
+    fn common_success(
+        &mut self,
+        channels: OriginContributions,
+        sample_rate_field: WemOriginField,
+    ) -> Result<(), MediaError> {
         let codec = self.combine([WemOriginField::Codec])?;
         self.field(OUTCOME, codec.clone())?;
         self.field(&format!("{OUTCOME}/type"), codec.clone())?;
@@ -256,12 +260,15 @@ impl<'source, 'info, 'writer, 'run> ConversionOrigins<'source, 'info, 'writer, '
         self.field(&format!("{OUTCOME}/payload/channels"), channels)?;
         self.field(
             &format!("{OUTCOME}/payload/sample_rate"),
-            self.combine([WemOriginField::SampleRate])?,
+            self.combine([sample_rate_field])?,
         )
     }
 
     fn success(&mut self, completed: &Completed) -> Result<(), MediaError> {
-        self.common_success(self.combine([WemOriginField::Channels])?)?;
+        self.common_success(
+            self.combine([WemOriginField::Channels])?,
+            WemOriginField::SampleRate,
+        )?;
         for (field, origin) in [
             ("sample_count", WemOriginField::SampleCount),
             ("loop_points", WemOriginField::Loop),

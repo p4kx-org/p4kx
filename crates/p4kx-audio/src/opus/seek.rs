@@ -20,21 +20,10 @@ use crate::{
     WemReadError, WemSourceChunk,
 };
 
-/// Original WEM-relative ranges used for a seekable Opus conversion.
-#[derive(Debug, Clone, PartialEq, Eq)]
-#[non_exhaustive]
-pub struct WemOpusRanges {
-    /// Checked format prefix covering the original layout, counts and pre-skip selectors.
-    pub format: Range<u64>,
-    /// Selected packet size words from the standalone seek chunk, when used.
-    pub seek_table: Option<Range<u64>>,
-    /// Checked embedded Ogg pages containing the original identification and comment packets.
-    pub embedded_headers: Option<Range<u64>>,
-    /// Checked DATA bytes containing the audio packets and original framing.
-    pub checked_data: Range<u64>,
-    /// Checked prefix containing every emitted packet, including source framing or page bytes.
-    pub emitted_data: Range<u64>,
-}
+#[path = "seek_ranges.rs"]
+mod ranges;
+
+pub use ranges::WemOpusRanges;
 
 /// Original source ranges and output layout of a successful Ogg Opus write.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -116,8 +105,6 @@ struct PreparedOpus<'source, R> {
     header: StreamHeader,
     count: PacketCount,
     ranges: WemOpusRanges,
-    embedded_header_pages: Option<EmbeddedOpusHeaderPages>,
-    switch_pre_skip: Option<SwitchOpusPreSkip>,
 }
 
 impl<R> WemOpusOgg<'_, R> {
@@ -168,9 +155,9 @@ impl<R: Read + Seek> WemOpusOgg<'_, R> {
         Ok(WemOpusOggEvidence {
             report: written.report,
             output: written.output,
+            embedded_header_pages: source.ranges.embedded_header_pages.clone(),
+            switch_pre_skip: source.ranges.switch_pre_skip.clone(),
             ranges: self.0.ranges,
-            embedded_header_pages: self.0.embedded_header_pages,
-            switch_pre_skip: self.0.switch_pre_skip,
             replayed_seek_table: replay.seek_table,
             replayed_audio_packets: data_start + replay.data.start..data_start + replay.data.end,
         })
@@ -342,8 +329,9 @@ fn prepare<'source, R: Read + Seek>(
         embedded_headers,
         checked_data: start..start + packets.checked_end(),
         emitted_data: start..start + count.emitted_end,
+        embedded_header_pages,
+        switch_pre_skip: packets.switch_pre_skip(),
     };
-    let switch_pre_skip = packets.switch_pre_skip();
     Ok(PreparedOpus {
         input,
         metadata,
@@ -351,8 +339,6 @@ fn prepare<'source, R: Read + Seek>(
         header,
         count,
         ranges,
-        embedded_header_pages,
-        switch_pre_skip,
     })
 }
 

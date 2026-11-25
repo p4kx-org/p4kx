@@ -74,7 +74,8 @@ impl<R: Read + Seek> PreparedOpus<'_, R> {
                     evidence,
                     writer,
                     |sink| {
-                        plan.write(sink)
+                        plan.write_with_evidence(sink)
+                            .map(|written| written.report)
                             .map_err(|cause| write_error(input, "Ogg encoder", cause))
                     },
                 )?;
@@ -109,7 +110,7 @@ pub(super) fn convert<R: Read + Seek>(
         Err(cause) => return Err(MediaError::Contract(cause.to_string())),
     };
     let ranges = conversion.ranges().clone();
-    let origins = OpusOrigins::capture(projection, conversion.metadata(), &ranges, writer)?;
+    let origins = OpusOrigins::capture(projection, conversion.metadata(), &ranges, format, writer)?;
     let result = recover_format_write(conversion.write(input, &origins.artifact, writer))?;
     Ok(result.map(|output| CompletedOpus {
         output,
@@ -177,6 +178,7 @@ struct OpusOrigins {
     format: OriginContributions,
     seek: Option<OriginContributions>,
     headers: Option<OriginContributions>,
+    identification: Option<OriginContributions>,
     checked: OriginContributions,
     emitted: OriginContributions,
     frames: OriginContributions,
@@ -188,18 +190,10 @@ impl OpusOrigins {
         projection: &WemProjection<'_>,
         metadata: &WemMetadata,
         ranges: &WemOpusRanges,
+        output: EncodedAudioFormat,
         writer: &MediaWriter<'_>,
     ) -> Result<Self, MediaError> {
-        let capture = |range: &Range<u64>, field| {
-            let indices = [range.start, range.end];
-            projection.capture(
-                [(
-                    OriginSite::new("wemOpusInput", &indices, field),
-                    SourceUseRole::Conversion,
-                )],
-                writer,
-            )
-        };
+        let capture = |range, field| capture_range(projection, range, field, writer);
         let format = capture(&ranges.format, "format")?;
         let seek = ranges
             .seek_table
@@ -211,6 +205,7 @@ impl OpusOrigins {
             .as_ref()
             .map(|range| capture(range, "headerPages"))
             .transpose()?;
+        let header = OpusHeaderOrigins::capture(projection, ranges, output, writer)?;
         let checked = capture(&ranges.checked_data, "checkedPackets")?;
         let emitted = capture(&ranges.emitted_data, "emittedPackets")?;
         let plan = WemOriginPlan::new(
@@ -222,23 +217,31 @@ impl OpusOrigins {
         let packet_inputs = [&format, &checked]
             .into_iter()
             .chain(seek.iter())
-            .chain(headers.iter());
+            .chain(header.identification.iter())
+            .chain(header.pre_skip.iter());
         let frames = join(writer, packet_inputs.chain([&sample]))?;
         let metadata_fields = capture_fields(
             projection,
             &plan,
             [
                 WemOriginField::Channels,
+                WemOriginField::Codec,
                 WemOriginField::Loop,
                 WemOriginField::RiffByteOrder,
             ],
             writer,
         )?;
-        let bytes = join(writer, [&metadata_fields, &frames, &emitted])?;
+        let bytes = join(
+            writer,
+            [&metadata_fields, &frames, &emitted]
+                .into_iter()
+                .chain(header.comments.iter()),
+        )?;
         Ok(Self {
             format,
             seek,
             headers,
+            identification: header.identification,
             checked,
             emitted,
             frames,
@@ -259,9 +262,16 @@ impl OpusOrigins {
             proof.writer,
             [&declared_channels, &self.format]
                 .into_iter()
-                .chain(self.headers.iter()),
+                .chain(self.identification.iter()),
         )?;
-        prove_framed(proof, channels, &self.frames, &self.artifact, has_loop)?;
+        prove_framed(
+            proof,
+            channels,
+            WemOriginField::Codec,
+            &self.frames,
+            &self.artifact,
+            has_loop,
+        )?;
         let selected = join(proof.writer, [&self.emitted, &self.frames])?;
         proof.range_at(SOURCE_RANGE, &selected)?;
         let inputs = join(
@@ -298,4 +308,81 @@ impl OpusOrigins {
             proof.field(&path, self.format.clone())
         }
     }
+}
+
+struct OpusHeaderOrigins {
+    identification: Option<OriginContributions>,
+    comments: Option<OriginContributions>,
+    pre_skip: Option<OriginContributions>,
+}
+
+impl OpusHeaderOrigins {
+    fn capture(
+        projection: &WemProjection<'_>,
+        ranges: &WemOpusRanges,
+        output: EncodedAudioFormat,
+        writer: &MediaWriter<'_>,
+    ) -> Result<Self, MediaError> {
+        let embedded = ranges.embedded_header_pages();
+        let identification = embedded
+            .map(|pages| {
+                capture_range(
+                    projection,
+                    &pages.identification,
+                    "embeddedIdentificationPages",
+                    writer,
+                )
+            })
+            .transpose()?;
+        let comments = match (output, embedded) {
+            (EncodedAudioFormat::Ogg, Some(pages)) => Some(capture_range(
+                projection,
+                &pages.comments,
+                "embeddedCommentPages",
+                writer,
+            )?),
+            _ => None,
+        };
+        let pre_skip = ranges
+            .switch_pre_skip()
+            .map(|source| {
+                let size = [source.packet_size.start, source.packet_size.end];
+                let duration = [source.duration_header.start, source.duration_header.end];
+                projection.capture(
+                    [
+                        (
+                            OriginSite::new("wemOpusInput", &size, "switchFirstPacketSize"),
+                            SourceUseRole::Selector,
+                        ),
+                        (
+                            OriginSite::new("wemOpusInput", &duration, "switchFirstDurationHeader"),
+                            SourceUseRole::Conversion,
+                        ),
+                    ],
+                    writer,
+                )
+            })
+            .transpose()?;
+        Ok(Self {
+            identification,
+            comments,
+            pre_skip,
+        })
+    }
+}
+
+fn capture_range(
+    projection: &WemProjection<'_>,
+    range: &Range<u64>,
+    field: &str,
+    writer: &MediaWriter<'_>,
+) -> Result<OriginContributions, MediaError> {
+    let indices = [range.start, range.end];
+    projection.capture(
+        [(
+            OriginSite::new("wemOpusInput", &indices, field),
+            SourceUseRole::Conversion,
+        )],
+        writer,
+    )
 }

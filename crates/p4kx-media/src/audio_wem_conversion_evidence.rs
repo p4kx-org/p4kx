@@ -119,11 +119,12 @@ pub(super) fn capture_fields(
 pub(super) fn prove_framed(
     proof: &mut ConversionOrigins<'_, '_, '_, '_>,
     channels: OriginContributions,
+    sample_rate_field: WemOriginField,
     frames: &OriginContributions,
     artifact: &ArtifactEvidence,
     has_loop: bool,
 ) -> Result<(), MediaError> {
-    proof.common_success(channels)?;
+    proof.common_success(channels, sample_rate_field)?;
     proof.field(&format!("{OUTCOME}/payload/sample_count"), frames.clone())?;
     let loop_points = join(
         proof.writer,
