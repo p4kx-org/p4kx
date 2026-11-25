@@ -72,8 +72,8 @@ impl Sound {
             )
         });
         match (written, replacement) {
-            (Ok(((written, digest), ())), Ok(replacement)) => {
-                replacement.finish_companion(out, (), digest, |writer, binding| {
+            (Ok(((written, digest), (), owner)), Ok(replacement)) => {
+                replacement.finish_companion(out, &owner, digest, |writer, binding| {
                     describe(&written.origins, writer, binding)
                 })?;
                 Ok(SoundPublication { written, companion })
@@ -83,3 +83,7 @@ impl Sound {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "sound_publication_tests.rs"]
+mod tests;

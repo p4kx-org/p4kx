@@ -51,7 +51,7 @@ pub fn write_replacing_protected<T>(
             .invalidate()
             .map_err(|source| write_error(out, source))
     })
-    .map(|(written, ())| written);
+    .map(|(written, (), _)| written);
     if let Some(replacement) = held {
         replacement.finish_conversion(out, result)
     } else {
@@ -59,13 +59,14 @@ pub fn write_replacing_protected<T>(
     }
 }
 
+/// Installs a staged file and retains its descriptor and precommit context.
 pub(crate) fn write_replacing_protected_before<T, Context>(
     out: &Path,
     protection: Option<&ArchiveWriteProtection>,
     cancel: Option<&CancelToken>,
     write: impl FnOnce(&mut BufWriter<File>) -> Result<T, ConversionError>,
     before_publish: impl FnOnce(&StagedOutput<'_>) -> Result<Context, ConversionError>,
-) -> Result<(T, Context), ConversionError> {
+) -> Result<(T, Context, OwnedFileToken), ConversionError> {
     check_protected_output(out, protection, cancel)?;
     let (temporary, file, ownership) = create_temporary(out, protection, cancel)?;
     let mut writer = BufWriter::with_capacity(WRITE_BUFFER_LEN, file);
@@ -96,10 +97,9 @@ pub(crate) fn write_replacing_protected_before<T, Context>(
         } => write_error(out, source),
         other => other,
     });
-    if result.is_err() {
-        crate::output_cleanup::conversion(result, &ownership, &temporary, cancel)
-    } else {
-        result
+    match result {
+        Ok((value, context)) => Ok((value, context, ownership)),
+        Err(error) => crate::output_cleanup::conversion(Err(error), &ownership, &temporary, cancel),
     }
 }
 

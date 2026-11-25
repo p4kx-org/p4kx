@@ -167,7 +167,7 @@ impl<'source> DirectoryReceipt<'source> {
             },
         );
         let (result, digest) = match written {
-            Ok((artifact, commit)) => {
+            Ok((artifact, commit, _)) => {
                 commit.record(actual);
                 artifact
             }

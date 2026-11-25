@@ -11,8 +11,7 @@ use crate::{
     OwnedFileToken,
 };
 
-use super::lock::{Contention, ReceiptLock, invalid, protection_error, regular_file};
-use super::target_path::{BindTarget, bind_target};
+use super::lock::{Contention, ReceiptLock, protection_error, regular_file};
 use super::{ExistingCompanions, FileReceipt};
 
 #[cfg(test)]
@@ -38,41 +37,12 @@ pub enum FilePublication {
 }
 
 impl FileReceipt<'_> {
-    pub(super) fn publish_companion(
-        &self,
-        held: &ReceiptLock<'_>,
-        digest: OriginArtifactDigest,
-        describe: impl FnOnce(&mut dyn Write, &OriginArtifactBinding) -> io::Result<()>,
-    ) -> io::Result<()> {
-        self.publish_companion_checked(held, digest, || self.check_committed_target(), describe)
-    }
-
     pub(super) fn publish_owned_companion(
         &self,
         held: &ReceiptLock<'_>,
         digest: OriginArtifactDigest,
         owner: &OwnedFileToken,
         checkpoint: impl FnOnce() -> io::Result<()>,
-        describe: impl FnOnce(&mut dyn Write, &OriginArtifactBinding) -> io::Result<()>,
-    ) -> io::Result<()> {
-        self.publish_companion_checked(
-            held,
-            digest,
-            || {
-                checkpoint()?;
-                owner
-                    .ensure_renamed_writable(&self.artifact, self.cancel.flag())
-                    .map_err(protection_error)
-            },
-            describe,
-        )
-    }
-
-    fn publish_companion_checked(
-        &self,
-        held: &ReceiptLock<'_>,
-        digest: OriginArtifactDigest,
-        check_committed: impl FnOnce() -> io::Result<()>,
         describe: impl FnOnce(&mut dyn Write, &OriginArtifactBinding) -> io::Result<()>,
     ) -> io::Result<()> {
         let binding = OriginArtifactBinding::File {
@@ -86,24 +56,12 @@ impl FileReceipt<'_> {
             |writer| describe(writer, &binding),
             |_| {
                 held.check(&self.cancel)?;
-                check_committed()
+                checkpoint()?;
+                owner
+                    .ensure_renamed_writable(&self.artifact, self.cancel.flag())
+                    .map_err(protection_error)
             },
         )
-    }
-
-    fn check_committed_target(&self) -> io::Result<()> {
-        let mode = if self.native_entry {
-            self.replacement_mode()
-        } else {
-            BindTarget::Receipt
-        };
-        let actual = bind_target(&self.artifact, self.protection, &self.cancel, mode)?.path;
-        if actual != self.artifact || regular_file(&actual)?.is_none() {
-            return Err(invalid(
-                "the committed artifact is no longer a regular file at its output path",
-            ));
-        }
-        Ok(())
     }
 
     /// Publishes byte content and its receipt according to the conflict policy.

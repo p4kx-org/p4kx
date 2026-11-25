@@ -13,7 +13,7 @@ use crate::owned_output_failure::io_error_chain;
 use crate::write::Outcome;
 use crate::{
     ArchiveWriteProtection, CancelToken, ConversionError, ExtractionError, OriginArtifactBinding,
-    OriginArtifactDigest,
+    OriginArtifactDigest, OwnedFileToken,
 };
 
 /// Whether the publication could not release its owned lock.
@@ -100,17 +100,19 @@ impl<'source> OrdinaryReplacement<'source> {
         self.invalidate()
     }
 
-    pub(crate) fn finish_companion<T>(
+    pub(crate) fn finish_companion(
         self,
         out: &Path,
-        value: T,
+        owner: &OwnedFileToken,
         digest: OriginArtifactDigest,
         describe: impl FnOnce(&mut dyn Write, &OriginArtifactBinding) -> io::Result<()>,
-    ) -> Result<T, ConversionError> {
-        let publication = self.receipt.publish_companion(&self.held, digest, describe);
+    ) -> Result<(), ConversionError> {
+        let publication =
+            self.receipt
+                .publish_owned_companion(&self.held, digest, owner, || Ok(()), describe);
         let retirement = self.held.retire();
         match (publication, retirement) {
-            (Ok(()), Ok(())) => Ok(value),
+            (Ok(()), Ok(())) => Ok(()),
             (Err(source), Ok(())) => Err(write_error(self.receipt.path(), source)),
             (Ok(()), Err(cleanup)) => Err(write_error(
                 out,

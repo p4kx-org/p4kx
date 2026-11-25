@@ -11,7 +11,7 @@ fn precommit_context_describes_the_staged_descriptor_that_is_renamed() {
     let dir = tempfile::tempdir().expect("folder");
     let out = dir.path().join("artifact.bin");
     fs::write(&out, b"previous").expect("previous output");
-    let ((), staged) = super::write_replacing_protected_before(
+    let ((), staged, _) = super::write_replacing_protected_before(
         &out,
         None,
         None,
