@@ -13,6 +13,8 @@ use super::{SOUND, TestResult};
 
 #[path = "json_audio_ogg_origins.rs"]
 mod ogg;
+#[path = "wav_receipt.rs"]
+mod wav_receipt;
 
 const SELECTED_FORMAT_BODY: u64 = 44;
 

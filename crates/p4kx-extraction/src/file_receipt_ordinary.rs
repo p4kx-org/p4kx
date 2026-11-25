@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io;
+use std::io::{self, Write};
 use std::path::Path;
 
 use super::lock::{Contention, ReceiptLock, RetainedLock};
@@ -11,7 +11,10 @@ use super::{DIRECTORY_NAME, ExistingCompanions, FileReceipt, ReceiptOwner, heade
 use crate::output_file::write_error;
 use crate::owned_output_failure::io_error_chain;
 use crate::write::Outcome;
-use crate::{ArchiveWriteProtection, CancelToken, ConversionError, ExtractionError};
+use crate::{
+    ArchiveWriteProtection, CancelToken, ConversionError, ExtractionError, OriginArtifactBinding,
+    OriginArtifactDigest,
+};
 
 /// Whether the publication could not release its owned lock.
 pub(crate) fn retained_lock_failure(error: &io::Error) -> bool {
@@ -80,6 +83,42 @@ impl<'source> OrdinaryReplacement<'source> {
             self.receipt.check_target()?;
         }
         self.receipt.invalidate(ExistingCompanions::PreserveForeign)
+    }
+
+    pub(crate) fn invalidate_for_companion(&self) -> io::Result<()> {
+        super::check(
+            self.receipt.path(),
+            self.receipt.receipt_protection,
+            &self.receipt.cancel,
+        )?;
+        header::check_existing(
+            self.receipt.path(),
+            ReceiptOwner::File(&self.receipt.artifact_name),
+        )?;
+        self.invalidate()
+    }
+
+    pub(crate) fn finish_companion<T>(
+        self,
+        out: &Path,
+        value: T,
+        digest: OriginArtifactDigest,
+        describe: impl FnOnce(&mut dyn Write, &OriginArtifactBinding) -> io::Result<()>,
+    ) -> Result<T, ConversionError> {
+        let publication = self.receipt.publish_companion(&self.held, digest, describe);
+        let retirement = self.held.retire(self.receipt.receipt_protection);
+        match (publication, retirement) {
+            (Ok(()), Ok(())) => Ok(value),
+            (Err(source), Ok(())) => Err(write_error(self.receipt.path(), source)),
+            (Ok(()), Err(cleanup)) => Err(write_error(
+                out,
+                io::Error::other(LockFinishFailure::<ConversionError>::Committed { cleanup }),
+            )),
+            (Err(primary), Err(cleanup)) => Err(write_error(
+                self.receipt.path(),
+                io::Error::other(LockFinishFailure::<io::Error>::Receipt { primary, cleanup }),
+            )),
+        }
     }
 
     pub(crate) fn finish_conversion<T>(
@@ -159,6 +198,12 @@ enum Placement {
 
 #[derive(Debug, thiserror::Error)]
 enum LockFinishFailure<E> {
+    #[error("output committed but its receipt and lock retirement failed: {cleanup}")]
+    Receipt {
+        #[source]
+        primary: E,
+        cleanup: io::Error,
+    },
     #[error("output was not replaced and its temporary publication lock could not be retired")]
     Unplaced {
         #[source]

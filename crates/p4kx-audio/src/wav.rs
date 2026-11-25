@@ -33,6 +33,20 @@ pub struct WavReport {
     pub loop_points: Option<Loop>,
 }
 
+/// The source and output extents of one successful PCM or ADPCM WAV write.
+#[derive(Debug, Clone, Copy)]
+#[non_exhaustive]
+pub struct LinearWavWrite {
+    /// The existing WAV summary.
+    pub report: WavReport,
+    /// Bytes used from the selected WEM data body.
+    pub source_audio_bytes: u64,
+    /// Bytes per complete IMA channel sub-block, when the selected codec is IMA.
+    pub ima_sub_block_bytes: Option<u64>,
+    /// First PCM sample byte in the output.
+    pub output_audio_start: u64,
+}
+
 impl<B: AsRef<[u8]>> Wem<B> {
     /// Writes the sound as a 16-bit PCM WAV file to `out`: a canonical `WAVE_FORMAT_PCM` header
     /// for one or two channels, `WAVE_FORMAT_EXTENSIBLE` with the channel mask for more. PCM is
@@ -57,15 +71,31 @@ impl<B: AsRef<[u8]>> Wem<B> {
     /// anything, and for a packet the decoder fails on after part of the WAV is written.
     pub fn write_wav(&self, out: &mut impl Write) -> Result<WavReport, AudioError> {
         match self.codec() {
-            Codec::Pcm => self.write_pcm_wav(out),
-            Codec::ImaAdpcm | Codec::PtAdpcm => self.write_adpcm_wav(out),
             Codec::Vorbis => self.write_vorbis_wav(out),
             Codec::Opus => self.write_opus_wav(out),
+            _ => self.write_linear_wav(out).map(|written| written.report),
+        }
+    }
+
+    /// Returns whether the selected codec uses the PCM or ADPCM WAV writer.
+    #[must_use]
+    pub const fn supports_linear_wav(&self) -> bool {
+        matches!(self.codec(), Codec::Pcm | Codec::ImaAdpcm | Codec::PtAdpcm)
+    }
+
+    /// Writes PCM or ADPCM as WAV and returns the byte extents of that write.
+    ///
+    /// # Errors
+    /// Returns WAV conversion or output errors, including a codec outside PCM and ADPCM.
+    pub fn write_linear_wav(&self, out: &mut impl Write) -> Result<LinearWavWrite, AudioError> {
+        match self.codec() {
+            Codec::Pcm => self.write_pcm_wav(out),
+            Codec::ImaAdpcm | Codec::PtAdpcm => self.write_adpcm_wav(out),
             codec => Err(AudioError::UnsupportedCodec(codec)),
         }
     }
 
-    fn write_adpcm_wav(&self, out: &mut impl Write) -> Result<WavReport, AudioError> {
+    fn write_adpcm_wav(&self, out: &mut impl Write) -> Result<LinearWavWrite, AudioError> {
         let layout = Layout::of(self.codec(), self.channels(), self.block_align()).ok_or(
             AudioError::InvalidFormat("the ADPCM block alignment does not fit the channels"),
         )?;
@@ -74,7 +104,13 @@ impl<B: AsRef<[u8]>> Wem<B> {
         layout
             .write_pcm(self.data(), self.byte_order(), &mut Vec::new(), out)
             .map_err(AudioError::Write)?;
-        Ok(report)
+        Ok(LinearWavWrite {
+            report,
+            source_audio_bytes: layout.consumed_bytes(self.data().len() as u64),
+            ima_sub_block_bytes: (self.codec() == Codec::ImaAdpcm)
+                .then(|| (layout.block_len() / usize::from(self.channels())) as u64),
+            output_audio_start: header.len() as u64,
+        })
     }
 
     pub(crate) fn decoded_wav_header(
@@ -84,7 +120,7 @@ impl<B: AsRef<[u8]>> Wem<B> {
         self.metadata().decoded_wav_header(frames)
     }
 
-    fn write_pcm_wav(&self, out: &mut impl Write) -> Result<WavReport, AudioError> {
+    fn write_pcm_wav(&self, out: &mut impl Write) -> Result<LinearWavWrite, AudioError> {
         let channels = self.channels();
         let block_align = wav_block_align(channels)?;
         let frames = self.data().len() / usize::from(block_align);
@@ -98,12 +134,17 @@ impl<B: AsRef<[u8]>> Wem<B> {
             ByteOrder::Little => out.write_all(data).map_err(AudioError::Write)?,
             ByteOrder::Big => write_swapped(data, out)?,
         }
-        Ok(WavReport {
-            channels,
-            sample_rate: self.sample_rate(),
-            sample_count: frames as u64,
-            size: (header.len() + data.len()) as u64,
-            loop_points,
+        Ok(LinearWavWrite {
+            report: WavReport {
+                channels,
+                sample_rate: self.sample_rate(),
+                sample_count: frames as u64,
+                size: (header.len() + data.len()) as u64,
+                loop_points,
+            },
+            source_audio_bytes: data.len() as u64,
+            ima_sub_block_bytes: None,
+            output_audio_start: header.len() as u64,
         })
     }
 }

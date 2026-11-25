@@ -2002,6 +2002,10 @@ WAV header. Opus keeps the effective playback rate. The immediate encryption mar
 to those input bytes. A standalone WEM has unknown Archive encryption. The corresponding
 source and use identifiers resolve in `provenance`.
 
+For PCM, IMA ADPCM and PTADPCM input, `originReceipt` names the sibling
+`<file>.p4kx-origin.jsonl` bound to the written byte length and SHA-256.
+The same companion is published without `--json`.
+
 ## `p4kx audio ogg <archive> <entry> --out <file> --json`
 
 Also `p4kx audio ogg <file> --out <file> --json` for a WEM file on disk.

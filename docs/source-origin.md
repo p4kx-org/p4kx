@@ -192,6 +192,19 @@ values identify the exact canvas Record fields used to derive them.
 Explicit dimensions and command options have their own tool-authored origins.
 A report value whose contributors cannot be established has a null marker.
 
+## Standalone PCM and ADPCM WAV
+
+The WAV sibling companion addresses each source-based header or loop value
+and the sample body as a `wavBytes` field with a half-open output range.
+WEM source uses distinguish the selected format, the data length used for
+frame admission and the actual bytes consumed by the successful decoder.
+`wemImaAdpcmByteRuns` indices record a decoded WEM base offset, occurrence
+count, byte stride, field offset and field length. They omit each IMA
+sub-block's reserved byte. The byte containing the final used nibble is
+retained. A truncated trailing sample frame or discarded block does not
+contribute audio bytes. A loose WEM retains its original file identity
+with unknown Archive encryption.
+
 ## Hologram rendering
 
 `p4kx ui hologram` publishes `<file>.p4kx-origin.jsonl` alongside the PNG.

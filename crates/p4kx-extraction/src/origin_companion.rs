@@ -59,6 +59,43 @@ pub enum OriginXmlField {
     Text,
 }
 
+/// The typed value represented by one emitted WAV byte range.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, JsonSchema)]
+#[serde(rename_all = "camelCase")]
+#[non_exhaustive]
+pub enum OriginWavField {
+    /// RIFF body length.
+    RiffLength,
+    /// Format chunk body length.
+    FormatLength,
+    /// Generated PCM format tag.
+    FormatTag,
+    /// Channel count.
+    Channels,
+    /// Sample rate.
+    SampleRate,
+    /// Bytes per second.
+    ByteRate,
+    /// Bytes per PCM frame.
+    BlockAlign,
+    /// Bits per PCM sample.
+    BitsPerSample,
+    /// Extensible speaker mask.
+    ChannelMask,
+    /// Loop sample period.
+    SamplePeriod,
+    /// Number of emitted loops.
+    LoopCount,
+    /// First loop frame.
+    LoopStart,
+    /// Last loop frame.
+    LoopEndInclusive,
+    /// PCM data length.
+    DataLength,
+    /// PCM sample body.
+    PcmSamples,
+}
+
 /// The exact datum within a bound standalone artifact.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(
@@ -114,6 +151,15 @@ pub enum OriginOutputAddress {
         start: DecimalU64,
         /// First byte past the emitted mip.
         end_exclusive: DecimalU64,
+    },
+    /// One typed field in the emitted WAV.
+    WavBytes {
+        /// First byte in the emitted field.
+        start: DecimalU64,
+        /// First byte past the emitted field.
+        end_exclusive: DecimalU64,
+        /// Category of the emitted field.
+        field: OriginWavField,
     },
     /// The bytes addressed by a buffer view in the GLB binary chunk.
     GlbBinaryBytes {

@@ -43,6 +43,8 @@ struct InfoJson<'a> {
 struct WavJson<'a> {
     sound: &'a str,
     output: String,
+    #[serde(rename = "originReceipt", skip_serializing_if = "Option::is_none")]
+    origin_receipt: Option<String>,
     channels: u16,
     sample_rate: u32,
     sample_count: u64,
@@ -70,7 +72,14 @@ struct OggJson<'a> {
 pub(crate) fn run(args: &AudioArgs, as_json: bool) -> Result<()> {
     match &args.action {
         AudioAction::Info(source) => info(&open(source, as_json)?, as_json),
-        AudioAction::Wav { source, out } => wav(&open(source, as_json)?, out, as_json),
+        AudioAction::Wav { source, out } => {
+            let sound = if as_json || source.entry.is_some() {
+                open(source, true)?
+            } else {
+                Sound::from_file_observed_for_wav(&source.path)?
+            };
+            wav(&sound, out, as_json)
+        }
         AudioAction::Ogg { source, out } => ogg(&open(source, as_json)?, out, as_json),
     }
 }
@@ -149,11 +158,25 @@ fn format_duration(duration: Duration) -> String {
 }
 
 fn wav(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
-    let report = sound.write_wav_to_file(out)?;
+    let (report, companion) = if sound.wem().supports_linear_wav() {
+        let (report, companion) = sound.write_linear_wav_with_receipt(out)?;
+        (report, Some(companion))
+    } else {
+        (sound.write_wav_to_file(out)?, None)
+    };
     if as_json {
+        let origin_receipt = if let Some(companion) = companion {
+            let basename = companion
+                .file_name()
+                .ok_or_else(|| io::Error::other("missing origin companion basename"))?;
+            Some(json::path(Path::new(basename)))
+        } else {
+            None
+        };
         let summary = WavJson {
             sound: sound.name(),
             output: json::path(out),
+            origin_receipt,
             channels: report.channels,
             sample_rate: report.sample_rate,
             sample_count: report.sample_count,
@@ -171,6 +194,13 @@ fn wav(sound: &Sound, out: &Path, as_json: bool) -> Result<()> {
             out.display(),
             report.size
         )?;
+        if let Some(companion) = companion {
+            writeln!(
+                io::stdout().lock(),
+                "source origins: {}",
+                companion.display()
+            )?;
+        }
     }
     Ok(())
 }

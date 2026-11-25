@@ -453,6 +453,35 @@
         },
         {
           "additionalProperties": false,
+          "description": "One typed field in the emitted WAV.",
+          "properties": {
+            "endExclusive": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "First byte past the emitted field."
+            },
+            "field": {
+              "$ref": "#/$defs/OriginWavField",
+              "description": "Category of the emitted field."
+            },
+            "start": {
+              "$ref": "#/$defs/DecimalU64",
+              "description": "First byte in the emitted field."
+            },
+            "type": {
+              "const": "wavBytes",
+              "type": "string"
+            }
+          },
+          "required": [
+            "type",
+            "start",
+            "endExclusive",
+            "field"
+          ],
+          "type": "object"
+        },
+        {
+          "additionalProperties": false,
           "description": "The bytes addressed by a buffer view in the GLB binary chunk.",
           "properties": {
             "endExclusive": {
@@ -480,6 +509,86 @@
             "endExclusive"
           ],
           "type": "object"
+        }
+      ]
+    },
+    "OriginWavField": {
+      "description": "The typed value represented by one emitted WAV byte range.",
+      "oneOf": [
+        {
+          "const": "riffLength",
+          "description": "RIFF body length.",
+          "type": "string"
+        },
+        {
+          "const": "formatLength",
+          "description": "Format chunk body length.",
+          "type": "string"
+        },
+        {
+          "const": "formatTag",
+          "description": "Generated PCM format tag.",
+          "type": "string"
+        },
+        {
+          "const": "channels",
+          "description": "Channel count.",
+          "type": "string"
+        },
+        {
+          "const": "sampleRate",
+          "description": "Sample rate.",
+          "type": "string"
+        },
+        {
+          "const": "byteRate",
+          "description": "Bytes per second.",
+          "type": "string"
+        },
+        {
+          "const": "blockAlign",
+          "description": "Bytes per PCM frame.",
+          "type": "string"
+        },
+        {
+          "const": "bitsPerSample",
+          "description": "Bits per PCM sample.",
+          "type": "string"
+        },
+        {
+          "const": "channelMask",
+          "description": "Extensible speaker mask.",
+          "type": "string"
+        },
+        {
+          "const": "samplePeriod",
+          "description": "Loop sample period.",
+          "type": "string"
+        },
+        {
+          "const": "loopCount",
+          "description": "Number of emitted loops.",
+          "type": "string"
+        },
+        {
+          "const": "loopStart",
+          "description": "First loop frame.",
+          "type": "string"
+        },
+        {
+          "const": "loopEndInclusive",
+          "description": "Last loop frame.",
+          "type": "string"
+        },
+        {
+          "const": "dataLength",
+          "description": "PCM data length.",
+          "type": "string"
+        },
+        {
+          "const": "pcmSamples",
+          "description": "PCM sample body.",
+          "type": "string"
         }
       ]
     },

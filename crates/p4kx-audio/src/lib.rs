@@ -279,7 +279,7 @@ pub use vorbis::{
     Codebooks, OggReport, VorbisError, WemVorbisOgg, WemVorbisRanges, WemVorbisWav,
     WemVorbisWriteError,
 };
-pub use wav::WavReport;
+pub use wav::{LinearWavWrite, WavReport};
 pub use wem::{Wem, WemChunk};
 pub use wem_cue::{WemCue, WemCuePoint};
 pub use wem_info_source::{

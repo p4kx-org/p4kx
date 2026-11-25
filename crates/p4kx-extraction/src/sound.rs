@@ -3,6 +3,9 @@
 
 //! Bounded WEM reads and original input evidence.
 
+#[path = "sound_wav_receipt.rs"]
+mod wav_receipt;
+
 #[path = "radar_audio.rs"]
 pub mod radar_audio;
 #[path = "wwise_path.rs"]
@@ -54,6 +57,13 @@ pub struct Sound {
 enum SoundInput {
     Archive(EntryOrigin),
     File(ObservedFileOrigin),
+}
+
+#[derive(Clone, Copy)]
+enum FileObservation {
+    None,
+    All,
+    LinearWav,
 }
 
 impl Sound {
@@ -131,7 +141,7 @@ impl Sound {
     /// [`ConversionError::SoundTooLarge`] when it exceeds [`MAX_SOUND_LEN`], and another
     /// [`ConversionError`] when it cannot be read or is no valid WEM.
     pub fn from_file(path: &Path) -> Result<Self, ConversionError> {
-        Self::read_file(path, false)
+        Self::read_file(path, FileObservation::None)
     }
 
     /// Reads a WEM file with its original standalone identity.
@@ -139,10 +149,18 @@ impl Sound {
     /// # Errors
     /// Returns the same errors as [`Self::from_file`].
     pub fn from_file_observed(path: &Path) -> Result<Self, ConversionError> {
-        Self::read_file(path, true)
+        Self::read_file(path, FileObservation::All)
     }
 
-    fn read_file(path: &Path, observe: bool) -> Result<Self, ConversionError> {
+    /// Reads a WEM file and observes its identity when it can produce a PCM or ADPCM WAV companion.
+    ///
+    /// # Errors
+    /// Returns the same errors as [`Self::from_file_observed`].
+    pub fn from_file_observed_for_wav(path: &Path) -> Result<Self, ConversionError> {
+        Self::read_file(path, FileObservation::LinearWav)
+    }
+
+    fn read_file(path: &Path, observation: FileObservation) -> Result<Self, ConversionError> {
         let mut file = File::open(path).map_err(|source| {
             if source.kind() == io::ErrorKind::NotFound {
                 ConversionError::NoSuchFile {
@@ -165,7 +183,12 @@ impl Sound {
             SourceProtection::new(None),
             None,
         )?;
-        if observe {
+        let observes_source = match observation {
+            FileObservation::None => false,
+            FileObservation::All => true,
+            FileObservation::LinearWav => sound.wem.supports_linear_wav(),
+        };
+        if observes_source {
             sound.original = ObservedFileOrigin::of_read(
                 path,
                 &file,
