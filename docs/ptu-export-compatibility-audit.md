@@ -8,6 +8,46 @@ of the current checkout. This report contains technical structures and implement
 only. Game values, text dumps, concrete test-build Record identities, build payloads and
 extracted assets are not included. Public technical issue updates were explicitly authorized.
 
+## PTU 13273298 comparison
+
+The installed manifest identifies change `13273298`, internal version `5.0.202.35026`.
+The comparison used a retained Archive without its original manifest. Its size and
+modification time match the `13260598` receipt. Its `Data/Game2.dcb` directory size and
+CRC-32C match the earlier manifest-bound `13260598` comparison. Both Archive stamps and
+the installed manifest stayed stable through the reads.
+
+| Compared layer | Added | Removed | Changed |
+| --- | ---: | ---: | ---: |
+| Archive directory Entries | 99 | 176 | 1,111 |
+| DataForge Records | 31 | 0 | 75 |
+| DataForge Structs, Properties, enums and enum options | 0 | 0 | 0 |
+
+The Record comparison reports zero moved or unreadable Records. Five ContractGenerator
+and six ContractTemplate Records changed. The authored changes include item matching,
+drop-off target types, courier text and spawn or location selection. The new
+`deliveryitemport_recovercomponent` `LocationResourceSlot` is referenced by two changed
+location-entity declarations. The existing selective SDK read all 67 resource slots
+with complete coverage and 1,072 contributing source uses from one physical source.
+[Location configuration](catalog-location-configuration.md)
+
+| Area | Source evidence and exporter coverage |
+| --- | --- |
+| Gatala Fungi and Pouchweed | Nine changed trigger occurrences resolve to seven distinct authored ATL triggers and Wwise Events. The scoped probe verifies both original Entries, `SC_INT_PT_HARV.xml` and `INT_PT_HARV.bnk`, and resolves each Event in the bank's 59 readable HIRC objects. The Gatala harvestable base also changes its two existing `AttachDef.Localization` fields. The original field walker and audio readers admit these shapes. [Audio control](media-audio-control.md) |
+| Biome, Levski and gravity-generator audio | Three changed ATL Entries have identical parsed element order and attributes on both sides. The bytes switch between text XML and CryXmlB. The selected files establish no changed authored values for these three graphs. Biome emitter motion, Levski room audibility and gravity-generator cockpit audibility depend on game execution. |
+| Starchitect | Twenty-nine matching Tile SOCPAKs changed and one was removed. The selected Compound verifies all ten members, adds a readable RoomMapping, and keeps 33 `Light` elements. The selected Agriculture changes its `Light` count from 303 to 309. The typed SOC scene projection emits both Agriculture fog components and verifies 22 scalar and vector cells against their original values, CryXml coordinates and selectors. The selected Compound emits zero fog components. [Authored SOC scene](soc-scene.md) |
+| Flora | All seven changed Corylus root models and their associated geometry are readable. The selected `corylus_02_a.cgf` has six LODs and its GLB writes one mesh, zero bones and zero skinned meshes. These physical inputs establish static geometry coverage. A rig comparison requires evidence binding a plant placement to an original skeletal asset. |
+| VR attachments | `hc_hud_pie_weaponattach_3d` is a new `BuildingBlocks_Canvas`. Its `list_Ports3D` uses the runtime `WeaponItemPorts` array and an augmented-reality preview scene. Record export preserves the authored structures. With `IsWeaponAttachmentUIEnabled` supplied, the still renderer reports `runtime_array` and identifies `scene[0].arrayVariable` as the complete original source. Its diagnostic names the required game array even when the widget is active. [UI render](commands.md) |
+
+The CRC-verified Nyx I descriptor has five `Child` names matching the extraction site or hub
+pattern and twelve matching medium settlement. These 17 entries declare class
+`MissionLocationTemplate`, `locationType` 3 and a present `classGuid`. The existing placement
+reader retains those fields. Name matching establishes these observed occurrences and
+leaves the template's classification and the Forager's Guide presentation as separate sources.
+
+The English Model-K2 descriptions change their content under existing keys.
+Crash fixes, server mission progression, effective payouts and engine rendering
+remain separate from the archived input and exporter checks.
+
 ## PTU 13260598 comparison
 
 The installed PTU manifest identifies change `13260598` and internal version

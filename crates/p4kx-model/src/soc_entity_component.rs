@@ -9,7 +9,7 @@ use crate::soc_source_node::{SocSourceNode, SocSourceValue, named};
 /// A directly authored SOC Entity component.
 #[derive(Debug, Clone, Copy)]
 pub struct SocEntityComponent<'document> {
-    property_ordinal: Option<usize>,
+    properties: Option<SocSourceNode<'document>>,
     node: SocSourceNode<'document>,
     kind: SocEntityComponentKind,
 }
@@ -21,7 +21,7 @@ impl<'document> SocEntityComponent<'document> {
 
     fn from_entity_child(node: SocSourceNode<'document>) -> impl Iterator<Item = Self> {
         let direct = named(node.element(), "InteractionLinkController").then_some(Self {
-            property_ordinal: None,
+            properties: None,
             node,
             kind: SocEntityComponentKind::InteractionLinkController,
         });
@@ -30,9 +30,9 @@ impl<'document> SocEntityComponent<'document> {
             .into_iter()
             .chain(properties.into_iter().flat_map(|properties| {
                 SocSourceNode::direct_children(properties.element()).filter_map(move |node| {
-                    let kind = SocEntityComponentKind::from_properties(node.element())?;
+                    let kind = SocEntityComponentKind::from_properties(node)?;
                     Some(Self {
-                        property_ordinal: Some(properties.ordinal()),
+                        properties: Some(properties),
                         node,
                         kind,
                     })
@@ -43,7 +43,17 @@ impl<'document> SocEntityComponent<'document> {
     /// Returns the `PropertiesDataCore` slot, if any, and the original component slot.
     #[must_use]
     pub const fn ordinal(self) -> (Option<usize>, usize) {
-        (self.property_ordinal, self.node.ordinal())
+        let properties = match self.properties {
+            Some(node) => Some(node.ordinal()),
+            None => None,
+        };
+        (properties, self.node.ordinal())
+    }
+
+    /// Returns the owning `PropertiesDataCore` element, when present.
+    #[must_use]
+    pub fn properties_element(self) -> Option<SourceElement<'document>> {
+        self.properties.map(SocSourceNode::element)
     }
 
     /// Returns the original component, including all unclassified content.
@@ -97,10 +107,13 @@ pub enum SocEntityComponentKind {
     RoomConnector,
     /// The `PropertiesDataCore/EntityComponentDefaultLoadout` component.
     DefaultLoadout,
+    /// The `PropertiesDataCore/FogVolume` component with type `FogVolumeComponentParams`.
+    FogVolume,
 }
 
 impl SocEntityComponentKind {
-    fn from_properties(element: SourceElement<'_>) -> Option<Self> {
+    fn from_properties(node: SocSourceNode<'_>) -> Option<Self> {
+        let element = node.element();
         if element.namespace().is_some() {
             return None;
         }
@@ -110,6 +123,12 @@ impl SocEntityComponentKind {
             "EntityGeometryResource" => Some(Self::GeometryResource),
             "EntityComponentRoomConnector" => Some(Self::RoomConnector),
             "EntityComponentDefaultLoadout" => Some(Self::DefaultLoadout),
+            "FogVolume"
+                if node.read("__type", Some)
+                    == SocSourceValue::Present("FogVolumeComponentParams") =>
+            {
+                Some(Self::FogVolume)
+            }
             _ => None,
         }
     }

@@ -168,10 +168,21 @@ impl<'a> XmlOrigin<'a> {
         attributes: impl IntoIterator<Item = SourceAttribute<'document>>,
         value: SourceValue<T>,
     ) -> Result<SourcedValue<T>, SocSceneError> {
+        self.field_with_selectors(element, attributes, value, &[])
+    }
+
+    fn field_with_selectors<'document, T>(
+        &self,
+        element: SourceElement<'_>,
+        attributes: impl IntoIterator<Item = SourceAttribute<'document>>,
+        value: SourceValue<T>,
+        selectors: &[SourceUse],
+    ) -> Result<SourcedValue<T>, SocSceneError> {
         let mut uses = vec![self.node(element, SourceUseRole::Payload)?];
         for attribute in attributes {
             uses.push(self.attribute(&attribute, SourceUseRole::Payload)?.1);
         }
+        uses.extend_from_slice(selectors);
         Ok(self.sources.value(value, &uses, true))
     }
 
@@ -181,10 +192,35 @@ impl<'a> XmlOrigin<'a> {
         name: &str,
         value: SocSourceValue<T>,
     ) -> Result<SourcedValue<T>, SocSceneError> {
-        let matching = element
-            .attributes()
-            .filter(|attr| attr.namespace().is_none() && attr.name() == name);
-        self.field(element, matching, source_value(value))
+        self.field(
+            element,
+            matching_attributes(element, name),
+            source_value(value),
+        )
+    }
+
+    pub(crate) fn parsed_attribute<'document, T>(
+        &self,
+        element: SourceElement<'document>,
+        name: &str,
+        parse: impl FnOnce(&'document str) -> Option<T>,
+    ) -> Result<SourcedValue<T>, SocSceneError> {
+        self.parsed_attribute_with_selectors(element, name, parse, &[])
+    }
+
+    pub(crate) fn parsed_attribute_with_selectors<'document, T>(
+        &self,
+        element: SourceElement<'document>,
+        name: &str,
+        parse: impl FnOnce(&'document str) -> Option<T>,
+        selectors: &[SourceUse],
+    ) -> Result<SourcedValue<T>, SocSceneError> {
+        self.field_with_selectors(
+            element,
+            matching_attributes(element, name),
+            read_attribute(element, name, parse),
+            selectors,
+        )
     }
 
     pub(crate) fn node_origin(
@@ -194,6 +230,30 @@ impl<'a> XmlOrigin<'a> {
         let used = self.node(element, SourceUseRole::Payload)?;
         Ok(self.sources.origin(&[used], true))
     }
+}
+
+pub(crate) fn read_attribute<'document, T>(
+    element: SourceElement<'document>,
+    name: &str,
+    parse: impl FnOnce(&'document str) -> Option<T>,
+) -> SourceValue<T> {
+    let mut matches = matching_attributes(element, name);
+    match (matches.next(), matches.next()) {
+        (None, _) => SourceValue::Absent,
+        (Some(attribute), None) => {
+            parse(attribute.value()).map_or(SourceValue::Invalid, SourceValue::Present)
+        }
+        _ => SourceValue::Invalid,
+    }
+}
+
+pub(crate) fn matching_attributes<'document>(
+    element: SourceElement<'document>,
+    name: &str,
+) -> impl Iterator<Item = SourceAttribute<'document>> {
+    element
+        .attributes()
+        .filter(move |attribute| attribute.namespace().is_none() && attribute.name() == name)
 }
 
 pub(crate) fn source_value<T>(value: SocSourceValue<T>) -> SourceValue<T> {

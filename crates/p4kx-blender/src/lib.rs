@@ -97,6 +97,7 @@ mod soc_scene_class_sensor;
 mod soc_scene_classes;
 mod soc_scene_controller_candidates;
 mod soc_scene_entities;
+mod soc_scene_fog_volume;
 mod soc_scene_geometry;
 mod soc_scene_included;
 mod soc_scene_included_row;

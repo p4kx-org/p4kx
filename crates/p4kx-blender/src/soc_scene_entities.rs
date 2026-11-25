@@ -11,6 +11,7 @@ use serde::Serialize;
 use crate::soc_scene::SocSceneError;
 use crate::soc_scene_class_mannequin::{children, string_attribute};
 use crate::soc_scene_classes::ClassTarget;
+use crate::soc_scene_fog_volume::FogVolume;
 use crate::soc_scene_lights::{Light, LightGroup};
 use crate::soc_scene_loadouts::Loadout;
 use crate::soc_scene_origin::{SocXmlPosition, XmlOrigin};
@@ -125,6 +126,8 @@ struct Component {
     declared_type: SourcedValue<String>,
     geometry_paths: Vec<SourcedValue<String>>,
     loadouts: Vec<Loadout>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    fog_volume: Option<FogVolume>,
 }
 
 #[derive(Debug, Serialize, JsonSchema)]
@@ -137,6 +140,7 @@ enum ComponentKind {
     GeometryResource,
     RoomConnector,
     DefaultLoadout,
+    FogVolume,
     Other,
 }
 
@@ -162,6 +166,7 @@ impl Component {
             SocEntityComponentKind::GeometryResource => ComponentKind::GeometryResource,
             SocEntityComponentKind::RoomConnector => ComponentKind::RoomConnector,
             SocEntityComponentKind::DefaultLoadout => ComponentKind::DefaultLoadout,
+            SocEntityComponentKind::FogVolume => ComponentKind::FogVolume,
             _ => ComponentKind::Other,
         };
         let geometry_paths = if component.kind() == SocEntityComponentKind::GeometryResource {
@@ -182,6 +187,9 @@ impl Component {
                 .map(str::to_owned),
             geometry_paths,
             loadouts: Loadout::read_all(component.loadouts(), origin)?,
+            fog_volume: (component.kind() == SocEntityComponentKind::FogVolume)
+                .then(|| FogVolume::read(component, origin))
+                .transpose()?,
         })
     }
 }

@@ -76,6 +76,19 @@ declaration. A proximity sensor retains its class's original exit
 delay and, for the declared box shape, the sensor-local extent and offset. Its authored
 links identify the target independently of trigger shape.
 
+An Entity's ordered `components` list includes a `fogVolume` row for each direct
+`PropertiesDataCore/FogVolume` with the unique unqualified type
+`FogVolumeComponentParams`. The row's `fogVolume` payload exposes the authored
+`volumeType` code, `globalDensity`, `softEdges`, `rampStart`, `rampEnd`,
+`rampInfluence`, `affectsThisAreaOnly` and `maxDistance` with independent value states
+and original source positions. The origins include the owning `PropertiesDataCore`
+element and the exact component name and type used for selection. `sizes` lists direct
+`size` elements declared as `Vec3`. Each `x`, `y` and `z` value cites its own source
+and the size element and type used for selection.
+Original attributes and their spellings remain in the chunk's XML document, including
+unrecognized fields, unsupported size declarations and the separate `FogVolumeHash`.
+The values describe authored configuration and carry no effective fog calculation.
+
 An entity with authored light components includes `lights` and/or `lightGroups`.
 Modes retain source order, including repeated or empty declarations and `offState`. Type, intensity,
 temperature, style and the temperature switch carry their original value states and

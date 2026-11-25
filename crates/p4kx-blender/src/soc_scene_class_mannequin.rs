@@ -171,17 +171,7 @@ pub(crate) fn string_attribute(
     name: &str,
     origin: &XmlOrigin<'_>,
 ) -> Result<SourcedValue<String>, SocSceneError> {
-    let attributes = || {
-        node.attributes()
-            .filter(|attr| attr.namespace().is_none() && attr.name() == name)
-    };
-    let mut matched = attributes();
-    let value = match (matched.next(), matched.next()) {
-        (None, _) => SourceValue::Absent,
-        (Some(value), None) => SourceValue::Present(value.value().to_owned()),
-        _ => SourceValue::Invalid,
-    };
-    origin.field(node, attributes(), value)
+    origin.parsed_attribute(node, name, |value| Some(value.to_owned()))
 }
 
 pub(crate) fn children<'document>(

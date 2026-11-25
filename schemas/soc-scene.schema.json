@@ -837,6 +837,16 @@
         "declaredType": {
           "$ref": "#/$defs/SourcedValueOfstring"
         },
+        "fogVolume": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FogVolume"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "geometryPaths": {
           "items": {
             "$ref": "#/$defs/SourcedValueOfstring"
@@ -895,6 +905,7 @@
         "geometryResource",
         "roomConnector",
         "defaultLoadout",
+        "fogVolume",
         "other"
       ],
       "type": "string"
@@ -1442,6 +1453,75 @@
       },
       "required": [
         "bits"
+      ],
+      "type": "object"
+    },
+    "FogVolume": {
+      "properties": {
+        "affectsThisAreaOnly": {
+          "$ref": "#/$defs/SourcedValueOfboolean"
+        },
+        "globalDensity": {
+          "$ref": "#/$defs/SourcedValueOffloat"
+        },
+        "maxDistance": {
+          "$ref": "#/$defs/SourcedValueOffloat"
+        },
+        "rampEnd": {
+          "$ref": "#/$defs/SourcedValueOffloat"
+        },
+        "rampInfluence": {
+          "$ref": "#/$defs/SourcedValueOffloat"
+        },
+        "rampStart": {
+          "$ref": "#/$defs/SourcedValueOffloat"
+        },
+        "sizes": {
+          "items": {
+            "$ref": "#/$defs/FogVolumeSize"
+          },
+          "type": "array"
+        },
+        "softEdges": {
+          "$ref": "#/$defs/SourcedValueOffloat"
+        },
+        "volumeType": {
+          "$ref": "#/$defs/SourcedValueOfuint32"
+        }
+      },
+      "required": [
+        "volumeType",
+        "globalDensity",
+        "softEdges",
+        "rampStart",
+        "rampEnd",
+        "rampInfluence",
+        "affectsThisAreaOnly",
+        "maxDistance",
+        "sizes"
+      ],
+      "type": "object"
+    },
+    "FogVolumeSize": {
+      "properties": {
+        "position": {
+          "$ref": "#/$defs/SocXmlPosition"
+        },
+        "x": {
+          "$ref": "#/$defs/SourcedValueOffloat"
+        },
+        "y": {
+          "$ref": "#/$defs/SourcedValueOffloat"
+        },
+        "z": {
+          "$ref": "#/$defs/SourcedValueOffloat"
+        }
+      },
+      "required": [
+        "position",
+        "x",
+        "y",
+        "z"
       ],
       "type": "object"
     },
