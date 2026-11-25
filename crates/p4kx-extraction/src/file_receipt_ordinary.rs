@@ -77,7 +77,7 @@ impl<'source> OrdinaryReplacement<'source> {
             self.receipt.check_target_mode(self.mode)?;
             let path = &self.receipt.artifact;
             if path.file_name().is_some_and(is_companion_name) {
-                return check_native_companion(path);
+                check_native_companion(path)?;
             }
         } else {
             self.receipt.check_target()?;
@@ -136,7 +136,10 @@ impl<'source> OrdinaryReplacement<'source> {
         out: &Path,
         result: Result<Outcome, ExtractionError>,
     ) -> Result<Outcome, ExtractionError> {
-        let placement = if matches!(&result, Ok(Outcome::Written | Outcome::Converted)) {
+        let placement = if matches!(
+            &result,
+            Ok(Outcome::Written | Outcome::Converted | Outcome::RawWritten(_))
+        ) {
             Placement::Committed
         } else {
             Placement::Uncommitted
@@ -167,28 +170,34 @@ impl<'source> OrdinaryReplacement<'source> {
     }
 }
 
-fn check_native_companion(path: &Path) -> io::Result<()> {
-    let ownership = ExistingCompanions::PreserveForeign;
-    let owned = if path
-        .file_name()
-        .is_some_and(|name| name.eq_ignore_ascii_case(DIRECTORY_NAME))
-    {
-        ownership.owned(header::check_existing(path, ReceiptOwner::Directory))?
-    } else if let Some(stem) = path
-        .file_stem()
-        .and_then(|name| Path::new(name).file_stem())
-    {
-        let owner = crate::OriginArtifactName::from_basename(stem)?;
-        ownership.owned(header::check_existing(path, ReceiptOwner::File(&owner)))?
-    } else {
-        false
-    };
-    if owned {
+pub(super) fn check_native_companion(path: &Path) -> io::Result<()> {
+    if is_owned_native_companion(path)? {
         return Err(super::invalid(
             "the native output path already holds an owned origin companion",
         ));
     }
     Ok(())
+}
+
+pub(crate) fn is_owned_native_companion(path: &Path) -> io::Result<bool> {
+    if !path.file_name().is_some_and(is_companion_name) {
+        return Ok(false);
+    }
+    let ownership = ExistingCompanions::PreserveForeign;
+    if path
+        .file_name()
+        .is_some_and(|name| name.eq_ignore_ascii_case(DIRECTORY_NAME))
+    {
+        ownership.owned(header::check_existing(path, ReceiptOwner::Directory))
+    } else if let Some(stem) = path
+        .file_stem()
+        .and_then(|name| Path::new(name).file_stem())
+    {
+        let owner = crate::OriginArtifactName::from_basename(stem)?;
+        ownership.owned(header::check_existing(path, ReceiptOwner::File(&owner)))
+    } else {
+        Ok(false)
+    }
 }
 
 enum Placement {

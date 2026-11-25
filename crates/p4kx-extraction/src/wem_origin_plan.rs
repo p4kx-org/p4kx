@@ -13,6 +13,7 @@ mod loops;
 #[path = "wem_origin_site.rs"]
 mod site;
 pub use site::WemOriginSite;
+pub(crate) use site::wem_location;
 
 /// A WEM summary value whose evidence is selected by the original parser decisions.
 #[derive(Debug, Clone, Copy)]

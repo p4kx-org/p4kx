@@ -13,6 +13,9 @@ use p4kx_testkit::{ArchiveBuilder, TestCodec, TestEntry, TestWem, test_signal};
 use serde_json::{Value, json};
 use sha2::{Digest as _, Sha256};
 
+#[path = "bulk_compressed_wav_origin.rs"]
+mod compressed;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const PCM_ENTRY: &str = "Data\\Sounds\\known.wem";
@@ -167,7 +170,7 @@ fn check_keep(
     Ok(())
 }
 
-fn read_companion(bytes: &[u8]) -> Result<Vec<Value>, Box<dyn Error>> {
+pub(super) fn read_companion(bytes: &[u8]) -> Result<Vec<Value>, Box<dyn Error>> {
     let rows: Vec<Value> = std::str::from_utf8(bytes)?
         .lines()
         .map(serde_json::from_str)
@@ -180,13 +183,16 @@ fn read_companion(bytes: &[u8]) -> Result<Vec<Value>, Box<dyn Error>> {
     Ok(rows)
 }
 
-fn field<'rows>(rows: &'rows [Value], name: &str) -> Result<&'rows Value, Box<dyn Error>> {
+pub(super) fn field<'rows>(
+    rows: &'rows [Value],
+    name: &str,
+) -> Result<&'rows Value, Box<dyn Error>> {
     rows.iter()
         .find(|row| row.pointer("/address/field").and_then(Value::as_str) == Some(name))
         .ok_or_else(|| format!("missing WAV origin for {name}").into())
 }
 
-fn field_uses<'rows>(
+pub(super) fn field_uses<'rows>(
     rows: &'rows [Value],
     field: &Value,
 ) -> Result<Vec<&'rows Value>, Box<dyn Error>> {

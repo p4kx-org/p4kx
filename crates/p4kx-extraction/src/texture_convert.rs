@@ -141,9 +141,9 @@ impl EntryWriter<'_> {
         }
         self.tracker.retract(done.counted.reported);
         for (index, entry) in raw_entries {
-            let outcome = match self.write_raw(entry, buffers) {
-                Outcome::Written if failure.is_none() => Outcome::Converted,
-                outcome => outcome,
+            let outcome = match (failure.is_none(), self.write_raw(entry, buffers)) {
+                (true, Outcome::Written | Outcome::RawWritten(None)) => Outcome::Converted,
+                (_, outcome) => outcome,
             };
             entries.push((index, entry.path().to_owned(), outcome));
         }

@@ -75,7 +75,7 @@ fn receipt_encoder_failure_keeps_new_artifact_without_old_binding() -> io::Resul
         matches!(
             placed,
             StagedReceiptPublication::Committed {
-                receipt: Err(ref error),
+                receipt: Some(Err(ref error)),
                 retirement: Ok(()),
             }
                 if error.to_string() == "injected receipt failure"
@@ -110,7 +110,7 @@ fn stage_check_at_receipt_commit_may_cancel_after_artifact_replacement() -> io::
         matches!(
             placed,
             StagedReceiptPublication::Committed {
-                receipt: Err(_),
+                receipt: Some(Err(_)),
                 retirement: Ok(()),
             }
         ),
@@ -147,6 +147,7 @@ fn skip_keeps_the_artifact_and_receipt_installed_during_staging() -> io::Result<
                 digest,
                 ConflictPolicy::Skip,
                 || Ok(()),
+                || panic!("retaining the artifact keeps its receipt"),
                 |_, _| panic!("the competing artifact owns its receipt"),
             );
 
@@ -231,7 +232,7 @@ fn a_committed_artifact_receives_the_digest_of_its_staged_bytes() -> io::Result<
         matches!(
             placed,
             StagedReceiptPublication::Committed {
-                receipt: Ok(()),
+                receipt: Some(Ok(())),
                 retirement: Ok(()),
             }
         ),

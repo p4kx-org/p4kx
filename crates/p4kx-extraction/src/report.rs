@@ -13,7 +13,7 @@ use thiserror::Error;
 
 use crate::{
     ConversionError, ConvertedSoundArtifact, NameRule, OriginArtifactDigest, PathLimit,
-    RecordExportReport, SourceEvidenceError, TextureArtifacts,
+    RawEntryArtifact, RecordExportReport, SourceEvidenceError, TextureArtifacts,
 };
 
 /// Why one Entry of an Extraction was not written.
@@ -231,6 +231,7 @@ pub struct ExtractionReport {
     pub(crate) texture_artifacts: Vec<TextureArtifacts>,
     pub(crate) merged_texture_artifacts: Vec<MergedTextureArtifact>,
     pub(crate) sound_artifacts: Vec<ConvertedSoundArtifact>,
+    pub(crate) raw_artifacts: Vec<RawEntryArtifact>,
 }
 
 impl ExtractionReport {
@@ -250,6 +251,12 @@ impl ExtractionReport {
     #[must_use]
     pub fn sound_artifacts(&self) -> &[ConvertedSoundArtifact] {
         &self.sound_artifacts
+    }
+
+    /// Returns unchanged files installed by this extraction and their current receipts.
+    #[must_use]
+    pub fn raw_artifacts(&self) -> &[RawEntryArtifact] {
+        &self.raw_artifacts
     }
 
     /// Returns the number of Entries written.

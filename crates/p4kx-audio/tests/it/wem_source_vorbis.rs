@@ -5,7 +5,9 @@ use std::cell::Cell;
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 use std::ops::Range;
 
-use p4kx_audio::{AudioError, ByteOrder, Wem, WemReadError, WemSource, WemVorbisWriteError};
+use p4kx_audio::{
+    AudioError, ByteOrder, Wem, WemReadError, WemSource, WemVorbisWavEvidence, WemVorbisWriteError,
+};
 use p4kx_testkit::{TestCodebook, TestVorbis};
 
 use super::wav::assert_output_ranges;
@@ -222,6 +224,7 @@ fn assert_wav_parity(fixture: &TestVorbis, decoded_packets: usize) -> TestResult
         "only packets supplied to the decoder"
     );
     let ranges = planned.ranges().clone();
+    let codebook_audio_packets = planned.codebook_audio_packets();
     probe.furthest.set(0);
     let mut actual = Vec::new();
     let evidence = planned.write_with_evidence(&mut actual)?;
@@ -229,19 +232,31 @@ fn assert_wav_parity(fixture: &TestVorbis, decoded_packets: usize) -> TestResult
     assert_eq!(evidence.report, report, "successful write report");
     assert_eq!(evidence.ranges, ranges, "same validated source ranges");
     assert_eq!(
-        evidence.decoded_audio_packets,
-        audio_start..decoded_end,
-        "the written samples use only the decoded prefix"
+        evidence.codebook_audio_packets, codebook_audio_packets,
+        "same codebook selection prefix as preparation"
     );
-    let expected_read_end = if decoded_packets == 0 { 0 } else { checked_end };
-    assert_eq!(probe.furthest.get(), expected_read_end, "bounded lookahead");
-    assert_eq!(
-        evidence.replayed_audio_packets,
-        audio_start..expected_read_end.max(audio_start),
-        "only the successful replay's audio reads contribute to this range"
-    );
+    let read_end = if decoded_packets == 0 { 0 } else { checked_end };
+    assert_pcm_replay(&evidence, &probe, audio_start..decoded_end, read_end);
     assert_output_ranges(&actual, &evidence.output, evidence.report)?;
     Ok(())
+}
+
+fn assert_pcm_replay(
+    evidence: &WemVorbisWavEvidence,
+    probe: &ReadProbe,
+    decoded: Range<u64>,
+    read_end: u64,
+) {
+    let replayed = decoded.start..read_end.max(decoded.start);
+    assert_eq!(
+        evidence.decoded_audio_packets, decoded,
+        "the written samples use only the decoded prefix"
+    );
+    assert_eq!(probe.furthest.get(), read_end, "bounded lookahead");
+    assert_eq!(
+        evidence.replayed_audio_packets, replayed,
+        "only the successful replay's audio reads contribute to this range"
+    );
 }
 
 #[test]

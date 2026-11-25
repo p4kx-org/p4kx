@@ -12,6 +12,17 @@ use super::fixture::{
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+const RAW_ROCK_OUTPUTS: [&str; 8] = [
+    "Data/Textures/rock_diff.dds",
+    "Data/Textures/rock_diff.dds.1",
+    "Data/Textures/rock_diff.dds.1.p4kx-origin.jsonl",
+    "Data/Textures/rock_diff.dds.2",
+    "Data/Textures/rock_diff.dds.2.p4kx-origin.jsonl",
+    "Data/Textures/rock_diff.dds.3",
+    "Data/Textures/rock_diff.dds.3.p4kx-origin.jsonl",
+    "Data/Textures/rock_diff.dds.p4kx-origin.jsonl",
+];
+
 #[test]
 fn conversion_merges_a_split_texture_and_exports_its_largest_mip_once() -> TestResult {
     let fixture = Fixture::new(texture_entries(&rock()))?;
@@ -114,8 +125,11 @@ fn keeping_raw_parts_with_the_merge_writes_the_parts_next_to_the_merged_dds() ->
         [
             "Data/Textures/rock_diff.dds",
             "Data/Textures/rock_diff.dds.1",
+            "Data/Textures/rock_diff.dds.1.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.dds.2",
+            "Data/Textures/rock_diff.dds.2.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.dds.3",
+            "Data/Textures/rock_diff.dds.3.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.dds.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.png",
         ]
@@ -149,9 +163,19 @@ fn keeping_raw_parts_without_the_merge_writes_the_header_and_parts_unchanged() -
 
     assert!(report.is_complete(), "{report:?}");
     assert_eq!(
-        files(&fixture.target)?.len(),
-        5,
-        "four raw Entries and the PNG"
+        files(&fixture.target)?,
+        [
+            "Data/Textures/rock_diff.dds",
+            "Data/Textures/rock_diff.dds.1",
+            "Data/Textures/rock_diff.dds.1.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.dds.2",
+            "Data/Textures/rock_diff.dds.2.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.dds.3",
+            "Data/Textures/rock_diff.dds.3.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.dds.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.png",
+        ],
+        "the raw Entries with their companions and the PNG"
     );
     assert_eq!(
         fixture.read("Data/Textures/rock_diff.dds")?,
@@ -175,7 +199,11 @@ fn without_any_texture_output_textures_are_written_raw() -> TestResult {
 
     assert!(report.is_complete(), "{report:?}");
     assert_eq!(report.converted(), Some(0), "nothing converted");
-    assert_eq!(files(&fixture.target)?.len(), 4, "the raw Entries");
+    assert_eq!(
+        files(&fixture.target)?,
+        RAW_ROCK_OUTPUTS,
+        "the raw Entries and their companions"
+    );
     Ok(())
 }
 
@@ -194,7 +222,11 @@ fn without_conversion_textures_are_written_raw() -> TestResult {
 
     assert!(report.is_complete(), "{report:?}");
     assert_eq!(report.converted(), None, "Conversion is off");
-    assert_eq!(files(&fixture.target)?.len(), 4, "the raw Entries");
+    assert_eq!(
+        files(&fixture.target)?,
+        RAW_ROCK_OUTPUTS,
+        "the raw Entries and their companions"
+    );
     assert_eq!(
         fixture.read("Data/Textures/rock_diff.dds")?,
         dds.header_bytes()
@@ -255,6 +287,7 @@ fn a_texture_without_parts_and_other_entries_convert_alongside() -> TestResult {
             "Data/UI/icon.DDS.p4kx-origin.jsonl",
             "Data/UI/icon.png",
             "Data/readme.txt",
+            "Data/readme.txt.p4kx-origin.jsonl",
         ]
     );
     assert_eq!(fixture.read("Data/UI/icon.DDS")?, whole.header_bytes());

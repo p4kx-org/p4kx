@@ -45,6 +45,13 @@ fn a_converted_folder_equals_what_extraction_with_conversion_writes() -> TestRes
         None,
         "observed file with unknown P4K encryption"
     );
+    for path in ["Data/Ships/text.xml", "Data/readme.bin"] {
+        let receipt = format!("{path}.p4kx-origin.jsonl");
+        let archive_raw = archived.remove(&receipt).ok_or("Archive raw receipt")?;
+        let folder_raw = written.remove(&receipt).ok_or("folder raw receipt")?;
+        assert_eq!(opaque_encryption(&archive_raw)?, Some(false));
+        assert_eq!(opaque_encryption(&folder_raw)?, None);
+    }
     assert_eq!(written, archived, "identical payload files");
     assert!(
         written
@@ -85,6 +92,28 @@ fn loose_merge_replaces_old_archive_proof_for_identical_payload_bytes() -> TestR
     );
     let loose_receipt = fs::read(target.join(RECEIPT))?;
     check_dds_origin_pair(&written, &archive_receipt, &loose_receipt)
+}
+
+fn opaque_encryption(bytes: &[u8]) -> Result<Option<bool>, Box<dyn std::error::Error>> {
+    for line in std::str::from_utf8(bytes)?.lines() {
+        let row: serde_json::Value = serde_json::from_str(line)?;
+        if row
+            .pointer("/address/type")
+            .and_then(serde_json::Value::as_str)
+            == Some("opaquePayload")
+        {
+            assert_eq!(
+                row.get("sourceSetComplete")
+                    .and_then(serde_json::Value::as_bool),
+                Some(true),
+                "the original payload is fully observed"
+            );
+            return Ok(row
+                .get("containsEncryptedSource")
+                .and_then(serde_json::Value::as_bool));
+        }
+    }
+    Err("opaque payload origin is missing".into())
 }
 
 fn pcm_encryption(bytes: &[u8]) -> Result<Option<bool>, Box<dyn std::error::Error>> {

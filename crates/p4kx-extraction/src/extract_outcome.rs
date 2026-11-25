@@ -1,10 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use crate::tracker::Tracker;
 use crate::write::Outcome;
-use crate::{
-    ConvertedSoundArtifact, EntryFailure, ExtractionReport, MergedTextureArtifact, TextureArtifacts,
-};
+use crate::{EntryFailure, ExtractionReport, MergedTextureArtifact, TextureArtifacts};
 
 /// The outcome of one Entry of an Extraction: its position, its path and how it ended.
 pub(crate) type EntryEnded = (usize, String, Outcome);
@@ -26,17 +25,19 @@ pub(crate) enum Ended {
         entry: EntryEnded,
         unconverted: Vec<EntryFailure>,
         cancelled: Vec<String>,
-        artifact: Option<ConvertedSoundArtifact>,
     },
 }
 
-pub(crate) fn summarise(ended: Vec<Ended>, convert: bool) -> ExtractionReport {
+pub(crate) fn summarise(
+    ended: Vec<Ended>,
+    convert: bool,
+    tracker: Tracker<'_>,
+) -> ExtractionReport {
     let mut outcomes = Vec::with_capacity(ended.len());
     let mut unconverted = Vec::new();
     let mut unwritten = Vec::new();
     let mut texture_artifacts = Vec::new();
     let mut merged_texture_artifacts = Vec::new();
-    let mut sound_artifacts = Vec::new();
     for item in ended {
         match item {
             Ended::Entry(outcome) => outcomes.push(outcome),
@@ -55,13 +56,11 @@ pub(crate) fn summarise(ended: Vec<Ended>, convert: bool) -> ExtractionReport {
                 entry,
                 unconverted: failures,
                 cancelled: sounds,
-                artifact,
             } => {
                 let index = entry.0;
                 outcomes.push(entry);
                 unconverted.extend(failures.into_iter().map(|failure| (index, failure)));
                 unwritten.extend(sounds.into_iter().map(|sound| (index, sound)));
-                sound_artifacts.extend(artifact);
             }
         }
     }
@@ -70,9 +69,10 @@ pub(crate) fn summarise(ended: Vec<Ended>, convert: bool) -> ExtractionReport {
     unconverted.sort_by_key(|(index, _)| *index);
     texture_artifacts.sort_unstable_by_key(|(index, _)| *index);
     merged_texture_artifacts.sort_unstable_by(|left, right| left.path.cmp(&right.path));
-    sound_artifacts.sort_unstable_by(|left, right| left.path.cmp(&right.path));
+    let artifacts = tracker.artifacts.into_sorted();
     let mut report = ExtractionReport {
-        sound_artifacts,
+        sound_artifacts: artifacts.sound,
+        raw_artifacts: artifacts.raw,
         merged_texture_artifacts,
         texture_artifacts: texture_artifacts
             .into_iter()
@@ -96,6 +96,12 @@ fn record_outcomes(report: &mut ExtractionReport, outcomes: Vec<EntryEnded>) {
     for (_, path, outcome) in outcomes {
         match outcome {
             Outcome::Written => report.extracted += 1,
+            Outcome::RawWritten(issue) => {
+                report.extracted += 1;
+                report
+                    .failures
+                    .extend(issue.map(|error| EntryFailure { path, error }));
+            }
             Outcome::Converted => {
                 report.extracted += 1;
                 report.converted = report.converted.map(|count| count + 1);

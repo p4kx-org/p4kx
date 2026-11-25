@@ -11,7 +11,7 @@ use crate::{
 };
 
 use super::lock::{Contention, ReceiptLock, invalid, protection_error, regular_file};
-use super::target_path::target;
+use super::target_path::{BindTarget, bind_target};
 use super::{ExistingCompanions, FileReceipt};
 
 #[cfg(test)]
@@ -71,7 +71,12 @@ impl FileReceipt<'_> {
     }
 
     fn check_committed_target(&self) -> io::Result<()> {
-        let actual = target(&self.artifact, self.protection, &self.cancel)?;
+        let mode = if self.native_entry {
+            self.replacement_mode()
+        } else {
+            BindTarget::Receipt
+        };
+        let actual = bind_target(&self.artifact, self.protection, &self.cancel, mode)?.path;
         if actual != self.artifact || regular_file(&actual)?.is_none() {
             return Err(invalid(
                 "the committed artifact is no longer a regular file at its output path",

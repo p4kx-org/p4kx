@@ -86,7 +86,7 @@ impl EntryWriter<'_> {
                 output.step = Some(Step::Written);
                 let owner = source.header.index();
                 self.tracker.written.record(relative, owner);
-                if receipt.is_ok() {
+                if receipt.as_ref().is_some_and(Result::is_ok) {
                     self.tracker.written.record(&companion, owner);
                     output.artifact = Some(artifact);
                 }

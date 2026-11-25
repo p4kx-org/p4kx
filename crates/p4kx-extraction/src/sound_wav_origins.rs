@@ -6,10 +6,10 @@ use std::io;
 use p4kx_audio::{Codec, Wem};
 
 use crate::sound::origins::{SoundEvidence, SoundOrigins, insert_summary};
-use crate::sound::{WemFormatField, WemOriginField};
+use crate::sound::{SoundOriginInput, WemFormatField, WemOriginField};
 use crate::{
-    DecimalU64, FieldOrigin, FieldOrigins, OriginOutputAddress, OriginWavField, SourceInput,
-    SourceLocation, SourceUse, SourceUseRole, SourceUses,
+    DecimalU64, FieldOrigin, FieldOrigins, OriginOutputAddress, OriginWavField, SourceUse,
+    SourceUseRole, SourceUses,
 };
 
 use super::written::WavWrite;
@@ -19,7 +19,7 @@ mod sources;
 
 pub(super) fn capture(
     wem: &Wem<impl AsRef<[u8]>>,
-    input: Option<SourceInput<'_>>,
+    input: Option<SoundOriginInput<'_>>,
     written: &WavWrite,
 ) -> io::Result<SoundOrigins> {
     let uses = SourceUses::new();
@@ -57,15 +57,15 @@ impl WavEvidence<'_, '_> {
             shape.extend(self.evidence.planned(WemOriginField::LoopEnd)?);
         }
 
-        self.field(RiffLength, 4, 8, &shape);
-        self.field(FormatLength, 16, 20, &channels);
-        self.field(FormatTag, 20, 22, &channels);
-        self.field(Channels, 22, 24, &channels);
-        self.field(SampleRate, 24, 28, &rate);
+        self.field(RiffLength, 4, 8, &shape)?;
+        self.field(FormatLength, 16, 20, &channels)?;
+        self.field(FormatTag, 20, 22, &channels)?;
+        self.field(Channels, 22, 24, &channels)?;
+        self.field(SampleRate, 24, 28, &rate)?;
         let byte_rate: Vec<_> = channels.iter().chain(&rate).cloned().collect();
-        self.field(ByteRate, 28, 32, &byte_rate);
-        self.field(BlockAlign, 32, 34, &channels);
-        self.insert(BitsPerSample, 34, 36, &[], true);
+        self.field(ByteRate, 28, 32, &byte_rate)?;
+        self.field(BlockAlign, 32, 34, &channels)?;
+        self.insert(BitsPerSample, 34, 36, self.evidence.authored());
 
         let loop_base = if written.report().channels > 2 {
             let mut mask =
@@ -74,7 +74,7 @@ impl WavEvidence<'_, '_> {
                         layout_present: wem.metadata().channel_layout().is_some(),
                     }))?;
             mask.extend_from_slice(&channels);
-            self.field(ChannelMask, 40, 44, &mask);
+            self.field(ChannelMask, 40, 44, &mask)?;
             EXTENSIBLE_FORMAT_END
         } else {
             PCM_FORMAT_END
@@ -90,14 +90,14 @@ impl WavEvidence<'_, '_> {
 
         let mut sources = shape.to_vec();
         sources.extend_from_slice(rate);
-        self.field(SamplePeriod, base + 16, base + 20, &sources);
-        self.field(LoopCount, base + 36, base + 40, shape);
+        self.field(SamplePeriod, base + 16, base + 20, &sources)?;
+        self.field(LoopCount, base + 36, base + 40, shape)?;
         let mut start = self.evidence.planned(WemOriginField::LoopStart)?;
         start.extend_from_slice(shape);
-        self.field(LoopStart, base + 52, base + 56, &start);
+        self.field(LoopStart, base + 52, base + 56, &start)?;
         let mut end = self.evidence.planned(WemOriginField::LoopEnd)?;
         end.extend_from_slice(shape);
-        self.field(LoopEndInclusive, base + 56, base + 60, &end);
+        self.field(LoopEndInclusive, base + 56, base + 60, &end)?;
         Ok(())
     }
 
@@ -109,11 +109,11 @@ impl WavEvidence<'_, '_> {
         let length_at = offset
             .checked_sub(4)
             .ok_or_else(|| io::Error::other("WAV has no data length word"))?;
-        self.field(DataLength, length_at, offset, &shape);
+        self.field(DataLength, length_at, offset, &shape)?;
         if let Some(payload) = self.evidence.payload.as_ref() {
             sources::samples(payload, wem, written, &mut shape)?;
         }
-        self.field(PcmSamples, offset, written.report().size, &shape);
+        self.field(PcmSamples, offset, written.report().size, &shape)?;
         Ok(())
     }
 
@@ -127,19 +127,12 @@ impl WavEvidence<'_, '_> {
             );
         }
         if let Some(payload) = self.evidence.payload.as_ref() {
-            let offset = wem.info_source().data_body_offset();
-            uses.push(
-                payload
-                    .at(
-                        SourceLocation::Subresource {
-                            namespace: "wemChunk".into(),
-                            indices: vec![offset],
-                            field: "bodyLength".into(),
-                        },
-                        SourceUseRole::Conversion,
-                    )
-                    .map_err(io::Error::other)?,
-            );
+            uses.push(payload.at(
+                "wemChunk",
+                &[wem.info_source().data_body_offset()],
+                "bodyLength",
+                SourceUseRole::Conversion,
+            )?);
             sources::shape(payload, wem, written, &mut uses)?;
         }
         Ok(uses)
@@ -184,8 +177,7 @@ impl WavEvidence<'_, '_> {
             selection.extend(self.evidence.planned(WemOriginField::LoopStart)?);
             selection.extend(self.evidence.planned(WemOriginField::LoopEnd)?);
         }
-        let complete = self.evidence.payload.as_ref().is_some();
-        let origin = self.evidence.uses.origin(&selection, complete);
+        let origin = self.evidence.origin(&selection)?;
         if written.report().loop_points.is_some() {
             for (path, field) in [
                 ("/loop/start", WemOriginField::LoopStart),
@@ -194,36 +186,30 @@ impl WavEvidence<'_, '_> {
             ] {
                 let mut inputs = self.evidence.planned(field)?;
                 inputs.extend(selection.iter().cloned());
-                insert_summary(fields, path, self.evidence.uses.origin(&inputs, complete))?;
+                insert_summary(fields, path, self.evidence.origin(&inputs)?)?;
             }
         }
         insert_summary(fields, "/loop", origin)
     }
 
-    fn field(&mut self, field: OriginWavField, start: u64, end: u64, sources: &[SourceUse]) {
-        self.insert(
-            field,
-            start,
-            end,
-            sources,
-            self.evidence.payload.as_ref().is_some(),
-        );
-    }
-
-    fn insert(
+    fn field(
         &mut self,
         field: OriginWavField,
         start: u64,
         end: u64,
         sources: &[SourceUse],
-        complete: bool,
-    ) {
+    ) -> io::Result<()> {
+        let origin = self.evidence.origin(sources)?;
+        self.insert(field, start, end, origin);
+        Ok(())
+    }
+
+    fn insert(&mut self, field: OriginWavField, start: u64, end: u64, origin: FieldOrigin) {
         let address = OriginOutputAddress::WavBytes {
             start: DecimalU64::new(start),
             end_exclusive: DecimalU64::new(end),
             field,
         };
-        self.fields
-            .push((address, self.evidence.uses.origin(sources, complete)));
+        self.fields.push((address, origin));
     }
 }

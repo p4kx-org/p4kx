@@ -124,6 +124,7 @@ fn conversion_writes_one_record_file_per_record_instead_of_the_dcb() -> TestResu
             "Data/libs/foundry/records/items/n1.xml",
             "Data/libs/foundry/records/items/n2.xml",
             "Data/readme.txt",
+            "Data/readme.txt.p4kx-origin.jsonl",
         ],
         "the Records go below the folder of the Entry, without the .dcb"
     );
@@ -171,7 +172,12 @@ fn without_conversion_the_dcb_is_written_as_before() -> TestResult {
     assert!(report.records().is_none(), "no Records: {report:?}");
     assert_eq!(
         files(&fixture.target)?,
-        ["Data/Game2.dcb", "Data/readme.txt"],
+        [
+            "Data/Game2.dcb",
+            "Data/Game2.dcb.p4kx-origin.jsonl",
+            "Data/readme.txt",
+            "Data/readme.txt.p4kx-origin.jsonl",
+        ],
         "raw Entries"
     );
     assert_eq!(
@@ -196,6 +202,7 @@ fn only_the_dataforge_the_archive_is_read_from_is_converted() -> TestResult {
         files(&fixture.target)?,
         [
             "Data/Game.dcb",
+            "Data/Game.dcb.p4kx-origin.jsonl",
             "Data/libs/foundry/records/items/n0.xml",
             "Data/libs/foundry/records/items/n1.xml",
         ],

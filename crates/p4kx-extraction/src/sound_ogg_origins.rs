@@ -4,10 +4,12 @@
 use std::io;
 use std::ops::Range;
 
-use crate::sound::WemOriginField;
+use p4kx_audio::Wem;
+
 use crate::sound::origins::{SoundEvidence, SoundOrigins, insert_summary};
+use crate::sound::{SoundOriginInput, WemOriginField};
 use crate::{
-    DecimalU64, FieldOrigin, FieldOrigins, OggReport, OriginOggField, OriginOutputAddress, Sound,
+    DecimalU64, FieldOrigin, FieldOrigins, OggReport, OriginOggField, OriginOutputAddress,
     SourceUses,
 };
 
@@ -17,11 +19,15 @@ use super::written::OggWrite;
 mod sources;
 use sources::OggSources;
 
-pub(super) fn capture(sound: &Sound, written: &OggWrite) -> io::Result<SoundOrigins> {
+pub(super) fn capture(
+    wem: &Wem<impl AsRef<[u8]>>,
+    input: Option<SoundOriginInput<'_>>,
+    written: &OggWrite,
+) -> io::Result<SoundOrigins> {
     let uses = SourceUses::new();
-    let evidence = SoundEvidence::observe(sound.wem(), sound.source_input(), &uses)?;
-    let sources = OggSources::capture(sound, written, &evidence)?;
-    let loops = LoopOrigins::capture(sound, written.report(), &evidence, &sources)?;
+    let evidence = SoundEvidence::observe(wem, input, &uses)?;
+    let sources = OggSources::capture(wem, written, &evidence)?;
+    let loops = LoopOrigins::capture(wem, written.report(), &evidence, &sources)?;
     let comments = evidence.combine([&sources.comments_and_setup, &loops.selection])?;
     let size = evidence.combine([&sources.identification, &comments, &sources.audio])?;
 
@@ -86,18 +92,18 @@ struct LoopPoints {
 
 impl LoopOrigins {
     fn capture(
-        sound: &Sound,
+        wem: &Wem<impl AsRef<[u8]>>,
         report: OggReport,
         evidence: &SoundEvidence<'_, '_>,
         sources: &OggSources,
     ) -> io::Result<Self> {
         let mut inputs = evidence.planned(WemOriginField::Loop)?;
-        if sound.wem().loop_points().is_some() {
+        if wem.loop_points().is_some() {
             inputs.extend(evidence.planned(WemOriginField::LoopStart)?);
             inputs.extend(evidence.planned(WemOriginField::LoopEnd)?);
         }
-        let declared = evidence.origin(&inputs);
-        let selection = if sound.wem().loop_points().is_some() {
+        let declared = evidence.origin(&inputs)?;
+        let selection = if wem.loop_points().is_some() {
             evidence.combine(
                 [&declared, &sources.sample_count]
                     .into_iter()
@@ -108,7 +114,7 @@ impl LoopOrigins {
         };
         let points = if report.loop_points.is_some() {
             let origin = |field| {
-                let value = evidence.origin(&evidence.planned(field)?);
+                let value = evidence.origin(&evidence.planned(field)?)?;
                 evidence.combine([&value, &selection])
             };
             Some(LoopPoints {

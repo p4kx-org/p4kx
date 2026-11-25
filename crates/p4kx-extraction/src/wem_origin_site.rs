@@ -97,12 +97,8 @@ impl WemOriginSite {
     /// Returns an error when the source evidence registry cannot record the use.
     pub fn bind(&self, payload: &SourceScope) -> Result<SourceUse, SourceEvidenceError> {
         payload.at(
-            SourceLocation::Subresource {
-                namespace: self.namespace.to_owned(),
-                indices: self.indices().to_vec(),
-                field: self.name.to_owned(),
-            },
-            self.role,
+            wem_location(self.namespace(), self.indices(), self.name(), None),
+            self.role(),
         )
     }
 
@@ -115,15 +111,30 @@ impl WemOriginSite {
         bank: &SourceScope,
         bytes: Range<u64>,
     ) -> Result<SourceUse, SourceEvidenceError> {
-        let mut indices = vec![bytes.start, bytes.end];
-        indices.extend_from_slice(self.indices());
         bank.at(
-            SourceLocation::Subresource {
-                namespace: format!("bnkWem.{}", self.namespace()),
-                indices,
-                field: self.name().into(),
-            },
+            wem_location(self.namespace(), self.indices(), self.name(), Some(bytes)),
             self.role(),
         )
+    }
+}
+
+pub(crate) fn wem_location(
+    namespace: &str,
+    coordinates: &[u64],
+    field: &str,
+    member: Option<Range<u64>>,
+) -> SourceLocation {
+    let (namespace, indices) = member.map_or_else(
+        || (namespace.to_owned(), coordinates.to_vec()),
+        |member| {
+            let mut indices = vec![member.start, member.end];
+            indices.extend_from_slice(coordinates);
+            (format!("bnkWem.{namespace}"), indices)
+        },
+    );
+    SourceLocation::Subresource {
+        namespace,
+        indices,
+        field: field.to_owned(),
     }
 }

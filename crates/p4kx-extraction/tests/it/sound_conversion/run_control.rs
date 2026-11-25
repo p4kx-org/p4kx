@@ -201,7 +201,7 @@ fn a_soundbank_cancelled_between_sounds_reports_what_it_wrote_and_what_it_left()
     assert!(!report.is_complete(), "the run is not complete");
     assert_eq!(
         fixture.names("Data/Sounds/wwise/Ship")?,
-        ["10.ogg"],
+        ["10.ogg", "10.ogg.p4kx-origin.jsonl"],
         "only the sound written before the cancel"
     );
     assert!(

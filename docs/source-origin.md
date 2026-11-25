@@ -214,15 +214,40 @@ decoded packet. Opus records the replayed packet-size words from its
 selected seek table when one exists. A loose WEM retains its original
 file identity with unknown Archive encryption.
 
-## WAV in extraction and folder conversion
+## Audio in extraction and folder conversion
 
-Bulk conversion of loose PCM and ADPCM WEM files writes the same WAV fields
-and sample ranges as standalone conversion. The sibling companion records the
-physical Archive Entry or the observed standalone file that supplied the WEM.
-This includes linear WAV files selected automatically under `--audio ogg`.
-The `sound_artifacts` JSON field points to companions for newly committed WAV
-files. Existing artifacts retained by the conflict policy retain their
-associated companion.
+Conversion of loose PCM, ADPCM, Vorbis and Opus WEM files to WAV records the
+WAV fields and the sample or packet ranges that contributed to them. For
+Vorbis and Opus written as Ogg, the companion records the output page groups
+and original codec ranges described below. Both companions record the physical
+Archive Entry or the observed file that supplied the WEM.
+
+For a soundbank member, the companion records the physical bank, the selected
+DIDX ID, offset and length words and the DATA section size. Every `bnkWem.*`
+location starts with the half-open decoded bank range of the member, followed
+by the original WEM-relative coordinates for that location.
+
+Linear WAV files selected automatically under `--audio ogg` also carry a
+companion. The `sound_artifacts` JSON field points to newly committed
+companions still associated with their artifact when the run finishes. An
+artifact retained by the conflict policy retains its companion.
+
+## Unchanged files in extraction
+
+The Extraction report's `raw_artifacts` entries give the relative file path,
+byte length, SHA-256 and companion path for each reported unchanged file.
+The companion addresses the full output as one opaque payload and gives the
+decoded Archive Entry or the observed standalone file. The same receipt covers
+the original bank retained during unpacking and a loose audio file written
+unchanged when no audio conversion applies or completes. For unchanged embedded
+WEM, prefetch and MIDI data, the companion identifies the selected DIDX
+words and the exact retained byte range within the bank DATA section. The
+standalone file's original P4K encryption state is unknown. A folder scan
+excludes recognized P4KX companions and admits ordinary files with the same
+suffix. Kept files retain their existing proof. The report uses null
+`origin_receipt` if a new file is admitted without the publication lock or if
+foreign content occupies its companion path. A replacement requires the guarded
+lock, retires a previous owned companion and preserves foreign content.
 
 ## Standalone Ogg
 

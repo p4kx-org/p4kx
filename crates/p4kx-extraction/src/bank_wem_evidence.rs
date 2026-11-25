@@ -3,13 +3,15 @@
 
 //! Common source bindings for a soundbank's embedded WEM list.
 
+use p4kx_audio::EmbeddedWemSource;
+
 use crate::bank_field_evidence::BankFieldEvidence;
 use crate::wem_payload_evidence::{
     DidxWord, EvidenceError, PayloadField, embedded_extent, put, range_use,
 };
 use crate::{
     Bank, EmbeddedWem, FieldOrigin, FieldOrigins, SectionId, SourceInventory, SourceLocation,
-    SourceUseRole,
+    SourceScope, SourceUse, SourceUseRole,
 };
 
 #[path = "bank_wem_read.rs"]
@@ -129,17 +131,8 @@ impl<'bank> BankWemEvidence<'bank> {
     ) -> Result<(SourceInventory, FieldOrigin), EvidenceError> {
         self.check_member(wem)?;
         let placement = wem.source();
-        let triplet = placement.triplet_offset();
-        let mut uses =
-            embedded_extent(&self.evidence.scope, triplet, placement.data_body_offset())?;
-        uses.push(DidxWord::Id.bind(&self.evidence.scope, triplet, SourceUseRole::Selector)?);
-        uses.push(range_use(
-            &self.evidence.scope,
-            "bnkEmbeddedWem",
-            "payload",
-            placement.byte_range(),
-            SourceUseRole::Payload,
-        )?);
+        let mut uses = member_selectors(&self.evidence.scope, placement)?;
+        uses.push(member_payload(&self.evidence.scope, placement)?);
         let origin = self.evidence.uses.origin(&uses, self.evidence.complete);
         Ok((self.finish()?, origin))
     }
@@ -174,6 +167,29 @@ impl<'bank> BankWemEvidence<'bank> {
     pub fn finish(self) -> Result<SourceInventory, EvidenceError> {
         self.evidence.finish()
     }
+}
+
+pub(crate) fn member_selectors(
+    scope: &SourceScope,
+    placement: EmbeddedWemSource,
+) -> Result<Vec<SourceUse>, EvidenceError> {
+    let triplet = placement.triplet_offset();
+    let mut uses = embedded_extent(scope, triplet, placement.data_body_offset())?;
+    uses.push(DidxWord::Id.bind(scope, triplet, SourceUseRole::Selector)?);
+    Ok(uses)
+}
+
+pub(crate) fn member_payload(
+    scope: &SourceScope,
+    placement: EmbeddedWemSource,
+) -> Result<SourceUse, EvidenceError> {
+    range_use(
+        scope,
+        "bnkEmbeddedWem",
+        "payload",
+        placement.byte_range(),
+        SourceUseRole::Payload,
+    )
 }
 
 #[cfg(test)]

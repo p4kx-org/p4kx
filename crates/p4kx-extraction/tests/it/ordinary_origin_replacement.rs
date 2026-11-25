@@ -27,6 +27,13 @@ fn fixture(path: &Path, entry: &str) -> Result<Archive, Box<dyn Error>> {
     Ok(Archive::open(path)?)
 }
 
+fn compressed_fixture(path: &Path) -> Result<Archive, Box<dyn Error>> {
+    ArchiveBuilder::new()
+        .entry(TestEntry::zstd(ENTRY, PAYLOAD.to_vec()))
+        .write_to(path)?;
+    Ok(Archive::open(path)?)
+}
+
 fn run(archive: &Archive, output: &Path, policy: ConflictPolicy) -> ExtractionReport {
     let entries: Vec<_> = archive.entries().iter().collect();
     extract(
@@ -56,6 +63,13 @@ fn keep_decisions_bypass_a_foreign_lock_directory_and_overwrite_reports_it() -> 
         "the clean new file needs no lock: {created:?}"
     );
     assert_eq!(fs::read(&artifact)?, PAYLOAD, "new original bytes");
+    let [raw] = created.raw_artifacts() else {
+        return Err("the fresh file is measured despite its unavailable companion".into());
+    };
+    assert!(
+        raw.origin_receipt.is_none(),
+        "the absent receipt is explicit"
+    );
 
     for policy in [ConflictPolicy::Skip, ConflictPolicy::IfChanged] {
         let report = run(&archive, &output, policy);
@@ -132,7 +146,7 @@ fn native_companion_suffix_is_usable_when_no_owned_receipt_occupies_it() -> Test
 fn identical_bytes_from_another_archive_retire_the_old_proof_only_on_overwrite() -> TestResult {
     let scratch = tempfile::tempdir()?;
     let original = fixture(&scratch.path().join("first.p4k"), ENTRY)?;
-    let replacement = fixture(&scratch.path().join("second.p4k"), ENTRY)?;
+    let replacement = compressed_fixture(&scratch.path().join("second.p4k"))?;
     let output = scratch.path().join("out");
     let artifact = output.join(ENTRY);
     fs::create_dir_all(output.join("Data"))?;
@@ -149,9 +163,15 @@ fn identical_bytes_from_another_archive_retire_the_old_proof_only_on_overwrite()
     let report = run(&replacement, &output, ConflictPolicy::Overwrite);
     assert!(report.is_complete(), "ordinary overwrite: {report:?}");
     assert_eq!(fs::read(artifact)?, PAYLOAD, "byte-identical replacement");
-    assert!(
-        !canonical.path().exists(),
-        "the old identity claim is retired"
+    assert_ne!(
+        fs::read(canonical.path())?,
+        prior,
+        "the replacement has its own proof"
+    );
+    assert_eq!(
+        report.raw_artifacts().len(),
+        1,
+        "one committed raw artifact"
     );
     Ok(())
 }
@@ -237,8 +257,8 @@ fn same_parent_ordinary_replacements_share_the_ephemeral_lock_protocol() -> Test
     );
     assert_eq!(
         fs::read_dir(output.join("Data"))?.count(),
-        FILES,
-        "the lock generations are retired and all files remain"
+        FILES * 2,
+        "the original payloads and their companions are the only files"
     );
     for index in 0..FILES {
         assert_eq!(
@@ -254,14 +274,14 @@ fn same_parent_ordinary_replacements_share_the_ephemeral_lock_protocol() -> Test
 fn an_orphaned_owned_companion_requires_the_locked_retirement_path() -> TestResult {
     let scratch = tempfile::tempdir()?;
     let source = fixture(&scratch.path().join("first.p4k"), ENTRY)?;
-    let replacement = fixture(&scratch.path().join("second.p4k"), ENTRY)?;
+    let replacement = compressed_fixture(&scratch.path().join("second.p4k"))?;
     let output = scratch.path().join("out");
     let artifact = output.join(ENTRY);
     fs::create_dir_all(output.join("Data"))?;
     publish_old_receipt(&source, &artifact)?;
     let receipt = FileReceipt::new(&artifact, None, None)?;
     fs::remove_file(&artifact)?;
-    assert!(receipt.path().is_file(), "the genuine old proof remains");
+    let orphaned = fs::read(receipt.path())?;
 
     let report = run(&replacement, &output, ConflictPolicy::Overwrite);
     assert!(report.is_complete(), "locked reinstallation: {report:?}");
@@ -270,9 +290,10 @@ fn an_orphaned_owned_companion_requires_the_locked_retirement_path() -> TestResu
         PAYLOAD,
         "the byte-identical new artifact"
     );
-    assert!(
-        !receipt.path().exists(),
-        "the orphaned past proof was retired"
+    assert_ne!(
+        fs::read(receipt.path())?,
+        orphaned,
+        "the new artifact owns the companion"
     );
     Ok(())
 }

@@ -3,13 +3,18 @@
 
 use std::fs;
 use std::io::{self, Write};
+use std::path::Path;
 
 use crate::origin_file_io;
 use crate::output_file::StagedOutput;
-use crate::{ConflictPolicy, OriginArtifactBinding, OriginArtifactDigest};
+use crate::{
+    ArchiveWriteProtection, CancelToken, ConflictPolicy, OriginArtifactBinding,
+    OriginArtifactDigest,
+};
 
 use super::lock::{Contention, ReceiptLock, invalid, protection_error};
-use super::target_path::{BindTarget, bind_target};
+use super::ordinary::check_native_companion;
+use super::target_path::{BindTarget, bind_target, is_companion_name};
 use super::{ExistingCompanions, FileReceipt};
 
 #[cfg(test)]
@@ -24,8 +29,8 @@ pub(crate) enum StagedReceiptPublication {
     Uncommitted(io::Error),
     /// The artifact was moved.
     Committed {
-        /// The receipt publication outcome.
-        receipt: io::Result<()>,
+        /// The publication outcome, or none when a foreign companion was retained.
+        receipt: Option<io::Result<()>>,
         /// The ephemeral lock retirement outcome.
         retirement: io::Result<()>,
     },
@@ -37,6 +42,30 @@ pub(super) struct RetirementFailure {
     #[source]
     primary: io::Error,
     cleanup: io::Error,
+}
+
+impl<'source> FileReceipt<'source> {
+    pub(crate) fn for_native_staged_replacement(
+        output: &Path,
+        protection: Option<&'source ArchiveWriteProtection>,
+        cancel: CancelToken,
+    ) -> io::Result<Self> {
+        Self::bind(
+            output,
+            protection,
+            protection,
+            cancel,
+            BindTarget::NativeReplacement,
+        )
+    }
+
+    pub(super) const fn replacement_mode(&self) -> BindTarget {
+        if self.native_entry {
+            BindTarget::NativeReplacement
+        } else {
+            BindTarget::Replacement
+        }
+    }
 }
 
 impl FileReceipt<'_> {
@@ -54,6 +83,7 @@ impl FileReceipt<'_> {
             digest,
             ConflictPolicy::Overwrite,
             checkpoint,
+            || {},
             describe,
         )
         .unwrap_or_else(|| {
@@ -64,12 +94,14 @@ impl FileReceipt<'_> {
     }
 
     /// Commits a staged artifact or returns `None` when `Skip` keeps a competing artifact.
+    /// Calls `invalidated` when the existing receipt has been invalidated.
     pub(crate) fn publish_staged_with_policy(
         &self,
         staged: &StagedOutput<'_>,
         digest: OriginArtifactDigest,
         policy: ConflictPolicy,
         mut checkpoint: impl FnMut() -> io::Result<()>,
+        invalidated: impl FnOnce(),
         describe: impl FnOnce(&mut dyn Write, &OriginArtifactBinding) -> io::Result<()>,
     ) -> Option<StagedReceiptPublication> {
         let held = match self.acquire(Contention::Wait) {
@@ -84,16 +116,21 @@ impl FileReceipt<'_> {
             }
             Ok(())
         };
-        match self.place_staged(&held, staged, policy, &mut check) {
-            Ok(true) => {
-                let receipt = self.publish_companion_checked(&held, digest, check, describe);
+        match self.place_staged(&held, staged, policy, &mut check, invalidated) {
+            Ok(Some(companion)) => {
+                let receipt = match companion {
+                    CompanionPlacement::Publish => {
+                        Some(self.publish_companion_checked(&held, digest, check, describe))
+                    }
+                    CompanionPlacement::PreserveForeign => None,
+                };
                 let retirement = held.retire(protection);
                 Some(StagedReceiptPublication::Committed {
                     receipt,
                     retirement,
                 })
             }
-            Ok(false) => held
+            Ok(None) => held
                 .retire(protection)
                 .err()
                 .map(StagedReceiptPublication::Uncommitted),
@@ -112,15 +149,16 @@ impl FileReceipt<'_> {
         held: &ReceiptLock,
         staged: &StagedOutput<'_>,
         policy: ConflictPolicy,
-        checkpoint: impl FnOnce() -> io::Result<()>,
-    ) -> io::Result<bool> {
+        mut checkpoint: impl FnMut() -> io::Result<()>,
+        invalidated: impl FnOnce(),
+    ) -> io::Result<Option<CompanionPlacement>> {
         held.check(&self.cancel)?;
         staged.check().map_err(protection_error)?;
         let current = bind_target(
             staged.output(),
             self.protection,
             &self.cancel,
-            BindTarget::Replacement,
+            self.replacement_mode(),
         )?;
         if (current.path.as_path(), current.leaf) != (self.artifact.as_path(), self.leaf) {
             return Err(invalid("the staged file names a different origin artifact"));
@@ -130,27 +168,53 @@ impl FileReceipt<'_> {
         held.check(&self.cancel)?;
         if policy == ConflictPolicy::Skip {
             match fs::symlink_metadata(&self.artifact) {
-                Ok(_) => return Ok(false),
+                Ok(_) => return Ok(None),
                 Err(error) if error.kind() == io::ErrorKind::NotFound => {}
                 Err(error) => return Err(error),
             }
         }
-        self.invalidate(ExistingCompanions::RequireOwned)?;
+        if self.native_entry && self.artifact.file_name().is_some_and(is_companion_name) {
+            check_native_companion(&self.artifact)?;
+        }
+        let companion = self.companion_placement()?;
+        invalidated();
+        checkpoint()?;
         if policy == ConflictPolicy::Skip {
             staged.check().map_err(protection_error)?;
             origin_file_io::install_without_replacing(staged, &self.artifact)
+                .map(|installed| installed.then_some(companion))
         } else {
             origin_file_io::replace_staged(staged)?;
-            Ok(true)
+            Ok(Some(companion))
+        }
+    }
+
+    fn companion_placement(&self) -> io::Result<CompanionPlacement> {
+        if !self.native_entry {
+            self.invalidate(ExistingCompanions::RequireOwned)?;
+            return Ok(CompanionPlacement::Publish);
+        }
+        self.invalidate(ExistingCompanions::PreserveForeign)?;
+        match fs::symlink_metadata(self.path()) {
+            Ok(_) => Ok(CompanionPlacement::PreserveForeign),
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {
+                Ok(CompanionPlacement::Publish)
+            }
+            Err(error) => Err(error),
         }
     }
 }
 
+enum CompanionPlacement {
+    Publish,
+    PreserveForeign,
+}
+
 pub(crate) fn finish_staged_receipt(
-    receipt: io::Result<()>,
+    receipt: Option<io::Result<()>>,
     retirement: io::Result<()>,
 ) -> io::Result<()> {
-    match (receipt, retirement) {
+    match (receipt.unwrap_or(Ok(())), retirement) {
         (Err(primary), Err(cleanup)) => {
             Err(io::Error::other(RetirementFailure { primary, cleanup }))
         }

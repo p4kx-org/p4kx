@@ -8,6 +8,10 @@ use crate::source::SourceEntry;
 use crate::written_paths::WrittenPaths;
 use crate::{ArchiveWatch, CancelToken, Progress};
 
+#[path = "tracked_extraction_artifacts.rs"]
+mod artifacts;
+pub(crate) use artifacts::ExtractionArtifacts;
+
 /// Counts the progress of one Extraction across worker threads and reports it in order.
 pub(crate) struct Tracker<'a> {
     cancel: Option<&'a CancelToken>,
@@ -16,6 +20,7 @@ pub(crate) struct Tracker<'a> {
     progress: Mutex<Progress>,
     pub(crate) folders: FolderCache,
     pub(crate) written: WrittenPaths,
+    pub(crate) artifacts: ExtractionArtifacts,
 }
 
 impl<'a> Tracker<'a> {
@@ -36,6 +41,7 @@ impl<'a> Tracker<'a> {
             }),
             folders: FolderCache::default(),
             written: WrittenPaths::default(),
+            artifacts: ExtractionArtifacts::default(),
         }
     }
 

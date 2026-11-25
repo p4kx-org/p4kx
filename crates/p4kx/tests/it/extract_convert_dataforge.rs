@@ -14,6 +14,8 @@ use p4kx_testkit::{
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+const README_RECEIPT: &str = "Data/readme.txt.p4kx-origin.jsonl";
+
 fn database() -> Vec<u8> {
     DataForgeBuilder::new()
         .structure(
@@ -86,8 +88,9 @@ fn extract(archive: &Path, out: &Path, args: &[&str]) -> Result<String, Box<dyn 
         .replace('\\', "/"))
 }
 
-/// Returns every file below `root` with its content, in path order.
+/// Returns the payload files with their content, in path order.
 fn tree(root: &Path) -> Result<String, Box<dyn Error>> {
+    let checked_companion = root.join(README_RECEIPT);
     let mut files = Vec::new();
     let mut folders = vec![root.to_path_buf()];
     while let Some(folder) = folders.pop() {
@@ -95,7 +98,7 @@ fn tree(root: &Path) -> Result<String, Box<dyn Error>> {
             let path = entry?.path();
             if path.is_dir() {
                 folders.push(path);
-            } else {
+            } else if path != checked_companion {
                 files.push(path);
             }
         }
@@ -118,8 +121,50 @@ fn convert_writes_the_dataforge_entry_as_record_files() -> TestResult {
 
     let stdout = extract(&archive, &out, &["--convert"])?;
 
+    check_readme_receipt(&out)?;
     insta::assert_snapshot!("convert_dataforge_files", tree(&out)?);
     insta::assert_snapshot!("convert_dataforge_stdout", stdout);
+    Ok(())
+}
+
+fn check_readme_receipt(out: &Path) -> TestResult {
+    let receipt = fs::read_to_string(out.join(README_RECEIPT))?;
+    let rows: Vec<serde_json::Value> = receipt
+        .lines()
+        .map(serde_json::from_str)
+        .collect::<Result<_, _>>()?;
+    let header = rows.first().ok_or("receipt header")?;
+    assert_eq!(
+        header["binding"],
+        serde_json::json!({
+            "type": "file",
+            "path": {"encoding": "utf8", "value": "readme.txt"},
+            "byteLength": "5",
+            "sha256": "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+        }),
+        "the receipt binds the original readme bytes",
+    );
+    let payload = rows
+        .iter()
+        .find(|row| {
+            row.pointer("/address/type")
+                .and_then(serde_json::Value::as_str)
+                == Some("opaquePayload")
+        })
+        .ok_or("readme payload origin")?;
+    assert_eq!(
+        payload["sourceSetComplete"], true,
+        "the raw readme source is complete"
+    );
+    assert_eq!(
+        payload["containsEncryptedSource"], false,
+        "the readme is plain Archive data"
+    );
+    assert_eq!(
+        rows.last().ok_or("receipt end")?["type"],
+        "end",
+        "the receipt has a terminal row"
+    );
     Ok(())
 }
 

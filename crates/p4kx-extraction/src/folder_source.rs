@@ -141,7 +141,7 @@ type Pending = (PathBuf, String, usize);
 
 /// The files below an input folder, listed once, with the paths below it using `\`.
 ///
-/// Links are never followed and so never listed; each is reported as a rejected file.
+/// Links are rejected and recognized P4KX origin companions are excluded.
 #[derive(Debug)]
 pub struct FolderSource {
     root: PathBuf,
@@ -326,13 +326,18 @@ impl FolderSource {
         Ok(())
     }
 
-    /// Lists the file `item` as `path`, or rejects it when its size cannot be read.
     fn add(&mut self, item: &fs::DirEntry, path: String) {
+        let disk = item.path();
+        match crate::file_receipt::is_owned_native_companion(&disk) {
+            Ok(true) => return,
+            Ok(false) => {}
+            Err(error) => return self.reject(&path, FolderFileError::Unreadable(error.kind())),
+        }
         match item.metadata() {
             Ok(metadata) => self.files.push(FolderFile {
                 path,
                 size: metadata.len(),
-                disk: item.path(),
+                disk,
             }),
             Err(error) => self.reject(&path, FolderFileError::Unreadable(error.kind())),
         }

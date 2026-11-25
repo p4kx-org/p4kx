@@ -121,10 +121,12 @@ fn convert_merges_textures_and_exports_png_once_per_texture() -> TestResult {
         files(&fixture.out)?,
         [
             "Data/Textures/broken_ddna.dds",
+            "Data/Textures/broken_ddna.dds.p4kx-origin.jsonl",
             "Data/Textures/panel_diff.dds",
             "Data/Textures/panel_diff.dds.p4kx-origin.jsonl",
             "Data/Textures/panel_diff.png",
             "Data/readme.txt",
+            "Data/readme.txt.p4kx-origin.jsonl",
         ],
         "one DDS and one PNG for the texture, the raw header of the broken one"
     );
@@ -157,12 +159,17 @@ fn textures_and_mip_choose_the_outputs() -> TestResult {
         files(&fixture.out)?,
         [
             "Data/Textures/broken_ddna.dds",
+            "Data/Textures/broken_ddna.dds.p4kx-origin.jsonl",
             "Data/Textures/broken_ddna.png",
             "Data/Textures/panel_diff.dds",
             "Data/Textures/panel_diff.dds.1",
+            "Data/Textures/panel_diff.dds.1.p4kx-origin.jsonl",
             "Data/Textures/panel_diff.dds.2",
+            "Data/Textures/panel_diff.dds.2.p4kx-origin.jsonl",
+            "Data/Textures/panel_diff.dds.p4kx-origin.jsonl",
             "Data/Textures/panel_diff.png",
             "Data/readme.txt",
+            "Data/readme.txt.p4kx-origin.jsonl",
         ],
         "the raw Entries and the PNGs; mip 1 of the broken texture needs no part"
     );
@@ -247,7 +254,11 @@ fn without_convert_textures_are_written_raw() -> TestResult {
         .code(0)
         .stdout(predicate::str::contains("converted").not());
 
-    assert_eq!(files(&fixture.out)?.len(), 5, "the raw Entries");
+    assert_eq!(
+        files(&fixture.out)?.len(),
+        10,
+        "five raw Entries and their companions"
+    );
     Ok(())
 }
 

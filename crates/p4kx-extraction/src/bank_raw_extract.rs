@@ -66,6 +66,8 @@ impl RawWemPublication {
                 retirement,
             } => (receipt, retirement),
         };
+        let receipt =
+            receipt.ok_or_else(|| io::Error::other("the raw bank receipt was not published"))?;
         let receipt = receipt.and_then(|()| {
             receipt_digest
                 .map(|digest| RawWemReceipt {

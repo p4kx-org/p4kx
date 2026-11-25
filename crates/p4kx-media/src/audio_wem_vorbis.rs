@@ -6,8 +6,8 @@ use std::ops::Range;
 use std::path::Path;
 
 use p4kx_extraction::sound::{
-    WemInspection, WemMetadata, WemOriginField, WemOriginPlan, WemReadError, WemVorbisOgg,
-    WemVorbisRanges, WemVorbisWav, WemVorbisWriteError,
+    WemFormatField, WemInspection, WemMetadata, WemOriginField, WemOriginPlan, WemReadError,
+    WemVorbisOgg, WemVorbisRanges, WemVorbisWav, WemVorbisWriteError,
 };
 use p4kx_extraction::{AudioError, Codec, SourceUseRole};
 
@@ -62,6 +62,13 @@ impl<R> PreparedVorbis<'_, R> {
         }
     }
 
+    const fn codebook_audio_packets(&self) -> Range<u64> {
+        match self {
+            Self::Ogg(plan) => plan.codebook_audio_packets(),
+            Self::Wav(plan) => plan.codebook_audio_packets(),
+        }
+    }
+
     const fn decoded(&self) -> Option<&Range<u64>> {
         match self {
             Self::Ogg(_) => None,
@@ -85,7 +92,8 @@ impl<R: Read + Seek> PreparedVorbis<'_, R> {
                     evidence,
                     writer,
                     |sink| {
-                        plan.write(sink)
+                        plan.write_with_evidence(sink)
+                            .map(|written| written.report)
                             .map_err(|cause| write_error(input, EncodedAudioFormat::Ogg, cause))
                     },
                 )?;
@@ -121,9 +129,7 @@ pub(super) fn convert<R: Read + Seek>(
         Err(cause) => return Err(MediaError::Contract(cause.to_string())),
     };
     let ranges = conversion.ranges().clone();
-    let decoded = conversion.decoded();
-    let origins =
-        VorbisOrigins::capture(projection, conversion.metadata(), &ranges, decoded, writer)?;
+    let origins = VorbisOrigins::capture(projection, &conversion, writer)?;
     let result = recover_format_write(conversion.write(input, &origins.artifact, writer))?;
     Ok(result.map(|output| CompletedVorbis {
         output,
@@ -198,19 +204,24 @@ struct VorbisOrigins {
 }
 
 impl VorbisOrigins {
-    fn capture(
+    fn capture<R>(
         projection: &WemProjection<'_>,
-        metadata: &WemMetadata,
-        ranges: &WemVorbisRanges,
-        decoded: Option<&Range<u64>>,
+        conversion: &PreparedVorbis<'_, R>,
         writer: &MediaWriter<'_>,
     ) -> Result<Self, MediaError> {
-        let capture = |range, field| Self::range(projection, range, field, writer);
+        let metadata = conversion.metadata();
+        let ranges = conversion.ranges();
+        let capture = |range: &Range<u64>, field| Self::range(projection, range, field, writer);
         let rate = capture(&ranges.average_byte_rate, "averageByteRate")?;
         let header = capture(&ranges.header, "configuration")?;
         let setup = capture(&ranges.setup_packet, "setupPacket")?;
         let audio_bytes = capture(&ranges.audio_packets, "audioPackets")?;
-        let decoded = decoded
+        let codebook_range = conversion.codebook_audio_packets();
+        let codebooks = (!codebook_range.is_empty())
+            .then(|| capture(&codebook_range, "codebookAudioPackets"))
+            .transpose()?;
+        let decoded = conversion
+            .decoded()
             .map(|range| capture(range, "decodedAudioPackets"))
             .transpose()?;
         let audio = join(writer, [decoded.as_ref().unwrap_or(&audio_bytes), &header])?;
@@ -219,20 +230,27 @@ impl VorbisOrigins {
             metadata.codec(),
             metadata.sample_count(),
         );
-        let declared = capture_fields(projection, &plan, [WemOriginField::SampleCount], writer)?;
-        let frames = join(writer, [&declared, &header, &setup, &audio_bytes])?;
-        let fmt = capture_fields(
+        let declared = capture_fields(
             projection,
             &plan,
-            [
-                WemOriginField::Channels,
-                WemOriginField::SampleRate,
-                WemOriginField::Loop,
-                WemOriginField::RiffByteOrder,
-            ],
+            [WemOriginField::SampleCount, WemOriginField::RiffByteOrder],
             writer,
         )?;
-        let bytes = join(writer, [&fmt, &frames, &rate])?;
+        let frames = join(
+            writer,
+            [&declared, &header, &setup, &audio_bytes]
+                .into_iter()
+                .chain(codebooks.iter()),
+        )?;
+        let artifact = format_evidence(
+            projection,
+            metadata,
+            &plan,
+            &frames,
+            &rate,
+            decoded.as_ref(),
+            writer,
+        )?;
         Ok(Self {
             rate,
             header,
@@ -240,10 +258,7 @@ impl VorbisOrigins {
             audio,
             checked: decoded.map(|_| audio_bytes),
             frames,
-            artifact: ArtifactEvidence {
-                shape: bytes.clone(),
-                bytes,
-            },
+            artifact,
         })
     }
 
@@ -295,4 +310,44 @@ impl VorbisOrigins {
             writer,
         )
     }
+}
+
+fn format_evidence(
+    projection: &WemProjection<'_>,
+    metadata: &WemMetadata,
+    plan: &WemOriginPlan<'_>,
+    frames: &OriginContributions,
+    rate: &OriginContributions,
+    decoded: Option<&OriginContributions>,
+    writer: &MediaWriter<'_>,
+) -> Result<ArtifactEvidence, MediaError> {
+    let header_shape = capture_fields(
+        projection,
+        plan,
+        [WemOriginField::Channels, WemOriginField::Loop],
+        writer,
+    )?;
+    let layout = (decoded.is_some() && metadata.channels() > 2).then_some(WemOriginField::Format(
+        WemFormatField::ChannelMask {
+            layout_present: metadata.channel_layout().is_some(),
+        },
+    ));
+    let header_bytes = capture_fields(
+        projection,
+        plan,
+        std::iter::once(WemOriginField::SampleRate).chain(layout),
+        writer,
+    )?;
+    let bytes = join(
+        writer,
+        [&header_shape, &header_bytes, frames, rate]
+            .into_iter()
+            .chain(decoded),
+    )?;
+    let shape = if decoded.is_some() {
+        join(writer, [&header_shape, frames])?
+    } else {
+        bytes.clone()
+    };
+    Ok(ArtifactEvidence { bytes, shape })
 }

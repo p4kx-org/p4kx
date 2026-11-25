@@ -109,6 +109,12 @@ impl<R> WemVorbisOgg<'_, R> {
         &self.0.ranges
     }
 
+    /// Returns the original packet prefix read to choose the Vorbis codebook.
+    #[must_use]
+    pub const fn codebook_audio_packets(&self) -> Range<u64> {
+        self.0.codebook_audio_packets()
+    }
+
     /// Returns the number of output frames after applying the authored sample count.
     #[must_use]
     pub const fn sample_count(&self) -> u64 {
@@ -138,6 +144,7 @@ impl<R: Read + Seek> WemVorbisOgg<'_, R> {
         output: &mut (impl Write + ?Sized),
     ) -> Result<WemVorbisOggEvidence, WemVorbisWriteError> {
         let written = self.0.write_ogg(output)?;
+        let codebook_audio_packets = self.codebook_audio_packets();
         let source = self.0.source;
         let audio_start = self.0.ranges.audio_packets.start;
         let actual = source.data.start + source.replayed_end as u64;
@@ -149,9 +156,15 @@ impl<R: Read + Seek> WemVorbisOgg<'_, R> {
             report: written.report,
             output: written.output,
             ranges: self.0.ranges,
-            codebook_audio_packets: audio_start..source.data.start + source.codebook_end as u64,
+            codebook_audio_packets,
             replayed_audio_packets: audio_start..actual,
         })
+    }
+}
+
+impl<R> PreparedVorbis<'_, R> {
+    const fn codebook_audio_packets(&self) -> Range<u64> {
+        self.ranges.audio_packets.start..self.source.data.start + self.source.codebook_end as u64
     }
 }
 

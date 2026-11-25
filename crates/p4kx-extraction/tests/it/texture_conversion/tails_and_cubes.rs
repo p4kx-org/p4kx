@@ -81,10 +81,15 @@ fn keeping_raw_parts_also_writes_the_alpha_tail_entries() -> TestResult {
         [
             "Data/Textures/rock_diff.dds",
             "Data/Textures/rock_diff.dds.1",
+            "Data/Textures/rock_diff.dds.1.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.dds.1a",
+            "Data/Textures/rock_diff.dds.1a.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.dds.2",
+            "Data/Textures/rock_diff.dds.2.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.dds.2a",
+            "Data/Textures/rock_diff.dds.2a.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.dds.a",
+            "Data/Textures/rock_diff.dds.a.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.dds.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.png",
         ]
@@ -114,9 +119,13 @@ fn a_broken_alpha_tail_is_reported_and_the_raw_entries_are_written() -> TestResu
         [
             "Data/Textures/rock_diff.dds",
             "Data/Textures/rock_diff.dds.1",
+            "Data/Textures/rock_diff.dds.1.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.dds.1a",
+            "Data/Textures/rock_diff.dds.1a.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.dds.2",
+            "Data/Textures/rock_diff.dds.2.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.dds.a",
+            "Data/Textures/rock_diff.dds.a.p4kx-origin.jsonl",
             "Data/Textures/rock_diff.dds.p4kx-origin.jsonl",
         ],
         "the merged DDS keeps the header's path, the other Entries are written raw"
@@ -218,9 +227,22 @@ fn merging_alone_with_raw_parts_keeps_the_merged_tail_under_the_tail_header_path
 
     assert!(report.is_complete(), "{report:?}");
     assert_eq!(
-        files(&fixture.target)?.len(),
-        8,
-        "two merged files, two companions and four raw parts"
+        files(&fixture.target)?,
+        [
+            "Data/Textures/rock_diff.dds",
+            "Data/Textures/rock_diff.dds.1",
+            "Data/Textures/rock_diff.dds.1.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.dds.1a",
+            "Data/Textures/rock_diff.dds.1a.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.dds.2",
+            "Data/Textures/rock_diff.dds.2.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.dds.2a",
+            "Data/Textures/rock_diff.dds.2a.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.dds.a",
+            "Data/Textures/rock_diff.dds.a.p4kx-origin.jsonl",
+            "Data/Textures/rock_diff.dds.p4kx-origin.jsonl",
+        ],
+        "the two merged files and four raw parts each have their companion"
     );
     assert_eq!(
         fixture.read("Data/Textures/rock_diff.dds.a")?,

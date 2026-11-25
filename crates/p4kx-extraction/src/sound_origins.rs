@@ -8,12 +8,17 @@ use p4kx_audio::Wem;
 
 use crate::origin_companion::write_selected_origin_companion;
 use crate::{
-    FieldOrigin, FieldOrigins, FieldPath, InputScope, OriginArtifactBinding, OriginOutputAddress,
-    SourceEvidenceError, SourceInput, SourceInventory, SourceInventorySelection, SourceLocation,
-    SourceScope, SourceUse, SourceUseRole, SourceUses,
+    FieldOrigin, FieldOrigins, FieldPath, OriginArtifactBinding, OriginOutputAddress,
+    SourceEvidenceError, SourceInventory, SourceInventorySelection, SourceUse, SourceUseRole,
+    SourceUses,
 };
 
 use super::{WemOriginField, WemOriginPlan};
+
+#[path = "sound_origin_input.rs"]
+mod input;
+pub(crate) use input::SoundOriginInput;
+pub(super) use input::SoundPayload;
 
 pub(crate) struct SoundOrigins {
     inventory: SourceInventory,
@@ -72,27 +77,40 @@ impl SoundOrigins {
     }
 }
 
+pub(crate) fn capture_raw_member(
+    input: Option<SoundOriginInput<'_>>,
+    length: u64,
+) -> io::Result<SoundOrigins> {
+    let uses = SourceUses::new();
+    let origin = match input {
+        Some(input) => SoundPayload::observe(input, &uses)?.raw_member_origin(&uses, length)?,
+        None => uses.origin(&[], false),
+    };
+    SoundOrigins::new(
+        &uses,
+        vec![(OriginOutputAddress::OpaquePayload, origin)],
+        FieldOrigins::new(),
+    )
+}
+
 pub(super) struct SoundEvidence<'uses, 'sound> {
-    pub(super) uses: &'uses SourceUses,
-    pub(super) payload: Option<SourceScope>,
-    input: Option<SourceInput<'sound>>,
+    uses: &'uses SourceUses,
+    pub(super) payload: Option<SoundPayload>,
     plan: WemOriginPlan<'sound>,
 }
 
 impl<'uses, 'sound> SoundEvidence<'uses, 'sound> {
     pub(super) fn observe(
         wem: &'sound Wem<impl AsRef<[u8]>>,
-        input: Option<SourceInput<'sound>>,
+        input: Option<SoundOriginInput<'_>>,
         uses: &'uses SourceUses,
     ) -> io::Result<Self> {
         let payload = input
-            .map(|input| uses.observe(input, InputScope::Payload))
-            .transpose()
-            .map_err(io::Error::other)?;
+            .map(|input| SoundPayload::observe(input, uses))
+            .transpose()?;
         Ok(Self {
             uses,
             payload,
-            input,
             plan: WemOriginPlan::new(wem.info_source(), wem.codec(), wem.sample_count()),
         })
     }
@@ -105,31 +123,15 @@ impl<'uses, 'sound> SoundEvidence<'uses, 'sound> {
             .field(field)
             .map_err(io::Error::other)?
             .iter()
-            .map(|site| site.bind(payload).map_err(io::Error::other))
+            .map(|site| payload.planned(site))
             .collect()
     }
 
     pub(super) fn name_origin(&self) -> io::Result<FieldOrigin> {
-        let Some(payload) = &self.payload else {
-            return Ok(self.uses.origin(&[], false));
-        };
-        let name_scope = match self.input {
-            Some(SourceInput::Archive(_) | SourceInput::ArchiveView(_)) => {
-                InputScope::ArchiveDirectoryMetadata
-            }
-            Some(SourceInput::File(_)) => InputScope::FileMetadata,
-            _ => return Ok(self.uses.origin(&[], false)),
-        };
-        let original = payload
-            .for_scope(name_scope)
-            .at(
-                SourceLocation::Metadata {
-                    field: "path".to_owned(),
-                },
-                SourceUseRole::Payload,
-            )
-            .map_err(io::Error::other)?;
-        Ok(self.uses.origin(&[original], true))
+        self.payload.as_ref().map_or_else(
+            || Ok(self.uses.origin(&[], false)),
+            |payload| payload.name_origin(self.uses),
+        )
     }
 
     pub(super) fn append_range(
@@ -143,13 +145,20 @@ impl<'uses, 'sound> SoundEvidence<'uses, 'sound> {
         if let Some(payload) = &self.payload
             && !range.is_empty()
         {
-            uses.push(range_use(payload, namespace, field, range, role)?);
+            uses.push(payload.range(namespace, field, range, role)?);
         }
         Ok(())
     }
 
-    pub(super) fn origin(&self, uses: &[SourceUse]) -> FieldOrigin {
-        self.uses.origin(uses, self.payload.is_some())
+    pub(super) fn origin(&self, uses: &[SourceUse]) -> io::Result<FieldOrigin> {
+        self.payload.as_ref().map_or_else(
+            || Ok(self.uses.origin(uses, false)),
+            |payload| payload.origin(self.uses, uses),
+        )
+    }
+
+    pub(super) fn authored(&self) -> FieldOrigin {
+        self.uses.origin(&[], true)
     }
 
     pub(super) fn combine<'a>(
@@ -160,25 +169,6 @@ impl<'uses, 'sound> SoundEvidence<'uses, 'sound> {
             .origin_with_origins(origins, true)
             .map_err(io::Error::other)
     }
-}
-
-pub(super) fn range_use(
-    payload: &SourceScope,
-    namespace: &str,
-    field: &str,
-    range: &Range<u64>,
-    role: SourceUseRole,
-) -> io::Result<SourceUse> {
-    payload
-        .at(
-            SourceLocation::Subresource {
-                namespace: namespace.into(),
-                indices: vec![range.start, range.end],
-                field: field.into(),
-            },
-            role,
-        )
-        .map_err(io::Error::other)
 }
 
 pub(super) fn insert_summary(

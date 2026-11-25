@@ -1,23 +1,26 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::io;
 use std::path::{Path, PathBuf};
+
+use p4kx_audio::Wem;
 
 use crate::output_file::write_error;
 use crate::{
     ConversionError, FieldOrigins, OggReport, SourceEvidenceError, SourceInventorySelection,
 };
 
-use super::Sound;
 use super::origins::SoundOrigins;
 use super::publication::SoundWrite;
+use super::{Sound, SoundOriginInput};
 
 #[path = "sound_ogg_origins.rs"]
 mod origins;
 
 #[path = "sound_ogg_write.rs"]
 mod written;
-use written::OggWrite;
+pub(crate) use written::OggWrite;
 
 /// Summary and immediate source evidence for a published Ogg stream and its companion.
 #[non_exhaustive]
@@ -55,10 +58,15 @@ impl Sound {
         let publication = self.publish_sound(
             out,
             |writer, companion| {
-                let written = OggWrite::convert(self, out, writer)?;
+                let written = OggWrite::encode(self.wem(), writer)
+                    .map_err(|cause| cause.into_conversion_error(self, out))?;
                 let report = written.report();
-                let origins = origins::capture(self, &written)
-                    .map_err(|source| write_error(companion, source))?;
+                let origins = capture_ogg(
+                    self.wem(),
+                    self.source_input().map(SoundOriginInput::loose),
+                    &written,
+                )
+                .map_err(|source| write_error(companion, source))?;
                 Ok(SoundWrite {
                     report,
                     byte_length: report.size,
@@ -73,4 +81,12 @@ impl Sound {
             origins: publication.written.origins,
         })
     }
+}
+
+pub(crate) fn capture_ogg(
+    wem: &Wem<impl AsRef<[u8]>>,
+    input: Option<SoundOriginInput<'_>>,
+    written: &OggWrite,
+) -> io::Result<SoundOrigins> {
+    origins::capture(wem, input, written)
 }

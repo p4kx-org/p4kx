@@ -158,6 +158,7 @@ fn check_origin(
     for (field, start, end) in [
         ("setupPacket", start, audio_start),
         ("audioPackets", audio_start, end),
+        ("codebookAudioPackets", audio_start, end),
     ] {
         let expected = json!({
             "type":"subresource", "namespace":"wemVorbisInput", "field":field,
@@ -303,6 +304,24 @@ fn check_wav_packet_proof(
             "{path} retains its exact encrypted source use"
         );
     }
+    let decoded_contributes = |field: &str| -> TestResult<bool> {
+        let uses = origins.for_field(
+            ordinal,
+            1,
+            &format!("/data/payload/outcome/payload/artifact/{field}"),
+        )?;
+        Ok(uses
+            .iter()
+            .any(|source| source.pointer("/location/field") == Some(&json!("decodedAudioPackets"))))
+    };
+    assert!(
+        decoded_contributes("digest/hex")?,
+        "the WAV digest includes the decoded sample input"
+    );
+    assert!(
+        !decoded_contributes("size")?,
+        "the WAV length uses framing and metadata"
+    );
     check_origin(origins, ordinal, data.body_offset, start, checked_end)
 }
 

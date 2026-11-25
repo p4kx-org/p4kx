@@ -7,11 +7,11 @@ use std::ops::Range;
 use p4kx_audio::{Codec, LinearWavWrite, Wem};
 
 use super::WavWrite;
-use crate::sound::origins::range_use;
-use crate::{SourceLocation, SourceScope, SourceUse, SourceUseRole};
+use crate::sound::origins::SoundPayload;
+use crate::{SourceUse, SourceUseRole};
 
 pub(super) fn shape(
-    payload: &SourceScope,
+    payload: &SoundPayload,
     wem: &Wem<impl AsRef<[u8]>>,
     written: &WavWrite,
     uses: &mut Vec<SourceUse>,
@@ -44,6 +44,7 @@ pub(super) fn shape(
                 ("averageByteRate", &ranges.average_byte_rate),
                 ("configuration", &ranges.header),
                 ("setupPacket", &ranges.setup_packet),
+                ("codebookAudioPackets", &written.codebook_audio_packets),
                 ("audioChecked", &ranges.audio_packets),
             ] {
                 append(payload, uses, "wemVorbis", field, range, selector)?;
@@ -54,7 +55,7 @@ pub(super) fn shape(
 }
 
 pub(super) fn samples(
-    payload: &SourceScope,
+    payload: &SoundPayload,
     wem: &Wem<impl AsRef<[u8]>>,
     written: &WavWrite,
     uses: &mut Vec<SourceUse>,
@@ -119,7 +120,7 @@ pub(super) fn samples(
 }
 
 fn append(
-    payload: &SourceScope,
+    payload: &SoundPayload,
     uses: &mut Vec<SourceUse>,
     namespace: &str,
     field: &str,
@@ -127,13 +128,13 @@ fn append(
     role: SourceUseRole,
 ) -> io::Result<()> {
     if !range.is_empty() {
-        uses.push(range_use(payload, namespace, field, range, role)?);
+        uses.push(payload.range(namespace, field, range, role)?);
     }
     Ok(())
 }
 
 fn linear_samples(
-    payload: &SourceScope,
+    payload: &SoundPayload,
     wem: &Wem<impl AsRef<[u8]>>,
     written: LinearWavWrite,
     uses: &mut Vec<SourceUse>,
@@ -153,8 +154,7 @@ fn linear_samples(
         } else {
             "wemAdpcmBlocks"
         };
-        uses.push(range_use(
-            payload,
+        uses.push(payload.range(
             namespace,
             "decodedAudio",
             &(start..end),
@@ -166,7 +166,7 @@ fn linear_samples(
 
 /// Binds byte runs for the history, index and nibbles of each used IMA sub-block.
 fn ima_source(
-    payload: &SourceScope,
+    payload: &SoundPayload,
     start: u64,
     written: LinearWavWrite,
     stride: u64,
@@ -192,18 +192,12 @@ fn ima_source(
             (0, IMA_USED_HEADER_BYTES),
             (IMA_HEADER_BYTES, step - IMA_HEADER_BYTES),
         ] {
-            sources.push(
-                payload
-                    .at(
-                        SourceLocation::Subresource {
-                            namespace: "wemImaAdpcmByteRuns".into(),
-                            indices: vec![position, count, step, offset, length],
-                            field: "decodedAudio".into(),
-                        },
-                        SourceUseRole::Conversion,
-                    )
-                    .map_err(io::Error::other)?,
-            );
+            sources.push(payload.at(
+                "wemImaAdpcmByteRuns",
+                &[position, count, step, offset, length],
+                "decodedAudio",
+                SourceUseRole::Conversion,
+            )?);
         }
     }
     Ok(sources)

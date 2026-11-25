@@ -48,7 +48,7 @@ pub(crate) use fresh::{FreshPublication, try_create_fresh};
 use header::ReceiptOwner;
 use lock::{Contention, ReceiptLock, invalid, protection_error, regular_file};
 pub(crate) use lock::{is_origin_lock_name, origin_lock_collision};
-pub(crate) use ordinary::{OrdinaryReplacement, retained_lock_failure};
+pub(crate) use ordinary::{OrdinaryReplacement, is_owned_native_companion, retained_lock_failure};
 pub use publication::FilePublication;
 pub(crate) use staged::{StagedReceiptPublication, finish_staged_receipt};
 use target_path::{BindTarget, TargetLeaf, bind_target, lexical_receipt, sibling_receipt, target};
@@ -64,6 +64,7 @@ pub(crate) fn companion_path(artifact: &Path) -> io::Result<PathBuf> {
 pub struct FileReceipt<'source> {
     artifact: PathBuf,
     leaf: TargetLeaf,
+    native_entry: bool,
     receipt: PathBuf,
     artifact_name: OriginArtifactName,
     protection: Option<&'source ArchiveWriteProtection>,
@@ -145,6 +146,7 @@ impl<'source> FileReceipt<'source> {
         Ok(Self {
             artifact,
             leaf: bound.leaf,
+            native_entry: mode == BindTarget::NativeReplacement,
             receipt,
             artifact_name,
             protection,
@@ -211,8 +213,8 @@ impl<'source> FileReceipt<'source> {
 
     fn check_target(&self) -> io::Result<()> {
         let mode = match self.leaf {
-            TargetLeaf::File => BindTarget::Receipt,
-            TargetLeaf::SymbolicLink => BindTarget::Replacement,
+            TargetLeaf::File if !self.native_entry => BindTarget::Receipt,
+            TargetLeaf::File | TargetLeaf::SymbolicLink => self.replacement_mode(),
         };
         self.check_target_mode(mode)
     }
@@ -253,10 +255,16 @@ impl<'source> FileReceipt<'source> {
             TargetLeaf::File => ReplacementPath::File(&self.artifact),
             TargetLeaf::SymbolicLink => ReplacementPath::SymbolicLink(&self.artifact),
         };
-        let aggregate_owned = existing.owned(
-            directory_table::lookup(&aggregate, Some(replacement))
-                .map(|overlap| overlap == Some(true)),
-        )?;
+        let aggregate_policy = if self.native_entry {
+            ExistingCompanions::PreserveForeign
+        } else {
+            existing
+        };
+        let aggregate_owned = aggregate != self.artifact
+            && aggregate_policy.owned(
+                directory_table::lookup(&aggregate, Some(replacement))
+                    .map(|overlap| overlap == Some(true)),
+            )?;
         if existing == ExistingCompanions::PreserveForeign {
             if aggregate_owned {
                 check(&aggregate, self.receipt_protection, &self.cancel)?;

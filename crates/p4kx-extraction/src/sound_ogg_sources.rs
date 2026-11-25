@@ -4,11 +4,11 @@
 use std::io;
 use std::ops::Range;
 
-use p4kx_audio::{WemOpusOggEvidence, WemVorbisOggEvidence};
+use p4kx_audio::{Wem, WemOpusOggEvidence, WemVorbisOggEvidence};
 
 use crate::sound::WemOriginField;
 use crate::sound::origins::SoundEvidence;
-use crate::{FieldOrigin, Sound, SourceLocation, SourceUse, SourceUseRole};
+use crate::{FieldOrigin, SourceUse, SourceUseRole};
 
 use super::OggWrite;
 
@@ -29,7 +29,7 @@ pub(super) struct OggSources {
 
 impl OggSources {
     pub(super) fn capture(
-        sound: &Sound,
+        wem: &Wem<impl AsRef<[u8]>>,
         written: &OggWrite,
         evidence: &SoundEvidence<'_, '_>,
     ) -> io::Result<Self> {
@@ -38,20 +38,14 @@ impl OggSources {
         let sample_rate = planned(evidence, WemOriginField::SampleRate)?;
         let mut length = Vec::new();
         if let Some(payload) = &evidence.payload {
-            length.push(
-                payload
-                    .at(
-                        SourceLocation::Subresource {
-                            namespace: "wemChunk".to_owned(),
-                            indices: vec![sound.wem().info_source().data_body_offset()],
-                            field: "bodyLength".to_owned(),
-                        },
-                        SourceUseRole::Selector,
-                    )
-                    .map_err(io::Error::other)?,
-            );
+            length.push(payload.at(
+                "wemChunk",
+                &[wem.info_source().data_body_offset()],
+                "bodyLength",
+                SourceUseRole::Selector,
+            )?);
         }
-        let length = evidence.origin(&length);
+        let length = evidence.origin(&length)?;
         let context = Context {
             evidence,
             codec: &codec,
@@ -136,7 +130,7 @@ fn opus(written: &WemOpusOggEvidence, context: &Context<'_, '_, '_>) -> io::Resu
     if let Some(table) = &ranges.seek_table {
         evidence.append_range(&mut checked, OPUS, "seekTableChecked", table, Selector)?;
     }
-    let checked = evidence.origin(&checked);
+    let checked = evidence.origin(&checked)?;
     let count = evidence.combine([context.length, &head, &frame_format, &checked])?;
     let mut replay = Vec::new();
     evidence.append_range(
@@ -149,7 +143,7 @@ fn opus(written: &WemOpusOggEvidence, context: &Context<'_, '_, '_>) -> io::Resu
     if let Some(table) = &written.replayed_seek_table {
         evidence.append_range(&mut replay, OPUS, "seekTableReplayed", table, Selector)?;
     }
-    let replay = evidence.origin(&replay);
+    let replay = evidence.origin(&replay)?;
     Ok(Groups {
         identification: head,
         comments_and_setup: evidence.combine(std::iter::once(context.codec).chain(&tags))?,
@@ -188,7 +182,7 @@ fn opus_head(
             SourceUseRole::Conversion,
         )?;
     }
-    let preskip = evidence.origin(&preskip);
+    let preskip = evidence.origin(&preskip)?;
     evidence.combine([context.codec, context.channels, format, &preskip])
 }
 
@@ -254,7 +248,7 @@ fn vorbis(written: &WemVorbisOggEvidence, context: &Context<'_, '_, '_>) -> io::
 }
 
 fn planned(evidence: &SoundEvidence<'_, '_>, field: WemOriginField) -> io::Result<FieldOrigin> {
-    Ok(evidence.origin(&evidence.planned(field)?))
+    evidence.origin(&evidence.planned(field)?)
 }
 
 fn single(
@@ -266,5 +260,5 @@ fn single(
 ) -> io::Result<FieldOrigin> {
     let mut uses: Vec<SourceUse> = Vec::new();
     evidence.append_range(&mut uses, namespace, field, bytes, role)?;
-    Ok(evidence.origin(&uses))
+    evidence.origin(&uses)
 }

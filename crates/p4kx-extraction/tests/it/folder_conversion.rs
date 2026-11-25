@@ -203,7 +203,14 @@ fn a_filter_selects_the_files_by_their_relative_path() -> TestResult {
 
     assert!(report.is_complete(), "complete: {report:?}");
     let names: Vec<_> = tree(&fixture.folder("out"))?.into_keys().collect();
-    assert_eq!(names, ["Data/Ships/gladius.xml", "Data/Ships/text.xml"]);
+    assert_eq!(
+        names,
+        [
+            "Data/Ships/gladius.xml",
+            "Data/Ships/text.xml",
+            "Data/Ships/text.xml.p4kx-origin.jsonl",
+        ]
+    );
     Ok(())
 }
 

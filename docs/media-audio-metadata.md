@@ -136,7 +136,10 @@ The `audio-wem-conversion` and `audio-bank-wem-conversion` namespaces contain on
 requested and actual formats, source codec, decoded dimensions and loop, original
 half-open range of consumed PCM frames, coded ADPCM blocks or selected compressed packet data,
 and verified artifact path, length and SHA-256. Vorbis rows add `vorbis_inputs` with the original
-average-byte-rate word, configuration and size-prefixed setup packet ranges. Vorbis WAV includes
+average-byte-rate word, configuration and size-prefixed setup packet ranges.
+The artifact and sample count origins identify the packet prefix used to select
+the codebook. WAV artifact lengths use the output frame count and header shape.
+Their digests also bind the packet range supplied to the PCM decoder. Vorbis WAV includes
 the entire checked packet range in `checked_audio_packets`, including packet lookahead. Its
 `source_range` ends with the last packet supplied to the PCM decoder. Opus source rows add
 `opus_inputs` with the selected format prefix, checked DATA range and any selected seek words or

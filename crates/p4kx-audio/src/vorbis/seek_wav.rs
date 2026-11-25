@@ -19,6 +19,8 @@ pub struct WemVorbisWavEvidence {
     pub output: WavOutputRanges,
     /// Original extents checked during preparation.
     pub ranges: WemVorbisRanges,
+    /// Original packet prefix read to choose the Vorbis codebook.
+    pub codebook_audio_packets: Range<u64>,
     /// Original audio packet prefix supplied to the PCM decoder, including packet framing.
     pub decoded_audio_packets: Range<u64>,
     /// Original audio prefix read during PCM replay, including lookahead and packet framing.
@@ -52,6 +54,12 @@ impl<R> WemVorbisWav<'_, R> {
         &self.source.ranges
     }
 
+    /// Returns the original packet prefix read to choose the Vorbis codebook.
+    #[must_use]
+    pub const fn codebook_audio_packets(&self) -> Range<u64> {
+        self.source.codebook_audio_packets()
+    }
+
     /// Returns the original audio prefix supplied to the PCM decoder.
     #[must_use]
     pub const fn decoded_audio_packets(&self) -> &Range<u64> {
@@ -79,6 +87,7 @@ impl<R: Read + Seek> WemVorbisWav<'_, R> {
         output
             .write_all(&self.header)
             .map_err(WemVorbisWriteError::Output)?;
+        let codebook_audio_packets = self.codebook_audio_packets();
         let source = &mut self.source;
         let decoded = source
             .headers
@@ -92,6 +101,7 @@ impl<R: Read + Seek> WemVorbisWav<'_, R> {
         Ok(WemVorbisWavEvidence {
             report: self.report,
             output: WavOutputRanges::new(self.header.len(), self.report),
+            codebook_audio_packets,
             decoded_audio_packets: self.decoded_audio_packets,
             replayed_audio_packets: source.ranges.audio_packets.start..replayed_end,
             ranges: self.source.ranges,

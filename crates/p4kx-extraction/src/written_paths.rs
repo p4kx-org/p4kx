@@ -70,7 +70,7 @@ impl EntryWriter<'_> {
             };
             if matches!(
                 outcome,
-                Outcome::Written | Outcome::Converted | Outcome::Kept
+                Outcome::Written | Outcome::RawWritten(_) | Outcome::Converted | Outcome::Kept
             ) && let Ok(relative) = self.relative_path(entry)
             {
                 self.tracker.written.record(&relative, entry.index());

@@ -129,10 +129,25 @@ fn if_changed_replaces_only_files_whose_size_or_crc_differs() -> TestResult {
 
 #[test]
 fn every_policy_leaves_no_temporary_file_behind() -> TestResult {
-    for policy in [
-        ConflictPolicy::Skip,
-        ConflictPolicy::Overwrite,
-        ConflictPolicy::IfChanged,
+    for (policy, companions) in [
+        (ConflictPolicy::Skip, &["fresh.txt.p4kx-origin.jsonl"][..]),
+        (
+            ConflictPolicy::Overwrite,
+            &[
+                "edited.txt.p4kx-origin.jsonl",
+                "fresh.txt.p4kx-origin.jsonl",
+                "resized.txt.p4kx-origin.jsonl",
+                "same.txt.p4kx-origin.jsonl",
+            ][..],
+        ),
+        (
+            ConflictPolicy::IfChanged,
+            &[
+                "edited.txt.p4kx-origin.jsonl",
+                "fresh.txt.p4kx-origin.jsonl",
+                "resized.txt.p4kx-origin.jsonl",
+            ][..],
+        ),
     ] {
         let fixture = prefilled()?;
 
@@ -142,10 +157,12 @@ fn every_policy_leaves_no_temporary_file_behind() -> TestResult {
             .map(|item| Ok(item?.file_name().to_string_lossy().into_owned()))
             .collect::<Result<_, std::io::Error>>()?;
         names.sort();
+        let mut expected = vec!["edited.txt", "fresh.txt", "resized.txt", "same.txt"];
+        expected.extend_from_slice(companions);
+        expected.sort_unstable();
         assert_eq!(
-            names,
-            ["edited.txt", "fresh.txt", "resized.txt", "same.txt"],
-            "{policy:?}: only the Entry files are in the folder"
+            names, expected,
+            "{policy:?}: only the Entry files and expected companions are in the folder"
         );
     }
     Ok(())

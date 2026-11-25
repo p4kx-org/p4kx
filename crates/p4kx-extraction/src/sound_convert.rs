@@ -1,7 +1,6 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::io::Write;
 use std::path::Path;
 use std::sync::atomic::AtomicU64;
 
@@ -12,15 +11,12 @@ use crate::decoded_buffer::{DecodedBuffer, MAX_ADDRESSABLE_BYTES};
 use crate::entry_path::relative_path;
 use crate::extract::Ended;
 use crate::sound_job::sound_role;
-use crate::sound_output::{LooseSound, SoundOutput};
+use crate::sound_output::{SoundArtifactSource, SoundOutput, sound_input};
 use crate::source::{SourceEntry, SourceReader};
 use crate::texture_convert::Step;
 use crate::texture_job::Indexed;
 use crate::write::{Destination, EntryWriter, Outcome};
-use crate::{
-    AudioConversion, ConflictPolicy, ConversionError, ConvertedSoundArtifact, EntryFailure,
-    ExtractionError, SourceInput,
-};
+use crate::{AudioConversion, ConflictPolicy, ConversionError, EntryFailure, ExtractionError};
 
 /// One sound to write: the folder it goes to, its file name without extension, the name its
 /// errors carry and whether it is only the prefetched start of a streamed WEM.
@@ -29,7 +25,7 @@ pub(crate) struct SoundFile<'a> {
     pub(crate) stem: &'a str,
     pub(crate) name: &'a str,
     pub(crate) prefetch: bool,
-    pub(crate) loose: Option<LooseSound<'a>>,
+    pub(crate) source: SoundArtifactSource<'a>,
 }
 
 /// How writing one sound ended: its step, whether it was converted rather than written
@@ -74,7 +70,6 @@ pub(crate) struct Converted {
     pub(crate) outcome: Outcome,
     pub(crate) unconverted: Vec<ConversionError>,
     pub(crate) cancelled: Vec<String>,
-    pub(crate) artifact: Option<ConvertedSoundArtifact>,
 }
 
 impl Converted {
@@ -83,7 +78,6 @@ impl Converted {
             outcome,
             unconverted: Vec::new(),
             cancelled: Vec::new(),
-            artifact: None,
         }
     }
 }
@@ -116,7 +110,6 @@ impl EntryWriter<'_> {
                 entry: (index, path.clone(), outcome),
                 unconverted: vec![EntryFailure { path, error }],
                 cancelled: Vec::new(),
-                artifact: None,
             };
         }
         let credited = AtomicU64::new(0);
@@ -142,7 +135,6 @@ impl EntryWriter<'_> {
             entry: (index, path, done.outcome),
             unconverted,
             cancelled: done.cancelled,
-            artifact: done.artifact,
         }
     }
 
@@ -189,7 +181,7 @@ impl EntryWriter<'_> {
             stem,
             name: entry.path(),
             prefetch: false,
-            loose: None,
+            source: SoundArtifactSource::loose(*entry, None),
         };
         if self.policy == ConflictPolicy::Skip
             && self.audio != AudioConversion::Ogg
@@ -199,18 +191,17 @@ impl EntryWriter<'_> {
         {
             return Ok(Converted::of(Outcome::Kept));
         }
-        let original = entry.observed_entry();
+
         let Some(read) = self.read_sound(entry, buffers, credited)? else {
             return Ok(Converted::of(Outcome::Cancelled));
         };
         let file = read.file_origin();
         drop(read);
-        let input = original
-            .map(SourceInput::ArchiveView)
-            .or_else(|| file.as_ref().map(SourceInput::File));
-        sound.loose = Some(LooseSound::new(*entry, input));
+        let input = sound_input(entry, file.as_ref());
+        sound.source = SoundArtifactSource::loose(*entry, input);
         let end = self.write_sound(&buffers.data, &sound, &mut buffers.chunk)?;
         let outcome = match (end.output.receipt_failure, end.output.step) {
+            (Some(error), Step::Written) if !end.converted => Outcome::RawWritten(Some(error)),
             (Some(error), _) => Outcome::Failed(error),
             (None, Step::Written) if end.converted => Outcome::Converted,
             (None, Step::Written) => Outcome::Written,
@@ -219,7 +210,7 @@ impl EntryWriter<'_> {
         };
         Ok(Converted {
             unconverted: end.unconverted.into_iter().collect(),
-            artifact: end.output.artifact,
+
             ..Converted::of(outcome)
         })
     }
@@ -264,15 +255,10 @@ impl EntryWriter<'_> {
             Form::Raw
         };
         let destination = sound_destination(sound, unchanged)?;
-        let step = self
-            .write_converted(
-                &destination,
-                |sink| sink.write_all(bytes).map_err(AudioError::Write),
-                chunk,
-            )?
-            .unwrap_or(Step::Cancelled);
+        let output = self.write_raw_sound(&destination, bytes, &sound.source, chunk)?;
+        let step = output.step;
         Ok(SoundEnd {
-            output: SoundOutput::of(step),
+            output,
             converted: false,
             unconverted: failure.filter(|_| step != Step::Cancelled).map(|source| {
                 ConversionError::Audio {
@@ -298,23 +284,14 @@ impl EntryWriter<'_> {
         };
         loop {
             let destination = sound_destination(sound, form)?;
-            if form == Form::Wav
-                && wem.supports_linear_wav()
-                && let Some(loose) = &sound.loose
-            {
-                return self.write_linear_sound(&destination, wem, loose, chunk);
-            }
-            let written = self.write_converted(
-                &destination,
-                |sink| match form {
-                    Form::Ogg => wem.write_ogg(sink).map(drop),
-                    Form::Wav | Form::Raw | Form::Midi => wem.write_wav(sink).map(drop),
-                },
-                chunk,
-            )?;
+            let written = if form == Form::Ogg {
+                self.write_ogg_sound(&destination, wem, &sound.source, chunk)
+            } else {
+                self.write_wav_sound(&destination, wem, &sound.source, chunk)
+            }?;
             match written {
                 Err(AudioError::UnsupportedOggCodec(_)) if form == Form::Ogg => form = Form::Wav,
-                written => return Ok(written.map(SoundOutput::of)),
+                written => return Ok(written),
             }
         }
     }

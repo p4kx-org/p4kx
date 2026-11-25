@@ -81,19 +81,19 @@ impl Item<'_> {
     pub(crate) fn output_paths(&self, writer: &EntryWriter<'_>, mut visit: impl FnMut(&str)) {
         match self {
             Self::Entry((_, entry)) => {
-                let path = writer.disk_name(entry);
-                visit(&path);
-                visit_companion(&path, &mut visit);
+                visit_raw(&writer.disk_name(entry), &mut visit);
             }
             Self::Sound((_, entry)) => {
-                visit(&writer.disk_name(entry));
-                if let Some((_, stem)) = sound_role(entry.path()) {
-                    visit(&format!("{stem}.ogg"));
-                    visit(&format!("{stem}.wav"));
+                let path = writer.disk_name(entry);
+                visit_raw(&path, &mut visit);
+                if let Some((_, stem)) = sound_role(&path) {
+                    for extension in ["ogg", "wav", "mid"] {
+                        visit_raw(&format!("{stem}.{extension}"), &mut visit);
+                    }
                 }
             }
             Self::Bank((_, entry)) => {
-                visit(&writer.disk_name(entry));
+                visit_raw(&writer.disk_name(entry), &mut visit);
                 if let Some((_, stem)) = sound_role(entry.path()) {
                     visit(&format!("{stem}\\"));
                 }
@@ -114,11 +114,16 @@ impl Item<'_> {
                     visit_companion(&writer.disk_name(alpha), &mut visit);
                 }
                 for (_, entry) in &job.requested {
-                    visit(&writer.disk_name(entry));
+                    visit_raw(&writer.disk_name(entry), &mut visit);
                 }
             }
         }
     }
+}
+
+fn visit_raw(path: &str, visit: &mut impl FnMut(&str)) {
+    visit(path);
+    visit(&format!("{path}{COMPANION_SUFFIX}"));
 }
 
 fn visit_companion(path: &str, visit: &mut impl FnMut(&str)) {

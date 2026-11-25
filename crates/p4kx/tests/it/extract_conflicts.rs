@@ -175,7 +175,12 @@ fn a_cancelled_overwrite_keeps_the_files_it_did_not_reach_with_exit_code_1() -> 
     files.sort();
     assert_eq!(
         files,
-        ["edited.txt", "resized.txt", "same.txt"],
+        [
+            "edited.txt",
+            "resized.txt",
+            "same.txt",
+            "same.txt.p4kx-origin.jsonl",
+        ],
         "no partial or temporary file is left"
     );
     assert_eq!(

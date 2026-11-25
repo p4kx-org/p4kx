@@ -55,6 +55,7 @@ mod path_index;
 mod portable_entry_names;
 mod portable_record_names;
 mod query_export;
+mod raw_entry_origin;
 mod record_combined;
 mod record_export;
 mod record_export_nested;

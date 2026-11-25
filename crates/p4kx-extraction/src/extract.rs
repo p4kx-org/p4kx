@@ -8,6 +8,7 @@ use p4kx_archive::{Archive, Entry};
 use crate::buffers::Buffers;
 use crate::dataforge_pick::{DataForgePick, Pick, located};
 use crate::dependent::Collisions;
+use crate::extract_outcome::summarise;
 use crate::sound_job::mark_sounds;
 use crate::sound_workers::{run_parallel, within};
 use crate::source::{EntrySource, SourceEntry};
@@ -206,7 +207,7 @@ fn run_guarded(
             ended.push(Ended::Entry((index, entry.path().to_owned(), outcome)));
             records
         });
-    let mut report = crate::extract_outcome::summarise(ended, options.convert);
+    let mut report = summarise(ended, options.convert, tracker);
     report.records = records;
     report.records_entry = dataforge
         .and_then(|index| entries.get(index))

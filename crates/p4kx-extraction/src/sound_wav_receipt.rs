@@ -4,24 +4,23 @@
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
-use p4kx_audio::{LinearWavWrite, Wem};
+use p4kx_audio::Wem;
 
 use crate::output_file::write_error;
 use crate::{
-    ConversionError, FieldOrigins, SourceEvidenceError, SourceInput, SourceInventorySelection,
-    WavReport,
+    ConversionError, FieldOrigins, SourceEvidenceError, SourceInventorySelection, WavReport,
 };
 
-use super::Sound;
 use super::origins::SoundOrigins;
 use super::publication::SoundWrite;
+use super::{Sound, SoundEncodeError, SoundOriginInput};
 
 #[path = "sound_wav_origins.rs"]
 mod origins;
 
 #[path = "sound_wav_write.rs"]
 mod written;
-use written::WavWrite;
+pub(crate) use written::WavWrite;
 
 /// Summary and immediate source evidence for a published WAV and its companion.
 #[non_exhaustive]
@@ -59,7 +58,7 @@ impl Sound {
         &self,
         out: &Path,
     ) -> Result<WavFileReceipt, ConversionError> {
-        self.write_wav_receipt(out, |writer| WavWrite::linear(self, out, writer))
+        self.write_wav_receipt(out, |writer| WavWrite::linear(self.wem(), writer))
     }
 
     /// Writes a supported WAV and publishes its bound source-origin companion.
@@ -67,21 +66,26 @@ impl Sound {
     /// # Errors
     /// Returns the conversion failure or an artifact or companion publication failure.
     pub fn write_wav_with_receipt(&self, out: &Path) -> Result<WavFileReceipt, ConversionError> {
-        self.write_wav_receipt(out, |writer| WavWrite::convert(self, out, writer))
+        self.write_wav_receipt(out, |writer| WavWrite::encode(self.wem(), writer))
     }
 
     fn write_wav_receipt(
         &self,
         out: &Path,
-        convert: impl FnOnce(&mut dyn Write) -> Result<WavWrite, ConversionError>,
+        convert: impl FnOnce(&mut dyn Write) -> Result<WavWrite, SoundEncodeError>,
     ) -> Result<WavFileReceipt, ConversionError> {
         let publication = self.publish_sound(
             out,
             |writer, companion| {
-                let written = convert(writer)?;
+                let written =
+                    convert(writer).map_err(|cause| cause.into_conversion_error(self, out))?;
                 let report = written.report();
-                let origins = origins::capture(self.wem(), self.source_input(), &written)
-                    .map_err(|source| write_error(companion, source))?;
+                let origins = capture_wav(
+                    self.wem(),
+                    self.source_input().map(SoundOriginInput::loose),
+                    &written,
+                )
+                .map_err(|source| write_error(companion, source))?;
                 Ok(SoundWrite {
                     report,
                     byte_length: report.size,
@@ -98,10 +102,10 @@ impl Sound {
     }
 }
 
-pub(crate) fn capture_linear_wav(
+pub(crate) fn capture_wav(
     wem: &Wem<impl AsRef<[u8]>>,
-    input: Option<SourceInput<'_>>,
-    written: LinearWavWrite,
+    input: Option<SoundOriginInput<'_>>,
+    written: &WavWrite,
 ) -> io::Result<SoundOrigins> {
-    origins::capture(wem, input, &WavWrite::Linear(written))
+    origins::capture(wem, input, written)
 }

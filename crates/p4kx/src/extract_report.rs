@@ -5,7 +5,8 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use p4kx_extraction::{
-    ConvertedSoundArtifact, EntryFailure, ExtractionReport, MergedTextureArtifact, TextureArtifacts,
+    ConvertedSoundArtifact, EntryFailure, ExtractionReport, MergedTextureArtifact,
+    RawEntryArtifact, TextureArtifacts,
 };
 use serde::Serialize;
 
@@ -39,6 +40,8 @@ pub(crate) struct ReportJson<'a> {
     merged_texture_artifacts: &'a [MergedTextureArtifact],
     #[serde(skip_serializing_if = "<[ConvertedSoundArtifact]>::is_empty")]
     sound_artifacts: &'a [ConvertedSoundArtifact],
+    #[serde(skip_serializing_if = "<[RawEntryArtifact]>::is_empty")]
+    raw_artifacts: &'a [RawEntryArtifact],
     #[serde(skip_serializing_if = "Option::is_none")]
     records: Option<RecordsJson<'a>>,
 }
@@ -83,6 +86,7 @@ pub(crate) fn report_json<'a>(
         texture_artifacts: report.texture_artifacts(),
         merged_texture_artifacts: report.merged_texture_artifacts(),
         sound_artifacts: report.sound_artifacts(),
+        raw_artifacts: report.raw_artifacts(),
         records: report.records().map(|records| RecordsJson {
             exported: records.written(),
             skipped: records.skipped(),

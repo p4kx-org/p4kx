@@ -20,10 +20,14 @@ use crate::{
 
 #[path = "write_publication.rs"]
 mod publication;
+#[path = "write_raw_receipt.rs"]
+mod raw_receipt;
+pub use raw_receipt::RawEntryArtifact;
 
 /// How one Entry of an Extraction ended.
 pub(crate) enum Outcome {
     Written,
+    RawWritten(Option<ExtractionError>),
     Converted,
     Kept,
     /// Left out because a run that copies only converted files found nothing to convert.
@@ -227,20 +231,29 @@ impl EntryWriter<'_> {
             Some(reader) => reader,
             None => self.open_entry(entry)?,
         };
-        let (temporary, mut file, ownership) = self.temporary(&destination.folder)?;
         let start = prefix.get(..peeked).unwrap_or_default();
+        let chunk = &mut buffers.chunk;
+        if matches!(self.entry_target, EntryTarget::Source) {
+            self.copy_with_receipt(entry, &mut reader, &destination, start, chunk, written)
+        } else {
+            self.copy_without_receipt(&mut reader, &destination, start, chunk, written)
+        }
+    }
+
+    fn copy_without_receipt(
+        &self,
+        reader: &mut SourceReader<'_>,
+        destination: &Destination,
+        prefix: &[u8],
+        buffer: &mut [u8],
+        written: &mut u64,
+    ) -> Result<Outcome, ExtractionError> {
+        let (temporary, mut file, ownership) = self.temporary(&destination.folder)?;
         let copied = file
-            .write_all(start)
+            .write_all(prefix)
             .map_err(|source| write_error(destination.file.clone(), source))
-            .and_then(|()| {
-                self.copy(
-                    &mut reader,
-                    file,
-                    &mut buffers.chunk,
-                    &destination.file,
-                    written,
-                )
-            });
+            .and_then(|()| self.copy(reader, &mut file, buffer, &destination.file, written));
+        drop(file);
         self.put_in_place(
             &temporary,
             &ownership,
@@ -313,7 +326,7 @@ impl EntryWriter<'_> {
     fn copy(
         &self,
         reader: &mut impl Read,
-        mut file: File,
+        file: &mut impl Write,
         buffer: &mut [u8],
         destination: &Path,
         written: &mut u64,

@@ -169,7 +169,13 @@ fn socpak_extract_takes_an_exclude_without_a_filter() -> TestResult {
         .arg(&out)
         .assert()
         .code(0);
-    assert_eq!(names(&out)?, BTreeSet::from(["room/good.xml".to_owned()]));
+    assert_eq!(
+        names(&out)?,
+        BTreeSet::from([
+            "room/good.xml".to_owned(),
+            "room/good.xml.p4kx-origin.jsonl".to_owned(),
+        ])
+    );
     p4kx()?
         .args(["socpak", "extract"])
         .arg(&archive)
@@ -212,7 +218,13 @@ fn socpak_verify_and_extract_take_an_exclude() -> TestResult {
         .arg(&out)
         .assert()
         .code(0);
-    assert_eq!(names(&out)?, BTreeSet::from(["room/good.xml".to_owned()]));
+    assert_eq!(
+        names(&out)?,
+        BTreeSet::from([
+            "room/good.xml".to_owned(),
+            "room/good.xml.p4kx-origin.jsonl".to_owned(),
+        ])
+    );
     Ok(())
 }
 

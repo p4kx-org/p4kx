@@ -10,6 +10,10 @@ use p4kx_extraction::{
     convert_folder, extract,
 };
 
+use serde_json::Value;
+
+use crate::bulk_wav_origin::{field_uses, read_companion};
+
 use super::fixture::{Fixture, rock, run_with, texture_entries};
 
 type TestResult = Result<(), Box<dyn Error>>;
@@ -23,8 +27,9 @@ const MERGE_ONLY: TextureConversion = TextureConversion {
 };
 
 #[test]
-fn raw_archive_replacement_removes_the_owned_dds_receipt() -> TestResult {
+fn raw_archive_replacement_binds_its_own_dds_receipt() -> TestResult {
     let target = published()?;
+    let prior_receipt = target.read(RECEIPT)?;
 
     let replacement = copy(&target, &target.target, false, false);
     assert!(replacement.is_complete(), "{replacement:?}");
@@ -33,16 +38,19 @@ fn raw_archive_replacement_removes_the_owned_dds_receipt() -> TestResult {
         rock().header_bytes(),
         "raw DDS replaced merged bytes"
     );
-    assert!(
-        !target.target.join(RECEIPT).exists(),
-        "obsolete owned proof was retired"
-    );
-    Ok(())
+    assert_opaque_replacement(
+        &target,
+        &replacement,
+        &prior_receipt,
+        "archiveEntryDecodedBytes",
+        Some(false),
+    )
 }
 
 #[test]
-fn successful_raw_fallback_removes_prior_merged_dds_receipt() -> TestResult {
+fn successful_raw_fallback_replaces_the_merged_dds_proof() -> TestResult {
     let target = published()?;
+    let prior_receipt = target.read(RECEIPT)?;
     let mut entries = texture_entries(&rock());
     entries.pop().ok_or("fixture has a required split mip")?;
     let broken = Fixture::new(entries)?;
@@ -55,18 +63,20 @@ fn successful_raw_fallback_removes_prior_merged_dds_receipt() -> TestResult {
     );
     assert!(
         replacement.merged_texture_artifacts().is_empty(),
-        "no new receipt was published"
+        "no new merged texture was published"
     );
     assert_eq!(
         target.read(COLOR)?,
         rock().header_bytes(),
         "raw fallback really replaced the bytes"
     );
-    assert!(
-        !target.target.join(RECEIPT).exists(),
-        "the old proof cannot follow raw bytes"
-    );
-    Ok(())
+    assert_opaque_replacement(
+        &target,
+        &replacement,
+        &prior_receipt,
+        "archiveEntryDecodedBytes",
+        Some(false),
+    )
 }
 
 #[test]
@@ -113,6 +123,12 @@ fn a_foreign_sibling_is_untouched_when_writing_raw_dds() -> TestResult {
         b"foreign sibling",
         "foreign content is never retired"
     );
+    let artifact = report
+        .raw_artifacts()
+        .iter()
+        .find(|artifact| artifact.path == COLOR)
+        .ok_or("the raw DDS was measured")?;
+    assert!(artifact.origin_receipt.is_none());
     Ok(())
 }
 
@@ -164,9 +180,52 @@ fn a_loose_dds_overwrite_retires_the_receipt_even_when_its_bytes_match() -> Test
         prior_bytes,
         "the replacement bytes are identical"
     );
+    assert_opaque_replacement(
+        &target,
+        &report,
+        &prior_receipt,
+        "standaloneFileBytes",
+        None,
+    )
+}
+
+fn assert_opaque_replacement(
+    target: &Fixture,
+    report: &ExtractionReport,
+    prior_receipt: &[u8],
+    namespace: &str,
+    encrypted: Option<bool>,
+) -> TestResult {
+    let artifact = report
+        .raw_artifacts()
+        .iter()
+        .find(|artifact| artifact.path == COLOR)
+        .ok_or("the replacement raw DDS")?;
+    assert_eq!(
+        artifact.origin_receipt.as_deref(),
+        Some(RECEIPT),
+        "the replacement identifies its published companion"
+    );
+    let content = target.read(RECEIPT)?;
+    assert!(content != prior_receipt, "the previous proof was retired");
+    let rows = read_companion(&content)?;
+    let payload = rows
+        .iter()
+        .find(|row| row.pointer("/address/type").and_then(Value::as_str) == Some("opaquePayload"))
+        .ok_or("the new opaque payload proof")?;
+    assert_eq!(
+        payload
+            .get("containsEncryptedSource")
+            .and_then(Value::as_bool),
+        encrypted,
+        "the replacement records its own source encryption"
+    );
     assert!(
-        !target.target.join(RECEIPT).exists(),
-        "the new source has no Archive proof"
+        field_uses(&rows, payload)?.iter().any(|row| {
+            row.get("role").and_then(Value::as_str) == Some("payload")
+                && row.pointer("/location/namespace").and_then(Value::as_str) == Some(namespace)
+        }),
+        "the opaque DDS binds the replacement input byte range"
     );
     Ok(())
 }

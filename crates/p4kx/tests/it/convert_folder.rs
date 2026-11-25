@@ -6,12 +6,15 @@
 use std::collections::BTreeMap;
 use std::error::Error;
 use std::fs;
+use std::io::{self, Write as _};
 use std::path::{Path, PathBuf};
 
+use p4kx_extraction::OriginDigestWriter;
 use p4kx_testkit::{
     ArchiveBuilder, CryXmlByteOrder, CryXmlSignature, SplitDds, TestCodec, TestElement, TestEntry,
     TestTextureFormat, TestWem, check_dds_origin_pair, p4kx, test_signal,
 };
+use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -95,7 +98,7 @@ fn convert_writes_what_extract_with_convert_writes() -> TestResult {
         .output()?;
 
     assert_eq!(output.status.code(), Some(0), "success: {output:?}");
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    let json: Value = serde_json::from_slice(&output.stdout)?;
     assert_eq!(json["failed"], serde_json::json!([]), "no failure");
     let merged = json["merged_texture_artifacts"]
         .as_array()
@@ -117,7 +120,78 @@ fn convert_writes_what_extract_with_convert_writes() -> TestResult {
         &archive_receipt,
         &loose_receipt,
     )?;
+    check_receipt_pair(
+        &mut archive,
+        &mut loose,
+        "Data/Sounds/5.wav",
+        &json!({
+            "type": "wavBytes",
+            "start": "44",
+            "endExclusive": "1004",
+            "field": "pcmSamples",
+        }),
+    )?;
+    check_receipt_pair(
+        &mut archive,
+        &mut loose,
+        "Data/readme.bin",
+        &json!({"type": "opaquePayload"}),
+    )?;
     assert_eq!(loose, archive, "the same payload files");
+    Ok(())
+}
+
+fn check_receipt_pair(
+    archive: &mut BTreeMap<String, Vec<u8>>,
+    loose: &mut BTreeMap<String, Vec<u8>>,
+    artifact: &str,
+    address: &Value,
+) -> TestResult {
+    let companion = format!("{artifact}.p4kx-origin.jsonl");
+    let leaf = Path::new(artifact).file_name().ok_or("artifact leaf")?;
+    for (files, encryption) in [(archive, json!(false)), (loose, Value::Null)] {
+        let bytes = files.get(artifact).ok_or("written artifact")?;
+        let mut measured = OriginDigestWriter::new(io::sink());
+        measured.write_all(bytes)?;
+        let digest = measured.finish()?;
+        let receipt = files.remove(&companion).ok_or("origin companion")?;
+        let rows: Vec<Value> = std::str::from_utf8(&receipt)?
+            .lines()
+            .map(serde_json::from_str)
+            .collect::<Result<_, _>>()?;
+        let header = rows.first().ok_or("receipt header")?;
+        assert_eq!(
+            header["type"], "header",
+            "the companion starts with its binding"
+        );
+        assert_eq!(
+            header["binding"],
+            json!({
+                "type": "file",
+                "path": {"encoding": "utf8", "value": leaf.to_str().ok_or("UTF-8 leaf")?},
+                "byteLength": digest.byte_length().to_string(),
+                "sha256": digest.sha256(),
+            }),
+            "the companion binds the installed artifact",
+        );
+        let field = rows
+            .iter()
+            .find(|row| row.get("address") == Some(address))
+            .ok_or("selected receipt address")?;
+        assert_eq!(
+            field["sourceSetComplete"], true,
+            "the payload source is complete"
+        );
+        assert_eq!(
+            field["containsEncryptedSource"], encryption,
+            "the actual input determines the encryption state"
+        );
+        assert_eq!(
+            rows.last().ok_or("receipt end")?["type"],
+            "end",
+            "the companion has a terminal row"
+        );
+    }
     Ok(())
 }
 
@@ -135,7 +209,7 @@ fn files_without_a_conversion_are_left_out_and_counted() -> TestResult {
         .output()?;
 
     assert_eq!(output.status.code(), Some(0), "success: {output:?}");
-    let json: serde_json::Value = serde_json::from_slice(&output.stdout)?;
+    let json: Value = serde_json::from_slice(&output.stdout)?;
     assert_eq!(json["not_converted"], 1, "readme.bin");
     assert!(!out.join("Data/readme.bin").exists(), "not copied");
     Ok(())

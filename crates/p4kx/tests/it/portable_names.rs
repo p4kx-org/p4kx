@@ -76,7 +76,12 @@ fn extract_reports_an_entry_with_a_forbidden_character_and_writes_the_others() -
     );
     assert_eq!(
         files(&out)?,
-        ["Data/Game2.dcb", "Data/ok.txt"],
+        [
+            "Data/Game2.dcb",
+            "Data/Game2.dcb.p4kx-origin.jsonl",
+            "Data/ok.txt",
+            "Data/ok.txt.p4kx-origin.jsonl",
+        ],
         "the other Entries are written"
     );
     Ok(())

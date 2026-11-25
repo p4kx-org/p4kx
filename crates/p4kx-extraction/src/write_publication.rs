@@ -16,7 +16,7 @@ use crate::{ConflictPolicy, ExtractionError};
 impl EntryWriter<'_> {
     /// Refuses publication after the extraction or its Archive watch stops.
     pub(crate) fn receipt_checkpoint(&self) -> io::Result<()> {
-        if self.tracker.should_stop() {
+        if self.tracker.should_stop() || self.tracker.archive_file_changed() {
             return Err(io::ErrorKind::Interrupted.into());
         }
         Ok(())
@@ -96,6 +96,7 @@ impl EntryWriter<'_> {
             replacement
                 .invalidate()
                 .map_err(|error| replacement_error(output, error))?;
+            self.tracker.artifacts.invalidate(output);
             if self.tracker.archive_file_changed() {
                 return Ok(Outcome::Cancelled);
             }

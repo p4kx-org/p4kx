@@ -66,6 +66,7 @@ pub use crate::source_use::{
 };
 pub use crate::source_uses::{SourceInventoryFreezeError, SourceUses};
 pub use crate::source_value::{SourceValue, SourceValueState, SourcedValue};
+pub use crate::write::RawEntryArtifact;
 pub use archive_animation_path::{
     NamedCafSelector, animation_bank_path_crc32, archive_animation_path,
 };

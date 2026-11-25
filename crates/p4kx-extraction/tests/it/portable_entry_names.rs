@@ -33,8 +33,12 @@ fn run(dir: &Path, paths: &[String]) -> Result<ExtractionReport, Box<dyn Error>>
 }
 
 fn written(dir: &Path) -> Result<Vec<String>, Box<dyn Error>> {
+    folder_names(&dir.join("out").join("Data"))
+}
+
+fn folder_names(dir: &Path) -> Result<Vec<String>, Box<dyn Error>> {
     let mut names = Vec::new();
-    for entry in fs::read_dir(dir.join("out").join("Data"))? {
+    for entry in fs::read_dir(dir)? {
         names.push(entry?.file_name().to_string_lossy().into_owned());
     }
     names.sort();
@@ -66,7 +70,11 @@ fn an_entry_with_a_character_windows_forbids_is_reported_with_the_character() ->
 
     let report = run(dir.path(), &paths(&names))?;
 
-    assert_eq!(written(dir.path())?, ["fine.txt"], "only the valid name");
+    assert_eq!(
+        written(dir.path())?,
+        ["fine.txt", "fine.txt.p4kx-origin.jsonl",],
+        "only the valid name"
+    );
     assert_eq!(report.extracted(), 1, "the run goes on");
     assert_eq!(report.failures().len(), cases.len());
     for ((name, expected), failure) in cases.iter().zip(report.failures()) {
@@ -113,7 +121,15 @@ fn entries_that_differ_only_in_case_are_a_collision_on_every_platform() -> TestR
         &paths(&["Same.txt", "other.txt", "same.TXT", "SAME.txt"]),
     )?;
 
-    assert_eq!(written(dir.path())?, ["Same.txt", "other.txt"]);
+    assert_eq!(
+        written(dir.path())?,
+        [
+            "Same.txt",
+            "Same.txt.p4kx-origin.jsonl",
+            "other.txt",
+            "other.txt.p4kx-origin.jsonl",
+        ]
+    );
     assert_eq!(report.failures().len(), 2, "both later Entries fail");
     for failure in report.failures() {
         assert!(
@@ -155,7 +171,7 @@ fn many_case_colliding_entries_always_leave_the_first_one_written() -> TestResul
 
         assert_eq!(
             written(dir.path())?,
-            ["collide"],
+            ["collide", "collide.p4kx-origin.jsonl",],
             "the first Entry is written"
         );
         assert_eq!(report.failures().len(), 127);
@@ -178,7 +194,7 @@ fn a_file_and_a_folder_that_differ_only_in_case_collide() -> TestResult {
 
     assert_eq!(
         written(dir.path())?,
-        ["A", "B"],
+        ["A", "A.p4kx-origin.jsonl", "B",],
         "the earlier Entries are written"
     );
     let earlier: Vec<_> = report
@@ -252,8 +268,15 @@ fn an_entry_is_written_with_the_case_of_its_path_and_a_second_run_adds_no_duplic
     );
 
     assert!(second.is_complete(), "{second:?}");
-    assert_eq!(written(dir.path())?, ["Mixed.TXT", "MixedFolder"]);
+    assert_eq!(
+        written(dir.path())?,
+        ["Mixed.TXT", "Mixed.TXT.p4kx-origin.jsonl", "MixedFolder",]
+    );
     let inner = dir.path().join("out").join("Data").join("MixedFolder");
-    assert_eq!(fs::read_dir(inner)?.count(), 1, "no second spelling");
+    assert_eq!(
+        folder_names(&inner)?,
+        ["Inner.Txt", "Inner.Txt.p4kx-origin.jsonl"],
+        "the inner file and its companion preserve the exact spelling"
+    );
     Ok(())
 }

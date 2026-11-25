@@ -5,18 +5,21 @@
 
 #[path = "sound_conversion_error.rs"]
 mod conversion_error;
+pub(crate) use conversion_error::SoundEncodeError;
 #[path = "sound_ogg_receipt.rs"]
 mod ogg_receipt;
 pub use ogg_receipt::OggFileReceipt;
+pub(crate) use ogg_receipt::{OggWrite, capture_ogg};
 #[path = "sound_origins.rs"]
 mod origins;
+pub(crate) use origins::{SoundOriginInput, SoundOrigins, capture_raw_member};
 #[path = "sound_publication.rs"]
 mod publication;
 
 #[path = "sound_wav_receipt.rs"]
 mod wav_receipt;
 pub use wav_receipt::WavFileReceipt;
-pub(crate) use wav_receipt::capture_linear_wav;
+pub(crate) use wav_receipt::{WavWrite, capture_wav};
 
 #[path = "radar_audio.rs"]
 pub mod radar_audio;
