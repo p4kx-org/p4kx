@@ -3348,6 +3348,29 @@ Reputation and factions used signed verifier source
 `6c917387ba663a8f06643d1de9fe64fcbe0d6877` and executable SHA-256
 `d8be9805427c93f78fd6090e5d45e03c0fbca9d86eb6abd43c4e135eb9e52b18`.
 
+### Economy definitions and mission configuration
+
+The Windows AMD64 verifier at `1114c40cd222c428cc917d05e64f214835b38789`
+read the installed LIVE `13220821` Archive and streamed the matching complete
+Normal Catalog from `23addc5e164f65a28a6f258302b30453b331edce`. Both runs
+used one worker and a 2,000,000,000-byte process cap. The Archive identity
+remained stable and both runs verified the retained frame digest.
+
+The economy comparison covered `manufacturers`, `commodities`,
+`commodityPresentation`, `cargoManifests`, `gameplayProperties`,
+`qualityDistributions` and `qualityQuantizations`. The mission configuration
+comparison covered `missionProperties`, `missionFlows`, `contractTemplates` and
+`missionBrokerEntries`. Counts follow those orders.
+
+| Group | Ordered row counts | Source uses | Physical sources | Elapsed ms | Peak private bytes | Peak working set bytes |
+| --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Economy definitions | 1,237, 170, 170, 81, 29, 21, 62 | 181,145 | 12 | 1,953,847 | 1,308,413,952 | 1,219,248,128 |
+| Mission configuration | 4,340, 2,925, 497, 2,428 | 6,047,646 | 1 | 2,426,895 | 1,091,637,248 | 1,023,356,928 |
+
+The peaks cover the typed queries and the retained Catalog replay. The
+verifier executable SHA-256 was
+`0bc4d9a475361f84cb2a24f857bbddccdd08dcb433db6cfbe7055f362182ae3f`.
+
 ## Verify dataset coverage
 
 The SDK coverage audit checks canonical dataset boundaries against calls to the public typed
