@@ -7,6 +7,7 @@ use std::sync::Arc;
 use p4kx_archive::{ArchiveInputOrigin, ObservedEntryBinding};
 
 use crate::DecimalU64;
+use crate::ProvenanceMode;
 use crate::field_origin::FieldOrigin;
 use crate::source_archive_binding::ArchiveSourceBinding;
 use crate::source_details::SourceDetails;
@@ -51,6 +52,7 @@ pub(crate) struct SourceRegistry {
     pub(crate) sources: BTreeMap<PhysicalSourceRef, Arc<PhysicalSource>>,
     pub(crate) uses: RegisteredUses,
     use_references: UseReferences,
+    mode: ProvenanceMode,
     sealed: bool,
 }
 
@@ -60,6 +62,14 @@ impl SourceRegistry {
     }
 
     const fn with_references(identity: Arc<()>, use_references: UseReferences) -> Self {
+        Self::with_mode(identity, use_references, ProvenanceMode::Full)
+    }
+
+    const fn with_mode(
+        identity: Arc<()>,
+        use_references: UseReferences,
+        mode: ProvenanceMode,
+    ) -> Self {
         Self {
             identity,
             inputs: Vec::new(),
@@ -69,6 +79,7 @@ impl SourceRegistry {
                 UseReferences::CompactCoordinates(_)
             )),
             use_references,
+            mode,
             sealed: false,
         }
     }
@@ -91,6 +102,14 @@ impl SourceRegistry {
         Self::with_references(
             identity,
             UseReferences::CompactCoordinates(CoordinateEncoding::Standard),
+        )
+    }
+
+    pub(crate) const fn with_provenance_mode(identity: Arc<()>, mode: ProvenanceMode) -> Self {
+        Self::with_mode(
+            identity,
+            UseReferences::CompactCoordinates(CoordinateEncoding::Standard),
+            mode,
         )
     }
 
@@ -227,6 +246,15 @@ impl SourceRegistry {
         });
     }
 
+    pub(crate) fn owns_use(&self, original: &SourceUse) -> bool {
+        Arc::ptr_eq(&self.identity, &original.identity)
+            && (self.mode == ProvenanceMode::MarkersOnly
+                || self
+                    .uses
+                    .get(original.reference())
+                    .is_some_and(|known| Arc::ptr_eq(known, &original.description)))
+    }
+
     pub(crate) fn register_use(
         &mut self,
         source: &PhysicalSourceRef,
@@ -278,17 +306,19 @@ impl SourceRegistry {
         encryption: SourceEncryptionState,
         location: impl FnOnce(&SourceUseRef) -> RetainedLocation,
     ) -> SourceUse {
-        let description = self.uses.get_or_insert_with(id, |id| {
-            let location = location(&id);
-            SourceUseDescription {
-                id,
-                source: source.clone(),
-                scope,
-                role,
-                location,
-                effective_encryption: encryption,
-            }
-        });
+        let describe = |id| SourceUseDescription {
+            location: location(&id),
+            id,
+            source: source.clone(),
+            scope,
+            role,
+            effective_encryption: encryption,
+        };
+        let description = if self.mode == ProvenanceMode::Full || role == SourceUseRole::Attempted {
+            self.uses.get_or_insert_with(id, describe)
+        } else {
+            Arc::new(describe(id))
+        };
         SourceUse {
             description,
             identity: Arc::clone(&self.identity),
@@ -310,7 +340,7 @@ impl SourceRegistry {
         );
         SourcedValue::new(
             value,
-            FieldOrigin::new(Arc::clone(&self.identity), [&used], true),
+            FieldOrigin::new(Arc::clone(&self.identity), [&used], true, self.mode),
         )
     }
 
@@ -330,7 +360,7 @@ impl SourceRegistry {
         );
         SourcedValue::new(
             value,
-            FieldOrigin::new(Arc::clone(&self.identity), [&used], true),
+            FieldOrigin::new(Arc::clone(&self.identity), [&used], true, self.mode),
         )
     }
 }

@@ -137,7 +137,11 @@ impl FieldOrigin {
         uses: impl IntoIterator<Item = &'a SourceUse>,
         complete: bool,
     ) -> Self {
-        let facts = OriginFacts::measure(uses.into_iter().map(SourceUse::description), complete);
+        let facts = OriginFacts::measure(
+            uses.into_iter().map(SourceUse::description),
+            complete,
+            shared.mode,
+        );
         Self::from_shared_facts(shared, facts)
     }
 

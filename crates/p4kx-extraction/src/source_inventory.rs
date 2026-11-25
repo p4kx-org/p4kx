@@ -283,7 +283,7 @@ impl PhysicalSource {
     }
 }
 
-/// Immutable sorted physical sources and observed use inventory for one prepared result.
+/// Immutable evidence inventory for one prepared result.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = projection_schema::require_properties)]
@@ -292,6 +292,9 @@ pub struct SourceInventory {
     sources: FrozenRows<PhysicalSource>,
     #[schemars(with = "Vec<SourceUseDescription>")]
     uses: FrozenUseRows,
+    #[serde(skip)]
+    #[schemars(skip)]
+    mode: crate::ProvenanceMode,
 }
 
 impl SourceInventory {
@@ -303,7 +306,21 @@ impl SourceInventory {
         Self {
             sources: FrozenRows::new(sources),
             uses: FrozenUseRows::new(uses, packed),
+            mode: crate::ProvenanceMode::Full,
         }
+    }
+
+    pub(crate) fn markers_only() -> Self {
+        Self {
+            mode: crate::ProvenanceMode::MarkersOnly,
+            ..Self::new(Vec::new(), Vec::new(), PackedUseRows::Snapshot(Vec::new()))
+        }
+    }
+
+    /// Reports whether this inventory carries original source evidence.
+    #[must_use]
+    pub const fn provenance_mode(&self) -> crate::ProvenanceMode {
+        self.mode
     }
 
     /// Returns the physical sources in stable identifier order.

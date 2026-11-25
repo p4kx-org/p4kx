@@ -3,6 +3,7 @@
 
 use std::sync::Arc;
 
+use crate::ProvenanceMode;
 use crate::field_origin::OriginAccumulator;
 use crate::source_evidence_error::{self, SourceEvidenceError};
 use crate::{
@@ -75,7 +76,7 @@ impl SourceUses {
         uses: impl IntoIterator<Item = &'source SourceUse>,
         complete: bool,
     ) -> Result<OriginAccumulator, SourceEvidenceError> {
-        let mut origin = OriginAccumulator::new(complete);
+        let mut origin = OriginAccumulator::new(complete, self.mode);
         for incoming in uses {
             if !Arc::ptr_eq(&incoming.identity, &self.identity) {
                 return Err(SourceEvidenceError::ForeignEvidence);
@@ -122,7 +123,11 @@ impl SourceUses {
         complete: bool,
     ) -> Result<FieldOrigin, SourceEvidenceError> {
         let registry = source_evidence_error::lock(&self.registry)?;
-        let mut accumulator = OriginAccumulator::new(complete);
+        if self.mode == ProvenanceMode::MarkersOnly {
+            drop(registry);
+            return self.combine_markers(origins, complete);
+        }
+        let mut accumulator = OriginAccumulator::new(complete, self.mode);
         for origin in origins {
             if !origin.belongs_to(&self.identity) {
                 return Err(SourceEvidenceError::ForeignEvidence);
@@ -137,6 +142,21 @@ impl SourceUses {
             }
         }
         drop(registry);
+        Ok(accumulator.finish(Arc::clone(&self.identity)))
+    }
+
+    fn combine_markers<'a>(
+        &self,
+        origins: impl IntoIterator<Item = &'a FieldOrigin>,
+        complete: bool,
+    ) -> Result<FieldOrigin, SourceEvidenceError> {
+        let mut accumulator = OriginAccumulator::new(complete, self.mode);
+        for origin in origins {
+            if !origin.belongs_to(&self.identity) {
+                return Err(SourceEvidenceError::ForeignEvidence);
+            }
+            accumulator.include_marker(origin);
+        }
         Ok(accumulator.finish(Arc::clone(&self.identity)))
     }
 }

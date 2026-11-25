@@ -13,6 +13,8 @@ mod default_material_receipt;
 mod entity_material_effects;
 #[path = "entry_directory_origins.rs"]
 mod entry_directory_origins;
+#[path = "provenance_mode.rs"]
+pub(crate) mod mode;
 #[path = "model_archive_source.rs"]
 mod model_archive_source;
 #[path = "model_material_origins.rs"]
@@ -25,6 +27,7 @@ mod sourced_value_seed;
 pub use self::entity_material_effects::{
     EntityMaterialEffects, EntityMaterialEffectsComponent, EntityMaterialEffectsError,
 };
+pub use self::mode::ProvenanceMode;
 pub use self::record_json_location::RecordJsonLocation;
 pub use self::sourced_value_seed::SourcedValueSeed;
 pub use crate::animation_sources::{

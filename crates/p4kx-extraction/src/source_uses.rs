@@ -17,6 +17,7 @@ mod union;
 mod freeze;
 pub use self::freeze::SourceInventoryFreezeError;
 
+use crate::ProvenanceMode;
 use crate::field_origin::{FieldOrigin, SharedFieldOrigin};
 use crate::source_details::{SourceCoordinateOmission, SourceDetails};
 use crate::source_evidence_error::{self, SourceEvidenceError};
@@ -30,6 +31,7 @@ use crate::source_value::{SourceValue, SourcedValue};
 pub struct SourceUses {
     registry: Arc<Mutex<SourceRegistry>>,
     identity: Arc<()>,
+    mode: ProvenanceMode,
 }
 
 impl SourceUses {
@@ -53,6 +55,27 @@ impl SourceUses {
         Self::with_registry(SourceRegistry::with_compact_coordinates)
     }
 
+    /// Creates a compact evidence capture for the requested provenance profile.
+    #[must_use]
+    pub fn with_provenance_mode(mode: ProvenanceMode) -> Self {
+        let identity = Arc::new(());
+        let registry = Arc::new(Mutex::new(SourceRegistry::with_provenance_mode(
+            Arc::clone(&identity),
+            mode,
+        )));
+        Self {
+            registry,
+            identity,
+            mode,
+        }
+    }
+
+    /// Reports whether this capture retains a detailed source graph.
+    #[must_use]
+    pub const fn provenance_mode(&self) -> ProvenanceMode {
+        self.mode
+    }
+
     pub(crate) fn with_field_statistics_coordinates() -> Self {
         Self::with_registry(SourceRegistry::with_field_statistics_coordinates)
     }
@@ -60,7 +83,11 @@ impl SourceUses {
     fn with_registry(make: impl FnOnce(Arc<()>) -> SourceRegistry) -> Self {
         let identity = Arc::new(());
         let registry = Arc::new(Mutex::new(make(Arc::clone(&identity))));
-        Self { registry, identity }
+        Self {
+            registry,
+            identity,
+            mode: ProvenanceMode::Full,
+        }
     }
 
     /// Retains the actual input once and returns a shared payload or metadata scope.
@@ -109,11 +136,7 @@ impl SourceUses {
             return Err(SourceEvidenceError::ForeignEvidence);
         }
         let mut registry = source_evidence_error::lock(&self.registry)?;
-        let registered = registry
-            .uses
-            .get(actual.reference())
-            .is_some_and(|row| Arc::ptr_eq(row, &actual.description));
-        if !registered {
+        if !registry.owns_use(actual) {
             return Err(SourceEvidenceError::ForeignEvidence);
         }
         let original = actual.description();
@@ -148,7 +171,7 @@ impl SourceUses {
     #[must_use]
     pub fn origin(&self, uses: &[SourceUse], source_set_complete: bool) -> FieldOrigin {
         let (own, complete) = self.owned_uses(uses, source_set_complete);
-        FieldOrigin::new(Arc::clone(&self.identity), own, complete)
+        FieldOrigin::new(Arc::clone(&self.identity), own, complete, self.mode)
     }
 
     /// Captures a contributor set shared by values derived from the same source survey.
@@ -159,7 +182,7 @@ impl SourceUses {
         source_set_complete: bool,
     ) -> SharedFieldOrigin {
         let (own, complete) = self.owned_uses(uses, source_set_complete);
-        SharedFieldOrigin::new(Arc::clone(&self.identity), own, complete)
+        SharedFieldOrigin::new(Arc::clone(&self.identity), own, complete, self.mode)
     }
 
     /// Binds a value to the union of a shared original contributor set and its own uses.
@@ -220,6 +243,10 @@ impl fmt::Debug for SourceUses {
         formatter.debug_struct("SourceUses").finish_non_exhaustive()
     }
 }
+
+#[cfg(test)]
+#[path = "provenance_mode_tests.rs"]
+mod provenance_mode_tests;
 
 #[cfg(test)]
 #[path = "source_inventory_binding_tests.rs"]

@@ -7,11 +7,15 @@ use std::sync::{Arc, OnceLock};
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::{Serialize, Serializer};
 
+use crate::ProvenanceMode;
 use crate::projection_schema;
-use crate::source_inventory::SourceEncryptionState;
-use crate::source_use::{
-    OriginUseId, SourceUse, SourceUseDescription, SourceUseRef, SourceUseRole,
-};
+use crate::source_provenance::mode::EncryptionMarker;
+use crate::source_use::{SourceUse, SourceUseRef};
+
+#[path = "field_origin_accumulator.rs"]
+mod accumulator;
+use self::accumulator::OriginFacts;
+pub(crate) use self::accumulator::{OriginAccumulator, OriginContribution};
 
 #[path = "field_origin_refs.rs"]
 mod refs;
@@ -37,6 +41,9 @@ struct OriginFields {
     #[schemars(with = "Vec<SourceUseRef>")]
     source_uses_refs: OriginRefs,
     source_set_complete: bool,
+    #[serde(skip)]
+    #[schemars(skip)]
+    mode: ProvenanceMode,
 }
 
 impl OriginFields {
@@ -49,6 +56,33 @@ impl OriginFields {
                 contains_encrypted_source: complete.then_some(false),
                 source_uses_refs: OriginRefs::Flat(Vec::new()),
                 source_set_complete: complete,
+                mode: ProvenanceMode::Full,
+            })
+        }))
+    }
+
+    fn markers(contains_encrypted_source: Option<bool>, source_set_complete: bool) -> Arc<Self> {
+        static ENCRYPTED: OnceLock<Arc<OriginFields>> = OnceLock::new();
+        static PARTIAL_ENCRYPTED: OnceLock<Arc<OriginFields>> = OnceLock::new();
+        static UNENCRYPTED: OnceLock<Arc<OriginFields>> = OnceLock::new();
+        static UNKNOWN: OnceLock<Arc<OriginFields>> = OnceLock::new();
+        static PARTIAL_UNKNOWN: OnceLock<Arc<OriginFields>> = OnceLock::new();
+        let slot = match (contains_encrypted_source, source_set_complete) {
+            (Some(true), true) => &ENCRYPTED,
+            (Some(true), false) => &PARTIAL_ENCRYPTED,
+            (Some(false), true) => &UNENCRYPTED,
+            (None, true) => &UNKNOWN,
+            (None, false) => &PARTIAL_UNKNOWN,
+            (Some(false), false) => {
+                unreachable!("unencrypted origin requires complete contributors")
+            }
+        };
+        Arc::clone(slot.get_or_init(|| {
+            Arc::new(Self {
+                contains_encrypted_source,
+                source_uses_refs: OriginRefs::Flat(Vec::new()),
+                source_set_complete,
+                mode: ProvenanceMode::MarkersOnly,
             })
         }))
     }
@@ -70,6 +104,7 @@ impl OriginFields {
             contains_encrypted_source,
             source_uses_refs: OriginRefs::flat(references),
             source_set_complete,
+            mode: ProvenanceMode::Full,
         })
     }
 }
@@ -82,6 +117,7 @@ pub struct SharedFieldOrigin {
     source_uses_refs: Arc<[SourceUseRef]>,
     source_set_complete: bool,
     fields: OnceLock<Arc<OriginFields>>,
+    mode: ProvenanceMode,
 }
 
 impl SharedFieldOrigin {
@@ -89,8 +125,10 @@ impl SharedFieldOrigin {
         identity: Arc<()>,
         uses: impl IntoIterator<Item = &'a SourceUse>,
         complete: bool,
+        mode: ProvenanceMode,
     ) -> Self {
-        let facts = OriginFacts::measure(uses.into_iter().map(SourceUse::description), complete);
+        let facts =
+            OriginFacts::measure(uses.into_iter().map(SourceUse::description), complete, mode);
         Self::from_facts(identity, facts)
     }
 
@@ -101,6 +139,7 @@ impl SharedFieldOrigin {
             source_uses_refs: facts.references.into(),
             source_set_complete: facts.source_set_complete,
             fields: OnceLock::new(),
+            mode: facts.mode,
         }
     }
 
@@ -113,9 +152,6 @@ impl SharedFieldOrigin {
             .references
             .retain(|reference| self.source_uses_refs.binary_search(reference).is_err());
         let source_set_complete = self.source_set_complete && local.source_set_complete;
-        if self.source_uses_refs.is_empty() && local.references.is_empty() {
-            return OriginFields::empty(source_set_complete);
-        }
         let contains_encrypted_source = match (
             self.contains_encrypted_source,
             local.contains_encrypted_source,
@@ -124,6 +160,12 @@ impl SharedFieldOrigin {
             (Some(false), Some(false)) if source_set_complete => Some(false),
             _ => None,
         };
+        if self.mode == ProvenanceMode::MarkersOnly {
+            return OriginFields::markers(contains_encrypted_source, source_set_complete);
+        }
+        if self.source_uses_refs.is_empty() && local.references.is_empty() {
+            return OriginFields::empty(source_set_complete);
+        }
         if local.references.is_empty()
             && source_set_complete == self.source_set_complete
             && contains_encrypted_source == self.contains_encrypted_source
@@ -133,6 +175,7 @@ impl SharedFieldOrigin {
                     contains_encrypted_source,
                     source_uses_refs: OriginRefs::Basis(Arc::clone(&self.source_uses_refs)),
                     source_set_complete,
+                    mode: ProvenanceMode::Full,
                 })
             }));
         }
@@ -140,6 +183,7 @@ impl SharedFieldOrigin {
             contains_encrypted_source,
             source_uses_refs: OriginRefs::shared(&self.source_uses_refs, local.references),
             source_set_complete,
+            mode: ProvenanceMode::Full,
         })
     }
 }
@@ -191,128 +235,33 @@ pub(crate) fn correlate_schema(schema: &mut Schema) {
     }
 }
 
-struct OriginFacts {
-    contains_encrypted_source: Option<bool>,
-    references: Vec<SourceUseRef>,
-    source_set_complete: bool,
-}
-
-impl OriginFacts {
-    fn measure<'a>(
-        uses: impl IntoIterator<Item = &'a SourceUseDescription>,
-        complete: bool,
-    ) -> Self {
-        let mut accumulator = OriginAccumulator::new(complete);
-        for description in uses {
-            accumulator.observe(OriginContribution::from(description));
-        }
-        accumulator.into_facts()
-    }
-}
-
-#[derive(Clone, Copy)]
-pub(crate) struct OriginContribution<'a> {
-    pub(crate) id: OriginUseId<'a>,
-    pub(crate) role: SourceUseRole,
-    pub(crate) encryption: SourceEncryptionState,
-    pub(crate) opaque: bool,
-}
-
-impl<'a> From<&'a SourceUseDescription> for OriginContribution<'a> {
-    fn from(description: &'a SourceUseDescription) -> Self {
-        Self {
-            id: OriginUseId::Description(description.id()),
-            role: description.role(),
-            encryption: description.effective_encryption(),
-            opaque: description.is_opaque(),
-        }
-    }
-}
-
-pub(crate) struct OriginAccumulator {
-    references: Vec<SourceUseRef>,
-    encryption: SourceEncryptionState,
-    complete: bool,
-}
-
-impl OriginAccumulator {
-    pub(crate) const fn new(complete: bool) -> Self {
-        Self {
-            references: Vec::new(),
-            encryption: SourceEncryptionState::Unencrypted,
-            complete,
-        }
-    }
-
-    pub(crate) const fn include_completeness(&mut self, complete: bool) {
-        self.complete &= complete;
-    }
-
-    pub(crate) fn observe(&mut self, contribution: OriginContribution<'_>) {
-        if contribution.role.contributes() {
-            self.include_completeness(!contribution.opaque);
-            self.references.push(contribution.id.retain());
-            self.encryption = self.encryption.combine(contribution.encryption);
-        }
-    }
-
-    pub(crate) fn finish(self, identity: Arc<()>) -> FieldOrigin {
-        FieldOrigin::from_facts(identity, self.into_facts())
-    }
-
-    pub(crate) fn finish_shared(self, identity: Arc<()>) -> SharedFieldOrigin {
-        SharedFieldOrigin::from_facts(identity, self.into_facts())
-    }
-
-    pub(crate) fn finish_with_shared(self, shared: &SharedFieldOrigin) -> FieldOrigin {
-        FieldOrigin::from_shared_facts(shared, self.into_facts())
-    }
-
-    fn into_facts(mut self) -> OriginFacts {
-        self.references.sort();
-        self.references.dedup();
-        let contains_encrypted_source = match self.encryption {
-            SourceEncryptionState::Encrypted => Some(true),
-            SourceEncryptionState::Unencrypted if self.complete => Some(false),
-            _ => None,
-        };
-        OriginFacts {
-            contains_encrypted_source,
-            references: self.references,
-            source_set_complete: self.complete,
-        }
-    }
-}
-
 impl FieldOrigin {
     pub(crate) fn new<'a>(
         identity: Arc<()>,
         uses: impl IntoIterator<Item = &'a SourceUse>,
         complete: bool,
+        mode: ProvenanceMode,
     ) -> Self {
-        Self::from_descriptions(
+        Self::from_facts(
             identity,
-            uses.into_iter().map(SourceUse::description),
-            complete,
+            OriginFacts::measure(uses.into_iter().map(SourceUse::description), complete, mode),
         )
     }
 
-    pub(crate) fn from_descriptions<'a>(
-        identity: Arc<()>,
-        uses: impl IntoIterator<Item = &'a SourceUseDescription>,
-        complete: bool,
-    ) -> Self {
-        Self::from_facts(identity, OriginFacts::measure(uses, complete))
-    }
-
     fn from_facts(identity: Arc<()>, facts: OriginFacts) -> Self {
-        Self {
-            identity: Some(identity),
-            fields: OriginFields::from_refs(
+        let fields = match facts.mode {
+            ProvenanceMode::Full => OriginFields::from_refs(
                 facts.contains_encrypted_source,
                 facts.references,
                 facts.source_set_complete,
             ),
+            ProvenanceMode::MarkersOnly => {
+                OriginFields::markers(facts.contains_encrypted_source, facts.source_set_complete)
+            }
+        };
+        Self {
+            identity: Some(identity),
+            fields,
         }
     }
 
@@ -328,7 +277,13 @@ impl FieldOrigin {
         self.fields.contains_encrypted_source
     }
 
-    /// Returns the exact contributing use references, excluding attempts and untouched targets.
+    /// Reports the evidence profile of this field.
+    #[must_use]
+    pub fn provenance_mode(&self) -> ProvenanceMode {
+        self.fields.mode
+    }
+
+    /// Returns the exact contributing use references in the full evidence profile.
     #[must_use]
     pub fn source_uses_refs(&self) -> &[SourceUseRef] {
         self.fields.source_uses_refs.as_slice()
@@ -355,7 +310,13 @@ impl Eq for FieldOrigin {}
 
 impl Serialize for FieldOrigin {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        self.fields.as_ref().serialize(serializer)
+        match self.provenance_mode() {
+            ProvenanceMode::Full => self.fields.as_ref().serialize(serializer),
+            ProvenanceMode::MarkersOnly => EncryptionMarker {
+                contains_encrypted_source: self.contains_encrypted_source(),
+            }
+            .serialize(serializer),
+        }
     }
 }
 

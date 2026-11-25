@@ -78,10 +78,7 @@ impl SourceScope {
         let description = original.description();
         if description.source() != &self.source
             || description.scope() != self.scope
-            || !registry
-                .uses
-                .get(original.reference())
-                .is_some_and(|known| Arc::ptr_eq(known, &original.description))
+            || !registry.owns_use(original)
         {
             return Err(SourceEvidenceError::ForeignEvidence);
         }
@@ -99,12 +96,7 @@ impl SourceScope {
         role: SourceUseRole,
     ) -> Result<SourceUse, SourceEvidenceError> {
         let mut registry = source_evidence_error::lock(&self.registry)?;
-        if selector.role() != SourceUseRole::Selector
-            || !registry
-                .uses
-                .get(selector.reference())
-                .is_some_and(|known| Arc::ptr_eq(known, &selector.description))
-        {
+        if selector.role() != SourceUseRole::Selector || !registry.owns_use(selector) {
             return Err(SourceEvidenceError::ForeignEvidence);
         }
         let location = SourceLocation::LocalizationLookup {

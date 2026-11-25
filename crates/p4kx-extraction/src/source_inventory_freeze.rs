@@ -114,6 +114,9 @@ impl SourceUses {
         let mut check = || check().map_err(SourceInventoryFreezeError::Interrupted);
         check()?;
         let registry = source_evidence_error::lock(&self.registry)?;
+        if self.provenance_mode() == crate::ProvenanceMode::MarkersOnly {
+            return Ok(SourceInventory::markers_only());
+        }
         let sources = collect_rows(registry.sources.values().cloned(), &mut check)?;
         let uses = collect_rows(registry.uses.values().cloned(), &mut check)?;
         let packed = registry
@@ -145,6 +148,10 @@ impl SourceUses {
         let sources = std::mem::take(&mut registry.sources);
         let mut uses = std::mem::take(&mut registry.uses);
         drop(registry);
+        if self.provenance_mode() == crate::ProvenanceMode::MarkersOnly {
+            check()?;
+            return Ok(SourceInventory::markers_only());
+        }
         uses.compact_pending(&mut check)?;
         let sources = collect_rows(sources.into_values(), &mut check)?;
         let (uses, packed) = uses.into_parts();

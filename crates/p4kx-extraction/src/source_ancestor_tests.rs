@@ -121,6 +121,33 @@ fn selecting_only_a_leaf_use_keeps_its_original_enclosing_sources() -> TestResul
     Ok(())
 }
 
+#[test]
+fn marker_mode_uses_the_enclosing_archive_encryption_in_the_correct_byte_domain() -> TestResult {
+    let (_directory, inner) = nested_leaf_archive()?;
+    let origin = inner
+        .entry_origin(inner.entries().first().ok_or("leaf Entry")?)
+        .ok_or("actual leaf origin")?;
+    let sources = SourceUses::with_provenance_mode(crate::ProvenanceMode::MarkersOnly);
+    let leaf = sources.observe(SourceInput::Archive(&origin), InputScope::Payload)?;
+    let middle = leaf.ancestor(1)?.ok_or("encrypted container")?;
+    assert_eq!(
+        marker(&sources, &leaf, InputScope::Payload)?,
+        Some(true),
+        "a plain leaf value inside the encrypted container is marked"
+    );
+    assert_eq!(
+        marker(&sources, &middle, InputScope::ArchiveDirectoryMetadata)?,
+        Some(false),
+        "the container's own directory entry is outside its ciphertext"
+    );
+    assert_eq!(
+        sources.registered_use_count()?,
+        0,
+        "neither use needs a stored record"
+    );
+    Ok(())
+}
+
 fn marker(
     sources: &SourceUses,
     scope: &SourceScope,
