@@ -70,11 +70,7 @@ pub(super) fn read() -> TestResult<[Route; 4]> {
         catalog.pointer(DATASET),
         "the same declarations retain Template-first order, original arena links and origins",
     );
-    let flows = Route::queried_rows(
-        DATASET,
-        &rows,
-        "both owner families have normal synthetic producer parity; installed parity open",
-    )?;
+    let flows = Route::queried_rows(DATASET, &rows, None)?;
     let templates = template_definitions::read(&parsed, &catalog)?;
     let brokers = broker_definitions::read(&parsed, &catalog)?;
     let contexts = template_contexts::read(&parsed, &catalog)?;

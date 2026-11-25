@@ -3376,21 +3376,26 @@ working set was 1,111,523,328 bytes. Each cold run passed the strict
 ### Economy definitions and mission configuration
 
 The Windows AMD64 verifier at `1114c40cd222c428cc917d05e64f214835b38789`
-read the installed LIVE `13220821` Archive and streamed the matching complete
-Normal Catalog from `23addc5e164f65a28a6f258302b30453b331edce`. Both runs
-used one worker and a 2,000,000,000-byte process cap. The Archive identity
-remained stable and both runs verified the retained frame digest.
+read installed LIVE `13220821` and PTU `13260598` with the matching complete
+Normal Catalogs. The producer revisions were
+`23addc5e164f65a28a6f258302b30453b331edce` on LIVE and
+`93d92ca20bef8a8c3731339214a3301124ade7ba` on PTU. Each run used one worker
+and a 2,000,000,000-byte process cap, preserved the Archive stamp and verified
+the retained frame digest.
 
 The economy comparison covered `manufacturers`, `commodities`,
 `commodityPresentation`, `cargoManifests`, `gameplayProperties`,
-`qualityDistributions` and `qualityQuantizations`. The mission configuration
-comparison covered `missionProperties`, `missionFlows`, `contractTemplates` and
-`missionBrokerEntries`. Counts follow those orders.
+`qualityDistributions` and `qualityQuantizations`. The mission visitor compared
+`missionProperties` and `missionFlows` plus the original `contractTemplates`
+and `missionBrokerEntries` owner arenas that those rows refer to. Counts follow
+those orders.
 
-| Group | Ordered row counts | Source uses | Physical sources | Elapsed ms | Peak private bytes | Peak working set bytes |
-| --- | --- | ---: | ---: | ---: | ---: | ---: |
-| Economy definitions | 1,237, 170, 170, 81, 29, 21, 62 | 181,145 | 12 | 1,953,847 | 1,308,413,952 | 1,219,248,128 |
-| Mission configuration | 4,340, 2,925, 497, 2,428 | 6,047,646 | 1 | 2,426,895 | 1,091,637,248 | 1,023,356,928 |
+| Group | Build | Ordered row counts | Source uses | Physical sources | Elapsed ms | Peak private bytes | Peak working set bytes |
+| --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
+| Economy definitions | LIVE | 1,237, 170, 170, 81, 29, 21, 62 | 181,145 | 12 | 1,953,847 | 1,308,413,952 | 1,219,248,128 |
+| Economy definitions | PTU | 1,239, 170, 170, 81, 29, 21, 62 | 181,282 | 12 | 2,086,697 | 1,321,877,504 | 1,237,241,856 |
+| Mission configuration | LIVE | 4,340, 2,925, 497, 2,428 | 6,047,646 | 1 | 2,426,895 | 1,091,637,248 | 1,023,356,928 |
+| Mission configuration | PTU | 4,669, 3,039, 611, 2,428 | 6,251,579 | 1 | 2,611,972 | 1,114,521,600 | 1,064,378,368 |
 
 The peaks cover the typed queries and the retained Catalog replay. The
 verifier executable SHA-256 was

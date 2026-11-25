@@ -72,11 +72,7 @@ pub(super) fn read() -> TestResult<Route> {
             .ok_or("canonical property table")?,
         "one route across both families preserves canonical order, rows and per-value provenance",
     );
-    Route::queried_rows(
-        DATASET,
-        &rows,
-        "typed query, source arena and encrypted synthetic producer parity available; installed producer parity open",
-    )
+    Route::queried_rows(DATASET, &rows, None)
 }
 
 fn check_family(

@@ -12,8 +12,6 @@ use super::{Route, TestResult};
 
 const DISTRIBUTION: &str = "CraftingQualityDistributionRecord";
 const QUANTIZATION: &str = "CraftingQualityQuantizationRecord";
-const REMAINING: &str =
-    "typed selection and synthetic producer parity available; installed producer parity open";
 
 pub(super) fn read() -> TestResult<[Route; 3]> {
     let dir = tempfile::tempdir()?;
@@ -45,12 +43,12 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
         parsed.with_quality_distributions(
             CatalogRecordSelection::RecordIndex(0),
             None,
-            |snapshot| Route::queried_rows(QUALITY_DISTRIBUTIONS, snapshot.rows(), REMAINING),
+            |snapshot| Route::queried_rows(QUALITY_DISTRIBUTIONS, snapshot.rows(), None),
         )??,
         parsed.with_quality_quantizations(
             CatalogRecordSelection::RecordIndex(1),
             None,
-            |snapshot| Route::queried_rows(QUALITY_QUANTIZATIONS, snapshot.rows(), REMAINING),
+            |snapshot| Route::queried_rows(QUALITY_QUANTIZATIONS, snapshot.rows(), None),
         )??,
         parsed.with_quality_quantization_resources(
             CatalogRecordSelection::RecordIndex(1),

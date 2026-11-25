@@ -56,7 +56,7 @@ fn read_item_rows_and_definitions(archive: &Archive) -> TestResult<[Route; 4]> {
             Route::queried_rows(ITEM_DEFINITIONS, snapshot.rows(), REMAINING)
         })??,
         parsed.with_manufacturers(selection, None, |snapshot| {
-            Route::queried_rows(MANUFACTURERS, &snapshot.rows, REMAINING)
+            Route::queried_rows(MANUFACTURERS, &snapshot.rows, None)
         })??,
     ])
 }

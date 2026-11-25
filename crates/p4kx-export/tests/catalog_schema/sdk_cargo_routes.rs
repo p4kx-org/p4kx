@@ -50,11 +50,7 @@ pub(super) fn read_manifests() -> TestResult<Route> {
         None,
         |snapshot| {
             verify_parity(&snapshot, &catalog)?;
-            Route::queried_rows(
-                CARGO_MANIFESTS,
-                &snapshot.rows,
-                "physical selection and synthetic Catalog/source-origin parity available; installed producer parity open",
-            )
+            Route::queried_rows(CARGO_MANIFESTS, &snapshot.rows, None)
         },
     )?
 }

@@ -25,9 +25,6 @@ mod gameplay_v3_schema;
 )]
 mod gameplay_v3_values;
 
-const REMAINING: &str =
-    "typed SDK row and synthetic producer parity available; installed producer parity open";
-
 pub(super) fn read() -> TestResult<[Route; 3]> {
     let (_directory, archive) = archive()?;
     let session =
@@ -39,7 +36,7 @@ pub(super) fn read() -> TestResult<[Route; 3]> {
     Ok([
         Route::queried_rows(BLUEPRINT_CATEGORY_LISTS, &lists.rows, None)?,
         Route::queried_rows(BLUEPRINT_CATEGORIES, &categories.rows, None)?,
-        Route::queried_rows(GAMEPLAY_PROPERTIES, &properties.rows, REMAINING)?,
+        Route::queried_rows(GAMEPLAY_PROPERTIES, &properties.rows, None)?,
     ])
 }
 

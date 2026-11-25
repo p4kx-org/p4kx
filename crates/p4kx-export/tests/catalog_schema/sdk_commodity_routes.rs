@@ -19,8 +19,6 @@ pub(super) fn fixture_record() -> TestRecord {
 }
 
 pub(super) fn read(archive: &Archive) -> TestResult<[Route; 2]> {
-    const REMAINING: &str =
-        "physical selection and synthetic catalog parity available; installed producer parity open";
     with_commodities(
         archive,
         CatalogRecordSelection::RecordIndex(7),
@@ -28,8 +26,8 @@ pub(super) fn read(archive: &Archive) -> TestResult<[Route; 2]> {
         None,
         |snapshot| {
             Ok([
-                Route::queried_rows(COMMODITY_DEFINITIONS, &snapshot.definitions, REMAINING)?,
-                Route::queried_rows(COMMODITY_PRESENTATIONS, &snapshot.presentations, REMAINING)?,
+                Route::queried_rows(COMMODITY_DEFINITIONS, &snapshot.definitions, None)?,
+                Route::queried_rows(COMMODITY_PRESENTATIONS, &snapshot.presentations, None)?,
             ])
         },
     )?
