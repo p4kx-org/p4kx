@@ -118,6 +118,7 @@ mod real_archive_npc_spawn_definitions;
 mod real_archive_npc_spawns;
 mod real_archive_paints;
 mod real_archive_playability;
+mod real_archive_procedural_definition_sdk_parity;
 mod real_archive_procedural_planet_audio;
 mod real_archive_property_sets;
 mod real_archive_quality_inverse_sdk;

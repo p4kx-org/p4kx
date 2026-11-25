@@ -193,6 +193,7 @@ impl<'de> Visitor<'de> for RowDigest {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(crate) enum DefinitionOwner {
     Record,
+    NestedRecord,
     Entry,
     CommodityPresentation,
 }
@@ -211,19 +212,18 @@ impl DefinitionOwner {
                 let id = reference.as_str().ok_or("invalid Commodity header use")?;
                 Sha256::digest(id.as_bytes())
             }
-            Self::Record | Self::Entry => Sha256::digest(self.physical_index(row)?.to_be_bytes()),
+            Self::Record | Self::NestedRecord | Self::Entry => {
+                Sha256::digest(self.physical_index(row)?.to_be_bytes())
+            }
         };
         Ok(digest.into())
     }
 
     pub(crate) fn physical_index(self, row: &Value) -> TestResult<u32> {
         let position = match self {
-            Self::Record
-                if row.pointer("/recordIndex/state").and_then(Value::as_str) == Some("present") =>
-            {
-                row.pointer("/recordIndex/value")
-            }
-            Self::Record | Self::CommodityPresentation => None,
+            Self::Record => present_index(row.get("recordIndex")),
+            Self::NestedRecord => present_index(row.pointer("/source/recordIndex")),
+            Self::CommodityPresentation => None,
             Self::Entry => row.pointer("/identity/entryIndex"),
         };
         position
@@ -231,6 +231,11 @@ impl DefinitionOwner {
             .and_then(|index| u32::try_from(index).ok())
             .ok_or_else(|| "missing or unreadable physical definition owner index".into())
     }
+}
+
+fn present_index(cell: Option<&Value>) -> Option<&Value> {
+    cell.filter(|cell| cell.get("state").and_then(Value::as_str) == Some("present"))
+        .and_then(|cell| cell.get("value"))
 }
 
 pub(super) fn encounter_key(row: &Value) -> TestResult<Fingerprint> {
