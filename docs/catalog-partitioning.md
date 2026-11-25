@@ -603,6 +603,23 @@ The full decoded SHA-256 values were
 `ca8a18cf99249b94e81f41a4efef8b99dd48657066acc0a95ce343ef896a820a` for LIVE and
 `1dc8e6f09663d3266c055cc8a8a996c6890fabbfc64faf5b6b9678b02de36e0e` for PTU.
 
+### Packaged Full measurement on PTU 13273298
+
+The Windows AMD64 CLI from merge `4d334e716cbc87e27525e8e095410a19103c51f5` completed
+the unfiltered PTU `13273298` export with one worker and Zstandard level 3 in
+4,841.461 seconds. Windows recorded a 39,515,860,992-byte private commit peak and
+a 36,655,288,320-byte working set peak. The frame held 1,514,538,432 bytes and its
+writer reported 80,930,456,013 decoded bytes.
+[Native Windows AMD64 package](https://github.com/p4kx-org/p4kx/actions/runs/45576709479/job/139076698399)
+
+The replay read the retained frame, verified the compressed SHA-256 before and
+after reading, and reconciled all 80,930,456,013 decoded bytes. It verified
+116,947 physical sources, 125,354,936 source uses and 89,200,816 sourced cells.
+Its private commit peak was 17,111,584,768 bytes and its working set peak was
+16,705,392,640 bytes. The decoded SHA-256 was
+`4b19edfe7dbb155612f5af02fc21eb1c19ae8582a13a571f36a97481b40e6adc`.
+The producer and replay are the PTU Full baseline for this revision.
+
 ## Measuring a complete export
 
 The installed regression checks verify decoded and stored byte counts against the actual writer
