@@ -399,6 +399,13 @@ placements. The camera positions agreed between the Hangar and Levski coordinate
 frames to within 1 cm per axis. The camera angle and the posed torso could not
 be independently calibrated from the repeated floor details and visible collar.
 
+For v0.5.0 this installed case verifies the root fallback for an unconfirmed
+selector. On LIVE `13220821`, the normal Armour GLB reports the unresolved
+`SubHelpers[0]` and keeps the backpack mounted. Its digest-bound companion
+identifies the authored root helper's name, offset position, offset rotation and
+item-locator name as contributors to the exported translation and rotation.
+The corrected item locator aligns with the root holder on `Spine3`.
+
 The [static relay fixture](static-relay-blender-verification.md) checks full helper rotation
 in an ordinary entity package imported by native Blender.
 
