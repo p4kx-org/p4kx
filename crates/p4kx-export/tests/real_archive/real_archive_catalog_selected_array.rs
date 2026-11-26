@@ -14,6 +14,13 @@ const PLACEMENTS_ROWS: &str = "/placements/facilityInstances/rows";
 const PLACEMENTS_AVAILABILITY: &str = "/placements/facilityInstances/availability";
 
 impl Table {
+    pub(crate) fn loadout_facilities(
+        availability: DatasetAvailability,
+        rows: Vec<Value>,
+    ) -> TestResult<Self> {
+        Self::from_wire(availability, rows, RowSelection::LoadoutFacilities)
+    }
+
     pub(crate) fn interior_placements(
         availability: DatasetAvailability,
         ship: u32,

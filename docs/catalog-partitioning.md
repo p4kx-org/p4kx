@@ -940,10 +940,36 @@ decoded bytes. Replay checks source-use IDs, original physical source ancestry, 
 roles and per-value encryption markers against the retained inventory. It rejects complete source
 sets that contain opaque coordinates.
 
+The verifier keeps original source-use IDs in packed UTF-8 chunks. The lookup index stores
+ordinals and compares the original ID bytes for every candidate. Index progress and the end of
+the first decoding pass appear in the transcript. Record the verifier's process peak separately
+from the producer measurement.
+
 The report includes exact section byte lengths, provenance inventory counts and sourced-value
 counts. Row counts cover `/items`, `/definitions/items/rows`, `/definitions/blueprints/rows` and
 `/placements/containerInstances/rows`. Replay opens no installed Archive and creates no raw file.
 Cross-domain link validation and consumer import measurements remain separate release evidence.
+
+#### Loadout census and independent Assembly comparison
+
+Keep the completed producer's `producer.stdout.log` beside `receipt.private.json`
+and the Full Catalog frame in `P4KX_CATALOG_MEASUREMENT_DIR`. Set
+`P4KX_CATALOG_REPLAY_RECEIPT` to the completed replay receipt that seals the
+producer receipt and transcript and records the decoded frame SHA-256. Configure
+the same installed Build with `P4KX_DATA_P4K` and its Archive key.
+
+```text
+cargo test --release --locked -p p4kx-export --test real_archive real_archive_loadouts::the_loadouts_of_a_real_archive_resolve_and_match_the_loadout_tree_of_a_ship -- --ignored --exact --nocapture --test-threads=1
+```
+
+The comparison streams the retained frame once. It holds compact owner and
+attachment identities, code counts, the selected physical 100i row and one
+current Loadout row. It reconciles the emitted kind count and recursive port
+counts with the sealed producer transcript. Ship and Item joins use the
+physical Record index and its GUID. The pinned 100i witness resolves the port
+tree directly from Assembly against the matching Archive. The separate
+`installed_loadout_visitor_matches_complete_catalog` test covers SDK row and
+provenance parity.
 
 The verifier at `01ae3cb78` completed both passes on the installed outputs from
 producer `25287d184`. It checked the immediate origin of every sourced cell

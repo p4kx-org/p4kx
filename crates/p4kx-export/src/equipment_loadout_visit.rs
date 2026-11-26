@@ -261,6 +261,41 @@ fn visit_owners<E: From<CatalogError>>(
     Ok(summary)
 }
 
+pub(super) fn visit_ship_roots<E: From<CatalogError>>(
+    query: &Query<'_>,
+    mut visit: impl FnMut(&ResolverInputs<'_>, &Texts<'_>, Wanted) -> Result<(), E>,
+) -> Result<CatalogRecordCoverage, E> {
+    let scope::VisitScope {
+        owners: scope::Scope { wanted, coverage },
+        ..
+    } = scope::read_visit(
+        query.forge,
+        LoadoutOwnerSelection::Ships,
+        query.cancel,
+        drop,
+    )?;
+    if wanted.is_empty() {
+        return Ok(coverage);
+    }
+    let locale = TextSources::read_languages(query.archive, &[])?;
+    let texts = Texts::parse(&locale)?;
+    let inputs = if wanted.len() == 1 {
+        ResolverInputs::new(query.archive, query.forge)
+    } else {
+        ResolverInputs::for_visit(
+            query.archive,
+            query.forge,
+            ResolverInputs::visit_record_cache(query.forge),
+            query.cancel,
+        )?
+    };
+    for (_, want) in resolution::in_catalog_order(wanted.into_iter()) {
+        checkpoint(query.cancel)?;
+        visit(&inputs, &texts, want)?;
+    }
+    Ok(coverage)
+}
+
 fn read_owner(
     query: &Query<'_>,
     inputs: &ResolverInputs<'_>,

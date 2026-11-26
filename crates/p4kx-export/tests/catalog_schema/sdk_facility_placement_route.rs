@@ -21,6 +21,8 @@ mod fixture;
 
 #[path = "sdk_installed_configuration_route.rs"]
 mod installed;
+#[path = "sdk_loadout_facility_visit.rs"]
+mod visit;
 
 const SHIP_RECORD: u32 = 0;
 const SEAT_RECORD: u32 = 1;
@@ -41,8 +43,8 @@ fn read_facilities() -> TestResult<Route> {
     let archive = Archive::open_with_key(path, Some(test_key()))?;
     let entry = DataForgeEntry::read(&archive)?;
     let catalog = normal_placements(&archive, &entry)?;
-    let snapshot = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
-        .read_loadout_facility_placements(SHIP_RECORD, None)?;
+    let queries = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?;
+    let snapshot = queries.read_loadout_facility_placements(SHIP_RECORD, None)?;
     compare(
         &snapshot,
         &catalog,
@@ -66,11 +68,9 @@ fn read_facilities() -> TestResult<Route> {
             .contains(&SHIP_RECORD),
         "the omitted dangling Reference remains reported in the original Loadout coverage",
     );
-    let docked = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
-        .read_loadout_facility_placements(DOCKED_RECORD, None)?;
+    let docked = queries.read_loadout_facility_placements(DOCKED_RECORD, None)?;
     compare(&docked, &catalog, DOCKED_RECORD, &[&[], &[0]])?;
-    let unselected = full_proof::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?
-        .read_loadout_facility_placements(UNSELECTED_RECORD, None)?;
+    let unselected = queries.read_loadout_facility_placements(UNSELECTED_RECORD, None)?;
     assert_eq!(
         unselected.loadout_state,
         SourceValueState::Absent,
@@ -85,11 +85,12 @@ fn read_facilities() -> TestResult<Route> {
         "an unadmitted root skips configuration reads"
     );
 
+    visit::compare(&archive, &entry, &catalog)?;
     check_encrypted_ancestor()?;
     Route::queried_rows(
         FACILITY_INSTANCES,
         &snapshot.rows,
-        "Loadout-kind synthetic parity and installed scoped memory verified; Interior admission and installed producer parity open",
+        "Complete Loadout visitor and selected Interior queries have synthetic parity. Complete installed producer parity remains open.",
     )
 }
 

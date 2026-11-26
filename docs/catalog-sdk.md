@@ -3242,6 +3242,21 @@ The same component can contribute an instance at several distinct positions.
 Check the selected Loadout state, its coverage, and the reached configuration dependencies
 before interpreting an empty result. Retain the snapshot's own source inventory.
 
+Use `equipment::visit_loadout_facility_placements` to read every admitted physical Ship
+in canonical Loadout order. Each callback carries the original Record index, placements,
+its Loadout state and dependency coverage, including for empty and unreadable Loadouts.
+The result's source inventory resolves its placement references in Full mode. Each Ship
+is resolved once and shared configuration dependencies are reused within that owner.
+Use the decoded-Entry form or the equivalent session and parsed-view methods to reuse
+inputs. Check terminal coverage before committing callback output.
+
+For complete-visit acceptance, run the ignored tests
+`installed_all_loadout_facility_placements_cold_visit` and
+`installed_all_loadout_facility_placements_match_retained_complete_catalog`
+with the exact installed Build. The retained comparison also requires
+`P4KX_FACILITY_LOADOUT_CATALOG_PRODUCER_REVISION` and the matching completed
+Normal Catalog measurement.
+
 ### Installed memory measurements for Store mappings and Loadout placements
 
 Run the ignored tests under `real_archive_scoped_equipment_sdk` in the

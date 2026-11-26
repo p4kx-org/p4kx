@@ -4,7 +4,7 @@
 use p4kx_extraction::{Archive, Build, CancelToken, DataForgeEntry, PathKeys, SourceValueState};
 
 use super::super::read::{Query, ResolverInputs};
-use super::super::{LoadoutOwnerSelection, scope, visit};
+use super::super::visit;
 use super::FacilityInteriorPlacementSnapshot;
 use super::read_scope::{ResolvedLoadout, finish_scope, read_room_scope};
 use crate::CatalogError;
@@ -14,8 +14,8 @@ use crate::catalog_queries::{
 };
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_v3::facility_loadout_placements::facility_placement_source_type;
-use crate::loadout::{Wanted, resolution};
-use crate::texts::{TextSources, Texts};
+use crate::loadout::Wanted;
+use crate::texts::Texts;
 
 /// Terminal counts and original Ship admission coverage of an Interior placement visit.
 #[derive(Debug)]
@@ -127,15 +127,6 @@ fn visit_all<E: From<CatalogError>>(
     query: &Query<'_>,
     mut visit: impl FnMut(&FacilityInteriorPlacementSnapshot) -> Result<(), E>,
 ) -> Result<FacilityInteriorPlacementVisitSummary, E> {
-    let scope::VisitScope {
-        owners: scope::Scope { wanted, coverage },
-        ..
-    } = scope::read_visit(
-        query.forge,
-        LoadoutOwnerSelection::Ships,
-        query.cancel,
-        drop,
-    )?;
     let declared =
         DatasetAvailability::from_source_declarations(query.forge, facility_placement_source_type);
     let mut summary = FacilityInteriorPlacementVisitSummary {
@@ -145,31 +136,15 @@ fn visit_all<E: From<CatalogError>>(
         placement_count: 0,
         coverage_count: 0,
         incomplete_owner_count: 0,
-        ship_coverage: coverage,
-    };
-    if wanted.is_empty() {
-        return Ok(summary);
-    }
-    let locales = TextSources::read_languages(query.archive, &[])?;
-    let texts = Texts::parse(&locales)?;
-    let inputs = if wanted.len() == 1 {
-        ResolverInputs::new(query.archive, query.forge)
-    } else {
-        ResolverInputs::for_visit(
-            query.archive,
-            query.forge,
-            ResolverInputs::visit_record_cache(query.forge),
-            query.cancel,
-        )?
+        ship_coverage: CatalogRecordCoverage::default(),
     };
     let archive_complete = crate::export_archive_health::inventory(query.archive).is_none();
     let mut path_keys = None;
-    for (_, want) in resolution::in_catalog_order(wanted.into_iter()) {
-        checkpoint(query.cancel)?;
+    summary.ship_coverage = visit::visit_ship_roots(query, |inputs, texts, want| {
         let snapshot = read_owner(
             query,
-            &inputs,
-            &texts,
+            inputs,
+            texts,
             want,
             declared,
             archive_complete,
@@ -178,7 +153,8 @@ fn visit_all<E: From<CatalogError>>(
         checkpoint(query.cancel)?;
         visit(&snapshot)?;
         summary.record(&snapshot);
-    }
+        Ok::<(), E>(())
+    })?;
     Ok(summary)
 }
 

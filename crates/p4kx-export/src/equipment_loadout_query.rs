@@ -22,8 +22,9 @@ pub use crafter_host::{
 mod facility_placements;
 pub use facility_placements::{
     FacilityConfigurationKind, FacilityInstance, FacilityPlacementDependency,
-    LoadoutFacilityPlacementSnapshot, read_loadout_facility_placements,
-    read_loadout_facility_placements_from,
+    LoadoutFacilityPlacementSnapshot, LoadoutFacilityPlacementVisitSummary,
+    read_loadout_facility_placements, read_loadout_facility_placements_from,
+    visit_loadout_facility_placements, visit_loadout_facility_placements_from,
 };
 
 #[path = "equipment_facility_interior_query.rs"]

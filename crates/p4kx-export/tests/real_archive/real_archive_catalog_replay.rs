@@ -67,7 +67,7 @@ fn index(input: impl Read) -> TestResult<Indexed> {
         return Err("streamed inventory counts disagree with section bytes".into());
     }
     Ok(Indexed {
-        digest: input.digest.finalize().into(),
+        digest: input.finish(),
         pass,
         sections,
     })
@@ -77,24 +77,28 @@ fn verify(input: impl Read, indexed: &Indexed, binding: &Binding) -> TestResult<
     binding.check(&indexed.pass)?;
     let mut input = DigestReader::new(input);
     let rows = cells::verify(BufReader::new(&mut input), &indexed.pass.inventory)?;
-    let digest: [u8; 32] = input.digest.finalize().into();
+    let digest = input.finish();
     if digest != indexed.digest {
         return Err("catalog bytes changed between validation passes".into());
     }
     Ok(rows)
 }
 
-struct DigestReader<R> {
+pub(crate) struct DigestReader<R> {
     input: R,
     digest: Sha256,
 }
 
 impl<R> DigestReader<R> {
-    fn new(input: R) -> Self {
+    pub(crate) fn new(input: R) -> Self {
         Self {
             input,
             digest: Sha256::new(),
         }
+    }
+
+    pub(crate) fn finish(self) -> [u8; 32] {
+        self.digest.finalize().into()
     }
 }
 

@@ -18,6 +18,8 @@ mod comparison;
 mod inventory;
 #[path = "real_archive_facility_placement_sources.rs"]
 mod source;
+#[path = "real_archive_facility_loadout_visit.rs"]
+mod visit;
 
 type Result<T = ()> = std::result::Result<T, Box<dyn std::error::Error>>;
 

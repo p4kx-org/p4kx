@@ -8,6 +8,7 @@ use serde::de::{DeserializeSeed, Deserializer, Error, IgnoredAny, SeqAccess, Vis
 use serde_json::Value;
 
 use super::digest_parity::{DigestedOrigins, DigestedRows};
+use super::loadout_census::{LoadoutRows, OwnerRows};
 use super::selected_origins::SelectedOrigins;
 use super::selected_ships::SelectedShipIdentities;
 use super::selected_texts::SelectedTexts;
@@ -28,6 +29,8 @@ pub(super) enum Projection<'scope> {
     DigestedOrigins(DigestedOrigins<'scope>),
     StreamRows(RowDigest),
     ShipLoadoutRows(ShipLoadoutRows),
+    LoadoutOwners(OwnerRows<'scope>),
+    LoadoutCensus(LoadoutRows<'scope>),
     StreamOrigins(StreamOrigins<'scope>),
     MissionDispositions(MissionDispositionRows),
 }
@@ -50,6 +53,8 @@ impl<'de> DeserializeSeed<'de> for Projection<'_> {
             Self::DigestedOrigins(origins) => origins.deserialize(deserializer),
             Self::StreamRows(rows) => rows.deserialize(deserializer),
             Self::ShipLoadoutRows(roots) => roots.deserialize(deserializer),
+            Self::LoadoutOwners(rows) => rows.deserialize(deserializer),
+            Self::LoadoutCensus(rows) => rows.deserialize(deserializer),
             Self::StreamOrigins(origins) => origins.deserialize(deserializer),
             Self::MissionDispositions(kinds) => kinds.deserialize(deserializer),
         }
@@ -77,6 +82,7 @@ pub(super) enum RowSelection {
     PhysicalShip(u32),
     InteriorShip(u32),
     InteriorPlacement(u32),
+    LoadoutFacilities,
 }
 
 impl RowSelection {
@@ -86,6 +92,7 @@ impl RowSelection {
             Self::PhysicalShip(ship) => ship_row::flight_includes(ship, row),
             Self::InteriorShip(ship) => ship_row::interior_includes(ship, row),
             Self::InteriorPlacement(ship) => ship_row::interior_placement_includes(ship, row),
+            Self::LoadoutFacilities => Ok(ship_row::interior_placement_root::<E>(row)?.is_none()),
         }
     }
 }
@@ -166,9 +173,8 @@ impl<'de> Visitor<'de> for ComparedRows<'_> {
             RowSelection::All => sequence.next_element::<IgnoredAny>()?.is_some(),
             RowSelection::PhysicalShip(_)
             | RowSelection::InteriorShip(_)
-            | RowSelection::InteriorPlacement(_) => {
-                self.next_matching_row(&mut sequence)?.is_some()
-            }
+            | RowSelection::InteriorPlacement(_)
+            | RowSelection::LoadoutFacilities => self.next_matching_row(&mut sequence)?.is_some(),
         };
         if has_extra {
             return Err(A::Error::custom(format!(

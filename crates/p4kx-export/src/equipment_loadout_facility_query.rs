@@ -33,6 +33,13 @@ use crate::{ExportAccountingError, Kind};
 
 pub use crate::catalog_v3::facility_instance::{FacilityConfigurationKind, FacilityInstance};
 
+#[path = "equipment_loadout_facility_visit.rs"]
+mod visit;
+pub use visit::{
+    LoadoutFacilityPlacementVisitSummary, visit_loadout_facility_placements,
+    visit_loadout_facility_placements_from,
+};
+
 /// An original Record consulted for Facility or Inventory storage links.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
@@ -50,6 +57,8 @@ pub struct FacilityPlacementDependency {
 pub struct LoadoutFacilityPlacementSnapshot {
     /// The Build of the original Archive.
     pub build: Option<Build>,
+    /// Physical index of the queried Ship in the original DataForge.
+    pub ship_record_index: u32,
     /// Availability of the original Facility and Inventory source families.
     pub availability: DatasetAvailability,
     /// Whether the queried Loadout is present, absent or unreadable.
@@ -64,6 +73,24 @@ pub struct LoadoutFacilityPlacementSnapshot {
     pub loadout_dependencies: LoadoutDependencyCoverage,
     /// Reached configuration dependencies in physical Record order.
     pub configuration_dependencies: Vec<FacilityPlacementDependency>,
+}
+
+impl LoadoutFacilityPlacementSnapshot {
+    /// Reports whether the original Loadout and reached configuration reads were conclusive.
+    #[must_use]
+    pub fn is_complete(&self) -> bool {
+        self.loadout_state != SourceValueState::Unreadable
+            && self.loadout_coverage.unreadable_headers.is_empty()
+            && self.loadout_coverage.unreadable_bodies.is_empty()
+            && self.loadout_coverage.incomplete_fields.is_empty()
+            && self.loadout_dependencies.is_complete()
+            && self.configuration_dependencies.iter().all(|dependency| {
+                matches!(
+                    dependency.state,
+                    AlignmentDependencyState::Complete | AlignmentDependencyState::NotAdmitted
+                )
+            })
+    }
 }
 
 /// Reads Loadout-kind facility placements from one physical Ship Record.
@@ -155,26 +182,18 @@ fn selected(
     let mut alignment = DirectAlignment::new(&projection, query.cancel);
     let (loadouts, loadout_dependencies) =
         query.resolve_rows(&input, wanted, &mut loadout_coverage, &mut alignment)?;
-    let mut configurations = BTreeMap::new();
-    let (loadout_state, rows) = match loadouts.as_slice() {
+    let (loadout_state, placements) = match loadouts.as_slice() {
         [loadout] => (
             SourceValueState::Present,
-            read_placements(
-                loadout,
-                &origins,
-                &mut alignment,
-                &mut configurations,
-                query.cancel,
-            )?,
+            read_placements(loadout, &origins, &mut alignment, query.cancel)?,
         ),
         [] if admitted || !loadout_coverage.unreadable_headers.is_empty() => {
-            (SourceValueState::Unreadable, Vec::new())
+            (SourceValueState::Unreadable, ProjectedPlacements::default())
         }
-        [] => (SourceValueState::Absent, Vec::new()),
+        [] => (SourceValueState::Absent, ProjectedPlacements::default()),
         _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
     };
-    loadout_coverage.incomplete_fields.sort_unstable();
-    loadout_coverage.incomplete_fields.dedup();
+    scope::finish_coverage(&mut loadout_coverage);
     let availability = DatasetAvailability::from_source_declarations(
         query.forge,
         loadout_facility_owner_source_type,
@@ -183,19 +202,14 @@ fn selected(
     checkpoint(query.cancel)?;
     Ok(LoadoutFacilityPlacementSnapshot {
         build: query.archive.build().cloned(),
+        ship_record_index,
         availability,
         loadout_state,
-        rows,
+        rows: placements.rows,
         source_inventory,
         loadout_coverage,
         loadout_dependencies,
-        configuration_dependencies: configurations
-            .into_iter()
-            .map(|(record_index, resolved)| FacilityPlacementDependency {
-                record_index,
-                state: resolved.state,
-            })
-            .collect(),
+        configuration_dependencies: placements.dependencies,
     })
 }
 
@@ -204,20 +218,34 @@ pub(super) struct ResolvedConfiguration {
     pub(super) links: Vec<FacilityConfiguration>,
 }
 
+#[derive(Default)]
+struct ProjectedPlacements {
+    rows: Vec<FacilityInstance>,
+    dependencies: Vec<FacilityPlacementDependency>,
+}
+
 fn read_placements(
     loadout: &Loadout,
     origins: &CatalogOrigins,
     alignment: &mut DirectAlignment<'_>,
-    configurations: &mut BTreeMap<u32, ResolvedConfiguration>,
     cancel: Option<&CancelToken>,
-) -> Result<Vec<FacilityInstance>, CatalogError> {
-    project_loadout(loadout, origins, cancel, &mut |index| {
+) -> Result<ProjectedPlacements, CatalogError> {
+    let mut configurations = BTreeMap::new();
+    let rows = project_loadout(loadout, origins, cancel, &mut |index| {
         let configuration = match configurations.entry(index) {
             Entry::Occupied(entry) => entry.into_mut(),
             Entry::Vacant(entry) => entry.insert(read_configuration(alignment, index)?),
         };
         Ok(configuration.links.clone())
-    })
+    })?;
+    let dependencies = configurations
+        .into_iter()
+        .map(|(record_index, resolved)| FacilityPlacementDependency {
+            record_index,
+            state: resolved.state,
+        })
+        .collect();
+    Ok(ProjectedPlacements { rows, dependencies })
 }
 
 pub(super) fn read_configuration(
