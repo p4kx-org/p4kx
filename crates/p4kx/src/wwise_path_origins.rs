@@ -14,7 +14,7 @@ mod totals;
 #[path = "wwise_resolve_variant_origins.rs"]
 mod variant_origins;
 
-pub(crate) use extract_report_origins::{FileTrigger, capture_extract, capture_files};
+pub(crate) use extract_report_origins::{FileTrigger, capture_export, capture_extract};
 use source_fields::{Definition, LanguageOrigins};
 use totals::{SummaryFields, Totals};
 

@@ -55,9 +55,9 @@ pub use error::{AudioFileError, AudioIssue};
 pub use event_sources::SoundbankEventSource;
 pub(crate) use export::ExportedWemOrigin;
 pub use export::{
-    ExportFailure, ExportLoopOrigin, ExportLoopOrigins, ExportOptions, ExportReport,
-    ExportReportCapture, ExportSoundSelection, ExportState, ExportWatch, ExportedSound,
-    SoundFormat, WemExportSource,
+    ExportFailure, ExportFailureKind, ExportFailureOrigin, ExportLoopOrigin, ExportLoopOrigins,
+    ExportOptions, ExportReport, ExportReportCapture, ExportReportOrigins, ExportSoundSelection,
+    ExportState, ExportWatch, ExportedSound, SoundFormat, WemExportSource,
 };
 pub use hirc_path_source::{HircPathOrigins, HircPathSource};
 pub use index::AudioIndex;

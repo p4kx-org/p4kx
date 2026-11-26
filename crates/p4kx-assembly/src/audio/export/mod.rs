@@ -21,7 +21,10 @@ use p4kx_extraction::{ArchiveWriteProtection, CancelToken, ConflictPolicy, Conve
 use self::loop_origins::CaptureOrigins;
 pub(crate) use self::loop_origins::ExportedWemOrigin;
 pub use self::loop_origins::{ExportLoopOrigin, ExportLoopOrigins};
-pub use self::report_origins::{ExportReportCapture, ExportSoundSelection};
+pub use self::report_origins::{
+    ExportFailureKind, ExportFailureOrigin, ExportReportCapture, ExportReportOrigins,
+    ExportSoundSelection,
+};
 pub(super) use self::source::ResolvedMedia;
 pub use self::source::WemExportSource;
 use self::write::Target;
@@ -293,9 +296,10 @@ impl ArchiveAudio<'_> {
                 report: false,
             },
         )
+        .map(|(report, origins)| (report, origins.loops))
     }
 
-    /// Exports sounds while retaining the original inputs used to measure their written sizes.
+    /// Exports sounds with the origin of written sizes and the source positions of failures.
     ///
     /// # Errors
     /// Returns the same output errors as [`Self::export_sounds_watched`].
@@ -306,7 +310,7 @@ impl ArchiveAudio<'_> {
         options: ExportOptions,
         watch: &ExportWatch,
         report_capture: ExportReportCapture,
-    ) -> Result<(ExportReport, ExportLoopOrigins), ConversionError> {
+    ) -> Result<(ExportReport, ExportReportOrigins), ConversionError> {
         self.export_sounds_with(
             triggers,
             folder,
@@ -326,17 +330,14 @@ impl ArchiveAudio<'_> {
         options: ExportOptions,
         watch: &ExportWatch,
         capture: CaptureOrigins,
-    ) -> Result<(ExportReport, ExportLoopOrigins), ConversionError> {
+    ) -> Result<(ExportReport, ExportReportOrigins), ConversionError> {
         if let Some(cut) = export_preflight::traversal_cut(triggers) {
             return Err(cut.into_error());
         }
         let plan = plan::build(triggers);
-        let mut origins = ExportLoopOrigins::default();
         watch.plan(plan.jobs.len());
-        let mut report = ExportReport {
-            failures: plan.failures,
-            ..ExportReport::default()
-        };
+        let (mut report, mut origins) =
+            ExportReportOrigins::with_planned_failures(plan.failures, capture.report);
         if watch.is_cancelled() {
             report.cancelled = !plan.jobs.is_empty();
             return Ok((report, origins));
@@ -364,11 +365,11 @@ impl ArchiveAudio<'_> {
             match outcome {
                 Ok(written) => {
                     if let Some(origin) = written.origin {
-                        origins.insert(&written.sound, origin);
+                        origins.loops.insert(&written.sound, origin);
                     }
                     report.sounds.push(written.sound);
                 }
-                Err(failure) => report.failures.push(failure),
+                Err(failure) => origins.push_failure(&mut report, failure, capture.report),
             }
         }
         report.cancelled = watch.is_cancelled() && watch.done() < plan.jobs.len();

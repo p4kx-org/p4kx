@@ -1079,6 +1079,14 @@ sounds are still written. `cancelled` is true when Ctrl+C stopped the export bef
 every sound; no partial file is left. Exit code 1 when anything is in `failures` or `unconverted`,
 or `cancelled` is true.
 
+Each failure retains the original trigger and nullable WEM ID under
+`/failures/{row}`. A fileless source's `reason` uses the authored plug-in or
+external kind and its declared source ID, which is distinct from the nullable
+WEM ID. An unsuccessful media search cites the known selectors with incomplete
+evidence. Operational failures report unknown reason origin when their exact
+inputs were unavailable. Entity audio carries those origins under
+`/extraction/failures`.
+
 With `--txtp`, the object has a `txtp` member, absent without it:
 `{"written": 1, "kept": 0, "skipped": 1, "files": [{"trigger": "Play_Multi", "event": "Play_Multi",
 "file": "…\\Play_Multi.txtp", "size": 120, "kept": false, "breaks": 0, "approximations": []}, …], "skips": [{"trigger": "Play_Multi",

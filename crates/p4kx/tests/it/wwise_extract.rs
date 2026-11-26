@@ -14,6 +14,7 @@ use p4kx_testkit::{
     TestHircObject, TestVorbis, TestWem, audio_schema, entity_schema, test_signal, wwise_short_id,
 };
 use serde_json::Value;
+mod failure_origins;
 
 #[path = "wwise_extract_publication.rs"]
 mod publication;

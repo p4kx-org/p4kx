@@ -3,9 +3,9 @@
 
 use anyhow::{Context, Result, ensure};
 use p4kx_assembly::audio::{
-    AudioIndex, AudioSurveyKind, AudioSurveyProof, EntityAudio, EntityTrigger, ExportReport,
-    LanguageChoice, PositionedTriggerReference, TriggerOccurrence, TriggerReference, TriggerScope,
-    TriggerSounds, Unmatched, positioned_trigger_references_in, trigger_references,
+    AudioIndex, AudioSurveyKind, AudioSurveyProof, EntityAudio, EntityTrigger, LanguageChoice,
+    PositionedTriggerReference, TriggerOccurrence, TriggerReference, TriggerScope, TriggerSounds,
+    Unmatched, positioned_trigger_references_in, trigger_references,
 };
 use p4kx_extraction::{
     Archive, DataForgeOrigin, FieldOrigin, FieldOrigins, FieldPath, InputScope, Record,
@@ -15,6 +15,7 @@ use p4kx_extraction::{
 use serde::Serialize;
 
 use crate::cli_wwise::SoundExportArgs;
+use crate::wwise_extract::SoundExport;
 use crate::wwise_json::{self, FileTrigger};
 
 #[path = "entity_audio_event_origins.rs"]
@@ -72,7 +73,7 @@ pub(super) struct Evidence {
 
 pub(super) fn capture(
     input: &Input<'_, '_>,
-    export: Option<(&ExportReport, &SoundExportArgs)>,
+    export: Option<(&SoundExport, &SoundExportArgs)>,
 ) -> Result<Evidence> {
     let mut output = Output::new(input.original)?;
     let record = header_origins::write(&mut output, input)?;
@@ -101,8 +102,8 @@ pub(super) fn capture(
     }
     output.counts(&record, &rows)?;
     header_origins::issues(&mut output, input.archive, input.index)?;
-    if let Some((report, args)) = export {
-        output.files(input, report, args)?;
+    if let Some((exported, args)) = export {
+        output.export_report(input, exported, args)?;
     }
     Ok(Evidence {
         fields: output.fields,
@@ -203,10 +204,10 @@ impl Output {
         })
     }
 
-    fn files(
+    fn export_report(
         &mut self,
         input: &Input<'_, '_>,
-        report: &ExportReport,
+        exported: &SoundExport,
         args: &SoundExportArgs,
     ) -> Result<()> {
         let mut triggers = Vec::new();
@@ -222,16 +223,16 @@ impl Output {
                 selector: Some(selector),
             });
         }
-        let mut files = FieldOrigins::new();
-        wwise_json::capture_files(
-            &mut files,
+        let mut report_fields = FieldOrigins::new();
+        wwise_json::capture_export(
+            &mut report_fields,
             (input.archive, input.index, &self.uses),
             &FieldPath::parse("/extraction")?,
-            report,
+            exported,
             &triggers,
             args,
         )?;
-        for (path, origin) in files.iter() {
+        for (path, origin) in report_fields.iter() {
             self.fields.insert(path.clone(), origin.clone())?;
         }
         Ok(())

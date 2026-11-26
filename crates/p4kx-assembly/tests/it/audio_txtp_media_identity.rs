@@ -68,8 +68,13 @@ fn same_short_id_keeps_both_physical_media_and_binds_each_txtp_loop() -> TestRes
     let [first_file, second_file] = exported.sounds.as_slice() else {
         return Err("two files for two physical sources".into());
     };
-    assert_exported_wem(&archive, &origins, first_file, &first, FIRST)?;
-    assert_exported_wem(&archive, &origins, second_file, &second, SECOND)?;
+    assert!(
+        origins.failures().is_empty(),
+        "a clean export needs no failure evidence"
+    );
+    let loop_origins = origins.loop_origins();
+    assert_exported_wem(&archive, loop_origins, first_file, &first, FIRST)?;
+    assert_exported_wem(&archive, loop_origins, second_file, &second, SECOND)?;
     assert_reported_sizes(&archive, [first_file, second_file])?;
 
     let report = write_txtp_with_loop_origins(
@@ -79,7 +84,7 @@ fn same_short_id_keeps_both_physical_media_and_binds_each_txtp_loop() -> TestRes
         &folder,
         ConflictPolicy::Overwrite,
         &CancelToken::new(),
-        &origins,
+        loop_origins,
     )?;
     let [file] = report.files.as_slice() else {
         return Err("one TXTP for the logical event".into());

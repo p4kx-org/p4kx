@@ -2,11 +2,15 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use anyhow::{Context, Result, ensure};
-use p4kx_assembly::audio::{AudioIndex, ExportReport, ExportedSound, SoundVariant, TriggerSounds};
+use p4kx_assembly::audio::{
+    AudioIndex, ExportFailure, ExportFailureKind, ExportFailureOrigin, ExportedSound, SoundVariant,
+    TerminalMediaOrigins, TriggerSounds, WemSelection,
+};
 use p4kx_extraction::{Archive, FieldOrigin, FieldOrigins, FieldPath, SourceInventory, SourceUses};
 
 use crate::cli::AudioOutput;
 use crate::cli_wwise::SoundExportArgs;
+use crate::wwise_extract::SoundExport;
 
 use super::{Capture, field, index_path};
 
@@ -14,7 +18,7 @@ pub(crate) fn capture_extract(
     archive: &Archive,
     index: &AudioIndex,
     sounds: &TriggerSounds<'_>,
-    report: &ExportReport,
+    exported: &SoundExport,
     args: &SoundExportArgs,
 ) -> Result<(FieldOrigins, SourceInventory)> {
     let uses = SourceUses::with_compact_use_refs();
@@ -22,11 +26,11 @@ pub(crate) fn capture_extract(
     capture.header(sounds)?;
     capture.break_count(sounds, index)?;
     capture.issues(index)?;
-    capture_files(
+    capture_export(
         &mut capture.fields,
         (archive, index, &uses),
         &FieldPath::root(),
-        report,
+        exported,
         &[FileTrigger {
             sounds,
             selector: None,
@@ -69,14 +73,19 @@ pub(crate) struct FileTrigger<'a, 'archive> {
     pub(crate) selector: Option<&'a FieldOrigin>,
 }
 
-pub(crate) fn capture_files(
+pub(crate) fn capture_export(
     fields: &mut FieldOrigins,
     (archive, index, uses): (&Archive, &AudioIndex, &SourceUses),
     root: &FieldPath,
-    report: &ExportReport,
+    exported: &SoundExport,
     triggers: &[FileTrigger<'_, '_>],
     args: &SoundExportArgs,
 ) -> Result<()> {
+    let report = &exported.report;
+    let captured = exported
+        .origins
+        .as_ref()
+        .context("audio report origins were not captured")?;
     let mut scopes = triggers
         .iter()
         .map(|trigger| {
@@ -89,7 +98,7 @@ pub(crate) fn capture_files(
         })
         .collect::<Result<Vec<_>>>()?;
     let files = field(root, "files")?;
-    let mut origins = Vec::with_capacity(report.sounds.len());
+    let mut file_origins = Vec::with_capacity(report.sounds.len());
     for (ordinal, sound) in report.sounds.iter().enumerate() {
         let selection = sound.selection;
         let trigger = triggers
@@ -101,10 +110,48 @@ pub(crate) fn capture_files(
         let row = index_path(&files, ordinal)?;
         let origin = capture.file(fields, &row, trigger.sounds, sound, args.format)?;
         fields.insert(row, origin.clone())?;
-        origins.push(origin);
+        file_origins.push(origin);
     }
-    fields.insert(files, uses.origin_with_origins(&origins, true)?)?;
+    fields.insert(files, uses.origin_with_origins(&file_origins, true)?)?;
+    let failures = field(root, "failures")?;
+    let failure_origins = capture_failures(
+        fields,
+        &failures,
+        &report.failures,
+        captured.failures(),
+        (triggers, &mut scopes),
+    )?;
+    fields.insert(failures, uses.origin_with_origins(&failure_origins, true)?)?;
     Ok(())
+}
+
+fn capture_failures(
+    fields: &mut FieldOrigins,
+    failures: &FieldPath,
+    rows: &[ExportFailure],
+    provenance: &[ExportFailureOrigin],
+    (triggers, scopes): (&[FileTrigger<'_, '_>], &mut [Capture<'_>]),
+) -> Result<Vec<FieldOrigin>> {
+    ensure!(
+        rows.len() == provenance.len(),
+        "audio failure positions do not match their report"
+    );
+    rows.iter()
+        .zip(provenance)
+        .enumerate()
+        .map(|(ordinal, (failure, proof))| {
+            let trigger = triggers
+                .get(proof.trigger_ordinal)
+                .context("audio failure trigger ordinal is missing")?;
+            let capture = scopes
+                .get_mut(proof.trigger_ordinal)
+                .context("audio failure trigger scope is missing")?;
+            let row = index_path(failures, ordinal)?;
+            let origin = capture.failed_file(fields, &row, trigger.sounds, failure, proof)?;
+            fields.insert(row, origin.clone())?;
+            Ok(origin)
+        })
+        .collect()
 }
 
 impl Capture<'_> {
@@ -125,11 +172,14 @@ impl Capture<'_> {
             .get(selection.media_variant_ordinal)
             .context("sound export media variant ordinal is missing")?;
         ensure!(
-            route.wem_id() == Some(sound.wem_id) && media.wem_id() == Some(sound.wem_id),
-            "sound export variants disagree with the reported WEM ID"
+            sounds.trigger().name() == sound.trigger
+                && route.wem_id() == Some(sound.wem_id)
+                && media.wem_id() == Some(sound.wem_id),
+            "sound export variants disagree with the reported trigger or WEM ID"
         );
-        let name = self.union([&self.definition.name, &self.definition.selection], true)?;
-        let id = self.exported_media_id(route)?;
+        let name = self.exported_trigger()?;
+        let (path, terminal) = self.exported_route(route)?;
+        let id = self.union([&path, &terminal.wem_id], true)?;
         let format_origin = if matches!(format, AudioOutput::Raw) {
             self.uses.origin(&[], true)
         } else {
@@ -155,6 +205,52 @@ impl Capture<'_> {
             ("kept", unknown),
             ("unconverted", format_origin),
         ];
+        self.insert_export_row(fields, row, members)
+    }
+
+    fn failed_file(
+        &mut self,
+        fields: &mut FieldOrigins,
+        row: &FieldPath,
+        sounds: &TriggerSounds<'_>,
+        failure: &ExportFailure,
+        proof: &ExportFailureOrigin,
+    ) -> Result<FieldOrigin> {
+        let variant = sounds
+            .variants()
+            .get(proof.variant_ordinal)
+            .context("audio failure variant ordinal is missing")?;
+        ensure!(
+            sounds.trigger().name() == failure.trigger && variant.wem_id() == failure.wem_id,
+            "audio failure variant disagrees with its reported trigger or WEM ID"
+        );
+        let name = self.exported_trigger()?;
+        let (path, terminal) = self.exported_route(variant)?;
+        let id = self.union([&path, &terminal.wem_id], true)?;
+        let reason = match proof.kind {
+            ExportFailureKind::FilelessSource => self.union(
+                [&path, &terminal.source_kind, &terminal.declared_source_id],
+                true,
+            )?,
+            ExportFailureKind::UnresolvedMedia => self.union(
+                [&id, &terminal.source_kind],
+                matches!(variant.wem_selection(), WemSelection::UnsupportedStorage),
+            )?,
+            ExportFailureKind::Job => self.uses.origin(&[], false),
+        };
+        self.insert_export_row(
+            fields,
+            row,
+            [("trigger", name), ("wem_id", id), ("reason", reason)],
+        )
+    }
+
+    fn insert_export_row<const N: usize>(
+        &self,
+        fields: &mut FieldOrigins,
+        row: &FieldPath,
+        members: [(&str, FieldOrigin); N],
+    ) -> Result<FieldOrigin> {
         let origin = self.union(members.iter().map(|(_, origin)| origin), true)?;
         for (name, origin) in members {
             fields.insert(field(row, name)?, origin)?;
@@ -162,7 +258,14 @@ impl Capture<'_> {
         Ok(origin)
     }
 
-    fn exported_media_id(&mut self, variant: &SoundVariant<'_>) -> Result<FieldOrigin> {
+    fn exported_trigger(&self) -> Result<FieldOrigin> {
+        self.union([&self.definition.name, &self.definition.selection], true)
+    }
+
+    fn exported_route(
+        &mut self,
+        variant: &SoundVariant<'_>,
+    ) -> Result<(FieldOrigin, TerminalMediaOrigins)> {
         let event = self.definition.event(&self.uses, variant.event())?;
         let route = self.path(
             None,
@@ -171,7 +274,7 @@ impl Capture<'_> {
             &event.id,
         )?;
         let terminal = variant.terminal_media_origins(self.archive, &self.uses)?;
-        self.union([&route.path, &terminal.wem_id], true)
+        Ok((route.path, terminal))
     }
 
     fn exported_location(&self, variant: &SoundVariant<'_>) -> Result<FieldOrigin> {

@@ -21,6 +21,8 @@ use super::{SoundVariant, SourceKind};
 pub struct TerminalMediaOrigins {
     /// The plug-in selector and, when applicable, the declared media ID.
     pub wem_id: FieldOrigin,
+    /// The declared source ID, including sources that have no WEM file.
+    pub declared_source_id: FieldOrigin,
     /// The plug-in selector and, when used, the declared storage byte.
     pub source_kind: FieldOrigin,
     /// The original source flags and the bank directory path used for localisation.
@@ -68,16 +70,7 @@ impl TerminalSourceTable {
         let complete = self.version.is_some() && entry.ancestors().all(|item| item.is_some());
         let scope = uses.observe(SourceInput::ArchiveView(entry), InputScope::Payload)?;
         let mut common = self.selectors(&scope)?;
-        let site = self
-            .table
-            .source_count
-            .as_ref()
-            .map(|_| variant.source_ordinal as u64);
-        let namespace = if site.is_some() {
-            "bnkMusicTrackSource"
-        } else {
-            "bnkSoundMediaSource"
-        };
+        let (namespace, site) = self.source_coordinates(variant.source_ordinal);
         let word = |field, bytes, role| register(&scope, namespace, field, bytes, site, role);
         common.push(word(
             "pluginId",
@@ -86,13 +79,14 @@ impl TerminalSourceTable {
         )?);
 
         let mut for_id = common.clone();
-        let id_complete = match (variant.wem_id(), &row.source_id) {
-            (Some(_), Some(id)) => {
-                for_id.push(word("sourceId", id.range.clone(), SourceUseRole::Payload)?);
-                complete
-            }
-            (Some(_), None) => false,
-            (None, _) => complete,
+        if let Some(id) = &row.source_id {
+            for_id.push(word("sourceId", id.range.clone(), SourceUseRole::Payload)?);
+        }
+        let declared_source_id = uses.origin(&for_id, complete && row.source_id.is_some());
+        let wem_id = if variant.wem_id().is_some() {
+            declared_source_id.clone()
+        } else {
+            uses.origin(&common, complete)
         };
         let mut localisation_uses = common.clone();
         let localised_complete = localisation(
@@ -113,10 +107,19 @@ impl TerminalSourceTable {
         }
         let kind_complete = complete && (!reads_storage || row.storage_code.is_some());
         Ok(TerminalMediaOrigins {
-            wem_id: uses.origin(&for_id, id_complete),
+            wem_id,
+            declared_source_id,
             source_kind: uses.origin(&common, kind_complete),
             localised: uses.origin(&localisation_uses, complete && localised_complete),
         })
+    }
+
+    const fn source_coordinates(&self, ordinal: usize) -> (&'static str, Option<u64>) {
+        if self.table.source_count.is_some() {
+            ("bnkMusicTrackSource", Some(ordinal as u64))
+        } else {
+            ("bnkSoundMediaSource", None)
+        }
     }
 
     fn entry<'archive>(&self, archive: &'archive Archive) -> Option<ObservedEntry<'archive>> {
@@ -184,6 +187,7 @@ fn unknown(uses: &SourceUses) -> TerminalMediaOrigins {
     let origin = uses.origin(&[], false);
     TerminalMediaOrigins {
         wem_id: origin.clone(),
+        declared_source_id: origin.clone(),
         source_kind: origin.clone(),
         localised: origin,
     }

@@ -2,12 +2,11 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use anyhow::Result;
-use p4kx_assembly::audio::ExportReport;
 use serde::Serialize;
 
 use crate::cli::EntityAudioArgs;
 use crate::json;
-use crate::wwise_extract::{self, ExportJson};
+use crate::wwise_extract::{self, ExportJson, SoundExport};
 use crate::wwise_json::LanguageJson;
 
 use super::origins;
@@ -34,9 +33,9 @@ pub(super) fn print(
     entry: &str,
     counts: Counts,
     args: &EntityAudioArgs,
-    report: Option<&ExportReport>,
+    exported: Option<&SoundExport>,
 ) -> Result<()> {
-    let evidence = origins::capture(input, report.map(|report| (report, &args.export)))?;
+    let evidence = origins::capture(input, exported.map(|export| (export, &args.export)))?;
     json::print(&AudioJson {
         archive: json::path(input.archive.path()),
         entry,
@@ -52,9 +51,9 @@ pub(super) fn print(
             })
             .collect(),
         counts,
-        extraction: report
+        extraction: exported
             .zip(args.extract.as_deref())
-            .map(|(report, out)| wwise_extract::export_json(report, out, &args.export)),
+            .map(|(export, out)| wwise_extract::export_json(&export.report, out, &args.export)),
         issues: issues_json(input.index),
         evidence,
     })?;

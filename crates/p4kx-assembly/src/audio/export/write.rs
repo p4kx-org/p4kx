@@ -22,12 +22,16 @@ mod input;
 use self::input::{GroupInput, SoundInput};
 use super::loop_origins::{CaptureOrigins, CapturedSoundOrigin};
 use super::plan::Job;
+use super::report_origins::FailedSound;
 use super::source::SourceEntry;
-use super::{ExportFailure, ExportOptions, ExportState, ExportWatch, ExportedSound, SoundFormat};
+use super::{
+    ExportFailureKind, ExportFailureOrigin, ExportOptions, ExportState, ExportWatch, ExportedSound,
+    SoundFormat,
+};
 use crate::audio::read::entry_bytes;
 use crate::audio::{ArchiveAudio, MAX_SOUNDBANK_LEN};
 
-type Outcome = Result<WrittenSound, ExportFailure>;
+type Outcome = Result<WrittenSound, FailedSound>;
 
 pub(super) struct WrittenSound {
     pub(super) sound: ExportedSound,
@@ -50,7 +54,7 @@ pub(super) struct Target<'a> {
 impl<'archive> Target<'archive> {
     /// Returns the path the sound of `job` is written to in `format`, or the failure when that
     /// path exceeds the limit of ADR-0248.
-    fn file(self, job: &Job, format: SoundFormat) -> Result<PathBuf, ExportFailure> {
+    fn file(self, job: &Job, format: SoundFormat) -> Result<PathBuf, FailedSound> {
         let name = format!("{}.{}", job.stem, format.extension());
         check_path_length(&self.absolute.join(&name))
             .map_err(|limit| failure(job, format!("{name}: {limit}")))?;
@@ -202,12 +206,17 @@ fn run_members(
     outcomes
 }
 
-fn failure(job: &Job, reason: String) -> ExportFailure {
-    ExportFailure {
-        trigger: job.trigger.clone(),
-        wem_id: Some(job.wem_id),
+fn failure(job: &Job, reason: String) -> FailedSound {
+    FailedSound::new(
+        &job.trigger,
+        Some(job.wem_id),
         reason,
-    }
+        ExportFailureOrigin {
+            trigger_ordinal: job.selection.trigger_ordinal,
+            variant_ordinal: job.selection.variant_ordinal,
+            kind: ExportFailureKind::Job,
+        },
+    )
 }
 
 /// What writing one form produced.

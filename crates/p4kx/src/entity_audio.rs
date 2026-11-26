@@ -19,7 +19,7 @@ use crate::cli::EntityAudioArgs;
 use crate::extract::cancel_on_interrupt;
 use crate::query_table::one_line;
 use crate::wwise::{break_line, language_choice, variant_line};
-use crate::wwise_extract;
+use crate::wwise_extract::{self, SoundExport};
 use crate::wwise_json::{self, BreakJson, VariantJson};
 
 #[path = "entity_audio_origins.rs"]
@@ -135,10 +135,9 @@ pub(crate) fn run(args: &EntityAudioArgs, as_json: bool) -> Result<ExitCode> {
     });
     let sounds = resolve_sounds(&audio, &resolved, &choice, options)?;
     let counts = Counts::of(&resolved);
-    let report = export_sounds(&audio, &sounds, args, &cancel, as_json)?;
-    let code = report
-        .as_ref()
-        .map_or(ExitCode::SUCCESS, wwise_extract::exit_code);
+    let exported = export_sounds(&audio, &sounds, args, &cancel, as_json)?;
+    let report = exported.as_ref().map(|export| &export.report);
+    let code = report.map_or(ExitCode::SUCCESS, wwise_extract::exit_code);
     if let Some(inspection) = &inspection {
         let input = origins::Input {
             archive: &archive,
@@ -150,7 +149,7 @@ pub(crate) fn run(args: &EntityAudioArgs, as_json: bool) -> Result<ExitCode> {
             sounds: &sounds,
             language: resolve_variants.then_some(&choice),
         };
-        presentation::print(&input, entry.path(), counts, args, report.as_ref())?;
+        presentation::print(&input, entry.path(), counts, args, exported.as_ref())?;
         return Ok(code);
     }
     print_completion(
@@ -159,7 +158,7 @@ pub(crate) fn run(args: &EntityAudioArgs, as_json: bool) -> Result<ExitCode> {
         &resolved,
         &sounds,
         counts,
-        report.as_ref().zip(args.extract.as_deref()),
+        report.zip(args.extract.as_deref()),
     )?;
     Ok(code)
 }
@@ -208,7 +207,7 @@ fn export_sounds(
     args: &EntityAudioArgs,
     cancel: &CancelToken,
     capture_report: bool,
-) -> Result<Option<ExportReport>> {
+) -> Result<Option<SoundExport>> {
     let Some(out) = &args.extract else {
         return Ok(None);
     };
