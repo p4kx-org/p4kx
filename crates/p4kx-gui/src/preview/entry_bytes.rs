@@ -4,7 +4,7 @@
 use std::io::Read;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use p4kx_extraction::{Archive, Entry, ObservedEntry};
+use p4kx_extraction::ObservedEntry;
 
 use super::PREVIEW_SIZE_LIMIT;
 use crate::EntryIndex;
@@ -18,37 +18,12 @@ pub(super) enum Unreadable {
     Failed(Option<String>),
 }
 
-/// Reads the whole Entry `id` of `index`, up to [`PREVIEW_SIZE_LIMIT`], failing once `dropped`
-/// is set or the Archive changed on disk.
-pub(super) fn read_whole(
-    index: &EntryIndex,
-    id: u32,
-    dropped: &AtomicBool,
-) -> Result<Vec<u8>, Unreadable> {
-    read(index, id, dropped).map(|read| read.bytes)
-}
-
-/// Reads an Entry and returns the binding of the physical source opened for it.
+/// Reads an Entry up to the preview limit and returns its observed physical binding.
 pub(super) fn read_whole_observed<'index>(
     index: &'index EntryIndex,
     id: u32,
     dropped: &AtomicBool,
 ) -> Result<(Vec<u8>, Option<ObservedEntry<'index>>), Unreadable> {
-    let read = read(index, id, dropped)?;
-    Ok((read.bytes, read.archive.observed_entry(read.entry)))
-}
-
-struct EntryBytes<'index> {
-    bytes: Vec<u8>,
-    archive: &'index Archive,
-    entry: &'index Entry,
-}
-
-fn read<'index>(
-    index: &'index EntryIndex,
-    id: u32,
-    dropped: &AtomicBool,
-) -> Result<EntryBytes<'index>, Unreadable> {
     let entry = index.entry(id).ok_or(Unreadable::Failed(None))?;
     if index.watch().check().is_err() {
         return Err(Unreadable::ArchiveChanged);
@@ -74,11 +49,7 @@ fn read<'index>(
     if index.watch().check().is_err() {
         return Err(Unreadable::ArchiveChanged);
     }
-    Ok(EntryBytes {
-        bytes,
-        archive,
-        entry,
-    })
+    Ok((bytes, archive.observed_entry(entry)))
 }
 
 /// A reader that fails once the preview it reads for was dropped.

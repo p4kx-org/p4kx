@@ -90,13 +90,6 @@ pub(super) struct SoundHeader {
 }
 
 impl SoundHeader {
-    pub(super) fn of<B: AsRef<[u8]>>(wem: &Wem<B>) -> Self {
-        Self {
-            info: SoundInfo::of(wem),
-            provenance: None,
-        }
-    }
-
     pub(super) fn observed<B: AsRef<[u8]>>(
         wem: &Wem<B>,
         source: Option<ObservedEntry<'_>>,
@@ -204,8 +197,8 @@ impl AudioPreview {
         let (sender, events) = mpsc::channel();
         let dropped = Arc::new(AtomicBool::new(false));
         let watched_index = match &source {
-            Source::Entry(index, _) => Some(Arc::clone(index)),
-            _ => None,
+            Source::Entry(index, _) | Source::InBank(index, _, _) => Some(Arc::clone(index)),
+            Source::Embedded { .. } => None,
         };
         let worker = Worker::new(source, sender, Arc::clone(&dropped));
         let spawned = thread::Builder::new()

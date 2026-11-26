@@ -275,6 +275,16 @@ decoded packet. Opus records the replayed packet-size words from its
 selected seek table when one exists. A loose WEM retains its original
 file identity with unknown Archive encryption.
 
+## Embedded WEM playback in the Sounds tab
+
+The Sounds tab shows field-level encryption markers for the codec, channels,
+sample rate and duration of a selected embedded WEM. A cached bank retains the
+physical Entry and Container ancestry captured when the bank was read.
+Selecting another WEM in that bank uses the same original source with the
+new WEM's DIDX selection and its own RIFF fields. Cached bytes without an
+original binding have unknown encryption. An observed Archive change
+retires the cached preview evidence.
+
 ## Audio in extraction and folder conversion
 
 Conversion of loose PCM, ADPCM, Vorbis and Opus WEM files to WAV records the

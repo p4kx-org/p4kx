@@ -8,7 +8,7 @@ use std::sync::mpsc::Sender;
 use p4kx_extraction::{EmbeddedWem, EntryOrigin, Soundbank, Wem};
 
 use super::audio::{Event, SoundHeader};
-use super::bank_cache::BankCache;
+use super::bank_cache::{BankCache, CachedBank};
 use super::entry_bytes::{self, Unreadable};
 use crate::EntryIndex;
 use crate::audio::{self, Pcm, Undecoded};
@@ -94,24 +94,33 @@ impl Worker {
         wake: &impl Fn(),
     ) -> Option<Event> {
         let bank = match cache.get(bank) {
-            Some(kept) => kept,
-            None => match entry_bytes::read_whole(index, bank, &self.dropped) {
-                Ok(bytes) => match Soundbank::parse(bytes) {
-                    Ok(parsed) => {
-                        let parsed = Arc::new(parsed);
-                        cache.keep(bank, &parsed);
-                        parsed
-                    }
-                    Err(error) => return Some(Event::Failed(Some(describe(&error)))),
-                },
-                Err(unread) => return Some(Event::from(unread)),
+            Some(kept) if index.watch().check().is_ok() => kept,
+            Some(_) => return Some(Event::ArchiveChanged),
+            None => match self.read_bank(index, bank) {
+                Ok(loaded) => {
+                    cache.keep(bank, &loaded);
+                    loaded
+                }
+                Err(event) => return Some(event),
             },
         };
-        let event = self.run_embedded(&bank, id, wake, |wem, _| SoundHeader::of(wem))?;
+        let event = self.run_embedded(&bank.bank, id, wake, |wem, selected| {
+            SoundHeader::observed_embedded(wem, selected, bank.original.as_ref())
+        })?;
         Some(match event {
             Event::Decoded(_) if index.watch().check().is_err() => Event::ArchiveChanged,
             other => other,
         })
+    }
+
+    fn read_bank(&self, index: &EntryIndex, id: u32) -> Result<Arc<CachedBank>, Event> {
+        let (bytes, original) = entry_bytes::read_whole_observed(index, id, &self.dropped)?;
+        let bank =
+            Soundbank::parse(bytes).map_err(|error| Event::Failed(Some(describe(&error))))?;
+        Ok(Arc::new(CachedBank {
+            bank,
+            original: original.map(|entry| entry.snapshot()),
+        }))
     }
 
     fn run_embedded(
