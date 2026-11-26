@@ -6,6 +6,7 @@ use std::sync::Arc;
 use p4kx_assembly::{ArchiveFiles, Entities};
 use p4kx_extraction::{Archive, CancelToken, DataForge, DataForgeError, Language};
 
+use super::super::dependency_coverage::EquipmentCoverageFold;
 use super::ShipSourceDependencyCoverage;
 use super::{ShipSnapshot, ShipSourceSnapshot, complete};
 use crate::build::catalog_queries::unlocalized_record_query::plan::{Owner, Plan};
@@ -199,7 +200,7 @@ fn project<'source>(
     checkpoint(cancel)?;
     let pool = ShipPool::new(entities, files);
     let mut playability = ShipDependencies::new(input);
-    let mut ledger = ExportLedger::default();
+    let mut fold = EquipmentCoverageFold::default();
     let mut rows = Vec::new();
     let mut dependencies = ShipSourceDependencyCoverage::default();
     while !owners.is_empty() {
@@ -221,12 +222,12 @@ fn project<'source>(
             )? {
                 rows.push(row);
             }
-            ledger.merge(std::mem::take(&mut owner_ledger));
+            fold.observe(&std::mem::take(&mut owner_ledger))?;
         }
         owners.clear();
         groups.fill(&mut owners, cancel)?;
     }
-    dependencies.finish(files.archive(), &ledger)?;
+    fold.finish(files.archive(), &mut dependencies)?;
     Ok(SelectedShips {
         rows,
         coverage: groups.finish(),

@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use p4kx_extraction::Archive;
 
 use crate::export_diagnostic::ExportDiagnosticSeverity;
-use crate::export_entry_ledger::EntryOperation;
+use crate::export_entry_ledger::{ArchiveEntryObservation, EntryOperation};
 use crate::export_ledger::{ExportLedger, SourceDisposition};
 use crate::{CatalogError, ExportAccountingError};
 
@@ -21,7 +21,7 @@ pub enum EquipmentFailureStage {
 }
 
 /// One actual failed Archive-entry operation of this query.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct EquipmentEntryFailure {
     operation: EntryOperation,
     entry_index: Option<usize>,
@@ -126,7 +126,23 @@ impl EquipmentDependencyCoverage {
         archive: &Archive,
         ledger: &ExportLedger,
     ) -> Result<(), CatalogError> {
-        self.directory_complete = crate::export_archive_health::inventory(archive).is_none();
+        let mut fold = EquipmentCoverageFold::default();
+        fold.observe(ledger)?;
+        fold.finish(archive, self)
+    }
+}
+
+/// Folds resolver observations into their terminal SDK coverage.
+#[derive(Default)]
+pub(super) struct EquipmentCoverageFold {
+    failed_records: BTreeSet<u32>,
+    incomplete_records: BTreeSet<u32>,
+    entry_operations: BTreeMap<EquipmentEntryFailure, usize>,
+    incomplete_fields: usize,
+}
+
+impl EquipmentCoverageFold {
+    pub(super) fn observe(&mut self, ledger: &ExportLedger) -> Result<(), CatalogError> {
         self.failed_records.extend(
             ledger
                 .sources
@@ -136,8 +152,6 @@ impl EquipmentDependencyCoverage {
         );
         self.failed_records
             .extend(ledger.derived_failures.iter().map(|row| row.record_index));
-        self.failed_records.sort_unstable();
-        self.failed_records.dedup();
         self.incomplete_records.extend(
             ledger
                 .field_inspections
@@ -145,32 +159,8 @@ impl EquipmentDependencyCoverage {
                 .filter(|row| !row.complete)
                 .map(|row| row.record_index),
         );
-        self.incomplete_records.sort_unstable();
-        self.incomplete_records.dedup();
-        let mut entry_operations = BTreeSet::new();
         for row in &ledger.entries {
-            let stage = match row.disposition {
-                SourceDisposition::ReadFailed => EquipmentFailureStage::SourceRead,
-                SourceDisposition::ProjectionFailed => EquipmentFailureStage::Projection,
-                _ => continue,
-            };
-            if !entry_operations.insert((
-                row.operation,
-                row.entry_index,
-                row.container_entry_index,
-                row.path.as_str(),
-                stage,
-            )) {
-                continue;
-            }
-            let failure = EquipmentEntryFailure {
-                operation: row.operation,
-                entry_index: row.entry_index,
-                container_entry_index: row.container_entry_index,
-                path: row.path.to_string(),
-                stage,
-            };
-            self.failed_entries.push(failure);
+            self.observe_entry(row);
         }
         for row in &ledger.field_diagnostics {
             if row.severity != ExportDiagnosticSeverity::Information {
@@ -182,4 +172,49 @@ impl EquipmentDependencyCoverage {
         }
         Ok(())
     }
+
+    fn observe_entry(&mut self, row: &ArchiveEntryObservation) {
+        let stage = match row.disposition {
+            SourceDisposition::ReadFailed => EquipmentFailureStage::SourceRead,
+            SourceDisposition::ProjectionFailed => EquipmentFailureStage::Projection,
+            _ => return,
+        };
+        let failure = EquipmentEntryFailure {
+            operation: row.operation,
+            entry_index: row.entry_index,
+            container_entry_index: row.container_entry_index,
+            path: row.path.to_string(),
+            stage,
+        };
+        let next = self.entry_operations.len();
+        self.entry_operations.entry(failure).or_insert(next);
+    }
+
+    pub(super) fn finish(
+        self,
+        archive: &Archive,
+        coverage: &mut EquipmentDependencyCoverage,
+    ) -> Result<(), CatalogError> {
+        coverage.directory_complete = crate::export_archive_health::inventory(archive).is_none();
+        coverage.failed_records.extend(self.failed_records);
+        coverage.failed_records.sort_unstable();
+        coverage.failed_records.dedup();
+        coverage.incomplete_records.extend(self.incomplete_records);
+        coverage.incomplete_records.sort_unstable();
+        coverage.incomplete_records.dedup();
+        let mut failures: Vec<_> = self.entry_operations.into_iter().collect();
+        failures.sort_unstable_by_key(|(_, order)| *order);
+        coverage
+            .failed_entries
+            .extend(failures.into_iter().map(|(failure, _)| failure));
+        coverage.incomplete_fields = coverage
+            .incomplete_fields
+            .checked_add(self.incomplete_fields)
+            .ok_or(ExportAccountingError::CounterOverflow)?;
+        Ok(())
+    }
 }
+
+#[cfg(test)]
+#[path = "equipment_dependency_coverage_tests.rs"]
+mod tests;
