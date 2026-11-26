@@ -27,6 +27,7 @@ thiserror.workspace = true
 zstd.workspace = true
 
 [dev-dependencies]
+hashbrown = { version = "0.17.1", default-features = false }
 num-bigint = "0.4.8"
 num-traits = "0.2.19"
 p4kx-testkit.workspace = true

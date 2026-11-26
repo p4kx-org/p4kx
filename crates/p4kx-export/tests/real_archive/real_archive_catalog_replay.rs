@@ -34,6 +34,10 @@ fn replay_completed_catalog_provenance_and_sections() -> TestResult {
         .ok_or("P4KX_CATALOG_MEASUREMENT_DIR is required")?;
     let binding = Receipt::read(&directory)?.binding()?;
     let first = artifact::read_completed(&directory, |input| index(input))?;
+    support::print_line(&format!(
+        "catalog replay indexed decodedBytes={} physicalSources={} sourceUses={}; verifying cells",
+        first.sections.decoded_bytes, first.sections.physical_sources, first.sections.source_uses,
+    ));
     let second = artifact::read_completed(&directory, |input| verify(input, &first, &binding))?;
     support::print_line(&format!(
         "catalog replay decodedBytes={} decodedSha256={} physicalSources={} sourceUses={} variantSourceUseSets={} rows={} sections={}",

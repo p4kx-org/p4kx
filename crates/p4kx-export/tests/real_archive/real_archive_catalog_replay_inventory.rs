@@ -10,12 +10,17 @@ use serde::{Deserialize, Deserializer};
 
 #[path = "real_archive_catalog_replay_references.rs"]
 mod references;
+#[path = "real_archive_catalog_replay_use_index.rs"]
+mod use_index;
 
 pub(super) use references::{Observed, References};
+use use_index::UseIndex;
+
+const FIRST_INDEX_PROGRESS: usize = 1 << 22;
 
 pub(super) struct Inventory {
     sources: u64,
-    uses: HashMap<Box<str>, UseFacts>,
+    uses: UseIndex,
     variant_sets: HashMap<u32, VariantSet>,
 }
 
@@ -246,7 +251,7 @@ impl Sources {
 
 #[derive(Default)]
 struct Uses {
-    rows: HashMap<Box<str>, UseFacts>,
+    rows: UseIndex,
     selectors: Vec<Box<str>>,
 }
 
@@ -260,8 +265,10 @@ impl Uses {
             encryption: row.effective_encryption,
             opaque: matches!(row.location, Location::Opaque),
         };
-        if row.id.is_empty() || self.rows.insert(row.id, facts).is_some() {
-            return Err("invalid or duplicate source-use ID");
+        self.rows.insert(&row.id, facts)?;
+        let indexed = self.rows.len();
+        if indexed >= FIRST_INDEX_PROGRESS && indexed.is_power_of_two() {
+            super::support::print_line(&format!("catalog replay indexing sourceUses={indexed}"));
         }
         if let Location::LocalizationLookup { selector } = row.location {
             self.selectors.push(selector);
@@ -269,7 +276,7 @@ impl Uses {
         Ok(())
     }
 
-    fn finish(self) -> Result<HashMap<Box<str>, UseFacts>, &'static str> {
+    fn finish(self) -> Result<UseIndex, &'static str> {
         for selector in self.selectors {
             let source = self
                 .rows

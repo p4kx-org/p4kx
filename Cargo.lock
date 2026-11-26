@@ -3705,6 +3705,7 @@ name = "p4kx-export"
 version = "0.4.2"
 dependencies = [
  "crc32c",
+ "hashbrown 0.17.1",
  "jsonschema",
  "num-bigint",
  "num-traits",

@@ -1,13 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::HashMap;
 use std::fmt;
 
 use serde::Deserializer;
 use serde::de::{self, DeserializeSeed, SeqAccess, Visitor};
 
-use super::{Encryption, Inventory, Role, UseFacts};
+use super::{Encryption, Inventory, Role, UseFacts, UseIndex};
 
 #[derive(Clone, Copy, Default)]
 pub(in super::super) struct Observed {
@@ -87,7 +86,7 @@ impl<'de> Visitor<'de> for References<'_> {
 }
 
 pub(super) fn contributors(
-    uses: &HashMap<Box<str>, UseFacts>,
+    uses: &UseIndex,
     references: &[Box<str>],
 ) -> Result<Observed, &'static str> {
     let mut observed = Observed::default();
@@ -99,10 +98,7 @@ pub(super) fn contributors(
     Ok(observed)
 }
 
-pub(super) fn check_attempts(
-    uses: &HashMap<Box<str>, UseFacts>,
-    references: &[Box<str>],
-) -> Result<(), &'static str> {
+pub(super) fn check_attempts(uses: &UseIndex, references: &[Box<str>]) -> Result<(), &'static str> {
     let mut previous = None;
     for reference in references {
         if lookup(uses, previous, reference)?.role != Role::Attempted {
@@ -113,13 +109,9 @@ pub(super) fn check_attempts(
     Ok(())
 }
 
-fn lookup(
-    uses: &HashMap<Box<str>, UseFacts>,
-    previous: Option<&str>,
-    id: &str,
-) -> Result<UseFacts, &'static str> {
+fn lookup(uses: &UseIndex, previous: Option<&str>, id: &str) -> Result<UseFacts, &'static str> {
     if previous.is_some_and(|previous| previous >= id) {
         return Err("source-use references must be sorted and unique");
     }
-    uses.get(id).copied().ok_or("missing referenced source use")
+    uses.get(id).ok_or("missing referenced source use")
 }
