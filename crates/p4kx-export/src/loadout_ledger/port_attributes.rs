@@ -2,10 +2,12 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::HashMap;
+use std::sync::Arc;
 
 use p4kx_assembly::{PortDefinition, PortDefinitionPosition, VehiclePortSelection};
 use p4kx_extraction::{
-    Archive, SourceUse, SourceUseRole, SourceValue, SourcedValue, StructValue, Value,
+    Archive, SharedFieldOrigin, SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue,
+    StructValue, Value,
 };
 
 use super::Capture;
@@ -15,7 +17,6 @@ use crate::catalog_read::original::{
 };
 use crate::{CatalogError, ExportAccountingError, Kind};
 
-#[derive(Clone)]
 struct DefinitionFacts {
     selectors: Vec<SourceUse>,
     min: FieldFact<u32>,
@@ -26,7 +27,6 @@ struct DefinitionFacts {
     display_name_key: FieldFact<String>,
 }
 
-#[derive(Clone)]
 struct FieldFact<T> {
     value: SourceValue<T>,
     inputs: Vec<SourceUse>,
@@ -35,7 +35,7 @@ struct FieldFact<T> {
 
 #[derive(Default)]
 pub(super) struct RecordPortAttributes {
-    definitions: HashMap<PortDefinitionPosition, DefinitionFacts>,
+    definitions: HashMap<PortDefinitionPosition, Arc<DefinitionFacts>>,
 }
 
 pub(crate) struct PortAttributes {
@@ -80,7 +80,7 @@ impl Capture<'_> {
         if state
             .port_attributes
             .definitions
-            .insert(position, attributes)
+            .insert(position, Arc::new(attributes))
             .is_some()
         {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
@@ -121,40 +121,19 @@ impl Capture<'_> {
         }
         let facts = {
             let state = self.lock()?;
-            let facts = state
-                .port_attributes
-                .definitions
-                .get(&definition.position())
-                .ok_or(ExportAccountingError::UnobservedFailure)?
-                .clone();
-            drop(state);
-            facts
+            Arc::clone(
+                state
+                    .port_attributes
+                    .definitions
+                    .get(&definition.position())
+                    .ok_or(ExportAccountingError::UnobservedFailure)?,
+            )
         };
-        let (selection, complete) = name.map_or_else(
+        let (selectors, complete) = name.map_or_else(
             || Ok((Vec::new(), false)),
             AuthoredEntryPath::selector_inputs,
         )?;
-        let mut selectors = facts.selectors;
-        selectors.extend(selection);
-        Ok(PortAttributes {
-            min_size: self.definition_field(facts.min, &selectors, complete),
-            max_size: self.definition_field(facts.max, &selectors, complete),
-            flags: self.definition_field(facts.flags, &selectors, complete),
-            port_tags: self.definition_field(facts.port_tags, &selectors, complete),
-            required_tags: self.definition_field(facts.required_tags, &selectors, complete),
-            display_name_key: self.definition_field(facts.display_name_key, &selectors, complete),
-        })
-    }
-
-    fn definition_field<T>(
-        &self,
-        mut fact: FieldFact<T>,
-        selectors: &[SourceUse],
-        complete: bool,
-    ) -> SourcedValue<T> {
-        fact.inputs.extend_from_slice(selectors);
-        self.name_sources
-            .value(fact.value, &fact.inputs, complete && fact.complete)
+        facts.bind(&self.name_sources, selectors, complete)
     }
 
     pub(crate) fn vehicle_attributes(
@@ -208,6 +187,41 @@ impl Capture<'_> {
         };
         drop(state);
         Ok(attributes)
+    }
+}
+
+impl DefinitionFacts {
+    fn bind(
+        &self,
+        sources: &SourceUses,
+        mut selectors: Vec<SourceUse>,
+        complete: bool,
+    ) -> Result<PortAttributes, CatalogError> {
+        selectors.extend_from_slice(&self.selectors);
+        let shared = sources.shared_origin(&selectors, complete);
+        Ok(PortAttributes {
+            min_size: self.min.bind(sources, &shared)?,
+            max_size: self.max.bind(sources, &shared)?,
+            flags: self.flags.bind(sources, &shared)?,
+            port_tags: self.port_tags.bind(sources, &shared)?,
+            required_tags: self.required_tags.bind(sources, &shared)?,
+            display_name_key: self.display_name_key.bind(sources, &shared)?,
+        })
+    }
+}
+
+impl<T: Clone> FieldFact<T> {
+    fn bind(
+        &self,
+        sources: &SourceUses,
+        shared: &SharedFieldOrigin,
+    ) -> Result<SourcedValue<T>, CatalogError> {
+        Ok(sources.value_with_shared_origin(
+            self.value.clone(),
+            shared,
+            &self.inputs,
+            self.complete,
+        )?)
     }
 }
 
@@ -327,3 +341,7 @@ fn flag_words(value: &str) -> Vec<String> {
         .map(str::to_owned)
         .collect()
 }
+
+#[cfg(test)]
+#[path = "port_attribute_tests.rs"]
+mod tests;

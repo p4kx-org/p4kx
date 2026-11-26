@@ -763,10 +763,20 @@ key with the original header receipt and clone the handle. Layout tests verify b
 representations and preserve the original evidence and authority checks.
 
 Item definitions and Entity tag declarations are compressed individually as the Record
-scan produces them. The publisher replays the indexed frames in canonical GUID and
-Record order for each JSON pass. The weapon animation join keeps its original sourced
-attachment fields in memory.
-Measure both the spool bytes and the cost of seeking to the ordered frames.
+scan produces them. The indexed writer streams each JSON row into its own checksummed
+frame through fixed-size buffers and reuses the compression context. Its index keeps
+the exact encoded length, compressed length and physical offset. The publisher replays
+the frames in canonical GUID and Record order for each JSON pass. Replay still allocates
+the input and output for one frame at a time. The weapon animation join keeps its
+original sourced attachment fields in memory.
+
+An isolated Windows AMD64 comparison with identical synthetic rows and pinned libraries
+measured the preparation stage in four fresh processes per workload. With two wide
+rows, private commit peaked at 211.0 MB with the buffered writer and 2.4 MB with the
+streaming writer, with 120–123 ms and 99–100 ms elapsed. With 40,000 small rows, private
+commit peaked at 5.2 MB and 5.9 MB, with 83–91 ms and 119–124 ms elapsed. These timings
+cover the indexed writer and its final sort. The packaged producer acceptance measures
+the complete preparation, publication and replay separately.
 Inventory item bounds are staged during the same scan in physical Record and Component order.
 Inventory storage selections stay in memory for the capacity and facility joins.
 
@@ -775,7 +785,10 @@ run in parallel within each scan window. The first ship to read a shared file ow
 One observed loadout resolver visits roots in stable GUID order and stages each complete row in
 one sequential compressed spool. It retains only the typed Ship port and owner data needed for
 crafter, facility and resource topology joins. The joins use the original attachment and name
-evidence. The producer releases those trees after the topology join. Record process writes during
+evidence. The producer releases those trees after the topology join. Each Record-defined port
+shares the selection evidence for its six attribute fields within that specific occurrence. Each
+field retains its own original inputs and completeness. Stage and SDK tests compare the serialized
+fields against their flat evidence sets in both provenance modes. Record process writes during
 loadout resolution and retained private bytes on entry to location and facility-interior projection.
 
 After each Record and ContractGenerator window and at selected projection boundaries, the

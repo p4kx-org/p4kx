@@ -10,7 +10,7 @@ use serde::{Serialize, Serializer};
 use serde_json::json;
 use serde_json::value::RawValue;
 
-use super::{RowSpoolError, RowSpoolWriter};
+use super::{IndexedRowSpoolWriter, RowSpoolError, RowSpoolWriter};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -207,6 +207,25 @@ fn cancellation_during_a_streamed_row_closes_the_writer() -> TestResult {
     };
     assert!(matches!(
         writer.append(&partial, Some(&cancel)),
+        Err(RowSpoolError::Cancelled)
+    ));
+    assert!(matches!(writer.finish(None), Err(RowSpoolError::Closed)));
+    assert_eq!(scratch.path().read_dir()?.count(), 0);
+    Ok(())
+}
+
+#[test]
+fn indexed_cancellation_during_a_streamed_row_closes_the_writer() -> TestResult {
+    let scratch = tempfile::tempdir()?;
+    let mut writer = IndexedRowSpoolWriter::new(scratch.path())?;
+    writer.append(0, &1, None)?;
+    let cancel = CancelToken::new();
+    let partial = CancelDuringRow {
+        prefix: "x".repeat(super::BUFFER_BYTES + 1),
+        cancel: &cancel,
+    };
+    assert!(matches!(
+        writer.append(1, &partial, Some(&cancel)),
         Err(RowSpoolError::Cancelled)
     ));
     assert!(matches!(writer.finish(None), Err(RowSpoolError::Closed)));

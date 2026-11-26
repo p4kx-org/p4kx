@@ -83,21 +83,7 @@ impl RowSpoolWriter {
         let mut encoder = self.encoder.take().ok_or(RowSpoolError::Closed)?;
         checkpoint(cancel)?;
         self.lengths.try_reserve(1)?;
-        let mut output = RowWriter {
-            inner: CheckedIo::new(&mut encoder, cancel),
-            length: 0,
-        };
-        let serialized = serde_json::to_writer(&mut output, row);
-        checkpoint(cancel)?;
-        serialized.map_err(|error| {
-            if error.is_io() {
-                RowSpoolError::Io(error.into())
-            } else {
-                RowSpoolError::Encode(error)
-            }
-        })?;
-        let length = NonZeroUsize::new(output.length)
-            .ok_or(RowSpoolError::Corrupt("encoded row is empty"))?;
+        let length = write_row(&mut encoder, row, cancel)?;
         self.lengths.push(length);
         self.encoder = Some(encoder);
         Ok(())
@@ -298,9 +284,33 @@ fn checked_read(
     }
 }
 
+fn write_row(
+    writer: &mut impl Write,
+    row: &(impl Serialize + ?Sized),
+    cancel: Option<&CancelToken>,
+) -> Result<NonZeroUsize, RowSpoolError> {
+    let mut output = RowWriter::new(CheckedIo::new(writer, cancel));
+    let serialized = serde_json::to_writer(&mut output, row);
+    checkpoint(cancel)?;
+    serialized.map_err(|error| {
+        if error.is_io() {
+            RowSpoolError::Io(error.into())
+        } else {
+            RowSpoolError::Encode(error)
+        }
+    })?;
+    NonZeroUsize::new(output.length).ok_or(RowSpoolError::Corrupt("encoded row is empty"))
+}
+
 struct RowWriter<W> {
     inner: W,
     length: usize,
+}
+
+impl<W> RowWriter<W> {
+    const fn new(inner: W) -> Self {
+        Self { inner, length: 0 }
+    }
 }
 
 impl<W: Write> Write for RowWriter<W> {
@@ -315,39 +325,6 @@ impl<W: Write> Write for RowWriter<W> {
 
     fn flush(&mut self) -> io::Result<()> {
         self.inner.flush()
-    }
-}
-
-#[derive(Default)]
-struct RowBuffer {
-    bytes: Vec<u8>,
-}
-
-impl RowBuffer {
-    fn encode(
-        &mut self,
-        row: &(impl Serialize + ?Sized),
-        cancel: Option<&CancelToken>,
-    ) -> Result<&[u8], RowSpoolError> {
-        self.bytes.clear();
-        let serialized = serde_json::to_writer(CheckedIo::new(&mut *self, cancel), row);
-        checkpoint(cancel)?;
-        serialized.map_err(RowSpoolError::Encode)?;
-        Ok(&self.bytes)
-    }
-}
-
-impl Write for RowBuffer {
-    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
-        self.bytes
-            .try_reserve(bytes.len())
-            .map_err(io::Error::other)?;
-        self.bytes.extend_from_slice(bytes);
-        Ok(bytes.len())
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        Ok(())
     }
 }
 
