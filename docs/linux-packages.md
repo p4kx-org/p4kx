@@ -43,17 +43,17 @@ prefixes = ["/pfad/zum/StarCitizen-Praefix"]
 ```
 
 Die Suche beginnt mit `WINEPREFIX` und den konfigurierten Präfixen in ihrer Reihenfolge.
-Danach prüft P4KX `~/Games/star-citizen` und `STEAM_COMPAT_DATA_PATH/pfx`. Steam wird
-unter `$XDG_DATA_HOME/Steam`, `~/.steam/steam`, `~/.steam/root`, `~/.local/share/Steam`
-sowie unter `data/Steam` und `.local/share/Steam` im Profil `~/.var/app/com.valvesoftware.Steam/`
-gesucht. Aus `steamapps/libraryfolders.vdf` und
-`config/libraryfolders.vdf` ermittelte Bibliotheken tragen ihre Proton-Präfixe unter
-`steamapps/compatdata/<numerische App-ID>/pfx` bei.
+Danach prüft P4KX `~/Games/star-citizen` und `STEAM_COMPAT_DATA_PATH/pfx`. Konfigurierte
+Steam-Installationen haben Vorrang vor den Standardpfaden `$XDG_DATA_HOME/Steam`,
+`~/.steam/steam`, `~/.steam/root`, `~/.local/share/Steam` und den Steam-Pfaden
+`data/Steam` und `.local/share/Steam` im Flatpak-Profil `~/.var/app/com.valvesoftware.Steam/`.
+P4KX liest `steamapps/libraryfolders.vdf` und `config/libraryfolders.vdf` in dieser
+Reihenfolge und prüft anschließend ausdrücklich konfigurierte Bibliotheken. In jedem
+Bibliothekspfad liegen die Proton-Präfixe unter `steamapps/compatdata/<numerische App-ID>/pfx`.
 
-P4KX sucht Bottles-Präfixe direkt unter `$XDG_DATA_HOME/bottles/bottles` (Standard
-`~/.local/share/bottles/bottles`) oder unter
-`~/.var/app/com.usebottles.bottles/data/bottles/bottles`. Ausdrücklich konfigurierte
-CrossOver-Wurzeln werden zwischen diesen beiden Orten geprüft. Für Lutris oder eigene
+Auf konfigurierte Bottles-Wurzeln folgt `$XDG_DATA_HOME/bottles/bottles` (Standard
+`~/.local/share/bottles/bottles`). P4KX prüft danach konfigurierte CrossOver-Wurzeln
+und den Flatpak-Pfad `~/.var/app/com.usebottles.bottles/data/bottles/bottles`. Für Lutris oder eigene
 Installationen prüft P4KX anschließend direkte Unterordner von `~/Games`. P4KX prüft die
 exakte Schreibweise jedes Pfadbestandteils zuerst und akzeptiert andernfalls nur einen
 eindeutigen Treffer ohne Beachtung der ASCII-Groß- und Kleinschreibung. Eine mehrdeutige
@@ -175,9 +175,11 @@ prefixes = ["/absolute/path/to/prefix"]
 ```
 
 P4KX checks `WINEPREFIX` and configured prefixes first, followed by `~/Games/star-citizen`
-and `STEAM_COMPAT_DATA_PATH/pfx`. It searches Steam compatibility data, including external
-libraries listed in `steamapps/libraryfolders.vdf` or `config/libraryfolders.vdf`.
-Native Bottles roots, configured CrossOver bottle roots and Flatpak Bottles roots follow.
+and `STEAM_COMPAT_DATA_PATH/pfx`. It checks configured Steam installations before the
+standard Steam roots. Steam libraries from `steamapps/libraryfolders.vdf` and
+`config/libraryfolders.vdf` are checked before explicitly configured libraries. P4KX then
+checks configured Bottles roots, the standard native Bottles root, configured CrossOver
+roots and the Flatpak Bottles root.
 P4KX then checks immediate `~/Games` children for Lutris or custom installs. Each component
 uses an exact spelling first, then a unique ASCII case-insensitive match. Ambiguous or
 incomplete discovery is reported.
@@ -399,6 +401,13 @@ the tar.gz, AppImage, deb and Flatpak launchers, software-rendered desktop frame
 and Documents portal grants. Both published their executed release payloads.
 [AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45714089604/job/139569392888) ·
 [ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45714089604/job/139569392909)
+
+Release merge `76849e9e755c2b2c1a64a2df8a33f7cbc5219794` for PR #1117 head
+`a839b2adad` passed the native Linux package jobs on both CPUs. The required execution
+step ran all four packaged launchers, rendered software desktop frames and exercised
+Documents portal grants. The jobs uploaded the executed package evidence.
+[AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45747658169/job/139680058941) ·
+[ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45747658169/job/139680058878)
 
 The tagged v0.5.0 candidate requires its own hosted Linux package evidence on both CPUs.
 
