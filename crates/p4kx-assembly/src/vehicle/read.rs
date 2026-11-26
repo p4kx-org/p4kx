@@ -6,10 +6,10 @@ use std::collections::HashMap;
 use p4kx_extraction::SourceValue;
 use p4kx_foundation::read_text_number;
 
-use super::aggregate_evidence::Checkpoint;
+use super::aggregate_evidence::{Checkpoint, VehicleEvidenceCapture};
 use super::{
-    ITEM_SUBTYPES_ATTRIBUTE, ITEM_TYPE_ATTRIBUTE, PartKind, VehicleAggregateEvidence,
-    VehicleItemPort, VehicleItemType, VehiclePart,
+    ITEM_SUBTYPES_ATTRIBUTE, ITEM_TYPE_ATTRIBUTE, PartKind, VehicleItemPort, VehicleItemType,
+    VehiclePart,
 };
 use crate::markup::Element;
 use crate::merge::port_key;
@@ -23,21 +23,21 @@ pub(super) struct IndexedPort {
 pub(super) struct PartTree {
     pub(super) parts: Vec<VehiclePart>,
     pub(super) paths: HashMap<String, IndexedPort>,
-    pub(super) selectors: Option<VehicleAggregateEvidence>,
+    pub(super) selectors: Option<VehicleEvidenceCapture>,
     pub(super) port_occurrences: Vec<Checkpoint>,
     pub(super) rolling_parts: bool,
-    pub(super) rolling_selectors: Option<VehicleAggregateEvidence>,
+    pub(super) rolling_selectors: Option<VehicleEvidenceCapture>,
 }
 
 pub(super) fn parts(
     vehicle: &Element,
-    totals: Option<&mut VehicleAggregateEvidence>,
+    totals: Option<&mut VehicleEvidenceCapture>,
     observe_ports: bool,
 ) -> PartTree {
-    let rolling_selectors = totals.is_some().then(VehicleAggregateEvidence::new);
+    let rolling_selectors = totals.is_some().then(VehicleEvidenceCapture::new);
     let mut reader = PartReader {
         totals,
-        selectors: observe_ports.then(VehicleAggregateEvidence::new),
+        selectors: observe_ports.then(VehicleEvidenceCapture::new),
         rolling_observation: rolling_selectors,
         rolling_parts: false,
         found_wheel: false,
@@ -65,9 +65,9 @@ pub(super) fn parts(
 }
 
 struct PartReader<'scope> {
-    totals: Option<&'scope mut VehicleAggregateEvidence>,
-    selectors: Option<VehicleAggregateEvidence>,
-    rolling_observation: Option<VehicleAggregateEvidence>,
+    totals: Option<&'scope mut VehicleEvidenceCapture>,
+    selectors: Option<VehicleEvidenceCapture>,
+    rolling_observation: Option<VehicleEvidenceCapture>,
     rolling_parts: bool,
     found_wheel: bool,
     paths: HashMap<String, IndexedPort>,
@@ -87,7 +87,7 @@ impl PartReader<'_> {
         }
     }
 
-    const fn rolling_observation(&mut self) -> Option<&mut VehicleAggregateEvidence> {
+    const fn rolling_observation(&mut self) -> Option<&mut VehicleEvidenceCapture> {
         if self.found_wheel {
             None
         } else {

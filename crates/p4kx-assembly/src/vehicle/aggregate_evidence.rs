@@ -35,7 +35,6 @@ pub enum VehicleAggregateIssue {
 #[derive(Debug, Clone)]
 pub struct VehicleAggregateEvidence {
     selectors: Vec<Arc<VehicleXmlSite>>,
-    seen: HashSet<SelectorSite>,
     issues: Vec<VehicleAggregateIssue>,
 }
 
@@ -74,14 +73,6 @@ pub(super) struct Checkpoint {
 }
 
 impl VehicleAggregateEvidence {
-    pub(super) fn new() -> Self {
-        Self {
-            selectors: Vec::new(),
-            seen: HashSet::new(),
-            issues: Vec::new(),
-        }
-    }
-
     /// Borrows distinct actual selectors in their first observed order.
     /// Numeric conversion uses come from [`VehicleImplementation::totals_with_field_uses`].
     pub fn selectors(&self) -> impl Iterator<Item = &VehicleXmlSite> {
@@ -102,48 +93,6 @@ impl VehicleAggregateEvidence {
             .issues
             .contains(&VehicleAggregateIssue::OriginalEvidenceUnavailable)
             && self.selectors.iter().all(|site| site.location().is_some())
-    }
-
-    pub(super) fn issue(&mut self, issue: VehicleAggregateIssue) {
-        if !self.issues.contains(&issue) {
-            self.issues.push(issue);
-        }
-    }
-
-    pub(super) fn selection(&mut self, site: Option<VehicleXmlSite>) {
-        let Some(site) = site else {
-            self.issue(VehicleAggregateIssue::OriginalEvidenceUnavailable);
-            return;
-        };
-        let key = SelectorSite(Arc::new(site));
-        if self.seen.insert(key.clone()) {
-            self.selectors.push(key.0);
-        }
-    }
-
-    pub(super) fn element(&mut self, element: &Element, field: &str) {
-        self.selection(element.origins.element().map(|site| site.with_field(field)));
-    }
-
-    pub(super) fn field(&mut self, element: &Element, name: &str) {
-        match element.origins.evidence(name) {
-            Some(evidence) => self.assignment(evidence),
-            None => self.element(element, "$attributes"),
-        }
-    }
-
-    pub(super) fn assignment(&mut self, evidence: &VehicleAttributeEvidence) {
-        self.selection(Some(evidence.original().clone()));
-        for selector in evidence.selectors() {
-            self.selection(Some(selector.clone()));
-        }
-    }
-
-    pub(super) const fn checkpoint(&self) -> Checkpoint {
-        Checkpoint {
-            selectors: self.selectors.len(),
-            issues: self.issues.len(),
-        }
     }
 
     pub(super) fn prefix_selectors(
@@ -170,12 +119,80 @@ impl VehicleAggregateEvidence {
                 .prefix_selectors(checkpoint)
                 .all(|site| site.location().is_some())
     }
+}
+
+pub(super) struct VehicleEvidenceCapture {
+    evidence: VehicleAggregateEvidence,
+    seen: HashSet<SelectorSite>,
+}
+
+impl VehicleEvidenceCapture {
+    pub(super) fn new() -> Self {
+        Self {
+            evidence: VehicleAggregateEvidence {
+                selectors: Vec::new(),
+                issues: Vec::new(),
+            },
+            seen: HashSet::new(),
+        }
+    }
+
+    pub(super) fn finish(self) -> VehicleAggregateEvidence {
+        self.evidence
+    }
+
+    #[cfg(test)]
+    pub(super) const fn evidence(&self) -> &VehicleAggregateEvidence {
+        &self.evidence
+    }
+
+    pub(super) fn issue(&mut self, issue: VehicleAggregateIssue) {
+        if !self.evidence.issues.contains(&issue) {
+            self.evidence.issues.push(issue);
+        }
+    }
+
+    pub(super) fn selection(&mut self, site: Option<VehicleXmlSite>) {
+        let Some(site) = site else {
+            self.issue(VehicleAggregateIssue::OriginalEvidenceUnavailable);
+            return;
+        };
+        let key = SelectorSite(Arc::new(site));
+        if self.seen.insert(key.clone()) {
+            self.evidence.selectors.push(key.0);
+        }
+    }
+
+    pub(super) fn element(&mut self, element: &Element, field: &str) {
+        self.selection(element.origins.element().map(|site| site.with_field(field)));
+    }
+
+    pub(super) fn field(&mut self, element: &Element, name: &str) {
+        match element.origins.evidence(name) {
+            Some(evidence) => self.assignment(evidence),
+            None => self.element(element, "$attributes"),
+        }
+    }
+
+    pub(super) fn assignment(&mut self, evidence: &VehicleAttributeEvidence) {
+        self.selection(Some(evidence.original().clone()));
+        for selector in evidence.selectors() {
+            self.selection(Some(selector.clone()));
+        }
+    }
+
+    pub(super) const fn checkpoint(&self) -> Checkpoint {
+        Checkpoint {
+            selectors: self.evidence.selectors.len(),
+            issues: self.evidence.issues.len(),
+        }
+    }
 
     pub(super) fn restore(&mut self, checkpoint: Checkpoint) {
-        for site in self.selectors.drain(checkpoint.selectors..) {
+        for site in self.evidence.selectors.drain(checkpoint.selectors..) {
             self.seen.remove(&SelectorSite(site));
         }
-        self.issues.truncate(checkpoint.issues);
+        self.evidence.issues.truncate(checkpoint.issues);
     }
 }
 

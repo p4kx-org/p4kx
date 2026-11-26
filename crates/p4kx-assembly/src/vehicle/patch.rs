@@ -8,7 +8,7 @@ mod overlay;
 #[path = "patch_scope.rs"]
 mod scope;
 
-use crate::VehicleAggregateEvidence;
+use super::aggregate_evidence::VehicleEvidenceCapture;
 use scope::PatchScope;
 
 use super::{ElemOverride, ValueOrigin, VehicleAttributeEvidence};
@@ -96,7 +96,7 @@ pub(super) fn apply_patch(
     base: &mut Element,
     patch: &Element,
     budget: &mut Budget,
-    aggregate: Option<&mut VehicleAggregateEvidence>,
+    aggregate: Option<&mut VehicleEvidenceCapture>,
 ) -> Result<ModificationReport, String> {
     let mut scope = PatchScope::new(aggregate);
     scope.element(patch, "$name");
@@ -309,7 +309,7 @@ pub(super) fn apply_elems(
     base: &mut Element,
     elems: &[ElemOverride],
     budget: &mut Budget,
-    aggregate: Option<&mut VehicleAggregateEvidence>,
+    aggregate: Option<&mut VehicleEvidenceCapture>,
 ) -> Result<Vec<String>, String> {
     if elems.is_empty() {
         return Ok(Vec::new());

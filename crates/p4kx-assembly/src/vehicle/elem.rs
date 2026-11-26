@@ -3,8 +3,9 @@
 
 use std::sync::Arc;
 
+use super::aggregate_evidence::VehicleEvidenceCapture;
 use crate::loadout_xml::{MissingAttribute, Node, Scope};
-use crate::{LoadoutPath, VehicleAggregateEvidence, VehicleAttributeEvidence, VehicleXmlSite};
+use crate::{LoadoutPath, VehicleAttributeEvidence, VehicleXmlSite};
 
 use super::{ITEM_SUBTYPES_ATTRIBUTE, ITEM_TYPE_ATTRIBUTE, PORT_OBSERVED_ATTRIBUTES};
 
@@ -27,7 +28,7 @@ pub(super) fn find_modification(
     vehicle: Node<'_, '_>,
     scope: &Scope<'_, '_>,
     requested: &str,
-    mut aggregate: Option<&mut VehicleAggregateEvidence>,
+    mut aggregate: Option<&mut VehicleEvidenceCapture>,
 ) -> Result<Option<Modification>, String> {
     let Some((node, authored_name)) =
         select_modification(vehicle, scope, requested, &mut aggregate)
@@ -59,7 +60,7 @@ fn read_elems(
     node: Node<'_, '_>,
     scope: &Scope<'_, '_>,
     modification: Option<&VehicleXmlSite>,
-    aggregate: &mut Option<&mut VehicleAggregateEvidence>,
+    aggregate: &mut Option<&mut VehicleEvidenceCapture>,
 ) -> Result<Vec<ElemOverride>, String> {
     let mut elems = Vec::new();
     observe_element(aggregate, scope, node, "$children");
@@ -152,7 +153,7 @@ fn select_modification<'document, 'input>(
     vehicle: Node<'document, 'input>,
     scope: &Scope<'_, '_>,
     requested: &str,
-    aggregate: &mut Option<&mut VehicleAggregateEvidence>,
+    aggregate: &mut Option<&mut VehicleEvidenceCapture>,
 ) -> Option<(Node<'document, 'input>, &'document str)> {
     let mut fallback = None;
     observe_element(aggregate, scope, vehicle, "$children");
@@ -183,7 +184,7 @@ fn select_modification<'document, 'input>(
 }
 
 fn observe_element(
-    aggregate: &mut Option<&mut VehicleAggregateEvidence>,
+    aggregate: &mut Option<&mut VehicleEvidenceCapture>,
     scope: &Scope<'_, '_>,
     node: Node<'_, '_>,
     field: &str,
@@ -198,7 +199,7 @@ fn observe_element(
 }
 
 fn observe_attribute(
-    aggregate: &mut Option<&mut VehicleAggregateEvidence>,
+    aggregate: &mut Option<&mut VehicleEvidenceCapture>,
     scope: &Scope<'_, '_>,
     node: Node<'_, '_>,
     name: &str,

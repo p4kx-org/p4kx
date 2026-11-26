@@ -231,9 +231,9 @@ pub(super) fn base_fragment<'bytes>(
     std::str::from_utf8(bytes.get(start..end)?).ok()
 }
 
-pub(crate) fn with_original_root(
+pub(in crate::vehicle) fn with_original_root(
     base: &[u8],
-    check: impl FnOnce(&mut crate::markup::Element, &mut crate::VehicleAggregateEvidence) -> TestResult,
+    check: impl FnOnce(&mut crate::markup::Element, super::VehicleEvidenceCapture) -> TestResult,
 ) -> TestResult {
     let (_directory, archive) = archive(base, None)?;
     let files = ArchiveFiles::new(&archive);
@@ -257,15 +257,12 @@ pub(crate) fn with_original_root(
         resolver.observation.as_deref(),
         &mut trace,
     )?;
-    let (mut root, _, mut evidence) = crate::vehicle::file_read::base(
+    let (mut root, _, evidence) = crate::vehicle::file_read::base(
         BASE,
         document,
         &mut crate::markup::Budget::new(base.len()),
         "",
         resolver.observation.as_deref(),
     )?;
-    check(
-        &mut root,
-        evidence.as_mut().ok_or("opt-in aggregate scope")?,
-    )
+    check(&mut root, evidence.ok_or("opt-in aggregate scope")?)
 }

@@ -2,11 +2,13 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use super::Selection;
+use crate::VehicleAggregateIssue;
 use crate::loadout_file_events::Document;
 use crate::loadout_file_trace::FileTrace;
 use crate::markup::{Budget, Element};
 use crate::resolver_observation::{self, LoadoutReadEvent, Observation};
 use crate::vehicle::ElemOverride;
+use crate::vehicle::aggregate_evidence::VehicleEvidenceCapture;
 use crate::vehicle::elem::{Modification, ModificationPatch};
 use crate::vehicle::file_read;
 use crate::vehicle::origin::PatchRoute;
@@ -17,14 +19,13 @@ use crate::{
     LoadoutDocumentKind, LoadoutError, LoadoutFailurePath, LoadoutFiles, LoadoutPath,
     LoadoutPathOperation,
 };
-use crate::{VehicleAggregateEvidence, VehicleAggregateIssue};
 
 const LISTED: usize = 8;
 
 /// The patch and element overrides retained by one selected Modification.
 #[derive(Default)]
 pub(super) struct AppliedModification {
-    pub(super) aggregate: Option<VehicleAggregateEvidence>,
+    pub(super) aggregate: Option<VehicleEvidenceCapture>,
     pub(super) patch_path: Option<String>,
     pub(super) patch_origin: Option<p4kx_extraction::EntryOrigin>,
     pub(super) patch_route: Option<PatchRoute>,
@@ -159,7 +160,7 @@ fn patch_candidates(
     authored: Option<&ModificationPatch>,
     issues: &mut Vec<LoadoutError>,
     observation: Option<&Observation<'_>>,
-    aggregate: Option<&mut VehicleAggregateEvidence>,
+    aggregate: Option<&mut VehicleEvidenceCapture>,
 ) -> Result<(Vec<LoadoutPath>, Option<LoadoutPath>), LoadoutError> {
     let mut candidates = Vec::new();
     let mut explicit = None;
@@ -213,11 +214,11 @@ fn guarded<T>(
     root: &mut Element,
     budget: &mut Budget,
     observation: Option<&Observation<'_>>,
-    mut aggregate: Option<&mut VehicleAggregateEvidence>,
+    mut aggregate: Option<&mut VehicleEvidenceCapture>,
     run: impl FnOnce(
         &mut Element,
         &mut Budget,
-        Option<&mut VehicleAggregateEvidence>,
+        Option<&mut VehicleEvidenceCapture>,
     ) -> Result<T, String>,
 ) -> Result<T, String> {
     if let Err(error) = budget.check_copy(root) {
@@ -280,7 +281,7 @@ fn apply_patch(
     budget: &mut Budget,
     issues: &mut Vec<LoadoutError>,
     observation: Option<&Observation<'_>>,
-    mut aggregate: Option<&mut VehicleAggregateEvidence>,
+    mut aggregate: Option<&mut VehicleEvidenceCapture>,
 ) -> Result<Option<ModificationReport>, LoadoutError> {
     match guarded(
         root,

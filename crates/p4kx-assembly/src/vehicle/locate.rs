@@ -3,12 +3,13 @@
 
 use std::borrow::Cow;
 
+use super::VehicleImplementation;
+use super::aggregate_evidence::VehicleEvidenceCapture;
 use super::elem::Modification;
 use super::file_read;
 use super::paths;
 use super::paths::DIRECTORY;
 use super::request;
-use super::{VehicleAggregateEvidence, VehicleImplementation};
 use crate::loadout_file_events::Document;
 use crate::loadout_file_trace::FileTrace;
 use crate::markup::{Budget, Element};
@@ -42,7 +43,7 @@ struct Selection<'a> {
     selected: Option<&'a Modification>,
     class_request: &'a LoadoutPath,
     caller: &'a LoadoutRequest,
-    aggregate: Option<VehicleAggregateEvidence>,
+    aggregate: Option<VehicleEvidenceCapture>,
 }
 
 pub(crate) fn load(
@@ -141,12 +142,12 @@ fn project(
     let totals_observed = observation.is_some_and(Observation::observes_vehicle_totals);
     let ports_observed = observation.is_some_and(Observation::observes_vehicle_port_attributes);
     let port_documents = if ports_observed {
-        aggregate.as_ref().map(VehicleAggregateEvidence::checkpoint)
+        aggregate.as_ref().map(VehicleEvidenceCapture::checkpoint)
     } else {
         None
     };
     let rolling_documents = if totals_observed {
-        aggregate.as_ref().map(VehicleAggregateEvidence::checkpoint)
+        aggregate.as_ref().map(VehicleEvidenceCapture::checkpoint)
     } else {
         None
     };
@@ -159,13 +160,13 @@ fn project(
     VehicleImplementation {
         structure: super::structure::digest(root),
         declarations: super::origin::DeclarationOrigins {
-            aggregate,
+            aggregate: aggregate.map(VehicleEvidenceCapture::finish),
             totals_observed,
             port_documents,
-            port_parts: parts.selectors,
+            port_parts: parts.selectors.map(VehicleEvidenceCapture::finish),
             port_occurrences: parts.port_occurrences,
             rolling_documents,
-            rolling_parts: parts.rolling_selectors,
+            rolling_parts: parts.rolling_selectors.map(VehicleEvidenceCapture::finish),
             base: physical,
             patch: modified.patch_origin,
             patch_route: modified.patch_route,

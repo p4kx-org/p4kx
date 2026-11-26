@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use super::VehicleAggregateEvidence;
+use super::aggregate_evidence::VehicleEvidenceCapture;
 use super::elem::{self, Modification};
 use super::locate;
 use super::patch::{self, ModificationReport};
@@ -22,7 +22,7 @@ pub(super) fn base(
     (
         Element,
         Option<Modification>,
-        Option<VehicleAggregateEvidence>,
+        Option<VehicleEvidenceCapture>,
     ),
     LoadoutError,
 > {
@@ -30,7 +30,7 @@ pub(super) fn base(
         .is_some_and(|reader| {
             reader.observes_vehicle_totals() || reader.observes_vehicle_port_attributes()
         })
-        .then(VehicleAggregateEvidence::new);
+        .then(VehicleEvidenceCapture::new);
     let result = markup::parse_observed(&document, budget, observation, |root, original, scope| {
         if !root.name.eq_ignore_ascii_case("Vehicle") {
             return Err(format!("its root element is {}, not Vehicle", root.name));
@@ -59,7 +59,7 @@ pub(super) fn patch(
     source: Document,
     budget: &mut Budget,
     observation: Option<&Observation<'_>>,
-    aggregate: Option<&mut VehicleAggregateEvidence>,
+    aggregate: Option<&mut VehicleEvidenceCapture>,
 ) -> Result<ModificationReport, String> {
     let document = match markup::parse_observed(&source, budget, observation, |root, _, _| Ok(root))
     {
