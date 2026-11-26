@@ -241,8 +241,9 @@ jobs:
         env:
           P4KX_MSI_FINISH_COLLECTION_CUTOFF_UTC: ${{ steps.msi-finish-start.outputs.collection_cutoff_utc }}
         run: |
-          . .github/scripts/msi-observer-finish-wait-host.ps1
-          Invoke-P4kxMsiHostedFinishWait -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -CollectionCutoffUtc $env:P4KX_MSI_FINISH_COLLECTION_CUTOFF_UTC
+          . .github/scripts/msi-observer-finish-watchdog.ps1
+          $code = Invoke-P4kxMsiHostedFinishWatchdog -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -CollectionCutoffUtc $env:P4KX_MSI_FINISH_COLLECTION_CUTOFF_UTC
+          exit $code
       - name: Finish the original native MSI lifecycle
         id: msi-finish
         if: ${{ always() && !cancelled() && steps.msi-finish-wait.outcome == 'success' }}

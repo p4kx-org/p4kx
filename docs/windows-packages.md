@@ -202,9 +202,11 @@ adapters; they are not a reproduction of an installer timeout.
 
 The package consumer records the original Finish supervisor launch locally, waits
 for its terminal receipt within the original deadline, and validates that receipt
-against the closed journal. The original terminal evidence must upload successfully
-before package evidence and payload publication. The detached observer controls
-exercise the intermediate Finish probes and their watchdog receipts in harmless
+against the closed journal. A watchdog runs the hosted receipt check in a separate
+process. The receipt observer writes stdout and stderr to `finish-supervision/host-stdout.log`
+and `finish-supervision/host-stderr.log` for the final diagnostic upload. The original terminal
+evidence must upload successfully before package evidence and payload publication. The
+detached observer controls exercise the Finish observation and timeout paths with harmless
 native workers.
 
 On hosted ARM64, a best-effort upload preserves the original phase checkpoints
@@ -586,3 +588,13 @@ release evidence requirements are separate from these synthetic controls.
 
 [AMD64 control log](https://github.com/p4kx-org/p4kx/actions/runs/45843748173/job/139992136364) ·
 [ARM64 control log](https://github.com/p4kx-org/p4kx/actions/runs/45843748173/job/139992136557)
+
+On the same run, both real Windows package consumers uploaded the pre-Finish
+observations and the supervisor launch binding. At 16:04 UTC both remained in
+WaitFinish beyond the collection deadline and the configured step limit. The
+last captured AMD64 phase was `previous-install` waiting for `msiexec`. The ARM64
+checkpoint had reached `runtime/installed`. The available evidence ends before
+the blocking call or terminal installer outcome.
+
+[AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45843748173/job/140018890789) ·
+[ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45843748173/job/140018890780)

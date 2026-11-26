@@ -89,7 +89,9 @@ Assert-FeedbackWorkflow ($installer.Contains('id: msi-launch') -and $installer.C
     $finishStart.Contains('invoke-msi-observer.ps1 -Stage StartFinish') -and $finishStart -cmatch '(?m)^        timeout-minutes: 1\r?$' -and
     $finishWait.Contains('id: msi-finish-wait') -and
     $finishStart.Contains('ConvertFrom-P4kxMsiBudgetTimestamp $launch.collection_cutoff_utc') -and
-    $finishWait.Contains('Invoke-P4kxMsiHostedFinishWait') -and
+    $finishWait.Contains('. .github/scripts/msi-observer-finish-watchdog.ps1') -and
+    $finishWait.Contains('Invoke-P4kxMsiHostedFinishWatchdog') -and $finishWait.Contains('exit $code') -and
+    -not $finishWait.Contains('Invoke-P4kxMsiHostedFinishWait ') -and
     $finishWait.Contains('P4KX_MSI_FINISH_COLLECTION_CUTOFF_UTC: ${{ steps.msi-finish-start.outputs.collection_cutoff_utc }}') -and
     $finishWait -cmatch '(?m)^        timeout-minutes: \$\{\{ fromJSON\(steps\.msi-budget\.outputs\.observer_finish_minutes\) \}\}\r?$' -and
     $finishWait.Contains("always() && !cancelled() && steps.msi-finish-start.outcome == 'success'") -and

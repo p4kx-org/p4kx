@@ -123,15 +123,17 @@ outcome on both architectures. A checkpoint records the phase observed in the or
 journal and carries an unproven lifecycle verdict. The original files remain in the local
 checkpoint and snapshot directories for diagnostic upload.
 
-A separate Finish supervisor observes the original lifecycle. The WaitFinish step uses a
-bounded probe to find its terminal receipt and binds the observed digest to the original
-request and supervisor. On both Windows CPUs, the Lifecycle wait checks its own probe's
-exit status under the original deadline. The wait receipt records the probe status and PID.
-The synthetic Control mode uses its Portal observation. CollectFinish requires the bound
-receipts, the original successful result, the
-closed journal and final cleanup. The terminal evidence upload must succeed before the
-executed release payload can be recorded. The last diagnostic upload collects the early
-checkpoints and worker logs if the job reaches that step.
+A separate Finish supervisor observes the original lifecycle. On both Windows CPUs, the hosted
+WaitFinish watchdog owns a child for the complete receipt check. The child binds the original
+request and supervisor, waits for the receipt, and records the observed digest on disk. Its output
+goes to private log files. At the original deadline the watchdog has a 750 ms allowance for the
+child to record a failure and up to 1,000 ms to reap the owned process. The deadline failure
+stands even if the child exits successfully during that allowance.
+
+CollectFinish requires the bound receipts, the original successful result, the closed journal
+and final cleanup. The terminal evidence upload must succeed before the executed release payload
+can be recorded. The last diagnostic upload collects the early checkpoints and worker logs if
+the job reaches that step.
 
 The ten-minute worker cap, thirty-five-minute diagnostic deadline and forty-five-minute
 job limit also apply to the native release consumer. The observer step reserves one minute

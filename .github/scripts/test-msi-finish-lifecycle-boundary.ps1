@@ -2,6 +2,7 @@ param([Parameter(Mandatory)][string]$Directory)
 $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'msi-observer-finish-wait-host.ps1')
+. (Join-Path $PSScriptRoot 'msi-observer-finish-watchdog.ps1')
 
 function Assert-P4kxFinishReceiptDigest([string]$Root) {
     $path = Join-Path $Root 'digest-fixture.json'
@@ -31,7 +32,7 @@ function Write-P4kxFinishLifecycleFixtureResult([string]$Path, [string]$Digest) 
 }
 
 function New-P4kxFinishLifecycleFixture {
-    param([string]$Root, [ValidateSet('Bound','Foreign','Stale','Hosted','LaunchReadFailure','Absent','Late')][string]$Case, [string]$ForeignDigest, [switch]$Unpublished)
+    param([string]$Root, [ValidateSet('Bound','Foreign','Stale','Hosted','LaunchReadFailure','Absent','Late','Watchdog','WatchdogFailure')][string]$Case, [string]$ForeignDigest, [switch]$Unpublished)
 
     $caseRoot = [IO.Directory]::CreateDirectory((Join-Path $Root $Case)).FullName
     $invocation = Join-Path $caseRoot 'invocation.json'
@@ -238,6 +239,23 @@ function Assert-P4kxHostedFinishWaitRefused($Fixture, [DateTimeOffset]$Cutoff) {
     }
 }
 
+function Assert-P4kxHostedFinishWatchdogBinding($Fixture, [switch]$WrongCutoff) {
+    $cutoff = if ($WrongCutoff) { $Fixture.collection_cutoff.AddSeconds(1) } else { $Fixture.collection_cutoff }
+    $code = Invoke-P4kxMsiHostedFinishWatchdog -Directory $Fixture.observer -CollectionCutoffUtc $cutoff.ToString('o')
+    $diagnostics = Split-Path -Parent $Fixture.wait_path
+    if ($WrongCutoff) {
+        $stderr = [IO.File]::ReadAllText((Join-Path $diagnostics 'host-stderr.log'))
+        if ($code -ne 1 -or $stderr -cnotmatch 'Hosted Finish wait requires the original Lifecycle collection cutoff.' -or
+            [IO.File]::Exists($Fixture.wait_path)) { throw 'The native watchdog lost the bound child cutoff rejection.' }
+    } else {
+        $stdout = [IO.File]::ReadAllText((Join-Path $diagnostics 'host-stdout.log'))
+        if ($code -ne 0 -or $stdout -cnotmatch 'The bound terminal receipt was observed. Native completion is unproven.') {
+            throw 'The native watchdog did not preserve the successful observation-only child exit.'
+        }
+        Assert-P4kxFinishLifecycleWait $Fixture (Get-P4kxDetachedDigest $Fixture.result_path) -Hosted
+    }
+}
+
 $root = [IO.Path]::GetFullPath($Directory)
 if (-not $IsWindows -or [IO.Path]::Exists($root)) { throw 'The Lifecycle Finish control requires a fresh native Windows directory.' }
 $null = New-Item -ItemType Directory -Path $root
@@ -264,7 +282,9 @@ try {
     Assert-P4kxHostedFinishLaunchReadFailure (New-P4kxFinishLifecycleFixture $root LaunchReadFailure -Unpublished)
     Assert-P4kxHostedFinishWaitRefused (New-P4kxFinishLifecycleFixture $root Absent -Unpublished) ([DateTimeOffset]::UtcNow.AddMilliseconds(150))
     Assert-P4kxHostedFinishWaitRefused (New-P4kxFinishLifecycleFixture $root Late) ([DateTimeOffset]::UtcNow.AddSeconds(-1))
-    'PASS: Lifecycle WaitFinish verified its bound receipt, refused foreign and stale sources, and retained missing or late observations without launching a hosted wait process.'
+    Assert-P4kxHostedFinishWatchdogBinding (New-P4kxFinishLifecycleFixture $root Watchdog)
+    Assert-P4kxHostedFinishWatchdogBinding (New-P4kxFinishLifecycleFixture $root WatchdogFailure) -WrongCutoff
+    'PASS: Lifecycle WaitFinish verified its bound receipt, refused foreign and stale sources, retained missing or late observations, and exercised the native watchdog child.'
 } finally {
     $env:P4KX_MSI_STEP_MINUTES = $savedMinutes
     $env:P4KX_MSI_STEP_COMPUTED_AT_UTC = $savedComputed

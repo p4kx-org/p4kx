@@ -58,6 +58,9 @@ jobs:
           .github/scripts/test-msi-detached-control.ps1 -Directory ($env:P4KX_CONTROL_TASK+'-contracts')
           .github/scripts/test-msi-finish-wait-progress.ps1 -Directory ($env:P4KX_CONTROL_TASK+'-wait-progress')
           .github/scripts/test-msi-finish-lifecycle-boundary.ps1 -Directory ($env:P4KX_CONTROL_TASK+'-lifecycle-finish-boundary')
+      - name: Check hosted Finish watchdog with harmless workers
+        timeout-minutes: 1
+        run: .github/scripts/test-msi-finish-hosted-watchdog.ps1 -Directory ($env:P4KX_CONTROL_TASK+'-hosted-finish-watchdog')
       - name: Observe Finish progress while its harmless worker is held
         timeout-minutes: 2
         run: .github/scripts/test-msi-observer.ps1 -Directory ($env:P4KX_CONTROL_TASK+'-finish-probe') -Case Complete -DetachedFinish -LiveFinishProbe
@@ -92,6 +95,10 @@ jobs:
             ${{ env.P4KX_CONTROL_TASK }}-contracts/**/*.json
             ${{ env.P4KX_CONTROL_TASK }}-contracts/**/*.jsonl
             ${{ env.P4KX_CONTROL_TASK }}-contracts/**/*.log
+            ${{ env.P4KX_CONTROL_TASK }}-lifecycle-finish-boundary/**/finish-supervision/*.json
+            ${{ env.P4KX_CONTROL_TASK }}-lifecycle-finish-boundary/**/finish-supervision/*.log
+            ${{ env.P4KX_CONTROL_TASK }}-hosted-finish-watchdog/**/finish-supervision/*.json
+            ${{ env.P4KX_CONTROL_TASK }}-hosted-finish-watchdog/**/finish-supervision/*.log
           if-no-files-found: error
       - name: Start the harmless native successive observer
         id: successive-start
