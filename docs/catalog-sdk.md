@@ -2482,6 +2482,16 @@ terminal census for its 10,955 expected owners. These peaks establish the
 resource use of the observed interval. Complete Loadout parity against the
 same-Build Normal Catalog requires a terminal comparison.
 
+A later one-worker Windows AMD64 verifier from signed `e2ec43eef` completed Full
+Loadout parity on the same LIVE Build. It visited 10,955 owners, retained 10,812
+ordered rows, reported 1,240 skipped leftovers and counted 226 rows with issues.
+The retained Normal Full Catalog from `e59c7410f6411302e8101f180751177dd0d6adfb`
+matched the rows, 2,379,065 contributing source uses and 374 physical sources.
+The visit and replay took 4,624.868 s with 1,667,289,088 peak private bytes and
+1,651,183,616 peak working-set bytes. The verifier used a direct JSON conversion
+for typed Loadout rows. An exact synthetic check compared it with the wire
+roundtrip on a nested Full row, including the canonical hash and its source closure.
+
 ## Direct ammunition definitions
 
 `catalog_queries::equipment::with_ammo_definitions` reads independently admitted physical
