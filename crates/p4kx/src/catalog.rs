@@ -9,10 +9,10 @@ use anyhow::{Context, Result};
 use p4kx_export::{
     CatalogError, CatalogFailures, CatalogFile, CatalogOptions, CatalogPublicationMode,
     CatalogStage, CatalogSummary, Compression, CraftingWarning, ExportDiagnosticSeverity,
-    ExportHealth, Filter, Kind, StarmapTraversalBudget, catalog_marker_schema, catalog_schema,
+    ExportHealth, Filter, Kind, StarmapTraversalBudget, catalog_schema_for,
     write_catalog_file_with_phases,
 };
-use p4kx_extraction::{Archive, ProvenanceMode};
+use p4kx_extraction::{Archive, ArchiveWatch, ProvenanceMode};
 
 use super::catalog_json::summary_json;
 use super::catalog_size::warn_about_size;
@@ -32,7 +32,7 @@ mod refusal_progress;
 pub(crate) fn run(args: &CatalogArgs, as_json: bool) -> Result<ExitCode> {
     let provenance_mode = args.provenance.into();
     if matches!(args.command, Some(CatalogCommand::Schema)) {
-        print_schema(provenance_mode)?;
+        print_schema(provenance_mode, as_json)?;
         return Ok(ExitCode::from(exit::SUCCESS));
     }
     let (Some(archive), Some(out)) = (&args.archive, &args.out) else {
@@ -178,6 +178,7 @@ fn write_file(
     provenance_mode: ProvenanceMode,
     phase: &dyn Fn(CatalogStage),
 ) -> Result<CatalogSummary> {
+    let watch = ArchiveWatch::new(archive);
     let uncancelled = p4kx_extraction::CancelToken::new();
     let cancel = options.cancel.unwrap_or(&uncancelled);
     let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
@@ -189,7 +190,7 @@ fn write_file(
         || CatalogFile::create_protected(out, &protection, cancel),
     );
     let (summary, file) = written.map_err(into_anyhow)?;
-    file.commit()
+    file.commit_if_current(&watch)
         .with_context(|| format!("cannot write {}", out.display()))?;
     Ok(summary)
 }
@@ -216,12 +217,12 @@ fn print_warnings(warnings: &[CraftingWarning]) -> io::Result<()> {
     Ok(())
 }
 
-fn print_schema(provenance_mode: ProvenanceMode) -> Result<()> {
-    let schema = if provenance_mode == ProvenanceMode::MarkersOnly {
-        catalog_marker_schema()
-    } else {
-        catalog_schema()
-    };
+fn print_schema(provenance_mode: ProvenanceMode, as_json: bool) -> Result<()> {
+    let schema = catalog_schema_for(provenance_mode);
+    if as_json {
+        json::print(&schema)?;
+        return Ok(());
+    }
     let mut text = serde_json::to_string_pretty(&schema)?;
     text.push('\n');
     io::stdout().lock().write_all(text.as_bytes())?;

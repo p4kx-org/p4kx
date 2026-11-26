@@ -8,12 +8,10 @@
 //! Record per line in record-path order, and returns a [`RecordExportSummary`]. Record JSON is
 //! defined in `docs/record-json.md` and `schemas/record-json.schema.json`.
 //!
-//! [`build_catalog`] selects Records by path and type, excludes development leftovers, resolves
-//! English/German texts, and writes deterministic UTF-8 JSON with crafting, [`ItemClass`] and
-//! [`Playability`] data. Normal publication refuses incomplete source reads or projections.
-//! [`CatalogPublicationMode::DiagnosticPartial`] retains readable results with explicit health
-//! and failure evidence. [`catalog_schema`] generates the schema from the same catalog types
-//! (`docs/catalog.md`).
+//! [`build_catalog`] writes deterministic Catalog JSON with the available supported languages
+//! and marker provenance by default. Normal publication requires complete export health.
+//! [`CatalogPublicationMode::DiagnosticPartial`] explicitly permits an incomplete diagnostic result.
+//! Use [`catalog_schema_for`] to validate the selected output profile.
 //!
 //! The starmap objects of the catalog take their world positions from the system containers
 //! (`ObjectContainers/PU/system`): the position of every `Child` element is composed with the

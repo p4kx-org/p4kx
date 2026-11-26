@@ -8,12 +8,12 @@ use p4kx_assembly::{
 };
 use p4kx_blender::PackageError;
 use p4kx_comparison::LineDiffError;
-use p4kx_export::{ActionMapError, CatalogError};
+use p4kx_export::{ActionMapError, CatalogError, ShipBaseError};
 use p4kx_extraction::cryxml::CryXmlError;
 use p4kx_extraction::query::SelectionError;
 use p4kx_extraction::{
-    ArchiveError, DataForgeError, DataForgeLoadError, FieldStatisticsError, FilterError,
-    FolderError, LocalizationLoadError, UnknownEntries,
+    ArchiveChanged, ArchiveError, DataForgeError, DataForgeLoadError, FieldStatisticsError,
+    FilterError, FolderError, LocalizationLoadError, UnknownEntries,
 };
 use p4kx_screens::ScreenError;
 
@@ -52,9 +52,9 @@ pub(crate) const PARTIAL_FAILURE: u8 = 1;
 pub(crate) const DIFFERENCES: u8 = 1;
 /// The command line is invalid, names an Entry the Archive does not contain (for a line diff:
 /// neither Archive contains), a file or geometry companion that does not exist, a mip level the
-/// texture, a chunk the chunk file or a LOD the model does not have, has a Filter that matches no
-/// Entry or Record, has Filter text that is too long or has too many wildcards, an empty
-/// exclusion Filter, or exclusion Filters that leave out every Entry the Filter matches, names an
+/// texture, a chunk the chunk file or a LOD the model does not have, has a Filter or exclusion
+/// Filters that leave a required Entry or Record selection empty, has Filter text that is too
+/// long or has too many wildcards, an empty exclusion Filter, names an
 /// output that is one of its inputs or lies inside a Star Citizen installation, names a
 /// package output folder that exists and holds something else than an earlier package, names an
 /// armour `--loadout` that is neither an Entity nor an XML Loadout that can be read, has an
@@ -70,7 +70,7 @@ pub(crate) const INVALID_INPUT: u8 = 2;
 /// opened or read, is no valid chunk file, model or CHF file, or is too large to read into memory;
 /// also the geometry of an exported Entity that cannot be read.
 pub(crate) const ARCHIVE_ERROR: u8 = 3;
-/// The Archive changed on disk after it was opened, so the Extraction stopped.
+/// The Archive or standalone DataForge changed on disk after it was opened.
 pub(crate) const ARCHIVE_CHANGED: u8 = 4;
 /// The Archive holds no DataForge, or its DataForge or a demanded Query value cannot be read.
 pub(crate) const DATAFORGE_ERROR: u8 = 5;
@@ -84,7 +84,8 @@ pub(crate) const INTERRUPTED: u8 = 130;
 /// The exit-code section of the help text.
 pub(crate) const EXIT_CODES_HELP: &str = "Exit codes:
   0  success: every requested Entry was extracted or already existed; verify: every Entry matched
-     its checksum; compare: no differences, also for the --diff Entry
+     its checksum; compare: no differences, also for the --diff Entry. Search without
+     --exclude can succeed with no matches
   1  partial failure: some Entries or Records failed or were cancelled, the data of an Entry
      does not match its checksum (verify, extract --verify), the target or the settings cannot
      be written, a texture is invalid or cannot be merged, decoded or written, e.g. because its
@@ -103,8 +104,8 @@ pub(crate) const EXIT_CODES_HELP: &str = "Exit codes:
      --diff Entry differ; chf diff: the CHF files differ; media export: diagnosed incompleteness,
      unavailable providers, exceeded limits, cancellation or generation failures
   2  invalid input: bad arguments, an Entry path the Archive does not contain (for --diff:
-     neither Archive contains), a Filter that matches no Entry or Record or whose --exclude
-     Filters leave nothing, Filter text that is too long or has too many wildcards, a Channel
+     neither Archive contains), a required Entry or Record selection left empty by a Filter
+     or its --exclude Filters, Filter text that is too long or has too many wildcards, a Channel
      path that does not exist or was never added, a texture, sound, soundbank, chunk file, UI
      movie file, model or geometry companion that does not exist, the geometry of the Entity
      that entity glb or entity package exports when it does not exist (nothing is written), a
@@ -140,8 +141,8 @@ pub(crate) const EXIT_CODES_HELP: &str = "Exit codes:
      (armour glb) that is missing or unreadable, or the input folder of convert that cannot be
      read or holds too many files; a missing texture, sound, soundbank, chunk file, UI movie
      file, model or geometry companion is 2
-  4  the Archive changed on disk while it was open, e.g. updated by the RSI Launcher; the
-     Extraction stopped, and Entries written before may be stale
+  4  the Archive or a standalone DataForge changed on disk while it was open. Entries
+     extracted before an Archive change may be stale
   5  the DataForge cannot be read: the Archive holds none, its version is not supported or it
      is corrupt, or its Records have more field paths than dcb fields counts, or the Record of
      the Entity whose Loadout or audio is shown cannot be read, or a demanded Query value
@@ -181,12 +182,32 @@ fn specialized_code(error: &anyhow::Error) -> Option<u8> {
     if let Some(code) = crate::media::error_code(error) {
         return Some(code);
     }
+    if is_changed_input(error) {
+        return Some(ARCHIVE_CHANGED);
+    }
     error
         .downcast_ref::<LineDiffError>()
         .map(|error| match error {
             LineDiffError::UnknownEntry { .. } => INVALID_INPUT,
             _ => ARCHIVE_ERROR,
         })
+}
+
+fn is_changed_input(error: &anyhow::Error) -> bool {
+    error.downcast_ref::<ArchiveChanged>().is_some()
+        || matches!(
+            error.downcast_ref::<DataForgeLoadError>(),
+            Some(DataForgeLoadError::ArchiveChanged(_))
+        )
+        || matches!(
+            error.downcast_ref::<CatalogError>(),
+            Some(CatalogError::ArchiveChanged(_))
+        )
+        || matches!(
+            error.downcast_ref::<ShipBaseError>(),
+            Some(ShipBaseError::Original(original))
+                if matches!(original.as_ref(), CatalogError::ArchiveChanged(_))
+        )
 }
 
 fn code_for(error: &anyhow::Error) -> u8 {
@@ -366,3 +387,7 @@ fn is_output_or_query_error(error: &anyhow::Error) -> bool {
         || error.downcast_ref::<UnreadableLoadout>().is_some()
         || error.downcast_ref::<InteriorOutputIsArchive>().is_some()
 }
+
+#[cfg(test)]
+#[path = "exit_tests.rs"]
+mod tests;

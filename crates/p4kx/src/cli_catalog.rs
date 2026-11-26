@@ -22,8 +22,8 @@ pub(crate) struct CatalogArgs {
     /// Sets the compression level from 1 to 22 for a `.zst` output. Defaults to 19.
     #[arg(long, value_name = "LEVEL", value_parser = clap::value_parser!(i32).range(1..=22))]
     pub(crate) zstd_level: Option<i32>,
-    /// Selects only the Records whose record path matches, with the rules of `p4kx search`; every
-    /// kind is then marked partial with this Filter.
+    /// Selects Records by record path using the Filter rules of `p4kx search`. Filtered kinds are
+    /// marked partial. The global `tags` and `shopInventories` kinds remain complete.
     #[arg(long, value_name = "FILTER")]
     pub(crate) filter: Option<String>,
     /// Writes an explicitly marked diagnostic catalog even when selected source data could not

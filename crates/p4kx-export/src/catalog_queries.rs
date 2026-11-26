@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-//! Selective access to canonical catalog data in an opened game Archive.
+//! Selective Catalog access through owned readers, scoped callbacks and per-owner visitors.
+//!
+//! Reuse [`ParsedCatalogQueries`] for calls on the same Archive.
 
 #[path = "blueprint_query.rs"]
 mod blueprints;

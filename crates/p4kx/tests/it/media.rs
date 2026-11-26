@@ -246,9 +246,11 @@ fn media_schemas_are_valid_json() -> TestResult {
         vec!["media", "schema", "--source"],
     ] {
         let result = p4kx_testkit::p4kx()?
+            .env("P4KX_ARCHIVE_KEY", "an invalid key")
             .args(arguments)
             .assert()
             .code(0)
+            .stderr(predicate::str::is_empty())
             .get_output()
             .stdout
             .clone();

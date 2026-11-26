@@ -17,7 +17,6 @@ impl<'source> MissionIndex<'source> {
         self.prepared = prepared;
     }
 
-
     pub(crate) fn lookup_template(
         &self,
         guid: Guid,

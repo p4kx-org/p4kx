@@ -34,6 +34,16 @@ impl CatalogRecordSelection {
         cancel: Option<&CancelToken>,
         mut read: impl FnMut(&Record<'source>) -> Result<(), E>,
     ) -> Result<(), E> {
+        if let Self::Guid(guid) = self
+            && let Some(records) = forge.records_by_guid_if_indexed(guid)
+        {
+            checkpoint(cancel)?;
+            for record in records {
+                checkpoint(cancel)?;
+                read(&record)?;
+            }
+            return Ok(());
+        }
         match self {
             Self::RecordIndex(index) => {
                 if let Some(record) = forge.record(index) {

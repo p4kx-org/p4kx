@@ -238,6 +238,24 @@ fn catalog_with_a_filter_marks_the_kind_partial_and_prints_json() -> TestResult 
     );
     let output_size = fs::metadata(&out)?.len();
     let result: serde_json::Value = serde_json::from_str(&summary)?;
+    let kinds = result["kinds"].as_array().ok_or("summary kinds")?;
+    for kind in [Kind::Tags, Kind::ShopInventories] {
+        let name = kind.name();
+        assert_eq!(
+            catalog["completeness"][name],
+            serde_json::json!({"status": "complete"}),
+            "{name} retains its global selection in the filtered catalog"
+        );
+        let summary_complete = kinds
+            .iter()
+            .find(|row| row["kind"].as_str() == Some(name))
+            .and_then(|row| row["complete"].as_bool());
+        assert_eq!(
+            summary_complete,
+            Some(true),
+            "{name} retains its global selection in the JSON summary"
+        );
+    }
     assert_eq!(
         result.get("size").and_then(serde_json::Value::as_u64),
         Some(output_size),

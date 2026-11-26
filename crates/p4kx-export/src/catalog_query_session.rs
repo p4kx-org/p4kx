@@ -37,8 +37,8 @@ impl CatalogLanguageSelection<'_> {
 
 /// A selective Catalog reader bound to one opened Archive and its decoded DataForge Entry.
 ///
-/// Each query produces an owned result and its own source inventory. Localization payloads are
-/// opened only by queries that need them.
+/// Queries can return owned data or borrow it through a callback. Publish staged callback
+/// results after success and coverage checks.
 #[must_use]
 pub struct CatalogQuerySession<'archive> {
     archive: &'archive Archive,

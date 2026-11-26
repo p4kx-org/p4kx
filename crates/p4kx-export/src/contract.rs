@@ -3,6 +3,7 @@
 
 use std::borrow::Cow;
 
+use p4kx_extraction::ProvenanceMode;
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -153,7 +154,7 @@ pub(crate) struct LocalisedText<'a> {
     pub(crate) de: Option<Cow<'a, str>>,
 }
 
-/// Returns the JSON Schema (draft 2020-12) of the P4KX catalog.
+/// Returns the JSON Schema (draft 2020-12) for a Full P4KX Catalog.
 #[must_use]
 pub fn catalog_schema() -> serde_json::Value {
     schemars::generate::SchemaSettings::draft2020_12()
@@ -161,4 +162,14 @@ pub fn catalog_schema() -> serde_json::Value {
         .into_generator()
         .into_root_schema_for::<Catalog<'static>>()
         .to_value()
+}
+
+/// Returns the JSON Schema for the selected Catalog provenance profile.
+#[must_use]
+pub fn catalog_schema_for(provenance_mode: ProvenanceMode) -> serde_json::Value {
+    if provenance_mode == ProvenanceMode::MarkersOnly {
+        marker_schema::catalog_marker_schema()
+    } else {
+        catalog_schema()
+    }
 }

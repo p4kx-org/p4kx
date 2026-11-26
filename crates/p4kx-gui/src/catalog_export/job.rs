@@ -340,17 +340,11 @@ impl Job {
     }
 
     fn complete(&self, summary: CatalogSummary, file: CatalogFile<'_>) -> RunResult {
-        if let Err(source) = self.index.watch().check() {
-            let primary = CatalogError::Write(std::io::Error::other(source));
-            return Err(describe(&super::output::discard(file, primary)));
+        match file.commit_if_current(self.index.watch()) {
+            Ok(()) => {}
+            Err(CatalogError::Cancelled) => return Ok(Outcome::Cancelled),
+            Err(error) => return Err(describe(&error)),
         }
-        if self.cancel.is_cancelled() {
-            return match super::output::discard(file, CatalogError::Cancelled) {
-                CatalogError::Cancelled => Ok(Outcome::Cancelled),
-                error => Err(describe(&error)),
-            };
-        }
-        file.commit().map_err(|error| describe(&error))?;
         Ok(Outcome::Written(Box::new(CatalogExportSummary {
             file: self.file.clone(),
             summary,

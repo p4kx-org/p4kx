@@ -30,7 +30,7 @@ pub use crate::client_profile_settings::{
     read_client_profile_settings_with_provenance_mode,
 };
 pub use crate::contract::marker_schema::catalog_marker_schema;
-pub use crate::contract::{SCHEMA_VERSION, catalog_schema};
+pub use crate::contract::{SCHEMA_VERSION, catalog_schema, catalog_schema_for};
 pub use crate::contract_entities::Ship;
 pub use crate::crafting::{Crafting, read_crafting};
 pub use crate::crafting_research::{Research, ResearchBlock, ResearchMember, ResearchValue};

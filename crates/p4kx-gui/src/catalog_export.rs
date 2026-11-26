@@ -3,7 +3,6 @@
 
 mod job;
 mod name;
-mod output;
 mod refusal;
 
 use std::path::{Path, PathBuf};

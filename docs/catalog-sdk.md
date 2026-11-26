@@ -1,5 +1,33 @@
 # Selective Catalog v3 data
 
+## Pick an entry point
+
+Use `p4kx_extraction::Archive` for the opened input and `p4kx_export` for Catalog output and
+canonical queries. Choose the route that matches the required output.
+
+| Need | Rust entry point |
+| --- | --- |
+| Generate a versioned document | `p4kx_export::build_catalog` for in-memory bytes or `write_catalog_file` for a staged file. Choose `catalog_schema_for(provenance_mode)` for the publication profile. `catalog_marker_schema()` matches the default output and `catalog_schema()` matches Full. |
+| Read one canonical dataset or Record | A domain reader under `p4kx_export::catalog_queries`, such as `read_blueprint_categories` for an owned snapshot or `with_item_ports` for a borrow scoped to a callback. |
+| Query the same Archive repeatedly | Open one `CatalogQuerySession`, call `parsed` once and use the resulting view to reuse decoding and lookup indexes. [Session example](#reuse-an-archive-session) |
+| Build a consumer-owned equipment index | Use an `equipment` visitor such as `visit_item_definitions` or `visit_loadout_owners` to process readable owners one at a time. Publish staged results after successful traversal and the required coverage checks. |
+
+Return owned values from a `with_*` callback if they must outlive the query. A visitor can call
+the consumer before a later failure or cancellation. Stage changes until the operation returns
+successfully and review its coverage before replacing cached data. For a complete parts inventory,
+use `visit_item_definitions(ItemDefinitionSelection::Records(CatalogRecordSelection::All), …)` and the applicable Loadout or port view. A batch of
+`RecordIndices` collected from ship Loadouts covers only the selected physical
+Items installed in those Loadouts.
+
+For a file export, use `CatalogFile::create_protected` inside the lazy file factory with the
+Archive's write protection. Create an `ArchiveWatch` for the same opened Archive and pass it
+to `file.commit_if_current(&watch)` after writing succeeds. The commit checks the source stamp
+immediately before replacing the destination. A changed Build or cancellation preserves the
+prior file and reports any separate cleanup failure. A generic `Write` sink leaves staging
+and rollback with the caller.
+
+## Blueprint categories and gameplay properties
+
 Use `p4kx_export::catalog_queries::read_blueprint_category_lists` to read canonical Blueprint
 category lists directly from an opened Archive. Supply `CatalogRecordSelection::All` to
 read the domain, `Guid` to read all matching physical declarations, or `RecordIndex` to read a
@@ -801,12 +829,14 @@ The callback borrows the canonical rows and original value arenas. Return
 consumer-owned values from the callback and publish them after the query succeeds.
 
 The snapshot carries Record, component and port positions, original value states,
-scope coverage, public labels in the selected languages, and the field origin
-inventory. The query reads the selected components and requested localization.
+scope coverage, public labels in the selected languages, and the field origin inventory.
+`with_item_ports` reads the requested localization before owner selection. An unreadable
+requested locale can therefore fail even when selection would return no owners.
 The archive-backed loadout resolver supplies equipped-item and XML-override data.
 
 Use `visit_item_ports` or `visit_item_ports_from` to process one readable physical Record
 at a time. Requested locale payloads load when traversal reaches the first readable owner.
+In a traversal with no readable owners, the visitor reads no locale payloads.
 The visitor borrows its port rows, public labels and source inventory for the current owner.
 Empty snapshots count toward the terminal owner count. An unreadable component selection
 is included in the terminal

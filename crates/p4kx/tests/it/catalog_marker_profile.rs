@@ -34,6 +34,18 @@ fn catalog_defaults_to_the_versioned_marker_document() -> TestResult {
     Ok(())
 }
 
+#[test]
+fn schema_json_is_compact_and_independent_of_archive_configuration() -> TestResult {
+    let pretty = schema_output(&[])?;
+    let compact = schema_output(&["--json"])?;
+    assert!(pretty.lines().count() > 1, "bare schema stays indented");
+    assert_eq!(compact.lines().count(), 1, "JSON schema is a single line");
+    let pretty: Value = serde_json::from_str(&pretty)?;
+    let compact: Value = serde_json::from_str(&compact)?;
+    assert!(pretty == compact, "formatting keeps the same schema");
+    Ok(())
+}
+
 fn verify_shapes(marker: &Value, full: &Value) -> TestResult {
     assert_eq!(marker["format"], "p4kx-catalog-markers", "marker format");
     assert_eq!(marker["formatVersion"], 1, "marker format version");
@@ -141,13 +153,20 @@ fn catalog(archive: &Path, out: &Path, options: &[&str]) -> Result<Vec<u8>, Box<
 }
 
 fn schema(options: &[&str]) -> Result<Value, Box<dyn Error>> {
+    Ok(serde_json::from_str(&schema_output(options)?)?)
+}
+
+fn schema_output(options: &[&str]) -> Result<String, Box<dyn Error>> {
     let result = p4kx_testkit::p4kx()?
+        .env("P4KX_ARCHIVE_KEY", "an invalid key")
         .args(["catalog", "schema"])
         .args(options)
         .output()?;
     assert!(
-        result.status.success(),
-        "catalog schema command: {result:?}"
+        result.status.success() && result.stderr.is_empty(),
+        "catalog schema exit {}: {}",
+        result.status,
+        String::from_utf8_lossy(&result.stderr)
     );
-    Ok(serde_json::from_slice(&result.stdout)?)
+    Ok(String::from_utf8(result.stdout)?)
 }

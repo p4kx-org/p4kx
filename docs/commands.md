@@ -44,11 +44,12 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   path (`*.xml`, `Data\Libs\*`, `*\defaultProfile.???`). Any other Filter matches when it occurs
   anywhere in the path (`Libs\Config`). Both ignore ASCII case and treat `\` and `/` alike; every
   other character, spaces and brackets included, is literal, and an empty Filter matches every
-  Entry. No match is not an error. `--exclude <filter>`, repeatable, leaves out the Entries an
-  exclusion Filter matches, with the same rules; a texture whose header it matches is left out with
-  its parts. With `--exclude`, a search that finds nothing is invalid input (exit 2) and the error
-  says whether the Filter matched none or the exclusion left out all it matched. `--json` lists the
-  exclusion Filters as `exclude`. A Filter is at most 1024 bytes with at most 32 `*` and `?`; an
+  Entry. Without exclusions, a search with no matches exits with code 0 and returns an empty result.
+  Repeat `--exclude <filter>` to remove matches using the same rules. Leaving out a texture header
+  also leaves out its parts. With `--exclude`, an empty selection exits with code 2. The error
+  distinguishes an include Filter with no matches from exclusions that removed every match.
+  `--json` lists the exclusion Filters as `exclude`. A Filter is at most 1024 bytes with at most
+  32 `*` and `?`; an
   empty or blank exclusion Filter is refused. Every command that takes a Filter refuses text beyond
   these limits as invalid input (exit 2), and the MCP tools answer with a tool error.
 - `p4kx grep <archive> <text> [--in records,loc,entries] [--filter <filter>] [--exclude <filter>]
@@ -507,9 +508,11 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   debug, deprecated and dev Records left out and counted as skipped, and names and descriptions
   resolved in every supported language with an available original Entry. The canonical text tables
   carry the original keys, language forms and source evidence. Global Tag definitions retain all source Records, including
-  development-like names; their convenience paths retain tree order. `--filter` leaves that
-  taxonomy complete and marks the owning Entity selection scope partial independently of
-  read/projection health. It prints the counts per
+  development-like names; their convenience paths retain tree order. `--filter` leaves the global
+  `tags` and physical `shopInventories` selections complete. Record-filtered kinds have partial
+  selection scope. Entity tag declarations follow the owning Entity selection. Read/projection
+  health is reported separately.
+  The command prints the counts per
   kind, the item classes read and the unresolved texts per language and warns when the catalog
   nears or exceeds the transfer or decoded-size reference thresholds. An `--out` name ending in
   `.zst` writes the catalog as one zstd frame with content size declared. `--zstd-level <level>`
@@ -903,7 +906,7 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
 |------|---------|
 | 0 | Success: every requested Entry was extracted or already existed; `verify`: every Entry matched its checksum; `compare`: no differences |
 | 1 | Partial failure: some Entries or Records failed or were cancelled, the data of an Entry does not match its checksum (`verify`, `extract --verify`), the target or the settings cannot be written, a texture, sound, soundbank or model cannot be read, converted or written, a tag or definition of a UI movie cannot be read or written, `ui render` leaves an element out (skipped, drawn without an effect, or beyond a limit; for `--screen` also a widget type without a renderer or an approximated layout), `chf glb` or `character package` could not shape the head by its DNA (the output is written without the head), `wwise events` could not look up the Entities (the triggers are still listed), or `coverage` finds a listed item failing; `compare`: the Archives or the `--diff` Entry differ; `chf diff`: the CHF files differ |
-| 2 | Invalid input: bad arguments, an Entry path the Archive does not contain (for `compare --diff`: neither Archive contains), a Filter that matches no Entry or Record, a Channel path that does not exist or was never added, a texture, sound, soundbank, chunk file, UI movie, model or geometry companion file that does not exist, the geometry of the Entity that `entity glb` or `entity package` exports when it does not exist, a mip level, chunk or LOD the file does not have, an output that is one of its inputs or lies inside a Star Citizen installation (the tool never writes there), a package folder that holds something other than an earlier package, an invalid Query, an Entity that no Record or several Records match, a malformed `--exclude` or `--replace`, an audio trigger no ATL definition has, an audio or localisation language the Archive holds nothing for, a `ui render` canvas that is empty, larger than 16384 pixels a side or 2^25 pixels, or not named by exactly one canvas Record, `--json` without `--out` for `cryxml` or `chf to-json`, a catalog `--out` ending in `.gz`, CHF JSON that is invalid, has an unknown version or cannot be stored as CHF, and a CHF file for `chf glb` or `character package` that holds no face DNA or whose DNA belongs to an unknown head rig |
+| 2 | Invalid input: bad arguments, an Entry path the Archive does not contain (for `compare --diff`: neither Archive contains), an empty selection in a command that requires a match, a Channel path that does not exist or was never added, a texture, sound, soundbank, chunk file, UI movie, model or geometry companion file that does not exist, the geometry of the Entity that `entity glb` or `entity package` exports when it does not exist, a mip level, chunk or LOD the file does not have, an output that is one of its inputs or lies inside a Star Citizen installation (the tool never writes there), a package folder that holds something other than an earlier package, an invalid Query, an Entity that no Record or several Records match, a malformed `--exclude` or `--replace`, an audio trigger no ATL definition has, an audio or localisation language the Archive holds nothing for, a `ui render` canvas that is empty, larger than 16384 pixels a side or 2^25 pixels, or not named by exactly one canvas Record, `--json` without `--out` for `cryxml` or `chf to-json`, a catalog `--out` ending in `.gz`, CHF JSON that is invalid, has an unknown version or cannot be stored as CHF, and a CHF file for `chf glb` or `character package` that holds no face DNA or whose DNA belongs to an unknown head rig |
 | 3 | The Archive, a socpak container in it or the input file cannot be read: missing, not an Archive, not CryXml, CHF, a chunk file or a UI movie, corrupt, a corrupt model or companion (for `entity glb` and `entity package` the geometry of the Entity itself, or its `.chrm` companion, that cannot be read), with a CHF CRC-32C mismatch or unknown CHF version, also a `compare --diff` Entry that cannot be read, does not hold its stated size or holds corrupt CryXml, a `global.ini` of `catalog` or `loc` that cannot be read, decoded or indexed (invalid bytes and lines without `=` are reported as notes), and a prefab library that cannot be read; a missing texture, sound, soundbank, chunk file, UI movie or model file is 2 |
 | 4 | The Archive changed on disk while it was open, e.g. updated by the RSI Launcher; the Extraction stopped, and Entries written before may be stale |
 | 5 | The DataForge cannot be read: the Archive holds none, its version is not supported or it is corrupt, or the Record of the Entity whose Loadout or audio is shown cannot be read, or a demanded Query value cannot be read to decide the selection |

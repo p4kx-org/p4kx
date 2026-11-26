@@ -19,7 +19,8 @@ use std::time::SystemTime;
 
 use p4kx_channels::PublicPatches;
 use p4kx_extraction::{
-    Archive, CancelToken, DataForgeEntry, Filter, Record, SourceInventory, SourceInventorySelection,
+    Archive, CancelToken, DataForgeEntry, DataForgeLoadError, Filter, Record, SourceInventory,
+    SourceInventorySelection,
 };
 use serde_json::Value;
 
@@ -163,7 +164,13 @@ pub fn build_ship_base(
     if options.cancel.is_some_and(CancelToken::is_cancelled) {
         return Err(ShipBaseError::Cancelled);
     }
-    let entry = DataForgeEntry::read(archive).map_err(ShipBaseError::Load)?;
+    let cancel = options.cancel;
+    let entry =
+        DataForgeEntry::read_until(archive, &|| cancel.is_some_and(CancelToken::is_cancelled))
+            .map_err(|error| match error {
+                DataForgeLoadError::Cancelled => ShipBaseError::Cancelled,
+                other => ShipBaseError::Load(other),
+            })?;
     build_ship_base_from(archive, &entry, options)
 }
 

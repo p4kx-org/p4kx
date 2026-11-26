@@ -52,9 +52,7 @@ fn write_archive<'a>(
     compression: Compression,
     create: impl FnOnce() -> io::Result<CatalogFile<'a>>,
 ) -> Result<(CatalogSummary, CatalogFile<'a>), CatalogError> {
-    run.check_cancelled()?;
-    run.begin(CatalogStage::ReadDataForge);
-    let entry = DataForgeEntry::read(archive).map_err(CatalogError::Load)?;
+    let entry = build::api::read_archive_entry(archive, run)?;
     write_file_from(archive, &entry, run, compression, create)
 }
 
@@ -94,13 +92,7 @@ fn write_file_from<'a>(
             .map(|file| (summary, file))
             .ok_or_else(|| CatalogError::Write(io::Error::other("catalog output was not created"))),
         Err(primary) => match file {
-            Some(file) => match file.discard() {
-                Ok(()) => Err(primary),
-                Err(cleanup) => Err(CatalogError::CleanupFailed {
-                    primary: Box::new(primary),
-                    cleanup: Box::new(cleanup),
-                }),
-            },
+            Some(file) => Err(file.discard_failure(primary)),
             None => Err(primary),
         },
     }

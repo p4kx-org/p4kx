@@ -19,7 +19,7 @@ pub enum CatalogError {
     /// A location physics voxel directory lookup could not be completed.
     #[error(transparent)]
     LocationPhysicsTarget(#[from] p4kx_assembly::SocCaptureError),
-    /// The original Archive or its Build changed during a scoped query.
+    /// The original Archive or its Build changed while the job used it.
     #[error(transparent)]
     ArchiveChanged(#[from] ArchiveChanged),
     /// Shared field-origin evidence was interrupted during mutation.

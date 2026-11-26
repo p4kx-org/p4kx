@@ -173,6 +173,24 @@ impl<'a> DataForge<'a> {
     /// Visits all Records with the GUID in definition order.
     pub fn records_by_guid(&self, guid: Guid) -> impl Iterator<Item = Record<'_>> + '_ {
         let index = self.guid_index.get_or_init(|| self.build_guid_index());
+        self.records_in_guid_index(index, guid)
+    }
+
+    /// Visits matching Records in definition order if the GUID index is already available.
+    pub fn records_by_guid_if_indexed(
+        &self,
+        guid: Guid,
+    ) -> Option<impl Iterator<Item = Record<'_>> + '_> {
+        self.guid_index
+            .get()
+            .map(|index| self.records_in_guid_index(index, guid))
+    }
+
+    fn records_in_guid_index<'s>(
+        &'s self,
+        index: &'s [u32],
+        guid: Guid,
+    ) -> impl Iterator<Item = Record<'s>> + 's {
         let stored = guid.stored();
         let first = index.partition_point(|&record| {
             self.record_def(record).map(|definition| definition.guid) < Some(stored)

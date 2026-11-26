@@ -3,16 +3,21 @@
 
 //! The catalog file written next to its target and moved over it, through the public API.
 
+use std::cell::RefCell;
 use std::error::Error;
 use std::fs;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::Path;
 
 use p4kx_export::{
-    CancelToken, CatalogError, CatalogFile, CatalogOptions, Compression, write_catalog_file_from,
-    write_catalog_from,
+    CancelToken, CatalogError, CatalogFile, CatalogOptions, CatalogStage, Compression,
+    write_catalog_file_from, write_catalog_file_with_phases, write_catalog_from,
 };
-use p4kx_extraction::DataForgeEntry;
+use p4kx_extraction::{
+    Archive, ArchiveWatch, ArchiveWriteProtection, DataForgeEntry, DataForgeLoadError,
+};
+use p4kx_testkit::write_build_manifest;
+use p4kx_testkit::{ArchiveBuilder, TestEntry};
 
 use super::catalog_compression::{archive, options};
 
@@ -91,6 +96,123 @@ fn a_committed_file_replaces_the_old_one_and_leaves_no_temporary_file() -> TestR
 }
 
 #[test]
+fn archive_change_while_writing_prevents_publication() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    write_build_manifest(dir.path(), "test-main", "5.0.0", "101", "fixture")?;
+    let archive = archive(dir.path())?;
+    let watch = ArchiveWatch::new(&archive);
+    watch.check()?;
+    let out = dir.path().join("catalog.json");
+    fs::write(&out, b"prior")?;
+
+    let changed = RefCell::new(None);
+    let (_, file) = write_catalog_file_with_phases(
+        &archive,
+        &options(),
+        Compression::None,
+        &|stage| {
+            if stage == CatalogStage::WriteJson {
+                *changed.borrow_mut() = Some(write_build_manifest(
+                    dir.path(),
+                    "test-main",
+                    "5.0.0",
+                    "102",
+                    "fixture",
+                ));
+            }
+        },
+        || CatalogFile::create(&out),
+    )?;
+    changed
+        .into_inner()
+        .ok_or("the catalog reached writing")??;
+    assert!(matches!(
+        file.commit_if_current(&watch),
+        Err(CatalogError::ArchiveChanged(_))
+    ));
+    assert_eq!(fs::read(&out)?, b"prior");
+    assert_eq!(
+        fs::read_dir(dir.path())?.count(),
+        3,
+        "unpublished output was removed"
+    );
+
+    let reopened = Archive::open(archive.path())?;
+    let new_watch = ArchiveWatch::new(&reopened);
+    let (_, file) =
+        write_catalog_file_with_phases(&reopened, &options(), Compression::None, &|_| {}, || {
+            CatalogFile::create(&out)
+        })?;
+    file.commit_if_current(&new_watch)?;
+    assert_ne!(fs::read(&out)?, b"prior", "the current build publishes");
+    assert_eq!(fs::read_dir(dir.path())?.count(), 3);
+    Ok(())
+}
+
+#[test]
+fn cancelled_archive_publication_preserves_a_foreign_temporary_and_its_primary_error() -> TestResult
+{
+    let dir = tempfile::tempdir()?;
+    let archive = archive(dir.path())?;
+    let watch = ArchiveWatch::new(&archive);
+    let out = dir.path().join("catalog.json");
+    fs::write(&out, b"prior")?;
+    let cancel = CancelToken::new();
+    let protection = ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
+    let mut file = CatalogFile::create_protected(&out, &protection, &cancel)?;
+    file.write_all(b"unpublished")?;
+
+    let temporary = out.with_file_name(format!("catalog.json.p4kx-{}.part", std::process::id()));
+    let retained = dir.path().join("original.part");
+    fs::rename(&temporary, &retained)?;
+    fs::write(&temporary, b"foreign")?;
+    cancel.cancel();
+    let result = file.commit_if_current(&watch);
+
+    assert!(
+        matches!(result, Err(CatalogError::CleanupFailed { primary, .. }) if matches!(*primary, CatalogError::Cancelled)),
+        "a failed cleanup retains its cancellation error"
+    );
+    assert_eq!(fs::read(&out)?, b"prior");
+    assert_eq!(fs::read(&temporary)?, b"foreign");
+    assert_eq!(fs::read(&retained)?, b"unpublished");
+    Ok(())
+}
+
+#[test]
+fn cancellation_at_the_dataforge_stage_precedes_a_decode_error() -> TestResult {
+    let dir = tempfile::tempdir()?;
+    let source = dir.path().join("Data.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::deflated("Data\\Game2.dcb", vec![0; 64]).with_payload(vec![0xff; 8]))
+        .write_to(&source)?;
+    let archive = Archive::open(&source)?;
+    assert!(matches!(
+        DataForgeEntry::read(&archive),
+        Err(DataForgeLoadError::Read { .. })
+    ));
+    let cancel = CancelToken::new();
+    let options = CatalogOptions {
+        cancel: Some(&cancel),
+        ..options()
+    };
+    let result = write_catalog_file_with_phases(
+        &archive,
+        &options,
+        Compression::None,
+        &|stage| {
+            if stage == CatalogStage::ReadDataForge {
+                cancel.cancel();
+            }
+        },
+        || panic!("cancelled read must not open the catalog sink"),
+    );
+    assert!(matches!(result, Err(CatalogError::Cancelled)));
+    assert_eq!(fs::read_dir(dir.path())?.count(), 1);
+    Ok(())
+}
+
+#[test]
 fn a_dropped_file_and_a_path_without_a_name_leave_nothing() -> TestResult {
     let dir = tempfile::tempdir()?;
     let out = dir.path().join("catalog.json");
@@ -113,7 +235,7 @@ fn protected_catalog_cancellation_explicitly_removes_the_created_temporary() -> 
     let out = dir.path().join("catalog.json");
     fs::write(&out, b"prior")?;
     let cancel = CancelToken::new();
-    let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
+    let protection = ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
     let options = CatalogOptions {
         cancel: Some(&cancel),
         ..options()
@@ -145,7 +267,7 @@ fn a_changed_temporary_does_not_hide_cleanup_failure_as_catalog_cancellation() -
     let temporary = out.with_file_name(format!("catalog.json.p4kx-{}.part", std::process::id()));
     let retained = dir.path().join("original.part");
     let cancel = CancelToken::new();
-    let protection = p4kx_extraction::ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
+    let protection = ArchiveWriteProtection::new(archive.path(), cancel.flag())?;
     let options = CatalogOptions {
         cancel: Some(&cancel),
         ..options()

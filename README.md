@@ -92,7 +92,8 @@ The look is P4KX's own dark theme, and the language is German or British English
 
 `p4kx <command> --help` documents every command and option; [docs/commands.md](docs/commands.md)
 describes them in full, the JSON shapes are in [docs/cli-json.md](docs/cli-json.md), and the exit
-codes are in `p4kx --help`. Every command takes the path of a `Data.p4k` as `<archive>`.
+codes are in `p4kx --help`. For an Archive input, pass the path of `Data.p4k` as `<archive>`. The
+command reference describes standalone file inputs and operations such as schema generation.
 
 | Area | Commands |
 |---|---|
@@ -106,8 +107,9 @@ codes are in `p4kx --help`. Every command takes the path of a `Data.p4k` as `<ar
 
 `p4kx catalog schema` prints the default marker document schema. Use
 `p4kx catalog schema --provenance full` for the standalone v3 schema.
-The Rust client-profile readers default to encryption markers and offer an option
-for full source evidence. [Client profile SDK](docs/catalog-sdk.md#client-profile-documents)
+The [Rust Catalog SDK](docs/catalog-sdk.md) covers document creation and selective domain queries.
+Its client-profile readers default to encryption markers and offer full source evidence.
+[Client profile SDK](docs/catalog-sdk.md#client-profile-documents)
 
 ## MCP server
 
@@ -208,6 +210,7 @@ P4KX only reads the game folders and refuses to write into a Star Citizen instal
 | Queries | [docs/query.md](docs/query.md) |
 | Record formats | [docs/record-xml.md](docs/record-xml.md), [docs/record-json.md](docs/record-json.md), [docs/record-flat.md](docs/record-flat.md) |
 | P4KX catalog and ship base data | [docs/catalog.md](docs/catalog.md), [docs/ship-base-data.md](docs/ship-base-data.md) |
+| Rust Catalog SDK | [docs/catalog-sdk.md](docs/catalog-sdk.md) |
 | Blender package | [docs/blender-package.md](docs/blender-package.md) |
 | Plan and decisions | [docs/ROADMAP.md](docs/ROADMAP.md), [docs/adr/](docs/adr/) |
 | The terms used | [CONTEXT.md](CONTEXT.md) |

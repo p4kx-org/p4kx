@@ -12,7 +12,8 @@ the standalone version 3 catalog with its source inventory and proof references.
 Its JSON Schema is [`schemas/p4kx-catalog.schema.json`](../schemas/p4kx-catalog.schema.json).
 The CLI generates the marker document's separate draft 2020-12 schema with
 `p4kx catalog schema`. Use `p4kx catalog schema --provenance full` for the
-standalone version 3 schema.
+standalone version 3 schema. In Rust, use `p4kx_export::catalog_marker_schema()` for the default
+`build_catalog` output and `p4kx_export::catalog_schema()` for the standalone Full document.
 
 The [Rust SDK](catalog-sdk.md) also reads supported catalog data directly from an opened Archive.
 `CatalogOptions::starmap_budget` defaults to complete Child traversal without a fixed count quota.
@@ -219,7 +220,7 @@ ResourceType source fields instead have the explicit state/value/origin carrier 
 | `source.encryptedEntriesUnread` | How many distinct encrypted Entries the export asked for and could not read because the key was missing or wrong; `0` when none was needed ([ADR-0353](adr/0353-exports-state-whether-the-archive-key-was-there.md)) |
 | `source.toolVersion` | The version of P4KX that wrote the catalog |
 | `source.exportedAt` | When the catalog was written, UTC in RFC 3339 form |
-| `completeness.<kind>` | `{"status": "complete"}`, or `{"status": "partial", "filter": "Ã¢â‚¬Â¦"}` when a Filter selected the Records; global `tags` remains complete independently of that Filter |
+| `completeness.<kind>` | `{"status": "complete"}`, or `{"status": "partial", "filter": "Ã¢â‚¬Â¦"}` for a Record-filtered kind. The global `tags` and physical `shopInventories` selections stay complete independently of the Record Filter |
 | `exportHealth` | Measured source-read and projection health, directly sourced failed-Record and diagnostic-subject identities with shared text storage, separate Record/Archive Entry counters and bounded diagnostics; independent of Filter completeness ([contract](catalog-export-health.md)) |
 | `definitions.tags`, `declarations.tagRoots`, `declarations.entityTags`, `projections.tagPaths` | Global physical Tag definitions, original root/child/Entity GUID arrays, and separately named first-selected tree paths with exact per-value origin; the taxonomy stays complete under an Entity Filter ([contract](catalog-tags.md)) |
 | `definitions.missionItems` | Physical authored item definitions, ordered tags and localized variants, original weight and Entity reference ([contract](catalog-mission-items.md)) |

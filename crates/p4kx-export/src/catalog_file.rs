@@ -7,9 +7,11 @@ use std::path::{Path, PathBuf};
 use std::process;
 
 use p4kx_extraction::{
-    ArchiveWriteProtection, CancelToken, OwnedFileToken, OwnedOutputCleanupError, OwnedOutputError,
-    check_protected_output, create_output_file,
+    ArchiveWatch, ArchiveWriteProtection, CancelToken, OwnedFileToken, OwnedOutputCleanupError,
+    OwnedOutputError, check_protected_output, create_output_file,
 };
+
+use crate::CatalogError;
 
 /// A catalog file written next to its target and moved over it on [`commit`](Self::commit).
 ///
@@ -82,18 +84,7 @@ impl<'a> CatalogFile<'a> {
     /// Returns the I/O error when the file cannot be flushed or cannot replace the target; the
     /// temporary file is removed then.
     pub fn commit(mut self) -> io::Result<()> {
-        let result = (|| {
-            if let Some(file) = self.file.take() {
-                file.sync_all()?;
-            }
-            self.ownership
-                .ensure_writable(&self.temporary, cancel_flag(self.cancel))
-                .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error))?;
-            check_output(&self.out, self.protection, self.cancel)?;
-            fs::rename(&self.temporary, &self.out)?;
-            self.temporary = PathBuf::new();
-            Ok(())
-        })();
+        let result = self.sync_staged().and_then(|()| self.publish());
         match result {
             Ok(()) => Ok(()),
             Err(source) => {
@@ -108,6 +99,55 @@ impl<'a> CatalogFile<'a> {
                 }
             }
         }
+    }
+
+    /// Publishes the catalog after checking the input Archive's watch at replacement.
+    ///
+    /// # Errors
+    /// Returns cancellation, a changed Archive, or a write failure, with any failed cleanup.
+    pub fn commit_if_current(mut self, watch: &ArchiveWatch) -> Result<(), CatalogError> {
+        let result = (|| {
+            self.check_cancelled()?;
+            self.sync_staged().map_err(CatalogError::Write)?;
+            watch.check()?;
+            self.check_cancelled()?;
+            self.publish().map_err(CatalogError::Write)
+        })();
+        result.map_err(|primary| self.discard_failure(primary))
+    }
+
+    pub(crate) fn discard_failure(self, primary: CatalogError) -> CatalogError {
+        match self.discard() {
+            Ok(()) => primary,
+            Err(cleanup) => CatalogError::CleanupFailed {
+                primary: Box::new(primary),
+                cleanup: Box::new(cleanup),
+            },
+        }
+    }
+
+    fn check_cancelled(&self) -> Result<(), CatalogError> {
+        if self.cancel.is_some_and(CancelToken::is_cancelled) {
+            return Err(CatalogError::Cancelled);
+        }
+        Ok(())
+    }
+
+    fn sync_staged(&mut self) -> io::Result<()> {
+        if let Some(file) = self.file.take() {
+            file.sync_all()?;
+        }
+        Ok(())
+    }
+
+    fn publish(&mut self) -> io::Result<()> {
+        self.ownership
+            .ensure_writable(&self.temporary, cancel_flag(self.cancel))
+            .map_err(|error| io::Error::new(io::ErrorKind::PermissionDenied, error))?;
+        check_output(&self.out, self.protection, self.cancel)?;
+        fs::rename(&self.temporary, &self.out)?;
+        self.temporary = PathBuf::new();
+        Ok(())
     }
 
     /// Removes the unpublished created file using its retained descriptor identity.

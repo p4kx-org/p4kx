@@ -139,11 +139,21 @@ fn exact_guid_lookup_keeps_every_physical_record_in_definition_order() -> TestRe
     let bytes = database(8, false);
     let forge = DataForge::open(&bytes)?;
     let original = forge.record(0).ok_or("original first Record")?;
+    assert!(
+        forge.records_by_guid_if_indexed(original.guid()).is_none(),
+        "an indexed-only lookup leaves the cold index uninitialized"
+    );
     let matches: Vec<_> = forge
         .records_by_guid(original.guid())
         .map(|record| record.index())
         .collect();
     assert_eq!(matches, [0, 1], "both physical matches remain visible");
+    let warm: Vec<_> = forge
+        .records_by_guid_if_indexed(original.guid())
+        .ok_or("the regular lookup initialized its index")?
+        .map(|record| record.index())
+        .collect();
+    assert_eq!(warm, matches, "warm lookup keeps duplicate physical order");
     assert_eq!(
         forge
             .record_by_guid(original.guid())

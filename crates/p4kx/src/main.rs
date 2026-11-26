@@ -172,13 +172,12 @@ use std::process::ExitCode;
 
 use clap::Parser;
 
-use crate::cli::{Cli, Command};
+use crate::cli::{CatalogArgs, CatalogCommand, Cli, Command};
+use crate::cli_media::{MediaAction, MediaArgs};
 
 fn main() -> ExitCode {
     let cli = Cli::parse();
-    if !matches!(cli.command, Command::CheckUpdate)
-        && let Err(code) = prepare_archive_command(&cli)
-    {
+    if let Err(code) = prepare_command(&cli) {
         return code;
     }
     let json = cli.json;
@@ -199,10 +198,24 @@ fn main() -> ExitCode {
     code
 }
 
-fn prepare_archive_command(cli: &Cli) -> Result<(), ExitCode> {
+fn prepare_command(cli: &Cli) -> Result<(), ExitCode> {
+    if matches!(cli.command, Command::CheckUpdate) {
+        return Ok(());
+    }
     if let Err(error) = p4kx_extraction::check_runtime_prerequisites() {
         report(&anyhow::Error::new(error));
         return Err(ExitCode::from(exit::PARTIAL_FAILURE));
+    }
+    if matches!(
+        cli.command,
+        Command::Catalog(CatalogArgs {
+            command: Some(CatalogCommand::Schema),
+            ..
+        }) | Command::Media(MediaArgs {
+            action: MediaAction::Schema { .. },
+        })
+    ) {
+        return Ok(());
     }
     guard::protect_installations();
     if !matches!(cli.command, Command::Key(_)) {

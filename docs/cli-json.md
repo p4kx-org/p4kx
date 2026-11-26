@@ -82,8 +82,9 @@ of its own, without `parts` fields.
 {"archive": "C:\\…\\LIVE\\Data.p4k", "filter": "*.xml", "entries": [Entry, …]}
 ```
 
-`filter` is the Filter as given; `entries` holds the matching Entries in Archive order and is empty
-when nothing matches.
+`filter` is the supplied Filter. `entries` holds the matching Entries in Archive order. When nothing
+matches, a search without `--exclude` exits with code 0 and returns `entries: []`. With `--exclude`,
+an empty selection exits with code 2 and produces no JSON.
 
 ## `p4kx info <archive> --json`
 
@@ -1562,19 +1563,35 @@ Plain table output retains its existing fields and formatting.
 
 ## `p4kx catalog <archive> --out <file> --json`
 
-The following excerpt shows the publication contract; other summary fields and the per-kind
-health and diagnostic lists are omitted. The complete health object is identical to the catalog's
-`exportHealth`; its nested keys retain camelCase inside the CLI's snake_case summary.
-The summary includes the source-use inventory under `provenance` when `--provenance full` is selected.
+The marker-only example shows one failed Record and the text entries it references. Other
+summary and health fields are omitted. The complete `export_health` object matches the
+catalog's `exportHealth`. Its nested keys retain camelCase inside the CLI's snake_case summary.
+With `--provenance full`, the summary includes a `provenance` inventory, and each sourced cell
+also carries `sourceUsesRefs` and `sourceSetComplete`.
 
 ```json
-{"archive": "Data.p4k", "out": "diagnostic.json.zst", "schema_version": 3,
- "archive_key": "missing", "encrypted_entries_unread": 412,
- "export_health": {"status": "incomplete", "read": "incomplete",
-   "projection": "complete", "publicationMode": "diagnosticPartial"},
- "size": 12345, "compressed_size": 2345,
- "failed": [{"guid": "90000000-0000-4000-8000-000000000009",
-   "path": "libs/foundry/records/crafting/blueprints/crafting/broken", "error": "source read failed"}]}
+{
+  "archive": "Data.p4k",
+  "out": "diagnostic.json.zst",
+  "schema_version": 3,
+  "export_health": {
+    "status": "incomplete",
+    "read": "incomplete",
+    "projection": "complete",
+    "publicationMode": "diagnosticPartial",
+    "metadata": {
+      "texts": [
+        {"state": "present", "value": "libs/foundry/records/crafting/blueprints/crafting/broken", "containsEncryptedSource": false},
+        {"state": "present", "value": "source read failed", "containsEncryptedSource": null}
+      ]
+    }
+  },
+  "failed": [{
+    "guid": {"state": "present", "value": "90000000-0000-4000-8000-000000000009", "containsEncryptedSource": false},
+    "path": {"state": "present", "value": {"atomIndex": "0"}, "containsEncryptedSource": false},
+    "error": {"state": "present", "value": {"atomIndex": "1"}, "containsEncryptedSource": null}
+  }]
+}
 ```
 
 `archive_key` is `given`, `missing` or `wrong` and `encrypted_entries_unread` counts the distinct
@@ -1597,11 +1614,18 @@ written. `size` is the size of the JSON in bytes, uncompressed;
 `compressed_size` is the size of the file written when it is compressed and `null` otherwise.
 `size_warning` is `near_limit` from 90 % of `upload_limit`, `over_limit` above it, and `null`
 otherwise; it compares the file written (`compressed_size`, else `size`). `decompressed_warning`
-does the same for `size` against `decompressed_limit` (1,000,000,000). `kinds` lists every kind in catalog order with the entities written, the
-development leftovers `skipped` and whether the kind is `complete` (no `--filter`); `skipped` sums
-them. `failed` lists the selected Records that could not be read and are left out of the catalog,
-with GUID, record path (empty when it cannot be read) and the reason and its causes joined by
-`: `, ordered by GUID; the synthetic diagnostic example shows one, a healthy export has none.
+does the same for `size` against `decompressed_limit` (1,000,000,000). `kinds` lists every kind in
+catalog order with the count written, development leftovers `skipped` and selection completeness in
+`complete`. With `--filter`, `tags` and `shopInventories` remain complete. `skipped` sums the
+per-kind counts.
+
+`failed` lists selected unreadable Records omitted from the catalog, ordered by GUID. Inspect each
+cell's `state` first. A present GUID is a string in `guid.value`. For a present `path` or `error`,
+parse `value.atomIndex` as a zero-based decimal-string index into the same summary's
+`export_health.metadata.texts`. Read the referenced text cell's `value`. A readable empty path
+has a present text value of `""`. An unreadable path has state `unreadable` and value `null`.
+Use the immediate occurrence's encryption marker and evidence for classification. The shared text
+cell can aggregate origins from multiple occurrences. See the [health contract](catalog-export-health.md#original-record-subjects-and-shared-text).
 Normal publication refuses incomplete read/projection health or blocking source warnings, with
 exit code 1, empty stdout and no destination creation or replacement. Use `--diagnostic-partial`
 explicitly to write an incomplete diagnostic artifact and its JSON summary; incomplete diagnostic
