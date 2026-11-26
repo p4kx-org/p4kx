@@ -210,6 +210,23 @@ The newer release verifier SHA-256 was
 `4d18af9a4126593ea14b8e5d2e1f58d6c3f5d13304b0b023f4152fe14775eca4`.
 Neither sample proves a reduction in completed-query memory.
 
+An instrumented Release witness from `d4055eaf5` used the same nominal
+LIVE query and 2,000,000,000-byte guard. It stopped in the next group after
+608 owners and rows, before releasing the resolver or finalizing texts or
+the inventory. At stop, the monitor recorded 2,057,920,512 B lifetime private
+commit and 2,027,102,208 B working set. The private witness SHA-256 was
+`c9666921d89d5d14a436944215aa09756a694e4ca0b72301576ab737899725db`.
+
+At the last completed group the resolver held 603 vehicle cache entries,
+including one failed entry, and 6,495 parsed Entity specs. It retained
+1,186,719 vehicle XML coordinate handles. Their estimated vector, object and
+coordinate storage was 166,808,821 B, with 13,478,976 B in mutable
+deduplication tables. The file graph held 927 operations and 92,080 path
+recipes. The Marker inventory registered 172 uses. These estimates omit
+allocator overhead, parsed parts, indirect shared allocations and output
+rows. They locate the observed growth during owner resolution. The guarded
+run did not measure a complete peak or comparative throughput.
+
 For the next Loadout comparison, measure time to first owner, admission,
 Record and XML cache misses, semantic Loadout resolution, port construction and
 alignment in the same release-profile run. A cache can reuse original parsed
