@@ -3183,6 +3183,18 @@ physical-source identities. The optimized verifier completed in
 1,723.431 s with 1,114,714,112 peak private bytes and 1,048,502,272 peak
 working-set bytes.
 
+On PTU `13273298`, a Windows AMD64 verifier from signed revision
+`e2ec43eef7eb6217c695102d824ce5f6b5aa09e9` checked one independently nominated
+physical Ship with Full provenance and one worker. The twelve selected rows
+matched in both queries. The retained comparison against the complete Normal
+Catalog from `4d334e716cbc87e27525e8e095410a19103c51f5` also verified their order,
+contributing source uses and physical-source identities.
+
+| Flight verification | Elapsed s | Peak private bytes | Peak working-set bytes |
+| --- | ---: | ---: | ---: |
+| Cold selected-Ship query | 10.728 | 1,114,898,432 | 1,048,842,240 |
+| Retained complete Catalog comparison | 1,752.497 | 1,114,927,104 | 1,032,990,720 |
+
 On LIVE `13220821`, one replay of the complete Normal Catalog from producer
 `23addc5e164f65a28a6f258302b30453b331edce` matched the 12 selected Flight rows,
 all 205 Vehicle Armor rows and all 14,024 resource network link rows. The three

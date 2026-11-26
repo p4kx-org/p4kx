@@ -499,6 +499,10 @@ JSON receipts. The checkpoint remains available if the runner stops reporting du
 Lifecycle WaitFinish also emits fixed hosted annotations at its process and receipt boundaries.
 The diagnostic runner-fuse fixture records whether GitHub retains the wait-start annotation
 after a deliberate step timeout. Both observations leave native lifecycle completion unproven.
+The hosted fuse run for `e2ec43eef` retained the `predicate-wait` start annotation
+on AMD64 and ARM64 after the one-minute timeout. The completed controls contained
+no such annotation. The independent verdict checked these cases against GitHub's
+Check Run annotations. [Hosted timeout retention](https://github.com/p4kx-org/p4kx/actions/runs/45726436203)
 The cancellation-aware diagnostic upload collects those local files after the terminal evidence
 and package publication steps. A runner failure before the upload can prevent delivery.
 The first install snapshot emits one bounded observation in its existing console stream after
