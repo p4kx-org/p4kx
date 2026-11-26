@@ -47,7 +47,7 @@ try {
         }
     }
     $caller = Join-Path $context.root 'snapshots/09/caller-result.json'
-    if ([IO.File]::Exists($caller)) { $result.caller_result_sha256 = Get-P4kxDetachedDigest $caller }
+    if ([IO.File]::Exists($caller)) { $result.caller_result_sha256 = Get-P4kxDetachedReceiptDigest $caller }
 } finally {
     Write-P4kxMsiSupervisorProgress finishSupervisorReceipt begin $context.digest
     Write-P4kxDetachedReceipt (Join-Path $context.directory 'result.json') $result

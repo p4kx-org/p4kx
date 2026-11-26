@@ -7,6 +7,22 @@ function Get-P4kxDetachedDigest([string]$Path) {
     return (Get-FileHash -LiteralPath $Path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 
+function Assert-P4kxDetachedReceiptLength([long]$Length) {
+    if ($Length -gt 16KB) { throw 'Detached control receipt exceeds its metadata bound.' }
+}
+
+function Get-P4kxDetachedReceiptDigest([string]$Path) {
+    $stream = [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read)
+    try {
+        $length = $stream.Length
+        Assert-P4kxDetachedReceiptLength $length
+        $bytes = [byte[]]::new([int]$length)
+        $stream.ReadExactly($bytes, 0, $bytes.Length)
+        if ($stream.ReadByte() -ne -1) { throw 'Detached control receipt changed while it was read.' }
+        return [Convert]::ToHexStringLower([Security.Cryptography.SHA256]::HashData($bytes))
+    } finally { $stream.Dispose() }
+}
+
 function Get-P4kxDetachedTrackingDigest {
     if ([string]::IsNullOrEmpty($env:RUNNER_TRACKING_ID)) { return $null }
     $bytes = [Text.Encoding]::UTF8.GetBytes($env:RUNNER_TRACKING_ID)
@@ -28,7 +44,7 @@ function Write-P4kxDetachedReceipt([string]$Path, $Value) {
 }
 
 function Read-P4kxDetachedReceipt([string]$Path) {
-    if ((Get-Item -LiteralPath $Path).Length -gt 16384) { throw 'Detached control receipt exceeds its metadata bound.' }
+    Assert-P4kxDetachedReceiptLength (Get-Item -LiteralPath $Path).Length
     return Get-Content -LiteralPath $Path -Raw | ConvertFrom-Json -AsHashtable -Depth 10 -DateKind String
 }
 

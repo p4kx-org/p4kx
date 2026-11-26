@@ -3,6 +3,26 @@ $ErrorActionPreference = 'Stop'
 
 . (Join-Path $PSScriptRoot 'msi-observer-finish-wait-host.ps1')
 
+function Assert-P4kxFinishReceiptDigest([string]$Root) {
+    $path = Join-Path $Root 'digest-fixture.json'
+    $json = '{"schema":1}'
+    $validAtLimit = $json.PadRight(16KB - 1) + [char]10
+    foreach ($content in @('', $json, $validAtLimit)) {
+        [IO.File]::WriteAllText($path, $content)
+        if ((Get-P4kxDetachedReceiptDigest $path) -cne (Get-P4kxDetachedDigest $path)) {
+            throw 'The bounded receipt digest changed the SHA-256 of the original bytes.'
+        }
+    }
+
+    [IO.File]::AppendAllText($path, ' ')
+    try {
+        $null = Get-P4kxDetachedReceiptDigest $path
+        throw 'An oversized Finish receipt was accepted for hashing.'
+    } catch {
+        if ($_.Exception.Message -cne 'Detached control receipt exceeds its metadata bound.') { throw }
+    }
+}
+
 function Write-P4kxFinishLifecycleFixtureResult([string]$Path, [string]$Digest) {
     Write-P4kxDetachedReceipt $Path @{
         schema=1;role='native-msi-finish-lifecycle-control-response';request_sha256=$Digest
@@ -221,6 +241,7 @@ function Assert-P4kxHostedFinishWaitRefused($Fixture, [DateTimeOffset]$Cutoff) {
 $root = [IO.Path]::GetFullPath($Directory)
 if (-not $IsWindows -or [IO.Path]::Exists($root)) { throw 'The Lifecycle Finish control requires a fresh native Windows directory.' }
 $null = New-Item -ItemType Directory -Path $root
+Assert-P4kxFinishReceiptDigest $root
 $budget = New-P4kxMsiStepBudget $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC
 $savedMinutes = $env:P4KX_MSI_STEP_MINUTES
 $savedComputed = $env:P4KX_MSI_STEP_COMPUTED_AT_UTC

@@ -128,7 +128,7 @@ function Wait-P4kxMsiFinishReceipt {
     if ($found) {
         Write-P4kxMsiObserverProgress finishWaitDigest begin @progress
         if ($Hosted -or $null -ne $direct) { Write-P4kxMsiFinishWaitNotice receipt-digest begin -Hosted:$Hosted }
-        $resultDigest = Get-P4kxDetachedDigest $receiptPath
+        $resultDigest = Get-P4kxDetachedReceiptDigest $receiptPath
         if ($Hosted -or $null -ne $direct) { Write-P4kxMsiFinishWaitNotice receipt-digest end -Hosted:$Hosted }
         Write-P4kxMsiObserverProgress finishWaitDigest end @progress
     }
@@ -175,7 +175,7 @@ function Read-P4kxMsiSupervisedFinish([string]$Directory) {
         $wait.supervisor_started_utc_ticks -ne $launch.supervisor_started_utc_ticks -or
         $wait.deadline_utc -cne $context.collection_cutoff.ToString('o') -or $wait.mutation_authority -ne $false -or
         $wait.result_sha256 -cnotmatch '^[0-9a-f]{64}$' -or
-        $wait.result_sha256 -cne (Get-P4kxDetachedDigest $receiptPath)) {
+        $wait.result_sha256 -cne (Get-P4kxDetachedReceiptDigest $receiptPath)) {
         throw 'Finish requires the exact terminal receipt from its bounded wait.'
     }
     $waitObserved = ConvertFrom-P4kxMsiBudgetTimestamp $wait.observed_utc
@@ -201,7 +201,7 @@ function Read-P4kxMsiSupervisedFinish([string]$Directory) {
     Write-P4kxMsiObserverProgress finishCollectSupervisorReceipt end -RequestDigest $context.digest
     Write-P4kxMsiObserverProgress finishCollectCallerReceipt begin -RequestDigest $context.digest
     $callerPath = Join-Path $context.root 'snapshots/09/caller-result.json'
-    if ($result.caller_result_sha256 -cne (Get-P4kxDetachedDigest $callerPath)) { throw 'The original Finish caller receipt differs.' }
+    if ($result.caller_result_sha256 -cne (Get-P4kxDetachedReceiptDigest $callerPath)) { throw 'The original Finish caller receipt differs.' }
     $caller = Read-P4kxDetachedReceipt $callerPath
     $observer = Read-P4kxDetachedReceipt (Join-Path $context.root 'observer-result.json')
     $snapshot = Join-Path $context.root 'checkpoints/09'
