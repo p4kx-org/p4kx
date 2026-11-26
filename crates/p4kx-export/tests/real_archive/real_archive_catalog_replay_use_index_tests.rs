@@ -112,3 +112,22 @@ fn dense_use_rows_keep_exact_ends_at_chunk_boundaries() -> Result<(), &'static s
     );
     Ok(())
 }
+
+#[test]
+fn an_indexed_ordinal_without_an_exact_key_is_refused() -> Result<(), &'static str> {
+    let mut index = UseIndex::<BuildHasherDefault<CollidingHasher>>::default();
+    index.insert("first", CLEAR)?;
+    index
+        .rows
+        .chunks
+        .first_mut()
+        .ok_or("the first insert must have created a chunk")?
+        .ends
+        .clear();
+    assert_eq!(
+        index.insert("second", OPAQUE),
+        Err("an indexed ordinal has no exact source-use key"),
+        "a corrupt ordinal must never authenticate another exact ID"
+    );
+    Ok(())
+}

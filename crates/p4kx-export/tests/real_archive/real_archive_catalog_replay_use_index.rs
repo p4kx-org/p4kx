@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::array;
+use std::cell::Cell;
 use std::hash::{BuildHasher, RandomState};
 
 use hashbrown::HashTable;
@@ -45,16 +46,22 @@ impl<S: BuildHasher> UseIndex<S> {
             .ok_or("invalid source-use hash shard")?;
         let rows = &mut self.rows;
         let hash_builder = &self.hash_builder;
+        let missing_key = Cell::new(false);
+        let exact_key = |ordinal| {
+            let key = rows.id(ordinal);
+            if key.is_none() {
+                missing_key.set(true);
+            }
+            key
+        };
         let entry = shard.entry(
             hash,
-            |&ordinal| rows.id(ordinal) == Some(bytes),
-            |&ordinal| {
-                let key = rows
-                    .id(ordinal)
-                    .expect("an indexed ordinal owns an exact key");
-                hash_builder.hash_one(key)
-            },
+            |&ordinal| exact_key(ordinal) == Some(bytes),
+            |&ordinal| exact_key(ordinal).map_or(hash, |key| hash_builder.hash_one(key)),
         );
+        if missing_key.get() {
+            return Err("an indexed ordinal has no exact source-use key");
+        }
         match entry {
             Entry::Occupied(_) => Err("invalid or duplicate source-use ID"),
             Entry::Vacant(entry) => {

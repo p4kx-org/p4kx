@@ -121,7 +121,7 @@ impl Inventory {
         self.variant_sets.len()
     }
 
-    pub(super) fn counts(&self) -> (u64, u64) {
+    pub(super) const fn counts(&self) -> (u64, u64) {
         (self.sources, self.uses.len() as u64)
     }
 }
