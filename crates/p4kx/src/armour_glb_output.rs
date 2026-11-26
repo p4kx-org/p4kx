@@ -6,10 +6,9 @@ use std::path::Path;
 
 use anyhow::Result;
 use p4kx_assembly::{ArchiveModels, Armour, CharacterAnimations};
-use p4kx_extraction::model::MeshOrigin;
 use p4kx_extraction::{
-    ArchiveWriteProtection, CancelToken, ConversionError, FrozenGlbMeshOrigins, GlbMeshOrigins,
-    GlbOptions, GlbSummary, GltfError, MaterialMode, TextureLoader,
+    ArchiveWriteProtection, CancelToken, ConversionError, FrozenGlbMeshOrigins, GlbOptions,
+    GlbSummary, GltfError, MaterialMode, TextureLoader,
 };
 
 use crate::cli_armour::ArmourGlbArgs;
@@ -88,53 +87,16 @@ fn publish(
     Ok(summary)
 }
 
-struct EmittedMesh {
-    accessor: usize,
-    source: Option<MeshOrigin>,
-    part: usize,
-}
-
 impl Export<'_> {
     fn write(
         &self,
         mut writer: &mut dyn io::Write,
     ) -> io::Result<(GlbSummary, FrozenGlbMeshOrigins)> {
-        let mut meshes = Vec::new();
-        let (summary, emission) = self
-            .armour
-            .write_glb_animated_observed_with_vertex_origins(
-                self.animated,
-                self.options,
-                self.textures,
-                &mut writer,
-                &mut |mesh, _| {
-                    meshes.push(EmittedMesh {
-                        accessor: mesh.position_accessor,
-                        source: mesh.origin,
-                        part: mesh.part,
-                    });
-                    Ok(())
-                },
-            )
+        self.armour
+            .write_glb_with_origins(self.animated, self.options, self.textures, &mut writer)
             .map_err(|error| match error {
                 GltfError::Write(source) => source,
                 source => io::Error::other(source),
-            })?;
-        let mut origins = GlbMeshOrigins::with_expanded_use_refs();
-        // Worn fields register first so their original reference encoding is stable.
-        let mounts = self
-            .armour
-            .worn_mount_fields(&emission, origins.source_uses())
-            .map_err(io::Error::other)?;
-        origins.include_json_fields(mounts);
-        for mesh in meshes {
-            let part = self
-                .armour
-                .parts()
-                .get(mesh.part)
-                .ok_or_else(|| io::Error::other("rigged mesh lost its producing part"))?;
-            origins.observe_mesh(mesh.accessor, mesh.source, part.model_archive_sources())?;
-        }
-        Ok((summary, origins.finish()?))
+            })
     }
 }

@@ -3,6 +3,8 @@
 
 use std::io::{self, Write};
 
+use p4kx_extraction::model::MeshOrigin;
+use p4kx_extraction::{FrozenGlbMeshOrigins, GlbMeshOrigins};
 use p4kx_gltf::{
     GlbOptions, GlbSummary, GltfError, MeshVertexMap, RigAnimation, RiggedGlbEmission,
     TextureLoader, write_rigged_glb_animated_observed,
@@ -36,7 +38,55 @@ impl CharacterAnimations<'_> {
     }
 }
 
+struct EmittedMesh {
+    accessor: usize,
+    source: Option<MeshOrigin>,
+    part: usize,
+}
+
 impl Armour {
+    /// Writes the rigged GLB and retains observed geometry and worn mount field origins.
+    ///
+    /// # Errors
+    /// Returns a GLB write or source evidence error.
+    pub fn write_glb_with_origins(
+        &self,
+        animations: &CharacterAnimations<'_>,
+        options: &GlbOptions,
+        textures: &dyn TextureLoader,
+        out: &mut impl Write,
+    ) -> Result<(GlbSummary, FrozenGlbMeshOrigins), GltfError> {
+        let mut meshes = Vec::new();
+        let (summary, emission) = self.write_glb_animated_observed_with_vertex_origins(
+            animations,
+            options,
+            textures,
+            out,
+            &mut |mesh, _| {
+                meshes.push(EmittedMesh {
+                    accessor: mesh.position_accessor,
+                    source: mesh.origin,
+                    part: mesh.part,
+                });
+                Ok(())
+            },
+        )?;
+        let mut origins = GlbMeshOrigins::with_expanded_use_refs();
+        // Worn fields register first so their original reference encoding is stable.
+        let mounts = self
+            .worn_mount_fields(&emission, origins.source_uses())
+            .map_err(io::Error::other)?;
+        origins.include_json_fields(mounts);
+        for mesh in meshes {
+            let part = self
+                .parts()
+                .get(mesh.part)
+                .ok_or_else(|| io::Error::other("rigged mesh lost its producing part"))?;
+            origins.observe_mesh(mesh.accessor, mesh.source, part.model_archive_sources())?;
+        }
+        Ok((summary, origins.finish()?))
+    }
+
     /// Writes the rigged GLB and visits output vertex mappings with their exact producing part.
     ///
     /// # Errors

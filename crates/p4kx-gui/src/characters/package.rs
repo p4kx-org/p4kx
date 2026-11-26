@@ -91,6 +91,7 @@ pub(super) fn write(index: &EntryIndex, request: &Request, cancel: &CancelToken)
             written: GlbSummary::default(),
             issues: package.issues.iter().map(PartIssue::of_package).collect(),
             package: Some(package),
+            origin_receipt: None,
         })),
         Err(error) => package_failure(index, error, cancel.is_cancelled())
             .map_or(Ended::Cancelled, Ended::Failed),

@@ -125,7 +125,7 @@ impl ModelSource {
         cancel: &CancelToken,
     ) -> ConversionError {
         if committed {
-            return write_error(out, io::Error::other(CommittedGlbPublication(error)));
+            return ConversionError::committed_glb_publication(out, error);
         }
         match error.downcast::<GltfError>() {
             Ok(error) => self.glb_write_error(out, error),
@@ -156,7 +156,13 @@ fn publication_io_error(out: &Path, error: io::Error, cancel: &CancelToken) -> C
 struct CommittedGlbPublication(#[source] io::Error);
 
 impl ConversionError {
-    /// Returns whether a standalone model GLB committed before publication failed.
+    /// Reports a standalone GLB publication failure after the file committed.
+    #[must_use]
+    pub fn committed_glb_publication(out: &Path, source: io::Error) -> Self {
+        write_error(out, io::Error::other(CommittedGlbPublication(source)))
+    }
+
+    /// Returns whether a standalone GLB committed before publication failed.
     #[must_use]
     pub fn standalone_glb_was_committed(&self) -> bool {
         matches!(

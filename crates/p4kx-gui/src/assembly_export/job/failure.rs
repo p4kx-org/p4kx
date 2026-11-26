@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::archive_error_in;
+use p4kx_extraction::{ConversionError, archive_error_in};
 
 use crate::model::describe;
 use crate::{EntryIndex, ModelExportFailure};
@@ -11,6 +11,12 @@ pub(crate) fn failure_of(
     index: &EntryIndex,
     error: &(dyn std::error::Error + 'static),
 ) -> ModelExportFailure {
+    if error
+        .downcast_ref::<ConversionError>()
+        .is_some_and(ConversionError::standalone_glb_was_committed)
+    {
+        return ModelExportFailure::Failed(describe(error));
+    }
     if index.watch().check().is_err() {
         return ModelExportFailure::ArchiveChanged;
     }

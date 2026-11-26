@@ -473,6 +473,14 @@ receipt does not establish complete material, light, transform or container-decl
 coverage. An origin publication failure after the GLB has been committed is reported
 as a failed export without a stale receipt.
 
+## GUI Character GLB
+
+The Character window publishes its single-file GLB with a digest-bound sibling
+receipt. The GLB keeps the selected appearance, textures and morph targets.
+The receipt uses the rigged Armour writer's observed mesh and worn-mount
+fields. Unobserved contributors leave the artifact origin incomplete.
+The export summary exposes the companion path for single-file GLB outputs.
+
 ## Rigid worn mounts
 
 `p4kx armour glb` publishes a sibling `<file>.p4kx-origin.jsonl` for emitted rigid
