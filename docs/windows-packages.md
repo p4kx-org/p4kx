@@ -571,3 +571,18 @@ where either runner stopped reporting remains unknown.
 [Release run](https://github.com/p4kx-org/p4kx/actions/runs/45825321334) ·
 [AMD64 checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45825321334/artifacts/15124615569) ·
 [ARM64 checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45825321334/artifacts/15124860101)
+
+Release run `45843748173` tested merge `2b4434893ea7092853f24eaf04950e8c3fedb9c8`.
+The synthetic detached controls reached the supervisor's negative-result
+fixture on both CPUs. Its failure injection still replaced the generic file
+digest, while the supervisor called the bounded receipt digest. This left the
+attempted caller-digest failure unexercised. The later harmless cleanup tried
+to read the request from a skipped launch and reported a missing file.
+
+The corrected synthetic checks inject the error at the bounded receipt reader
+and verify the bound negative result and refusal to collect it. The harmless
+cleanup requires an attempted launch. The original real Installer checks and
+release evidence requirements are separate from these synthetic controls.
+
+[AMD64 control log](https://github.com/p4kx-org/p4kx/actions/runs/45843748173/job/139992136364) ·
+[ARM64 control log](https://github.com/p4kx-org/p4kx/actions/runs/45843748173/job/139992136557)

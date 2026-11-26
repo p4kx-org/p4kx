@@ -172,6 +172,10 @@ Assert-FeedbackWorkflow ($observerEntry.Contains('Invoke-P4kxMsiObserverSnapshot
     $snapshotWorker.Contains('Assert-P4kxMsiObserverOriginalResult $request $handle $snapshot') -and
     $snapshotWorker.Contains('Write-P4kxMsiObserverProgress writeResult end')) 'Finish must use fixed sequence 09, bounded capture and original-result validation.'
 $harmless=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/workflows/windows-msi-detached-control.yml')
+$harmlessStart=Get-FeedbackWorkflowStep $harmless 'Start harmless tracked phase worker and leave its launcher'
+$harmlessFinish=Get-FeedbackWorkflowStep $harmless 'Release and verify only the owned harmless worker'
+Assert-FeedbackWorkflow ($harmlessStart.Contains('id: detached-start') -and
+    $harmlessFinish.Contains("always() && steps.detached-start.outcome != '' && steps.detached-start.outcome != 'skipped'")) 'The harmless cleanup must run only after its worker launch step was attempted.'
 $harmlessDelay=Get-FeedbackWorkflowStep $harmless 'Wait separately for harmless MSI split-delay control'
 $harmlessVerify=Get-FeedbackWorkflowStep $harmless 'Verify harmless MSI split-delay control'
 Assert-FeedbackWorkflow ($harmlessDelay.Contains('invoke-msi-observer.ps1 -Stage Delay') -and $harmlessDelay.Contains('-Sequence 2 -WaitMilliseconds 75000') -and

@@ -62,6 +62,7 @@ jobs:
         timeout-minutes: 2
         run: .github/scripts/test-msi-observer.ps1 -Directory ($env:P4KX_CONTROL_TASK+'-finish-probe') -Case Complete -DetachedFinish -LiveFinishProbe
       - name: Start harmless tracked phase worker and leave its launcher
+        id: detached-start
         timeout-minutes: 1
         run: .github/scripts/invoke-msi-detached-control.ps1 -Stage Start -Directory $env:P4KX_CONTROL_TASK
       - name: Observe the exact live worker from another step
@@ -75,7 +76,7 @@ jobs:
           path: ${{ env.P4KX_CONTROL_TASK }}/checkpoint/*
           if-no-files-found: error
       - name: Release and verify only the owned harmless worker
-        if: always()
+        if: ${{ always() && steps.detached-start.outcome != '' && steps.detached-start.outcome != 'skipped' }}
         timeout-minutes: 1
         run: .github/scripts/invoke-msi-detached-control.ps1 -Stage Finish -Directory $env:P4KX_CONTROL_TASK
       - name: Preserve control completion and source-bound diagnostics

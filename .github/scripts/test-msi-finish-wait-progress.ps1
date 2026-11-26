@@ -40,9 +40,10 @@ function Assert-P4kxFinishSupervisorNegativeReceipt([string]$Root) {
 
     function Get-P4kxMsiFinishContext([string]$Directory) { return $fixtureContext }
     function Start-P4kxMsiFinishProcess { return $fixtureCaller }
-    function Get-P4kxDetachedDigest([string]$Path) {
+    $readReceiptDigest = ${function:Get-P4kxDetachedReceiptDigest}
+    function Get-P4kxDetachedReceiptDigest([string]$Path) {
         if ($failDigest -and $Path -ceq $callerPath) { throw 'synthetic caller digest failure' }
-        return (Get-FileHash -LiteralPath $Path).Hash.ToLowerInvariant()
+        & $readReceiptDigest $Path
     }
 
     foreach ($case in @(
@@ -69,7 +70,7 @@ function Assert-P4kxFinishSupervisorNegativeReceipt([string]$Root) {
         $failure = $null
         try { & $entry -Directory $path }
         catch { $failure = $_.Exception.Message }
-        Assert-P4kxWaitProgress ($null -ne $failure -and $failure.Contains($case.reason) -and $fixtureCaller.Disposed) 'Supervisor did not propagate the fixture failure and dispose the owned caller.'
+        Assert-P4kxWaitProgress ($null -ne $failure -and $failure.Contains($case.reason) -and $fixtureCaller.Disposed) "Supervisor did not propagate the $($case.name) fixture failure and dispose the owned caller."
 
         $terminal = Join-Path $supervision 'result.json'
         $result = Read-P4kxDetachedReceipt $terminal
