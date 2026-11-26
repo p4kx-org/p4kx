@@ -313,6 +313,73 @@ function Assert-P4kxHostedFinishAcrossLaunchers($Fixture) {
     }
 }
 
+function Assert-P4kxFinishReadyCheckpoint([string]$Root) {
+    $caseRoot = [IO.Directory]::CreateDirectory((Join-Path $Root 'live-ready')).FullName
+    $fixture = New-P4kxFinishLifecycleFixture $caseRoot Bound
+    $script = Join-Path $PSScriptRoot 'observe-msi-finish-ready.ps1'
+    $checkpoint = Join-Path $fixture.observer 'checkpoints/04'
+    $handlePath = Join-Path $fixture.observer 'handle.json'
+    $self = [Diagnostics.Process]::GetCurrentProcess()
+    try { $started = $self.StartTime.ToUniversalTime().Ticks } finally { $self.Dispose() }
+    $handle = Read-P4kxDetachedReceipt $handlePath
+    $handle.started_utc_ticks = $started
+    $handle.executable = [Environment]::ProcessPath
+    [IO.File]::WriteAllText($handlePath,($handle | ConvertTo-Json -Compress))
+    $supervision = Join-Path $fixture.observer 'finish-supervision'
+    $launchDigest = Get-P4kxDetachedReceiptDigest (Join-Path $supervision 'launch.json')
+    $readyPath = Join-Path $supervision 'waiter-ready.json'
+    $cutoff = $fixture.collection_cutoff.ToString('o')
+    Write-P4kxDetachedReceipt $readyPath @{
+        schema=1;role='native-msi-finish-waiter-ready';request_sha256=$fixture.digest
+        launch_sha256=$launchDigest;monitor_pid=$PID;monitor_started_utc_ticks=$started
+        waiter_pid=[int]::MaxValue;waiter_started_utc_ticks=$started;deadline_utc=$cutoff
+        observed_utc=[DateTimeOffset]::UtcNow.ToString('o');native_completion_unproven=$true;mutation_authority=$false
+    }
+    $binding = @{Directory=$fixture.observer;CollectionCutoffUtc=$cutoff}
+    try {
+        & $script @binding -ReadyDigest ('f' * 64)
+        throw 'The live checkpoint accepted a foreign readiness digest.'
+    } catch {
+        if ($_.Exception.Message -cne 'Finish readiness bytes differ from the original launch stage.' -or [IO.Path]::Exists($checkpoint)) { throw }
+    }
+
+    $diagnostics = [IO.Directory]::CreateDirectory((Join-Path $fixture.output 'diagnostics')).FullName
+    $phase = New-P4kxMsiPhaseContext $diagnostics $fixture.request.target
+    $null = Start-P4kxMsiPhase $phase 'worker'
+    $readyDigest = Get-P4kxDetachedReceiptDigest $readyPath
+    $savedImage = $env:ImageVersion
+    $savedRunner = $env:RUNNER_VERSION
+    try {
+        $env:ImageVersion = '20261116.315.1'
+        $env:RUNNER_VERSION = 'invalid value'
+        & $script @binding -ReadyDigest $readyDigest
+    } finally {
+        $env:ImageVersion = $savedImage
+        $env:RUNNER_VERSION = $savedRunner
+    }
+    $postReady = Read-P4kxDetachedReceipt (Join-Path $checkpoint 'post-ready.json')
+    $captured = Read-P4kxDetachedReceipt (Join-Path $checkpoint 'checkpoint.json')
+    if ($postReady.role -cne 'native-msi-finish-live-checkpoint' -or $postReady.request_sha256 -cne $fixture.digest -or
+        $postReady.launch_sha256 -cne $launchDigest -or $postReady.readiness_sha256 -cne $readyDigest -or
+        $postReady.collection_cutoff_utc -cne $cutoff -or
+        $postReady.checkpoint_sha256 -cne (Get-P4kxDetachedReceiptDigest (Join-Path $checkpoint 'checkpoint.json')) -or
+        $postReady.processes.monitor.state -cne 'running' -or $postReady.processes.waiter.state -cne 'absent' -or
+        $postReady.runner.image_version -cne '20261116.315.1' -or $postReady.runner.ContainsKey('runner_version') -or
+        $postReady.completed_success -ne $false -or $postReady.native_completion_unproven -ne $true -or $postReady.mutation_authority -ne $false -or
+        $captured.journal.events -ne 1 -or $captured.journal.terminal -or
+        $captured.files['phase-journal.jsonl'].sha256 -cne (Get-P4kxDetachedDigest $phase.journal) -or
+        $postReady.files['result.json'].sha256 -cne (Get-P4kxDetachedReceiptDigest $fixture.result_path) -or
+        $postReady.files['waiter-exit.json'].status -cne 'absent' -or
+        [IO.File]::Exists($fixture.wait_path)) { throw 'The live checkpoint altered or lost the original bound observation.' }
+    try {
+        & $script @binding -ReadyDigest $readyDigest
+        throw 'The live checkpoint overwrote an existing sequence.'
+    } catch {
+        if ($_.Exception.Message -cne 'MSI observer checkpoint sequence must be fresh.') { throw }
+    }
+    'PASS: Live Finish checkpoint binds timely readiness, observes original processes and journal, and remains observation only.'
+}
+
 $root = [IO.Path]::GetFullPath($Directory)
 if (-not $IsWindows -or [IO.Path]::Exists($root)) { throw 'The Lifecycle Finish control requires a fresh native Windows directory.' }
 $null = New-Item -ItemType Directory -Path $root
@@ -342,6 +409,7 @@ try {
     Assert-P4kxHostedFinishWatchdogBinding (New-P4kxFinishLifecycleFixture $root Watchdog)
     Assert-P4kxHostedFinishWatchdogBinding (New-P4kxFinishLifecycleFixture $root WatchdogFailure) -WrongCutoff
     Assert-P4kxHostedFinishAcrossLaunchers (New-P4kxFinishLifecycleFixture $root AcrossLaunchers -Unpublished)
+    Assert-P4kxFinishReadyCheckpoint $root
     'PASS: Lifecycle WaitFinish verified its bound receipt, refused foreign and stale sources, retained missing or late observations, and exercised the native watchdog child.'
 } finally {
     $env:P4KX_MSI_STEP_MINUTES = $savedMinutes

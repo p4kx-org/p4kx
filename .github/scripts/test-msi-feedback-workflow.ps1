@@ -113,6 +113,33 @@ Assert-FeedbackWorkflow ($finishReady.Contains("always() && !cancelled() && step
     $finishReady -cmatch '(?m)^        timeout-minutes: 1\r?$' -and
     -not ($finishReady -match '(?m)^        (run|continue-on-error):') -and
     $finishWait.Contains('P4KX_MSI_FINISH_READY_DIGEST: ${{ steps.msi-finish-observer-start.outputs.ready_digest }}')) 'An immutable waiter readiness receipt must be uploaded before the long wait.'
+$liveCheckpoint=Get-FeedbackWorkflowStep $verify 'Observe the original MSI after Finish readiness'
+$liveUpload=Get-FeedbackWorkflowStep $verify 'Preserve the live original MSI checkpoint'
+Assert-FeedbackWorkflow (-not $finishWait.Contains('msi-finish-live')) 'Wait must not depend on the optional live checkpoint.'
+Assert-FeedbackWorkflow ($liveCheckpoint.Contains("always() && !cancelled() && steps.msi-finish-ready.outcome == 'success'") -and
+    $liveCheckpoint.Contains('observe-msi-finish-ready.ps1') -and
+    $liveCheckpoint.Contains('P4KX_MSI_FINISH_COLLECTION_CUTOFF_UTC: ${{ steps.msi-finish-start.outputs.collection_cutoff_utc }}') -and
+    $liveCheckpoint.Contains('P4KX_MSI_FINISH_READY_DIGEST: ${{ steps.msi-finish-observer-start.outputs.ready_digest }}') -and
+    $liveUpload.Contains("always() && !cancelled() && steps.msi-finish-live.outcome == 'success'") -and
+    $liveUpload.Contains('name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-finish-live') -and
+    $liveUpload.Contains('actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9') -and
+    $liveUpload.Contains('overwrite: false') -and
+    $liveUpload.Contains('/checkpoints/04/post-ready.json') -and
+    $liveUpload.Contains('/checkpoints/04/phase-journal.jsonl') -and
+    $liveUpload.Contains('/checkpoints/04/original-diagnostic-inputs.json') -and
+    -not $liveUpload.Contains('*')) 'The live snapshot must bind existing readiness and publish only allowlisted original observations.'
+$expectedLivePaths=@(
+    'post-ready.json','checkpoint.json','phase-journal.jsonl','original-diagnostic-inputs.json',
+    'finish-result.json','finish-wait-result.json','finish-waiter-exit.json'
+) | ForEach-Object { '${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/' + $_ }
+$livePaths=@([regex]::Matches($liveUpload,'(?m)^            ([^\r\n]+)\r?$') | ForEach-Object { $_.Groups[1].Value })
+Assert-FeedbackWorkflow ([string]::Join([char]10,$livePaths) -ceq [string]::Join([char]10,$expectedLivePaths)) 'Transfer only the bounded original live checkpoint, journal, inputs and sampled receipts.'
+foreach ($step in @($liveCheckpoint,$liveUpload)) {
+    Assert-FeedbackWorkflow ($step -cmatch '(?m)^        timeout-minutes: 1\r?$' -and
+        $step -cmatch '(?m)^        continue-on-error: true\r?$') 'Live sampling and upload must have their own short, optional step bounds.'
+}
+$liveScript=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/scripts/observe-msi-finish-ready.ps1')
+Assert-FeedbackWorkflow ($liveScript -cnotmatch '\b(Start-Sleep|Start-Process|WaitForExit|Stop-Process|ProbeFinish)\b') 'Live sampling must read the existing processes and journal immediately.'
 $firstCheckpoint=Get-FeedbackWorkflowStep $verify 'Preserve original MSI phase checkpoint 1'
 $passive=Get-FeedbackWorkflowStep $verify 'Observe the original ARM64 MSI Registry capture'
 $install=Get-FeedbackWorkflowStep $verify 'Observe the first original MSI install outcome'
@@ -173,13 +200,13 @@ $expectedFinalPaths=@(
     '${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/observer-result.json'
 )
 Assert-FeedbackWorkflow ([string]::Join([char]10,$finalPaths) -ceq [string]::Join([char]10,$expectedFinalPaths)) 'Final compact proof must contain the original checkpoint, bounded Finish progress and observer verdict.'
-$localStages=@($installer,$firstCheckpoint,$passive,$install,$preFinishUpload,$finishStart,$finishLaunchEvidence,$finishObserverStart,$finishReady,$finishWait,$observerFinish,$finalUpload)
+$localStages=@($installer,$firstCheckpoint,$passive,$install,$preFinishUpload,$finishStart,$finishLaunchEvidence,$finishObserverStart,$finishReady,$liveCheckpoint,$liveUpload,$finishWait,$observerFinish,$finalUpload)
 $positions=@($localStages | ForEach-Object { $verify.IndexOf($_,[StringComparison]::Ordinal) })
 for ($index=1; $index -lt $positions.Count; $index++) {
     Assert-FeedbackWorkflow ($positions[$index-1] -lt $positions[$index]) 'Capture phase diagnostics before starting Finish and validate the lifecycle before the final evidence transfer.'
 }
-$beforeTransfer=$verify.Substring(0,$positions[-1]).Replace($preFinishUpload,'').Replace($finishLaunchEvidence,'').Replace($finishReady,'')
-Assert-FeedbackWorkflow (-not $beforeTransfer.Contains('uses: actions/upload-artifact@')) 'Only the original phase, launch and readiness diagnostic allowlists can transfer before native lifecycle validation.'
+$beforeTransfer=$verify.Substring(0,$positions[-1]).Replace($preFinishUpload,'').Replace($finishLaunchEvidence,'').Replace($finishReady,'').Replace($liveUpload,'')
+Assert-FeedbackWorkflow (-not $beforeTransfer.Contains('uses: actions/upload-artifact@')) 'Only original phase, launch, readiness and live checkpoint allowlists can transfer before native lifecycle validation.'
 Assert-FeedbackWorkflow (([regex]::Matches($verify,'invoke-msi-observer\.ps1 -Stage Snapshot').Count -eq 3) -and
     -not ($verify -match 'invoke-msi-observer\.ps1 -Stage Delay|\s-WaitMilliseconds [1-9]|-ScheduledDelay')) 'The installer must not depend on a fixed observation wait.'
 $observerEntry=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/scripts/invoke-msi-observer.ps1')

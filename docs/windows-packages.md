@@ -215,6 +215,15 @@ This artifact contains the compact observation metadata. The upload has a
 one-minute limit inside the existing job budget, and release acceptance still
 requires the original terminal result and native runtime checks.
 
+After the original Finish waiter confirms readiness, the Windows consumer takes one
+immediate, read-only checkpoint and uploads a separate immutable `-finish-live`
+artifact. The checkpoint binds the original request, supervisor launch, readiness,
+bounded phase journal and process identities. It records the supervisor, monitor
+and waiter liveness, any retained receipt hashes and the allowlisted runner image
+and version values when the host supplies them. Sampling and upload each have a
+one-minute step limit. The required Wait and CollectFinish validation keep their
+original allowance and proceed if this optional evidence is unavailable.
+
 The diagnostic-only `MSI feedback runner-fuse probe` workflow runs native AMD64 and ARM64
 complete/timeout controls through the same phase writer. Its separate verifier downloads the
 actual artifacts and checks the service's failed-step and timeout annotations, source revision,
@@ -630,6 +639,12 @@ cutoff at 19:06:01 UTC. The last validated original checkpoint had 63 events and
 placed the worker in `previous-install` waiting for `msiexec`. The readiness
 receipt establishes that the waiter bound to the original supervisor. The
 public snapshot contains no waiter exit or terminal installer result.
+GitHub cancelled the AMD64 job at 19:45:43 UTC after 55 minutes and recorded
+"The job has exceeded the maximum execution time of 45m0s". WaitFinish still
+showed in progress, and the CollectFinish and payload steps were pending. The
+only AMD64 observer artifacts were the pre-Finish checkpoint, launch binding
+and readiness receipt. The blocking operation and original installer outcome
+remain unobserved.
 [AMD64 execution](https://github.com/p4kx-org/p4kx/actions/runs/45872703215/job/140113609956) ·
 [AMD64 readiness](https://github.com/p4kx-org/p4kx/actions/runs/45872703215/artifacts/15147036542)
 
