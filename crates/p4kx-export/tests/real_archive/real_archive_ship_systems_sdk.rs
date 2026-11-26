@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ProvenanceMode,
 };
 use p4kx_extraction::Archive;
 use serde_json::Value;
@@ -31,7 +31,8 @@ fn installed_ship_system_sdk_matches_the_same_complete_catalog() -> TestResult {
 
 pub(crate) fn read_sdk(archive: &Archive, origins: &mut Origins) -> TestResult<[Table; 2]> {
     let session =
-        CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+        CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?
+            .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session.parsed(None)?;
     let shields = parsed.with_shield_generators(CatalogRecordSelection::All, None, |sdk| {
         capture_table(&sdk, archive, origins, component_identity)

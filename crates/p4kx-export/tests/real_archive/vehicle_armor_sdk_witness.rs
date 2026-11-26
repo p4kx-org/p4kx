@@ -4,7 +4,7 @@
 use p4kx_export::Kind;
 use p4kx_export::catalog_queries::equipment::vehicle_armor::{VehicleArmor, VehicleArmorSnapshot};
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ProvenanceMode,
 };
 use p4kx_extraction::{
     Archive, ArchiveWatch, DataForge, DataForgeEntry, Filter, StructValue, TreeBuilder,
@@ -75,7 +75,8 @@ fn installed_vehicle_armor_sdk_matches_the_original_physical_tuning() -> TestRes
         CatalogLanguageSelection::Selected(&[]),
         None,
     )
-    .map_err(|_| "prepare the vehicle armor SDK session from the decoded DataForge")?;
+    .map_err(|_| "prepare the vehicle armor SDK session from the decoded DataForge")?
+    .with_provenance_mode(ProvenanceMode::Full);
     let sdk = session
         .parsed(None)
         .map_err(|_| "open the parsed vehicle armor SDK session")?;

@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ProvenanceMode,
 };
 use p4kx_extraction::Archive;
 
@@ -29,7 +29,8 @@ fn installed_cargo_sdk_matches_the_same_complete_catalog() -> TestResult {
 
 pub(crate) fn read_sdk(archive: &Archive, origins: &mut Origins) -> TestResult<[Table; 2]> {
     let session =
-        CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+        CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?
+            .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session.parsed(None)?;
     let loading =
         parsed.with_cargo_loading_globals(CatalogRecordSelection::All, None, |sdk| {

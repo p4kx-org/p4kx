@@ -5,9 +5,7 @@ use std::collections::BTreeSet;
 use std::time::UNIX_EPOCH;
 
 use p4kx_assembly::{ArchiveFiles, ENTITY_TYPE, EntityNode, LoadoutResolver};
-use p4kx_export::catalog_queries::equipment::{
-    ShipBaseFacts, ShipCargoSource, ShipSourceSnapshot, with_ship_sources_from,
-};
+use p4kx_export::catalog_queries::equipment::{ShipBaseFacts, ShipCargoSource, ShipSourceSnapshot};
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability,
 };
@@ -17,6 +15,7 @@ use serde_json::Value;
 
 use super::{TestResult, legacy_grid, legacy_total, same_scu};
 use crate::real_archive_catalog_table_parity::{Origins, wire_row};
+use crate::real_archive_scoped_equipment_sdk::equipment_input::full_source_session_from;
 use crate::real_archive_shop_inventory_v3::verify_build;
 use crate::real_archive_verification::print_line;
 
@@ -171,32 +170,32 @@ fn query<T>(
     index: u32,
     inspect: impl FnOnce(&ShipSourceSnapshot<'_>, &ShipBaseFacts) -> TestResult<T>,
 ) -> TestResult<T> {
-    with_ship_sources_from(
-        archive,
-        entry,
-        CatalogRecordSelection::RecordIndex(index),
-        CatalogLanguageSelection::Selected(&[]),
-        None,
-        |snapshot| {
-            let [ship] = snapshot.rows() else {
-                return Err("the scoped query must return one Ship".into());
-            };
-            let facts = ship.base_facts();
-            let coverage = snapshot.coverage();
-            if facts.ship_record_index().value() != Some(&index)
-                || snapshot.build() != archive.build()
-                || !matches!(snapshot.availability(), DatasetAvailability::Available)
-                || !coverage.unreadable_headers.is_empty()
-                || !coverage.unreadable_bodies.is_empty()
-            {
-                return Err(
-                    "the scoped query differs from the nominated original Ship or Build".into(),
-                );
-            }
-            inspect(&snapshot, facts)
-        },
-    )
-    .map_err(|_| "read the physical Ship cargo SDK scope")?
+    let session =
+        full_source_session_from(archive, entry, CatalogLanguageSelection::Selected(&[]))?;
+    session
+        .with_ship_sources(
+            CatalogRecordSelection::RecordIndex(index),
+            None,
+            |snapshot| {
+                let [ship] = snapshot.rows() else {
+                    return Err("the scoped query must return one Ship".into());
+                };
+                let facts = ship.base_facts();
+                let coverage = snapshot.coverage();
+                if facts.ship_record_index().value() != Some(&index)
+                    || snapshot.build() != archive.build()
+                    || !matches!(snapshot.availability(), DatasetAvailability::Available)
+                    || !coverage.unreadable_headers.is_empty()
+                    || !coverage.unreadable_bodies.is_empty()
+                {
+                    return Err(
+                        "the scoped query differs from the nominated original Ship or Build".into(),
+                    );
+                }
+                inspect(&snapshot, facts)
+            },
+        )
+        .map_err(|_| "read the physical Ship cargo SDK scope")?
 }
 
 fn compare_original<'source>(

@@ -14,7 +14,10 @@ use serde_json::Value;
 use super::{
     PATH, RadarAudioBindingStatus, RadarAudioConfiguration, RadarAudioDatum, RadarAudioNode,
 };
-use crate::catalog_queries::radar_audio::{RadarAudioSelection, read_radar_audio};
+use crate::catalog_queries::ProvenanceMode;
+use crate::catalog_queries::radar_audio::{
+    RadarAudioSelection, read_radar_audio, read_radar_audio_with_provenance_mode,
+};
 use crate::catalog_table::DatasetAvailability;
 use crate::{CatalogError, CatalogOptions, build_catalog};
 
@@ -42,7 +45,12 @@ const SYNTHETIC: &[u8] = br#"<RadarAudioData>
 #[test]
 fn original_slot_states_and_exact_numeric_declarations_match_catalog() -> TestResult {
     let (_folder, archive) = fixture()?;
-    let sdk = read_radar_audio(&archive, RadarAudioSelection::All, None)?;
+    let sdk = read_radar_audio_with_provenance_mode(
+        &archive,
+        RadarAudioSelection::All,
+        ProvenanceMode::Full,
+        None,
+    )?;
     assert_eq!(
         sdk.entries.selected, 2,
         "only the physical configuration Entries are read"
@@ -53,7 +61,12 @@ fn original_slot_states_and_exact_numeric_declarations_match_catalog() -> TestRe
     check_text(text)?;
     check_binary(binary)?;
     let index = binary.identity().entry_index();
-    let selected = read_radar_audio(&archive, RadarAudioSelection::EntryIndex(index), None)?;
+    let selected = read_radar_audio_with_provenance_mode(
+        &archive,
+        RadarAudioSelection::EntryIndex(index),
+        ProvenanceMode::Full,
+        None,
+    )?;
     witness::check_payload_scope(&archive, index, &selected)?;
     check_catalog(&archive, &sdk.rows)
 }

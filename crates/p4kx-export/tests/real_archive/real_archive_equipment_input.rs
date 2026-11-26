@@ -20,6 +20,18 @@ pub(crate) fn full_source_session<'archive>(
         .with_provenance_mode(ProvenanceMode::Full))
 }
 
+/// Opens a Full proof session from this Archive's decoded Entry.
+pub(crate) fn full_source_session_from<'archive>(
+    archive: &'archive Archive,
+    entry: &'archive DataForgeEntry,
+    languages: CatalogLanguageSelection<'_>,
+) -> TestResult<CatalogQuerySession<'archive>> {
+    Ok(
+        CatalogQuerySession::from_entry(archive, entry, languages, None)?
+            .with_provenance_mode(ProvenanceMode::Full),
+    )
+}
+
 pub(crate) fn with_archive(check: impl FnOnce(&Archive) -> TestResult) -> TestResult {
     let path = real_archive_path().map_err(|_| "configure the installed Archive path")?;
     let key = real_archive_key().map_err(|_| "configure the trusted installed Archive key")?;

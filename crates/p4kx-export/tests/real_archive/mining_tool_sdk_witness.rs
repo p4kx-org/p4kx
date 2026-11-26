@@ -7,6 +7,7 @@ use p4kx_export::catalog_queries::equipment::consumables::Consumable;
 use p4kx_export::catalog_queries::equipment::mining_tools::{AttachableModifier, MiningLaser};
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ParsedCatalogQueries,
+    ProvenanceMode,
 };
 use p4kx_extraction::{Archive, ArchiveWatch, DataForgeEntry};
 use p4kx_testkit::{real_archive_key, real_archive_path};
@@ -57,7 +58,8 @@ fn installed_mining_tools_and_consumables_preserve_original_values_and_links() -
         CatalogLanguageSelection::Selected(&[]),
         None,
     )
-    .map_err(|_| "prepare the equipment SDK session from the decoded DataForge")?;
+    .map_err(|_| "prepare the equipment SDK session from the decoded DataForge")?
+    .with_provenance_mode(ProvenanceMode::Full);
     let sdk = session
         .parsed(None)
         .map_err(|_| "reuse the parsed equipment SDK session")?;

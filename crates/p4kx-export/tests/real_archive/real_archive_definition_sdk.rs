@@ -9,7 +9,7 @@ use p4kx_export::catalog_queries::equipment::component_definitions::{
 };
 use p4kx_export::catalog_queries::{
     CanonicalRecordHeader, CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
-    DatasetAvailability, ParsedCatalogQueries,
+    DatasetAvailability, ParsedCatalogQueries, ProvenanceMode,
 };
 use p4kx_extraction::{
     Archive, ArchiveWatch, Build, DataForge, DataForgeEntry, DataForgeOrigin, InputScope,
@@ -109,7 +109,8 @@ fn installed_component_definition_sdk_preserves_selected_original_values() -> Te
         &entry,
         CatalogLanguageSelection::Selected(&[]),
         None,
-    )?;
+    )?
+    .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session.parsed(None)?;
     let evidence = Evidence::new(&original, session.dataforge_origin(), build)?;
     prove_definitions(&parsed, &evidence, &selection)?;

@@ -4,7 +4,7 @@
 use std::env::{self, VarError};
 use std::time::Instant;
 
-use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogQuerySession};
+use p4kx_export::catalog_queries::CatalogLanguageSelection;
 
 use super::equipment_input;
 use crate::real_archive_catalog_table_parity::{Origins, TestResult};
@@ -35,7 +35,7 @@ fn installed_standalone_mining_sdk_cold_query() -> TestResult {
 
         let stage = Instant::now();
         let session =
-            CatalogQuerySession::open(archive, CatalogLanguageSelection::AllAvailable, None)?;
+            equipment_input::full_source_session(archive, CatalogLanguageSelection::AllAvailable)?;
         print_line(&format!(
             "Mining SDK cold phase=entry-ready elapsedMs={}",
             stage.elapsed().as_millis(),

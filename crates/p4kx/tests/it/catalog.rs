@@ -51,7 +51,7 @@ fn catalog(archive: &Path, out: &Path, args: &[&str]) -> Result<String, Box<dyn 
 }
 
 fn printed_schema() -> Result<String, Box<dyn Error>> {
-    let output = p4kx(&["catalog", "--provenance", "full", "schema"])?.output()?;
+    let output = p4kx(&["catalog", "schema", "--provenance", "full"])?.output()?;
     assert_eq!(output.status.code(), Some(0), "exit code: {output:?}");
     Ok(String::from_utf8(output.stdout)?)
 }

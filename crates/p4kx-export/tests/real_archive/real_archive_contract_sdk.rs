@@ -6,7 +6,7 @@ use std::io::Write as _;
 
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ContractKey,
-    ParsedCatalogQueries,
+    ParsedCatalogQueries, ProvenanceMode,
 };
 use p4kx_extraction::{Archive, ArchiveWatch, DataForge, DataForgeEntry, RecordTree};
 use p4kx_testkit::{real_archive_key, real_archive_path};
@@ -52,7 +52,8 @@ fn selected_contract_sdk_matches_original_owner_and_logical_slots() -> TestResul
         CatalogLanguageSelection::Selected(&[]),
         None,
     )
-    .map_err(|_| "open SDK session")?;
+    .map_err(|_| "open SDK session")?
+    .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session.parsed(None).map_err(|_| "parse SDK view")?;
     let forge = entry
         .open()

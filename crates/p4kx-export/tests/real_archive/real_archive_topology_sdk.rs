@@ -7,7 +7,7 @@ use p4kx_export::catalog_queries::equipment::resource_topology::{
     ResourceTopologyPlacementSnapshot, ResourceTopologyRootState,
 };
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogQuerySession, ParsedCatalogQueries, ProvenanceMode,
 };
 use p4kx_export::catalog_schema;
 use p4kx_extraction::{Archive, ArchiveWatch, DataForge, DataForgeEntry};
@@ -49,7 +49,8 @@ fn installed_topology_sdk_matches_source_selected_roots() -> TestResult {
         CatalogLanguageSelection::Selected(&[]),
         None,
     )
-    .map_err(|_| "bind the topology query to the original Entry")?;
+    .map_err(|_| "bind the topology query to the original Entry")?
+    .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session
         .parsed(None)
         .map_err(|_| "parse the SDK DataForge view")?;

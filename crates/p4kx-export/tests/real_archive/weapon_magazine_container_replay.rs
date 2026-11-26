@@ -3,7 +3,7 @@
 
 use p4kx_export::catalog_queries::equipment::{AmmoBinding, AmmoContainer, EquipmentSnapshot};
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogQuerySession, ParsedCatalogQueries, ProvenanceMode,
 };
 use p4kx_extraction::{Archive, DataForgeEntry, RecordTree, SourceInventory, Value as Raw};
 use serde_json::Value;
@@ -37,7 +37,8 @@ pub(crate) fn read(archive: &Archive, origins: &mut Origins) -> TestResult<[Rows
         &entry,
         CatalogLanguageSelection::Selected(&[]),
         None,
-    )?;
+    )?
+    .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session.parsed(None)?;
     let own = selected_rows(&parsed, archive, &own.owner, own.slot, origins)?;
     let linked = match dependency_rows(&parsed, archive, &linked, target, origins)? {

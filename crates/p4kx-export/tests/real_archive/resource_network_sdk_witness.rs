@@ -8,6 +8,7 @@ use p4kx_export::catalog_queries::equipment::resource_network::{
 };
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ParsedCatalogQueries,
+    ProvenanceMode,
 };
 use p4kx_extraction::{
     Archive, ArchiveWatch, DataForgeEntry, SourceValueState, SourcedValue, StructValue,
@@ -72,7 +73,8 @@ fn installed_resource_network_sdk_reconciles_original_components_and_connections
         CatalogLanguageSelection::Selected(&[]),
         None,
     )
-    .map_err(|_| "prepare the resource network SDK session from the decoded DataForge")?;
+    .map_err(|_| "prepare the resource network SDK session from the decoded DataForge")?
+    .with_provenance_mode(ProvenanceMode::Full);
     let sdk = session
         .parsed(None)
         .map_err(|_| "open the parsed resource network SDK session")?;

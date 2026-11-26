@@ -4,10 +4,10 @@
 use std::env;
 
 use p4kx_export::StarmapTraversalBudget;
-use p4kx_export::catalog_queries::DatasetAvailability;
 use p4kx_export::catalog_queries::shops::{
-    Shop, ShopRegistrySelection, ShopRowSnapshot, read_shop,
+    Shop, ShopRegistrySelection, ShopRowSnapshot, read_shop_with_provenance_mode,
 };
+use p4kx_export::catalog_queries::{DatasetAvailability, ProvenanceMode};
 use p4kx_extraction::{Archive, PhysicalSourceKind, SourceInventory, SourceLocation, SourcedValue};
 
 use serde_json::Value;
@@ -144,8 +144,14 @@ fn read_registry_node(archive: &Archive, node: u32) -> TestResult<ShopRowSnapsho
         return Err("the nominated Entry must be the original Shop registry".into());
     }
     let selection = ShopRegistrySelection::new(entry_index, node);
-    let snapshot = read_shop(archive, selection, StarmapTraversalBudget::default(), None)
-        .map_err(|_| "read the selected physical Shop from the installed Archive")?;
+    let snapshot = read_shop_with_provenance_mode(
+        archive,
+        selection,
+        StarmapTraversalBudget::default(),
+        ProvenanceMode::Full,
+        None,
+    )
+    .map_err(|_| "read the selected physical Shop from the installed Archive")?;
     if snapshot.build.as_ref() != archive.build()
         || snapshot.selection != selection
         || !matches!(snapshot.availability, DatasetAvailability::Available)

@@ -4,6 +4,7 @@
 use p4kx_export::catalog_queries::equipment::loot_generation::LootGenerationSnapshot;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
+    ProvenanceMode,
 };
 use p4kx_extraction::{Archive, DataForgeEntry};
 use serde_json::{Value, json};
@@ -24,7 +25,8 @@ pub(super) fn compare(
         CatalogLanguageSelection::Selected(&[]),
         None,
     )
-    .map_err(|_| "admit filtered Loot component SDK input")?;
+    .map_err(|_| "admit filtered Loot component SDK input")?
+    .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session
         .parsed(None)
         .map_err(|_| "parse matching SDK DataForge")?;

@@ -10,6 +10,7 @@ use p4kx_testkit::{
 };
 use serde_json::Value;
 
+use super::super::tests as reader_tests;
 use crate::mining_locations::{
     MiningLocationOptions, MiningLocationSnapshot, MiningResourceType, read_mining_locations,
 };
@@ -25,7 +26,7 @@ const ELEMENT: u128 = 0x6;
 fn resource_dependencies_match_canonical_rows_and_close_both_display_names() -> TestResult {
     let folder = tempfile::tempdir()?;
     let archive = archive(&folder.path().join("Data.p4k"), true)?;
-    let snapshot = read_mining_locations(
+    let snapshot = reader_tests::read_with_full_provenance(
         &archive,
         MiningLocationOptions::new(Language::English, None),
     )?;

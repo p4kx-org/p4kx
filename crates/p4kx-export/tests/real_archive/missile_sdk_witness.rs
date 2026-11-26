@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ProvenanceMode,
 };
 use p4kx_extraction::{Archive, DataForgeEntry};
 use serde_json::Value;
@@ -25,7 +25,8 @@ pub(super) fn compare(
         CatalogLanguageSelection::Selected(&[]),
         None,
     )
-    .map_err(|_| "admit the same installed Archive for the ordnance SDK")?;
+    .map_err(|_| "admit the same installed Archive for the ordnance SDK")?
+    .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session
         .parsed(None)
         .map_err(|_| "parse the same DataForge for the ordnance SDK")?;

@@ -1,12 +1,13 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::quality;
+use p4kx_export::catalog_queries::CatalogLanguageSelection;
 use p4kx_export::catalog_queries::{CatalogRecordSelection, DatasetAvailability};
 use p4kx_extraction::Archive;
 use serde_json::Value;
 
 use crate::real_archive_catalog_table_parity::{self as parity, Origins, Table, TestResult};
+use crate::real_archive_scoped_equipment_sdk::equipment_input::full_source_session;
 use crate::real_archive_verification;
 
 pub(super) const QUANTIZATION_RESOURCES: &str = "/projections/qualityQuantizationResources";
@@ -24,7 +25,8 @@ fn installed_quality_inverse_sdk_matches_the_same_complete_catalog() -> TestResu
 }
 
 pub(super) fn read_sdk(archive: &Archive, origins: &mut Origins) -> TestResult<[Table; 1]> {
-    quality::with_quantization_resources(archive, CatalogRecordSelection::All, None, |snapshot| {
+    let session = full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
+    session.with_quality_quantization_resources(CatalogRecordSelection::All, None, |snapshot| {
         let projection = &snapshot.projection;
         if projection.build() != archive.build()
             || !matches!(projection.availability(), DatasetAvailability::Available)

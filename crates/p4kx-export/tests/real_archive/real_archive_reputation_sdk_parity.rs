@@ -4,8 +4,8 @@
 use std::env;
 
 use p4kx_export::catalog_queries::{
-    CatalogGuid, CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
-    ParsedCatalogQueries, ReputationSelection, ReputationSnapshot,
+    CatalogGuid, CatalogLanguageSelection, CatalogRecordSelection, ParsedCatalogQueries,
+    ReputationSelection, ReputationSnapshot,
 };
 use p4kx_extraction::{SourceInventory, SourceLocation};
 
@@ -107,7 +107,7 @@ fn installed_reputation_and_factions_cold_query() -> TestResult {
         .ok_or("configure one exact Reputation or Faction dataset path")?;
     let expected = parse_counts(&env::var(EXPECTED_ROWS)?)?;
     equipment_input::with_archive(|archive| {
-        let session = CatalogQuerySession::open(archive, family.languages(), None)?;
+        let session = equipment_input::full_source_session(archive, family.languages())?;
         let parsed = session.parsed(None)?;
         let mut proof = Proof::cold(archive, expected);
         if let Some(selection) = family.reputation_selection() {

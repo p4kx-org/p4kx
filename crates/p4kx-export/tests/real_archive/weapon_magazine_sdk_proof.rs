@@ -3,7 +3,7 @@
 
 use p4kx_export::Kind;
 use p4kx_export::catalog_queries::equipment::{WeaponMagazineOutcome, WeaponMagazineSnapshot};
-use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogQuerySession};
+use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogQuerySession, ProvenanceMode};
 use p4kx_extraction::{
     Archive, ArchiveByteRange, ArchiveWatch, DataForge, DataForgeEntry, DataForgeOrigin, DataType,
     Filter, InputScope, PhysicalSourceKind, RecordTree, SourceEncryption, SourceInput, SourceUses,
@@ -54,7 +54,8 @@ fn verify(archive: &Archive) -> TestResult {
         CatalogLanguageSelection::Selected(&[]),
         None,
     )
-    .map_err(|_| "bind the decoded DataForge to the magazine SDK")?;
+    .map_err(|_| "bind the decoded DataForge to the magazine SDK")?
+    .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session
         .parsed(None)
         .map_err(|_| "open parsed magazine SDK session")?;

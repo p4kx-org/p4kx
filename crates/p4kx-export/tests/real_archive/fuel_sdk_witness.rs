@@ -4,6 +4,7 @@
 use p4kx_export::catalog_queries::equipment::fuel::{FuelIntake, FuelTank, ResourceContainer};
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ParsedCatalogQueries,
+    ProvenanceMode,
 };
 use p4kx_export::{Filter, Kind};
 use p4kx_extraction::{
@@ -65,7 +66,8 @@ fn installed_fuel_sdk_preserves_original_values_link_slots_and_origins() -> Test
         CatalogLanguageSelection::Selected(&[]),
         None,
     )
-    .map_err(|_| "prepare a session from the decoded DataForge")?;
+    .map_err(|_| "prepare a session from the decoded DataForge")?
+    .with_provenance_mode(ProvenanceMode::Full);
     let sdk = session
         .parsed(None)
         .map_err(|_| "open the parsed fuel SDK session")?;

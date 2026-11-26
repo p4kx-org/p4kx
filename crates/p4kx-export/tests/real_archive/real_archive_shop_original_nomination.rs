@@ -4,10 +4,10 @@
 use p4kx_export::StarmapTraversalBudget;
 use p4kx_export::catalog_queries::shops::{
     ResolutionStatus, ShopInventoryResolution, ShopRegistrySelection, ShopResolutionSelection,
-    read_shop_inventory_resolutions,
+    read_shop_inventory_resolutions_with_provenance_mode,
 };
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, DatasetAvailability,
+    CatalogLanguageSelection, CatalogQuerySession, DatasetAvailability, ProvenanceMode,
 };
 use p4kx_extraction::Archive;
 
@@ -25,7 +25,8 @@ fn nominate_located_shop_from_original_archive() -> TestResult {
 fn nominate(archive: &Archive) -> TestResult {
     let candidates = registry_candidates(archive)?;
     let session = CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)
-        .map_err(|_| "open a reusable DataForge session for Shop nomination")?;
+        .map_err(|_| "open a reusable DataForge session for Shop nomination")?
+        .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session
         .parsed(None)
         .map_err(|_| "parse the DataForge session")?;
@@ -72,8 +73,13 @@ fn nominate(archive: &Archive) -> TestResult {
 }
 
 fn registry_candidates(archive: &Archive) -> TestResult<Vec<ShopRegistrySelection>> {
-    let resolution = read_shop_inventory_resolutions(archive, ShopResolutionSelection::All, None)
-        .map_err(|_| "observe original Shop registry and inventory resolutions")?;
+    let resolution = read_shop_inventory_resolutions_with_provenance_mode(
+        archive,
+        ShopResolutionSelection::All,
+        ProvenanceMode::Full,
+        None,
+    )
+    .map_err(|_| "observe original Shop registry and inventory resolutions")?;
     if resolution.build.as_ref() != archive.build()
         || !matches!(resolution.availability, DatasetAvailability::Available)
         || !resolution.coverage.registry_complete

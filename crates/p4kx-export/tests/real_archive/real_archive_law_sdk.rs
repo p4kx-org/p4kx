@@ -4,6 +4,7 @@
 use p4kx_export::catalog_queries::law::{LawFamily, LawRows, LawSnapshot};
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ParsedCatalogQueries,
+    ProvenanceMode,
 };
 use p4kx_extraction::{Archive, ArchiveWatch, DataForgeEntry};
 use serde::Serialize;
@@ -78,7 +79,8 @@ fn inspect_laws<T>(
         &entry,
         CatalogLanguageSelection::AllAvailable,
         None,
-    )?;
+    )?
+    .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session.parsed(None)?;
     verify_known_absence(archive, &parsed, &original)?;
     let result = parsed.with_law(LawFamily::All, CatalogRecordSelection::All, None, |sdk| {

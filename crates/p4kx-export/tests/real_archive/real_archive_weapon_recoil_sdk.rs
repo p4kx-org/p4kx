@@ -7,6 +7,7 @@ use p4kx_export::Kind;
 use p4kx_export::catalog_queries::equipment::{WeaponAction, WeaponSourceSnapshot};
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
+    ProvenanceMode,
 };
 use p4kx_export::mining_locations::ResourceFloat32;
 use p4kx_extraction::{
@@ -120,7 +121,8 @@ fn verify(archive: &Archive) -> TestResult<Counts> {
         CatalogLanguageSelection::Selected(&[]),
         None,
     )
-    .map_err(|_| "bind the decoded DataForge to the recoil SDK")?;
+    .map_err(|_| "bind the decoded DataForge to the recoil SDK")?
+    .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session
         .parsed(None)
         .map_err(|_| "open parsed recoil SDK session")?;

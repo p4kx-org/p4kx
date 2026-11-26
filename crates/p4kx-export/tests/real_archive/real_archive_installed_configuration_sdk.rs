@@ -3,15 +3,17 @@
 
 use std::collections::BTreeSet;
 
-use p4kx_export::catalog_queries::DatasetAvailability;
 use p4kx_export::catalog_queries::equipment::resource_topology::PhysicalPort;
 use p4kx_export::catalog_queries::equipment::{
-    AlignmentDependencyState, InstalledConfigurationSnapshot, read_installed_configurations,
-    read_installed_configurations_from,
+    AlignmentDependencyState, InstalledConfigurationSnapshot,
+};
+use p4kx_export::catalog_queries::{
+    CatalogLanguageSelection, CatalogQuerySession, DatasetAvailability, ProvenanceMode,
 };
 use p4kx_extraction::{Archive, SourceValueState};
 use serde_json::Value;
 
+use super::equipment_input::full_source_session;
 use super::{
     complete, dataforge, document, physical_filter, produce, record_index, report_scoped_rows,
     ship_row, with_archive,
@@ -30,8 +32,15 @@ fn installed_flight_matches_exact_scoped_normal_producer() -> TestResult {
     with_archive(|archive| {
         let index = record_index(SHIP_RECORD)?;
         let input = dataforge(archive)?;
-        let snapshot = read_installed_configurations_from(archive, &input, index, None)
-            .map_err(|_| "read the nominated SDK installed flight scope")?;
+        let snapshot = CatalogQuerySession::from_entry(
+            archive,
+            &input,
+            CatalogLanguageSelection::Selected(&[]),
+            None,
+        )?
+        .with_provenance_mode(ProvenanceMode::Full)
+        .read_installed_configurations(index, None)
+        .map_err(|_| "read the nominated SDK installed flight scope")?;
         let rows = selected_rows(archive, index, &snapshot)?;
         let filter = physical_filter(
             &input,
@@ -72,7 +81,8 @@ fn installed_flight_matches_exact_scoped_normal_producer() -> TestResult {
 fn installed_flight_cold_query() -> TestResult {
     with_archive(|archive| {
         let index = record_index(SHIP_RECORD)?;
-        let snapshot = read_installed_configurations(archive, index, None)
+        let snapshot = full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?
+            .read_installed_configurations(index, None)
             .map_err(|_| "read the cold SDK installed flight scope")?;
         let rows = selected_rows(archive, index, &snapshot)?;
         let mut origins = Origins::default();

@@ -4,7 +4,7 @@
 use p4kx_export::catalog_queries::medical::MedicalItemTierSnapshot;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    ParsedCatalogQueries,
+    ParsedCatalogQueries, ProvenanceMode,
 };
 use p4kx_extraction::{
     Archive, ArchiveWatch, DataForge, DataForgeEntry, InputScope, Record, SourceLocation,
@@ -46,7 +46,8 @@ fn installed_medical_tier_sdk_matches_original_physical_definitions() -> TestRes
         &entry,
         CatalogLanguageSelection::Selected(&[]),
         None,
-    )?;
+    )?
+    .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session.parsed(None)?;
     if forge.record(u32::MAX).is_some() {
         return Err("expected a physical index outside the original Record table".into());

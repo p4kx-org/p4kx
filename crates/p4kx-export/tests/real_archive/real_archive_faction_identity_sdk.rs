@@ -7,6 +7,7 @@ use p4kx_export::Kind;
 use p4kx_export::catalog_queries::faction_identities::FactionIdentitySnapshot;
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
+    ProvenanceMode,
 };
 use p4kx_extraction::{Archive, Build, DataForgeEntry};
 use serde_json::Value;
@@ -26,7 +27,8 @@ pub(super) fn verify(archive: &Archive, entry: &DataForgeEntry, catalog: &Value)
         CatalogLanguageSelection::AllAvailable,
         None,
     )
-    .map_err(|_| "admit the original FactionIdentity Archive Entry")?;
+    .map_err(|_| "admit the original FactionIdentity Archive Entry")?
+    .with_provenance_mode(ProvenanceMode::Full);
     let queries = session
         .parsed(None)
         .map_err(|_| "open the bound SDK DataForge")?;

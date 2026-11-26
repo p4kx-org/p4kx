@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use p4kx_export::Kind;
 use p4kx_export::catalog_queries::equipment::EquipmentSnapshot;
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ProvenanceMode,
 };
 use p4kx_extraction::{Archive, DataForgeEntry};
 use serde::Serialize;
@@ -27,7 +27,8 @@ pub(super) fn verify(archive: &Archive, entry: &DataForgeEntry, catalog: &Value)
         entry,
         CatalogLanguageSelection::Selected(&[]),
         None,
-    )?;
+    )?
+    .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session.parsed(None)?;
     parsed.with_cargo_loading_globals(CatalogRecordSelection::All, None, |sdk| {
         verify_sdk_rows(&sdk, loading)

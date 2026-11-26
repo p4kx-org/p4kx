@@ -6,10 +6,12 @@ use p4kx_testkit::ArchiveBuilder;
 use serde_json::{Value, json};
 
 use super::{PALETTE, SAMPLE, TestResult, VALID, fixture, json_catalog, resource, rows};
-use crate::catalog_queries::DatasetAvailability;
 use crate::catalog_queries::planet_resources::{
     LooseArchivePathState, PlanetResourceSelection, read_planet_resources,
-    read_planet_resources_from,
+    read_planet_resources_with_provenance_mode,
+};
+use crate::catalog_queries::{
+    CatalogLanguageSelection, CatalogQuerySession, DatasetAvailability, ProvenanceMode,
 };
 use crate::{CatalogError, ExportDiagnosticCode};
 
@@ -28,10 +30,21 @@ fn scoped_planet_rows_match_catalog_and_close_mixed_provenance() -> TestResult {
         true,
     )?;
     let catalog = json_catalog(&archive, None)?;
-    let selected = read_planet_resources(&archive, PlanetResourceSelection::All, None)?;
+    let selected = read_planet_resources_with_provenance_mode(
+        &archive,
+        PlanetResourceSelection::All,
+        ProvenanceMode::Full,
+        None,
+    )?;
     let decoded = DataForgeEntry::read(&archive)?;
-    let reused =
-        read_planet_resources_from(&archive, &decoded, PlanetResourceSelection::All, None)?;
+    let session = CatalogQuerySession::from_entry(
+        &archive,
+        &decoded,
+        CatalogLanguageSelection::Selected(&[]),
+        None,
+    )?
+    .with_provenance_mode(ProvenanceMode::Full);
+    let reused = session.read_planet_resources(PlanetResourceSelection::All, None)?;
     let actual = serde_json::to_value(&selected.rows)?;
     check_closure(&actual, &selected.source_inventory)?;
     let [_, _, unresolved] = selected.rows.as_slice() else {

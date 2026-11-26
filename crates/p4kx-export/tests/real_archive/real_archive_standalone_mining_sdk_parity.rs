@@ -2,8 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
-    DatasetAvailability, MiningDefinitionSnapshot, ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogRecordCoverage, CatalogRecordSelection, DatasetAvailability,
+    MiningDefinitionSnapshot, ParsedCatalogQueries,
 };
 use p4kx_extraction::{Archive, Build};
 use serde::Serialize;
@@ -12,6 +12,7 @@ use serde_json::Value;
 use crate::real_archive_catalog_table_parity::{
     Origins, Table, TestResult, capture_rows, with_bound_measurement_from_producer,
 };
+use crate::real_archive_scoped_equipment_sdk::equipment_input::full_source_session;
 use crate::real_archive_verification::print_line;
 
 const ELEMENTS: &str = "/mineableElements";
@@ -96,7 +97,7 @@ impl MiningDataset {
 }
 
 fn read_sdk(archive: &Archive, origins: &mut Origins) -> TestResult<MiningRows> {
-    let session = CatalogQuerySession::open(archive, CatalogLanguageSelection::AllAvailable, None)?;
+    let session = full_source_session(archive, CatalogLanguageSelection::AllAvailable)?;
     let parsed = session.parsed(None)?;
     let mut read = |dataset| capture_dataset(archive, &parsed, dataset, origins);
     Ok(MiningRows {

@@ -7,8 +7,9 @@ use p4kx_extraction::{Archive, CancelToken, InputScope};
 use serde_json::Value;
 
 use super::{BROKEN, NEW, OLD, TestResult, assert_rain_slots, synthetic_archive};
+use crate::catalog_queries::ProvenanceMode;
 use crate::catalog_queries::particle_libraries::{
-    ParticleLibrarySelection, read_particle_libraries,
+    ParticleLibrarySelection, read_particle_libraries, read_particle_libraries_with_provenance_mode,
 };
 use crate::catalog_table::DatasetAvailability;
 use crate::{CatalogError, CatalogOptions, CatalogPublicationMode, build_catalog};
@@ -17,9 +18,10 @@ use crate::{CatalogError, CatalogOptions, CatalogPublicationMode, build_catalog}
 fn selected_particle_entry_matches_catalog_cells_and_source_roles() -> TestResult {
     let (_folder, archive) = synthetic_archive(true)?;
     let new_index = entry_index(&archive, NEW)?;
-    let selected = read_particle_libraries(
+    let selected = read_particle_libraries_with_provenance_mode(
         &archive,
         ParticleLibrarySelection::EntryIndex(new_index),
+        ProvenanceMode::Full,
         None,
     )?;
     let [row] = selected.rows.as_slice() else {

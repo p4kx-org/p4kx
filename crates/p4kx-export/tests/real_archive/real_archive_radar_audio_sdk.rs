@@ -3,10 +3,10 @@
 
 use std::env;
 
-use p4kx_export::catalog_queries::DatasetAvailability;
 use p4kx_export::catalog_queries::radar_audio::{
-    RadarAudioSelection, RadarAudioSnapshot, read_radar_audio,
+    RadarAudioSelection, RadarAudioSnapshot, read_radar_audio_with_provenance_mode,
 };
+use p4kx_export::catalog_queries::{DatasetAvailability, ProvenanceMode};
 use p4kx_extraction::Archive;
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
@@ -70,8 +70,13 @@ pub(crate) fn read_sdk(archive: &Archive, origins: &mut Origins) -> TestResult<[
 }
 
 fn read_complete(archive: &Archive) -> TestResult<RadarAudioSnapshot> {
-    let sdk = read_radar_audio(archive, RadarAudioSelection::All, None)
-        .map_err(|_| "read the nominated Archive's Radar Audio SDK scope")?;
+    let sdk = read_radar_audio_with_provenance_mode(
+        archive,
+        RadarAudioSelection::All,
+        ProvenanceMode::Full,
+        None,
+    )
+    .map_err(|_| "read the nominated Archive's Radar Audio SDK scope")?;
     let rows = sdk.rows.len();
     let entries = sdk.entries;
     if sdk.build.as_ref() != archive.build()

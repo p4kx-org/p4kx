@@ -14,8 +14,10 @@ use super::{
     SubsumptionEvent, SubsumptionEventControl, SubsumptionEventField, SubsumptionEventFormat,
     SubsumptionEventValue,
 };
+use crate::catalog_queries::ProvenanceMode;
 use crate::catalog_queries::subsumption_events::{
     SubsumptionEventLookup, SubsumptionEventSelection, read_subsumption_events,
+    read_subsumption_events_with_provenance_mode,
 };
 use crate::{CatalogError, CatalogOptions, CatalogPublicationMode, build_catalog};
 
@@ -247,7 +249,12 @@ fn sdk_event_documents_match_synthetic_catalog_output() -> TestResult {
     options.publication_mode = CatalogPublicationMode::DiagnosticPartial;
     let catalog: Value =
         serde_json::from_slice(build_catalog(&archive, options.with_full_provenance())?.json())?;
-    let selected = read_subsumption_events(&archive, SubsumptionEventSelection::All, None)?;
+    let selected = read_subsumption_events_with_provenance_mode(
+        &archive,
+        SubsumptionEventSelection::All,
+        ProvenanceMode::Full,
+        None,
+    )?;
     let expected = catalog
         .pointer("/definitions/subsumptionEvents/rows")
         .ok_or("canonical event dataset")?;

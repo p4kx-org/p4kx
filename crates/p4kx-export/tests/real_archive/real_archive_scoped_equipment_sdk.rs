@@ -4,12 +4,11 @@
 use std::collections::BTreeSet;
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::catalog_queries::CatalogRecordCoverage;
 use p4kx_export::catalog_queries::equipment::{
     AlignmentDependencyState, LoadoutFacilityPlacementSnapshot, ShipStoreSlugSnapshot,
-    read_loadout_facility_placements, read_loadout_facility_placements_from, with_ship_store_slugs,
-    with_ship_store_slugs_from,
+    with_ship_store_slugs, with_ship_store_slugs_from,
 };
+use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordCoverage};
 use p4kx_export::{BuiltCatalog, CatalogOptions, SCHEMA_VERSION, build_catalog_from};
 use p4kx_extraction::{Archive, Checksum, DataForgeEntry, Filter, SourceValueState};
 use serde_json::{Value, json};
@@ -21,7 +20,10 @@ use crate::real_archive_verification::print_line;
 
 #[path = "real_archive_equipment_input.rs"]
 pub(crate) mod equipment_input;
-use equipment_input::{dataforge, literal_filter, physical_filter, record_index, with_archive};
+use equipment_input::{
+    dataforge, full_source_session, full_source_session_from, literal_filter, physical_filter,
+    record_index, with_archive,
+};
 
 #[path = "real_archive_standalone_mining_sdk_cold.rs"]
 mod mining_cold;
@@ -180,7 +182,10 @@ fn installed_loadout_facilities_match_exact_scoped_normal_producer() -> TestResu
     with_archive(|archive| {
         let index = record_index(FACILITY_RECORD)?;
         let input = dataforge(archive)?;
-        let snapshot = read_loadout_facility_placements_from(archive, &input, index, None)
+        let session =
+            full_source_session_from(archive, &input, CatalogLanguageSelection::Selected(&[]))?;
+        let snapshot = session
+            .read_loadout_facility_placements(index, None)
             .map_err(|_| "read the nominated SDK Loadout Facility scope")?;
         let rows = facility_rows(archive, index, &snapshot)?;
         let filter = facility_filter(&input, index, &snapshot)?;
@@ -214,7 +219,9 @@ fn installed_loadout_facilities_match_exact_scoped_normal_producer() -> TestResu
 fn installed_loadout_facility_cold_query() -> TestResult {
     with_archive(|archive| {
         let index = record_index(FACILITY_RECORD)?;
-        let snapshot = read_loadout_facility_placements(archive, index, None)
+        let session = full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
+        let snapshot = session
+            .read_loadout_facility_placements(index, None)
             .map_err(|_| "read the cold SDK Loadout Facility scope")?;
         let rows = facility_rows(archive, index, &snapshot)?;
         let mut origins = Origins::default();

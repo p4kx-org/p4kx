@@ -5,7 +5,7 @@ use std::io::Write as _;
 
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    MissionLocationTemplateSnapshot,
+    MissionLocationTemplateSnapshot, ProvenanceMode,
 };
 use p4kx_extraction::TagTree;
 
@@ -64,7 +64,8 @@ fn selected_mission_location_sdk_slots_match_original_sources() -> TestResult {
         CatalogLanguageSelection::Selected(&[]),
         None,
     )
-    .map_err(|_| "open location SDK session")?;
+    .map_err(|_| "open location SDK session")?
+    .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session
         .parsed(None)
         .map_err(|_| "parse location SDK source")?;

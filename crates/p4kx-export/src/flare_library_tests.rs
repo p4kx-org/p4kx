@@ -11,7 +11,10 @@ use p4kx_testkit::{
 use serde_json::{Value, json};
 
 use super::{FlareElement, FlareField, FlareLibrary, FlareNodeRole, FlareValue};
-use crate::catalog_queries::flares::{FlareLibrarySelection, read_flare_libraries};
+use crate::catalog_queries::ProvenanceMode;
+use crate::catalog_queries::flares::{
+    FlareLibrarySelection, read_flare_libraries, read_flare_libraries_with_provenance_mode,
+};
 use crate::catalog_table::DatasetAvailability;
 use crate::{CatalogError, CatalogOptions, CatalogPublicationMode, build_catalog};
 
@@ -82,7 +85,12 @@ fn parameters() -> TestElement {
 #[test]
 fn narrow_flare_query_preserves_repeated_items_and_nested_unknown_markup() -> TestResult {
     let (_folder, archive) = fixture()?;
-    let all = read_flare_libraries(&archive, FlareLibrarySelection::All, None)?;
+    let all = read_flare_libraries_with_provenance_mode(
+        &archive,
+        FlareLibrarySelection::All,
+        ProvenanceMode::Full,
+        None,
+    )?;
     assert_eq!(all.rows.len(), 2, "both physical libraries are retained");
     let old = all.rows.first().ok_or("ordinary XML library")?;
     let new = all.rows.get(1).ok_or("replacement CryXml library")?;
@@ -239,7 +247,12 @@ fn authored_flare_rows_match_the_full_catalog_table() -> TestResult {
     let options = CatalogOptions::new(UNIX_EPOCH);
     let built = build_catalog(&archive, options.with_full_provenance())?;
     let catalog: Value = serde_json::from_slice(built.json())?;
-    let selected = read_flare_libraries(&archive, FlareLibrarySelection::All, None)?;
+    let selected = read_flare_libraries_with_provenance_mode(
+        &archive,
+        FlareLibrarySelection::All,
+        ProvenanceMode::Full,
+        None,
+    )?;
     let rows = catalog
         .pointer("/definitions/flareLibraries/rows")
         .and_then(Value::as_array)
@@ -314,8 +327,12 @@ fn required_flare_failures_are_counted_and_refuse_normal_publication() -> TestRe
 #[test]
 fn missing_flare_entry_index_only_uses_directory_count() -> TestResult {
     let (_folder, archive) = fixture()?;
-    let snapshot =
-        read_flare_libraries(&archive, FlareLibrarySelection::EntryIndex(u32::MAX), None)?;
+    let snapshot = read_flare_libraries_with_provenance_mode(
+        &archive,
+        FlareLibrarySelection::EntryIndex(u32::MAX),
+        ProvenanceMode::Full,
+        None,
+    )?;
     assert!(matches!(snapshot.availability, DatasetAvailability::Absent));
     assert!(snapshot.rows.is_empty());
     let [id] = snapshot.directory.source_uses_refs() else {

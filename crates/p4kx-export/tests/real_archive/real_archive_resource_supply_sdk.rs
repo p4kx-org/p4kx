@@ -1,15 +1,14 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection,
-};
+use p4kx_export::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use p4kx_extraction::Archive;
 
 use crate::real_archive_catalog_table_parity::{
     Origins, Table, TestResult, capture_table, with_bound_measurement_from_producer,
 };
 use crate::real_archive_resource_configurations_sdk::component_identity;
+use crate::real_archive_scoped_equipment_sdk::equipment_input::full_source_session;
 use crate::real_archive_verification::print_line;
 
 const TABLES: [&str; 5] = [
@@ -39,8 +38,7 @@ fn installed_resource_supply_sdk_matches_one_complete_catalog() -> TestResult {
 }
 
 fn read_sdk(archive: &Archive, origins: &mut Origins) -> TestResult<[Table; 5]> {
-    let session =
-        CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+    let session = full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
     let parsed = session.parsed(None)?;
     let all = CatalogRecordSelection::All;
     Ok([

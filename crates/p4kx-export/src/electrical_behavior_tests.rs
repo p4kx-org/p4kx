@@ -11,9 +11,9 @@ use p4kx_testkit::{
 use serde_json::{Value, json};
 
 use super::ElectricalBehavior;
-use crate::catalog_queries::CatalogRecordSelection;
-use crate::catalog_queries::weather::{
-    LightningTargetMode, LightningTargetPayload, with_electrical_behaviors,
+use crate::catalog_queries::weather::{LightningTargetMode, LightningTargetPayload};
+use crate::catalog_queries::{
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ProvenanceMode,
 };
 use crate::{CatalogOptions, build_catalog};
 
@@ -35,8 +35,10 @@ fn electrical_behaviors_share_catalog_and_selected_sdk_projection() -> TestResul
         .entry(TestEntry::stored("Data/Game2.dcb", fixture()).encrypted())
         .write_to(&path)?;
     let archive = Archive::open_with(&path, OpenOptions::new().key(Some(test_key())))?;
-    let projected = with_electrical_behaviors(
-        &archive,
+    let session =
+        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?
+            .with_provenance_mode(ProvenanceMode::Full);
+    let projected = session.with_electrical_behaviors(
         CatalogRecordSelection::RecordIndex(0),
         None,
         |snapshot| {

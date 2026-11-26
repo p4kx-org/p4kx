@@ -7,14 +7,13 @@ use p4kx_export::catalog_queries::location_vocabulary::{
     LocationVocabularyFamily as Family, LocationVocabularyRows, LocationVocabularySnapshot,
 };
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability, ParsedCatalogQueries,
 };
 use p4kx_extraction::Archive;
 use serde::Serialize;
 use serde_json::Value;
 
-use super::equipment_input::with_archive;
+use super::equipment_input::{full_source_session, with_archive};
 use crate::real_archive_catalog_table_parity::{
     Origins, Table, TestResult, capture_rows, with_bound_measurement_from_producer,
 };
@@ -45,8 +44,7 @@ fn installed_location_vocabulary_matches_one_complete_catalog() -> TestResult {
     let revision = env::var("P4KX_LOCATION_VOCABULARY_CATALOG_PRODUCER_REVISION")
         .map_err(|_| "configure the exact location vocabulary Catalog producer revision")?;
     with_bound_measurement_from_producer(&revision, |archive, measurement| {
-        let session =
-            CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+        let session = full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
         let parsed = session.parsed(None)?;
         let mut origins = Origins::default();
         let tables: [Table; FAMILIES.len()] = FAMILIES
@@ -75,8 +73,7 @@ fn installed_location_vocabulary_cold_query() -> TestResult {
         .find(|(_, path)| *path == selected_path)
         .ok_or("expected one exact location vocabulary dataset path")?;
     with_archive(|archive| {
-        let session =
-            CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+        let session = full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
         let parsed = session.parsed(None)?;
         let mut origins = Origins::default();
         let table = read_family(archive, &parsed, selected, &mut origins)?;

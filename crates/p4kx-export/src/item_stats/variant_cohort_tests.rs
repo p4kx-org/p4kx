@@ -13,8 +13,10 @@ use super::{
     AMMO, AMMO_CONTAINER, ENTITY, FIRST_MAGAZINE, PRIMARY_MAGAZINE_FIELD, SECOND_MAGAZINE,
     TestResult, WEAPON_COMPONENT, ammo, fixture_types, magazine, weapon_at,
 };
-use crate::catalog_queries::CatalogRecordSelection;
-use crate::catalog_queries::equipment::{ItemSnapshot, with_items};
+use crate::catalog_queries::equipment::ItemSnapshot;
+use crate::catalog_queries::{
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ProvenanceMode,
+};
 use crate::item_variant::{self, ItemComponentKey};
 use crate::record_fields::component;
 use crate::{
@@ -185,12 +187,10 @@ fn with_selected(
     inspect: impl FnOnce(ItemSnapshot<'_>) -> TestResult,
 ) -> TestResult {
     let (_folder, archive) = open_cohort(cohort)?;
-    with_items(
-        &archive,
-        CatalogRecordSelection::RecordIndex(SELECTED),
-        None,
-        inspect,
-    )?
+    let session =
+        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?
+            .with_provenance_mode(ProvenanceMode::Full);
+    session.with_items(CatalogRecordSelection::RecordIndex(SELECTED), None, inspect)?
 }
 
 fn open_cohort(cohort: ComponentCohort) -> Result<(tempfile::TempDir, Archive), Box<dyn Error>> {

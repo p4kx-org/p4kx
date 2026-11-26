@@ -553,7 +553,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
   projection runs, `project-facility-interiors` follows the facility loadout joins.
   Marker provenance is the default. It writes the `p4kx-catalog-markers` format v1
   containing the v3 dataset. Select `--provenance full` for the standalone v3 document with
-  proof references. `p4kx catalog schema` prints the selected profile's JSON Schema.
+  proof references. `p4kx catalog schema` prints the default marker schema. Use
+  `p4kx catalog schema --provenance full` for the standalone schema.
 - `p4kx ships <archive> --out <file> [--format json|ndjson] [--filter <filter>]
   [--exported-at <seconds>]` writes the base data of every ship
   ([docs/ship-base-data.md](ship-base-data.md)): hull mass and hit points summed from the

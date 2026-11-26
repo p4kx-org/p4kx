@@ -4,7 +4,7 @@
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordReference,
     CatalogRecordSelection, DatasetAvailability, MineableBaseSignature, MineableEntity,
-    MineableSignature,
+    MineableSignature, ProvenanceMode,
 };
 use p4kx_extraction::{
     Archive, ArchiveWatch, DataForgeEntry, DataForgeOrigin, InputScope, RecordTree,
@@ -100,7 +100,8 @@ impl<'source> WitnessInput<'source> {
             CatalogLanguageSelection::Selected(&[]),
             None,
         )
-        .map_err(|_| "prepare the mineable entity SDK session")?;
+        .map_err(|_| "prepare the mineable entity SDK session")?
+        .with_provenance_mode(ProvenanceMode::Full);
         let sdk = session
             .parsed(None)
             .map_err(|_| "open the parsed Mineable Entity SDK session")?;

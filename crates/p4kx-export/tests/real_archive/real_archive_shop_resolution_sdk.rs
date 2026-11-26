@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_export::catalog_queries::DatasetAvailability;
 use p4kx_export::catalog_queries::shops::{
     self, ResolutionStatus, ShopInventoryResolution, ShopInventoryResolutionSnapshot,
     ShopResolutionSelection,
 };
+use p4kx_export::catalog_queries::{DatasetAvailability, ProvenanceMode};
 use p4kx_extraction::{Archive, ArchiveWatch, PhysicalSourceKind, SourceLocation, SourceUseRole};
 use p4kx_testkit::{real_archive_key, real_archive_path};
 use serde_json::Value;
@@ -88,8 +88,13 @@ fn read(
     archive: &Archive,
     selection: ShopResolutionSelection<'_>,
 ) -> TestResult<ShopInventoryResolutionSnapshot> {
-    let snapshot = shops::read_shop_inventory_resolutions(archive, selection, None)
-        .map_err(|_| "read the requested Shop resolution SDK scope")?;
+    let snapshot = shops::read_shop_inventory_resolutions_with_provenance_mode(
+        archive,
+        selection,
+        ProvenanceMode::Full,
+        None,
+    )
+    .map_err(|_| "read the requested Shop resolution SDK scope")?;
     if archive.build().is_none()
         || snapshot.build.as_ref() != archive.build()
         || !matches!(snapshot.availability, DatasetAvailability::Available)

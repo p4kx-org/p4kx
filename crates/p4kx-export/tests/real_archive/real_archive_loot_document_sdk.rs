@@ -6,7 +6,7 @@ use p4kx_export::catalog_queries::loot::{
     LootDocumentSnapshot, LootEntityContainerDocument,
 };
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, DatasetAvailability,
+    CatalogLanguageSelection, CatalogQuerySession, DatasetAvailability, ProvenanceMode,
 };
 use p4kx_extraction::{Archive, SourceInventory};
 use serde_json::Value;
@@ -26,7 +26,8 @@ fn installed_loot_documents_match_the_same_complete_catalog_and_exact_member() -
 
 fn verify(archive: &Archive, measurement: &BoundMeasurement) -> TestResult {
     let session = CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)
-        .map_err(|_| "open the same-Build Loot document SDK session")?;
+        .map_err(|_| "open the same-Build Loot document SDK session")?
+        .with_provenance_mode(ProvenanceMode::Full);
     let queries = session
         .parsed(None)
         .map_err(|_| "parse the original DataForge for Loot documents")?;

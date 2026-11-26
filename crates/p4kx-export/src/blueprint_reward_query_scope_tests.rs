@@ -9,8 +9,10 @@ use p4kx_testkit::{
 };
 
 use super::{TestResult, fixture};
-use crate::catalog_queries::CatalogRecordSelection;
 use crate::catalog_queries::crafting::{self, BlueprintRewardSelection, BlueprintRewardSnapshot};
+use crate::catalog_queries::{
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ProvenanceMode,
+};
 use crate::catalog_read::original::{OwnedValueEvent, OwnedValueWalk};
 
 #[test]
@@ -124,7 +126,10 @@ fn physically_excluded_source_owner_retains_no_orphan_source_uses() -> TestResul
     let excluded = excluded_direct_ordinal(&archive)?;
     let selection =
         BlueprintRewardSelection::TargetPools(CatalogRecordSelection::RecordIndex(fixture::ALIAS));
-    crafting::with_reward_sources(&archive, selection, None, |snapshot| {
+    let session =
+        CatalogQuerySession::open(&archive, CatalogLanguageSelection::Selected(&[]), None)?
+            .with_provenance_mode(ProvenanceMode::Full);
+    session.with_blueprint_reward_sources(selection, None, |snapshot| {
         verify_filtered_uses(&snapshot, excluded)
     })??;
     Ok(())

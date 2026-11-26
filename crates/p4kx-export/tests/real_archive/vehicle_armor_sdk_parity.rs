@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ParsedCatalogQueries,
+    CatalogLanguageSelection, CatalogRecordSelection, ParsedCatalogQueries,
 };
 use p4kx_extraction::Archive;
 
@@ -10,6 +10,7 @@ use crate::real_archive_catalog_table_parity::{
     Origins, Table, TestResult, capture_table, with_bound_measurement_from_producer,
 };
 use crate::real_archive_resource_configurations_sdk::component_identity;
+use crate::real_archive_scoped_equipment_sdk::equipment_input::full_source_session;
 use crate::real_archive_verification::print_line;
 
 pub(crate) const DATASET: &str = "/configurations/vehicleArmor";
@@ -20,8 +21,7 @@ fn installed_vehicle_armor_matches_retained_complete_catalog() -> TestResult {
     let revision = std::env::var("P4KX_VEHICLE_ARMOR_CATALOG_PRODUCER_REVISION")
         .map_err(|_| "configure the exact Vehicle Armor Catalog producer revision")?;
     let counts = with_bound_measurement_from_producer(&revision, |archive, measurement| {
-        let session =
-            CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+        let session = full_source_session(archive, CatalogLanguageSelection::Selected(&[]))?;
         let parsed = session.parsed(None)?;
         let mut origins = Origins::default();
         let table = capture_all(&parsed, archive, &mut origins)?;

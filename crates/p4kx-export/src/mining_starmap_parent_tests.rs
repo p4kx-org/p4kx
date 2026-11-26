@@ -11,7 +11,8 @@ use p4kx_testkit::{
 };
 use serde_json::Value;
 
-use crate::mining_locations::{MiningLocationOptions, MiningStarmapObject, read_mining_locations};
+use super::super::tests as reader_tests;
+use crate::mining_locations::{MiningLocationOptions, MiningStarmapObject};
 use crate::{CatalogOptions, build_catalog};
 
 const AUTHORED_PARENT: u128 = 0xe001;
@@ -26,7 +27,7 @@ type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 fn authored_and_placement_parents_match_their_distinct_catalog_sources() -> TestResult {
     let folder = tempfile::tempdir()?;
     let archive = archive(&folder.path().join("Data.p4k"))?;
-    let snapshot = read_mining_locations(
+    let snapshot = reader_tests::read_with_full_provenance(
         &archive,
         MiningLocationOptions::new(Language::English, None),
     )?;

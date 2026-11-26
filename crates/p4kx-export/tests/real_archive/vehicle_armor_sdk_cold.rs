@@ -5,11 +5,12 @@ use std::collections::{HashMap, HashSet};
 
 use p4kx_export::catalog_queries::equipment::vehicle_armor::{
     ArmorDamageInfo, ArmorDamageSource, HealthLink, VehicleArmor, VehicleArmorDamage,
-    VehicleArmorSnapshot, with_vehicle_armor_from,
+    VehicleArmorSnapshot,
 };
 use p4kx_export::catalog_queries::{
-    CatalogRecordSelection, DatasetAvailability, SourceArenaOutput, SourceField, SourcePayload,
-    SourceRecordReference, SourceWeakReference, SourceWeakTarget,
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
+    ProvenanceMode, SourceArenaOutput, SourceField, SourcePayload, SourceRecordReference,
+    SourceWeakReference, SourceWeakTarget,
 };
 use p4kx_extraction::{
     Build, DataForgeOrigin, InputScope, PhysicalSourceKind, PhysicalSourceRef, SourceInventory,
@@ -33,13 +34,16 @@ fn installed_vehicle_armor_full_cold_query() -> TestResult {
         if !input.origin().matches_archive(archive) || origin.ancestors().len() != 0 {
             return Err("Vehicle Armor requires the root Archive's exact DataForge Entry".into());
         }
-        with_vehicle_armor_from(
+        let session = CatalogQuerySession::from_entry(
             archive,
             &input,
-            CatalogRecordSelection::All,
+            CatalogLanguageSelection::Selected(&[]),
             None,
-            |snapshot| verify(&snapshot, archive.build(), origin.entry().index()),
         )?
+        .with_provenance_mode(ProvenanceMode::Full);
+        session.with_vehicle_armor(CatalogRecordSelection::All, None, |snapshot| {
+            verify(&snapshot, archive.build(), origin.entry().index())
+        })?
     })
 }
 

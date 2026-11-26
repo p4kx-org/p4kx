@@ -11,18 +11,30 @@ mod fixture;
 
 use fixture::{PLANET, archive};
 
+use crate::catalog_queries::{CatalogLanguageSelection, CatalogQuerySession, ProvenanceMode};
 use crate::mining_locations::{
-    MiningLocationOptions, read_mining_locations, read_mining_locations_from,
+    MiningLocationOptions, MiningLocationSnapshot, read_mining_locations,
+    read_mining_locations_from,
 };
 use crate::{CatalogError, StarmapTraversalBudget};
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
+pub(super) fn read_with_full_provenance(
+    archive: &Archive,
+    options: MiningLocationOptions<'_>,
+) -> Result<MiningLocationSnapshot, CatalogError> {
+    let languages = CatalogLanguageSelection::Selected(std::slice::from_ref(&options.language));
+    CatalogQuerySession::open(archive, languages, options.cancel)?
+        .with_provenance_mode(ProvenanceMode::Full)
+        .read_mining_locations(options)
+}
+
 #[test]
 fn reads_five_linked_tables_and_keeps_selected_locale_evidence() -> TestResult {
     let dir = tempfile::tempdir()?;
     let archive = archive(&dir.path().join("Data.p4k"))?;
-    let result = read_mining_locations(
+    let result = read_with_full_provenance(
         &archive,
         MiningLocationOptions::new(Language::English, None),
     )?;
@@ -96,7 +108,7 @@ fn proved_absence_counts_each_route_without_blocking_complete_mining_placements(
             &dir.path().join(format!("{name}.p4k")),
             targets,
         )?;
-        let result = read_mining_locations(
+        let result = read_with_full_provenance(
             &archive,
             MiningLocationOptions::new(Language::English, None),
         )?;

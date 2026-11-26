@@ -5,7 +5,7 @@ use p4kx_export::catalog_queries::equipment::worn_gear::{Clothing, ItemRadar, Su
 use p4kx_export::catalog_queries::equipment::{ComponentOwner, EquipmentSnapshot};
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    ParsedCatalogQueries,
+    ParsedCatalogQueries, ProvenanceMode,
 };
 use p4kx_extraction::{
     Archive, ArchiveWatch, Build, DataForge, DataForgeEntry, DataForgeOrigin, InputScope,
@@ -54,7 +54,8 @@ fn installed_worn_gear_sdk_matches_original_component_values_and_macro() -> Test
         CatalogLanguageSelection::Selected(&[]),
         None,
     )
-    .map_err(|_| "prepare the worn gear SDK session from the decoded DataForge")?;
+    .map_err(|_| "prepare the worn gear SDK session from the decoded DataForge")?
+    .with_provenance_mode(ProvenanceMode::Full);
     let sdk = session
         .parsed(None)
         .map_err(|_| "reuse the parsed worn gear SDK session")?;

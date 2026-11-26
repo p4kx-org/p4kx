@@ -4,7 +4,7 @@
 use p4kx_export::catalog_queries::equipment::{ComponentOwner, EquipmentSnapshot};
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
-    ParsedCatalogQueries, ResourceFloat32,
+    ParsedCatalogQueries, ProvenanceMode, ResourceFloat32,
 };
 use p4kx_extraction::{
     Archive, ArchiveWatch, Build, DataForge, DataForgeEntry, RecordTree, SourceUses,
@@ -45,7 +45,8 @@ fn installed_flight_sdk_preserves_selected_original_components() -> Result {
         &entry,
         CatalogLanguageSelection::Selected(&[]),
         None,
-    )?;
+    )?
+    .with_provenance_mode(ProvenanceMode::Full);
     let queries = session.parsed(None)?;
     let sources = SourceUses::with_compact_coordinates();
     let original = Evidence {

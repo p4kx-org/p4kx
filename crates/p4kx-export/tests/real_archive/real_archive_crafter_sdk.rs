@@ -7,7 +7,7 @@ use std::time::UNIX_EPOCH;
 use p4kx_export::catalog_queries::crafting::{CrafterHostSnapshot, CrafterSnapshot};
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordCoverage, CatalogRecordSelection,
-    DatasetAvailability, ParsedCatalogQueries,
+    DatasetAvailability, ParsedCatalogQueries, ProvenanceMode,
 };
 use p4kx_export::{CatalogOptions, CatalogPublicationMode, build_catalog_from};
 use p4kx_extraction::{
@@ -58,7 +58,8 @@ fn installed_crafter_station_matches_original_sdk_and_literal_producer() -> Test
         &entry,
         CatalogLanguageSelection::Selected(&[]),
         None,
-    )?;
+    )?
+    .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session.parsed(None)?;
     let mut origins = Origins::default();
     let row = compare_station(&archive, &parsed, &station, &mut origins)?;
@@ -94,7 +95,8 @@ fn installed_crafter_hosts_match_original_sdk_and_exact_filtered_producer() -> T
         &entry,
         CatalogLanguageSelection::Selected(&[]),
         None,
-    )?;
+    )?
+    .with_provenance_mode(ProvenanceMode::Full);
     let parsed = session.parsed(None)?;
     let snapshot = parsed.read_crafter_hosts(ship, None)?;
     let mut origins = Origins::default();

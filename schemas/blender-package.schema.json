@@ -5102,7 +5102,7 @@
       "x-p4kx-vocabularyClass": "control"
     },
     "SourceInventory": {
-      "description": "Immutable sorted physical sources and observed use inventory for one prepared result.",
+      "description": "Immutable evidence inventory for one prepared result.",
       "properties": {
         "sources": {
           "items": {
