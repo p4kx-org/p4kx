@@ -241,7 +241,8 @@ fn inventory_stem(entry: &Entry) -> Option<String> {
     stem(&path).map(str::to_owned)
 }
 
-fn inventory_path(entry: &Entry) -> Option<String> {
+/// Returns the normalized path of an authored Shop inventory JSON Entry.
+pub(crate) fn inventory_path(entry: &Entry) -> Option<String> {
     let raw = entry.path();
     let is_json = raw
         .len()

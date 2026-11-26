@@ -155,7 +155,12 @@ fn staged_row_bytes(catalog: &Catalog<'_>) -> u128 {
         )
 }
 
-fn encoder<'a, W: Write>(sink: W, level: i32, length: u64) -> io::Result<Encoder<'a, W>> {
+/// Creates a Zstandard frame with the exact decoded document length.
+pub(crate) fn encoder<'a, W: Write>(
+    sink: W,
+    level: i32,
+    length: u64,
+) -> io::Result<Encoder<'a, W>> {
     let mut encoder = Encoder::new(sink, level)?;
     encoder.set_pledged_src_size(Some(length))?;
     encoder.include_contentsize(true)?;

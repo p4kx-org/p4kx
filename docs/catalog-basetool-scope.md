@@ -181,6 +181,14 @@ over the available canonical results before checking reduced size.
   Normal export. Shop resolution coverage cannot stand in for the full
   selected inventory coverage.
 
+## Internal Shop producer slice
+
+The Shop slice uses normalized inventory paths and physical Entry order. It
+shares the canonical registry and inventory-resolution readers. It resolves original JSON cells before discarding their
+arena and retains the exact JSON number tokens and classification of text cells.
+It checks the reduced byte limits through the same zstd framing as the full Catalog.
+The complete reduced wire format and command require all selected datasets.
+
 ## Acceptance
 
 #1177 tracks the wire contract, generation and import. Use a distinct versioned

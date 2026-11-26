@@ -1,0 +1,80 @@
+// SPDX-License-Identifier: MIT OR Apache-2.0
+// SPDX-FileCopyrightText: 2026 the P4KX contributors
+
+use std::io;
+use std::path::Path;
+
+use p4kx_extraction::{Archive, ArchiveWatch, CancelToken};
+use thiserror::Error;
+
+use crate::catalog_rows::spool::RowSpoolError;
+use crate::{CatalogError, CatalogFile};
+
+mod bounded_output;
+mod cell;
+mod inventory;
+mod plan;
+mod shops;
+
+#[cfg(test)]
+mod tests;
+
+#[derive(Debug, Error)]
+enum ReducedError {
+    #[error(transparent)]
+    Catalog(#[from] CatalogError),
+    #[error(transparent)]
+    Json(#[from] serde_json::Error),
+    #[error(transparent)]
+    Io(#[from] io::Error),
+    #[error(transparent)]
+    Spool(#[from] RowSpoolError),
+    #[error("the selected data is incomplete at {0}")]
+    IncompleteScope(&'static str),
+    #[error("the selected Shop inventory at Entry {0} is unreadable")]
+    UnreadableInventory(u32),
+    #[error("a reduced Shop inventory value could not resolve its original typed address")]
+    InvalidInventoryReference,
+    #[error("the {kind:?} reduced output exceeds {limit} bytes")]
+    Limit {
+        kind: bounded_output::LimitKind,
+        limit: u64,
+    },
+    #[error("could not discard the staged reduced output after {primary}: {cleanup}")]
+    Cleanup {
+        primary: Box<Self>,
+        cleanup: p4kx_extraction::OwnedOutputCleanupError,
+    },
+}
+
+fn prepare_shop_slice<'output>(
+    archive: &Archive,
+    scratch: &Path,
+    cancel: Option<&CancelToken>,
+    limits: bounded_output::Limits,
+    create: impl FnOnce() -> io::Result<CatalogFile<'output>>,
+) -> Result<(CatalogFile<'output>, bounded_output::Sizes), ReducedError> {
+    let watch = ArchiveWatch::new(archive);
+    watch.check().map_err(CatalogError::from)?;
+    let slice = shops::collect(archive, scratch, cancel)?;
+    let decoded = bounded_output::measure(&slice, limits.decoded, cancel)
+        .map_err(|error| slice.take_spool_failure().map_or(error, ReducedError::from))?;
+    let mut file = create()?;
+    let result = (|| {
+        let sizes = bounded_output::write(&slice, &mut file, decoded, limits, cancel)
+            .map_err(|error| slice.take_spool_failure().map_or(error, ReducedError::from))?;
+        watch.check().map_err(CatalogError::from)?;
+        crate::catalog_query_session::checkpoint(cancel)?;
+        Ok(sizes)
+    })();
+    match result {
+        Ok(sizes) => Ok((file, sizes)),
+        Err(primary) => match file.discard() {
+            Ok(()) => Err(primary),
+            Err(cleanup) => Err(ReducedError::Cleanup {
+                primary: Box::new(primary),
+                cleanup,
+            }),
+        },
+    }
+}
