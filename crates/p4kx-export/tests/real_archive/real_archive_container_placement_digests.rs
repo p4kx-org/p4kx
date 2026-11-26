@@ -137,7 +137,7 @@ fn retain_row(
     ordered.append_encounter_row(key, fingerprint(wire)?)
 }
 
-fn collect_input_refs(value: &Value, sources: &mut HashSet<String>) -> TestResult {
+pub(super) fn collect_input_refs(value: &Value, sources: &mut HashSet<String>) -> TestResult {
     match value {
         Value::Array(values) => {
             for value in values {
