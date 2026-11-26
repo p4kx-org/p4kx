@@ -492,6 +492,22 @@ cited its 45-minute limit. The final receipt and executed ARM64 payload were abs
 [ARM64 execution](https://github.com/p4kx-org/p4kx/actions/runs/45714089604/job/139572874813) ·
 [ARM64 checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45714089604/artifacts/15072330016)
 
+For PR #1117 head `a839b2adad`, AMD64 completed the original MSI lifecycle and
+published its final receipt. The last available ARM64 checkpoint recorded 44 events
+and placed its worker in installed runtime verification. GitHub cancelled the job
+after 55 minutes and cited the 45-minute job limit. It still reported WaitFinish as
+active. The job log and the final original ARM64 receipt were unavailable.
+[AMD64 receipt](https://github.com/p4kx-org/p4kx/actions/runs/45747658169/artifacts/15085849753) ·
+[ARM64 checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45747658169/artifacts/15086685851)
+
+On head `f301ec7e8`, the ARM64 runner-fuse and dynamic parent-chain controls reached
+their deliberately imposed 60-second step deadlines. Both uploaded diagnostics one
+second later. This confirms that ordinary step timeouts can preserve evidence on
+the hosted ARM64 runner. The last confirmed state of the real MSI remains the
+pre-Finish checkpoint.
+[Runner-fuse job](https://github.com/p4kx-org/p4kx/actions/runs/45758595624/job/139703109461) ·
+[Parent-chain job](https://github.com/p4kx-org/p4kx/actions/runs/45758595630/job/139703108446)
+
 The real consumer records the prepared allowance, source hashes, checkpoints and parent controls
 on the runner. It refreshes admission under the original deadline before launching the installer.
 Before Finish starts, each native target uploads a checkpoint with the six allowed diagnostic
