@@ -124,6 +124,15 @@ the fields of that revision's summary, the authored location rules and the appli
 text lookups. The figures measure the SDK query, including preparation in the whole-process
 column. Integrated consumer refresh, cache and slot processing have separate costs.
 
+### Paired SDK measurements
+
+Use separate verified binaries for revision comparisons. The installed SDK probe
+can compare the complete ordered summary rows, authored location rules, text tables
+and diagnostics. Bind each executable to its actual freshly compiled changed
+libraries as well as its source tree. A shared Cargo target can reuse libraries
+across separate source snapshots with archived timestamps. Record elapsed time
+and process peaks independently of semantic comparison.
+
 ## Coverage and cache updates
 
 The result separates selected-owner coverage, reverse-survey scope, related Generator owners,

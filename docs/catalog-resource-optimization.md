@@ -19,8 +19,14 @@ the resource topology step. The synthetic spool check compares the exact
 serialized bytes and preserves the preceding output after cancellation.
 All 1,694 synthetic Catalog integration tests and the 49 targeted Loadout
 unit tests passed. The installed-only Loadout unit test requires its Archive.
-Installed elapsed time and peak memory have their own comparison. The
-measurements below predate the new implementations.
+An installed SDK probe on LIVE 13220821 matched summary and TagPaths output,
+but its two executables reused the same compiled SDK libraries. Treat these
+trials as repeatability checks. Changed-library compilation and source binding
+are required for the revision comparison. The installed producer comparison
+for the Ship spool is separate.
+[SDK measurement method](catalog-contract-queries.md#paired-sdk-measurements)
+
+The detailed baseline measurements below predate the implementation.
 
 ## What the measurements establish
 
