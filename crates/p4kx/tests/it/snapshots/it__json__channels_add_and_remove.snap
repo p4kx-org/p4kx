@@ -5,19 +5,23 @@ expression: "steps.join(\"\\n\")"
 {
   "action": "added",
   "kind": "folder",
+  "originApplicability": "notApplicable",
   "path": "[DIR]/Games/StarCitizen"
 }
 {
   "action": "already_added",
   "kind": "folder",
+  "originApplicability": "notApplicable",
   "path": "[DIR]/Games/StarCitizen"
 }
 {
   "action": "added",
   "kind": "archive",
+  "originApplicability": "notApplicable",
   "path": "[DIR]/library/EPTU/Data.p4k"
 }
 {
   "action": "removed",
+  "originApplicability": "notApplicable",
   "path": "[DIR]/Games/StarCitizen"
 }

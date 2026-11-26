@@ -11,6 +11,8 @@ use assert_cmd::Command;
 use p4kx_testkit::{ArchiveBuilder, TestContainer, TestEntry, other_test_key, test_key};
 use predicates::prelude::{PredicateBooleanExt, predicate};
 
+mod json;
+
 type TestResult = Result<(), Box<dyn Error>>;
 
 const SECRET: &[u8] = b"<secret data of the Archive/>";
@@ -270,6 +272,7 @@ fn key_show_masks_the_key_and_names_its_source() -> TestResult {
         .output()?;
     let value: serde_json::Value = serde_json::from_slice(&json.stdout)?;
     assert_eq!(value["in_use"]["source"], "profile", "{value}");
+    assert_eq!(value["originApplicability"], "notApplicable", "{value}");
     assert!(
         !String::from_utf8_lossy(&json.stdout).contains(&hex),
         "masked"

@@ -156,10 +156,59 @@ pub(crate) fn meta(used: ArchiveKeyUse) -> MetaObject {
 mod tests {
     use std::error::Error;
 
+    use p4kx_export::ArchiveKeyUse;
+    use rmcp::model::{CallToolResult, MetaObject};
+    use serde_json::json;
+
     use super::{clear, take, watch};
     use crate::archives::Archives;
     use crate::key_fixture::{OTHER, SECRET, read};
     use crate::key_stamp::KeyStamp;
+    use crate::noted::Notes;
+
+    #[test]
+    fn archive_key_notice_keeps_existing_result_metadata() -> Result<(), Box<dyn Error>> {
+        let dir = tempfile::tempdir()?;
+        let archive = crate::key_fixture::archive(dir.path())?;
+        read(&archive, SECRET);
+        let key = ArchiveKeyUse::of(&archive);
+
+        let metadata_value = json!({"version": 1, "sources": []});
+        let mut metadata = MetaObject::new();
+        metadata.insert("fixture/origin".to_owned(), metadata_value.clone());
+        let payload = json!({"total": 0});
+        let mut result = CallToolResult::structured(payload.clone());
+        result.meta = Some(metadata);
+        Notes {
+            key: Some(key),
+            ..Notes::default()
+        }
+        .apply(&mut result);
+
+        let response = serde_json::to_value(result)?;
+        let meta = response.get("_meta").ok_or("result metadata")?;
+        assert_eq!(
+            meta.get("fixture/origin"),
+            Some(&metadata_value),
+            "the origin metadata survives the key notice"
+        );
+        assert_eq!(
+            meta.get("archive_key"),
+            Some(&json!("missing")),
+            "the key notice preserves the missing-key state"
+        );
+        assert_eq!(
+            meta.get("encrypted_entries_unread"),
+            Some(&json!(1)),
+            "the one requested encrypted Entry was unread"
+        );
+        assert_eq!(
+            response.get("structuredContent"),
+            Some(&payload),
+            "the key notice leaves the structured result intact"
+        );
+        Ok(())
+    }
 
     #[test]
     fn an_entry_the_call_and_a_reused_build_both_asked_for_counts_once()

@@ -5,6 +5,7 @@ use std::num::NonZeroUsize;
 use std::path::PathBuf;
 use std::sync::Arc;
 
+use p4kx_extraction::OriginApplicability;
 use rmcp::handler::server::router::tool::ToolRouter;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{Implementation, ServerCapabilities, ServerConfig};
@@ -229,6 +230,7 @@ impl Server {
             let page = Page::new(&"list_channels", params.cursor.as_deref(), params.limit)?;
             let channels = state.locations.channels()?;
             Ok(ChannelsResult {
+                origin_applicability: OriginApplicability::NotApplicable,
                 total: channels.len(),
                 channels: page
                     .slice(&channels)

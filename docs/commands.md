@@ -946,7 +946,7 @@ change. `p4kx-mcp --version` and `-V` show the legal notice.
 
 | Tool | Result |
 |------|--------|
-| `list_channels` | The detected Channels with Archive path, source and Build, found like `p4kx channels` |
+| `list_channels` | Detected Channels with Archive path, source and Build, found like `p4kx channels`, and `originApplicability: "notApplicable"` on every page |
 | `archive_info` | Channel, Build, number of Entries and encrypted Entries, sizes, cached source-layout `metadata`, `issue_count` and the first 50 `issues` (Entry path and defect) of the directory |
 | `list_entries` | One folder of an Archive (`folder`, e.g. `Data/Libs`): its subfolders with their Entry count, then its Entries |
 | `search_entries` | The Entries matching a Filter (`filter`), with the rules of `p4kx search` |

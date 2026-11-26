@@ -2,7 +2,9 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_channels::Channel;
-use p4kx_extraction::{ArchiveLayoutOrigins, ArchiveSummary, Build, Entry, EntryMetadataInfo};
+use p4kx_extraction::{
+    ArchiveLayoutOrigins, ArchiveSummary, Build, Entry, EntryMetadataInfo, OriginApplicability,
+};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -11,6 +13,9 @@ use crate::entry_directory_origins::DirectoryOrigins;
 /// The detected Channels.
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct ChannelsResult {
+    /// Archive payload origin does not apply to discovery metadata.
+    #[serde(rename = "originApplicability")]
+    pub(crate) origin_applicability: OriginApplicability,
     /// The number of detected Channels.
     pub(crate) total: usize,
     /// The Channels on this page.

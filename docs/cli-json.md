@@ -1924,28 +1924,28 @@ language. The report also includes `fieldOrigins` and `provenance`.
 ## `p4kx key set|show|remove --json`
 
 `p4kx key set [<hex>] [--archive <archive>] --json` prints
-`{"action": "stored", "file": "…", "checked_against": "…"}`; `checked_against` is the Archive
-whose encrypted Entry the key decrypted, or `null` when no Archive with a suitable encrypted
+`{"action": "stored", "file": "…", "checked_against": "…", "originApplicability": "notApplicable"}`.
+`checked_against` is the Archive whose encrypted Entry the key decrypted, or `null` when no Archive with a suitable encrypted
 Entry was found and the key was stored unchecked. `p4kx key remove --json` prints
-`{"action": "removed", "file": "…"}`, or `"none_stored"` when there was nothing to remove.
+`{"action": "removed", "file": "…", "originApplicability": "notApplicable"}`, or `"none_stored"` when there was nothing to remove.
 
 `p4kx key show --json` prints `{"file": "…", "stored": "****…1234" | null, "in_use": {"source":
-"flag" | "environment" | "profile", "key": "****…1234"} | null}`. Keys are always masked: every
+"flag" | "environment" | "profile", "key": "****…1234"} | null, "originApplicability": "notApplicable"}`. Keys are always masked: every
 digit but the last four is `*`. No command prints or logs a key in full.
 
 ## `p4kx channels --json`
 
 ```json
-{"channels": [{"name": "LIVE", "build": Build, "source": "default", "archive": "…"}, …]}
+{"channels": [{"name": "LIVE", "build": Build, "source": "default", "archive": "…"}, …], "originApplicability": "notApplicable"}
 ```
 
 `source` is `default` (below the default Library folder), `launcher` (below a Library folder from
 the RSI Launcher log) or `manual`.
 
-`p4kx channels add <path> --json` prints `{"action": "added", "kind": "folder", "path": "…"}`;
+`p4kx channels add <path> --json` prints `{"action": "added", "kind": "folder", "path": "…", "originApplicability": "notApplicable"}`.
 `action` is `added` or `already_added`, `kind` is `folder` or `archive`, and `path` is the
 absolute path stored in the settings. `p4kx channels remove <path> --json` prints
-`{"action": "removed", "path": "…"}`.
+`{"action": "removed", "path": "…", "originApplicability": "notApplicable"}`.
 
 ## `p4kx texture info <archive> <entry> --json`
 

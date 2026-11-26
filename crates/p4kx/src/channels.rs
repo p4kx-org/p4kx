@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result};
 use p4kx_channels::SearchRecipe;
+use p4kx_extraction::OriginApplicability;
 use p4kx_settings::{Settings, default_settings_file};
 use serde::Serialize;
 use thiserror::Error;
@@ -29,6 +30,8 @@ pub(crate) enum InvalidPath {
 
 #[derive(Serialize)]
 struct ChannelsJson<'a> {
+    #[serde(rename = "originApplicability")]
+    origin_applicability: OriginApplicability,
     channels: Vec<ChannelJson<'a>>,
 }
 
@@ -42,6 +45,8 @@ struct ChannelJson<'a> {
 
 #[derive(Serialize)]
 struct ChangeJson {
+    #[serde(rename = "originApplicability")]
+    origin_applicability: OriginApplicability,
     action: Action,
     #[serde(skip_serializing_if = "Option::is_none")]
     kind: Option<Kind>,
@@ -94,6 +99,7 @@ fn list(args: &ChannelsArgs, settings_file: &Path, as_json: bool) -> Result<()> 
             .into_parts();
     if as_json {
         json::print(&ChannelsJson {
+            origin_applicability: OriginApplicability::NotApplicable,
             channels: channels
                 .iter()
                 .map(|channel| ChannelJson {
@@ -142,6 +148,7 @@ fn add(path: &Path, settings_file: &Path, as_json: bool) -> Result<()> {
     }
     if as_json {
         json::print(&ChangeJson {
+            origin_applicability: OriginApplicability::NotApplicable,
             action: if added {
                 Action::Added
             } else {
@@ -172,6 +179,7 @@ fn remove(path: &Path, settings_file: &Path, as_json: bool) -> Result<()> {
     settings.save(settings_file)?;
     if as_json {
         json::print(&ChangeJson {
+            origin_applicability: OriginApplicability::NotApplicable,
             action: Action::Removed,
             kind: None,
             path: json::path(&absolute),

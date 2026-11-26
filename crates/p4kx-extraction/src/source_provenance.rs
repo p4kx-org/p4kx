@@ -21,6 +21,8 @@ pub(crate) mod mode;
 mod model_archive_source;
 #[path = "model_material_origins.rs"]
 pub(crate) mod model_material_origins;
+#[path = "source_origin_applicability.rs"]
+mod origin_applicability;
 #[path = "record_json_location.rs"]
 mod record_json_location;
 #[path = "sourced_value_seed.rs"]
@@ -30,6 +32,7 @@ pub use self::entity_material_effects::{
     EntityMaterialEffects, EntityMaterialEffectsComponent, EntityMaterialEffectsError,
 };
 pub use self::mode::ProvenanceMode;
+pub use self::origin_applicability::OriginApplicability;
 pub use self::record_json_location::RecordJsonLocation;
 pub use self::sourced_value_seed::SourcedValueSeed;
 pub use crate::animation_sources::{

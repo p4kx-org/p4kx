@@ -11,7 +11,7 @@ use p4kx_channels::SearchRecipe;
 use p4kx_comparison::LineDiffError;
 use p4kx_extraction::{
     Archive, ArchiveError, ArchiveKey, ArchiveKeyError, Entry, KeyCheck, OpenOptions,
-    archive_error_in,
+    OriginApplicability, archive_error_in,
 };
 use p4kx_settings::{
     ChosenKey, KEY_VARIABLE, KeyChoiceError, KeySource, KeyStore, KeyText, choose_key,
@@ -53,6 +53,8 @@ pub(crate) enum InvalidKey {
 
 #[derive(Serialize)]
 struct StoredJson {
+    #[serde(rename = "originApplicability")]
+    origin_applicability: OriginApplicability,
     action: &'static str,
     file: String,
     checked_against: Option<String>,
@@ -60,12 +62,16 @@ struct StoredJson {
 
 #[derive(Serialize)]
 struct RemovedJson {
+    #[serde(rename = "originApplicability")]
+    origin_applicability: OriginApplicability,
     action: &'static str,
     file: String,
 }
 
 #[derive(Serialize)]
 struct ShownJson {
+    #[serde(rename = "originApplicability")]
+    origin_applicability: OriginApplicability,
     file: Option<String>,
     stored: Option<String>,
     in_use: Option<InUseJson>,
@@ -194,6 +200,7 @@ fn set(store: &KeyStore, text: Option<&str>, archive: Option<&Path>, as_json: bo
     store.save(&key)?;
     if as_json {
         json::print(&StoredJson {
+            origin_applicability: OriginApplicability::NotApplicable,
             action: "stored",
             file: json::path(store.file()),
             checked_against: checked_against.as_deref().map(json::path),
@@ -267,6 +274,7 @@ fn show(store: &KeyStore, flag: Option<&str>, as_json: bool) -> Result<()> {
     let in_use = chosen.as_ref().map(in_use);
     if as_json {
         json::print(&ShownJson {
+            origin_applicability: OriginApplicability::NotApplicable,
             file: Some(json::path(store.file())),
             stored: stored_mask,
             in_use,
@@ -303,6 +311,7 @@ fn remove(store: &KeyStore, as_json: bool) -> Result<()> {
     let removed = store.remove()?;
     if as_json {
         json::print(&RemovedJson {
+            origin_applicability: OriginApplicability::NotApplicable,
             action: if removed { "removed" } else { "none_stored" },
             file: json::path(store.file()),
         })?;

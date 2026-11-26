@@ -68,7 +68,10 @@ impl Notes {
             result
                 .content
                 .extend(key_report::text(key).map(ContentBlock::text));
-            result.meta = Some(key_report::meta(key));
+            result
+                .meta
+                .get_or_insert_default()
+                .extend(key_report::meta(key));
         }
     }
 }

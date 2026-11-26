@@ -22,5 +22,6 @@ expression: json
       "name": "PTU",
       "source": "default"
     }
-  ]
+  ],
+  "originApplicability": "notApplicable"
 }
