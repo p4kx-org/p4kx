@@ -6,7 +6,7 @@ Its only port authors `noRotation = true`. Two translated helpers apply rotation
 about different axes, so translation-only placement leaves the fuse incorrectly oriented.
 
 Use the [isolated verification profile](media-fixture-selection.md#rust-exported-synthetic-packages-in-blender).
-Set `$p4kx` and `$blender` to the built P4KX executable and Blender 5.3 executable.
+Set `$p4kx` and `$blender` to the built P4KX executable and a native Blender 5.2 LTS executable.
 Generate the fixtures in a new absolute directory if they are not already prepared.
 
 ```powershell
@@ -46,5 +46,15 @@ The native Blender 5.3.0 import emitted no warnings on Windows AMD64.
 The CLI reported one missing material library for the synthetic mesh.
 The world and relative matrices agreed within `2.23e-16` per coefficient. The
 translation-only control had zero position error and a maximum matrix error of `1.0`.
+
+The Blender 5.2.5 LTS consumer replay on Windows AMD64 used native build
+`5f2fd03c4701` and the add-on from `9db4a876638a04a5d7b6bd6861f67c7d0897278d`.
+The verifier imported the retained, checksummed four-file synthetic package
+without warnings. The maximum error per matrix coefficient was
+`2.220446049250313e-16` for both world and parent-relative transforms. The
+translation-only control preserved the position and had a maximum matrix error
+of `1.0`. The consumer receipt SHA-256 is
+`638ec97bec090c68cebf7684f3f9bf0bad58fafc7a8e081ef8f405cd1f277b4f`.
+
 The witness covers static placement. The animation-time interpretation remains
 unresolved under [ADR-0321](adr/0321-a-ports-ang3-offset-is-degrees-with-x-before-z-and-a-loadout-entry-prefers-its-reference.md).
