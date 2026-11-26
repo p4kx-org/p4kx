@@ -208,6 +208,20 @@ with distinct states for missing values. More than one selected kind may
 reference a key. In that case the text values and states must agree, and the
 encryption marker incorporates all contributing inputs.
 
+## Internal Ship equipment producer slice
+
+A single resolved Ship-root visitor feeds the nested Loadout rows and the
+CargoGrid placement join. The CargoGrid definition survey includes unmounted
+grids. The placement uses the host Record index, installed port ordinals and
+physical configuration owner. Repeated mounts of one grid definition remain
+separate occurrences.
+
+Canonical Ship base facts supply the original cargo total and capacities per
+mount. A separate `cargo.freight` result excludes grids whose observed
+`miningOnly` flag is true. It reports an incomplete value when an occurrence
+lacks a unique physical configuration, matching capacity or known mining flag.
+The original cargo total and its marker still describe all canonical mounts.
+
 ## Acceptance
 
 #1177 tracks the wire contract, generation and import. Use a distinct versioned

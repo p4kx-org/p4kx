@@ -7,7 +7,7 @@ use p4kx_extraction::{CancelToken, SourcedValue};
 use serde::Serialize;
 
 use super::ReducedError;
-use super::cell::Cell;
+use super::cell::{self, Cell};
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_text_contract::{CanonicalText, GameTextRef, PublicNameRef};
 
@@ -174,14 +174,10 @@ fn join_marker<T>(existing: &mut Cell<T>, incoming: &Cell<T>) -> Result<(), Redu
     if existing.state != incoming.state {
         return Err(ReducedError::IncompleteScope("texts"));
     }
-    existing.contains_encrypted_source = match (
+    existing.contains_encrypted_source = cell::merge_encryption(
         existing.contains_encrypted_source,
         incoming.contains_encrypted_source,
-    ) {
-        (Some(true), _) | (_, Some(true)) => Some(true),
-        (Some(false), Some(false)) => Some(false),
-        _ => None,
-    };
+    );
     Ok(())
 }
 

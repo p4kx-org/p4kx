@@ -3,6 +3,8 @@
 
 use p4kx_extraction::{Archive, CancelToken, DataForgeEntry};
 
+#[cfg(test)]
+use super::owner_visit::{EntityScope, EquipmentVisitSummary};
 use super::{read, rows};
 use crate::CatalogError;
 use crate::catalog_queries::{
@@ -81,6 +83,21 @@ impl CatalogQuerySession<'_> {
 }
 
 impl ParsedCatalogQueries<'_> {
+    #[cfg(test)]
+    pub(crate) fn visit_cargo_grid_owners<E: From<CatalogError>>(
+        &self,
+        cancel: Option<&CancelToken>,
+        visit: impl FnMut(u32, CargoGridSnapshot<'_>) -> Result<(), E>,
+    ) -> Result<EquipmentVisitSummary, E> {
+        use crate::catalog_v3::catalog_facility::CARGO_GRID_SOURCE_TYPE;
+
+        self.visit_equipment_owners::<rows::CargoGrids, E>(
+            CatalogRecordSelection::All,
+            EntityScope::Components(&[CARGO_GRID_SOURCE_TYPE]),
+            cancel,
+            visit,
+        )
+    }
     /// Supplies the selected physical owner's Cargo Grid rows through this parsed view.
     ///
     /// # Errors

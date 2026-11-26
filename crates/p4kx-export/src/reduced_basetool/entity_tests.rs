@@ -35,6 +35,10 @@ fn selected_entity_tables_preserve_bilingual_domains_and_reviewed_pledges() -> T
     let slice = entities::collect(&session.parsed(None)?, scratch.path(), None, &mut texts)?;
     assert_eq!(slice.items.len(), 0, "no Item records in fixture");
     assert_eq!(slice.ships.len(), 0, "no Ship records in fixture");
+    assert!(
+        slice.ship_cargo.is_empty(),
+        "no canonical cargo rows without Ships"
+    );
     assert_eq!(slice.paints.len(), 0, "no Paint records in fixture");
     let mapping = StoreSlugs::embedded()?;
     assert_eq!(

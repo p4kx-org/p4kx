@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::collections::BTreeMap;
 use std::path::Path;
 
 use p4kx_extraction::{CancelToken, Language};
@@ -13,6 +14,7 @@ use super::manufacturer_definitions;
 use super::record_targets::RecordTargets;
 use super::selected_texts::{SelectedTexts, TextRefs};
 use super::ship::Ship;
+use super::ship_cargo::ShipCargo;
 use crate::catalog_queries::{CatalogRecordSelection, ParsedCatalogQueries};
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogSequence, StagedCatalogTable};
@@ -36,6 +38,7 @@ pub(super) struct Entities {
     pub(super) ship_store_slugs: StagedCatalogSequence,
     pub(super) ship_store_pledges: ShipStorePledges,
     pub(super) manufacturers: StagedCatalogTable,
+    pub(super) ship_cargo: BTreeMap<u32, ShipCargo>,
 }
 
 pub(super) fn collect(
@@ -53,17 +56,24 @@ pub(super) fn collect(
     }
     let (manufacturers, manufacturer_targets) =
         manufacturer_definitions::collect(parsed, scratch, cancel, texts)?;
-    let (ships, ship_store_slugs, ship_targets) =
-        collect_ships(parsed, scratch, cancel, texts, &manufacturer_targets)?;
-    let (items, paints) = collect_items(parsed, scratch, cancel, &ship_targets)?;
+    let ships = collect_ships(parsed, scratch, cancel, texts, &manufacturer_targets)?;
+    let (items, paints) = collect_items(parsed, scratch, cancel, &ships.targets)?;
     Ok(Entities {
         items,
-        ships,
+        ships: ships.rows,
         paints,
-        ship_store_slugs,
+        ship_store_slugs: ships.store_slugs,
         ship_store_pledges: ship_store_pledges()?,
         manufacturers,
+        ship_cargo: ships.cargo,
     })
+}
+
+struct StagedShips {
+    rows: StagedCatalogSequence,
+    store_slugs: StagedCatalogSequence,
+    targets: RecordTargets,
+    cargo: BTreeMap<u32, ShipCargo>,
 }
 
 fn collect_ships(
@@ -72,7 +82,7 @@ fn collect_ships(
     cancel: Option<&CancelToken>,
     texts: &mut SelectedTexts,
     manufacturer_targets: &RecordTargets,
-) -> Result<(StagedCatalogSequence, StagedCatalogSequence, RecordTargets), ReducedError> {
+) -> Result<StagedShips, ReducedError> {
     let mapping = StoreSlugs::embedded()?;
     parsed.with_ships(CatalogRecordSelection::All, cancel, |snapshot| {
         let sources = snapshot.sources();
@@ -88,6 +98,7 @@ fn collect_ships(
         let mut staged = StagedCatalogRows::new(scratch, cancel);
         let mut references = TextRefs::default();
         let mut identities = Vec::new();
+        let mut cargo = BTreeMap::new();
         for row in snapshot.rows() {
             targets.verify_variant(
                 SHIPS,
@@ -98,6 +109,14 @@ fn collect_ships(
                 verify_manufacturer(reference, manufacturer_targets)
             })?)?;
             identities.push(ShipIdentity::read(row.source())?);
+            let base = ShipCargo::from(row.base_facts());
+            let index = base
+                .ship_record_index
+                .value
+                .ok_or(ReducedError::IncompleteScope(SHIPS))?;
+            if cargo.insert(index, base).is_some() {
+                return Err(ReducedError::IncompleteScope(SHIPS));
+            }
         }
         texts.add(
             references,
@@ -108,7 +127,12 @@ fn collect_ships(
         let ships = staged.finish_sequence()?;
         completeness::rows(SHIPS, snapshot.rows().len(), ships.len())?;
         let slugs = collect_store_slugs(&mapping, &identities, scratch, cancel)?;
-        Ok((ships, slugs, targets))
+        Ok(StagedShips {
+            rows: ships,
+            store_slugs: slugs,
+            targets,
+            cargo,
+        })
     })?
 }
 

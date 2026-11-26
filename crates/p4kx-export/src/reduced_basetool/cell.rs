@@ -42,3 +42,11 @@ impl<'source, T> From<&'source SourcedValue<T>> for Cell<&'source T> {
         }
     }
 }
+
+pub(super) const fn merge_encryption(left: Option<bool>, right: Option<bool>) -> Option<bool> {
+    match (left, right) {
+        (Some(true), _) | (_, Some(true)) => Some(true),
+        (Some(false), Some(false)) => Some(false),
+        _ => None,
+    }
+}
