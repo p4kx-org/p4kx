@@ -89,7 +89,7 @@ fn stage_groups(
     for row in snapshot.definitions() {
         groups.insert(DEFINITIONS, row.header())?;
         completeness::value(DEFINITIONS, row.name())?;
-        references.name(row.name());
+        references.name(row.name().value());
         definitions.append(&Definition {
             identity: row.header().into(),
             name: row.name().into(),

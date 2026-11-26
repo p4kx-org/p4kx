@@ -262,6 +262,20 @@ targets against the staged ResourceType rows. The writer preserves both an
 absent declaration and an explicitly null slot. Raw float bits, thumbnails,
 validation flags and description references are outside this selection.
 
+## Internal Commodity producer slice
+
+The canonical Commodity query supplies both the physical definition and its
+presentation. The definition retains identity. A presentation carries the
+matching Commodity GUID and Record index, so physical aliases sharing one
+GUID remain distinguishable. Presentation density keeps its canonical
+grams-per-cubic-centimetre value. Nullable resource, group and refinement
+choices preserve their states and markers. Several Commodities may still
+use the same ResourceType link.
+
+Selected names enter the public-name closure. Descriptions and display
+types enter the protected game-text closure in English and German.
+Original authoring bodies and proof inventories are outside this selection.
+
 ## Acceptance
 
 #1177 tracks the wire contract, generation and import. Use a distinct versioned

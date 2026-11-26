@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use p4kx_extraction::{CancelToken, SourcedValue};
+use p4kx_extraction::CancelToken;
 use serde::Serialize;
 
 use super::ReducedError;
@@ -18,14 +18,14 @@ pub(super) struct TextRefs<'source> {
 }
 
 impl<'source> TextRefs<'source> {
-    pub(super) fn name(&mut self, key: &'source SourcedValue<PublicNameRef>) {
-        if let Some(key) = key.value() {
+    pub(super) fn name(&mut self, key: Option<&'source PublicNameRef>) {
+        if let Some(key) = key {
             self.names.insert(key.as_str());
         }
     }
 
-    pub(super) fn description(&mut self, key: &'source SourcedValue<GameTextRef>) {
-        if let Some(key) = key.value() {
+    pub(super) fn game_text(&mut self, key: Option<&'source GameTextRef>) {
+        if let Some(key) = key {
             self.descriptions.insert(key.as_str());
         }
     }

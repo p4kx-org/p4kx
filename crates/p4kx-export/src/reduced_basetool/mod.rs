@@ -15,6 +15,7 @@ mod cargo_globals;
 mod cargo_grids;
 mod cargo_placements;
 mod cell;
+mod commodities;
 mod completeness;
 mod component;
 mod contract_scope;
@@ -42,6 +43,8 @@ mod shops;
 
 #[cfg(test)]
 mod cargo_globals_tests;
+#[cfg(test)]
+mod commodity_tests;
 #[cfg(test)]
 mod contract_scope_tests;
 #[cfg(test)]

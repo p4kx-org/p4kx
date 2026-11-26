@@ -54,10 +54,10 @@ impl<'source> Ship<'source> {
         let variant = row
             .variant_of()
             .ok_or(ReducedError::IncompleteScope(SHIPS))?;
-        texts.name(row.name());
-        texts.description(row.description());
-        texts.name(row.role());
-        texts.name(row.career());
+        texts.name(row.name().value());
+        texts.game_text(row.description().value());
+        texts.name(row.role().value());
+        texts.name(row.career().value());
         Ok(Self {
             identity: address.into(),
             name: row.name().into(),

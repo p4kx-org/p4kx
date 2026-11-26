@@ -67,9 +67,9 @@ impl<'source> Row<'source> {
             completeness::value(PATH, row.name())?;
             completeness::value(PATH, row.short_name())?;
             completeness::value(PATH, row.description())?;
-            texts.name(row.name());
-            texts.name(row.short_name());
-            texts.description(row.description());
+            texts.name(row.name().value());
+            texts.name(row.short_name().value());
+            texts.game_text(row.description().value());
             Ok::<_, ReducedError>(Localization {
                 name: row.name().into(),
                 short_name: row.short_name().into(),

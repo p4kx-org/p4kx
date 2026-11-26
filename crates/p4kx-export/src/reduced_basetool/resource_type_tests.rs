@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{Archive, Language};
-use p4kx_testkit::{ArchiveBuilder, GlobalIniBuilder, TestEntry, test_key};
+use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, GlobalIniBuilder, TestEntry, test_key};
 use serde_json::Value;
 
 use super::resource_types;
@@ -12,7 +12,7 @@ use crate::catalog_queries::{CatalogLanguageSelection, CatalogQuerySession};
 #[path = "../../tests/it/resource_density_schema_fixture.rs"]
 mod resource_density_schema_fixture;
 #[path = "../../tests/it/resource_fixture.rs"]
-mod resource_fixture;
+pub(super) mod resource_fixture;
 #[path = "../../tests/it/resource_fixture_values.rs"]
 mod resource_fixture_values;
 #[path = "../../tests/it/resource_quality_schema_fixture.rs"]
@@ -20,7 +20,7 @@ mod resource_quality_schema_fixture;
 #[path = "../../tests/it/resource_schema_fixture.rs"]
 mod resource_schema_fixture;
 
-use self::resource_quality_schema_fixture::OverrideEntryTarget;
+pub(super) use self::resource_quality_schema_fixture::OverrideEntryTarget;
 
 #[test]
 fn resource_types_retain_units_quality_and_member_links() -> Result<(), Box<dyn std::error::Error>>
@@ -32,30 +32,8 @@ fn resource_types_retain_units_quality_and_member_links() -> Result<(), Box<dyn 
 }
 
 fn verify(target: OverrideEntryTarget) -> Result<(), Box<dyn std::error::Error>> {
-    let scratch = tempfile::tempdir()?;
-    let path = scratch.path().join("Data.p4k");
-    let forge = resource_fixture::database(target).build();
-    let english = GlobalIniBuilder::new()
-        .text("fixture_resource_name", "Resource")
-        .text("fixture_group_name", "Materials")
-        .text("fixture_resource_description", "Protected")
-        .build();
-    let german = GlobalIniBuilder::new()
-        .text("fixture_resource_name", "Ressource")
-        .text("fixture_group_name", "Materialien")
-        .build();
-    ArchiveBuilder::new()
-        .entry(TestEntry::stored("Data/Game2.dcb", forge).encrypted())
-        .entry(TestEntry::stored(
-            Language::English.global_ini_path(),
-            english,
-        ))
-        .entry(TestEntry::stored(
-            Language::German.global_ini_path(),
-            german,
-        ))
-        .write_to(&path)?;
-    let archive = Archive::open_with_key(path, Some(test_key()))?;
+    let database = resource_fixture::database(target);
+    let (scratch, archive) = open_fixture(&database)?;
     let session = CatalogQuerySession::open(
         &archive,
         CatalogLanguageSelection::Selected(&[Language::English, Language::German]),
@@ -192,4 +170,35 @@ fn verify(target: OverrideEntryTarget) -> Result<(), Box<dyn std::error::Error>>
         Some(0)
     );
     Ok(())
+}
+
+pub(super) fn open_fixture(
+    database: &DataForgeBuilder,
+) -> Result<(tempfile::TempDir, Archive), Box<dyn std::error::Error>> {
+    let scratch = tempfile::tempdir()?;
+    let path = scratch.path().join("Data.p4k");
+    let forge = database.build();
+    let english = GlobalIniBuilder::new()
+        .text("fixture_resource_name", "Resource")
+        .text("fixture_group_name", "Materials")
+        .text("fixture_resource_description", "Protected")
+        .build();
+    let german = GlobalIniBuilder::new()
+        .text("fixture_resource_name", "Ressource")
+        .text("fixture_group_name", "Materialien")
+        .text("fixture_resource_description", "Geschuetzter Text")
+        .build();
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored("Data/Game2.dcb", forge).encrypted())
+        .entry(TestEntry::stored(
+            Language::English.global_ini_path(),
+            english,
+        ))
+        .entry(TestEntry::stored(
+            Language::German.global_ini_path(),
+            german,
+        ))
+        .write_to(&path)?;
+    let archive = Archive::open_with_key(path, Some(test_key()))?;
+    Ok((scratch, archive))
 }

@@ -87,7 +87,7 @@ fn label<'read>(
     Cell::from(slot).try_map(|item| {
         let name = item.display_name();
         completeness::value(PATH, name)?;
-        texts.name(name);
+        texts.name(name.value());
         Ok(Label {
             display_name: name.into(),
         })

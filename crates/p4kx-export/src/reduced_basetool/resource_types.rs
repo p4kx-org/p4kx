@@ -63,7 +63,7 @@ fn stage(
     let mut rows = StagedCatalogRows::new(scratch, cancel);
     let mut text_refs = TextRefs::default();
     for source in snapshot.rows() {
-        text_refs.name(source.name());
+        text_refs.name(source.name().value());
         rows.append(&Definition::read(source, &targets)?)?;
     }
     let rows = rows.finish(availability)?;
