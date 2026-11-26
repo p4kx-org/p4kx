@@ -25,6 +25,15 @@ struct RecordSubType {
 }
 
 impl RecordPortTypes {
+    #[cfg(test)]
+    pub(super) fn test_absent(declaration: SourceUse) -> Self {
+        Self(FieldFact {
+            value: SourceValue::Absent,
+            inputs: vec![declaration],
+            complete: true,
+        })
+    }
+
     pub(super) fn read<'scope, 'read, 'source>(
         fields: &OriginalFlowFields<'scope, 'read, 'source>,
         port: &OriginalValueFact<'scope, 'read, 'source>,

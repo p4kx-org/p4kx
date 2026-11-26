@@ -8,7 +8,7 @@ use p4kx_extraction::{
 use p4kx_testkit::{ArchiveBuilder, TestEntry};
 use serde::Serialize;
 
-use super::{DefinitionFacts, FieldFact};
+use super::{DefinitionFacts, FieldFact, RecordPortTypes};
 use crate::build::original_input::test_support::TestResult;
 
 #[test]
@@ -116,6 +116,7 @@ fn definition_facts(clear: &SourceScope) -> TestResult<DefinitionFacts> {
     let declaration = observe(clear, "declaration", SourceUseRole::Selector)?;
     Ok(DefinitionFacts {
         selectors: vec![selector.clone(), selector],
+        types: RecordPortTypes::test_absent(declaration.clone()),
         min: FieldFact {
             value: SourceValue::Present(2),
             inputs: vec![observe(clear, "minSize", SourceUseRole::Conversion)?],
