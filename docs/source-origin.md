@@ -26,13 +26,17 @@ shown length, and truncation. The path and declared size use directory metadata.
 Truncation uses that size and the actual retained byte range. The path line
 shows the current view's marker in its tooltip.
 
-The installed LIVE `13220821` witness matched the English localisation Entry
-prefix against an independent Archive read. It also checked the stored
+On installed LIVE and PTU Builds, the witness matched the English localisation
+Entry prefix against an independent Archive read. It checked the stored
 encryption declaration, payload role, decoded byte range and physical Entry
-position. The debug test executable SHA-256
-`d3a2d337674dfac41414ac7a5316f8eda7aefd44b4509371a83e78165f7dac04`
-ran for 75.0197 seconds including the GUI index build. Peak private commit
-was 954,011,648 bytes and peak working set was 976,150,528 bytes.
+position. Both runs used the debug executable with SHA-256
+`d3a2d337674dfac41414ac7a5316f8eda7aefd44b4509371a83e78165f7dac04`.
+Elapsed time includes building the GUI index.
+
+| Build | Elapsed (seconds) | Peak private commit (bytes) | Peak working set (bytes) |
+| --- | ---: | ---: | ---: |
+| LIVE `13220821` | 75.0197 | 954,011,648 | 976,150,528 |
+| PTU `13284307` | 75.7904 | 974,606,336 | 996,515,840 |
 
 ## Companion records
 
