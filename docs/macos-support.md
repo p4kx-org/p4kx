@@ -104,6 +104,15 @@ same package and add-on checks. The recorded run establishes only the observed O
 [Current pull-request guest](https://github.com/p4kx-org/p4kx/actions/runs/45530796171/job/138990049813) ·
 [Hosted package assembly](https://github.com/p4kx-org/p4kx/actions/runs/45530796171/job/138990050506)
 
+For PR #1117 head `36181deeb` at merge revision
+`eb6c0aceade893baf0639d337427b072131d0114`, both Apple Silicon guests again
+executed the mounted DMG and verified the add-on ZIP in native Blender 5.2.4.
+The observed versions were macOS 26.7.2 and 27.0.1. Package assembly published
+the DMG after verifying both guest receipts.
+[Minimum guest](https://github.com/p4kx-org/p4kx/actions/runs/45714089604/job/139574882502) ·
+[Current guest](https://github.com/p4kx-org/p4kx/actions/runs/45714089604/job/139574882535) ·
+[Assembled package](https://github.com/p4kx-org/p4kx/actions/runs/45714089604/artifacts/15072150981)
+
 ## References
 
 - [Shared native platform contract (ADR-0343)](adr/0343-one-native-platform-contract-and-target-bound-runtime-evidence.md)

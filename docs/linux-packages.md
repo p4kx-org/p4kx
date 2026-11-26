@@ -371,8 +371,7 @@ At that same merge, both package consumers wrote the selected file
 through the writable Flatpak Documents grant. They rejected its
 origin receipt during host identity validation. The replacement
 implementations validate their retained file descriptor before placing
-the receipt. The two native package jobs still need to verify that
-behavior on real Documents grants.
+the receipt. That run left receipt publication through Documents grants unverified.
 [AMD64 package evidence](https://github.com/p4kx-org/p4kx/actions/runs/45576709479/job/139096347560) ·
 [ARM64 package evidence](https://github.com/p4kx-org/p4kx/actions/runs/45576709479/job/139096347666)
 
@@ -393,6 +392,13 @@ After lease release, the next export succeeded. The stock API 4 session
 recorded the expected prerequisite refusal. The PR package version was `0.4.2`.
 [AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45611267510/job/139216272963) ·
 [ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45611267510/job/139216273107)
+
+Release merge `eb6c0aceade893baf0639d337427b072131d0114` for PR #1117 head
+`36181deeb` passed native execution on both Linux CPUs. The jobs exercised
+the tar.gz, AppImage, deb and Flatpak launchers, software-rendered desktop frames
+and Documents portal grants. Both published their executed release payloads.
+[AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45714089604/job/139569392888) ·
+[ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45714089604/job/139569392909)
 
 The tagged v0.5.0 candidate requires its own hosted Linux package evidence on both CPUs.
 
