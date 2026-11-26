@@ -9,8 +9,9 @@ use anyhow::Result;
 use p4kx_assembly::audio::{
     ArchiveAudio, AudioIndex, ExportLoopOrigins, ExportOptions, ExportReport, ExportReportCapture,
     ExportReportOrigins, ExportState, ExportWatch, SoundFormat, TriggerSounds, TxtpReport,
+    TxtpReportWithOrigins,
 };
-use p4kx_extraction::{CancelToken, ConversionError, FieldOrigins, SourceInventory};
+use p4kx_extraction::{Archive, CancelToken, ConversionError, FieldOrigins, SourceInventory};
 use serde::Serialize;
 
 use crate::cli::AudioOutput;
@@ -253,23 +254,11 @@ pub(crate) fn run(args: &WwiseExtractArgs, as_json: bool) -> Result<ExitCode> {
     };
     let report = &published.report;
     if as_json {
-        let (field_origins, provenance) =
-            wwise_json::capture_extract(&archive, index, &sounds, &published, &args.export)?;
-        json::print(&ExtractJson {
-            archive: json::path(archive.path()),
-            language: LanguageJson::of(&choice),
-            trigger: wwise_json::trigger(&sounds),
-            breaks: sounds.breaks().len(),
-            export: export_json(report, &args.out, &args.export),
-            txtp: txtp.as_ref().map(wwise_txtp::to_json),
-            issues: issues_json(index),
-            field_origins,
-            provenance,
-        })?;
+        print_extraction_json(&archive, index, &sounds, &published, args, txtp.as_ref())?;
     } else {
         print_extraction(
             report,
-            txtp.as_ref(),
+            txtp.as_ref().map(|outcome| &outcome.report),
             index,
             &args.out,
             sounds.breaks().len(),
@@ -284,7 +273,7 @@ fn export_with_txtp(
     args: &WwiseExtractArgs,
     cancel: &CancelToken,
     capture_report: bool,
-) -> Result<(SoundExport, Option<TxtpReport>)> {
+) -> Result<(SoundExport, Option<TxtpReportWithOrigins>)> {
     let watch = ExportWatch::linked(cancel.clone());
     let options = export_options(&args.export);
     let publish = |report: &ExportReport, loops: &ExportLoopOrigins| {
@@ -319,6 +308,30 @@ fn export_with_txtp(
         },
         txtp,
     ))
+}
+
+fn print_extraction_json(
+    archive: &Archive,
+    index: &AudioIndex,
+    sounds: &TriggerSounds<'_>,
+    published: &SoundExport,
+    args: &WwiseExtractArgs,
+    txtp: Option<&TxtpReportWithOrigins>,
+) -> Result<()> {
+    let (field_origins, provenance) =
+        wwise_json::capture_extract(archive, index, sounds, published, &args.export, txtp)?;
+    json::print(&ExtractJson {
+        archive: json::path(archive.path()),
+        language: LanguageJson::of(sounds.language_choice()),
+        trigger: wwise_json::trigger(sounds),
+        breaks: sounds.breaks().len(),
+        export: export_json(&published.report, &args.out, &args.export),
+        txtp: txtp.map(|outcome| wwise_txtp::to_json(&outcome.report)),
+        issues: issues_json(index),
+        field_origins,
+        provenance,
+    })?;
+    Ok(())
 }
 
 fn print_extraction(

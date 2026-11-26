@@ -18,7 +18,7 @@ const FILELESS_ID: u32 = 770;
 const MISSING_WEM: u32 = 701;
 const BLOCKED_WEM: u32 = 702;
 
-fn fixture() -> Result<Fixture, Box<dyn Error>> {
+fn authored_fixture(events: &[&str]) -> Result<Fixture, Box<dyn Error>> {
     let folder = tempfile::tempdir()?;
     let archive = folder.path().join("Data.p4k");
     let out = folder.path().join("out");
@@ -44,7 +44,7 @@ fn fixture() -> Result<Fixture, Box<dyn Error>> {
         .entry(TestEntry::zstd(
             "Data\\Libs\\GameAudio\\FailureOrigins.xml",
             TestAtl::new("FailureOrigins")
-                .trigger(TRIGGER, &[TRIGGER])
+                .trigger(TRIGGER, events)
                 .to_cryxml(),
         ))
         .entry(TestEntry::zstd("Data\\Sounds\\wwise\\FailureOrigins.bnk", bank.bytes()).encrypted())
@@ -55,6 +55,10 @@ fn fixture() -> Result<Fixture, Box<dyn Error>> {
         archive,
         out,
     })
+}
+
+fn fixture() -> Result<Fixture, Box<dyn Error>> {
+    authored_fixture(&[TRIGGER])
 }
 
 #[test]
@@ -97,6 +101,66 @@ fn entity_failures_use_the_same_origins_after_an_unmatched_trigger() -> TestResu
         "the compacted failure position retains its original encrypted Entity selection"
     );
     check_failures(&report, "/extraction")
+}
+
+#[test]
+fn txtp_skip_reason_cites_the_first_failed_leaf() -> TestResult {
+    let fixture = fixture()?;
+    let report = extract(
+        &fixture,
+        TRIGGER,
+        &["--format", "raw", "--conflict", "overwrite", "--txtp"],
+        1,
+    )?;
+    let skip = &report["txtp"]["skips"][0];
+    assert_eq!(skip["event"], TRIGGER);
+    let expected = format!("plug-in source {FILELESS_ID} has no file");
+    assert_eq!(skip["reason"].as_str(), Some(expected.as_str()));
+    let event = origin(&report, "/txtp/skips/0/event")?;
+    assert_eq!(event["containsEncryptedSource"], false);
+    let reason = origin(&report, "/txtp/skips/0/reason")?;
+    assert_eq!(reason["containsEncryptedSource"], true);
+    assert_eq!(reason["sourceSetComplete"], true);
+    assert_eq!(reason, origin(&report, "/failures/0/reason")?);
+    Ok(())
+}
+
+#[test]
+fn equal_event_names_keep_distinct_authored_skip_positions() -> TestResult {
+    let fixture = authored_fixture(&[TRIGGER, TRIGGER])?;
+    let report = extract(
+        &fixture,
+        TRIGGER,
+        &["--format", "raw", "--conflict", "overwrite", "--txtp"],
+        1,
+    )?;
+    assert_eq!(report["txtp"]["skipped"], 2);
+    let first = origin(&report, "/txtp/skips/0/event")?;
+    let second = origin(&report, "/txtp/skips/1/event")?;
+    assert_eq!(first, origin(&report, "/trigger/events/0/name")?);
+    assert_eq!(second, origin(&report, "/trigger/events/1/name")?);
+    assert_ne!(first["sourceUsesRefs"], second["sourceUsesRefs"]);
+    Ok(())
+}
+
+#[test]
+fn txtp_publication_skip_keeps_event_but_has_unknown_operational_reason() -> TestResult {
+    let fixture = super::fixture()?;
+    fs::create_dir_all(fixture.out.join("Play_Single.txtp"))?;
+    let report = extract(
+        &fixture,
+        "Play_Single",
+        &["--format", "wav", "--conflict", "overwrite", "--txtp"],
+        0,
+    )?;
+    assert_eq!(report["txtp"]["skipped"], 1);
+    assert_eq!(report["txtp"]["skips"][0]["event"], "Play_Single");
+    assert_eq!(report["written"], 1);
+    let reason = origin(&report, "/txtp/skips/0/reason")?;
+    assert_eq!(reason["containsEncryptedSource"], Value::Null);
+    assert_eq!(reason["sourceSetComplete"], false);
+    assert_eq!(reason["sourceUsesRefs"], json!([]));
+    Ok(())
 }
 
 fn check_failures(report: &Value, root: &str) -> TestResult {

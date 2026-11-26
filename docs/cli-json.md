@@ -1087,6 +1087,11 @@ evidence. Operational failures report unknown reason origin when their exact
 inputs were unavailable. Entity audio carries those origins under
 `/extraction/failures`.
 
+Under `/txtp/skips/{row}`, the trigger and event retain their authored name origins.
+A leaf failure cites the declared kind and source ID of the first blocked playback
+command. If a usable media file could not be established, additional operational
+evidence may be incomplete. An unbound publication failure has unknown reason origin.
+
 With `--txtp`, the object has a `txtp` member, absent without it:
 `{"written": 1, "kept": 0, "skipped": 1, "files": [{"trigger": "Play_Multi", "event": "Play_Multi",
 "file": "…\\Play_Multi.txtp", "size": 120, "kept": false, "breaks": 0, "approximations": []}, …], "skips": [{"trigger": "Play_Multi",

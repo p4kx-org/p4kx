@@ -6,7 +6,7 @@ use std::path::Path;
 
 use p4kx_assembly::audio::{
     ExportLoopOrigins, ExportReport, ExportState, TriggerSounds, TxtpApproximation, TxtpReport,
-    write_txtp_with_loop_origins,
+    TxtpReportWithOrigins, write_txtp_with_report_origins,
 };
 use p4kx_extraction::{Archive, CancelToken, FieldOrigins, SourceInventory};
 use serde::Serialize;
@@ -71,8 +71,8 @@ pub(crate) fn write(
     archive: &Archive,
     cancel: &CancelToken,
     loop_origins: &ExportLoopOrigins,
-) -> io::Result<TxtpReport> {
-    write_txtp_with_loop_origins(
+) -> io::Result<TxtpReportWithOrigins> {
+    write_txtp_with_report_origins(
         archive,
         &[sounds],
         exported,

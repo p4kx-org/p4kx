@@ -4,7 +4,7 @@
 use anyhow::{Context, Result, ensure};
 use p4kx_assembly::audio::{
     AudioIndex, ExportFailure, ExportFailureKind, ExportFailureOrigin, ExportedSound, SoundVariant,
-    TerminalMediaOrigins, TriggerSounds, WemSelection,
+    TerminalMediaOrigins, TriggerSounds, TxtpReportWithOrigins, WemSelection,
 };
 use p4kx_extraction::{Archive, FieldOrigin, FieldOrigins, FieldPath, SourceInventory, SourceUses};
 
@@ -20,12 +20,16 @@ pub(crate) fn capture_extract(
     sounds: &TriggerSounds<'_>,
     exported: &SoundExport,
     args: &SoundExportArgs,
+    txtp: Option<&TxtpReportWithOrigins>,
 ) -> Result<(FieldOrigins, SourceInventory)> {
     let uses = SourceUses::with_compact_use_refs();
     let mut capture = Capture::open(archive, index, &uses, sounds)?;
     capture.header(sounds)?;
     capture.break_count(sounds, index)?;
     capture.issues(index)?;
+    if let Some(outcome) = txtp {
+        capture.txtp_skips(sounds, outcome)?;
+    }
     capture_export(
         &mut capture.fields,
         (archive, index, &uses),
@@ -41,6 +45,51 @@ pub(crate) fn capture_extract(
 }
 
 impl Capture<'_> {
+    fn txtp_skips(
+        &mut self,
+        sounds: &TriggerSounds<'_>,
+        outcome: &TxtpReportWithOrigins,
+    ) -> Result<()> {
+        let skips = &outcome.report.skipped;
+        ensure!(
+            skips.len() == outcome.skipped_sources.len(),
+            "TXTP skip positions do not match their report"
+        );
+        let variants = sounds.variants();
+        let path = field(&field(&FieldPath::root(), "txtp")?, "skips")?;
+        for (ordinal, (row, observed)) in skips.iter().zip(&outcome.skipped_sources).enumerate() {
+            ensure!(
+                observed.trigger_ordinal == 0 && row.trigger == sounds.trigger().name(),
+                "TXTP skip does not match its source trigger"
+            );
+            let event = variants
+                .get(observed.event_variant_ordinal)
+                .context("TXTP skip event source is missing")?
+                .event();
+            let trigger = self.exported_trigger()?;
+            let name = self.definition.event(&self.uses, event)?.name;
+            let reason = if let Some(leaf) = observed.failed_variant_ordinal {
+                let variant = variants.get(leaf).context("TXTP skipped leaf is missing")?;
+                ensure!(
+                    std::ptr::eq(variant.event(), event),
+                    "TXTP skipped leaf is from another event"
+                );
+                let (route, terminal) = self.exported_route(variant)?;
+                self.union(
+                    [&route, &terminal.source_kind, &terminal.declared_source_id],
+                    variant.wem_id().is_none(),
+                )?
+            } else {
+                self.uses.origin(&[], false)
+            };
+            self.group(
+                &index_path(&path, ordinal)?,
+                [("trigger", trigger), ("event", name), ("reason", reason)],
+            )?;
+        }
+        Ok(())
+    }
+
     fn break_count(&mut self, sounds: &TriggerSounds<'_>, index: &AudioIndex) -> Result<()> {
         let searched = self.searched_banks(sounds, index)?;
         let mut observed = vec![

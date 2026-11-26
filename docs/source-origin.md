@@ -249,7 +249,9 @@ size source. Its planned trigger and WEM still describe the attempted export.
 Failure rows cite the original trigger and terminal declaration. A fileless
 source can cite its authored source ID in the explanation even when its WEM ID
 is null. Missing search evidence and unobserved operational error sources remain
-incomplete or unknown.
+incomplete or unknown. A skipped TXTP event reports its authored trigger and
+event under `/txtp/skips`. Its reason can cite the terminal declaration that
+blocked playback. A publication error without bound inputs keeps unknown origin.
 
 ## Unchanged files in extraction
 

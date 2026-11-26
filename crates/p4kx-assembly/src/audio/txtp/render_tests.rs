@@ -14,7 +14,9 @@ fn render_text(
     header: &[String],
     files: &[Option<SoundFile<'_>>],
 ) -> Result<String, String> {
-    render(tree, header, files).map(|rendered| rendered.text)
+    render(tree, header, files)
+        .map(|rendered| rendered.text)
+        .map_err(|error| error.reason)
 }
 
 fn sound(wem_id: u32) -> Leaf {

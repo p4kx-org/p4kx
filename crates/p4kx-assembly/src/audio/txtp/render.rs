@@ -12,6 +12,7 @@ use crate::audio::playback_features::{PlaybackFeature, PlaybackFeatures};
 use crate::audio::{ExportLoopOrigin, ExportedWemOrigin};
 
 use super::TxtpApproximation;
+use super::skip_source::EventFailure;
 use super::tree::{Combine, Group, Leaf, Node, Tree};
 
 /// The longest text of a comment line, in characters.
@@ -177,7 +178,7 @@ pub(super) fn render<'a>(
     tree: &Tree,
     header: &[String],
     files: &[Option<SoundFile<'a>>],
-) -> Result<RenderedTxtp<'a>, String> {
+) -> Result<RenderedTxtp<'a>, EventFailure> {
     let mut rendered = RenderedTxtp {
         text: String::new(),
         approximations: Vec::new(),
@@ -221,17 +222,19 @@ fn group_lines<'a>(
     rendered: &mut RenderedTxtp<'a>,
     tree: &Tree,
     files: &[Option<SoundFile<'a>>],
-) -> Result<(), String> {
+) -> Result<(), EventFailure> {
     let root = tree
         .group(Tree::ROOT)
-        .ok_or("the TXTP root group is missing")?;
+        .ok_or_else(|| EventFailure::unbound("the TXTP root group is missing"))?;
     let mut groups = vec![GroupCursor::new(root, 0, 0)];
     while let Some(cursor) = groups.last_mut() {
         let depth = cursor.depth + usize::from(cursor.emits_group());
         match cursor.children.next() {
             Some(Node::Leaf(leaf)) => leaf_line(rendered, leaf, depth, files)?,
             Some(Node::Group(id)) => {
-                let group = tree.group(*id).ok_or("a TXTP child group is missing")?;
+                let group = tree
+                    .group(*id)
+                    .ok_or_else(|| EventFailure::unbound("a TXTP child group is missing"))?;
                 groups.push(GroupCursor::new(group, depth, rendered.commands.len()));
             }
             None => {
@@ -250,16 +253,24 @@ fn leaf_line<'a>(
     leaf: &Leaf,
     depth: usize,
     files: &[Option<SoundFile<'a>>],
-) -> Result<(), String> {
+) -> Result<(), EventFailure> {
     let file = files
         .get(leaf.variant)
         .and_then(Option::as_ref)
-        .ok_or_else(|| format!("{} {} has no file", leaf.kind.label(), leaf.source_id))?;
+        .ok_or_else(|| {
+            EventFailure::leaf(
+                format!("{} {} has no file", leaf.kind.label(), leaf.source_id),
+                leaf.variant,
+            )
+        })?;
     if file.prefetch_only {
-        return Err(format!(
-            "{} {}: only its start was written, the rest is streamed",
-            leaf.kind.label(),
-            leaf.source_id
+        return Err(EventFailure::leaf(
+            format!(
+                "{} {}: only its start was written, the rest is streamed",
+                leaf.kind.label(),
+                leaf.source_id
+            ),
+            leaf.variant,
         ));
     }
     rendered.note_music_clips(leaf.music_clip_features);

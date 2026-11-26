@@ -75,8 +75,9 @@ pub use search::{MAX_SEARCH_PAGE, SearchPage, TriggerHit};
 pub use sounds::{NodeKind, PathStep, SoundVariant, SourceKind, TriggerSounds, WemLocation};
 pub use terminal_media_origin::TerminalMediaOrigins;
 pub use txtp::{
-    TxtpApproximation, TxtpFile, TxtpOrigins, TxtpReport, TxtpSkip, write_txtp,
-    write_txtp_with_loop_origins, write_txtp_with_origins,
+    TxtpApproximation, TxtpFile, TxtpOrigins, TxtpReport, TxtpReportWithOrigins, TxtpSkip,
+    TxtpSkipSource, write_txtp, write_txtp_with_loop_origins, write_txtp_with_origins,
+    write_txtp_with_report_origins,
 };
 pub use users::TriggerUsers;
 pub use wem_location_origin::WemLocationOrigins;
