@@ -17,30 +17,35 @@ use crate::catalog_read::original::OriginalFlowFields;
 use crate::export_ledger::ExportLedger;
 use crate::guid_text::CatalogGuid;
 use crate::loadout::ledger::Capture;
-use crate::paint::{PaintOwner, PaintRequirements};
+use crate::paint::{PaintOwner, PaintRequirements, ShipPaintMatches};
 use crate::paint_port::VehiclePorts;
 use crate::record_header_field::RecordHeaderField;
 use crate::{CatalogError, Kind, ship};
 
 pub(super) struct Fleet {
-    pub(super) matches: Vec<PaintOwner>,
+    pub(super) matches: ShipPaintMatches,
     pub(super) records: CatalogRecordCoverage,
     pub(super) dependencies: EquipmentDependencyCoverage,
     pub(super) origins: Vec<FieldOrigin>,
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct Selection<'scope> {
+    pub(super) requirements: &'scope PaintRequirements,
+    pub(super) index: &'scope PaintTagIndex<'scope>,
 }
 
 pub(super) fn read<'source>(
     archive: &'source Archive,
     input: &'source OriginalCatalogInput<'source, 'source>,
     cancel: Option<&CancelToken>,
-    paint: &PaintRequirements,
-    index: &PaintTagIndex<'_>,
+    selection: Option<Selection<'_>>,
 ) -> Result<Fleet, CatalogError> {
     let forge = input.forge();
     let files = ArchiveFiles::new(archive);
 
     let mut fleet = Fleet {
-        matches: Vec::new(),
+        matches: ShipPaintMatches::default(),
         records: CatalogRecordCoverage::default(),
         dependencies: EquipmentDependencyCoverage::default(),
         origins: Vec::new(),
@@ -49,8 +54,7 @@ pub(super) fn read<'source>(
         input,
         files: &files,
         cancel,
-        paint,
-        index,
+        selection,
     };
     let mut trees = TreeBuilder::new();
     let mut ledger = ExportLedger::default();
@@ -99,8 +103,7 @@ struct ShipContext<'context, 'source> {
     files: &'context ArchiveFiles<'source>,
 
     cancel: Option<&'context CancelToken>,
-    paint: &'context PaintRequirements,
-    index: &'context PaintTagIndex<'context>,
+    selection: Option<Selection<'context>>,
 }
 
 impl Fleet {
@@ -137,20 +140,27 @@ impl Fleet {
             self.origins.extend(proof);
         }
         ledger.merge(capture.finish()?);
-        if !ports.is_empty()
-            && context
-                .paint
-                .accepts(&ports, &ship::lowered_tags(tree), context.index)
-        {
-            let index = header.observe_header(
-                RecordHeaderField::RecordIndex,
-                p4kx_extraction::SourceUseRole::Payload,
-            )?;
-            self.origins.push(origins.uses.origin(&[index], true));
-            self.matches.push(PaintOwner {
-                record_index: record.index(),
-                guid: CatalogGuid(record.guid()),
-            });
+        if !ports.is_empty() {
+            let tags = ship::lowered_tags(tree);
+            if context.selection.is_none_or(|selection| {
+                selection
+                    .requirements
+                    .accepts(&ports, &tags, selection.index)
+            }) {
+                let index = header.observe_header(
+                    RecordHeaderField::RecordIndex,
+                    p4kx_extraction::SourceUseRole::Payload,
+                )?;
+                self.origins.push(origins.uses.origin(&[index], true));
+                self.matches.add(
+                    PaintOwner {
+                        record_index: record.index(),
+                        guid: CatalogGuid(record.guid()),
+                    },
+                    ports,
+                    || tags,
+                );
+            }
         }
         Ok(())
     }

@@ -3,6 +3,7 @@
 
 use p4kx_extraction::{FieldOrigin, SourceUses, SourceValue, SourceValueState, SourcedValue};
 
+use super::ItemPaintFacts;
 use crate::catalog_v3::authored_fields::locale_input::AuthoredLocaleInput;
 use crate::catalog_v3::catalog_item_components::item_definition::{
     ItemAttachmentPresentation, ItemDefinition, ItemDefinitionComponent,
@@ -57,10 +58,11 @@ impl<'read, 'source> SelectedItem<'read, 'source> {
         })
     }
 
-    pub(super) fn attachment(&self) -> Option<&'read ItemAttachmentPresentation<'source>> {
-        self.attachment
-            .and_then(SourcedValue::value)
-            .map(AsRef::as_ref)
+    pub(super) fn paint(&self) -> ItemPaintFacts<'source> {
+        ItemPaintFacts::selected(
+            self.selection.attachment_component_ordinal(),
+            self.attachment,
+        )
     }
 
     pub(super) fn name(&self) -> ItemLocaleRead<'read, 'source> {

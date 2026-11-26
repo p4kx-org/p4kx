@@ -14,6 +14,8 @@ use crate::catalog_queries::{
 };
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_v3::tag_catalog;
+#[cfg(test)]
+use crate::paint::ShipPaintMatches;
 use crate::paint::{PaintCandidate, PaintRequirements};
 use crate::texts::{TextSources, Texts};
 use crate::{CatalogError, Kind};
@@ -113,6 +115,30 @@ impl CatalogQuerySession<'_> {
 }
 
 impl ParsedCatalogQueries<'_> {
+    #[cfg(test)]
+    pub(crate) fn with_paint_matches<T, E: From<CatalogError>>(
+        &self,
+        cancel: Option<&CancelToken>,
+        inspect: impl FnOnce(&ShipPaintMatches, &PaintTagIndex<'_>, bool) -> Result<T, E>,
+    ) -> Result<T, E> {
+        self.project_fallible(cancel, |archive, entry, forge| {
+            let origins = entry.records(archive)?;
+            let input = OriginalCatalogInput::new(forge, &origins);
+            let tag_catalog::TagContextRead {
+                context: tags,
+                failures,
+            } = tag_catalog::read_context(forge, &input, cancel)?;
+            let index = PaintTagIndex::new(tags.tree());
+            let fleet = fleet::read(archive, &input, cancel, None)?;
+            let coverage = complete(&fleet.records)
+                && fleet.dependencies.is_complete()
+                && failures.is_empty()
+                && tags.paint_scope()?.source_set_complete()
+                && fleet.origins.iter().all(FieldOrigin::source_set_complete);
+            checkpoint(cancel)?;
+            inspect(&fleet.matches, &index, coverage)
+        })
+    }
     /// Reads the exact Paint scope through the already parsed original DataForge.
     ///
     /// # Errors
@@ -213,7 +239,15 @@ fn project<'source>(
         records,
         dependencies,
         mut origins,
-    } = fleet::read(archive, input, cancel, &requirements, &index)?;
+    } = fleet::read(
+        archive,
+        input,
+        cancel,
+        Some(fleet::Selection {
+            requirements: &requirements,
+            index: &index,
+        }),
+    )?;
     origins.push(owners::record_inventory(input)?);
     origins.push(taxonomy);
     let sources = &input.origins().uses;
@@ -228,7 +262,7 @@ fn project<'source>(
         &owner.inputs.tags,
         &owner.inputs.required_tags,
     );
-    let (row, ordered_ships) = candidate.project_accepted(matches, cancel)?;
+    let (row, ordered_ships) = candidate.project_accepted(matches.owners().collect(), cancel)?;
     Ok(Fit {
         ship_record_indices: ordered_ships
             .into_iter()

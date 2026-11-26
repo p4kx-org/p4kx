@@ -53,7 +53,7 @@ pub(crate) fn item<'source>(
     projection: &CatalogProjection<'_, 'source>,
 ) -> Result<(Item<'source>, ClassLine), CatalogError> {
     let read = project_source(tree, definition, originals, projection, |inputs| {
-        ItemPaintFacts::read(inputs.attachment())
+        inputs.paint()
     })?;
     let identity = ItemIdentity::read(read.source.source())?;
     Ok((

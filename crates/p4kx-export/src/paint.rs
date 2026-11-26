@@ -15,8 +15,7 @@ use crate::{CatalogError, ExportAccountingError, PaintSummary};
 #[path = "paint_matching.rs"]
 mod matching;
 
-use matching::ShipPaintMatches;
-pub(crate) use matching::{PaintOwner, PaintRequirements};
+pub(crate) use matching::{PaintOwner, PaintRequirements, ShipPaintMatches};
 
 const PAINT_TYPE: &str = "Paints";
 
@@ -94,7 +93,11 @@ pub(crate) fn paints<'f>(
     let index = PaintTagIndex::new(tags.tree.tree());
     let mut paints: Vec<Paint> = candidates
         .par_iter()
-        .map(|candidate| candidate.project(&matches, &index, cancel))
+        .map(|candidate| {
+            candidate
+                .project_fit(&matches, &index, cancel)
+                .map(|(row, _)| row)
+        })
         .collect::<Result<_, _>>()?;
     paints.sort_by_cached_key(|paint| paint.item_guid.text());
     let summary = summarise(&paints, unreadable);
@@ -143,17 +146,16 @@ impl<'item, 'source> PaintCandidate<'item, 'source> {
         }
     }
 
-    fn project(
+    pub(crate) fn project_fit(
         &self,
         matches: &ShipPaintMatches,
         index: &PaintTagIndex<'_>,
         cancel: Option<&CancelToken>,
-    ) -> Result<Paint, CatalogError> {
+    ) -> Result<(Paint, Vec<PaintOwner>), CatalogError> {
         self.project_accepted(
             matches.fit(self.tags, self.required_tags, index).collect(),
             cancel,
         )
-        .map(|(row, _)| row)
     }
 
     pub(crate) fn project_accepted(

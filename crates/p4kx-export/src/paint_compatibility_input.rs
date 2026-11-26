@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{FieldOrigin, SourceValueState, SourcedValue};
+use p4kx_extraction::{FieldOrigin, SourceValueState};
 
 use super::inputs::selected_attachment;
-use super::paint_facts::ItemPaintFacts;
+use super::paint_facts::{ItemPaintFacts, read_cell};
 use crate::catalog_read::original::OriginalFlowFields;
 use crate::catalog_v3::catalog_item_components::item_definition::ItemDefinition;
 use crate::catalog_v3::catalog_item_components::selection::ItemSourceSelection;
@@ -51,9 +51,9 @@ pub(crate) fn read<'source>(
             if is_paint {
                 let offers = attachment.tags();
                 let requires = attachment.required_tags();
-                complete &= read_cell(offers) && read_cell(requires);
                 origins.extend([offers.origin(), requires.origin()]);
                 let facts = ItemPaintFacts::read(Some(attachment));
+                complete &= facts.source_set_complete;
                 tags = facts.tags;
                 required_tags = facts.required_tags;
             }
@@ -68,12 +68,4 @@ pub(crate) fn read<'source>(
         required_tags,
         origin: originals.sources().origin_with_origins(origins, complete)?,
     })
-}
-
-fn read_cell<T>(value: &SourcedValue<T>) -> bool {
-    value.origin().source_set_complete()
-        && matches!(
-            value.state(),
-            SourceValueState::Present | SourceValueState::Absent | SourceValueState::Null
-        )
 }

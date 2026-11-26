@@ -22,7 +22,7 @@ pub(crate) struct PaintOwner {
 
 /// Ships grouped by their effective ports and tags.
 #[derive(Default)]
-pub(super) struct ShipPaintMatches {
+pub(crate) struct ShipPaintMatches {
     groups: HashMap<ShipPorts, Vec<PaintOwner>>,
 }
 
@@ -48,7 +48,7 @@ impl ShipPaintMatches {
     }
 
     /// Retains one physical ship after folding its effective Record and XML ports.
-    pub(super) fn add(
+    pub(crate) fn add(
         &mut self,
         owner: PaintOwner,
         mut ports: Vec<PaintPort>,
@@ -66,6 +66,10 @@ impl ShipPaintMatches {
             .entry(ShipPorts { ports, tags })
             .or_default()
             .push(owner);
+    }
+
+    pub(crate) fn owners(&self) -> impl Iterator<Item = PaintOwner> + '_ {
+        self.groups.values().flatten().copied()
     }
 
     /// Iterates the physical ships whose effective ports accept the paint.

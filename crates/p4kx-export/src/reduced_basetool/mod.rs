@@ -12,9 +12,25 @@ use crate::{CatalogError, CatalogFile};
 
 mod bounded_output;
 mod cell;
+mod completeness;
+mod entities;
 mod inventory;
+mod item;
+mod manufacturer;
+mod manufacturer_definitions;
+mod number;
 mod plan;
+mod record_identity;
+mod record_targets;
+mod selected_texts;
+mod ship;
 mod shops;
+
+#[cfg(test)]
+mod entity_tests;
+
+#[cfg(test)]
+mod paint_fleet_tests;
 
 #[cfg(test)]
 mod tests;
@@ -33,6 +49,10 @@ enum ReducedError {
     IncompleteScope(&'static str),
     #[error("the selected Shop inventory at Entry {0} is unreadable")]
     UnreadableInventory(u32),
+    #[error("ship Record {0} declares a manufacturer shape without a reduced projection")]
+    UnsupportedManufacturer(u32),
+    #[error("the selected dataset {path} does not contain the target at Record {index}")]
+    UnresolvedRecordLink { path: &'static str, index: u32 },
     #[error("a reduced Shop inventory value could not resolve its original typed address")]
     InvalidInventoryReference,
     #[error("the {kind:?} reduced output exceeds {limit} bytes")]

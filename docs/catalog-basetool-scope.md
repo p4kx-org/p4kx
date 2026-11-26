@@ -189,6 +189,25 @@ arena and retains the exact JSON number tokens and classification of text cells.
 It checks the reduced byte limits through the same zstd framing as the full Catalog.
 The complete reduced wire format and command require all selected datasets.
 
+## Internal entity producer slice
+
+The Item and Ship tables use their canonical unfiltered equipment readers
+within one parsed session. Physical Record indices keep variant and
+manufacturer links unambiguous when two Records share a GUID. The Ship reader
+also supplies the original ATLS availability and the admitted identities for
+the Store slug mapping. Pledges retain their reviewed snapshot identity.
+
+The Paint projector shares the canonical matcher across one fleet and tag
+survey. Its physical Ship indices align with the compatible GUID list. A
+missing original Paint selector or compatibility dependency blocks this
+slice.
+
+The selected Ship and Manufacturer references contribute to the shared public
+and protected text tables. English and German use canonical language paths,
+with distinct states for missing values. More than one selected kind may
+reference a key. In that case the text values and states must agree, and the
+encryption marker incorporates all contributing inputs.
+
 ## Acceptance
 
 #1177 tracks the wire contract, generation and import. Use a distinct versioned
