@@ -105,6 +105,7 @@ pub(super) fn read<'source>(
         &mut coverage,
         cancel,
     )?;
+    coverage.dependencies.forward_records.sort_unstable();
     output.coverage = coverage;
     Ok(output)
 }

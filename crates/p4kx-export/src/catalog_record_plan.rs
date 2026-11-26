@@ -9,6 +9,7 @@ use p4kx_extraction::{
     TreeBuilder,
 };
 
+use crate::catalog_queries::record_selection::RecordVisit;
 use crate::catalog_queries::unlocalized_record_query;
 use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection};
 use crate::catalog_query_session::checkpoint;
@@ -108,10 +109,10 @@ impl<'source> Plan<'source> {
         Self::read_with(forge, selection, cancel, observer, selected)
     }
 
-    pub(in crate::build::catalog_queries) fn visit_items<E: From<CatalogError>>(
+    pub(in crate::build::catalog_queries) fn visit_items<'selection, E: From<CatalogError>>(
         forge: &'source DataForge<'source>,
         component_types: Option<&[&str]>,
-        selection: CatalogRecordSelection,
+        selection: impl Into<RecordVisit<'selection>>,
         cancel: Option<&CancelToken>,
         observer: Option<Arc<dyn CanonicalReadObserver>>,
         visit: impl FnMut(Owner<'source>, &mut CatalogRecordCoverage) -> Result<(), E>,
@@ -189,9 +190,9 @@ impl<'source> Plan<'source> {
         Ok(Self { owners, coverage })
     }
 
-    fn visit_with<E: From<CatalogError>>(
+    fn visit_with<'selection, E: From<CatalogError>>(
         forge: &'source DataForge<'source>,
-        selection: CatalogRecordSelection,
+        selection: impl Into<RecordVisit<'selection>>,
         cancel: Option<&CancelToken>,
         observer: Option<Arc<dyn CanonicalReadObserver>>,
         mut selected: impl FnMut(
@@ -204,17 +205,19 @@ impl<'source> Plan<'source> {
         let mut coverage = CatalogRecordCoverage::default();
         let mut trees = TreeBuilder::new();
         trees.set_read_observer(observer);
-        selection.try_for_each::<E>(forge, cancel, |record| {
-            checkpoint(cancel)?;
-            if !selected(record, &mut trees, &mut coverage)? {
-                return Ok(());
-            }
-            checkpoint(cancel)?;
-            if let Some(owner) = read_owner(&mut trees, record, &mut coverage)? {
-                visit(owner, &mut coverage)?;
-            }
-            Ok(())
-        })?;
+        selection
+            .into()
+            .try_for_each::<E>(forge, cancel, |record| {
+                checkpoint(cancel)?;
+                if !selected(record, &mut trees, &mut coverage)? {
+                    return Ok(());
+                }
+                checkpoint(cancel)?;
+                if let Some(owner) = read_owner(&mut trees, record, &mut coverage)? {
+                    visit(owner, &mut coverage)?;
+                }
+                Ok(())
+            })?;
         Ok(coverage)
     }
 }

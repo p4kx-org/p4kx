@@ -45,6 +45,15 @@ when a Struct is added or removed and reports direct mappings as `mapped_instanc
 | Starchitect, ArcCorp and flora | The extraction-unit SOC reader produces an authored scene for the changed container. ArcCorp's parent container gains five Entries and loses one. The changed 600i front container's directory reads successfully and has 35 members, compared with 37 in the retained copy. The inspected member names establish no distinct minimap declaration. Both flora model reads succeed, and the new Archive supplies LOD 0 through 4 for the selected model after removing its LOD 5 files. [Authored SOC scene](soc-scene.md) |
 | Dialogue and audio | Three authored administrator Subsumption activities change. The chosen activity diff and changed `CommunicationConfig` show changes to conversation logic, channel selection and variation rules. The changed `AudioEnvironment` Record supplies an updated `interiorityMinimum`. The original activity XML and both DataForge types are accessible through generic comparison and query tools. |
 
+In `eckhartsecurity_careerboard`, the authored Career contract
+`4e01dbe6-2440-465c-a5af-3adabde9ce62` pairs the handler's Eckhart Security faction
+with the contract's faction standing minimum `reputationstanding_factionrep_rank1`.
+The same contract's `additionalPrerequisites` has a `ContractPrerequisite_Reputation`
+for `factionreputation_guild_mercenary` in `reputationscope_guild`, with
+`reputationstanding_guild_02` and `reputationstanding_guild_50` as its bounds.
+The compact SDK result includes the direct parent standing bounds and the separate
+ordered reputation prerequisites. [Contract summaries](catalog-contract-queries.md#contract-summaries)
+
 The Windows AMD64 CLI completed Normal Catalog publications in both origin profiles with
 the same backpack Record filter. Each publication retained exactly 13 Carryable rows and
 matched all 26 changed width fields to the original Single bits. The immediate encryption

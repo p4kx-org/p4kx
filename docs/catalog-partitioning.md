@@ -292,6 +292,7 @@ in [the roster extension](https://github.com/p4kx-org/p4kx/commit/6a7db311544a4d
 | Authored reputation reward amounts | `with_reputation_reward_amounts`, with per-contract gains from `reputation_gains` |
 | Declared port rules and candidate attachment constraints | `equipment::visit_declared_equipment` for both families with the physical Ship or Item owner |
 | Resolved ship and Item ports with XML overrides and equipped items | `equipment::read_loadouts` for one owner or `visit_loadout_owners` for Ship roots or a batch of physical owners |
+| Item definitions for attached and standalone parts | `equipment::visit_item_definitions` with the physical Record indices needed by the consumer |
 
 Use a shared `CatalogQuerySession` and parsed view where the routes support it.
 The full and summary results contain the referenced authored rules in `location_queries`. The game

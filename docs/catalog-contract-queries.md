@@ -86,11 +86,18 @@ are separate domain queries.
 `with_contract_summaries(selection, cancel, callback)` and
 `with_contract_summary(ContractKey, cancel, callback)` on both session views return the same
 canonical winner and ordering for each selected parent or sub-contract. Each summary contains
-its original logical IDs and physical Generator record index, blueprint rewards, giver faction,
-offered locations, layered sharing flag, authored location-query links, reputation gains and
-canonical localized title. The result includes the shared authored location-query rows, protected
-text lookups and coverage. Blueprint rewards link to their original pool IDs. Runtime results of
-location rules are outside this Archive query.
+its original logical IDs, physical Generator record index, debug name, blueprint and successful
+fixed rewards, giver faction, offered locations, sharing, cooldowns and their source layers,
+buy-in, reacceptance after abandoning or failing, authored location-query links, reputation gains
+and protected localized title and description. The result includes the shared authored
+location-query rows, protected text lookups and coverage. Blueprint rewards link to their
+original pool IDs. Runtime results of location rules are outside this Archive query.
+
+The parent contract's standing bounds use `minStandingGuid` and `maxStandingGuid`.
+`standingRequirements` retains the authored reputation prerequisites at the handler, contract and
+sub-contract levels, in that order. A row carries its faction and scope GUIDs, standing bounds
+and exclusion flag when stated. A guild requirement can use these links to resolve the standing
+in the queried reputation data.
 
 The summary projection skips building Generator source arenas, retains neither ship, NPC nor
 entity spawn pools across Generator transactions, and skips property-set text publication. It
@@ -113,8 +120,8 @@ cache was left in place.
 
 Both queries returned 5,188 contract rows and 1,886 authored location rules with the same
 coverage. Separate hashing runs agreed on the ordered physical and logical contract identities,
-the seven summary fields, the authored location rules and the applicable protected text
-lookups. The figures measure the SDK query, including preparation in the whole-process
+the fields of that revision's summary, the authored location rules and the applicable protected
+text lookups. The figures measure the SDK query, including preparation in the whole-process
 column. Integrated consumer refresh, cache and slot processing have separate costs.
 
 ## Coverage and cache updates

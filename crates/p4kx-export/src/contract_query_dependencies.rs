@@ -13,6 +13,7 @@ use crate::contract_starmap::StarmapObject;
 use crate::mission_index::demand::{DependencyKey, PreparedDependencies, PreparedOutcome};
 use crate::mission_index::read::selection::{self, Action, SelectionError};
 use crate::mission_index::{MissionIndex, read};
+use crate::mission_places::Places;
 use crate::record_read::{self, RecordAdmission};
 use crate::{CatalogError, ExportAccountingError, Kind};
 
@@ -63,8 +64,8 @@ impl<'source> Dependencies<'source> {
         })
     }
 
-    pub(super) fn objects(&self) -> impl Iterator<Item = &StarmapObject<'source>> {
-        self.objects.values()
+    pub(super) fn places(&self) -> Places<'_, 'source> {
+        Places::from_prepared(&self.by_guid, &self.objects, self.prepared.clone())
     }
 
     pub(super) fn prepare(
@@ -105,8 +106,6 @@ impl<'source> Dependencies<'source> {
             admitted = true;
             failed |= self.read(position, candidate, input, index, coverage)?;
         }
-        coverage.dependencies.forward_records.sort_unstable();
-        coverage.dependencies.forward_records.dedup();
         self.prepared.prepare(
             key,
             if failed {
@@ -193,11 +192,22 @@ impl<'source> Dependencies<'source> {
         projection: &CatalogProjection<'_, 'source>,
         cancel: Option<&CancelToken>,
     ) -> Result<Vec<StarmapObject<'source>>, CatalogError> {
-        let mut objects = Vec::new();
-        for (&position, object) in &self.objects {
-            if !consulted.contains(&DependencyKey::Place(object.guid.0)) {
-                continue;
+        let mut positions = Vec::new();
+        for key in consulted {
+            if let DependencyKey::Place(guid) = key
+                && let Some(records) = self.by_guid.get(guid)
+            {
+                positions.extend(
+                    records
+                        .iter()
+                        .copied()
+                        .filter(|index| self.objects.contains_key(index)),
+                );
             }
+        }
+        positions.sort_unstable();
+        let mut objects = Vec::with_capacity(positions.len());
+        for position in positions {
             let tree = self
                 .records
                 .get(&position)

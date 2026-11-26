@@ -92,10 +92,7 @@ impl<'context, 'source> Interpreter<'context, 'source> {
                 &registry,
             )
             .for_kind(Kind::Contracts);
-            let places = Places::with_dependencies(
-                self.dependencies.objects(),
-                self.index.query_dependencies(),
-            );
+            let places = self.dependencies.places();
             match self.attempt(tree, role, &projection, &places)? {
                 ContractAttempt::Dependency(key) => {
                     let place_registry = CatalogTextRegistry::default();

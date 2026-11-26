@@ -126,6 +126,124 @@ fn cancelled_item_definition_query_has_no_consumer_callback() -> TestResult {
     Ok(())
 }
 
+#[test]
+fn item_definition_visit_preserves_selected_physical_aliases_and_locales() -> TestResult {
+    let (_folder, archive) = common::open(
+        &fixture::database(fixture::Layout::Complete),
+        DcbOrigin::Encrypted,
+    )?;
+    let catalog = canonical(&archive)?;
+    let session = full_proof::open(
+        &archive,
+        CatalogLanguageSelection::Selected(&[Language::English, Language::German]),
+        None,
+    )?;
+    let parsed = session.parsed(None)?;
+    let mut records = Vec::new();
+    let summary = parsed.visit_item_definitions(
+        equipment::ItemDefinitionSelection::RecordIndices(&[91, 1, 2, 1, 0, 90, 91]),
+        None,
+        |index, snapshot| -> TestResult {
+            let [row] = snapshot.rows() else {
+                return Err("one canonical Item per visit".into());
+            };
+            assert_eq!(
+                row.source().record_index().value(),
+                Some(&index),
+                "the callback identifies the physical source Record"
+            );
+            verify(
+                snapshot,
+                &catalog,
+                &[index],
+                fixture::Layout::Complete,
+                Some(true),
+            )?;
+            records.push(index);
+            Ok(())
+        },
+    )?;
+    assert_eq!(
+        records,
+        [0, 1],
+        "duplicates and non-Item records have no extra visits"
+    );
+    assert_eq!(
+        summary.owner_count(),
+        2,
+        "two physical aliases were visited"
+    );
+    assert_eq!(
+        summary.row_count(),
+        2,
+        "each admitted Item supplied its definition"
+    );
+    assert_eq!(
+        summary.missing_record_indices(),
+        [90, 91],
+        "missing indices remain separate"
+    );
+    assert!(
+        summary.coverage().unreadable_bodies.is_empty(),
+        "known non-Items and absent indices do not report body read failures"
+    );
+    Ok(())
+}
+
+#[test]
+fn item_definition_visit_keeps_marker_default_and_stops_on_cancel() -> TestResult {
+    let (_folder, archive) = common::open(
+        &fixture::database(fixture::Layout::Complete),
+        DcbOrigin::Plain,
+    )?;
+    let entry = DataForgeEntry::read(&archive)?;
+    let cancel = CancelToken::new();
+    let selection = equipment::ItemDefinitionSelection::Records(CatalogRecordSelection::Guid(
+        common::guid(fixture::OWNER).parse()?,
+    ));
+    let mut visits = 0;
+    let result = equipment::visit_item_definitions_from(
+        &archive,
+        &entry,
+        selection,
+        CatalogLanguageSelection::Selected(&[]),
+        Some(&cancel),
+        |index, snapshot| -> Result<(), CatalogError> {
+            visits += 1;
+            assert_eq!(
+                index, 0,
+                "the first callback identifies the first physical alias"
+            );
+            assert_eq!(snapshot.rows().len(), 1, "one Item per callback");
+            assert_eq!(
+                snapshot.source_inventory().use_count(),
+                0,
+                "the default visitor retains Marker provenance without the Full inventory"
+            );
+            assert_eq!(
+                snapshot.rows()[0]
+                    .source()
+                    .guid()
+                    .origin()
+                    .contains_encrypted_source(),
+                Some(false),
+                "the field keeps its original unencrypted marker"
+            );
+            cancel.cancel();
+            Ok(())
+        },
+    );
+    assert!(
+        matches!(result, Err(CatalogError::Cancelled)),
+        "terminal cancellation is visible"
+    );
+    assert_eq!(
+        visits, 1,
+        "cancellation prevents the next physical alias callback"
+    );
+    Ok(())
+}
+
 fn verify(
     snapshot: &ItemDefinitionSnapshot<'_>,
     catalog: &Value,

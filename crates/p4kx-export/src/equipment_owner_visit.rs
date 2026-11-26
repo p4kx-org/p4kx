@@ -11,6 +11,7 @@ use super::snapshot::EquipmentSnapshot;
 use crate::build::catalog_queries::unlocalized_record_query::plan::{Owner, Plan};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_projection::{CatalogProjection, CatalogTextRegistry};
+use crate::catalog_queries::record_selection::RecordVisit;
 use crate::catalog_queries::{
     CatalogRecordCoverage, CatalogRecordSelection, DatasetAvailability, ParsedCatalogQueries,
 };
@@ -26,6 +27,7 @@ pub struct EquipmentVisitSummary {
     owner_count: usize,
     row_count: usize,
     coverage: CatalogRecordCoverage,
+    missing_record_indices: Vec<u32>,
 }
 
 impl EquipmentVisitSummary {
@@ -47,6 +49,12 @@ impl EquipmentVisitSummary {
         self.row_count
     }
 
+    /// Borrows the requested batch indices absent from the original DataForge.
+    #[must_use]
+    pub fn missing_record_indices(&self) -> &[u32] {
+        &self.missing_record_indices
+    }
+
     /// Borrows the selection-wide Record read and projection coverage.
     #[must_use]
     pub const fn coverage(&self) -> &CatalogRecordCoverage {
@@ -55,21 +63,33 @@ impl EquipmentVisitSummary {
 }
 
 #[derive(Clone, Copy)]
-pub(super) enum EntityScope {
+pub(super) enum EntityScope<'selection> {
     All,
+    Items(Option<&'selection [u32]>),
     Kinds(&'static [Kind]),
     Components(&'static [&'static str]),
 }
 
-impl EntityScope {
+impl EntityScope<'_> {
     fn visit<'archive, E: From<CatalogError>>(
         self,
         query: &Query<'archive>,
+        missing_record_indices: &mut Vec<u32>,
         visit: impl FnMut(Owner<'archive>, &mut CatalogRecordCoverage) -> Result<(), E>,
     ) -> Result<CatalogRecordCoverage, E> {
         match self {
             Self::All => {
                 Plan::visit_entities(query.forge, query.selection, None, query.cancel, visit)
+            }
+            Self::Items(indices) => {
+                let selection = indices.map_or_else(
+                    || query.selection.into(),
+                    |indices| RecordVisit::Indices {
+                        indices,
+                        missing: missing_record_indices,
+                    },
+                );
+                Plan::visit_items(query.forge, None, selection, query.cancel, None, visit)
             }
             Self::Kinds(kinds) => Plan::visit_entities(
                 query.forge,
@@ -93,7 +113,7 @@ impl ParsedCatalogQueries<'_> {
     pub(super) fn visit_equipment_owners<P: Projector, E: From<CatalogError>>(
         &self,
         selection: CatalogRecordSelection,
-        scope: EntityScope,
+        scope: EntityScope<'_>,
         cancel: Option<&CancelToken>,
         visit: impl for<'source> FnMut(
             u32,
@@ -117,7 +137,7 @@ impl ParsedCatalogQueries<'_> {
 impl Query<'_> {
     fn visit_equipment_owners<P: Projector, E: From<CatalogError>>(
         self,
-        scope: EntityScope,
+        scope: EntityScope<'_>,
         mut inspect: impl for<'source> FnMut(
             u32,
             EquipmentSnapshot<'source, P::Row<'source>>,
@@ -131,47 +151,50 @@ impl Query<'_> {
         let text_cache = OnceCell::new();
         let mut owner_count = 0_usize;
         let mut row_count = 0_usize;
-        let coverage = scope.visit::<E>(&self, |owner, aggregate| {
-            checkpoint(self.cancel)?;
-            let sources = if let Some(sources) = source_cache.get() {
-                sources
-            } else {
-                let sources = TextSources::read_languages(self.archive, languages)?;
-                source_cache.get_or_init(|| sources)
-            };
-            checkpoint(self.cancel)?;
-            let texts = if let Some(texts) = text_cache.get() {
-                texts
-            } else {
-                let texts = Texts::parse(sources)?;
-                text_cache.get_or_init(|| texts)
-            };
-            let index = owner.record.index();
-            let inputs = OwnerInputs {
-                sources,
-                texts,
-                options: &options,
-                languages,
-                declared_availability,
-            };
-            self.visit_equipment_owner::<P, E>(owner, &inputs, |snapshot| {
-                owner_count = owner_count.checked_add(1).ok_or_else(counter_overflow)?;
-                row_count = row_count
-                    .checked_add(snapshot.rows().len())
-                    .ok_or_else(counter_overflow)?;
-                aggregate
-                    .incomplete_fields
-                    .extend_from_slice(&snapshot.coverage().incomplete_fields);
-                inspect(index, snapshot)
+        let mut missing_record_indices = Vec::new();
+        let coverage =
+            scope.visit::<E>(&self, &mut missing_record_indices, |owner, aggregate| {
+                checkpoint(self.cancel)?;
+                let sources = if let Some(sources) = source_cache.get() {
+                    sources
+                } else {
+                    let sources = TextSources::read_languages(self.archive, languages)?;
+                    source_cache.get_or_init(|| sources)
+                };
+                checkpoint(self.cancel)?;
+                let texts = if let Some(texts) = text_cache.get() {
+                    texts
+                } else {
+                    let texts = Texts::parse(sources)?;
+                    text_cache.get_or_init(|| texts)
+                };
+                let index = owner.record.index();
+                let inputs = OwnerInputs {
+                    sources,
+                    texts,
+                    options: &options,
+                    languages,
+                    declared_availability,
+                };
+                self.visit_equipment_owner::<P, E>(owner, &inputs, |snapshot| {
+                    owner_count = owner_count.checked_add(1).ok_or_else(counter_overflow)?;
+                    row_count = row_count
+                        .checked_add(snapshot.rows().len())
+                        .ok_or_else(counter_overflow)?;
+                    aggregate
+                        .incomplete_fields
+                        .extend_from_slice(&snapshot.coverage().incomplete_fields);
+                    inspect(index, snapshot)
+                })?;
+                checkpoint(self.cancel)?;
+                Ok(())
             })?;
-            checkpoint(self.cancel)?;
-            Ok(())
-        })?;
         Ok(EquipmentVisitSummary {
             availability: observed_availability(declared_availability, row_count),
             owner_count,
             row_count,
             coverage,
+            missing_record_indices,
         })
     }
 

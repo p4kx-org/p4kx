@@ -54,6 +54,48 @@ impl CatalogRecordSelection {
     }
 }
 
+pub(crate) enum RecordVisit<'selection> {
+    Records(CatalogRecordSelection),
+    Indices {
+        indices: &'selection [u32],
+        missing: &'selection mut Vec<u32>,
+    },
+}
+
+impl From<CatalogRecordSelection> for RecordVisit<'_> {
+    fn from(selection: CatalogRecordSelection) -> Self {
+        Self::Records(selection)
+    }
+}
+
+impl RecordVisit<'_> {
+    pub(crate) fn try_for_each<'source, E: From<CatalogError>>(
+        self,
+        forge: &'source DataForge<'_>,
+        cancel: Option<&CancelToken>,
+        mut read: impl FnMut(&Record<'source>) -> Result<(), E>,
+    ) -> Result<(), E> {
+        match self {
+            Self::Records(selection) => selection.try_for_each(forge, cancel, read),
+            Self::Indices { indices, missing } => {
+                checkpoint(cancel)?;
+                let mut indices = indices.to_vec();
+                indices.sort_unstable();
+                indices.dedup();
+                for index in indices {
+                    checkpoint(cancel)?;
+                    if let Some(record) = forge.record(index) {
+                        read(&record)?;
+                    } else {
+                        missing.push(index);
+                    }
+                }
+                Ok(())
+            }
+        }
+    }
+}
+
 /// Physical Records that could not be read fully, or were skipped by selection policy.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 #[non_exhaustive]

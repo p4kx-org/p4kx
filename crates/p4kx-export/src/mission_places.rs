@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::collections::{HashMap, HashSet};
+use std::collections::{BTreeMap, HashMap, HashSet};
 
 use p4kx_extraction::{Guid, StructValue, Value};
 
@@ -76,8 +76,32 @@ impl Where {
 
 /// The starmap objects by GUID, to turn the places of a contract into names.
 pub(crate) struct Places<'s, 'f> {
-    objects: HashMap<Guid, &'s StarmapObject<'f>>,
+    objects: PlaceObjects<'s, 'f>,
     prepared: PreparedDependencies,
+}
+
+enum PlaceObjects<'s, 'f> {
+    Local(HashMap<Guid, &'s StarmapObject<'f>>),
+    Prepared {
+        records_by_guid: &'s BTreeMap<Guid, Vec<u32>>,
+        objects_by_index: &'s BTreeMap<u32, StarmapObject<'f>>,
+    },
+}
+
+impl<'s, 'f> PlaceObjects<'s, 'f> {
+    fn get(&self, guid: Guid) -> Option<&'s StarmapObject<'f>> {
+        match self {
+            Self::Local(objects) => objects.get(&guid).copied(),
+            Self::Prepared {
+                records_by_guid,
+                objects_by_index,
+            } => records_by_guid
+                .get(&guid)?
+                .iter()
+                .rev()
+                .find_map(|index| objects_by_index.get(index)),
+        }
+    }
 }
 
 impl<'s, 'f> Places<'s, 'f> {
@@ -91,10 +115,26 @@ impl<'s, 'f> Places<'s, 'f> {
     ) -> Self {
         Self {
             prepared,
-            objects: objects
-                .into_iter()
-                .map(|object| (object.guid.0, object))
-                .collect(),
+            objects: PlaceObjects::Local(
+                objects
+                    .into_iter()
+                    .map(|object| (object.guid.0, object))
+                    .collect(),
+            ),
+        }
+    }
+
+    pub(crate) const fn from_prepared(
+        records_by_guid: &'s BTreeMap<Guid, Vec<u32>>,
+        objects_by_index: &'s BTreeMap<u32, StarmapObject<'f>>,
+        prepared: PreparedDependencies,
+    ) -> Self {
+        Self {
+            objects: PlaceObjects::Prepared {
+                records_by_guid,
+                objects_by_index,
+            },
+            prepared,
         }
     }
 
@@ -124,7 +164,7 @@ impl<'s, 'f> Places<'s, 'f> {
         let mut ranked: Vec<(u8, Guid, &StarmapObject<'f>)> = Vec::new();
         for guid in listed {
             self.prepared.require(DependencyKey::Place(guid))?;
-            let Some(object) = self.objects.get(&guid).copied() else {
+            let Some(object) = self.objects.get(guid) else {
                 continue;
             };
             let kind = object.r#type;
@@ -198,7 +238,7 @@ impl<'s, 'f> Places<'s, 'f> {
             .into_iter()
             .map(|guid| {
                 self.prepared.require(DependencyKey::Place(guid))?;
-                Ok(describe(guid, self.objects.get(&guid).copied()))
+                Ok(describe(guid, self.objects.get(guid)))
             })
             .collect::<Result<_, ReadError>>()?;
         Ok(OfferedAt {

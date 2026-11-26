@@ -1,15 +1,18 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::error::Error;
+
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ContractKey,
-    ContractSnapshot, ContractSummaries,
+    ContractSnapshot, ContractSummaries, ContractSummary,
 };
 use p4kx_extraction::{Archive, CancelToken};
-use serde_json::{Value, json};
+use serde_json::{Map, Value, json};
 
 use super::TestResult;
 use crate::contracts_fixture;
+use crate::facts_fixture;
 use crate::sdk_full_proof as full_proof;
 use crate::spawns_fixture;
 
@@ -28,10 +31,7 @@ fn contract_summaries_match_selected_canonical_rows_and_location_queries() -> Te
             let first = snapshot.rows.first().ok_or("a canonical contract")?;
             let guid = first.base.guid.value().ok_or("parent GUID")?.get();
             let sub = first.base.sub_contract_guid.value().map(|guid| guid.get());
-            Ok::<_, Box<dyn std::error::Error>>((
-                full_rows(&snapshot)?,
-                ContractKey::new(guid, sub),
-            ))
+            Ok::<_, Box<dyn Error>>((full_rows(&snapshot)?, ContractKey::new(guid, sub)))
         })??;
     parsed.with_contract_summaries(CatalogRecordSelection::All, None, |summary| {
         verify_summary(&summary, &expected)
@@ -49,7 +49,7 @@ fn contract_summaries_match_selected_canonical_rows_and_location_queries() -> Te
     session
         .with_provenance_mode(full_proof::MODE)
         .with_contract_summaries(CatalogRecordSelection::All, None, |summary| {
-            verify_title_origin(&summary)
+            verify_text_origins(&summary)
         })??;
     Ok(())
 }
@@ -88,28 +88,108 @@ fn contract_summaries_keep_locations_while_omitting_ship_spawn_tables() -> TestR
     Ok(())
 }
 
-fn full_rows(snapshot: &ContractSnapshot<'_>) -> Result<Value, serde_json::Error> {
+#[test]
+fn summaries_preserve_stated_buy_in_and_explicit_reacceptance_values() -> TestResult {
+    let folder = tempfile::tempdir()?;
+    let archive = Archive::open_with_key(
+        facts_fixture::write_archive(folder.path())?,
+        Some(p4kx_testkit::test_key()),
+    )?;
+    let session =
+        CatalogQuerySession::open(&archive, CatalogLanguageSelection::AllAvailable, None)?;
+    let parsed = session.parsed(None)?;
+    let expected = parsed.with_contracts(CatalogRecordSelection::All, None, |snapshot| {
+        full_rows(&snapshot)
+    })??;
+    parsed.with_contract_summaries(CatalogRecordSelection::All, None, |summary| {
+        verify_summary(&summary, &expected)?;
+        let terms = summary
+            .rows
+            .iter()
+            .find(|row| row.buy_in_amount.value() == Some(&1500))
+            .ok_or("stated contract buy-in")?;
+        assert_eq!(
+            terms.can_reaccept_after_abandoning.value.value(),
+            Some(&true),
+            "the authored positive reacceptance value survives"
+        );
+        assert_eq!(
+            terms.can_reaccept_after_failing.value.value(),
+            Some(&false),
+            "explicit false is distinct from an absent reacceptance value"
+        );
+        Ok::<_, Box<dyn Error>>(())
+    })??;
+    Ok(())
+}
+
+#[test]
+fn summary_schema_keeps_both_mission_texts_protected() -> TestResult {
+    let schema = serde_json::to_value(schemars::schema_for!(ContractSummary<'_>))?;
+    for text in ["title", "description"] {
+        assert_eq!(
+            schema.pointer(&format!("/properties/{text}/x-gameText")),
+            Some(&Value::Bool(true)),
+            "{text} remains a protected game text field"
+        );
+    }
+    Ok(())
+}
+
+const PROJECTED_BASE_FIELDS: &[&str] = &[
+    "guid",
+    "subContractGuid",
+    "debugName",
+    "blueprintRewards",
+    "fixedRewards",
+    "giverFaction",
+    "offeredAt",
+    "canBeShared",
+    "cooldownLayer",
+    "cooldownLayers",
+    "hasPersonalCooldown",
+    "personalCooldownTime",
+    "personalCooldownTimeVariation",
+    "abandonedCooldownTime",
+    "abandonedCooldownTimeVariation",
+    "buyInAmount",
+    "canReacceptAfterAbandoning",
+    "canReacceptAfterFailing",
+    "minStandingGuid",
+    "maxStandingGuid",
+    "standingRequirements",
+    "locationQueries",
+    "reputationGains",
+];
+
+fn full_rows(snapshot: &ContractSnapshot<'_>) -> Result<Value, Box<dyn Error>> {
     let rows = snapshot
         .rows
         .iter()
         .zip(&snapshot.mission_titles)
-        .map(|(row, title)| {
-            let base = &row.base;
-            json!({
-                "sourceRecordIndex": base.source.record_index(),
-                "guid": base.guid,
-                "subContractGuid": base.sub_contract_guid,
-                "blueprintRewards": base.blueprint_rewards,
-                "giverFaction": base.giver_faction,
-                "offeredAt": base.offered_at,
-                "canBeShared": base.facts.layered.can_be_shared,
-                "locationQueries": base.location_queries,
-                "reputationGains": base.reputation_gains,
-                "title": title.title,
-            })
+        .map(|(row, texts)| {
+            let mut projected = serde_json::to_value(row)?;
+            let fields = projected.as_object_mut().ok_or("detailed contract row")?;
+            let mut summary = Map::new();
+            for &field in PROJECTED_BASE_FIELDS {
+                let value = fields
+                    .remove(field)
+                    .ok_or_else(|| format!("the detailed contract must include {field}"))?;
+                summary.insert(field.to_owned(), value);
+            }
+            summary.insert(
+                "sourceRecordIndex".to_owned(),
+                json!(row.base.source.record_index()),
+            );
+            summary.insert("title".to_owned(), serde_json::to_value(&texts.title)?);
+            summary.insert(
+                "description".to_owned(),
+                serde_json::to_value(&texts.description)?,
+            );
+            Ok::<_, Box<dyn Error>>(Value::Object(summary))
         })
-        .collect::<Vec<_>>();
-    serde_json::to_value((&rows, &snapshot.location_queries))
+        .collect::<Result<Vec<_>, _>>()?;
+    Ok(serde_json::to_value((&rows, &snapshot.location_queries))?)
 }
 
 fn verify_summary(summary: &ContractSummaries<'_>, expected: &Value) -> TestResult {
@@ -119,37 +199,47 @@ fn verify_summary(summary: &ContractSummaries<'_>, expected: &Value) -> TestResu
         "the summary contains precisely the original typed fields in the canonical order"
     );
     for row in &summary.rows {
-        if let Some(reference) = row.title.key.value() {
-            assert!(
-                summary
-                    .game_texts
-                    .iter()
-                    .any(|text| text.id().value() == Some(reference)),
-                "the original title key resolves in the summary's own protected text rows"
-            );
+        for field in [&row.title, &row.description] {
+            if let Some(reference) = field.key.value() {
+                assert!(
+                    summary
+                        .game_texts
+                        .iter()
+                        .any(|text| text.id().value() == Some(reference)),
+                    "each original text key resolves in the summary's own protected text rows"
+                );
+            }
         }
     }
     Ok(())
 }
 
-fn verify_title_origin(summary: &ContractSummaries<'_>) -> TestResult {
-    let translation = summary
+fn verify_text_origins(summary: &ContractSummaries<'_>) -> TestResult {
+    let title = summary
         .rows
         .iter()
         .flat_map(|row| row.title.translations.values())
         .find(|translation| translation.value().is_some())
         .ok_or("an actual localized title")?;
-    let refs = translation.origin().source_uses_refs();
-    assert!(
-        !refs.is_empty(),
-        "Full summaries keep the localized title's field-level proof"
-    );
-    assert!(
-        refs.iter().all(|reference| summary
-            .source_inventory
-            .iter_uses()
-            .any(|source| source.id() == reference)),
-        "every localized title evidence reference is bound in the summary's own inventory"
-    );
+    let description = summary
+        .rows
+        .iter()
+        .flat_map(|row| row.description.translations.values())
+        .find(|translation| translation.value().is_some())
+        .ok_or("an actual localized description")?;
+    for (name, translation) in [("title", title), ("description", description)] {
+        let refs = translation.origin().source_uses_refs();
+        assert!(
+            !refs.is_empty(),
+            "Full summaries keep the localized {name}'s source proof"
+        );
+        assert!(
+            refs.iter().all(|reference| summary
+                .source_inventory
+                .iter_uses()
+                .any(|source| source.id() == reference)),
+            "every localized {name} evidence reference is bound in its own inventory"
+        );
+    }
     Ok(())
 }

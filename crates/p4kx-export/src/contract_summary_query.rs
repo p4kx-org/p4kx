@@ -8,9 +8,9 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::{
-    BlueprintReward, ContractKey, ContractQueryCoverage, ContractWithTitles, GiverFaction,
-    LocationQuery, LocationQueryLink, OfferedAt, ProjectedMissionText, QueryOutput, QueryRequest,
-    ReputationGain, Stated,
+    BlueprintReward, ContractCooldown, ContractKey, ContractQueryCoverage, ContractWithTitles,
+    FixedReward, GiverFaction, LocationQuery, LocationQueryLink, OfferedAt, ProjectedMissionText,
+    QueryOutput, QueryRequest, ReputationGain, StandingRequirement, Stated,
 };
 use super::{plan, read, read_parsed};
 use crate::CatalogError;
@@ -20,7 +20,7 @@ use crate::catalog_table::DatasetAvailability;
 use crate::catalog_text_contract::{CanonicalText, GameTextRef, PublicNameRef};
 use crate::guid_text::CatalogGuid;
 
-/// A canonical contract identity, offer, sharing, title and reward projection.
+/// Canonical contract identity, offer, run terms, texts and rewards.
 #[derive(Debug, JsonSchema, Serialize)]
 #[serde(rename_all = "camelCase")]
 #[non_exhaustive]
@@ -31,14 +31,33 @@ pub struct ContractSummary<'source> {
     pub guid: SourcedValue<CatalogGuid>,
     /// The original sub-contract identity, absent on a parent row.
     pub sub_contract_guid: SourcedValue<CatalogGuid>,
+    /// The original contract or sub-contract debug name, when stated.
+    pub debug_name: Option<&'source str>,
     /// Blueprint pool links and their stated chances.
     pub blueprint_rewards: Vec<BlueprintReward>,
+    /// The ordered successful fixed payouts of the parent contract.
+    pub fixed_rewards: SourcedValue<Vec<FixedReward<'source>>>,
     /// The faction of the contract and the source of that selection.
     pub giver_faction: Option<GiverFaction<'source>>,
     /// The authored offer locations, including the canonical broker fallback.
     pub offered_at: OfferedAt<'source>,
     /// The nearest stated shareability value and its original layer.
     pub can_be_shared: Stated<bool>,
+    /// The resolved cooldown values and their original source layers.
+    #[serde(flatten)]
+    pub cooldown: ContractCooldown,
+    /// The original buy-in amount of the parent contract.
+    pub buy_in_amount: SourcedValue<i64>,
+    /// Whether the contract can be accepted again after abandoning it and where that is stated.
+    pub can_reaccept_after_abandoning: Stated<bool>,
+    /// Whether the contract can be accepted again after failing it and where that is stated.
+    pub can_reaccept_after_failing: Stated<bool>,
+    /// The original minimum standing GUID of the parent contract, when stated.
+    pub min_standing_guid: Option<CatalogGuid>,
+    /// The original maximum standing GUID of the parent contract, when stated.
+    pub max_standing_guid: Option<CatalogGuid>,
+    /// Authored faction and scope requirements with standing bounds, in source layer order.
+    pub standing_requirements: Vec<StandingRequirement>,
     /// Links to the authored location queries used by the contract.
     pub location_queries: Vec<LocationQueryLink>,
     /// The contract's ordered reputation amounts granted on success.
@@ -46,6 +65,9 @@ pub struct ContractSummary<'source> {
     /// The protected canonical title key and localized title.
     #[schemars(extend("x-gameText" = true))]
     pub title: ProjectedMissionText<'source>,
+    /// The protected canonical description key and localized description.
+    #[schemars(extend("x-gameText" = true))]
+    pub description: ProjectedMissionText<'source>,
 }
 
 impl<'source> ContractSummary<'source> {
@@ -57,13 +79,23 @@ impl<'source> ContractSummary<'source> {
             source_record_index: base.source.record_index(),
             guid: base.guid,
             sub_contract_guid: base.sub_contract_guid,
+            debug_name: base.debug_name,
             blueprint_rewards: base.blueprint_rewards,
+            fixed_rewards: base.fixed_rewards,
             giver_faction: base.giver_faction,
             offered_at: base.offered_at,
             can_be_shared: base.facts.layered.can_be_shared,
+            cooldown: base.cooldown,
+            buy_in_amount: base.facts.buy_in_amount,
+            can_reaccept_after_abandoning: base.facts.layered.can_reaccept_after_abandoning,
+            can_reaccept_after_failing: base.facts.layered.can_reaccept_after_failing,
+            min_standing_guid: base.min_standing_guid,
+            max_standing_guid: base.max_standing_guid,
+            standing_requirements: base.standing_requirements,
             location_queries: base.location_queries,
             reputation_gains: base.reputation_gains,
             title: titles.title,
+            description: titles.description,
         }
     }
 }

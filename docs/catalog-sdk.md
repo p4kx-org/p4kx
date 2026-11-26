@@ -1494,12 +1494,21 @@ Use `catalog_queries::equipment::with_item_definitions`, `with_attachment_constr
 form and the same-named session/parsed-view method. Select the dataset, all physical declarations
 with a GUID, or a physical Record index. Physical indices are local to the supplied DataForge.
 
-Use `catalog_queries::equipment::visit_item_bounds` or `visit_attachment_constraints`
-to process one readable physical Record at a time. Each has a decoded-Entry `_from` form
-and a session or parsed-view method. Rows and their original source inventory are scoped
-to the current owner. The terminal summary reports availability, owner and row counts,
-and selection-wide coverage. Commit consumer-owned output only after a successful
-traversal whose coverage meets the consumer's requirements.
+Use `catalog_queries::equipment::visit_item_definitions`, `visit_item_bounds` or
+`visit_attachment_constraints` to process one readable physical Record at a time. Each has
+a decoded-Entry `_from` form and a session or parsed-view method. Rows and their original
+source inventory are scoped to the current owner. The terminal summary reports availability,
+owner and row counts, and selection-wide coverage. Commit consumer-owned output only after
+a successful traversal whose coverage meets the consumer's requirements.
+
+Use `ItemDefinitionSelection::RecordIndices(&indices)` to select the listed physical Item
+owners in one visit. Collect present `target_record_index()` values from the resolved ports'
+`source_constraints().attachment()` results. Both queries must use the same DataForge.
+Duplicate indices are visited once in ascending order. The Item definition callback receives
+the physical index even when it has no projected row. A readable Record of another kind is
+outside the selection. The summary reports absent indices through `missing_record_indices()`.
+Use `ItemDefinitionSelection::Records(CatalogRecordSelection::All)` to visit all Item definitions.
+The same wrapper accepts selection by one GUID or physical Record index.
 
 `definitions.items` contains original Item presentation, physics and purchase fields. Its nested
 immutable getters preserve the original component order, numbers, null/unavailable states,
