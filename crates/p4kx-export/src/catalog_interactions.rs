@@ -21,7 +21,8 @@ use crate::source_fields::FieldError;
 #[path = "carryable_grip.rs"]
 mod carryable_grip;
 pub use carryable_grip::{
-    CarryableGrip, CarryableGripContainer, CarryableHandGrip, CarryableParameters,
+    CarryableGrip, CarryableGripContainer, CarryableGripOffset, CarryableHandGrip,
+    CarryableParameters,
 };
 
 const INTERACTABLE: &str = "SEntityInteractableParams";

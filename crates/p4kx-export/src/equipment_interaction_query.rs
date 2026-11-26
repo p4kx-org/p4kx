@@ -15,8 +15,8 @@ use crate::catalog_v3::catalog_entity_configurations;
 use crate::record_observation::RecordObservation;
 
 pub use crate::catalog_v3::catalog_interactions::{
-    CarryableGrip, CarryableGripContainer, CarryableHandGrip, CarryableParameters,
-    InteractionConfiguration,
+    CarryableGrip, CarryableGripContainer, CarryableGripOffset, CarryableHandGrip,
+    CarryableParameters, InteractionConfiguration,
 };
 pub use crate::catalog_v3::interactable_configuration::InteractableConfiguration;
 pub use crate::catalog_v3::interaction_point::InteractionPoint;

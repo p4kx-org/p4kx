@@ -10,11 +10,15 @@ use serde_json::{Value, json};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::{health_origin_assertions as proof, sdk_full_proof as full_proof};
 
+#[path = "catalog_carryable_offsets.rs"]
+mod offsets;
+
 const COMPONENT: &str = "SEntityComponentCarryableParams";
 const CONTAINER: &str = "SGripContainer";
 const GRIP: &str = "SCarryableGrip";
 const HAND: &str = "SGrip";
 const PARAMETERS: &str = "SCarryParams";
+const OFFSET: &str = "QuatT";
 
 #[derive(Clone, Copy)]
 enum Grips {
@@ -200,7 +204,8 @@ fn database(grips: Grips) -> DataForgeBuilder {
         .structure(
             TestStruct::new(HAND)
                 .field("gripID", TestType::String)
-                .field("optionalHelper", TestType::String),
+                .field("optionalHelper", TestType::String)
+                .field("offset", class(OFFSET)),
         )
         .structure(
             TestStruct::new(PARAMETERS)
@@ -255,14 +260,14 @@ fn grip_container(grips: Grips) -> (TestStruct, TestInstance) {
 
 fn grip(style: &str, off_hand: bool) -> TestValue {
     let off_hand = if off_hand {
-        hand("FixtureLeft")
+        hand("FixtureLeft", -1.0)
     } else {
         TestValue::Null
     };
     TestValue::Struct(
         TestInstance::new(GRIP)
             .value("carryStyleID", TestValue::text(style))
-            .value("handGrip", hand("FixtureRight"))
+            .value("handGrip", hand("FixtureRight", 1.0))
             .value("offHandGrip", off_hand)
             .value(
                 "carryParameters",
@@ -277,11 +282,24 @@ fn grip(style: &str, off_hand: bool) -> TestValue {
     )
 }
 
-fn hand(helper: &str) -> TestValue {
+fn hand(helper: &str, side: f32) -> TestValue {
+    let offset = TestInstance::new(OFFSET)
+        .value("Rotation", axes("Ang3", [side * -0.0, side * 0.5, -1.0]))
+        .value("Position", axes("Vec3", [side * 0.25, 0.75, -0.5]));
     TestValue::Struct(
         TestInstance::new(HAND)
             .value("gripID", TestValue::text("FixtureGrip"))
-            .value("optionalHelper", TestValue::text(helper)),
+            .value("optionalHelper", TestValue::text(helper))
+            .value("offset", TestValue::Struct(offset)),
+    )
+}
+
+fn axes(name: &str, [x, y, z]: [f32; 3]) -> TestValue {
+    TestValue::Struct(
+        TestInstance::new(name)
+            .value("x", TestValue::Single(x))
+            .value("y", TestValue::Single(y))
+            .value("z", TestValue::Single(z)),
     )
 }
 

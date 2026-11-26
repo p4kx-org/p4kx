@@ -36,9 +36,12 @@ outside the Catalog's normal Entity selection.
 A `carryable` row keeps the original `gripData` class and the ordered `grips` array. Each
 grip preserves its `carryStyleID`, `handGrip` and optional `offHandGrip` helper, and
 `carryParameters` width, height and depth as sourced Single values with original bits.
-The SDK exposes the same row through `with_interactions` and `grip_data()`. Stored empty
-grip arrays and absent or unsupported declarations have separate source states. The authored
-parameters describe carrying, with no unit or pose inferred from their values.
+Each hand grip retains its local `offset` (`QuatT`). Its `rotation` (`Ang3`) and
+`position` (`Vec3`) carry independently sourced `x`, `y` and `z` Singles.
+The SDK exposes the same fields through `with_interactions`, `grip_data()` and
+the hand grip's `offset()` accessor. Stored empty arrays, null pointers, and absent
+or unsupported declarations have separate source states. These components keep their
+original coordinate representation.
 
 Polymorphic predicates, dispatchers, animated parameters and other modifiers retain their
 concrete source types and raw original members. Additional fields also preserve point

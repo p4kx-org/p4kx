@@ -13,6 +13,10 @@ use crate::resource_float::ResourceFloat32;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 
+#[path = "carryable_grip_offset.rs"]
+mod offset;
+pub use offset::CarryableGripOffset;
+
 pub(super) const SOURCE_TYPE: &str = "SGripContainer";
 const GRIP_TYPE: &str = "SCarryableGrip";
 const HAND_GRIP_TYPE: &str = "SGrip";
@@ -124,7 +128,7 @@ impl<'source> CarryableGrip<'source> {
     }
 }
 
-/// One authored hand grip and its optional helper string.
+/// One authored hand grip with its helper string and local offset.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
@@ -132,6 +136,7 @@ pub struct CarryableHandGrip<'source> {
     #[serde(flatten)]
     source: UnitSource<'source>,
     optional_helper: SourcedValue<&'source str>,
+    offset: SourcedValue<Box<CarryableGripOffset<'source>>>,
 }
 
 impl<'source> CarryableHandGrip<'source> {
@@ -141,14 +146,31 @@ impl<'source> CarryableHandGrip<'source> {
         &self.optional_helper
     }
 
+    /// Borrows the original local grip offset.
+    #[must_use]
+    pub const fn offset(&self) -> &SourcedValue<Box<CarryableGripOffset<'source>>> {
+        &self.offset
+    }
+
     fn read(
         source: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,
     ) -> Result<Self, CatalogError> {
         let optional_helper = source.borrowed_string("optionalHelper", notes)?;
+        let offset =
+            source.declared_class_to("offset", offset::SOURCE_TYPE, notes, |source, notes| {
+                CarryableGripOffset::read(source, notes).map(Box::new)
+            })?;
         Ok(Self {
-            source: UnitSource::read(source, [("optionalHelper", optional_helper.state())])?,
+            source: UnitSource::read(
+                source,
+                [
+                    ("optionalHelper", optional_helper.state()),
+                    ("offset", offset.state()),
+                ],
+            )?,
             optional_helper,
+            offset,
         })
     }
 }
