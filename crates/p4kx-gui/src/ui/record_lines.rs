@@ -10,7 +10,7 @@ use egui::{
 };
 
 use super::record_key::Trailer;
-use super::record_preview::RecordStep;
+use super::record_preview::{self, RecordStep};
 use super::record_value::{spoken_value, value_text};
 use super::table::head_fill;
 use crate::theme::desktop::{
@@ -38,6 +38,7 @@ const HEADS: [Text; 2] = [
 /// scroll view, the key of its caches and the text that names a link; it takes `path` and `field`.
 pub(super) struct List<'a> {
     pub(super) lines: &'a [FieldLine],
+    pub(super) source: Option<&'a RecordView>,
     pub(super) heads: [Text; 2],
     pub(super) follow: Text,
     pub(super) scroll: ScrollText,
@@ -161,6 +162,7 @@ pub(super) fn show(
 ) -> Option<RecordStep> {
     let list = List {
         lines: view.lines(),
+        source: Some(view),
         heads: HEADS,
         follow: Text::Record(RecordText::Follow),
         scroll: ScrollText::Lines,
@@ -193,8 +195,7 @@ pub(super) fn show_list(
             area.show_rows(ui, ROW_HEIGHT, list.lines.len(), |ui, range| {
                 for index in range {
                     if let Some(field) = list.lines.get(index)
-                        && let Some(followed) =
-                            row(ui, texts, &mut cache, (index, field), list.follow)
+                        && let Some(followed) = row(ui, texts, &mut cache, (index, field), list)
                     {
                         step = Some(followed);
                     }
@@ -228,7 +229,7 @@ fn row(
     texts: &Texts,
     cache: &mut LineCache,
     (index, field): (usize, &FieldLine),
-    follow: Text,
+    list: &List<'_>,
 ) -> Option<RecordStep> {
     let (rect, response) =
         ui.allocate_exact_size(vec2(ui.available_width(), ROW_HEIGHT), Sense::hover());
@@ -263,8 +264,11 @@ fn row(
     response.widget_info(|| WidgetInfo::labeled(Role::Row, true, described()));
     tooltip::hover(response, |ui| {
         tooltip::line(ui, described());
+        if let Some(view) = list.source {
+            record_preview::line_origins(ui, texts, view, (index, field));
+        }
     });
-    value(ui, texts, (index, field, follow), (value_cell, &laid))
+    value(ui, texts, (index, field, list.follow), (value_cell, &laid))
 }
 
 /// Shows the value of `field` in `cell`: a link to the Record it refers to, named by `follow`, or

@@ -14,9 +14,11 @@ use source::take_turn;
 use waiting::Waiting;
 
 mod source;
+mod tag_paths;
 mod waiting;
 
 pub(crate) use source::{ForgeSource, ReadFailure};
+pub(crate) use tag_paths::ObservedTagTree;
 
 /// The one DataForge cache of an open Archive, shared by the Record tree, the Record preview, the
 /// Query tab and the Record export.

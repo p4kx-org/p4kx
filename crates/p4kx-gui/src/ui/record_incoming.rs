@@ -121,6 +121,7 @@ fn ready(ui: &mut Ui, texts: &Texts, view: &IncomingView, generation: u64) -> Op
     }
     let list = List {
         lines: view.lines(),
+        source: None,
         heads: HEADS,
         follow: Text::Incoming(IncomingText::Follow),
         scroll: ScrollText::Incoming,

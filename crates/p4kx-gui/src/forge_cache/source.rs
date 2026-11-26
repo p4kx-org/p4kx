@@ -12,6 +12,7 @@ use p4kx_extraction::TagTree;
 use p4kx_extraction::query::QuerySchema;
 use p4kx_extraction::{DataForgeEntry, ReferenceIndex};
 
+use super::ObservedTagTree;
 use crate::ModelExportFailure;
 use crate::model::describe;
 
@@ -50,7 +51,7 @@ pub(crate) struct ForgeSource {
     references: OnceLock<Arc<ReferenceIndex>>,
     references_turn: Mutex<()>,
     references_builds: AtomicUsize,
-    tags: OnceLock<Arc<TagTree>>,
+    tags: OnceLock<Arc<ObservedTagTree>>,
     tags_turn: Mutex<()>,
     tags_builds: AtomicUsize,
 }
@@ -129,6 +130,13 @@ impl ForgeSource {
         &self,
         stop: &dyn Fn() -> bool,
     ) -> Result<Option<Arc<TagTree>>, ReadFailure> {
+        Ok(self.observed_tags(stop)?.map(|kept| Arc::clone(&kept.tree)))
+    }
+
+    pub(crate) fn observed_tags(
+        &self,
+        stop: &dyn Fn() -> bool,
+    ) -> Result<Option<Arc<ObservedTagTree>>, ReadFailure> {
         if let Some(tags) = self.tags.get() {
             return Ok(Some(Arc::clone(tags)));
         }
@@ -142,7 +150,7 @@ impl ForgeSource {
             .entry
             .open()
             .map_err(|error| ReadFailure::Unreadable(describe(&error)))?;
-        let Some(built) = TagTree::build_with(&forge, stop) else {
+        let Some(built) = ObservedTagTree::build(&forge, stop) else {
             return Ok(None);
         };
         self.tags_builds.fetch_add(1, Ordering::Relaxed);

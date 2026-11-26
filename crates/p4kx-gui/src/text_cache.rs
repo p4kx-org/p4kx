@@ -5,7 +5,7 @@ use std::collections::TryReserveError;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock, PoisonError};
 
-use p4kx_extraction::{LocalizationSet, OwnedTextSet};
+use p4kx_extraction::{EntryOrigin, LocalizationSet, OwnedTextSet};
 
 use crate::model::describe;
 use crate::{EntryIndex, TextLanguage};
@@ -21,7 +21,13 @@ pub(crate) enum TextFailure {
     Reserve(TryReserveError),
 }
 
-type Loaded = Result<Arc<OwnedTextSet>, TextFailure>;
+#[derive(Debug)]
+pub(crate) struct CachedLanguage {
+    pub(crate) texts: OwnedTextSet,
+    pub(crate) original: Option<EntryOrigin>,
+}
+
+type Loaded = Result<Arc<CachedLanguage>, TextFailure>;
 
 /// The localisation texts of an open Archive, one language at a time.
 ///
@@ -86,6 +92,14 @@ impl TextCache {
             .try_to_owned_set()
             .map_err(TextFailure::Reserve)?;
         index.watch().check().map_err(changed)?;
-        Ok(Arc::new(set))
+        let original = files
+            .entries()
+            .first()
+            .and_then(|entry| entry.origin())
+            .cloned();
+        Ok(Arc::new(CachedLanguage {
+            texts: set,
+            original,
+        }))
     }
 }

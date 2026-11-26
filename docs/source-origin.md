@@ -65,6 +65,23 @@ Elapsed time includes building the GUI index.
 | LIVE `13220821` | 69.9884 | 954,019,840 | 976,158,720 |
 | PTU `13284307` | 80.2773 | 974,532,608 | 996,503,552 |
 
+## Structured Record preview
+
+The Record tab exposes field-level source evidence for the selected physical
+DataForge Record. Its row tooltips identify encryption of names, values and
+visible annotations independently. The preview model retains the specific
+header, property, array, owned-instance and Reference inputs, including the
+actual target members displayed by the tab.
+
+A displayed localisation key retains its DataForge source. A translation or
+missing-text decision also retains the selected language Entry and original
+lookup. Tag paths use the names and selected original root and child
+occurrences observed during the cached Tag tree build. A standalone DataForge
+can retain exact field coordinates with unknown original P4K encryption.
+
+Byte-addressed evidence for the separate Record XML tab requires a positioned
+Record XML writer.
+
 ## Companion records
 
 The [JSON Schema](../schemas/p4kx-source-origin.schema.json) describes each line.

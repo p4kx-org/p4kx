@@ -163,7 +163,8 @@ pub use record_index::{
 pub use record_language::RecordTextChoice;
 pub use record_preview::{
     FieldLine, IncomingPreview, IncomingStatus, IncomingView, KeyText, LineValue,
-    MAX_INCOMING_LINES, RecordLink, RecordPreview, RecordPreviewStatus, RecordView,
+    MAX_INCOMING_LINES, RecordFieldProvenance, RecordHeaderProvenance, RecordLink, RecordPreview,
+    RecordPreviewProvenance, RecordPreviewStatus, RecordReferenceProvenance, RecordView,
 };
 pub use record_tree::{DataForgeFailure, RecordNode, RecordRow, RecordTree, RecordTreeStatus};
 pub use sort::{Sort, SortColumn, SortDirection};

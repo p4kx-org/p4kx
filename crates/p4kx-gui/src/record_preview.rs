@@ -4,15 +4,20 @@
 mod incoming;
 mod lines;
 mod navigation;
+mod provenance;
 mod worker;
 
 use std::ops::Range;
 
-use p4kx_extraction::Guid;
+use p4kx_extraction::{Guid, SourceEvidenceError};
 
 pub(crate) use incoming::IncomingList;
 pub use incoming::{IncomingPreview, IncomingStatus, IncomingView, MAX_INCOMING_LINES};
 pub(crate) use navigation::Navigation;
+pub use provenance::{
+    RecordFieldProvenance, RecordHeaderProvenance, RecordPreviewProvenance,
+    RecordReferenceProvenance,
+};
 
 use crate::{RecordId, TextLanguage, XmlDocument};
 
@@ -158,6 +163,7 @@ pub struct RecordView {
     xml_error: Option<Box<str>>,
     language: Option<TextLanguage>,
     texts_failure: Option<(TextLanguage, Box<str>)>,
+    provenance: Option<Result<Box<RecordPreviewProvenance>, SourceEvidenceError>>,
 }
 
 impl RecordView {
@@ -189,6 +195,14 @@ impl RecordView {
     #[must_use]
     pub fn lines(&self) -> &[FieldLine] {
         &self.lines
+    }
+
+    /// Returns the original physical contributions to the structured preview's fields.
+    ///
+    /// An evidence error is separate from whether the Record values could be read.
+    #[must_use]
+    pub fn provenance(&self) -> Option<Result<&RecordPreviewProvenance, &SourceEvidenceError>> {
+        self.provenance.as_ref().map(Result::as_deref)
     }
 
     /// Returns the number of values that cannot be read.

@@ -101,8 +101,9 @@ pub use model_material_origins::{
 };
 pub use p4kx_archive::EncryptionFieldEvidence;
 pub use p4kx_dataforge::{
-    PositionedRecord, RecordJsonBytes, RecordJsonObserver, RecordJsonRecordField, RecordJsonSource,
-    RecordJsonUse, RecordJsonUseRole,
+    PositionedFields, PositionedRecord, PositionedReferenceSources, PositionedSources,
+    PositionedValue, RecordJsonBytes, RecordJsonObserver, RecordJsonRecordField,
+    RecordJsonReferenceMember, RecordJsonSource, RecordJsonUse, RecordJsonUseRole,
 };
 pub use p4kx_gltf::{
     RiggedBufferSource, RiggedBufferView, RiggedGlbEmission, RiggedJsonAddress,

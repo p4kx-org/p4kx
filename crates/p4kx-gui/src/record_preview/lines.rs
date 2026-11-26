@@ -50,6 +50,7 @@ pub(super) fn view(
         xml_error,
         language: None,
         texts_failure: None,
+        provenance: None,
     }
 }
 
