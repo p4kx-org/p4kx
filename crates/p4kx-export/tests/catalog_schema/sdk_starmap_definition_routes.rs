@@ -30,8 +30,6 @@ const PRESETS: &str = "/definitions/starmapPresets";
 const AMENITIES: &str = "/definitions/starmapAmenities";
 const LANGUAGES: &[Language] = &[Language::English];
 
-pub(in super::super) const DATASETS: [&str; 4] = [OBJECTS, TYPES, PRESETS, AMENITIES];
-
 #[path = "sdk_starmap_object_scope.rs"]
 mod objects;
 

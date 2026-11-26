@@ -27,15 +27,6 @@ const JURISDICTIONS: &str = "/definitions/jurisdictions";
 const SECURITY: &str = "/definitions/securityNetworkManifests";
 const PUBLIC_NAMES: &str = "/texts/publicNames";
 const GAME_TEXTS: &str = "/texts/gameTexts";
-pub(super) const PATHS: [&str; 6] = [
-    INFRACTIONS,
-    INFRACTION_SETS,
-    JURISDICTIONS,
-    SECURITY,
-    PUBLIC_NAMES,
-    GAME_TEXTS,
-];
-
 const TEXTS_REMAINING: &str =
     "owner-scoped synthetic producer parity witnessed; installed and full cross-owner parity open";
 

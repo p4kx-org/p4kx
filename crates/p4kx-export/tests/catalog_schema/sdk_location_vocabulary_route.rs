@@ -45,10 +45,6 @@ const DATASETS: [(Family, &str); 7] = [
     ),
 ];
 
-pub(super) fn datasets() -> impl Iterator<Item = &'static str> {
-    DATASETS.into_iter().map(|(_, dataset)| dataset)
-}
-
 pub(super) fn read() -> TestResult<Vec<Route>> {
     let (_directory, archive) = open(DataForgeStorage::Encrypted)?;
     let entry = DataForgeEntry::read(&archive)?;

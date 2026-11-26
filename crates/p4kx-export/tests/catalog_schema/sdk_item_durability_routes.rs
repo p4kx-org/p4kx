@@ -12,14 +12,6 @@ use super::{Route, TestResult};
 #[path = "sdk_item_durability_fixture.rs"]
 mod fixture;
 
-pub(super) const fn datasets() -> [&'static str; 3] {
-    [
-        fixture::DURABILITY,
-        fixture::DEGRADATION,
-        fixture::DISTORTION,
-    ]
-}
-
 pub(super) fn read() -> TestResult<[Route; 3]> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("durability_fixture.p4k");

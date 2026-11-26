@@ -19,7 +19,6 @@ use super::{Route, TestResult};
 
 const SOILS: &str = "/definitions/soils";
 const TEXTURE_SETS: &str = "/definitions/soilTextureSets";
-pub(super) const DATASETS: [&str; 2] = [SOILS, TEXTURE_SETS];
 const OWNER: &str = "Data/Libs/Planets/soil_sets/selected.soil";
 const ALIAS: &str = "Data/Libs/Planets/soil_sets/alias.soil";
 const DAMAGED_OWNER: &str = "Data/Libs/Planets/soil_sets/damaged.soil";

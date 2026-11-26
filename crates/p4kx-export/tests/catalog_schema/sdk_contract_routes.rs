@@ -42,24 +42,6 @@ const GENERATORS: &str = "/definitions/contractGenerators";
 const REMAINING: &str =
     "typed query and synthetic producer parity verified; complete installed producer parity open";
 
-pub(super) const DATASETS: &[&str] = &[
-    CONTRACTS,
-    TITLES,
-    PROPERTY_SETS,
-    GENERATORS,
-    scenario_progress::DATASET,
-    mission_properties::DATASET,
-    mission_flows::DATASET,
-    mission_flows::TEMPLATE_DEFINITIONS,
-    mission_flows::TEMPLATE_CONTEXTS,
-    mission_flows::BROKER_DEFINITIONS,
-    broker_context::DATASET,
-    spawns::SHIPS,
-    spawns::ENTITIES,
-    spawns::LOCATIONS,
-    spawns::NPCS,
-];
-
 pub(super) fn read() -> TestResult<[Route; 15]> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("contracts.p4k");

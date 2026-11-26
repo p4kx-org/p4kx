@@ -28,15 +28,12 @@ mod visit;
 
 #[path = "sdk_broker_definition_route.rs"]
 mod broker_definitions;
-pub(super) use broker_definitions::DATASET as BROKER_DEFINITIONS;
 
 #[path = "sdk_contract_template_definition_route.rs"]
 mod template_definitions;
-pub(super) use template_definitions::DATASET as TEMPLATE_DEFINITIONS;
 
 #[path = "sdk_contract_template_context_route.rs"]
 mod template_contexts;
-pub(super) use template_contexts::DATASET as TEMPLATE_CONTEXTS;
 
 pub(super) const DATASET: &str = "/configurations/missionFlows";
 

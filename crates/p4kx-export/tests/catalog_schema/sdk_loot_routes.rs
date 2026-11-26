@@ -109,16 +109,6 @@ const fn definition_remaining(family: LootDefinitionKind) -> Option<&'static str
     }
 }
 
-pub(super) fn datasets() -> impl Iterator<Item = &'static str> {
-    FIXTURES.iter().map(|fixture| fixture.path).chain([
-        TABLES,
-        ARCHETYPES,
-        LEGACY_TABLES,
-        LEGACY_ARCHETYPES,
-        multi_configs::DATASET,
-    ])
-}
-
 pub(super) fn read() -> TestResult<Vec<Route>> {
     let dir = tempfile::tempdir()?;
     let path = dir.path().join("Data.p4k");

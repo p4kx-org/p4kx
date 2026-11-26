@@ -35,10 +35,6 @@ const DATASETS: [(Family, &str); 5] = [
     (Family::Encounters, "/definitions/encounterIndices"),
 ];
 
-pub(super) fn datasets() -> impl Iterator<Item = &'static str> {
-    DATASETS.into_iter().map(|(_, path)| path)
-}
-
 pub(super) fn read() -> TestResult<Vec<Route>> {
     let (_folder, archive) = open(&auto_spawn_fixture::extend(npc_fixture::database()))?;
     let entry = DataForgeEntry::read(&archive)?;

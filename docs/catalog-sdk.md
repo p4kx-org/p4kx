@@ -3850,6 +3850,7 @@ with partial selection or missing parity evidence remains open in the audit.
 cargo test --locked -p p4kx-export --test catalog_schema dataset_ownership::sdk_dataset_coverage::every_catalog_v3_dataset_has_a_verified_sdk_query -- --ignored --exact
 ```
 
-The report names each dataset with an unregistered or partial witness. A dataset may already
-have an SDK query while its coverage witness is pending. The ordinary schema suite checks
-registered witnesses and rejects new unclassified schema boundaries and incompatible changes.
+The report names every dataset with an absent witness or outstanding acceptance evidence.
+The ordinary schema suite rejects any canonical dataset without a typed query witness,
+any unclassified schema boundary and any incompatible row shape. The explicit release
+audit also requires complete selection and same-Build parity evidence.

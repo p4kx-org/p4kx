@@ -10,7 +10,6 @@ use serde_json::Value;
 use super::super::super::schema_navigation::{resolve, schema_at};
 use super::{Entry, Route, Shape, TestResult, row_schema};
 
-pub(super) const NO_WITNESS: &str = "no query witness recorded by the audit";
 const EXPORT_ATTEMPT_FIELDS: &[&str] = &[
     "/schemaVersion",
     "/completeness",
@@ -21,11 +20,16 @@ const EXPORT_ATTEMPT_FIELDS: &[&str] = &[
     "/source/toolVersion",
 ];
 
+enum Gap {
+    MissingWitness,
+    PendingAcceptance(&'static str),
+}
+
 pub(super) fn audit(
     schema: Value,
     registered: &BTreeMap<String, Entry>,
     witnesses: &[Route],
-) -> TestResult<BTreeMap<String, &'static str>> {
+) -> TestResult<CoverageGaps> {
     let drift = super::super::compare(&schema, registered)?;
     if !drift.is_empty() {
         return Err(format!("catalog ownership drift: {drift:?}").into());
@@ -36,7 +40,7 @@ pub(super) fn audit(
     let mut gaps: BTreeMap<_, _> = registered
         .keys()
         .filter(|path| !EXPORT_ATTEMPT_FIELDS.contains(&path.as_str()))
-        .map(|path| (path.clone(), NO_WITNESS))
+        .map(|path| (path.clone(), Gap::MissingWitness))
         .collect();
     let mut seen = BTreeSet::new();
     for route in witnesses {
@@ -55,14 +59,14 @@ pub(super) fn audit(
             .map_err(|error| format!("SDK route {}: {error}", route.dataset))?;
         match route.remaining {
             Some(reason) => {
-                gaps.insert(route.dataset.to_owned(), reason);
+                gaps.insert(route.dataset.to_owned(), Gap::PendingAcceptance(reason));
             }
             None => {
                 gaps.remove(route.dataset);
             }
         }
     }
-    Ok(gaps)
+    Ok(CoverageGaps(gaps))
 }
 
 fn canonical_value<'s>(schema: &'s Value, dataset: &str, shape: Shape) -> TestResult<&'s Value> {
@@ -74,12 +78,31 @@ fn canonical_value<'s>(schema: &'s Value, dataset: &str, shape: Shape) -> TestRe
     schema_at(schema, &path)
 }
 
-pub(super) struct CoverageGaps(pub(super) BTreeMap<String, &'static str>);
+pub(super) struct CoverageGaps(BTreeMap<String, Gap>);
+
+impl CoverageGaps {
+    pub(super) fn require_registered(mut self) -> TestResult {
+        self.0.retain(|_, gap| matches!(gap, Gap::MissingWitness));
+        self.require_accepted()
+    }
+
+    pub(super) fn require_accepted(self) -> TestResult {
+        if self.0.is_empty() {
+            Ok(())
+        } else {
+            Err(self.into())
+        }
+    }
+}
 
 impl fmt::Display for CoverageGaps {
     fn fmt(&self, output: &mut fmt::Formatter<'_>) -> fmt::Result {
         writeln!(output, "{} unfinished SDK dataset routes", self.0.len())?;
-        for (path, reason) in &self.0 {
+        for (path, gap) in &self.0 {
+            let reason = match gap {
+                Gap::MissingWitness => "no query witness recorded by the audit",
+                Gap::PendingAcceptance(reason) => reason,
+            };
             writeln!(output, "{path} {reason}")?;
         }
         Ok(())

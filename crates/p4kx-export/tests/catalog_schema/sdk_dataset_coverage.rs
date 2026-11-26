@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use serde_json::{Value, json};
+use std::collections::BTreeMap;
+
+use serde_json::json;
 
 use super::{Entry, Owner, Shape, TestResult, dataset_owners};
 
@@ -14,7 +16,7 @@ mod routes;
 #[path = "sdk_row_schema.rs"]
 mod row_schema;
 
-use dataset_audit::{CoverageGaps, NO_WITNESS, audit};
+use dataset_audit::audit;
 use route_contract::Route;
 
 const LANGUAGE_POLICY: &str = "/texts/languagePolicy";
@@ -138,193 +140,50 @@ const LOOT_CONTAINERS: &str = "/lootContainers";
 const LOOT_DOCUMENTS: &str = "/declarations/lootEntityContainerDocuments";
 const UNRESOLVED: &str = "/placements/unresolvedContainerLinks";
 
-const REQUIRED_WITNESSES: &[&str] = &[
-    "/definitions/radarSystemSharedParams",
-    "/placements/resourceNetworkNodes",
-    "/placements/resourceNetworkLinkBindings",
-    "/placements/roomAssociationBindings",
-    LANGUAGE_POLICY,
-    LANGUAGE_SOURCES,
-    ITEMS,
-    ITEM_DEFINITIONS,
-    LOADOUTS,
-    SHIPS,
-    SHIP_BASE_FACTS,
-    SHIP_STORE_SLUGS,
-    SHIP_STORE_PLEDGES,
-    ITEM_PORTS,
-    ATTACHMENT_CONSTRAINTS,
-    ITEM_BOUNDS,
-    ENTITY_TAGS,
-    TAG_DEFINITIONS,
-    TAG_ROOTS,
-    TAG_PATHS,
-    INVENTORY_CONTAINERS,
-    PROVENANCE,
-    PAINTS,
-    ITEM_RECOVERY_ECONOMY,
-    ITEM_RECOVERY_OVERRIDES,
-    ITEM_RECOVERY_POLICY,
-    INVENTORY_CONFIGURATIONS,
-    routes::interactions::DATASET,
-    FACILITIES,
-    FACILITY_INSTANCES,
-    FACILITY_INTERIOR_COVERAGE,
-    MEDICAL_ITEM_TIER_CONFIGS,
-    MANUFACTURERS,
-    FACTION_IDENTITIES,
-    FACTION_REPUTATIONS,
-    REPUTATION_SCOPES,
-    REPUTATION_STANDINGS,
-    REPUTATION_REWARD_AMOUNTS,
-    COMMODITY_DEFINITIONS,
-    COMMODITY_PRESENTATIONS,
-    LOCATION_ENTITIES,
-    BLUEPRINT_POOLS,
-    BLUEPRINT_POOL_WEIGHTS,
-    BLUEPRINT_CATEGORY_LISTS,
-    BLUEPRINT_CATEGORIES,
-    GAMEPLAY_PROPERTIES,
-    BLUEPRINT_REWARDS,
-    LOCAL_CONTRACT_GENERATORS,
-    CONTRACT_SCENARIO_REQUIREMENTS,
-    BLUEPRINT_DEFINITIONS,
-    BLUEPRINT_TIERS,
-    BLUEPRINT_PRESENTATION,
-    CRAFTING_GLOBAL,
-    QUALITY_DISTRIBUTIONS,
-    QUALITY_QUANTIZATIONS,
-    QUALITY_QUANTIZATION_RESOURCES,
-    SUIT_ARMOR,
-    VEHICLE_ARMOR,
-    LOOT_GENERATION,
-    RESOURCE_GROUPS,
-    RESOURCE_GROUP_MEMBERS,
-    RESOURCE_GROUP_PARENTS,
-    RESOURCE_TYPES,
-    RESOURCE_COMPONENTS,
-    RESOURCE_CONNECTIONS,
-    FUEL_TANKS,
-    FUEL_INTAKES,
-    RESOURCE_CONTAINERS,
-    CARGO_MANIFESTS,
-    routes::dismantle::DATASET,
-    routes::crafters::DATASET,
-    routes::crafter_hosts::DATASET,
-    CARGO_LOADING_GLOBALS,
-    SHOP_COMMODITY_GLOBALS,
-    SHIELD_GENERATORS,
-    QUANTUM_DRIVES,
-    QUANTUM_INTERDICTION,
-    JUMP_DRIVES,
-    JUMP_DRIVE_FLIGHT_TUNING,
-    JUMP_POINT_CONFIGURATIONS,
-    GLOBAL_JUMP_POINT_CONFIGURATIONS,
-    JUMP_TUNNEL_FORCES,
-    CLOTHING,
-    ITEM_RADARS,
-    MINEABLE_ENTITIES,
-    MINEABLE_ELEMENTS,
-    MINEABLE_COMPOSITIONS,
-    REFINING_PROCESSES,
-    MINING_GLOBALS,
-    HARVESTABLE_PROVIDER_PRESETS,
-    "/harvestableLocations",
-    REPUTATION_CONTEXTS,
-    REPUTATION_PERKS,
-    REPUTATION_TRIGGER_RECORDS,
-    MINING_LASERS,
-    ATTACHABLE_MODIFIERS,
-    CONSUMABLE_CONFIGURATIONS,
-    SHOP_INVENTORIES,
-    SHOP_RESOLUTION,
-    FLARE_LIBRARIES,
-    PARTICLE_LIBRARIES,
-    SUBSUMPTION_EVENTS,
-    CLIENT_PROFILE_DOCUMENTS,
-    RADAR_AUDIO,
-    AMMUNITION,
-    AMMO_BINDINGS,
-    EMP,
-    EXPLOSIVES,
-    MISSILE_CONFIGURATIONS,
-    EXPLOSION_DEFINITIONS,
-    AMMO_CONTAINERS,
-    COUNTERMEASURE_EMITTERS,
-    REPUTATION_TRIGGER_CONFIGURATIONS,
-    WEAPON_ACTIONS,
-    PROJECTILE_AMMUNITION,
-    MAGAZINE_RESOLUTION,
-    WEAPON_COMBAT,
-    WEAPON_RECOIL,
-    WEAPON_ANIMATION,
-    routes::entity_animation::DATASET,
-    CONTAINERS,
-    LOCATION_INSTANCES,
-    LOCATION_PHYSICS_GRIDS,
-    LOOT_CONTAINERS,
-    LOOT_DOCUMENTS,
-    UNRESOLVED,
-    "/placements/starmapPlacements",
-    "/placements/jumpEndpoints",
-    "/projections/jumpConnections",
-];
-
 #[test]
 fn sdk_query_witnesses_keep_their_canonical_dataset_contract() -> TestResult {
     let schema = p4kx_export::catalog_schema();
     let registered = dataset_owners::entries();
     let witnesses = routes::read()?;
-    let gaps = audit(schema, &registered, &witnesses)?;
-    for path in REQUIRED_WITNESSES
-        .iter()
-        .copied()
-        .chain(routes::loot_datasets())
-        .chain(routes::contract_datasets())
-        .chain(routes::archive_source::DATASETS.iter().copied())
-        .chain(routes::law_datasets())
-        .chain(routes::mission_datasets())
-        .chain(routes::world_datasets())
-        .chain(routes::durability_datasets())
-        .chain(routes::weapon_animation_datasets())
-        .chain(routes::actor_procedural_recoil_datasets())
-        .chain(routes::weapon_procedural_datasets())
-    {
-        assert_ne!(
-            gaps.get(path),
-            Some(&NO_WITNESS),
-            "missing typed SDK row for {path}"
-        );
-    }
-    Ok(())
+    audit(schema, &registered, &witnesses)?.require_registered()
 }
 
 #[test]
 fn acknowledged_new_dataset_still_needs_a_query() -> TestResult {
-    let mut schema = p4kx_export::catalog_schema();
-    let mut registered = dataset_owners::entries();
-    let properties = schema
-        .get_mut("properties")
-        .and_then(Value::as_object_mut)
-        .ok_or("catalog root properties")?;
-    properties.insert("fixtureRows".to_owned(), json!({"type":"array","items":{}}));
-    let gaps = audit(schema.clone(), &registered, &[]);
+    const DATASET: &str = "/fixtureRows";
+    const PENDING: &str = "installed fixture acceptance is pending";
+    let witness = Route::queried_rows(DATASET, &[7_u8], PENDING)?;
+    let schema = json!({"type":"object","properties":{"fixtureRows":&witness.schema}});
+    let mut registered = BTreeMap::new();
     assert!(
-        gaps.is_err(),
+        audit(schema.clone(), &registered, &[]).is_err(),
         "a dataset without ownership fails the strategy audit"
     );
     registered.insert(
-        "/fixtureRows".to_owned(),
+        DATASET.to_owned(),
         Entry {
             owner: Owner::RootDataset,
             shape: Shape::Array,
         },
     );
-    let gaps = audit(schema, &registered, &[])?;
-    assert_eq!(
-        gaps.get("/fixtureRows"),
-        Some(&NO_WITNESS),
-        "assigning ownership does not establish an SDK route"
+    let error = audit(schema.clone(), &registered, &[])?
+        .require_registered()
+        .err()
+        .ok_or("an owned dataset with no SDK route must fail the ordinary gate")?;
+    assert!(
+        error.to_string().contains(DATASET),
+        "the ordinary gate identifies the missing witness"
+    );
+
+    let witnesses = std::slice::from_ref(&witness);
+    audit(schema.clone(), &registered, witnesses)?.require_registered()?;
+    let error = audit(schema, &registered, witnesses)?
+        .require_accepted()
+        .err()
+        .ok_or("registered routes with pending acceptance must fail the strict gate")?;
+    assert!(
+        error.to_string().contains(PENDING),
+        "the strict gate preserves the reason acceptance is unfinished"
     );
     Ok(())
 }
@@ -357,9 +216,5 @@ fn a_public_query_cannot_discharge_a_different_dataset_or_value_shape() -> TestR
 #[ignore = "strict SDK dataset gate: run explicitly to list outstanding routes"]
 fn every_catalog_v3_dataset_has_a_verified_sdk_query() -> TestResult {
     let schema = p4kx_export::catalog_schema();
-    let gaps = audit(schema, &dataset_owners::entries(), &routes::read()?)?;
-    if gaps.is_empty() {
-        return Ok(());
-    }
-    Err(CoverageGaps(gaps).into())
+    audit(schema, &dataset_owners::entries(), &routes::read()?)?.require_accepted()
 }

@@ -183,41 +183,6 @@ mod weapon_sources;
 #[path = "sdk_worn_gear_routes.rs"]
 mod worn_gear;
 
-pub(super) fn contract_datasets() -> impl Iterator<Item = &'static str> {
-    contracts::DATASETS.iter().copied()
-}
-
-pub(super) fn loot_datasets() -> impl Iterator<Item = &'static str> {
-    loot::datasets()
-}
-
-pub(super) fn law_datasets() -> impl Iterator<Item = &'static str> {
-    law::PATHS.into_iter()
-}
-
-pub(super) fn mission_datasets() -> impl Iterator<Item = &'static str> {
-    use super::{MISSION_LOCATION_TEMPLATES as LOCATION_TEMPLATES, MISSION_TYPES};
-    [
-        LOCATION_TEMPLATES,
-        MISSION_TYPES,
-        mission_locality::DATASET,
-        mission_board::DATASET,
-    ]
-    .into_iter()
-    .chain(location_vocabulary::datasets())
-    .chain(npc_spawns::datasets())
-    .chain(mission_definitions::DATASETS)
-}
-
-pub(super) fn world_datasets() -> impl Iterator<Item = &'static str> {
-    starmap_definitions::DATASETS
-        .into_iter()
-        .chain(soils::DATASETS)
-        .chain(terrain::DATASETS)
-        .chain([climate_assets::DATASET, ELECTRICAL_BEHAVIORS])
-        .chain(planet_assets::DATASETS)
-}
-
 pub(super) fn read() -> TestResult<Vec<Route>> {
     let (_directory, archive) = fixtures::open()?;
     let independent_ammo = read_ammunition(&archive)?;
@@ -369,20 +334,4 @@ fn read_weather(archive: &Archive) -> TestResult<Route> {
     with_electrical_behaviors(archive, CatalogRecordSelection::All, None, |snapshot| {
         Route::queried_rows(ELECTRICAL_BEHAVIORS, snapshot.rows(), None)
     })?
-}
-
-pub(super) const fn actor_procedural_recoil_datasets() -> [&'static str; 2] {
-    actor_procedural_recoil::DATASETS
-}
-
-pub(super) const fn weapon_procedural_datasets() -> [&'static str; 2] {
-    weapon_procedural::DATASETS
-}
-
-pub(super) const fn weapon_animation_datasets() -> [&'static str; 8] {
-    weapon_animation::GRAPH_DATASETS
-}
-
-pub(super) const fn durability_datasets() -> [&'static str; 3] {
-    item_durability::datasets()
 }

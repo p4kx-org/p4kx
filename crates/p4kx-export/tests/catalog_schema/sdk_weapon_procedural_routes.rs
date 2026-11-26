@@ -14,8 +14,6 @@ mod fixture;
 
 const ANIMATIONS: &str = "/definitions/weaponProceduralAnimations";
 const CLIPS: &str = "/definitions/weaponProceduralClips";
-pub(super) const DATASETS: [&str; 2] = [ANIMATIONS, CLIPS];
-
 pub(super) fn read() -> TestResult<[Route; 2]> {
     let directory = tempfile::tempdir()?;
     let path = directory.path().join("sdk_weapon_procedural.p4k");

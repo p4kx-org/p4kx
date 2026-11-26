@@ -24,17 +24,6 @@ const BUILD_ID: &str = "/source/build/buildId";
 const PUBLIC_PATCH: &str = "/source/build/publicPatch";
 const CHANGE_NUMBER: &str = "10012345";
 
-pub(in super::super) const DATASETS: &[&str] = &[
-    CHANNEL,
-    SIZE,
-    MODIFIED,
-    BRANCH,
-    VERSION,
-    CHANGE,
-    BUILD_ID,
-    PUBLIC_PATCH,
-];
-
 pub(super) fn read() -> TestResult<[Route; 8]> {
     let folder = tempfile::tempdir()?;
     let channel = folder.path().join("PTU");

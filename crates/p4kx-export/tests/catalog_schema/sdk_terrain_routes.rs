@@ -23,8 +23,6 @@ mod geology;
 
 const ECOSYSTEMS: &str = "/definitions/ecosystems";
 const SHADING: &str = "/definitions/shadingClasses";
-pub(super) const DATASETS: [&str; 4] = [ECOSYSTEMS, SHADING, geology::SETS, geology::TEXTURE_SETS];
-
 const ECO: &str = "Data/Libs/EcoSystems/fixture.eco";
 const DAMAGED: &str = "Data/Libs/EcoSystems/damaged.eco";
 const SHADE: &str = "Data/Libs/Planets/shading_classes/fixture.shadingclass";

@@ -25,7 +25,6 @@ use super::{Route, TestResult};
 const SCENARIOS: &str = "/definitions/missionScenarios";
 const MODULES: &str = "/definitions/missionModuleDeclarations";
 const ITEMS: &str = "/definitions/missionItems";
-pub(super) const DATASETS: [&str; 3] = [SCENARIOS, MODULES, ITEMS];
 const ALTERNATIVES: &str = "MissionStringVariants";
 const ALTERNATIVE: &str = "MissionStringVariant";
 const MODULE_BASE: &str = "ModuleDeclarationType_Base";

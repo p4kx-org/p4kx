@@ -25,8 +25,6 @@ use super::{Route, TestResult};
 
 const GEOLOGY: &str = "/definitions/geologyAssets";
 const CREATURES: &str = "/definitions/creatures";
-pub(super) const DATASETS: [&str; 2] = [GEOLOGY, CREATURES];
-
 const GEO: &str = "Data/Libs/Planets/geology_assets/fixture.geoasset";
 const FAUNA: &str = "Data/Libs/Planets/creatures/fixture.creature";
 const DAMAGED_GEO: &str = "Data/Libs/Planets/geology_assets/damaged.geoasset";
