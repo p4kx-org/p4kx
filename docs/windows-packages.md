@@ -679,3 +679,30 @@ The live archive SHA-256 is
 [AMD64 diagnostic job](https://github.com/p4kx-org/p4kx/actions/runs/45883443481/job/140128182133) ·
 [Readiness archive](https://github.com/p4kx-org/p4kx/actions/runs/45883443481/artifacts/15148063150) ·
 [Live archive](https://github.com/p4kx-org/p4kx/actions/runs/45883443481/artifacts/15148846894)
+
+### Native Windows lifecycle with a production live checkpoint
+
+Windows-only run `45886906022`, attempt 1, exercised the native Windows
+packages at `c5b1c79091a60d305b90f0018b2fd6c406fcb6e6`. The ARM64 consumer
+on Windows 11 build 26200 completed in 4 minutes 47 seconds. Its production
+live checkpoint captured 76 events at 20:32:41 UTC, 2.15 seconds after bound
+readiness. The worker was in `runtime/repaired`, and the original parent,
+supervisor, monitor and waiter were running.
+
+The original Wait step completed in 68 seconds. CollectFinish verified the
+same request, launch and readiness chain. The original journal closed all
+174 events with one completed final cleanup. Both retained packages matched
+their producer hashes and passed native CLI, MCP and GUI frame checks. The
+software adapter, install, repair, rollback and profile preservation passed.
+Physical audio, clipboard, file dialogs and hardware GPU remain unobserved.
+
+The ARM64 live checkpoint archive SHA-256 is
+`31b292129377e633b5c26f3fa8fafc268c016c0fa126352ee036a711a4112602`.
+The terminal evidence archive SHA-256 is
+`d5e6506477ab7bc3207a737347cc385fc3488b4b7e4d39477c293337533fffc5`.
+The executed package archive SHA-256 is
+`2c63a68a04e9076126829f93543cd178e417289d907ac2ccd3e7e64d3c2b3ba4`.
+[ARM64 job](https://github.com/p4kx-org/p4kx/actions/runs/45886906022/job/140154656751) ·
+[ARM64 live checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45886906022/artifacts/15152405389) ·
+[ARM64 terminal evidence](https://github.com/p4kx-org/p4kx/actions/runs/45886906022/artifacts/15151841991) ·
+[ARM64 executed packages](https://github.com/p4kx-org/p4kx/actions/runs/45886906022/artifacts/15152181505)

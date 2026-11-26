@@ -3366,8 +3366,15 @@ source closure in one streamed read. Its SHA-256 was
 `8bfc79fcc0227d0a419762cb12181f89ea190af6b8dfc044ad078ae6f8b2f951`.
 This verification took 554.417 s with a 1,091,801,088 B private-commit peak
 and a 1,039,769,600 B working-set peak. The elapsed time includes reading
-the complete retained frame. Fleet-wide parity and final-candidate resource
-validation remain pending.
+the complete retained frame.
+
+The same release verifier matched all 1,033 resolved Ship roots on that
+Build, including 76 with incomplete Interior coverage. The streamed
+comparison matched 4,519 coverage rows, 2,447 placements, 62,094 contributing
+source uses and 944 physical sources. Elapsed time was 938.526 s, including
+the retained Catalog decode. Lifetime peaks were 1,468,084,224 B private
+commit and 1,352,679,424 B working set. This run establishes LIVE parity
+against the nominated producer and includes the verifier overhead.
 
 ## Installed flight configurations
 
