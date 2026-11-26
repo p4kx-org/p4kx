@@ -9,3 +9,5 @@
 - Catalog production stages Ship and Item Loadout rows in one ordered spool. The sequential writer
   streams each row into compression with bounded buffering. Compact typed Ship facts support the
   placement and resource joins and release duplicate port names and evidence after staging.
+- The SDK uses a smaller original-field index for Item definitions and one shared physical
+  Record selector for equipment batches.

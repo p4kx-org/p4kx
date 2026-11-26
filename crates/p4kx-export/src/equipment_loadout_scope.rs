@@ -3,6 +3,7 @@
 
 use p4kx_extraction::{CancelToken, DataForge, DataForgeError, Record, RecordTree, TreeBuilder};
 
+use crate::catalog_queries::record_selection::RecordVisit;
 use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection};
 use crate::catalog_query_session::checkpoint;
 use crate::contract_loadout::EntityKind;
@@ -120,30 +121,19 @@ fn visit_records<'source>(
     forge: &'source DataForge<'_>,
     selection: LoadoutOwnerSelection<'_>,
     cancel: Option<&CancelToken>,
-    mut visit: impl FnMut(&Record<'source>) -> Result<(), CatalogError>,
+    visit: impl FnMut(&Record<'source>) -> Result<(), CatalogError>,
 ) -> Result<Vec<u32>, CatalogError> {
-    match selection {
-        LoadoutOwnerSelection::Records(selection) => selection.for_each(forge, cancel, visit)?,
-        LoadoutOwnerSelection::Ships => {
-            CatalogRecordSelection::All.for_each(forge, cancel, visit)?;
-        }
-        LoadoutOwnerSelection::RecordIndices(indices) => {
-            let mut indices = indices.to_vec();
-            indices.sort_unstable();
-            indices.dedup();
-            let mut missing = Vec::new();
-            for index in indices {
-                checkpoint(cancel)?;
-                if let Some(record) = forge.record(index) {
-                    visit(&record)?;
-                } else {
-                    missing.push(index);
-                }
-            }
-            return Ok(missing);
-        }
-    }
-    Ok(Vec::new())
+    let mut missing = Vec::new();
+    let records = match selection {
+        LoadoutOwnerSelection::Records(selection) => selection.into(),
+        LoadoutOwnerSelection::Ships => CatalogRecordSelection::All.into(),
+        LoadoutOwnerSelection::RecordIndices(indices) => RecordVisit::Indices {
+            indices,
+            missing: &mut missing,
+        },
+    };
+    records.try_for_each(forge, cancel, visit)?;
+    Ok(missing)
 }
 
 pub(super) fn finish_coverage(coverage: &mut CatalogRecordCoverage) {

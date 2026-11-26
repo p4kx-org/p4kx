@@ -93,6 +93,19 @@ factory-installed. This explains why a batch derived from ship Loadouts is incom
 for that consumer. Its slot phase includes the SDK, callbacks and construction of the
 consumer files. The aggregate measurement leaves the individual costs open. [Release flag parity][summaries]
 
+The original-value index uses one map lookup to insert each value and
+stores each optional span endpoint in one machine word. The Item definition
+visitor uses this index for every readable Item Record, including records
+outside Ship Loadouts. The memory change applies to the active Record's span
+table. Its effect on elapsed time and process peaks needs a paired measurement.
+
+For an embedded slot refresh, measure the resolved Loadout visit, the all-Item
+definition visit, and any declared equipment visit separately. Time the consumer
+callbacks and cache serialization within those measurements. Keep the Archive
+Build, SDK build profile, locale selection, provenance and consumer output fixed.
+Compare the completed ship, part and mining outputs before comparing timing or
+private memory peaks.
+
 ## Implementation order for the embedded SDK
 
 | Order | Change and benefit | Cost, risk and first falsification test |

@@ -3,6 +3,8 @@
 
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::collections::hash_map::Entry;
+use std::num::NonZeroUsize;
 
 use p4kx_extraction::{CancelToken, Field, SourceEvidenceError, StructValue, Value};
 
@@ -14,7 +16,7 @@ pub(crate) struct OriginalFlowFields<'scope, 'read, 'source> {
     scope: &'scope OriginalRecordScope<'read, 'source>,
     cancel: Option<&'scope CancelToken>,
     facts: Vec<OriginalValueFact<'scope, 'read, 'source>>,
-    ends: Vec<Option<usize>>,
+    ends: Vec<Option<NonZeroUsize>>,
     values: HashMap<*const (), usize>,
     structures: HashMap<*const StructValue<'source>, usize>,
     first_fields: RefCell<HashMap<Option<u64>, HashMap<&'source str, usize>>>,
@@ -82,17 +84,19 @@ impl<'scope, 'read, 'source> OriginalFlowFields<'scope, 'read, 'source> {
             || self
                 .child_value(fact.parent_ordinal(), fact.edge())
                 .is_none_or(|original| !std::ptr::eq(original, fact.value()))
-            || self.values.contains_key(&value)
         {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         }
-        self.values.insert(value, index);
+        let Entry::Vacant(entry) = self.values.entry(value) else {
+            return Err(ExportAccountingError::ConflictingSourceDatum.into());
+        };
+        entry.insert(index);
         let end = if matches!(fact.value(), Value::Struct(_) | Value::Array(_)) {
             None
         } else {
             Some(
-                index
-                    .checked_add(1)
+                NonZeroUsize::MIN
+                    .checked_add(index)
                     .ok_or(ExportAccountingError::CounterOverflow)?,
             )
         };

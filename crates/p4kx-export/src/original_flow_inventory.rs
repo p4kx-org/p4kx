@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::num::NonZeroUsize;
 use std::ops::Range;
 
 use p4kx_extraction::{
@@ -94,6 +95,7 @@ impl<'scope, 'read, 'source> OriginalFlowFields<'scope, 'read, 'source> {
                 ordinal: fact.ordinal(),
             }
         })?;
+        let end = end.get();
         if end <= start || end > self.facts.len() {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         }
@@ -248,7 +250,10 @@ impl<'scope, 'read, 'source> OriginalFlowFields<'scope, 'read, 'source> {
         if end.is_some() {
             return Err(ExportAccountingError::ConflictingSourceDatum.into());
         }
-        *end = Some(self.facts.len());
+        *end = Some(
+            NonZeroUsize::new(self.facts.len())
+                .ok_or(ExportAccountingError::ConflictingSourceDatum)?,
+        );
         Ok(())
     }
 }
