@@ -551,3 +551,23 @@ with a journal event count and terminal marker. The observation carries no lifec
 budget, and always declares completion unproven and no mutation authority. It is not evidence that
 the child started, exited or left the Windows Installer service idle. All real installer cases,
 45-minute job, 35-minute deadline and 600000-ms worker maximum remain required.
+
+On Release run `45825321334`, merge `4c31057f8325235e54cb0305792560f78c7262e4`,
+both Windows Builds and the native synthetic controls completed. The actual
+AMD64 and ARM64 Installer jobs preserved their original pre-Finish checkpoints
+and supervisor launch bindings. The last validated AMD64 phase was an active
+`msiexec/wait` during legacy calibration. The ARM64 checkpoint was in
+`runtime/installed`. Neither phase establishes a terminal outcome.
+
+GitHub recorded both Windows execution jobs as cancelled at 14:47:02 UTC.
+The recorded elapsed time was 55 minutes and the sole job annotation cited
+the 45-minute limit. Both step records still showed `WaitFinish` in progress.
+The hosted phase notices, final Finish receipts and Windows execution payloads
+were absent. Individual job-log downloads returned BlobNotFound. The run-level
+log archive also lacked the two Windows job logs. The published checkpoints
+establish that the runner reported progress before Finish. The exact operation
+where either runner stopped reporting remains unknown.
+
+[Release run](https://github.com/p4kx-org/p4kx/actions/runs/45825321334) ·
+[AMD64 checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45825321334/artifacts/15124615569) ·
+[ARM64 checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45825321334/artifacts/15124860101)

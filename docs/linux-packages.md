@@ -409,6 +409,15 @@ Documents portal grants. The jobs uploaded the executed package evidence.
 [AMD64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45747658169/job/139680058941) ·
 [ARM64 package job](https://github.com/p4kx-org/p4kx/actions/runs/45747658169/job/139680058878)
 
+At PR #1117 merge `4c31057f8325235e54cb0305792560f78c7262e4`, both native Linux
+consumer jobs passed the package-launcher, desktop-frame and Documents-grant
+execution step. The completed jobs published their source-bound payload
+artifacts for their respective CPUs.
+[AMD64 job](https://github.com/p4kx-org/p4kx/actions/runs/45825321334/job/139945393333) ·
+[ARM64 job](https://github.com/p4kx-org/p4kx/actions/runs/45825321334/job/139945393329) ·
+[AMD64 payload](https://github.com/p4kx-org/p4kx/actions/runs/45825321334/artifacts/15122711905) ·
+[ARM64 payload](https://github.com/p4kx-org/p4kx/actions/runs/45825321334/artifacts/15121443860)
+
 The tagged v0.5.0 candidate requires its own hosted Linux package evidence on both CPUs.
 
 For a branch-only native Linux validation, dispatch the existing `release.yml` workflow with

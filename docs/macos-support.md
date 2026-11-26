@@ -113,6 +113,15 @@ the DMG after verifying both guest receipts.
 [Current guest](https://github.com/p4kx-org/p4kx/actions/runs/45714089604/job/139574882535) ·
 [Assembled package](https://github.com/p4kx-org/p4kx/actions/runs/45714089604/artifacts/15072150981)
 
+At PR #1117 merge `4c31057f8325235e54cb0305792560f78c7262e4`, the minimum and
+current hosted Apple Silicon jobs again mounted the DMG read-only, ran the
+relocated app and tested the exact release add-on in native Blender 5.2 LTS.
+The paired workers completed and the macOS release payload was published as
+a workflow artifact for this pull-request candidate.
+[Minimum guest](https://github.com/p4kx-org/p4kx/actions/runs/45825321334/job/139954435330) ·
+[Current guest](https://github.com/p4kx-org/p4kx/actions/runs/45825321334/job/139954435276) ·
+[Assembled payload](https://github.com/p4kx-org/p4kx/actions/runs/45825321334/artifacts/15123008996)
+
 ## References
 
 - [Shared native platform contract (ADR-0343)](adr/0343-one-native-platform-contract-and-target-bound-runtime-evidence.md)
