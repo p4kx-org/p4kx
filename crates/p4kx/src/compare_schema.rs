@@ -6,8 +6,8 @@ use std::process::ExitCode;
 
 use anyhow::Result;
 use p4kx_comparison::{
-    Archive, EnumChange, KindCounts, OptionChangeKind, PropertyChange, SchemaDiff, Side,
-    StructChange, compare_schema, schema_report,
+    Archive, DataForges, EnumChange, KindCounts, OptionChangeKind, PropertyChange, SchemaDiff,
+    Side, StructChange, compare_schema, schema_report_with_dataforge_entries,
 };
 
 use crate::compare::{finish, write_line, write_side};
@@ -19,14 +19,23 @@ use crate::{dataforges, json};
 pub(crate) fn run(old: &Archive, new: &Archive, as_json: bool) -> Result<ExitCode> {
     let (old_entry, new_entry) = dataforges::read_both(old, new)?;
     let (old_forge, new_forge) = dataforges::open_both(&old_entry, &new_entry)?;
-    let diff = compare_schema(&old_forge, &new_forge);
-    let printed = if as_json {
+    if as_json {
         let patches = crate::launcher_discovery::patches()?;
-        json::print(&schema_report(old, new, &diff, Some(&patches)))
+        let report = schema_report_with_dataforge_entries(
+            old,
+            new,
+            DataForges {
+                old: &old_forge,
+                new: &new_forge,
+            },
+            [&old_entry, &new_entry],
+            Some(&patches),
+        );
+        finish(json::print(&report), report.has_differences())
     } else {
-        print(&diff, old, new)
-    };
-    finish(printed, diff.has_differences())
+        let diff = compare_schema(&old_forge, &new_forge);
+        finish(print(&diff, old, new), diff.has_differences())
+    }
 }
 
 fn print(diff: &SchemaDiff, old: &Archive, new: &Archive) -> io::Result<()> {

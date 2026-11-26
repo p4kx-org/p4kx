@@ -3328,10 +3328,17 @@ difference as well.
 | `enums[].options` | array | The options added or removed from a changed enum, ordered by name: `name` and `change` (`added` or `removed`) |
 | `unreadable` | object | `old` and `new`: the structs, enums, properties, options, parents and Records left out on each side because a name or struct cannot be read, or because a struct, enum or property name is defined twice (the first definition wins) |
 
-A property is joined by name within its struct, and differs in its data type, conversion type or
-target. A struct also differs in its parent. Records are counted by the struct they are instances
-of (GUID-addressed Records only), then rolled up to the parents, at most 64 levels and without
-following a cycle.
+A property is joined by name within its struct. Its data type, conversion type and target
+determine whether it differs. A struct also differs with a different parent. Records are counted
+by their declared struct and rolled up its parent chain until the first repeated struct.
+
+Archive-backed reports include `fieldOrigins` and `provenance` in version 1. The field map uses
+JSON Pointers. Declaration values, such as `/structs/0/properties/0/new/target`, resolve to the
+corresponding physical DataForge definitions on their own side. A change decision uses both
+sides. An absent definition uses the inspected name range on that side. Mapping counts resolve
+to the physical mapping count or the mapping-selector range used to establish absence. Record
+and report counts carry the inspected selector ranges. Historical unbound reports can omit
+these two members.
 
 ## `p4kx compare <old> <new> --diff <entry> --json`
 

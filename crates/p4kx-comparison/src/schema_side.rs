@@ -3,7 +3,7 @@
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use p4kx_dataforge::{DataForge, DataForgeError, Property, Struct};
+use p4kx_dataforge::{DataForge, DataForgeError, Enum, Property, Struct};
 
 use crate::PropertyShape;
 
@@ -13,22 +13,32 @@ pub(crate) struct SideSchema<'f> {
     pub(crate) structs: BTreeMap<&'f str, StructDef<'f>>,
     pub(crate) enums: BTreeMap<&'f str, EnumDef<'f>>,
     pub(crate) unreadable: u64,
+    pub(crate) record_type_names: BTreeSet<u32>,
+    pub(crate) record_lineage: BTreeSet<&'f str>,
 }
 
 /// A struct with the properties it declares.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct StructDef<'f> {
+    pub(crate) declaration: Struct<'f>,
     pub(crate) parent: Option<&'f str>,
-    pub(crate) properties: BTreeMap<&'f str, PropertyShape>,
+    pub(crate) properties: BTreeMap<&'f str, PropertyDef<'f>>,
     pub(crate) enums: Vec<&'f str>,
     pub(crate) records: u64,
     pub(crate) mapped_instances: u64,
 }
 
+#[derive(Debug)]
+pub(crate) struct PropertyDef<'f> {
+    pub(crate) declaration: Property<'f>,
+    pub(crate) shape: PropertyShape,
+}
+
 /// An enum with its option names and the Records that carry it.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub(crate) struct EnumDef<'f> {
-    pub(crate) options: BTreeSet<&'f str>,
+    pub(crate) declaration: Enum<'f>,
+    pub(crate) options: BTreeMap<&'f str, usize>,
     pub(crate) records: u64,
 }
 
@@ -59,11 +69,15 @@ impl<'f> SideSchema<'f> {
                 side.unreadable += 1;
                 continue;
             }
-            let mut def = EnumDef::default();
-            for option in enumeration.options() {
+            let mut def = EnumDef {
+                declaration: enumeration,
+                options: BTreeMap::new(),
+                records: 0,
+            };
+            for (index, option) in enumeration.option_range().zip(enumeration.options()) {
                 match option {
                     Ok(option) => {
-                        def.options.insert(option);
+                        def.options.entry(option).or_insert(index);
                     }
                     Err(_) => side.unreadable += 1,
                 }
@@ -80,10 +94,15 @@ impl<'f> SideSchema<'f> {
     fn count_records(&mut self, forge: &'f DataForge<'f>) {
         let mut own: HashMap<&'f str, u64> = HashMap::new();
         for record in forge.records() {
-            match record.struct_type().ok().and_then(|s| s.name().ok()) {
-                Some(name) => {
+            let original = record
+                .struct_type()
+                .ok()
+                .and_then(|structure| Some((structure.index(), structure.name().ok()?)));
+            match original {
+                Some((index, name)) => {
                     let count = own.entry(name).or_default();
                     *count = count.saturating_add(1);
+                    self.record_type_names.insert(index);
                 }
                 None => self.unreadable += 1,
             }
@@ -93,6 +112,7 @@ impl<'f> SideSchema<'f> {
         for (&name, &count) in &own {
             let mut enums: Vec<&str> = Vec::new();
             for member in self.chain(name) {
+                self.record_lineage.insert(member);
                 let total = rolled.entry(member).or_default();
                 *total = total.saturating_add(count);
                 let declared = self.structs.get(member).map_or(&[][..], |def| &def.enums);
@@ -132,8 +152,12 @@ impl<'f> SideSchema<'f> {
 
 fn struct_def<'f>(structure: &Struct<'f>, unreadable: &mut u64) -> StructDef<'f> {
     let mut def = StructDef {
+        declaration: *structure,
+        parent: None,
+        properties: BTreeMap::new(),
+        enums: Vec::new(),
+        records: 0,
         mapped_instances: u64::from(structure.instance_count()),
-        ..StructDef::default()
     };
     if let Some(parent) = structure.parent() {
         match parent.name() {
@@ -155,7 +179,13 @@ fn struct_def<'f>(structure: &Struct<'f>, unreadable: &mut u64) -> StructDef<'f>
         {
             def.enums.push(enumeration);
         }
-        def.properties.insert(name, shape(&property));
+        def.properties.insert(
+            name,
+            PropertyDef {
+                declaration: property,
+                shape: shape(&property),
+            },
+        );
     }
     def
 }

@@ -35,9 +35,13 @@ mod report_entry_aggregates;
 mod report_origins;
 mod report_record_body;
 mod schema_diff;
+mod schema_origin_aggregates;
+mod schema_record_origins;
 mod schema_report;
+mod schema_report_origins;
 mod schema_side;
 mod schema_types;
+mod schema_witness;
 mod text_diff;
 mod value_report;
 
@@ -66,6 +70,7 @@ pub use report::{REPORT_FORMAT_VERSION, Report, report_schema};
 pub use schema_diff::compare_schema;
 pub use schema_report::{
     SCHEMA_REPORT_FORMAT_VERSION, SchemaReport, schema_report, schema_report_schema,
+    schema_report_with_dataforge_entries,
 };
 pub use schema_types::{
     EnumChange, KindCounts, OptionChange, OptionChangeKind, ParentChange, PropertyAspect,
