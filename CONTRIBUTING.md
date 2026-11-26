@@ -141,9 +141,9 @@ sudo apt-get install build-essential pkgconf libasound2-dev
 Audio preview needs a working ALSA `default` device. On Ubuntu 24.04, `pipewire-alsa`
 provides the ALSA plug-in for PipeWire and `libasound2-plugins` provides the ALSA plug-in
 for PulseAudio.
-The Ubuntu 24.04 software-rendered GUI smoke uses `xvfb`, `mesa-vulkan-drivers`,
-`libvulkan1`, `libasound2t64` and the X11/EGL libraries listed in
-[the native test workflow](.github/workflows/tests.yml).
+The Ubuntu 24.04 software-rendered GUI smoke uses Xvfb for X11 and isolated Weston for HiDPI
+Wayland. It needs `xvfb`, `weston`, `mesa-vulkan-drivers`, `libvulkan1`, `libasound2t64` and
+the X11/EGL libraries listed in [the native test action](.github/actions/test-native-archive/action.yml).
 The [platform guide](docs/supported-platforms.md#build-and-test-contract) explains how
 CI records those results and reports unavailable device capabilities.
 
