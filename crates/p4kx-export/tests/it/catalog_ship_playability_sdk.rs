@@ -49,9 +49,9 @@ fn ship_playability_sdk_and_catalog_share_physical_lookup_and_source_evidence() 
 
 #[test]
 fn ship_playability_sdk_preserves_each_reached_unreadable_dependency() -> TestResult {
-    for (corrupt, class, dependencies) in [
-        (Corrupt::Manifests, "Ship_Crewed", 1),
-        (Corrupt::Tags, "Ship_Salvage", 2),
+    for (corrupt, class, dependencies, all_failed) in [
+        (Corrupt::Manifests, "Ship_Crewed", 1, [0, 1]),
+        (Corrupt::Tags, "Ship_Salvage", 2, [2, 3]),
     ] {
         let directory = tempfile::tempdir()?;
         let archive = Archive::open_with_key(
@@ -80,6 +80,7 @@ fn ship_playability_sdk_preserves_each_reached_unreadable_dependency() -> TestRe
             "each corrupt linked Record has a distinct attempted coordinate"
         );
         compare_sdk(&archive, &catalog, index(row)?, carrier, &failed)?;
+        check_all_failures(&archive, all_failed)?;
         proof::closure(&catalog)?;
     }
     Ok(())
@@ -193,6 +194,25 @@ fn physical_indices(uses: &[&Value], namespace: &str, field: &str, role: &str) -
                 .ok()
         })
         .collect()
+}
+
+fn check_all_failures(archive: &Archive, failed: [u32; 2]) -> TestResult {
+    full_proof::open(archive, CatalogLanguageSelection::Selected(&[]), None)?.with_ship_sources(
+        CatalogRecordSelection::All,
+        None,
+        |snapshot| {
+            assert!(
+                snapshot.rows().len() > 1,
+                "several original Ships share dependency proofs"
+            );
+            assert_eq!(
+                snapshot.dependency_coverage().failed_records(),
+                failed,
+                "the full selection retains each unreadable manifest or tag exactly once"
+            );
+        },
+    )?;
+    Ok(())
 }
 
 fn compare_sdk(

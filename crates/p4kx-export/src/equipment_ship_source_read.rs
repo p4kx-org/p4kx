@@ -203,7 +203,8 @@ fn project<'source>(
     let mut rows = Vec::new();
     let mut dependencies = ShipSourceDependencyCoverage::default();
     while !owners.is_empty() {
-        ledger.merge(playability.prepare(owners.iter().map(|owner| &owner.tree), cancel)?);
+        let mut owner_ledger =
+            playability.prepare(owners.iter().map(|owner| &owner.tree), cancel)?;
         let projector = ShipQueryProjector {
             input,
             projection,
@@ -214,12 +215,13 @@ fn project<'source>(
         for owner in owners.drain(..) {
             if let Some(row) = projector.project_owner(
                 &owner,
-                &mut ledger,
+                &mut owner_ledger,
                 &mut groups.coverage,
                 &mut dependencies,
             )? {
                 rows.push(row);
             }
+            ledger.merge(std::mem::take(&mut owner_ledger));
         }
         groups.fill(&mut owners, cancel)?;
     }

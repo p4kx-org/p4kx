@@ -2263,6 +2263,12 @@ physical selection returns an empty source inventory before locale and Entity in
 Use the result's text resolvers and source inventory to resolve original keys and text identities
 in the requested languages.
 
+Use the ignored `installed_ship_sources_marker_timing` test for a fresh-process
+measurement of the all-owner source query. Set the installed build, the
+independently verified row count in `P4KX_SHIP_SOURCE_SDK_ROWS`, and the
+consumer's comma-separated locales in `P4KX_SHIP_SOURCE_SDK_LANGUAGES`.
+Record private-commit and working-set peaks in the same process.
+
 Check `coverage()` for owner selection/read/field gaps and `dependency_coverage()` for actual
 failed Record/Entry operations, incomplete source coordinates and directory scope. Known absent,
 unreadable and available-but-incomplete cells remain distinct. Preserve the three-valued
@@ -2545,6 +2551,14 @@ Check `coverage` and `dependencies_complete` on the terminal summary before
 committing a staged consumer result. Visitor errors and cancellation stop later
 callbacks. The session checks the bound Archive again before returning success.
 
+For a timing run with the default Marker mode, use the ignored
+`installed_loadout_visitor_marker_timing` test in a fresh release-profile
+process. Set `P4KX_DATA_P4K`, the expected Build in `P4KX_NEW_SDK_BUILD`
+and an independent `P4KX_LOADOUT_OWNER_CENSUS`. Run with `--nocapture`.
+The test reports Archive and DataForge setup, time to the first owner and
+total visitor time with a minimal callback. Measure private-commit and
+working-set peaks externally. Use the separate retained Catalog parity
+test to compare values, coverage and source references.
 
 The Ship-scope verifier on installed LIVE `13220821` compared resolver input
 reuse on and off at signed revision `0ff026d07`. It ran fresh Windows AMD64

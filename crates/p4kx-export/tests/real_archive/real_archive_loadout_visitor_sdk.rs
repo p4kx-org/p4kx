@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::time::Instant;
 use std::{env, slice};
 
 use p4kx_export::catalog_queries::equipment::{Loadout, LoadoutOwnerSnapshot};
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability,
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, DatasetAvailability,
 };
 use p4kx_extraction::{Archive, Guid};
 use serde_json::Value;
@@ -32,6 +33,45 @@ const RECORD_INDEX: &str = "P4KX_LOADOUT_RECORD_INDEX";
 fn installed_loadout_visitor_cold_all() -> TestResult {
     let expected = Census::parse(&env::var(CENSUS)?)?;
     cold_visit("all", CatalogRecordSelection::All, expected, |_| Ok(()))
+}
+
+#[test]
+#[ignore = "installed Archive: configure the exact Build and independent Loadout census"]
+fn installed_loadout_visitor_marker_timing() -> TestResult {
+    let expected = Census::parse(&env::var(CENSUS)?)?;
+    let opened = Instant::now();
+    equipment_input::with_archive(|archive| {
+        let session =
+            CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
+        let parsed = session.parsed(None)?;
+        let started = Instant::now();
+        let mut first = None;
+        let summary =
+            parsed.visit_loadouts(CatalogRecordSelection::All, None, |_| -> TestResult {
+                first.get_or_insert_with(|| started.elapsed());
+                Ok(())
+            })?;
+        let elapsed = started.elapsed();
+        if summary.build.as_ref() != archive.build()
+            || summary.owner_count != expected.owners
+            || summary.row_count != expected.rows
+            || summary.coverage.skipped_leftovers != expected.skipped
+            || !matches!(summary.availability, DatasetAvailability::Available)
+        {
+            return Err("the Marker timing probe differs from the nominated Loadout census".into());
+        }
+        let first = first.ok_or("the Marker timing probe did not reach an Owner")?;
+        print_line(&format!(
+            "Loadout Marker timing: owners={} rows={} initialMillis={} firstOwnerMillis={} visitMillis={} dependenciesComplete={}",
+            summary.owner_count,
+            summary.row_count,
+            started.duration_since(opened).as_millis(),
+            first.as_millis(),
+            elapsed.as_millis(),
+            summary.dependencies_complete,
+        ));
+        Ok(())
+    })
 }
 
 #[test]
