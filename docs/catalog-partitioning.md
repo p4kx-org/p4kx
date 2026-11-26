@@ -259,6 +259,28 @@ for contracts, mission locations and reputation returned the incomplete-Catalog 
 `DiagnosticPartial` is the explicit diagnostic export mode. Use the selective readers
 for local refresh.
 
+A later maintainer run measured one process per call on LIVE `13220821` with the game
+closed. After Archive and DataForge opening, the reported baseline was about
+0.8 GB on 0.4.2 and 1.0 GB on the 0.5.0 test revisions.
+
+| SDK call | `8637591ab` elapsed / peak | `fd3160449` elapsed / peak |
+| --- | ---: | ---: |
+| `with_contract_generators(All)` | 16.5 s / 2.4 GB | 4.1 s / 1.1 GB |
+| `with_contracts(All)` | 227 s / 3.1 GB | 120 s / 1.4 GB |
+| `read_loadouts(All)` | 85 s / 5.4 GB | 46 s / 3.5 GB |
+
+At `fd3160449`, `visit_loadouts` took 108 s with memory near the reported
+baseline. `with_item_definitions` and `with_attachment_constraints` reached
+3.1 GB and 3.5 GB respectively. The 0.4.2 contract-generator source read took
+1.2 s at 0.8 GB, and its slot workflow took 20 s at 2.1 GB. The pending
+consumer refresh measurement uses the compact contract and scoped loadout
+routes below. These earlier runs quantify the cost of the individual calls.
+
+The change from 1,028 to 1,033 Ship sources on the same LIVE Build comes from
+admission of the ATLS IKTI Akuma, ATLS IKTI Rad and three GEO Collector owners
+in [the roster extension](https://github.com/p4kx-org/p4kx/commit/6a7db311544a4df96715b3c7a28942173d1f70f6).
+[Exosuit admission](adr/0417-exosuits-share-the-vehicle-catalog.md)
+
 | Consumer data | Selective SDK route |
 | --- | --- |
 | Fundorte and their resource joins | `read_mining_locations` |
