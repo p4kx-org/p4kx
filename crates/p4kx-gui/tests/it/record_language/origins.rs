@@ -8,9 +8,9 @@ use p4kx_gui::{
     Browser, EntryIndex, KeyText, LineValue, RecordPreview, RecordTreeStatus, RecordView,
     TextLanguage,
 };
-use p4kx_testkit::{TestEntry, test_key};
+use p4kx_testkit::{GlobalIniBuilder, TestEntry, test_key};
 
-use super::fixtures::{TRUCK_PATH, TestResult, archive_with, database, english};
+use super::fixtures::{TRUCK_PATH, TestResult, archive_with, database};
 use crate::waiting::wait_polling;
 
 fn selected_browser(
@@ -53,7 +53,11 @@ fn ready(browser: &mut Browser) -> Result<&RecordView, Box<dyn Error>> {
 
 #[test]
 fn record_key_and_translation_bind_independent_original_sources() -> TestResult {
-    let english = TestEntry::zstd(TextLanguage::English.global_ini_path(), english()).encrypted();
+    let english = GlobalIniBuilder::new()
+        .text("vehicle_Truck", "Truck")
+        .text("vehicle_TruckDesc", "Hauls.\\n<&")
+        .build();
+    let english = TestEntry::zstd(TextLanguage::English.global_ini_path(), english).encrypted();
     let (_folder, path) = archive_with(&[], vec![english])?;
     let archive = Archive::open_with_key(path, Some(test_key()))?;
     let mut browser = selected_browser(EntryIndex::build(archive), Some(TextLanguage::English))?;
@@ -69,7 +73,8 @@ fn record_key_and_translation_bind_independent_original_sources() -> TestResult 
         }),
         "physical second Record identity"
     );
-    assert_localized_rows(view)
+    assert_localized_rows(view)?;
+    assert_xml_origins(view)
 }
 
 fn assert_localized_rows(view: &RecordView) -> TestResult {
@@ -195,6 +200,48 @@ fn a_standalone_dataforge_keeps_exact_fields_with_unknown_original_encryption() 
     assert!(
         !first_field.value.source_uses_refs().is_empty(),
         "the field retains original storage proof"
+    );
+    Ok(())
+}
+
+fn assert_xml_origins(view: &RecordView) -> TestResult {
+    let record = view
+        .provenance()
+        .ok_or("Record evidence")?
+        .map_err(ToString::to_string)?;
+    let fields = record
+        .xml_fields()
+        .ok_or("Record XML evidence")?
+        .map_err(ToString::to_string)?;
+    for (fragment, marker) in [
+        ("@vehicle_TruckDesc", false),
+        ("Hauls.&#10;&lt;&amp;", true),
+        ("true", true),
+        ("", false),
+    ] {
+        let origin = fields
+            .iter()
+            .find_map(|field| {
+                let range = usize::try_from(field.bytes.start).ok()?
+                    ..usize::try_from(field.bytes.end).ok()?;
+                (view.xml().bytes().get(range)? == fragment.as_bytes()).then_some(&field.origin)
+            })
+            .ok_or("expected exact emitted XML fragment")?;
+        assert_eq!(
+            origin.contains_encrypted_source(),
+            Some(marker),
+            "marker for {fragment:?}"
+        );
+        assert!(
+            origin.source_set_complete(),
+            "complete proof for {fragment:?}"
+        );
+    }
+    assert!(!fields.is_empty(), "Record XML fields were retained");
+    let first = fields.first().ok_or("first emitted field")?;
+    assert!(
+        first.bytes.start > 0,
+        "the generated declaration has no original field"
     );
     Ok(())
 }

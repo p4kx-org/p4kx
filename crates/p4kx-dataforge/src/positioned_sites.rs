@@ -158,6 +158,19 @@ impl<'record, 'source> PositionedValue<'record, 'source> {
     /// Returns the original contributors to a dangling Reference error.
     #[must_use]
     pub fn dangling_reference_error_sources(&self) -> Option<RecordJsonReferenceSources> {
+        self.dangling_reference_sources(DanglingReferenceMember::Error)
+    }
+
+    /// Returns the original stored GUID of an unresolved Reference.
+    #[must_use]
+    pub fn dangling_reference_guid_sources(&self) -> Option<RecordJsonReferenceSources> {
+        self.dangling_reference_sources(DanglingReferenceMember::Guid)
+    }
+
+    fn dangling_reference_sources(
+        &self,
+        member: DanglingReferenceMember,
+    ) -> Option<RecordJsonReferenceSources> {
         match self.value {
             Value::Error(ValueError::DanglingReference { .. })
                 if self.slot.data_type == DataType::Reference =>
@@ -165,7 +178,7 @@ impl<'record, 'source> PositionedValue<'record, 'source> {
                 Some(RecordJsonReferenceSources::dangling(
                     self.record,
                     Some(self.slot),
-                    DanglingReferenceMember::Error,
+                    member,
                 ))
             }
             _ => None,

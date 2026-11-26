@@ -79,8 +79,13 @@ lookup. Tag paths use the names and selected original root and child
 occurrences observed during the cached Tag tree build. A standalone DataForge
 can retain exact field coordinates with unknown original P4K encryption.
 
-Byte-addressed evidence for the separate Record XML tab requires a positioned
-Record XML writer.
+The Record XML tab uses the same Record XML writer as export. It binds the
+emitted byte ranges of names, values, Reference members and language
+annotations to the same original evidence as the structured preview. Hover
+over an XML line for its first field markers or open its context menu to browse
+all emitted fields. Ranges contain the escaped bytes and preserve the position
+of an empty value. Generated syntax and fields beyond the retained XML have no
+range.
 
 ## Companion records
 

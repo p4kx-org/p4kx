@@ -22,6 +22,8 @@ pub struct RecordFieldProvenance {
     pub annotation: Option<FieldOrigin>,
     /// Original Reference members when the line displays a Reference.
     pub reference: Option<RecordReferenceProvenance>,
+    /// Stored GUID when the Record XML reports an unresolved Reference.
+    pub dangling_guid: Option<FieldOrigin>,
 }
 
 /// Original inputs of one resolved Record preview Reference.
@@ -66,7 +68,22 @@ impl Capture<'_> {
             value,
             annotation,
             reference,
+            dangling_guid: self.dangling_guid(parent, at)?,
         })
+    }
+
+    fn dangling_guid(
+        &self,
+        parent: &Route,
+        at: Option<PositionedValue<'_, '_>>,
+    ) -> Result<Option<FieldOrigin>, SourceEvidenceError> {
+        let Some(sources) = at.and_then(|slot| slot.dangling_reference_guid_sources()) else {
+            return Ok(None);
+        };
+        let mut route = parent.clone();
+        self.binding
+            .referenced(&mut route, sources.sources(), sources.complete())?;
+        Ok(Some(route.origin(&self.binding.uses)))
     }
 
     fn value(

@@ -6,6 +6,7 @@ mod lines;
 mod navigation;
 mod provenance;
 mod worker;
+mod xml_provenance;
 
 use std::ops::Range;
 
@@ -18,6 +19,7 @@ pub use provenance::{
     RecordFieldProvenance, RecordHeaderProvenance, RecordPreviewProvenance,
     RecordReferenceProvenance,
 };
+pub use xml_provenance::RecordXmlFieldProvenance;
 
 use crate::{RecordId, TextLanguage, XmlDocument};
 

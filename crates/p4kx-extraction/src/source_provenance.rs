@@ -104,6 +104,7 @@ pub use p4kx_dataforge::{
     PositionedFields, PositionedRecord, PositionedReferenceSources, PositionedSources,
     PositionedValue, RecordJsonBytes, RecordJsonObserver, RecordJsonRecordField,
     RecordJsonReferenceMember, RecordJsonSource, RecordJsonUse, RecordJsonUseRole,
+    RecordXmlHeaderMember, RecordXmlSite, RecordXmlSpan, RecordXmlValueMember,
 };
 pub use p4kx_gltf::{
     RiggedBufferSource, RiggedBufferView, RiggedGlbEmission, RiggedJsonAddress,

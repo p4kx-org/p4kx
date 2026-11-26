@@ -3,6 +3,7 @@
 
 use std::io::{self, Write};
 
+use super::observation::{Output, RecordXmlSpan};
 use super::tasks::{Fields, Head, Task};
 use super::{classification, sink};
 use crate::{Annotations, Field, RecordTree, Value};
@@ -52,8 +53,33 @@ impl RecordXml {
         annotations: Annotations<'_>,
         out: &mut W,
     ) -> io::Result<()> {
+        let mut out = Output::new(out, None);
+        self.write_document(tree, annotations, &mut out)
+    }
+
+    /// Writes annotated Record XML and observes each emitted original field's final byte range.
+    ///
+    /// # Errors
+    /// Returns the writer's or observer's error.
+    pub fn write_observed<'tree, 'source, W: Write>(
+        &mut self,
+        tree: &'tree RecordTree<'source>,
+        annotations: Annotations<'_>,
+        out: &mut W,
+        observe: &mut impl FnMut(RecordXmlSpan<'tree, 'source>) -> io::Result<()>,
+    ) -> io::Result<()> {
+        let mut out = Output::new(out, Some(observe));
+        self.write_document(tree, annotations, &mut out)
+    }
+
+    fn write_document<'tree, 'source>(
+        &mut self,
+        tree: &'tree RecordTree<'source>,
+        annotations: Annotations<'_>,
+        out: &mut Output<'_, 'tree, 'source, impl Write>,
+    ) -> io::Result<()> {
         out.write_all(DECLARATION)?;
-        self.write_element_annotated(tree, annotations, 0, out)
+        self.write_record(out, tree, annotations, 0, true)
     }
 
     /// Writes the root element of `tree` without the XML declaration, indented by `depth` levels
@@ -84,9 +110,8 @@ impl RecordXml {
         depth: usize,
         out: &mut W,
     ) -> io::Result<()> {
-        self.attribute.clear();
-        let head = Head::Record(tree, true);
-        self.write_iterative(out, head, tree.fields(), depth, annotations)
+        let mut out = Output::new(out, None);
+        self.write_record(&mut out, tree, annotations, depth, true)
     }
 
     /// Writes the root element of `tree` like [`RecordXml::write_element`], but without the
@@ -118,22 +143,22 @@ impl RecordXml {
         depth: usize,
         out: &mut W,
     ) -> io::Result<()> {
-        self.attribute.clear();
-        let head = Head::Record(tree, false);
-        self.write_iterative(out, head, tree.fields(), depth, annotations)
+        let mut out = Output::new(out, None);
+        self.write_record(&mut out, tree, annotations, depth, false)
     }
 
-    fn write_iterative<'tree, 'source>(
+    fn write_record<'tree, 'source>(
         &mut self,
-        out: &mut impl Write,
-        head: Head<'tree, 'source>,
-        fields: &'tree [Field<'source>],
-        depth: usize,
+        out: &mut Output<'_, 'tree, 'source, impl Write>,
+        tree: &'tree RecordTree<'source>,
         annotations: Annotations<'_>,
+        depth: usize,
+        namespace: bool,
     ) -> io::Result<()> {
+        self.attribute.clear();
         let mut pending = vec![Task::Structure {
-            head,
-            fields,
+            head: Head::Record(tree, namespace),
+            fields: tree.fields(),
             depth,
         }];
         while let Some(task) = pending.pop() {
@@ -144,7 +169,7 @@ impl RecordXml {
 
     fn step<'tree, 'source>(
         &mut self,
-        out: &mut impl Write,
+        out: &mut Output<'_, 'tree, 'source, impl Write>,
         task: Task<'tree, 'source>,
         annotations: Annotations<'_>,
         pending: &mut Vec<Task<'tree, 'source>>,
@@ -173,7 +198,7 @@ impl RecordXml {
 
     fn structure<'tree, 'source>(
         &mut self,
-        out: &mut impl Write,
+        out: &mut Output<'_, 'tree, 'source, impl Write>,
         head: Head<'tree, 'source>,
         fields: &'tree [Field<'source>],
         depth: usize,
@@ -193,7 +218,7 @@ impl RecordXml {
 
     fn fields<'tree, 'source>(
         &mut self,
-        out: &mut impl Write,
+        out: &mut Output<'_, 'tree, 'source, impl Write>,
         mut fields: Fields<'tree, 'source>,
         pending: &mut Vec<Task<'tree, 'source>>,
     ) -> io::Result<()> {
@@ -208,7 +233,7 @@ impl RecordXml {
         Ok(())
     }
     fn child<'tree, 'source>(
-        out: &mut impl Write,
+        out: &mut Output<'_, 'tree, 'source, impl Write>,
         field: &'tree Field<'source>,
         depth: usize,
         annotations: Annotations<'_>,
@@ -222,7 +247,7 @@ impl RecordXml {
             Value::Array(items) => &items[..],
             single => std::slice::from_ref(single),
         };
-        let name = sink::open_field(out, field.name(), items.is_empty(), depth)?;
+        let name = sink::open_field(out, field, items.is_empty(), depth)?;
         if !items.is_empty() {
             pending.push(Task::CloseField { name, depth });
             pending.push(Task::Items(items.iter(), depth + 1));
@@ -231,7 +256,7 @@ impl RecordXml {
     }
 
     fn value<'tree, 'source>(
-        out: &mut impl Write,
+        out: &mut Output<'_, 'tree, 'source, impl Write>,
         value: &'tree Value<'source>,
         depth: usize,
         annotations: Annotations<'_>,
@@ -239,7 +264,10 @@ impl RecordXml {
     ) -> io::Result<()> {
         match value {
             Value::Struct(structure) => pending.push(Task::Structure {
-                head: Head::Nested(structure.type_name()),
+                head: Head::Nested {
+                    type_name: structure.type_name(),
+                    value,
+                },
                 fields: structure.fields(),
                 depth,
             }),

@@ -165,6 +165,7 @@ pub use record_preview::{
     FieldLine, IncomingPreview, IncomingStatus, IncomingView, KeyText, LineValue,
     MAX_INCOMING_LINES, RecordFieldProvenance, RecordHeaderProvenance, RecordLink, RecordPreview,
     RecordPreviewProvenance, RecordPreviewStatus, RecordReferenceProvenance, RecordView,
+    RecordXmlFieldProvenance,
 };
 pub use record_tree::{DataForgeFailure, RecordNode, RecordRow, RecordTree, RecordTreeStatus};
 pub use sort::{Sort, SortColumn, SortDirection};

@@ -3,13 +3,14 @@
 
 use std::io::{self, Write};
 
+use super::observation::{Output, RecordXmlSite as Site, RecordXmlValueMember as Member};
 use crate::texts::annotation;
 use crate::xml_text::{write_display, write_escaped, write_float};
 use crate::{Annotations, Field, Reference, Resolution, Value, ValueError};
 
 const INDENT: &[u8; 64] = b"                                                                ";
 
-pub(crate) fn indent(out: &mut impl Write, depth: usize) -> io::Result<()> {
+pub(super) fn indent(out: &mut impl Write, depth: usize) -> io::Result<()> {
     let mut spaces = depth.saturating_mul(2);
     while spaces > 0 {
         let chunk = spaces.min(INDENT.len());
@@ -19,101 +20,156 @@ pub(crate) fn indent(out: &mut impl Write, depth: usize) -> io::Result<()> {
     Ok(())
 }
 
-pub(crate) fn attribute(out: &mut impl Write, name: &str, value: &str) -> io::Result<()> {
+pub(super) fn attribute<'tree, 'source>(
+    out: &mut Output<'_, 'tree, 'source, impl Write>,
+    name: &str,
+    value: &str,
+    origin: Option<Site<'tree, 'source>>,
+) -> io::Result<()> {
+    attribute_with(out, name, origin, |out| write_escaped(out, value))
+}
+
+pub(super) fn attribute_with<'out, 'tree, 'source, W: Write>(
+    out: &mut Output<'out, 'tree, 'source, W>,
+    name: &str,
+    origin: Option<Site<'tree, 'source>>,
+    write: impl FnOnce(&mut Output<'out, 'tree, 'source, W>) -> io::Result<()>,
+) -> io::Result<()> {
     out.write_all(b" ")?;
     out.write_all(name.as_bytes())?;
+    attribute_value(out, origin, write)
+}
+
+fn attribute_value<'out, 'tree, 'source, W: Write>(
+    out: &mut Output<'out, 'tree, 'source, W>,
+    origin: Option<Site<'tree, 'source>>,
+    write: impl FnOnce(&mut Output<'out, 'tree, 'source, W>) -> io::Result<()>,
+) -> io::Result<()> {
     out.write_all(b"=\"")?;
-    write_escaped(out, value)?;
+    out.fragment(origin, write)?;
     out.write_all(b"\"")
 }
 
-pub(crate) fn write_reference(
-    out: &mut impl Write,
+pub(super) fn value_attribute<'tree, 'source>(
+    out: &mut Output<'_, 'tree, 'source, impl Write>,
+    name: &str,
+    value: &'tree Value<'source>,
+) -> io::Result<()> {
+    attribute_with(out, name, Some(Site::member(value, Member::Value)), |out| {
+        write_scalar(out, value)
+    })
+}
+
+pub(super) fn write_reference<'tree, 'source>(
+    out: &mut Output<'_, 'tree, 'source, impl Write>,
+    value: &'tree Value<'source>,
     reference: &Reference<'_>,
     annotations: Annotations<'_>,
 ) -> io::Result<()> {
-    out.write_all(b"<p4kx:reference guid=\"")?;
-    write!(out, "{}", reference.guid())?;
-    out.write_all(b"\"")?;
-    attribute(out, "path", reference.record_path())?;
-    attribute(out, "type", reference.type_name())?;
+    let site = |member| Some(Site::member(value, member));
+    out.write_all(b"<p4kx:reference")?;
+    attribute_with(out, "guid", site(Member::Guid), |out| {
+        write!(out, "{}", reference.guid())
+    })?;
+    attribute(out, "path", reference.record_path(), site(Member::Path))?;
+    attribute(out, "type", reference.type_name(), site(Member::Type))?;
     if let Some(location) = reference.location() {
-        attribute(out, "at", location.as_str())?;
+        attribute(out, "at", location.as_str(), site(Member::InstancePath))?;
     }
     if let Some(path) = annotations.tag_path(reference) {
-        attribute(out, "tag", path.as_ref())?;
+        attribute(out, "tag", path.as_ref(), site(Member::Tag))?;
     }
     out.write_all(b"/>\n")
 }
 
-/// Writes the `reason` attribute of an error value and, for a dangling Reference, the `guid` of
-/// the missing Record, then closes the element.
-pub(crate) fn write_error_end(out: &mut impl Write, error: &ValueError) -> io::Result<()> {
-    out.write_all(b" reason=\"")?;
-    write_display(out, error)?;
-    out.write_all(b"\"")?;
+pub(super) fn write_error_end<'tree, 'source>(
+    out: &mut Output<'_, 'tree, 'source, impl Write>,
+    value: &'tree Value<'source>,
+    error: &ValueError,
+) -> io::Result<()> {
+    attribute_with(
+        out,
+        "reason",
+        Some(Site::member(value, Member::Value)),
+        |out| write_display(out, error),
+    )?;
     if let Some(guid) = error.dangling_guid() {
-        write!(out, " guid=\"{guid}\"")?;
+        attribute_with(
+            out,
+            "guid",
+            Some(Site::member(value, Member::Guid)),
+            |out| write!(out, "{guid}"),
+        )?;
     }
     out.write_all(b"/>\n")
 }
 
-/// Writes a scalar field as an attribute, followed by the `p4kx:text-` or `p4kx:missing-`
-/// attribute of its localisation key.
-pub(crate) fn write_attribute_field(
-    out: &mut impl Write,
-    field: &Field<'_>,
+pub(super) fn write_attribute_field<'tree, 'source>(
+    out: &mut Output<'_, 'tree, 'source, impl Write>,
+    field: &'tree Field<'source>,
     annotations: Annotations<'_>,
 ) -> io::Result<()> {
+    let value = field.value();
     out.write_all(b" ")?;
-    out.write_all(field.name().as_bytes())?;
-    out.write_all(b"=\"")?;
-    write_scalar(out, field.value())?;
-    out.write_all(b"\"")?;
-    if let Value::Locale(key) = field.value() {
-        match annotation(&annotations, key) {
-            Some(Resolution::Text(text)) => {
-                out.write_all(b" p4kx:text-")?;
-                out.write_all(field.name().as_bytes())?;
-                out.write_all(b"=\"")?;
-                write_escaped(out, &text)?;
-                out.write_all(b"\"")?;
-            }
-            Some(_) => {
-                out.write_all(b" p4kx:missing-")?;
-                out.write_all(field.name().as_bytes())?;
-                out.write_all(b"=\"true\"")?;
-            }
-            None => {}
-        }
-    }
-    Ok(())
+    out.fragment(Some(Site::member(value, Member::Name)), |out| {
+        out.write_all(field.name().as_bytes())
+    })?;
+    attribute_value(out, Some(Site::member(value, Member::Value)), |out| {
+        write_scalar(out, value)
+    })?;
+    localized(out, value, Some(field.name()), annotations)
 }
 
-/// Writes the `text` or `missing` attribute of a localisation key and then `end`; any other
-/// value, a kept key and default output write just `end`.
-pub(crate) fn write_annotation(
-    out: &mut impl Write,
-    value: &Value<'_>,
+pub(super) fn write_annotation<'tree, 'source>(
+    out: &mut Output<'_, 'tree, 'source, impl Write>,
+    value: &'tree Value<'source>,
     annotations: Annotations<'_>,
     end: &[u8],
 ) -> io::Result<()> {
-    if let Value::Locale(key) = value {
-        match annotation(&annotations, key) {
-            Some(Resolution::Text(text)) => {
-                out.write_all(b" text=\"")?;
-                write_escaped(out, &text)?;
-                out.write_all(b"\"")?;
-            }
-            Some(_) => out.write_all(b" missing=\"true\"")?,
-            None => {}
-        }
-    }
+    localized(out, value, None, annotations)?;
     out.write_all(end)
 }
 
+fn localized<'tree, 'source>(
+    out: &mut Output<'_, 'tree, 'source, impl Write>,
+    value: &'tree Value<'source>,
+    field: Option<&str>,
+    annotations: Annotations<'_>,
+) -> io::Result<()> {
+    let Value::Locale(key) = value else {
+        return Ok(());
+    };
+    let Some(resolved) = annotation(&annotations, key) else {
+        return Ok(());
+    };
+    let name: &[u8] = if matches!(resolved, Resolution::Text(_)) {
+        b"text"
+    } else {
+        b"missing"
+    };
+    out.write_all(b" ")?;
+    if let Some(field) = field {
+        out.write_all(b"p4kx:")?;
+        out.write_all(name)?;
+        out.write_all(b"-")?;
+        out.fragment(Some(Site::member(value, Member::Name)), |out| {
+            out.write_all(field.as_bytes())
+        })?;
+    } else {
+        out.write_all(name)?;
+    }
+    attribute_value(
+        out,
+        Some(Site::member(value, Member::Translation)),
+        |out| match resolved {
+            Resolution::Text(text) => write_escaped(out, &text),
+            _ => out.write_all(b"true"),
+        },
+    )
+}
+
 /// Writes the text of a scalar; other values write nothing.
-pub(crate) fn write_scalar(out: &mut impl Write, value: &Value<'_>) -> io::Result<()> {
+fn write_scalar(out: &mut impl Write, value: &Value<'_>) -> io::Result<()> {
     match value {
         Value::Bool(value) => out.write_all(if *value { b"true" } else { b"false" }),
         Value::Int8(value) => write!(out, "{value}"),

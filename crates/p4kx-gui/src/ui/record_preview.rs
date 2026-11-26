@@ -206,14 +206,20 @@ pub(super) fn show_xml(ui: &mut Ui, texts: &Texts, browser: &Browser) {
     let (path, name) = heading(browser);
     path_line(ui, path, name);
     if let Some(view) = status_body(ui, texts, browser, path) {
-        frames::preview_body().show(ui, |ui| match view.xml_error() {
-            Some(reason) => {
+        frames::preview_body().show(ui, |ui| {
+            if let Some(reason) = view.xml_error() {
                 let reason = ("reason", FluentValue::from(reason.to_owned()));
                 let path = ("path", FluentValue::from(path.to_owned()));
                 let text = texts.format(RecordText::XmlFailed, &[path, reason]);
                 ui.colored_label(palette::DANGER_TEXT, text);
+            } else {
+                let origins = view
+                    .provenance()
+                    .and_then(Result::ok)
+                    .and_then(RecordPreviewProvenance::xml_fields)
+                    .and_then(Result::ok);
+                xml_view::show_record(ui, texts, view.xml(), origins);
             }
-            None => xml_view::show(ui, texts, view.xml(), None),
         });
     }
 }

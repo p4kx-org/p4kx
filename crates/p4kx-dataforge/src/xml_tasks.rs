@@ -1,13 +1,23 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use super::observation::RecordXmlSite;
 use crate::{Field, RecordTree, Value};
 use std::slice::Iter;
 
 #[derive(Clone, Copy)]
 pub(super) enum Head<'tree, 'source> {
     Record(&'tree RecordTree<'source>, bool),
-    Nested(&'source str),
+    Nested {
+        type_name: &'source str,
+        value: &'tree Value<'source>,
+    },
+}
+
+#[derive(Clone, Copy)]
+pub(super) struct Name<'tree, 'source> {
+    pub(super) text: &'source str,
+    pub(super) origin: Option<RecordXmlSite<'tree, 'source>>,
 }
 
 pub(super) enum Task<'tree, 'source> {
@@ -21,7 +31,7 @@ pub(super) enum Task<'tree, 'source> {
     Value(&'tree Value<'source>, usize),
     Items(Iter<'tree, Value<'source>>, usize),
     CloseField {
-        name: &'source str,
+        name: Name<'tree, 'source>,
         depth: usize,
     },
 }
@@ -29,7 +39,7 @@ pub(super) enum Task<'tree, 'source> {
 pub(super) struct Fields<'tree, 'source> {
     entries: &'tree [Field<'source>],
     pub(super) base: usize,
-    pub(super) name: &'source str,
+    pub(super) name: Name<'tree, 'source>,
     pub(super) depth: usize,
     next: usize,
 }
@@ -38,7 +48,7 @@ impl<'tree, 'source> Fields<'tree, 'source> {
     pub(super) const fn new(
         entries: &'tree [Field<'source>],
         base: usize,
-        name: &'source str,
+        name: Name<'tree, 'source>,
         depth: usize,
     ) -> Self {
         Self {

@@ -9,8 +9,9 @@ use p4kx_extraction::{
 };
 
 use super::FieldLine;
-use crate::TextLanguage;
+use super::xml_provenance::{PendingXml, RecordXmlFieldProvenance, RowPositions};
 use crate::forge_cache::ObservedTagTree;
+use crate::{TextLanguage, XmlPreviewOriginError};
 
 #[path = "line_provenance.rs"]
 mod line_provenance;
@@ -29,6 +30,8 @@ pub struct RecordHeaderProvenance {
     pub guid: FieldOrigin,
     /// Displayed Record path.
     pub record_path: FieldOrigin,
+    /// Stored Record tag when present.
+    pub tag: Option<FieldOrigin>,
 }
 
 /// Original source evidence for the structured Record preview.
@@ -37,6 +40,7 @@ pub struct RecordPreviewProvenance {
     header: RecordHeaderProvenance,
     lines: Vec<RecordFieldProvenance>,
     inventory: SourceInventory,
+    xml: Option<Result<Vec<RecordXmlFieldProvenance>, XmlPreviewOriginError>>,
 }
 
 impl RecordPreviewProvenance {
@@ -58,6 +62,16 @@ impl RecordPreviewProvenance {
         &self.inventory
     }
 
+    /// Returns the exact emitted fields in the retained Record XML.
+    ///
+    /// Returns an evidence error separately from a Record XML serialization failure.
+    #[must_use]
+    pub fn xml_fields(
+        &self,
+    ) -> Option<Result<&[RecordXmlFieldProvenance], &XmlPreviewOriginError>> {
+        self.xml.as_ref().map(Result::as_deref)
+    }
+
     pub(super) fn capture(
         forge: &DataForge<'_>,
         record: &PositionedRecord<'_>,
@@ -65,6 +79,7 @@ impl RecordPreviewProvenance {
         locale: Option<(TextLanguage, Option<&EntryOrigin>)>,
         tags: Option<&ObservedTagTree>,
         shown: &[FieldLine],
+        xml: Option<(PendingXml, u64)>,
     ) -> Result<Self, SourceEvidenceError> {
         let binding = Binding::new(input)?;
         let header = binding.header(forge, record)?;
@@ -76,6 +91,7 @@ impl RecordPreviewProvenance {
             tags,
             lines: Vec::with_capacity(shown.len()),
             shown: shown.iter(),
+            positions: xml.as_ref().map(|_| RowPositions::reserve(shown.len())),
         };
         capture.fields(
             record.tree().fields(),
@@ -85,10 +101,17 @@ impl RecordPreviewProvenance {
         if capture.shown.next().is_some() {
             return Err(SourceEvidenceError::ForeignEvidence);
         }
+        let xml = xml
+            .zip(capture.positions)
+            .map(|((pending, retained_end), positions)| {
+                let unknown = capture.binding.uses.origin(&[], false);
+                pending.bind(retained_end, positions, &header, &capture.lines, &unknown)
+            });
         Ok(Self {
             header,
             lines: capture.lines,
             inventory: capture.binding.uses.freeze()?,
+            xml,
         })
     }
 }
@@ -153,7 +176,29 @@ impl Binding {
             type_name: kind.origin(&self.uses),
             guid,
             record_path,
+            tag: tree
+                .tag()
+                .map(|tag| self.header_tag(forge, tree.record_index(), tag))
+                .transpose()?,
         })
+    }
+
+    fn header_tag(
+        &self,
+        forge: &DataForge<'_>,
+        index: u32,
+        tag: &str,
+    ) -> Result<FieldOrigin, SourceEvidenceError> {
+        let mut route = Route {
+            inputs: vec![self.record_field(index, "tag", SourceUseRole::Conversion)?],
+            complete: self.complete,
+        };
+        if let Some(text) = RecordJsonLocation::borrowed_text(forge, tag) {
+            route.push(self.site(text, SourceUseRole::Payload)?);
+        } else {
+            route.complete = false;
+        }
+        Ok(route.origin(&self.uses))
     }
 
     fn root_route(&self, record: u32) -> Result<Route, SourceEvidenceError> {
@@ -274,6 +319,7 @@ struct Capture<'a> {
     tags: Option<&'a ObservedTagTree>,
     lines: Vec<RecordFieldProvenance>,
     shown: std::slice::Iter<'a, FieldLine>,
+    positions: Option<RowPositions>,
 }
 
 impl Capture<'_> {
@@ -300,6 +346,9 @@ impl Capture<'_> {
             .shown
             .next()
             .ok_or(SourceEvidenceError::ForeignEvidence)?;
+        if let Some(positions) = &mut self.positions {
+            positions.record(value, self.lines.len());
+        }
         let line = self.line(parent, at, shown.value())?;
         self.lines.push(line);
         match value {

@@ -2,6 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::io::{self, Write};
+use std::ops::Range;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use p4kx_extraction::XmlRenderOrigins;
@@ -106,12 +107,18 @@ impl XmlDocument {
     /// Returns the zero-based line `index` with its terminator, empty past the end.
     #[must_use]
     pub fn line(&self, index: usize) -> &[u8] {
-        let start = self.starts.get(index).map_or(usize::MAX, |&at| at as usize);
-        let end = index
-            .checked_add(1)
-            .and_then(|next| self.starts.get(next))
+        self.line_range(index)
+            .and_then(|bytes| self.bytes.get(bytes))
+            .unwrap_or_default()
+    }
+
+    pub(crate) fn line_range(&self, index: usize) -> Option<Range<usize>> {
+        let start = *self.starts.get(index)? as usize;
+        let end = self
+            .starts
+            .get(index + 1)
             .map_or(self.bytes.len(), |&at| at as usize);
-        self.bytes.get(start..end).unwrap_or_default()
+        Some(start..end)
     }
 
     /// Returns the longest line by its characters, a tab counting as four.

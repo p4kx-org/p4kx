@@ -195,7 +195,7 @@ fn read(
     let resolver = loaded
         .as_ref()
         .map(|(language, texts)| LanguageTexts::owned(&texts.texts, *language));
-    let mut view = lines::view(
+    let (mut view, xml) = lines::view(
         forge,
         record.tree(),
         resolver
@@ -215,6 +215,7 @@ fn read(
                 .map(|(language, texts)| (*language, texts.original.as_ref())),
             tags.tree.get().map(Arc::as_ref),
             &view.lines,
+            xml.map(|pending| (pending, view.xml().bytes().len() as u64)),
         )
         .map(Box::new),
     );

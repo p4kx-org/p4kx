@@ -86,7 +86,6 @@ mod value_text;
 mod weak;
 mod xml;
 mod xml_text;
-mod xml_write;
 
 pub use annotations::{Annotations, TAG_TYPE, TagResolver};
 pub use build::TreeBuilder;
@@ -149,4 +148,7 @@ pub use tree::RecordTree;
 pub use tree_cursor::ValueVisit;
 pub use value::{Field, Value};
 pub use value_error::ValueError;
-pub use xml::{RECORD_XML_NAMESPACE, RecordXml};
+pub use xml::{
+    RECORD_XML_NAMESPACE, RecordXml, RecordXmlHeaderMember, RecordXmlSite, RecordXmlSpan,
+    RecordXmlValueMember,
+};
