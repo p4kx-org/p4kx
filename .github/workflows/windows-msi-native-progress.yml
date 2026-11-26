@@ -1,0 +1,143 @@
+name: Observe the retained native Windows AMD64 MSI
+
+on:
+  workflow_call:
+    inputs:
+      exclusive:
+        type: boolean
+        required: true
+
+permissions: {}
+
+jobs:
+  observe:
+    runs-on: windows-2025
+    timeout-minutes: 45
+    permissions:
+      actions: read
+      contents: read
+    defaults:
+      run:
+        shell: pwsh
+    env:
+      P4KX_TARGET: x86_64-pc-windows-msvc
+      P4KX_MSI_CANDIDATE: bb2461a7754a042e331042a4ac78196b0041e5cc
+      P4KX_MSI_PRODUCER_RUN: '45872703215'
+    steps:
+      - name: Require an exclusive branch diagnostics dispatch
+        timeout-minutes: 1
+        env:
+          EXCLUSIVE: ${{ inputs.exclusive }}
+        run: |
+          if ($env:GITHUB_REPOSITORY -cne 'p4kx-org/p4kx' -or $env:GITHUB_EVENT_NAME -cne 'workflow_dispatch' -or
+              $env:GITHUB_REF_TYPE -cne 'branch' -or $env:EXCLUSIVE -cne 'true') {
+            throw 'Native MSI observations require an exclusive manual dispatch from a repository branch.'
+          }
+          "P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC=$([DateTimeOffset]::UtcNow.AddMinutes(35).ToString('o'))" >> $env:GITHUB_ENV
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ env.P4KX_MSI_CANDIDATE }}
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          path: .msi-progress
+          sparse-checkout: .github/scripts
+          persist-credentials: false
+      - name: Create an isolated diagnostic task
+        run: |
+          . .github/scripts/native-package-task.ps1
+          $task = New-P4kxNativePackageTask -Directory $env:RUNNER_TEMP -RunId $env:GITHUB_RUN_ID -Attempt $env:GITHUB_RUN_ATTEMPT -Target $env:P4KX_TARGET -Role consumer
+          "P4KX_PACKAGE_TASK=$task" >> $env:GITHUB_ENV
+      - name: Download the two sealed Windows build artifacts
+        timeout-minutes: 3
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          artifact-ids: '15146677135,15144744704'
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          run-id: ${{ env.P4KX_MSI_PRODUCER_RUN }}
+          path: ${{ env.P4KX_PACKAGE_TASK }}/windows-inputs
+          digest-mismatch: error
+      - uses: ./.github/actions/install-rust
+        with:
+          target: ${{ env.P4KX_TARGET }}
+          nextest: "true"
+      - name: Verify exact producer inputs and build the raw Registry fixture
+        timeout-minutes: 8
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: .msi-progress/.github/scripts/prepare-msi-native-progress.ps1
+      - name: Prepare the original MSI lifecycle allowance
+        id: budget
+        timeout-minutes: 1
+        run: |
+          $env:GITHUB_SHA = $env:P4KX_MSI_CANDIDATE
+          .github/scripts/prepare-msi-feedback.ps1 -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/lifecycle-feedback')
+      - name: Start the bound original MSI lifecycle
+        timeout-minutes: 1
+        run: |
+          $env:GITHUB_SHA = $env:P4KX_MSI_CANDIDATE
+          . .github/scripts/msi-diagnostic-budget.ps1
+          Assert-P4kxMsiStepAdmission $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC $env:P4KX_MSI_STEP_MINUTES $env:P4KX_MSI_STEP_COMPUTED_AT_UTC
+          .github/scripts/invoke-msi-observer.ps1 -Stage Start -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -Invocation (Join-Path $env:P4KX_PACKAGE_TASK 'msi-invocation.json')
+      - name: Observe the first original AMD64 MSI install outcome
+        timeout-minutes: 1
+        continue-on-error: true
+        run: |
+          $env:GITHUB_SHA = $env:P4KX_MSI_CANDIDATE
+          .github/scripts/invoke-msi-observer.ps1 -Stage Snapshot -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -Sequence 3 -WaitMilliseconds 0 -OriginalInstallBoundary
+      - name: Start the original bound Finish supervisor and waiter
+        id: ready
+        timeout-minutes: 1
+        run: |
+          $env:GITHUB_SHA = $env:P4KX_MSI_CANDIDATE
+          $observer = Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer'
+          .github/scripts/invoke-msi-observer.ps1 -Stage StartFinish -Directory $observer
+          . .github/scripts/msi-detached-control.ps1
+          $launch = Read-P4kxDetachedReceipt (Join-Path $observer 'finish-supervision/launch.json')
+          $cutoff = ConvertFrom-P4kxMsiBudgetTimestamp $launch.collection_cutoff_utc
+          $ready = .github/scripts/invoke-msi-finish-observation.ps1 -Stage Start -Directory $observer -CollectionCutoffUtc $cutoff.ToString('o')
+          "cutoff=$($cutoff.ToString('o'))" >> $env:GITHUB_OUTPUT
+          "digest=$ready" >> $env:GITHUB_OUTPUT
+      - name: Preserve the original observation readiness and candidate binding
+        timeout-minutes: 1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: msi-native-progress-${{ github.run_id }}-${{ github.run_attempt }}-ready
+          path: |
+            ${{ env.P4KX_PACKAGE_TASK }}/candidate-binding.json
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/feedback/diagnostic-inputs.json
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/feedback/diagnostic-sources.json
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/finish-supervision/launch.json
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/03/checkpoint.json
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/finish-supervision/waiter-ready.json
+          if-no-files-found: error
+          overwrite: false
+      - name: Sample the original native MSI after readiness
+        id: progress
+        timeout-minutes: 1
+        env:
+          P4KX_MSI_READY_DIGEST: ${{ steps.ready.outputs.digest }}
+          P4KX_MSI_COLLECTION_CUTOFF: ${{ steps.ready.outputs.cutoff }}
+        run: .msi-progress/.github/scripts/observe-msi-native-progress.ps1
+      - name: Preserve the live MSI journal and liveness before Wait
+        if: ${{ always() && !cancelled() && (steps.progress.outcome == 'success' || steps.progress.outcome == 'failure') }}
+        timeout-minutes: 1
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: msi-native-progress-${{ github.run_id }}-${{ github.run_attempt }}-live
+          path: |
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/checkpoints/04/*
+            ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/finish-probes/04/*.json
+          if-no-files-found: error
+          overwrite: false
+      - name: Wait for the original observation after preserving diagnostics
+        if: ${{ always() && !cancelled() && steps.ready.outcome == 'success' }}
+        timeout-minutes: ${{ fromJSON(steps.budget.outputs.observer_finish_minutes) }}
+        env:
+          P4KX_MSI_READY_DIGEST: ${{ steps.ready.outputs.digest }}
+          P4KX_MSI_COLLECTION_CUTOFF: ${{ steps.ready.outputs.cutoff }}
+        run: |
+          $env:GITHUB_SHA = $env:P4KX_MSI_CANDIDATE
+          .github/scripts/invoke-msi-finish-observation.ps1 -Stage Wait -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -CollectionCutoffUtc $env:P4KX_MSI_COLLECTION_CUTOFF -ReadyDigest $env:P4KX_MSI_READY_DIGEST
