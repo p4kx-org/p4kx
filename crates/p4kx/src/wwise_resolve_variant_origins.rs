@@ -20,7 +20,12 @@ pub(super) fn write(
     variant: &SoundVariant<'_>,
 ) -> Result<VariantOrigins> {
     let event = output.definition.event(&output.uses, variant.event())?;
-    let route = output.path(row, variant.path().len(), variant.path_sources(), &event.id)?;
+    let route = output.path(
+        Some(row),
+        variant.path().len(),
+        variant.path_sources(),
+        &event.id,
+    )?;
     let bank = output.bank(
         &field(row, "soundbank")?,
         variant

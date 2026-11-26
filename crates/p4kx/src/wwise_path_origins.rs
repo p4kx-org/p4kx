@@ -5,6 +5,8 @@ use anyhow::Result;
 use p4kx_assembly::audio::{AudioIndex, BreakReason, BrokenLink, HircPathSource, TriggerSounds};
 use p4kx_extraction::{Archive, FieldOrigin, FieldOrigins, FieldPath, SourceInventory, SourceUses};
 
+#[path = "wwise_extract_report_origins.rs"]
+mod extract_report_origins;
 #[path = "wwise_resolve_source_fields.rs"]
 mod source_fields;
 #[path = "wwise_resolve_totals.rs"]
@@ -12,6 +14,7 @@ mod totals;
 #[path = "wwise_resolve_variant_origins.rs"]
 mod variant_origins;
 
+pub(crate) use extract_report_origins::capture_extract;
 use source_fields::{Definition, LanguageOrigins};
 use totals::{SummaryFields, Totals};
 
@@ -21,15 +24,7 @@ pub(crate) fn capture(
     sounds: &TriggerSounds<'_>,
 ) -> Result<(FieldOrigins, SourceInventory)> {
     let uses = SourceUses::with_compact_use_refs();
-    let definition = Definition::open(archive, index, &uses, sounds.trigger())?;
-    let language = LanguageOrigins::of(archive, index, &uses, sounds.language_choice())?;
-    let mut capture = Capture {
-        archive,
-        uses: uses.clone(),
-        fields: FieldOrigins::new(),
-        definition,
-        language,
-    };
+    let mut capture = Capture::open(archive, index, &uses, sounds)?;
     let root = FieldPath::root();
     capture.header(sounds)?;
     capture
@@ -47,17 +42,9 @@ pub(crate) fn capture_nested(
     root: &FieldPath,
     trigger_selector: &FieldOrigin,
 ) -> Result<(FieldOrigins, FieldOrigin)> {
-    let mut definition = Definition::open(archive, index, uses, sounds.trigger())?;
-    definition.selection =
-        uses.origin_with_origins([&definition.selection, trigger_selector], true)?;
-    let language = LanguageOrigins::of(archive, index, uses, sounds.language_choice())?;
-    let mut capture = Capture {
-        archive,
-        uses: uses.clone(),
-        fields: FieldOrigins::new(),
-        definition,
-        language,
-    };
+    let mut capture = Capture::open(archive, index, uses, sounds)?;
+    capture.definition.selection =
+        uses.origin_with_origins([&capture.definition.selection, trigger_selector], true)?;
     let origin =
         capture
             .resolved(sounds, index, root)?
@@ -88,7 +75,22 @@ struct BreakOrigins {
     reason: FieldOrigin,
 }
 
-impl Capture<'_> {
+impl<'a> Capture<'a> {
+    fn open(
+        archive: &'a Archive,
+        index: &AudioIndex,
+        uses: &'a SourceUses,
+        sounds: &TriggerSounds<'a>,
+    ) -> Result<Self> {
+        Ok(Self {
+            archive,
+            uses: uses.clone(),
+            fields: FieldOrigins::new(),
+            definition: Definition::open(archive, index, uses, sounds.trigger())?,
+            language: LanguageOrigins::of(archive, index, uses, sounds.language_choice())?,
+        })
+    }
+
     fn resolved(
         &mut self,
         sounds: &TriggerSounds<'_>,
@@ -102,18 +104,26 @@ impl Capture<'_> {
             let proof = variant_origins::write(self, &index_path(&variants, ordinal)?, variant)?;
             totals.variant(proof);
         }
-        let searched = sounds
-            .breaks()
-            .iter()
-            .any(|link| matches!(link.reason(), BreakReason::NoSoundbank))
-            .then(|| source_fields::bank_survey(self.archive, index, &self.uses))
-            .transpose()?;
+        let searched = self.searched_banks(sounds, index)?;
         for (ordinal, link) in sounds.breaks().iter().enumerate() {
             let proof =
                 self.broken_link(&index_path(&breaks, ordinal)?, link, searched.as_ref())?;
             totals.broken_link(proof, link.reason());
         }
         Ok(totals)
+    }
+
+    fn searched_banks(
+        &self,
+        sounds: &TriggerSounds<'_>,
+        index: &AudioIndex,
+    ) -> Result<Option<FieldOrigin>> {
+        sounds
+            .breaks()
+            .iter()
+            .any(|link| matches!(link.reason(), BreakReason::NoSoundbank))
+            .then(|| source_fields::bank_survey(self.archive, index, &self.uses))
+            .transpose()
     }
 
     fn header(&mut self, sounds: &TriggerSounds<'_>) -> Result<()> {
@@ -160,22 +170,27 @@ impl Capture<'_> {
 
     fn path(
         &mut self,
-        row: &FieldPath,
+        row: Option<&FieldPath>,
         length: usize,
         sources: &[HircPathSource],
         event: &FieldOrigin,
     ) -> Result<Route> {
-        let path = field(row, "path")?;
+        let path = row.map(|row| field(row, "path")).transpose()?;
         let mut end = None;
         let mut steps = vec![event.clone()];
         for position in 0..length {
-            let address = index_path(&path, position)?;
             let origin = self.step(sources.get(position), (position == 0).then_some(event))?;
-            steps.push(self.put_step(&address, &origin)?);
+            let proof = match &path {
+                Some(path) => self.put_step(&index_path(path, position)?, &origin)?,
+                None => self.union([&origin.kind, &origin.id], true)?,
+            };
+            steps.push(proof);
             end = Some(origin);
         }
         let proof = self.union(&steps, length == sources.len())?;
-        self.fields.insert(path, proof.clone())?;
+        if let Some(path) = path {
+            self.fields.insert(path, proof.clone())?;
+        }
         Ok(Route { path: proof, end })
     }
 
@@ -211,9 +226,8 @@ impl Capture<'_> {
         searched: Option<&FieldOrigin>,
     ) -> Result<BreakOrigins> {
         let event = self.definition.event(&self.uses, link.event())?;
-        let route = self.path(row, link.path().len(), link.path_sources(), &event.id)?;
-        let edge = link.failed_edge_origin(self.archive, &self.uses)?;
-        let reason = self.break_reason(link.reason(), &route.path, &event.id, searched, &edge)?;
+        let route = self.path(Some(row), link.path().len(), link.path_sources(), &event.id)?;
+        let reason = self.observed_break(link, &route, &event.id, searched)?;
         let object = if let Some(end) = route.end {
             self.put_step(&field(row, "object")?, &end)?
         } else {
@@ -246,6 +260,17 @@ impl Capture<'_> {
             row: origin,
             reason,
         })
+    }
+
+    fn observed_break(
+        &self,
+        link: &BrokenLink<'_>,
+        route: &Route,
+        event: &FieldOrigin,
+        searched: Option<&FieldOrigin>,
+    ) -> Result<FieldOrigin> {
+        let edge = link.failed_edge_origin(self.archive, &self.uses)?;
+        self.break_reason(link.reason(), &route.path, event, searched, &edge)
     }
 
     fn break_reason(

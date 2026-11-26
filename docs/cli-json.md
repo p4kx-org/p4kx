@@ -1063,6 +1063,10 @@ an empty name becomes `%`. A name that is still too long for a file (more than 2
 kept file and when no companion was published. If receipt publication fails after the sound
 commits, its file row carries the error in `origin_receipt_failure` and the command exits with
 code 1. Both fields are available in `p4kx entity audio --extract` results.
+The extract JSON report also includes `fieldOrigins` and `provenance` for its trigger,
+language selection, broken-link count and index issues. The trigger event ID cites the
+original event name used in its calculation. The broken-link count cites the observed
+resolution routes, including successful routes when the count is zero.
 `failures` lists the sounds that got no file: source plug-ins and external sources (`wem_id` null),
 WEMs no soundbank or loose Entry holds, and sounds whose absolute file path exceeds the limit of
 ADR-0248 (260 UTF-16 units for the file, 248 for its folder), each with its reason; the other

@@ -1,17 +1,35 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::error::Error;
 use std::fs;
 use std::io::{self, Cursor, Write};
 use std::path::Path;
 
 use lewton::inside_ogg::OggStreamReader;
 use p4kx_extraction::OriginDigestWriter;
-use serde_json::Value;
+use p4kx_testkit::{ArchiveBuilder, TestAtl, TestBank, TestEntry, TestHircObject, wwise_short_id};
+use serde_json::{Value, json};
 
-use super::{TestResult, count, extract, fixture, names, pcm, xma};
+use super::{Fixture, PLAY, STREAMED, TestResult, count, extract, fixture, names, pcm, xma};
 
 pub(super) fn assert_sound_receipt(file: &Value, address: &str) -> TestResult {
+    let rows = sound_receipt(file)?;
+    assert!(
+        rows.iter().any(|row| {
+            row.pointer("/address/type").and_then(Value::as_str) == Some(address)
+                && row["containsEncryptedSource"] == false
+                && row["sourceSetComplete"] == true
+                && row["sourceUsesRefs"]
+                    .as_array()
+                    .is_some_and(|uses| !uses.is_empty())
+        }),
+        "plain Archive input is cited for {address}"
+    );
+    Ok(())
+}
+
+fn sound_receipt(file: &Value) -> Result<Vec<Value>, Box<dyn Error>> {
     assert_eq!(
         file.get("origin_receipt_failure"),
         Some(&Value::Null),
@@ -59,16 +77,157 @@ pub(super) fn assert_sound_receipt(file: &Value, address: &str) -> TestResult {
         "end",
         "the companion was written completely"
     );
+    Ok(rows)
+}
+
+const ATL_PATH: &str = "Data\\Libs\\GameAudio\\SC_ExtractOrigin.xml";
+const EVENT: &str = "Emit_ExtractOrigin";
+const TRIGGER: &str = "Play_ExtractOrigin";
+const MEDIA: u32 = 321;
+
+fn fixture_with_encrypted_atl(xml: &str) -> Result<Fixture, Box<dyn Error>> {
+    let bank = TestBank::new(wwise_short_id("ExtractOrigin"))
+        .object(TestHircObject::event(wwise_short_id(EVENT), &[1]))
+        .object(TestHircObject::action(1, PLAY, 2))
+        .object(TestHircObject::sound(2, MEDIA, STREAMED, 0));
+    let dir = tempfile::tempdir()?;
+    let archive = dir.path().join("Data.p4k");
+    let out = dir.path().join("out");
+    ArchiveBuilder::v2()
+        .entry(TestEntry::zstd(ATL_PATH, xml.as_bytes()).encrypted())
+        .entry(TestEntry::stored(
+            "Data\\Sounds\\wwise\\ExtractOrigin.bnk",
+            bank.bytes(),
+        ))
+        .entry(TestEntry::stored(
+            format!("Data\\Sounds\\wwise\\Media\\{MEDIA}.wem"),
+            pcm(),
+        ))
+        .write_to(&archive)?;
+    Ok(Fixture {
+        _dir: dir,
+        archive,
+        out,
+    })
+}
+
+#[test]
+fn extract_json_distinguishes_encrypted_trigger_from_plain_waveform() -> TestResult {
+    let xml = TestAtl::new("SC_ExtractOrigin")
+        .trigger(TRIGGER, &[EVENT])
+        .to_xml();
+    let fixture = fixture_with_encrypted_atl(&xml)?;
+    let report = extract(&fixture, TRIGGER, &["--format", "wav"], 0)?;
+
+    assert_eq!(
+        report.pointer("/trigger/events/0/id"),
+        Some(&json!(wwise_short_id(EVENT))),
+        "the original event still resolves to the same ID"
+    );
+    assert_eq!(
+        count(&report, "breaks"),
+        Some(0),
+        "the sound fully resolves"
+    );
+    assert_eq!(count(&report, "written"), Some(1), "one waveform committed");
+    check_trigger_origin(&report, &xml)?;
+
+    let file = report.pointer("/files/0").ok_or("reported waveform")?;
+    let rows = sound_receipt(file)?;
+    let binding = rows.first().ok_or("artifact binding")?;
+    let length = binding
+        .pointer("/binding/byteLength")
+        .and_then(Value::as_str)
+        .ok_or("bound waveform length")?
+        .parse::<u64>()?;
+    assert_eq!(
+        count(file, "size"),
+        Some(length),
+        "report matches the written byte count"
+    );
     assert!(
         rows.iter().any(|row| {
-            row.pointer("/address/type").and_then(Value::as_str) == Some(address)
-                && row["containsEncryptedSource"] == false
-                && row["sourceSetComplete"] == true
-                && row["sourceUsesRefs"]
-                    .as_array()
+            row.pointer("/address/field").and_then(Value::as_str) == Some("pcmSamples")
+                && row.get("containsEncryptedSource") == Some(&json!(false))
+                && row.get("sourceSetComplete") == Some(&json!(true))
+                && row
+                    .get("sourceUsesRefs")
+                    .and_then(Value::as_array)
                     .is_some_and(|uses| !uses.is_empty())
         }),
-        "plain Archive input is cited for {address}"
+        "the clear loose WEM is the waveform sample source"
+    );
+    Ok(())
+}
+
+fn check_trigger_origin(report: &Value, xml: &str) -> TestResult {
+    let fields = report.get("fieldOrigins").ok_or("extract field origins")?;
+    let origin = fields
+        .get("/trigger/events/0/id")
+        .ok_or("event ID origin")?;
+    assert_eq!(
+        origin.get("containsEncryptedSource"),
+        Some(&json!(true)),
+        "the event lookup uses the encrypted ATL"
+    );
+    assert_eq!(
+        origin.get("sourceSetComplete"),
+        Some(&json!(true)),
+        "the event lookup has all original operands"
+    );
+    let breaks = fields
+        .get("/breaks")
+        .ok_or("zero broken links retain origin")?;
+    assert!(
+        breaks.get("containsEncryptedSource").is_some(),
+        "zero has an immediate marker"
+    );
+
+    let attribute = format!(r#"wwise_name="{EVENT}""#);
+    let start = xml.find(&attribute).ok_or("authored event name")?;
+    let end = start + attribute.len();
+    let indices = json!([start.to_string(), end.to_string()]);
+    check_event_uses(report, origin, &indices)
+}
+
+fn check_event_uses(report: &Value, origin: &Value, indices: &Value) -> TestResult {
+    let references = origin
+        .get("sourceUsesRefs")
+        .and_then(Value::as_array)
+        .ok_or("event source-use references")?;
+    let inventory = report
+        .pointer("/provenance/uses")
+        .and_then(Value::as_array)
+        .ok_or("original use inventory")?;
+    let sources = report
+        .pointer("/provenance/sources")
+        .and_then(Value::as_array)
+        .ok_or("original source inventory")?;
+    let mut exact_name = false;
+    for reference in references {
+        let used = inventory
+            .iter()
+            .find(|value| value.get("id") == Some(reference))
+            .ok_or("referenced original use")?;
+        let id = used.get("source").ok_or("physical source reference")?;
+        let source = sources
+            .iter()
+            .find(|source| source.get("id") == Some(id))
+            .ok_or("referenced physical source")?;
+        assert_eq!(
+            source.pointer("/path/value").and_then(Value::as_str),
+            Some(ATL_PATH),
+            "the trigger ID operands belong to the original ATL"
+        );
+        exact_name |= used.get("role").and_then(Value::as_str) == Some("conversion")
+            && used.pointer("/location/namespace").and_then(Value::as_str)
+                == Some("textXmlAttribute")
+            && used.pointer("/location/field").and_then(Value::as_str) == Some("wwise_name")
+            && used.pointer("/location/indices") == Some(indices);
+    }
+    assert!(
+        exact_name,
+        "the ID hashes the exact original event attribute"
     );
     Ok(())
 }

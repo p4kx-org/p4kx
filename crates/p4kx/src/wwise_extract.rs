@@ -7,9 +7,10 @@ use std::process::ExitCode;
 
 use anyhow::Result;
 use p4kx_assembly::audio::{
-    ArchiveAudio, ExportOptions, ExportReport, ExportState, ExportWatch, SoundFormat, TriggerSounds,
+    ArchiveAudio, AudioIndex, ExportOptions, ExportReport, ExportState, ExportWatch, SoundFormat,
+    TriggerSounds, TxtpReport,
 };
-use p4kx_extraction::{CancelToken, ConversionError};
+use p4kx_extraction::{CancelToken, ConversionError, FieldOrigins, SourceInventory};
 use serde::Serialize;
 
 use crate::cli::AudioOutput;
@@ -32,6 +33,9 @@ struct ExtractJson<'a> {
     #[serde(skip_serializing_if = "Option::is_none")]
     txtp: Option<TxtpJson<'a>>,
     issues: Vec<IssueJson<'a>>,
+    #[serde(rename = "fieldOrigins")]
+    field_origins: FieldOrigins,
+    provenance: SourceInventory,
 }
 
 /// The JSON shape of a sound export.
@@ -203,12 +207,15 @@ pub(crate) fn run(args: &WwiseExtractArgs, as_json: bool) -> Result<ExitCode> {
         .ok_or(ConversionError::Cancelled)?;
     let choice = language_choice(index, &args.resolve)?;
     let mut options = args.resolve.options(&cancel);
-    if args.txtp {
+    if args.txtp || as_json {
         options = options.with_path_sources();
     }
     let sounds = audio
         .resolve_trigger_with_options(&args.trigger, &choice, options)?
         .ok_or_else(|| UnknownTrigger::new(&args.trigger))?;
+    let origins = as_json
+        .then(|| wwise_json::capture_extract(&archive, index, &sounds))
+        .transpose()?;
     let (report, txtp) = if args.txtp {
         let watch = ExportWatch::linked(cancel.clone());
         let (report, origins) = audio.export_sounds_watched_with_loop_origins(
@@ -227,7 +234,7 @@ pub(crate) fn run(args: &WwiseExtractArgs, as_json: bool) -> Result<ExitCode> {
             None,
         )
     };
-    if as_json {
+    if let Some((field_origins, provenance)) = origins {
         json::print(&ExtractJson {
             archive: json::path(archive.path()),
             language: LanguageJson::of(&choice),
@@ -236,20 +243,38 @@ pub(crate) fn run(args: &WwiseExtractArgs, as_json: bool) -> Result<ExitCode> {
             export: export_json(&report, &args.out, &args.export),
             txtp: txtp.as_ref().map(wwise_txtp::to_json),
             issues: issues_json(index),
+            field_origins,
+            provenance,
         })?;
     } else {
-        warn(index)?;
-        print_report(&report, &args.out)?;
-        if let Some(txtp) = &txtp {
-            wwise_txtp::print(txtp, &args.out)?;
-        }
-        if !sounds.breaks().is_empty() {
-            writeln!(
-                io::stderr().lock(),
-                "warning: {} broken links; run `p4kx wwise resolve` to list them",
-                sounds.breaks().len()
-            )?;
-        }
+        print_extraction(
+            &report,
+            txtp.as_ref(),
+            index,
+            &args.out,
+            sounds.breaks().len(),
+        )?;
     }
     Ok(exit_code(&report))
+}
+
+fn print_extraction(
+    report: &ExportReport,
+    txtp: Option<&TxtpReport>,
+    index: &AudioIndex,
+    out: &Path,
+    breaks: usize,
+) -> io::Result<()> {
+    warn(index)?;
+    print_report(report, out)?;
+    if let Some(txtp) = txtp {
+        wwise_txtp::print(txtp, out)?;
+    }
+    if breaks != 0 {
+        writeln!(
+            io::stderr().lock(),
+            "warning: {breaks} broken links; run `p4kx wwise resolve` to list them"
+        )?;
+    }
+    Ok(())
 }
