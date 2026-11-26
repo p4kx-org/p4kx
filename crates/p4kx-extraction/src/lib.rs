@@ -361,7 +361,7 @@ pub use record_export::{
     export_planned_record_files, export_planned_record_files_with_receipt, export_record_files,
     export_records,
 };
-pub use record_format::RecordFileFormat;
+pub use record_format::{RecordFileFormat, RecordJsonReceipt};
 pub use record_plan::RecordFilePlan;
 pub use record_report::{
     RecordExportError, RecordExportOptions, RecordExportReport, RecordFailure, RecordRenamed,

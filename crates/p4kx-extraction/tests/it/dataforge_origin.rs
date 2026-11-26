@@ -15,6 +15,9 @@ use p4kx_extraction::{
 };
 use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry, TestRecord, TestStruct};
 
+#[path = "record_json_payload.rs"]
+mod record_json_payload;
+
 type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
 fn database() -> Vec<u8> {

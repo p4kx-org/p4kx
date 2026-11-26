@@ -5,6 +5,11 @@ use std::io;
 
 use p4kx_dataforge::{Annotations, RecordJson, RecordTree, RecordXml};
 
+#[path = "record_json_receipt.rs"]
+mod json_receipt;
+
+pub use json_receipt::RecordJsonReceipt;
+
 /// The file format of a Record export with one file per Record: how a Record tree becomes the
 /// bytes of its file.
 pub trait RecordFileFormat: Default + Send {
