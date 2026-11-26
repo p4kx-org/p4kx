@@ -223,3 +223,6 @@ mod name_origins;
 
 #[path = "catalog_loadout_visit_sdk.rs"]
 mod visit;
+
+#[path = "catalog_loadout_vehicle_prefix_sdk.rs"]
+mod vehicle_prefix;

@@ -36,6 +36,7 @@ pub enum VehicleAggregateIssue {
 pub struct VehicleAggregateEvidence {
     selectors: Vec<Arc<VehicleXmlSite>>,
     issues: Vec<VehicleAggregateIssue>,
+    first_unpositioned: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -72,6 +73,12 @@ pub(super) struct Checkpoint {
     issues: usize,
 }
 
+impl Checkpoint {
+    pub(super) const fn selector_count(self) -> usize {
+        self.selectors
+    }
+}
+
 impl VehicleAggregateEvidence {
     /// Borrows distinct actual selectors in their first observed order.
     /// Numeric conversion uses come from [`VehicleImplementation::totals_with_field_uses`].
@@ -92,7 +99,7 @@ impl VehicleAggregateEvidence {
         !self
             .issues
             .contains(&VehicleAggregateIssue::OriginalEvidenceUnavailable)
-            && self.selectors.iter().all(|site| site.location().is_some())
+            && self.first_unpositioned.is_none()
     }
 
     pub(super) fn prefix_selectors(
@@ -100,6 +107,17 @@ impl VehicleAggregateEvidence {
         checkpoint: Checkpoint,
     ) -> impl Iterator<Item = &VehicleXmlSite> {
         self.selectors().take(checkpoint.selectors)
+    }
+
+    pub(super) fn prefix_selector(
+        &self,
+        checkpoint: Checkpoint,
+        index: usize,
+    ) -> Option<&VehicleXmlSite> {
+        self.selectors
+            .get(..checkpoint.selectors)?
+            .get(index)
+            .map(Arc::as_ref)
     }
 
     pub(super) fn prefix_complete(&self, checkpoint: Checkpoint) -> bool {
@@ -116,8 +134,8 @@ impl VehicleAggregateEvidence {
     fn prefix_has_coordinates(&self, checkpoint: Checkpoint) -> bool {
         checkpoint.selectors <= self.selectors.len()
             && self
-                .prefix_selectors(checkpoint)
-                .all(|site| site.location().is_some())
+                .first_unpositioned
+                .is_none_or(|index| index >= checkpoint.selectors)
     }
 }
 
@@ -132,6 +150,7 @@ impl VehicleEvidenceCapture {
             evidence: VehicleAggregateEvidence {
                 selectors: Vec::new(),
                 issues: Vec::new(),
+                first_unpositioned: None,
             },
             seen: HashSet::new(),
         }
@@ -159,6 +178,9 @@ impl VehicleEvidenceCapture {
         };
         let key = SelectorSite(Arc::new(site));
         if self.seen.insert(key.clone()) {
+            if key.0.location().is_none() && self.evidence.first_unpositioned.is_none() {
+                self.evidence.first_unpositioned = Some(self.evidence.selectors.len());
+            }
             self.evidence.selectors.push(key.0);
         }
     }
@@ -193,6 +215,13 @@ impl VehicleEvidenceCapture {
             self.seen.remove(&SelectorSite(site));
         }
         self.evidence.issues.truncate(checkpoint.issues);
+        if self
+            .evidence
+            .first_unpositioned
+            .is_some_and(|index| index >= checkpoint.selectors)
+        {
+            self.evidence.first_unpositioned = None;
+        }
     }
 }
 

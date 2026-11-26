@@ -209,6 +209,14 @@ construction and separately verify any optimization with the same workload
 and an ordinary executable. The timers attribute cost within this instrumented
 run. The earlier uninstrumented 245.973 seconds is a separate measurement.
 
+The Loadout port reader binds the known file choices and each consulted XML
+selector once for a physical vehicle node in MarkersOnly. It retains the
+positions where completeness or the encryption marker changes. This preserves
+evidence for out-of-order port requests without repeatedly scanning or
+materializing each prefix. Full preserves the ordered selector uses. The
+synthetic SDK comparison checks both profiles across separate physical calls
+that share a base XML file. Installed LIVE throughput remains a separate test.
+
 A matched Ship-only measurement used the same ignored timing test, LIVE Archive,
 English language and single worker on both signed release-profile Builds.
 An independent Interior parity verifier ran during both measurements. The

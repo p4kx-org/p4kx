@@ -6,12 +6,15 @@ use p4kx_assembly::{
     VehicleAttributeEvidence, VehicleImplementation, VehicleItemType, VehiclePortSelection,
     VehicleXmlSite,
 };
-use p4kx_extraction::{
-    Archive, SharedFieldOrigin, SourceUseRole, SourceUses, SourceValue, SourcedValue,
-};
+use p4kx_extraction::{Archive, SourceUseRole, SourceUses, SourceValue, SourcedValue};
 
+#[path = "vehicle_port_prefix.rs"]
+mod prefix;
 #[path = "vehicle_structure_binding.rs"]
 pub(crate) mod structure_binding;
+
+use prefix::PortSelectorOrigin;
+pub(crate) use prefix::VehiclePortRead;
 
 use super::port_vehicle_calls::PortVehicleCall;
 use super::vehicle_stage::Contributions;
@@ -31,7 +34,7 @@ struct VehicleFiles<'scope> {
 pub(super) struct VehiclePortSources<'scope> {
     sources: &'scope SourceUses,
     files: VehicleFiles<'scope>,
-    shared: SharedFieldOrigin,
+    shared: PortSelectorOrigin,
 }
 
 impl<'scope> VehiclePortSources<'scope> {
@@ -40,28 +43,21 @@ impl<'scope> VehiclePortSources<'scope> {
         state: &'scope State,
         selected: &VehiclePortSelection<'_>,
         name: Option<&AuthoredEntryPath>,
-        archive: Option<&Archive>,
-        record_index: Option<u32>,
+        read: &mut VehiclePortRead<'_>,
     ) -> Result<Self, CatalogError> {
         let files = VehicleFiles {
             entries: capture.input.map(EntryCapture::for_input),
             state,
-            call: record_index.and_then(|index| state.port_vehicles.call(index)),
+            call: read
+                .record_index()
+                .and_then(|index| state.port_vehicles.call(index)),
         };
-        let (inputs, known) = name.map_or_else(
-            || Ok((Vec::new(), false)),
-            AuthoredEntryPath::selector_inputs,
-        )?;
-        let mut proof = Contributions::new(inputs, known && selected.is_complete());
-        files.select_files(archive, &mut proof)?;
-        for site in selected.selectors() {
-            files.retain(site, SourceUseRole::Selector, &mut proof)?;
-        }
         let sources = &capture.name_sources;
+        let shared = read.proof(&files, selected, name, sources)?;
         Ok(Self {
             sources,
             files,
-            shared: proof.shared(sources),
+            shared,
         })
     }
 
@@ -104,10 +100,7 @@ impl<'scope> VehiclePortSources<'scope> {
         value: SourceValue<T>,
         local: Contributions,
     ) -> Result<SourcedValue<T>, CatalogError> {
-        let (uses, complete) = local.into_parts();
-        Ok(self
-            .sources
-            .value_with_shared_origin(value, &self.shared, &uses, complete)?)
+        self.shared.value(self.sources, value, local)
     }
 
     pub(super) fn item_types(
@@ -165,8 +158,7 @@ impl Capture<'_> {
         xml: Option<&VehiclePortSelection<'_>>,
         name: Option<&AuthoredEntryPath>,
         flags: Option<&SourcedValue<Vec<String>>>,
-        archive: Option<&Archive>,
-        record_index: Option<u32>,
+        read: &mut VehiclePortRead<'_>,
     ) -> Result<SourcedValue<&'static str>, CatalogError> {
         let value = SourceValue::Present(code);
         let Some(xml) = xml else {
@@ -179,7 +171,7 @@ impl Capture<'_> {
             };
         };
         let state = self.lock()?;
-        let source = VehiclePortSources::read(self, &state, xml, name, archive, record_index)?;
+        let source = VehiclePortSources::read(self, &state, xml, name, read)?;
         let visibility = source.value(
             value,
             xml.port().flags_evidence(),

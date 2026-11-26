@@ -126,7 +126,52 @@ fn check_ports(
         ["Paints"],
         "the override takes effect on the second port"
     );
+    check_prefix_selectors(first, second)?;
     check_winner(second, winner, field)
+}
+
+fn check_prefix_selectors(
+    first: &VehiclePortSelection<'_>,
+    second: &VehiclePortSelection<'_>,
+) -> TestResult {
+    assert!(
+        first.selector_count() < second.selector_count(),
+        "the later port consults an additional Part prefix"
+    );
+    for selection in [first, second] {
+        let count = selection.selector_count();
+        let indexed = (0..count)
+            .map(|index| {
+                selection
+                    .selector(index)
+                    .ok_or("original selector position")
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+        assert_eq!(
+            indexed.len(),
+            selection.selectors().count(),
+            "exact prefix length"
+        );
+        assert!(
+            indexed
+                .into_iter()
+                .zip(selection.selectors())
+                .all(|(left, right)| std::ptr::eq(left, right)),
+            "indexing preserves each ordered physical site"
+        );
+        assert!(
+            selection.selector(count).is_none(),
+            "no access beyond the consulted prefix"
+        );
+    }
+    assert!(
+        first
+            .selectors()
+            .zip(second.selectors())
+            .all(|(left, right)| std::ptr::eq(left, right)),
+        "both selections share the same physical prefix"
+    );
+    Ok(())
 }
 
 fn check_winner(

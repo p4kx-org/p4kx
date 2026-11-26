@@ -6,13 +6,13 @@ use std::sync::Arc;
 
 use p4kx_assembly::{PortDefinition, PortDefinitionPosition, VehiclePortSelection};
 use p4kx_extraction::{
-    Archive, SharedFieldOrigin, SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue,
+    SharedFieldOrigin, SourceUse, SourceUseRole, SourceUses, SourceValue, SourcedValue,
     StructValue, Value,
 };
 
 use super::Capture;
 use super::port_type_attributes::RecordPortTypes;
-use super::port_vehicle_sources::VehiclePortSources;
+use super::port_vehicle_sources::{VehiclePortRead, VehiclePortSources};
 use crate::catalog_read::original::{
     AuthoredEntryPath, OriginalFlowFields, OriginalValueEdge, OriginalValueFact, OriginalValuePart,
 };
@@ -148,8 +148,7 @@ impl Capture<'_> {
         &self,
         selection: &VehiclePortSelection<'_>,
         name: Option<&AuthoredEntryPath>,
-        archive: Option<&Archive>,
-        record_index: Option<u32>,
+        read: &mut VehiclePortRead<'_>,
     ) -> Result<PortAttributes, CatalogError> {
         let port = selection.port();
         let (min, min_site) = port.min_size_source();
@@ -159,8 +158,7 @@ impl Capture<'_> {
         let (required, required_site) = port.required_tags_source();
         let (display_name, display_name_site) = port.display_name_source();
         let state = self.lock()?;
-        let source =
-            VehiclePortSources::read(self, &state, selection, name, archive, record_index)?;
+        let source = VehiclePortSources::read(self, &state, selection, name, read)?;
         let attributes = PortAttributes {
             min_size: source.value(min.clone(), min_site, SourceUseRole::Conversion)?,
             max_size: source.value(max.clone(), max_site, SourceUseRole::Conversion)?,

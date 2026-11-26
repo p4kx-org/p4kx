@@ -49,7 +49,7 @@ mod vehicle_result;
 #[path = "loadout_ledger/vehicle_stage.rs"]
 mod vehicle_stage;
 
-pub(crate) use port_vehicle_sources::structure_binding;
+pub(crate) use port_vehicle_sources::{VehiclePortRead, structure_binding};
 pub(crate) use vehicle_result::{ShipAggregateValues, ShipVehicleValues};
 
 use std::collections::btree_map::Entry;

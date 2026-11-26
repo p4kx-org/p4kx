@@ -66,6 +66,29 @@ impl<'vehicle> VehiclePortSelection<'vehicle> {
             .flat_map(Prefix::sites)
     }
 
+    /// Returns the number of consulted document and Part selectors.
+    #[must_use]
+    pub fn selector_count(&self) -> usize {
+        let count = |prefix: &Prefix<'_>| prefix.end.selector_count();
+        self.documents.as_ref().map_or(0, count) + self.parts.as_ref().map_or(0, count)
+    }
+
+    /// Borrows a selector in the same order as [`Self::selectors`].
+    #[must_use]
+    pub fn selector(&self, index: usize) -> Option<&'vehicle VehicleXmlSite> {
+        let document_count = self
+            .documents
+            .as_ref()
+            .map_or(0, |prefix| prefix.end.selector_count());
+        if let Some(part_index) = index.checked_sub(document_count) {
+            let parts = self.parts.as_ref()?;
+            parts.evidence.prefix_selector(parts.end, part_index)
+        } else {
+            let documents = self.documents.as_ref()?;
+            documents.evidence.prefix_selector(documents.end, index)
+        }
+    }
+
     /// Reports whether the observed XML selection retained all original coordinates.
     #[must_use]
     pub fn is_complete(&self) -> bool {

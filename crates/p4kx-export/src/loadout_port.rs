@@ -14,7 +14,7 @@ use crate::catalog_read::original::AuthoredEntryPath;
 use crate::contract_loadout::LoadoutPort;
 use crate::loadout::{
     alignment::{AlignmentLookup, LoadoutAlignment},
-    ledger::Capture,
+    ledger::{Capture, VehiclePortRead},
 };
 
 const VEHICLE_SOURCE: &str = "vehicle";
@@ -62,23 +62,21 @@ impl<'rows> PortReader<'rows> {
     ) -> Result<Vec<LoadoutPort>, CatalogError> {
         self.issues
             .extend(node.issues().iter().map(LoadoutError::kind));
-        let vehicle = node.vehicle();
+        let mut vehicle = VehiclePortRead::new(self.archive, node.record_index(), node.vehicle());
         node.ports()
             .iter()
-            .map(|port| {
-                let xml = vehicle.and_then(|vehicle| vehicle.item_port_with_selection(port.name()));
-                self.read_port(port, xml.as_ref(), node.record_index(), capture)
-            })
+            .map(|port| self.read_port(port, &mut vehicle, capture))
             .collect()
     }
 
     fn read_port(
         &mut self,
         port: &PortNode,
-        xml: Option<&VehiclePortSelection<'_>>,
-        record_index: Option<u32>,
+        vehicle: &mut VehiclePortRead<'_>,
         capture: &Capture<'_>,
     ) -> Result<LoadoutPort, CatalogError> {
+        let selected = vehicle.select(port.name());
+        let xml = selected.as_ref();
         let name_proof = capture.port_name_proof(port.name(), port.name_proof())?;
         let name = capture.port_name(port.name(), name_proof.as_ref())?;
         let shape = read_shape(
@@ -87,8 +85,7 @@ impl<'rows> PortReader<'rows> {
             name,
             name_proof.as_ref(),
             capture,
-            self.archive,
-            record_index,
+            vehicle,
         )?;
         let (source, visibility_code) = match (port.source(), xml.map(VehiclePortSelection::port)) {
             (PortSource::Empty, Some(own)) => (VEHICLE_SOURCE, own.visibility().code()),
@@ -103,8 +100,7 @@ impl<'rows> PortReader<'rows> {
                 xml,
                 name_proof.as_ref(),
                 port.definition().map(|_| &shape.flags),
-                self.archive,
-                record_index,
+                vehicle,
             )?
         };
         let mut shape = LoadoutPort {
@@ -129,10 +125,11 @@ impl<'rows> PortReader<'rows> {
     ) -> Result<(), CatalogError> {
         match port.attachment() {
             Attachment::Empty => {
+                let mut vehicle = VehiclePortRead::new(self.archive, None, None);
                 shape.ports = port
                     .nested()
                     .iter()
-                    .map(|nested| self.read_port(nested, None, None, capture))
+                    .map(|nested| self.read_port(nested, &mut vehicle, capture))
                     .collect::<Result<_, _>>()?;
             }
             Attachment::Entity(child) => {
@@ -163,12 +160,11 @@ fn read_shape(
     name: SourcedValue<String>,
     proof: Option<&AuthoredEntryPath>,
     capture: &Capture<'_>,
-    archive: Option<&Archive>,
-    record_index: Option<u32>,
+    vehicle: &mut VehiclePortRead<'_>,
 ) -> Result<LoadoutPort, CatalogError> {
     let attributes = match (definition, xml) {
         (Some(definition), _) => capture.definition_attributes(definition, proof)?,
-        (None, Some(xml)) => capture.vehicle_attributes(xml, proof, archive, record_index)?,
+        (None, Some(xml)) => capture.vehicle_attributes(xml, proof, vehicle)?,
         (None, None) => return Ok(LoadoutPort::named(name)),
     };
     let mut port = LoadoutPort {
