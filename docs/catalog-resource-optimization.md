@@ -196,6 +196,20 @@ observed lower bounds and times to stop.
 Folding the dependency ledger by owner preserves the focused coverage tests.
 The matched run leaves the fleet-wide memory criterion open.
 
+A second Ship-only comparison ran without another Archive verifier or
+compiler. Revision `eedf19375` releases temporary vehicle selector
+deduplication tables before caching, retaining the ordered original evidence.
+Both guarded samples reached the ceiling before emitting a completed result.
+
+| Revision | Seconds to stop | Private commit at stop (B) | Working set at stop (B) |
+| --- | ---: | ---: | ---: |
+| `d4055eaf5` | 14.4408 | 2,040,053,760 | 2,008,125,440 |
+| `eedf19375` | 14.8990 | 2,039,361,536 | 2,009,104,384 |
+
+The newer release verifier SHA-256 was
+`4d18af9a4126593ea14b8e5d2e1f58d6c3f5d13304b0b023f4152fe14775eca4`.
+Neither sample proves a reduction in completed-query memory.
+
 For the next Loadout comparison, measure time to first owner, admission,
 Record and XML cache misses, semantic Loadout resolution, port construction and
 alignment in the same release-profile run. A cache can reuse original parsed

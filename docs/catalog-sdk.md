@@ -3376,6 +3376,16 @@ the retained Catalog decode. Lifetime peaks were 1,468,084,224 B private
 commit and 1,352,679,424 B working set. This run establishes LIVE parity
 against the nominated producer and includes the verifier overhead.
 
+On PTU `13284307`, the same one-worker release verifier matched 1,041
+resolved Ship roots against the retained Normal Full Catalog from
+`eada15a2`. It verified 4,583 coverage rows, 2,414 placements, 62,232
+contributing source uses and 949 physical sources. The SDK and Catalog
+agreed on the 86 incompletely covered Ships. End-to-end verification took
+1,074.500 s with 1,491,918,848 B lifetime private commit and 1,373,360,128 B
+working set. The time includes the streamed Catalog read. The bound
+producer and replay evidence are recorded in the
+[PTU replay](catalog-partitioning.md#completed-ptu-13284307-replay).
+
 ## Installed flight configurations
 
 Use `equipment::read_installed_configurations`, its decoded-Entry form or the equivalent
