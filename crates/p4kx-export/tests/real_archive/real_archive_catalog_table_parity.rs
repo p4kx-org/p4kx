@@ -32,7 +32,7 @@ mod measurement;
 #[path = "real_archive_catalog_stream_parity.rs"]
 mod stream_parity;
 
-pub(crate) use digest_parity::{DigestedInventory, DigestedTable, PhysicalSlot};
+pub(crate) use digest_parity::{DigestedInventory, DigestedTable, PhysicalSlot, fingerprint};
 pub(crate) use json_digest::update_json_digest;
 pub(crate) use measurement::{with_bound_measurement, with_bound_measurement_from_producer};
 pub(crate) use stream_parity::{

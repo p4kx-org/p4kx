@@ -20,14 +20,14 @@ use super::selected_origins::SelectOrigin;
 use super::{BoundMeasurement, Counts, SOURCES, TestResult, USES, collect_references, measurement};
 use super::{update_json_digest, wire_row};
 
-pub(super) type WireDigest = [u8; 32];
+pub(crate) type WireDigest = [u8; 32];
 #[derive(Clone, Copy, Debug, Eq, Ord, PartialEq, PartialOrd)]
 pub(crate) struct PhysicalSlot {
     pub(crate) record_index: u32,
     pub(crate) component_ordinal: u32,
 }
 
-pub(super) fn fingerprint(mut value: Value) -> serde_json::Result<WireDigest> {
+pub(crate) fn fingerprint(mut value: Value) -> serde_json::Result<WireDigest> {
     value.sort_all_objects();
     let mut digest = Sha256::new();
     update_json_digest(&mut digest, &value)?;

@@ -3,7 +3,7 @@
 
 use std::{env, slice};
 
-use p4kx_export::catalog_queries::equipment::LoadoutOwnerSnapshot;
+use p4kx_export::catalog_queries::equipment::{Loadout, LoadoutOwnerSnapshot};
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogRecordSelection, DatasetAvailability,
 };
@@ -16,6 +16,9 @@ use crate::real_archive_catalog_table_parity::{
 };
 use crate::real_archive_scoped_equipment_sdk::{component_family_parity, equipment_input};
 use crate::real_archive_verification::print_line;
+
+#[path = "real_archive_loadout_direct_wire_tests.rs"]
+mod direct_wire_tests;
 
 const LOADOUTS: &str = "/loadouts";
 const PRODUCER: &str = "P4KX_LOADOUT_CATALOG_PRODUCER_REVISION";
@@ -164,7 +167,7 @@ fn visit(
             .into());
         }
         if let Some(loadout) = &snapshot.row {
-            let row = wire_row(loadout)?;
+            let row = loadout_wire_row(loadout)?;
             check_identity(snapshot, &row, &position.0)?;
             inspect(snapshot, row)?;
             observed.rows += 1;
@@ -200,6 +203,10 @@ fn visit(
         .into());
     }
     Ok(summary.availability)
+}
+
+fn loadout_wire_row(loadout: &Loadout) -> serde_json::Result<Value> {
+    serde_json::to_value(loadout)
 }
 
 fn check_identity(snapshot: &LoadoutOwnerSnapshot, row: &Value, guid: &str) -> TestResult {
