@@ -132,7 +132,7 @@ fn the_entity_export_offers_the_interior_and_writes_it_below_an_interior_node() 
     );
     let bytes = std::fs::read(&file)?;
     assert!(has_node(&bytes, "Interior")?, "grouped below the hull");
-    let rows = read_glb_origin(&file, &bytes)?;
+    let rows = read_glb_origin(&summary, &bytes)?;
     assert_geometry_origin(&rows, "cockpit_seat.cgfm");
     assert!(
         harness.query_by_label("Entity exported").is_some(),

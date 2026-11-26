@@ -3,6 +3,7 @@
 
 use std::cell::Cell;
 use std::io;
+use std::path::PathBuf;
 
 use p4kx_assembly::{ArchiveModels, Assembly, Interior};
 use p4kx_extraction::{
@@ -30,7 +31,7 @@ pub(super) fn publish(
     scene: Scene<'_>,
     archive_models: &ArchiveModels<'_>,
     (cancel, shared): (&CancelToken, &Shared),
-) -> Result<GlbSummary, ConversionError> {
+) -> Result<(GlbSummary, PathBuf), ConversionError> {
     let protection = ArchiveWriteProtection::new(index.path(), cancel.flag()).map_err(|error| {
         if error.is_cancelled() {
             ConversionError::Cancelled
@@ -71,7 +72,7 @@ pub(super) fn publish(
                 conversion_error(request, cancel, error)
             }
         })?;
-    Ok(summary)
+    Ok((summary, receipt.path().to_path_buf()))
 }
 
 impl Scene<'_> {

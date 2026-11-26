@@ -136,6 +136,10 @@ fn the_export_writes_the_package_folder_reports_it_and_remembers_the_choices() -
     finished(&mut harness)?;
 
     let summary = summary(&harness)?;
+    assert!(
+        summary.origin_receipt().is_none(),
+        "the package summary has no single-file GLB receipt"
+    );
     let package = summary.package().ok_or("no package in the summary")?;
     assert_eq!(summary.parts(), 3, "the ship, the gun and the relay");
     let manifest = manifest(&folder)?;

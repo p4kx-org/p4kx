@@ -4,7 +4,6 @@
 //! The export of a socpak container on its own, from the Entry that holds it.
 
 use std::io::{self, Write};
-use std::path::Path;
 
 use crate::entity_picking::TestResult;
 use crate::interior_export::{
@@ -17,7 +16,7 @@ use egui::accesskit::Role;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use p4kx_extraction::OriginDigestWriter;
-use p4kx_gui::{AssemblyExportStatus, Model, TreeNode};
+use p4kx_gui::{AssemblyExportStatus, AssemblyExportSummary, Model, TreeNode};
 use p4kx_testkit::INTERIOR_ROOT;
 use serde_json::Value;
 
@@ -148,7 +147,7 @@ fn a_socpak_of_another_container_is_exported_from_where_it_lies() -> TestResult 
         "the container the export started from"
     );
     assert!(has_node(&bytes, "cockpit_seat")?, "its model");
-    let rows = read_glb_origin(&file, &bytes)?;
+    let rows = read_glb_origin(&summary(&harness)?, &bytes)?;
     let whole = rows
         .iter()
         .find(|row| row["address"]["type"] == "opaquePayload")
@@ -197,10 +196,18 @@ fn an_entry_that_is_no_socpak_offers_no_interior_export() -> TestResult {
 }
 
 pub(crate) fn read_glb_origin(
-    file: &Path,
+    summary: &AssemblyExportSummary,
     bytes: &[u8],
 ) -> Result<Vec<Value>, Box<dyn std::error::Error>> {
-    let text = std::fs::read_to_string(file.with_extension("glb.p4kx-origin.jsonl"))?;
+    let receipt = summary
+        .origin_receipt()
+        .ok_or("no receipt in the finished export")?;
+    assert_eq!(
+        std::fs::canonicalize(receipt)?,
+        std::fs::canonicalize(summary.file().with_extension("glb.p4kx-origin.jsonl"))?,
+        "the result names the published sibling receipt"
+    );
+    let text = std::fs::read_to_string(receipt)?;
     let rows = text
         .lines()
         .map(serde_json::from_str)

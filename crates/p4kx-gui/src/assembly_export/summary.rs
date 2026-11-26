@@ -68,6 +68,7 @@ pub struct InteriorFacts {
 #[derive(Debug, Clone, PartialEq)]
 pub struct AssemblyExportSummary {
     file: PathBuf,
+    origin_receipt: Option<PathBuf>,
     name: String,
     lod: u32,
     parts: usize,
@@ -103,6 +104,7 @@ impl AssemblyExportSummary {
     ) -> Self {
         Self {
             file,
+            origin_receipt: None,
             name,
             lod: assembly.lod(),
             parts: assembly.parts().len(),
@@ -132,6 +134,7 @@ impl AssemblyExportSummary {
     ) -> Self {
         Self {
             file,
+            origin_receipt: None,
             name,
             lod: interior.lod(),
             parts: interior.parts().len(),
@@ -167,6 +170,11 @@ impl AssemblyExportSummary {
         }
     }
 
+    pub(crate) fn with_origin_receipt(mut self, path: PathBuf) -> Self {
+        self.origin_receipt = Some(path);
+        self
+    }
+
     pub(crate) fn with_mismatches(mut self, mismatches: Vec<PortMismatch>) -> Self {
         self.mismatches = mismatches;
         self
@@ -194,6 +202,12 @@ impl AssemblyExportSummary {
     #[must_use]
     pub fn file(&self) -> &Path {
         &self.file
+    }
+
+    /// Returns the published origin receipt for a single-file GLB export.
+    #[must_use]
+    pub fn origin_receipt(&self) -> Option<&Path> {
+        self.origin_receipt.as_deref()
     }
 
     /// Returns the class name of the Entity.

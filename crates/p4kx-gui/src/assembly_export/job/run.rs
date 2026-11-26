@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::path::PathBuf;
+
 use p4kx_assembly::{
     ArchiveModels, Assembly, AssemblyError, AssemblyOptions, EntityInterior, EntityNode,
     ForgePalettes, Interior, InteriorForge, InteriorOptions, InteriorProgress, InteriorWatch,
@@ -340,11 +342,13 @@ fn open_in(
 
 fn ended(
     index: &EntryIndex,
-    written: Result<GlbSummary, ConversionError>,
+    written: Result<(GlbSummary, PathBuf), ConversionError>,
     summary: impl FnOnce(GlbSummary) -> AssemblyExportSummary,
 ) -> Ended {
     match written {
-        Ok(written) => Ended::Written(Box::new(summary(written))),
+        Ok((written, receipt)) => {
+            Ended::Written(Box::new(summary(written).with_origin_receipt(receipt)))
+        }
         Err(ConversionError::Cancelled) => Ended::Cancelled,
         Err(error) => failed(index, &error),
     }

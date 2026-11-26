@@ -465,9 +465,10 @@ retained selectors. Unknown contributors keep their field's source set incomplet
 
 ## GUI assembly GLB
 
-Entity and Interior GLB exports write a sibling `<output>.p4kx-origin.jsonl`. The receipt
-binds the committed GLB bytes, the explicitly opened container chain, and observed
-POSITION accessor counts with their producing Archive geometry chunks. A count keeps
+Entity and Interior GLB exports write a sibling `<output>.p4kx-origin.jsonl` and expose its
+path in the finished export summary. The receipt binds the committed GLB bytes, the
+explicitly opened container chain, and observed POSITION accessor counts with their
+producing Archive geometry chunks. A count keeps
 incomplete coverage when the export has no proof of all contributing values. The
 receipt does not establish complete material, light, transform or container-declaration
 coverage. An origin publication failure after the GLB has been committed is reported
