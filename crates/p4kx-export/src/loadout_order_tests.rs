@@ -9,7 +9,7 @@ use p4kx_extraction::{
 };
 
 use super::Wanted;
-use super::resolution::{UseCompaction, resolve_ordered};
+use super::resolution::{UseCompaction, in_catalog_order, resolve_ordered};
 use crate::contract_loadout::{EntityKind, Loadout, LoadoutPort};
 use crate::guid_text::CatalogGuid;
 use crate::loadout::staging::StagedLoadoutWriter;
@@ -44,6 +44,24 @@ fn resolved(want: Wanted) -> Loadout {
             ))
         }],
     }
+}
+
+#[test]
+fn an_empty_or_single_owner_keeps_its_original_position() {
+    assert!(
+        in_catalog_order(std::iter::empty()).next().is_none(),
+        "an empty selection yields no owners"
+    );
+    let owner = wanted(42, guid(3), EntityKind::Ship);
+    let mut ordered = in_catalog_order(std::iter::once(owner));
+    assert_eq!(
+        ordered
+            .next()
+            .map(|(position, want)| (position, want.record_index)),
+        Some((0, owner.record_index)),
+        "the singleton retains its input position and physical owner"
+    );
+    assert!(ordered.next().is_none(), "the owner is delivered once");
 }
 
 #[test]

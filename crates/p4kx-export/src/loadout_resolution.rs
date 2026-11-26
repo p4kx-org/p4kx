@@ -119,7 +119,7 @@ pub(super) fn resolve_ordered<'source>(
     mut after_owner: impl FnMut(usize) -> Result<(), CatalogError>,
 ) -> Result<Vec<CatalogReadFailure<'source>>, CatalogError> {
     let mut failures = Vec::new();
-    for (index, (position, want)) in in_catalog_order(wanted).into_iter().enumerate() {
+    for (index, (position, want)) in in_catalog_order(wanted).enumerate() {
         checkpoint(cancel)?;
         match read(want) {
             Ok(Some(entry)) => accept(entry)?,
@@ -133,10 +133,18 @@ pub(super) fn resolve_ordered<'source>(
     Ok(failures.into_iter().map(|(_, failure)| failure).collect())
 }
 
-pub(crate) fn in_catalog_order(wanted: impl Iterator<Item = Wanted>) -> Vec<(usize, Wanted)> {
-    let mut ordered: Vec<_> = wanted.enumerate().collect();
-    guid_text::sort_by_guid(&mut ordered, |(_, want)| want.guid);
-    ordered
+pub(crate) fn in_catalog_order(
+    wanted: impl Iterator<Item = Wanted>,
+) -> impl Iterator<Item = (usize, Wanted)> {
+    let mut indexed = wanted.enumerate();
+    let (single, ordered) = if matches!(indexed.size_hint().1, Some(0..=1)) {
+        (indexed.next(), Vec::new())
+    } else {
+        let mut ordered: Vec<_> = indexed.collect();
+        guid_text::sort_by_guid(&mut ordered, |(_, want)| want.guid);
+        (None, ordered)
+    };
+    single.into_iter().chain(ordered)
 }
 
 pub(super) fn read_with<'f: 'worker, 'worker>(
