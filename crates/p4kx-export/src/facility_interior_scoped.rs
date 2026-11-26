@@ -40,6 +40,7 @@ pub(crate) fn collect_room_attachments(
     Ok(attachments)
 }
 
+#[derive(Clone, Copy)]
 pub(crate) struct RoomScope<'scope, 'source> {
     pub(crate) root: crate::loadout::Wanted,
     pub(crate) declarations:
@@ -93,7 +94,7 @@ pub(crate) fn project_rooms(
     let forge = input.forge();
     let coverage = interior::scoped(
         &mut project,
-        interior::RoomPaths { archive, keys },
+        &interior::RoomPaths { archive, keys },
         &rooms,
         hosts,
         &capture,

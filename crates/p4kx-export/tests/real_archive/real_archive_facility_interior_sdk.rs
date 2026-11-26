@@ -55,7 +55,10 @@ fn installed_all_facility_interior_placements_cold_visit() -> TestResult {
     with_archive(|archive| {
         let session =
             CatalogQuerySession::open(archive, CatalogLanguageSelection::Selected(&[]), None)?;
-        visit_installed(&session, nominated_build(archive)?, |_| Ok(()))?;
+        let summary = visit_installed(&session, nominated_build(archive)?, |_| Ok(()))?;
+        if summary.owner_count == 0 {
+            return Err("the installed Interior visit emitted no physical Ship owners".into());
+        }
         Ok(())
     })
 }

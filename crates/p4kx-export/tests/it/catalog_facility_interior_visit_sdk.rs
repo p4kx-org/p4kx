@@ -66,7 +66,11 @@ impl VisitedRooms {
     fn retain(&mut self, snapshot: &FacilityInteriorPlacementSnapshot) -> TestResult {
         let coverage = &snapshot.coverage;
         let ship = coverage.ship_record_index;
-        assert_eq!(coverage.root_state, SourceValueState::Present);
+        assert_eq!(
+            coverage.root_state,
+            SourceValueState::Present,
+            "the fixture Ship keeps its present physical root"
+        );
         self.roots.push(ship);
         self.incomplete_owners += usize::from(!coverage.complete);
         match ship {
@@ -85,7 +89,11 @@ impl VisitedRooms {
             let placement = row
                 .interior_placement()
                 .ok_or("a typed Interior placement")?;
-            assert_eq!(row.ship_record_index().value(), Some(&ship));
+            assert_eq!(
+                row.ship_record_index().value(),
+                Some(&ship),
+                "the Interior placement retains its physical Ship Record"
+            );
             self.placements
                 .retain(ship, placement.loadout_position().is_some(), row, &sources)?;
         }

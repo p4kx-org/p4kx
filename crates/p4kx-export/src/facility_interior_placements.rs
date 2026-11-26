@@ -94,7 +94,7 @@ pub(super) struct RoomPaths<'archive> {
 
 pub(super) fn scoped<'host>(
     project: &mut Projection<'_, '_, '_>,
-    paths: RoomPaths<'_>,
+    paths: &RoomPaths<'_>,
     rooms: &RoomOwners<'_, '_>,
     hosts: impl IntoIterator<Item = RoomHost<'host>>,
     capture: &EntryCapture<'_>,

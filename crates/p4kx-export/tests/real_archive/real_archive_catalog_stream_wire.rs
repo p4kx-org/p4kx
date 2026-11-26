@@ -261,16 +261,20 @@ pub(super) fn encounter_key(row: &Value) -> TestResult<Fingerprint> {
 }
 
 fn interior_placement_key(row: &Value) -> TestResult<Fingerprint> {
-    let root = ship_row::interior_placement_root::<serde_json::Error>(row)?
+    let root_record_index = ship_row::interior_placement_root::<serde_json::Error>(row)?
         .ok_or("a Loadout placement has no Interior occurrence key")?;
-    let room = row
+    let room_identity = row
         .pointer("/source/room")
         .and_then(Value::as_object)
         .ok_or("the Interior placement lacks a room identity")?;
     let position = present_index(row.pointer("/source/position"))
         .and_then(Value::as_object)
         .ok_or("the Interior placement lacks a present SOC occurrence")?;
-    Ok(fingerprint(serde_json::to_value((root, room, position))?)?)
+    Ok(fingerprint(serde_json::to_value((
+        root_record_index,
+        room_identity,
+        position,
+    ))?)?)
 }
 
 fn wire_slot(row: &Value) -> TestResult<PhysicalSlot> {

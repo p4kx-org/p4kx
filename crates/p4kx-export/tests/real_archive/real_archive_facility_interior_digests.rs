@@ -88,7 +88,7 @@ impl<'directory> StreamedInteriorDigests<'directory> {
             rooms.into_ordered(SHAPES[0])?,
             placements.into_ordered(SHAPES[1])?,
         ];
-        let roots = self.roots.finish();
+        let loadout_roots = self.roots.finish();
         measurement.verify_streamed_scope(
             StreamedRowPaths::Arrays(PATHS),
             [DatasetAvailability::Available; 2],
@@ -96,14 +96,14 @@ impl<'directory> StreamedInteriorDigests<'directory> {
             None,
             |capture| {
                 capture.keep(AVAILABILITY);
-                capture.project(LOADOUTS, Projection::ShipLoadoutRows(roots));
+                capture.project(LOADOUTS, Projection::ShipLoadoutRows(loadout_roots));
             },
             |catalog| {
                 let expected = serde_json::to_value(DatasetAvailability::Available)?;
                 if catalog.pointer(AVAILABILITY) != Some(&expected) {
                     return Err("the retained FacilityInstance table is unavailable".into());
                 }
-                if catalog.pointer(LOADOUTS) != Some(&Value::from(roots.count())) {
+                if catalog.pointer(LOADOUTS) != Some(&Value::from(loadout_roots.count())) {
                     return Err("the retained Ship Loadout roots are missing".into());
                 }
                 Ok(())

@@ -103,7 +103,7 @@ fn record_index(value: &Value) -> Option<u32> {
 #[cfg(test)]
 mod tests {
     use serde::de::DeserializeSeed as _;
-    use serde_json::{Value, json};
+    use serde_json::{Map, Value, json};
 
     use super::super::{ComparedRows, RowSelection};
     use crate::real_archive_catalog_table_parity::TestResult;
@@ -117,17 +117,23 @@ mod tests {
     }
 
     fn declaration(owner: u32, position: Value) -> Value {
-        json!({
-            "owner": {"ownerRecordIndex": {"state": "present", "value": owner}},
-            "loadoutPosition": position,
-        })
+        Value::Object(Map::from_iter([
+            (
+                "owner".into(),
+                json!({"ownerRecordIndex": {"state": "present", "value": owner}}),
+            ),
+            ("loadoutPosition".into(), position),
+        ]))
     }
 
     fn placement(ship: u32, source: Value) -> Value {
-        json!({
-            "shipRecordIndex": {"state": "present", "value": ship},
-            "source": source,
-        })
+        Value::Object(Map::from_iter([
+            (
+                "shipRecordIndex".into(),
+                json!({"state": "present", "value": ship}),
+            ),
+            ("source".into(), source),
+        ]))
     }
 
     fn interior(ship: u32, owner: u32, position: Value) -> Value {

@@ -212,9 +212,9 @@ fn project<'source>(
             playability: playability.evidence(),
             cancel,
         };
-        for owner in owners.drain(..) {
+        for owner in &owners {
             if let Some(row) = projector.project_owner(
-                &owner,
+                owner,
                 &mut owner_ledger,
                 &mut groups.coverage,
                 &mut dependencies,
@@ -223,6 +223,7 @@ fn project<'source>(
             }
             ledger.merge(std::mem::take(&mut owner_ledger));
         }
+        owners.clear();
         groups.fill(&mut owners, cancel)?;
     }
     dependencies.finish(files.archive(), &ledger)?;
