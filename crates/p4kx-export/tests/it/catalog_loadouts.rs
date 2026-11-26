@@ -18,6 +18,28 @@ use serde_json::{Value, json};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+fn type_values(port: &Value) -> Value {
+    Value::Array(
+        port["types"]["value"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|kind| {
+                let subtypes: Vec<_> = kind["subTypes"]["value"]
+                    .as_array()
+                    .into_iter()
+                    .flatten()
+                    .map(|subtype| &subtype["value"])
+                    .collect();
+                json!({
+                    "type": kind["type"]["value"],
+                    "subTypes": subtypes
+                })
+            })
+            .collect(),
+    )
+}
+
 #[test]
 fn every_ship_and_every_item_with_ports_has_a_loadout_ordered_by_guid() -> TestResult {
     let (_, catalog) = build(None)?;
@@ -78,8 +100,8 @@ fn the_ports_list_the_loadout_ports_then_the_vehicle_only_ports() -> TestResult 
         (
             &empty["source"],
             &empty["minSize"]["value"],
-            &empty["itemGuid"],
-            &empty["visibility"]
+            &empty["itemGuid"]["value"],
+            &empty["visibility"]["value"]
         ),
         (
             &json!("vehicle"),
@@ -90,7 +112,7 @@ fn the_ports_list_the_loadout_ports_then_the_vehicle_only_ports() -> TestResult 
         "a vehicle-only port is empty"
     );
     assert_eq!(
-        empty["types"],
+        type_values(empty),
         json!([
             {"type": "Missile", "subTypes": ["IR", "EM", "IR"]},
             {"type": "Bomb", "subTypes": []},
@@ -113,18 +135,18 @@ fn a_record_port_keeps_its_definition_and_the_vehicle_file_gives_the_visibility(
         (
             &turret["minSize"]["value"],
             &turret["maxSize"]["value"],
-            &turret["types"],
+            &type_values(turret),
             &turret["flags"]["value"],
             &turret["portTags"]["value"],
             &turret["requiredTags"]["value"],
             &turret["displayNameKey"]["value"],
-            &turret["visibility"],
+            &turret["visibility"]["value"],
             &turret["source"]
         ),
         (
             &json!(2),
             &json!(4),
-            &json!([{"type": "Turret", "subTypes": ["GunTurret"]}]),
+            &json!([{"type": "Turret", "subTypes": ["GunTurret", "GunTurret"]}]),
             &json!(["uneditable"]),
             &json!(["Turret"]),
             &json!(["Mount"]),
@@ -135,7 +157,10 @@ fn a_record_port_keeps_its_definition_and_the_vehicle_file_gives_the_visibility(
         "the Record's definition wins; the vehicle file's flag hides the port"
     );
     assert_eq!(
-        (&turret["itemGuid"], &turret["itemClassName"]),
+        (
+            &turret["itemGuid"]["value"],
+            &turret["itemClassName"]["value"]
+        ),
         (&json!(guid(TURRET)), &json!("ACME_Turret")),
         "the attached item"
     );
@@ -150,11 +175,11 @@ fn a_port_the_record_lacks_takes_its_definition_from_the_vehicle_file() -> TestR
         (
             &gun["minSize"]["value"],
             &gun["maxSize"]["value"],
-            &gun["types"],
+            &type_values(gun),
             &gun["flags"]["value"],
             &gun["portTags"]["value"],
             &gun["requiredTags"]["value"],
-            &gun["visibility"]
+            &gun["visibility"]["value"]
         ),
         (
             &json!(1),
@@ -299,8 +324,8 @@ fn the_ports_of_an_attached_item_are_nested_with_the_overrides_of_the_loadout() 
     assert_eq!(
         (
             &first["source"],
-            &first["itemGuid"],
-            &first["itemClassName"]
+            &first["itemGuid"]["value"],
+            &first["itemClassName"]["value"]
         ),
         (
             &json!("override"),
@@ -311,13 +336,13 @@ fn the_ports_of_an_attached_item_are_nested_with_the_overrides_of_the_loadout() 
     );
     let second = port(&turret["ports"], "gun_2")?;
     assert_eq!(
-        (&second["source"], &second["itemGuid"]),
+        (&second["source"], &second["itemGuid"]["value"]),
         (&json!("port_default"), &json!(guid(GUN_DEFAULT))),
         "the port's own default item"
     );
     let own = port(&loadout(&catalog, TURRET)?["ports"], "gun_1")?;
     assert_eq!(
-        (&own["source"], &own["itemGuid"]),
+        (&own["source"], &own["itemGuid"]["value"]),
         (&json!("port_default"), &json!(guid(GUN_DEFAULT))),
         "the turret's own loadout keeps its default"
     );
@@ -331,7 +356,11 @@ fn an_item_with_a_port_and_no_loadout_lists_the_port_empty() -> TestResult {
     assert_eq!(rack["ports"].as_array().map(Vec::len), Some(1), "one port");
     let slot = port(&rack["ports"], "slot_1")?;
     assert_eq!(
-        (&slot["source"], &slot["itemGuid"], &slot["itemClassName"]),
+        (
+            &slot["source"],
+            &slot["itemGuid"]["value"],
+            &slot["itemClassName"]["value"]
+        ),
         (&json!("unset"), &Value::Null, &Value::Null),
         "the port holds nothing"
     );

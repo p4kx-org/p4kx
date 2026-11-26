@@ -105,7 +105,7 @@ fn entities() -> Vec<TestEntity> {
             .port(
                 TestPort::new("hardpoint_turret")
                     .sizes(2, 4)
-                    .item_type("Turret", ["GunTurret"])
+                    .item_type("Turret", ["GunTurret", "GunTurret"])
                     .flags("uneditable")
                     .tags("Turret", "Mount"),
             )

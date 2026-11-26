@@ -42,9 +42,8 @@ fn a_dangling_attachment_retains_its_target_without_becoming_unreadable_source()
         .ports
         .first()
         .ok_or("port missing")?
-        .item_guid
-        .ok_or("target identity missing")?
-        .0;
+        .item_guid()
+        .ok_or("target identity missing")?;
     let ledger = capture.finish()?;
     let note = ledger
         .field_diagnostics

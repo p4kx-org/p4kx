@@ -101,7 +101,7 @@ fn an_invisible_armor_override_joins_its_physical_definition() -> TestResult {
         "the explicit override selects the attachment"
     );
     assert_eq!(
-        attached["visibility"], "invisible",
+        attached["visibility"]["value"], "invisible",
         "the original vehicle port is invisible"
     );
     let identity = proof::at(attached, "/sourceConstraints/attachedItem")?;
@@ -123,7 +123,7 @@ fn an_invisible_armor_override_joins_its_physical_definition() -> TestResult {
         "the original unresolved placement is kept"
     );
     assert_eq!(
-        lost["itemGuid"],
+        lost["itemGuid"]["value"],
         json!(common::guid(fixture::MISSING)),
         "the unresolved placement retains the original target GUID"
     );

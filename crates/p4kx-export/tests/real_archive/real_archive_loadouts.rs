@@ -74,7 +74,8 @@ fn check_counts(built: &BuiltCatalog, catalog: &Value) -> TestResult {
     for entry in loadouts {
         walk(self::ports(entry), &mut |port| {
             ports += 1;
-            attached += usize::from(port["unresolved"].is_null() && !port["itemGuid"].is_null());
+            attached +=
+                usize::from(port["unresolved"].is_null() && !port["itemGuid"]["value"].is_null());
             docked += usize::from(port["dockedVehicle"] == json!(true));
             unresolved += usize::from(!port["unresolved"].is_null());
         });
@@ -115,10 +116,10 @@ fn check_references(built: &BuiltCatalog, catalog: &Value) -> TestResult {
         assert!(owners.insert(owner), "{owner} has one loadout");
         walk(ports(entry), &mut |port| {
             if port["unresolved"].is_null()
-                && let Some(guid) = port["itemGuid"].as_str()
+                && let Some(guid) = port["itemGuid"]["value"].as_str()
                 && !known.contains(guid)
                 && outside.insert(guid)
-                && let Some(class) = port["itemClassName"].as_str()
+                && let Some(class) = port["itemClassName"]["value"].as_str()
             {
                 classes.insert(class);
             }
@@ -155,7 +156,7 @@ fn same(tree: &[PortNode], listed: &[Value], at: &str) {
         };
         assert_eq!(json["source"], source, "{here}: source");
         assert_eq!(
-            json["visibility"],
+            json["visibility"]["value"],
             port.visibility().code(),
             "{here}: visibility"
         );
@@ -166,23 +167,36 @@ fn same(tree: &[PortNode], listed: &[Value], at: &str) {
             ] {
                 assert_eq!(json.pointer(field), Some(&json!(size)), "{here}: {field}");
             }
-            let types: Vec<&str> = json["types"]
+            let types: Vec<&str> = json["types"]["value"]
                 .as_array()
                 .into_iter()
                 .flatten()
-                .filter_map(|kind| kind["type"].as_str())
+                .filter_map(|kind| kind["type"]["value"].as_str())
                 .collect();
-            let wanted: Vec<&str> = definition.types().iter().map(PortType::name).collect();
+            let wanted: Vec<&str> = definition
+                .types()
+                .iter()
+                .map(PortType::name)
+                .filter(|name| !name.is_empty())
+                .collect();
             assert_eq!(types, wanted, "{here}: types");
         }
         match port.attachment() {
             Attachment::Empty => {
-                assert!(json["itemGuid"].is_null(), "{here}: empty");
+                assert!(json["itemGuid"]["value"].is_null(), "{here}: empty");
                 same(port.nested(), ports(json), &here);
             }
             Attachment::Entity(child) => {
-                assert_eq!(json["itemGuid"], child.guid().to_string(), "{here}: item");
-                assert_eq!(json["itemClassName"], child.class_name(), "{here}: class");
+                assert_eq!(
+                    json["itemGuid"]["value"],
+                    child.guid().to_string(),
+                    "{here}: item"
+                );
+                assert_eq!(
+                    json["itemClassName"]["value"],
+                    child.class_name(),
+                    "{here}: class"
+                );
                 assert_eq!(
                     json["dockedVehicle"],
                     json!(child.is_docked_vehicle()),
@@ -267,15 +281,18 @@ fn check_known_ship(archive: &Archive, catalog: &Value) -> TestResult {
     let by_name = |name: &str| top.iter().find(|port| port_name(port) == Some(name));
     let power = by_name("hardpoint_power_plant").ok_or("the power plant port")?;
     assert_eq!(
-        power["itemGuid"], "4a4a2a9c-040f-4f36-befe-7101b230fa53",
+        power["itemGuid"]["value"], "4a4a2a9c-040f-4f36-befe-7101b230fa53",
         "power plant"
     );
     assert_eq!(
-        power["itemClassName"], "POWR_LPLT_S01_PowerBolt_SCItem",
+        power["itemClassName"]["value"], "POWR_LPLT_S01_PowerBolt_SCItem",
         "power plant class"
     );
     let gun = by_name("hardpoint_weapon_gun_left").ok_or("the gun port")?;
-    assert_eq!(gun["itemClassName"], "Mount_Gimbal_S3", "gun mount");
+    assert_eq!(
+        gun["itemClassName"]["value"], "Mount_Gimbal_S3",
+        "gun mount"
+    );
     assert_eq!(ports(gun).len(), 1, "the gimbal mount carries one gun port");
     let bay = by_name("hardpoint_weapon_missilebay_front").ok_or("the missile bay")?;
     assert_eq!(

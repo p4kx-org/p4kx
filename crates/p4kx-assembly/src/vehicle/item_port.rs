@@ -9,6 +9,7 @@ use super::{PortVisibility, ValueOrigin, VehicleAttributeEvidence, VehicleXmlSit
 use crate::markup::AttributeOrigins;
 
 pub(crate) const ITEM_TYPE_ATTRIBUTE: &str = "type";
+pub(crate) const ITEM_SUBTYPES_ATTRIBUTE: &str = "subtypes";
 pub(crate) const PORT_OBSERVED_ATTRIBUTES: [&str; 5] = [
     "minSize",
     "maxSize",
@@ -31,6 +32,7 @@ pub struct VehicleItemType {
     pub(crate) item_type: String,
     pub(crate) subtypes: Vec<String>,
     pub(super) assignment: Option<Arc<VehicleAttributeEvidence>>,
+    pub(super) subtypes_assignment: Option<Arc<VehicleAttributeEvidence>>,
     pub(super) collection: Option<Arc<VehicleXmlSite>>,
     pub(super) declaration: Option<Arc<VehicleXmlSite>>,
 }
@@ -70,6 +72,12 @@ impl VehicleItemType {
     #[must_use]
     pub fn subtypes(&self) -> &[String] {
         &self.subtypes
+    }
+
+    /// Borrows the original attribute that supplied or omitted these subtypes.
+    #[must_use]
+    pub fn subtypes_evidence(&self) -> Option<&VehicleAttributeEvidence> {
+        self.subtypes_assignment.as_deref()
     }
 }
 

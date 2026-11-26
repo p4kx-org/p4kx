@@ -93,7 +93,7 @@ impl From<&LoadoutPort> for PortJoinState {
             attachment_port_inventory_complete: port.attachment_port_inventory_complete,
             docked_vehicle: port.docked_vehicle,
             unresolved: port.unresolved.is_some(),
-            item_selector: if port.item_guid.is_some() || port.item_class_name.is_some() {
+            item_selector: if port.item_guid().is_some() || port.item_class_name().is_some() {
                 ItemSelector::Present
             } else {
                 ItemSelector::Absent

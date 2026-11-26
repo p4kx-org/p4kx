@@ -4,6 +4,7 @@
 //! Loadouts of ships and items in the P4KX catalog, through the public API: the references
 //! of the ports, the summary, the Filter and the order.
 
+use crate::health_origin_assertions as origin;
 use crate::loadouts_fixture::{
     self, ALPHA, BROKEN, GUN_DEFAULT, GUN_OVERRIDE, GUN_TEMPLATE, MISSING, SNUB, TURRET,
 };
@@ -24,7 +25,7 @@ fn a_docked_vehicle_is_a_ship_reference_whose_ports_are_not_listed() -> TestResu
     let hangar = port(&loadout(&catalog, ALPHA)?["ports"], "hangar")?;
     assert_eq!(
         (
-            &hangar["itemGuid"],
+            &hangar["itemGuid"]["value"],
             &hangar["dockedVehicle"],
             &hangar["ports"]
         ),
@@ -45,21 +46,25 @@ fn an_attachment_that_cannot_be_resolved_is_kept_with_its_code() -> TestResult {
     let (_, catalog) = build(None)?;
     let alpha = loadout(&catalog, ALPHA)?;
     let lost = port(&alpha["ports"], "lost")?;
+    origin::cell(lost, "itemGuid", "absent")?;
+    origin::present(lost, "itemClassName", &json!("NoSuchClass"), Some(true))?;
     assert_eq!(
         (
             &lost["unresolved"],
-            &lost["itemGuid"],
-            &lost["itemClassName"]
+            &lost["itemGuid"]["value"],
+            &lost["itemClassName"]["value"]
         ),
         (&json!("unknown_class"), &Value::Null, &json!("NoSuchClass")),
         "a class name no Entity has"
     );
     let dangling = port(&alpha["ports"], "hardpoint_ref")?;
+    origin::present(dangling, "itemGuid", &json!(guid(MISSING)), Some(true))?;
+    origin::cell(dangling, "itemClassName", "absent")?;
     assert_eq!(
         (
             &dangling["unresolved"],
-            &dangling["itemGuid"],
-            &dangling["itemClassName"]
+            &dangling["itemGuid"]["value"],
+            &dangling["itemClassName"]["value"]
         ),
         (
             &json!("dangling_reference"),
@@ -104,7 +109,11 @@ fn the_summary_counts_the_ports_and_the_entities_without_an_entry() -> TestResul
         "the leftover is no item"
     );
     let held = port(&loadout(&catalog, ALPHA)?["ports"], "hardpoint_old")?;
-    assert_eq!(held["itemGuid"], json!(template), "but it stays referenced");
+    assert_eq!(
+        held["itemGuid"]["value"],
+        json!(template),
+        "but it stays referenced"
+    );
     let kind = built.summary().kind(Kind::Loadouts).ok_or("the kind")?;
     assert_eq!((kind.count, kind.complete), (7, true), "the kind summary");
     assert_eq!(
@@ -128,7 +137,7 @@ fn every_attached_guid_resolves_except_the_counted_ones() -> TestResult {
     while let Some(port) = stack.pop() {
         stack.extend(port["ports"].as_array().into_iter().flatten());
         if port["unresolved"].is_null()
-            && let Some(guid) = port["itemGuid"].as_str()
+            && let Some(guid) = port["itemGuid"]["value"].as_str()
             && !known.contains(&guid)
             && !outside.contains(&guid)
         {
@@ -184,11 +193,15 @@ fn a_shared_dataforge_preserves_sequential_ship_and_item_catalogs() -> TestResul
         let ships = compare_reused_catalog(&archive, &entry, "*/spaceships/*")?;
         let ports = &loadout(&ships, ALPHA)?["ports"];
         let empty = port(ports, "hardpoint_empty")?;
-        assert_eq!(empty["itemGuid"], Value::Null, "the empty vehicle port");
+        assert_eq!(
+            empty["itemGuid"]["value"],
+            Value::Null,
+            "the empty vehicle port"
+        );
         let turret = port(ports, "hardpoint_turret")?;
         let nested = port(&turret["ports"], "gun_1")?;
         assert_eq!(
-            nested["itemGuid"],
+            nested["itemGuid"]["value"],
             json!(guid(GUN_OVERRIDE)),
             "the ship's nested attachment override"
         );
@@ -198,7 +211,7 @@ fn a_shared_dataforge_preserves_sequential_ship_and_item_catalogs() -> TestResul
     let items = compare_reused_catalog(&archive, &entry, "*/scitem/*")?;
     let own = port(&loadout(&items, TURRET)?["ports"], "gun_1")?;
     assert_eq!(
-        own["itemGuid"],
+        own["itemGuid"]["value"],
         json!(guid(GUN_DEFAULT)),
         "the next filtered read retains the item's own default attachment"
     );

@@ -4,7 +4,7 @@
 use std::ops::ControlFlow;
 
 use p4kx_assembly::{LoadoutClassSelection, LoadoutXmlClassUse, XmlLoadoutClassSite};
-use p4kx_extraction::{Guid, Record};
+use p4kx_extraction::{Guid, Record, SourcedValue};
 
 use crate::catalog_read::original::{
     ExampleBodyReceipt, LoadoutClassNameReceipt, LoadoutTargetReceipt,
@@ -90,6 +90,29 @@ impl Capture<'_> {
             target.bind_class_xml(selected)?;
         }
         Ok(target)
+    }
+
+    pub(super) fn unresolved_class_name(
+        &self,
+        selection: &LoadoutClassSelection,
+        name: &str,
+        xml_use: Option<&LoadoutXmlClassUse>,
+    ) -> Result<SourcedValue<String>, CatalogError> {
+        let input = self
+            .input
+            .ok_or(ExportAccountingError::UnboundHealthSubject)?;
+        let state = self.lock()?;
+        let mut original = state.classes.name(selection, name)?;
+        let selected = match (original.original_xml(), xml_use) {
+            (Some(source), Some(usage)) => Some(state.graph.selected_xml_use(usage, source)?),
+            (None, None) => None,
+            _ => return Err(ExportAccountingError::ConflictingSourceDatum.into()),
+        };
+        drop(state);
+        if let Some(selected) = selected {
+            original.bind_xml(selected)?;
+        }
+        Ok(original.retained_name(input)?.into_cell(&self.name_sources))
     }
 
     pub(super) fn class_example(

@@ -36,7 +36,7 @@ fn resolved(want: Wanted) -> Loadout {
         entity_kind: crate::loadout_owner_value::LoadoutOwnerValue::fixture(want.kind),
         issues: Vec::new(),
         ports: vec![LoadoutPort {
-            item_guid: Some(guid(99)),
+            item_guid: SourceUses::default().value(SourceValue::Present(guid(99)), &[], false),
             ..LoadoutPort::named(SourceUses::default().value(
                 SourceValue::Present(want.record_index.to_string()),
                 &[],

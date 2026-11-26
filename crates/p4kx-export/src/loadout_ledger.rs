@@ -3,6 +3,8 @@
 
 #[path = "loadout_ledger/alignment.rs"]
 mod alignment;
+#[path = "loadout_ledger/attachment_values.rs"]
+mod attachment_values;
 #[path = "loadout_ledger/cargo_record_effect.rs"]
 mod cargo_record_effect;
 #[path = "loadout_ledger/cargo_storage.rs"]
@@ -32,6 +34,8 @@ mod path_observer;
 mod path_proofs;
 #[path = "loadout_ledger/port_attributes.rs"]
 mod port_attributes;
+#[path = "loadout_ledger/port_type_attributes.rs"]
+mod port_type_attributes;
 #[path = "loadout_ledger/root_index.rs"]
 mod root_index;
 #[path = "loadout_ledger/typed.rs"]

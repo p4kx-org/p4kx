@@ -38,7 +38,7 @@ fn direct_loadout_wire_preserves_nested_full_proof() -> TestResult {
                 .pointer("/ports/0/ports/0")
                 .ok_or("nested gun port")?;
             assert_eq!(
-                gun.get("itemClassName").and_then(Value::as_str),
+                gun["itemClassName"]["value"].as_str(),
                 Some("ACME_Gun"),
                 "the sample resolves the nested gun attachment",
             );

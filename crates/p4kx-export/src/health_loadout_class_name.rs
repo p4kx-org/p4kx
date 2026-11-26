@@ -2,12 +2,12 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_assembly::{LoadoutDocumentKind, LoadoutFileObservation, XmlLoadoutClassSite};
-use p4kx_extraction::{SourceUse, StructValue, Value};
+use p4kx_extraction::{SourceUse, SourceValue, StructValue, Value};
 
 use super::authored_entry_text::AuthoredEntryText;
 use super::health_entry_frame::EntryCapture;
 use super::health_loadout_graph::ClassXmlSelection;
-use super::{EntryPathCapture, OriginalValueEdge, OriginalValueFact};
+use super::{EntryPathCapture, OriginalDatum, OriginalValueEdge, OriginalValueFact};
 use crate::build::original_input::OriginalCatalogInput;
 use crate::{CatalogError, ExportAccountingError};
 
@@ -63,11 +63,11 @@ impl LoadoutClassNameReceipt {
         })
     }
 
-    pub(super) fn original_xml(&self) -> Option<&LoadoutFileObservation> {
+    pub(crate) fn original_xml(&self) -> Option<&LoadoutFileObservation> {
         self.xml.as_ref().map(|xml| &xml.operation)
     }
 
-    pub(super) fn bind_xml(
+    pub(crate) fn bind_xml(
         &mut self,
         selection: ClassXmlSelection,
     ) -> Result<(), ExportAccountingError> {
@@ -82,7 +82,7 @@ impl LoadoutClassNameReceipt {
         Ok(())
     }
 
-    pub(super) fn value(&self) -> &str {
+    pub(crate) fn value(&self) -> &str {
         self.text.as_str()
     }
 
@@ -119,5 +119,20 @@ impl LoadoutClassNameReceipt {
             }
         }
         Ok((inputs, complete))
+    }
+
+    pub(crate) fn retained_name(
+        &self,
+        input: &OriginalCatalogInput<'_, '_>,
+    ) -> Result<OriginalDatum<String>, CatalogError> {
+        self.check_input(input)?;
+        let (_, mut inputs, known) = self.text.retain()?.into_parts();
+        let (selectors, complete) = self.selectors()?;
+        inputs.extend(selectors);
+        Ok(OriginalDatum::observed(
+            SourceValue::Present(self.value().to_owned()),
+            inputs,
+            known && complete,
+        ))
     }
 }

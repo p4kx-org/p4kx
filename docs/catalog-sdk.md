@@ -2469,6 +2469,27 @@ selection stages keep the field origin incomplete.
 sourced list cells. Words within one list share the original field or attribute. The value-only
 list getters return an empty slice for non-present cells.
 
+`source_item_guid()` and `source_item_class_name()` borrow the immediate
+`itemGuid` and `itemClassName` cells. A resolved class name comes from the
+selected Record header. A dangling Reference can still supply its GUID, and an
+unresolved class lookup can supply its original name. An unreadable target
+keeps the unreadable state. Empty slots keep the absent state. Their origin
+remains incomplete when resolution has no observation for the empty selector.
+
+`source_visibility()` borrows the resolved `visibility` cell. The selected
+vehicle flags take precedence over the DataForge flags. When the resolver has
+no vehicle winner, it retains the available fallback flag evidence and keeps
+the selection incomplete.
+
+`source_types()` borrows the ordered `types` cell. Each accepted item type
+has separate `type` and `subTypes` cells for the original DataForge
+fields or effective vehicle XML attributes. Each DataForge subtype cites
+its original array slot. Subtypes split from one XML attribute share that
+attribute's conversion evidence. The XML collection remains
+incomplete when the capture cannot prove the entire membership survey.
+The value getters `item_guid()`, `item_class_name()`, `visibility()`,
+`types()`, `item_type()` and `sub_types()` keep their existing signatures.
+
 `source_display_name_key()` borrows `displayNameKey`, including the original empty or placeholder
 key and its origin. `display_name_key()` returns a key only when it is present, nonempty and not a
 placeholder. Use the original port-definition link for the canonical text lookup.

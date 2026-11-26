@@ -86,7 +86,7 @@ fn resolved_loadout_instances_share_the_original_configuration_without_expanding
     )?;
     let docked = port(ports, "hangar")?;
     assert_eq!(
-        proof::at(docked, "/itemGuid")?,
+        proof::at(docked, "/itemGuid/value")?,
         &json!(common::guid(DOCKED))
     );
     assert_eq!(proof::at(docked, "/dockedVehicle")?, &json!(true));

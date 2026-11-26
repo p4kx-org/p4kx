@@ -319,8 +319,8 @@ fn the_loadout_fields_accept_additions_and_new_closed_values_but_stay_required()
     let catalog = minimal_catalog();
     let mut unknown_port = catalog.clone();
     unknown_port["loadouts"][0]["ports"][0]["ports"][0]["extra"] = json!(true);
-    unknown_port["loadouts"][0]["ports"][0]["types"] = json!([{"type": "Turret", "extra": 1,
-        "subTypes": []}]);
+    let nested_type = &mut unknown_port["loadouts"][0]["ports"][0]["ports"][0]["types"]["value"][0];
+    nested_type["extra"] = json!(1);
     assert!(
         validator.is_valid(&unknown_port),
         "unknown fields in a nested port and a port type"
@@ -329,7 +329,7 @@ fn the_loadout_fields_accept_additions_and_new_closed_values_but_stay_required()
     let mut new_values = catalog.clone();
     new_values["loadouts"][0]["entityKind"]["value"] = json!("vehicle");
     new_values["loadouts"][0]["ports"][0]["source"] = json!("modification");
-    new_values["loadouts"][0]["ports"][0]["visibility"] = json!("hidden");
+    new_values["loadouts"][0]["ports"][0]["visibility"]["value"] = json!("hidden");
     assert!(
         validator.is_valid(&new_values),
         "a new entity kind, source or visibility is additive: the closed sets stay strings"
@@ -339,6 +339,9 @@ fn the_loadout_fields_accept_additions_and_new_closed_values_but_stay_required()
         ("entityKind", None),
         ("issues", None),
         ("ports", Some("itemGuid")),
+        ("ports", Some("itemClassName")),
+        ("ports", Some("visibility")),
+        ("ports", Some("types")),
         ("ports", Some("dockedVehicle")),
         ("ports", Some("unresolved")),
         ("ports", Some("ports")),
@@ -359,6 +362,12 @@ fn the_loadout_fields_accept_additions_and_new_closed_values_but_stay_required()
             "{path} {field:?} stays required"
         );
     }
+    let mut bare = catalog.clone();
+    bare["loadouts"][0]["ports"][0]["itemGuid"] = Value::Null;
+    assert!(
+        !validator.is_valid(&bare),
+        "a bare attachment GUID loses its marker"
+    );
     Ok(())
 }
 

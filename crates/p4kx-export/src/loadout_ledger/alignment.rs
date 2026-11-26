@@ -64,7 +64,7 @@ impl Capture<'_> {
         ))
     }
 
-    fn retained_target(
+    pub(super) fn retained_target(
         &self,
         guid: Guid,
         selection: &LoadoutTargetGuid,

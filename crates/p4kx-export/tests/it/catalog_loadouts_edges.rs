@@ -21,8 +21,8 @@ fn an_entity_that_holds_itself_is_an_unresolved_cycle_and_is_not_attached() -> T
     assert_eq!(
         (
             &held["unresolved"],
-            &held["itemGuid"],
-            &held["itemClassName"],
+            &held["itemGuid"]["value"],
+            &held["itemClassName"]["value"],
             &held["ports"]
         ),
         (
@@ -49,17 +49,28 @@ fn an_empty_port_lists_the_ports_of_its_nested_loadout() -> TestResult {
     let body = port(&loadout(&catalog, NESTED)?["ports"], "body")?;
     assert_eq!(
         (
-            &body["itemGuid"],
-            &body["itemClassName"],
+            &body["itemGuid"]["value"],
+            &body["itemClassName"]["value"],
             &body["unresolved"]
         ),
         (&Value::Null, &Value::Null, &Value::Null),
         "the empty port holds nothing itself"
     );
+    assert_eq!(
+        body["visibility"],
+        json!({
+            "state": "present",
+            "value": "unspecified",
+            "containsEncryptedSource": null,
+            "sourceUsesRefs": [],
+            "sourceSetComplete": false
+        }),
+        "a port without an observed flag definition keeps unknown visibility evidence"
+    );
     assert_eq!(names(&body["ports"]), ["seat_1"], "the nested port");
     let seat = port(&body["ports"], "seat_1")?;
     assert_eq!(
-        (&seat["itemGuid"], &seat["itemClassName"]),
+        (&seat["itemGuid"]["value"], &seat["itemClassName"]["value"]),
         (&json!(guid(GUN)), &json!("ACME_Gun")),
         "and what the nested Loadout attaches to it"
     );

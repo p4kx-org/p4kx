@@ -13,12 +13,15 @@ pub(super) fn loadouts() -> serde_json::Value {
     let gun = json!({
         "name": present(json!("hardpoint_gun_left")), "source": "loadout",
         "minSize": present(json!(1)), "maxSize": present(json!(3)),
-        "types": [{"type": "WeaponGun", "subTypes": ["Gun"]}],
+        "types": present(json!([{
+            "type": present(json!("WeaponGun")),
+            "subTypes": present(json!([present(json!("Gun"))]))
+        }])),
         "flags": present(json!(["uneditable"])), "portTags": present(json!(["Gun"])),
         "requiredTags": present(json!(["Mount"])),
-        "displayNameKey": source(SourceValue::Absent), "visibility": "visible",
-        "itemGuid": "30000000-0000-4000-8000-000000000001",
-        "itemClassName": "POWR_ACAS_S01", "dockedVehicle": false, "unresolved": null,
+        "displayNameKey": source(SourceValue::Absent), "visibility": present(json!("visible")),
+        "itemGuid": present(json!("30000000-0000-4000-8000-000000000001")),
+        "itemClassName": present(json!("POWR_ACAS_S01")), "dockedVehicle": false, "unresolved": null,
         "sourceConstraints": {"portDefinition": null, "attachedItem": null},
         "ports": []
     });
@@ -30,10 +33,10 @@ pub(super) fn loadouts() -> serde_json::Value {
         "ports": [{
             "name": present(json!("hardpoint_turret")), "source": "vehicle",
             "minSize": source(SourceValue::Absent), "maxSize": source(SourceValue::Absent),
-            "types": [], "flags": source(SourceValue::Absent), "portTags": source(SourceValue::Absent),
+            "types": present(json!([])), "flags": source(SourceValue::Absent), "portTags": source(SourceValue::Absent),
             "requiredTags": source(SourceValue::Absent),
-            "displayNameKey": source(SourceValue::Absent), "visibility": "unspecified",
-            "itemGuid": null, "itemClassName": null, "dockedVehicle": false,
+            "displayNameKey": source(SourceValue::Absent), "visibility": present(json!("unspecified")),
+            "itemGuid": source(SourceValue::Absent), "itemClassName": source(SourceValue::Absent), "dockedVehicle": false,
             "unresolved": null,
             "sourceConstraints": {"portDefinition": null, "attachedItem": null},
             "ports": [gun]

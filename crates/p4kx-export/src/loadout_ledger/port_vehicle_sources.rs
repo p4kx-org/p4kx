@@ -3,7 +3,8 @@
 
 use p4kx_assembly::{
     LoadoutDocumentKind, LoadoutError, LoadoutFailurePath, LoadoutFileError,
-    VehicleAttributeEvidence, VehicleImplementation, VehiclePortSelection, VehicleXmlSite,
+    VehicleAttributeEvidence, VehicleImplementation, VehicleItemType, VehiclePortSelection,
+    VehicleXmlSite,
 };
 use p4kx_extraction::{
     Archive, SharedFieldOrigin, SourceUseRole, SourceUses, SourceValue, SourcedValue,
@@ -18,6 +19,7 @@ use super::{Capture, State};
 use crate::catalog_read::original::{
     AuthoredEntryPath, EntryCapture, OriginalDatum, VehicleFileSelection,
 };
+use crate::contract_loadout::{PortSubTypes, PortType};
 use crate::{CatalogError, ExportAccountingError};
 
 struct VehicleFiles<'scope> {
@@ -70,28 +72,121 @@ impl<'scope> VehiclePortSources<'scope> {
         role: SourceUseRole,
     ) -> Result<SourcedValue<T>, CatalogError> {
         let mut local = Contributions::default();
+        self.retain_attribute(evidence, role, &mut local)?;
+        self.sourced_value(value, local)
+    }
+
+    fn retain_attribute(
+        &self,
+        evidence: Option<&VehicleAttributeEvidence>,
+        role: SourceUseRole,
+        local: &mut Contributions,
+    ) -> Result<(), CatalogError> {
         if let Some(evidence) = evidence {
-            let role = if matches!(value, SourceValue::Absent) {
+            let role = if evidence.original().checked_absence() {
                 SourceUseRole::Selector
             } else {
                 role
             };
-            self.files.retain(evidence.original(), role, &mut local)?;
+            self.files.retain(evidence.original(), role, local)?;
             for selector in evidence.selectors() {
                 self.files
-                    .retain(selector, SourceUseRole::Selector, &mut local)?;
+                    .retain(selector, SourceUseRole::Selector, local)?;
             }
         } else {
             local.incomplete();
         }
+        Ok(())
+    }
+
+    fn sourced_value<T>(
+        &self,
+        value: SourceValue<T>,
+        local: Contributions,
+    ) -> Result<SourcedValue<T>, CatalogError> {
         let (uses, complete) = local.into_parts();
         Ok(self
             .sources
             .value_with_shared_origin(value, &self.shared, &uses, complete)?)
     }
+
+    pub(super) fn item_types(
+        &self,
+        kinds: &[VehicleItemType],
+        position: Option<&VehicleXmlSite>,
+    ) -> Result<SourcedValue<Vec<PortType>>, CatalogError> {
+        let mut members = Contributions::new(Vec::new(), false);
+        if let Some(position) = position {
+            self.files
+                .retain(position, SourceUseRole::Selector, &mut members)?;
+        }
+        let items = kinds
+            .iter()
+            .map(|kind| self.item_type(kind, &mut members))
+            .collect::<Result<_, _>>()?;
+        self.sourced_value(SourceValue::Present(items), members)
+    }
+
+    fn item_type(
+        &self,
+        kind: &VehicleItemType,
+        members: &mut Contributions,
+    ) -> Result<PortType, CatalogError> {
+        let mut local = Contributions::default();
+        for site in kind.selection_sites() {
+            self.files
+                .retain(site, SourceUseRole::Selector, &mut local)?;
+        }
+        let mut name = local.clone();
+        let (item_type, evidence) = kind.item_type_source();
+        self.retain_attribute(evidence, SourceUseRole::Selector, members)?;
+        members.extend(local.clone());
+        self.retain_attribute(evidence, SourceUseRole::Payload, &mut name)?;
+        let evidence = kind.subtypes_evidence();
+        self.retain_attribute(evidence, SourceUseRole::Conversion, &mut local)?;
+        let state = if evidence.is_some_and(|evidence| evidence.original().checked_absence()) {
+            SourceValue::Absent
+        } else {
+            SourceValue::Present(())
+        };
+        let sub_types = self.sourced_value(state, local)?;
+        let member = sub_types.clone();
+        Ok(PortType {
+            r#type: self.sourced_value(SourceValue::Present(item_type.to_owned()), name)?,
+            sub_types: sub_types.map(|()| PortSubTypes::shared(kind.subtypes().to_vec(), member)),
+        })
+    }
 }
 
 impl Capture<'_> {
+    pub(crate) fn port_visibility(
+        &self,
+        code: &'static str,
+        xml: Option<&VehiclePortSelection<'_>>,
+        name: Option<&AuthoredEntryPath>,
+        flags: Option<&SourcedValue<Vec<String>>>,
+        archive: Option<&Archive>,
+        record_index: Option<u32>,
+    ) -> Result<SourcedValue<&'static str>, CatalogError> {
+        let value = SourceValue::Present(code);
+        let Some(xml) = xml else {
+            let visibility = self.name_sources.value(value, &[], false);
+            return match flags {
+                Some(flags) => Ok(self
+                    .name_sources
+                    .add_value_origins(visibility, &[flags.origin()])?),
+                None => Ok(visibility),
+            };
+        };
+        let state = self.lock()?;
+        let source = VehiclePortSources::read(self, &state, xml, name, archive, record_index)?;
+        source.value(
+            value,
+            xml.port().flags_evidence(),
+            SourceUseRole::Conversion,
+        )
+    }
+
     pub(crate) fn paint_missing_vehicle_survey(
         &self,
         record_index: u32,

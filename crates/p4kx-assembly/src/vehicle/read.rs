@@ -8,8 +8,8 @@ use p4kx_foundation::read_text_number;
 
 use super::aggregate_evidence::Checkpoint;
 use super::{
-    ITEM_TYPE_ATTRIBUTE, PartKind, VehicleAggregateEvidence, VehicleItemPort, VehicleItemType,
-    VehiclePart,
+    ITEM_SUBTYPES_ATTRIBUTE, ITEM_TYPE_ATTRIBUTE, PartKind, VehicleAggregateEvidence,
+    VehicleItemPort, VehicleItemType, VehiclePart,
 };
 use crate::markup::Element;
 use crate::merge::port_key;
@@ -231,7 +231,7 @@ fn read_types(port: &Element) -> Vec<VehicleItemType> {
             Some(VehicleItemType {
                 item_type: element.attribute(ITEM_TYPE_ATTRIBUTE)?.to_owned(),
                 subtypes: element
-                    .attribute("subtypes")
+                    .attribute(ITEM_SUBTYPES_ATTRIBUTE)
                     .unwrap_or_default()
                     .split(',')
                     .map(str::trim)
@@ -239,6 +239,7 @@ fn read_types(port: &Element) -> Vec<VehicleItemType> {
                     .map(str::to_owned)
                     .collect(),
                 assignment: element.origins.evidence(ITEM_TYPE_ATTRIBUTE).cloned(),
+                subtypes_assignment: element.origins.evidence(ITEM_SUBTYPES_ATTRIBUTE).cloned(),
                 collection: collection_site.clone(),
                 declaration: element.origins.shared_element(),
             })

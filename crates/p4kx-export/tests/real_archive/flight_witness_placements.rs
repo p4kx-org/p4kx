@@ -146,7 +146,7 @@ fn check_port(output: &Value, child: &EntityNode, index: u32) -> Result {
     );
     let guid = child.guid().to_string();
     assert!(
-        text(output, "/itemGuid")? == guid,
+        text(output, "/itemGuid/value")? == guid,
         "original port target GUID"
     );
     assert!(

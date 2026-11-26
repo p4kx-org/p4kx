@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use std::sync::OnceLock;
-
-use p4kx_extraction::{ProvenanceMode, SourceUses, SourceValue, SourcedValue, is_placeholder_key};
+use p4kx_extraction::{SourcedValue, is_placeholder_key};
 use schemars::JsonSchema;
 use serde::Serialize;
 
@@ -11,6 +9,10 @@ use crate::contract::every_field_required;
 use crate::guid_text::CatalogGuid;
 use crate::loadout::alignment::LoadoutAlignment;
 use crate::loadout_owner_value::LoadoutOwnerValue;
+
+#[path = "loadout_sub_types.rs"]
+mod sub_types;
+pub(crate) use sub_types::PortSubTypes;
 
 /// Which kind of entry a loadout belongs to; serialised as the strings `ship` and `item`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -72,7 +74,7 @@ pub struct LoadoutPort {
     /// The largest item size the port takes and its original source.
     pub(crate) max_size: SourcedValue<u32>,
     /// The item types the port takes, in stored order; empty when the data names none.
-    pub(crate) types: Vec<PortType>,
+    pub(crate) types: SourcedValue<Vec<PortType>>,
     /// The flags split at white space without a leading `$`, and their shared source.
     pub(crate) flags: SourcedValue<Vec<String>>,
     /// The offered tag words in stored order and their shared source.
@@ -85,15 +87,15 @@ pub struct LoadoutPort {
     /// part of that name says; without such a part `invisible` when the port definition carries
     /// the flag `invisible`, else `unspecified`. A closed set the game may extend, so the schema
     /// keeps a string.
-    pub(crate) visibility: &'static str,
+    pub(crate) visibility: SourcedValue<&'static str>,
     /// The `guid` of the entry in `items` (or, for a docked vehicle, in `ships`) the port holds
     /// by default; `null` for an empty port. For an attachment that cannot be resolved it is the
     /// GUID the Loadout names, which may belong to no entry, or `null` when the Loadout names a
     /// class name only.
-    pub(crate) item_guid: Option<CatalogGuid>,
+    pub(crate) item_guid: SourcedValue<CatalogGuid>,
     /// The class name of the attached Entity, or the class name the Loadout names; `null` for an
     /// empty port or an unresolved Reference.
-    pub(crate) item_class_name: Option<String>,
+    pub(crate) item_class_name: SourcedValue<String>,
     /// Whether the attached Entity is a docked vehicle, e.g. a snub craft in a hangar port. Its
     /// ports are not listed.
     pub(crate) docked_vehicle: bool,
@@ -108,15 +110,16 @@ pub struct LoadoutPort {
 }
 
 /// An item type a port takes.
-#[derive(Debug, Serialize, JsonSchema)]
+#[derive(Clone, Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
 pub struct PortType {
     /// The item type, e.g. `WeaponGun`.
-    pub(crate) r#type: String,
+    pub(crate) r#type: SourcedValue<String>,
     /// The item subtypes the port takes; empty when it takes every subtype or the data gives
     /// none.
-    pub(crate) sub_types: Vec<String>,
+    #[schemars(with = "SourcedValue<Vec<SourcedValue<String>>>")]
+    pub(crate) sub_types: SourcedValue<PortSubTypes>,
 }
 
 impl Loadout {
@@ -178,63 +181,10 @@ impl Loadout {
     }
 }
 
-#[derive(Clone)]
-struct UnobservedPortFields {
-    size: SourcedValue<u32>,
-    words: SourcedValue<Vec<String>>,
-    name_key: SourcedValue<String>,
-}
-
-impl UnobservedPortFields {
-    fn with_mode(mode: ProvenanceMode) -> Self {
-        static MARKERS: OnceLock<UnobservedPortFields> = OnceLock::new();
-        static FULL: OnceLock<UnobservedPortFields> = OnceLock::new();
-        match mode {
-            ProvenanceMode::MarkersOnly => MARKERS.get_or_init(|| Self::new(mode)).clone(),
-            ProvenanceMode::Full => FULL.get_or_init(|| Self::new(mode)).clone(),
-            _ => Self::new(mode),
-        }
-    }
-
-    fn new(mode: ProvenanceMode) -> Self {
-        let uses = SourceUses::with_provenance_mode(mode);
-        Self {
-            size: uses.value(SourceValue::Absent, &[], false),
-            words: uses.value(SourceValue::Absent, &[], false),
-            name_key: uses.value(SourceValue::Absent, &[], false),
-        }
-    }
-}
+#[path = "loadout_port_default.rs"]
+mod port_default;
 
 impl LoadoutPort {
-    pub(crate) fn named(name: SourcedValue<String>) -> Self {
-        let UnobservedPortFields {
-            size,
-            words,
-            name_key,
-        } = UnobservedPortFields::with_mode(name.origin().provenance_mode());
-        Self {
-            name,
-            name_proof: None,
-            attachment_port_inventory_complete: false,
-            source: "",
-            min_size: size.clone(),
-            max_size: size,
-            types: Vec::new(),
-            flags: words.clone(),
-            port_tags: words.clone(),
-            required_tags: words,
-            display_name_key: name_key,
-            visibility: "",
-            item_guid: None,
-            item_class_name: None,
-            docked_vehicle: false,
-            unresolved: None,
-            source_constraints: LoadoutAlignment::default(),
-            ports: Vec::new(),
-        }
-    }
-
     /// Borrows the resolved original port name and its immediate source evidence.
     #[must_use]
     pub const fn name(&self) -> &SourcedValue<String> {
@@ -274,6 +224,12 @@ impl LoadoutPort {
     /// Borrows the allowed original item types in declaration order.
     #[must_use]
     pub fn types(&self) -> &[PortType] {
+        self.types.value().map_or(&[], Vec::as_slice)
+    }
+
+    /// Borrows the ordered item type declarations and their selection evidence.
+    #[must_use]
+    pub const fn source_types(&self) -> &SourcedValue<Vec<PortType>> {
         &self.types
     }
 
@@ -331,19 +287,40 @@ impl LoadoutPort {
     /// Returns the canonical visibility code.
     #[must_use]
     pub const fn visibility(&self) -> &'static str {
-        self.visibility
+        match self.visibility.value() {
+            Some(value) => value,
+            None => "",
+        }
+    }
+
+    /// Borrows the resolved visibility and the evidence for its selection.
+    #[must_use]
+    pub const fn source_visibility(&self) -> &SourcedValue<&'static str> {
+        &self.visibility
     }
 
     /// Returns the attached or authored target GUID when available.
     #[must_use]
     pub fn item_guid(&self) -> Option<p4kx_extraction::Guid> {
-        self.item_guid.map(CatalogGuid::get)
+        self.item_guid.value().copied().map(CatalogGuid::get)
     }
 
     /// Borrows the attached or authored target class when available.
     #[must_use]
     pub fn item_class_name(&self) -> Option<&str> {
-        self.item_class_name.as_deref()
+        self.item_class_name.value().map(String::as_str)
+    }
+
+    /// Borrows the attached GUID and its immediate source evidence.
+    #[must_use]
+    pub const fn source_item_guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.item_guid
+    }
+
+    /// Borrows the attached class name and its immediate source evidence.
+    #[must_use]
+    pub const fn source_item_class_name(&self) -> &SourcedValue<String> {
+        &self.item_class_name
     }
 
     /// Reports whether resolution reached a docked vehicle.
@@ -375,13 +352,30 @@ impl PortType {
     /// Borrows the original accepted item type.
     #[must_use]
     pub const fn item_type(&self) -> &str {
-        self.r#type.as_str()
+        match self.r#type.value() {
+            Some(value) => value.as_str(),
+            None => "",
+        }
     }
 
     /// Borrows the original accepted item subtypes.
     #[must_use]
     pub fn sub_types(&self) -> &[String] {
-        &self.sub_types
+        self.sub_types.value().map_or(&[], PortSubTypes::values)
+    }
+
+    /// Borrows the accepted item type and the evidence for its selected declaration.
+    #[must_use]
+    pub const fn source_item_type(&self) -> &SourcedValue<String> {
+        &self.r#type
+    }
+
+    /// Returns the authored collection with each accepted subtype and its evidence.
+    #[must_use]
+    pub fn source_sub_types(&self) -> SourcedValue<Vec<SourcedValue<&str>>> {
+        let values = self.sub_types.value();
+        self.sub_types
+            .map_ref(|_| values.into_iter().flat_map(PortSubTypes::members).collect())
     }
 }
 

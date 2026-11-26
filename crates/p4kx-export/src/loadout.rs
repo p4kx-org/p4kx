@@ -113,10 +113,10 @@ impl LoadoutSummary {
             self.ports = self.ports.saturating_add(1);
             if port.unresolved.is_some() {
                 self.unresolved = self.unresolved.saturating_add(1);
-            } else if let Some(guid) = port.item_guid {
+            } else if let Some(guid) = port.item_guid() {
                 self.attached = self.attached.saturating_add(1);
-                if !known.contains(&guid.0) {
-                    outside.insert(guid.0);
+                if !known.contains(&guid) {
+                    outside.insert(guid);
                 }
             }
             if port.docked_vehicle {

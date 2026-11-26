@@ -3,7 +3,7 @@
 
 use p4kx_dataforge::Guid;
 
-use crate::{LoadoutError, LoadoutReferenceSelection};
+use crate::{LoadoutClassSelection, LoadoutError, LoadoutReferenceSelection, LoadoutXmlClassUse};
 
 /// An attachment that cannot be resolved: what was named and why it fails.
 #[derive(Debug, Clone)]
@@ -11,6 +11,13 @@ pub struct Unresolved {
     pub(crate) target: Target,
     pub(crate) error: LoadoutError,
     pub(crate) reference: Option<LoadoutReferenceSelection>,
+    pub(crate) class: Option<Box<UnresolvedClass>>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct UnresolvedClass {
+    pub(crate) selection: LoadoutClassSelection,
+    pub(crate) xml_use: Option<LoadoutXmlClassUse>,
 }
 
 impl PartialEq for Unresolved {
@@ -26,6 +33,14 @@ impl Unresolved {
     #[must_use]
     pub const fn reference_selection(&self) -> Option<&LoadoutReferenceSelection> {
         self.reference.as_ref()
+    }
+
+    /// Borrows the actual class lookup and any XML use that supplied its input.
+    #[must_use]
+    pub fn class_selection(&self) -> Option<(&LoadoutClassSelection, Option<&LoadoutXmlClassUse>)> {
+        self.class
+            .as_ref()
+            .map(|class| (&class.selection, class.xml_use.as_ref()))
     }
 
     /// Returns what the Loadout names.

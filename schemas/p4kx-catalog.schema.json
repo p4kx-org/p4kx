@@ -24848,6 +24848,7 @@
       "type": "object"
     },
     "InteriorFacilityPlacement": {
+      "description": "One original SOC Entity located in a Ship room.",
       "properties": {
         "classRecordIndex": {
           "$ref": "#/$defs/SourcedValueOfuint32"
@@ -25077,35 +25078,43 @@
       "type": "object"
     },
     "InteriorSocPosition": {
+      "description": "Original archive and container coordinates of one SOC Entity.",
       "properties": {
         "chunkIndex": {
+          "description": "Chunk index within the stream.",
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
         },
         "container": {
-          "$ref": "#/$defs/PhysicalEntryRef"
+          "$ref": "#/$defs/PhysicalEntryRef",
+          "description": "Physical room container entry."
         },
         "containerOccurrenceOrdinal": {
+          "description": "Occurrence of the container under the root room.",
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
         },
         "descriptor": {
-          "$ref": "#/$defs/PhysicalEntryRef"
+          "$ref": "#/$defs/PhysicalEntryRef",
+          "description": "Physical XML descriptor entry."
         },
         "descriptorNodeIndex": {
+          "description": "Node index of the stream declaration within the XML descriptor.",
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
         },
         "entityOrdinal": {
+          "description": "Entity ordinal within the chunk.",
           "format": "uint32",
           "minimum": 0,
           "type": "integer"
         },
         "stream": {
-          "$ref": "#/$defs/PhysicalEntryRef"
+          "$ref": "#/$defs/PhysicalEntryRef",
+          "description": "Physical SOC stream entry."
         }
       },
       "required": [
@@ -29008,21 +29017,11 @@
           "description": "The flags split at white space without a leading `$`, and their shared source."
         },
         "itemClassName": {
-          "description": "The class name of the attached Entity, or the class name the Loadout names; `null` for an\nempty port or an unresolved Reference.",
-          "type": [
-            "string",
-            "null"
-          ]
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The class name of the attached Entity, or the class name the Loadout names; `null` for an\nempty port or an unresolved Reference."
         },
         "itemGuid": {
-          "anyOf": [
-            {
-              "$ref": "#/$defs/Guid"
-            },
-            {
-              "type": "null"
-            }
-          ],
+          "$ref": "#/$defs/SourcedValueOfGuid",
           "description": "The `guid` of the entry in `items` (or, for a docked vehicle, in `ships`) the port holds\nby default; `null` for an empty port. For an attachment that cannot be resolved it is the\nGUID the Loadout names, which may belong to no entry, or `null` when the Loadout names a\nclass name only."
         },
         "maxSize": {
@@ -29061,11 +29060,8 @@
           "description": "Physical source configuration links for the port definition and attached Entity."
         },
         "types": {
-          "description": "The item types the port takes, in stored order; empty when the data names none.",
-          "items": {
-            "$ref": "#/$defs/PortType"
-          },
-          "type": "array"
+          "$ref": "#/$defs/SourcedValueOfArray_of_PortType",
+          "description": "The item types the port takes, in stored order; empty when the data names none."
         },
         "unresolved": {
           "description": "The code of the error that kept the attachment from being resolved, e.g.\n`dangling_reference` or `unknown_class`; `null` otherwise.",
@@ -29075,8 +29071,8 @@
           ]
         },
         "visibility": {
-          "description": "Whether the port shows its item: `visible` or `invisible` as the vehicle implementation's\npart of that name says; without such a part `invisible` when the port definition carries\nthe flag `invisible`, else `unspecified`. A closed set the game may extend, so the schema\nkeeps a string.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Whether the port shows its item: `visible` or `invisible` as the vehicle implementation's\npart of that name says; without such a part `invisible` when the port definition carries\nthe flag `invisible`, else `unspecified`. A closed set the game may extend, so the schema\nkeeps a string."
         }
       },
       "required": [
@@ -37394,15 +37390,12 @@
       "description": "An item type a port takes.",
       "properties": {
         "subTypes": {
-          "description": "The item subtypes the port takes; empty when it takes every subtype or the data gives\nnone.",
-          "items": {
-            "type": "string"
-          },
-          "type": "array"
+          "$ref": "#/$defs/SourcedValueOfArray_of_SourcedValueOfstring",
+          "description": "The item subtypes the port takes; empty when it takes every subtype or the data gives\nnone."
         },
         "type": {
-          "description": "The item type, e.g. `WeaponGun`.",
-          "type": "string"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "The item type, e.g. `WeaponGun`."
         }
       },
       "required": [
@@ -48194,12 +48187,15 @@
       "type": "object"
     },
     "SocAttribute": {
+      "description": "One original SOC Entity attribute.",
       "properties": {
         "name": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original attribute name."
         },
         "value": {
-          "$ref": "#/$defs/SourcedValueOfstring"
+          "$ref": "#/$defs/SourcedValueOfstring",
+          "description": "Original attribute value."
         }
       },
       "required": [
@@ -54191,6 +54187,139 @@
               "value": {
                 "items": {
                   "$ref": "#/$defs/PlayerMotion"
+                },
+                "type": "array"
+              }
+            }
+          }
+        }
+      ],
+      "description": "A typed data value with its immediate, materialized source origin.",
+      "properties": {
+        "containsEncryptedSource": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "sourceSetComplete": {
+          "type": "boolean"
+        },
+        "sourceUsesRefs": {
+          "items": {
+            "$ref": "#/$defs/SourceUseRef"
+          },
+          "type": "array"
+        },
+        "state": {
+          "$ref": "#/$defs/SourceValueState"
+        },
+        "value": true
+      },
+      "required": [
+        "containsEncryptedSource",
+        "sourceSetComplete",
+        "sourceUsesRefs",
+        "state",
+        "value"
+      ],
+      "type": "object"
+    },
+    "SourcedValueOfArray_of_PortType": {
+      "allOf": [
+        {
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "containsEncryptedSource": {
+                    "const": false
+                  }
+                },
+                "required": [
+                  "containsEncryptedSource"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "sourceSetComplete": {
+                    "const": true
+                  }
+                }
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "sourceUsesRefs": {
+                    "maxItems": 0
+                  }
+                },
+                "required": [
+                  "sourceUsesRefs"
+                ]
+              },
+              "then": {
+                "else": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "type": "null"
+                    }
+                  }
+                },
+                "if": {
+                  "properties": {
+                    "sourceSetComplete": {
+                      "const": true
+                    }
+                  },
+                  "required": [
+                    "sourceSetComplete"
+                  ]
+                },
+                "then": {
+                  "properties": {
+                    "containsEncryptedSource": {
+                      "const": false
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "properties": {
+            "sourceUsesRefs": {
+              "items": {
+                "minLength": 1,
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        },
+        {
+          "else": {
+            "properties": {
+              "value": {
+                "type": "null"
+              }
+            }
+          },
+          "if": {
+            "properties": {
+              "state": {
+                "const": "present"
+              }
+            },
+            "required": [
+              "state"
+            ]
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "items": {
+                  "$ref": "#/$defs/PortType"
                 },
                 "type": "array"
               }

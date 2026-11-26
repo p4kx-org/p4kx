@@ -17,6 +17,7 @@ use crate::node_notes;
 use crate::resolver::LoadoutResolver;
 use crate::resolver_observation::{self, LoadoutReadEvent};
 use crate::spec::{EntitySpec, LoadoutSpec, TargetSpec};
+use crate::tree::UnresolvedClass;
 use crate::vehicle::flags_contain;
 use crate::walk::Walk;
 use crate::{
@@ -146,7 +147,7 @@ impl LoadoutResolver<'_> {
         xml_use: Option<&LoadoutXmlClassUse>,
         walk: &mut Walk,
     ) -> Attachment {
-        let failure = |named, error| unresolved(named, error, target);
+        let failure = |named, error| unresolved(named, error, target, xml_use);
         if self.observation_stopped() {
             return failure(Target::Unreadable, LoadoutError::ObservationStopped);
         }
@@ -307,15 +308,30 @@ fn class_text(target: &TargetSpec) -> String {
     }
 }
 
-fn unresolved(target: Target, error: LoadoutError, source: &TargetSpec) -> Attachment {
+fn unresolved(
+    target: Target,
+    error: LoadoutError,
+    source: &TargetSpec,
+    xml_use: Option<&LoadoutXmlClassUse>,
+) -> Attachment {
     let error = match source {
         TargetSpec::Reference(reference) => error.with_reference(reference),
         _ => error,
     };
     let reference: Option<LoadoutReferenceSelection> = source.reference_selection().cloned();
+    let class = match source {
+        TargetSpec::ClassName(name) => name.selection().map(|selection| {
+            Box::new(UnresolvedClass {
+                selection: selection.clone(),
+                xml_use: xml_use.cloned(),
+            })
+        }),
+        _ => None,
+    };
     Attachment::Unresolved(Unresolved {
         target,
         error,
         reference,
+        class,
     })
 }

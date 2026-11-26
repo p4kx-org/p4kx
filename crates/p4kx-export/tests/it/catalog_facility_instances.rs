@@ -32,7 +32,7 @@ fn ship_facility_instances_preserve_repeated_nested_and_docked_loadout_positions
         "unresolved original placement evidence remains in the Loadout"
     );
     assert_eq!(
-        proof::at(docked, "/ports/0/itemGuid")?,
+        proof::at(docked, "/ports/0/itemGuid/value")?,
         &common::guid(fixture::SEAT),
         "the separately selected vehicle still resolves its own facilities"
     );

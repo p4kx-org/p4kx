@@ -4,15 +4,14 @@
 use std::collections::BTreeSet;
 
 use p4kx_assembly::{
-    Attachment, EntityNode, LoadoutError, PortDefinition, PortNode, PortSource, Target,
-    VehicleItemPort, VehiclePortSelection,
+    Attachment, EntityNode, LoadoutError, PortDefinition, PortNode, PortSource,
+    VehiclePortSelection,
 };
 use p4kx_extraction::{Archive, SourcedValue};
 
 use crate::CatalogError;
 use crate::catalog_read::original::AuthoredEntryPath;
-use crate::contract_loadout::{LoadoutPort, PortType};
-use crate::guid_text::CatalogGuid;
+use crate::contract_loadout::LoadoutPort;
 use crate::loadout::{
     alignment::{AlignmentLookup, LoadoutAlignment},
     ledger::Capture,
@@ -91,10 +90,22 @@ impl<'rows> PortReader<'rows> {
             self.archive,
             record_index,
         )?;
-        let (source, visibility) = match (port.source(), xml.map(VehiclePortSelection::port)) {
+        let (source, visibility_code) = match (port.source(), xml.map(VehiclePortSelection::port)) {
             (PortSource::Empty, Some(own)) => (VEHICLE_SOURCE, own.visibility().code()),
             (PortSource::Empty, None) => (VEHICLE_SOURCE, port.visibility().code()),
             (source, _) => (source.code(), port.visibility().code()),
+        };
+        let visibility = if shape.visibility.value().is_some() {
+            shape.visibility
+        } else {
+            capture.port_visibility(
+                visibility_code,
+                xml,
+                name_proof.as_ref(),
+                port.definition().map(|_| &shape.flags),
+                self.archive,
+                record_index,
+            )?
         };
         let mut shape = LoadoutPort {
             name_proof,
@@ -106,6 +117,16 @@ impl<'rows> PortReader<'rows> {
             )?,
             ..shape
         };
+        self.read_attachment(port, &mut shape, capture)?;
+        Ok(shape)
+    }
+
+    fn read_attachment(
+        &mut self,
+        port: &PortNode,
+        shape: &mut LoadoutPort,
+        capture: &Capture<'_>,
+    ) -> Result<(), CatalogError> {
         match port.attachment() {
             Attachment::Empty => {
                 shape.ports = port
@@ -115,8 +136,9 @@ impl<'rows> PortReader<'rows> {
                     .collect::<Result<_, _>>()?;
             }
             Attachment::Entity(child) => {
-                shape.item_guid = Some(CatalogGuid(child.guid()));
-                shape.item_class_name = Some(child.class_name().to_owned());
+                let values = capture.attached_values(child)?;
+                shape.item_guid = values.guid;
+                shape.item_class_name = values.class_name;
                 shape.docked_vehicle = child.is_docked_vehicle();
                 shape.attachment_port_inventory_complete = child.issues().is_empty();
                 if child.is_expanded() {
@@ -126,14 +148,12 @@ impl<'rows> PortReader<'rows> {
             Attachment::Unresolved(unresolved) => {
                 self.issues.insert(unresolved.error().kind());
                 shape.unresolved = Some(unresolved.error().kind());
-                match unresolved.target() {
-                    Target::Reference(guid) => shape.item_guid = Some(CatalogGuid(*guid)),
-                    Target::ClassName(name) => shape.item_class_name = Some(name.clone()),
-                    Target::Unreadable => {}
-                }
+                let values = capture.unresolved_attachment_values(unresolved)?;
+                shape.item_guid = values.guid;
+                shape.item_class_name = values.class_name;
             }
         }
-        Ok(shape)
+        Ok(())
     }
 }
 
@@ -146,52 +166,23 @@ fn read_shape(
     archive: Option<&Archive>,
     record_index: Option<u32>,
 ) -> Result<LoadoutPort, CatalogError> {
-    let (port, attributes) = match (definition, xml) {
-        (Some(definition), _) => (
-            read_definition(definition, name),
-            capture.definition_attributes(definition, proof)?,
-        ),
-        (None, Some(xml)) => (
-            read_vehicle(xml.port(), name),
-            capture.vehicle_attributes(xml, proof, archive, record_index)?,
-        ),
+    let attributes = match (definition, xml) {
+        (Some(definition), _) => capture.definition_attributes(definition, proof)?,
+        (None, Some(xml)) => capture.vehicle_attributes(xml, proof, archive, record_index)?,
         (None, None) => return Ok(LoadoutPort::named(name)),
     };
-    Ok(LoadoutPort {
+    let mut port = LoadoutPort {
         min_size: attributes.min_size,
         max_size: attributes.max_size,
+        types: attributes.types,
         flags: attributes.flags,
         port_tags: attributes.port_tags,
         required_tags: attributes.required_tags,
         display_name_key: attributes.display_name_key,
-        ..port
-    })
-}
-
-fn read_definition(definition: &PortDefinition, name: SourcedValue<String>) -> LoadoutPort {
-    LoadoutPort {
-        types: definition
-            .types()
-            .iter()
-            .map(|kind| PortType {
-                r#type: kind.name().to_owned(),
-                sub_types: kind.sub_types().to_vec(),
-            })
-            .collect(),
         ..LoadoutPort::named(name)
+    };
+    if let Some(visibility) = attributes.visibility {
+        port.visibility = visibility;
     }
-}
-
-fn read_vehicle(port: &VehicleItemPort, name: SourcedValue<String>) -> LoadoutPort {
-    LoadoutPort {
-        types: port
-            .item_types()
-            .iter()
-            .map(|kind| PortType {
-                r#type: kind.item_type().to_owned(),
-                sub_types: kind.subtypes().to_vec(),
-            })
-            .collect(),
-        ..LoadoutPort::named(name)
-    }
+    Ok(port)
 }

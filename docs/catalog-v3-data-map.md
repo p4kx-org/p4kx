@@ -104,7 +104,7 @@ Source inventory is current contract.rs:69-181 and generated schema's top requir
 | dismantleProcesses | D.dismantleProcesses | physical process header, exact efficiency and duration components with derived whole seconds |
 | craftingGlobal | C.craftingGlobal | true global parameters, explicit presence/owner |
 | paints | D.paints; A.paintShipCompatibility | item identity plus fit relationship |
-| loadouts | C.itemPorts; P.loadoutItems | source definitions/restrictions vs resolved default attachments/full path/parent and merge evidence |
+| loadouts | loadouts; C.itemPorts | nested resolved default attachments use root and port occurrence paths, with immediate source facts. Authored DataForge port restrictions have a separate configuration owner. |
 | starmapObjects | D.starmapObjects; P.starmapPlacements | identity/navigation definition vs physical placement/world projection |
 | object-container XML | P.containerInstances | resolved physical SOCpak occurrences with system-local instance keys, exact declaring paths and local/world transforms |
 | location physics grid XML | P.locationPhysicsGrids | typed descriptor ownership, ordered original controls and voxel references joined by the exact physical container |

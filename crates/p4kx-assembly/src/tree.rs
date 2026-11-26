@@ -20,6 +20,7 @@ use crate::{ItemClassification, LoadoutEntry};
 #[path = "loadout_target.rs"]
 mod loadout_target;
 
+pub(crate) use self::loadout_target::UnresolvedClass;
 pub use self::loadout_target::{Target, Unresolved};
 
 /// One Entity in a Loadout tree: its Record and its ports with what they hold.

@@ -73,4 +73,19 @@ impl ClassProofs {
         }
         Ok(proof.clone())
     }
+
+    pub(super) fn name(
+        &self,
+        selection: &LoadoutClassSelection,
+        expected: &str,
+    ) -> Result<LoadoutClassNameReceipt, ExportAccountingError> {
+        let proof = self
+            .classes
+            .get(selection)
+            .ok_or(ExportAccountingError::UnboundHealthSubject)?;
+        if proof.getter.value() != expected {
+            return Err(ExportAccountingError::ConflictingSourceDatum);
+        }
+        Ok(proof.getter.clone())
+    }
 }

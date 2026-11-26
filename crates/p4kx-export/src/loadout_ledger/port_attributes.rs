@@ -11,10 +11,12 @@ use p4kx_extraction::{
 };
 
 use super::Capture;
+use super::port_type_attributes::RecordPortTypes;
 use super::port_vehicle_sources::VehiclePortSources;
 use crate::catalog_read::original::{
     AuthoredEntryPath, OriginalFlowFields, OriginalValueEdge, OriginalValueFact, OriginalValuePart,
 };
+use crate::contract_loadout::PortType;
 use crate::{CatalogError, ExportAccountingError, Kind};
 
 struct DefinitionFacts {
@@ -25,12 +27,13 @@ struct DefinitionFacts {
     port_tags: FieldFact<Vec<String>>,
     required_tags: FieldFact<Vec<String>>,
     display_name_key: FieldFact<String>,
+    types: RecordPortTypes,
 }
 
-struct FieldFact<T> {
-    value: SourceValue<T>,
-    inputs: Vec<SourceUse>,
-    complete: bool,
+pub(super) struct FieldFact<T> {
+    pub(super) value: SourceValue<T>,
+    pub(super) inputs: Vec<SourceUse>,
+    pub(super) complete: bool,
 }
 
 #[derive(Default)]
@@ -45,6 +48,8 @@ pub(crate) struct PortAttributes {
     pub(crate) port_tags: SourcedValue<Vec<String>>,
     pub(crate) required_tags: SourcedValue<Vec<String>>,
     pub(crate) display_name_key: SourcedValue<String>,
+    pub(crate) types: SourcedValue<Vec<PortType>>,
+    pub(crate) visibility: Option<SourcedValue<&'static str>>,
 }
 
 impl Capture<'_> {
@@ -75,6 +80,7 @@ impl Capture<'_> {
                 SourceUseRole::Payload,
                 |raw| text(raw).map(str::to_owned),
             )?,
+            types: RecordPortTypes::read(fields, port)?,
         };
         let mut state = self.lock()?;
         if state
@@ -117,6 +123,8 @@ impl Capture<'_> {
                     &[],
                     false,
                 ),
+                types: RecordPortTypes::unbound(definition, &self.name_sources),
+                visibility: None,
             });
         }
         let facts = {
@@ -184,6 +192,12 @@ impl Capture<'_> {
                 display_name_site,
                 SourceUseRole::Payload,
             )?,
+            types: source.item_types(port.item_types(), selection.position())?,
+            visibility: Some(source.value(
+                SourceValue::Present(port.visibility().code()),
+                flag_site,
+                SourceUseRole::Conversion,
+            )?),
         };
         drop(state);
         Ok(attributes)
@@ -206,22 +220,45 @@ impl DefinitionFacts {
             port_tags: self.port_tags.bind(sources, &shared)?,
             required_tags: self.required_tags.bind(sources, &shared)?,
             display_name_key: self.display_name_key.bind(sources, &shared)?,
+            types: self.types.bind(sources, &shared)?,
+            visibility: None,
         })
     }
 }
 
-impl<T: Clone> FieldFact<T> {
-    fn bind(
+impl<T> FieldFact<T> {
+    pub(super) fn bind(
         &self,
         sources: &SourceUses,
         shared: &SharedFieldOrigin,
-    ) -> Result<SourcedValue<T>, CatalogError> {
+    ) -> Result<SourcedValue<T>, CatalogError>
+    where
+        T: Clone,
+    {
         Ok(sources.value_with_shared_origin(
             self.value.clone(),
             shared,
             &self.inputs,
             self.complete,
         )?)
+    }
+
+    pub(super) fn bind_map<U>(
+        &self,
+        sources: &SourceUses,
+        shared: &SharedFieldOrigin,
+        map: impl FnOnce(&T) -> Result<U, CatalogError>,
+    ) -> Result<SourcedValue<U>, CatalogError> {
+        let value = match &self.value {
+            SourceValue::Present(value) => SourceValue::Present(map(value)?),
+            SourceValue::Absent => SourceValue::Absent,
+            SourceValue::Null => SourceValue::Null,
+            SourceValue::Unreadable => SourceValue::Unreadable,
+            SourceValue::Invalid => SourceValue::Invalid,
+            SourceValue::Unsupported => SourceValue::Unsupported,
+            _ => SourceValue::Unsupported,
+        };
+        Ok(sources.value_with_shared_origin(value, shared, &self.inputs, self.complete)?)
     }
 }
 
@@ -287,7 +324,7 @@ fn record_field<'scope, 'read, 'source, T>(
     read_record_field(fields, port, name, SourceUseRole::Conversion, parse)
 }
 
-fn read_record_field<'scope, 'read, 'source, T>(
+pub(super) fn read_record_field<'scope, 'read, 'source, T>(
     fields: &OriginalFlowFields<'scope, 'read, 'source>,
     port: &OriginalValueFact<'scope, 'read, 'source>,
     name: &'static str,
@@ -322,7 +359,7 @@ fn read_record_field<'scope, 'read, 'source, T>(
     })
 }
 
-const fn text<'source>(value: &Value<'source>) -> Option<&'source str> {
+pub(super) const fn text<'source>(value: &Value<'source>) -> Option<&'source str> {
     match value {
         Value::String(text) | Value::Locale(text) | Value::Enum(text) => Some(text),
         _ => None,

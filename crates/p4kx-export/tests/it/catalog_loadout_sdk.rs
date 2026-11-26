@@ -10,9 +10,82 @@ use p4kx_extraction::{Archive, CancelToken, DataForgeEntry, Guid};
 use serde_json::Value;
 
 use crate::commodity_v3_fixture::TestResult;
+use crate::health_origin_assertions as origin;
 use crate::loadouts_fixture::{self, ALPHA, EMPTY_LOADOUT};
 use crate::loadouts_support;
 use crate::sdk_full_proof as full_proof;
+
+#[test]
+fn port_fields_keep_the_same_values_and_immediate_markers_in_both_profiles() -> TestResult {
+    let (_folder, archive) = fixture()?;
+    let full: Value = serde_json::from_slice(
+        build_catalog(
+            &archive,
+            loadouts_support::options(None).with_full_provenance(),
+        )?
+        .json(),
+    )?;
+    let markers: Value =
+        serde_json::from_slice(build_catalog(&archive, &loadouts_support::options(None))?.json())?;
+    let marker_catalog = origin::at(&markers, "/catalog")?;
+    let full_ship = loadouts_support::loadout(&full, ALPHA)?;
+    let marker_ship = loadouts_support::loadout(marker_catalog, ALPHA)?;
+    let full_turret = loadouts_support::port(&full_ship["ports"], "hardpoint_turret")?;
+    let marker_turret = loadouts_support::port(&marker_ship["ports"], "hardpoint_turret")?;
+    compare_port_markers(&full, full_turret, marker_turret)?;
+    let full_visibility = origin::uses(&full, &full_turret["visibility"])?;
+    assert!(
+        full_visibility
+            .iter()
+            .any(|used| used["role"] == "conversion"
+                && used.pointer("/location/field").and_then(Value::as_str) == Some("flags")),
+        "the vehicle's effective flags convert to visibility"
+    );
+    let subtypes = origin::rows(full_turret, "/types/value/0/subTypes/value")?;
+    let [first, second] = subtypes else {
+        return Err("two equal authored subtype occurrences".into());
+    };
+    assert_eq!(
+        first["value"], second["value"],
+        "equal authored subtype text"
+    );
+    assert_ne!(
+        first["sourceUsesRefs"], second["sourceUsesRefs"],
+        "each DataForge array slot retains its own physical source"
+    );
+    Ok(())
+}
+
+fn compare_port_markers(full: &Value, full_port: &Value, marker_port: &Value) -> TestResult {
+    for path in [
+        "/itemGuid",
+        "/itemClassName",
+        "/visibility",
+        "/types/value/0/type",
+        "/types/value/0/subTypes/value/0",
+        "/types/value/0/subTypes/value/1",
+    ] {
+        let complete = origin::at(full_port, path)?;
+        let reduced = origin::at(marker_port, path)?;
+        assert_eq!(reduced["value"], complete["value"], "same value at {path}");
+        assert_eq!(reduced["state"], complete["state"], "same state at {path}");
+        let marker = origin::at(reduced, "/containsEncryptedSource")?;
+        assert_eq!(
+            Some(marker),
+            complete.get("containsEncryptedSource"),
+            "same immediate marker at {path}"
+        );
+        assert!(
+            !origin::uses(full, complete)?.is_empty(),
+            "exact inputs at {path}"
+        );
+        assert!(
+            reduced.get("sourceUsesRefs").is_none(),
+            "marker-only cell at {path}"
+        );
+    }
+    Ok(())
+}
 
 #[test]
 fn direct_loadouts_match_the_producer_and_preserve_nested_occurrences() -> TestResult {

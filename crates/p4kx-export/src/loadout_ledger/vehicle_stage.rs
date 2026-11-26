@@ -42,6 +42,7 @@ pub(super) struct MetricContributions {
     pub(super) invalid_number: bool,
 }
 
+#[derive(Clone)]
 pub(super) struct Contributions {
     uses: Vec<SourceUse>,
     complete: bool,
