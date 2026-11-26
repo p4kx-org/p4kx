@@ -14,6 +14,7 @@ use crate::resolver::VehicleResult;
 use crate::resolver_observation::{self, LoadoutReadEvent, Observation};
 use crate::resolver_path_read;
 use crate::spec::{EntitySpec, VehicleSource, read_vehicle_source, vehicle_component};
+use crate::vehicle_cache_lifetime::{VehicleRetention, vehicle_cache_class};
 use crate::{
     LandingGear, LoadoutError, LoadoutFiles, LoadoutReadObserver, LoadoutRequest, LoadoutResolver,
     LoadoutTargetGuid, VehicleImplementation, vehicle,
@@ -49,7 +50,7 @@ pub fn read_observed_vehicle_tree<'source>(
         return Ok(None);
     }
     let name = tree.name();
-    let class_name = crate::entities::class_name_of(name).unwrap_or(name);
+    let class_name = vehicle_cache_class(name);
     let caller = vehicle_request(&source);
     let read = vehicle::load_observed(
         files,
@@ -145,7 +146,12 @@ impl<'f> LoadoutResolver<'f> {
         else {
             return Ok(None);
         };
-        let result = self.vehicle_of(&source, tree.name(), Some(record.index()));
+        let result = self.vehicle_of(
+            &source,
+            tree.name(),
+            Some(record.index()),
+            VehicleRetention::Resolver,
+        );
         if self.stopped() {
             return Err(LoadoutError::ObservationStopped);
         }
@@ -158,11 +164,12 @@ impl<'f> LoadoutResolver<'f> {
         source: &VehicleSource,
         record_name: &str,
         record_index: Option<u32>,
+        retention: VehicleRetention,
     ) -> Option<(VehicleResult, LoadoutRequest)> {
         let files = self
             .files
             .filter(|files| files.reads_vehicle_implementations())?;
-        let class_name = crate::entities::class_name_of(record_name).unwrap_or(record_name);
+        let class_name = vehicle_cache_class(record_name);
         if source.definition.is_empty() {
             return None;
         }
@@ -173,25 +180,32 @@ impl<'f> LoadoutResolver<'f> {
             class_name: class_name.to_ascii_lowercase(),
             capture_paint,
         };
+        let release = matches!(retention, VehicleRetention::Owner)
+            && record_index
+                .zip(self.fleet_vehicle_classes.as_ref())
+                .is_some_and(|(index, classes)| classes.is_unique(index, &key.class_name));
         let caller = vehicle_request(source);
         let observation = self.observation.as_deref();
         let loaded = match self.vehicles.entry(key) {
-            Entry::Occupied(entry) => entry.into_mut().reused(observation, &caller),
-            Entry::Vacant(entry) => Ok(entry
-                .insert(CachedDocument::read(|trace| {
+            Entry::Occupied(entry) => entry
+                .get()
+                .reused(observation, &caller)
+                .map_or_else(Err, Clone::clone),
+            Entry::Vacant(entry) => {
+                let document = CachedDocument::read(|trace| {
                     let capture = capture_paint.then(Observation::capture_vehicle_port_attributes);
                     let observation = observation.or(capture.as_ref());
                     vehicle::load_observed(files, class_name, &caller, observation, trace)
                         .map(Arc::new)
-                }))
-                .value()),
+                });
+                let value = document.value().clone();
+                if !release || value.is_err() {
+                    entry.insert(document);
+                }
+                value
+            }
         };
-        let result = bind_vehicle_result(
-            loaded.map_or_else(Err, Clone::clone),
-            observation,
-            &caller,
-            record_index,
-        );
+        let result = bind_vehicle_result(loaded, observation, &caller, record_index);
         Some((result, caller))
     }
 

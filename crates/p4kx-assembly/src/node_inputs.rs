@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use crate::merge::{merge_by_port, merge_by_port_observed};
 use crate::spec::{EntitySpec, EntrySpec, LoadoutSpec};
+use crate::vehicle_cache_lifetime::VehicleRetention;
 use crate::{
     LandingGear, LoadoutError, LoadoutResolver, PortSource, RecordLoadoutEffect,
     RecordPortSelection, VehicleImplementation,
@@ -24,8 +25,9 @@ impl LoadoutResolver<'_> {
         spec: &EntitySpec,
         overrides: Option<&LoadoutSpec>,
         issues: &mut Vec<LoadoutError>,
+        retention: VehicleRetention,
     ) -> Option<NodeInputs> {
-        let vehicle = self.vehicle_with_issues(spec, issues);
+        let vehicle = self.vehicle_with_issues(spec, issues, retention);
         if self.observation_stopped() {
             return None;
         }
@@ -49,9 +51,10 @@ impl LoadoutResolver<'_> {
         &mut self,
         spec: &EntitySpec,
         issues: &mut Vec<LoadoutError>,
+        retention: VehicleRetention,
     ) -> Option<Arc<VehicleImplementation>> {
         let source = &spec.vehicle.as_ref()?.source;
-        match self.vehicle_of(source, &spec.name, spec.record_index) {
+        match self.vehicle_of(source, &spec.name, spec.record_index, retention) {
             Some((Ok(vehicle), caller)) => {
                 if vehicle.issues.iter().any(LoadoutError::is_missing_file) {
                     let caller = Arc::new(caller);

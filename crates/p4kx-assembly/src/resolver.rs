@@ -18,6 +18,7 @@ use crate::resolver_observation::{self, Cache, LoadoutReadEvent, Observation};
 use crate::resolver_vehicle::VehicleCacheKey;
 use crate::resolver_xml::XmlCache;
 use crate::spec::{EntitySpec, EntrySpec, LoadoutSpec};
+use crate::vehicle_cache_lifetime::FleetVehicleClasses;
 use crate::walk::Walk;
 use crate::{
     ChangeError, ChangedLoadout, Entities, EntityNode, ItemFacts, LandingGear, LoadoutChanges,
@@ -66,6 +67,7 @@ pub struct LoadoutResolver<'f> {
     pub(crate) specs: HashMap<u32, SpecResult>,
     pub(crate) xml: XmlCache,
     pub(crate) vehicles: HashMap<VehicleCacheKey, CachedDocument<VehicleResult>>,
+    pub(crate) fleet_vehicle_classes: Option<FleetVehicleClasses>,
     pub(crate) landing: HashMap<Guid, Result<Arc<[LandingGear]>, LoadoutError>>,
     pub(crate) builder: TreeBuilder<'f>,
     pub(crate) record_cache: Option<&'f dyn LoadoutRecordReader>,
@@ -111,6 +113,7 @@ impl<'f> LoadoutResolver<'f> {
             specs: HashMap::new(),
             xml: XmlCache::default(),
             vehicles: HashMap::new(),
+            fleet_vehicle_classes: None,
             landing: HashMap::new(),
             builder: TreeBuilder::new(),
             record_cache: None,

@@ -58,7 +58,8 @@ impl LoadoutResolver<'_> {
         }
         let mut issues = Vec::new();
         let mut ports = Vec::new();
-        let Some(inputs) = self.node_inputs(spec, overrides, &mut issues) else {
+        let retention = self.vehicle_retention(spec, walk.is_root());
+        let Some(inputs) = self.node_inputs(spec, overrides, &mut issues, retention) else {
             return shell(spec, attached_vehicle, false);
         };
         let NodeInputs {

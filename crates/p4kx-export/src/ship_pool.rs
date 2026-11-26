@@ -20,6 +20,7 @@ pub(crate) struct ShipPool<'f> {
     files: &'f ArchiveFiles<'f>,
     idle: Mutex<Vec<ShipReader<'f>>>,
     observed: Mutex<Vec<ObservedReader<'f>>>,
+    single_pass_fleet: bool,
 }
 
 struct ObservedReader<'f> {
@@ -40,7 +41,17 @@ impl<'f> ShipPool<'f> {
             files,
             idle: Mutex::new(Vec::new()),
             observed: Mutex::new(Vec::new()),
+            single_pass_fleet: false,
         }
+    }
+
+    pub(crate) const fn for_sdk_fleet(
+        entities: Arc<Entities<'f>>,
+        files: &'f ArchiveFiles<'f>,
+    ) -> Self {
+        let mut pool = Self::new(entities, files);
+        pool.single_pass_fleet = true;
+        pool
     }
 
     pub(crate) fn read(
@@ -83,14 +94,17 @@ impl<'f> ShipPool<'f> {
                 cancel,
                 crate::Kind::Ships,
             ));
-            ObservedReader {
-                reader: ShipReader::with_observed_entities(
-                    Arc::clone(&self.entities),
-                    self.files,
-                    Arc::clone(&capture),
-                ),
-                capture,
-            }
+            let reader = ShipReader::with_observed_entities(
+                Arc::clone(&self.entities),
+                self.files,
+                Arc::clone(&capture),
+            );
+            let reader = if self.single_pass_fleet {
+                reader.retiring_single_use_fleet_vehicles()
+            } else {
+                reader
+            };
+            ObservedReader { reader, capture }
         });
         observed.capture.check_input(input)?;
         observed.capture.seed_proofs(sources)?;

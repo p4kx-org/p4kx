@@ -31,6 +31,11 @@ impl<'f> ShipReader<'f> {
 }
 
 impl<'f> ShipReader<'f> {
+    pub(crate) fn retiring_single_use_fleet_vehicles(mut self) -> Self {
+        self.resolver = self.resolver.retiring_single_use_fleet_vehicles();
+        self
+    }
+
     /// Creates a reader over `forge` that reads the vehicle implementations and XML Loadouts from
     /// `files`. Docked vehicles in a Loadout stay in their port, marked, and are not expanded.
     #[must_use]

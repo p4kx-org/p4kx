@@ -195,6 +195,7 @@ mod spec_loadout;
 mod tree;
 mod tree_walk;
 mod vehicle;
+mod vehicle_cache_lifetime;
 mod vehicle_paint;
 mod walk;
 mod xml;

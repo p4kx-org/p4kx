@@ -198,7 +198,11 @@ fn project<'source>(
     checkpoint(cancel)?;
     let entities = Arc::new(Entities::new(input.forge()));
     checkpoint(cancel)?;
-    let pool = ShipPool::new(entities, files);
+    let pool = if groups.is_all() {
+        ShipPool::for_sdk_fleet(entities, files)
+    } else {
+        ShipPool::new(entities, files)
+    };
     let mut playability = ShipDependencies::new(input);
     let mut fold = EquipmentCoverageFold::default();
     let mut rows = Vec::new();

@@ -227,6 +227,16 @@ allocator overhead, parsed parts, indirect shared allocations and output
 rows. They locate the observed growth during owner resolution. The guarded
 run did not measure a complete peak or comparative throughput.
 
+The All-Ship SDK traversal releases a successful vehicle result after its
+root when the actual AttachDef stops that vehicle at nested ports and the
+normalized vehicle cache class belongs to one physical Entity. The exact
+FileGraph keeps the observed operations and positions. Physical aliases,
+normalized-name collisions, nested consumers and failed reads retain the
+resolver cache. Four Assembly fixtures cover reuse and release. The 41
+Ship integration cases include exact Full SDK and canonical contributor
+parity. The candidate requires an isolated release-profile LIVE measurement
+to establish its peak and elapsed time.
+
 For the next Loadout comparison, measure time to first owner, admission,
 Record and XML cache misses, semantic Loadout resolution, port construction and
 alignment in the same release-profile run. A cache can reuse original parsed

@@ -59,6 +59,10 @@ impl<'source> OwnerGroups<'source> {
         }
     }
 
+    pub(super) const fn is_all(&self) -> bool {
+        matches!(&self.pending, PendingOwners::Records(_))
+    }
+
     pub(super) fn fill(
         &mut self,
         owners: &mut Vec<Owner<'source>>,
