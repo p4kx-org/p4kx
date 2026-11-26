@@ -362,7 +362,7 @@ fn the_loadout_fields_accept_additions_and_new_closed_values_but_stay_required()
             "{path} {field:?} stays required"
         );
     }
-    let mut bare = catalog.clone();
+    let mut bare = catalog;
     bare["loadouts"][0]["ports"][0]["itemGuid"] = Value::Null;
     assert!(
         !validator.is_valid(&bare),

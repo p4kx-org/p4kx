@@ -44,11 +44,12 @@ fn report(built: &BuiltCatalog, elapsed: std::time::Duration) {
     );
 }
 
-fn walk<'c>(ports: &'c [Value], visit: &mut impl FnMut(&'c Value)) {
+fn walk<'c>(ports: &'c [Value], visit: &mut impl FnMut(&'c Value) -> TestResult) -> TestResult {
     for port in ports {
-        visit(port);
-        walk(self::ports(port), visit);
+        visit(port)?;
+        walk(self::ports(port), visit)?;
     }
+    Ok(())
 }
 
 fn check_counts(built: &BuiltCatalog, catalog: &Value) -> TestResult {
@@ -74,11 +75,13 @@ fn check_counts(built: &BuiltCatalog, catalog: &Value) -> TestResult {
     for entry in loadouts {
         walk(self::ports(entry), &mut |port| {
             ports += 1;
-            attached +=
-                usize::from(port["unresolved"].is_null() && !port["itemGuid"]["value"].is_null());
+            let at = port_name(port).unwrap_or("unnamed port");
+            let item = port_field(port, "/itemGuid/value", at)?;
+            attached += usize::from(port["unresolved"].is_null() && !item.is_null());
             docked += usize::from(port["dockedVehicle"] == json!(true));
             unresolved += usize::from(!port["unresolved"].is_null());
-        });
+            Ok(())
+        })?;
     }
     assert_eq!(
         (ports, attached, docked, unresolved),
@@ -115,15 +118,19 @@ fn check_references(built: &BuiltCatalog, catalog: &Value) -> TestResult {
         assert!(known.contains(owner), "owner {owner} is an item or a ship");
         assert!(owners.insert(owner), "{owner} has one loadout");
         walk(ports(entry), &mut |port| {
+            let at = port_name(port).unwrap_or("unnamed port");
+            let item = port_field(port, "/itemGuid/value", at)?;
+            let class = port_field(port, "/itemClassName/value", at)?;
             if port["unresolved"].is_null()
-                && let Some(guid) = port["itemGuid"]["value"].as_str()
+                && let Some(guid) = item.as_str()
                 && !known.contains(guid)
                 && outside.insert(guid)
-                && let Some(class) = port["itemClassName"]["value"].as_str()
+                && let Some(class) = class.as_str()
             {
                 classes.insert(class);
             }
-        });
+            Ok(())
+        })?;
     }
     assert_eq!(
         outside.len(),
@@ -144,80 +151,118 @@ fn port_name(port: &Value) -> Option<&str> {
     port.pointer("/name/value").and_then(Value::as_str)
 }
 
-fn same(tree: &[PortNode], listed: &[Value], at: &str) {
+fn port_field<'json>(
+    data: &'json Value,
+    field: &str,
+    at: &str,
+) -> Result<&'json Value, Box<dyn Error>> {
+    data.pointer(field)
+        .ok_or_else(|| format!("{at}: missing Loadout port field {field}").into())
+}
+
+fn same(tree: &[PortNode], listed: &[Value], at: &str) -> TestResult {
     assert!(listed.len() >= tree.len(), "{at}: ports");
     for (port, json) in tree.iter().zip(listed) {
         let here = format!("{at}/{}", port.name());
         assert_eq!(port_name(json), Some(port.name()), "{here}: name");
-        let source = if port.source() == PortSource::Empty {
-            VEHICLE_ONLY
-        } else {
-            port.source().code()
-        };
-        assert_eq!(json["source"], source, "{here}: source");
-        assert_eq!(
-            json["visibility"]["value"],
-            port.visibility().code(),
-            "{here}: visibility"
-        );
-        if let Some(definition) = port.definition() {
-            for (field, size) in [
-                ("/minSize/value", definition.min_size()),
-                ("/maxSize/value", definition.max_size()),
-            ] {
-                assert_eq!(json.pointer(field), Some(&json!(size)), "{here}: {field}");
-            }
-            let types: Vec<&str> = json["types"]["value"]
-                .as_array()
-                .into_iter()
-                .flatten()
-                .filter_map(|kind| kind["type"]["value"].as_str())
-                .collect();
-            let wanted: Vec<&str> = definition
-                .types()
-                .iter()
-                .map(PortType::name)
-                .filter(|name| !name.is_empty())
-                .collect();
-            assert_eq!(types, wanted, "{here}: types");
+        check_port_shape(port, json, &here)?;
+        check_port_attachment(port, json, &here)?;
+    }
+    Ok(())
+}
+
+fn check_port_shape(port: &PortNode, json: &Value, at: &str) -> TestResult {
+    let source = if port.source() == PortSource::Empty {
+        VEHICLE_ONLY
+    } else {
+        port.source().code()
+    };
+    assert_eq!(
+        port_field(json, "/source", at)?.as_str(),
+        Some(source),
+        "{at}: source"
+    );
+    assert_eq!(
+        port_field(json, "/visibility/value", at)?.as_str(),
+        Some(port.visibility().code()),
+        "{at}: visibility"
+    );
+    if let Some(definition) = port.definition() {
+        for (field, size) in [
+            ("/minSize/value", definition.min_size()),
+            ("/maxSize/value", definition.max_size()),
+        ] {
+            assert_eq!(port_field(json, field, at)?, &json!(size), "{at}: {field}");
         }
-        match port.attachment() {
-            Attachment::Empty => {
-                assert!(json["itemGuid"]["value"].is_null(), "{here}: empty");
-                same(port.nested(), ports(json), &here);
-            }
-            Attachment::Entity(child) => {
-                assert_eq!(
-                    json["itemGuid"]["value"],
-                    child.guid().to_string(),
-                    "{here}: item"
-                );
-                assert_eq!(
-                    json["itemClassName"]["value"],
-                    child.class_name(),
-                    "{here}: class"
-                );
-                assert_eq!(
-                    json["dockedVehicle"],
-                    json!(child.is_docked_vehicle()),
-                    "{here}: docked"
-                );
-                if child.is_expanded() {
-                    assert_eq!(ports(json).len(), child.ports().len(), "{here}: below");
-                    same(child.ports(), ports(json), &here);
-                } else {
-                    assert!(ports(json).is_empty(), "{here}: not expanded");
-                }
-            }
-            Attachment::Unresolved(unresolved) => {
-                assert_eq!(
-                    json["unresolved"],
-                    unresolved.error().kind(),
-                    "{here}: error"
-                );
-            }
+        check_port_types(json, definition.types(), at)?;
+    }
+    Ok(())
+}
+
+fn check_port_types(json: &Value, expected: &[PortType], at: &str) -> TestResult {
+    let expected: Vec<_> = expected
+        .iter()
+        .map(PortType::name)
+        .filter(|name| !name.is_empty())
+        .collect();
+    let types = match port_field(json, "/types/value", at)? {
+        Value::Array(types) => types.as_slice(),
+        Value::Null if expected.is_empty() => &[],
+        _ => return Err(format!("{at}: expected /types/value array").into()),
+    };
+    let mut names = Vec::new();
+    for kind in types {
+        match port_field(kind, "/type/value", at)? {
+            Value::String(name) => names.push(name.as_str()),
+            Value::Null => {}
+            _ => return Err(format!("{at}: expected string or null at /type/value").into()),
         }
     }
+    assert_eq!(names, expected, "{at}: types");
+    Ok(())
+}
+
+fn check_port_attachment(port: &PortNode, json: &Value, at: &str) -> TestResult {
+    match port.attachment() {
+        Attachment::Empty => {
+            assert!(
+                port_field(json, "/itemGuid/value", at)?.is_null(),
+                "{at}: empty"
+            );
+            same(port.nested(), ports(json), at)?;
+        }
+        Attachment::Entity(child) => {
+            assert_eq!(
+                port_field(json, "/itemGuid/value", at)?,
+                &json!(child.guid().to_string()),
+                "{at}: item"
+            );
+            assert_eq!(
+                port_field(json, "/itemClassName/value", at)?.as_str(),
+                Some(child.class_name()),
+                "{at}: class"
+            );
+            assert_eq!(
+                port_field(json, "/dockedVehicle", at)?.as_bool(),
+                Some(child.is_docked_vehicle()),
+                "{at}: docked"
+            );
+            if child.is_expanded() {
+                assert_eq!(ports(json).len(), child.ports().len(), "{at}: below");
+                same(child.ports(), ports(json), at)?;
+            } else {
+                assert!(ports(json).is_empty(), "{at}: not expanded");
+            }
+        }
+        Attachment::Unresolved(unresolved) => {
+            assert_eq!(
+                port_field(json, "/unresolved", at)?.as_str(),
+                Some(unresolved.error().kind()),
+                "{at}: error"
+            );
+        }
+    }
+    Ok(())
 }
 
 fn check_known_ship_row(catalog: &Value, index: u32) -> Result<&Value, Box<dyn Error>> {
@@ -253,7 +298,7 @@ fn check_known_ship(archive: &Archive, catalog: &Value) -> TestResult {
     let record = resolver.entities().find(ORIG_100I)?;
     let tree = resolver.resolve(&record)?;
     let listed = check_known_ship_row(catalog, record.index())?;
-    same(tree.ports(), ports(listed), "100i");
+    same(tree.ports(), ports(listed), "100i")?;
     assert_eq!(
         ports(listed).len(),
         tree.ports().len(),
@@ -277,20 +322,26 @@ fn check_known_ship(archive: &Archive, catalog: &Value) -> TestResult {
         PINNED_100I_TREE_PORTS,
         "tree ports with the vehicle-only ones"
     );
-    let top = ports(listed);
+    check_pinned_attachments(ports(listed))
+}
+
+fn check_pinned_attachments(top: &[Value]) -> TestResult {
     let by_name = |name: &str| top.iter().find(|port| port_name(port) == Some(name));
     let power = by_name("hardpoint_power_plant").ok_or("the power plant port")?;
     assert_eq!(
-        power["itemGuid"]["value"], "4a4a2a9c-040f-4f36-befe-7101b230fa53",
+        port_field(power, "/itemGuid/value", "hardpoint_power_plant")?.as_str(),
+        Some("4a4a2a9c-040f-4f36-befe-7101b230fa53"),
         "power plant"
     );
     assert_eq!(
-        power["itemClassName"]["value"], "POWR_LPLT_S01_PowerBolt_SCItem",
+        port_field(power, "/itemClassName/value", "hardpoint_power_plant")?.as_str(),
+        Some("POWR_LPLT_S01_PowerBolt_SCItem"),
         "power plant class"
     );
     let gun = by_name("hardpoint_weapon_gun_left").ok_or("the gun port")?;
     assert_eq!(
-        gun["itemClassName"]["value"], "Mount_Gimbal_S3",
+        port_field(gun, "/itemClassName/value", "hardpoint_weapon_gun_left")?.as_str(),
+        Some("Mount_Gimbal_S3"),
         "gun mount"
     );
     assert_eq!(ports(gun).len(), 1, "the gimbal mount carries one gun port");
@@ -323,7 +374,8 @@ fn report_codes(catalog: &Value) -> TestResult {
             if let Some(code) = port["unresolved"].as_str() {
                 *unresolved.entry(code).or_default() += 1;
             }
-        });
+            Ok(())
+        })?;
     }
     println!("unresolved ports by code: {unresolved:?}");
     println!("loadouts with an issue, by code: {issues:?}");

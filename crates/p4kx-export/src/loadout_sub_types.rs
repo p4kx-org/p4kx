@@ -38,14 +38,16 @@ impl PortSubTypes {
         &self.values
     }
 
-    pub(super) fn members(&self) -> impl ExactSizeIterator<Item = SourcedValue<&str>> {
-        self.values.iter().enumerate().map(|(index, value)| {
-            let origin = match &self.origins {
-                SubTypeOrigins::Shared(origin) => origin,
-                SubTypeOrigins::Separate(origins) => &origins[index],
-            };
-            origin.map_ref(|_| value.as_str())
-        })
+    pub(super) fn members(&self) -> impl Iterator<Item = SourcedValue<&str>> {
+        let (shared, separate) = match &self.origins {
+            SubTypeOrigins::Shared(origin) => (Some(origin), &[][..]),
+            SubTypeOrigins::Separate(origins) => (None, origins.as_slice()),
+        };
+        let origins = shared.into_iter().cycle().chain(separate);
+        self.values
+            .iter()
+            .zip(origins)
+            .map(|(value, origin)| origin.map_ref(|()| value.as_str()))
     }
 }
 

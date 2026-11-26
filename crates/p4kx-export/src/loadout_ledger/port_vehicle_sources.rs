@@ -180,11 +180,13 @@ impl Capture<'_> {
         };
         let state = self.lock()?;
         let source = VehiclePortSources::read(self, &state, xml, name, archive, record_index)?;
-        source.value(
+        let visibility = source.value(
             value,
             xml.port().flags_evidence(),
             SourceUseRole::Conversion,
-        )
+        );
+        drop(state);
+        visibility
     }
 
     pub(crate) fn paint_missing_vehicle_survey(

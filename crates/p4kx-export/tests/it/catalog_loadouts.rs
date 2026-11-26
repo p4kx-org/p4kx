@@ -7,6 +7,7 @@
 #[path = "catalog_item_alignment.rs"]
 mod catalog_item_alignment;
 
+use crate::health_origin_assertions as proof;
 use crate::loadouts_fixture::{
     ALPHA, BROKEN, EMPTY_LOADOUT, GUN, GUN_DEFAULT, GUN_OVERRIDE, LOOP, NESTED, RACK, SNUB, TURRET,
 };
@@ -16,28 +17,26 @@ use std::error::Error;
 
 use serde_json::{Value, json};
 
-type TestResult = Result<(), Box<dyn Error>>;
+type TestResult<T = ()> = Result<T, Box<dyn Error>>;
 
-fn type_values(port: &Value) -> Value {
-    Value::Array(
-        port["types"]["value"]
-            .as_array()
-            .into_iter()
-            .flatten()
-            .map(|kind| {
-                let subtypes: Vec<_> = kind["subTypes"]["value"]
-                    .as_array()
-                    .into_iter()
-                    .flatten()
-                    .map(|subtype| &subtype["value"])
-                    .collect();
-                json!({
-                    "type": kind["type"]["value"],
-                    "subTypes": subtypes
-                })
-            })
-            .collect(),
-    )
+fn type_values(port: &Value) -> TestResult<Value> {
+    let mut kinds = Vec::new();
+    for kind in proof::rows(port, "/types/value")? {
+        let subtypes = match proof::at(kind, "/subTypes/value")? {
+            Value::Null => &[],
+            Value::Array(subtypes) => subtypes.as_slice(),
+            _ => return Err("expected /subTypes/value to hold an array or null".into()),
+        };
+        let subtypes = subtypes
+            .iter()
+            .map(|subtype| proof::at(subtype, "/value"))
+            .collect::<Result<Vec<_>, _>>()?;
+        kinds.push(json!({
+            "type": proof::at(kind, "/type/value")?,
+            "subTypes": subtypes,
+        }));
+    }
+    Ok(Value::Array(kinds))
 }
 
 #[test]
@@ -112,7 +111,7 @@ fn the_ports_list_the_loadout_ports_then_the_vehicle_only_ports() -> TestResult 
         "a vehicle-only port is empty"
     );
     assert_eq!(
-        type_values(empty),
+        type_values(empty)?,
         json!([
             {"type": "Missile", "subTypes": ["IR", "EM", "IR"]},
             {"type": "Bomb", "subTypes": []},
@@ -135,7 +134,7 @@ fn a_record_port_keeps_its_definition_and_the_vehicle_file_gives_the_visibility(
         (
             &turret["minSize"]["value"],
             &turret["maxSize"]["value"],
-            &type_values(turret),
+            &type_values(turret)?,
             &turret["flags"]["value"],
             &turret["portTags"]["value"],
             &turret["requiredTags"]["value"],
@@ -175,7 +174,7 @@ fn a_port_the_record_lacks_takes_its_definition_from_the_vehicle_file() -> TestR
         (
             &gun["minSize"]["value"],
             &gun["maxSize"]["value"],
-            &type_values(gun),
+            &type_values(gun)?,
             &gun["flags"]["value"],
             &gun["portTags"]["value"],
             &gun["requiredTags"]["value"],

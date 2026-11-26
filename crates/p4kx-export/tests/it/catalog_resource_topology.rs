@@ -283,7 +283,8 @@ fn check_nodes(catalog: &Value, root: u64, ship: &Value) -> TestResult {
     }
     let mount = crate::loadouts_support::port(&ship["ports"], "mount_a")?;
     assert_eq!(
-        mount["visibility"]["value"], "invisible",
+        proof::at(mount, "/visibility/value")?,
+        "invisible",
         "invisible placements remain graph nodes"
     );
     let docked = named_port_ordinal(ship, "hangar")?;

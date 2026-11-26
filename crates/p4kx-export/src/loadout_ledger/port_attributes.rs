@@ -255,7 +255,6 @@ impl<T> FieldFact<T> {
             SourceValue::Null => SourceValue::Null,
             SourceValue::Unreadable => SourceValue::Unreadable,
             SourceValue::Invalid => SourceValue::Invalid,
-            SourceValue::Unsupported => SourceValue::Unsupported,
             _ => SourceValue::Unsupported,
         };
         Ok(sources.value_with_shared_origin(value, shared, &self.inputs, self.complete)?)
