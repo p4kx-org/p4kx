@@ -1,4 +1,6 @@
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'linux-window-smoke-report.ps1')
+
 $runtime = Join-Path $env:RUNNER_TEMP 'p4kx-wayland'
 New-Item -ItemType Directory -Path $runtime | Out-Null
 [IO.File]::SetUnixFileMode($runtime,
@@ -31,11 +33,19 @@ try {
     $env:WAYLAND_DISPLAY = $null
     $env:WAYLAND_SOCKET = $null
     $env:P4KX_TEST_WAYLAND_RUNTIME_DIR = $runtime
-    $filter = 'test(the_window_starts_draws_frames_and_exits) | test(the_wayland_window_draws_hidpi_frames_and_exits)'
-    $nextest = @('nextest', 'run', '--archive-file', 'nextest-archive.tar.zst', '--workspace-remap', '.',
-        '--extract-to', '.', '--extract-overwrite', '--run-ignored', 'only', '--no-tests', 'fail', '-E', $filter)
+    $reportPath = 'target/nextest/linux-window-smoke/junit.xml'
+    if (Test-Path -LiteralPath $reportPath -PathType Leaf) {
+        Remove-Item -LiteralPath $reportPath
+    }
+    $cases = (Get-P4kxLinuxWindowSmokeCases | ForEach-Object { "test(=$_)" }) -join ' | '
+    $filter = "binary_id(p4kx-gui::smoke_window) & ($cases)"
+    $nextest = @('nextest', 'run', '--profile', 'linux-window-smoke', '--archive-file', 'nextest-archive.tar.zst',
+        '--workspace-remap', '.', '--extract-to', '.', '--extract-overwrite', '--run-ignored', 'only',
+        '--no-tests', 'fail', '-E', $filter)
     & xvfb-run --auto-servernum cargo @nextest
     if ($LASTEXITCODE -ne 0) { throw 'Native Linux X11 or HiDPI Wayland window smoke failed.' }
+    $report = [xml](Get-Content -Raw -LiteralPath $reportPath)
+    Assert-P4kxLinuxWindowSmokeReport $report
 }
 finally {
     try {

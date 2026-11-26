@@ -4,6 +4,7 @@ $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'native-evidence.ps1')
 . (Join-Path $PSScriptRoot 'native-test-fixtures.ps1')
 . (Join-Path $PSScriptRoot 'binary-machine.ps1')
+. (Join-Path $PSScriptRoot 'linux-window-smoke-report.ps1')
 New-Item -ItemType Directory -Path $Directory -Force | Out-Null
 $contract = Get-P4kxPlatformContract
 $revision = 'a' * 40
@@ -90,4 +91,19 @@ foreach ($row in $contract.targets) {
     try { Assert-P4kxRuntimeEvidence -Metadata $baseline -Platform $row -Version '0.5.0' -Revision $revision } catch { $rejected = $true }
     if (-not $rejected) { throw 'Skipped native runtime check was accepted.' }
 }
-Write-Output 'PASS: native image machines, malformed images, cross-target/source/tool/hash evidence and skipped runtime rejection.'
+$testNames = @(Get-P4kxLinuxWindowSmokeCases)
+$completeCases = ($testNames | ForEach-Object { "<testcase name='$_'/>" }) -join ''
+$completeReport = [xml]"<testsuites><testsuite>$completeCases</testsuite></testsuites>"
+Assert-P4kxLinuxWindowSmokeReport $completeReport
+foreach ($missing in $testNames) {
+    $partial = $completeReport.Clone()
+    $removed = $partial.SelectSingleNode("/testsuites/testsuite/testcase[@name='$missing']")
+    [void]$removed.ParentNode.RemoveChild($removed)
+    $rejected = $false
+    try { Assert-P4kxLinuxWindowSmokeReport $partial } catch {
+        if ($_.Exception.Message -cne "Linux window smoke did not record exactly one pass for $missing.") { throw }
+        $rejected = $true
+    }
+    if (-not $rejected) { throw "Native Linux accepted a smoke report without $missing." }
+}
+Write-Output 'PASS: native images, target/source/tool/hash evidence, skipped runtime rejection and both Linux desktop checks.'
