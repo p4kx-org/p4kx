@@ -137,6 +137,43 @@ factory-installed. This explains why a batch derived from ship Loadouts is incom
 for that consumer. Its slot phase includes the SDK, callbacks and construction of the
 consumer files. The aggregate measurement leaves the individual costs open. [Release flag parity][summaries]
 
+A third VerseKit trial reported equivalent application output on LIVE 13220821
+with SDK revision `75db174a3`, including contract reputation and the ship, part
+and mining files. The isolated SDK timings use a fresh process per invocation.
+Opening the Archive and parsing DataForge cost about 1.2 s and 1.04 GB private
+memory on that host.
+
+| Operation | Seconds | Private peak |
+| --- | ---: | ---: |
+| `visit_loadouts(All)`, empty callback | 82.0 | 1.04 GB |
+| `visit_item_definitions(Records(All))`, empty callback | 11.9 | 1.04 GB |
+| `with_ship_sources(All)` | 10.3 | 2.04 GB |
+| Writing the slot files | 0.06 | |
+| Integrated slot refresh | 122 | 2.36 GB |
+| Integrated contracts through summaries | 31 | |
+| Entire integrated refresh | 202 | 2.44 GB |
+
+The Loadout visit reported 10,955 owners and 10,810 rows. The corresponding
+0.4.2 slot phase took 15 s with a 2.11 GB private peak and its whole refresh
+took 45 s with a 2.25 GB peak. About 20 s of the new slot phase came from
+consumer code. The empty callback isolates SDK cost and the isolated Ship
+snapshot exceeds the query budget. The individual process peaks and the
+integrated application peak measure different workloads. This external report
+does not time the subsequent admission-tree reuse or original-field indexing
+changes.
+
+For the next Loadout comparison, measure time to first owner, admission,
+Record and XML cache misses, semantic Loadout resolution, port construction and
+alignment in the same release-profile run. A cache can reuse original parsed
+facts while keeping each owner's selected sources and diagnostics local. For
+the Ship query, measure the selected Record plan, global playability preparation
+and row projection separately. The measured snapshot retained decoded owner
+trees alongside the developing result. The bounded reader holds up to 32
+decoded owner trees per batch and merges newly observed owner evidence once.
+Compare its complete rows and coverage with the earlier result before
+attributing changes in time or peak memory. An identity-only query has a
+smaller dependency scope when the consumer only needs Ship identity and labels.
+
 The original-value index uses one map lookup to insert each value and
 stores each optional span endpoint in one machine word. The Item definition
 visitor uses this index for every readable Item Record, including records
