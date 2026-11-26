@@ -16,7 +16,7 @@ use crate::source::{SourceEntry, SourceReader};
 use crate::{
     ConflictPolicy, ExtractionError, FieldOrigin, FileReceipt, InputScope, OriginArtifactDigest,
     OriginDigestWriter, OriginOutputAddress, SourceEvidenceError, SourceInput, SourceInventory,
-    SourceLocation, SourceUseRole, SourceUses, write_origin_companion,
+    SourceUseRole, SourceUses, write_origin_companion,
 };
 
 /// An unchanged file installed by Extraction.
@@ -258,18 +258,9 @@ impl RawOrigins {
         let origin = if matches!(input, SourceInput::Unknown) {
             uses.origin(&[], false)
         } else {
-            let namespace = if matches!(input, SourceInput::ArchiveView(_)) {
-                "archiveEntryDecodedBytes"
-            } else {
-                "standaloneFileBytes"
-            };
             let scope = uses.observe(input, InputScope::Payload)?;
             let actual = scope.at(
-                SourceLocation::Subresource {
-                    namespace: namespace.to_owned(),
-                    indices: vec![0, length],
-                    field: "bytes".to_owned(),
-                },
+                crate::source_scope::raw_payload_location(input, length),
                 SourceUseRole::Payload,
             )?;
             uses.origin(&[actual], true)

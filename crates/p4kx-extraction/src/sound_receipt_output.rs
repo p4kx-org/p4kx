@@ -11,8 +11,7 @@ use crate::file_receipt::{self, StagedReceiptPublication, finish_staged_receipt}
 use crate::origin_file_io::StageDisposition;
 use crate::output_file::StagedOutput;
 use crate::sound::{
-    OggWrite, SoundEncodeError, SoundOrigins, WavWrite, capture_ogg, capture_raw_member,
-    capture_wav,
+    OggWrite, SoundEncodeError, SoundOrigins, WavWrite, capture_ogg, capture_raw_sound, capture_wav,
 };
 use crate::texture_convert::Step;
 use crate::tracker::ExtractionArtifacts;
@@ -76,7 +75,7 @@ impl EntryWriter<'_> {
                 sink.write_all(bytes).map_err(AudioError::Write)?;
                 Ok(((), length))
             },
-            |()| capture_raw_member(source.input, length),
+            |()| capture_raw_sound(source.input, length),
         )?
         .map_err(|error| write_error(destination.file.clone(), io::Error::other(error)))
     }

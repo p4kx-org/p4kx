@@ -4,6 +4,7 @@
 use std::io;
 use std::ops::Range;
 
+use p4kx_archive::ObservedEntry;
 use p4kx_audio::EmbeddedWemSource;
 
 use crate::bank_wem_evidence;
@@ -14,13 +15,26 @@ use crate::{
     SourceUse, SourceUseRole, SourceUses,
 };
 
-#[derive(Clone, Copy)]
-pub(crate) struct SoundOriginInput<'a> {
+/// Original input of an already-read WEM payload.
+#[derive(Debug, Clone, Copy)]
+pub struct SoundOriginInput<'a> {
     source: SourceInput<'a>,
     member: Option<EmbeddedWemSource>,
 }
 
 impl<'a> SoundOriginInput<'a> {
+    /// Binds the observed Archive Entry and optional exact WEM member selected in its bank.
+    #[must_use]
+    pub const fn for_archive_entry(
+        entry: ObservedEntry<'a>,
+        member: Option<EmbeddedWemSource>,
+    ) -> Self {
+        Self {
+            source: SourceInput::ArchiveView(entry),
+            member,
+        }
+    }
+
     pub(crate) const fn loose(source: SourceInput<'a>) -> Self {
         Self {
             source,
@@ -89,14 +103,22 @@ impl SoundPayload {
         )
     }
 
-    pub(super) fn raw_member_origin(
+    pub(super) fn raw_origin(
         &self,
         uses: &SourceUses,
+        source: SourceInput<'_>,
         length: u64,
     ) -> io::Result<FieldOrigin> {
-        let member = self
-            .member
-            .ok_or_else(|| io::Error::other("the raw audio payload has no selected bank member"))?;
+        let Some(member) = self.member else {
+            let payload = self
+                .scope
+                .at(
+                    crate::source_scope::raw_payload_location(source, length),
+                    SourceUseRole::Payload,
+                )
+                .map_err(io::Error::other)?;
+            return self.origin(uses, &[payload]);
+        };
         let range = member.byte_range();
         if range.end - range.start != length {
             return Err(io::Error::other(

@@ -12,7 +12,11 @@ pub use ogg_receipt::OggFileReceipt;
 pub(crate) use ogg_receipt::{OggWrite, capture_ogg};
 #[path = "sound_origins.rs"]
 mod origins;
-pub(crate) use origins::{SoundOriginInput, SoundOrigins, capture_raw_member};
+pub use origins::SoundOriginInput;
+pub(crate) use origins::{SoundOrigins, capture_raw_sound};
+#[path = "wem_output.rs"]
+mod wem_output;
+pub use wem_output::{WemOutput, WemOutputPublication, WemOutputTarget, publish_wem_output};
 #[path = "sound_publication.rs"]
 mod publication;
 

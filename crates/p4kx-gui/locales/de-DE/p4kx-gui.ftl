@@ -861,6 +861,11 @@ sounds-summary-unconverted =
         [one] { $number } Sound wurde unverändert geschrieben, weil er sich nicht umwandeln lässt
        *[other] { $number } Sounds wurden unverändert geschrieben, weil sie sich nicht umwandeln lassen
     }
+sounds-summary-receipt-failed =
+    { $count ->
+        [one] { $number } Herkunftsbeleg konnte nicht geschrieben werden
+       *[other] { $number } Herkunftsbelege konnten nicht geschrieben werden
+    }
 sounds-summary-failed =
     { $count ->
         [one] { $number } Sound wurde nicht exportiert

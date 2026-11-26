@@ -137,6 +137,10 @@ pub struct ExportedSound {
     pub source: WemExportSource,
     /// The file.
     pub path: PathBuf,
+    /// The sibling origin companion published for this write.
+    pub origin_receipt: Option<PathBuf>,
+    /// Why companion publication failed after committing this file.
+    pub origin_receipt_failure: Option<String>,
     /// The format the file is in.
     pub format: SoundFormat,
     /// The size of the file in bytes.
@@ -207,7 +211,13 @@ impl ExportReport {
     /// Returns whether every sound was exported and converted as asked.
     #[must_use]
     pub fn is_clean(&self) -> bool {
-        !self.cancelled && self.failures.is_empty() && self.unconverted_count() == 0
+        !self.cancelled
+            && self.failures.is_empty()
+            && self.unconverted_count() == 0
+            && self
+                .sounds
+                .iter()
+                .all(|sound| sound.origin_receipt_failure.is_none())
     }
 }
 
@@ -224,7 +234,8 @@ impl ArchiveAudio<'_> {
     /// sound that cannot be converted is written unchanged and reported in its
     /// [`ExportedSound::unconverted`]; one that cannot be located, whose path exceeds the limit of
     /// ADR-0248, or that cannot be written is listed in [`ExportReport::failures`] and the others
-    /// are still written.
+    /// are still written. Each new file can carry a sibling origin companion for its payload and
+    /// conversion fields.
     ///
     /// # Errors
     ///

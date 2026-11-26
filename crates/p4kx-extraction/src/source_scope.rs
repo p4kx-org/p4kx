@@ -36,6 +36,19 @@ pub enum SourceInput<'a> {
     Unknown,
 }
 
+pub(crate) fn raw_payload_location(input: SourceInput<'_>, length: u64) -> SourceLocation {
+    let namespace = if matches!(input, SourceInput::Archive(_) | SourceInput::ArchiveView(_)) {
+        "archiveEntryDecodedBytes"
+    } else {
+        "standaloneFileBytes"
+    };
+    SourceLocation::Subresource {
+        namespace: namespace.to_owned(),
+        indices: vec![0, length],
+        field: "bytes".to_owned(),
+    }
+}
+
 /// A shared physical-source scope used when binding individual data values.
 #[derive(Clone)]
 pub struct SourceScope {

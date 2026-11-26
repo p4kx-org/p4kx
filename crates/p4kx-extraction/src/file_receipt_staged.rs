@@ -126,6 +126,7 @@ impl FileReceipt<'_> {
                         describe,
                     )),
                     CompanionPlacement::PreserveForeign => None,
+                    CompanionPlacement::Unavailable(error) => Some(Err(error)),
                 };
                 let retirement = held.retire();
                 Some(StagedReceiptPublication::Committed {
@@ -204,6 +205,9 @@ impl FileReceipt<'_> {
             Err(error) if error.kind() == io::ErrorKind::NotFound => {
                 Ok(CompanionPlacement::Publish)
             }
+            Err(error) if error.kind() == io::ErrorKind::InvalidFilename => {
+                Ok(CompanionPlacement::Unavailable(error))
+            }
             Err(error) => Err(error),
         }
     }
@@ -212,6 +216,7 @@ impl FileReceipt<'_> {
 enum CompanionPlacement {
     Publish,
     PreserveForeign,
+    Unavailable(io::Error),
 }
 
 pub(crate) fn finish_staged_receipt(

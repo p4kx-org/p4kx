@@ -4,14 +4,13 @@
 use std::collections::HashMap;
 use std::error::Error;
 use std::fs;
-use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
 use p4kx_archive::ObservedEntry;
-use p4kx_audio::{AudioError, Codec, Soundbank, Wem};
+use p4kx_audio::{Codec, Soundbank, Wem};
+use p4kx_extraction::sound::{SoundOriginInput, WemOutput, WemOutputTarget, publish_wem_output};
 use p4kx_extraction::{
     ArchiveWriteProtection, ConflictPolicy, ConversionError, MAX_SOUND_LEN, check_path_length,
-    write_replacing_counted_protected,
 };
 use rayon::prelude::*;
 
@@ -121,6 +120,7 @@ fn run_group(
     let Some(entry) = audio.archive().entries().get(index) else {
         return failed_all("the Archive no longer holds the Entry".to_owned());
     };
+    let observed = audio.archive().observed_entry(entry);
     let bytes = match entry_bytes(audio.archive(), entry, limit) {
         Ok(bytes) => bytes,
         Err(error) => return failed_all(format!("{}: {error}", entry.path())),
@@ -134,15 +134,12 @@ fn run_group(
     };
     let binding = match capture {
         CaptureOrigins::Omit => None,
-        CaptureOrigins::Retain => audio
-            .archive()
-            .observed_entry(entry)
-            .as_ref()
-            .map(ObservedEntry::binding),
+        CaptureOrigins::Retain => observed.as_ref().map(ObservedEntry::binding),
     };
     let input = GroupInput {
         bytes: &bytes,
         bank: bank.as_ref(),
+        observed,
         binding: binding.as_ref(),
     };
     run_members(
@@ -195,6 +192,19 @@ fn failure(job: &Job, reason: String) -> ExportFailure {
 struct Emitted {
     size: u64,
     state: ExportState,
+    origin_receipt: Option<PathBuf>,
+    receipt_failure: Option<String>,
+}
+
+impl Emitted {
+    const fn kept(size: u64) -> Self {
+        Self {
+            size,
+            state: ExportState::Kept,
+            origin_receipt: None,
+            receipt_failure: None,
+        }
+    }
 }
 
 /// Parses the available WEM once for loop metadata and any requested conversion.
@@ -235,6 +245,8 @@ fn write_sound(
                 wem_id: job.wem_id,
                 source: job.source,
                 path: path.clone(),
+                origin_receipt: emitted.origin_receipt,
+                origin_receipt_failure: emitted.receipt_failure,
                 format,
                 size: emitted.size,
                 state: emitted.state,
@@ -252,16 +264,13 @@ fn write_sound(
         if options.policy == ConflictPolicy::Skip
             && let Ok(existing) = fs::symlink_metadata(&path)
         {
-            let emitted = Emitted {
-                size: existing.len(),
-                state: ExportState::Kept,
-            };
-            return Some(Ok(sound(emitted, note)));
+            return Some(Ok(sound(Emitted::kept(existing.len()), note)));
         }
         match emit(
             format,
             wem.as_ref(),
             input.bytes,
+            input.observed_source(),
             &path,
             Some(target.protection),
             (job, options, watch),
@@ -292,65 +301,33 @@ const fn formats(wem: Option<&Wem<&[u8]>>, requested: SoundFormat) -> &'static [
     }
 }
 
-/// Fails a write once the export is cancelled, so the file being written is dropped.
-struct Guarded<'w, 'o> {
-    inner: &'w mut dyn Write,
-    watch: &'o ExportWatch,
-}
-
-impl Write for Guarded<'_, '_> {
-    fn write(&mut self, data: &[u8]) -> io::Result<usize> {
-        if self.watch.is_cancelled() {
-            return Err(io::Error::other("the export was cancelled"));
-        }
-        self.inner.write(data)
-    }
-
-    fn flush(&mut self) -> io::Result<()> {
-        self.inner.flush()
-    }
-}
-
 fn emit(
     format: SoundFormat,
     wem: Option<&Wem<&[u8]>>,
     bytes: &[u8],
+    source: Option<SoundOriginInput<'_>>,
     path: &Path,
     protection: Option<&ArchiveWriteProtection>,
     (job, options, watch): (&Job, ExportOptions, &ExportWatch),
 ) -> Result<Emitted, ConversionError> {
-    let convert = |source: AudioError, path: &Path| match source {
-        AudioError::Write(source) => ConversionError::Write {
-            path: path.to_path_buf(),
-            source,
-        },
-        source => ConversionError::Audio {
-            sound: format!("{} WEM {}", job.trigger, job.wem_id),
-            source,
-        },
+    let output = match (format, wem) {
+        (SoundFormat::Ogg, Some(wem)) => WemOutput::Ogg(wem),
+        (SoundFormat::Wav, Some(wem)) => WemOutput::Wav(wem),
+        _ => WemOutput::Raw(bytes),
     };
-    let replaced = write_replacing_counted_protected(
-        path,
-        options.policy == ConflictPolicy::IfChanged,
-        protection,
-        Some(&watch.token),
-        |out| {
-            let mut guarded = Guarded { inner: out, watch };
-            match (format, wem) {
-                (SoundFormat::Ogg, Some(wem)) => wem.write_ogg(&mut guarded).map(drop),
-                (SoundFormat::Wav, Some(wem)) => wem.write_wav(&mut guarded).map(drop),
-                _ => guarded.write_all(bytes).map_err(AudioError::Write),
-            }
-            .map_err(|source| convert(source, path))
-        },
-    )?;
+    let target = WemOutputTarget::new(path, options.policy, protection, &watch.token);
+    let published = publish_wem_output(output, source, target, || {
+        format!("{} WEM {}", job.trigger, job.wem_id)
+    })?;
     Ok(Emitted {
-        size: replaced.len,
-        state: if replaced.changed {
+        size: published.artifact.len,
+        state: if published.artifact.changed {
             ExportState::Written
         } else {
             ExportState::Kept
         },
+        origin_receipt: published.origin_receipt,
+        receipt_failure: published.receipt_failure.as_ref().map(chain_text),
     })
 }
 

@@ -234,6 +234,14 @@ companion. The `sound_artifacts` JSON field points to newly committed
 companions still associated with their artifact when the run finishes. An
 artifact retained by the conflict policy retains its companion.
 
+The Sounds window, `p4kx wwise extract` and `p4kx entity audio --extract`
+publish the same audio byte-range companions for written WAV and Ogg files
+and an opaque payload companion for unchanged WEMs. The origin comes from
+the Entry that supplied the bytes. Embedded WEMs include the selected
+member's DIDX and DATA ranges. Trigger names and their resolved paths have separate
+source evidence. The result names the newly published companion
+and leaves kept files and their existing companions in place.
+
 ## Unchanged files in extraction
 
 The Extraction report's `raw_artifacts` entries give the relative file path,

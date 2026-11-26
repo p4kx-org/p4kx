@@ -53,6 +53,8 @@ struct FileJson {
     trigger: String,
     wem_id: u32,
     file: String,
+    origin_receipt: Option<String>,
+    origin_receipt_failure: Option<String>,
     format: &'static str,
     size: u64,
     kept: bool,
@@ -114,6 +116,8 @@ pub(crate) fn export_json(report: &ExportReport, out: &Path, args: &SoundExportA
                 trigger: sound.trigger.clone(),
                 wem_id: sound.wem_id,
                 file: json::path(&sound.path),
+                origin_receipt: sound.origin_receipt.as_deref().map(json::path),
+                origin_receipt_failure: sound.origin_receipt_failure.clone(),
                 format: sound.format.extension(),
                 size: sound.size,
                 kept: sound.state == ExportState::Kept,
@@ -136,6 +140,13 @@ pub(crate) fn export_json(report: &ExportReport, out: &Path, args: &SoundExportA
 pub(crate) fn print_report(report: &ExportReport, out: &Path) -> io::Result<()> {
     let mut stderr = io::stderr().lock();
     for sound in &report.sounds {
+        if let Some(reason) = &sound.origin_receipt_failure {
+            writeln!(
+                stderr,
+                "error: could not publish the origin receipt for {} ({reason})",
+                sound.path.display()
+            )?;
+        }
         if let Some(reason) = &sound.unconverted {
             writeln!(
                 stderr,

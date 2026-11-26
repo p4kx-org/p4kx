@@ -9,6 +9,7 @@ use crate::sounding::FakeOutput;
 
 use egui::accesskit::Role;
 use egui_kittest::kittest::Queryable;
+use p4kx_assembly::audio::ExportReport;
 use p4kx_gui::{
     Language, ListStatus, Playable, SoundFormat, SoundsExportStatus, SoundsListStatus,
     SoundsStatus, SourceKind, WorkTab,
@@ -192,6 +193,20 @@ fn a_record_that_is_no_entity_is_reported() -> TestResult {
     Ok(())
 }
 
+fn assert_sound_receipts(report: &ExportReport) -> TestResult {
+    for sound in &report.sounds {
+        let receipt = sound.origin_receipt.as_deref().ok_or("sound receipt")?;
+        let expected = sound.path.with_extension("wav.p4kx-origin.jsonl");
+        assert_eq!(
+            std::fs::canonicalize(receipt)?,
+            std::fs::canonicalize(expected)?,
+            "the GUI result names the sibling receipt"
+        );
+        assert!(receipt.is_file(), "the published receipt exists");
+    }
+    Ok(())
+}
+
 #[test]
 fn the_sounds_of_a_trigger_are_exported_with_progress_and_the_trigger_name() -> TestResult {
     let (dir, mut harness) = opened(Language::BritishEnglish, SIZE, &FakeOutput::default())?;
@@ -241,6 +256,7 @@ fn the_sounds_of_a_trigger_are_exported_with_progress_and_the_trigger_name() -> 
         "named after the trigger and the WEM"
     );
     assert!(out.join("Play_Multi_100.wav").is_file(), "written");
+    assert_sound_receipts(report)?;
     assert_eq!(report.failures.len(), 1, "WEM 104 is missing");
     harness.run_steps(3);
     assert!(

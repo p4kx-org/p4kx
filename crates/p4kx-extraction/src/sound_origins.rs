@@ -17,7 +17,7 @@ use super::{WemOriginField, WemOriginPlan};
 
 #[path = "sound_origin_input.rs"]
 mod input;
-pub(crate) use input::SoundOriginInput;
+pub use input::SoundOriginInput;
 pub(super) use input::SoundPayload;
 
 pub(crate) struct SoundOrigins {
@@ -77,14 +77,16 @@ impl SoundOrigins {
     }
 }
 
-pub(crate) fn capture_raw_member(
+pub(crate) fn capture_raw_sound(
     input: Option<SoundOriginInput<'_>>,
     length: u64,
 ) -> io::Result<SoundOrigins> {
     let uses = SourceUses::new();
     let origin = match input {
-        Some(input) => SoundPayload::observe(input, &uses)?.raw_member_origin(&uses, length)?,
-        None => uses.origin(&[], false),
+        Some(input) if !matches!(input.source(), crate::SourceInput::Unknown) => {
+            SoundPayload::observe(input, &uses)?.raw_origin(&uses, input.source(), length)?
+        }
+        _ => uses.origin(&[], false),
     };
     SoundOrigins::new(
         &uses,

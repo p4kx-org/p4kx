@@ -173,6 +173,8 @@ pub enum SoundsText {
     SummaryTarget,
     /// The heading of the sounds written unchanged; takes `count` and `number`.
     SummaryUnconverted,
+    /// The heading for origin receipt failures, with `count` and `number`.
+    SummaryReceiptFailed,
     /// The heading of the sounds not exported; takes `count` and `number`.
     SummaryFailed,
     /// A sound written unchanged; takes `name` and `reason`.
@@ -185,7 +187,7 @@ pub enum SoundsText {
 
 impl SoundsText {
     /// Every text of the Sounds tab.
-    pub(crate) const ALL: [Self; 88] = [
+    pub(crate) const ALL: [Self; 89] = [
         Self::Tab,
         Self::EntityLabel,
         Self::EntityHint,
@@ -270,6 +272,7 @@ impl SoundsText {
         Self::SummaryCounts,
         Self::SummaryTarget,
         Self::SummaryUnconverted,
+        Self::SummaryReceiptFailed,
         Self::SummaryFailed,
         Self::SummaryFile,
         Self::SummaryFailure,
@@ -365,6 +368,7 @@ impl SoundsText {
             Self::SummaryCounts => "sounds-summary-counts",
             Self::SummaryTarget => "sounds-summary-target",
             Self::SummaryUnconverted => "sounds-summary-unconverted",
+            Self::SummaryReceiptFailed => "sounds-summary-receipt-failed",
             Self::SummaryFailed => "sounds-summary-failed",
             Self::SummaryFile => "sounds-summary-file",
             Self::SummaryFailure => "sounds-summary-failure",

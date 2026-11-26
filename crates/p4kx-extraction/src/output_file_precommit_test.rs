@@ -62,14 +62,13 @@ fn counted_commit_revalidates_a_staged_file_after_lock_acquisition()
     file.write_all(b"current")?;
     let staged = super::StagedOutput::new(&temporary, &out, &ownership, None, None);
     let retained = dir.path().join("retained.bin");
-    let error = super::place(&staged, file, false, 7, 0, || {
-        let replacement = super::OrdinaryReplacement::new(&out, None, None)
-            .map_err(|source| super::write_error(&out, source))?;
-        fs::rename(&temporary, &retained).map_err(|source| super::write_error(&out, source))?;
-        fs::write(&temporary, b"unowned").map_err(|source| super::write_error(&out, source))?;
-        Ok(replacement)
-    })
-    .expect_err("the staged name no longer identifies the created file");
+    file.sync_all()?;
+    drop(file);
+    let replacement = super::OrdinaryReplacement::new(&out, None, None)?;
+    fs::rename(&temporary, &retained)?;
+    fs::write(&temporary, b"unowned")?;
+    let error = super::replace_counted(&staged, replacement)
+        .expect_err("the staged name no longer identifies the created file");
     assert!(
         matches!(error, crate::ConversionError::Installation(_)),
         "{error}"

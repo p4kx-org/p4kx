@@ -1042,6 +1042,7 @@ references resolve in `provenance`.
  "target": "…", "format": "ogg", "written": 3, "kept": 0, "unconverted": 1, "failed": 1,
  "cancelled": false,
  "files": [{"trigger": "Play_Multi", "wem_id": 100, "file": "…\\Play_Multi_100.ogg",
+            "origin_receipt": "…\\Play_Multi_100.ogg.p4kx-origin.jsonl", "origin_receipt_failure": null,
             "format": "ogg", "size": 4096, "kept": false, "unconverted": null}, …],
  "failures": [{"trigger": "Play_Multi", "wem_id": 104, "reason": "…"}, …],
  "issues": [Issue, …]}
@@ -1058,6 +1059,10 @@ digits, and `%` itself as `%25`; so are `#` and a leading space, which a TXTP li
 an empty name becomes `%`. A name that is still too long for a file (more than 228 bytes) becomes
 `sound`. A name already taken under the case fold of that rule (Unicode simple lower case, `\` as
 `/`) gets `_2`, `_3`, … `kept` is true for an existing file left alone by `--conflict skip` or an identical one under `if-changed`.
+`origin_receipt` names the digest-bound sibling for the newly written audio. It is null for a
+kept file and when no companion was published. If receipt publication fails after the sound
+commits, its file row carries the error in `origin_receipt_failure` and the command exits with
+code 1. Both fields are available in `p4kx entity audio --extract` results.
 `failures` lists the sounds that got no file: source plug-ins and external sources (`wem_id` null),
 WEMs no soundbank or loose Entry holds, and sounds whose absolute file path exceeds the limit of
 ADR-0248 (260 UTF-16 units for the file, 248 for its folder), each with its reason; the other

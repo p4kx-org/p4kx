@@ -10,6 +10,7 @@ use p4kx_texture::TextureError;
 
 use crate::counting::{Counting, holds};
 use crate::file_receipt::OrdinaryReplacement;
+use crate::origin_file_io::StageDisposition;
 use crate::{
     ArchiveWriteProtection, CancelToken, ConversionError, OwnedFileToken, WriteProtectionError,
 };
@@ -155,64 +156,84 @@ pub fn write_replacing_counted_protected(
     cancel: Option<&CancelToken>,
     write: impl FnOnce(&mut dyn Write) -> Result<(), ConversionError>,
 ) -> Result<Replaced, ConversionError> {
+    stage_counted_protected(
+        out,
+        if_changed,
+        protection,
+        cancel,
+        write,
+        |len| Replaced {
+            len,
+            changed: false,
+        },
+        |(), len, staged| {
+            let replacement = OrdinaryReplacement::new(out, protection, cancel)
+                .map_err(|source| write_error(out, source))?;
+            replace_counted(staged, replacement)?;
+            Ok(StageDisposition::Moved(Replaced { len, changed: true }))
+        },
+    )
+}
+
+pub(crate) fn stage_counted_protected<T, Output>(
+    out: &Path,
+    if_changed: bool,
+    protection: Option<&ArchiveWriteProtection>,
+    cancel: Option<&CancelToken>,
+    write: impl FnOnce(&mut dyn Write) -> Result<T, ConversionError>,
+    keep: impl FnOnce(u64) -> Output,
+    publish: impl FnOnce(T, u64, &StagedOutput<'_>) -> Result<StageDisposition<Output>, ConversionError>,
+) -> Result<Output, ConversionError> {
     check_protected_output(out, protection, cancel)?;
     let (temporary, file, ownership) = create_temporary(out, protection, cancel)?;
     let mut counting = Counting::new(BufWriter::with_capacity(WRITE_BUFFER_LEN, file));
     let written = write(&mut counting);
     let (len, crc) = (counting.len(), counting.crc());
     let result = match written {
-        Ok(()) => counting
-            .into_inner()
-            .into_inner()
-            .map_err(io::IntoInnerError::into_error)
-            .map_err(|source| write_error(out, source))
-            .and_then(|file| {
-                let staged = StagedOutput::new(&temporary, out, &ownership, protection, cancel);
-                place(&staged, file, if_changed, len, crc, || {
-                    OrdinaryReplacement::new(out, protection, cancel)
-                        .map_err(|source| write_error(out, source))
-                })
-            }),
+        Ok(value) => (|| {
+            let file = counting
+                .into_inner()
+                .into_inner()
+                .map_err(io::IntoInnerError::into_error)
+                .map_err(|source| write_error(out, source))?;
+            let staged = StagedOutput::new(&temporary, out, &ownership, protection, cancel);
+            staged.check()?;
+            if if_changed
+                && holds(out, len, crc, &mut Vec::new())
+                    .map_err(|source| read_error(out, source))?
+            {
+                return Ok(StageDisposition::Cleanup(keep(len)));
+            }
+            file.sync_all().map_err(|source| write_error(out, source))?;
+            drop(file);
+            publish(value, len, &staged)
+        })(),
         Err(error) => {
             drop(counting);
             Err(error)
         }
     };
-    if result.as_ref().map_or(true, |replaced| !replaced.changed) {
-        return crate::output_cleanup::conversion(result, &ownership, &temporary, cancel);
+    match result {
+        Ok(StageDisposition::Moved(written)) => Ok(written),
+        Ok(StageDisposition::Cleanup(kept)) => {
+            crate::output_cleanup::conversion(Ok(kept), &ownership, &temporary, cancel)
+        }
+        Err(error) => crate::output_cleanup::conversion(Err(error), &ownership, &temporary, cancel),
     }
-    result
 }
 
-fn place<'source>(
+fn replace_counted(
     staged: &StagedOutput<'_>,
-    file: File,
-    if_changed: bool,
-    len: u64,
-    crc: u32,
-    begin: impl FnOnce() -> Result<OrdinaryReplacement<'source>, ConversionError>,
-) -> Result<Replaced, ConversionError> {
-    staged.check()?;
-    let out = staged.output;
-    if if_changed
-        && holds(out, len, crc, &mut Vec::new()).map_err(|source| read_error(out, source))?
-    {
-        return Ok(Replaced {
-            len,
-            changed: false,
-        });
-    }
-    file.sync_all().map_err(|source| write_error(out, source))?;
-    drop(file);
-    let replacement = begin()?;
+    replacement: OrdinaryReplacement<'_>,
+) -> Result<(), ConversionError> {
+    let out = staged.output();
     let result = (|| {
         staged.check()?;
         replacement
             .invalidate()
             .map_err(|source| write_error(out, source))?;
         staged.check()?;
-        fs::rename(staged.temporary(), out).map_err(|source| write_error(out, source))?;
-        Ok(Replaced { len, changed: true })
+        fs::rename(staged.temporary(), out).map_err(|source| write_error(out, source))
     })();
     replacement.finish_conversion(out, result)
 }
