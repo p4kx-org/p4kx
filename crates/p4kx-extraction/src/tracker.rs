@@ -20,6 +20,7 @@ pub(crate) struct Tracker<'a> {
     progress: Mutex<Progress>,
     pub(crate) folders: FolderCache,
     pub(crate) written: WrittenPaths,
+    pub(crate) cryxml_native_paths: WrittenPaths,
     pub(crate) artifacts: ExtractionArtifacts,
 }
 
@@ -41,6 +42,7 @@ impl<'a> Tracker<'a> {
             }),
             folders: FolderCache::default(),
             written: WrittenPaths::default(),
+            cryxml_native_paths: WrittenPaths::default(),
             artifacts: ExtractionArtifacts::default(),
         }
     }

@@ -12,7 +12,7 @@ use std::path::{Path, PathBuf};
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
-use p4kx_gui::{Language, Model, ui};
+use p4kx_gui::{Extraction, ExtractionStatus, Language, Model, ui};
 use p4kx_settings::ExtractionAudio;
 use p4kx_testkit::{
     ArchiveBuilder, TestBank, TestCodec, TestEntry, TestVorbis, TestWem, test_signal,
@@ -120,11 +120,32 @@ fn the_default_writes_ogg_and_wav_unpacks_soundbanks_and_lists_the_undecodable_s
 
     harness.get_by_label("Extracted 4 (3 converted), skipped 0, failed 0, cancelled 0");
     harness.get_by_label("Not converted (1)");
+    assert_summary_receipts(&harness)?;
     harness.get_by_label(&format!(
         "{XMA}: cannot convert the sound: {XMA}: converting XMA2 to WAV is not supported"
     ));
     assert_receipted_outputs(&media(&out), &["500.ogg", "600.wav", "700.wem"])?;
     assert_receipted_outputs(&bank_folder(&out), &["10.ogg", "20.wav"])
+}
+
+fn assert_summary_receipts(harness: &Harness<'_, Model>) -> TestResult {
+    harness.get_by_label("File origin receipts (6)");
+    let Some(ExtractionStatus::Finished(summary)) =
+        harness.state().extraction().map(Extraction::status)
+    else {
+        return Err("expected a finished extraction summary".into());
+    };
+    let receipts = summary.file_origin_receipts();
+    for name in [
+        "500.ogg", "600.wav", "700.wem", "Ship.bnk", "10.ogg", "20.wav",
+    ] {
+        let companion = format!("{name}.p4kx-origin.jsonl");
+        assert!(
+            receipts.iter().any(|path| path.ends_with(&companion)),
+            "the summary names the actual audio companion for {name}"
+        );
+    }
+    Ok(())
 }
 
 #[test]

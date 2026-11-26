@@ -64,6 +64,7 @@ pub struct ExtractionSummary {
     excluded_parts: usize,
     not_converted: usize,
     merged_texture_receipts: Vec<String>,
+    file_origin_receipts: Vec<String>,
 }
 
 impl ExtractionSummary {
@@ -115,6 +116,19 @@ impl ExtractionSummary {
                 .merged_texture_artifacts()
                 .iter()
                 .map(|artifact| artifact.origin_receipt.clone())
+                .collect(),
+            file_origin_receipts: report
+                .raw_artifacts()
+                .iter()
+                .chain(report.cryxml_artifacts())
+                .filter_map(|artifact| artifact.origin_receipt.as_ref())
+                .chain(
+                    report
+                        .sound_artifacts()
+                        .iter()
+                        .map(|artifact| &artifact.origin_receipt),
+                )
+                .cloned()
                 .collect(),
         }
     }
@@ -201,6 +215,12 @@ impl ExtractionSummary {
     #[must_use]
     pub const fn not_converted(&self) -> usize {
         self.not_converted
+    }
+
+    /// Borrows the relative companions for unchanged files, converted CryXml and audio.
+    #[must_use]
+    pub fn file_origin_receipts(&self) -> &[String] {
+        &self.file_origin_receipts
     }
 
     pub(crate) fn merged_texture_receipts(&self) -> &[String] {

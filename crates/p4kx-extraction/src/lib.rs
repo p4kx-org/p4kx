@@ -204,6 +204,7 @@ mod wem_payload_field;
 mod write;
 mod write_compare;
 mod written_paths;
+mod xml_receipt;
 mod zip_header_info;
 
 pub use animation_listing::{AnimationListing, headers as animation_headers};
@@ -220,7 +221,6 @@ pub use coverage::{
     ReferenceItem, ReferenceKind, ReferenceList, SampleExport, TypeCoverage,
 };
 pub use coverage_origins::{CoverageOriginError, ObservedCoverage};
-pub use cryxml_field_uses::CryXmlFieldUses;
 pub use dataforge::{DATAFORGE_ENTRIES, DataForgeEntry, DataForgeLoadError};
 pub use dataforge_file::is_dataforge_file;
 pub use dataforge_file_origin::DataForgeFileOrigin;

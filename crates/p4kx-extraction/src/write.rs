@@ -18,17 +18,17 @@ use crate::{
     TextureConversion, WriteProtectionError,
 };
 
+#[path = "write_entry_receipt.rs"]
+mod entry_receipt;
 #[path = "write_publication.rs"]
 mod publication;
-#[path = "write_raw_receipt.rs"]
-mod raw_receipt;
-pub use raw_receipt::RawEntryArtifact;
+pub use entry_receipt::{ExtractedFileArtifact, RawEntryArtifact};
 
 /// How one Entry of an Extraction ended.
 pub(crate) enum Outcome {
     Written,
     RawWritten(Option<ExtractionError>),
-    Converted,
+    Converted(Option<ExtractionError>),
     Kept,
     /// Left out because a run that copies only converted files found nothing to convert.
     NotConverted,

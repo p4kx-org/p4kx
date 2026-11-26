@@ -54,6 +54,7 @@ pub(crate) use ordinary::{OrdinaryReplacement, is_owned_native_companion, retain
 pub use publication::FilePublication;
 pub(crate) use staged::{StagedReceiptPublication, finish_staged_receipt};
 pub use stdout::StdoutReceipt;
+pub(crate) use target_path::is_companion_name;
 use target_path::{BindTarget, TargetLeaf, bind_target, lexical_receipt, sibling_receipt};
 
 pub(crate) const COMPANION_SUFFIX: &str = ".p4kx-origin.jsonl";

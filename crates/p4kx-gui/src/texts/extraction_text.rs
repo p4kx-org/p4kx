@@ -128,6 +128,8 @@ pub enum ExtractionText {
     SummaryUnconverted,
     /// The list of published origin companions for merged DDS textures.
     SummaryTextureReceipts,
+    /// The heading of published companions for extracted files and converted XML or audio.
+    SummaryFileOriginReceipts,
     /// One failed Entry; takes `path` and `reason`.
     SummaryFailure,
     /// The heading of the Records that were not written; takes `number`.
@@ -144,7 +146,7 @@ pub enum ExtractionText {
 
 impl ExtractionText {
     /// Every text, for checks of the Fluent files.
-    pub const ALL: [Self; 66] = [
+    pub const ALL: [Self; 67] = [
         Self::ActionSelected,
         Self::ActionShown,
         Self::ActionAll,
@@ -205,6 +207,7 @@ impl ExtractionText {
         Self::SummaryCancelled,
         Self::SummaryUnconverted,
         Self::SummaryTextureReceipts,
+        Self::SummaryFileOriginReceipts,
         Self::SummaryFailure,
         Self::SummaryRecordsFailed,
         Self::SummaryRecordFailure,
@@ -278,6 +281,7 @@ impl ExtractionText {
             Self::SummaryCancelled => "extraction-summary-cancelled",
             Self::SummaryUnconverted => "extraction-summary-unconverted",
             Self::SummaryTextureReceipts => "extraction-summary-texture-receipts",
+            Self::SummaryFileOriginReceipts => "extraction-summary-file-origin-receipts",
             Self::SummaryFailure => "extraction-summary-failure",
             Self::SummaryRecordsFailed => "extraction-summary-records-failed",
             Self::SummaryRecordFailure => "extraction-summary-record-failure",

@@ -114,6 +114,11 @@ fn a_finished_conversion_shows_its_counts_and_the_folders() -> TestResult {
         "Written 1 (1 converted), kept 0, failed 0, cancelled 0, left out without a conversion 1",
     );
     harness.get_by_label(&format!("Input folder: {}", input.display()));
+    harness.get_by_label("File origin receipts (1)");
+    assert!(
+        output.join("Data/gladius.xml.p4kx-origin.jsonl").is_file(),
+        "the GUI names the committed CryXml companion"
+    );
     assert!(
         output.join("Data").join("gladius.xml").is_file(),
         "converted"

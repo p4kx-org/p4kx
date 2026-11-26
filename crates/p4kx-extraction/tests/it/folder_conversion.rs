@@ -207,6 +207,7 @@ fn a_filter_selects_the_files_by_their_relative_path() -> TestResult {
         names,
         [
             "Data/Ships/gladius.xml",
+            "Data/Ships/gladius.xml.p4kx-origin.jsonl",
             "Data/Ships/text.xml",
             "Data/Ships/text.xml.p4kx-origin.jsonl",
         ]

@@ -6,6 +6,16 @@ With raw XML on stdout, use `--origin-stderr` to receive the companion on stderr
 `--origin-out <file>` to save a copy, or both. Read stderr as a companion only
 after a successful exit.
 
+## Discovery and key metadata
+
+The Channel discovery and settings JSON, key-command JSON, and MCP `list_channels`
+results declare `originApplicability: "notApplicable"`. These operations report
+installation or operational metadata. The value is distinct from the unknown
+encryption state of a source-backed datum.
+
+MCP key notices merge into existing `_meta`. For tools with structured results,
+`structuredContent` carries the data and its applicable origin.
+
 ## Companion records
 
 The [JSON Schema](../schemas/p4kx-source-origin.schema.json) describes each line.
@@ -257,6 +267,10 @@ blocked playback. A publication error without bound inputs keeps unknown origin.
 
 The Extraction report's `raw_artifacts` entries give the relative file path,
 byte length, SHA-256 and companion path for each reported unchanged file.
+The GUI extraction summary lists committed companions for unchanged files,
+converted CryXml and converted audio. All paths are relative to the extraction
+target. A kept file retains its existing companion.
+
 The companion addresses the full output as one opaque payload and gives the
 decoded Archive Entry or the observed standalone file. The same receipt covers
 the original bank retained during unpacking and a loose audio file written
@@ -269,6 +283,22 @@ suffix. Kept files retain their existing proof. The report uses null
 `origin_receipt` if a new file is admitted without the publication lock or if
 foreign content occupies its companion path. A replacement requires the guarded
 lock, retires a previous owned companion and preserves foreign content.
+
+## CryXml in extraction and folder conversion
+
+The batch commands publish the converted XML beside the same field-addressed
+companion as the standalone converter. Each companion binds the final XML
+bytes and identifies the actual Archive Entry or observed loose file. A loose
+file has unknown original P4K encryption even when its contributors are
+complete. Text XML copied unchanged uses an opaque payload companion.
+
+The `cryxml_artifacts` report lists paths, byte digests and companion paths for
+binary CryXml converted to XML. A null companion path means none was committed.
+The writer reserves selected Entry paths before publishing new CryXml companions.
+If the companion path is reserved or exceeds the portable length limit, the
+report includes the converted XML and a companion error. The report also covers
+companion write failures after XML publication. Keeping an existing XML file
+under the conflict policy does not publish a new companion.
 
 ## Standalone Ogg
 

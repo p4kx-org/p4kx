@@ -52,6 +52,7 @@ fn a_converted_folder_equals_what_extraction_with_conversion_writes() -> TestRes
         assert_eq!(opaque_encryption(&archive_raw)?, Some(false));
         assert_eq!(opaque_encryption(&folder_raw)?, None);
     }
+    check_cryxml_origin_pair(&mut archived, &mut written)?;
     assert_eq!(written, archived, "identical payload files");
     assert!(
         written
@@ -92,6 +93,52 @@ fn loose_merge_replaces_old_archive_proof_for_identical_payload_bytes() -> TestR
     );
     let loose_receipt = fs::read(target.join(RECEIPT))?;
     check_dds_origin_pair(&written, &archive_receipt, &loose_receipt)
+}
+
+fn check_cryxml_origin_pair(
+    archive: &mut std::collections::BTreeMap<String, Vec<u8>>,
+    loose: &mut std::collections::BTreeMap<String, Vec<u8>>,
+) -> TestResult {
+    use serde_json::{Value, json};
+
+    const XML: &str = "Data/Ships/gladius.xml";
+    const ORIGIN: &str = "Data/Ships/gladius.xml.p4kx-origin.jsonl";
+    let xml = std::str::from_utf8(loose.get(XML).ok_or("converted loose XML")?)?;
+    let start = xml.find("<Ship").ok_or("converted root element")? + 1;
+    let expected = json!({
+        "type": "xmlBytes",
+        "start": start.to_string(),
+        "endExclusive": (start + "Ship".len()).to_string(),
+        "field": "elementName",
+    });
+    for (files, encrypted) in [(archive, json!(false)), (loose, Value::Null)] {
+        let receipt = files.remove(ORIGIN).ok_or("converted XML companion")?;
+        let mut seen = false;
+        for line in std::str::from_utf8(&receipt)?.lines() {
+            let row: Value = serde_json::from_str(line)?;
+            if row.get("address") == Some(&expected) {
+                assert_eq!(
+                    row.get("containsEncryptedSource"),
+                    Some(&encrypted),
+                    "the shared XML field keeps the actual input encryption marker"
+                );
+                assert_eq!(
+                    row.get("sourceSetComplete"),
+                    Some(&json!(true)),
+                    "the original CryXml field was fully observed"
+                );
+                assert!(
+                    row.get("sourceUsesRefs")
+                        .and_then(Value::as_array)
+                        .is_some_and(|refs| !refs.is_empty()),
+                    "the emitted XML element name cites its original source field"
+                );
+                seen = true;
+            }
+        }
+        assert!(seen, "the companion covers the original XML root name");
+    }
+    Ok(())
 }
 
 fn opaque_encryption(bytes: &[u8]) -> Result<Option<bool>, Box<dyn std::error::Error>> {

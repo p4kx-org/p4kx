@@ -142,7 +142,7 @@ impl<'source> OrdinaryReplacement<'source> {
     ) -> Result<Outcome, ExtractionError> {
         let placement = if matches!(
             &result,
-            Ok(Outcome::Written | Outcome::Converted | Outcome::RawWritten(_))
+            Ok(Outcome::Written | Outcome::Converted(_) | Outcome::RawWritten(_))
         ) {
             Placement::Committed
         } else {

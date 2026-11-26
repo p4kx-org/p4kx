@@ -382,8 +382,9 @@ fn cryxml_textures_and_the_dataforge_convert_in_one_run() -> TestResult {
             "Data/libs/foundry/records/items/n0.xml",
             "Data/libs/foundry/records/items/n1.xml",
             "Data/ship.xml",
+            "Data/ship.xml.p4kx-origin.jsonl",
         ],
-        "the texture merged and exported, the Records written, the CryXml converted"
+        "texture, Record and CryXml outputs with their expected companions"
     );
     assert!(
         fs::read(fixture.target.join("Data/ship.xml"))?.starts_with(b"<?xml"),

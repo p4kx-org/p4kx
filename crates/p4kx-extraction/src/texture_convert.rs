@@ -48,7 +48,7 @@ impl Done {
 
     fn outcome(&self) -> Outcome {
         if self.steps().contains(&Some(Step::Written)) {
-            Outcome::Converted
+            Outcome::Converted(None)
         } else {
             Outcome::Kept
         }
@@ -142,7 +142,7 @@ impl EntryWriter<'_> {
         self.tracker.retract(done.counted.reported);
         for (index, entry) in raw_entries {
             let outcome = match (failure.is_none(), self.write_raw(entry, buffers)) {
-                (true, Outcome::Written | Outcome::RawWritten(None)) => Outcome::Converted,
+                (true, Outcome::Written | Outcome::RawWritten(None)) => Outcome::Converted(None),
                 (_, outcome) => outcome,
             };
             entries.push((index, entry.path().to_owned(), outcome));

@@ -7,14 +7,13 @@ use std::path::Path;
 use anyhow::{Context, Result};
 use p4kx_extraction::{
     ArchiveWriteProtection, CancelToken, ChunkDumpMode, ChunkDumpPayload, ChunkJson,
-    ChunkTableEvidence, ConversionError, FieldOrigins, FieldPath, PreparedChunk, SourceInventory,
-    SourceUse, SourceUseRole,
+    ChunkTableEvidence, ConversionError, EmbeddedXml, FieldOrigins, FieldPath, PreparedChunk,
+    SourceInventory, SourceUse, SourceUseRole, XmlReceipt,
 };
 use serde::Serialize;
 
 use super::{UNKNOWN, open};
 use crate::cli_chunks::ChunkFileSource;
-use crate::cryxml_origins::{EmbeddedXml, XmlReceipt};
 use crate::file_receipt::FileReceipt;
 use crate::json;
 
@@ -111,10 +110,7 @@ fn render(
             writer,
             (evidence.uses(), evidence.scope()),
             evidence.is_complete(),
-            Some(&EmbeddedXml {
-                base,
-                selectors: &selectors,
-            }),
+            Some(&EmbeddedXml::new(base, &selectors)),
         ),
         _ => Err(io::Error::other("unknown prepared chunk representation")),
     }

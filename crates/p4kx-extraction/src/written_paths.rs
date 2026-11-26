@@ -2,14 +2,16 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::path::Path;
 use std::sync::{Mutex, PoisonError};
 
 use crate::ExtractionError;
 use crate::extract::{Ended, EntryEnded};
-use crate::portable_name::fold;
+use crate::file_receipt;
+use crate::portable_name::{self, fold};
 use crate::source::SourceEntry;
-use crate::write::{EntryWriter, Outcome};
+use crate::write::{EntryTarget, EntryWriter, Outcome};
 
 /// The files an Extraction has put in place, by their path folded to lower case, so an Entry whose
 /// path differs only in case from a written one is found whatever file system the target is on.
@@ -32,12 +34,15 @@ impl WrittenPaths {
     /// Returns the Archive index of the Entry that wrote a file colliding with `relative`, the
     /// path of the Entry with Archive index `index`, unless that is the Entry itself.
     pub(crate) fn conflict(&self, relative: &Path, index: usize) -> Option<usize> {
-        let key = key(relative);
+        self.conflict_key(&key(relative), index)
+    }
+
+    fn conflict_key(&self, key: &str, index: usize) -> Option<usize> {
         let paths = self.paths.lock().unwrap_or_else(PoisonError::into_inner);
         let other = |holder: Option<&usize>| holder.copied().filter(|holder| *holder != index);
-        other(paths.files.get(&key))
-            .or_else(|| other(paths.folders.get(&key)))
-            .or_else(|| parents(&key).find_map(|parent| other(paths.files.get(parent))))
+        other(paths.files.get(key))
+            .or_else(|| other(paths.folders.get(key)))
+            .or_else(|| parents(key).find_map(|parent| other(paths.files.get(parent))))
     }
 
     /// Records that the Entry with Archive index `index` put the file `relative` in place.
@@ -61,6 +66,46 @@ fn parents(key: &str) -> impl Iterator<Item = &str> {
 }
 
 impl EntryWriter<'_> {
+    /// Reserves selected native names that can overlap a CryXml companion.
+    pub(crate) fn reserve_cryxml_native_paths(
+        &self,
+        entries: &[SourceEntry<'_>],
+        dataforge: Option<usize>,
+    ) {
+        if !self.convert || !matches!(self.entry_target, EntryTarget::Source) {
+            return;
+        }
+        for (position, entry) in entries.iter().enumerate() {
+            if Some(position) != dataforge
+                && self
+                    .disk_name(entry)
+                    .split(['\\', '/'])
+                    .any(|part| file_receipt::is_companion_name(OsStr::new(part)))
+                && let Ok(relative) = self.relative_path(entry)
+                && portable_name::check_path_length(&self.target.join(&relative)).is_ok()
+            {
+                self.tracker
+                    .cryxml_native_paths
+                    .record(&relative, entry.index());
+            }
+        }
+    }
+
+    pub(crate) fn cryxml_companion_collision(
+        &self,
+        relative: &Path,
+        entry: &SourceEntry<'_>,
+    ) -> Result<(), ExtractionError> {
+        let key = key(relative);
+        let index = entry.index();
+        let conflict = self
+            .tracker
+            .written
+            .conflict_key(&key, index)
+            .or_else(|| self.tracker.cryxml_native_paths.conflict_key(&key, index));
+        self.report_collision(conflict)
+    }
+
     /// Records the files of the Entries of `ended` that were put in place or kept, so a later
     /// Entry of the run that collides with one is reported.
     pub(crate) fn record_written(&self, entries: &[SourceEntry<'_>], ended: &Ended) {
@@ -70,7 +115,7 @@ impl EntryWriter<'_> {
             };
             if matches!(
                 outcome,
-                Outcome::Written | Outcome::RawWritten(_) | Outcome::Converted | Outcome::Kept
+                Outcome::Written | Outcome::RawWritten(_) | Outcome::Converted(_) | Outcome::Kept
             ) && let Ok(relative) = self.relative_path(entry)
             {
                 self.tracker.written.record(&relative, entry.index());
@@ -84,14 +129,15 @@ impl EntryWriter<'_> {
         relative: &Path,
         entry: &SourceEntry<'_>,
     ) -> Result<(), ExtractionError> {
-        self.tracker
-            .written
-            .conflict(relative, entry.index())
-            .map_or(Ok(()), |earlier| {
-                Err(ExtractionError::CaseCollision {
-                    earlier: self.source.path_of(earlier).map_or_default(str::to_owned),
-                })
+        self.report_collision(self.tracker.written.conflict(relative, entry.index()))
+    }
+
+    fn report_collision(&self, conflict: Option<usize>) -> Result<(), ExtractionError> {
+        conflict.map_or(Ok(()), |earlier| {
+            Err(ExtractionError::CaseCollision {
+                earlier: self.source.path_of(earlier).map_or_default(str::to_owned),
             })
+        })
     }
 }
 

@@ -73,6 +73,7 @@ pub(crate) fn summarise(
     let mut report = ExtractionReport {
         sound_artifacts: artifacts.sound,
         raw_artifacts: artifacts.raw,
+        cryxml_artifacts: artifacts.cryxml,
         merged_texture_artifacts,
         texture_artifacts: texture_artifacts
             .into_iter()
@@ -102,9 +103,12 @@ fn record_outcomes(report: &mut ExtractionReport, outcomes: Vec<EntryEnded>) {
                     .failures
                     .extend(issue.map(|error| EntryFailure { path, error }));
             }
-            Outcome::Converted => {
+            Outcome::Converted(issue) => {
                 report.extracted += 1;
                 report.converted = report.converted.map(|count| count + 1);
+                report
+                    .failures
+                    .extend(issue.map(|error| EntryFailure { path, error }));
             }
             Outcome::Kept => report.skipped.push(path),
             Outcome::NotConverted => report.not_converted += 1,

@@ -155,6 +155,7 @@ extraction-summary-skipped = Skipped ({ $number })
 extraction-summary-cancelled = Cancelled ({ $number })
 extraction-summary-unconverted = Not converted ({ $number })
 extraction-summary-texture-receipts = DDS origin receipts ({ $number })
+extraction-summary-file-origin-receipts = File origin receipts ({ $number })
 extraction-summary-failure = { $path }: { $reason }
 extraction-summary-records-failed = Records not written ({ $number })
 extraction-summary-record-failure = { $path } ({ $guid }): { $reason }

@@ -137,8 +137,42 @@ fn convert_writes_what_extract_with_convert_writes() -> TestResult {
         "Data/readme.bin",
         &json!({"type": "opaquePayload"}),
     )?;
+    check_converted_xml(&json, &mut archive, &mut loose)?;
     assert_eq!(loose, archive, "the same payload files");
     Ok(())
+}
+
+fn check_converted_xml(
+    report: &Value,
+    archive: &mut BTreeMap<String, Vec<u8>>,
+    loose: &mut BTreeMap<String, Vec<u8>>,
+) -> TestResult {
+    const XML: &str = "Data/Ships/gladius.xml";
+    let artifacts = report["cryxml_artifacts"]
+        .as_array()
+        .ok_or("converted CryXml summary")?;
+    let [artifact] = artifacts.as_slice() else {
+        return Err("expected one converted XML artifact".into());
+    };
+    assert_eq!(artifact["path"], XML, "the converted XML");
+    assert_eq!(
+        artifact["origin_receipt"],
+        format!("{XML}.p4kx-origin.jsonl"),
+        "the committed CryXml companion"
+    );
+    let xml = std::str::from_utf8(loose.get(XML).ok_or("written XML")?)?;
+    let start = xml.find("<Ship").ok_or("the root element name")? + 1;
+    check_receipt_pair(
+        archive,
+        loose,
+        XML,
+        &json!({
+            "type": "xmlBytes",
+            "start": start.to_string(),
+            "endExclusive": (start + "Ship".len()).to_string(),
+            "field": "elementName",
+        }),
+    )
 }
 
 fn check_receipt_pair(

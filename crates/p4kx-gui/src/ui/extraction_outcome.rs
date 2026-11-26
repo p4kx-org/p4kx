@@ -246,6 +246,16 @@ pub(super) fn lists(ui: &mut Ui, texts: &Texts, summary: &ExtractionSummary) {
     list(
         ui,
         texts,
+        (
+            T::SummaryFileOriginReceipts,
+            summary.file_origin_receipts(),
+            None,
+        ),
+        false,
+    );
+    list(
+        ui,
+        texts,
         (T::SummarySkipped, summary.skipped(), None),
         false,
     );

@@ -203,7 +203,7 @@ impl EntryWriter<'_> {
         let outcome = match (end.output.receipt_failure, end.output.step) {
             (Some(error), Step::Written) if !end.converted => Outcome::RawWritten(Some(error)),
             (Some(error), _) => Outcome::Failed(error),
-            (None, Step::Written) if end.converted => Outcome::Converted,
+            (None, Step::Written) if end.converted => Outcome::Converted(None),
             (None, Step::Written) => Outcome::Written,
             (None, Step::Kept) => Outcome::Kept,
             (None, Step::Cancelled) => Outcome::Cancelled,

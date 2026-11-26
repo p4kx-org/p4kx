@@ -44,6 +44,18 @@ fn selected_entries_go_into_a_new_sc_export_folder_named_like_the_cli() -> TestR
     );
     assert_eq!(summary.target(), target, "the summary names the target");
     assert_eq!(summary.extracted(), 2, "two Entries were checked");
+    assert_eq!(
+        summary.file_origin_receipts().len(),
+        2,
+        "the summary lists each committed receipt"
+    );
+    assert!(
+        summary
+            .file_origin_receipts()
+            .iter()
+            .all(|receipt| target.join(receipt).is_file()),
+        "every listed receipt exists under the extraction target"
+    );
     assert_receipted_outputs(&target, &["Data\\Objects\\ship.cgf", "readme.txt"])?;
     assert_eq!(fs::read(target.join("readme.txt"))?, b"readme", "data");
     Ok(())

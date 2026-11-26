@@ -41,7 +41,7 @@ impl Unpacked {
         let outcome = if let Some(error) = self.error {
             Outcome::Failed(error)
         } else if self.converted {
-            Outcome::Converted
+            Outcome::Converted(None)
         } else if self.steps.contains(&Step::Written) {
             Outcome::Written
         } else {

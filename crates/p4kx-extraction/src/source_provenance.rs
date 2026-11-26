@@ -40,6 +40,7 @@ pub use crate::animation_sources::{
     ArchiveModelAnimations, ArchivePositionedAnimation, PositionedUnreadAnimation,
 };
 pub use crate::chunk_source::{ChunkDumpMode, ChunkDumpPayload, PreparedChunk};
+pub use crate::cryxml_field_uses::CryXmlFieldUses;
 pub use crate::field_origin::{FieldOrigin, SharedFieldOrigin};
 pub use crate::field_origin_seed::FieldOriginSeed;
 pub use crate::field_origins::{FieldOrigins, FieldOriginsError};
@@ -74,7 +75,8 @@ pub use crate::source_use::{
 };
 pub use crate::source_uses::{SourceInventoryFreezeError, SourceUses};
 pub use crate::source_value::{SourceValue, SourceValueState, SourcedValue};
-pub use crate::write::RawEntryArtifact;
+pub use crate::write::{ExtractedFileArtifact, RawEntryArtifact};
+pub use crate::xml_receipt::{EmbeddedXml, XmlReceipt};
 pub use archive_animation_path::{
     NamedCafSelector, animation_bank_path_crc32, archive_animation_path,
 };

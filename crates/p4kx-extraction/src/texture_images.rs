@@ -239,7 +239,7 @@ impl EntryWriter<'_> {
             &ownership,
             &destination.file,
             Ok(Chunk::End),
-            Outcome::Converted,
+            Outcome::Converted(None),
         )?;
         Ok(match step_of(&placed) {
             Step::Written => ImageWrite::Written(digest),

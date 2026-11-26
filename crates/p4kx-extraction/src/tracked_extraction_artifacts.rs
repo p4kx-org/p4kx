@@ -7,7 +7,7 @@ use std::sync::{Mutex, PoisonError};
 
 #[cfg(windows)]
 use crate::portable_name::fold;
-use crate::{ConvertedSoundArtifact, RawEntryArtifact};
+use crate::{ConvertedSoundArtifact, ExtractedFileArtifact, RawEntryArtifact};
 
 #[derive(Default)]
 pub(crate) struct ExtractionArtifacts {
@@ -17,12 +17,14 @@ pub(crate) struct ExtractionArtifacts {
 enum Artifact {
     Raw(RawEntryArtifact),
     Sound(ConvertedSoundArtifact),
+    CryXml(ExtractedFileArtifact),
 }
 
 #[derive(Default)]
 pub(crate) struct ArtifactReports {
     pub(crate) raw: Vec<RawEntryArtifact>,
     pub(crate) sound: Vec<ConvertedSoundArtifact>,
+    pub(crate) cryxml: Vec<ExtractedFileArtifact>,
 }
 
 impl ExtractionArtifacts {
@@ -32,6 +34,10 @@ impl ExtractionArtifacts {
 
     pub(crate) fn insert_sound(&self, output: &Path, artifact: ConvertedSoundArtifact) {
         self.insert(output, Artifact::Sound(artifact));
+    }
+
+    pub(crate) fn insert_cryxml(&self, output: &Path, artifact: ExtractedFileArtifact) {
+        self.insert(output, Artifact::CryXml(artifact));
     }
 
     fn insert(&self, output: &Path, artifact: Artifact) {
@@ -59,10 +65,12 @@ impl ExtractionArtifacts {
             match entry {
                 Artifact::Raw(artifact) => reports.raw.push(artifact),
                 Artifact::Sound(artifact) => reports.sound.push(artifact),
+                Artifact::CryXml(artifact) => reports.cryxml.push(artifact),
             }
         }
         reports.raw.sort_unstable_by(|a, b| a.path.cmp(&b.path));
         reports.sound.sort_unstable_by(|a, b| a.path.cmp(&b.path));
+        reports.cryxml.sort_unstable_by(|a, b| a.path.cmp(&b.path));
         reports
     }
 }

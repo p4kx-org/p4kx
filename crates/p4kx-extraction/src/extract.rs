@@ -182,10 +182,8 @@ fn run_guarded(
         DataForgePick::default()
     };
     let dataforge = found.position;
-    let (independent, dependent) = split_dependent(
-        within(pool, || items(source, entries, options, dataforge)),
-        &writer,
-    );
+    let (independent, dependent) =
+        split_dependent(within(pool, || items(&writer, entries, dataforge)), &writer);
     let run = |buffers: &mut Buffers, item: Item<'_>| {
         let ended = write_item(&writer, item, buffers);
         writer.record_written(entries, &ended);
@@ -318,19 +316,19 @@ fn not_started(
 /// Splits `entries` into the items of the run: with Conversion on, textures, sounds and
 /// soundbanks; the DataForge Entry at `dataforge` is left out.
 fn items<'a>(
-    source: &'a dyn EntrySource,
+    writer: &EntryWriter<'a>,
     entries: &'a [SourceEntry<'a>],
-    options: &ExtractOptions<'_>,
     dataforge: Option<usize>,
 ) -> Vec<Item<'a>> {
-    let mut items = if options.convert && options.textures.converts() {
-        group_textures(source, entries)
+    writer.reserve_cryxml_native_paths(entries, dataforge);
+    let mut items = if writer.convert && writer.textures.converts() {
+        group_textures(writer.source, entries)
     } else {
         entries.iter().enumerate().map(Item::Entry).collect()
     };
     items.retain(|item| !matches!(item, Item::Entry((index, _)) if Some(*index) == dataforge));
-    if options.convert {
-        mark_sounds(&mut items, options.audio);
+    if writer.convert {
+        mark_sounds(&mut items, writer.audio);
     }
     items
 }

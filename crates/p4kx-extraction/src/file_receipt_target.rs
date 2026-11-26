@@ -92,7 +92,7 @@ pub(super) fn bind_target(
     Ok(bound)
 }
 
-pub(super) fn is_companion_name(name: &OsStr) -> bool {
+pub(crate) fn is_companion_name(name: &OsStr) -> bool {
     name.as_encoded_bytes()
         .get(name.len().saturating_sub(COMPANION_SUFFIX.len())..)
         .is_some_and(|suffix| suffix.eq_ignore_ascii_case(COMPANION_SUFFIX.as_bytes()))

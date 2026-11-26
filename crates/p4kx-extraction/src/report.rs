@@ -12,8 +12,8 @@ use serde::Serialize;
 use thiserror::Error;
 
 use crate::{
-    ConversionError, ConvertedSoundArtifact, NameRule, OriginArtifactDigest, PathLimit,
-    RawEntryArtifact, RecordExportReport, SourceEvidenceError, TextureArtifacts,
+    ConversionError, ConvertedSoundArtifact, ExtractedFileArtifact, NameRule, OriginArtifactDigest,
+    PathLimit, RawEntryArtifact, RecordExportReport, SourceEvidenceError, TextureArtifacts,
 };
 
 /// Why one Entry of an Extraction was not written.
@@ -232,6 +232,7 @@ pub struct ExtractionReport {
     pub(crate) merged_texture_artifacts: Vec<MergedTextureArtifact>,
     pub(crate) sound_artifacts: Vec<ConvertedSoundArtifact>,
     pub(crate) raw_artifacts: Vec<RawEntryArtifact>,
+    pub(crate) cryxml_artifacts: Vec<ExtractedFileArtifact>,
 }
 
 impl ExtractionReport {
@@ -259,6 +260,12 @@ impl ExtractionReport {
         &self.raw_artifacts
     }
 
+    /// Borrows the XML files produced from binary CryXml and their committed companions.
+    #[must_use]
+    pub fn cryxml_artifacts(&self) -> &[ExtractedFileArtifact] {
+        &self.cryxml_artifacts
+    }
+
     /// Returns the number of Entries written.
     #[must_use]
     pub const fn extracted(&self) -> usize {
@@ -279,7 +286,8 @@ impl ExtractionReport {
         &self.skipped
     }
 
-    /// Returns the Entries that failed, with the reason.
+    /// Borrows the extraction and companion failures.
+    /// A companion failure can refer to an Entry whose payload was written.
     #[must_use]
     pub fn failures(&self) -> &[EntryFailure] {
         &self.failures

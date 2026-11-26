@@ -12,23 +12,54 @@ use crate::file_receipt::{
 };
 use crate::origin_file_io::StageDisposition;
 use crate::output_file::StagedOutput;
+use crate::portable_name;
 use crate::source::{SourceEntry, SourceReader};
 use crate::{
-    ConflictPolicy, ExtractionError, FieldOrigin, FileReceipt, InputScope, OriginArtifactDigest,
-    OriginDigestWriter, OriginOutputAddress, SourceEvidenceError, SourceInput, SourceInventory,
-    SourceUseRole, SourceUses, write_origin_companion,
+    ConflictPolicy, ExtractionError, FieldOrigin, FileReceipt, InputScope, OriginArtifactBinding,
+    OriginArtifactDigest, OriginDigestWriter, OriginOutputAddress, SourceEvidenceError,
+    SourceInput, SourceInventory, SourceUseRole, SourceUses, XmlReceipt, write_origin_companion,
 };
 
-/// An unchanged file installed by Extraction.
+/// A byte-bound file installed by Extraction and its portable companion.
 #[derive(Debug, Serialize)]
 #[non_exhaustive]
-pub struct RawEntryArtifact {
+pub struct ExtractedFileArtifact {
     /// The output file relative to the extraction target.
     pub path: String,
     /// The measured byte length and SHA-256 of the output.
     pub digest: OriginArtifactDigest,
     /// The relative source companion, when its publication succeeded.
     pub origin_receipt: Option<String>,
+}
+
+/// An unchanged file installed by Extraction.
+pub type RawEntryArtifact = ExtractedFileArtifact;
+
+#[derive(Clone, Copy)]
+enum ArtifactKind {
+    Raw,
+    CryXml,
+}
+
+impl ArtifactKind {
+    fn insert(
+        self,
+        writer: &EntryWriter<'_>,
+        output: &Path,
+        artifact: ExtractedFileArtifact,
+        issue: Option<ExtractionError>,
+    ) -> Outcome {
+        match self {
+            Self::Raw => {
+                writer.tracker.artifacts.insert_raw(output, artifact);
+                Outcome::RawWritten(issue)
+            }
+            Self::CryXml => {
+                writer.tracker.artifacts.insert_cryxml(output, artifact);
+                Outcome::Converted(issue)
+            }
+        }
+    }
 }
 
 impl EntryWriter<'_> {
@@ -41,7 +72,7 @@ impl EntryWriter<'_> {
         buffer: &mut [u8],
         written: &mut u64,
     ) -> Result<Outcome, ExtractionError> {
-        let paths = RawPaths::prepare(self, entry, &destination.file)?;
+        let paths = EntryReceiptPaths::prepare(self, entry, &destination.file, ArtifactKind::Raw)?;
         let archive = entry.observed_entry();
         let (temporary, file, ownership) = self.temporary(&destination.folder)?;
         let mut output = OriginDigestWriter::new(file);
@@ -80,6 +111,67 @@ impl EntryWriter<'_> {
                 Err(error)
             }
         };
+        self.finish_staged_entry(result, &ownership, &temporary)
+    }
+
+    pub(crate) fn write_observed_cryxml(
+        &self,
+        entry: &SourceEntry<'_>,
+        destination: &Destination,
+        bytes: &[u8],
+        evidence: &XmlReceipt,
+    ) -> Result<Outcome, ExtractionError> {
+        let paths =
+            EntryReceiptPaths::prepare(self, entry, &destination.file, ArtifactKind::CryXml)?;
+        let (temporary, file, ownership) = self.temporary(&destination.folder)?;
+        let mut output = OriginDigestWriter::new(file);
+        let digest = match output.write_all(bytes).and_then(|()| output.finish()) {
+            Ok(digest) => digest,
+            Err(error) => {
+                let error = write_error(destination.file.clone(), error);
+                return self.finish_staged_entry(Err(error), &ownership, &temporary);
+            }
+        };
+        if let Err(error) = paths.check_cryxml_receipt(self, entry) {
+            let issue = write_error(paths.receipt.clone(), error);
+            let outcome = self.put_in_place(
+                &temporary,
+                &ownership,
+                &destination.file,
+                Ok(Chunk::End),
+                Outcome::Converted(Some(issue)),
+            )?;
+            if matches!(outcome, Outcome::Converted(_)) {
+                self.tracker
+                    .artifacts
+                    .insert_cryxml(&destination.file, paths.artifact(digest, false));
+            }
+            return Ok(outcome);
+        }
+        let staged = StagedOutput::new(
+            &temporary,
+            &destination.file,
+            &ownership,
+            self.protection,
+            self.cancel,
+        );
+        let result = self.publish_entry_receipt(
+            &staged,
+            paths,
+            digest,
+            entry,
+            ArtifactKind::CryXml,
+            |writer, binding| evidence.write(writer, binding),
+        );
+        self.finish_staged_entry(result, &ownership, &temporary)
+    }
+
+    fn finish_staged_entry(
+        &self,
+        result: Result<StageDisposition<Outcome>, ExtractionError>,
+        ownership: &crate::OwnedFileToken,
+        temporary: &Path,
+    ) -> Result<Outcome, ExtractionError> {
         match result {
             Ok(StageDisposition::Moved(outcome)) => Ok(outcome),
             result => crate::output_cleanup::extraction(
@@ -88,8 +180,8 @@ impl EntryWriter<'_> {
                         outcome
                     }
                 }),
-                &ownership,
-                &temporary,
+                ownership,
+                temporary,
                 self.cancel,
             ),
         }
@@ -102,35 +194,26 @@ impl EntryWriter<'_> {
         input: SourceInput<'_>,
         entry: &SourceEntry<'_>,
     ) -> Result<StageDisposition<Outcome>, ExtractionError> {
-        let paths = RawPaths::prepare(self, entry, staged.output())?;
+        let paths = EntryReceiptPaths::prepare(self, entry, staged.output(), ArtifactKind::Raw)?;
         self.publish_raw(staged, paths, digest, input, entry)
     }
 
     fn publish_raw(
         &self,
         staged: &StagedOutput<'_>,
-        paths: RawPaths,
+        paths: EntryReceiptPaths,
         digest: OriginArtifactDigest,
         input: SourceInput<'_>,
         entry: &SourceEntry<'_>,
     ) -> Result<StageDisposition<Outcome>, ExtractionError> {
-        let output = staged.output();
-        let receipt = match FileReceipt::for_native_staged_replacement(
-            output,
-            self.protection,
-            self.cancel.cloned().unwrap_or_default(),
-        ) {
-            Ok(receipt) => receipt,
-            Err(error) => return self.recover_uncommitted_raw(staged, paths, digest, error),
-        };
         let evidence = RawOrigins::capture(input, digest.byte_length())
             .map_err(|error| write_error(paths.receipt.clone(), io::Error::other(error)))?;
-        let result = receipt.publish_staged_with_policy(
+        self.publish_entry_receipt(
             staged,
-            digest.clone(),
-            self.policy,
-            || self.receipt_checkpoint(),
-            || self.tracker.artifacts.invalidate(output),
+            paths,
+            digest,
+            entry,
+            ArtifactKind::Raw,
             |writer, binding| {
                 write_origin_companion(
                     writer,
@@ -139,11 +222,41 @@ impl EntryWriter<'_> {
                     [(&OriginOutputAddress::OpaquePayload, &evidence.origin)],
                 )
             },
+        )
+    }
+
+    fn publish_entry_receipt(
+        &self,
+        staged: &StagedOutput<'_>,
+        paths: EntryReceiptPaths,
+        digest: OriginArtifactDigest,
+        entry: &SourceEntry<'_>,
+        kind: ArtifactKind,
+        describe: impl FnOnce(&mut dyn Write, &OriginArtifactBinding) -> io::Result<()>,
+    ) -> Result<StageDisposition<Outcome>, ExtractionError> {
+        let output = staged.output();
+        let receipt = match FileReceipt::for_native_staged_replacement(
+            output,
+            self.protection,
+            self.cancel.cloned().unwrap_or_default(),
+        ) {
+            Ok(receipt) => receipt,
+            Err(error) => {
+                return self.recover_uncommitted_entry(staged, paths, digest, kind, error);
+            }
+        };
+        let result = receipt.publish_staged_with_policy(
+            staged,
+            digest.clone(),
+            self.policy,
+            || self.receipt_checkpoint(),
+            || self.tracker.artifacts.invalidate(output),
+            describe,
         );
         let (receipt, retirement) = match result {
             None => return Ok(StageDisposition::Cleanup(Outcome::Kept)),
             Some(StagedReceiptPublication::Uncommitted(error)) => {
-                return self.recover_uncommitted_raw(staged, paths, digest, error);
+                return self.recover_uncommitted_entry(staged, paths, digest, kind, error);
             }
             Some(StagedReceiptPublication::Committed {
                 receipt,
@@ -157,10 +270,7 @@ impl EntryWriter<'_> {
         let issue = finish_staged_receipt(receipt, retirement)
             .err()
             .map(|error| write_error(paths.receipt.clone(), error));
-        self.tracker
-            .artifacts
-            .insert_raw(output, paths.artifact(digest, available));
-        let outcome = Outcome::RawWritten(issue);
+        let outcome = kind.insert(self, output, paths.artifact(digest, available), issue);
         Ok(if self.policy == ConflictPolicy::Skip {
             StageDisposition::Cleanup(outcome)
         } else {
@@ -168,11 +278,12 @@ impl EntryWriter<'_> {
         })
     }
 
-    fn recover_uncommitted_raw(
+    fn recover_uncommitted_entry(
         &self,
         staged: &StagedOutput<'_>,
-        paths: RawPaths,
+        paths: EntryReceiptPaths,
         digest: OriginArtifactDigest,
+        kind: ArtifactKind,
         error: io::Error,
     ) -> Result<StageDisposition<Outcome>, ExtractionError> {
         if error.kind() == io::ErrorKind::Interrupted && self.tracker.should_stop() {
@@ -184,10 +295,7 @@ impl EntryWriter<'_> {
         };
         let outcome = match try_create_fresh(staged, self.cancel, || self.tracker.should_stop())? {
             FreshPublication::Installed => {
-                self.tracker
-                    .artifacts
-                    .insert_raw(output, paths.artifact(digest, false));
-                Outcome::Written
+                kind.insert(self, output, paths.artifact(digest, false), None)
             }
             FreshPublication::Cancelled => Outcome::Cancelled,
             FreshPublication::Contended if self.policy == ConflictPolicy::Skip => Outcome::Kept,
@@ -201,7 +309,7 @@ impl EntryWriter<'_> {
     }
 }
 
-struct RawPaths {
+struct EntryReceiptPaths {
     relative: String,
     relative_receipt: String,
     companion: PathBuf,
@@ -209,11 +317,12 @@ struct RawPaths {
     owns_name: bool,
 }
 
-impl RawPaths {
+impl EntryReceiptPaths {
     fn prepare(
         writer: &EntryWriter<'_>,
         entry: &SourceEntry<'_>,
         output: &Path,
+        kind: ArtifactKind,
     ) -> Result<Self, ExtractionError> {
         let relative = output
             .strip_prefix(writer.target)
@@ -221,8 +330,10 @@ impl RawPaths {
         let companion = file_receipt::companion_path(relative)
             .map_err(|error| write_error(output.to_path_buf(), error))?;
         let receipt = writer.target.join(&companion);
-        writer.case_collision(&companion, entry)?;
-        crate::portable_name::check_path_length(&receipt)?;
+        if matches!(kind, ArtifactKind::Raw) {
+            writer.case_collision(&companion, entry)?;
+            portable_name::check_path_length(&receipt)?;
+        }
         Ok(Self {
             relative: report_path(relative)?,
             relative_receipt: report_path(&companion)?,
@@ -232,8 +343,19 @@ impl RawPaths {
         })
     }
 
-    fn artifact(self, digest: OriginArtifactDigest, available: bool) -> RawEntryArtifact {
-        RawEntryArtifact {
+    fn check_cryxml_receipt(
+        &self,
+        writer: &EntryWriter<'_>,
+        entry: &SourceEntry<'_>,
+    ) -> io::Result<()> {
+        writer
+            .cryxml_companion_collision(&self.companion, entry)
+            .map_err(io::Error::other)?;
+        portable_name::check_path_length(&self.receipt).map_err(io::Error::other)
+    }
+
+    fn artifact(self, digest: OriginArtifactDigest, available: bool) -> ExtractedFileArtifact {
+        ExtractedFileArtifact {
             path: self.relative,
             digest,
             origin_receipt: available.then_some(self.relative_receipt),

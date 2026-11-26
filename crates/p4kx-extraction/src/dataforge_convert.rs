@@ -84,7 +84,7 @@ impl EntryWriter<'_> {
         let outcome = if report.cancelled() > 0 {
             Outcome::Cancelled
         } else {
-            Outcome::Converted
+            Outcome::Converted(None)
         };
         Ok((outcome, Some(report)))
     }

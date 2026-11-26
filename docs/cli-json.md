@@ -3186,12 +3186,20 @@ carry the target-relative `path` and `origin_receipt` and the measured
 `digest` of the written audio file. The report omits this field when no such
 companion is present.
 
+`cryxml_artifacts` lists XML files written from binary CryXml by Archive
+extraction or folder conversion. Each row has the target-relative `path`,
+measured `digest` and `origin_receipt`. The companion binds the XML bytes and
+describes each emitted field. If the companion could not be published,
+`origin_receipt` is null. A companion path that is too long or overlaps a selected
+Entry can produce a `failed` row alongside successfully converted XML. Kept
+files do not appear in `cryxml_artifacts`.
+
 An Entry whose path has a part that is no valid file name on Linux and Windows, a path that is too
 long for Windows or that differs only in case from an earlier written Entry is listed in `failed`
 with the part and the rule it breaks
 ([ADR-0248](adr/0248-written-file-names-are-valid-on-linux-and-windows-on-every-platform.md)).
-`skipped` lists the Entries whose existing file in the target was kept under `--conflict`;
-`failed` lists the Entries that were not written, with the reason and its causes joined by `: `;
+`skipped` lists the Entries whose existing file in the target was kept under `--conflict`.
+`failed` lists extraction and companion failures, with the reason and its causes joined by `: `.
 `cancelled` lists the Entries not written because the run was cancelled and, once a cancelled run
 had written a soundbank itself, each of its WEMs not unpacked as `<bank> WEM <ID>`, after the
 Entries. The Entries in all three are in Archive order. With `--verify` the report also holds `"mismatched": [{"path":
