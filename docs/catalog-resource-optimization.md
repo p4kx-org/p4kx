@@ -234,8 +234,18 @@ FileGraph keeps the observed operations and positions. Physical aliases,
 normalized-name collisions, nested consumers and failed reads retain the
 resolver cache. Four Assembly fixtures cover reuse and release. The 41
 Ship integration cases include exact Full SDK and canonical contributor
-parity. The candidate requires an isolated release-profile LIVE measurement
-to establish its peak and elapsed time.
+parity.
+
+The ordinary one-worker English MarkersOnly witness on LIVE 13220821
+completed at signed revision `04a619da7` with all **1,033 Ship rows**. The test
+reported 799 ms for initialization and 19,351 ms for the query. Native
+process time was 20.415 s. Lifetime peak private commit was
+**1,785,106,432 B**, and peak working set was **1,770,205,184 B**. Both were below
+2,000,000,000 B. The binary SHA-256 was
+`4ba7e893157856b977b5b1614a4f1ce65121115007615b5a5e4b8cdb4e2700d8`.
+The witness used the same Build, selection, harness and peak provider as the
+matched stopped runs. The integrated consumer refresh still needs its
+own 2 GB witness.
 
 For the next Loadout comparison, measure time to first owner, admission,
 Record and XML cache misses, semantic Loadout resolution, port construction and
