@@ -34,10 +34,13 @@ function Write-P4kxMsiObserverProgress {
 
 function Write-P4kxMsiFinishWaitNotice {
     param(
-        [ValidateSet('predicate-setup','predicate-start','predicate-wait','predicate-cleanup','receipt-digest','wait-receipt')][string]$Phase,
-        [ValidateSet('begin','end')][string]$Status
+        [ValidateSet('predicate-setup','predicate-start','predicate-wait','predicate-cleanup',
+            'context-binding','launch-read','receipt-poll','receipt-digest','wait-receipt')][string]$Phase,
+        [ValidateSet('begin','end')][string]$Status,
+        [switch]$Hosted
     )
     if ($env:GITHUB_ACTIONS -ceq 'true' -and $env:RUNNER_ENVIRONMENT -ceq 'github-hosted') {
-        Write-Host "::notice title=Native MSI Finish observation::phase=$Phase status=$Status completion=unproven"
+        $title = if ($Hosted) { 'Native MSI hosted Finish phase' } else { 'Native MSI Finish observation' }
+        Write-Host "::notice title=${title}::phase=$Phase status=$Status completion=unproven"
     }
 }

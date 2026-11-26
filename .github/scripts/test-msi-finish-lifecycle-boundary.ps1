@@ -11,7 +11,7 @@ function Write-P4kxFinishLifecycleFixtureResult([string]$Path, [string]$Digest) 
 }
 
 function New-P4kxFinishLifecycleFixture {
-    param([string]$Root, [ValidateSet('Bound','Foreign','Stale','Hosted','Absent','Late')][string]$Case, [string]$ForeignDigest, [switch]$Unpublished)
+    param([string]$Root, [ValidateSet('Bound','Foreign','Stale','Hosted','LaunchReadFailure','Absent','Late')][string]$Case, [string]$ForeignDigest, [switch]$Unpublished)
 
     $caseRoot = [IO.Directory]::CreateDirectory((Join-Path $Root $Case)).FullName
     $invocation = Join-Path $caseRoot 'invocation.json'
@@ -124,6 +124,19 @@ function Assert-P4kxFinishLaunchRefused($Fixture, [string]$Entrypoint) {
     }
 }
 
+function Assert-P4kxHostedFinishNotices([string[]]$Lines, [string[]]$Phases, [string]$InterruptedPhase) {
+    $observed = @($Lines | ForEach-Object {
+        if ($_ -cmatch '^::notice title=Native MSI hosted Finish phase::phase=(\S+) status=(begin|end) completion=unproven$') {
+            $Matches[1] + '.' + $Matches[2]
+        }
+    })
+    $expected = @(foreach ($phase in $Phases) { "$phase.begin"; "$phase.end" })
+    if ($InterruptedPhase) { $expected += "$InterruptedPhase.begin" }
+    if (($observed -join ' ') -cne ($expected -join ' ')) {
+        throw 'Hosted Finish observation notices are missing, out of order or claim native completion.'
+    }
+}
+
 function Assert-P4kxHostedFinishWait($Fixture) {
     $diagnostics = Split-Path -Parent $Fixture.wait_path
     $wrongCutoff = $Fixture.collection_cutoff.AddSeconds(1).ToString('o')
@@ -134,7 +147,7 @@ function Assert-P4kxHostedFinishWait($Fixture) {
         if ($_.Exception.Message -cne 'Hosted Finish wait requires the original Lifecycle collection cutoff.') { throw }
     }
 
-    & {
+    $lines = @(& {
         function Start-Process { throw 'Hosted receipt observation attempted to launch a process.' }
         function New-P4kxPackageProcess { throw 'Hosted receipt observation constructed an owned process.' }
         function Start-Sleep([int]$Milliseconds) {
@@ -143,8 +156,9 @@ function Assert-P4kxHostedFinishWait($Fixture) {
             }
             Write-P4kxFinishLifecycleFixtureResult $Fixture.result_path $Fixture.digest
         }
-        Invoke-P4kxMsiHostedFinishWait -Directory $Fixture.observer -CollectionCutoffUtc $Fixture.collection_cutoff.ToString('o') 6>$null
-    }
+        Invoke-P4kxMsiHostedFinishWait -Directory $Fixture.observer -CollectionCutoffUtc $Fixture.collection_cutoff.ToString('o')
+    } 6>&1 | ForEach-Object { $_.ToString() })
+    Assert-P4kxHostedFinishNotices $lines @('context-binding','launch-read','receipt-poll','receipt-digest','wait-receipt')
     $digest = Get-P4kxDetachedDigest $Fixture.result_path
     Assert-P4kxFinishLifecycleWait $Fixture $digest -Hosted
     foreach ($stage in 'finishWaitBinding','finishWaitPoll','finishWaitDigest','finishWaitReceipt') {
@@ -166,17 +180,35 @@ function Assert-P4kxHostedFinishWait($Fixture) {
     }
 }
 
+function Assert-P4kxHostedFinishLaunchReadFailure($Fixture) {
+    $failure = @{message=$null}
+    $lines = @(& {
+        function Read-P4kxMsiFinishLaunch { throw 'Injected hosted Finish launch read failure.' }
+        try {
+            Invoke-P4kxMsiHostedFinishWait -Directory $Fixture.observer -CollectionCutoffUtc $Fixture.collection_cutoff.ToString('o')
+        } catch { $failure.message = $_.Exception.Message }
+    } 6>&1 | ForEach-Object { $_.ToString() })
+    Assert-P4kxHostedFinishNotices $lines @('context-binding') -InterruptedPhase 'launch-read'
+    if ($failure.message -cne 'Injected hosted Finish launch read failure.' -or
+        [IO.File]::Exists($Fixture.wait_path) -or [IO.Path]::Exists($Fixture.output)) {
+        throw 'Hosted Finish changed the read failure or wrote a terminal observation.'
+    }
+}
+
 function Assert-P4kxHostedFinishWaitRefused($Fixture, [DateTimeOffset]$Cutoff) {
     $context = Get-P4kxMsiFinishContext $Fixture.observer
     $launch = Read-P4kxMsiFinishLaunch $context
     $context.collection_cutoff = $Cutoff
     $clock = [Diagnostics.Stopwatch]::StartNew()
-    try {
-        Wait-P4kxMsiFinishReceipt $context $launch -Hosted
-        throw 'Missing or late terminal bytes passed the hosted wait.'
-    } catch {
-        if ($_.Exception.Message -cne 'The bound Finish supervisor produced no result within the original allowance.') { throw }
+    $failure = @{message=$null}
+    $lines = @(& {
+        try { Wait-P4kxMsiFinishReceipt $context $launch -Hosted }
+        catch { $failure.message = $_.Exception.Message }
+    } 6>&1 | ForEach-Object { $_.ToString() })
+    if ($failure.message -cne 'The bound Finish supervisor produced no result within the original allowance.') {
+        throw 'Missing or late terminal bytes passed the hosted wait or emitted a different error.'
     }
+    Assert-P4kxHostedFinishNotices $lines @('receipt-poll','wait-receipt')
     $wait = Read-P4kxDetachedReceipt $Fixture.wait_path
     if ($clock.ElapsedMilliseconds -gt 5000 -or $wait.schema -ne 1 -or $wait.role -cne 'native-msi-finish-receipt-wait' -or
         $wait.deadline_utc -cne $Cutoff.ToString('o') -or $wait.request_sha256 -cne $Fixture.digest -or
@@ -192,7 +224,11 @@ $null = New-Item -ItemType Directory -Path $root
 $budget = New-P4kxMsiStepBudget $env:P4KX_MSI_DIAGNOSTIC_DEADLINE_UTC
 $savedMinutes = $env:P4KX_MSI_STEP_MINUTES
 $savedComputed = $env:P4KX_MSI_STEP_COMPUTED_AT_UTC
+$savedActions = $env:GITHUB_ACTIONS
+$savedRunner = $env:RUNNER_ENVIRONMENT
 try {
+    $env:GITHUB_ACTIONS = 'true'
+    $env:RUNNER_ENVIRONMENT = 'github-hosted'
     $env:P4KX_MSI_STEP_MINUTES = [string]$budget.minutes
     $env:P4KX_MSI_STEP_COMPUTED_AT_UTC = $budget.computed_at_utc
     $entry = Join-Path $PSScriptRoot 'invoke-msi-observer.ps1'
@@ -204,10 +240,13 @@ try {
     Assert-P4kxFinishLaunchRefused (New-P4kxFinishLifecycleFixture $root Foreign -ForeignDigest $bound.digest) $entry
     Assert-P4kxFinishLaunchRefused (New-P4kxFinishLifecycleFixture $root Stale) $entry
     Assert-P4kxHostedFinishWait (New-P4kxFinishLifecycleFixture $root Hosted -Unpublished)
+    Assert-P4kxHostedFinishLaunchReadFailure (New-P4kxFinishLifecycleFixture $root LaunchReadFailure -Unpublished)
     Assert-P4kxHostedFinishWaitRefused (New-P4kxFinishLifecycleFixture $root Absent -Unpublished) ([DateTimeOffset]::UtcNow.AddMilliseconds(150))
     Assert-P4kxHostedFinishWaitRefused (New-P4kxFinishLifecycleFixture $root Late) ([DateTimeOffset]::UtcNow.AddSeconds(-1))
     'PASS: Lifecycle WaitFinish verified its bound receipt, refused foreign and stale sources, and retained missing or late observations without launching a hosted wait process.'
 } finally {
     $env:P4KX_MSI_STEP_MINUTES = $savedMinutes
     $env:P4KX_MSI_STEP_COMPUTED_AT_UTC = $savedComputed
+    $env:GITHUB_ACTIONS = $savedActions
+    $env:RUNNER_ENVIRONMENT = $savedRunner
 }

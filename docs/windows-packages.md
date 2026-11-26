@@ -529,7 +529,11 @@ runner stops reporting during Finish. The workflow saves the original Finish
 launch binding before waiting. The runner step polls the supervisor's atomic
 result file using the original UTC cutoff and a monotonic budget. It records
 the observation phases and a bound receipt before reporting the outcome.
-If the terminal result is absent or late, the receipt contains no result digest.
+On GitHub-hosted Windows runners, fixed observation notices mark the request and launch
+binding, result poll, digest and wait receipt independently of artifact upload.
+Each notice names its phase and whether the operation started or returned.
+The notices establish progress only. Native lifecycle completion depends on the bound
+original result. If the terminal result is absent or late, the receipt contains no result digest.
 CollectFinish validates the cutoff, digest and original native lifecycle
 evidence before publication.
 The diagnostic runner-fuse fixture records whether GitHub retains the wait-start annotation

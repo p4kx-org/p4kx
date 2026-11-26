@@ -115,7 +115,10 @@ function Wait-P4kxMsiFinishReceipt {
     }
     Write-P4kxMsiObserverProgress finishWaitPoll begin @progress
     $found = if ($Hosted) {
-        Wait-P4kxMsiFinishReceiptFile $receiptPath $Context.collection_cutoff $clock $budget
+        Write-P4kxMsiFinishWaitNotice receipt-poll begin -Hosted
+        $present = Wait-P4kxMsiFinishReceiptFile $receiptPath $Context.collection_cutoff $clock $budget
+        Write-P4kxMsiFinishWaitNotice receipt-poll end -Hosted
+        $present
     } elseif ($null -ne $direct) {
         Test-P4kxMsiFinishDirectReceiptPresence $Context $receiptPath $clock $budget $direct
     } else {
@@ -124,9 +127,9 @@ function Wait-P4kxMsiFinishReceipt {
     Write-P4kxMsiObserverProgress finishWaitPoll end @progress
     if ($found) {
         Write-P4kxMsiObserverProgress finishWaitDigest begin @progress
-        if ($null -ne $direct) { Write-P4kxMsiFinishWaitNotice receipt-digest begin }
+        if ($Hosted -or $null -ne $direct) { Write-P4kxMsiFinishWaitNotice receipt-digest begin -Hosted:$Hosted }
         $resultDigest = Get-P4kxDetachedDigest $receiptPath
-        if ($null -ne $direct) { Write-P4kxMsiFinishWaitNotice receipt-digest end }
+        if ($Hosted -or $null -ne $direct) { Write-P4kxMsiFinishWaitNotice receipt-digest end -Hosted:$Hosted }
         Write-P4kxMsiObserverProgress finishWaitDigest end @progress
     }
     $observedAt = [DateTimeOffset]::UtcNow
@@ -141,9 +144,9 @@ function Wait-P4kxMsiFinishReceipt {
         result_sha256=$resultDigest;mutation_authority=$false
     }
     if ($null -ne $direct) { $wait.direct_probe = $direct }
-    if ($null -ne $direct) { Write-P4kxMsiFinishWaitNotice wait-receipt begin }
+    if ($Hosted -or $null -ne $direct) { Write-P4kxMsiFinishWaitNotice wait-receipt begin -Hosted:$Hosted }
     Write-P4kxDetachedReceipt (Join-Path $Context.directory 'wait-result.json') $wait
-    if ($null -ne $direct) { Write-P4kxMsiFinishWaitNotice wait-receipt end }
+    if ($Hosted -or $null -ne $direct) { Write-P4kxMsiFinishWaitNotice wait-receipt end -Hosted:$Hosted }
     Write-P4kxMsiObserverProgress finishWaitReceipt end @progress
     if (-not $resultDigest) { throw 'The bound Finish supervisor produced no result within the original allowance.' }
 }
