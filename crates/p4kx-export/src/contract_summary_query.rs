@@ -173,7 +173,7 @@ pub fn with_contract_summaries<T>(
 /// Supplies canonical summaries using a decoded Entry from the same Archive.
 ///
 /// # Errors
-/// Returns the errors of [with_contract_summaries], including source-origin mismatch.
+/// Returns the errors of [`with_contract_summaries`], including source-origin mismatch.
 pub fn with_contract_summaries_from<T>(
     archive: &Archive,
     entry: &DataForgeEntry,
@@ -189,7 +189,7 @@ pub fn with_contract_summaries_from<T>(
 /// Supplies the canonical summary for one logical parent or sub-contract identity.
 ///
 /// # Errors
-/// Returns the errors of [with_contract_summaries].
+/// Returns the errors of [`with_contract_summaries`].
 pub fn with_contract_summary<T>(
     archive: &Archive,
     key: ContractKey,
@@ -204,7 +204,7 @@ pub fn with_contract_summary<T>(
 /// Supplies one logical summary using a decoded Entry from the same Archive.
 ///
 /// # Errors
-/// Returns the errors of [with_contract_summary], including source-origin mismatch.
+/// Returns the errors of [`with_contract_summary`], including source-origin mismatch.
 pub fn with_contract_summary_from<T>(
     archive: &Archive,
     entry: &DataForgeEntry,
