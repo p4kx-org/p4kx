@@ -10,6 +10,7 @@ use serde::Serialize;
 use super::ReducedError;
 use super::completeness;
 use super::item::Item;
+use super::item_definitions;
 use super::manufacturer_definitions;
 use super::record_targets::RecordTargets;
 use super::selected_texts::{SelectedTexts, TextRefs};
@@ -33,6 +34,7 @@ const STORE_SLUGS: &str = "shipStoreSlugs";
 
 pub(super) struct Entities {
     pub(super) items: StagedCatalogSequence,
+    pub(super) item_definitions: StagedCatalogTable,
     pub(super) ships: StagedCatalogSequence,
     pub(super) paints: StagedCatalogSequence,
     pub(super) ship_store_slugs: StagedCatalogSequence,
@@ -58,8 +60,11 @@ pub(super) fn collect(
         manufacturer_definitions::collect(parsed, scratch, cancel, texts)?;
     let ships = collect_ships(parsed, scratch, cancel, texts, &manufacturer_targets)?;
     let (items, paints) = collect_items(parsed, scratch, cancel, &ships.targets)?;
+    let item_definitions =
+        item_definitions::collect(parsed, scratch, cancel, texts, &manufacturer_targets)?;
     Ok(Entities {
         items,
+        item_definitions,
         ships: ships.rows,
         paints,
         ship_store_slugs: ships.store_slugs,

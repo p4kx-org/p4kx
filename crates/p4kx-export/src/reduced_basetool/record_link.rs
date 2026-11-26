@@ -50,6 +50,17 @@ impl<'source> RecordLink<'source> {
         })
     }
 
+    pub(super) fn read_source(
+        path: &'static str,
+        link: &'source SourceRecordReference<'_>,
+        targets: &RecordTargets,
+        selected: impl FnOnce(&str) -> bool,
+    ) -> Result<Self, ReducedError> {
+        let reference = Self::from_source(path, link)?;
+        reference.verify(path, targets, selected)?;
+        Ok(reference)
+    }
+
     pub(super) fn read(
         path: &'static str,
         link: &'source CatalogRecordReference,
@@ -57,23 +68,33 @@ impl<'source> RecordLink<'source> {
         targets: &RecordTargets,
     ) -> Result<Self, ReducedError> {
         let reference = Self::from(link);
-        if let DefinitionStatus::Present = reference.status {
-            let source_type = reference
-                .target_type
+        reference.verify(path, targets, |source_type| {
+            catalog_reference::actual_kind(source_type) == Some(target_kind)
+        })?;
+        Ok(reference)
+    }
+
+    fn verify(
+        &self,
+        path: &'static str,
+        targets: &RecordTargets,
+        selected: impl FnOnce(&str) -> bool,
+    ) -> Result<(), ReducedError> {
+        if !matches!(self.status, DefinitionStatus::Present) {
+            return Ok(());
+        }
+        let source_type = self
+            .target_type
+            .value
+            .ok_or(ReducedError::IncompleteScope(path))?;
+        if selected(source_type) {
+            let index = self
+                .target_record_index
                 .value
                 .ok_or(ReducedError::IncompleteScope(path))?;
-            if catalog_reference::actual_kind(source_type) == Some(target_kind) {
-                let index = reference
-                    .target_record_index
-                    .value
-                    .ok_or(ReducedError::IncompleteScope(path))?;
-                let guid = reference
-                    .guid
-                    .value
-                    .ok_or(ReducedError::IncompleteScope(path))?;
-                targets.verify(path, *index, guid.get())?;
-            }
+            let guid = self.guid.value.ok_or(ReducedError::IncompleteScope(path))?;
+            targets.verify(path, *index, guid.get())?;
         }
-        Ok(reference)
+        Ok(())
     }
 }

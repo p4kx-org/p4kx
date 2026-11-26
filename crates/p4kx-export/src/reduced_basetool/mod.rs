@@ -10,7 +10,12 @@ use thiserror::Error;
 use crate::catalog_rows::spool::RowSpoolError;
 use crate::{CatalogError, CatalogFile};
 
+mod blueprint_catalog;
+mod blueprint_cost_context;
+mod blueprint_recipe_coordinates;
 mod blueprint_taxonomy;
+mod blueprint_tiers;
+mod blueprints;
 mod bounded_output;
 mod cargo_globals;
 mod cargo_grids;
@@ -20,9 +25,14 @@ mod commodities;
 mod completeness;
 mod component;
 mod contract_scope;
+mod crafting_global;
+mod damage_resistance_macros;
+mod dismantle_processes;
+mod durability;
 mod entities;
 mod inventory;
 mod item;
+mod item_definitions;
 mod jump_inventory;
 mod jump_point_configuration;
 mod manufacturer;
@@ -44,9 +54,13 @@ mod ship_cargo;
 mod ship_equipment;
 mod ship_loadout;
 mod shops;
+mod suit_armor;
+mod wearable_fields;
 
 #[cfg(test)]
 mod blueprint_taxonomy_tests;
+#[cfg(test)]
+mod blueprints_tests;
 #[cfg(test)]
 mod cargo_globals_tests;
 #[cfg(test)]
@@ -54,7 +68,13 @@ mod commodity_tests;
 #[cfg(test)]
 mod contract_scope_tests;
 #[cfg(test)]
+mod crafting_dependencies_tests;
+#[cfg(test)]
+mod durability_suit_tests;
+#[cfg(test)]
 mod entity_tests;
+#[cfg(test)]
+mod item_definitions_tests;
 #[cfg(test)]
 mod jump_inventory_tests;
 #[cfg(test)]
@@ -67,6 +87,8 @@ mod resource_group_tests;
 mod resource_type_tests;
 #[cfg(test)]
 mod ship_equipment_tests;
+#[cfg(test)]
+mod wearable_fields_tests;
 
 #[cfg(test)]
 mod paint_fleet_tests;

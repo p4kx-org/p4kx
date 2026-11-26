@@ -43,6 +43,11 @@ fn verify(target: OverrideEntryTarget) -> Result<(), Box<dyn std::error::Error>>
     let result = resource_types::collect(&session.parsed(None)?, scratch.path(), None, &mut texts)?;
     let resources = serde_json::to_value(result.definitions)?;
     let groups = serde_json::to_value(result.groups.members)?;
+    let globals = serde_json::to_value(result.crafting_global)?;
+    assert_eq!(
+        globals.get("availability").and_then(Value::as_str),
+        Some("absent")
+    );
     let rows = resources
         .get("rows")
         .and_then(Value::as_array)

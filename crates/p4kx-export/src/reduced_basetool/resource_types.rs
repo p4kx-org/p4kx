@@ -9,6 +9,7 @@ use serde::Serialize;
 use super::ReducedError;
 use super::cell::Cell;
 use super::completeness;
+use super::crafting_global;
 use super::record_identity::RecordIdentity;
 use super::record_link::RecordLink;
 use super::record_targets::RecordTargets;
@@ -28,6 +29,7 @@ const PATH: &str = "definitions.resourceTypes";
 pub(super) struct Resources {
     pub(super) definitions: StagedCatalogTable,
     pub(super) groups: ResourceGroups,
+    pub(super) crafting_global: StagedCatalogTable,
 }
 
 pub(super) fn collect(
@@ -41,9 +43,11 @@ pub(super) fn collect(
             stage(&snapshot, scratch, cancel, texts)
         })??;
     let groups = resource_groups::collect(parsed, scratch, cancel, &targets, texts)?;
+    let crafting_global = crafting_global::collect(parsed, scratch, cancel, &targets)?;
     Ok(Resources {
         definitions,
         groups,
+        crafting_global,
     })
 }
 

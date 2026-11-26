@@ -17,9 +17,8 @@ use crate::Kind;
 use crate::catalog_queries::crafting::{BlueprintPoolEntry, BlueprintPoolSnapshot};
 use crate::catalog_queries::{CatalogRecordSelection, ParsedCatalogQueries};
 use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogTable};
-use crate::definition_reference::DefinitionStatus;
+
 use crate::guid_text::CatalogGuid;
-use crate::source_value_catalog::SourceRecordReference;
 
 pub(super) const CATEGORIES: &str = "definitions.blueprintCategories";
 pub(super) const POOLS: &str = "definitions.blueprintPools";
@@ -127,33 +126,14 @@ impl<'read> Reward<'read> {
         Ok(Self {
             blueprint_record: completeness::cell(POOLS, value.blueprint_record())?.try_map(
                 |reference| {
-                    verify_blueprint(reference, targets)?;
-                    RecordLink::from_source(POOLS, reference)
+                    RecordLink::read_source(POOLS, reference, targets, |source_type| {
+                        source_type == Kind::Blueprints.records().type_name
+                    })
                 },
             )?,
             weight: completeness::cell(POOLS, value.weight())?.map(Number::from),
         })
     }
-}
-
-fn verify_blueprint(
-    reference: &SourceRecordReference<'_>,
-    targets: &RecordTargets,
-) -> Result<(), ReducedError> {
-    let source_type = reference.target_type().value().copied();
-    if matches!(reference.status(), DefinitionStatus::Present)
-        && source_type == Some(Kind::Blueprints.records().type_name)
-    {
-        let index = reference
-            .resolved_index()
-            .ok_or(ReducedError::IncompleteScope(POOLS))?;
-        let guid = reference
-            .guid
-            .value()
-            .ok_or(ReducedError::IncompleteScope(POOLS))?;
-        targets.verify(POOLS, index, guid.get())?;
-    }
-    Ok(())
 }
 
 #[derive(Serialize)]

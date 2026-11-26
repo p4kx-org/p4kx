@@ -165,11 +165,11 @@ over the available canonical results before checking reduced size.
 - The v2 `blueprints[].key` is the class name copied from the same Record that
   supplies `blueprints[].className`. Get the reduced value from the sourced
   `className` in `definitions.blueprints`. Join the presentation's
-  `blueprint.inputRef` and `blueprint.recordIndex` to the definition's
-  `inputRef` and `recordIndex.value`. A physical Record identity keeps this join
-  unambiguous when a GUID occurs more than once. Preserve the source casing and
-  state. Skip Wiki matching when the class name is empty or the join is
-  unavailable.
+  `blueprint.recordIndex` to the definition's `recordIndex.value` in the same
+  Catalog generation. The producer verifies the original source identities
+  before emitting the physical index. This keeps repeated GUIDs distinct.
+  Preserve source casing and state. Skip Wiki matching when the class name is
+  empty or the join is unavailable.
 - Resolve a retained recipe slot's debug name from its actual original value
   and retain protected text classification. Accumulate text selectors for the
   included fields by canonical public-name or game-text domain and key before
@@ -308,6 +308,56 @@ pool positions. Pool slots retain their order, repetitions, nulls and
 dangling references, along with each original relative weight. Every
 resolved reference to an included Blueprint must resolve to the matching
 physical definition in the reduced table.
+
+## Internal Blueprint definition, presentation and tier producer slice
+
+The canonical Blueprint query supplies the three tables in one pass. The
+category and pool readers share the parsed input and verify every resolved
+pool reward against the staged physical Blueprint definitions. Presentation
+rows refer to physical Blueprint, tier and cost positions within
+the generation. Cost paths distinguish mandatory, optional and nested
+selection slots. The selected tiers retain authored times and ingredient
+quantities in units or SCU, quality limits, and cost modifiers. An unsupported
+modifier range prevents a complete publication. Selected text references use
+the shared English and German catalogs, with protected debug strings retained
+as game text.
+
+## Internal item health and suit armor producer slice
+
+Keep the original Entity Record and component ordinal for each durability and
+suit armor row. Item durability retains the health value, including non-finite
+values. Keep suit damage-resistance links with their authored state and require
+each resolved macro link to match the physical target in the reduced table.
+The six resistance channels retain their multipliers, thresholds and damage
+caps, with the selected numeric types and encryption markers.
+
+## Internal clothing and item radar producer slice
+
+Clothing keeps the canonical minimum and maximum temperature resistance,
+maximum radiation capacity and radiation dissipation rate. Item Radar keeps
+the minimum and maximum aim-assist assignment distances. Both preserve
+source-value state and the original Record and component occurrence.
+Flight resistance, scan-ping fields and the radar buffer are outside the
+reduced slice.
+
+## Internal dismantle and crafting globals producer slice
+
+Dismantle definitions keep efficiency and the canonical duration in seconds.
+A Blueprint with a dismantle choice carries both the selected process GUID
+and the physical index of the staged process. An ambiguous choice remains
+absent. Crafting globals preserve the ordered dismantle resource blacklist
+and reconcile resolved Resource Type links with the staged physical
+definitions. The optional entity blacklist and default Blueprint list are
+outside this reduced payload.
+
+## Internal item definition producer slice
+
+Stage one physical Item definition at a time and restore canonical GUID and
+Record-index order when writing. Keep attachment type, subtype, fit tags,
+size, grade and manufacturer, physical mass and the selected presentation
+texts. The selected manufacturer link must resolve in the same generation.
+Purchase and attachment text references use the canonical public-name and
+protected game-text domains, including when a key occurs in both.
 
 ## Acceptance
 
