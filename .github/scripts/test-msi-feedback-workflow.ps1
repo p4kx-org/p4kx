@@ -106,6 +106,13 @@ Assert-FeedbackWorkflow ($installer.Contains('id: msi-launch') -and $installer.C
     $observerFinish -cmatch '(?m)^        timeout-minutes: 1\r?$' -and
     $observerFinish.Contains("always() && !cancelled() && steps.msi-finish-wait.outcome == 'success'") -and
     -not $observerFinish.Contains('continue-on-error')) 'Finish must bound the terminal wait independently and require local validation of the bound receipt.'
+$noticeBracket = '(?ms)^        run: \|\r?\n\s*\$waitOutcome = ''error''\r?\n\s*Write-Host ''::notice title=Native MSI Finish outer Wait::state=enter completion=unproven''\r?\n\s*try \{\r?\n(?<call>.*?)^\s*\} finally \{\r?\n(?<unwind>.*?)^\s*\}\s*$'
+$waitNotice = [regex]::Match($finishWait,$noticeBracket)
+$waitCall = $waitNotice.Groups['call'].Value
+$waitInvocation = $waitCall.IndexOf('invoke-msi-finish-observation.ps1 -Stage Wait',[StringComparison]::Ordinal)
+Assert-FeedbackWorkflow ($waitNotice.Success -and $waitInvocation -ge 0 -and
+    $waitCall.IndexOf('$waitOutcome = ''returned''',[StringComparison]::Ordinal) -gt $waitInvocation -and
+    $waitNotice.Groups['unwind'].Value.Contains('Write-Host "::notice title=Native MSI Finish outer Wait::state=unwind outcome=$waitOutcome completion=unproven"')) 'The hosted Wait shell must signal entry before its canonical call and signal unwind in finally.'
 Assert-FeedbackWorkflow ($finishReady.Contains("always() && !cancelled() && steps.msi-finish-observer-start.outcome == 'success'") -and
     $finishReady.Contains('path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/finish-supervision/waiter-ready.json') -and
     $finishReady.Contains('actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9') -and

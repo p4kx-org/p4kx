@@ -231,6 +231,12 @@ outer `lifecycle/historical-uninstall` phase. Either can show a begin, an end,
 an error or no observation. Wait and CollectFinish retain the original
 deadline and release acceptance requirements.
 
+The hosted Wait shell emits an entry notice before calling the canonical
+receipt check. Its unwind notice reports whether the check returned or raised
+an error. Received notices provide shell execution evidence. Runner or service
+failure can leave either notice unavailable. Native success requires the
+original bound receipts and CollectFinish.
+
 The diagnostic-only `MSI feedback runner-fuse probe` workflow runs native AMD64 and ARM64
 complete/timeout controls through the same phase writer. Its separate verifier downloads the
 actual artifacts and checks the service's failed-step and timeout annotations, source revision,

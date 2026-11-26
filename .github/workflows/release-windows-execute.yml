@@ -287,7 +287,15 @@ jobs:
         env:
           P4KX_MSI_FINISH_COLLECTION_CUTOFF_UTC: ${{ steps.msi-finish-start.outputs.collection_cutoff_utc }}
           P4KX_MSI_FINISH_READY_DIGEST: ${{ steps.msi-finish-observer-start.outputs.ready_digest }}
-        run: .github/scripts/invoke-msi-finish-observation.ps1 -Stage Wait -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -CollectionCutoffUtc $env:P4KX_MSI_FINISH_COLLECTION_CUTOFF_UTC -ReadyDigest $env:P4KX_MSI_FINISH_READY_DIGEST
+        run: |
+          $waitOutcome = 'error'
+          Write-Host '::notice title=Native MSI Finish outer Wait::state=enter completion=unproven'
+          try {
+            .github/scripts/invoke-msi-finish-observation.ps1 -Stage Wait -Directory (Join-Path $env:P4KX_PACKAGE_TASK 'installer-check/observer') -CollectionCutoffUtc $env:P4KX_MSI_FINISH_COLLECTION_CUTOFF_UTC -ReadyDigest $env:P4KX_MSI_FINISH_READY_DIGEST
+            $waitOutcome = 'returned'
+          } finally {
+            Write-Host "::notice title=Native MSI Finish outer Wait::state=unwind outcome=$waitOutcome completion=unproven"
+          }
       - name: Finish the original native MSI lifecycle
         id: msi-finish
         if: ${{ always() && !cancelled() && steps.msi-finish-wait.outcome == 'success' }}
