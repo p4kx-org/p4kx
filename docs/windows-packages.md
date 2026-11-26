@@ -632,3 +632,35 @@ receipt establishes that the waiter bound to the original supervisor. The
 public snapshot contains no waiter exit or terminal installer result.
 [AMD64 execution](https://github.com/p4kx-org/p4kx/actions/runs/45872703215/job/140113609956) ·
 [AMD64 readiness](https://github.com/p4kx-org/p4kx/actions/runs/45872703215/artifacts/15147036542)
+
+### Native AMD64 diagnostic replay with live progress
+
+The diagnostic job in run `45883443481`, attempt 1, used harness revision
+`d809586729c72533289ae62e8d3bb01c836ceace` and the sealed native MSI packages
+from production run `45872703215`, attempt 1, at revision
+`bb2461a7754a042e331042a4ac78196b0041e5cc`. The replay verified each MSI and
+helper hash and recorded the hash of the Registry fixture rebuilt from the
+candidate revision.
+
+The read-only checkpoint at 19:26:40 UTC recorded 129 events. The worker
+had completed the previous install, rename upgrade, historical uninstall,
+fresh install, feature no-op, and rollback-disabled phases. It was waiting
+for `msiexec` in the repair phase, 35.43 seconds after worker start. The
+request-bound supervisor, monitor, and waiter were all running 25.95 seconds
+after readiness. The snapshot observer exited zero.
+
+The diagnostic job succeeded in 3 minutes 28 seconds. Its Wait step took
+86 seconds and accepted the readiness-bound zero-exit receipt before the
+original cutoff. The job log retained the Wait invocation, and GitHub
+records the successful step outcome.
+The uploaded archives preserve readiness and the earlier live snapshot.
+Production CollectFinish, final cleanup evidence, and package execution
+remain separate checks on the original consumer.
+
+The readiness archive SHA-256 is
+`34bef927708b28925ff8c9809da809723cec143e67cc3c57a6395096514a14e5`.
+The live archive SHA-256 is
+`5e62891d43b87afe7686e29232e08f45ef547701389f0f8760b2c06cf9e73f77`.
+[AMD64 diagnostic job](https://github.com/p4kx-org/p4kx/actions/runs/45883443481/job/140128182133) ·
+[Readiness archive](https://github.com/p4kx-org/p4kx/actions/runs/45883443481/artifacts/15148063150) ·
+[Live archive](https://github.com/p4kx-org/p4kx/actions/runs/45883443481/artifacts/15148846894)
