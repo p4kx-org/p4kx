@@ -4,7 +4,7 @@
 use std::ops::Range;
 
 use crate::header::NODE_LEN;
-use crate::{ByteOrder, XmlFieldKind};
+use crate::{ByteOrder, XmlFieldKind, XmlWriteField};
 
 /// The source fact in the original decoded CryXml bytes.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -202,6 +202,7 @@ pub struct XmlRenderSpan {
     kind: XmlRenderKind,
     range: Range<u64>,
     sources: Contributors,
+    attribute_selection: Option<Box<XmlWriteField>>,
     complete: bool,
 }
 
@@ -216,6 +217,7 @@ impl XmlRenderSpan {
             kind,
             range,
             sources: Contributors::Fields(sources),
+            attribute_selection: None,
             complete,
         }
     }
@@ -233,6 +235,7 @@ impl XmlRenderSpan {
                 fields: fields.unwrap_or_default(),
                 value: Box::new(value.unwrap_or_default()),
             },
+            attribute_selection: None,
             complete,
         }
     }
@@ -246,6 +249,7 @@ impl XmlRenderSpan {
             kind: XmlRenderKind::Structure,
             range,
             sources: Contributors::Indentation(sources),
+            attribute_selection: None,
             complete,
         }
     }
@@ -259,8 +263,22 @@ impl XmlRenderSpan {
             kind: XmlRenderKind::Structure,
             range,
             sources: Contributors::ChildAbsence { fields, absence },
+            attribute_selection: None,
             complete: false,
         }
+    }
+
+    pub(crate) fn with_attribute_selection(mut self, field: &XmlWriteField) -> Self {
+        if field.preceding_names().is_some() || field.namespace_value_index().is_some() {
+            self.attribute_selection = Some(Box::new(field.clone()));
+        }
+        self
+    }
+
+    /// Returns the original attribute-name choice when rendering interpreted other fields.
+    #[must_use]
+    pub fn attribute_selection(&self) -> Option<&XmlWriteField> {
+        self.attribute_selection.as_deref()
     }
 
     /// Returns the emitted XML byte range or the insertion point for an empty value.

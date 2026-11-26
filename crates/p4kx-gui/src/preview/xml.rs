@@ -6,9 +6,11 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 
+use p4kx_extraction::ObservedEntry;
 use p4kx_extraction::cryxml::{self, Format};
 
 use super::xml_document::{CappedWriter, XML_TEXT_LIMIT, XmlDocument};
+use super::xml_preview_origin::PositionedXml;
 use crate::EntryIndex;
 use crate::model::describe;
 
@@ -16,6 +18,10 @@ use crate::model::describe;
 pub const XML_SIZE_LIMIT: u64 = 64 * 1024 * 1024;
 
 const READ_CHUNK: u64 = 1024 * 1024;
+
+#[cfg(test)]
+#[path = "xml_origin_tests.rs"]
+mod origin_tests;
 
 /// Returns whether data starting with `start` is `CryXml`; text XML and other data are not.
 pub(super) fn is_cryxml(start: &[u8]) -> bool {
@@ -130,11 +136,11 @@ impl XmlJob {
     pub(super) fn run(
         self,
         index: &EntryIndex,
-        (start, size): (&[u8], u64),
+        input: (&[u8], u64, Option<ObservedEntry<'_>>),
         reader: &mut impl Read,
         wake: &dyn Fn(),
     ) {
-        let Some(converted) = self.convert(index, (start, size), reader) else {
+        let Some(converted) = self.convert(index, input, reader) else {
             return;
         };
         if !self.dropped.load(Ordering::Acquire) && self.sender.send(converted).is_ok() {
@@ -145,9 +151,10 @@ impl XmlJob {
     fn convert(
         &self,
         index: &EntryIndex,
-        (start, size): (&[u8], u64),
+        input: (&[u8], u64, Option<ObservedEntry<'_>>),
         reader: &mut impl Read,
     ) -> Option<Converted> {
+        let (start, size, original) = input;
         if size > XML_SIZE_LIMIT {
             return Some(Converted::TooLarge);
         }
@@ -177,13 +184,30 @@ impl XmlJob {
         if index.watch().check().is_err() {
             return Some(Converted::ArchiveChanged);
         }
+        let rendered = self.render(data, original, XML_TEXT_LIMIT);
+        if index.watch().check().is_err() {
+            Some(Converted::ArchiveChanged)
+        } else {
+            rendered
+        }
+    }
+
+    fn render(
+        &self,
+        data: Vec<u8>,
+        original: Option<ObservedEntry<'_>>,
+        limit: usize,
+    ) -> Option<Converted> {
         let document = match cryxml::parse(&data) {
             Ok(document) => document,
             Err(error) => return Some(Converted::Failed(describe(&error))),
         };
-        let mut writer = CappedWriter::new(XML_TEXT_LIMIT, &self.dropped);
-        if let Err(error) = document.write_xml(&mut writer)
-            && !writer.capped
+        let mut writer = CappedWriter::new(limit, &self.dropped);
+        let mut positioned = PositionedXml::new();
+        if let Err(error) = document.write_xml_positioned(&mut writer, |span| {
+            positioned.observe(span);
+            Ok(())
+        }) && !writer.capped
         {
             return (!self.is_dropped()).then(|| Converted::Failed(describe(&error)));
         }
@@ -192,10 +216,9 @@ impl XmlJob {
         if self.is_dropped() {
             return None;
         }
-        Some(Converted::Ready(XmlDocument::new(
-            writer.out,
-            writer.capped,
-        )))
+        let document = XmlDocument::new(writer.out, writer.capped);
+        let origin = positioned.finish(original, document.bytes().len() as u64, &self.dropped);
+        (!self.is_dropped()).then(|| Converted::Ready(document.with_provenance(origin)))
     }
 
     fn is_dropped(&self) -> bool {

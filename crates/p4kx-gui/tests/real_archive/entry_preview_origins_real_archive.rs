@@ -11,8 +11,7 @@ use p4kx_gui::{
 };
 use p4kx_testkit::{real_archive_key, real_archive_path};
 
-#[path = "../support/preview_physical_entry.rs"]
-mod physical_entry;
+use crate::preview_physical_entry;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -48,7 +47,7 @@ fn installed_entry_preview_keeps_the_original_localization_entry_prefix() -> Tes
     );
 
     let index = EntryIndex::build(archive);
-    let id = physical_entry::browser_id(&index, physical_position)
+    let id = preview_physical_entry::browser_id(&index, physical_position)
         .ok_or("the browser has no tree id for the original Entry")?;
     let mut browser = Browser::new(index);
     browser.select_entry(id, || {});

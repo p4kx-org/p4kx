@@ -20,6 +20,8 @@ mod model_export_real_archive;
 mod model_viewer_real_archive;
 #[path = "../support/node_text.rs"]
 mod node_text;
+#[path = "../support/preview_physical_entry.rs"]
+mod preview_physical_entry;
 mod query_completion_real_archive;
 mod real_archive;
 mod record_export_real_archive;
@@ -29,4 +31,5 @@ mod record_preview_real_archive;
 mod software_wgpu;
 mod soundbank_preview_real_archive;
 mod tags_real_archive;
+mod xml_preview_origin_real_archive;
 mod xml_preview_real_archive;

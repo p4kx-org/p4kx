@@ -27,6 +27,8 @@ mod origin_applicability;
 mod record_json_location;
 #[path = "sourced_value_seed.rs"]
 mod sourced_value_seed;
+#[path = "xml_render_origins.rs"]
+mod xml_render_origins;
 
 pub use self::entity_material_effects::{
     EntityMaterialEffects, EntityMaterialEffectsComponent, EntityMaterialEffectsError,
@@ -35,6 +37,7 @@ pub use self::mode::ProvenanceMode;
 pub use self::origin_applicability::OriginApplicability;
 pub use self::record_json_location::RecordJsonLocation;
 pub use self::sourced_value_seed::SourcedValueSeed;
+pub use self::xml_render_origins::{XmlRenderOrigin, XmlRenderOrigins};
 pub use crate::animation_sources::{
     AnimationFlagRun, ArchiveAnimationAdmission, ArchiveAnimationRead, ArchiveClipEvidence,
     ArchiveModelAnimations, ArchivePositionedAnimation, PositionedUnreadAnimation,
@@ -77,6 +80,7 @@ pub use crate::source_uses::{SourceInventoryFreezeError, SourceUses};
 pub use crate::source_value::{SourceValue, SourceValueState, SourcedValue};
 pub use crate::write::{ExtractedFileArtifact, RawEntryArtifact};
 pub use crate::xml_receipt::{EmbeddedXml, XmlReceipt};
+
 pub use archive_animation_path::{
     NamedCafSelector, animation_bank_path_crc32, archive_animation_path,
 };

@@ -38,6 +38,33 @@ Elapsed time includes building the GUI index.
 | LIVE `13220821` | 75.0197 | 954,011,648 | 976,150,528 |
 | PTU `13284307` | 75.7904 | 974,606,336 | 996,515,840 |
 
+## Converted CryXml preview
+
+The XML tab binds the source-backed ranges of the converted XML to the
+selected physical Archive Entry and its ordered Containers. It keeps proof
+for the complete lines displayed by the tab, including empty authored fields.
+String runs identify their original decoded bytes. Remapped attribute names
+identify the original attribute and the preceding-name or namespace selectors
+that determined the spelling. Generated punctuation has no original Entry
+contribution.
+
+The tab's path tooltip shows the immediate encryption marker from the retained
+source-dependent ranges. The typed preview result exposes those ranges and
+their source inventory. Evidence errors leave the converted XML available and
+are reported by the preview's provenance accessor.
+
+For each installed Build, the witness compared the rendered XML with a direct
+read and conversion of the selected Entry. It checked the original root name's
+decoded byte range, payload conversion role, stored encryption marker and
+physical directory ordinal. The debug executable SHA-256 was
+`a5ce43db20cfa85f230373bfab4ecbb20b12118f342d652c316f0a3ad53f18ce`.
+Elapsed time includes building the GUI index.
+
+| Build | Elapsed (seconds) | Peak private commit (bytes) | Peak working set (bytes) |
+| --- | ---: | ---: | ---: |
+| LIVE `13220821` | 69.9884 | 954,019,840 | 976,158,720 |
+| PTU `13284307` | 80.2773 | 974,532,608 | 996,503,552 |
+
 ## Companion records
 
 The [JSON Schema](../schemas/p4kx-source-origin.schema.json) describes each line.

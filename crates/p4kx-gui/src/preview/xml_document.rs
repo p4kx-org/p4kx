@@ -4,6 +4,9 @@
 use std::io::{self, Write};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
+use p4kx_extraction::XmlRenderOrigins;
+
+use super::XmlPreviewOriginError;
 use crate::comparison::shown_len;
 
 /// The most bytes of converted XML a preview keeps; the lines after them are left out.
@@ -19,6 +22,7 @@ pub struct XmlDocument {
     starts: Vec<u32>,
     truncated: bool,
     widest: usize,
+    provenance: Option<Result<XmlRenderOrigins, XmlPreviewOriginError>>,
 }
 
 impl XmlDocument {
@@ -51,6 +55,27 @@ impl XmlDocument {
             starts,
             truncated,
             widest: widest.1,
+            provenance: None,
+        }
+    }
+
+    pub(super) fn with_provenance(
+        mut self,
+        provenance: Result<XmlRenderOrigins, XmlPreviewOriginError>,
+    ) -> Self {
+        self.provenance = Some(provenance);
+        self
+    }
+
+    /// Returns the source evidence for the retained converted spans, when collected.
+    ///
+    /// # Errors
+    /// Returns an error if the converted bytes were displayed without their source proof.
+    #[must_use]
+    pub const fn provenance(&self) -> Option<Result<&XmlRenderOrigins, &XmlPreviewOriginError>> {
+        match &self.provenance {
+            Some(proof) => Some(proof.as_ref()),
+            None => None,
         }
     }
 

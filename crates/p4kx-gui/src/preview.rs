@@ -22,6 +22,7 @@ mod texture_info;
 mod wem_header_provenance;
 mod xml;
 mod xml_document;
+mod xml_preview_origin;
 
 use std::sync::Arc;
 use std::sync::mpsc::{Receiver, TryRecvError};
@@ -48,6 +49,7 @@ pub use wem_header_provenance::{WemHeaderEvidenceError, WemHeaderProvenance};
 use xml::is_cryxml;
 pub use xml::{XML_SIZE_LIMIT, XmlPreview, XmlStatus};
 pub use xml_document::{XML_TEXT_LIMIT, XmlDocument};
+pub use xml_preview_origin::XmlPreviewOriginError;
 
 use crate::EntryIndex;
 use crate::viewer::{ModelPreview, is_model_path};
@@ -212,7 +214,7 @@ impl Preview {
             Some(entry) if entry.uncompressed_size() > PREVIEW_SIZE_LIMIT => State::TooLarge,
             Some(_) => match spawn(index, id, move || wake()) {
                 Spawned::Running(result) => State::Loading(result),
-                Spawned::Finished(read) => preview.settle(read),
+                Spawned::Finished(read) => preview.settle(*read),
             },
         };
         preview

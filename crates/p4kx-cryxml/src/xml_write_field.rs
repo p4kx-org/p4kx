@@ -21,13 +21,13 @@ pub enum XmlFieldKind {
 }
 
 /// The exact original source coordinate and emitted byte range of a field.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct XmlWriteField {
     pub(crate) site: FieldSite,
     pub(crate) range: Range<u64>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct FieldSite {
     pub(crate) node: u32,
     pub(crate) attribute: Option<u32>,
@@ -36,7 +36,7 @@ pub(crate) struct FieldSite {
     pub(crate) namespace: Option<NamespaceChoice>,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum NamespaceChoice {
     Default,
     Alias(Range<u32>),

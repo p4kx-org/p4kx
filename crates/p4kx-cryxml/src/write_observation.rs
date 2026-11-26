@@ -45,12 +45,8 @@ where
 
     pub(crate) fn field(&mut self, observed: XmlWriteField) -> io::Result<()> {
         if let Some(positioned) = &mut self.positioned {
-            positioned(source_span(
-                self.input,
-                &observed.site,
-                observed.range.clone(),
-                None,
-            ))?;
+            let span = source_span(self.input, &observed.site, observed.range.clone(), None);
+            positioned(span.with_attribute_selection(&observed))?;
         }
         (self.legacy)(observed)
     }

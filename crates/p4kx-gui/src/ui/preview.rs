@@ -2,7 +2,7 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use egui::{Response, Role, Sense, Ui, WidgetInfo, vec2};
-use p4kx_extraction::{Entry, Texture};
+use p4kx_extraction::{Entry, Texture, XmlRenderOrigins};
 
 use super::audio_preview;
 use super::entry_status::status_body;
@@ -20,7 +20,8 @@ use crate::widgets::text::{hairline_below, line, paint_left, plain};
 use crate::widgets::tooltip;
 use crate::{
     AudioText, Browser, ComparisonText, Model, Preview, PreviewContents, PreviewTab,
-    SoundbankPreview, Text, Texts, ViewerSupport, format, is_bank_path, is_model_path, is_wem_path,
+    SoundbankPreview, Text, Texts, ViewerSupport, XmlPreview, XmlText, format, is_bank_path,
+    is_model_path, is_wem_path,
 };
 
 /// Shows the Image tab after selecting a texture header, the Audio tab after selecting a WEM or a
@@ -214,13 +215,7 @@ fn body(
         .and_then(|bank| soundbank_preview::summary(texts, bank, size))
         .unwrap_or_else(|| format::size(size, texts.language()));
     let response = path_line(ui, path, &size_line);
-    if matches!(tab, PreviewTab::Text | PreviewTab::Hex)
-        && let Some(contents) = preview.contents()
-    {
-        entry_origins(response, texts, contents, (tab, preview.soundbank()));
-    } else if let Some(bank) = preview.soundbank() {
-        soundbank_origins::summary(response, texts, bank);
-    }
+    path_origins(response, texts, preview, tab);
     let jump = browser
         .hit_line()
         .filter(|hit| hit.entry() == preview.entry())
@@ -242,6 +237,26 @@ fn body(
     }
     status_body(ui, texts, preview, (path, size), (tab, jump));
     None
+}
+
+fn path_origins(response: Response, texts: &Texts, preview: &Preview, tab: PreviewTab) {
+    if matches!(tab, PreviewTab::Text | PreviewTab::Hex)
+        && let Some(contents) = preview.contents()
+    {
+        entry_origins(response, texts, contents, (tab, preview.soundbank()));
+    } else if tab == PreviewTab::Xml
+        && let Some(document) = preview.xml().and_then(XmlPreview::text)
+    {
+        let marker = document
+            .provenance()
+            .and_then(Result::ok)
+            .and_then(XmlRenderOrigins::contains_encrypted_source);
+        tooltip::hover(response, |ui| {
+            source_origin::row_marker(ui, texts, XmlText::Tab, marker);
+        });
+    } else if let Some(bank) = preview.soundbank() {
+        soundbank_origins::summary(response, texts, bank);
+    }
 }
 
 fn entry_origins(

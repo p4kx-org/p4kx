@@ -125,6 +125,8 @@ mod model_window;
 #[path = "../support/node_text.rs"]
 mod node_text;
 mod preview;
+#[path = "../support/preview_physical_entry.rs"]
+mod preview_physical_entry;
 mod preview_scrolling;
 mod previewing_records;
 mod query_completion_model;
@@ -183,6 +185,7 @@ mod wide_forge;
 mod window;
 mod xml_preview;
 mod xml_preview_limits;
+mod xml_preview_origins;
 mod xml_previewing;
 
 mod prerequisite_notice;

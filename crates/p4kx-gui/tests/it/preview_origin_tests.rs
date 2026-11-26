@@ -8,10 +8,8 @@ use p4kx_gui::{
 use p4kx_testkit::{ArchiveBuilder, TestContainer, TestEntry, test_key};
 
 use super::{TestResult, opened, preview};
+use crate::preview_physical_entry;
 use crate::waiting::wait_polling;
-
-#[path = "../support/preview_physical_entry.rs"]
-mod physical_entry;
 
 fn marker(origin: &FieldOrigin, encrypted: bool) {
     assert_eq!(
@@ -119,7 +117,8 @@ fn an_empty_preview_still_binds_the_payload_and_its_encrypted_container() -> Tes
         .ok_or("the exact nested Entry")?;
     let physical_position = original.entry_index();
     let index = EntryIndex::build(container);
-    let id = physical_entry::browser_id(&index, physical_position).ok_or("the nested tree id")?;
+    let id = preview_physical_entry::browser_id(&index, physical_position)
+        .ok_or("the nested tree id")?;
     assert_ne!(
         id, physical_position,
         "tree order differs from physical order"

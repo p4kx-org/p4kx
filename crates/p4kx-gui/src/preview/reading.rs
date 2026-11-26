@@ -17,7 +17,7 @@ use crate::model::describe;
 
 pub(super) enum Spawned {
     Running(Receiver<ReadResult>),
-    Finished(ReadResult),
+    Finished(Box<ReadResult>),
 }
 
 pub(super) fn spawn(index: &Arc<EntryIndex>, id: u32, wake: impl Fn() + Send + 'static) -> Spawned {
@@ -46,7 +46,7 @@ pub(super) fn spawn(index: &Arc<EntryIndex>, id: u32, wake: impl Fn() + Send + '
                 },
                 &|| {},
             );
-            Spawned::Finished(finished.unwrap_or(Err(Unread::Failed(None))))
+            Spawned::Finished(Box::new(finished.unwrap_or(Err(Unread::Failed(None)))))
         }
     }
 }
@@ -107,7 +107,11 @@ pub(super) fn read(
     if let Some((job, start)) = job {
         job.run(
             index,
-            (&start, entry.uncompressed_size()),
+            (
+                &start,
+                entry.uncompressed_size(),
+                archive.observed_entry(entry),
+            ),
             &mut reader,
             wake,
         );
