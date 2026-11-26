@@ -143,6 +143,33 @@ Unselected fields and datasets can contribute to a retained projection. Close
 the Blueprint tiers, physical ammo and port/facility, reputation and text joins
 over the available canonical results before checking reduced size.
 
+## Canonical readers and reduced references
+
+- Resolve Ship and Vehicle roots with `visit_loadout_owners(Ships)`. Project
+  nested port cells from the resolved Loadout so their value states and
+  encryption markers survive. Feed the same root and port traversal to the
+  CargoGrid placement join. Keep the physical owner, component ordinal and
+  port path required to identify each mounted grid.
+- Read the starmap systems once for placements and jump endpoints. Use the
+  complete inventory survey for endpoint/partner evidence. Only bound Object
+  Records enter the placement table. Preserve endpoint and connection
+  availability even when there are zero connections.
+- Process each Blueprint using the canonical tier and recipe readers. Translate
+  original arena addresses before dropping the owner. Use the physical Blueprint
+  Record index, tier position and cost position to link ingredients, nested
+  options and dismantle tiers. Preserve authored order, duplicate Blueprint
+  GUIDs and gaps where an original slot has no interpreted cost.
+- Resolve a retained recipe slot's debug name from its actual original value
+  and retain protected text classification. Accumulate text selectors for the
+  included fields by canonical public-name or game-text domain and key before
+  materializing English and German. A key can occur in both domains. Preserve
+  absent translations and the marker derived from the selected contributions.
+- Resolve Shop inventory value addresses within each original file before
+  discarding its raw value arena. Preserve inventory order, physical candidates,
+  cell states and price/stock values. An unreadable selected inventory blocks
+  Normal export. Shop resolution coverage cannot stand in for the full
+  selected inventory coverage.
+
 ## Acceptance
 
 #1177 tracks the wire contract, generation and import. Use a distinct versioned
