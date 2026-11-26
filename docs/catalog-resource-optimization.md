@@ -182,6 +182,20 @@ worker trials and the reported VerseKit timings use different execution
 conditions and cannot establish a comparable throughput change.
 
 
+A matched Ship-only measurement used the same ignored timing test, LIVE Archive,
+English language and single worker on both signed release-profile Builds.
+An independent Interior parity verifier ran during both measurements. The
+monitor stopped both processes at the 2,000,000,000-byte ceiling. These are
+observed lower bounds and times to stop.
+
+| Revision | Seconds to stop | Private commit at stop (B) | Working set at stop (B) |
+| --- | ---: | ---: | ---: |
+| `4aa8bcfa2` | 12.4378 | 2,038,980,608 | 2,005,876,736 |
+| `d4055eaf5` | 13.0382 | 2,050,396,160 | 2,019,790,848 |
+
+Folding the dependency ledger by owner preserves the focused coverage tests.
+The matched run leaves the fleet-wide memory criterion open.
+
 For the next Loadout comparison, measure time to first owner, admission,
 Record and XML cache misses, semantic Loadout resolution, port construction and
 alignment in the same release-profile run. A cache can reuse original parsed
