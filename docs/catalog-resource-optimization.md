@@ -75,6 +75,38 @@ while private bytes in the producer stayed at 35,494,363,136 B. The search proce
 later held 29,323,603,968 B of private memory and was stopped. The concurrent
 load prevents a comparison of completed producer peaks. [Packaged CLI](https://github.com/p4kx-org/p4kx/actions/runs/45811044734/artifacts/15116366395)
 
+An isolated repeat of the same PTU Build and CLI began at 13:40:54 UTC and
+completed in 2,296.843 s. The Windows lifetime private-commit peak was
+36,286,316,544 B, below the 40,000,000,000 B application ceiling. The working-set
+peak was 33,867,112,448 B. The completed zstd file was 1,596,847,563 B with
+84,336,679,622 decoded bytes. These are producer measurements for that packaged
+revision.
+
+The archive-free replay started at 14:37:10 UTC. It verified the input seal
+and began reading the frame. It stopped after 2,091.976 s when remaining
+system commit headroom reached 17,039,216,640 B, below the 16 GiB reserve.
+Available physical memory stayed at or above 21,842,841,600 B. The verifier
+reached 17,130,360,832 B peak private commit and 10,398,920,704 B peak working
+set. The interrupted
+replay produced no final source-closure or section result. The completed
+producer file and its size measurements remain available.
+
+The second archive-free attempt ended after 2,386.990 s at the same host
+reserve. The verifier reached 17,130,283,008 B private commit while system
+commit headroom dropped to 17,090,404,352 B. Available physical memory remained
+at or above 18,018,533,376 B. These are stopped verifier measurements. Both
+attempts retain the producer's sealed output and lack a terminal replay digest.
+
+The packed verifier at `9db4a8766` completed both replay passes over that same
+sealed frame in 4,880.338 s. Its Windows lifetime peaks were 8,714,493,952 B
+private commit and 8,651,968,512 B working set. Across 4,847 host samples,
+available physical memory stayed at or above 39,446,003,712 B and remaining
+system commit headroom at or above 56,382,038,016 B. These minima cleared
+the 12 GiB physical and 16 GiB commit reserves. The installed Archive remained
+closed during replay. The receipt rechecked the original frame seal after
+the final pass and reconciled 84,336,679,622 decoded bytes, 133,034,573 source
+uses and 96,392,635 sourced cells. [Completed PTU replay and section counts](catalog-partitioning.md#completed-ptu-13284307-replay)
+
 | Fresh process on LIVE 13220821, consumer revision `7526b777` | Seconds | Reported peak private MB |
 | --- | ---: | ---: |
 | Open Archive and DataForge | 0.8 | 1,040 |

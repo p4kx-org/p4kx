@@ -979,3 +979,43 @@ One streaming decode produces the section and reference-set census and copies th
 UTF-8 bytes to `p4kx-catalog.json` in that directory. Publication requires the encoded
 and decoded lengths to agree with the writer receipt. An existing raw file is preserved.
 The installed Archive is unnecessary for this check.
+
+### Completed PTU 13284307 replay
+
+The packaged Windows AMD64 producer from merge `eada15a2` completed an
+unfiltered Normal Full export in 2,296.843 s, using one worker and Zstandard
+level 3. Its native lifetime peaks were 36,286,316,544 B private commit and
+33,867,112,448 B working set. Both stayed below the 40,000,000,000 B application
+ceiling. The completed frame was 1,596,847,563 B. The producer SHA-256 was
+`aa3103eb4c39c4a6f483550170984b845786c2d15bfb007875f186aed7a07694`. [Native PTU producer](https://github.com/p4kx-org/p4kx/actions/runs/45811044734/artifacts/15116366395)
+
+The optimized verifier at `9db4a8766` replayed the sealed frame in
+4,880.338 s with one worker. It verified the input seals before and after
+the run, while the installed Archive remained closed. The compressed frame
+SHA-256 was `8bae446e2de13c56f9c848cae5e2fcd6015c06e9d69ebb73aa679a6815f7d280`.
+Both passes decoded 84,336,679,622 B with SHA-256
+`c1e5b201e85ce2608ae0ebf6464f1cae7f1a66cb3b031ab8f3562cb609fb1b0a`.
+The verifier binary SHA-256 was
+`746aa923163d8993195912808257f47efce7cadcbb86939f788a7ff8542c6c5b`.
+
+| Replay inventory | Count |
+| --- | ---: |
+| Physical sources | 116,628 |
+| Source uses | 133,034,573 |
+| Variant source-use sets | 513 |
+| Sourced cells | 96,392,635 |
+| Items and item definitions | 24,509 each |
+| Blueprint definitions | 1,692 |
+| Container instances | 229,728 |
+
+The section report contains 254 measured members. Its 35 top-level members
+and 37 framing bytes account for the decoded length. The `/provenance` object
+used 33,548,202,851 B, including 33,403,459,131 B under `/provenance/uses`.
+`/loadouts` used 19,435,567,420 B and `/placements` used 3,538,770,689 B.
+These are value bytes inside the decoded document.
+
+The replay's native lifetime peaks were 8,714,493,952 B private commit and
+8,651,968,512 B working set. Minimum sampled host availability was
+39,446,003,712 B physical and 56,382,038,016 B commit headroom, above the
+respective 12 GiB and 16 GiB reserves. The two earlier host-reserve stops
+retain their separate measurements. [Producer and replay measurements](catalog-resource-optimization.md#what-the-measurements-establish)
