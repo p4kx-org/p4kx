@@ -162,6 +162,26 @@ integrated application peak measure different workloads. This external report
 does not time the subsequent admission-tree reuse or original-field indexing
 changes.
 
+On installed LIVE `13220821`, the separately built Windows AMD64 verifier at
+signed revision `4aa8bcfa2` ran each MarkersOnly query in a fresh release-profile
+process with one worker. The executable SHA-256 is
+`8bfc79fcc0227d0a419762cb12181f89ea190af6b8dfc044ad078ae6f8b2f951`.
+
+| Query and outcome | Elapsed (seconds) | Peak private commit (bytes) | Peak working set (bytes) |
+| --- | ---: | ---: | ---: |
+| `visit_loadouts(All)`, completed | 245.9727 | 1,091,764,224 | 1,022,652,416 |
+| `with_ship_sources(All)`, English, stopped at the budget | 12.2815 | 2,022,715,392 | 2,004,758,528 |
+
+Loadouts opened the Archive and parsed DataForge in 0.700 seconds. It took
+2.818 seconds after that to reach the first owner and 245.090 seconds to
+complete the visit. The visitor reported 10,955 owners, 10,812 rows and complete
+dependency coverage. Peak private commit of the separate measurement process was
+133,214,208 bytes. Minimum observed available host memory was 50,501,722,112
+bytes. The Ship run has no completed count or elapsed-time result. These single
+worker trials and the reported VerseKit timings use different execution
+conditions and cannot establish a comparable throughput change.
+
+
 For the next Loadout comparison, measure time to first owner, admission,
 Record and XML cache misses, semantic Loadout resolution, port construction and
 alignment in the same release-profile run. A cache can reuse original parsed
