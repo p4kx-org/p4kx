@@ -22,8 +22,12 @@ use crate::catalog_v3::reputation_standing_definition::StandingDefinition;
 use crate::source_value_catalog::SourceRecordReference;
 use crate::texts::{TextSources, Texts};
 
-pub use crate::catalog_v3::reputation_context_definition::ContextDefinition as ReputationContextDefinition;
-pub use crate::catalog_v3::reputation_perk::ReputationPerk;
+pub use crate::catalog_v3::reputation_context_definition::{
+    ContextDefinition as ReputationContextDefinition, ScopeContext as ReputationScopeContext,
+};
+pub use crate::catalog_v3::reputation_perk::{
+    PerkCategory as ReputationPerkCategory, PerkDetails as ReputationPerkDetails, ReputationPerk,
+};
 pub use crate::catalog_v3::reputation_perk_list::{ReputationPerkEntry, ReputationPerkList};
 pub use crate::catalog_v3::sandbox_trigger::SandboxTrigger;
 pub use crate::catalog_v3::sandbox_trigger_record_definition::SandboxTriggerRecordDefinition;

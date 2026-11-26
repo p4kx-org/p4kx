@@ -42,7 +42,8 @@ pub struct ContextDefinition<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct ScopeContext<'source> {
+/// One authored scope selection in a reputation display context.
+pub struct ScopeContext<'source> {
     source_type: SourcedValue<&'source str>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     scope: SourcedValue<Box<SourceRecordReference<'source>>>,
@@ -51,6 +52,11 @@ struct ScopeContext<'source> {
 }
 
 impl<'source> ScopeContext<'source> {
+    /// Borrows the original scope link and its physical target.
+    #[must_use]
+    pub const fn scope(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.scope
+    }
     fn read(
         fields: Observed<'_, '_, '_, 'source>,
         projection: &CatalogProjection<'_, 'source>,
@@ -72,6 +78,19 @@ impl<'source> ScopeContext<'source> {
 }
 
 impl<'source> ContextDefinition<'source> {
+    /// Borrows the primary authored scope selection.
+    #[must_use]
+    pub const fn primary_scope_context(&self) -> &SourcedValue<ScopeContext<'source>> {
+        &self.primary_scope_context
+    }
+
+    /// Borrows other authored scope selections in their original order.
+    #[must_use]
+    pub const fn scope_context_list(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<ScopeContext<'source>>>> {
+        &self.scope_context_list
+    }
     /// Borrows the physical Record identity and header.
     #[must_use]
     pub const fn source(&self) -> &CanonicalRecordHeader<'source> {

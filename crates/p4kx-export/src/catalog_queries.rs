@@ -295,9 +295,10 @@ pub use mission_types::{
     MissionType, MissionTypeSnapshot, with_mission_types, with_mission_types_from,
 };
 pub use reputation::{
-    ReputationContextDefinition, ReputationPerk, ReputationPerkEntry, ReputationPerkList,
-    ReputationRows, ReputationSelection, ReputationSnapshot, SandboxTrigger,
-    SandboxTriggerRecordDefinition, with_reputation, with_reputation_from,
+    ReputationContextDefinition, ReputationPerk, ReputationPerkCategory, ReputationPerkDetails,
+    ReputationPerkEntry, ReputationPerkList, ReputationRows, ReputationScopeContext,
+    ReputationSelection, ReputationSnapshot, SandboxTrigger, SandboxTriggerRecordDefinition,
+    with_reputation, with_reputation_from,
 };
 pub use reputation_reward_amounts::{
     ReputationRewardAmountDefinition, ReputationRewardAmountSnapshot,

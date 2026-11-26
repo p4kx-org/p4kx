@@ -359,6 +359,16 @@ texts. The selected manufacturer link must resolve in the same generation.
 Purchase and attachment text references use the canonical public-name and
 protected game-text domains, including when a key occurs in both.
 
+## Internal reputation and mission-board producer slice
+
+Read faction reputation, ranks, scopes, contexts and perks in one SDK
+snapshot. Keep physical links among the staged tables. Preserve standing
+order, exact thresholds, drift hours, and the selected protected texts.
+Retain the source class and typed details of each authored perk. Keep a
+career board's guild affiliation and faction slots in order, with exact
+resolved links to the staged faction reputation rows. Preserve the source type
+for other board variants.
+
 ## Acceptance
 
 #1177 tracks the wire contract, generation and import. Use a distinct versioned

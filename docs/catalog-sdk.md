@@ -1274,7 +1274,10 @@ remain available through the borrowed values.
 Use `ReputationSelection::default()` and set `contexts`, `perks` or `trigger_records`
 to select one of those families independently. Contexts and perk lists can retain protected
 text references. A standalone trigger-record request opens no localization payloads.
-The context preserves authored scope configuration. Perk entries retain their original scope
+Read the primary scope with `primary_scope_context()` and the other authored
+scopes with `scope_context_list()`. Each scope selection exposes its physical
+link through `scope()`. Use `ReputationPerk::details()` for the authored
+reward item and category selectors. Perk entries retain their original scope
 and standing links, and each trigger retains its ordered manual slots. The linked Records can
 be queried separately by their original physical Record indices.
 

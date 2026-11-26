@@ -9,12 +9,12 @@ use serde::Serialize;
 use super::ReducedError;
 use super::cell::Cell;
 use super::completeness;
-use super::component::{Component, ComponentKey};
+use super::component::{self, Component, ComponentKey};
 use super::number::Number;
-use crate::catalog_queries::equipment::EquipmentSnapshot;
+
 use crate::catalog_queries::equipment::worn_gear::{Clothing, ItemRadar};
 use crate::catalog_queries::{CatalogRecordSelection, ParsedCatalogQueries};
-use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogTable};
+use crate::catalog_rows::staged::StagedCatalogTable;
 use crate::resource_float::ResourceFloat32;
 
 pub(super) const CLOTHING: &str = "configurations.clothing";
@@ -31,30 +31,12 @@ pub(super) fn collect(
     cancel: Option<&CancelToken>,
 ) -> Result<WearableFields, ReducedError> {
     let clothing = parsed.with_clothing(CatalogRecordSelection::All, cancel, |snapshot| {
-        stage(CLOTHING, &snapshot, scratch, cancel, Protection::read)
+        component::stage_selected(CLOTHING, &snapshot, scratch, cancel, Protection::read)
     })??;
     let radars = parsed.with_item_radars(CatalogRecordSelection::All, cancel, |snapshot| {
-        stage(RADARS, &snapshot, scratch, cancel, Radar::read)
+        component::stage_selected(RADARS, &snapshot, scratch, cancel, Radar::read)
     })??;
     Ok(WearableFields { clothing, radars })
-}
-
-fn stage<'read, Source, Reduced: Serialize>(
-    path: &'static str,
-    snapshot: &'read EquipmentSnapshot<'_, Source>,
-    scratch: &Path,
-    cancel: Option<&CancelToken>,
-    mut project: impl FnMut(&'read Source) -> Result<Reduced, ReducedError>,
-) -> Result<StagedCatalogTable, ReducedError> {
-    let availability = snapshot.availability();
-    completeness::inventory(path, availability, snapshot.coverage())?;
-    let mut output = StagedCatalogRows::new(scratch, cancel);
-    for row in snapshot.rows() {
-        output.append(&project(row)?)?;
-    }
-    let table = output.finish(availability)?;
-    completeness::rows(path, snapshot.rows().len(), table.len())?;
-    Ok(table)
 }
 
 #[derive(Serialize)]

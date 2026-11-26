@@ -33,6 +33,35 @@ pub struct ReputationPerk<'source> {
 }
 
 impl<'source> ReputationPerk<'source> {
+    /// Borrows the original technical perk name.
+    #[must_use]
+    pub const fn name(&self) -> &SourcedValue<&'source str> {
+        &self.presentation.name
+    }
+
+    /// Borrows the original protected literal description.
+    #[must_use]
+    pub const fn description(&self) -> &SourcedValue<&'source str> {
+        &self.presentation.description
+    }
+
+    /// Borrows the original protected display description reference.
+    #[must_use]
+    pub const fn display_description(&self) -> &SourcedValue<GameTextRef> {
+        &self.presentation.display_description
+    }
+
+    /// Borrows the original icon asset path.
+    #[must_use]
+    pub const fn icon(&self) -> &SourcedValue<&'source str> {
+        &self.presentation.icon
+    }
+
+    /// Borrows the typed fields of the concrete perk variant.
+    #[must_use]
+    pub const fn details(&self) -> &PerkDetails<'source> {
+        &self.details
+    }
     /// Borrows the declared concrete perk type.
     #[must_use]
     pub const fn source_type(&self) -> &SourcedValue<&'source str> {
@@ -141,22 +170,34 @@ impl<'source> PerkPresentation<'source> {
     rename_all_fields = "camelCase"
 )]
 #[schemars(transform = every_field_required)]
-enum PerkDetails<'source> {
+#[non_exhaustive]
+pub enum PerkDetails<'source> {
+    /// A perk with only the shared presentation.
     Base,
+    /// A perk granting an original item reference.
     Item {
+        /// The original reward item link.
         #[schemars(with = "SourcedValue<CatalogRecordReference>")]
         reward_item: SourcedValue<Box<SourceRecordReference<'source>>>,
     },
+    /// An authored shop item category.
     ShopItemCategory {
+        /// The original category selectors.
         category: Box<PerkCategory<'source>>,
     },
+    /// A perk enabling an item category.
     EnabledItemCategory {
+        /// The original category selectors.
         category: Box<PerkCategory<'source>>,
     },
+    /// A perk discounting an item category.
     DiscountItemCategory {
+        /// The original category selectors.
         category: Box<PerkCategory<'source>>,
+        /// The authored discount percentage.
         discount_percentage: SourcedValue<ResourceFloat32>,
     },
+    /// A concrete authored variant with no typed projection.
     Authored,
 }
 
@@ -212,7 +253,7 @@ impl<'source> PerkDetails<'source> {
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-struct PerkCategory<'source> {
+pub struct PerkCategory<'source> {
     id: SourcedValue<CatalogGuid>,
     #[schemars(with = "SourcedValue<CatalogRecordReference>")]
     franchise: SourcedValue<Box<SourceRecordReference<'source>>>,
@@ -224,6 +265,35 @@ struct PerkCategory<'source> {
 }
 
 impl<'source> PerkCategory<'source> {
+    /// Borrows the original category identity.
+    #[must_use]
+    pub const fn id(&self) -> &SourcedValue<CatalogGuid> {
+        &self.id
+    }
+
+    /// Borrows the original shop franchise reference.
+    #[must_use]
+    pub const fn franchise(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.franchise
+    }
+
+    /// Borrows the original item type label.
+    #[must_use]
+    pub const fn item_type(&self) -> &SourcedValue<&'source str> {
+        &self.item_type
+    }
+
+    /// Borrows the original item subtype label.
+    #[must_use]
+    pub const fn sub_type(&self) -> &SourcedValue<&'source str> {
+        &self.sub_type
+    }
+
+    /// Borrows the original required tag reference.
+    #[must_use]
+    pub const fn required_tag(&self) -> &SourcedValue<Box<SourceRecordReference<'source>>> {
+        &self.required_tag
+    }
     fn read(
         fields: Observed<'_, '_, '_, 'source>,
         notes: &mut Vec<FieldError>,

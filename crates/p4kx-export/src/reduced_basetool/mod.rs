@@ -30,6 +30,7 @@ mod damage_resistance_macros;
 mod dismantle_processes;
 mod durability;
 mod entities;
+mod faction_reputations;
 mod inventory;
 mod item;
 mod item_definitions;
@@ -37,12 +38,17 @@ mod jump_inventory;
 mod jump_point_configuration;
 mod manufacturer;
 mod manufacturer_definitions;
+mod mission_boards;
 mod number;
 mod plan;
 mod quantum_drives;
 mod record_identity;
 mod record_link;
 mod record_targets;
+mod reputation_catalog;
+mod reputation_contexts;
+mod reputation_perks;
+mod reputation_ranks;
 mod resource_density;
 mod resource_groups;
 mod resource_properties;
@@ -74,13 +80,21 @@ mod durability_suit_tests;
 #[cfg(test)]
 mod entity_tests;
 #[cfg(test)]
+mod faction_reputations_tests;
+#[cfg(test)]
 mod item_definitions_tests;
 #[cfg(test)]
 mod jump_inventory_tests;
 #[cfg(test)]
 mod jump_point_configuration_tests;
 #[cfg(test)]
+mod mission_board_tests;
+#[cfg(test)]
 mod quantum_drive_tests;
+#[cfg(test)]
+mod reputation_perk_tests;
+#[cfg(test)]
+mod reputation_ranks_tests;
 #[cfg(test)]
 mod resource_group_tests;
 #[cfg(test)]
