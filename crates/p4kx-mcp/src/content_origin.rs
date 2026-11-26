@@ -178,11 +178,7 @@ impl EntryPageSources {
         }
         self.payload
             .at(
-                SourceLocation::Subresource {
-                    namespace: "archiveEntryDecodedBytes".into(),
-                    indices: vec![range.start, range.end],
-                    field: field.into(),
-                },
+                SourceLocation::archive_entry_decoded_bytes(range, field),
                 role,
             )
             .map(Some)

@@ -16,6 +16,24 @@ encryption state of a source-backed datum.
 MCP key notices merge into existing `_meta`. For tools with structured results,
 `structuredContent` carries the data and its applicable origin.
 
+## Entry Text and Hex previews
+
+The GUI captures the exact decoded prefix retained by the Text and Hex tabs,
+including a successful empty Entry. Preview contents expose the physical
+Entry and its ordered Containers, contributor completeness, and the immediate
+encryption marker for the bytes, the text and hexadecimal displays, path, size,
+shown length, and truncation. The path and declared size use directory metadata.
+Truncation uses that size and the actual retained byte range. The path line
+shows the current view's marker in its tooltip.
+
+The installed LIVE `13220821` witness matched the English localisation Entry
+prefix against an independent Archive read. It also checked the stored
+encryption declaration, payload role, decoded byte range and physical Entry
+position. The debug test executable SHA-256
+`d3a2d337674dfac41414ac7a5316f8eda7aefd44b4509371a83e78165f7dac04`
+ran for 75.0197 seconds including the GUI index build. Peak private commit
+was 954,011,648 bytes and peak working set was 976,150,528 bytes.
+
 ## Companion records
 
 The [JSON Schema](../schemas/p4kx-source-origin.schema.json) describes each line.

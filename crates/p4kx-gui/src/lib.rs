@@ -141,11 +141,12 @@ pub use p4kx_update::{Release, ReleaseCheck};
 pub use prerequisite_notice::PrerequisiteNotice;
 pub use preview::{
     AudioPreview, AudioStatus, BankSound, BankSoundIdentityProvenance, BankSoundProvenance,
-    ImageHeaderProvenance, ImageMipProvenance, ImagePreview, ImageStatus, MAX_PREVIEW_PIXELS,
-    MipStatus, PREVIEW_READ_LIMIT, PREVIEW_SIZE_LIMIT, Preview, PreviewContents, PreviewStatus,
-    PreviewTab, SoundInfo, SoundStatus, SoundbankPreview, SoundbankStatus,
-    SoundbankSummaryProvenance, TextureInfo, WemHeaderEvidenceError, WemHeaderProvenance,
-    XML_SIZE_LIMIT, XML_TEXT_LIMIT, XmlDocument, XmlPreview, XmlStatus, is_bank_path, is_wem_path,
+    EntryPreviewProvenance, ImageHeaderProvenance, ImageMipProvenance, ImagePreview, ImageStatus,
+    MAX_PREVIEW_PIXELS, MipStatus, PREVIEW_READ_LIMIT, PREVIEW_SIZE_LIMIT, Preview,
+    PreviewContents, PreviewStatus, PreviewTab, SoundInfo, SoundStatus, SoundbankPreview,
+    SoundbankStatus, SoundbankSummaryProvenance, TextureInfo, WemHeaderEvidenceError,
+    WemHeaderProvenance, XML_SIZE_LIMIT, XML_TEXT_LIMIT, XmlDocument, XmlPreview, XmlStatus,
+    is_bank_path, is_wem_path,
 };
 pub use query::{
     CellLook, NameNote, QUERY_PAGE_ROWS, QueryExportFormat, QueryExportStatus, QueryInvalid,

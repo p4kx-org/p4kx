@@ -10,16 +10,17 @@ use super::preview_bar::Export;
 use super::preview_tab::{Asked, Typed, typed_tab};
 use super::record_preview;
 use super::{dataforge_summary, image_preview, preview_bar, record_incoming};
-use super::{soundbank_origins, soundbank_preview};
+use super::{soundbank_origins, soundbank_preview, source_origin};
 use crate::theme::desktop::{PREVIEW_PADDING_X, PREVIEW_PATH_HEIGHT};
 use crate::theme::palette;
 use crate::theme::tokens::{FS_XS, SPACE_2, Weight};
 use crate::widgets::frames;
 use crate::widgets::scroll_region::Jump;
 use crate::widgets::text::{hairline_below, line, paint_left, plain};
+use crate::widgets::tooltip;
 use crate::{
-    Browser, Model, Preview, PreviewTab, Text, Texts, ViewerSupport, format, is_bank_path,
-    is_model_path, is_wem_path,
+    AudioText, Browser, ComparisonText, Model, Preview, PreviewContents, PreviewTab,
+    SoundbankPreview, Text, Texts, ViewerSupport, format, is_bank_path, is_model_path, is_wem_path,
 };
 
 /// Shows the Image tab after selecting a texture header, the Audio tab after selecting a WEM or a
@@ -213,7 +214,11 @@ fn body(
         .and_then(|bank| soundbank_preview::summary(texts, bank, size))
         .unwrap_or_else(|| format::size(size, texts.language()));
     let response = path_line(ui, path, &size_line);
-    if let Some(bank) = preview.soundbank() {
+    if matches!(tab, PreviewTab::Text | PreviewTab::Hex)
+        && let Some(contents) = preview.contents()
+    {
+        entry_origins(response, texts, contents, (tab, preview.soundbank()));
+    } else if let Some(bank) = preview.soundbank() {
         soundbank_origins::summary(response, texts, bank);
     }
     let jump = browser
@@ -237,6 +242,38 @@ fn body(
     }
     status_body(ui, texts, preview, (path, size), (tab, jump));
     None
+}
+
+fn entry_origins(
+    response: Response,
+    texts: &Texts,
+    contents: &PreviewContents,
+    (tab, bank): (PreviewTab, Option<&SoundbankPreview>),
+) {
+    let proof = contents.provenance().ok();
+    let (label, origin) = if tab == PreviewTab::Hex {
+        (Text::PreviewTabHex, proof.map(|proof| &proof.hex))
+    } else {
+        (Text::PreviewTabText, proof.map(|proof| &proof.text))
+    };
+    tooltip::hover(response, |ui| {
+        source_origin::row(
+            ui,
+            texts,
+            ComparisonText::ColumnPath,
+            proof.map(|proof| &proof.path),
+        );
+        source_origin::row(ui, texts, Text::ColumnSize, proof.map(|proof| &proof.size));
+        source_origin::row(ui, texts, label, origin);
+        if let Some(bank_proof) = bank.and_then(SoundbankPreview::summary_provenance) {
+            source_origin::row(
+                ui,
+                texts,
+                AudioText::BankWemCount,
+                bank_proof.ok().map(|proof| &proof.wem_count),
+            );
+        }
+    });
 }
 
 /// Shows the path line of the preview: `path`, then `size` muted.

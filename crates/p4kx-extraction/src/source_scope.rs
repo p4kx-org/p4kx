@@ -37,13 +37,11 @@ pub enum SourceInput<'a> {
 }
 
 pub(crate) fn raw_payload_location(input: SourceInput<'_>, length: u64) -> SourceLocation {
-    let namespace = if matches!(input, SourceInput::Archive(_) | SourceInput::ArchiveView(_)) {
-        "archiveEntryDecodedBytes"
-    } else {
-        "standaloneFileBytes"
-    };
+    if matches!(input, SourceInput::Archive(_) | SourceInput::ArchiveView(_)) {
+        return SourceLocation::archive_entry_decoded_bytes(0..length, "bytes");
+    }
     SourceLocation::Subresource {
-        namespace: namespace.to_owned(),
+        namespace: "standaloneFileBytes".to_owned(),
         indices: vec![0, length],
         field: "bytes".to_owned(),
     }

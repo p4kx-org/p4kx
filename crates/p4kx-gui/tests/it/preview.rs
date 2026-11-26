@@ -16,6 +16,9 @@ use tempfile::TempDir;
 
 type TestResult = Result<(), Box<dyn Error>>;
 
+#[path = "preview_origin_tests.rs"]
+mod origins;
+
 const CONFIG: &str = "<config>\n  <ship name=\"Aurora\"/>\n</config>\n";
 const BLOB: &[u8] = b"Hello\x00\x01\xff world, binary data!";
 

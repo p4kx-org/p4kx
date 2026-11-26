@@ -9,7 +9,8 @@ use std::thread;
 use p4kx_extraction::Entry;
 
 use super::{
-    Loaded, PREVIEW_READ_LIMIT, PreviewContents, ReadResult, Unread, XmlPreview, is_cryxml,
+    EntryPreviewProvenance, Loaded, PREVIEW_READ_LIMIT, PreviewContents, ReadResult, Unread,
+    XmlPreview, is_cryxml,
 };
 use crate::EntryIndex;
 use crate::model::describe;
@@ -92,7 +93,9 @@ pub(super) fn read(
         Ok(bytes) => {
             let (xml, job) = is_cryxml(&bytes).then(XmlPreview::pending).unzip();
             let start = job.as_ref().map(|_| bytes.clone());
-            let contents = PreviewContents::new(bytes, entry.uncompressed_size());
+            let provenance =
+                EntryPreviewProvenance::capture(archive.observed_entry(entry), bytes.len() as u64);
+            let contents = PreviewContents::new(bytes, entry.uncompressed_size(), provenance);
             (Ok(Loaded { contents, xml }), job.zip(start))
         }
         Err(unread) => (Err(unread), None),

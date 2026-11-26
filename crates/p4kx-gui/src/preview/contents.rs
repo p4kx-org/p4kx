@@ -3,6 +3,9 @@
 
 use std::ops::Range;
 
+use p4kx_extraction::SourceEvidenceError;
+
+use super::EntryPreviewProvenance;
 use crate::PreviewTab;
 
 /// The number of bytes in one row of the hex view.
@@ -17,11 +20,16 @@ pub struct PreviewContents {
     size: u64,
     text: String,
     lines: Vec<Range<usize>>,
+    provenance: Result<EntryPreviewProvenance, SourceEvidenceError>,
 }
 
 impl PreviewContents {
     /// Decodes `bytes`, the start of an Entry of `size` bytes.
-    pub(crate) fn new(bytes: Vec<u8>, size: u64) -> Self {
+    pub(crate) fn new(
+        bytes: Vec<u8>,
+        size: u64,
+        provenance: Result<EntryPreviewProvenance, SourceEvidenceError>,
+    ) -> Self {
         let text = decode(&bytes);
         let lines = lines(&text);
         Self {
@@ -29,6 +37,18 @@ impl PreviewContents {
             size,
             text,
             lines,
+            provenance,
+        }
+    }
+
+    /// Returns source evidence for the retained bytes, their displays and size facts.
+    ///
+    /// # Errors
+    /// Returns an error if the source evidence could not be captured.
+    pub const fn provenance(&self) -> Result<&EntryPreviewProvenance, SourceEvidenceError> {
+        match &self.provenance {
+            Ok(proof) => Ok(proof),
+            Err(error) => Err(*error),
         }
     }
 
@@ -205,25 +225,30 @@ mod tests {
             .collect()
     }
 
+    fn contents(bytes: Vec<u8>, size: u64) -> PreviewContents {
+        let origin = super::EntryPreviewProvenance::capture(None, bytes.len() as u64);
+        PreviewContents::new(bytes, size, origin)
+    }
+
     #[test]
     fn lines_end_at_either_kind_of_line_break() {
-        let contents = PreviewContents::new(b"one\r\ntwo\n\nthree".to_vec(), 15);
+        let contents = contents(b"one\r\ntwo\n\nthree".to_vec(), 15);
 
         assert_eq!(lines(&contents), ["one", "two", "", "three"], "lines");
     }
 
     #[test]
     fn a_lone_carriage_return_ends_a_line_too() {
-        let contents = PreviewContents::new(b"one\rtwo\r\r\nthree\r".to_vec(), 16);
+        let contents = contents(b"one\rtwo\r\r\nthree\r".to_vec(), 16);
 
         assert_eq!(lines(&contents), ["one", "two", "", "three"], "lines");
     }
 
     #[test]
     fn a_byte_order_mark_selects_the_encoding_and_is_dropped() {
-        let utf8 = PreviewContents::new(b"\xEF\xBB\xBFgr\xC3\xBC\xC3\x9F".to_vec(), 9);
-        let utf16 = PreviewContents::new(b"\xFF\xFEh\x00\xE4\x00".to_vec(), 6);
-        let big_endian = PreviewContents::new(b"\xFE\xFF\x00h\x00i".to_vec(), 6);
+        let utf8 = contents(b"\xEF\xBB\xBFgr\xC3\xBC\xC3\x9F".to_vec(), 9);
+        let utf16 = contents(b"\xFF\xFEh\x00\xE4\x00".to_vec(), 6);
+        let big_endian = contents(b"\xFE\xFF\x00h\x00i".to_vec(), 6);
 
         assert_eq!(utf8.text(), "grüß", "UTF-8");
         assert_eq!(utf16.text(), "hä", "UTF-16 LE");
@@ -232,14 +257,14 @@ mod tests {
 
     #[test]
     fn control_characters_and_invalid_bytes_are_replaced() {
-        let contents = PreviewContents::new(b"a\x00b\tc\xFF".to_vec(), 6);
+        let contents = contents(b"a\x00b\tc\xFF".to_vec(), 6);
 
         assert_eq!(contents.text(), "a\u{B7}b\tc\u{B7}", "replaced");
     }
 
     #[test]
     fn hex_rows_are_padded_so_the_characters_line_up() {
-        let contents = PreviewContents::new(b"0123456789ABCDEFxyz".to_vec(), 19);
+        let contents = contents(b"0123456789ABCDEFxyz".to_vec(), 19);
 
         assert_eq!(
             contents.hex_row(1),
@@ -251,13 +276,7 @@ mod tests {
 
     #[test]
     fn the_preview_is_truncated_only_when_bytes_were_left_out() {
-        assert!(
-            PreviewContents::new(vec![0; 4], 5).is_truncated(),
-            "left out"
-        );
-        assert!(
-            !PreviewContents::new(vec![0; 4], 4).is_truncated(),
-            "complete"
-        );
+        assert!(contents(vec![0; 4], 5).is_truncated(), "left out");
+        assert!(!contents(vec![0; 4], 4).is_truncated(), "complete");
     }
 }

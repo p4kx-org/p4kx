@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::ops::Range;
+
 use schemars::JsonSchema;
 use serde::{Serialize, Serializer};
 
@@ -71,6 +73,16 @@ pub enum SourceLocation {
 }
 
 impl SourceLocation {
+    /// Addresses a retained half-open byte range in the decoded Entry.
+    #[must_use]
+    pub fn archive_entry_decoded_bytes(range: Range<u64>, field: &str) -> Self {
+        Self::Subresource {
+            namespace: "archiveEntryDecodedBytes".into(),
+            indices: vec![range.start, range.end],
+            field: field.into(),
+        }
+    }
+
     pub(crate) fn key(&self) -> String {
         match self {
             Self::Opaque { reason } => format!("o:{}", reason.key()),

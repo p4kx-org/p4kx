@@ -11,6 +11,7 @@ mod bank_cache_tests;
 mod bank_sound;
 mod contents;
 mod entry_bytes;
+mod entry_preview_provenance;
 mod image;
 mod image_provenance;
 mod reading;
@@ -32,6 +33,7 @@ pub(crate) use bank_cache::BankCache;
 pub use bank_sound::BankSound;
 pub use contents::PreviewContents;
 pub(crate) use contents::{HEX_ROW_LEN, printable};
+pub use entry_preview_provenance::EntryPreviewProvenance;
 pub use image::{ImagePreview, ImageStatus, MipStatus};
 pub use image_provenance::{ImageHeaderProvenance, ImageMipProvenance};
 #[cfg(test)]
