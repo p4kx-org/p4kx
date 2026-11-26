@@ -5,7 +5,7 @@ use std::cell::RefCell;
 use std::path::Path;
 
 use p4kx_extraction::{CancelToken, DataForge};
-use serde::ser::SerializeStruct;
+use serde::ser::{SerializeSeq, SerializeStruct};
 use serde::{Serialize, Serializer};
 
 use super::spool::{IndexedRowSpoolWriter, RowSpool, RowSpoolError, RowSpoolWriter, checkpoint};
@@ -55,13 +55,20 @@ impl<'a> StagedCatalogRows<'a> {
         self,
         availability: DatasetAvailability,
     ) -> Result<StagedCatalogTable, RowSpoolError> {
+        Ok(StagedCatalogTable {
+            availability,
+            rows: self.finish_sequence()?,
+        })
+    }
+
+    pub(crate) fn finish_sequence(self) -> Result<StagedCatalogSequence, RowSpoolError> {
         let spool = if let Some(writer) = self.writer {
             Some(writer.finish(self.cancel)?)
         } else {
             checkpoint(self.cancel)?;
             None
         };
-        Ok(StagedCatalogTable::new(availability, spool, self.cancel))
+        Ok(StagedCatalogSequence::new(spool, self.cancel))
     }
 }
 
@@ -169,6 +176,12 @@ impl<'stage> OrderedComponentRows<'stage> {
 #[derive(Debug)]
 pub(crate) struct StagedCatalogTable {
     availability: DatasetAvailability,
+    rows: StagedCatalogSequence,
+}
+
+/// A catalog sequence whose ordered elements are prepared in a private spool.
+#[derive(Debug)]
+pub(crate) struct StagedCatalogSequence {
     spool: Option<RowSpool>,
     cancel: Option<CancelToken>,
     failure: RefCell<Option<RowSpoolError>>,
@@ -178,9 +191,7 @@ impl StagedCatalogTable {
     pub(crate) const fn empty(availability: DatasetAvailability) -> Self {
         Self {
             availability,
-            spool: None,
-            cancel: None,
-            failure: RefCell::new(None),
+            rows: StagedCatalogSequence::empty(),
         }
     }
 
@@ -191,6 +202,44 @@ impl StagedCatalogTable {
     ) -> Self {
         Self {
             availability,
+            rows: StagedCatalogSequence::new(spool, cancel),
+        }
+    }
+
+    pub(crate) const fn len(&self) -> usize {
+        self.rows.len()
+    }
+
+    pub(crate) const fn stored_bytes(&self) -> u64 {
+        self.rows.stored_bytes()
+    }
+
+    pub(crate) fn take_failure(&self) -> Option<RowSpoolError> {
+        self.rows.take_failure()
+    }
+}
+
+impl Serialize for StagedCatalogTable {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.rows.clear_failure();
+        let mut table = serializer.serialize_struct("CatalogTable", 2)?;
+        table.serialize_field("availability", &self.availability)?;
+        table.serialize_field("rows", &self.rows)?;
+        table.end()
+    }
+}
+
+impl StagedCatalogSequence {
+    const fn empty() -> Self {
+        Self {
+            spool: None,
+            cancel: None,
+            failure: RefCell::new(None),
+        }
+    }
+
+    fn new(spool: Option<RowSpool>, cancel: Option<&CancelToken>) -> Self {
+        Self {
             spool,
             cancel: cancel.cloned(),
             failure: RefCell::new(None),
@@ -214,21 +263,21 @@ impl StagedCatalogTable {
     pub(crate) fn take_failure(&self) -> Option<RowSpoolError> {
         self.failure.take()
     }
+
+    pub(crate) fn clear_failure(&self) {
+        *self.failure.borrow_mut() = None;
+    }
 }
 
-impl Serialize for StagedCatalogTable {
+impl Serialize for StagedCatalogSequence {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        *self.failure.borrow_mut() = None;
-        let mut table = serializer.serialize_struct("CatalogTable", 2)?;
-        table.serialize_field("availability", &self.availability)?;
-        if let Some(spool) = &self.spool {
-            let rows = spool.serialize_rows(self.cancel.as_ref());
-            let result = table.serialize_field("rows", &rows);
-            *self.failure.borrow_mut() = rows.take_failure();
-            result?;
-        } else {
-            table.serialize_field("rows", &[] as &[()])?;
-        }
-        table.end()
+        self.clear_failure();
+        let Some(spool) = &self.spool else {
+            return serializer.serialize_seq(Some(0))?.end();
+        };
+        let rows = spool.serialize_rows(self.cancel.as_ref());
+        let result = rows.serialize(serializer);
+        *self.failure.borrow_mut() = rows.take_failure();
+        result
     }
 }

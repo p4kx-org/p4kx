@@ -735,8 +735,9 @@ The completed writer reports `catalog storage:` on stderr. It sums the logical b
 temporary row spools for container instances, locations, Entity tag declarations,
 Item and Blueprint definitions, particle libraries,
 contract generators, contract templates, mission broker entries, loadouts, item ports,
-interactions, inventory item bounds, durability and weapon animation candidates, plus the
-final bytes of the publication temporary. The spools stay
+interactions, inventory item bounds, durability, Facility instances and weapon animation
+candidates and fragment selectors. It also reports the final bytes of the publication
+temporary. The spools stay
 open until publication. The measurement includes open spools with no visible file name. On an
 interrupted run, a dedicated scratch volume can provide sampled allocation evidence.
 Capture stderr line by line to align process memory samples with preparation, health, provenance,
@@ -768,7 +769,10 @@ frame through fixed-size buffers and reuses the compression context. Its index k
 the exact encoded length, compressed length and physical offset. The publisher replays
 the frames in canonical GUID and Record order for each JSON pass. Replay still allocates
 the input and output for one frame at a time. The weapon animation join keeps its
-original sourced attachment fields in memory.
+original sourced attachment fields in memory. It stages each edge's fragment selectors
+in graph traversal order after using them to resolve that edge's candidates. The SDK
+returns the same typed original graph. The Catalog replays the fragment rows in the
+same graph object and accounts for spool bytes and replay errors.
 
 An isolated Windows AMD64 comparison with identical synthetic rows and pinned libraries
 measured the preparation stage in four fresh processes per workload. With two wide
@@ -791,9 +795,9 @@ run in parallel within each scan window. The first ship to read a shared file ow
 One observed loadout resolver visits roots in stable GUID order and stages each complete row in
 one sequential compressed spool. It retains only the typed Ship port and owner data needed for
 crafter, facility and resource topology joins. The joins use the original attachment and name
-evidence. The producer releases those trees after the topology join. Each Record-defined port
-shares the selection evidence for its six attribute fields within that specific occurrence. Each
-field retains its own original inputs and completeness. Stage and SDK tests compare the serialized
+evidence. The producer releases each tree immediately after joining its resource topology.
+Each Record-defined port shares the selection evidence for its six attribute fields within
+that specific occurrence. Each field retains its own original inputs and completeness. Stage and SDK tests compare the serialized
 fields against their flat evidence sets in both provenance modes. Record process writes during
 loadout resolution and retained private bytes on entry to location and facility-interior projection.
 

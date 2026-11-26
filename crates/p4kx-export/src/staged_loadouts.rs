@@ -92,8 +92,8 @@ impl StagedLoadouts {
         &self.ships
     }
 
-    pub(crate) fn release_ship_joins(&mut self) {
-        self.ships = Vec::new();
+    pub(crate) fn take_ship_joins(&mut self) -> Vec<ShipLoadoutJoin> {
+        std::mem::take(&mut self.ships)
     }
 
     pub(crate) fn stored_bytes(&self) -> u64 {

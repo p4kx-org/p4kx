@@ -63,6 +63,18 @@ GB and MB here are decimal. The paired LIVE runs reduced elapsed time by 64.0%, 
 
 For PTU 13284307, the local measurement receipt for the isolated repeat beginning 2026-11-26 06:33:46 UTC identifies package run 45762183499, artifact 15092206325, binary SHA-256 `877f17474776bfc0cea1f778be76e8ea8fd8aeff6447f369814155cefdb3600f`. Its observed lifetime private peak was 40,042,229,760 B and working-set peak 37,195,284,480 B. Sampled private maxima were 19.10 GB during Records, 37.07 GB during Loadout resolution, 33.56 GB during locations, 36.58 GB during ContractGenerators, 37.92 GB during independent configurations, 39.42 GB during weapon animation and 40.04 GB during facility interiors. These phase totals include earlier allocations. Attributing 40 GB to interior processing alone would misdirect the first investigation. The earlier attempt stopped on the separate host reserve during Loadouts at 29.32 GB lifetime private commit. Both stops preceded final publication. A third run on the same archive and package revision `6a407804` also stopped before publication. Its final sample showed 12,884,312,064 B available, 589,824 B below the host reserve, with 35.789 GB of remaining commit headroom. At the stop its sampled Windows lifetime counters were 29,508,784,128 B private and 28,223,492,096 B resident. The run did not reach the application ceiling or the same phase as its earlier repeat. These runs cannot establish a change in the complete producer peak or wall time. The package link establishes binary identity. The memory figures come from the local measurement receipts. [Native package][package] · [Measurement method][method]
 
+Another PTU 13284307 Normal Full run began at 12:49:26 UTC with the packaged
+Windows AMD64 CLI from merge revision `eada15a2`. It stopped 968.666 s later
+during `project-weapon-animation`. The last sample showed 11,330,998,272 B of
+available physical memory against a 12 GiB host reserve. Windows lifetime peaks
+were 35,498,344,448 B private and 32,887,623,680 B resident. The application
+ceiling was 40,000,000,000 B. The run produced no complete frame for
+archive-free replay. A separate text search started at 13:05:28 UTC. In the next
+six seconds available physical memory fell from 16,424,726,528 B to 11,330,998,272 B
+while private bytes in the producer stayed at 35,494,363,136 B. The search process
+later held 29,323,603,968 B of private memory and was stopped. The concurrent
+load prevents a comparison of completed producer peaks. [Packaged CLI](https://github.com/p4kx-org/p4kx/actions/runs/45811044734/artifacts/15116366395)
+
 | Fresh process on LIVE 13220821, consumer revision `7526b777` | Seconds | Reported peak private MB |
 | --- | ---: | ---: |
 | Open Archive and DataForge | 0.8 | 1,040 |

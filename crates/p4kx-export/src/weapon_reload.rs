@@ -35,6 +35,7 @@ use graph::BranchLink;
 use relation::{CandidateInput, FragmentMatch};
 use scope::DatabaseScopes;
 use sources::ActorBinding;
+pub(crate) use sources::StagedWeaponAnimationSources;
 
 #[path = "weapon_reload_coverage.rs"]
 mod coverage;
@@ -62,7 +63,7 @@ pub use scope::{
 pub use sources::{ActorBinding as MannequinActorBinding, WeaponAnimationSources};
 
 pub(crate) struct WeaponAnimation<'source> {
-    pub(crate) sources: WeaponAnimationSources<'source>,
+    pub(crate) sources: StagedWeaponAnimationSources<'source>,
     pub(crate) candidates: StagedCatalogTable,
 }
 
@@ -76,14 +77,29 @@ pub(crate) fn read<'source>(
 ) -> Result<WeaponAnimation<'source>, CatalogError> {
     let scratch = std::env::temp_dir();
     let mut candidates = StagedCatalogRows::new(&scratch, cancel);
-    let players = entities.named_class_candidates("Player");
-    let projected = project(archive, players, input, weapons, cancel, |row| {
-        candidates.append(&row).map_err(CatalogError::from)
-    })?;
+    let mut fragments = StagedCatalogRows::new(&scratch, cancel);
+    let projected = if weapons.is_empty() {
+        WeaponAnimationProjection::absent()
+    } else {
+        let players = entities.named_class_candidates("Player");
+        project_graph(
+            archive,
+            players,
+            input,
+            weapons,
+            cancel,
+            GraphRows {
+                candidate: |row| candidates.append(&row).map_err(CatalogError::from),
+                fragment: |row| fragments.append(&row).map_err(CatalogError::from),
+            },
+        )?
+    };
     let candidates = candidates.finish(projected.availability)?;
+    let sources =
+        StagedWeaponAnimationSources::new(projected.sources, fragments.finish_sequence()?);
     ledger.merge(projected.ledger);
     Ok(WeaponAnimation {
-        sources: projected.sources,
+        sources,
         candidates,
     })
 }
@@ -94,22 +110,28 @@ pub(crate) struct WeaponAnimationProjection<'source> {
     pub(crate) ledger: ExportLedger,
 }
 
+impl WeaponAnimationProjection<'_> {
+    fn absent() -> Self {
+        Self {
+            sources: WeaponAnimationSources::default(),
+            availability: DatasetAvailability::Absent,
+            ledger: ExportLedger::default(),
+        }
+    }
+}
+
 pub(crate) fn project<'source>(
     archive: &Archive,
     players: &[Record<'source>],
     input: &OriginalCatalogInput<'_, 'source>,
     weapons: &[WeaponAttachment<'source>],
     cancel: Option<&CancelToken>,
-    emit: impl FnMut(WeaponPlayerAnimationCandidate) -> Result<(), CatalogError>,
+    candidate: impl FnMut(WeaponPlayerAnimationCandidate) -> Result<(), CatalogError>,
 ) -> Result<WeaponAnimationProjection<'source>, CatalogError> {
     if weapons.is_empty() {
-        return Ok(WeaponAnimationProjection {
-            sources: WeaponAnimationSources::default(),
-            availability: DatasetAvailability::Absent,
-            ledger: ExportLedger::default(),
-        });
+        return Ok(WeaponAnimationProjection::absent());
     }
-    project_graph(archive, players, input, weapons, cancel, emit)
+    collect_graph(archive, players, input, weapons, cancel, candidate)
 }
 
 pub(crate) fn project_sources<'source>(
@@ -118,7 +140,39 @@ pub(crate) fn project_sources<'source>(
     input: &OriginalCatalogInput<'_, 'source>,
     cancel: Option<&CancelToken>,
 ) -> Result<WeaponAnimationProjection<'source>, CatalogError> {
-    project_graph(archive, players, input, &[], cancel, |_| Ok(()))
+    collect_graph(archive, players, input, &[], cancel, |_| Ok(()))
+}
+
+fn collect_graph<'source>(
+    archive: &Archive,
+    players: &[Record<'source>],
+    input: &OriginalCatalogInput<'_, 'source>,
+    weapons: &[WeaponAttachment<'source>],
+    cancel: Option<&CancelToken>,
+    candidate: impl FnMut(WeaponPlayerAnimationCandidate) -> Result<(), CatalogError>,
+) -> Result<WeaponAnimationProjection<'source>, CatalogError> {
+    let mut fragment_selectors = Vec::new();
+    let mut projected = project_graph(
+        archive,
+        players,
+        input,
+        weapons,
+        cancel,
+        GraphRows {
+            candidate,
+            fragment: |row| {
+                fragment_selectors.push(row);
+                Ok(())
+            },
+        },
+    )?;
+    projected.sources.fragment_selectors = fragment_selectors;
+    Ok(projected)
+}
+
+struct GraphRows<Candidate, Fragment> {
+    candidate: Candidate,
+    fragment: Fragment,
 }
 
 fn project_graph<'source>(
@@ -127,7 +181,10 @@ fn project_graph<'source>(
     input: &OriginalCatalogInput<'_, 'source>,
     weapons: &[WeaponAttachment<'source>],
     cancel: Option<&CancelToken>,
-    mut emit: impl FnMut(WeaponPlayerAnimationCandidate) -> Result<(), CatalogError>,
+    mut rows: GraphRows<
+        impl FnMut(WeaponPlayerAnimationCandidate) -> Result<(), CatalogError>,
+        impl FnMut(FragmentMatch) -> Result<(), CatalogError>,
+    >,
 ) -> Result<WeaponAnimationProjection<'source>, CatalogError> {
     let entry = EntryCapture::for_input(input);
     let mut assets = Assets::new(archive, &entry, cancel);
@@ -140,14 +197,14 @@ fn project_graph<'source>(
         .collect::<Vec<_>>();
     let branches = graph::walk(&mut assets, roots, sources, cancel)?;
     let scopes = scope::databases(&mut assets, sources, cancel)?;
-    let fragments = build_rows(
+    build_rows(
         &actor_bindings,
         &branches,
         &scopes,
         &assets,
         weapons,
         (sources, cancel),
-        &mut emit,
+        &mut rows,
     )?;
     let available = if assets.databases.is_empty() {
         DatasetAvailability::Unavailable
@@ -163,7 +220,7 @@ fn project_graph<'source>(
             tag_definitions: assets.definitions.into_values().collect(),
             scopes,
             branches,
-            fragment_selectors: fragments,
+            fragment_selectors: Vec::new(),
         },
         availability: available,
         ledger: assets.ledger,
@@ -201,14 +258,16 @@ fn build_rows(
     assets: &Assets<'_, '_, '_>,
     weapons: &[WeaponAttachment<'_>],
     (sources, cancel): (&SourceUses, Option<&CancelToken>),
-    emit: &mut impl FnMut(WeaponPlayerAnimationCandidate) -> Result<(), CatalogError>,
-) -> Result<Vec<FragmentMatch>, CatalogError> {
+    rows: &mut GraphRows<
+        impl FnMut(WeaponPlayerAnimationCandidate) -> Result<(), CatalogError>,
+        impl FnMut(FragmentMatch) -> Result<(), CatalogError>,
+    >,
+) -> Result<(), CatalogError> {
     let scope_by_entry = scopes
         .iter()
         .map(|scope| (&scope.database, scope))
         .collect::<BTreeMap<_, _>>();
     let branches_by_entry = (!weapons.is_empty()).then(|| graph::by_database(branches));
-    let mut fragment_selectors = Vec::new();
     let indices = weapons_by_tag(weapons);
     for edge in branches {
         check_cancel(cancel)?;
@@ -252,15 +311,15 @@ fn build_rows(
                             fragment_results: &fragments,
                         };
                         if let Some(candidate) = input.project(sources)? {
-                            emit(candidate)?;
+                            (rows.candidate)(candidate)?;
                         }
                     }
                 }
             }
         }
-        fragment_selectors.extend(fragments);
+        fragments.into_iter().try_for_each(&mut rows.fragment)?;
     }
-    Ok(fragment_selectors)
+    Ok(())
 }
 
 fn reachable(

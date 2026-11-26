@@ -50,9 +50,13 @@ impl<'source> Collected<'source> {
         sources: &SourceUses,
         cancel: Option<&CancelToken>,
     ) -> Result<CatalogResourceTopology<'source>, CatalogError> {
-        let placements = project(&self.loadouts, &self.entity_configurations, sources, cancel)?
-            .into_tables(forge);
-        self.loadouts.release_ship_joins();
+        let placements = project(
+            &mut self.loadouts,
+            &self.entity_configurations,
+            sources,
+            cancel,
+        )?
+        .into_tables(forge);
         let declarations =
             std::mem::take(&mut self.entity_configurations.topology).into_tables(forge);
         Ok(CatalogResourceTopology {
@@ -63,14 +67,14 @@ impl<'source> Collected<'source> {
 }
 
 fn project(
-    loadouts: &StagedLoadouts,
+    loadouts: &mut StagedLoadouts,
     selected: &EntityConfigurationRows<'_>,
     sources: &SourceUses,
     cancel: Option<&CancelToken>,
 ) -> Result<ResourceNetworkPlacements, CatalogError> {
     let index = TopologyIndex::new(selected)?;
     let mut graph = ResourceNetworkPlacements::default();
-    for ship in loadouts.ships() {
+    for ship in loadouts.take_ship_joins() {
         graph.add_loadout(&ship.view(), &index, sources, cancel)?;
     }
     Ok(graph)

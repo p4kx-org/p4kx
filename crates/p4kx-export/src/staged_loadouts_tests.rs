@@ -35,7 +35,7 @@ fn row(identity: u32, kind: EntityKind) -> Loadout {
 }
 
 #[test]
-fn staged_rows_replay_exact_wire_order_after_ship_joins_are_released() -> TestResult {
+fn staged_rows_replay_exact_wire_order_after_ship_joins_are_taken() -> TestResult {
     let scratch = tempfile::tempdir()?;
     let rows = vec![
         row(1, EntityKind::Ship),
@@ -67,16 +67,29 @@ fn staged_rows_replay_exact_wire_order_after_ship_joins_are_released() -> TestRe
         expected,
         "exact original wire before release"
     );
-    staged.release_ship_joins();
+    let taken = staged.take_ship_joins();
     assert!(
         staged.ships().is_empty(),
-        "the completed joins release their retained tree"
+        "the spool no longer retains the transferred join trees"
+    );
+    assert!(
+        taken
+            .into_iter()
+            .map(|ship| ship.view().record_index)
+            .eq([1, 4, 6]),
+        "the final join receives the same physical owners in traversal order"
     );
     assert_eq!(
         serde_json::to_vec(&staged)?,
         expected,
         "exact original wire after release"
     );
+    Ok(())
+}
+
+#[test]
+fn staged_ship_only_and_empty_spools_keep_their_wire_shape() -> TestResult {
+    let scratch = tempfile::tempdir()?;
     let ships = vec![row(1, EntityKind::Ship)];
     let expected_ships = serde_json::to_vec(&ships)?;
     let ships_only = StagedLoadouts::stage(ships, scratch.path(), None)?;

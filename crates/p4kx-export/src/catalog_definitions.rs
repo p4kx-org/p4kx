@@ -14,6 +14,9 @@ use crate::catalog_v3::cargo_manifest::CargoManifestDefinition;
 use crate::catalog_v3::catalog_independent_configurations::{
     ConsumableDefinitions, ItemLinkedDefinitions, MiningLaserGlobalDefinition, TurretHealthModifier,
 };
+use crate::catalog_v3::catalog_projections::weapon_reload::{
+    StagedWeaponAnimationSources, WeaponAnimationSources,
+};
 use crate::catalog_v3::catalog_resource_network_read::resource_network_global::ResourceNetworkGlobal;
 use crate::catalog_v3::explosion_definition::ExplosionDefinition;
 use crate::catalog_v3::faction_definition::FactionDefinition;
@@ -165,8 +168,8 @@ pub(crate) struct CatalogDefinitions<'source> {
     pub(crate) procedural_planet_audio: CatalogTable<ProceduralPlanetAudio<'source>>,
     pub(crate) resource_network_globals: CatalogTable<ResourceNetworkGlobal<'source>>,
     pub(crate) ammo_definitions: CatalogTable<AmmoDefinition<'source>>,
-    pub(crate) weapon_animation_sources:
-        crate::catalog_v3::catalog_projections::weapon_reload::WeaponAnimationSources<'source>,
+    #[schemars(with = "WeaponAnimationSources<'source>")]
+    pub(crate) weapon_animation_sources: StagedWeaponAnimationSources<'source>,
     pub(crate) weapon_action_recoil_definitions:
         CatalogTable<WeaponActionRecoilDefinition<'source>>,
     #[serde(flatten)]
