@@ -64,6 +64,7 @@ mod real_archive_economy_definition_sdk_parity;
 mod real_archive_emp;
 mod real_archive_equipment_catalog;
 mod real_archive_explosive_components;
+mod real_archive_facility_interior_sdk;
 mod real_archive_facility_placements;
 mod real_archive_facility_seats;
 mod real_archive_faction_identity_definitions;

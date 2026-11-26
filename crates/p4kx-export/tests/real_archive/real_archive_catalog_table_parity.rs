@@ -37,12 +37,16 @@ pub(crate) use json_digest::update_json_digest;
 pub(crate) use measurement::{with_bound_measurement, with_bound_measurement_from_producer};
 pub(crate) use stream_parity::{
     DefinitionOwner, LootHarvestDataset, LootHarvestDigests, MissionDisposition,
-    StreamedComponentDigests, StreamedDefinitionDigests, StreamedMissionDigests,
-    StreamedPlacementDigests,
+    StreamedComponentDigests, StreamedDefinitionDigests, StreamedInteriorDigests,
+    StreamedMissionDigests, StreamedPlacementDigests,
 };
 
 #[path = "real_archive_catalog_selected_origins.rs"]
 mod selected_origins;
+
+#[path = "real_archive_catalog_selected_array.rs"]
+mod selected_array;
+use selected_array::check_row_array_count;
 
 #[path = "real_archive_catalog_selected_row.rs"]
 mod selected_row;
@@ -121,7 +125,7 @@ impl BoundMeasurement {
         let mut capture = measurement::normal_capture();
         capture.project(
             path,
-            Projection::Rows(ComparedRows::bare_array(path, expected)),
+            Projection::Rows(ComparedRows::bare_array(path, expected, RowSelection::All)),
         );
         let catalog = artifact::read_completed(&self.directory, |input| Ok(capture.read(input)?))?;
         self.binding.check_catalog(&catalog)?;
@@ -170,7 +174,10 @@ impl BoundMeasurement {
             );
         }
         for &(path, rows) in arrays {
-            capture.project(path, Projection::Rows(ComparedRows::bare_array(path, rows)));
+            capture.project(
+                path,
+                Projection::Rows(ComparedRows::bare_array(path, rows, RowSelection::All)),
+            );
         }
         capture.project(USES, Projection::Origins(SelectedOrigins(&origins.uses)));
         capture.project(
@@ -196,13 +203,6 @@ impl BoundMeasurement {
             physical_sources: origins.sources.len(),
         })
     }
-}
-
-fn check_row_array_count(catalog: &Value, path: &str, expected: usize) -> TestResult {
-    if catalog.pointer(path) != Some(&Value::from(expected)) {
-        return Err(format!("missing or incomplete Catalog row array at {path}").into());
-    }
-    Ok(())
 }
 
 pub(crate) struct Table {

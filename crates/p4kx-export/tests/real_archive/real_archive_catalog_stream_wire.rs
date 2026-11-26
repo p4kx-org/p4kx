@@ -8,6 +8,7 @@ use serde_json::Value;
 use sha2::{Digest as _, Sha256};
 
 use super::super::TestResult;
+use super::super::compare_rows::ship_row;
 use super::super::digest_parity::{PhysicalSlot, fingerprint};
 use super::super::selected_origins::SelectOrigin;
 use super::digest_runs::{DigestRun, Fingerprint};
@@ -23,6 +24,8 @@ enum RowOrder {
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub(super) enum EncounterRow {
     Placement,
+    InteriorPlacement,
+    InteriorCoverage,
     MissionProperties,
     MissionFlows,
     MissionArena,
@@ -35,6 +38,12 @@ impl EncounterRow {
     pub(super) fn project(self, row: Value) -> TestResult<(Fingerprint, Value)> {
         match self {
             Self::Placement => Ok((encounter_key(&row)?, row)),
+            Self::InteriorPlacement => Ok((interior_placement_key(&row)?, row)),
+            Self::InteriorCoverage => {
+                ship_row::interior_room_root::<serde_json::Error>(&row)?;
+                let room = row.get("room").ok_or("missing physical room identity")?;
+                Ok((fingerprint(room.clone())?, row))
+            }
             Self::LootOriginal | Self::LootWeighted | Self::HarvestSlotPreset => {
                 Ok((super::loot_harvest::loot_harvest_key(self, &row)?, row))
             }
@@ -142,6 +151,11 @@ impl<'de> Visitor<'de> for RowDigest {
             ..OrderedRows::default()
         };
         while let Some(row) = sequence.next_element::<Value>()? {
+            if self.order == RowOrder::Encounter(EncounterRow::InteriorPlacement)
+                && ship_row::interior_placement_root::<A::Error>(&row)?.is_none()
+            {
+                continue;
+            }
             if ordered.count == self.count {
                 return Err(A::Error::custom(format!(
                     "extra retained row after {} expected rows",
@@ -244,6 +258,19 @@ pub(super) fn encounter_key(row: &Value) -> TestResult<Fingerprint> {
         .filter(|value| value.is_object())
         .ok_or("the placement occurrence key is malformed")?;
     Ok(fingerprint(key.clone())?)
+}
+
+fn interior_placement_key(row: &Value) -> TestResult<Fingerprint> {
+    let root = ship_row::interior_placement_root::<serde_json::Error>(row)?
+        .ok_or("a Loadout placement has no Interior occurrence key")?;
+    let room = row
+        .pointer("/source/room")
+        .and_then(Value::as_object)
+        .ok_or("the Interior placement lacks a room identity")?;
+    let position = present_index(row.pointer("/source/position"))
+        .and_then(Value::as_object)
+        .ok_or("the Interior placement lacks a present SOC occurrence")?;
+    Ok(fingerprint(serde_json::to_value((root, room, position))?)?)
 }
 
 fn wire_slot(row: &Value) -> TestResult<PhysicalSlot> {

@@ -3195,7 +3195,6 @@ and Inventory storage owners. Use each position's physical root and ordered port
 The same component can contribute an instance at several distinct positions.
 Check the selected Loadout state, its coverage, and the reached configuration dependencies
 before interpreting an empty result. Retain the snapshot's own source inventory.
-Interior-kind facility instances are available through the full Catalog.
 
 ### Installed memory measurements for Store mappings and Loadout placements
 
@@ -3242,6 +3241,53 @@ The result includes Loadout, declaration and class dependency coverage.
 `complete` describes the selected scope and is conservative about traversal
 findings, unreadable declarations and unresolved operations. Known rows
 and findings remain available with their original field sources.
+
+### Interior facility placements
+
+Use `equipment::read_facility_interior_placements`, its decoded-Entry form or
+the equivalent session methods to read the Interior-kind rows of
+`placements.facilityInstances` for a physical Ship. The query uses the canonical
+room model helpers and SOC transforms. It returns direct placements before
+placements reached through attached rooms. The separate coverage query avoids
+opening room models when an application needs only the traversal results.
+
+`FacilityInstance::interior_placement()` exposes the room owner, attachment
+position, physical SOC coordinates, class and transforms. The instance's
+configuration links retain the original physical owner identities. Check
+`availability` and `coverage` before interpreting empty rows. Resolve the
+source references of both row sets through `coverage.source_inventory`.
+
+Use `equipment::visit_facility_interior_placements` for all admitted physical
+Ships. The free function, decoded-Entry form, session and parsed session share
+the same fallible callback. Each callback borrows one Ship snapshot, including
+Ships with no rooms and Ships with incomplete coverage. The final summary
+counts Ships, placements, room coverage rows and incomplete Ships alongside
+the original Ship admission coverage. The placement and room rows have
+owner-local source inventories when Full provenance is requested.
+
+Callbacks follow canonical Loadout owner order, with GUIDs compared by their
+text form. Each Ship's direct rooms precede rooms reached through its attached
+items. To reproduce the full Catalog's global order, emit all direct rooms in
+physical Ship Record order first, then emit the attached rooms in callback
+order with their original port traversal order.
+
+For an installed coverage comparison, set `P4KX_DATA_P4K`, the normal stored
+key and the expected change number in `P4KX_NEW_SDK_BUILD`. Select a physical
+Record in `P4KX_FACILITY_INTERIOR_SDK_RECORD`. The ignored
+`installed_facility_interior_nominate_record` test accepts a unique original path
+in `P4KX_FACILITY_INTERIOR_SDK_RECORD_PATH`. Use the physical index for the
+separate `installed_facility_interior_cold_query` and
+`installed_facility_interior_placements_cold_query` measurements in fresh processes.
+`installed_facility_interior_placements_match_retained_complete_catalog`
+compares the selected Interior placements and coverage in one stream. The
+retained comparisons read `P4KX_CATALOG_MEASUREMENT_DIR` and verify the nominated
+producer revision from `P4KX_FACILITY_INTERIOR_CATALOG_PRODUCER_REVISION`.
+The ignored `installed_all_facility_interior_placements_match_retained_complete_catalog`
+test compares both datasets and their referenced physical sources for all Ships
+in one stream. It reconciles the resolved Ship roots with the published Loadout
+owner sequence, including published Ships with no Interior rows. The separate
+`installed_all_facility_interior_placements_cold_visit`
+test measures the default provenance mode with the same installed Build.
 
 ## Installed flight configurations
 

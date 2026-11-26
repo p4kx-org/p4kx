@@ -11,8 +11,11 @@ use super::digest_parity::{DigestedOrigins, DigestedRows};
 use super::selected_origins::SelectedOrigins;
 use super::selected_ships::SelectedShipIdentities;
 use super::selected_texts::SelectedTexts;
-use super::stream_parity::{MissionDispositionRows, RowDigest, StreamOrigins};
+use super::stream_parity::{MissionDispositionRows, RowDigest, ShipLoadoutRows, StreamOrigins};
 use crate::real_archive_catalog_size::replay::bindings::check_catalog_selection;
+
+#[path = "real_archive_catalog_ship_row.rs"]
+pub(super) mod ship_row;
 
 #[derive(Clone, Copy)]
 pub(super) enum Projection<'scope> {
@@ -24,6 +27,7 @@ pub(super) enum Projection<'scope> {
     DigestedRows(DigestedRows<'scope>),
     DigestedOrigins(DigestedOrigins<'scope>),
     StreamRows(RowDigest),
+    ShipLoadoutRows(ShipLoadoutRows),
     StreamOrigins(StreamOrigins<'scope>),
     MissionDispositions(MissionDispositionRows),
 }
@@ -45,6 +49,7 @@ impl<'de> DeserializeSeed<'de> for Projection<'_> {
             Self::DigestedRows(rows) => rows.deserialize(deserializer),
             Self::DigestedOrigins(origins) => origins.deserialize(deserializer),
             Self::StreamRows(rows) => rows.deserialize(deserializer),
+            Self::ShipLoadoutRows(roots) => roots.deserialize(deserializer),
             Self::StreamOrigins(origins) => origins.deserialize(deserializer),
             Self::MissionDispositions(kinds) => kinds.deserialize(deserializer),
         }
@@ -70,28 +75,18 @@ impl fmt::Display for RowAddress<'_> {
 pub(super) enum RowSelection {
     All,
     PhysicalShip(u32),
+    InteriorShip(u32),
+    InteriorPlacement(u32),
 }
 
 impl RowSelection {
     fn includes<E: Error>(self, row: &Value) -> Result<bool, E> {
-        let Self::PhysicalShip(ship) = self else {
-            return Ok(true);
-        };
-        let index = row
-            .pointer("/shipRecordIndex/value")
-            .and_then(Value::as_u64)
-            .and_then(|value| u32::try_from(value).ok())
-            .ok_or_else(|| E::custom("a Catalog flight row has no physical Ship Record index"))?;
-        if row
-            .pointer("/shipRecordIndex/state")
-            .and_then(Value::as_str)
-            != Some("present")
-        {
-            return Err(E::custom(
-                "a Catalog flight row has no present Ship identity",
-            ));
+        match self {
+            Self::All => Ok(true),
+            Self::PhysicalShip(ship) => ship_row::flight_includes(ship, row),
+            Self::InteriorShip(ship) => ship_row::interior_includes(ship, row),
+            Self::InteriorPlacement(ship) => ship_row::interior_placement_includes(ship, row),
         }
-        Ok(index == ship)
     }
 }
 
@@ -115,11 +110,15 @@ impl<'scope> ComparedRows<'scope> {
         }
     }
 
-    pub(super) const fn bare_array(dataset: &'scope str, expected: &'scope [Value]) -> Self {
+    pub(super) const fn bare_array(
+        dataset: &'scope str,
+        expected: &'scope [Value],
+        selection: RowSelection,
+    ) -> Self {
         Self {
             address: RowAddress::BareArray(dataset),
             expected,
-            selection: RowSelection::All,
+            selection,
         }
     }
 
@@ -165,7 +164,11 @@ impl<'de> Visitor<'de> for ComparedRows<'_> {
         }
         let has_extra = match self.selection {
             RowSelection::All => sequence.next_element::<IgnoredAny>()?.is_some(),
-            RowSelection::PhysicalShip(_) => self.next_matching_row(&mut sequence)?.is_some(),
+            RowSelection::PhysicalShip(_)
+            | RowSelection::InteriorShip(_)
+            | RowSelection::InteriorPlacement(_) => {
+                self.next_matching_row(&mut sequence)?.is_some()
+            }
         };
         if has_extra {
             return Err(A::Error::custom(format!(
@@ -313,7 +316,7 @@ fn bare_array_capture_requires_every_ordered_row_at_the_actual_member() -> super
     let mut capture = CatalogCapture::default();
     capture.project(
         PATH,
-        Projection::Rows(ComparedRows::bare_array(PATH, &expected)),
+        Projection::Rows(ComparedRows::bare_array(PATH, &expected, RowSelection::All)),
     );
 
     let value = capture.read(
