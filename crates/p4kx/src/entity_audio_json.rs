@@ -36,7 +36,7 @@ pub(super) fn print(
     args: &EntityAudioArgs,
     report: Option<&ExportReport>,
 ) -> Result<()> {
-    let evidence = origins::capture(input)?;
+    let evidence = origins::capture(input, report.map(|report| (report, &args.export)))?;
     json::print(&AudioJson {
         archive: json::path(input.archive.path()),
         entry,

@@ -8,8 +8,10 @@ use p4kx_extraction::{
 };
 
 use super::super::plan::Job;
-use super::super::{ExportOptions, ExportWatch, SoundFormat, WemExportSource};
-use super::{ExportState, emit};
+use super::super::{
+    ExportOptions, ExportSoundSelection, ExportWatch, SoundFormat, WemExportSource,
+};
+use super::{ExportState, WemOutputTarget, emit};
 
 fn job() -> Job {
     Job {
@@ -17,6 +19,11 @@ fn job() -> Job {
         stem: "Play".to_owned(),
         wem_id: 1,
         source: WemExportSource::Loose { entry: 0 },
+        selection: ExportSoundSelection {
+            trigger_ordinal: 0,
+            variant_ordinal: 0,
+            media_variant_ordinal: 0,
+        },
     }
 }
 
@@ -35,9 +42,13 @@ fn a_write_after_cancel_fails_and_leaves_no_file_behind() {
         None,
         &[7; 64],
         None,
-        &dir.path().join("Play.wem"),
-        None,
-        (&job(), options, &watch),
+        WemOutputTarget::new(
+            &dir.path().join("Play.wem"),
+            options.policy,
+            None,
+            watch.cancel_token(),
+        ),
+        &job(),
     );
 
     assert!(emitted.is_err(), "the write stops");
@@ -54,28 +65,11 @@ fn an_uncancelled_write_reports_the_bytes_it_wrote() {
     let path = dir.path().join("Play.wem");
     let watch = ExportWatch::default();
 
-    let first = emit(
-        SoundFormat::Raw,
-        None,
-        &[7; 64],
-        None,
-        &path,
-        None,
-        (&job(), options, &watch),
-    )
-    .expect("first");
+    let target = WemOutputTarget::new(&path, options.policy, None, watch.cancel_token());
+    let first = emit(SoundFormat::Raw, None, &[7; 64], None, target, &job()).expect("first");
     let companion = first.origin_receipt.as_ref().expect("written companion");
     let previous = fs::read(companion).expect("original companion");
-    let second = emit(
-        SoundFormat::Raw,
-        None,
-        &[7; 64],
-        None,
-        &path,
-        None,
-        (&job(), options, &watch),
-    )
-    .expect("second");
+    let second = emit(SoundFormat::Raw, None, &[7; 64], None, target, &job()).expect("second");
 
     assert_eq!((first.size, second.size), (64, 64));
     assert_eq!(
@@ -103,16 +97,13 @@ fn source_bound_audio_output_refuses_the_original_source_file() {
         None,
         b"output",
         None,
-        &source,
-        Some(&protection),
-        (
-            &job(),
-            ExportOptions {
-                format: SoundFormat::Raw,
-                policy: ConflictPolicy::Overwrite,
-            },
-            &watch,
+        WemOutputTarget::new(
+            &source,
+            ConflictPolicy::Overwrite,
+            Some(&protection),
+            watch.cancel_token(),
         ),
+        &job(),
     );
     assert!(matches!(
         result,
@@ -141,9 +132,8 @@ fn replace_preserves_a_foreign_companion_and_reports_the_new_audio() {
         None,
         b"new sound",
         None,
-        &path,
-        None,
-        (&job(), options, &watch),
+        WemOutputTarget::new(&path, options.policy, None, watch.cancel_token()),
+        &job(),
     )
     .expect("replacement");
 
@@ -183,9 +173,8 @@ fn a_late_skip_reports_the_incumbent_and_leaves_its_companion() {
         None,
         b"new sound",
         None,
-        &path,
-        None,
-        (&job(), options, &watch),
+        WemOutputTarget::new(&path, options.policy, None, watch.cancel_token()),
+        &job(),
     )
     .expect("keep");
 

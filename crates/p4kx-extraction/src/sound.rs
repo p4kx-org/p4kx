@@ -17,6 +17,9 @@ pub(crate) use origins::{SoundOrigins, capture_raw_sound};
 #[path = "wem_output.rs"]
 mod wem_output;
 pub use wem_output::{WemOutput, WemOutputPublication, WemOutputTarget, publish_wem_output};
+#[path = "wem_written_size_origin.rs"]
+mod wem_written_size_origin;
+pub use wem_written_size_origin::WemWrittenSizeOrigin;
 #[path = "sound_publication.rs"]
 mod publication;
 

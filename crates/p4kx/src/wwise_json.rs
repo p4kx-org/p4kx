@@ -12,7 +12,9 @@ use crate::entity_audio::IssueJson;
 
 #[path = "wwise_path_origins.rs"]
 mod path_origins;
-pub(crate) use path_origins::{capture, capture_extract, capture_nested};
+pub(crate) use path_origins::{
+    FileTrigger, capture, capture_extract, capture_files, capture_nested,
+};
 
 /// The JSON shape of `p4kx wwise resolve`.
 #[derive(Serialize)]

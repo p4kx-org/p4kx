@@ -4,10 +4,10 @@
 use std::fs;
 
 use p4kx_assembly::audio::{
-    ArchiveAudio, ExportLoopOrigins, ExportOptions, ExportWatch, ExportedSound, SoundFormat,
-    TxtpFile, WemExportSource, write_txtp_with_loop_origins,
+    ArchiveAudio, ExportLoopOrigins, ExportOptions, ExportReportCapture, ExportWatch,
+    ExportedSound, SoundFormat, TxtpFile, WemExportSource, write_txtp_with_loop_origins,
 };
-use p4kx_extraction::{Archive, CancelToken, ConflictPolicy};
+use p4kx_extraction::{Archive, CancelToken, ConflictPolicy, SourceUses};
 use p4kx_testkit::{ArchiveBuilder, TestAtl, TestBank, TestEntry, TestHircObject, wwise_short_id};
 
 use super::audio_txtp_support::{EMBEDDED, PLAY, TestResult, pcm, sound};
@@ -51,7 +51,7 @@ fn same_short_id_keeps_both_physical_media_and_binds_each_txtp_loop() -> TestRes
     );
 
     let triggers = [&sounds];
-    let (exported, origins) = audio.export_sounds_watched_with_loop_origins(
+    let (exported, origins) = audio.export_sounds_watched_with_report_origins(
         &triggers,
         &folder,
         ExportOptions {
@@ -59,6 +59,7 @@ fn same_short_id_keeps_both_physical_media_and_binds_each_txtp_loop() -> TestRes
             policy: ConflictPolicy::Overwrite,
         },
         &ExportWatch::default(),
+        ExportReportCapture::FileSizesAndLoops,
     )?;
     assert!(
         exported.is_clean(),
@@ -69,6 +70,7 @@ fn same_short_id_keeps_both_physical_media_and_binds_each_txtp_loop() -> TestRes
     };
     assert_exported_wem(&archive, &origins, first_file, &first, FIRST)?;
     assert_exported_wem(&archive, &origins, second_file, &second, SECOND)?;
+    assert_reported_sizes(&archive, [first_file, second_file])?;
 
     let report = write_txtp_with_loop_origins(
         &archive,
@@ -83,6 +85,27 @@ fn same_short_id_keeps_both_physical_media_and_binds_each_txtp_loop() -> TestRes
         return Err("one TXTP for the logical event".into());
     };
     assert_txtp_commands(file, [first_file, second_file])
+}
+
+fn assert_reported_sizes(archive: &Archive, files: [&ExportedSound; 2]) -> TestResult {
+    let uses = SourceUses::new();
+    for (file, (ordinal, encrypted)) in files.into_iter().zip([(0, false), (2, true)]) {
+        assert_eq!(
+            file.selection.variant_ordinal, ordinal,
+            "duplicate actions do not change the file's original variant ordinal"
+        );
+        let size = file.written_size_origin(archive, &uses)?;
+        assert!(
+            size.source_set_complete(),
+            "the selected bank has complete size inputs"
+        );
+        assert_eq!(
+            size.contains_encrypted_source(),
+            Some(encrypted),
+            "the size follows its physical bank even when another bank uses the same WEM ID"
+        );
+    }
+    Ok(())
 }
 
 fn assert_txtp_commands(

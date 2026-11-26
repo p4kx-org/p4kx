@@ -171,8 +171,8 @@ impl ExportLoopOrigin {
     }
 }
 
-#[derive(Clone, Copy)]
-pub(super) enum CaptureOrigins {
-    Omit,
-    Retain,
+#[derive(Clone, Copy, Default)]
+pub(super) struct CaptureOrigins {
+    pub(super) loops: bool,
+    pub(super) report: bool,
 }

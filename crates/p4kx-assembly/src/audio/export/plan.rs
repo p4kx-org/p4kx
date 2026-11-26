@@ -3,9 +3,9 @@
 
 use std::collections::HashSet;
 
-use super::ExportFailure;
 use super::name::{StemSet, portable_stem};
 use super::source::{ResolvedMedia, WemExportSource};
+use super::{ExportFailure, ExportSoundSelection};
 use crate::audio::TriggerSounds;
 
 const FALLBACK_STEM: &str = "sound";
@@ -16,6 +16,7 @@ pub(super) struct Job {
     pub(super) stem: String,
     pub(super) wem_id: u32,
     pub(super) source: WemExportSource,
+    pub(super) selection: ExportSoundSelection,
 }
 
 #[derive(Debug, Default)]
@@ -27,12 +28,12 @@ pub(super) struct Plan {
 pub(super) fn build(triggers: &[&TriggerSounds<'_>]) -> Plan {
     let mut plan = Plan::default();
     let mut stems = StemSet::default();
-    for sounds in triggers {
+    for (trigger_ordinal, sounds) in triggers.iter().enumerate() {
         let trigger = sounds.trigger().name();
         let resolved = ResolvedMedia::new(sounds.variants());
         let mut media = Vec::new();
         let mut seen = HashSet::new();
-        for variant in sounds.variants() {
+        for (variant_ordinal, variant) in sounds.variants().iter().enumerate() {
             let Some(wem_id) = variant.wem_id() else {
                 plan.failures.push(ExportFailure {
                     trigger: trigger.to_owned(),
@@ -45,15 +46,15 @@ pub(super) fn build(triggers: &[&TriggerSounds<'_>]) -> Plan {
                 });
                 continue;
             };
-            let identity = (wem_id, resolved.source(variant, wem_id));
-            if seen.insert(identity) {
-                media.push(identity);
+            let selected = resolved.select(variant, wem_id);
+            if seen.insert((wem_id, selected.as_ref().map(|media| media.source))) {
+                media.push((variant_ordinal, wem_id, selected));
             }
         }
         let several = media.len() > 1;
         let base = portable_stem(trigger, FALLBACK_STEM);
-        for (wem_id, source) in media {
-            let Some(source) = source else {
+        for (variant_ordinal, wem_id, selected) in media {
+            let Some(selected) = selected else {
                 plan.failures.push(ExportFailure {
                     trigger: trigger.to_owned(),
                     wem_id: Some(wem_id),
@@ -70,7 +71,12 @@ pub(super) fn build(triggers: &[&TriggerSounds<'_>]) -> Plan {
                 trigger: trigger.to_owned(),
                 stem: stems.unique(&stem),
                 wem_id,
-                source,
+                source: selected.source,
+                selection: ExportSoundSelection {
+                    trigger_ordinal,
+                    variant_ordinal,
+                    media_variant_ordinal: selected.donor_ordinal.unwrap_or(variant_ordinal),
+                },
             });
         }
     }

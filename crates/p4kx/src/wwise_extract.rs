@@ -7,8 +7,8 @@ use std::process::ExitCode;
 
 use anyhow::Result;
 use p4kx_assembly::audio::{
-    ArchiveAudio, AudioIndex, ExportOptions, ExportReport, ExportState, ExportWatch, SoundFormat,
-    TriggerSounds, TxtpReport,
+    ArchiveAudio, AudioIndex, ExportOptions, ExportReport, ExportReportCapture, ExportState,
+    ExportWatch, SoundFormat, TriggerSounds, TxtpReport,
 };
 use p4kx_extraction::{CancelToken, ConversionError, FieldOrigins, SourceInventory};
 use serde::Serialize;
@@ -87,9 +87,22 @@ pub(crate) fn export(
     out: &Path,
     args: &SoundExportArgs,
     cancel: &CancelToken,
+    capture_report: bool,
 ) -> Result<ExportReport> {
     let watch = ExportWatch::linked(cancel.clone());
-    Ok(audio.export_sounds_watched(triggers, out, export_options(args), &watch)?)
+    let options = export_options(args);
+    if capture_report {
+        return Ok(audio
+            .export_sounds_watched_with_report_origins(
+                triggers,
+                out,
+                options,
+                &watch,
+                ExportReportCapture::FileSizes,
+            )?
+            .0);
+    }
+    Ok(audio.export_sounds_watched(triggers, out, options, &watch)?)
 }
 
 const fn export_options(args: &SoundExportArgs) -> ExportOptions {
@@ -213,28 +226,24 @@ pub(crate) fn run(args: &WwiseExtractArgs, as_json: bool) -> Result<ExitCode> {
     let sounds = audio
         .resolve_trigger_with_options(&args.trigger, &choice, options)?
         .ok_or_else(|| UnknownTrigger::new(&args.trigger))?;
-    let origins = as_json
-        .then(|| wwise_json::capture_extract(&archive, index, &sounds))
-        .transpose()?;
     let (report, txtp) = if args.txtp {
-        let watch = ExportWatch::linked(cancel.clone());
-        let (report, origins) = audio.export_sounds_watched_with_loop_origins(
-            &[&sounds],
-            &args.out,
-            export_options(&args.export),
-            &watch,
-        )?;
-        let txtp = (!report.cancelled)
-            .then(|| wwise_txtp::write(&sounds, &report, args, &archive, &cancel, &origins))
-            .transpose()?;
-        (report, txtp)
+        export_with_txtp(&audio, &sounds, args, &cancel, as_json)?
     } else {
         (
-            export(&audio, &[&sounds], &args.out, &args.export, &cancel)?,
+            export(
+                &audio,
+                &[&sounds],
+                &args.out,
+                &args.export,
+                &cancel,
+                as_json,
+            )?,
             None,
         )
     };
-    if let Some((field_origins, provenance)) = origins {
+    if as_json {
+        let (field_origins, provenance) =
+            wwise_json::capture_extract(&archive, index, &sounds, &report, &args.export)?;
         json::print(&ExtractJson {
             archive: json::path(archive.path()),
             language: LanguageJson::of(&choice),
@@ -256,6 +265,32 @@ pub(crate) fn run(args: &WwiseExtractArgs, as_json: bool) -> Result<ExitCode> {
         )?;
     }
     Ok(exit_code(&report))
+}
+
+fn export_with_txtp(
+    audio: &ArchiveAudio<'_>,
+    sounds: &TriggerSounds<'_>,
+    args: &WwiseExtractArgs,
+    cancel: &CancelToken,
+    capture_report: bool,
+) -> Result<(ExportReport, Option<TxtpReport>)> {
+    let watch = ExportWatch::linked(cancel.clone());
+    let options = export_options(&args.export);
+    let (report, origins) = if capture_report {
+        audio.export_sounds_watched_with_report_origins(
+            &[sounds],
+            &args.out,
+            options,
+            &watch,
+            ExportReportCapture::FileSizesAndLoops,
+        )?
+    } else {
+        audio.export_sounds_watched_with_loop_origins(&[sounds], &args.out, options, &watch)?
+    };
+    let txtp = (!report.cancelled)
+        .then(|| wwise_txtp::write(sounds, &report, args, audio.archive(), cancel, &origins))
+        .transpose()?;
+    Ok((report, txtp))
 }
 
 fn print_extraction(

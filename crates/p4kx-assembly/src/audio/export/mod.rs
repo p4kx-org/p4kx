@@ -6,6 +6,7 @@
 mod loop_origins;
 pub(super) mod name;
 mod plan;
+mod report_origins;
 mod source;
 mod write;
 
@@ -14,11 +15,13 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use p4kx_audio::Loop;
+use p4kx_extraction::sound::WemWrittenSizeOrigin;
 use p4kx_extraction::{ArchiveWriteProtection, CancelToken, ConflictPolicy, ConversionError};
 
 use self::loop_origins::CaptureOrigins;
 pub(crate) use self::loop_origins::ExportedWemOrigin;
 pub use self::loop_origins::{ExportLoopOrigin, ExportLoopOrigins};
+pub use self::report_origins::{ExportReportCapture, ExportSoundSelection};
 pub(super) use self::source::ResolvedMedia;
 pub use self::source::WemExportSource;
 use self::write::Target;
@@ -135,6 +138,8 @@ pub struct ExportedSound {
     pub wem_id: u32,
     /// The selected source in the Archive used to plan this file.
     pub source: WemExportSource,
+    /// The original route and physical-media selection in the resolved input.
+    pub selection: ExportSoundSelection,
     /// The file.
     pub path: PathBuf,
     /// The sibling origin companion published for this write.
@@ -155,6 +160,7 @@ pub struct ExportedSound {
     pub loop_points: Option<Loop>,
     /// Whether the file holds only the prefetched start of a streamed WEM, not the whole sound.
     pub prefetch_only: bool,
+    size_origin: Option<WemWrittenSizeOrigin>,
 }
 
 /// A sound that was not exported.
@@ -262,7 +268,7 @@ impl ArchiveAudio<'_> {
         options: ExportOptions,
         watch: &ExportWatch,
     ) -> Result<ExportReport, ConversionError> {
-        self.export_sounds_with(triggers, folder, options, watch, CaptureOrigins::Omit)
+        self.export_sounds_with(triggers, folder, options, watch, CaptureOrigins::default())
             .map(|(report, _)| report)
     }
 
@@ -277,7 +283,40 @@ impl ArchiveAudio<'_> {
         options: ExportOptions,
         watch: &ExportWatch,
     ) -> Result<(ExportReport, ExportLoopOrigins), ConversionError> {
-        self.export_sounds_with(triggers, folder, options, watch, CaptureOrigins::Retain)
+        self.export_sounds_with(
+            triggers,
+            folder,
+            options,
+            watch,
+            CaptureOrigins {
+                loops: true,
+                report: false,
+            },
+        )
+    }
+
+    /// Exports sounds while retaining the original inputs used to measure their written sizes.
+    ///
+    /// # Errors
+    /// Returns the same output errors as [`Self::export_sounds_watched`].
+    pub fn export_sounds_watched_with_report_origins(
+        &self,
+        triggers: &[&TriggerSounds<'_>],
+        folder: &Path,
+        options: ExportOptions,
+        watch: &ExportWatch,
+        report_capture: ExportReportCapture,
+    ) -> Result<(ExportReport, ExportLoopOrigins), ConversionError> {
+        self.export_sounds_with(
+            triggers,
+            folder,
+            options,
+            watch,
+            CaptureOrigins {
+                loops: report_capture == ExportReportCapture::FileSizesAndLoops,
+                report: true,
+            },
+        )
     }
 
     fn export_sounds_with(
@@ -319,6 +358,7 @@ impl ArchiveAudio<'_> {
             folder,
             absolute: &absolute,
             protection: &protection,
+            report_origins: capture.report,
         };
         for outcome in write::run(self, &plan.jobs, target, options, watch, capture) {
             match outcome {

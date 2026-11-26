@@ -7,10 +7,11 @@ use std::error::Error;
 use std::fs;
 
 use p4kx_assembly::audio::{
-    ArchiveAudio, ExportOptions, ExportedSound, SoundFormat, TriggerSounds,
+    ArchiveAudio, ExportOptions, ExportReportCapture, ExportWatch, ExportedSound, SoundFormat,
+    TriggerSounds,
 };
 use p4kx_audio::Wem;
-use p4kx_extraction::{Archive, Checksum, ConflictPolicy};
+use p4kx_extraction::{Archive, Checksum, ConflictPolicy, SourceUses};
 use p4kx_testkit::{
     ArchiveBuilder, TestAtl, TestBank, TestCodec, TestEntry, TestHircObject, TestWem, test_signal,
     wwise_short_id,
@@ -73,14 +74,53 @@ fn export_mix(first: (&str, Vec<u8>, u8), second: (&str, Vec<u8>, u8)) -> TestRe
     let out = tempfile::tempdir()?;
     let triggers: Vec<&TriggerSounds<'_>> = vec![&sounds];
 
-    let report = audio.export_sounds(&triggers, out.path(), OPTIONS)?;
+    let (report, _) = audio.export_sounds_watched_with_report_origins(
+        &triggers,
+        out.path(),
+        OPTIONS,
+        &ExportWatch::default(),
+        ExportReportCapture::FileSizes,
+    )?;
     let [sound] = report.sounds.as_slice() else {
         return Err("one file for the WEM".into());
     };
+    assert_reported_selection(sound, &archive, full_in_second)?;
     assert_eq!(sound.format, SoundFormat::Wav, "the full copy converts");
     assert_eq!(sound.unconverted, None, "nothing is left unconverted");
     assert!(report.failures.is_empty(), "{:?}", report.failures);
     assert_bound_pcm(sound, &expected, full_in_second)
+}
+
+fn assert_reported_selection(
+    sound: &ExportedSound,
+    archive: &Archive,
+    full_in_second: bool,
+) -> TestResult {
+    assert_eq!(
+        sound.selection.trigger_ordinal, 0,
+        "the only trigger plans the file"
+    );
+    assert_eq!(
+        sound.selection.variant_ordinal, 0,
+        "the first route plans the file"
+    );
+    assert_eq!(
+        sound.selection.media_variant_ordinal,
+        usize::from(full_in_second),
+        "the full WEM has its own input ordinal"
+    );
+    let uses = SourceUses::new();
+    let size = sound.written_size_origin(archive, &uses)?;
+    assert_eq!(
+        size.contains_encrypted_source(),
+        Some(full_in_second),
+        "only the donor supplies the measured size"
+    );
+    assert!(
+        size.source_set_complete(),
+        "the written size cites the complete donor inputs"
+    );
+    Ok(())
 }
 
 fn assert_bound_pcm(sound: &ExportedSound, expected: &[u8], encrypted: bool) -> TestResult {

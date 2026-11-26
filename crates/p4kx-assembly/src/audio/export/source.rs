@@ -76,22 +76,27 @@ impl<'archive> Candidate<'archive> {
     }
 }
 
+pub(super) struct SelectedMedia {
+    pub(super) source: WemExportSource,
+    pub(super) donor_ordinal: Option<usize>,
+}
+
 pub(in crate::audio) struct ResolvedMedia<'archive> {
-    whole: HashMap<u32, Vec<Candidate<'archive>>>,
+    whole: HashMap<u32, Vec<(usize, Candidate<'archive>)>>,
 }
 
 impl<'archive> ResolvedMedia<'archive> {
     pub(in crate::audio) fn new(variants: &[SoundVariant<'archive>]) -> Self {
-        let mut whole: HashMap<u32, Vec<Candidate<'archive>>> = HashMap::new();
+        let mut whole = HashMap::<_, Vec<_>>::new();
         let mut checked = HashSet::new();
-        for variant in variants {
+        for (ordinal, variant) in variants.iter().enumerate() {
             let Some((id, candidate)) = variant.wem_id().and_then(|id| {
                 Candidate::for_variant(variant, id).map(|candidate| (id, candidate))
             }) else {
                 continue;
             };
             if !candidate.prefetch && checked.insert((id, candidate.source)) {
-                whole.entry(id).or_default().push(candidate);
+                whole.entry(id).or_default().push((ordinal, candidate));
             }
         }
         Self { whole }
@@ -102,26 +107,45 @@ impl<'archive> ResolvedMedia<'archive> {
         variant: &SoundVariant<'archive>,
         id: u32,
     ) -> Option<WemExportSource> {
-        let candidate = Candidate::for_variant(variant, id)?;
-        if candidate.prefetch
-            && let Some(whole) = self.unique_whole(id, candidate.language)
-        {
-            return Some(whole);
-        }
-        Some(candidate.source)
+        self.select(variant, id).map(|selected| selected.source)
     }
 
-    fn unique_whole(&self, id: u32, language: Option<&str>) -> Option<WemExportSource> {
-        let mut matching =
-            self.whole
-                .get(&id)?
-                .iter()
-                .filter(|candidate| match (language, candidate.language) {
-                    (Some(first), Some(second)) => first.eq_ignore_ascii_case(second),
-                    (None, None) => true,
-                    _ => false,
-                });
+    pub(super) fn select(
+        &self,
+        variant: &SoundVariant<'archive>,
+        id: u32,
+    ) -> Option<SelectedMedia> {
+        let candidate = Candidate::for_variant(variant, id)?;
+        let selected = if candidate.prefetch {
+            self.unique_whole(id, candidate.language)
+        } else {
+            None
+        };
+        Some(selected.map_or(
+            SelectedMedia {
+                source: candidate.source,
+                donor_ordinal: None,
+            },
+            |(ordinal, whole)| SelectedMedia {
+                source: whole.source,
+                donor_ordinal: Some(*ordinal),
+            },
+        ))
+    }
+
+    fn unique_whole(
+        &self,
+        id: u32,
+        language: Option<&str>,
+    ) -> Option<&(usize, Candidate<'archive>)> {
+        let mut matching = self.whole.get(&id)?.iter().filter(|(_, candidate)| {
+            match (language, candidate.language) {
+                (Some(first), Some(second)) => first.eq_ignore_ascii_case(second),
+                (None, None) => true,
+                _ => false,
+            }
+        });
         let found = matching.next()?;
-        matching.next().is_none().then_some(found.source)
+        matching.next().is_none().then_some(found)
     }
 }

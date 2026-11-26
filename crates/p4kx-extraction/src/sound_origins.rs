@@ -9,11 +9,11 @@ use p4kx_audio::Wem;
 use crate::origin_companion::write_selected_origin_companion;
 use crate::{
     FieldOrigin, FieldOrigins, FieldPath, OriginArtifactBinding, OriginOutputAddress,
-    SourceEvidenceError, SourceInventory, SourceInventorySelection, SourceUse, SourceUseRole,
-    SourceUses,
+    SourceEvidenceError, SourceInput, SourceInventory, SourceInventorySelection, SourceUse,
+    SourceUseRole, SourceUses,
 };
 
-use super::{WemOriginField, WemOriginPlan};
+use super::{WemOriginField, WemOriginPlan, WemWrittenSizeOrigin};
 
 #[path = "sound_origin_input.rs"]
 mod input;
@@ -53,6 +53,35 @@ impl SoundOrigins {
         )
     }
 
+    pub(super) fn written_size_origin(
+        &self,
+        input: Option<SoundOriginInput<'_>>,
+    ) -> Result<Option<WemWrittenSizeOrigin>, SourceEvidenceError> {
+        let entry = match input.map(SoundOriginInput::source) {
+            Some(SourceInput::ArchiveView(entry)) => entry.binding(),
+            Some(SourceInput::Archive(entry)) => entry.binding(),
+            _ => return Ok(None),
+        };
+        let origin = self
+            .summary
+            .iter()
+            .find_map(|(path, origin)| (path.as_str() == "/size").then_some(origin))
+            .or_else(|| {
+                self.fields.iter().find_map(|(address, origin)| {
+                    matches!(address, OriginOutputAddress::OpaquePayload).then_some(origin)
+                })
+            });
+        let Some(origin) = origin else {
+            return Ok(None);
+        };
+        let selected = self.inventory.select_uses(origin.source_uses_refs())?;
+        Ok(WemWrittenSizeOrigin::capture(
+            entry,
+            &selected,
+            origin.source_set_complete(),
+        ))
+    }
+
     pub(crate) fn write(
         &self,
         writer: &mut dyn Write,
@@ -83,7 +112,7 @@ pub(crate) fn capture_raw_sound(
 ) -> io::Result<SoundOrigins> {
     let uses = SourceUses::new();
     let origin = match input {
-        Some(input) if !matches!(input.source(), crate::SourceInput::Unknown) => {
+        Some(input) if !matches!(input.source(), SourceInput::Unknown) => {
             SoundPayload::observe(input, &uses)?.raw_origin(&uses, input.source(), length)?
         }
         _ => uses.origin(&[], false),

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use anyhow::{Result, ensure};
+use anyhow::{Context, Result, ensure};
 use p4kx_assembly::audio::{
-    AudioIndex, AudioSurveyKind, AudioSurveyProof, EntityAudio, EntityTrigger, LanguageChoice,
-    PositionedTriggerReference, TriggerOccurrence, TriggerReference, TriggerScope, TriggerSounds,
-    Unmatched, positioned_trigger_references_in, trigger_references,
+    AudioIndex, AudioSurveyKind, AudioSurveyProof, EntityAudio, EntityTrigger, ExportReport,
+    LanguageChoice, PositionedTriggerReference, TriggerOccurrence, TriggerReference, TriggerScope,
+    TriggerSounds, Unmatched, positioned_trigger_references_in, trigger_references,
 };
 use p4kx_extraction::{
     Archive, DataForgeOrigin, FieldOrigin, FieldOrigins, FieldPath, InputScope, Record,
@@ -14,7 +14,8 @@ use p4kx_extraction::{
 };
 use serde::Serialize;
 
-use crate::wwise_json;
+use crate::cli_wwise::SoundExportArgs;
+use crate::wwise_json::{self, FileTrigger};
 
 #[path = "entity_audio_event_origins.rs"]
 mod event_origins;
@@ -69,7 +70,10 @@ pub(super) struct Evidence {
     provenance: SourceInventory,
 }
 
-pub(super) fn capture(input: &Input<'_, '_>) -> Result<Evidence> {
+pub(super) fn capture(
+    input: &Input<'_, '_>,
+    export: Option<(&ExportReport, &SoundExportArgs)>,
+) -> Result<Evidence> {
     let mut output = Output::new(input.original)?;
     let record = header_origins::write(&mut output, input)?;
     let surveys = Surveys::capture(input, &output)?;
@@ -97,6 +101,9 @@ pub(super) fn capture(input: &Input<'_, '_>) -> Result<Evidence> {
     }
     output.counts(&record, &rows)?;
     header_origins::issues(&mut output, input.archive, input.index)?;
+    if let Some((report, args)) = export {
+        output.files(input, report, args)?;
+    }
     Ok(Evidence {
         fields: output.fields,
         provenance: output.uses.freeze()?,
@@ -194,6 +201,40 @@ impl Output {
             count: references,
             status: selected.status,
         })
+    }
+
+    fn files(
+        &mut self,
+        input: &Input<'_, '_>,
+        report: &ExportReport,
+        args: &SoundExportArgs,
+    ) -> Result<()> {
+        let mut triggers = Vec::new();
+        for (ordinal, sounds) in input.sounds.iter().enumerate() {
+            let Some(sounds) = sounds else { continue };
+            let location = FieldPath::parse(&format!("/triggers/{ordinal}/location"))?;
+            let selector = self
+                .fields
+                .get(&location)
+                .context("audio trigger was not projected")?;
+            triggers.push(FileTrigger {
+                sounds,
+                selector: Some(selector),
+            });
+        }
+        let mut files = FieldOrigins::new();
+        wwise_json::capture_files(
+            &mut files,
+            (input.archive, input.index, &self.uses),
+            &FieldPath::parse("/extraction")?,
+            report,
+            &triggers,
+            args,
+        )?;
+        for (path, origin) in files.iter() {
+            self.fields.insert(path.clone(), origin.clone())?;
+        }
+        Ok(())
     }
 
     fn occurrence(

@@ -1067,6 +1067,10 @@ The extract JSON report also includes `fieldOrigins` and `provenance` for its tr
 language selection, broken-link count and index issues. The trigger event ID cites the
 original event name used in its calculation. The broken-link count cites the observed
 resolution routes, including successful routes when the count is zero.
+Each `/files/{row}/trigger` and `/files/{row}/wem_id` cites the original route selected by
+the export plan. The measured `size` cites the original WEM input used by the successful
+write, including a full donor WEM when it replaces a prefetch. The original size source is
+unknown for retained files. The same fields appear under `/extraction/files` in entity audio.
 `failures` lists the sounds that got no file: source plug-ins and external sources (`wem_id` null),
 WEMs no soundbank or loose Entry holds, and sounds whose absolute file path exceeds the limit of
 ADR-0248 (260 UTF-16 units for the file, 248 for its folder), each with its reason; the other

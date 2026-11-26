@@ -16,8 +16,8 @@ use crate::{
 };
 
 use super::{
-    OggWrite, SoundEncodeError, SoundOriginInput, SoundOrigins, WavWrite, capture_ogg,
-    capture_raw_sound, capture_wav,
+    OggWrite, SoundEncodeError, SoundOriginInput, SoundOrigins, WavWrite, WemWrittenSizeOrigin,
+    capture_ogg, capture_raw_sound, capture_wav,
 };
 
 /// The representation to publish for an already-read WEM.
@@ -39,6 +39,7 @@ pub struct WemOutputTarget<'a> {
     policy: ConflictPolicy,
     protection: Option<&'a ArchiveWriteProtection>,
     cancel: &'a CancelToken,
+    report_origins: bool,
 }
 
 impl<'a> WemOutputTarget<'a> {
@@ -55,7 +56,15 @@ impl<'a> WemOutputTarget<'a> {
             policy,
             protection,
             cancel,
+            report_origins: false,
         }
+    }
+
+    /// Retains the original contributors to the measured byte length of a newly written file.
+    #[must_use]
+    pub const fn with_report_origins(mut self) -> Self {
+        self.report_origins = true;
+        self
     }
 }
 
@@ -69,6 +78,8 @@ pub struct WemOutputPublication {
     pub origin_receipt: Option<PathBuf>,
     /// A failure after the artifact was committed.
     pub receipt_failure: Option<ConversionError>,
+    /// The retained inputs of the byte count when this operation committed the file.
+    pub size_origin: Option<WemWrittenSizeOrigin>,
 }
 
 impl WemOutputPublication {
@@ -80,6 +91,7 @@ impl WemOutputPublication {
             },
             origin_receipt: None,
             receipt_failure: None,
+            size_origin: None,
         }
     }
 }
@@ -119,6 +131,13 @@ fn publish_encoded(
     let origins = written
         .capture(source)
         .map_err(|source| write_error(&companion, source))?;
+    let size_origin = if target.report_origins {
+        origins
+            .written_size_origin(source)
+            .map_err(|source| write_error(&companion, io::Error::other(source)))?
+    } else {
+        None
+    };
     let receipt = FileReceipt::for_native_staged_replacement(
         target.path,
         target.protection,
@@ -150,7 +169,8 @@ fn publish_encoded(
         }) => Ok(StageDisposition::Moved(finish_publication(
             staged,
             companion,
-            len,
+            Replaced { len, changed: true },
+            size_origin,
             (receipt, retirement),
             target,
         ))),
@@ -160,7 +180,8 @@ fn publish_encoded(
 fn finish_publication(
     staged: &StagedOutput<'_>,
     companion: PathBuf,
-    len: u64,
+    artifact: Replaced,
+    size_origin: Option<WemWrittenSizeOrigin>,
     (receipt, retirement): (Option<io::Result<()>>, io::Result<()>),
     target: &WemOutputTarget<'_>,
 ) -> WemOutputPublication {
@@ -178,9 +199,10 @@ fn finish_publication(
         publication
     };
     WemOutputPublication {
-        artifact: Replaced { len, changed: true },
+        artifact,
         origin_receipt: published.then_some(companion),
         receipt_failure: publication.err(),
+        size_origin,
     }
 }
 

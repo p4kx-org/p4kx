@@ -17,7 +17,7 @@ use serde_json::Value;
 
 #[path = "wwise_extract_publication.rs"]
 mod publication;
-use publication::assert_sound_receipt;
+use publication::{assert_sound_receipt, check_size_origin};
 #[path = "wwise_extract_resolution_limits.rs"]
 mod resolution_limits;
 #[path = "wwise_txtp_approximation.rs"]
@@ -104,6 +104,7 @@ fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
         "TEST_Ship",
         "libs/foundry/records/entities/spaceships/test_ship.xml",
     )
+    .audio_trigger("A_Undefined_Ship")
     .audio_trigger("Play_Single")
     .audio_trigger("play_single_copy");
     let twin = TestEntity::new(
@@ -125,8 +126,8 @@ fn write_archive(dir: &Path) -> Result<PathBuf, Box<dyn Error>> {
         .trigger("PLAY_SINGLE_COPY", &["Play_Single"])
         .trigger("..\\Evil:x", &["Play_Single"]);
     let path = dir.join("Data.p4k");
-    ArchiveBuilder::new()
-        .entry(TestEntry::zstd("Data\\Game2.dcb", database.build()))
+    ArchiveBuilder::v2()
+        .entry(TestEntry::zstd("Data\\Game2.dcb", database.build()).encrypted())
         .entry(TestEntry::zstd(
             "Data\\Libs\\GameAudio\\SC_Audio.xml",
             definitions.to_cryxml(),
@@ -260,11 +261,39 @@ fn entity_audio_extracts_every_trigger_with_distinct_names() -> TestResult {
     assert_eq!(output.status.code(), Some(0), "exit code: {output:?}");
     let report: Value = serde_json::from_slice(&output.stdout)?;
     assert_eq!(count(&report["extraction"], "written"), Some(2));
-    for file in report["extraction"]["files"]
+    assert_eq!(
+        report.pointer("/triggers/0/name").and_then(Value::as_str),
+        Some("A_Undefined_Ship"),
+        "the unmatched trigger is present before the two exportable matches"
+    );
+    assert!(
+        report
+            .pointer("/triggers/0/unmatched")
+            .is_some_and(Value::is_object),
+        "the first Entity trigger does not enter the export plan"
+    );
+    let origins = report.get("fieldOrigins").ok_or("entity audio origins")?;
+    for (ordinal, file) in report["extraction"]["files"]
         .as_array()
         .ok_or("entity sound files")?
+        .iter()
+        .enumerate()
     {
         assert_sound_receipt(file, "opaquePayload")?;
+        let path = format!("/extraction/files/{ordinal}");
+        check_size_origin(
+            &report,
+            &format!("{path}/size"),
+            "Data\\Sounds\\wwise\\Test.bnk",
+        )?;
+        let name = origins
+            .get(format!("{path}/trigger"))
+            .ok_or("entity audio trigger origin")?;
+        assert_eq!(
+            name.get("containsEncryptedSource").and_then(Value::as_bool),
+            Some(true),
+            "the original encrypted Entity selection is used after the unmatched trigger"
+        );
     }
     assert_eq!(
         names(&fixture.out)?,

@@ -242,6 +242,11 @@ member's DIDX and DATA ranges. Trigger names and their resolved paths have separ
 source evidence. The result names the newly published companion
 and leaves kept files and their existing companions in place.
 
+The CLI file reports use `fieldOrigins` for trigger selection, WEM identity and
+measured file size. The size cites the bytes used by the completed write, even
+when the companion could not be published. A kept file has an unknown original
+size source. Its planned trigger and WEM still describe the attempted export.
+
 ## Unchanged files in extraction
 
 The Extraction report's `raw_artifacts` entries give the relative file path,

@@ -135,7 +135,7 @@ pub(crate) fn run(args: &EntityAudioArgs, as_json: bool) -> Result<ExitCode> {
     });
     let sounds = resolve_sounds(&audio, &resolved, &choice, options)?;
     let counts = Counts::of(&resolved);
-    let report = export_sounds(&audio, &sounds, args, &cancel)?;
+    let report = export_sounds(&audio, &sounds, args, &cancel, as_json)?;
     let code = report
         .as_ref()
         .map_or(ExitCode::SUCCESS, wwise_extract::exit_code);
@@ -207,6 +207,7 @@ fn export_sounds(
     sounds: &[Option<TriggerSounds<'_>>],
     args: &EntityAudioArgs,
     cancel: &CancelToken,
+    capture_report: bool,
 ) -> Result<Option<ExportReport>> {
     let Some(out) = &args.extract else {
         return Ok(None);
@@ -218,6 +219,7 @@ fn export_sounds(
         out,
         &args.export,
         cancel,
+        capture_report,
     )?))
 }
 

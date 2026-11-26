@@ -8,7 +8,9 @@ use std::path::{Path, PathBuf};
 
 use p4kx_archive::ObservedEntry;
 use p4kx_audio::{Codec, Soundbank, Wem};
-use p4kx_extraction::sound::{SoundOriginInput, WemOutput, WemOutputTarget, publish_wem_output};
+use p4kx_extraction::sound::{
+    SoundOriginInput, WemOutput, WemOutputTarget, WemWrittenSizeOrigin, publish_wem_output,
+};
 use p4kx_extraction::{
     ArchiveWriteProtection, ConflictPolicy, ConversionError, MAX_SOUND_LEN, check_path_length,
 };
@@ -41,9 +43,11 @@ pub(super) struct Target<'a> {
     pub(super) absolute: &'a Path,
     /// Immutable source evidence retained by this Archive job.
     pub(super) protection: &'a ArchiveWriteProtection,
+    /// Whether to retain the original contributors to measured byte lengths.
+    pub(super) report_origins: bool,
 }
 
-impl Target<'_> {
+impl<'archive> Target<'archive> {
     /// Returns the path the sound of `job` is written to in `format`, or the failure when that
     /// path exceeds the limit of ADR-0248.
     fn file(self, job: &Job, format: SoundFormat) -> Result<PathBuf, ExportFailure> {
@@ -51,6 +55,24 @@ impl Target<'_> {
         check_path_length(&self.absolute.join(&name))
             .map_err(|limit| failure(job, format!("{name}: {limit}")))?;
         Ok(self.folder.join(name))
+    }
+
+    const fn sound_target<'path>(
+        self,
+        path: &'path Path,
+        policy: ConflictPolicy,
+        watch: &'path ExportWatch,
+    ) -> WemOutputTarget<'path>
+    where
+        'archive: 'path,
+    {
+        let target =
+            WemOutputTarget::new(path, policy, Some(self.protection), watch.cancel_token());
+        if self.report_origins {
+            target.with_report_origins()
+        } else {
+            target
+        }
     }
 }
 
@@ -132,10 +154,10 @@ fn run_group(
         },
         SourceEntry::Loose(_) => None,
     };
-    let binding = match capture {
-        CaptureOrigins::Omit => None,
-        CaptureOrigins::Retain => observed.as_ref().map(ObservedEntry::binding),
-    };
+    let binding = observed
+        .as_ref()
+        .filter(|_| capture.loops)
+        .map(ObservedEntry::binding);
     let input = GroupInput {
         bytes: &bytes,
         bank: bank.as_ref(),
@@ -194,6 +216,7 @@ struct Emitted {
     state: ExportState,
     origin_receipt: Option<PathBuf>,
     receipt_failure: Option<String>,
+    size_origin: Option<WemWrittenSizeOrigin>,
 }
 
 impl Emitted {
@@ -203,6 +226,7 @@ impl Emitted {
             state: ExportState::Kept,
             origin_receipt: None,
             receipt_failure: None,
+            size_origin: None,
         }
     }
 }
@@ -244,6 +268,7 @@ fn write_sound(
                 trigger: job.trigger.clone(),
                 wem_id: job.wem_id,
                 source: job.source,
+                selection: job.selection,
                 path: path.clone(),
                 origin_receipt: emitted.origin_receipt,
                 origin_receipt_failure: emitted.receipt_failure,
@@ -254,6 +279,7 @@ fn write_sound(
                     .filter(|_| format == SoundFormat::Raw && options.format != SoundFormat::Raw),
                 loop_points,
                 prefetch_only: input.prefetch,
+                size_origin: emitted.size_origin,
             },
             origin: if emitted.state == ExportState::Written {
                 input.origin(job.wem_id, wem.as_ref())
@@ -271,9 +297,8 @@ fn write_sound(
             wem.as_ref(),
             input.bytes,
             input.observed_source(),
-            &path,
-            Some(target.protection),
-            (job, options, watch),
+            target.sound_target(&path, options.policy, watch),
+            job,
         ) {
             Ok(emitted) => return Some(Ok(sound(emitted, note))),
             Err(
@@ -306,16 +331,14 @@ fn emit(
     wem: Option<&Wem<&[u8]>>,
     bytes: &[u8],
     source: Option<SoundOriginInput<'_>>,
-    path: &Path,
-    protection: Option<&ArchiveWriteProtection>,
-    (job, options, watch): (&Job, ExportOptions, &ExportWatch),
+    target: WemOutputTarget<'_>,
+    job: &Job,
 ) -> Result<Emitted, ConversionError> {
     let output = match (format, wem) {
         (SoundFormat::Ogg, Some(wem)) => WemOutput::Ogg(wem),
         (SoundFormat::Wav, Some(wem)) => WemOutput::Wav(wem),
         _ => WemOutput::Raw(bytes),
     };
-    let target = WemOutputTarget::new(path, options.policy, protection, &watch.token);
     let published = publish_wem_output(output, source, target, || {
         format!("{} WEM {}", job.trigger, job.wem_id)
     })?;
@@ -328,6 +351,7 @@ fn emit(
         },
         origin_receipt: published.origin_receipt,
         receipt_failure: published.receipt_failure.as_ref().map(chain_text),
+        size_origin: published.size_origin,
     })
 }
 

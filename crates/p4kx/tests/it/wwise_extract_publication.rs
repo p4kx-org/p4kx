@@ -131,6 +131,20 @@ fn extract_json_distinguishes_encrypted_trigger_from_plain_waveform() -> TestRes
     );
     assert_eq!(count(&report, "written"), Some(1), "one waveform committed");
     check_trigger_origin(&report, &xml)?;
+    let fields = report.get("fieldOrigins").ok_or("file report origins")?;
+    for field in ["/files/0/trigger", "/files/0/wem_id"] {
+        let origin = fields.get(field).ok_or("file selection origin")?;
+        assert_eq!(
+            origin.get("containsEncryptedSource"),
+            Some(&json!(true)),
+            "{field} retains the encrypted trigger selection"
+        );
+    }
+    check_size_origin(
+        &report,
+        "/files/0/size",
+        &format!("Data\\Sounds\\wwise\\Media\\{MEDIA}.wem"),
+    )?;
 
     let file = report.pointer("/files/0").ok_or("reported waveform")?;
     let rows = sound_receipt(file)?;
@@ -157,6 +171,56 @@ fn extract_json_distinguishes_encrypted_trigger_from_plain_waveform() -> TestRes
         }),
         "the clear loose WEM is the waveform sample source"
     );
+    Ok(())
+}
+
+pub(super) fn check_size_origin(report: &Value, field: &str, path: &str) -> TestResult {
+    let origin = report
+        .get("fieldOrigins")
+        .and_then(|fields| fields.get(field))
+        .ok_or("written size origin")?;
+    assert_eq!(
+        origin.get("containsEncryptedSource"),
+        Some(&json!(false)),
+        "{field} uses the clear WEM"
+    );
+    assert_eq!(
+        origin.get("sourceSetComplete"),
+        Some(&json!(true)),
+        "the written size contributor set is complete"
+    );
+    let references = origin
+        .get("sourceUsesRefs")
+        .and_then(Value::as_array)
+        .ok_or("size uses")?;
+    assert!(
+        !references.is_empty(),
+        "the written size cites original inputs"
+    );
+    let inventory = report
+        .pointer("/provenance/uses")
+        .and_then(Value::as_array)
+        .ok_or("use inventory")?;
+    let sources = report
+        .pointer("/provenance/sources")
+        .and_then(Value::as_array)
+        .ok_or("source inventory")?;
+    for reference in references {
+        let used = inventory
+            .iter()
+            .find(|used| used.get("id") == Some(reference))
+            .ok_or("size source use")?;
+        let id = used.get("source").ok_or("size physical source")?;
+        let source = sources
+            .iter()
+            .find(|source| source.get("id") == Some(id))
+            .ok_or("actual size source")?;
+        assert_eq!(
+            source.pointer("/path/value").and_then(Value::as_str),
+            Some(path),
+            "the byte length uses the observed WEM, even when the trigger is encrypted"
+        );
+    }
     Ok(())
 }
 
@@ -291,6 +355,26 @@ fn conflict_policies_decide_about_existing_files() -> TestResult {
     fs::write(&target, b"old")?;
     let skipped = extract(&fixture, "Play_Single", &[], 0)?;
     assert_eq!(count(&skipped, "kept"), Some(1));
+    assert_eq!(count(&skipped["files"][0], "size"), Some(3));
+    let size = skipped
+        .get("fieldOrigins")
+        .and_then(|fields| fields.get("/files/0/size"))
+        .ok_or("kept size origin")?;
+    assert_eq!(
+        size.get("containsEncryptedSource"),
+        Some(&Value::Null),
+        "the incumbent has unknown origin"
+    );
+    assert_eq!(
+        size.get("sourceSetComplete"),
+        Some(&json!(false)),
+        "the incumbent source set is incomplete"
+    );
+    assert_eq!(
+        size.get("sourceUsesRefs"),
+        Some(&json!([])),
+        "the incumbent does not inherit the attempted WEM use"
+    );
     assert_eq!(
         skipped["files"][0].get("origin_receipt"),
         Some(&Value::Null)
