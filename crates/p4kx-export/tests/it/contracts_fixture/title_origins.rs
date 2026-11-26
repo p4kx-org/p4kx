@@ -72,8 +72,8 @@ fn description_fallback_uses_the_actual_broker_description_site() -> TestResult 
     let german = translation(description, Language::German)?;
     assert_eq!(
         assertions::at(english, "/value")?,
-        "Verify\nData",
-        "the actual description normalization"
+        "Verify <EM4>Child ready</EM4>\n<EM4>ready</EM4>",
+        "the expanded description keeps the authored emphasis and token order"
     );
     assert_eq!(
         assertions::at(german, "/value")?,
@@ -86,7 +86,7 @@ fn description_fallback_uses_the_actual_broker_description_site() -> TestResult 
         &catalog,
         english,
         Language::English,
-        &[original.description],
+        &[original.description, original.child_piece, original.nested],
     )?;
     lookup_payloads(&catalog, german, Language::German, &[original.description])?;
     for cell in [english, german] {

@@ -5,8 +5,10 @@
 
 use std::error::Error;
 
-use p4kx_comparison::{DataForge, SchemaChangeKind, SchemaDiff, compare_schema};
-use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct, TestType, TestValue};
+use p4kx_comparison::{
+    DataForge, PropertyChange, SchemaChangeKind, SchemaDiff, SideCounts, compare_schema,
+};
+use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
 
 type TestResult = Result<(), Box<dyn Error>>;
 
@@ -23,8 +25,7 @@ fn record(guid: u128, type_name: &str) -> TestRecord {
 }
 
 fn wheels(old: bool) -> DataForgeBuilder {
-    let wheel =
-        |name: &str| TestValue::Struct(p4kx_testkit::TestInstance::new("Wheel").named(name));
+    let wheel = |name: &str| TestValue::Struct(TestInstance::new("Wheel").named(name));
     let car = TestStruct::new("Car").array("wheels", TestType::StrongPointer("Wheel".to_owned()));
     let wheel_struct = if old {
         TestStruct::new("Wheel").field("grip", TestType::Int32)
@@ -57,6 +58,122 @@ fn a_struct_that_only_strong_pointers_hold_has_no_records() -> TestResult {
         (0, 0),
         "three instances of Wheel, but none is a Record"
     );
+    assert_eq!(
+        wheel.mapped_instances,
+        Some(SideCounts { old: 3, new: 3 }),
+        "pointer targets still contribute to the direct mapping count"
+    );
+    Ok(())
+}
+
+fn traversal_types(include_nested: bool) -> DataForgeBuilder {
+    let builder = DataForgeBuilder::new()
+        .structure(TestStruct::new("Route").field("enabled", TestType::Bool))
+        .structure(TestStruct::new("Waypoint").field("weight", TestType::Int32))
+        .structure(
+            TestStruct::new("Panel").field("target", TestType::StrongPointer("Route".to_owned())),
+        );
+    let panel = record(1, "Panel");
+    if include_nested {
+        builder
+            .structure(
+                TestStruct::new("TraversalRoute")
+                    .parent("Route")
+                    .field("targetPath", TestType::WeakPointer("Waypoint".to_owned()))
+                    .field("nextTarget", TestType::StrongPointer("Route".to_owned())),
+            )
+            .structure(TestStruct::new("UnusedRange").parent("Route"))
+            .record(panel.value(
+                "target",
+                TestValue::Struct(TestInstance::new("TraversalRoute")),
+            ))
+    } else {
+        builder.record(panel)
+    }
+}
+
+#[test]
+fn an_added_or_removed_nested_struct_reports_its_own_declarations() -> TestResult {
+    let earlier = traversal_types(false);
+    let later = traversal_types(true);
+    for (diff, kind, instances) in [
+        (
+            diff(&earlier, &later)?,
+            SchemaChangeKind::Added,
+            SideCounts { old: 0, new: 1 },
+        ),
+        (
+            diff(&later, &earlier)?,
+            SchemaChangeKind::Removed,
+            SideCounts { old: 1, new: 0 },
+        ),
+    ] {
+        let [traversal, unused] = diff.structs.as_slice() else {
+            return Err("two one-sided structures".into());
+        };
+        assert_eq!(traversal.name, "TraversalRoute", "canonical struct order");
+        assert_eq!(traversal.change, kind, "one-sided struct change");
+        assert_eq!(
+            traversal.records,
+            SideCounts::default(),
+            "no GUID-addressed Record"
+        );
+        assert_eq!(
+            traversal.mapped_instances,
+            Some(instances),
+            "one nested mapped instance"
+        );
+        assert_eq!(unused.name, "UnusedRange", "empty derived declaration");
+        assert!(
+            unused.properties.is_empty(),
+            "inherited properties stay excluded"
+        );
+        assert_eq!(
+            unused.mapped_instances,
+            Some(SideCounts::default()),
+            "the empty mapping count is explicit"
+        );
+        check_declarations(&traversal.properties, kind)?;
+        let counts = diff.counts.properties;
+        let (added, removed) = if kind == SchemaChangeKind::Added {
+            (2, 0)
+        } else {
+            (0, 2)
+        };
+        assert_eq!(
+            (counts.added, counts.removed, counts.changed),
+            (added, removed, 0),
+            "only actual declarations count"
+        );
+    }
+    Ok(())
+}
+
+fn check_declarations(properties: &[PropertyChange], kind: SchemaChangeKind) -> TestResult {
+    let [next, target] = properties else {
+        return Err("two directly declared properties".into());
+    };
+    for (property, name, data_type, reference) in [
+        (next, "nextTarget", "StrongPointer", "Route"),
+        (target, "targetPath", "WeakPointer", "Waypoint"),
+    ] {
+        assert_eq!(property.name, name, "property order by name");
+        assert_eq!(property.change, kind, "one-sided property change");
+        assert!(
+            property.aspects.is_empty(),
+            "no shared property shape to compare"
+        );
+        let (present, absent) = if kind == SchemaChangeKind::Added {
+            (&property.new, &property.old)
+        } else {
+            (&property.old, &property.new)
+        };
+        assert!(absent.is_none(), "no declaration on the other side");
+        let shape = present.as_ref().ok_or("original property shape")?;
+        assert_eq!(shape.data_type, data_type, "original pointer kind");
+        assert_eq!(shape.conversion, 0, "scalar pointer");
+        assert_eq!(shape.target.as_deref(), Some(reference), "original target");
+    }
     Ok(())
 }
 

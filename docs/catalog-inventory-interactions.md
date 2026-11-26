@@ -2,7 +2,8 @@
 
 `configurations.interactions` contains one row for each selected physical
 `SEntityInteractableParams`, `SInteractionStateMachineParams` or
-`KioskInteractionEntityComponentParams` component. Its owner is identified by Record GUID,
+`KioskInteractionEntityComponentParams` or `SEntityComponentCarryableParams` component.
+Its owner is identified by Record GUID,
 physical Record index and component ordinal. Repeated declarations keep their original positions.
 
 An `interactable` row retains its ordered shared declarations, interaction points, three task
@@ -31,6 +32,13 @@ stored `false`, original Components position and payload provenance returned
 by the SDK. Peak private commit was 1,115,238,400 bytes, and peak working set
 was 1,034,334,208 bytes. Generic DataForge inspection covers Kiosk components
 outside the Catalog's normal Entity selection.
+
+A `carryable` row keeps the original `gripData` class and the ordered `grips` array. Each
+grip preserves its `carryStyleID`, `handGrip` and optional `offHandGrip` helper, and
+`carryParameters` width, height and depth as sourced Single values with original bits.
+The SDK exposes the same row through `with_interactions` and `grip_data()`. Stored empty
+grip arrays and absent or unsupported declarations have separate source states. The authored
+parameters describe carrying, with no unit or pose inferred from their values.
 
 Polymorphic predicates, dispatchers, animated parameters and other modifiers retain their
 concrete source types and raw original members. Additional fields also preserve point

@@ -104,6 +104,7 @@ fn a_changed_schema_prints_its_changes_and_exits_with_code_1() -> TestResult {
         "0 added, 0 removed, 1 changed",
         "Enum options:",
         "1 added, 0 removed, 0 changed",
+        "mapped instances 1 -> 1",
         "+ armor: Bool",
         "~ speed: Int32 -> Single (type)",
         "+ Huge",
@@ -124,6 +125,11 @@ fn the_json_report_lists_the_changes() -> TestResult {
     assert_eq!(report.pointer("/source/old/channel"), Some(&"LIVE".into()));
     assert_eq!(report.pointer("/structs/0/name"), Some(&"Ship".into()));
     assert_eq!(report.pointer("/structs/0/records/old"), Some(&1.into()));
+    assert_eq!(
+        report.pointer("/structs/0/mapped_instances/new"),
+        Some(&1.into()),
+        "the report exposes original physical instance counts"
+    );
     assert_eq!(
         report.pointer("/structs/0/properties/0/name"),
         Some(&"armor".into())

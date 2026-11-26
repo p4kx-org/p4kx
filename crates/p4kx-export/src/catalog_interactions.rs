@@ -18,17 +18,26 @@ use crate::catalog_table::DatasetAvailability;
 use crate::schema_fields::every_field_required;
 use crate::source_fields::FieldError;
 
+#[path = "carryable_grip.rs"]
+mod carryable_grip;
+pub use carryable_grip::{
+    CarryableGrip, CarryableGripContainer, CarryableHandGrip, CarryableParameters,
+};
+
 const INTERACTABLE: &str = "SEntityInteractableParams";
 const STATE_MACHINE: &str = "SInteractionStateMachineParams";
 const KIOSK: &str = "KioskInteractionEntityComponentParams";
 const KIOSK_VR_ALIGNMENT: &str = "supportWalkToAlignInVR";
-pub(crate) const SOURCE_TYPES: &[&str] = &[INTERACTABLE, STATE_MACHINE, KIOSK];
+const CARRYABLE: &str = "SEntityComponentCarryableParams";
+const GRIP_DATA: &str = "gripData";
+pub(crate) const SOURCE_TYPES: &[&str] = &[INTERACTABLE, STATE_MACHINE, KIOSK, CARRYABLE];
 
 #[derive(Clone, Copy)]
 pub(super) enum InteractionKind {
     Interactable,
     StateMachine,
     Kiosk,
+    Carryable,
 }
 
 impl InteractionKind {
@@ -37,6 +46,7 @@ impl InteractionKind {
             INTERACTABLE => Some(Self::Interactable),
             STATE_MACHINE => Some(Self::StateMachine),
             KIOSK => Some(Self::Kiosk),
+            CARRYABLE => Some(Self::Carryable),
             _ => None,
         }
     }
@@ -62,6 +72,9 @@ pub struct InteractionConfiguration<'source> {
     rename_all_fields = "camelCase"
 )]
 enum InteractionFields<'source> {
+    Carryable {
+        grip_data: Box<SourcedValue<CarryableGripContainer<'source>>>,
+    },
     Interactable {
         interactable: Box<SourcedValue<InteractableConfiguration<'source>>>,
     },
@@ -92,7 +105,9 @@ impl<'source> InteractionConfiguration<'source> {
     pub fn interactable(&self) -> Option<&SourcedValue<InteractableConfiguration<'source>>> {
         match &self.fields {
             InteractionFields::Interactable { interactable } => Some(interactable.as_ref()),
-            InteractionFields::StateMachine { .. } | InteractionFields::Kiosk { .. } => None,
+            InteractionFields::StateMachine { .. }
+            | InteractionFields::Kiosk { .. }
+            | InteractionFields::Carryable { .. } => None,
         }
     }
 
@@ -102,7 +117,9 @@ impl<'source> InteractionConfiguration<'source> {
         &self,
     ) -> Option<&SourcedValue<Vec<SourcedValue<InteractionStateType<'source>>>>> {
         match &self.fields {
-            InteractionFields::Interactable { .. } | InteractionFields::Kiosk { .. } => None,
+            InteractionFields::Interactable { .. }
+            | InteractionFields::Kiosk { .. }
+            | InteractionFields::Carryable { .. } => None,
             InteractionFields::StateMachine { state_types } => Some(state_types),
         }
     }
@@ -114,7 +131,20 @@ impl<'source> InteractionConfiguration<'source> {
             InteractionFields::Kiosk {
                 support_walk_to_align_in_vr,
             } => Some(support_walk_to_align_in_vr),
-            InteractionFields::Interactable { .. } | InteractionFields::StateMachine { .. } => None,
+            InteractionFields::Interactable { .. }
+            | InteractionFields::StateMachine { .. }
+            | InteractionFields::Carryable { .. } => None,
+        }
+    }
+
+    /// Borrows the original grip container for a carryable component.
+    #[must_use]
+    pub fn grip_data(&self) -> Option<&SourcedValue<CarryableGripContainer<'source>>> {
+        match &self.fields {
+            InteractionFields::Carryable { grip_data } => Some(grip_data.as_ref()),
+            InteractionFields::Interactable { .. }
+            | InteractionFields::StateMachine { .. }
+            | InteractionFields::Kiosk { .. } => None,
         }
     }
 
@@ -157,6 +187,21 @@ impl<'source> InteractionConfiguration<'source> {
                 (
                     InteractionFields::Kiosk {
                         support_walk_to_align_in_vr,
+                    },
+                    projected,
+                )
+            }
+            InteractionKind::Carryable => {
+                let grip_data = source.declared_class_to(
+                    GRIP_DATA,
+                    carryable_grip::SOURCE_TYPE,
+                    notes,
+                    CarryableGripContainer::read,
+                )?;
+                let projected = (GRIP_DATA, grip_data.state());
+                (
+                    InteractionFields::Carryable {
+                        grip_data: Box::new(grip_data),
                     },
                     projected,
                 )

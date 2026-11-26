@@ -6,6 +6,8 @@ use serde_json::{Value, json};
 use crate::commodity_v3_fixture::{self as common, DcbOrigin, TestResult};
 use crate::health_origin_assertions as proof;
 
+#[path = "catalog_carryable_interactions.rs"]
+mod carryable;
 #[path = "catalog_inventory_interactions_fixture.rs"]
 mod fixture;
 #[path = "catalog_kiosk_interactions.rs"]

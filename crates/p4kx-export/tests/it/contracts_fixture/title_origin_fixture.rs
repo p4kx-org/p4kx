@@ -30,7 +30,8 @@ const TEMPLATE_TITLE: &str = "@template_title";
 
 const ENGLISH_TITLE: &str = "Inspect ~mission(Piece)";
 pub(super) const GERMAN_TITLE: &str = "Pruefen";
-const ENGLISH_DESCRIPTION: &str = r"  Verify\nData  ";
+const ENGLISH_DESCRIPTION: &str =
+    r"  Verify <EM4>~mission(Piece)</EM4>\n<EM4>~mission(Nested)</EM4>  ";
 pub(super) const GERMAN_DESCRIPTION: &str = "Daten";
 
 #[derive(Clone, Copy, Debug)]

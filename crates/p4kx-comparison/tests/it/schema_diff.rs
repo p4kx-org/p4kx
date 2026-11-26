@@ -249,9 +249,9 @@ fn properties_differ_in_type_conversion_and_target() -> TestResult {
         owner.new.as_ref().and_then(|shape| shape.target.as_deref()),
         Some("Part")
     );
-    assert_eq!(diff.counts.properties.added, 2, "extra and Base.id");
-    assert_eq!(diff.counts.properties.removed, 1);
-    assert_eq!(diff.counts.properties.changed, 3);
+    assert_eq!(diff.counts.properties.added, 3, "includes Fresh.flag");
+    assert_eq!(diff.counts.properties.removed, 2, "includes Retired.flag");
+    assert_eq!(diff.counts.properties.changed, 3, "shared properties");
     Ok(())
 }
 
@@ -314,6 +314,11 @@ fn the_report_names_both_sides_and_carries_the_diff() -> TestResult {
     assert_eq!(report.pointer("/structs/0/name"), Some(&"Base".into()));
     assert_eq!(report.pointer("/structs/0/change"), Some(&"changed".into()));
     assert_eq!(report.pointer("/structs/0/records/new"), Some(&4.into()));
+    assert_eq!(
+        report.pointer("/structs/0/mapped_instances/new"),
+        Some(&0.into()),
+        "the base struct has no direct mappings despite its inherited Record count"
+    );
     assert_eq!(
         report.pointer("/enums/2/options/0/name"),
         Some(&"Huge".into())

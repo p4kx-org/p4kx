@@ -86,6 +86,13 @@ fn write_struct(out: &mut impl Write, change: &StructChange) -> io::Result<()> {
         change.records.old,
         change.records.new
     )?;
+    if let Some(instances) = &change.mapped_instances {
+        writeln!(
+            out,
+            "  mapped instances {} -> {}",
+            instances.old, instances.new
+        )?;
+    }
     if let Some(parent) = &change.parent {
         writeln!(
             out,

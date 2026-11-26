@@ -22,6 +22,7 @@ pub(crate) struct StructDef<'f> {
     pub(crate) properties: BTreeMap<&'f str, PropertyShape>,
     pub(crate) enums: Vec<&'f str>,
     pub(crate) records: u64,
+    pub(crate) mapped_instances: u64,
 }
 
 /// An enum with its option names and the Records that carry it.
@@ -130,7 +131,10 @@ impl<'f> SideSchema<'f> {
 }
 
 fn struct_def<'f>(structure: &Struct<'f>, unreadable: &mut u64) -> StructDef<'f> {
-    let mut def = StructDef::default();
+    let mut def = StructDef {
+        mapped_instances: u64::from(structure.instance_count()),
+        ..StructDef::default()
+    };
     if let Some(parent) = structure.parent() {
         match parent.name() {
             Ok(parent) => def.parent = Some(parent),

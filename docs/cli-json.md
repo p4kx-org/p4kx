@@ -3315,11 +3315,12 @@ difference as well.
 |-------|------|---------|
 | `format_version` | number | Version of the report shape, now `1` |
 | `source.old`, `source.new` | object | `archive` (path), `channel` (string or `null`) and `build` (a [Build](#build) or `null`) of each side |
-| `counts` | object | `structs`, `properties`, `enums` and `options`, each with `added`, `removed` and `changed` counts; `properties` counts the property changes of the changed structs and `options` the option changes of the changed enums |
+| `counts` | object | `structs`, `properties`, `enums` and `options`, each with `added`, `removed` and `changed` counts; `properties` counts the property changes in added, removed and changed structs and `options` the option changes of the changed enums |
 | `structs` | array | One object per added, removed or changed struct: `name`, `change` (`added`, `removed` or `changed`), `records`, `parent` and `properties` |
 | `structs[].records` | object | `old` and `new`: the Records on each side whose struct is this struct or inherits from it, `0` on a side that lacks the struct; instances that are no Record, such as the targets of strong pointers, are not counted |
+| `structs[].mapped_instances` | object (optional) | `old` and `new`: DataForge mappings of this exact struct, including nested instances, with `0` for an absent struct. Earlier version 1 reports may omit these counts. |
 | `structs[].parent` | object | `old` and `new` parent struct name (`null` for none); present only when a changed struct inherits from another struct than before |
-| `structs[].properties` | array | The properties the struct declares itself that differ, ordered by name, empty for an added or removed struct: `name`, `change`, `aspects`, and `old` and `new` for the sides that have it |
+| `structs[].properties` | array | The properties the struct declares itself that differ, ordered by name. An added or removed struct lists all of its own declarations: `name`, `change`, `aspects`, and `old` and `new` for the sides that have it |
 | `structs[].properties[].aspects` | array | What differs in a changed property, in this order: `data_type`, `conversion`, `target`; empty for an added or removed property |
 | `structs[].properties[].old`, `.new` | object | `data_type` (e.g. `Reference`, `String`, `Class`; `Unknown(0x…)` for an unknown code), `conversion` (`0` for one value, any other code for an array) and `target` (the struct or enum name, or `null`) |
 | `enums` | array | One object per added, removed or changed enum: `name`, `change`, `records` and `options` |

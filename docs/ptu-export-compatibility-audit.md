@@ -8,6 +8,57 @@ of the current checkout. This report contains technical structures and implement
 only. Game values, text dumps, concrete test-build Record identities, build payloads and
 extracted assets are not included. Public technical issue updates were explicitly authorized.
 
+## PTU 13284307 comparison
+
+The installed manifest identifies change `13284307`, internal version `5.0.202.46035`.
+The retained comparison Archive has no adjacent Build manifest. Its size and modification
+time agree with the previous installed `13273298` receipt. The earlier directory receipts
+also match the retained `Data/Game2.dcb` and English `global.ini` sizes and CRC-32C values.
+The retained and installed Archive stamps stayed stable through the comparison.
+
+| Compared layer | Added | Removed | Changed |
+| --- | ---: | ---: | ---: |
+| Archive directory Entries | 271 | 32 | 1,554 |
+| DataForge Records | 126 | 2 | 256 |
+| DataForge Structs | 2 | 0 | 0 |
+
+Five Records moved. The comparison reports zero unreadable Records and no changed enum
+declarations or properties of existing Structs.
+
+| New DataForge Struct | Original mapped instances | Own declarations |
+| --- | ---: | --- |
+| `GameplayTrigger_TargetType_TraversalTargetPath` | 1 | `targetPath` WeakPointer to `SEntityTraversingTarget`, `nextTarget` StrongPointer to `GameplayTrigger_TargetType_Base` |
+| `LoadoutUnifiedRange` | 0 | Inherits `Range` without own properties |
+
+The traversal instance occurs in an authored target preset of a ship room control panel.
+Both Structs have zero top-level Records. The schema comparison emits own declarations
+when a Struct is added or removed and reports direct mappings as `mapped_instances`.
+[Schema comparison report](cli-json.md#p4kx-compare-old-new---schema---json)
+
+| Area | Source evidence and exporter coverage |
+| --- | --- |
+| Carrying backpacks | Thirteen physical Entity Records change a Single value in each of two `gripData.grips[*].carryParameters.width` fields. The `carryable` Interaction row exposes the ordered grips, style IDs, hand helpers and authored width, height and depth. The selected English name identifies a Palatino backpack. Both original hand helpers change their local transforms, and the worn locator keeps its transform. [Interaction contract](catalog-inventory-interactions.md) |
+| Backpack storage and recovery | Seven existing `InventoryContainer` Records change their exclusion arrays. Two of those Records also change the Z dimension. One container Record was added. The existing storage projection exposes the exclusions and dimensions. The changed recovery policy retains its original ordered type and subtype selectors. [Storage contract](catalog-inventory-storage.md) |
+| Guild ranks | Seven standing Records update their names, Locale keys and the two authored icon paths. The guild scope replaces 50 ordered standing links and adds one. All 14 referenced SVGs are present, and a selected English rank name resolves. The existing reputation reader exposes both icon fields and resolves standings through the scope's authored order. [Reputation SDK](catalog-sdk.md#reputation) |
+| Contracts and text | Eighteen ContractGenerators change. The Nyx location filters, Ling haul item selectors and blueprint reward pools use existing fields. The English localization adds 39 Nyx reward keys in the `BP_MISSIONRWARD_` family. Eighteen bounty and certification description keys expand `<EM4>` emphasis around existing mission tokens without changing the number of tokens per key. The description renderer preserves the authored spans during token replacement. [Contract source](catalog-contract-generators.md) |
+| Mining | The changed ship `MiningGlobalParams` Record updates its existing `absorbableVolumeThreshold` Single value. The Catalog and selective SDK already expose it. The inspected mining declarations provide no fracture highlight color. [Mining SDK](catalog-sdk.md) |
+| Starchitect, ArcCorp and flora | The extraction-unit SOC reader produces an authored scene for the changed container. ArcCorp's parent container gains five Entries and loses one. The changed 600i front container's directory reads successfully and has 35 members, compared with 37 in the retained copy. The inspected member names establish no distinct minimap declaration. Both flora model reads succeed, and the new Archive supplies LOD 0 through 4 for the selected model after removing its LOD 5 files. [Authored SOC scene](soc-scene.md) |
+| Dialogue and audio | Three authored administrator Subsumption activities change. The chosen activity diff and changed `CommunicationConfig` show changes to conversation logic, channel selection and variation rules. The changed `AudioEnvironment` Record supplies an updated `interiorityMinimum`. The original activity XML and both DataForge types are accessible through generic comparison and query tools. |
+
+The Windows AMD64 CLI completed Normal Catalog publications in both origin profiles with
+the same backpack Record filter. Each publication retained exactly 13 Carryable rows and
+matched all 26 changed width fields to the original Single bits. The immediate encryption
+marker agrees with the original unencrypted DataForge Entry. The Full fields' 78 distinct
+reference IDs resolve in the emitted source inventory. An installed Windows AMD64 SDK
+query selected one Palatino owner and verified both profiles against the original grip
+order, styles, helpers and all six authored dimension values. The query took 12.158 s
+with a sampled peak of 964,153,344 private bytes.
+
+The selected Climate, Geology and Ecosystem Entry directories have no changes in the
+directory comparison. The existing climate and geology readers retain authored soil-depth
+and ground-cover fields. The engine's precipitation lighting, cloud reddening, fracture
+highlight, live mission generation and server reputation multiplier require runtime evidence.
+
 ## PTU 13273298 comparison
 
 The installed manifest identifies change `13273298`, internal version `5.0.202.35026`.

@@ -2993,11 +2993,14 @@ Use `equipment::interactions::with_interactions`, its decoded-Entry form or the
 equivalent session methods for the canonical `configurations.interactions` table.
 Select a physical Entity Record index, a GUID with all its admitted occurrences,
 or the entire component family. Each row retains its original Components slot.
-The typed accessors expose interactable declarations, state machines and the
-authored kiosk flag. On kiosk rows, `support_walk_to_align_in_vr()` returns the
-sourced Bool carrier. Its state distinguishes a stored value, a missing field
-and invalid storage. Serialize the row for the complete original component,
-including authored Tag references and additional fields.
+The typed accessors expose interactable declarations, state machines, carryable
+grips and the authored kiosk flag. On kiosk rows, `support_walk_to_align_in_vr()`
+returns the sourced Bool carrier. Its state distinguishes a stored value, a
+missing field and invalid storage. On a carryable row, `grip_data()` retains
+the ordered original grip array, hand helper references and carry dimensions.
+The dimensions retain the authored Single bits. Serialize the row for the
+complete original component, including authored Tag references and additional
+fields. [Interaction contract](catalog-inventory-interactions.md)
 
 Use the snapshot's protected-text lookup for reached display names and keep its
 source inventory with the result. References retain the authored target and

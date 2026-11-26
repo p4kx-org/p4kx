@@ -138,7 +138,7 @@
       ]
     },
     "PropertyChange": {
-      "description": "One added, removed or changed property of a changed struct.",
+      "description": "One added, removed or changed property declared by a compared struct.",
       "properties": {
         "aspects": {
           "description": "What differs, in the order data type, conversion, target; empty for an added or removed\nproperty.",
@@ -247,7 +247,7 @@
         },
         "properties": {
           "$ref": "#/$defs/KindCounts",
-          "description": "The property changes of the changed structs."
+          "description": "The property changes in added, removed and changed structs."
         },
         "structs": {
           "$ref": "#/$defs/KindCounts",
@@ -369,6 +369,17 @@
           "$ref": "#/$defs/SchemaChangeKind",
           "description": "How the struct differs."
         },
+        "mapped_instances": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SideCounts"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "description": "The directly mapped instances of this struct on each side, including nested instances.\nAn absent struct has a count of `0`."
+        },
         "name": {
           "description": "The struct name.",
           "type": "string"
@@ -385,7 +396,7 @@
           "description": "The parents, present when a changed struct inherits from another struct than before."
         },
         "properties": {
-          "description": "The properties the struct declares itself that differ, ordered by name; empty for an added\nor removed struct.",
+          "description": "The properties the struct declares itself that differ, ordered by name.",
           "items": {
             "$ref": "#/$defs/PropertyChange"
           },

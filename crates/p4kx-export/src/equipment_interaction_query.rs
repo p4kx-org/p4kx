@@ -14,7 +14,10 @@ use crate::catalog_read::scoped_source_read::ScopedSourceRead;
 use crate::catalog_v3::catalog_entity_configurations;
 use crate::record_observation::RecordObservation;
 
-pub use crate::catalog_v3::catalog_interactions::InteractionConfiguration;
+pub use crate::catalog_v3::catalog_interactions::{
+    CarryableGrip, CarryableGripContainer, CarryableHandGrip, CarryableParameters,
+    InteractionConfiguration,
+};
 pub use crate::catalog_v3::interactable_configuration::InteractableConfiguration;
 pub use crate::catalog_v3::interaction_point::InteractionPoint;
 pub use crate::catalog_v3::interaction_state::InteractionState;

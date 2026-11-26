@@ -637,7 +637,8 @@ The first argument of nearly every command is the path of a `Data.p4k` Archive, 
 - `p4kx compare <old> <new> --schema` compares the schema of both DataForges instead of their
   contents: the structs, properties (data type, conversion type, target), enums and enum options
   added, removed or changed, each struct and enum with the number of Records it concerns on both
-  sides. `--json` prints the report (see
+  sides. Added and removed structs list their own property declarations. `--json` also includes
+  direct mapped-instance counts for structs (see
   [docs/cli-json.md](cli-json.md#p4kx-compare-old-new---schema---json)); the Comparison tab
   of the window shows it in the Schema list once the Record level was compared. The exit code is 0
   without and 1 with differences.

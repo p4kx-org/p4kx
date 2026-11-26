@@ -73,6 +73,7 @@ fn verify(entry: &DataForgeEntry, catalog: &Value) -> TestResult {
                 &mut state_machine,
             ),
             Some("kiosk") => (compare_kiosk as ComponentCheck, KIOSK, &mut kiosk_checked),
+            Some("carryable") => continue,
             _ => return Err("unknown interaction component kind".into()),
         };
         if *checked {
