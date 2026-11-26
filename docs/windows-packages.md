@@ -522,8 +522,11 @@ were published for merge `4e2e192e8733aef7300dd6f048807b92ac180e86`.
 The real consumer records the prepared allowance, source hashes, checkpoints and parent controls
 on the runner. It refreshes admission under the original deadline before launching the installer.
 Before Finish starts, each native target uploads a checkpoint with the six allowed diagnostic
-JSON receipts. The checkpoint remains available if the runner stops reporting during Finish.
-The workflow saves the original Finish launch binding before waiting. A local host
+JSON receipts. The checkpoint records the last complete and validated phase row,
+including its occurrence, parent, status and timestamp. A partial trailing line
+does not replace that observation. The published JSON remains available if the
+runner stops reporting during Finish. The workflow saves the original Finish
+launch binding before waiting. A local host
 waits on the owned WaitFinish process and uses one second of the existing hosted
 cleanup reserve for process exit after an on-time observation. Its three standard
 streams point to task files. The host uses the direct child exit signal and

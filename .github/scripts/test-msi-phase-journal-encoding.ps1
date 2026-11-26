@@ -62,8 +62,11 @@ $cases=@(
         [IO.File]::WriteAllBytes($path,$utf8.GetBytes($prefix))
         $actual=Read-P4kxMsiPhaseJournal $path
         Assert-JournalEncoding ($actual.present -and -not $actual.complete -and $actual.events -eq 2 -and $actual.active.Count -eq 2 -and $actual.active -ccontains 'worker' -and $actual.active -ccontains 'fixture/read' -and $null -eq $actual.terminal) 'Incomplete trailing UTF8 changed the actual open-scope contract.'
+        Assert-JournalEncoding ($actual.last_event.sequence -eq 2 -and $actual.last_event.phase -ceq 'fixture/read' -and
+            $actual.last_event.status -ceq 'begin') 'The partial tail displaced the last complete event.'
         $missing=Read-P4kxMsiPhaseJournal (Join-Path $Directory 'missing.jsonl')
-        Assert-JournalEncoding (-not $missing.present -and -not $missing.complete -and $missing.events -eq 0) 'Missing journal changed its original observation.'
+        Assert-JournalEncoding (-not $missing.present -and -not $missing.complete -and $missing.events -eq 0 -and
+            $null -eq $missing.last_event) 'Missing journal changed its original observation.'
     }},
     @{name='passive-original-raw-checkpoint';action={
         $root=Join-Path $Directory 'passive-checkpoint'
@@ -96,6 +99,38 @@ $cases=@(
         $refused=$false
         try{Read-P4kxMsiOriginalBoundary (Join-Path $checkpoint 'phase-journal.jsonl') $other 'preamble/original-raw' | Out-Null}catch{$refused=$true}
         Assert-JournalEncoding $refused 'A foreign target must not prove the original capture boundary.'
+    }},
+    @{name='last-persisted-install-event';action={
+        $root=Join-Path $Directory 'open-install'
+        $originalDirectory=Join-Path $root 'original'
+        $diagnostics=Join-Path $originalDirectory 'diagnostics'
+        New-Item -ItemType Directory -Force -Path $diagnostics | Out-Null
+        $context=New-P4kxMsiPhaseContext $diagnostics $target
+        $worker=Start-P4kxMsiPhase $context 'worker'
+        $installName=if($target -ceq 'x86_64-pc-windows-msvc'){'lifecycle/previous-install'}else{'lifecycle/install'}
+        $install=Start-P4kxMsiPhase $context $installName
+        $wait=Start-P4kxMsiPhase $context 'msiexec/wait'
+        $request=@{directory=$root;output_directory=$originalDirectory;target=$target;mode='Lifecycle'}
+        $handle=@{request_sha256='synthetic-open-install-journal-fixture'}
+        $state=@{state='running';lifetime_ended=$false}
+        $checkpoint=Save-P4kxMsiObserverCheckpoint $request $handle 3 $state -OriginalBoundary 'lifecycle/install'
+        $approved=Read-P4kxDetachedReceipt (Join-Path $checkpoint 'checkpoint.json')
+        $tail=$approved.journal.last_event
+        $events=[Collections.Generic.List[hashtable]]::new()
+        Read-P4kxMsiPhaseJournal (Join-Path $checkpoint 'phase-journal.jsonl') -ObservedEvents $events | Out-Null
+        $written=$events[2]
+        Assert-JournalEncoding ($tail -is [hashtable] -and $tail.Count -eq 7 -and $tail.sequence -eq 3 -and
+            $tail.id -eq $wait.id -and $tail.parent -eq $install.id -and $tail.phase -ceq 'msiexec/wait' -and
+            $tail.status -ceq 'begin' -and $tail.utc_ms -eq $written.utc_ms -and
+            $tail.elapsed_ms -eq $written.elapsed_ms) 'The durable checkpoint lost the exact last observation.'
+        Assert-JournalEncoding ($approved.original_install_phase -ceq 'notObserved' -and
+            $approved.native_completion_unproven -eq $true -and $null -eq $approved.journal.terminal) 'The checkpoint must describe progress without granting a completion verdict.'
+        Stop-P4kxMsiPhase $context $wait
+        Stop-P4kxMsiPhase $context $install
+        Stop-P4kxMsiPhase $context $worker
+        $closed=Read-P4kxMsiPhaseJournal $context.journal
+        Assert-JournalEncoding ($closed.last_event.sequence -eq 6 -and $closed.last_event.phase -ceq 'worker' -and
+            $closed.last_event.status -ceq 'end' -and $tail.status -ceq 'begin') 'The old checkpoint must retain only its captured observation.'
     }},
     @{name='first-original-install-outcome';action={
         $firstPhases = @('lifecycle/install')

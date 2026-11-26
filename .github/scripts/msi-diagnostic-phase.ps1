@@ -77,7 +77,8 @@ function Assert-P4kxMsiPhaseEvent {
     if ($phaseEvent.Count -ne $fields.Count -or @($phaseEvent.Keys | Where-Object { $_ -cnotin $fields }).Count -ne 0 -or
         $phaseEvent.schema -ne 1 -or ($phaseEvent.sequence -isnot [long] -and $phaseEvent.sequence -isnot [int]) -or
         ($phaseEvent.id -isnot [long] -and $phaseEvent.id -isnot [int]) -or ($phaseEvent.parent -isnot [long] -and $phaseEvent.parent -isnot [int]) -or ($phaseEvent.elapsed_ms -isnot [long] -and $phaseEvent.elapsed_ms -isnot [int]) -or $phaseEvent.sequence -le 0 -or $phaseEvent.id -le 0 -or $phaseEvent.parent -lt 0 -or $phaseEvent.elapsed_ms -lt 0 -or
-        $phaseEvent.phase -cnotmatch '\A[a-z0-9]+(?:[/-][a-z0-9]+)*\z' -or $phaseEvent.status -cnotin @('begin','end','error') -or
+        $phaseEvent.phase -isnot [string] -or $phaseEvent.phase -cnotmatch '\A[a-z0-9]+(?:[/-][a-z0-9]+)*\z' -or
+        $phaseEvent.status -isnot [string] -or $phaseEvent.status -cnotin @('begin','end','error') -or
         $phaseEvent.target -cnotin @('x86_64-pc-windows-msvc','aarch64-pc-windows-msvc') -or
         $phaseEvent.process_arch -cnotin @('X64','Arm64')) { throw 'Invalid bounded MSI phase event.' }
     if (($phaseEvent.utc_ms -isnot [long] -and $phaseEvent.utc_ms -isnot [int]) -or $phaseEvent.utc_ms -le 0) { throw 'Invalid MSI phase UTC timestamp.' }
@@ -85,11 +86,11 @@ function Assert-P4kxMsiPhaseEvent {
 
 function Read-P4kxMsiPhaseJournal {
     param([string]$Path, [Collections.Generic.List[hashtable]]$ObservedEvents=$null)
-    if (-not (Test-Path -LiteralPath $Path)) { return @{present=$false; complete=$false; events=0; active=@(); terminal=$null} }
+    if (-not (Test-Path -LiteralPath $Path)) { return @{present=$false; complete=$false; events=0; active=@(); terminal=$null; last_event=$null} }
     $text = Read-P4kxMsiDiagnosticUtf8 $Path 1MB 'MSI phase journal exceeds its byte bound.'
     $lines = $text.Split([char]10)
     $complete = $text.EndsWith([string][char]10, [StringComparison]::Ordinal)
-    $count = 0; $active = @{}; $terminal = $null
+    $count = 0; $active = @{}; $terminal = $null; $last = $null
     for ($index=0; $index -lt $lines.Length-1; $index++) {
         if ($count -ge 2048 -or [Text.Encoding]::UTF8.GetByteCount($lines[$index])+1 -gt 1024) { throw 'MSI phase event bound exceeded.' }
         $phaseEvent = $lines[$index] | ConvertFrom-Json -AsHashtable -Depth 4
@@ -105,8 +106,15 @@ function Read-P4kxMsiPhaseJournal {
             $active.Remove([string]$phaseEvent.id)
             if ($phaseEvent.phase -ceq 'worker') { $terminal=$phaseEvent.status }
         }
+        $last = $phaseEvent
     }
-    return @{present=$true; complete=$complete; events=$count; active=@($active.Values); terminal=$terminal}
+    $lastEvent = if ($null -ne $last) {
+        @{
+            sequence=$last.sequence; id=$last.id; parent=$last.parent
+            phase=$last.phase; status=$last.status; utc_ms=$last.utc_ms; elapsed_ms=$last.elapsed_ms
+        }
+    }
+    return @{present=$true; complete=$complete; events=$count; active=@($active.Values); terminal=$terminal; last_event=$lastEvent}
 }
 
 function New-P4kxMsiPhaseForwarder {
