@@ -6,6 +6,13 @@ function Assert-P4kxWaitProgress([bool]$Condition, [string]$Message) {
     if (-not $Condition) { throw $Message }
 }
 
+function Read-P4kxFinishWaitNotice([string]$Console) {
+    $prefix = '::notice title=Native MSI Finish observation::'
+    foreach ($line in $Console.Split([Environment]::NewLine)) {
+        if ($line.StartsWith($prefix,[StringComparison]::Ordinal)) { $line.Substring($prefix.Length) }
+    }
+}
+
 class P4kxFinishTestCaller {
     [int]$Id
     [bool]$HasExited
@@ -127,7 +134,16 @@ function Assert-P4kxFinishWaitSetupBudget([string]$Root) {
 if ([IO.Directory]::Exists($Directory)) { throw 'Wait progress requires a fresh synthetic directory.' }
 $root = [IO.Directory]::CreateDirectory($Directory).FullName
 $oldActions = $env:GITHUB_ACTIONS
+$oldRunnerEnvironment = $env:RUNNER_ENVIRONMENT
 $env:GITHUB_ACTIONS = 'true'
+$env:RUNNER_ENVIRONMENT = 'github-hosted'
+$receiptNotices = @('phase=wait-receipt status=begin completion=unproven','phase=wait-receipt status=end completion=unproven')
+$expectedNotices = @(
+    foreach ($phase in @('predicate-setup','predicate-start','predicate-wait','predicate-cleanup','receipt-digest')) {
+        "phase=$phase status=begin completion=unproven"
+        "phase=$phase status=end completion=unproven"
+    }
+) + $receiptNotices
 try {
     foreach ($case in @(
         @{name='native-arm-lifecycle';target='aarch64-pc-windows-msvc';mode='Lifecycle';direct=$true},
@@ -150,7 +166,9 @@ try {
             $wait.request_sha256 -ceq $context.digest -and $wait.supervisor_pid -eq $launch.supervisor_pid -and
             $wait.supervisor_started_utc_ticks -eq $launch.supervisor_started_utc_ticks -and
             $wait.mutation_authority -eq $false) "$($case.name) changed the terminal binding or deadline."
+        $notices = @(Read-P4kxFinishWaitNotice $console)
         if ($case.direct) {
+            Assert-P4kxWaitProgress (($notices -join ',') -ceq ($expectedNotices -join ',')) "$($case.name) did not emit the exact observation-only stages in order."
             Assert-P4kxWaitProgress (-not $console.Contains('finishWaitPortal') -and
                 -not $console.Contains('WaitFinish owned probe entered capture.')) 'The direct probe wrote Portal progress.'
             Assert-P4kxWaitProgress ($wait.direct_probe.signal_contract -ceq 'direct-process-only' -and
@@ -158,6 +176,7 @@ try {
                 $wait.direct_probe.exited -eq $true -and $wait.direct_probe.exit_code -eq 0 -and
                 $wait.direct_probe.timed_out -eq $false) 'The wait lacks its owned process exit observation.'
         } else {
+            Assert-P4kxWaitProgress ($notices.Count -eq 0) "$($case.name) emitted Lifecycle-only notice stages."
             Assert-P4kxWaitProgress (-not $wait.Contains('direct_probe') -and $console.Contains('finishWaitPortalCapture') -and
                 $console.Contains('WaitFinish owned probe entered capture.')) "$($case.name) changed its console contract."
         }
@@ -167,17 +186,32 @@ try {
     $context.directory = $path
     $context.request = @{target='aarch64-pc-windows-msvc';mode='Lifecycle'}
     $context.collection_cutoff = [DateTimeOffset]::UtcNow.AddMilliseconds(-1)
-    $failure = $null
-    try { Wait-P4kxMsiFinishReceipt $context $launch 6>$null }
-    catch { $failure = $_.Exception.Message }
+    $failure = @{message=$null}
+    $console = @(& {
+        try { Wait-P4kxMsiFinishReceipt $context $launch }
+        catch { $failure.message = $_.Exception.Message }
+    } 6>&1) -join [Environment]::NewLine
+    $notices = @(Read-P4kxFinishWaitNotice $console)
+    Assert-P4kxWaitProgress (($notices -join ',') -ceq ($receiptNotices -join ',')) 'Expired wait reported a probe or digest phase instead of its observation-only negative receipt.'
     $expired = Read-P4kxDetachedReceipt (Join-Path $path 'wait-result.json')
-    Assert-P4kxWaitProgress ($failure -ceq 'The bound Finish supervisor produced no result within the original allowance.' -and
+    Assert-P4kxWaitProgress ($failure.message -ceq 'The bound Finish supervisor produced no result within the original allowance.' -and
         $expired.deadline_utc -ceq $context.collection_cutoff.ToString('o') -and
         $null -eq $expired.result_sha256 -and $expired.direct_probe.started -eq $false -and
         $expired.direct_probe.timed_out -eq $true -and
         -not [IO.File]::Exists((Join-Path $path 'wait-probe-stdout.log'))) 'An expired wait launched a probe or accepted a result.'
+
+    $env:RUNNER_ENVIRONMENT = 'self-hosted'
+    $context.directory = [IO.Directory]::CreateDirectory((Join-Path $root 'nonhost')).FullName
+    $context.collection_cutoff = [DateTimeOffset]::UtcNow.AddSeconds(10)
+    $terminal = Join-Path $context.directory 'result.json'
+    Write-P4kxDetachedReceipt $terminal @{fixture='present'}
+    $console = @(Wait-P4kxMsiFinishReceipt $context $launch 6>&1) -join [Environment]::NewLine
+    $wait = Read-P4kxDetachedReceipt (Join-Path $context.directory 'wait-result.json')
+    Assert-P4kxWaitProgress (@(Read-P4kxFinishWaitNotice $console).Count -eq 0 -and
+        $wait.result_sha256 -ceq (Get-P4kxDetachedDigest $terminal)) 'The non-hosted wait changed its success receipt or emitted a hosted annotation.'
 } finally {
     $env:GITHUB_ACTIONS = $oldActions
+    $env:RUNNER_ENVIRONMENT = $oldRunnerEnvironment
 }
 'PASS: both Windows lifecycle targets use the direct process result, and both Control targets use Portal.'
 Assert-P4kxFinishSupervisorNegativeReceipt $root

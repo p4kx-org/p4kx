@@ -22,8 +22,11 @@ function Test-P4kxMsiFinishDirectReceiptPresence {
     $script=Join-Path $PSScriptRoot 'msi-observer-finish-wait-worker.ps1'
     $arguments=@('-NoLogo','-NoProfile','-NonInteractive','-File',$script,
         '-ReceiptPath',$ReceiptPath,'-CollectionCutoff',$Context.collection_cutoff.ToString('o'),'-UseExitStatus')
+    Write-P4kxMsiFinishWaitNotice predicate-setup begin
     $process=New-P4kxPackageProcess ([Environment]::ProcessPath) $arguments $Context.directory
     try {
+        Write-P4kxMsiFinishWaitNotice predicate-setup end
+        Write-P4kxMsiFinishWaitNotice predicate-start begin
         if ((Get-P4kxMsiFinishProbeMilliseconds $Context.collection_cutoff $Clock $Budget) -eq 0) {
             $Observation.timed_out=$true
             return $false
@@ -31,9 +34,13 @@ function Test-P4kxMsiFinishDirectReceiptPresence {
         if (-not $process.Start()) { throw 'The owned Finish presence probe did not start.' }
         $Observation.started=$true
         $Observation.pid=$process.Id
+        Write-P4kxMsiFinishWaitNotice predicate-start end
         # An inherited pipe writer can outlive the predicate process.
+        Write-P4kxMsiFinishWaitNotice predicate-wait begin
         $remaining=Get-P4kxMsiFinishProbeMilliseconds $Context.collection_cutoff $Clock $Budget
-        if ($remaining -eq 0 -or -not $process.WaitForExit($remaining)) {
+        $exited=$remaining -gt 0 -and $process.WaitForExit($remaining)
+        Write-P4kxMsiFinishWaitNotice predicate-wait end
+        if (-not $exited) {
             $Observation.timed_out=$true
             return $false
         }
@@ -46,6 +53,7 @@ function Test-P4kxMsiFinishDirectReceiptPresence {
         }
     } finally {
         try {
+            Write-P4kxMsiFinishWaitNotice predicate-cleanup begin
             if ($Observation.started -and -not $Observation.exited) {
                 if (-not $process.HasExited) {
                     $process.Kill($false)
@@ -55,5 +63,6 @@ function Test-P4kxMsiFinishDirectReceiptPresence {
                 $Observation.exit_code=$process.ExitCode
             }
         } finally { $process.Dispose() }
+        Write-P4kxMsiFinishWaitNotice predicate-cleanup end
     }
 }

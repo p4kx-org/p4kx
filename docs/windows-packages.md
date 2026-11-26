@@ -471,10 +471,34 @@ The operation responsible for the earlier hosted cancellation remains unknown.
 [AMD64 execution](https://github.com/p4kx-org/p4kx/actions/runs/45669055539/job/139426076930) ·
 [ARM64 execution](https://github.com/p4kx-org/p4kx/actions/runs/45669055539/job/139426076867)
 
+For PR #1117 head `db162ecba`, both native consumers observed the initial
+install outcome and uploaded their pre-Finish diagnostics. The last AMD64
+checkpoint placed the original worker in the upgrade's `msiexec` wait. The
+last ARM64 checkpoint placed it in installed runtime verification. GitHub
+recorded cancellation after 55 minutes 1 second on both jobs and cited the
+45-minute job limit. The recorded step remained WaitFinish. The job logs
+returned HTTP 404, and final lifecycle receipts were absent.
+[AMD64 checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45697517932/artifacts/15064902733) ·
+[ARM64 checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45697517932/artifacts/15065830796) ·
+[Release run](https://github.com/p4kx-org/p4kx/actions/runs/45697517932)
+
+For PR #1117 head `36181deeb`, AMD64 completed the exact native lifecycle.
+WaitFinish took 92 seconds. The job published the final original MSI receipt
+and the executed portable and installer payloads. The ARM64 job retained the
+initial install and pre-Finish checkpoint. GitHub cancelled it while the reported
+step was WaitFinish. The recorded duration was 55 minutes and the job annotation
+cited its 45-minute limit. The final receipt and executed ARM64 payload were absent.
+[AMD64 execution](https://github.com/p4kx-org/p4kx/actions/runs/45714089604/job/139572874737) ·
+[ARM64 execution](https://github.com/p4kx-org/p4kx/actions/runs/45714089604/job/139572874813) ·
+[ARM64 checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45714089604/artifacts/15072330016)
+
 The real consumer records the prepared allowance, source hashes, checkpoints and parent controls
 on the runner. It refreshes admission under the original deadline before launching the installer.
 Before Finish starts, each native target uploads a checkpoint with the six allowed diagnostic
 JSON receipts. The checkpoint remains available if the runner stops reporting during Finish.
+Lifecycle WaitFinish also emits fixed hosted annotations at its process and receipt boundaries.
+The diagnostic runner-fuse fixture records whether GitHub retains the wait-start annotation
+after a deliberate step timeout. Both observations leave native lifecycle completion unproven.
 The cancellation-aware diagnostic upload collects those local files after the terminal evidence
 and package publication steps. A runner failure before the upload can prevent delivery.
 The first install snapshot emits one bounded observation in its existing console stream after

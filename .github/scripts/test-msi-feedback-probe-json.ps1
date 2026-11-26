@@ -66,6 +66,23 @@ $cases=@(
         $bytes=[byte[]]([Text.Encoding]::Unicode.GetPreamble()+[Text.Encoding]::Unicode.GetBytes('{"schema":1,"note":"valid JSON in a different encoding"}'))
         Assert-ProbeDecodeRejected 'utf16-bom' $bytes
     }},
+    @{name='notice-retention-evidence';action={
+        $notice=@{title='Native MSI Finish observation';annotation_level='notice';message='phase=predicate-wait status=begin completion=unproven'}
+        Assert-ProbeJsonReader (Test-P4kxMsiProbeNoticeRetention @($notice) $true) 'The exact timeout notice was lost.'
+        Assert-ProbeJsonReader (-not (Test-P4kxMsiProbeNoticeRetention @() $true)) 'An absent notice became retained evidence.'
+        $changed=$notice.Clone()
+        $changed.message='phase=predicate-wait status=end completion=unproven'
+        foreach($invalid in @(
+            @{annotations=@($notice,$notice);timeout=$true},
+            @{annotations=@($changed);timeout=$true},
+            @{annotations=@($notice);timeout=$false}
+        )){
+            $refused=$false
+            try{Test-P4kxMsiProbeNoticeRetention $invalid.annotations $invalid.timeout | Out-Null}
+            catch{$refused=$_.Exception.Message -ceq 'Observed Finish annotation differs from the exact harmless timeout marker.'}
+            Assert-ProbeJsonReader $refused 'The verifier accepted a duplicate, wrong or misplaced notice.'
+        }
+    }},
     @{name='exact-byte-bound';action={
         $prefix='{"schema":1,"note":"';$suffix='"}'
         $length=65536-$utf8.GetByteCount($prefix+$suffix)

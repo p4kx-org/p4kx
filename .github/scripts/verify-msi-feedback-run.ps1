@@ -67,6 +67,7 @@ foreach($row in @((Get-P4kxPlatformContract).targets | Where-Object {$_.os -ceq 
             $artifact="msi-feedback-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT-$($row.target)-$mode"
             $directory=Join-Path $ArtifactDirectory $artifact
             $proof=Assert-P4kxMsiProbeArtifact $directory $row.target $mode $env:GITHUB_SHA $env:P4KX_MSI_PROBE_HEAD $env:GITHUB_RUN_ID $env:GITHUB_RUN_ATTEMPT
+            $proof.finish_wait_notice_retained=Test-P4kxMsiProbeNoticeRetention $annotations ($mode -ceq 'timeout')
             if($mode -ceq 'timeout'){
                 $binding=@{Target=$row.target;Mode=$mode;Revision=$env:GITHUB_SHA;Head=$env:P4KX_MSI_PROBE_HEAD;Run=$env:GITHUB_RUN_ID;Attempt=$env:GITHUB_RUN_ATTEMPT}
                 Assert-P4kxMsiProbeMissingPhaseRejected $directory (Join-Path $EvidenceDirectory ($label+'-missing-phase')) $binding

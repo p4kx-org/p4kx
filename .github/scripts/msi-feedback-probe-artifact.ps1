@@ -12,7 +12,7 @@ function Assert-P4kxMsiProbeBinding {
     $arch=if($Target -ceq 'x86_64-pc-windows-msvc'){'X64'}elseif($Target -ceq 'aarch64-pc-windows-msvc'){'Arm64'}else{throw 'Unknown native probe target.'}
     if($Value.schema -ne 1 -or $Value.role -cne 'native-msi-runner-fuse-probe' -or $Value.revision -cne $Revision -or $Value.head_revision -cne $Head -or
         $Value.run -cne $Run -or $Value.attempt -cne $Attempt -or $Value.target -cne $Target -or $Value.mode -cne $Mode -or $Value.process_arch -cne $arch){throw 'Probe artifact source/run/attempt/CPU/mode binding differs.'}
-    $expected=@('invoke-msi-feedback-probe.ps1','msi-diagnostic-phase.ps1','msi-diagnostic-utf8.ps1')
+    $expected=@('invoke-msi-feedback-probe.ps1','msi-diagnostic-phase.ps1','msi-diagnostic-utf8.ps1','msi-observer-progress.ps1')
     if($Value.sources.Count -ne $expected.Count){throw 'Probe source inventory differs.'}
     foreach($name in $expected){
         $actual=@($Value.sources | Where-Object {$_.name -ceq $name})
@@ -45,6 +45,17 @@ function Assert-P4kxMsiProbeArtifact {
     return @{target=$Target;mode=$Mode;events=$journal.events;completed_success=$complete;mutation_authority=$false}
 }
 
+
+function Test-P4kxMsiProbeNoticeRetention {
+    param([object[]]$Annotations,[bool]$ExpectedTimeout)
+    $notices=@($Annotations | Where-Object { $_.title -ceq 'Native MSI Finish observation' })
+    if($notices.Count -eq 0){return $false}
+    if(-not $ExpectedTimeout -or $notices.Count -ne 1 -or $notices[0].annotation_level -cne 'notice' -or
+        $notices[0].message -cne 'phase=predicate-wait status=begin completion=unproven'){
+        throw 'Observed Finish annotation differs from the exact harmless timeout marker.'
+    }
+    return $true
+}
 
 function Assert-P4kxMsiProbeMissingPhaseRejected {
     param([string]$Directory,[string]$ReplayDirectory,[hashtable]$Binding)

@@ -31,3 +31,13 @@ function Write-P4kxMsiObserverProgress {
         Write-Host ('[P4KX-MSI-OBSERVER]'+($receipt | ConvertTo-Json -Depth 3 -Compress))
     }
 }
+
+function Write-P4kxMsiFinishWaitNotice {
+    param(
+        [ValidateSet('predicate-setup','predicate-start','predicate-wait','predicate-cleanup','receipt-digest','wait-receipt')][string]$Phase,
+        [ValidateSet('begin','end')][string]$Status
+    )
+    if ($env:GITHUB_ACTIONS -ceq 'true' -and $env:RUNNER_ENVIRONMENT -ceq 'github-hosted') {
+        Write-Host "::notice title=Native MSI Finish observation::phase=$Phase status=$Status completion=unproven"
+    }
+}

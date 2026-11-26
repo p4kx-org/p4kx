@@ -115,7 +115,9 @@ function Wait-P4kxMsiFinishReceipt($Context, $Launch) {
     Write-P4kxMsiObserverProgress finishWaitPoll end -RequestDigest $Context.digest
     if ($found) {
         Write-P4kxMsiObserverProgress finishWaitDigest begin -RequestDigest $Context.digest
+        if ($null -ne $direct) { Write-P4kxMsiFinishWaitNotice receipt-digest begin }
         $resultDigest = Get-P4kxDetachedDigest $receiptPath
+        if ($null -ne $direct) { Write-P4kxMsiFinishWaitNotice receipt-digest end }
         Write-P4kxMsiObserverProgress finishWaitDigest end -RequestDigest $Context.digest
     }
     $observedAt = [DateTimeOffset]::UtcNow
@@ -130,7 +132,9 @@ function Wait-P4kxMsiFinishReceipt($Context, $Launch) {
         result_sha256=$resultDigest;mutation_authority=$false
     }
     if ($null -ne $direct) { $wait.direct_probe = $direct }
+    if ($null -ne $direct) { Write-P4kxMsiFinishWaitNotice wait-receipt begin }
     Write-P4kxDetachedReceipt (Join-Path $Context.directory 'wait-result.json') $wait
+    if ($null -ne $direct) { Write-P4kxMsiFinishWaitNotice wait-receipt end }
     Write-P4kxMsiObserverProgress finishWaitReceipt end -RequestDigest $Context.digest
     if (-not $resultDigest) { throw 'The bound Finish supervisor produced no result within the original allowance.' }
 }

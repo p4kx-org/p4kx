@@ -6,6 +6,7 @@ param(
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'platform-contract.ps1')
 . (Join-Path $PSScriptRoot 'msi-diagnostic-phase.ps1')
+. (Join-Path $PSScriptRoot 'msi-observer-progress.ps1')
 $row=Get-P4kxPlatform $Target
 Assert-P4kxNativeHost $row
 $processArch=[Runtime.InteropServices.RuntimeInformation]::ProcessArchitecture.ToString()
@@ -15,7 +16,7 @@ if(Test-Path -LiteralPath $Directory){throw 'Diagnostic-only probe directory mus
 $feedback=Join-Path $Directory 'feedback'
 $diagnostics=Join-Path $Directory 'diagnostics'
 New-Item -ItemType Directory -Path $feedback,$diagnostics -Force | Out-Null
-$sources=@(foreach($name in @('invoke-msi-feedback-probe.ps1','msi-diagnostic-phase.ps1','msi-diagnostic-utf8.ps1')){
+$sources=@(foreach($name in @('invoke-msi-feedback-probe.ps1','msi-diagnostic-phase.ps1','msi-diagnostic-utf8.ps1','msi-observer-progress.ps1')){
     @{name=$name;sha256=(Get-FileHash -LiteralPath (Join-Path $PSScriptRoot $name) -Algorithm SHA256).Hash.ToLowerInvariant()}
 })
 $binding=@{schema=1;role='native-msi-runner-fuse-probe';revision=$env:GITHUB_SHA;head_revision=$env:P4KX_MSI_PROBE_HEAD;
@@ -28,7 +29,10 @@ $result=$binding.Clone()
 $result.completed_success=$false;$result.native_completion_unproven=$true;$result.mutation_authority=$false
 $result | ConvertTo-Json -Depth 4 | Set-Content -LiteralPath (Join-Path $diagnostics 'diagnostic-result.json') -Encoding utf8NoBOM
 'Flushed diagnostic-only active scopes; no MSI/Registry/product payload.' | Set-Content -LiteralPath (Join-Path $diagnostics 'probe.log') -Encoding utf8NoBOM
-if($Mode -ceq 'timeout'){Start-Sleep -Seconds 120}
+if($Mode -ceq 'timeout'){
+    Write-P4kxMsiFinishWaitNotice predicate-wait begin
+    Start-Sleep -Seconds 120
+}
 Stop-P4kxMsiPhase $context $phase
 Stop-P4kxMsiPhase $context $worker
 $result.completed_success=$true;$result.native_completion_unproven=$false
