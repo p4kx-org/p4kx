@@ -268,6 +268,37 @@ fn read_owner(
     want: Wanted,
     coverage: &mut CatalogRecordCoverage,
 ) -> Result<LoadoutOwnerSnapshot, CatalogError> {
+    let (loadout, source_inventory) =
+        with_resolved_owner(query, inputs, texts, want, coverage, |_, _, loadout| {
+            Ok(loadout)
+        })?;
+    Ok(LoadoutOwnerSnapshot {
+        record_index: want.record_index,
+        entity_guid: want.guid.0,
+        entity_kind: want.kind,
+        row: loadout.row,
+        source_inventory,
+        dependencies: loadout.dependencies,
+    })
+}
+
+pub(super) struct OwnerLoadout {
+    pub(super) row: Option<Loadout>,
+    pub(super) dependencies: LoadoutDependencyCoverage,
+}
+
+pub(super) fn with_resolved_owner<T>(
+    query: &Query<'_>,
+    inputs: &ResolverInputs<'_>,
+    texts: &Texts<'_>,
+    want: Wanted,
+    coverage: &mut CatalogRecordCoverage,
+    project: impl FnOnce(
+        &OriginalCatalogInput<'_, '_>,
+        &mut DirectAlignment<'_>,
+        OwnerLoadout,
+    ) -> Result<T, CatalogError>,
+) -> Result<(T, SourceInventory), CatalogError> {
     let origins = query.entry.records(query.archive)?;
     let input = OriginalCatalogInput::new(query.forge, &origins);
     let registry = CatalogTextRegistry::default();
@@ -287,12 +318,7 @@ fn read_owner(
             Ok(())
         },
     )?;
-    Ok(LoadoutOwnerSnapshot {
-        record_index: want.record_index,
-        entity_guid: want.guid.0,
-        entity_kind: want.kind,
-        row,
-        source_inventory: origins.uses.finish_with(|| checkpoint(query.cancel))?,
-        dependencies,
-    })
+    let result = project(&input, &mut alignment, OwnerLoadout { row, dependencies })?;
+    let source_inventory = origins.uses.finish_with(|| checkpoint(query.cancel))?;
+    Ok((result, source_inventory))
 }

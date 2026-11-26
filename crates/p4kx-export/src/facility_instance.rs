@@ -68,6 +68,15 @@ impl FacilityInstance {
         }
     }
 
+    /// Borrows the resolved SOC Entity placement of an Interior instance.
+    #[must_use]
+    pub const fn interior_placement(&self) -> Option<&InteriorFacilityPlacement> {
+        match &self.source {
+            FacilityPlacementSource::Interior(interior) => Some(interior),
+            FacilityPlacementSource::Loadout(_) => None,
+        }
+    }
+
     /// Iterates linked configuration owners in original Components array order.
     pub fn configurations(
         &self,

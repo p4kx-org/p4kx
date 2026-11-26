@@ -20,12 +20,12 @@ use super::types::{
     InteriorSocPosition, SocAttribute,
 };
 use super::walk::{RoomReader, RootRoomTransform, StreamContext};
+use crate::CatalogError;
 use crate::catalog_read::original::{
     EntryCapture, EntrySocEntity, OriginalDatum, PhysicalEntryRef, SocSourceFields,
 };
 use crate::contract_entities::Ship;
 use crate::record_header_field::RecordHeaderField;
-use crate::{CatalogError, ExportAccountingError};
 
 pub(super) fn project(
     project: &mut Projection<'_, '_, '_>,
@@ -87,43 +87,42 @@ pub(super) fn project(
     Ok(coverage)
 }
 
-pub(super) fn coverage(
+pub(super) struct RoomPaths<'archive> {
+    pub(super) archive: &'archive Archive,
+    pub(super) keys: &'archive PathKeys,
+}
+
+pub(super) fn scoped<'host>(
     project: &mut Projection<'_, '_, '_>,
-    archive: &Archive,
-    root: &ShipContext,
+    paths: RoomPaths<'_>,
     rooms: &RoomOwners<'_, '_>,
-    attachments: &[RoomAttachment],
+    hosts: impl IntoIterator<Item = RoomHost<'host>>,
     capture: &EntryCapture<'_>,
     targets: ClassTargets<'_, '_>,
+    model_forge: Option<&DataForge<'_>>,
 ) -> Result<Vec<InteriorRoomCoverage>, CatalogError> {
-    let keys = PathKeys::new(archive);
-    let index = keys.index(archive);
+    let index = paths.keys.index(paths.archive);
     let mut reader = RoomReader {
-        archive,
+        archive: paths.archive,
         index: &index,
         capture,
         targets,
         cancel: project.cancel,
     };
     let mut coverage = Vec::new();
-    let record = *root
-        .ship_record_index
-        .value()
-        .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-    let host = RoomHost {
-        record,
-        ship: root,
-        attachment: None,
-    };
-    reader.project_host(project, &mut coverage, rooms, &host, None)?;
-    for attachment in attachments {
+    let mut models = model_forge.map(|forge| {
+        RoomHelperModels::new(
+            &index,
+            paths.keys,
+            forge,
+            capture,
+            project.origins,
+            project.cancel,
+        )
+    });
+    for host in hosts {
         project.check_cancel()?;
-        let host = RoomHost {
-            record: attachment.record,
-            ship: &attachment.ship,
-            attachment: Some(attachment),
-        };
-        reader.project_host(project, &mut coverage, rooms, &host, None)?;
+        reader.project_host(project, &mut coverage, rooms, &host, models.as_mut())?;
     }
     Ok(coverage)
 }
@@ -159,7 +158,10 @@ impl RoomReader<'_, '_> {
         let Some(frame) = route.ship_frame else {
             return Ok(());
         };
-        let configurations = project.configuration_links(index)?;
+        let configurations = match self.targets.scoped_configuration_links(index) {
+            Some(links) => links?,
+            None => project.configuration_links(index)?,
+        };
         if configurations.is_empty() {
             return Ok(());
         }

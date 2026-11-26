@@ -56,7 +56,7 @@ use loadout_walk_state::Path;
 mod interior;
 #[path = "facility_interior_scoped.rs"]
 mod scoped_rooms;
-pub(crate) use scoped_rooms::{collect_room_attachments, project_room_coverage};
+pub(crate) use scoped_rooms::{RoomProjection, RoomScope, collect_room_attachments, project_rooms};
 #[path = "facility_model_helper.rs"]
 mod model_helper;
 #[path = "facility_model_node_inputs.rs"]
@@ -70,8 +70,9 @@ mod types;
 #[path = "facility_interior_walk.rs"]
 mod walk;
 
-pub(super) use types::InteriorFacilityPlacement;
-pub use types::InteriorRoomCoverage;
+pub use types::{
+    InteriorFacilityPlacement, InteriorRoomCoverage, InteriorSocPosition, SocAttribute,
+};
 
 pub(super) struct LoadoutPlacements {
     pub(super) facilities: StagedCatalogTable,
@@ -132,15 +133,17 @@ pub(super) fn table(
             &capture,
         )?
     };
-    let facilities = facilities.finish_matching_source_types(forge, |name| {
-        loadout_facility_owner_source_type(name)
-            || name == resource_topology_declarations::ITEM_ROOM
-    })?;
+    let facilities =
+        facilities.finish_matching_source_types(forge, facility_placement_source_type)?;
     Ok(LoadoutPlacements {
         facilities,
         rooms: coverage,
         flight: FlightConfigurationTables::installed_table(forge, flight_instances.rows),
     })
+}
+
+pub(crate) fn facility_placement_source_type(name: &str) -> bool {
+    loadout_facility_owner_source_type(name) || name == resource_topology_declarations::ITEM_ROOM
 }
 
 pub(crate) fn project_loadout<'lookup>(

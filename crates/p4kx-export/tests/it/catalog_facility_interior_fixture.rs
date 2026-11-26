@@ -27,6 +27,7 @@ pub(super) enum Case {
     NestedChildren,
     ChildFaults,
     ItemRooms,
+    VisitorRoots,
     ShipFrame,
     HelperFrame,
     HelperAtOrigin,
@@ -181,8 +182,8 @@ fn database(case: Case) -> DataForgeBuilder {
                 .field("boneName", TestType::String),
         );
     }
-    if matches!(case, Case::ItemRooms) {
-        return database.record(
+    if matches!(case, Case::ItemRooms | Case::VisitorRoots) {
+        let database = database.record(
             TestEntity::new(
                 MODULE,
                 "FixtureRoomModule",
@@ -192,6 +193,11 @@ fn database(case: Case) -> DataForgeBuilder {
             .item_container(ROOM)
             .record(),
         );
+        return if matches!(case, Case::VisitorRoots) {
+            visitor_roots(database)
+        } else {
+            database
+        };
     }
     if matches!(case, Case::AmbiguousClass) {
         return database
@@ -206,6 +212,44 @@ fn database(case: Case) -> DataForgeBuilder {
     database
 }
 
+fn visitor_roots(database: DataForgeBuilder) -> DataForgeBuilder {
+    database
+        .record(
+            TestEntity::new(
+                0x1063_0510,
+                "FixtureDirectInteriorHost",
+                "libs/foundry/records/entities/spaceships/fixture_direct_interior_host.xml",
+            )
+            .vehicle("", "")
+            .object_container(ROOM, "", [2.0, 0.0, 0.0], [0.0; 3])
+            .record(),
+        )
+        .record(
+            TestEntity::new(
+                0x1063_0511,
+                "FixtureEmptyInteriorHost",
+                "libs/foundry/records/entities/spaceships/fixture_empty_interior_host.xml",
+            )
+            .vehicle("", "")
+            .record(),
+        )
+        .record(
+            TestEntity::new(
+                0x1063_0512,
+                "FixtureMissingInteriorHost",
+                "libs/foundry/records/entities/spaceships/fixture_missing_interior_host.xml",
+            )
+            .vehicle("", "")
+            .object_container(
+                r"ObjectContainers\Ships\Fixture\missing.socpak",
+                "",
+                [0.0; 3],
+                [0.0; 3],
+            )
+            .record(),
+        )
+}
+
 fn ship(case: Case) -> TestRecord {
     let ship = TestEntity::new(
         SHIP,
@@ -213,8 +257,13 @@ fn ship(case: Case) -> TestRecord {
         "libs/foundry/records/entities/spaceships/fixture_interior_host.xml",
     )
     .vehicle("", "");
-    if matches!(case, Case::ItemRooms) {
+    if matches!(case, Case::ItemRooms | Case::VisitorRoots) {
         let ports = ["left_room", "right_room"];
+        let ship = if matches!(case, Case::VisitorRoots) {
+            ship.object_container(ROOM, "", [5.0, 0.0, 0.0], [0.0; 3])
+        } else {
+            ship
+        };
         return ship
             .port(TestPort::new(ports[0]))
             .port(TestPort::new(ports[1]))

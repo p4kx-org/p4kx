@@ -25,6 +25,10 @@ mod nested;
 mod room_declarations;
 #[path = "catalog_facility_interior_coverage_sdk.rs"]
 mod scoped_coverage;
+#[path = "catalog_facility_interior_placement_sdk.rs"]
+mod scoped_placement;
+#[path = "catalog_facility_interior_visit_sdk.rs"]
+mod visit_placement;
 #[path = "catalog_facility_ship_frame.rs"]
 mod ship_frame;
 

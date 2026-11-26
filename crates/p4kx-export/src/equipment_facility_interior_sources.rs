@@ -4,15 +4,14 @@
 use std::collections::BTreeMap;
 use std::collections::btree_map::Entry;
 
-use crate::CatalogError;
+use super::super::facility_placements::read_configuration;
 use crate::catalog_v3::catalog_entity_configurations::{
-    ResourceTopologyDeclarations, ResourceTopologyKind, read_loadout_facility_owners,
-    read_resource_topology,
+    ResourceTopologyDeclarations, ResourceTopologyKind, read_resource_topology,
 };
-use crate::catalog_v3::facility_loadout_placements::{
-    ClassMembership, loadout_configuration_links,
-};
+use crate::catalog_v3::facility_instance::FacilityConfiguration;
+use crate::catalog_v3::facility_loadout_placements::{ClassLookup, ClassMembership};
 use crate::loadout::alignment::direct::{AlignmentDependencyState, DirectAlignment};
+use crate::{CatalogError, ExportAccountingError};
 
 type State = AlignmentDependencyState;
 
@@ -109,32 +108,36 @@ impl<'source> RoomReads<'source> {
     }
 }
 
-#[derive(Default)]
-pub(super) struct ClassReads {
+pub(super) struct ClassReads<'alignment, 'source> {
+    alignment: &'alignment mut DirectAlignment<'source>,
     classes: BTreeMap<u32, (bool, State)>,
+    placement_links: Option<BTreeMap<u32, Vec<FacilityConfiguration>>>,
 }
 
-impl ClassReads {
-    pub(super) fn read(
-        &mut self,
-        index: u32,
-        alignment: &mut DirectAlignment<'_>,
-    ) -> Result<ClassMembership, CatalogError> {
+impl<'alignment, 'source> ClassReads<'alignment, 'source> {
+    pub(super) fn new(
+        alignment: &'alignment mut DirectAlignment<'source>,
+        placements: bool,
+    ) -> Self {
+        Self {
+            alignment,
+            classes: BTreeMap::new(),
+            placement_links: placements.then(BTreeMap::new),
+        }
+    }
+}
+
+impl ClassLookup for ClassReads<'_, '_> {
+    fn read(&mut self, index: u32) -> Result<ClassMembership, CatalogError> {
         let (configured, state) = match self.classes.entry(index) {
             Entry::Occupied(slot) => *slot.get(),
             Entry::Vacant(slot) => {
-                let read = alignment.read_configuration(
-                    index,
-                    |tree, projection, admission, cancel| {
-                        let read =
-                            read_loadout_facility_owners(tree, projection, admission, cancel)?;
-                        let state = State::from_scoped_read(&read);
-                        let configured =
-                            !loadout_configuration_links(index, &read.value, cancel)?.is_empty();
-                        Ok((configured, state))
-                    },
-                )?;
-                *slot.insert(read.unwrap_or_else(|state| (false, state)))
+                let resolved = read_configuration(self.alignment, index)?;
+                let configured = !resolved.links.is_empty();
+                if let Some(links) = self.placement_links.as_mut().filter(|_| configured) {
+                    links.insert(index, resolved.links);
+                }
+                *slot.insert((configured, resolved.state))
             }
         };
         Ok(ClassMembership {
@@ -142,11 +145,19 @@ impl ClassReads {
             complete: complete(state),
         })
     }
+
+    fn configuration_links(&self, index: u32) -> Result<Vec<FacilityConfiguration>, CatalogError> {
+        self.placement_links
+            .as_ref()
+            .and_then(|links| links.get(&index))
+            .cloned()
+            .ok_or_else(|| ExportAccountingError::ConflictingSourceDatum.into())
+    }
 }
 
 pub(super) fn dependencies(
     rooms: RoomReads<'_>,
-    classes: ClassReads,
+    classes: ClassReads<'_, '_>,
 ) -> Vec<InteriorCoverageDependency> {
     let mut captured: BTreeMap<_, _> = rooms
         .owners

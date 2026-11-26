@@ -5,6 +5,7 @@ use std::collections::{HashMap, HashSet};
 
 use p4kx_extraction::{CancelToken, DataForge, Guid};
 
+use super::super::facility_instance::FacilityConfiguration;
 use crate::catalog_query_session::checkpoint;
 use crate::{CatalogError, ExportAccountingError};
 
@@ -19,12 +20,15 @@ pub(crate) struct ClassMembership {
     pub(crate) complete: bool,
 }
 
-pub(crate) type ClassLookup<'lookup> =
-    dyn FnMut(u32) -> Result<ClassMembership, CatalogError> + 'lookup;
+pub(crate) trait ClassLookup {
+    fn read(&mut self, index: u32) -> Result<ClassMembership, CatalogError>;
+
+    fn configuration_links(&self, index: u32) -> Result<Vec<FacilityConfiguration>, CatalogError>;
+}
 
 enum Configured<'lookup> {
     Indexed(HashSet<u32>),
-    Scoped(&'lookup mut ClassLookup<'lookup>),
+    Scoped(&'lookup mut dyn ClassLookup),
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -68,13 +72,23 @@ impl<'source, 'lookup> ClassTargets<'source, 'lookup> {
     pub(super) fn scoped(
         forge: &'source DataForge<'source>,
         cancel: Option<&'source CancelToken>,
-        lookup: &'lookup mut ClassLookup<'lookup>,
+        lookup: &'lookup mut dyn ClassLookup,
     ) -> Self {
         Self {
             forge,
             configured: Configured::Scoped(lookup),
             resolved: HashMap::new(),
             cancel,
+        }
+    }
+
+    pub(super) fn scoped_configuration_links(
+        &self,
+        index: u32,
+    ) -> Option<Result<Vec<FacilityConfiguration>, CatalogError>> {
+        match &self.configured {
+            Configured::Indexed(_) => None,
+            Configured::Scoped(lookup) => Some(lookup.configuration_links(index)),
         }
     }
 
@@ -94,7 +108,7 @@ impl<'source, 'lookup> ClassTargets<'source, 'lookup> {
                         configured: configured.contains(&index),
                         complete: true,
                     }),
-                    Configured::Scoped(lookup) => lookup(index),
+                    Configured::Scoped(lookup) => lookup.read(index),
                 }
             },
         )?;

@@ -34,10 +34,11 @@ pub(super) enum InteriorRoomDeclaration {
     Item,
 }
 
+/// One original SOC Entity located in a Ship room.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(in crate::catalog_v3) struct InteriorFacilityPlacement {
+pub struct InteriorFacilityPlacement {
     pub(super) room: InteriorRoomRef,
     pub(super) position: SourcedValue<InteriorSocPosition>,
     pub(super) stream_name: SourcedValue<String>,
@@ -48,24 +49,93 @@ pub(in crate::catalog_v3) struct InteriorFacilityPlacement {
     pub(super) entity_attributes: Vec<SocAttribute>,
 }
 
+impl InteriorFacilityPlacement {
+    /// Borrows the owner of the original room declaration.
+    #[must_use]
+    pub const fn room_owner(&self) -> &ComponentOwner {
+        &self.room.owner
+    }
+
+    /// Borrows the ordered Loadout path of an attached room.
+    #[must_use]
+    pub const fn loadout_position(&self) -> Option<&SourcedValue<LoadoutPosition>> {
+        self.room.loadout_position.as_ref()
+    }
+
+    /// Borrows the physical position of the original SOC Entity.
+    #[must_use]
+    pub const fn position(&self) -> &SourcedValue<InteriorSocPosition> {
+        &self.position
+    }
+
+    /// Borrows the name of the stream declared by the room descriptor.
+    #[must_use]
+    pub const fn stream_name(&self) -> &SourcedValue<String> {
+        &self.stream_name
+    }
+
+    /// Borrows the uniquely matched physical DataForge class Record index.
+    #[must_use]
+    pub const fn class_record_index(&self) -> &SourcedValue<u32> {
+        &self.class_record_index
+    }
+
+    /// Borrows the row-major affine transform in the Entity's local room frame.
+    #[must_use]
+    pub const fn local_transform(&self) -> &SourcedValue<[[f32; 4]; 3]> {
+        &self.local_transform
+    }
+
+    /// Borrows the row-major affine transform in the root room frame, when available.
+    #[must_use]
+    pub const fn root_room_transform(&self) -> Option<&SourcedValue<[[f32; 4]; 3]>> {
+        self.root_room_transform.as_ref()
+    }
+
+    /// Borrows the row-major affine transform in the owning Ship's frame.
+    #[must_use]
+    pub const fn ship_frame_transform(&self) -> &SourcedValue<[[f32; 4]; 3]> {
+        &self.ship_frame_transform
+    }
+
+    /// Borrows the original Entity attributes in their source order.
+    #[must_use]
+    pub fn entity_attributes(&self) -> &[SocAttribute] {
+        &self.entity_attributes
+    }
+}
+
+/// Original archive and container coordinates of one SOC Entity.
 #[derive(Debug, Serialize, JsonSchema)]
 #[serde(rename_all = "camelCase")]
 #[schemars(transform = every_field_required)]
-pub(super) struct InteriorSocPosition {
-    pub(super) container_occurrence_ordinal: u32,
-    pub(super) container: PhysicalEntryRef,
-    pub(super) descriptor: PhysicalEntryRef,
-    pub(super) descriptor_node_index: u32,
-    pub(super) stream: PhysicalEntryRef,
-    pub(super) chunk_index: u32,
-    pub(super) entity_ordinal: u32,
+#[non_exhaustive]
+pub struct InteriorSocPosition {
+    /// Occurrence of the container under the root room.
+    pub container_occurrence_ordinal: u32,
+    /// Physical room container entry.
+    pub container: PhysicalEntryRef,
+    /// Physical XML descriptor entry.
+    pub descriptor: PhysicalEntryRef,
+    /// Node index of the stream declaration within the XML descriptor.
+    pub descriptor_node_index: u32,
+    /// Physical SOC stream entry.
+    pub stream: PhysicalEntryRef,
+    /// Chunk index within the stream.
+    pub chunk_index: u32,
+    /// Entity ordinal within the chunk.
+    pub entity_ordinal: u32,
 }
 
+/// One original SOC Entity attribute.
 #[derive(Debug, Serialize, JsonSchema)]
 #[schemars(transform = every_field_required)]
-pub(super) struct SocAttribute {
-    pub(super) name: SourcedValue<String>,
-    pub(super) value: SourcedValue<String>,
+#[non_exhaustive]
+pub struct SocAttribute {
+    /// Original attribute name.
+    pub name: SourcedValue<String>,
+    /// Original attribute value.
+    pub value: SourcedValue<String>,
 }
 
 /// Scope and findings for one original ship-room declaration.

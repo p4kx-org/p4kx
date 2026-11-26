@@ -29,8 +29,12 @@ pub use facility_placements::{
 #[path = "equipment_facility_interior_query.rs"]
 mod facility_interiors;
 pub use facility_interiors::{
-    FacilityInteriorCoverageSnapshot, InteriorCoverageDependency, InteriorRoomCoverage,
-    read_facility_interior_coverage, read_facility_interior_coverage_from,
+    FacilityInteriorCoverageSnapshot, FacilityInteriorPlacementSnapshot,
+    FacilityInteriorPlacementVisitSummary, InteriorCoverageDependency, InteriorFacilityPlacement,
+    InteriorRoomCoverage, InteriorSocPosition, SocAttribute, read_facility_interior_coverage,
+    read_facility_interior_coverage_from, read_facility_interior_placements,
+    read_facility_interior_placements_from, visit_facility_interior_placements,
+    visit_facility_interior_placements_from,
 };
 
 #[path = "equipment_installed_configuration_query.rs"]

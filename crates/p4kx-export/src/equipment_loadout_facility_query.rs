@@ -199,9 +199,9 @@ fn selected(
     })
 }
 
-struct ResolvedConfiguration {
-    state: AlignmentDependencyState,
-    links: Vec<FacilityConfiguration>,
+pub(super) struct ResolvedConfiguration {
+    pub(super) state: AlignmentDependencyState,
+    pub(super) links: Vec<FacilityConfiguration>,
 }
 
 fn read_placements(
@@ -220,7 +220,7 @@ fn read_placements(
     })
 }
 
-fn read_configuration(
+pub(super) fn read_configuration(
     alignment: &mut DirectAlignment<'_>,
     index: u32,
 ) -> Result<ResolvedConfiguration, CatalogError> {
