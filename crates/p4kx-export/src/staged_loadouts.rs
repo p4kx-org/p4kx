@@ -46,7 +46,8 @@ impl<'run> StagedLoadoutWriter<'run> {
         };
         writer.append(&loadout, self.cancel)?;
         if loadout.entity_kind() == EntityKind::Ship {
-            self.ships.push(loadout.into());
+            self.ships
+                .push(ShipLoadoutJoin::retain(loadout, self.cancel)?);
         }
         Ok(())
     }

@@ -1,11 +1,12 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{SourceUse, SourcedValue};
+use p4kx_extraction::{CancelToken, SourceUse, SourcedValue};
 
 use super::alignment::LoadoutAlignment;
 use crate::CatalogError;
 use crate::catalog_read::original::AuthoredEntryPath;
+use crate::catalog_rows::spool::{RowSpoolError, checkpoint};
 use crate::contract_loadout::{Loadout, LoadoutPort};
 use crate::guid_text::CatalogGuid;
 use crate::loadout_owner_value::LoadoutOwnerValue;
@@ -51,17 +52,18 @@ impl ShipLoadoutJoin {
             ports: &self.ports,
         }
     }
-}
 
-impl From<Loadout> for ShipLoadoutJoin {
-    fn from(loadout: Loadout) -> Self {
-        Self {
+    pub(crate) fn retain(
+        loadout: Loadout,
+        cancel: Option<&CancelToken>,
+    ) -> Result<Self, RowSpoolError> {
+        Ok(Self {
             record_index: loadout.root_record_index,
             source_record_index: loadout.source_record_index,
             entity_guid: loadout.entity_guid,
             port_inventory_complete: loadout.port_inventory_complete,
-            ports: retain_ports(loadout.ports),
-        }
+            ports: retain_ports(loadout.ports, cancel)?,
+        })
     }
 }
 
@@ -142,42 +144,66 @@ impl JoinPort for LoadoutPort {
 
 #[derive(Debug)]
 pub(crate) struct ShipPortJoin {
-    name: SourcedValue<String>,
-    name_proof: Option<AuthoredEntryPath>,
+    name: RetainedPortName,
     alignment: LoadoutAlignment,
     state: PortJoinState,
     children: Vec<Self>,
 }
 
-impl From<LoadoutPort> for ShipPortJoin {
-    fn from(port: LoadoutPort) -> Self {
+#[derive(Debug)]
+enum RetainedPortName {
+    Authored(AuthoredEntryPath),
+    Other {
+        value: Option<String>,
+        proof: Option<AuthoredEntryPath>,
+    },
+}
+
+impl ShipPortJoin {
+    fn retain(port: LoadoutPort, cancel: Option<&CancelToken>) -> Result<Self, RowSpoolError> {
         let state = (&port).into();
-        Self {
-            name: port.name,
-            name_proof: port.name_proof,
+        let name = match (port.name.into_value(), port.name_proof) {
+            (Some(value), Some(proof)) if value == proof.as_str() => {
+                RetainedPortName::Authored(proof)
+            }
+            (value, proof) => RetainedPortName::Other { value, proof },
+        };
+        Ok(Self {
+            name,
             alignment: port.source_constraints,
             state,
-            children: retain_ports(port.ports),
-        }
+            children: retain_ports(port.ports, cancel)?,
+        })
     }
 }
 
-fn retain_ports(ports: Vec<LoadoutPort>) -> Vec<ShipPortJoin> {
+fn retain_ports(
+    ports: Vec<LoadoutPort>,
+    cancel: Option<&CancelToken>,
+) -> Result<Vec<ShipPortJoin>, RowSpoolError> {
+    checkpoint(cancel)?;
     // The retained tree must use the smaller port layout's allocation.
     let mut retained = Vec::with_capacity(ports.len());
     for port in ports {
-        retained.push(ShipPortJoin::from(port));
+        checkpoint(cancel)?;
+        retained.push(ShipPortJoin::retain(port, cancel)?);
     }
-    retained
+    Ok(retained)
 }
 
 impl JoinPort for ShipPortJoin {
     fn name_value(&self) -> Option<&str> {
-        self.name.value().map(String::as_str)
+        match &self.name {
+            RetainedPortName::Authored(proof) => Some(proof.as_str()),
+            RetainedPortName::Other { value, .. } => value.as_deref(),
+        }
     }
 
     fn name_proof(&self) -> Option<&AuthoredEntryPath> {
-        self.name_proof.as_ref()
+        match &self.name {
+            RetainedPortName::Authored(proof) => Some(proof),
+            RetainedPortName::Other { proof, .. } => proof.as_ref(),
+        }
     }
 
     fn alignment(&self) -> &LoadoutAlignment {

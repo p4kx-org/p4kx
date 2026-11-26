@@ -102,6 +102,12 @@ impl<T> SourcedValue<T> {
         self.value.as_ref()
     }
 
+    /// Moves out the present value and drops its source state and evidence.
+    #[must_use]
+    pub fn into_value(self) -> Option<T> {
+        self.value
+    }
+
     /// Returns the immediate contribution set and encryption filter index.
     #[must_use]
     pub const fn origin(&self) -> &FieldOrigin {

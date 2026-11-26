@@ -111,10 +111,8 @@ impl<Key: Ord> IndexedRowSpoolWriter<Key> {
         }
         Ok(RowSpool {
             file: Mutex::new(file),
-            rows: frames.len(),
-            largest_row: 0,
             bytes: self.bytes,
-            frames: Some(frames),
+            index: super::RowIndex::Indexed(frames),
         })
     }
 }

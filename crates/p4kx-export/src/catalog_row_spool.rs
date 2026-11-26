@@ -4,6 +4,7 @@
 use std::cell::RefCell;
 use std::fs::File;
 use std::io::{self, BufReader, BufWriter, Read, Seek as _, Write};
+use std::num::NonZeroUsize;
 use std::path::Path;
 use std::sync::Mutex;
 
@@ -53,12 +54,10 @@ impl From<RowSpoolError> for CatalogError {
     }
 }
 
-/// Appends length-framed JSON rows to one private compressed temporary file.
+/// Streams ordered JSON rows into one private compressed file and indexes their decoded lengths.
 pub(crate) struct RowSpoolWriter {
-    encoder: Option<write::Encoder<'static, BufWriter<File>>>,
-    row: RowBuffer,
-    rows: usize,
-    largest_row: usize,
+    encoder: Option<BufWriter<write::Encoder<'static, BufWriter<File>>>>,
+    lengths: Vec<NonZeroUsize>,
 }
 
 impl RowSpoolWriter {
@@ -70,10 +69,8 @@ impl RowSpoolWriter {
         )?;
         encoder.include_checksum(true)?;
         Ok(Self {
-            encoder: Some(encoder),
-            row: RowBuffer::default(),
-            rows: 0,
-            largest_row: 0,
+            encoder: Some(BufWriter::with_capacity(BUFFER_BYTES, encoder)),
+            lengths: Vec::new(),
         })
     }
 
@@ -85,17 +82,23 @@ impl RowSpoolWriter {
     ) -> Result<(), RowSpoolError> {
         let mut encoder = self.encoder.take().ok_or(RowSpoolError::Closed)?;
         checkpoint(cancel)?;
-        let rows = self.rows.checked_add(1).ok_or(RowSpoolError::Overflow)?;
-        let bytes = self.row.encode(row, cancel)?;
-        let length = u64::try_from(bytes.len()).map_err(|_| RowSpoolError::Overflow)?;
-        let mut output = CheckedIo::new(&mut encoder, cancel);
-        let written = output
-            .write_all(&length.to_le_bytes())
-            .and_then(|()| output.write_all(bytes));
+        self.lengths.try_reserve(1)?;
+        let mut output = RowWriter {
+            inner: CheckedIo::new(&mut encoder, cancel),
+            length: 0,
+        };
+        let serialized = serde_json::to_writer(&mut output, row);
         checkpoint(cancel)?;
-        written?;
-        self.rows = rows;
-        self.largest_row = self.largest_row.max(bytes.len());
+        serialized.map_err(|error| {
+            if error.is_io() {
+                RowSpoolError::Io(error.into())
+            } else {
+                RowSpoolError::Encode(error)
+            }
+        })?;
+        let length = NonZeroUsize::new(output.length)
+            .ok_or(RowSpoolError::Corrupt("encoded row is empty"))?;
+        self.lengths.push(length);
         self.encoder = Some(encoder);
         Ok(())
     }
@@ -106,8 +109,12 @@ impl RowSpoolWriter {
         cancel: Option<&CancelToken>,
     ) -> Result<RowSpool, RowSpoolError> {
         checkpoint(cancel)?;
-        let encoder = self.encoder.take().ok_or(RowSpoolError::Closed)?;
-        let completed = encoder.finish();
+        let buffered = self.encoder.take().ok_or(RowSpoolError::Closed)?;
+        let encoder = buffered
+            .into_inner()
+            .map_err(io::IntoInnerError::into_error);
+        checkpoint(cancel)?;
+        let completed = encoder?.finish();
         checkpoint(cancel)?;
         let mut buffered = completed?;
         let flushed = buffered.flush();
@@ -119,10 +126,8 @@ impl RowSpoolWriter {
         let bytes = file.metadata()?.len();
         Ok(RowSpool {
             file: Mutex::new(file),
-            rows: self.rows,
-            largest_row: self.largest_row,
             bytes,
-            frames: None,
+            index: RowIndex::Sequential(self.lengths),
         })
     }
 }
@@ -131,15 +136,22 @@ impl RowSpoolWriter {
 #[derive(Debug)]
 pub(crate) struct RowSpool {
     file: Mutex<File>,
-    rows: usize,
-    largest_row: usize,
     bytes: u64,
-    frames: Option<Vec<indexed::Frame>>,
+    index: RowIndex,
+}
+
+#[derive(Debug)]
+enum RowIndex {
+    Sequential(Vec<NonZeroUsize>),
+    Indexed(Vec<indexed::Frame>),
 }
 
 impl RowSpool {
     pub(crate) const fn rows(&self) -> usize {
-        self.rows
+        match &self.index {
+            RowIndex::Sequential(lengths) => lengths.len(),
+            RowIndex::Indexed(frames) => frames.len(),
+        }
     }
 
     pub(crate) const fn stored_bytes(&self) -> u64 {
@@ -169,9 +181,10 @@ impl RowSpool {
         if file.metadata().map_err(RowSpoolError::Io)?.len() != self.bytes {
             return Err(RowSpoolError::Corrupt("compressed length changed").into());
         }
-        if let Some(frames) = &self.frames {
-            return indexed::replay(&mut file, frames, cancel, visit);
-        }
+        let lengths = match &self.index {
+            RowIndex::Sequential(lengths) => lengths,
+            RowIndex::Indexed(frames) => return indexed::replay(&mut file, frames, cancel, visit),
+        };
         file.rewind().map_err(RowSpoolError::Io)?;
         let input = CheckedIo::new(&mut *file, cancel);
         let decoder = read::Decoder::with_buffer(BufReader::with_capacity(BUFFER_BYTES, input))
@@ -179,8 +192,8 @@ impl RowSpool {
             .single_frame();
         let mut input = CheckedIo::new(decoder, cancel);
         let mut bytes = Vec::new();
-        for _ in 0..self.rows {
-            let row = read_row(&mut input, &mut bytes, self.largest_row, cancel)?;
+        for &length in lengths {
+            let row = read_row(&mut input, &mut bytes, length, cancel)?;
             visit(row).map_err(ReplayError::Output)?;
         }
         let mut tail = [0];
@@ -256,17 +269,11 @@ impl Serialize for SpoolRows<'_> {
 fn read_row<'a>(
     input: &mut impl Read,
     bytes: &'a mut Vec<u8>,
-    largest_row: usize,
+    length: NonZeroUsize,
     cancel: Option<&CancelToken>,
 ) -> Result<&'a RawValue, RowSpoolError> {
-    let mut length = [0; size_of::<u64>()];
-    checked_read(input, &mut length, cancel)?;
-    let size = usize::try_from(u64::from_le_bytes(length)).map_err(|_| RowSpoolError::Overflow)?;
-    if size == 0 || size > largest_row {
-        return Err(RowSpoolError::Corrupt(
-            "row length differs from the prepared bounds",
-        ));
-    }
+    checkpoint(cancel)?;
+    let size = length.get();
     bytes.clear();
     bytes.try_reserve(size)?;
     bytes.resize(size, 0);
@@ -288,6 +295,26 @@ fn checked_read(
             Err(RowSpoolError::Corrupt("a prepared row ended early"))
         }
         read => read.map_err(RowSpoolError::Io),
+    }
+}
+
+struct RowWriter<W> {
+    inner: W,
+    length: usize,
+}
+
+impl<W: Write> Write for RowWriter<W> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let written = self.inner.write(bytes)?;
+        self.length = self
+            .length
+            .checked_add(written)
+            .ok_or_else(|| io::Error::other(RowSpoolError::Overflow))?;
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
     }
 }
 

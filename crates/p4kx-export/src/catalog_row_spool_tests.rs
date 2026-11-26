@@ -5,6 +5,8 @@ use std::error::Error;
 use std::io::{self, Read as _, Seek as _, SeekFrom, Write as _};
 
 use p4kx_extraction::CancelToken;
+use serde::ser::SerializeSeq as _;
+use serde::{Serialize, Serializer};
 use serde_json::json;
 use serde_json::value::RawValue;
 
@@ -55,6 +57,34 @@ fn rows_replay_in_original_order_as_the_same_compact_json() -> TestResult {
         0,
         "scratch is released on drop"
     );
+    Ok(())
+}
+
+#[test]
+fn streamed_lengths_separate_scalars_and_a_row_larger_than_the_buffer() -> TestResult {
+    let scratch = tempfile::tempdir()?;
+    let mut writer = RowSpoolWriter::new(scratch.path())?;
+    let large = "x".repeat(super::BUFFER_BYTES * 4 + 1);
+    let rows = [json!(1), json!(23), json!(&large), json!(4)];
+    for row in &rows {
+        writer.append(row, None)?;
+    }
+    let spool = writer.finish(None)?;
+    let super::RowIndex::Sequential(lengths) = &spool.index else {
+        return Err("expected sequential row lengths".into());
+    };
+    assert_eq!(
+        lengths
+            .iter()
+            .map(|length| length.get())
+            .collect::<Vec<_>>(),
+        [1, 2, large.len() + 2, 1],
+        "the index counts serialized bytes accepted across buffer flushes"
+    );
+    let expected = serde_json::to_vec(&rows)?;
+    for _ in 0..2 {
+        assert_eq!(serde_json::to_vec(&spool.serialize_rows(None))?, expected);
+    }
     Ok(())
 }
 
@@ -163,6 +193,40 @@ fn an_in_place_checksum_corruption_stops_replay() -> TestResult {
         "spool replay error remains available"
     );
     Ok(())
+}
+
+#[test]
+fn cancellation_during_a_streamed_row_closes_the_writer() -> TestResult {
+    let scratch = tempfile::tempdir()?;
+    let mut writer = RowSpoolWriter::new(scratch.path())?;
+    writer.append(&1, None)?;
+    let cancel = CancelToken::new();
+    let partial = CancelDuringRow {
+        prefix: "x".repeat(super::BUFFER_BYTES + 1),
+        cancel: &cancel,
+    };
+    assert!(matches!(
+        writer.append(&partial, Some(&cancel)),
+        Err(RowSpoolError::Cancelled)
+    ));
+    assert!(matches!(writer.finish(None), Err(RowSpoolError::Closed)));
+    assert_eq!(scratch.path().read_dir()?.count(), 0);
+    Ok(())
+}
+
+struct CancelDuringRow<'a> {
+    prefix: String,
+    cancel: &'a CancelToken,
+}
+
+impl Serialize for CancelDuringRow<'_> {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut sequence = serializer.serialize_seq(Some(2))?;
+        sequence.serialize_element(&self.prefix)?;
+        self.cancel.cancel();
+        sequence.serialize_element(&false)?;
+        sequence.end()
+    }
 }
 
 struct FailedOutput;
