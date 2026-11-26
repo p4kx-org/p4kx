@@ -96,7 +96,7 @@ pub(super) fn read() -> TestResult<[Route; 15]> {
 }
 
 fn read_spawn_rows() -> TestResult<[Route; 4]> {
-    const REMAINING: &str = "Generator-scope producer parity verified; independent Template and Broker enumeration, installed parity and memory acceptance open";
+    const REMAINING: &str = "synthetic Generator, Template and Broker owner parity verified; installed cross-owner parity and memory acceptance open";
     spawns::with_catalog_parity(|_, snapshot| {
         Ok([
             Route::queried_rows(spawns::SHIPS, &snapshot.ship_spawns, REMAINING)?,

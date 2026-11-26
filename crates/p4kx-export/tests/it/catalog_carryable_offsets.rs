@@ -5,7 +5,7 @@ use std::ptr;
 
 use p4kx_export::build_catalog_from;
 use p4kx_export::catalog_queries::{CatalogQuerySession, CatalogRecordSelection, ProvenanceMode};
-use p4kx_extraction::{DataForgeEntry, Field, StructValue, Value as Original};
+use p4kx_extraction::{Archive, DataForgeEntry, Field, RecordTree, StructValue, Value as Original};
 use serde_json::{Value, json};
 
 use super::{DcbOrigin, Grips, TestResult, common, database, full_proof, proof};
@@ -19,6 +19,24 @@ fn hand_offsets_match_exact_original_axes_in_both_profiles() -> TestResult {
         .record(0)
         .ok_or("the physical fixture owner")?
         .tree()?;
+    let grips = original_grips(&owner)?;
+
+    let normal = common::options();
+    let marker_catalog: Value =
+        serde_json::from_slice(build_catalog_from(&archive, &entry, &normal)?.json())?;
+    let full_catalog: Value = serde_json::from_slice(
+        build_catalog_from(&archive, &entry, normal.with_full_provenance())?.json(),
+    )?;
+    let table = "/configurations/interactions/rows/0";
+    let full_row = proof::at(&full_catalog, table)?;
+    let marker_row = proof::at(proof::at(&marker_catalog, "/catalog")?, table)?;
+    check_grips(&full_catalog, owner.fields(), grips, full_row, marker_row)?;
+    check_marker_sdk(&archive, &entry, marker_row)
+}
+
+fn original_grips<'tree, 'source>(
+    owner: &'tree RecordTree<'source>,
+) -> TestResult<&'tree [Original<'source>]> {
     let Some(Original::Array(components)) = owner.field("Components") else {
         return Err("original Components array".into());
     };
@@ -31,16 +49,16 @@ fn hand_offsets_match_exact_original_axes_in_both_profiles() -> TestResult {
     let Some(Original::Array(grips)) = container.field("grips") else {
         return Err("original grips array".into());
     };
+    Ok(grips)
+}
 
-    let normal = common::options();
-    let marker_catalog: Value =
-        serde_json::from_slice(build_catalog_from(&archive, &entry, &normal)?.json())?;
-    let full_catalog: Value = serde_json::from_slice(
-        build_catalog_from(&archive, &entry, normal.with_full_provenance())?.json(),
-    )?;
-    let table = "/configurations/interactions/rows/0";
-    let full_row = proof::at(&full_catalog, table)?;
-    let marker_row = proof::at(proof::at(&marker_catalog, "/catalog")?, table)?;
+fn check_grips(
+    catalog: &Value,
+    fields: &[Field<'_>],
+    grips: &[Original<'_>],
+    full_row: &Value,
+    marker_row: &Value,
+) -> TestResult {
     let original_grips = proof::rows(full_row, "/gripData/value/grips/value")?;
     assert_eq!(
         original_grips.len(),
@@ -53,41 +71,56 @@ fn hand_offsets_match_exact_original_axes_in_both_profiles() -> TestResult {
         };
         for hand in ["handGrip", "offHandGrip"] {
             let path = format!("/gripData/value/grips/value/{index}/value/{hand}");
-            let (full_hand, marker_hand) =
-                (proof::at(full_row, &path)?, proof::at(marker_row, &path)?);
-            match grip.field(hand) {
-                Some(Original::Null) => {
-                    check_null(full_hand, marker_hand);
-                }
-                Some(Original::Struct(hand)) => {
-                    let Some(Original::Struct(offset)) = hand.field("offset") else {
-                        return Err("original local offset".into());
-                    };
-                    let full_offset = proof::at(full_hand, "/value/offset/value")?;
-                    let marker_offset = proof::at(marker_hand, "/value/offset/value")?;
-                    for (source_field, field) in
-                        [("Position", "position"), ("Rotation", "rotation")]
-                    {
-                        let Some(Original::Struct(axes)) = offset.field(source_field) else {
-                            return Err("original offset vector".into());
-                        };
-                        let path = format!("/{field}/value");
-                        check_axes(
-                            &full_catalog,
-                            owner.fields(),
-                            axes,
-                            proof::at(full_offset, &path)?,
-                            proof::at(marker_offset, &path)?,
-                        )?;
-                    }
-                }
-                _ => return Err("original hand declaration".into()),
-            }
+            check_hand(
+                catalog,
+                fields,
+                grip.field(hand),
+                proof::at(full_row, &path)?,
+                proof::at(marker_row, &path)?,
+            )?;
         }
     }
+    Ok(())
+}
 
-    let session =
-        CatalogQuerySession::from_entry(&archive, &entry, full_proof::NO_LANGUAGES, None)?;
+fn check_hand(
+    catalog: &Value,
+    fields: &[Field<'_>],
+    original: Option<&Original<'_>>,
+    full_hand: &Value,
+    marker_hand: &Value,
+) -> TestResult {
+    let hand = match original {
+        Some(Original::Null) => {
+            check_null(full_hand, marker_hand);
+            return Ok(());
+        }
+        Some(Original::Struct(hand)) => hand,
+        _ => return Err("original hand declaration".into()),
+    };
+    let Some(Original::Struct(offset)) = hand.field("offset") else {
+        return Err("original local offset".into());
+    };
+    let full_offset = proof::at(full_hand, "/value/offset/value")?;
+    let marker_offset = proof::at(marker_hand, "/value/offset/value")?;
+    for (source_field, field) in [("Position", "position"), ("Rotation", "rotation")] {
+        let Some(Original::Struct(axes)) = offset.field(source_field) else {
+            return Err("original offset vector".into());
+        };
+        let path = format!("/{field}/value");
+        check_axes(
+            catalog,
+            fields,
+            axes,
+            proof::at(full_offset, &path)?,
+            proof::at(marker_offset, &path)?,
+        )?;
+    }
+    Ok(())
+}
+
+fn check_marker_sdk(archive: &Archive, entry: &DataForgeEntry, marker_row: &Value) -> TestResult {
+    let session = CatalogQuerySession::from_entry(archive, entry, full_proof::NO_LANGUAGES, None)?;
     session.with_interactions(
         CatalogRecordSelection::RecordIndex(0),
         None,
