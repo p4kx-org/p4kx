@@ -20,10 +20,12 @@ identity and per-value provenance carried by v3.
 | --- | --- |
 | `blueprintCategories[].guid`, `className`, `recordPath` | Corresponding sourced field's `value` under `definitions.blueprintCategories.rows[]`. |
 | `blueprintCategories[].name` and its `key`, `en`, `de` | The released writer always used an empty placeholder. The original category Records have no name field. Use the sourced class name when an application needs a category label. |
-| `blueprintPools[].guid`, `className`, `recordPath` | Corresponding sourced value in `definitions.blueprintPools.rows[]`. Resolve nominal GUIDs to physical definitions before identifying an individual pool. |
-| `blueprintPools[].entries[].blueprintGuid`, `weight` | Each `definitions.blueprintPools.rows[].blueprintRewards.value[]` position holds the original `blueprintRecord` Reference and exact `weight`. Retain their original states and positions. |
-| `blueprintPools[].totalWeight` | `projections.blueprintPoolWeights.rows[].totalWeight`. Match the same input and `pool.recordIndex.value` to the definition. |
-| `blueprintPools[].rewardSources[]` | In `declarations.blueprintRewardSources.rows[]`, `guid` and `recordPath` identify the original referencing Record. `sourceOrdinal` distinguishes its occurrences. Use `pool` for the authored target, `poolStorage` for its original storage type, and the sourced `contractId`, `contractName` and `chance` for authored facts. |
+| `blueprintPools[].guid`, `className`, `recordPath` | Corresponding sourced field's `value` in `definitions.blueprintPools.rows[]`. Use the DataForge input and `recordIndex.value` to distinguish physical pools with the same GUID. |
+| `blueprintPools[].entries` | `definitions.blueprintPools.rows[].blueprintRewards.value[]` retains the original slot order and each slot's source state. |
+| `blueprintPools[].entries[].blueprintGuid`, `weight` | For a present slot, read `value.blueprintRecord.value.guid.value` and `value.weight.value`. The Reference also carries resolution status and physical target identity. The weight retains its original numeric representation. |
+| `blueprintPools[].totalWeight` | `projections.blueprintPoolWeights.rows[].totalWeight.value` carries exact Single bits and a nullable finite value. Match `pool.inputRef` and `pool.recordIndex.value` to the same physical pool definition. |
+| `blueprintPools[].rewardSources` | Read `declarations.blueprintRewardSources.rows[]` for the original pool-reference occurrences. When resolved, join `pool.value.targetRecordIndex.value` to the physical pool definition within the same input. Keep unresolved References and their original storage in `poolStorage`. |
+| `blueprintPools[].rewardSources[].recordGuid`, `recordPath`, `contractId`, `contractName`, `chance` | Read `guid.value`, `recordPath.value`, `contractId.value`, `contractName.value` and `chance.value` on each joined occurrence. The referencing Record index and `sourceOrdinal.value` distinguish repeated occurrences. |
 | `gameplayProperties[].guid`, `className`, `recordPath` | Corresponding sourced field's `value` under `definitions.gameplayProperties.rows[]`. |
 | `gameplayProperties[].name` | Join `definitions.gameplayProperties.rows[].propertyName.value` to `texts.publicNames[].id.value`. |
 | `gameplayProperties[].name.key` | `key.value` of that public-name entry. |

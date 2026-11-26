@@ -10,6 +10,8 @@ use serde_json::Value;
 use super::legacy_v2_inventory::{Inventory, released_schema};
 use super::schema_navigation::{present_value, resolve, schema_at};
 
+#[path = "legacy_v2_blueprint_pool.rs"]
+mod blueprint_pool;
 #[path = "legacy_v2_commodity.rs"]
 mod commodity;
 #[path = "legacy_v2_manufacturer.rs"]
