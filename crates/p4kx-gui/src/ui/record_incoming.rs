@@ -3,21 +3,23 @@
 
 use std::sync::Arc;
 
-use egui::{Color32, Galley, Id, TextStyle, TextWrapMode, Ui, WidgetText};
+use egui::{Color32, Galley, Id, Response, TextStyle, TextWrapMode, Ui, WidgetText};
 use fluent_bundle::FluentValue;
 
 use super::preview::path_line;
 use super::record_lines::{self, List};
 use super::record_preview::{RecordStep, heading};
+use super::source_origin;
 use crate::theme::desktop::SPINNER_INLINE;
 use crate::theme::palette;
 use crate::theme::tokens::{FS_SM, Weight};
 use crate::widgets::frames;
 use crate::widgets::indicator::spinner;
 use crate::widgets::text::plain;
+use crate::widgets::tooltip;
 use crate::{
-    Browser, IncomingPreview, IncomingStatus, IncomingText, IncomingView, Language, ScrollText,
-    Text, Texts, format,
+    Browser, IncomingPreview, IncomingStatus, IncomingText, IncomingView, Language, RecordText,
+    ScrollText, Text, Texts, format,
 };
 
 const SALT: &str = "incoming-lines";
@@ -90,12 +92,14 @@ fn ready(ui: &mut Ui, texts: &Texts, view: &IncomingView, generation: u64) -> Op
     frames::preview_body().show(ui, |ui| {
         if empty {
             let none = || (texts.get(IncomingText::None), palette::GRAY_2_TEXT);
-            note(ui, (texts, generation, 3), none);
+            let response = note(ui, (texts, generation, 3), none);
+            count_origin(response, texts, view);
             return;
         }
-        note(ui, (texts, generation, 4), || {
+        let counts = note(ui, (texts, generation, 4), || {
             (summary(texts, view), palette::GRAY_1)
         });
+        count_origin(counts, texts, view);
         if view.is_truncated() {
             note(ui, (texts, generation, 5), || {
                 let shown = ("shown", count(texts, view.lines().len()).into());
@@ -122,6 +126,7 @@ fn ready(ui: &mut Ui, texts: &Texts, view: &IncomingView, generation: u64) -> Op
     let list = List {
         lines: view.lines(),
         source: None,
+        incoming: Some(view),
         heads: HEADS,
         follow: Text::Incoming(IncomingText::Follow),
         scroll: ScrollText::Incoming,
@@ -135,7 +140,7 @@ fn note(
     ui: &mut Ui,
     (texts, generation, state): (&Texts, u64, u8),
     make: impl FnOnce() -> (String, Color32),
-) {
+) -> Response {
     let key = NoteKey {
         generation,
         language: texts.language(),
@@ -157,7 +162,35 @@ fn note(
             ui.data_mut(|data| data.insert_temp(id, (key, Arc::clone(&laid))));
             laid
         };
-    ui.label(WidgetText::Galley(galley));
+    ui.label(WidgetText::Galley(galley))
+}
+
+fn count_origin(response: Response, texts: &Texts, view: &IncomingView) {
+    tooltip::hover(response, |ui| {
+        tooltip::line(ui, texts.get(source_origin::label(view.count_origin())));
+    });
+}
+
+pub(super) fn line_origins(ui: &mut Ui, texts: &Texts, view: &IncomingView, index: usize) {
+    let proof = view.line_origins().and_then(|lines| lines.get(index));
+    source_origin::row(
+        ui,
+        texts,
+        IncomingText::HeadField,
+        proof.map(|row| &row.name),
+    );
+    source_origin::row(
+        ui,
+        texts,
+        IncomingText::HeadRecord,
+        proof.map(|row| &row.value),
+    );
+    source_origin::row(
+        ui,
+        texts,
+        RecordText::Type,
+        proof.and_then(|row| row.annotation.as_ref()),
+    );
 }
 
 fn summary(texts: &Texts, view: &IncomingView) -> String {

@@ -6,12 +6,18 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender, TryRecvError};
 use std::thread;
 
-use p4kx_extraction::{CancelToken, DataForge, ReferenceIndex};
+use p4kx_extraction::{
+    CancelToken, DataForge, DataForgeOrigin, FieldOrigin, ReferenceIndex, SourceEvidenceError,
+    SourceInventory,
+};
+
+#[path = "incoming_origins.rs"]
+mod origins;
 
 use super::{FieldLine, LineValue, RecordLink};
 use crate::forge_cache::ReadFailure;
 use crate::model::describe;
-use crate::{EntryIndex, RecordId};
+use crate::{EntryIndex, RecordFieldProvenance, RecordId};
 
 /// The most References the "Referenced by" list shows; the count line still counts all of them.
 pub const MAX_INCOMING_LINES: usize = 10_000;
@@ -26,9 +32,33 @@ pub struct IncomingView {
     references: usize,
     records: usize,
     incomplete: bool,
+    evidence: Result<origins::Evidence, SourceEvidenceError>,
 }
 
 impl IncomingView {
+    /// Returns the original Reference sites and displayed Record member origins in line order.
+    #[must_use]
+    pub fn line_origins(&self) -> Option<&[RecordFieldProvenance]> {
+        self.evidence
+            .as_ref()
+            .ok()
+            .map(|proof| proof.rows.as_slice())
+    }
+
+    /// Returns the original scan used by the incoming Reference and referring Record counts.
+    #[must_use]
+    pub fn count_origin(&self) -> Option<&FieldOrigin> {
+        self.evidence.as_ref().ok().map(|proof| &proof.count)
+    }
+
+    /// Returns the physical inputs and exact uses of the incoming summary and lines.
+    ///
+    /// # Errors
+    /// Returns the error preventing the retained original observations from being bound.
+    pub fn source_inventory(&self) -> Result<&SourceInventory, &SourceEvidenceError> {
+        self.evidence.as_ref().map(|proof| &proof.inventory)
+    }
+
     /// Returns the lines in the order of the referring Records and of the fields in each; the
     /// field is the name of a line, the referring Record its [`LineValue::Reference`].
     #[must_use]
@@ -306,15 +336,21 @@ fn find(
         Ok(forge) => forge,
         Err(error) => return Some(Err(Unread::Failed(describe(&error)))),
     };
-    let view = view(&forge, &references, id);
+    let view = view(&forge, &references, id, source.entry.origin_of(&forge));
     if index.watch().check().is_err() {
         return Some(Err(Unread::ArchiveChanged));
     }
     Some(Ok(view))
 }
 
-fn view(forge: &DataForge<'_>, references: &ReferenceIndex, id: RecordId) -> IncomingView {
+fn view(
+    forge: &DataForge<'_>,
+    references: &ReferenceIndex,
+    id: RecordId,
+    input: Option<&DataForgeOrigin>,
+) -> IncomingView {
     let total = references.incoming(id.0).len();
+    let mut evidence = origins::Capture::new(input);
     let mut lines = Vec::with_capacity(total.min(MAX_INCOMING_LINES));
     let mut records = 0;
     let mut last = None;
@@ -330,13 +366,21 @@ fn view(forge: &DataForge<'_>, references: &ReferenceIndex, id: RecordId) -> Inc
         let Some(record) = forge.record(source) else {
             continue;
         };
+        let path = record.record_path().ok();
+        let kind = record.type_name().ok();
+        if let Ok(capture) = &mut evidence
+            && let Err(error) =
+                capture.row(forge, references.origin(reference), &record, path, kind)
+        {
+            evidence = Err(error);
+        }
         lines.push(FieldLine {
             depth: 0,
             name: reference.location().into(),
             value: LineValue::Reference(RecordLink {
                 guid: record.guid(),
-                record_path: record.record_path().unwrap_or_default().into(),
-                type_name: record.type_name().unwrap_or_default().into(),
+                record_path: path.unwrap_or_default().into(),
+                type_name: kind.unwrap_or_default().into(),
                 at: None,
                 tag: None,
                 target: Some(RecordId(source)),
@@ -349,5 +393,6 @@ fn view(forge: &DataForge<'_>, references: &ReferenceIndex, id: RecordId) -> Inc
         references: total,
         records,
         incomplete: references.is_truncated() || references.unreadable_records() > 0,
+        evidence: evidence.and_then(|capture| capture.finish(forge, references, id.0)),
     }
 }

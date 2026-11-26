@@ -287,3 +287,40 @@ fn aliases_keep_the_actual_physical_weak_pointer_target() -> TestResult {
         Ok(())
     })
 }
+
+#[test]
+fn a_cancellable_owned_observation_preserves_order_and_physical_occurrences() -> TestResult {
+    in_both_versions(&scenes(), |forge| {
+        let source = record(forge, "Scene.One")?;
+        let target = record(forge, "Scene.Two")?;
+        let plain = ReferenceIndex::build(forge);
+        let observed = ReferenceIndex::build_observed_cancellable(forge, &|| false)
+            .ok_or("the cached observed index")?;
+        assert_eq!(
+            pairs(&observed, 2),
+            pairs(&plain, 2),
+            "plain and observed index order"
+        );
+        let link = observed
+            .incoming(target)
+            .next()
+            .ok_or("incoming Reference")?;
+        assert_eq!(link.source(), source, "the exact referrer");
+        assert_eq!(
+            observed.origin(link).map(|site| site.value_ordinal()),
+            Some(3),
+            "ordinal follows the owning array, its nested instance and its field"
+        );
+        assert!(
+            plain
+                .incoming(target)
+                .all(|link| observed.origin(link).is_none()),
+            "an equal occurrence in a foreign index cannot be rebound"
+        );
+        assert!(
+            ReferenceIndex::build_observed_cancellable(forge, &|| true).is_none(),
+            "cancelled observation does not publish an index"
+        );
+        Ok(())
+    })
+}

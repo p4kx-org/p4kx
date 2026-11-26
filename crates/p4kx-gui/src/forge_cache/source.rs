@@ -183,7 +183,7 @@ impl ForgeSource {
             .entry
             .open()
             .map_err(|error| ReadFailure::Unreadable(describe(&error)))?;
-        let Some(built) = ReferenceIndex::build_cancellable(&forge, stop) else {
+        let Some(built) = ReferenceIndex::build_observed_cancellable(&forge, stop) else {
             return Ok(None);
         };
         self.references_builds.fetch_add(1, Ordering::Relaxed);

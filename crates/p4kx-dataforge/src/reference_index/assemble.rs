@@ -5,7 +5,7 @@ use std::collections::HashMap;
 
 use super::ReferenceIndex;
 use super::collect::Chunk;
-use super::observed::Evidence;
+use super::observed::{Evidence, EvidencePolicy};
 
 /// Joins the chunks, which arrive in Record order, into one index of at most `limit` References.
 /// The caller drops each chunk once it is pushed, so only one wave of chunks lives at a time.
@@ -17,18 +17,18 @@ pub(super) struct Assembler {
 }
 
 impl Assembler {
-    pub(super) fn new(limit: usize, observed: bool) -> Self {
+    pub(super) fn new(limit: usize, observed: bool, policy: EvidencePolicy) -> Self {
         Self {
             index: ReferenceIndex::default(),
             shape_ids: HashMap::new(),
             limit,
-            evidence: observed.then(Evidence::default),
+            evidence: observed.then(|| Evidence::new(policy)),
         }
     }
 
     /// Returns whether References were left out, so that no later chunk can add any.
     pub(super) fn is_full(&self) -> bool {
-        self.index.truncated || self.evidence.as_ref().is_some_and(Evidence::failed)
+        self.index.truncated || self.evidence.as_ref().is_some_and(Evidence::aborts_index)
     }
 
     /// Appends the References of `chunk`, those past the limit are dropped and mark the index as
@@ -47,7 +47,9 @@ impl Assembler {
             && let Err(error) = evidence.append(original, take)
         {
             evidence.fail(error);
-            return;
+            if evidence.aborts_index() {
+                return;
+            }
         }
         if take > 0 {
             self.append_columns(&chunk, take);
@@ -89,7 +91,7 @@ impl Assembler {
         if self
             .evidence
             .as_ref()
-            .is_none_or(|evidence| !evidence.failed())
+            .is_none_or(|evidence| !evidence.aborts_index())
         {
             self.index.finish(record_count);
         }
@@ -126,4 +128,44 @@ fn remap_shapes(
             id
         })
         .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Assembler, Chunk, Evidence, EvidencePolicy};
+    use crate::ReferenceIndexError;
+
+    fn one(source: u32, target: u32, evidence: Evidence) -> Chunk {
+        Chunk {
+            sources: vec![source],
+            targets: vec![target],
+            shapes: vec![0],
+            index_starts: vec![0],
+            shape_ids: [("link".into(), 0)].into(),
+            evidence: Some(evidence),
+            ..Chunk::default()
+        }
+    }
+
+    #[test]
+    fn optional_evidence_failure_does_not_stop_indexing() {
+        let policy = EvidencePolicy::Optional;
+        let mut original = Evidence::new(policy);
+        original.fail(ReferenceIndexError::Inconsistent);
+        let mut assembly = Assembler::new(usize::MAX, true, policy);
+        assembly.push(one(0, 2, original));
+        assembly.push(one(1, 2, Evidence::new(policy)));
+        let (index, evidence) = assembly.finish(3);
+        let sources: Vec<_> = index.incoming(2).map(|link| link.source()).collect();
+
+        assert_eq!(
+            sources,
+            [0, 1],
+            "the canonical and following chunk remain indexed"
+        );
+        assert!(
+            evidence.is_some_and(|original| original.failed()),
+            "failed proof cannot be published"
+        );
+    }
 }

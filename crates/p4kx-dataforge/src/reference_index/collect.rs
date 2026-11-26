@@ -8,7 +8,7 @@ use crate::tree_cursor::Cursor;
 use crate::{DataForge, Field, Guid, Record, Step, TreeBuilder, Value, ValueError};
 
 use super::UNRESOLVED;
-use super::observed::{Evidence, ReferenceIndexError};
+use super::observed::{Evidence, EvidencePolicy, ReferenceIndexError};
 
 /// The Records each parallel task reads.
 pub(super) const RECORDS_PER_TASK: u32 = 512;
@@ -47,9 +47,10 @@ pub(super) fn collect<'f, const OBSERVED: bool>(
     range: Range<u32>,
     limit: usize,
     stop: &(dyn Fn() -> bool + Sync),
+    policy: EvidencePolicy,
 ) -> Chunk {
     let mut chunk = Chunk {
-        evidence: OBSERVED.then(Evidence::default),
+        evidence: OBSERVED.then(|| Evidence::new(policy)),
         ..Chunk::default()
     };
     let mut walker = Walker::<OBSERVED> {
@@ -61,7 +62,11 @@ pub(super) fn collect<'f, const OBSERVED: bool>(
     };
     for index in range {
         if walker.chunk.truncated
-            || walker.chunk.evidence.as_ref().is_some_and(Evidence::failed)
+            || walker
+                .chunk
+                .evidence
+                .as_ref()
+                .is_some_and(Evidence::aborts_index)
             || stop()
         {
             break;
@@ -92,7 +97,9 @@ impl<const OBSERVED: bool> Walker<'_, OBSERVED> {
         let tree = match builder.build(record) {
             Ok(tree) => tree,
             Err(error) => {
-                if let Some(evidence) = &mut self.chunk.evidence {
+                if let Some(evidence) = &mut self.chunk.evidence
+                    && !evidence.failed()
+                {
                     evidence.tree_error(record.index(), error);
                 }
                 return false;
@@ -111,9 +118,10 @@ impl<const OBSERVED: bool> Walker<'_, OBSERVED> {
             let current = visit.ordinal() as u64;
             if let Value::Error(error) = visit.value
                 && let Some(evidence) = &mut self.chunk.evidence
+                && !evidence.failed()
             {
                 evidence.value_error(self.source, current, visit.data_type, *error);
-                if evidence.failed() {
+                if evidence.aborts_index() {
                     break;
                 }
             }
@@ -129,10 +137,13 @@ impl<const OBSERVED: bool> Walker<'_, OBSERVED> {
                 break;
             }
             if let Some(evidence) = &mut self.chunk.evidence
+                && !evidence.failed()
                 && let Err(error) = evidence.retain(current)
             {
                 evidence.fail(error);
-                break;
+                if evidence.aborts_index() {
+                    break;
+                }
             }
             self.set_path(visit.steps);
             self.push(target, guid);

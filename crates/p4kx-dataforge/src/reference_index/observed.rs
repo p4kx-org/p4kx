@@ -66,8 +66,9 @@ impl<'source> ObservedReferenceIndex<'source> {
     ///
     /// Returns an error when the evidence cannot be allocated or the operation cannot finish.
     pub fn build(forge: &'source DataForge<'source>) -> Result<Self, ReferenceIndexError> {
-        let (index, evidence) = ReferenceIndex::scan::<true>(forge, usize::MAX, &|| false)
-            .ok_or(ReferenceIndexError::Inconsistent)?;
+        let (index, evidence) =
+            ReferenceIndex::scan::<true>(forge, usize::MAX, &|| false, EvidencePolicy::Required)
+                .ok_or(ReferenceIndexError::Inconsistent)?;
         let mut evidence = evidence.ok_or(ReferenceIndexError::Inconsistent)?;
         if let Some(error) = evidence.fault.take() {
             return Err(error);
@@ -103,16 +104,7 @@ impl<'source> ObservedReferenceIndex<'source> {
     /// Returns the actual original position when the occurrence belongs to this index.
     #[must_use]
     pub fn origin(&self, reference: IndexedReference<'_>) -> Option<IndexedReferenceOrigin<'_>> {
-        if !std::ptr::eq(reference.index, &raw const self.index) {
-            return None;
-        }
-        Some(IndexedReferenceOrigin {
-            reference: IndexedReference {
-                index: &self.index,
-                entry: reference.entry,
-            },
-            value_ordinal: *self.evidence.ordinals.get(reference.entry)?,
-        })
+        self.evidence.origin(&self.index, reference)
     }
 }
 
@@ -137,20 +129,67 @@ impl<'index> IndexedReferenceOrigin<'index> {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Copy)]
+pub(super) enum EvidencePolicy {
+    Required,
+    Optional,
+}
+
+#[derive(Debug)]
 pub(super) struct Evidence {
+    policy: EvidencePolicy,
     ordinals: Vec<u64>,
     gaps: Vec<ReferenceScanGap>,
     fault: Option<ReferenceIndexError>,
 }
 
 impl Evidence {
+    pub(super) const fn new(policy: EvidencePolicy) -> Self {
+        Self {
+            policy,
+            ordinals: Vec::new(),
+            gaps: Vec::new(),
+            fault: None,
+        }
+    }
+
+    pub(super) fn origin<'index>(
+        &self,
+        index: &'index ReferenceIndex,
+        reference: IndexedReference<'_>,
+    ) -> Option<IndexedReferenceOrigin<'index>> {
+        if !std::ptr::eq(reference.index, index) {
+            return None;
+        }
+        Some(IndexedReferenceOrigin {
+            reference: IndexedReference {
+                index,
+                entry: reference.entry,
+            },
+            value_ordinal: *self.ordinals.get(reference.entry)?,
+        })
+    }
+
+    pub(super) fn gaps(&self) -> &[ReferenceScanGap] {
+        &self.gaps
+    }
+
+    pub(super) const fn covers(&self, length: usize) -> bool {
+        !self.failed() && self.ordinals.len() == length
+    }
+
+    pub(super) const fn aborts_index(&self) -> bool {
+        self.failed() && matches!(self.policy, EvidencePolicy::Required)
+    }
+
     pub(super) const fn failed(&self) -> bool {
         self.fault.is_some()
     }
 
     pub(super) fn fail(&mut self, error: ReferenceIndexError) {
         self.fault.get_or_insert(error);
+        self.ordinals = Vec::new();
+        self.gaps = Vec::new();
     }
 
     pub(super) fn retain(&mut self, ordinal: u64) -> Result<(), ReferenceIndexError> {
@@ -209,6 +248,9 @@ impl Evidence {
     }
 
     pub(super) fn append(&mut self, chunk: Self, kept: usize) -> Result<(), ReferenceIndexError> {
+        if self.failed() {
+            return Ok(());
+        }
         if let Some(error) = chunk.fault {
             return Err(error);
         }

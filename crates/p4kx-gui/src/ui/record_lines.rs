@@ -9,6 +9,7 @@ use egui::{
     UiBuilder, Vec2, WidgetInfo, pos2, vec2,
 };
 
+use super::record_incoming;
 use super::record_key::Trailer;
 use super::record_preview::{self, RecordStep};
 use super::record_value::{spoken_value, value_text};
@@ -25,7 +26,8 @@ use crate::widgets::scroll_region;
 use crate::widgets::text::{caps, line, paint_left, plain};
 use crate::widgets::tooltip;
 use crate::{
-    FieldLine, LineValue, RecordChangeText, RecordText, RecordView, ScrollText, Text, Texts,
+    FieldLine, IncomingView, LineValue, RecordChangeText, RecordText, RecordView, ScrollText, Text,
+    Texts,
 };
 
 const MAX_ROWS: usize = 512;
@@ -39,6 +41,7 @@ const HEADS: [Text; 2] = [
 pub(super) struct List<'a> {
     pub(super) lines: &'a [FieldLine],
     pub(super) source: Option<&'a RecordView>,
+    pub(super) incoming: Option<&'a IncomingView>,
     pub(super) heads: [Text; 2],
     pub(super) follow: Text,
     pub(super) scroll: ScrollText,
@@ -163,6 +166,7 @@ pub(super) fn show(
     let list = List {
         lines: view.lines(),
         source: Some(view),
+        incoming: None,
         heads: HEADS,
         follow: Text::Record(RecordText::Follow),
         scroll: ScrollText::Lines,
@@ -266,6 +270,8 @@ fn row(
         tooltip::line(ui, described());
         if let Some(view) = list.source {
             record_preview::line_origins(ui, texts, view, (index, field));
+        } else if let Some(view) = list.incoming {
+            record_incoming::line_origins(ui, texts, view, index);
         }
     });
     value(ui, texts, (index, field, list.follow), (value_cell, &laid))

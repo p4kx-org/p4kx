@@ -21,7 +21,7 @@ pub use observed::{
 
 pub use observed_file_graph::{ObservedFileEdge, ObservedFileGraph};
 
-use observed::Evidence;
+use observed::{Evidence, EvidencePolicy};
 
 /// An optional occurrence budget for callers that request a bounded Reference index.
 pub const MAX_INDEXED_REFERENCES: usize = 1 << 23;
@@ -53,6 +53,7 @@ pub struct ReferenceIndex {
     source_offsets: Vec<usize>,
     target_offsets: Vec<usize>,
     by_target: Vec<usize>,
+    evidence: Option<Evidence>,
     unreadable: u32,
     truncated: bool,
 }
@@ -84,13 +85,41 @@ impl ReferenceIndex {
         limit: usize,
         stop: &(dyn Fn() -> bool + Sync),
     ) -> Option<Self> {
-        Self::scan::<false>(forge, limit, stop).map(|(index, _)| index)
+        Self::scan::<false>(forge, limit, stop, EvidencePolicy::Required).map(|(index, _)| index)
+    }
+
+    /// Builds the complete index and retains original positions and scan gaps when available.
+    ///
+    /// Cancellation returns no index. A proof allocation or observation failure leaves the
+    /// index available without source positions.
+    #[must_use]
+    pub fn build_observed_cancellable(
+        forge: &DataForge<'_>,
+        stop: &(dyn Fn() -> bool + Sync),
+    ) -> Option<Self> {
+        let (mut index, evidence) =
+            Self::scan::<true>(forge, usize::MAX, stop, EvidencePolicy::Optional)?;
+        index.evidence = evidence.filter(|evidence| evidence.covers(index.len()));
+        Some(index)
+    }
+
+    /// Returns the original position of a retained occurrence from this observed index.
+    #[must_use]
+    pub fn origin(&self, reference: IndexedReference<'_>) -> Option<IndexedReferenceOrigin<'_>> {
+        self.evidence.as_ref()?.origin(self, reference)
+    }
+
+    /// Returns gaps in the observed Record scan, if the source proof was retained.
+    #[must_use]
+    pub fn scan_gaps(&self) -> Option<&[ReferenceScanGap]> {
+        Some(self.evidence.as_ref()?.gaps())
     }
 
     fn scan<const OBSERVED: bool>(
         forge: &DataForge<'_>,
         limit: usize,
         stop: &(dyn Fn() -> bool + Sync),
+        evidence_policy: EvidencePolicy,
     ) -> Option<(Self, Option<Evidence>)> {
         let count = u32::try_from(forge.record_count()).unwrap_or(u32::MAX);
         let _warm = forge.record_by_guid(Guid::default());
@@ -99,7 +128,7 @@ impl ReferenceIndex {
             u32::try_from(rayon::current_num_threads().saturating_mul(WAVE_TASKS_PER_THREAD))
                 .unwrap_or(u32::MAX)
                 .max(1);
-        let mut assembler = assemble::Assembler::new(limit, OBSERVED);
+        let mut assembler = assemble::Assembler::new(limit, OBSERVED, evidence_policy);
         let mut next = 0_u32;
         while next < tasks && !assembler.is_full() {
             if stop() {
@@ -112,7 +141,14 @@ impl ReferenceIndex {
                     let start = task * collect::RECORDS_PER_TASK;
                     let range: Range<u32> =
                         start..count.min(start.saturating_add(collect::RECORDS_PER_TASK));
-                    collect::collect::<OBSERVED>(forge, builder, range, limit, stop)
+                    collect::collect::<OBSERVED>(
+                        forge,
+                        builder,
+                        range,
+                        limit,
+                        stop,
+                        evidence_policy,
+                    )
                 })
                 .collect();
             for chunk in chunks {

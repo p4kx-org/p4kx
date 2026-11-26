@@ -87,6 +87,15 @@ all emitted fields. Ranges contain the escaped bytes and preserve the position
 of an empty value. Generated syntax and fields beyond the retained XML have no
 range.
 
+## Incoming Record references
+
+The Referenced by tab keeps the original Reference occurrences from its
+cached DataForge index. Each displayed field path and referring Record member
+has its original source uses and an immediate encryption marker. The totals
+include the original reference scan and retain incomplete evidence when the
+scan has gaps. If the source positions cannot be kept, navigation and queries
+continue with unknown provenance where the positions are required.
+
 ## Companion records
 
 The [JSON Schema](../schemas/p4kx-source-origin.schema.json) describes each line.
