@@ -1,8 +1,10 @@
 # Reduced Basetool Catalog scope
 
-The field-selection workbook marked 76 rows for inclusion and 157 for omission.
-Five selected rows are containers for selected child tables. The field sheet has
-no individual overrides. The dataset notes narrow the retained fields below.
+The field-selection workbook marks 76 rows for inclusion and 157 for omission.
+Five selected rows are containers for selected child tables. All 60,512 field
+rows inherit the dataset choice. The dataset notes narrow the retained fields
+below. Omission applies to the delivered payload. Canonical readers still use
+the inputs that selected projections require.
 This selection was made against Catalog v3 at `6f3cda47`. Validate the source path
 for each field against the release candidate before fixing the reduced schema.
 
@@ -12,7 +14,8 @@ for each field against the release candidate before fixing the reduced schema.
   `source` block includes the Channel, Build (including change number and public
   patch when known), tool version, export timestamp, key access and unread
   encrypted Entry count. Health assesses the source closure needed for this
-  export. An incomplete selected source can block publication.
+  export. A Normal export requires complete selected data, and the importer
+  requires a healthy export before applying it.
 - For every published dataset, retain the selection status and filter needed
   to validate import and decide whether to remove absent rows. Report the exact
   selected populations. Ship-only Loadouts must carry that scope explicitly.
@@ -117,7 +120,7 @@ selected data.
 | `placements.jumpEndpoints` | System, starmap Record GUID and type, world position, target path, candidates and declared partner. |
 | `placements.starmapPlacements` | Object and placed-under GUIDs, entity name, system and position in system-frame metres. Cover container sources supported by the canonical reader. |
 | `projections.blueprintPoolWeights` | Total weight by pool. |
-| `projections.blueprintPresentation` | Blueprint identity, name, category, product, default availability, dismantle process and tier, first tier and ingredients. Resolve tier and ingredient links without publishing raw arenas. The v2 Wiki key has no corresponding field on the v3 presentation row. Verify its source before deriving a compatibility value. |
+| `projections.blueprintPresentation` | Blueprint identity, name, category, product, default availability, dismantle process and tier, first tier, ingredients and the class name used as the v2 Wiki key. Resolve tier and ingredient links without publishing raw arenas. |
 | `projections.commodityPresentation` | Commodity GUID, name, description, display type, density, type, subtype and refined-subtype GUIDs. |
 | `projections.contracts` | Parent and sub-contract GUIDs, debug name, handler, title/giver/type references, faction and giver faction, standing and reputation data, cooldowns, fixed and Blueprint rewards, layered values, offer locations and pickup points. Keep additional domain pointers as opaque GUIDs only when their target tables are outside the published scope. |
 | `projections.jumpConnections` | Preserve the table and its availability, including an empty surveyed table while no connection is established. |
@@ -159,6 +162,14 @@ over the available canonical results before checking reduced size.
   Record index, tier position and cost position to link ingredients, nested
   options and dismantle tiers. Preserve authored order, duplicate Blueprint
   GUIDs and gaps where an original slot has no interpreted cost.
+- The v2 `blueprints[].key` is the class name copied from the same Record that
+  supplies `blueprints[].className`. Get the reduced value from the sourced
+  `className` in `definitions.blueprints`. Join the presentation's
+  `blueprint.inputRef` and `blueprint.recordIndex` to the definition's
+  `inputRef` and `recordIndex.value`. A physical Record identity keeps this join
+  unambiguous when a GUID occurs more than once. Preserve the source casing and
+  state. Skip Wiki matching when the class name is empty or the join is
+  unavailable.
 - Resolve a retained recipe slot's debug name from its actual original value
   and retain protected text classification. Accumulate text selectors for the
   included fields by canonical public-name or game-text domain and key before
