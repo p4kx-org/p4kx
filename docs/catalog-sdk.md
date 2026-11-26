@@ -2257,8 +2257,9 @@ supported ATLS owners, one physical Record at a time.
 
 This query shares the Catalog's original reader, Archive-backed ShipPool and per-call
 Capture. It uses the Entity header index to open the dependencies reached by the selected owners'
-Ship, loadout and cargo resolvers. It returns the selected rows in memory. An empty physical
-selection returns an empty source inventory and finishes before locale and Entity index setup.
+Ship, loadout and cargo resolvers. An all-owner query prepares the original Record bodies
+in groups of up to 32 and retains the selected result rows for the callback. An empty
+physical selection returns an empty source inventory before locale and Entity index setup.
 Use the result's text resolvers and source inventory to resolve original keys and text identities
 in the requested languages.
 

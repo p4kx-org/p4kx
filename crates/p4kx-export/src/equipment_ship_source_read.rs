@@ -15,14 +15,18 @@ use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection, Data
 use crate::catalog_query_session::{CatalogQuerySource, checkpoint};
 use crate::export_diagnostic::ExportSourceRole;
 use crate::export_ledger::ExportLedger;
-use crate::guid_text::CatalogGuid;
-use crate::playability_rules::Evidence;
+use crate::playability_rules::{Evidence, ShipDependencies};
 use crate::record_observation::RecordObservation;
 use crate::ship::{ShipSource, source_projection};
 use crate::ship_pool::ShipPool;
 use crate::texts::{TextSources, Texts};
 use crate::variant_use_sets::VariantSourceUseSets;
 use crate::{CatalogError, ExportAccountingError, Kind};
+
+#[path = "equipment_ship_owner_groups.rs"]
+mod owner_groups;
+
+use owner_groups::OwnerGroups;
 
 pub(super) struct Query<'query> {
     pub(super) archive: &'query Archive,
@@ -51,8 +55,8 @@ impl<'query> Query<'query> {
         inspect: impl FnOnce(ShipSourceSnapshot<'_>) -> T,
     ) -> Result<T, CatalogError> {
         checkpoint(self.cancel)?;
-        let plan = self.plan()?;
-        self.run_plan(plan, inspect)
+        let owners = self.owners()?;
+        self.project_plan(owners, Scope::Sources, |snapshot, _| inspect(snapshot))
     }
 
     pub(super) fn run_plan<T>(
@@ -60,7 +64,11 @@ impl<'query> Query<'query> {
         plan: Plan<'query>,
         inspect: impl FnOnce(ShipSourceSnapshot<'_>) -> T,
     ) -> Result<T, CatalogError> {
-        self.project_plan(plan, Scope::Sources, |snapshot, _| inspect(snapshot))
+        self.project_plan(
+            OwnerGroups::prepared(plan),
+            Scope::Sources,
+            |snapshot, _| inspect(snapshot),
+        )
     }
 
     pub(super) fn run_ships<T>(
@@ -68,26 +76,22 @@ impl<'query> Query<'query> {
         inspect: impl FnOnce(ShipSnapshot<'_>) -> T,
     ) -> Result<T, CatalogError> {
         checkpoint(self.cancel)?;
-        let plan = self.plan()?;
-        self.project_plan(plan, Scope::Canonical, |snapshot, variant_sets| {
+        let owners = self.owners()?;
+        self.project_plan(owners, Scope::Canonical, |snapshot, variant_sets| {
             inspect(ShipSnapshot::new(snapshot, variant_sets))
         })
     }
 
     fn project_plan<T>(
         &self,
-        mut plan: Plan<'query>,
+        mut groups: OwnerGroups<'query>,
         scope: Scope,
         inspect: impl FnOnce(ShipSourceSnapshot<'_>, VariantSourceUseSets) -> T,
     ) -> Result<T, CatalogError> {
-        plan.owners.sort_by_key(|owner| {
-            (
-                CatalogGuid(owner.record.guid()).text(),
-                owner.record.index(),
-            )
-        });
-        if plan.owners.is_empty() {
-            return self.empty(plan.coverage, |snapshot| {
+        let mut owners = Vec::new();
+        groups.fill(&mut owners, self.cancel)?;
+        if owners.is_empty() {
+            return self.empty(groups.finish(), |snapshot| {
                 inspect(snapshot, VariantSourceUseSets::default())
             });
         }
@@ -100,7 +104,7 @@ impl<'query> Query<'query> {
         let registry = CatalogTextRegistry::default();
         let projection = CatalogProjection::new(&texts, &input, &registry).for_kind(Kind::Ships);
         let files = ArchiveFiles::new(self.archive);
-        let mut selected = project(plan, &input, &projection, &files, self.cancel)?;
+        let mut selected = project(groups, owners, &input, &projection, &files, self.cancel)?;
         let variant_sets = match scope {
             Scope::Sources => VariantSourceUseSets::default(),
             Scope::Canonical => super::variants::project(
@@ -173,13 +177,18 @@ impl<'query> Query<'query> {
         })
     }
 
-    fn plan(&self) -> Result<Plan<'query>, CatalogError> {
-        Plan::read(self.forge, Kind::Ships, self.selection, self.cancel, None)
+    fn owners(&self) -> Result<OwnerGroups<'query>, CatalogError> {
+        if matches!(self.selection, CatalogRecordSelection::All) {
+            return OwnerGroups::all(self.forge, self.cancel);
+        }
+        let plan = Plan::read(self.forge, Kind::Ships, self.selection, self.cancel, None)?;
+        Ok(OwnerGroups::prepared(plan))
     }
 }
 
 fn project<'source>(
-    mut plan: Plan<'source>,
+    mut groups: OwnerGroups<'source>,
+    mut owners: Vec<Owner<'source>>,
     input: &'source OriginalCatalogInput<'source, 'source>,
     projection: &CatalogProjection<'_, 'source>,
     files: &'source ArchiveFiles<'source>,
@@ -189,28 +198,35 @@ fn project<'source>(
     let entities = Arc::new(Entities::new(input.forge()));
     checkpoint(cancel)?;
     let pool = ShipPool::new(entities, files);
-    let (playability, mut ledger) =
-        Evidence::read_for_ships(plan.owners.iter().map(|owner| &owner.tree), input, cancel)?;
+    let mut playability = ShipDependencies::new(input);
+    let mut ledger = ExportLedger::default();
     let mut rows = Vec::new();
     let mut dependencies = ShipSourceDependencyCoverage::default();
-    let projector = ShipQueryProjector {
-        input,
-        projection,
-        pool: &pool,
-        playability: &playability,
-        cancel,
-    };
-    for owner in plan.owners {
-        if let Some(row) =
-            projector.project_owner(&owner, &mut ledger, &mut plan.coverage, &mut dependencies)?
-        {
-            rows.push(row);
+    while !owners.is_empty() {
+        ledger.merge(playability.prepare(owners.iter().map(|owner| &owner.tree), cancel)?);
+        let projector = ShipQueryProjector {
+            input,
+            projection,
+            pool: &pool,
+            playability: playability.evidence(),
+            cancel,
+        };
+        for owner in owners.drain(..) {
+            if let Some(row) = projector.project_owner(
+                &owner,
+                &mut ledger,
+                &mut groups.coverage,
+                &mut dependencies,
+            )? {
+                rows.push(row);
+            }
         }
+        groups.fill(&mut owners, cancel)?;
     }
     dependencies.finish(files.archive(), &ledger)?;
     Ok(SelectedShips {
         rows,
-        coverage: plan.coverage,
+        coverage: groups.finish(),
         dependencies,
     })
 }

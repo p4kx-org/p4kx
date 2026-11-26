@@ -38,6 +38,7 @@ pub(super) enum Case {
     RepairedWithMass,
     RepairedWithoutMass,
     Aliases,
+    GroupedOwners,
     RoundedZero,
 }
 
@@ -71,6 +72,9 @@ pub(super) fn open_with_origin(
 
 fn database(case: Case) -> Vec<u8> {
     let mut database = p4kx_testkit::entity_schema(DataForgeBuilder::new().version(8));
+    if matches!(case, Case::GroupedOwners) {
+        return grouped_database(database);
+    }
     for mass in if matches!(case, Case::Aliases) {
         vec![10.0, 20.0]
     } else {
@@ -103,10 +107,35 @@ fn database(case: Case) -> Vec<u8> {
     database.build()
 }
 
+fn grouped_database(mut database: DataForgeBuilder) -> Vec<u8> {
+    for index in 0..=66_u16 {
+        let guid = match index {
+            0 => 0xff00,
+            1 => 0xaa00,
+            66 => 0x4400,
+            _ => 0x7700,
+        };
+        let class = format!("GroupedShip{index}");
+        let path = format!("libs/foundry/records/entities/spaceships/grouped_{index}.xml");
+        let record = TestEntity::new(guid, &class, &path)
+            .attach_type("NOITEM_Vehicle")
+            .vehicle(DEFINITION, "")
+            .physics_mass(f32::from(index))
+            .record();
+        let record = if matches!(index, 0 | 66) {
+            record.with_instance_index(u16::MAX)
+        } else {
+            record
+        };
+        database = database.record(record);
+    }
+    database.build()
+}
+
 fn xml(case: Case) -> TestResult<Option<Vec<u8>>> {
     Ok(match case {
         Case::Parts | Case::Unreadable | Case::UnreadableWithPhysics => Some(PARTS.to_vec()),
-        Case::Empty | Case::Aliases => Some(EMPTY.to_vec()),
+        Case::Empty | Case::Aliases | Case::GroupedOwners => Some(EMPTY.to_vec()),
         Case::InvalidValues | Case::InvalidValuesWithPhysics => Some(
             br#"<Vehicle><Parts><Part mass="invalid" damageMax="invalid"/></Parts></Vehicle>"#
                 .to_vec(),

@@ -35,6 +35,12 @@ impl<'source> OrderedOwnerPlan<'source> {
         Ok(Self { records, coverage })
     }
 
+    pub(in crate::build::catalog_queries) fn into_parts(
+        self,
+    ) -> (Vec<Record<'source>>, CatalogRecordCoverage) {
+        (self.records, self.coverage)
+    }
+
     pub(in crate::build::catalog_queries) fn project<Row>(
         self,
         cancel: Option<&CancelToken>,

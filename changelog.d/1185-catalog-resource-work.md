@@ -11,3 +11,5 @@
   placement and resource joins and release duplicate port names and evidence after staging.
 - The SDK uses a smaller original-field index for Item definitions and one shared physical
   Record selector for equipment batches.
+- All-Ship queries decode original Record bodies in bounded groups and retain the same
+  ordered result and coverage.

@@ -59,6 +59,28 @@ fn direct_ship_sdk_keeps_guid_aliases_and_exact_physical_selection() -> TestResu
     Ok(())
 }
 
+#[test]
+fn all_ship_sources_keep_physical_ties_and_failures_across_groups() -> TestResult {
+    let (_folder, archive) = fixture::open(Case::GroupedOwners)?;
+    let catalog = fixture::catalog(&archive)?;
+    let languages = CatalogLanguageSelection::Selected(&[]);
+    let indices: Vec<_> = (2..=65).chain([1]).collect();
+    let masses: Vec<_> = indices.iter().copied().map(f64::from).collect();
+    full_proof::open(&archive, languages, None)?.with_ship_sources(
+        CatalogRecordSelection::All,
+        None,
+        |snapshot| -> TestResult {
+            assert_eq!(
+                snapshot.coverage().unreadable_bodies,
+                [0, 66],
+                "unreadable coverage keeps physical order even when body reads follow GUID order"
+            );
+            aliases(&snapshot, &catalog, &indices, &masses)
+        },
+    )??;
+    Ok(())
+}
+
 fn aliases(
     snapshot: &ShipSourceSnapshot<'_>,
     catalog: &Value,
