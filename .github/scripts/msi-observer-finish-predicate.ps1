@@ -1,11 +1,6 @@
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'msi-observer-finish-receipt-poll.ps1')
 . (Join-Path $PSScriptRoot 'package-process.ps1')
-
-function Get-P4kxMsiFinishProbeMilliseconds {
-    param([DateTimeOffset]$Deadline, [Diagnostics.Stopwatch]$Clock, [double]$Budget)
-    $wall=($Deadline - [DateTimeOffset]::UtcNow).TotalMilliseconds
-    return [int][Math]::Max(0,[Math]::Floor([Math]::Min($wall,$Budget - $Clock.Elapsed.TotalMilliseconds)))
-}
 
 function Test-P4kxMsiFinishDirectReceiptPresence {
     param($Context, [string]$ReceiptPath, [Diagnostics.Stopwatch]$Clock, [double]$Budget, [hashtable]$Observation)

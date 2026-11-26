@@ -1,20 +1,17 @@
-param([Parameter(Mandatory)][string]$Directory, [switch]$HoldWorker)
+param([Parameter(Mandatory)][string]$Directory)
 $ErrorActionPreference = 'Stop'
 
-if ($HoldWorker) {
-    [IO.File]::WriteAllText((Join-Path $Directory 'worker-ready'), [string]$PID)
-    $clock = [Diagnostics.Stopwatch]::StartNew()
-    while ($clock.ElapsedMilliseconds -lt 20000 -and -not [IO.File]::Exists((Join-Path $Directory 'worker-release'))) {
-        Start-Sleep -Milliseconds 25
-    }
-    exit 0
-}
-. (Join-Path $PSScriptRoot 'msi-observer-request.ps1')
-. (Join-Path $PSScriptRoot 'msi-observer-snapshot-caller.ps1')
 . (Join-Path $PSScriptRoot 'msi-observer-finish-wait-host.ps1')
 
+function Write-P4kxFinishLifecycleFixtureResult([string]$Path, [string]$Digest) {
+    Write-P4kxDetachedReceipt $Path @{
+        schema=1;role='native-msi-finish-lifecycle-control-response';request_sha256=$Digest
+        completed_success=$false;native_completion_unproven=$true;mutation_authority=$false
+    }
+}
+
 function New-P4kxFinishLifecycleFixture {
-    param([string]$Root, [ValidateSet('Bound','Foreign','Stale','Hosted')][string]$Case, [string]$ForeignDigest)
+    param([string]$Root, [ValidateSet('Bound','Foreign','Stale','Hosted','Absent','Late')][string]$Case, [string]$ForeignDigest, [switch]$Unpublished)
 
     $caseRoot = [IO.Directory]::CreateDirectory((Join-Path $Root $Case)).FullName
     $invocation = Join-Path $caseRoot 'invocation.json'
@@ -42,9 +39,8 @@ function New-P4kxFinishLifecycleFixture {
     if ($Case -ceq 'Stale') { $launch.cutoff_utc = $cutoff.AddSeconds(-1).ToString('o') }
     Write-P4kxDetachedReceipt (Join-Path $finish 'launch.json') $launch
     $resultPath = Join-Path $finish 'result.json'
-    Write-P4kxDetachedReceipt $resultPath @{
-        schema=1;role='native-msi-finish-lifecycle-control-response';request_sha256=$digest
-        completed_success=$false;native_completion_unproven=$true;mutation_authority=$false
+    if (-not $Unpublished) {
+        Write-P4kxFinishLifecycleFixtureResult $resultPath $digest
     }
     return @{
         observer=$observer;output=$output;request=$request;digest=$digest;launch=$launch
@@ -91,7 +87,8 @@ function Assert-P4kxFinishLifecycleObservation($Fixture, [string[]]$Lines) {
     if (($notices -join ' ') -cne ($expected -join ' ')) { throw 'Original Finish predicate notices are missing or out of order.' }
 }
 
-function Assert-P4kxFinishLifecycleWait($Fixture, [string]$ResultDigest) {
+function Assert-P4kxFinishLifecycleWait {
+    param($Fixture, [string]$ResultDigest, [switch]$Hosted)
     $wait = Read-P4kxDetachedReceipt $Fixture.wait_path
     $probe = $wait.direct_probe
     $observed = ConvertFrom-P4kxMsiBudgetTimestamp $wait.observed_utc
@@ -102,10 +99,14 @@ function Assert-P4kxFinishLifecycleWait($Fixture, [string]$ResultDigest) {
         $wait.deadline_utc -cne $Fixture.collection_cutoff.ToString('o') -or
         $wait.result_sha256 -cne $ResultDigest -or (Get-P4kxDetachedDigest $Fixture.result_path) -cne $ResultDigest -or
         $observed -lt $started -or $observed -gt $Fixture.collection_cutoff -or $wait.mutation_authority -ne $false -or
-        $probe.signal_contract -cne 'direct-process-only' -or $probe.pid -le 0 -or $probe.pid -eq $PID -or
-        $probe.started -ne $true -or $probe.exited -ne $true -or $probe.exit_code -ne 0 -or $probe.timed_out -ne $false -or
         [IO.Path]::Exists($Fixture.output) -or [IO.Path]::Exists((Join-Path $Fixture.observer 'observer-result.json'))) {
-        throw 'The actual Finish wait lost its bound observation-only result.'
+        throw 'The Finish wait lost its bound observation-only result.'
+    }
+    if ($Hosted) {
+        if ($wait.Contains('direct_probe')) { throw 'Hosted Finish receipt observation launched a direct probe.' }
+    } elseif ($probe.signal_contract -cne 'direct-process-only' -or $probe.pid -le 0 -or $probe.pid -eq $PID -or
+        $probe.started -ne $true -or $probe.exited -ne $true -or $probe.exit_code -ne 0 -or $probe.timed_out -ne $false) {
+        throw 'The direct predicate control lost its process-lifetime evidence.'
     }
 }
 
@@ -123,91 +124,65 @@ function Assert-P4kxFinishLaunchRefused($Fixture, [string]$Entrypoint) {
     }
 }
 
-function Assert-P4kxFinishWaitHostBinding($Record, [DateTimeOffset]$Cutoff) {
-    $started = ConvertFrom-P4kxMsiBudgetTimestamp $Record.started_utc
-    $ended = ConvertFrom-P4kxMsiBudgetTimestamp $Record.ended_utc
-    if ($Record.schema -ne 1 -or $Record.role -cne 'native-msi-finish-wait-host' -or
-        $Record.revision -cne $env:GITHUB_SHA -or $Record.run -cne $env:GITHUB_RUN_ID -or
-        $Record.attempt -cne $env:GITHUB_RUN_ATTEMPT -or $Record.target -cne $env:P4KX_TARGET -or
-        $Record.pid -ne $PID -or $Record.child_pid -le 0 -or $Record.child_pid -eq $PID -or
-        $Record.cutoff_utc -cne $Cutoff.ToString('o') -or $started -ge $Cutoff -or $ended -lt $started -or
-        $Record.child_exited -ne $true -or $Record.native_completion_unproven -ne $true -or
-        $Record.mutation_authority -ne $false) {
-        throw 'The hosted Finish wait record lost its source, cutoff or owned-child observation.'
-    }
-}
-
 function Assert-P4kxHostedFinishWait($Fixture) {
-    $digest = Get-P4kxDetachedDigest $Fixture.result_path
-    $cutoff = $Fixture.collection_cutoff
-    Invoke-P4kxMsiHostedFinishWait -Directory $Fixture.observer -CollectionCutoffUtc $cutoff.ToString('o') 6>$null
     $diagnostics = Split-Path -Parent $Fixture.wait_path
-    $record = Read-P4kxDetachedReceipt (Join-Path $diagnostics 'wait-host-result.json')
-    $hostCutoff = $cutoff.AddSeconds(1)
-    Assert-P4kxFinishWaitHostBinding $record $hostCutoff
-    if ($record.timed_out -ne $false -or $record.exit_code -ne 0 -or
-        (ConvertFrom-P4kxMsiBudgetTimestamp $record.ended_utc) -gt $hostCutoff) {
-        throw 'The hosted Finish wait did not preserve a timely successful observation.'
-    }
-    Assert-P4kxFinishLifecycleObservation $Fixture ([IO.File]::ReadAllLines((Join-Path $diagnostics 'wait-host-stdout.log')))
-    Assert-P4kxFinishLifecycleWait $Fixture $digest
-}
-
-function Get-P4kxFinishHoldArguments([string]$Script, [string]$Directory) {
-    @('-NoLogo','-NoProfile','-NonInteractive','-File',('"' + $Script + '"'),
-        '-Directory',('"' + $Directory + '"'),'-HoldWorker')
-}
-
-function Wait-P4kxOriginalControlWorker($Process, [string]$ReadyPath) {
-    $clock = [Diagnostics.Stopwatch]::StartNew()
-    while (-not [IO.File]::Exists($ReadyPath)) {
-        if ($Process.HasExited -or $clock.ElapsedMilliseconds -ge 6000) {
-            throw 'The independent harmless worker did not reach its hold.'
-        }
-        Start-Sleep -Milliseconds 25
-    }
-    if ($Process.HasExited -or [IO.File]::ReadAllText($ReadyPath) -cne [string]$Process.Id) {
-        throw 'The independent harmless worker identity differs.'
-    }
-}
-
-function Assert-P4kxFinishWaitHostTimeout([string]$Root, [string]$Script) {
-    $original = [IO.Directory]::CreateDirectory((Join-Path $Root 'independent worker')).FullName
-    $timeout = [IO.Directory]::CreateDirectory((Join-Path $Root 'uncooperative wait')).FullName
-    $workerArguments = Get-P4kxFinishHoldArguments $Script $original
-    $worker = Start-Process -FilePath ([Environment]::ProcessPath) -ArgumentList $workerArguments -WindowStyle Hidden -PassThru
+    $wrongCutoff = $Fixture.collection_cutoff.AddSeconds(1).ToString('o')
     try {
-        Wait-P4kxOriginalControlWorker $worker (Join-Path $original 'worker-ready')
-        $arguments = Get-P4kxFinishHoldArguments $Script $timeout
-        $cutoff = [DateTimeOffset]::UtcNow.AddSeconds(4)
-        $failure = $null
-        try {
-            $null = Invoke-P4kxMsiFinishWaitProcess -Arguments $arguments -Directory $timeout -Cutoff $cutoff 6>$null
-        } catch { $failure = $_.Exception.Message }
-        $record = Read-P4kxDetachedReceipt (Join-Path $timeout 'wait-host-result.json')
-        Assert-P4kxFinishWaitHostBinding $record $cutoff
-        $readyPid = [IO.File]::ReadAllText((Join-Path $timeout 'worker-ready'))
-        if ($failure -cne 'The owned MSI Finish wait exceeded the original collection cutoff.' -or
-            $record.timed_out -ne $true -or $null -eq $record.exit_code -or $record.exit_code -eq 0 -or
-            (ConvertFrom-P4kxMsiBudgetTimestamp $record.ended_utc) -lt $cutoff -or
-            $readyPid -cne [string]$record.child_pid -or $record.child_pid -eq $worker.Id -or $worker.HasExited -or
-            [IO.Path]::Exists((Join-Path $timeout 'wait-result.json'))) {
-            throw 'The expired wait did not stop only its owned child and retain a failure observation.'
-        }
-        $child = Get-Process -Id $record.child_pid -ErrorAction SilentlyContinue
-        try {
-            if ($null -ne $child -and -not $child.HasExited) { throw 'The owned wait child is still alive after its recorded exit.' }
-        } finally {
-            if ($null -ne $child) { $child.Dispose() }
-        }
-    } finally {
-        try {
-            [IO.File]::WriteAllText((Join-Path $original 'worker-release'), '')
-            if (-not $worker.WaitForExit(3000)) {
-                $worker.Kill($false)
-                if (-not $worker.WaitForExit(1000)) { throw 'The owned harmless fixture worker did not stop.' }
+        Invoke-P4kxMsiHostedFinishWait -Directory $Fixture.observer -CollectionCutoffUtc $wrongCutoff
+        throw 'Hosted Finish wait accepted a different collection cutoff.'
+    } catch {
+        if ($_.Exception.Message -cne 'Hosted Finish wait requires the original Lifecycle collection cutoff.') { throw }
+    }
+
+    & {
+        function Start-Process { throw 'Hosted receipt observation attempted to launch a process.' }
+        function New-P4kxPackageProcess { throw 'Hosted receipt observation constructed an owned process.' }
+        function Start-Sleep([int]$Milliseconds) {
+            if ($Milliseconds -lt 1 -or $Milliseconds -gt 100 -or [IO.File]::Exists($Fixture.result_path)) {
+                throw 'Hosted Finish receipt polling exceeded its interval or repeated a completed read.'
             }
-        } finally { $worker.Dispose() }
+            Write-P4kxFinishLifecycleFixtureResult $Fixture.result_path $Fixture.digest
+        }
+        Invoke-P4kxMsiHostedFinishWait -Directory $Fixture.observer -CollectionCutoffUtc $Fixture.collection_cutoff.ToString('o') 6>$null
+    }
+    $digest = Get-P4kxDetachedDigest $Fixture.result_path
+    Assert-P4kxFinishLifecycleWait $Fixture $digest -Hosted
+    foreach ($stage in 'finishWaitBinding','finishWaitPoll','finishWaitDigest','finishWaitReceipt') {
+        foreach ($status in 'begin','end') {
+            $progress = Read-P4kxDetachedReceipt (Join-Path $diagnostics "$stage-$status.json")
+            if ($progress.stage -cne $stage -or $progress.status -cne $status -or
+                $progress.request_sha256 -cne $Fixture.digest -or $progress.native_completion_unproven -ne $true -or
+                $progress.completed_success -ne $false -or $progress.mutation_authority -ne $false) {
+                throw 'Hosted Finish lost durable stage and request evidence.'
+            }
+        }
+    }
+    [IO.File]::AppendAllText($Fixture.result_path, ' ')
+    try {
+        Read-P4kxMsiSupervisedFinish $Fixture.observer 6>$null
+        throw 'Changed terminal bytes passed the original Finish validation.'
+    } catch {
+        if ($_.Exception.Message -cne 'Finish requires the exact terminal receipt from its bounded wait.') { throw }
+    }
+}
+
+function Assert-P4kxHostedFinishWaitRefused($Fixture, [DateTimeOffset]$Cutoff) {
+    $context = Get-P4kxMsiFinishContext $Fixture.observer
+    $launch = Read-P4kxMsiFinishLaunch $context
+    $context.collection_cutoff = $Cutoff
+    $clock = [Diagnostics.Stopwatch]::StartNew()
+    try {
+        Wait-P4kxMsiFinishReceipt $context $launch -Hosted
+        throw 'Missing or late terminal bytes passed the hosted wait.'
+    } catch {
+        if ($_.Exception.Message -cne 'The bound Finish supervisor produced no result within the original allowance.') { throw }
+    }
+    $wait = Read-P4kxDetachedReceipt $Fixture.wait_path
+    if ($clock.ElapsedMilliseconds -gt 5000 -or $wait.schema -ne 1 -or $wait.role -cne 'native-msi-finish-receipt-wait' -or
+        $wait.deadline_utc -cne $Cutoff.ToString('o') -or $wait.request_sha256 -cne $Fixture.digest -or
+        $wait.supervisor_pid -ne $launch.supervisor_pid -or $wait.supervisor_started_utc_ticks -ne $launch.supervisor_started_utc_ticks -or
+        $null -ne $wait.result_sha256 -or $wait.Contains('direct_probe') -or $wait.mutation_authority -ne $false) {
+        throw 'The hosted wait did not preserve bounded negative observation evidence.'
     }
 }
 
@@ -228,9 +203,10 @@ try {
     Assert-P4kxFinishLifecycleWait $bound $digest
     Assert-P4kxFinishLaunchRefused (New-P4kxFinishLifecycleFixture $root Foreign -ForeignDigest $bound.digest) $entry
     Assert-P4kxFinishLaunchRefused (New-P4kxFinishLifecycleFixture $root Stale) $entry
-    Assert-P4kxHostedFinishWait (New-P4kxFinishLifecycleFixture $root Hosted)
-    Assert-P4kxFinishWaitHostTimeout $root $PSCommandPath
-    'PASS: Lifecycle WaitFinish verified bound observations, refused foreign and stale launches, and timed out only its owned wait child.'
+    Assert-P4kxHostedFinishWait (New-P4kxFinishLifecycleFixture $root Hosted -Unpublished)
+    Assert-P4kxHostedFinishWaitRefused (New-P4kxFinishLifecycleFixture $root Absent -Unpublished) ([DateTimeOffset]::UtcNow.AddMilliseconds(150))
+    Assert-P4kxHostedFinishWaitRefused (New-P4kxFinishLifecycleFixture $root Late) ([DateTimeOffset]::UtcNow.AddSeconds(-1))
+    'PASS: Lifecycle WaitFinish verified its bound receipt, refused foreign and stale sources, and retained missing or late observations without launching a hosted wait process.'
 } finally {
     $env:P4KX_MSI_STEP_MINUTES = $savedMinutes
     $env:P4KX_MSI_STEP_COMPUTED_AT_UTC = $savedComputed

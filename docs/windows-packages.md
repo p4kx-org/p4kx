@@ -526,12 +526,12 @@ JSON receipts. The checkpoint records the last complete and validated phase row,
 including its occurrence, parent, status and timestamp. A partial trailing line
 does not replace that observation. The published JSON remains available if the
 runner stops reporting during Finish. The workflow saves the original Finish
-launch binding before waiting. A local host
-waits on the owned WaitFinish process and uses one second of the existing hosted
-cleanup reserve for process exit after an on-time observation. Its three standard
-streams point to task files. The host uses the direct child exit signal and
-retains a separate diagnostic outcome on timeout. CollectFinish validates the
-original collection cutoff and the native lifecycle receipt before publication.
+launch binding before waiting. The runner step polls the supervisor's atomic
+result file using the original UTC cutoff and a monotonic budget. It records
+the observation phases and a bound receipt before reporting the outcome.
+If the terminal result is absent or late, the receipt contains no result digest.
+CollectFinish validates the cutoff, digest and original native lifecycle
+evidence before publication.
 The diagnostic runner-fuse fixture records whether GitHub retains the wait-start annotation
 after a deliberate step timeout. Both observations leave native lifecycle completion unproven.
 The hosted fuse run for `e2ec43eef` retained the `predicate-wait` start annotation
