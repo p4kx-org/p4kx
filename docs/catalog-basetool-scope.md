@@ -290,6 +290,25 @@ and the sourced largest-ship-size link. A null link and an undeclared link
 keep their states. A resolved LandingPadSize target retains its physical
 identity, path and type even though its definition is outside the selection.
 
+## Internal Quantum Drive producer slice
+
+The selected configuration keeps each physical drive component, its fuel
+requirement and jump range, and the standard speed, acceleration stages,
+engage speed, cooldown, spool and calibration fields. The original
+numeric types, signed zero and source states survive the reduction. Speeds,
+distances and times keep the units in the [canonical Quantum Drive
+contract](catalog-quantum-drives.md). An absent standard profile stays
+absent. Spline, heat, boost and effects are outside the selection.
+
+## Internal Blueprint category and pool producer slice
+
+Category rows retain their physical Record identities. Pool definitions
+and total weights come from one canonical query and join by their physical
+pool positions. Pool slots retain their order, repetitions, nulls and
+dangling references, along with each original relative weight. Every
+resolved reference to an included Blueprint must resolve to the matching
+physical definition in the reduced table.
+
 ## Acceptance
 
 #1177 tracks the wire contract, generation and import. Use a distinct versioned

@@ -5,14 +5,14 @@ use p4kx_extraction::SourcedValue;
 use serde::Serialize;
 
 use super::cell::Cell;
-use crate::canonical_record_header::CanonicalRecordHeader;
+use crate::canonical_record_header::{CanonicalRecordHeader, CatalogRecordSource};
 use crate::guid_text::CatalogGuid;
 use crate::variant_target::VariantTarget;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(super) struct RecordIdentity<'source> {
-    guid: Cell<&'source CatalogGuid>,
+    guid: Cell<CatalogGuid>,
     record_index: Cell<&'source u32>,
     class_name: Cell<&'source str>,
     record_path: Cell<&'source str>,
@@ -21,10 +21,21 @@ pub(super) struct RecordIdentity<'source> {
 impl<'source> From<&'source CanonicalRecordHeader<'_>> for RecordIdentity<'source> {
     fn from(header: &'source CanonicalRecordHeader<'_>) -> Self {
         Self {
-            guid: Cell::from(&header.guid),
+            guid: Cell::from(&header.guid).map(|guid| *guid),
             record_index: Cell::from(header.record_index()),
             class_name: Cell::from(header.class_name()).map(|name| *name),
             record_path: Cell::from(header.record_path()).map(|path| *path),
+        }
+    }
+}
+
+impl<'source> From<&'source CatalogRecordSource> for RecordIdentity<'source> {
+    fn from(header: &'source CatalogRecordSource) -> Self {
+        Self {
+            guid: Cell::from(&header.guid).map(|guid| CatalogGuid(*guid)),
+            record_index: Cell::from(&header.record_index),
+            class_name: Cell::from(&header.class_name).map(String::as_str),
+            record_path: Cell::from(&header.record_path).map(String::as_str),
         }
     }
 }

@@ -10,6 +10,7 @@ use thiserror::Error;
 use crate::catalog_rows::spool::RowSpoolError;
 use crate::{CatalogError, CatalogFile};
 
+mod blueprint_taxonomy;
 mod bounded_output;
 mod cargo_globals;
 mod cargo_grids;
@@ -28,6 +29,7 @@ mod manufacturer;
 mod manufacturer_definitions;
 mod number;
 mod plan;
+mod quantum_drives;
 mod record_identity;
 mod record_link;
 mod record_targets;
@@ -44,6 +46,8 @@ mod ship_loadout;
 mod shops;
 
 #[cfg(test)]
+mod blueprint_taxonomy_tests;
+#[cfg(test)]
 mod cargo_globals_tests;
 #[cfg(test)]
 mod commodity_tests;
@@ -55,6 +59,8 @@ mod entity_tests;
 mod jump_inventory_tests;
 #[cfg(test)]
 mod jump_point_configuration_tests;
+#[cfg(test)]
+mod quantum_drive_tests;
 #[cfg(test)]
 mod resource_group_tests;
 #[cfg(test)]
