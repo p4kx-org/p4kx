@@ -56,5 +56,15 @@ translation-only control preserved the position and had a maximum matrix error
 of `1.0`. The consumer receipt SHA-256 is
 `638ec97bec090c68cebf7684f3f9bf0bad58fafc7a8e081ef8f405cd1f277b4f`.
 
+A second check generated a fresh four-file package with the sealed Windows AMD64
+CLI from `eada15a2e10c24a93e112c49d781726912528a0d`. Blender 5.2.5 LTS build
+`5f2fd03c4701` imported it with the add-on from
+`0a7162bf7baf35534c63ea54ccf724aa4c5522e5`. Independent composition from the
+synthetic archive, DataForge record and model helpers agreed with both evaluated
+transforms within `2.220446049250313e-16` per coefficient. The importer emitted
+no warnings. The translation-only control preserved position but differed in
+orientation by up to `1.0` per coefficient. The producer and consumer receipt
+SHA-256 is `8ea48e00079acbffc392df930b426a5911f208552e5b99eff5e7cc583dfc2894`.
+
 The witness covers static placement. The animation-time interpretation remains
 unresolved under [ADR-0321](adr/0321-a-ports-ang3-offset-is-degrees-with-x-before-z-and-a-loadout-entry-prefers-its-reference.md).
