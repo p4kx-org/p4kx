@@ -5,7 +5,8 @@ function Invoke-P4kxMsiHostedFinishWatchdog {
     param(
         [Parameter(Mandatory)][string]$Directory,
         [Parameter(Mandatory)][string]$CollectionCutoffUtc,
-        [string]$WorkerScript = (Join-Path $PSScriptRoot 'msi-observer-finish-hosted-worker.ps1')
+        [string]$WorkerScript = (Join-Path $PSScriptRoot 'msi-observer-finish-hosted-worker.ps1'),
+        [long]$MonitorStartedUtcTicks
     )
     $cutoff = ConvertFrom-P4kxMsiBudgetTimestamp $CollectionCutoffUtc
     $timer = [Diagnostics.Stopwatch]::StartNew()
@@ -20,7 +21,10 @@ function Invoke-P4kxMsiHostedFinishWatchdog {
         RedirectStandardOutput = [IO.Path]::Combine($privateLogs, 'host-stdout.log')
         RedirectStandardError = [IO.Path]::Combine($privateLogs, 'host-stderr.log')
     }
-    $hosted = $env:GITHUB_ACTIONS -ceq 'true' -and $env:RUNNER_ENVIRONMENT -ceq 'github-hosted'
+    if ($MonitorStartedUtcTicks -gt 0) {
+        $start.ArgumentList += @('-MonitorPid',$PID,'-MonitorStartedUtcTicks',$MonitorStartedUtcTicks)
+    }
+    $hosted = $MonitorStartedUtcTicks -eq 0 -and $env:GITHUB_ACTIONS -ceq 'true' -and $env:RUNNER_ENVIRONMENT -ceq 'github-hosted'
     if ($hosted) { Write-Host '::notice title=Native MSI Finish watchdog::Starting the bound receipt observer. Native completion is unproven.' }
     $owned = Start-Process @start
     try {

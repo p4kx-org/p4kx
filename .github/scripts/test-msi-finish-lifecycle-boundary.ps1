@@ -32,7 +32,7 @@ function Write-P4kxFinishLifecycleFixtureResult([string]$Path, [string]$Digest) 
 }
 
 function New-P4kxFinishLifecycleFixture {
-    param([string]$Root, [ValidateSet('Bound','Foreign','Stale','Hosted','LaunchReadFailure','Absent','Late','Watchdog','WatchdogFailure')][string]$Case, [string]$ForeignDigest, [switch]$Unpublished)
+    param([string]$Root, [ValidateSet('Bound','Foreign','Stale','Hosted','LaunchReadFailure','Absent','Late','Watchdog','WatchdogFailure','AcrossLaunchers')][string]$Case, [string]$ForeignDigest, [switch]$Unpublished)
 
     $caseRoot = [IO.Directory]::CreateDirectory((Join-Path $Root $Case)).FullName
     $invocation = Join-Path $caseRoot 'invocation.json'
@@ -256,6 +256,63 @@ function Assert-P4kxHostedFinishWatchdogBinding($Fixture, [switch]$WrongCutoff) 
     }
 }
 
+function Assert-P4kxHostedFinishAcrossLaunchers($Fixture) {
+    $PSNativeCommandUseErrorActionPreference = $false
+    $observer = Join-Path $PSScriptRoot 'invoke-msi-finish-observation.ps1'
+    $shellArguments = @('-NoLogo','-NoProfile','-NonInteractive','-File',$observer)
+    $cutoff = $Fixture.collection_cutoff.ToString('o')
+    $binding = @('-Directory',$Fixture.observer,'-CollectionCutoffUtc',$cutoff)
+    $scriptBinding = @{Directory=$Fixture.observer;CollectionCutoffUtc=$cutoff}
+    $digest = & ([Environment]::ProcessPath) @shellArguments -Stage Start @binding
+    if ($LASTEXITCODE -ne 0 -or $digest -cnotmatch '^[0-9a-f]{64}$') {
+        throw 'The first Finish shell did not exit with a single original readiness digest.'
+    }
+    $directory = Split-Path -Parent $Fixture.wait_path
+    $readyPath = Join-Path $directory 'waiter-ready.json'
+    $exitPath = Join-Path $directory 'waiter-exit.json'
+    $ready = Read-P4kxMsiHostedFinishReady $readyPath $Fixture.collection_cutoff $digest
+    $worker = Get-Process -Id $ready.waiter_pid
+    try {
+        if ($worker.StartTime.ToUniversalTime().Ticks -ne $ready.waiter_started_utc_ticks -or
+            $ready.request_sha256 -cne $Fixture.digest -or
+            $ready.launch_sha256 -cne (Get-P4kxDetachedReceiptDigest (Join-Path $directory 'launch.json')) -or
+            [IO.File]::Exists($exitPath) -or [IO.File]::Exists($Fixture.wait_path)) {
+            throw 'The observed waiter did not stay live after its launcher, or readiness claimed completion.'
+        }
+    } finally { $worker.Dispose() }
+    try {
+        & $observer -Stage Wait @scriptBinding -ReadyDigest ('b'*64)
+        throw 'A foreign readiness digest was accepted.'
+    } catch {
+        if ($_.Exception.Message -cne 'Finish readiness bytes differ from the original launch stage.') { throw }
+    } finally {
+        Write-P4kxFinishLifecycleFixtureResult $Fixture.result_path $Fixture.digest
+    }
+    & ([Environment]::ProcessPath) @shellArguments -Stage Wait @binding -ReadyDigest $digest
+    if ($LASTEXITCODE -ne 0) { throw 'The second Finish shell rejected the timely bound child exit.' }
+    Assert-P4kxFinishLifecycleWait $Fixture (Get-P4kxDetachedReceiptDigest $Fixture.result_path) -Hosted
+    $expired = [DateTimeOffset]::UtcNow.AddSeconds(-1).ToString('o')
+    try {
+        & $observer -Stage Wait -Directory $Fixture.observer -CollectionCutoffUtc $expired -ReadyDigest $digest
+        throw 'An expired original Finish wait was accepted.'
+    } catch {
+        if ($_.Exception.Message -cne 'Native MSI diagnostic deadline expired or exceeds its job budget.') { throw }
+    }
+    [IO.File]::AppendAllText($Fixture.wait_path, [char]10)
+    try {
+        & $observer -Stage Wait @scriptBinding -ReadyDigest $digest
+        throw 'Changed wait receipt bytes were accepted.'
+    } catch {
+        if ($_.Exception.Message -cne 'The original Finish waiter exit proof is late, foreign or unsuccessful.') { throw }
+    }
+    try {
+        & $observer -Stage Start @scriptBinding
+        throw 'A duplicate Finish waiter launch was accepted.'
+    } catch {
+        if ($_.Exception.Message -cne 'A Finish waiter was already admitted for this launch.') { throw }
+    }
+}
+
 $root = [IO.Path]::GetFullPath($Directory)
 if (-not $IsWindows -or [IO.Path]::Exists($root)) { throw 'The Lifecycle Finish control requires a fresh native Windows directory.' }
 $null = New-Item -ItemType Directory -Path $root
@@ -284,6 +341,7 @@ try {
     Assert-P4kxHostedFinishWaitRefused (New-P4kxFinishLifecycleFixture $root Late) ([DateTimeOffset]::UtcNow.AddSeconds(-1))
     Assert-P4kxHostedFinishWatchdogBinding (New-P4kxFinishLifecycleFixture $root Watchdog)
     Assert-P4kxHostedFinishWatchdogBinding (New-P4kxFinishLifecycleFixture $root WatchdogFailure) -WrongCutoff
+    Assert-P4kxHostedFinishAcrossLaunchers (New-P4kxFinishLifecycleFixture $root AcrossLaunchers -Unpublished)
     'PASS: Lifecycle WaitFinish verified its bound receipt, refused foreign and stale sources, retained missing or late observations, and exercised the native watchdog child.'
 } finally {
     $env:P4KX_MSI_STEP_MINUTES = $savedMinutes

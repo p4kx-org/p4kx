@@ -1,3 +1,3 @@
 ### Fixed
 
-- Bound the Windows MSI Finish wait from the job shell, preserve its launch evidence and report the owned child outcome.
+- Upload the bound Windows MSI waiter readiness before the long Finish wait and retain its exit evidence under the original deadline.

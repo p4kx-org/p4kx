@@ -527,17 +527,18 @@ Before Finish starts, each native target uploads a checkpoint with the six allow
 JSON receipts. The checkpoint records the last complete and validated phase row,
 including its occurrence, parent, status and timestamp. A partial trailing line
 does not replace that observation. The published JSON remains available if the
-runner stops reporting during Finish. The workflow saves the original Finish
-launch binding before waiting. The runner step polls the supervisor's atomic
-result file using the original UTC cutoff and a monotonic budget. It records
-the observation phases and a bound receipt before reporting the outcome.
-On GitHub-hosted Windows runners, fixed observation notices mark the request and launch
-binding, result poll, digest and wait receipt independently of artifact upload.
-Each notice names its phase and whether the operation started or returned.
-The notices establish progress only. Native lifecycle completion depends on the bound
-original result. If the terminal result is absent or late, the receipt contains no result digest.
-CollectFinish validates the cutoff, digest and original native lifecycle
-evidence before publication.
+runner stops reporting during Finish. The workflow uploads the original Finish
+launch binding, starts the read-only waiter in a separate bounded step and uploads its
+readiness receipt before WaitFinish. The receipt binds the request, launch, collection
+deadline and waiter and monitor process identities. It remains available after a later
+job timeout if its upload completed.
+
+The waiter polls the supervisor's atomic result using the original UTC cutoff and a
+monotonic budget. Its phase markers and private logs help diagnose later failure.
+WaitFinish verifies the bound waiter exit and wait receipt. If the terminal result is
+absent or late, the wait receipt contains no result digest. Readiness and phase notices
+establish progress only. CollectFinish still validates the cutoff, digest and original
+native lifecycle evidence before publication.
 The diagnostic runner-fuse fixture records whether GitHub retains the wait-start annotation
 after a deliberate step timeout. Both observations leave native lifecycle completion unproven.
 The hosted fuse run for `e2ec43eef` retained the `predicate-wait` start annotation

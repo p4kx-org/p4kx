@@ -124,12 +124,18 @@ outcome on both architectures. A checkpoint records the phase observed in the or
 journal and carries an unproven lifecycle verdict. The original files remain in the local
 checkpoint and snapshot directories for diagnostic upload.
 
-A separate Finish supervisor observes the original lifecycle. On both Windows CPUs, the hosted
-WaitFinish watchdog owns a child for the complete receipt check. The child binds the original
-request and supervisor, waits for the receipt, and records the observed digest on disk. Its output
-goes to private log files. At the original deadline the watchdog has a 750 ms allowance for the
-child to record a failure and up to 1,000 ms to reap the owned process. The deadline failure
-stands even if the child exits successfully during that allowance.
+A separate Finish supervisor observes the original lifecycle. Each Windows job uploads its
+original launch binding, then starts a detached monitor and its read-only waiter in a short
+workflow step. The waiter validates the original request and supervisor, then writes a readiness
+receipt containing their digests, the original cutoff and both process identities. The job uploads
+that receipt before entering the longer WaitFinish step. Readiness records progress and leaves
+native completion unproven.
+
+The monitor owns the waiter for the complete receipt observation and keeps its output in private
+logs. It records the waiter's exit code and binds a successful exit to the observed receipt
+digest. WaitFinish checks that evidence against the same cutoff. At the deadline the monitor
+allows 750 ms for the waiter to record failure and up to 1,000 ms to reap the owned process.
+The deadline failure stands even if the waiter exits successfully during that allowance.
 
 CollectFinish requires the bound receipts, the original successful result, the closed journal
 and final cleanup. The terminal evidence upload must succeed before the executed release payload

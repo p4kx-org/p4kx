@@ -1,11 +1,14 @@
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'msi-observer-request.ps1')
 . (Join-Path $PSScriptRoot 'msi-observer-finish-control.ps1')
+. (Join-Path $PSScriptRoot 'msi-observer-finish-ready.ps1')
 
 function Invoke-P4kxMsiHostedFinishWait {
     param(
         [Parameter(Mandatory)][string]$Directory,
-        [Parameter(Mandatory)][string]$CollectionCutoffUtc
+        [Parameter(Mandatory)][string]$CollectionCutoffUtc,
+        [int]$MonitorPid,
+        [long]$MonitorStartedUtcTicks
     )
     Write-P4kxMsiFinishWaitNotice context-binding begin -Hosted
     $context = Get-P4kxMsiFinishContext $Directory
@@ -21,6 +24,7 @@ function Invoke-P4kxMsiHostedFinishWait {
     $launch = Read-P4kxMsiFinishLaunch $context
     Write-P4kxMsiFinishWaitNotice launch-read end -Hosted
     Write-P4kxMsiObserverProgress finishWaitBinding end @progress
+    if ($MonitorPid -gt 0) { Write-P4kxMsiHostedFinishReady $context $MonitorPid $MonitorStartedUtcTicks }
     Wait-P4kxMsiFinishReceipt $context $launch -Hosted
     Write-Host '::notice title=Native MSI Finish wait host::The bound terminal receipt was observed. Native completion is unproven.'
 }
