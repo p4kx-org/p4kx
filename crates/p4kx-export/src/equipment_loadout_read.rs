@@ -38,12 +38,8 @@ const VISIT_XML_CACHE_BYTES: usize = 8 << 20;
 pub(super) struct ResolverInputs<'source> {
     files: ArchiveFiles<'source>,
     entities: Arc<Entities<'source>>,
-    shared: Option<VisitResolverInputs<'source>>,
-}
-
-struct VisitResolverInputs<'source> {
-    records: LoadoutRecordCache<'source>,
-    options: AlignmentOptions<'source>,
+    records: Option<LoadoutRecordCache<'source>>,
+    alignment_options: Option<AlignmentOptions<'source>>,
 }
 
 impl<'source> ResolverInputs<'source> {
@@ -51,27 +47,33 @@ impl<'source> ResolverInputs<'source> {
         Self {
             files: ArchiveFiles::new(archive),
             entities: Arc::new(Entities::new(forge)),
-            shared: None,
+            records: None,
+            alignment_options: None,
         }
+    }
+
+    pub(super) fn visit_record_cache(
+        forge: &'source DataForge<'source>,
+    ) -> LoadoutRecordCache<'source> {
+        LoadoutRecordCache::new(forge, VISIT_RECORD_CACHE_ENTRIES, VISIT_RECORD_CACHE_BYTES)
+    }
+
+    pub(super) fn with_record_cache(mut self, records: LoadoutRecordCache<'source>) -> Self {
+        self.records = Some(records);
+        self
     }
 
     pub(super) fn for_visit(
         archive: &'source Archive,
         forge: &'source DataForge<'source>,
+        records: LoadoutRecordCache<'source>,
         cancel: Option<&CancelToken>,
     ) -> Result<Self, CatalogError> {
-        let mut inputs = Self::new(archive, forge);
+        let mut inputs = Self::new(archive, forge).with_record_cache(records);
         inputs.files = inputs
             .files
             .with_xml_read_cache(VISIT_XML_CACHE_ENTRIES, VISIT_XML_CACHE_BYTES);
-        inputs.shared = Some(VisitResolverInputs {
-            records: LoadoutRecordCache::new(
-                forge,
-                VISIT_RECORD_CACHE_ENTRIES,
-                VISIT_RECORD_CACHE_BYTES,
-            ),
-            options: AlignmentOptions::read(forge, cancel)?,
-        });
+        inputs.alignment_options = Some(AlignmentOptions::read(forge, cancel)?);
         Ok(inputs)
     }
 
@@ -79,16 +81,16 @@ impl<'source> ResolverInputs<'source> {
         &'read self,
         alignment: DirectAlignment<'read>,
     ) -> DirectAlignment<'read> {
-        match &self.shared {
-            Some(shared) => alignment.with_shared_inputs(&shared.options, &shared.records),
+        match self.alignment_options.as_ref().zip(self.records.as_ref()) {
+            Some((options, records)) => alignment.with_shared_inputs(options, records),
             None => alignment,
         }
     }
 
     fn record_reader(&self) -> Option<&dyn LoadoutRecordReader> {
-        self.shared
+        self.records
             .as_ref()
-            .map(|shared| &shared.records as &dyn LoadoutRecordReader)
+            .map(|records| records as &dyn LoadoutRecordReader)
     }
 }
 

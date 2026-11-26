@@ -2,7 +2,10 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::DataForge;
-use p4kx_testkit::{DataForgeBuilder, TestInstance, TestRecord, TestStruct, TestType, TestValue};
+use p4kx_testkit::{
+    DataForgeBuilder, TestEntity, TestInstance, TestPort, TestRecord, TestStruct, TestType,
+    TestValue,
+};
 
 use super::{LoadoutOwnerSelection, read, read_visit};
 use crate::Kind;
@@ -67,7 +70,7 @@ fn ship_roots_skip_standalone_item_admission_fields() -> TestResult {
         [0],
         "the standalone Item has malformed admission fields"
     );
-    let ships = read_visit(&forge, LoadoutOwnerSelection::Ships, None)?;
+    let ships = read_visit(&forge, LoadoutOwnerSelection::Ships, None, drop)?;
     let [ship] = ships.owners.wanted.as_slice() else {
         return Err("one admitted Ship".into());
     };
@@ -80,6 +83,67 @@ fn ship_roots_skip_standalone_item_admission_fields() -> TestResult {
         ships.missing_record_indices.is_empty(),
         "only explicit batches report absent indices"
     );
+    Ok(())
+}
+
+#[test]
+fn all_and_batch_offer_only_admitted_physical_item_trees() -> TestResult {
+    let item_path = "libs/foundry/records/entities/scitem/fixture";
+    let bytes = p4kx_testkit::entity_schema(DataForgeBuilder::new())
+        .record(
+            TestEntity::new(1, "FirstItem", format!("{item_path}/first.xml"))
+                .port(TestPort::new("port"))
+                .record(),
+        )
+        .record(TestEntity::new(2, "NoPort", format!("{item_path}/empty.xml")).record())
+        .record(
+            TestEntity::new(1, "ItemAlias", format!("{item_path}/alias.xml"))
+                .port(TestPort::new("alias_port"))
+                .record(),
+        )
+        .build();
+    let forge = DataForge::open(&bytes)?;
+    let batch = [2, u32::MAX, 1, 0, 2];
+    for (selection, missing) in [
+        (
+            LoadoutOwnerSelection::Records(CatalogRecordSelection::All),
+            &[][..],
+        ),
+        (
+            LoadoutOwnerSelection::RecordIndices(&batch),
+            &[u32::MAX][..],
+        ),
+    ] {
+        let baseline = read_visit(&forge, selection, None, drop)?;
+        let mut seeds = Vec::new();
+        let seeded = read_visit(&forge, selection, None, |tree| {
+            seeds.push(tree.record_index());
+        })?;
+        assert_eq!(seeds, [0, 2], "the two physical Item aliases have ports");
+        assert_eq!(
+            seeded
+                .owners
+                .wanted
+                .iter()
+                .map(|wanted| wanted.record_index)
+                .collect::<Vec<_>>(),
+            baseline
+                .owners
+                .wanted
+                .iter()
+                .map(|wanted| wanted.record_index)
+                .collect::<Vec<_>>(),
+            "seeding changes no physical admission or tie order"
+        );
+        assert_eq!(
+            seeded.owners.coverage, baseline.owners.coverage,
+            "coverage is exact"
+        );
+        assert_eq!(
+            seeded.missing_record_indices, missing,
+            "batch missing indices are retained"
+        );
+    }
     Ok(())
 }
 

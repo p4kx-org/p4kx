@@ -9,7 +9,7 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use p4kx_dataforge::{DataForge, Record, RecordTree, Value};
 use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct, TestType, TestValue};
 
-use super::{LoadoutRecordCache, LoadoutRecordReader};
+use super::{LoadoutRecordCache, LoadoutRecordReader, retained_bytes};
 use crate::resolver_observation::alias_fixture;
 use crate::{
     Entities, LoadoutPathObserver, LoadoutReadEvent, LoadoutReadObserver, LoadoutResolver,
@@ -107,6 +107,55 @@ fn shared_record_cache_skips_unreadable_values_and_oversized_trees() -> TestResu
     Ok(())
 }
 
+#[test]
+fn seeding_keeps_original_trees_without_evicting_at_either_limit() -> TestResult {
+    let bytes = alias_fixture::database();
+    let forge = DataForge::open(&bytes)?;
+    let foreign = DataForge::open(&bytes)?;
+    let first = forge.record(0).ok_or("first physical alias")?;
+    let second = forge.record(1).ok_or("second physical alias")?;
+    let foreign_first = foreign.record(0).ok_or("foreign physical alias")?;
+    let first_bytes = retained_bytes(&first.tree()?).ok_or("readable first alias")?;
+    let limits = [
+        (NonZeroUsize::MIN, usize::MAX),
+        (NonZeroUsize::MIN.saturating_add(1), first_bytes + 1),
+    ];
+    for (entries, bytes) in limits {
+        let mut cache = LoadoutRecordCache::new(&forge, entries, bytes);
+        assert!(
+            !cache.try_seed(foreign_first.tree()?),
+            "a foreign tree cannot enter the cache"
+        );
+        let tree = first.tree()?;
+        let original_fields = tree.fields().as_ptr();
+        assert!(
+            cache.try_seed(tree),
+            "the first admitted original tree fits"
+        );
+        assert!(
+            !cache.try_seed(second.tree()?),
+            "seeding never evicts existing trees"
+        );
+        assert!(
+            cache.seed_saturated,
+            "the first limit stops further seeding"
+        );
+        let seeds = cache.entries.get_mut().map_err(|_| "seeded cache")?;
+        let retained = seeds
+            .get(first.index())
+            .ok_or("first admitted original tree")?;
+        assert!(
+            std::ptr::eq(retained.fields().as_ptr(), original_fields),
+            "seeding retains the already decoded allocation from the original owner"
+        );
+        assert!(
+            seeds.get(second.index()).is_none(),
+            "seeding never evicts the earlier tree"
+        );
+    }
+    Ok(())
+}
+
 struct Observer<'tree> {
     expected: &'tree RecordTree<'tree>,
     reads: AtomicUsize,
@@ -164,8 +213,18 @@ fn shared_tree_emits_canonical_and_path_evidence_for_each_fresh_resolver() -> Te
     let forge = DataForge::open(&bytes)?;
     let root = forge.record(2).ok_or("original resolver root")?;
     let entries = NonZeroUsize::new(8).ok_or("nonzero fixture cache limit")?;
-    let cache = LoadoutRecordCache::new(&forge, entries, usize::MAX);
-    let tree = cache.read(&root)?.ok_or("original retained tree")?;
+    let mut cache = LoadoutRecordCache::new(&forge, entries, usize::MAX);
+    assert!(
+        cache.try_seed(root.tree()?),
+        "the original root fits in the cache"
+    );
+    let tree = cache
+        .entries
+        .get_mut()
+        .map_err(|_| "original seeded tree cache")?
+        .get(root.index())
+        .cloned()
+        .ok_or("original seeded tree")?;
     let entities = Arc::new(Entities::new(&forge));
     for route in [Resolve::Prefetched, Resolve::Serial] {
         let observer = Arc::new(Observer {

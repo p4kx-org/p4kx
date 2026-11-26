@@ -42,6 +42,14 @@ impl<K: Copy + Eq + Hash, V> BoundedReadCache<K, V> {
         self.values.get(&key).map(|(_, value)| value)
     }
 
+    pub(crate) fn spare_payload_bytes(&self) -> Option<usize> {
+        if self.values.len() >= self.max_entries.get() {
+            return None;
+        }
+        let spare = self.max_bytes - self.retained_bytes;
+        (spare > 0).then_some(spare)
+    }
+
     /// Retains a completed input and evicts the oldest entries as needed.
     pub(crate) fn insert(&mut self, key: K, bytes: usize, value: V) {
         if bytes > self.max_bytes || self.values.contains_key(&key) {

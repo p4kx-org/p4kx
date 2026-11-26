@@ -2500,9 +2500,11 @@ owner. The scan reuses the entity and XML directory indexes. Visits of multiple
 owners also reuse completed canonical Entity trees and decoded XML payloads
 from the same inputs. The per-visit cache keeps up to 2,048 Record trees within
 a 32 MiB estimated retained-tree budget and 256 XML payloads within 8 MiB of
-decoded byte capacity. Eviction permits a later read of the same input. Each
-owner still receives its own original source observations, file dependencies
-and alignment coverage. The visit releases the owner's resolved row and source
+decoded byte capacity. All-owner and batch visits can retain the admitted Item
+trees already decoded during selection in the same tree cache. Seeding fills
+spare capacity. Resolver reads can still evict trees and reread them. Each owner
+receives its own original source observations, file dependencies and alignment
+coverage. The visit releases the owner's resolved row and source
 inventory before resolving the next owner.
 
 The original visitor accepts the same all-owner, GUID and physical Record selections as

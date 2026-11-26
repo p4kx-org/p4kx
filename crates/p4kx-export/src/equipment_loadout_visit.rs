@@ -212,10 +212,21 @@ fn visit_owners<E: From<CatalogError>>(
     selection: LoadoutOwnerSelection<'_>,
     mut visit: impl FnMut(&LoadoutOwnerSnapshot) -> Result<(), E>,
 ) -> Result<LoadoutVisitSummary, E> {
+    let mut records = ResolverInputs::visit_record_cache(query.forge);
+    let mut has_seeds = false;
+    let seed_item_trees = matches!(
+        selection,
+        LoadoutOwnerSelection::Records(CatalogRecordSelection::All)
+            | LoadoutOwnerSelection::RecordIndices(_)
+    );
     let scope::VisitScope {
         owners: scope::Scope { wanted, coverage },
         missing_record_indices,
-    } = scope::read_visit(query.forge, selection, query.cancel)?;
+    } = scope::read_visit(query.forge, selection, query.cancel, |tree| {
+        if seed_item_trees {
+            has_seeds |= records.try_seed(tree);
+        }
+    })?;
     let mut summary = LoadoutVisitSummary {
         build: query.archive.build().cloned(),
         availability: query.availability(0),
@@ -228,10 +239,12 @@ fn visit_owners<E: From<CatalogError>>(
     if !wanted.is_empty() {
         let locale = TextSources::read_languages(query.archive, &[])?;
         let texts = Texts::parse(&locale)?;
-        let inputs = if wanted.len() > 1 {
-            ResolverInputs::for_visit(query.archive, query.forge, query.cancel)?
-        } else {
-            ResolverInputs::new(query.archive, query.forge)
+        let inputs = match wanted.len() {
+            1 if has_seeds => {
+                ResolverInputs::new(query.archive, query.forge).with_record_cache(records)
+            }
+            1 => ResolverInputs::new(query.archive, query.forge),
+            _ => ResolverInputs::for_visit(query.archive, query.forge, records, query.cancel)?,
         };
         for (_, want) in resolution::in_catalog_order(wanted.into_iter()) {
             checkpoint(query.cancel)?;

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
-use p4kx_extraction::{CancelToken, DataForge, DataForgeError, Record, TreeBuilder};
+use p4kx_extraction::{CancelToken, DataForge, DataForgeError, Record, RecordTree, TreeBuilder};
 
 use crate::catalog_queries::{CatalogRecordCoverage, CatalogRecordSelection};
 use crate::catalog_query_session::checkpoint;
@@ -54,13 +54,20 @@ pub(super) fn read(
     selection: CatalogRecordSelection,
     cancel: Option<&CancelToken>,
 ) -> Result<Scope, CatalogError> {
-    Ok(read_visit(forge, LoadoutOwnerSelection::Records(selection), cancel)?.owners)
+    Ok(read_visit(
+        forge,
+        LoadoutOwnerSelection::Records(selection),
+        cancel,
+        drop,
+    )?
+    .owners)
 }
 
-pub(super) fn read_visit(
-    forge: &DataForge<'_>,
+pub(super) fn read_visit<'source>(
+    forge: &'source DataForge<'source>,
     selection: LoadoutOwnerSelection<'_>,
     cancel: Option<&CancelToken>,
+    mut retain_item_tree: impl FnMut(RecordTree<'source>),
 ) -> Result<VisitScope, CatalogError> {
     let kinds = match selection {
         LoadoutOwnerSelection::Ships => RootKinds::Ships,
@@ -87,6 +94,7 @@ pub(super) fn read_visit(
                     let admission = PortAdmission::read(&tree);
                     if admission.wanted {
                         items.push(wanted);
+                        retain_item_tree(tree);
                     }
                     if admission.incomplete {
                         coverage.incomplete_fields.push(record.index());

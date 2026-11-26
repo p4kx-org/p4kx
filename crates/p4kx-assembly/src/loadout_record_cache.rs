@@ -25,6 +25,7 @@ pub trait LoadoutRecordReader: Sync {
 pub struct LoadoutRecordCache<'source> {
     forge: &'source DataForge<'source>,
     entries: Mutex<BoundedReadCache<u32, Arc<RecordTree<'source>>>>,
+    seed_saturated: bool,
 }
 
 impl<'source> LoadoutRecordCache<'source> {
@@ -38,7 +39,42 @@ impl<'source> LoadoutRecordCache<'source> {
         Self {
             forge,
             entries: Mutex::new(BoundedReadCache::new(max_entries, max_bytes)),
+            seed_saturated: false,
         }
+    }
+
+    /// Reports whether an already decoded original tree was retained without eviction.
+    /// Seeding stops once an eligible tree would exceed the cache limits.
+    #[must_use]
+    pub fn try_seed(&mut self, tree: RecordTree<'source>) -> bool {
+        if self.seed_saturated {
+            return false;
+        }
+        let Ok(entries) = self.entries.get_mut() else {
+            return false;
+        };
+        let Some(spare_bytes) = entries.spare_payload_bytes() else {
+            self.seed_saturated = true;
+            return false;
+        };
+        let index = tree.record_index();
+        if entries.get(index).is_some()
+            || !self
+                .forge
+                .record(index)
+                .is_some_and(|record| tree.is_from(&record))
+        {
+            return false;
+        }
+        let Some(bytes) = retained_bytes(&tree) else {
+            return false;
+        };
+        if bytes > spare_bytes {
+            self.seed_saturated = true;
+            return false;
+        }
+        entries.insert(index, bytes, Arc::new(tree));
+        true
     }
 }
 
