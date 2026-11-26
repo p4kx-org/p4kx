@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use p4kx_extraction::{SourceValueState, SourcedValue};
+
 use super::ReducedError;
 use crate::catalog_queries::{CatalogRecordCoverage, DatasetAvailability};
 
@@ -28,6 +30,19 @@ pub(super) fn all_fields(
         return Err(ReducedError::IncompleteScope(path));
     }
     Ok(())
+}
+
+pub(super) fn value<T>(path: &'static str, value: &SourcedValue<T>) -> Result<(), ReducedError> {
+    if value.origin().source_set_complete()
+        && matches!(
+            value.state(),
+            SourceValueState::Present | SourceValueState::Absent | SourceValueState::Null
+        )
+    {
+        Ok(())
+    } else {
+        Err(ReducedError::IncompleteScope(path))
+    }
 }
 
 pub(super) fn rows(

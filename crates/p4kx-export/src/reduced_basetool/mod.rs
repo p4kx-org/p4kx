@@ -11,11 +11,13 @@ use crate::catalog_rows::spool::RowSpoolError;
 use crate::{CatalogError, CatalogFile};
 
 mod bounded_output;
+mod cargo_globals;
 mod cargo_grids;
 mod cargo_placements;
 mod cell;
 mod completeness;
 mod component;
+mod contract_scope;
 mod entities;
 mod inventory;
 mod item;
@@ -32,6 +34,10 @@ mod ship_equipment;
 mod ship_loadout;
 mod shops;
 
+#[cfg(test)]
+mod cargo_globals_tests;
+#[cfg(test)]
+mod contract_scope_tests;
 #[cfg(test)]
 mod entity_tests;
 #[cfg(test)]

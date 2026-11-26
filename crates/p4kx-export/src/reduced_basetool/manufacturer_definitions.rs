@@ -3,7 +3,7 @@
 
 use std::path::Path;
 
-use p4kx_extraction::{CancelToken, SourceValueState, SourcedValue};
+use p4kx_extraction::CancelToken;
 use serde::Serialize;
 
 use super::ReducedError;
@@ -61,12 +61,12 @@ impl<'source> Row<'source> {
         definition: &'source ManufacturerDefinition<'source>,
         texts: &mut TextRefs<'source>,
     ) -> Result<Self, ReducedError> {
-        selected_cell(definition.code())?;
-        selected_cell(definition.localization())?;
+        completeness::value(PATH, definition.code())?;
+        completeness::value(PATH, definition.localization())?;
         let localization = Cell::from(definition.localization()).try_map(|row| {
-            selected_cell(row.name())?;
-            selected_cell(row.short_name())?;
-            selected_cell(row.description())?;
+            completeness::value(PATH, row.name())?;
+            completeness::value(PATH, row.short_name())?;
+            completeness::value(PATH, row.description())?;
             texts.name(row.name());
             texts.name(row.short_name());
             texts.description(row.description());
@@ -90,17 +90,4 @@ struct Localization<'source> {
     name: Cell<&'source PublicNameRef>,
     short_name: Cell<&'source PublicNameRef>,
     description: Cell<&'source GameTextRef>,
-}
-
-fn selected_cell<T>(cell: &SourcedValue<T>) -> Result<(), ReducedError> {
-    if cell.origin().source_set_complete()
-        && matches!(
-            cell.state(),
-            SourceValueState::Present | SourceValueState::Absent | SourceValueState::Null
-        )
-    {
-        Ok(())
-    } else {
-        Err(ReducedError::IncompleteScope(PATH))
-    }
 }

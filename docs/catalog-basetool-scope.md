@@ -222,6 +222,18 @@ mount. A separate `cargo.freight` result excludes grids whose observed
 lacks a unique physical configuration, matching capacity or known mining flag.
 The original cargo total and its marker still describe all canonical mounts.
 
+## Internal cargo loading and contract scope slices
+
+The cargo loading and commodity fee tables use their canonical SDK
+readers. The reduced rows keep exact authored times, their SCU size keys,
+signed prices, and the numeric state and marker of each selected cell.
+Non-finite times remain distinguishable with their numeric type.
+
+Contract scope rows retain each of the seven original label slots. A
+null pointer differs from an absent declaration. The label references feed
+the shared English and German public-name closure. Icons and additional
+source members are outside this selection.
+
 ## Acceptance
 
 #1177 tracks the wire contract, generation and import. Use a distinct versioned

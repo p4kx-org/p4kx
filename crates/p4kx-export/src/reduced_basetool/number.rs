@@ -3,6 +3,7 @@
 
 use serde::Serialize;
 
+use crate::resource_float::ResourceFloat32;
 use crate::resource_number::ResourceNumber;
 
 #[derive(Serialize)]
@@ -42,14 +43,7 @@ enum NonFinite {
 impl<'source> From<&'source ResourceNumber> for Number<'source> {
     fn from(number: &'source ResourceNumber) -> Self {
         match number {
-            ResourceNumber::Single(value) => Self::Single(Float {
-                kind: FloatKind::Single,
-                finite: value.finite(),
-                non_finite: value
-                    .finite()
-                    .is_none()
-                    .then(|| non_finite(f64::from(f32::from_bits(value.raw_bits())))),
-            }),
+            ResourceNumber::Single(value) => value.into(),
             ResourceNumber::Double(value) => Self::Double(Float {
                 kind: FloatKind::Double,
                 finite: value.finite(),
@@ -60,6 +54,19 @@ impl<'source> From<&'source ResourceNumber> for Number<'source> {
             }),
             _ => Self::Integer(number),
         }
+    }
+}
+
+impl From<&ResourceFloat32> for Number<'_> {
+    fn from(value: &ResourceFloat32) -> Self {
+        let finite = value.finite();
+        Self::Single(Float {
+            kind: FloatKind::Single,
+            finite,
+            non_finite: finite
+                .is_none()
+                .then(|| non_finite(f64::from(f32::from_bits(value.raw_bits())))),
+        })
     }
 }
 
