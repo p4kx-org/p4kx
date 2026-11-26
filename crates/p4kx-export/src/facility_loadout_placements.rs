@@ -25,8 +25,9 @@ use crate::catalog_query_session::checkpoint;
 use crate::catalog_read::original::EntryCapture;
 use crate::catalog_table::CatalogTable;
 use crate::contract_entities::Ship;
-use crate::contract_loadout::{Loadout, LoadoutPort};
-use crate::loadout::alignment::AttachmentIdentity;
+use crate::contract_loadout::Loadout;
+use crate::loadout::alignment::{AttachmentIdentity, LoadoutAlignment};
+use crate::loadout::join::{JoinPort, LoadoutJoin};
 use crate::loadout::staging::StagedLoadouts;
 use crate::options::{CatalogRun, CatalogStage};
 use crate::record_header_field::RecordHeaderField;
@@ -108,8 +109,8 @@ pub(super) fn table(
         let mut room_lookup = |record| Ok(rooms.contains(record));
         for ship in loadouts.ships() {
             project.check_cancel()?;
-            project.loadout(
-                &ship.loadout,
+            project.join_loadout(
+                &ship.view(),
                 &mut room_lookup,
                 &mut attachments,
                 &mut flight_instances,
@@ -302,7 +303,17 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
         room_attachments: &mut Vec<RoomAttachment>,
         flight: &mut InstalledConfigurations<'_>,
     ) -> Result<(), CatalogError> {
-        let root = loadout.root_record_index;
+        self.join_loadout(&LoadoutJoin::from(loadout), rooms, room_attachments, flight)
+    }
+
+    fn join_loadout(
+        &mut self,
+        loadout: &LoadoutJoin<'_, impl JoinPort>,
+        rooms: &mut RoomLookup<'_>,
+        room_attachments: &mut Vec<RoomAttachment>,
+        flight: &mut InstalledConfigurations<'_>,
+    ) -> Result<(), CatalogError> {
+        let root = loadout.record_index;
         let ship = ShipContext::read(self.origins, loadout.entity_guid.value, root)?;
         let selector = self
             .origins
@@ -318,24 +329,21 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
             || walk.position_cell(&self.origins.uses),
             None,
         )?;
-        self.walk_ports(loadout, &ship, walk, rooms, room_attachments, flight)
+        self.walk_ports(loadout.ports, &ship, walk, rooms, room_attachments, flight)
     }
 
     fn emit(
         &mut self,
         ship: &ShipContext,
         path: &Path,
-        attachment: Option<(&LoadoutPort, &AttachmentIdentity)>,
+        attachment: Option<(&LoadoutAlignment, &AttachmentIdentity)>,
         configurations: Vec<FacilityConfiguration>,
     ) -> Result<(), CatalogError> {
         if configurations.is_empty() {
             return Ok(());
         }
-        let (original_port, attached_item) = if let Some((port, attachment)) = attachment {
-            (
-                port.source_constraints.physical_port()?,
-                Some(attachment.clone()),
-            )
+        let (original_port, attached_item) = if let Some((alignment, attachment)) = attachment {
+            (alignment.physical_port()?, Some(attachment.clone()))
         } else {
             (None, None)
         };

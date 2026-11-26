@@ -24,8 +24,8 @@ fn contract_sdk_dependency_probes_publish_only_complete_owner_transactions() -> 
         )?
         .with_provenance_mode(mode)
         .with_contracts(CatalogRecordSelection::RecordIndex(0), None, |snapshot| {
-            verify(&snapshot)?;
-            verify_text_origins(&snapshot, mode)
+            verify_text_origins(&snapshot, mode);
+            verify(&snapshot)
         })??;
     }
     Ok(())
@@ -135,7 +135,7 @@ fn verify_texts(snapshot: &ContractSnapshot<'_>) -> TestResult {
     Ok(())
 }
 
-fn verify_text_origins(snapshot: &ContractSnapshot<'_>, mode: ProvenanceMode) -> TestResult {
+fn verify_text_origins(snapshot: &ContractSnapshot<'_>, mode: ProvenanceMode) {
     for text in &snapshot.game_texts {
         let refs = text.key().origin().source_uses_refs();
         assert_eq!(
@@ -151,5 +151,4 @@ fn verify_text_origins(snapshot: &ContractSnapshot<'_>, mode: ProvenanceMode) ->
             "the published text key has no dangling evidence reference after commit"
         );
     }
-    Ok(())
 }

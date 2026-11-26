@@ -13,16 +13,16 @@ use super::installed::InstalledConfigurations;
 use crate::CatalogError;
 use crate::catalog_v3::facility_instance::ShipContext;
 use crate::catalog_v3::loadout_position::{self, LoadoutPosition};
-use crate::contract_loadout::{Loadout, LoadoutPort};
 use crate::loadout::alignment::AttachmentProof;
+use crate::loadout::join::JoinPort;
 
-struct Frame<'loadout> {
-    ports: Enumerate<Iter<'loadout, LoadoutPort>>,
+struct Frame<'loadout, Port> {
+    ports: Enumerate<Iter<'loadout, Port>>,
     parent: Checkpoint,
 }
 
-impl<'loadout> Frame<'loadout> {
-    fn new(ports: &'loadout [LoadoutPort], parent: Checkpoint) -> Self {
+impl<'loadout, Port> Frame<'loadout, Port> {
+    fn new(ports: &'loadout [Port], parent: Checkpoint) -> Self {
         Self {
             ports: ports.iter().enumerate(),
             parent,
@@ -77,7 +77,7 @@ impl Path {
     fn enter(
         &mut self,
         ordinal: usize,
-        port: &LoadoutPort,
+        port: &impl JoinPort,
         proof: Option<&AttachmentProof>,
     ) -> Result<(), CatalogError> {
         self.position
@@ -109,14 +109,14 @@ impl Path {
 impl Projection<'_, '_> {
     pub(super) fn walk_ports(
         &mut self,
-        loadout: &Loadout,
+        ports: &[impl JoinPort],
         ship: &ShipContext,
         mut path: Path,
         rooms: &mut RoomLookup<'_>,
         room_attachments: &mut Vec<RoomAttachment>,
         flight: &mut InstalledConfigurations<'_>,
     ) -> Result<(), CatalogError> {
-        let mut stack = vec![Frame::new(&loadout.ports, path.checkpoint())];
+        let mut stack = vec![Frame::new(ports, path.checkpoint())];
         while let Some(frame) = stack.last_mut() {
             self.check_cancel()?;
             let Some((ordinal, port)) = frame.ports.next() else {
@@ -124,18 +124,19 @@ impl Projection<'_, '_> {
                 stack.pop();
                 continue;
             };
-            if port.docked_vehicle || port.unresolved.is_some() {
+            let state = port.state();
+            if state.docked_vehicle || state.unresolved {
                 continue;
             }
             let parent = path.checkpoint();
-            if let Some((attachment, proof)) = port.source_constraints.placement_attachment() {
+            if let Some((attachment, proof)) = port.alignment().placement_attachment() {
                 let Some(record) = attachment.target_record_index.value().copied() else {
                     continue;
                 };
                 let has_rooms = rooms(record)?;
                 let configurations = self.configuration_links(record)?;
                 let flight_links = flight.links(record)?;
-                if port.ports.is_empty()
+                if port.children().is_empty()
                     && !has_rooms
                     && configurations.is_empty()
                     && flight_links.is_empty()
@@ -143,7 +144,7 @@ impl Projection<'_, '_> {
                     continue;
                 }
                 path.enter(ordinal, port, Some(proof))?;
-                let attached = Some((port, attachment));
+                let attached = Some((port.alignment(), attachment));
                 self.emit(ship, &path, attached, configurations)?;
                 flight.emit(
                     ship,
@@ -154,18 +155,15 @@ impl Projection<'_, '_> {
                 if has_rooms {
                     room_attachments.push(path.room_attachment(record, ship, &self.origins.uses));
                 }
-            } else if !port.ports.is_empty()
-                && port.item_guid.is_none()
-                && port.item_class_name.is_none()
-            {
+            } else if !port.children().is_empty() && !state.has_item_selector() {
                 path.enter(ordinal, port, None)?;
             } else {
                 continue;
             }
-            if port.ports.is_empty() {
+            if port.children().is_empty() {
                 path.restore(parent);
             } else {
-                stack.push(Frame::new(&port.ports, parent));
+                stack.push(Frame::new(port.children(), parent));
             }
         }
         Ok(())

@@ -11,6 +11,7 @@ use crate::CatalogFile;
 use crate::catalog_rows::spool::RowSpoolError;
 use crate::contract_loadout::{EntityKind, Loadout, LoadoutPort};
 use crate::guid_text::CatalogGuid;
+use crate::loadout::join::JoinPort;
 
 type TestResult = Result<(), Box<dyn std::error::Error>>;
 
@@ -34,7 +35,7 @@ fn row(identity: u32, kind: EntityKind) -> Loadout {
 }
 
 #[test]
-fn staged_items_and_retained_ships_replay_exact_wire_order() -> TestResult {
+fn staged_rows_replay_exact_wire_order_after_ship_joins_are_released() -> TestResult {
     let scratch = tempfile::tempdir()?;
     let rows = vec![
         row(1, EntityKind::Ship),
@@ -45,40 +46,73 @@ fn staged_items_and_retained_ships_replay_exact_wire_order() -> TestResult {
         row(6, EntityKind::Ship),
     ];
     let expected = serde_json::to_vec(&rows)?;
-    let staged = StagedLoadouts::stage(rows, scratch.path(), None)?;
+    let mut staged = StagedLoadouts::stage(rows, scratch.path(), None)?;
     assert_eq!(staged.len(), 6, "all canonical roots count");
     assert!(
         staged.stored_bytes() > 0,
-        "three Item stages have a persistent compressed frame"
+        "Ship and Item rows share a compressed frame"
     );
     let ships = staged.ships();
     assert_eq!(
-        ships.iter().map(|ship| ship.ordinal).collect::<Vec<_>>(),
-        [0, 3, 5],
-        "ship joins keep original wire positions"
-    );
-    assert!(
         ships
             .iter()
-            .all(|ship| ship.loadout.port_inventory_complete)
+            .map(|ship| ship.view().record_index)
+            .collect::<Vec<_>>(),
+        [1, 4, 6],
+        "only Ship joins retain their physical owner identities in traversal order"
     );
-    for _ in 0..2 {
-        assert_eq!(
-            serde_json::to_vec(&staged)?,
-            expected,
-            "exact original JSON bytes on replay"
-        );
-    }
+    check_ship_joins(&staged)?;
+    assert_eq!(
+        serde_json::to_vec(&staged)?,
+        expected,
+        "exact original wire before release"
+    );
+    staged.release_ship_joins();
+    assert!(
+        staged.ships().is_empty(),
+        "the completed joins release their retained tree"
+    );
+    assert_eq!(
+        serde_json::to_vec(&staged)?,
+        expected,
+        "exact original wire after release"
+    );
     let ships = vec![row(1, EntityKind::Ship)];
     let expected_ships = serde_json::to_vec(&ships)?;
     let ships_only = StagedLoadouts::stage(ships, scratch.path(), None)?;
-    assert_eq!(
-        ships_only.stored_bytes(),
-        0,
-        "ships are never written to the spool"
+    assert!(
+        ships_only.stored_bytes() > 0,
+        "a Ship-only export stages its wire row"
     );
-    assert_eq!(serde_json::to_vec(&ships_only)?, expected_ships);
-    assert_eq!(serde_json::to_vec(&StagedLoadouts::default())?, b"[]");
+    assert_eq!(
+        serde_json::to_vec(&ships_only)?,
+        expected_ships,
+        "Ship-only replay retains bytes"
+    );
+    assert_eq!(
+        serde_json::to_vec(&StagedLoadouts::default())?,
+        b"[]",
+        "an empty spool remains an empty array"
+    );
+    Ok(())
+}
+
+fn check_ship_joins(staged: &StagedLoadouts) -> TestResult {
+    for ship in staged.ships() {
+        let join = ship.view();
+        assert!(
+            join.port_inventory_complete,
+            "the original inventory completeness remains"
+        );
+        let [port] = join.ports else {
+            return Err("one original port in the join tree".into());
+        };
+        assert_eq!(
+            port.children().first().and_then(JoinPort::name_value),
+            Some("nested"),
+            "the original child occurrence remains nested"
+        );
+    }
     Ok(())
 }
 
@@ -100,14 +134,14 @@ impl Write for CancelAfterWrite<'_> {
 }
 
 #[test]
-fn cancelled_item_replay_preserves_previous_catalog_generation() -> TestResult {
+fn cancelled_loadout_replay_preserves_previous_catalog_generation() -> TestResult {
     let scratch = tempfile::tempdir()?;
     let output = scratch.path().join("catalog.json");
     let previous = b"previous complete generation";
     fs::write(&output, previous)?;
     let cancel = CancelToken::new();
     let rows = StagedLoadouts::stage(
-        vec![row(1, EntityKind::Item)],
+        vec![row(1, EntityKind::Ship), row(2, EntityKind::Item)],
         scratch.path(),
         Some(&cancel),
     )?;
@@ -119,7 +153,10 @@ fn cancelled_item_replay_preserves_previous_catalog_generation() -> TestResult {
         },
         &rows,
     );
-    assert!(attempt.is_err(), "item-spool replay observes cancellation");
+    assert!(
+        attempt.is_err(),
+        "the Loadout spool replay observes cancellation"
+    );
     assert!(
         matches!(rows.take_failure(), Some(RowSpoolError::Cancelled)),
         "typed cancellation survives Serde"
@@ -135,7 +172,7 @@ fn cancelled_item_replay_preserves_previous_catalog_generation() -> TestResult {
     assert_eq!(
         contents.len(),
         1,
-        "the unpublished generation and item frame are gone"
+        "the unpublished generation and Loadout frame are gone"
     );
     assert!(
         matches!(
@@ -146,7 +183,7 @@ fn cancelled_item_replay_preserves_previous_catalog_generation() -> TestResult {
             ),
             Err(RowSpoolError::Cancelled)
         ),
-        "cancelled staging is refused before it opens an item spool"
+        "cancelled staging is refused before it opens the Loadout spool"
     );
     Ok(())
 }

@@ -13,8 +13,14 @@ The focused integration suite checked 25 contract, six Item-definition and three
 Loadout selection cases. Code and synthetic checks for the next slices cover
 direct marker binding, committing staged contract text registrations, packing
 idle Full DataForge uses during Loadout resolution, and filtering archive names
-before normalizing XML keys. Installed speed and memory for these slices have
-their own comparison. The measurements below predate the new implementations.
+before normalizing XML keys. The producer now stages Ship and Item Loadout rows
+in original order during resolution and retains the typed Ship join facts until
+the resource topology step. The synthetic spool check compares the exact
+serialized bytes and preserves the preceding output after cancellation.
+All 1,694 synthetic Catalog integration tests and the 49 targeted Loadout
+unit tests passed. The installed-only Loadout unit test requires its Archive.
+Installed elapsed time and peak memory have their own comparison. The
+measurements below predate the new implementations.
 
 ## What the measurements establish
 

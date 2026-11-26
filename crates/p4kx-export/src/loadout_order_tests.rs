@@ -85,10 +85,10 @@ fn a_guid_tie_preserves_wire_order_and_ship_ordinals() -> Result<(), Box<dyn std
         staged
             .ships()
             .iter()
-            .map(|ship| ship.ordinal)
+            .map(|ship| ship.view().record_index)
             .collect::<Vec<_>>(),
-        [2, 3],
-        "ship ordinals include emitted Item rows and exclude skipped rows",
+        [3, 5],
+        "Ship joins preserve the physical Records in canonical traversal order",
     );
     assert_eq!(summary.items, 2, "both emitted Item rows are counted");
     assert_eq!(summary.ships, 2, "both Ship rows are counted");

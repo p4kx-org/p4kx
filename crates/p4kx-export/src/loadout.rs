@@ -26,6 +26,8 @@ use staging::{StagedLoadoutWriter, StagedLoadouts};
 #[path = "loadout_resolution.rs"]
 pub(crate) mod resolution;
 
+#[path = "loadout_join.rs"]
+pub(crate) mod join;
 #[path = "staged_loadouts.rs"]
 pub(crate) mod staging;
 

@@ -17,9 +17,10 @@ use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::loadout_position::{self, LoadoutPosition};
-use crate::contract_loadout::{Loadout, LoadoutPort};
+use crate::contract_loadout::Loadout;
 use crate::guid_text::CatalogGuid;
 use crate::loadout::alignment::AttachmentIdentity;
+use crate::loadout::join::{JoinPort, LoadoutJoin};
 use crate::loadout::staging::StagedLoadouts;
 use crate::record_header_field::RecordHeaderField;
 use crate::scan::CRAFTER_STRUCT;
@@ -83,7 +84,7 @@ pub(crate) fn table(
     let mut rows = Vec::new();
     if !stations.is_empty() {
         for ship in loadouts.ships() {
-            rows.extend(project_loadout(&ship.loadout, origins, cancel, |record| {
+            rows.extend(project_join(&ship.view(), origins, cancel, |record| {
                 Ok(stations.contains(&record))
             })?);
         }
@@ -100,6 +101,15 @@ pub(crate) fn table(
 /// Projects the proved crafter mounts reached by one original ship Loadout.
 pub(crate) fn project_loadout(
     loadout: &Loadout,
+    origins: &CatalogOrigins,
+    cancel: Option<&CancelToken>,
+    is_crafter: impl FnMut(u32) -> Result<bool, CatalogError>,
+) -> Result<Vec<CrafterHost>, CatalogError> {
+    project_join(&LoadoutJoin::from(loadout), origins, cancel, is_crafter)
+}
+
+fn project_join(
+    loadout: &LoadoutJoin<'_, impl JoinPort>,
     origins: &CatalogOrigins,
     cancel: Option<&CancelToken>,
     mut is_crafter: impl FnMut(u32) -> Result<bool, CatalogError>,
@@ -122,16 +132,16 @@ struct HostProjection<'a> {
 impl HostProjection<'_> {
     fn read_loadout(
         &mut self,
-        loadout: &Loadout,
+        loadout: &LoadoutJoin<'_, impl JoinPort>,
         is_crafter: &mut impl FnMut(u32) -> Result<bool, CatalogError>,
     ) -> Result<(), CatalogError> {
-        let root = loadout.record_index();
+        let root = loadout.record_index;
         let root_use = self
             .origins
             .record(root)
             .observe_header(RecordHeaderField::RecordIndex, SourceUseRole::Selector)?;
         let mut path = MountPath::new(root, root_use);
-        let mut stack = vec![Frame::new(&loadout.ports, path.checkpoint())];
+        let mut stack = vec![Frame::new(loadout.ports, path.checkpoint())];
         while let Some(frame) = stack.last_mut() {
             checkpoint(self.cancel)?;
             let Some((index, port)) = frame.ports.next() else {
@@ -144,16 +154,16 @@ impl HostProjection<'_> {
                 .port_ordinals
                 .push(loadout_position::ordinal(index)?);
             path.complete &= port.append_name_uses(&mut path.uses)?;
-            if let Some((attachment, proof)) = port.source_constraints.placement_attachment() {
+            if let Some((attachment, proof)) = port.alignment().placement_attachment() {
                 path.uses.extend_from_slice(&proof.source_uses);
                 path.complete &= proof.source_set_complete;
                 self.emit(loadout, port, attachment, &path, is_crafter)?;
             }
-            path.complete &= port.unresolved.is_none();
-            if port.ports.is_empty() {
+            path.complete &= !port.state().unresolved;
+            if port.children().is_empty() {
                 path.restore(parent);
             } else {
-                stack.push(Frame::new(&port.ports, parent));
+                stack.push(Frame::new(port.children(), parent));
             }
         }
         Ok(())
@@ -161,8 +171,8 @@ impl HostProjection<'_> {
 
     fn emit(
         &mut self,
-        loadout: &Loadout,
-        port: &LoadoutPort,
+        loadout: &LoadoutJoin<'_, impl JoinPort>,
+        port: &impl JoinPort,
         attachment: &AttachmentIdentity,
         path: &MountPath,
         is_crafter: &mut impl FnMut(u32) -> Result<bool, CatalogError>,
@@ -170,14 +180,14 @@ impl HostProjection<'_> {
         let Some(crafter) = attachment.target_record_index().value().copied() else {
             return Ok(());
         };
-        if port.unresolved.is_some() || !is_crafter(crafter)? {
+        if port.state().unresolved || !is_crafter(crafter)? {
             return Ok(());
         }
         self.groups
             .entry(crafter)
             .or_insert_with(|| CrafterHost {
-                ship_guid: loadout.source_entity_guid().map(CatalogGuid),
-                ship_record_index: loadout.source_record_index().clone(),
+                ship_guid: loadout.entity_guid.sourced().map(|&guid| guid),
+                ship_record_index: loadout.source_record_index.clone(),
                 crafter: attachment.clone(),
                 mount_positions: Vec::new(),
             })
@@ -187,13 +197,13 @@ impl HostProjection<'_> {
     }
 }
 
-struct Frame<'loadout> {
-    ports: Enumerate<Iter<'loadout, LoadoutPort>>,
+struct Frame<'loadout, Port> {
+    ports: Enumerate<Iter<'loadout, Port>>,
     parent: Checkpoint,
 }
 
-impl<'loadout> Frame<'loadout> {
-    fn new(ports: &'loadout [LoadoutPort], parent: Checkpoint) -> Self {
+impl<'loadout, Port> Frame<'loadout, Port> {
+    fn new(ports: &'loadout [Port], parent: Checkpoint) -> Self {
         Self {
             ports: ports.iter().enumerate(),
             parent,

@@ -10,7 +10,7 @@ use schemars::JsonSchema;
 use serde::Serialize;
 
 use super::catalog_item_alignment::{PhysicalPort, TopologyPortDefinition};
-use crate::contract_loadout::LoadoutPort;
+use crate::loadout::join::JoinPort;
 use crate::schema_fields::every_field_required;
 use crate::source_value_catalog::SourceWeakReference;
 use crate::{CatalogError, ExportAccountingError};
@@ -101,8 +101,8 @@ impl NetworkEndpoint {
 }
 
 /// The admissible endpoints among direct siblings of one installed Entity.
-pub(super) struct LocalPorts<'scope, 'rows> {
-    ports: &'rows [LoadoutPort],
+pub(super) struct LocalPorts<'scope, 'rows, Port> {
+    ports: &'rows [Port],
     physical_uses: HashMap<PhysicalPort, &'rows SourceUse>,
     sources: &'scope SourceUses,
     origin: SharedFieldOrigin,
@@ -111,9 +111,9 @@ pub(super) struct LocalPorts<'scope, 'rows> {
     complete: bool,
 }
 
-impl<'scope, 'rows> LocalPorts<'scope, 'rows> {
+impl<'scope, 'rows, Port: JoinPort> LocalPorts<'scope, 'rows, Port> {
     pub(super) fn new(
-        ports: &'rows [LoadoutPort],
+        ports: &'rows [Port],
         definitions: &[TopologyPortDefinition<'rows>],
         inventory: &[&SourceUse],
         complete: bool,
@@ -142,11 +142,10 @@ impl<'scope, 'rows> LocalPorts<'scope, 'rows> {
                 u32::try_from(ordinal).map_err(|_| ExportAccountingError::CounterOverflow)?;
             let candidate = EndpointCandidate {
                 loadout_port_ordinal: Some(ordinal),
-                physical_port: port.source_constraints.physical_port()?,
+                physical_port: port.alignment().physical_port()?,
             };
             let name = port
-                .name()
-                .value()
+                .name_value()
                 .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
             local.add(name, candidate);
         }
@@ -299,7 +298,7 @@ impl<'scope, 'rows> LocalPorts<'scope, 'rows> {
 
 fn name_inventory_origin(
     sources: &SourceUses,
-    ports: &[LoadoutPort],
+    ports: &[impl JoinPort],
     definitions: &[TopologyPortDefinition<'_>],
     inventory: &[&SourceUse],
     read_complete: bool,

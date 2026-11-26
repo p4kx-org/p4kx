@@ -18,18 +18,19 @@ use super::resource_topology_declarations::ResourceTopologyDeclarations;
 use super::resource_topology_index::{TopologyIndex, TopologySource};
 use crate::CatalogError;
 use crate::collected::Collected;
-use crate::contract_loadout::{Loadout, LoadoutPort};
+use crate::contract_loadout::Loadout;
 use crate::loadout::alignment::AttachmentIdentity;
+use crate::loadout::join::{JoinPort, LoadoutJoin};
 use crate::loadout::staging::StagedLoadouts;
 
-struct Context<'loadout> {
+struct Context<'loadout, Port> {
     position: LoadoutPosition,
     record: Option<u32>,
-    ports: &'loadout [LoadoutPort],
+    ports: &'loadout [Port],
     complete: bool,
 }
 
-impl Context<'_> {
+impl<Port> Context<'_, Port> {
     fn child(&self, ordinal: u32) -> LoadoutPosition {
         let mut position = self.position.clone();
         position.port_ordinals.push(ordinal);
@@ -51,6 +52,7 @@ impl<'source> Collected<'source> {
     ) -> Result<CatalogResourceTopology<'source>, CatalogError> {
         let placements = project(&self.loadouts, &self.entity_configurations, sources, cancel)?
             .into_tables(forge);
+        self.loadouts.release_ship_joins();
         let declarations =
             std::mem::take(&mut self.entity_configurations.topology).into_tables(forge);
         Ok(CatalogResourceTopology {
@@ -69,7 +71,7 @@ fn project(
     let index = TopologyIndex::new(selected)?;
     let mut graph = ResourceNetworkPlacements::default();
     for ship in loadouts.ships() {
-        graph.add_loadout(&ship.loadout, &index, sources, cancel)?;
+        graph.add_loadout(&ship.view(), &index, sources, cancel)?;
     }
     Ok(graph)
 }
@@ -87,7 +89,7 @@ pub(crate) fn project_scoped(
     if let Some(loadout) = loadout {
         let index =
             TopologyIndex::with_facts(declarations, resources, &alignment.topology_facts())?;
-        graph.add_loadout(loadout, &index, sources, cancel)?;
+        graph.add_loadout(&LoadoutJoin::from(loadout), &index, sources, cancel)?;
     }
     Ok(graph.into_tables(forge))
 }
@@ -95,13 +97,13 @@ pub(crate) fn project_scoped(
 impl ResourceNetworkPlacements {
     fn add_loadout(
         &mut self,
-        loadout: &Loadout,
+        loadout: &LoadoutJoin<'_, impl JoinPort>,
         index: &TopologyIndex<'_, '_>,
         sources: &SourceUses,
         cancel: Option<&CancelToken>,
     ) -> Result<(), CatalogError> {
         check_cancel(cancel)?;
-        let record = loadout.root_record_index;
+        let record = loadout.record_index;
         let position = LoadoutPosition::root(record);
         let root_resources = components(index, Some(record));
         if !root_resources.is_empty() {
@@ -117,7 +119,7 @@ impl ResourceNetworkPlacements {
         let mut stack = vec![Context {
             position,
             record: Some(record),
-            ports: &loadout.ports,
+            ports: loadout.ports,
             complete: loadout.port_inventory_complete,
         }];
         while let Some(context) = stack.pop() {
@@ -128,14 +130,15 @@ impl ResourceNetworkPlacements {
                 let has_declarations = record
                     .and_then(|record| index.get(record))
                     .is_some_and(TopologySource::has_declarations);
-                if port.docked_vehicle || (port.ports.is_empty() && !has_declarations) {
+                let state = port.state();
+                if state.docked_vehicle || (port.children().is_empty() && !has_declarations) {
                     continue;
                 }
                 stack.push(Context {
                     position: context.child(loadout_position::ordinal(ordinal)?),
                     record,
-                    ports: &port.ports,
-                    complete: port.attachment_port_inventory_complete,
+                    ports: port.children(),
+                    complete: state.attachment_port_inventory_complete,
                 });
             }
         }
@@ -144,7 +147,7 @@ impl ResourceNetworkPlacements {
 
     fn add_context(
         &mut self,
-        context: &Context<'_>,
+        context: &Context<'_, impl JoinPort>,
         index: &TopologyIndex<'_, '_>,
         sources: &SourceUses,
         cancel: Option<&CancelToken>,
@@ -165,12 +168,12 @@ impl ResourceNetworkPlacements {
         for (ordinal, port) in context.ports.iter().enumerate() {
             check_cancel(cancel)?;
             let ordinal = loadout_position::ordinal(ordinal)?;
-            let attachment = port.source_constraints.attachment();
+            let attachment = port.alignment().attachment();
             let resource_components = components(index, target_record(attachment));
             if referenced.contains(&ordinal) || !resource_components.is_empty() {
                 self.nodes.push(ResourceNetworkNode {
                     position: context.child(ordinal),
-                    original_port: port.source_constraints.physical_port()?,
+                    original_port: port.alignment().physical_port()?,
                     attached_item: attachment.cloned(),
                     vehicle_boundary: boundary(port, index, sources)?,
                     resource_components,
@@ -181,11 +184,11 @@ impl ResourceNetworkPlacements {
         Ok(())
     }
 
-    fn add_bindings(
+    fn add_bindings<Port: JoinPort>(
         &mut self,
-        context: &Context<'_>,
+        context: &Context<'_, Port>,
         source: &TopologySource<'_, '_>,
-        local: &LocalPorts<'_, '_>,
+        local: &LocalPorts<'_, '_, Port>,
         record: u32,
         referenced: &mut HashSet<u32>,
         cancel: Option<&CancelToken>,
@@ -245,28 +248,28 @@ fn port_ordinals(cell: &SourcedValue<NetworkEndpoint>) -> impl Iterator<Item = u
 }
 
 fn boundary(
-    port: &LoadoutPort,
+    port: &impl JoinPort,
     index: &TopologyIndex<'_, '_>,
     sources: &SourceUses,
 ) -> Result<Option<SourcedValue<bool>>, CatalogError> {
-    let Some(attachment) = port.source_constraints.attachment_proof() else {
+    let Some(attachment) = port.alignment().attachment_proof() else {
         return Ok(None);
     };
     let type_use = port
-        .source_constraints
+        .alignment()
         .attachment_component()?
         .and_then(|position| index.attachment_types.get(&position));
     let mut inputs = attachment.source_uses.clone();
     inputs.extend(type_use.into_iter().copied().cloned());
     Ok(Some(sources.value(
-        SourceValue::Present(port.docked_vehicle),
+        SourceValue::Present(port.state().docked_vehicle),
         &inputs,
         attachment.source_set_complete && type_use.is_some(),
     )))
 }
 
-pub(crate) fn attachment_record(port: &LoadoutPort) -> Option<u32> {
-    target_record(port.source_constraints.attachment())
+pub(crate) fn attachment_record(port: &impl JoinPort) -> Option<u32> {
+    target_record(port.alignment().attachment())
 }
 
 fn target_record(attachment: Option<&AttachmentIdentity>) -> Option<u32> {

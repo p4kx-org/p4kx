@@ -734,7 +734,7 @@ fixed export time, default text selection, `--progress-phases` and one private `
 The completed writer reports `catalog storage:` on stderr. It sums the logical bytes of the
 temporary row spools for container instances, locations, Entity tag declarations,
 Item and Blueprint definitions, particle libraries,
-contract generators, contract templates, mission broker entries, item loadouts, item ports,
+contract generators, contract templates, mission broker entries, loadouts, item ports,
 interactions, inventory item bounds, durability and weapon animation candidates, plus the
 final bytes of the publication temporary. The spools stay
 open until publication. The measurement includes open spools with no visible file name. On an
@@ -772,12 +772,11 @@ Inventory storage selections stay in memory for the capacity and facility joins.
 
 The observed ship base reader visits selected ships in physical Record order. Other entity checks
 run in parallel within each scan window. The first ship to read a shared file owns the observation.
-One observed loadout resolver visits roots in stable GUID order and stages each result before the
-next root. Item rows go straight into one sequential compressed spool. Ship loadouts keep their
-original Catalog array position and source-bearing port data for facility and resource topology joins.
-The writer interleaves both sets in canonical GUID order. Record the write-counter
-change during loadout resolution and the retained private bytes on entry to
-location projection.
+One observed loadout resolver visits roots in stable GUID order and stages each complete row in
+one sequential compressed spool. It retains only the typed Ship port and owner data needed for
+crafter, facility and resource topology joins. The joins use the original attachment and name
+evidence. The producer releases those trees after the topology join. Record process writes during
+loadout resolution and retained private bytes on entry to location and facility-interior projection.
 
 After each Record and ContractGenerator window and at selected projection boundaries, the
 source registry packs unheld DataForge uses into compact coordinates. It keeps live handles and their original authority. A later observation

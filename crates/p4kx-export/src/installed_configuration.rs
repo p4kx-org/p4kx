@@ -19,9 +19,8 @@ use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_queries::CatalogRecordCoverage;
 use crate::catalog_table::CatalogTable;
 use crate::catalog_v3::component_sources::flight::{FlightController, Ifcs, Thruster};
-use crate::contract_loadout::LoadoutPort;
 use crate::guid_text::CatalogGuid;
-use crate::loadout::alignment::AttachmentIdentity;
+use crate::loadout::alignment::{AttachmentIdentity, LoadoutAlignment};
 use crate::schema_fields::every_field_required;
 use crate::{CatalogError, ExportAccountingError};
 
@@ -169,16 +168,13 @@ impl<'rows> InstalledConfigurations<'rows> {
         vehicle: &ShipContext,
         configurations: Vec<FlightConfigurationLink>,
         position: impl FnOnce() -> SourcedValue<LoadoutPosition>,
-        attachment: Option<(&LoadoutPort, &AttachmentIdentity)>,
+        attachment: Option<(&LoadoutAlignment, &AttachmentIdentity)>,
     ) -> Result<(), CatalogError> {
         if configurations.is_empty() {
             return Ok(());
         }
-        let (original_port, attached_item) = if let Some((port, attachment)) = attachment {
-            (
-                port.source_constraints.physical_port()?,
-                Some(attachment.clone()),
-            )
+        let (original_port, attached_item) = if let Some((alignment, attachment)) = attachment {
+            (alignment.physical_port()?, Some(attachment.clone()))
         } else {
             (None, None)
         };
