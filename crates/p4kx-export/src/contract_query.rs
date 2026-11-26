@@ -41,7 +41,10 @@ mod summary;
 mod survey;
 
 pub use key::{ContractKey, with_contract, with_contract_from};
-pub use summary::{ContractSummaries, ContractSummary};
+pub use summary::{
+    ContractSummaries, ContractSummary, with_contract_summaries, with_contract_summaries_from,
+    with_contract_summary, with_contract_summary_from,
+};
 
 pub use coverage::{
     ContractDependencyCoverage, ContractDiagnosticExample, ContractQueryCoverage,

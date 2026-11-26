@@ -85,7 +85,12 @@ are separate domain queries.
 
 `with_contract_summaries(selection, cancel, callback)` and
 `with_contract_summary(ContractKey, cancel, callback)` on both session views return the same
-canonical winner and ordering for each selected parent or sub-contract. Each summary contains
+canonical winner and ordering for each selected parent or sub-contract. The one-shot functions
+of the same names and their suffix forms with `_from` are exported from
+`p4kx_export::catalog_queries`. The suffix forms verify that the decoded Entry belongs
+to the Archive. Reuse a parsed view for a refresh that makes several queries.
+
+Each summary contains
 its original logical IDs, physical Generator record index, debug name, blueprint and successful
 fixed rewards, giver faction, offered locations, sharing, cooldowns and their source layers,
 buy-in, reacceptance after abandoning or failing, authored location-query links, reputation gains
@@ -95,7 +100,9 @@ original pool IDs. Runtime results of location rules are outside this Archive qu
 
 `notForRelease` and `workInProgress` copy the parent contract's flags for both parent
 and sub-contract rows, with `null` for an absent flag. The SDK returns the same
-canonical rows regardless of these flags, so callers can apply their own visibility rules.
+canonical rows regardless of these flags. To hide rows explicitly marked for development,
+keep rows satisfying `row.not_for_release != Some(true) && row.work_in_progress != Some(true)`.
+This policy keeps rows whose flags are absent.
 
 The parent contract's standing bounds use `minStandingGuid` and `maxStandingGuid`.
 `standingRequirements` retains the authored reputation prerequisites at the handler, contract and

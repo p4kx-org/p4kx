@@ -2,7 +2,8 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_extraction::{
-    Build, CancelToken, Language, LocalizationNote, SourceInventory, SourcedValue,
+    Archive, Build, CancelToken, DataForgeEntry, Language, LocalizationNote, SourceInventory,
+    SourcedValue,
 };
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -14,7 +15,7 @@ use super::{
 };
 use super::{plan, read, read_parsed};
 use crate::CatalogError;
-use crate::catalog_queries::CatalogRecordSelection;
+use crate::catalog_queries::{CatalogLanguageSelection, CatalogRecordSelection};
 use crate::catalog_query_session::{CatalogQuerySession, ParsedCatalogQueries};
 use crate::catalog_table::DatasetAvailability;
 use crate::catalog_text_contract::{CanonicalText, GameTextRef, PublicNameRef};
@@ -151,6 +152,69 @@ impl<'source> ContractSummaries<'source> {
             coverage: query.projected.coverage,
         }
     }
+}
+
+/// Supplies canonical summaries owned by selected physical Generator Records.
+/// Publish consumer-owned changes after this function returns successfully.
+///
+/// # Errors
+/// Returns input, source evidence, Archive change or cancellation errors.
+pub fn with_contract_summaries<T>(
+    archive: &Archive,
+    selection: CatalogRecordSelection,
+    languages: CatalogLanguageSelection<'_>,
+    cancel: Option<&CancelToken>,
+    inspect: impl FnOnce(ContractSummaries<'_>) -> T,
+) -> Result<T, CatalogError> {
+    CatalogQuerySession::open(archive, languages, cancel)?
+        .with_contract_summaries(selection, cancel, inspect)
+}
+
+/// Supplies canonical summaries using a decoded Entry from the same Archive.
+///
+/// # Errors
+/// Returns the errors of [with_contract_summaries], including source-origin mismatch.
+pub fn with_contract_summaries_from<T>(
+    archive: &Archive,
+    entry: &DataForgeEntry,
+    selection: CatalogRecordSelection,
+    languages: CatalogLanguageSelection<'_>,
+    cancel: Option<&CancelToken>,
+    inspect: impl FnOnce(ContractSummaries<'_>) -> T,
+) -> Result<T, CatalogError> {
+    CatalogQuerySession::from_entry(archive, entry, languages, cancel)?
+        .with_contract_summaries(selection, cancel, inspect)
+}
+
+/// Supplies the canonical summary for one logical parent or sub-contract identity.
+///
+/// # Errors
+/// Returns the errors of [with_contract_summaries].
+pub fn with_contract_summary<T>(
+    archive: &Archive,
+    key: ContractKey,
+    languages: CatalogLanguageSelection<'_>,
+    cancel: Option<&CancelToken>,
+    inspect: impl FnOnce(ContractSummaries<'_>) -> T,
+) -> Result<T, CatalogError> {
+    CatalogQuerySession::open(archive, languages, cancel)?
+        .with_contract_summary(key, cancel, inspect)
+}
+
+/// Supplies one logical summary using a decoded Entry from the same Archive.
+///
+/// # Errors
+/// Returns the errors of [with_contract_summary], including source-origin mismatch.
+pub fn with_contract_summary_from<T>(
+    archive: &Archive,
+    entry: &DataForgeEntry,
+    key: ContractKey,
+    languages: CatalogLanguageSelection<'_>,
+    cancel: Option<&CancelToken>,
+    inspect: impl FnOnce(ContractSummaries<'_>) -> T,
+) -> Result<T, CatalogError> {
+    CatalogQuerySession::from_entry(archive, entry, languages, cancel)?
+        .with_contract_summary(key, cancel, inspect)
 }
 
 impl CatalogQuerySession<'_> {

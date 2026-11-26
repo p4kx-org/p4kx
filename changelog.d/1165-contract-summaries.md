@@ -6,3 +6,4 @@
 - Contract summaries also carry the canonical debug name, fixed payouts, cooldowns, buy-in,
   reacceptance, standing bounds, authored scoped reputation requirements and protected descriptions.
   The `notForRelease` and `workInProgress` flags use the same parent values as full contracts.
+- Both summary queries have direct SDK entry points for an Archive or its decoded DataForge Entry.

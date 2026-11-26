@@ -66,7 +66,10 @@ pub use contracts::{
     TagOption, TagPaths, TagTerm, TimeTrialSplit, with_contract, with_contract_from,
     with_contracts, with_contracts_from,
 };
-pub use contracts::{ContractSummaries, ContractSummary};
+pub use contracts::{
+    ContractSummaries, ContractSummary, with_contract_summaries, with_contract_summaries_from,
+    with_contract_summary, with_contract_summary_from,
+};
 
 #[path = "contract_generator_query.rs"]
 mod contract_generators;

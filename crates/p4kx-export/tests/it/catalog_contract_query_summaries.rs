@@ -5,9 +5,10 @@ use std::error::Error;
 
 use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ContractKey,
-    ContractSnapshot, ContractSummaries, ContractSummary,
+    ContractSnapshot, ContractSummaries, ContractSummary, with_contract_summaries,
+    with_contract_summaries_from, with_contract_summary, with_contract_summary_from,
 };
-use p4kx_extraction::{Archive, CancelToken, Guid};
+use p4kx_extraction::{Archive, CancelToken, DataForgeEntry, Guid};
 use serde_json::{Map, Value, json};
 
 use super::TestResult;
@@ -53,6 +54,55 @@ fn contract_summaries_match_selected_canonical_rows_and_location_queries() -> Te
             verify_text_origins(&summary)
         })??;
     Ok(())
+}
+
+#[test]
+fn one_shot_contract_summary_queries_match_parsed_view() -> TestResult {
+    let folder = tempfile::tempdir()?;
+    let archive = Archive::open_with_key(
+        contracts_fixture::write_archive(folder.path())?,
+        Some(p4kx_testkit::test_key()),
+    )?;
+    let entry = DataForgeEntry::read(&archive)?;
+    let languages = CatalogLanguageSelection::AllAvailable;
+    let session = CatalogQuerySession::from_entry(&archive, &entry, languages, None)?;
+    let parsed = session.parsed(None)?;
+    let selection = CatalogRecordSelection::All;
+    let (all, key) = parsed.with_contract_summaries(selection, None, |summary| {
+        let first = summary.rows.first().ok_or("a canonical summary")?;
+        let parent = first.guid.value().ok_or("summary parent GUID")?.get();
+        let sub = first.sub_contract_guid.value().map(|guid| guid.get());
+        Ok::<_, Box<dyn Error>>((
+            serde_json::to_value(&summary.rows)?,
+            ContractKey::new(parent, sub),
+        ))
+    })??;
+    let exact = parsed.with_contract_summary(key, None, summary_rows)??;
+    assert_eq!(
+        with_contract_summaries(&archive, selection, languages, None, summary_rows)??,
+        all,
+        "one-shot physical selection matches the parsed view"
+    );
+    assert_eq!(
+        with_contract_summaries_from(&archive, &entry, selection, languages, None, summary_rows)??,
+        all,
+        "decoded-entry physical selection matches the parsed view"
+    );
+    assert_eq!(
+        with_contract_summary(&archive, key, languages, None, summary_rows)??,
+        exact,
+        "one-shot logical selection matches the parsed view"
+    );
+    assert_eq!(
+        with_contract_summary_from(&archive, &entry, key, languages, None, summary_rows)??,
+        exact,
+        "decoded-entry logical selection matches the parsed view"
+    );
+    Ok(())
+}
+
+fn summary_rows(summary: ContractSummaries<'_>) -> serde_json::Result<Value> {
+    serde_json::to_value(summary.rows)
 }
 
 #[test]
