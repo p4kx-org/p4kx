@@ -35,8 +35,9 @@ pub use crate::shops::resolution_scope::{
 };
 pub use crate::shops::row_query::{
     ShopNameCoverage, ShopRegistrySelection, ShopRowCoverage, ShopRowResult, ShopRowSnapshot,
-    ShopRowsSnapshot, read_shop, read_shop_with_provenance_mode, read_shops,
-    read_shops_with_provenance_mode,
+    ShopRowVisitSummary, ShopRowsSnapshot, read_shop, read_shop_with_provenance_mode, read_shops,
+    read_shops_with_provenance_mode, visit_shops, visit_shops_from,
+    visit_shops_with_provenance_mode,
 };
 use crate::{
     CatalogError, ExportAccountingError, ExportDiagnosticCode, ExportDiagnosticStage, Kind,

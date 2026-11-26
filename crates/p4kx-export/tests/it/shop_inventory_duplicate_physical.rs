@@ -14,6 +14,9 @@ use p4kx_testkit::{TestContainer, TestElement, TestEntry};
 use serde_json::{Value, json};
 
 use super::{TestResult, original, resolution_row};
+
+#[path = "shop_inventory_all_physical.rs"]
+mod all;
 use crate::health_origin_assertions as health;
 use crate::shop_items_rest_fixture::{ITEM_A, ITEM_B};
 use crate::shops_fixture::{self, EXCHANGE, REGISTRY};
@@ -207,6 +210,7 @@ fn equivalent_inventory_paths_are_ambiguous_without_changing_legacy_shop_links()
     assert_targets(&catalog, row, originals)?;
     assert_compatibility_origin(&catalog, legacy, originals)?;
     assert_physical_shop_scope(&archive, &catalog, legacy)?;
+    all::assert_scope(&archive, &catalog)?;
     super::resolution_sdk::assert_physical_duplicate_scope(&archive, &catalog, row, key)
 }
 

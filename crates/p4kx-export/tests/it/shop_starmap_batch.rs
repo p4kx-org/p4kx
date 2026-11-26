@@ -12,6 +12,9 @@ use super::TestResult;
 use crate::health_origin_assertions as health;
 use crate::shops_fixture::{self, REGISTRY};
 
+#[path = "shop_starmap_all.rs"]
+mod all;
+
 #[test]
 fn physical_shop_batch_preserves_order_coverage_and_original_uses() -> TestResult {
     let directory = tempfile::tempdir()?;

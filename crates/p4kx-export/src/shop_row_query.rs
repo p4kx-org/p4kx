@@ -19,6 +19,12 @@ use crate::{CatalogError, StarmapTraversalBudget};
 mod input;
 #[path = "shop_row_placement.rs"]
 mod placement;
+#[path = "shop_row_visit.rs"]
+mod visit;
+
+pub use visit::{
+    ShopRowVisitSummary, visit_shops, visit_shops_from, visit_shops_with_provenance_mode,
+};
 
 /// A physical `ShopBackup` node in the original shop registry selected by the catalog.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,7 +57,7 @@ pub struct ShopNameCoverage {
     pub routes_complete: bool,
 }
 
-/// Observed source scope for one physical shop lookup.
+/// Observed source scope for a Shop query.
 #[derive(Debug, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct ShopRowCoverage {
@@ -59,7 +65,7 @@ pub struct ShopRowCoverage {
     pub registry_complete: bool,
     /// Whether all eligible shop declarations were scanned, if a shop was admitted.
     pub declarations_complete: Option<bool>,
-    /// Count of compatibility inventory payload reads, including a failed selected read.
+    /// Count of distinct compatibility inventory payloads attempted in this scope.
     pub inventory_payloads: usize,
     /// Whether the name join was globally enumerable, when the shop supplies a location.
     pub names: Option<ShopNameCoverage>,

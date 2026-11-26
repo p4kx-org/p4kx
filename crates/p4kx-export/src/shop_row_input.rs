@@ -13,7 +13,7 @@ use crate::shop_containers::{Component, Containers, Inventory};
 use crate::shop_inventories::{Inventories, is_placeholder};
 use crate::shop_inventory_path::InventoryStem;
 use crate::shop_inventory_resolution::InventoryResolver;
-use crate::shop_registry::{self, RegistryNeed, RegistryShop};
+use crate::shop_registry::{self, RegistryDocument, RegistryNeed, RegistryShop};
 use crate::shop_summary::ShopSummary;
 use crate::shops::shop_list::{self, PreparedShop, ShopPlacement};
 use crate::shops::{Lists, ShopDeclarations, record_registry};
@@ -84,30 +84,20 @@ fn registry(
     summary: &mut ShopSummary,
     ledger: &mut ExportLedger,
 ) -> Result<RegistryMatch, CatalogError> {
-    let directory_complete = crate::export_archive_health::inventory(archive).is_none();
-    let registry = shop_registry::read_source(
-        archive,
-        &ArchiveFiles::new(archive),
-        RegistryNeed::Optional,
-        summary,
-        ledger,
-        capture,
-    )?;
-    let Some(shop_registry::RegistryDocument {
+    let RegistryInput {
+        document,
+        availability,
+        directory_complete,
+    } = read_registry(archive, capture, summary, ledger)?;
+    let Some(RegistryDocument {
         rows,
         source: original,
         complete: registry_complete,
-    }) = registry
+    }) = document
     else {
-        let complete = summary.registry_missing && directory_complete;
-        let availability = if complete {
-            DatasetAvailability::Absent
-        } else {
-            DatasetAvailability::Unavailable
-        };
         return Ok(RegistryMatch {
             availability,
-            complete,
+            complete: matches!(availability, DatasetAvailability::Absent),
             owner: None,
         });
     };
@@ -131,11 +121,46 @@ fn registry(
         })
         .transpose()?;
     Ok(RegistryMatch {
-        availability: DatasetAvailability::Available,
+        availability,
         complete: directory_complete
             && registry_complete
             && disposition == SourceDisposition::Projected,
         owner,
+    })
+}
+
+pub(super) struct RegistryInput {
+    pub(super) document: Option<RegistryDocument>,
+    pub(super) availability: DatasetAvailability,
+    pub(super) directory_complete: bool,
+}
+
+pub(super) fn read_registry(
+    archive: &Archive,
+    capture: &EntryCapture<'_>,
+    summary: &mut ShopSummary,
+    ledger: &mut ExportLedger,
+) -> Result<RegistryInput, CatalogError> {
+    let directory_complete = crate::export_archive_health::inventory(archive).is_none();
+    let document = shop_registry::read_source(
+        archive,
+        &ArchiveFiles::new(archive),
+        RegistryNeed::Optional,
+        summary,
+        ledger,
+        capture,
+    )?;
+    let availability = if document.is_some() {
+        DatasetAvailability::Available
+    } else if summary.registry_missing && directory_complete {
+        DatasetAvailability::Absent
+    } else {
+        DatasetAvailability::Unavailable
+    };
+    Ok(RegistryInput {
+        document,
+        availability,
+        directory_complete,
     })
 }
 

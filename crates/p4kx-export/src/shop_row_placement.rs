@@ -58,10 +58,24 @@ impl<'query, 'capture, 'data> Lookup<'query, 'capture, 'data> {
         &mut self,
         location: &SourcedValue<String>,
     ) -> Result<(SourcedValue<CatalogGuid>, Option<ShopNameCoverage>), CatalogError> {
+        let linked = self.link(location)?;
+        Ok((linked, location.value().and_then(|_| self.coverage())))
+    }
+
+    pub(super) fn coverage(&self) -> Option<ShopNameCoverage> {
+        self.survey.as_ref().map(|survey| ShopNameCoverage {
+            records: survey.names.coverage.clone(),
+            routes_complete: survey.routes_complete,
+        })
+    }
+
+    pub(super) fn link(
+        &mut self,
+        location: &SourcedValue<String>,
+    ) -> Result<SourcedValue<CatalogGuid>, CatalogError> {
         let sources = self.capture.source_uses();
         let Some(wanted) = location.value() else {
-            let absent = sources.value_with_origins(SourceValue::Absent, &[location.origin()])?;
-            return Ok((absent, None));
+            return Ok(sources.value_with_origins(SourceValue::Absent, &[location.origin()])?);
         };
         let survey = if let Some(survey) = &self.survey {
             survey
@@ -82,14 +96,7 @@ impl<'query, 'capture, 'data> Lookup<'query, 'capture, 'data> {
                 routes_complete,
             })
         };
-        let linked = survey.resolve(wanted, location, sources, self.cancel)?;
-        Ok((
-            linked,
-            Some(ShopNameCoverage {
-                records: survey.names.coverage.clone(),
-                routes_complete: survey.routes_complete,
-            }),
-        ))
+        survey.resolve(wanted, location, sources, self.cancel)
     }
 }
 

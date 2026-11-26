@@ -35,8 +35,24 @@ impl Inventories {
         ledger: &mut ExportLedger,
         cancel: Option<&CancelToken>,
     ) -> Result<(Self, usize), CatalogError> {
+        Self::prepare_shops(
+            archive,
+            |group| stem == Some(group),
+            capture,
+            ledger,
+            cancel,
+        )
+    }
+
+    pub(crate) fn prepare_shops(
+        archive: &Archive,
+        includes: impl Fn(&str) -> bool,
+        capture: &EntryCapture<'_>,
+        ledger: &mut ExportLedger,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(Self, usize), CatalogError> {
         Self::prepare_selective(archive, capture, ledger, cancel, |group, entries| {
-            if stem == Some(group) {
+            if includes(group) {
                 entries.last().copied()
             } else {
                 None

@@ -3,7 +3,6 @@
 
 use std::time::UNIX_EPOCH;
 
-use p4kx_export::catalog_queries::CatalogLanguageSelection;
 use p4kx_export::catalog_queries::flares::{FlareLibrarySelection, read_flare_libraries};
 use p4kx_export::catalog_queries::localization::{catalog_language_policy, with_language_sources};
 use p4kx_export::catalog_queries::particle_libraries::{
@@ -11,13 +10,15 @@ use p4kx_export::catalog_queries::particle_libraries::{
 };
 use p4kx_export::catalog_queries::radar_audio::{RadarAudioSelection, read_radar_audio};
 use p4kx_export::catalog_queries::shops::{
-    ResolutionStatus, ShopInventorySelection, ShopRegistrySelection, ShopResolutionSelection,
+    ResolutionStatus, Shop, ShopInventorySelection, ShopRegistrySelection, ShopResolutionSelection,
     read_shop_inventories, read_shop_inventory_resolutions, read_shop_with_provenance_mode,
+    visit_shops_with_provenance_mode,
 };
 use p4kx_export::catalog_queries::subsumption_events::{
     SubsumptionEventSelection, read_subsumption_events,
 };
-use p4kx_export::{CatalogOptions, StarmapTraversalBudget, build_catalog};
+use p4kx_export::catalog_queries::{CatalogLanguageSelection, DatasetAvailability};
+use p4kx_export::{CatalogError, CatalogOptions, StarmapTraversalBudget, build_catalog};
 use p4kx_extraction::{Archive, Language, find_entry};
 use p4kx_testkit::{ArchiveBuilder, DataForgeBuilder, TestEntry, test_key};
 use serde_json::{Value, json};
@@ -198,6 +199,21 @@ pub(super) fn read_physical_shop() -> TestResult<Route> {
         "one chosen physical inventory body is required"
     );
     let row = snapshot.row.ok_or("one scoped Shop row")?;
+    assert_shop_field_sources(&row)?;
+    assert_eq!(
+        &serde_json::to_value(&row)?,
+        expected,
+        "the independently called physical route writes the exact normal Shop row"
+    );
+    assert_complete_shop_rows(&archive, rows)?;
+    Route::queried_rows(
+        SHOPS,
+        std::slice::from_ref(&row),
+        "synthetic Normal array parity available; installed complete producer parity open",
+    )
+}
+
+fn assert_shop_field_sources(row: &Shop) -> TestResult<()> {
     assert_eq!(
         row.registry.key.origin().contains_encrypted_source(),
         Some(false),
@@ -220,16 +236,36 @@ pub(super) fn read_physical_shop() -> TestResult<Route> {
         Some(true),
         "the item value retains its own encrypted JSON origin"
     );
-    assert_eq!(
-        &serde_json::to_value(&row)?,
-        expected,
-        "the independently called physical route writes the exact normal Shop row"
+    Ok(())
+}
+
+fn assert_complete_shop_rows(archive: &Archive, expected: &[Value]) -> TestResult<()> {
+    let mut all = Vec::new();
+    let summary = visit_shops_with_provenance_mode::<CatalogError>(
+        archive,
+        StarmapTraversalBudget::default(),
+        full_proof::MODE,
+        None,
+        |shop| {
+            all.push(serde_json::to_value(shop).map_err(CatalogError::Json)?);
+            Ok(())
+        },
+    )?;
+    assert!(
+        matches!(summary.availability, DatasetAvailability::Available),
+        "the complete visit observes the physical registry"
     );
-    Route::queried_rows(
-        SHOPS,
-        std::slice::from_ref(&row),
-        "synthetic Normal row parity available; integrated installed producer parity open",
-    )
+    assert_eq!(
+        summary.row_count,
+        all.len(),
+        "one callback per canonical Shop"
+    );
+    assert_eq!(
+        all.as_slice(),
+        expected,
+        "the complete SDK visitor emits the Normal array"
+    );
+    Ok(())
 }
 
 fn physical_shop_fixture() -> TestResult<(tempfile::TempDir, Archive)> {

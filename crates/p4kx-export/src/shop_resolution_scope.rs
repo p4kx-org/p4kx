@@ -146,7 +146,7 @@ struct ScopeRead {
     ledger: ExportLedger,
 }
 
-type SelectedPlacement<'registry> = (&'registry RegistryShop, shop_list::ShopPlacement);
+pub(super) type SelectedPlacement<'registry> = (&'registry RegistryShop, shop_list::ShopPlacement);
 
 fn read_scope(
     archive: &Archive,
@@ -224,7 +224,12 @@ impl ScopeRead {
         let needed = needed_bodies(&containers, placements);
         let (mut inventories, inventory_payloads) =
             Inventories::prepare_resolution(archive, &needed, capture, &mut self.ledger, cancel)?;
-        let lists = selected_lists(&containers, &mut inventories, &needed, &mut self.ledger)?;
+        let lists = selected_lists(
+            &containers,
+            &mut inventories,
+            &mut self.ledger,
+            |files, stem| needed.contains(stem) && files.files(stem).len() <= 1,
+        )?;
         let resolver = InventoryResolver::new(
             &containers,
             &inventories,
@@ -254,7 +259,7 @@ impl ScopeRead {
     }
 }
 
-fn needed_bodies<'scope>(
+pub(super) fn needed_bodies<'scope>(
     containers: &'scope Containers,
     placements: &[SelectedPlacement<'_>],
 ) -> BTreeSet<&'scope str> {
@@ -269,15 +274,15 @@ fn needed_bodies<'scope>(
         .collect()
 }
 
-fn selected_lists<'scope>(
+pub(super) fn selected_lists<'scope>(
     containers: &'scope Containers,
     inventories: &mut Inventories,
-    needed: &BTreeSet<&str>,
     ledger: &mut ExportLedger,
+    includes: impl Fn(&Inventories, &str) -> bool,
 ) -> Result<Lists<'scope>, CatalogError> {
     let mut lists = Lists::new();
     for (stem, selection) in containers.inventory_selections()? {
-        if needed.contains(stem) && inventories.files(stem).len() <= 1 {
+        if includes(inventories, stem) {
             lists.insert(stem, inventories.items(&selection, ledger)?);
         }
     }

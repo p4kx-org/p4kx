@@ -3,11 +3,12 @@
 
 use std::env;
 
-use p4kx_export::StarmapTraversalBudget;
 use p4kx_export::catalog_queries::shops::{
-    Shop, ShopRegistrySelection, ShopRowSnapshot, read_shop_with_provenance_mode,
+    Shop, ShopRegistrySelection, ShopRowSnapshot, ShopRowVisitSummary,
+    read_shop_with_provenance_mode, visit_shops_with_provenance_mode,
 };
 use p4kx_export::catalog_queries::{DatasetAvailability, ProvenanceMode};
+use p4kx_export::{CatalogError, StarmapTraversalBudget};
 use p4kx_extraction::{Archive, PhysicalSourceKind, SourceInventory, SourceLocation, SourcedValue};
 
 use serde_json::Value;
@@ -55,6 +56,66 @@ fn installed_physical_shop_matches_retained_complete_catalog() -> TestResult {
 #[ignore = "same Build: compare one Shop and two original magazine slots in one retained Normal stream"]
 fn installed_physical_shop_and_ammo_containers_match_retained_complete_catalog() -> TestResult {
     verify_retained_catalog(Replay::ShopAndAmmo)
+}
+
+#[test]
+#[ignore = "real Archive: run the complete Shop SDK visit once per Build in a measured process"]
+fn installed_all_shops_cold_query() -> TestResult {
+    with_archive(|archive| {
+        let summary = visit_shops_with_provenance_mode::<CatalogError>(
+            archive,
+            StarmapTraversalBudget::default(),
+            ProvenanceMode::Full,
+            None,
+            |_| Ok(()),
+        )?;
+        validate_all_shop_summary(archive, &summary)?;
+        print_line(&format!(
+            "complete Shop SDK cold visit: rows={}",
+            summary.row_count
+        ));
+        Ok(())
+    })
+}
+
+#[test]
+#[ignore = "same Build: compare all ordered Shops and original field evidence with a retained Normal Catalog"]
+fn installed_all_shops_match_retained_complete_catalog() -> TestResult {
+    let revision = env::var("P4KX_SHOP_CATALOG_PRODUCER_REVISION")
+        .map_err(|_| "configure the exact Shop Catalog producer revision")?;
+    with_bound_measurement_from_producer(&revision, |archive, measurement| {
+        let mut rows = Vec::new();
+        let summary = visit_shops_with_provenance_mode::<CatalogError>(
+            archive,
+            StarmapTraversalBudget::default(),
+            ProvenanceMode::Full,
+            None,
+            |shop| {
+                rows.push(serde_json::to_value(shop).map_err(CatalogError::Json)?);
+                Ok(())
+            },
+        )?;
+        validate_all_shop_summary(archive, &summary)?;
+        if rows.len() != summary.row_count {
+            return Err("the complete Shop visit count differs from its output".into());
+        }
+        let mut origins = Origins::default();
+        origins.extend(&summary.source_inventory, &rows)?;
+        measurement.verify_tables_and_arrays([], &[], &[("/shops", &rows)], &origins)?;
+        report_scoped_rows("Physical Shop", "all-retained-parity", &rows)
+    })
+}
+
+fn validate_all_shop_summary(archive: &Archive, summary: &ShopRowVisitSummary) -> TestResult {
+    if archive.build().is_none()
+        || summary.build.as_ref() != archive.build()
+        || !matches!(summary.availability, DatasetAvailability::Available)
+        || summary.row_count == 0
+        || summary.coverage.names.is_none()
+    {
+        return Err("expected actual located Shop rows from the exact measured Build".into());
+    }
+    Ok(())
 }
 
 #[derive(Clone, Copy)]

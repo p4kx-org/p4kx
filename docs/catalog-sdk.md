@@ -483,8 +483,19 @@ positions. Its rows share one source inventory and at most one Starmap name surv
 The corresponding methods on `CatalogQuerySession` and `ParsedCatalogQueries` reuse the
 session's decoded DataForge and, in the parsed view, its indexes.
 
-Synthetic fixtures compare the exact Normal Shop row and exercise incomplete and
-ambiguous location evidence. Isolated Windows debug test processes built from
+Use `visit_shops` for the complete `/shops` array in canonical key order. It reads the
+registry and shop declarations once, opens the last matching physical inventory for
+each needed stem, and shares one Starmap survey across located shops. The terminal
+summary reports source availability, row count and coverage. In Full mode, resolve
+the emitted rows' source-use references in the summary's source inventory. Retain
+callback output only after checking the terminal result and its coverage.
+`visit_shops_from` reuses a decoded DataForge Entry, and sessions and parsed views
+expose the same visitor. A standalone visit with no located shops needs no DataForge.
+An exhaustive Archive directory with no registry yields `Absent` in this query.
+The complete catalog producer can require the registry when exporting Starmap data.
+
+Synthetic fixtures compare the selected Shop row and the complete ordered array
+with catalog output and exercise incomplete and ambiguous location evidence. Isolated Windows debug test processes built from
 `0dbe2469c` resolved the original registry coordinate, a complete sourced Starmap
 link and one nonempty inventory for one located row per Build.
 
