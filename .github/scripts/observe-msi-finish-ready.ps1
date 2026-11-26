@@ -20,6 +20,21 @@ $launchDigest = Get-P4kxDetachedReceiptDigest (Join-Path $context.directory 'lau
 $ready = Read-P4kxMsiHostedFinishReady (Join-Path $context.directory 'waiter-ready.json') $cutoff $ReadyDigest
 Assert-P4kxMsiProgressReadiness $context $ready $launchDigest
 
+$historicalProbe = $null
+if ($context.request.target -ceq 'x86_64-pc-windows-msvc') {
+    $historicalPhase = 'lifecycle/historical-uninstall'
+    $historicalProbe = @{ budget_ms=15000;started_utc=[DateTimeOffset]::UtcNow.ToString('o') }
+    try {
+        $originalParent = Get-P4kxMsiObserverParentState $context.request $context.handle
+        $parameters = @{
+            Request=$context.request;Handle=$context.handle;ParentState=$originalParent
+            ProgressDirectory=$context.directory;Phase=$historicalPhase;MaximumMilliseconds=$historicalProbe.budget_ms
+        }
+        $null = Wait-P4kxMsiOriginalBoundary @parameters
+    } catch { $historicalProbe.wait_failure_type = $_.Exception.GetType().FullName }
+    finally { $historicalProbe.finished_utc = [DateTimeOffset]::UtcNow.ToString('o') }
+}
+
 $observed = [DateTimeOffset]::UtcNow
 $processes = @{
     supervisor=(Get-P4kxMsiObservedProcess $launch.supervisor_pid $launch.supervisor_started_utc_ticks)
@@ -29,6 +44,14 @@ $processes = @{
 $parent = Get-P4kxMsiObserverParentState $context.request $context.handle
 $sequence = 4
 $checkpoint = Save-P4kxMsiObserverCheckpoint $context.request $context.handle $sequence $parent
+if ($historicalProbe) {
+    try {
+        $boundary = Read-P4kxMsiOriginalBoundary (Join-Path $checkpoint 'phase-journal.jsonl') $context.request.target $historicalPhase
+        $historicalProbe.journal_present = $boundary.journal.present
+        $historicalProbe.transaction = $boundary.historical_uninstall.transaction
+        $historicalProbe.client_wait = $boundary.historical_uninstall.client_wait
+    } catch { $historicalProbe.journal_failure_type = $_.Exception.GetType().FullName }
+}
 $files = @{}
 foreach ($name in @('result.json','wait-result.json','waiter-exit.json')) {
     $files[$name] = Copy-P4kxMsiObserverFile (Join-Path $context.directory $name) (Join-Path $checkpoint "finish-$name") 16KB
@@ -40,7 +63,7 @@ foreach ($key in $runnerVariables.Keys) {
     if ($value -cmatch '\A[A-Za-z0-9._-]{1,80}\z') { $runner[$key] = $value }
 }
 if ([DateTimeOffset]::UtcNow -ge $cutoff) { throw 'The live checkpoint reached the original collection cutoff.' }
-Write-P4kxDetachedReceipt (Join-Path $checkpoint 'post-ready.json') @{
+$proof = @{
     schema=1;role='native-msi-finish-live-checkpoint';revision=$context.request.revision
     run=$context.request.run;attempt=$context.request.attempt;target=$context.request.target
     sequence=$sequence;request_sha256=$context.digest;launch_sha256=$launchDigest
@@ -49,3 +72,5 @@ Write-P4kxDetachedReceipt (Join-Path $checkpoint 'post-ready.json') @{
     processes=$processes;files=$files;runner=$runner
     completed_success=$false;native_completion_unproven=$true;mutation_authority=$false
 }
+if ($historicalProbe) { $proof.historical_uninstall = $historicalProbe }
+Write-P4kxDetachedReceipt (Join-Path $checkpoint 'post-ready.json') $proof

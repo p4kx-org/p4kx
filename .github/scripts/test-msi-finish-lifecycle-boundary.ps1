@@ -313,6 +313,43 @@ function Assert-P4kxHostedFinishAcrossLaunchers($Fixture) {
     }
 }
 
+function Assert-P4kxHistoricalUninstallObservation($Phase) {
+    $name = 'lifecycle/historical-uninstall'
+    $prior = Start-P4kxMsiPhase $Phase 'lifecycle/previous-install'
+    $foreignWait = Start-P4kxMsiPhase $Phase 'msiexec/wait'
+    Stop-P4kxMsiPhase $Phase $foreignWait
+    Stop-P4kxMsiPhase $Phase $prior
+    $absent = Read-P4kxMsiOriginalBoundary $Phase.journal $Phase.target $name
+    if ($absent.historical_uninstall.transaction.state -cne 'notObserved' -or
+        $absent.historical_uninstall.client_wait.state -cne 'notObserved') { throw 'An unrelated MSI wait satisfied the historical uninstall boundary.' }
+
+    $uninstall = Start-P4kxMsiPhase $Phase $name
+    $clientWait = Start-P4kxMsiPhase $Phase 'msiexec/wait'
+    $active = (Read-P4kxMsiOriginalBoundary $Phase.journal $Phase.target $name).historical_uninstall
+    if ($active.transaction.state -cne 'begin' -or $active.client_wait.state -cne 'begin' -or
+        $active.client_wait.begin.parent -ne $active.transaction.begin.id -or $active.client_wait.end -or
+        $active.transaction.end) { throw 'The active markers lost the original uninstall and client identities.' }
+
+    Stop-P4kxMsiPhase $Phase $clientWait
+    $separate = (Read-P4kxMsiOriginalBoundary $Phase.journal $Phase.target $name).historical_uninstall
+    if ($separate.transaction.state -cne 'begin' -or $separate.client_wait.state -cne 'end' -or
+        $separate.client_wait.end.id -ne $active.client_wait.begin.id) { throw 'A client wait end was not preserved separately from the transaction.' }
+
+    Stop-P4kxMsiPhase $Phase $uninstall
+    $closed = Read-P4kxMsiOriginalBoundary $Phase.journal $Phase.target $name
+    if ($closed.status -cne 'reached' -or $closed.historical_uninstall.transaction.state -cne 'end' -or
+        $closed.historical_uninstall.transaction.end.id -ne $active.transaction.begin.id -or
+        $closed.historical_uninstall.client_wait.end.sequence -ge $closed.historical_uninstall.transaction.end.sequence) {
+        throw 'The historical uninstall did not close after its original client wait.'
+    }
+    try {
+        $null = Read-P4kxMsiOriginalBoundary $Phase.journal 'aarch64-pc-windows-msvc' $name
+        throw 'The historical uninstall accepted a foreign CPU journal.'
+    } catch {
+        if ($_.Exception.Message -cne 'Original phase journal CPU or target differs.') { throw }
+    }
+}
+
 function Assert-P4kxFinishReadyCheckpoint([string]$Root) {
     $caseRoot = [IO.Directory]::CreateDirectory((Join-Path $Root 'live-ready')).FullName
     $fixture = New-P4kxFinishLifecycleFixture $caseRoot Bound
@@ -346,6 +383,7 @@ function Assert-P4kxFinishReadyCheckpoint([string]$Root) {
     $diagnostics = [IO.Directory]::CreateDirectory((Join-Path $fixture.output 'diagnostics')).FullName
     $phase = New-P4kxMsiPhaseContext $diagnostics $fixture.request.target
     $null = Start-P4kxMsiPhase $phase 'worker'
+    if ($phase.target -ceq 'x86_64-pc-windows-msvc') { Assert-P4kxHistoricalUninstallObservation $phase }
     $readyDigest = Get-P4kxDetachedReceiptDigest $readyPath
     $savedImage = $env:ImageVersion
     $savedRunner = $env:RUNNER_VERSION
@@ -366,11 +404,22 @@ function Assert-P4kxFinishReadyCheckpoint([string]$Root) {
         $postReady.processes.monitor.state -cne 'running' -or $postReady.processes.waiter.state -cne 'absent' -or
         $postReady.runner.image_version -cne '20261116.315.1' -or $postReady.runner.ContainsKey('runner_version') -or
         $postReady.completed_success -ne $false -or $postReady.native_completion_unproven -ne $true -or $postReady.mutation_authority -ne $false -or
-        $captured.journal.events -ne 1 -or $captured.journal.terminal -or
+        $captured.journal.events -ne $phase.sequence -or $captured.journal.terminal -or
         $captured.files['phase-journal.jsonl'].sha256 -cne (Get-P4kxDetachedDigest $phase.journal) -or
         $postReady.files['result.json'].sha256 -cne (Get-P4kxDetachedReceiptDigest $fixture.result_path) -or
         $postReady.files['waiter-exit.json'].status -cne 'absent' -or
         [IO.File]::Exists($fixture.wait_path)) { throw 'The live checkpoint altered or lost the original bound observation.' }
+    if ($phase.target -ceq 'x86_64-pc-windows-msvc') {
+        $observed = $postReady.historical_uninstall
+        $archived = (Read-P4kxMsiOriginalBoundary (Join-Path $checkpoint 'phase-journal.jsonl') $phase.target 'lifecycle/historical-uninstall').historical_uninstall
+        if ($null -eq $observed -or $observed.budget_ms -ne 15000 -or $observed.wait_failure_type -or
+            $observed.journal_failure_type -or $observed.journal_present -ne $true -or
+            $observed.transaction.state -cne 'end' -or $observed.client_wait.state -cne 'end' -or
+            $observed.transaction.end.sequence -ne $archived.transaction.end.sequence -or
+            $observed.client_wait.end.sequence -ne $archived.client_wait.end.sequence) {
+            throw 'The signed live receipt did not retain both original phase boundaries.'
+        }
+    } elseif ($postReady.ContainsKey('historical_uninstall')) { throw 'An ARM64 checkpoint ran the AMD64-only observer.' }
     try {
         & $script @binding -ReadyDigest $readyDigest
         throw 'The live checkpoint overwrote an existing sequence.'

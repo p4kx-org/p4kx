@@ -216,13 +216,20 @@ one-minute limit inside the existing job budget, and release acceptance still
 requires the original terminal result and native runtime checks.
 
 After the original Finish waiter confirms readiness, the Windows consumer takes one
-immediate, read-only checkpoint and uploads a separate immutable `-finish-live`
+read-only checkpoint and uploads a separate immutable `-finish-live`
 artifact. The checkpoint binds the original request, supervisor launch, readiness,
 bounded phase journal and process identities. It records the supervisor, monitor
 and waiter liveness, any retained receipt hashes and the allowlisted runner image
 and version values when the host supplies them. Sampling and upload each have a
 one-minute step limit. The required Wait and CollectFinish validation keep their
 original allowance and proceed if this optional evidence is unavailable.
+
+The native AMD64 checkpoint passively follows the current product uninstall
+after the historical upgrade for up to 15 seconds within the original observer
+allowance. The archived bound journal distinguishes `msiexec/wait` and its
+outer `lifecycle/historical-uninstall` phase. Either can show a begin, an end,
+an error or no observation. Wait and CollectFinish retain the original
+deadline and release acceptance requirements.
 
 The diagnostic-only `MSI feedback runner-fuse probe` workflow runs native AMD64 and ARM64
 complete/timeout controls through the same phase writer. Its separate verifier downloads the
@@ -706,3 +713,22 @@ The executed package archive SHA-256 is
 [ARM64 live checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45886906022/artifacts/15152405389) ·
 [ARM64 terminal evidence](https://github.com/p4kx-org/p4kx/actions/runs/45886906022/artifacts/15151841991) ·
 [ARM64 executed packages](https://github.com/p4kx-org/p4kx/actions/runs/45886906022/artifacts/15152181505)
+
+The native AMD64 consumer retained its live checkpoint at 20:32:26 UTC, 3.28
+seconds after verified readiness. At sequence 85, 22.09 seconds into the
+worker, `msiexec/wait` was active in `lifecycle/historical-uninstall`. The
+legacy installer and rename upgrade had completed. The active operation was
+uninstalling the current product after that upgrade. The original parent,
+supervisor, monitor and waiter were all running at the sample.
+
+Wait began at 20:32:27 UTC. GitHub still showed the step in progress after
+the 20:44:58 UTC collection cutoff and cancelled the job at 21:24:21 UTC,
+55 minutes after its start. The sole annotation reported a 45-minute job
+maximum. The job log was unavailable, and the run retained no AMD64 terminal
+installer evidence or executed package. The sample establishes the last
+observed phase. The blocking operation and MSI outcome remain unobserved.
+
+The AMD64 live checkpoint archive SHA-256 is
+`216c17b3f6f811dfe9dff33f1f1431bb221bb073878839942df039a08feca514`.
+[AMD64 job](https://github.com/p4kx-org/p4kx/actions/runs/45886906022/job/140154656694) ·
+[AMD64 live checkpoint](https://github.com/p4kx-org/p4kx/actions/runs/45886906022/artifacts/15151148864)

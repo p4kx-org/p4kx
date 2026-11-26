@@ -23,12 +23,44 @@ function Copy-P4kxMsiObserverFile {
     } catch { return @{status='unreadable';failure_type=$_.Exception.GetType().FullName} }
 }
 
+function Get-P4kxMsiHistoricalUninstallLedger($Events) {
+    $transaction = @{ state='notObserved';begin=$null;end=$null;error=$null }
+    $clientWait = $transaction.Clone()
+    foreach ($event in $Events) {
+        $entry = if ($event.phase -ceq 'lifecycle/historical-uninstall') {
+            $transaction
+        } elseif ($event.phase -ceq 'msiexec/wait' -and $transaction.begin -and $event.parent -eq $transaction.begin.id) {
+            $clientWait
+        }
+        if ($null -eq $entry) { continue }
+        if ($entry[$event.status] -or $entry.state -cin @('end','error') -or
+            ($event.status -cne 'begin' -and ($event.id -ne $entry.begin.id -or $event.parent -ne $entry.begin.parent))) {
+            throw 'The historical uninstall journal repeats or changes its observed phase identity.'
+        }
+        $entry[$event.status] = $event
+        $entry.state = $event.status
+    }
+    return @{ transaction=$transaction;client_wait=$clientWait }
+}
+
 function Read-P4kxMsiOriginalBoundary {
     param([string]$Path, [string]$Target,
-        [ValidateSet('preamble/original-raw','lifecycle/install')][string]$Phase)
+        [ValidateSet('preamble/original-raw','lifecycle/install','lifecycle/historical-uninstall')][string]$Phase)
     $events = [Collections.Generic.List[hashtable]]::new()
     $journal = Read-P4kxMsiPhaseJournal $Path -ObservedEvents $events
     $platform = Get-P4kxPlatform -Target $Target
+    foreach ($event in $events) {
+        if ($event.target -cne $Target -or $event.process_arch -ine $platform.runner_arch) { throw 'Original phase journal CPU or target differs.' }
+    }
+    if ($Phase -ceq 'lifecycle/historical-uninstall') {
+        $ledger = Get-P4kxMsiHistoricalUninstallLedger $events
+        $status = switch -CaseSensitive ($ledger.transaction.state) {
+            'end' { 'reached' }
+            'error' { 'failed' }
+            default { $ledger.transaction.state }
+        }
+        return @{ journal=$journal;status=$status;phase=$Phase;historical_uninstall=$ledger }
+    }
     $phases = @($Phase)
     if ($Phase -ceq 'lifecycle/install' -and $Target -ceq 'x86_64-pc-windows-msvc') {
         $phases += 'lifecycle/previous-install'
@@ -37,7 +69,6 @@ function Read-P4kxMsiOriginalBoundary {
     $selectedPhase = $null
     $status = if ($journal.present) { 'notObserved' } else { 'unavailable' }
     foreach ($event in $events) {
-        if ($event.target -cne $Target -or $event.process_arch -ine $platform.runner_arch) { throw 'Original phase journal CPU or target differs.' }
         if ($event.phase -cnotin $phases) { continue }
         if ($null -eq $first -and $event.status -ceq 'begin') {
             $first = $event.id
@@ -52,12 +83,13 @@ function Read-P4kxMsiOriginalBoundary {
 
 function Wait-P4kxMsiOriginalBoundary {
     param($Request, $Handle, $ParentState, [string]$ProgressDirectory,
-        [ValidateSet('preamble/original-raw','lifecycle/install')][string]$Phase)
+        [ValidateSet('preamble/original-raw','lifecycle/install','lifecycle/historical-uninstall')][string]$Phase,
+        [ValidateRange(1,15000)][int]$MaximumMilliseconds=5000)
     $journal = Join-Path $Request.output_directory 'diagnostics/phase-journal.jsonl'
     $sample = Join-Path $ProgressDirectory 'phase-boundary-sample.jsonl'
     if ([IO.File]::Exists($sample)) { throw 'Passive checkpoint requires a fresh journal sample.' }
     $cutoff = ConvertFrom-P4kxMsiBudgetTimestamp $Request.observer_deadline_utc
-    $window = [TimeSpan]::FromSeconds(5)
+    $window = [TimeSpan]::FromMilliseconds($MaximumMilliseconds)
     $timer = [Diagnostics.Stopwatch]::StartNew()
     $sampledLength = -1
     while (-not $ParentState.lifetime_ended) {
@@ -75,6 +107,8 @@ function Wait-P4kxMsiOriginalBoundary {
                 }
             } finally { [IO.File]::Delete($sample) }
         }
+        $remaining = [Math]::Min(($window-$timer.Elapsed).TotalMilliseconds, ($cutoff-[DateTimeOffset]::UtcNow).TotalMilliseconds)
+        if ($remaining -le 0) { break }
         Start-Sleep -Milliseconds ([int][Math]::Min(100, $remaining))
         $ParentState = Get-P4kxMsiObserverParentState $Request $Handle
     }
