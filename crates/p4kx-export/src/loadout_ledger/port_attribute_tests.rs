@@ -33,61 +33,71 @@ fn record_port_attributes_match_flat_proofs_for_each_occurrence() -> TestResult 
             .ok_or("occurrence origin")?;
         let clear = sources.observe(SourceInput::Archive(&definition), InputScope::Payload)?;
         let encrypted = sources.observe(SourceInput::Archive(&occurrence), InputScope::Payload)?;
-        let facts = definition_facts(&clear)?;
-        let duplicate = facts.selectors.first().ok_or("definition selector")?;
         let foreign = SourceUses::with_provenance_mode(mode);
         let foreign_scope =
             foreign.observe(SourceInput::Archive(&definition), InputScope::Payload)?;
-        let cases = [
-            (
-                vec![
-                    observe(&clear, "firstName", SourceUseRole::Selector)?,
-                    duplicate.clone(),
-                ],
-                true,
-                Some(false),
-            ),
-            (
-                vec![observe(&encrypted, "secondName", SourceUseRole::Selector)?],
-                true,
-                Some(true),
-            ),
-            (Vec::new(), false, None),
-            (
-                vec![observe(
-                    &foreign_scope,
-                    "portSelector",
-                    SourceUseRole::Selector,
-                )?],
-                true,
-                None,
-            ),
-        ];
-        for (selectors, complete, marker) in cases {
-            let actual = facts.bind(&sources, selectors.clone(), complete)?;
-            let definition_and_occurrence = facts
-                .selectors
-                .iter()
-                .chain(selectors.iter())
-                .cloned()
-                .collect::<Vec<_>>();
-            let expected = FlatProof {
-                sources: &sources,
-                selectors: &definition_and_occurrence,
-                complete,
-            };
-            expected.check(&facts.min, &actual.min_size)?;
-            expected.check(&facts.max, &actual.max_size)?;
-            expected.check(&facts.flags, &actual.flags)?;
-            expected.check(&facts.port_tags, &actual.port_tags)?;
-            expected.check(&facts.required_tags, &actual.required_tags)?;
-            expected.check(&facts.display_name_key, &actual.display_name_key)?;
-            assert_eq!(
-                actual.min_size.origin().contains_encrypted_source(),
-                marker,
-                "the original occurrence can independently change the encryption marker"
-            );
-        }
+        compare_occurrences(&sources, &clear, &encrypted, &foreign_scope)?;
+    }
+    Ok(())
+}
+
+fn compare_occurrences(
+    sources: &SourceUses,
+    clear: &SourceScope,
+    encrypted: &SourceScope,
+    foreign_scope: &SourceScope,
+) -> TestResult {
+    let facts = definition_facts(clear)?;
+    let duplicate = facts.selectors.first().ok_or("definition selector")?;
+    let cases = [
+        (
+            vec![
+                observe(clear, "firstName", SourceUseRole::Selector)?,
+                duplicate.clone(),
+            ],
+            true,
+            Some(false),
+        ),
+        (
+            vec![observe(encrypted, "secondName", SourceUseRole::Selector)?],
+            true,
+            Some(true),
+        ),
+        (Vec::new(), false, None),
+        (
+            vec![observe(
+                foreign_scope,
+                "portSelector",
+                SourceUseRole::Selector,
+            )?],
+            true,
+            None,
+        ),
+    ];
+    for (selectors, complete, marker) in cases {
+        let actual = facts.bind(sources, selectors.clone(), complete)?;
+        let definition_and_occurrence = facts
+            .selectors
+            .iter()
+            .chain(selectors.iter())
+            .cloned()
+            .collect::<Vec<_>>();
+        let expected = FlatProof {
+            sources,
+            selectors: &definition_and_occurrence,
+            complete,
+        };
+        expected.check(&facts.min, &actual.min_size)?;
+        expected.check(&facts.max, &actual.max_size)?;
+        expected.check(&facts.flags, &actual.flags)?;
+        expected.check(&facts.port_tags, &actual.port_tags)?;
+        expected.check(&facts.required_tags, &actual.required_tags)?;
+        expected.check(&facts.display_name_key, &actual.display_name_key)?;
+        assert_eq!(
+            actual.min_size.origin().contains_encrypted_source(),
+            marker,
+            "the original occurrence can independently change the encryption marker"
+        );
     }
     Ok(())
 }

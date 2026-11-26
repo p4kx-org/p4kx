@@ -3,6 +3,8 @@
 
 use std::collections::BTreeSet;
 
+use serde_json::Value;
+
 use super::{Inventory, Result, family_fields, released_schema, schema_at};
 
 const FAMILY: &str = "blueprintPools";
@@ -64,7 +66,10 @@ fn every_released_blueprint_pool_field_has_one_canonical_destination() -> Result
         classified,
         "every released pool field needs an explicit migration route"
     );
+    verify_types_and_physical_identity(&current)
+}
 
+fn verify_types_and_physical_identity(current: &Value) -> Result {
     for (owner, field, definition) in [
         (POOL, "/guid/value", "Guid"),
         (
@@ -86,7 +91,7 @@ fn every_released_blueprint_pool_field_has_one_canonical_destination() -> Result
             .pointer(&format!("/$defs/{definition}"))
             .ok_or("expected canonical pool field type")?;
         assert_eq!(
-            schema_at(&current, &path)?,
+            schema_at(current, &path)?,
             expected,
             "{path} preserves {definition}"
         );
@@ -101,7 +106,7 @@ fn every_released_blueprint_pool_field_has_one_canonical_destination() -> Result
         (REWARD, "/pool/value/targetRecordIndex/value"),
         (REWARD, "/poolStorage/value"),
     ] {
-        schema_at(&current, &format!("{owner}{field}"))?;
+        schema_at(current, &format!("{owner}{field}"))?;
     }
     Ok(())
 }

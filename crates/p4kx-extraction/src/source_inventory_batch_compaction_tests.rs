@@ -14,6 +14,7 @@ type TestResult = Result<(), Box<dyn std::error::Error>>;
 
 #[test]
 fn batch_compaction_retries_temporarily_held_rows_at_projection_end() -> TestResult {
+    let continue_compaction = || Ok::<(), SourceEvidenceError>(());
     let uses = SourceUses::with_provenance_mode(ProvenanceMode::Full);
     let scope = uses.observe(SourceInput::Unknown, InputScope::Payload)?;
     let temporary = observe(&scope, 10)?;
@@ -65,6 +66,7 @@ fn batch_compaction_retries_temporarily_held_rows_at_projection_end() -> TestRes
 
 #[test]
 fn interruption_retains_both_unvisited_and_deferred_uses() -> TestResult {
+    let continue_compaction = || Ok::<(), SourceEvidenceError>(());
     let uses = SourceUses::with_provenance_mode(ProvenanceMode::Full);
     let scope = uses.observe(SourceInput::Unknown, InputScope::Payload)?;
     drop(observe(&scope, 1)?);
@@ -115,8 +117,4 @@ fn observe(scope: &SourceScope, index: u32) -> Result<SourceUse, SourceEvidenceE
         },
         SourceUseRole::Payload,
     )
-}
-
-const fn continue_compaction() -> Result<(), SourceEvidenceError> {
-    Ok(())
 }
