@@ -7,10 +7,11 @@ use p4kx_export::catalog_queries::{
     CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ContractKey,
     ContractSnapshot, ContractSummaries, ContractSummary,
 };
-use p4kx_extraction::{Archive, CancelToken};
+use p4kx_extraction::{Archive, CancelToken, Guid};
 use serde_json::{Map, Value, json};
 
 use super::TestResult;
+use crate::catalog_contracts_facts::SUB;
 use crate::contracts_fixture;
 use crate::facts_fixture;
 use crate::sdk_full_proof as full_proof;
@@ -89,7 +90,7 @@ fn contract_summaries_keep_locations_while_omitting_ship_spawn_tables() -> TestR
 }
 
 #[test]
-fn summaries_preserve_stated_buy_in_and_explicit_reacceptance_values() -> TestResult {
+fn summaries_preserve_stated_run_terms_and_release_flags() -> TestResult {
     let folder = tempfile::tempdir()?;
     let archive = Archive::open_with_key(
         facts_fixture::write_archive(folder.path())?,
@@ -118,8 +119,37 @@ fn summaries_preserve_stated_buy_in_and_explicit_reacceptance_values() -> TestRe
             Some(&false),
             "explicit false is distinct from an absent reacceptance value"
         );
-        Ok::<_, Box<dyn Error>>(())
+        verify_release_flags(&summary)
     })??;
+    Ok(())
+}
+
+fn verify_release_flags(summary: &ContractSummaries<'_>) -> TestResult {
+    let cases = [
+        ("Bare", None, Some(true), Some(false)),
+        ("Overridden", None, Some(false), Some(true)),
+        ("Overridden", Some(SUB), Some(false), Some(true)),
+        ("Stripped", None, None, None),
+    ];
+    for (name, sub_contract, not_for_release, work_in_progress) in cases {
+        let sub_contract_guid = sub_contract.map(str::parse::<Guid>).transpose()?;
+        let row = summary
+            .rows
+            .iter()
+            .find(|row| {
+                row.debug_name == Some(name)
+                    && row.sub_contract_guid.value().map(|guid| guid.get()) == sub_contract_guid
+            })
+            .ok_or_else(|| format!("summary row for {name}, sub-contract {sub_contract:?}"))?;
+        assert_eq!(
+            row.not_for_release, not_for_release,
+            "{name} uses the parent contract's notForRelease"
+        );
+        assert_eq!(
+            row.work_in_progress, work_in_progress,
+            "{name} uses the parent contract's workInProgress"
+        );
+    }
     Ok(())
 }
 
@@ -140,6 +170,8 @@ const PROJECTED_BASE_FIELDS: &[&str] = &[
     "guid",
     "subContractGuid",
     "debugName",
+    "notForRelease",
+    "workInProgress",
     "blueprintRewards",
     "fixedRewards",
     "giverFaction",

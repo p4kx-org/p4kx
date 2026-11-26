@@ -106,8 +106,12 @@ fn sub_contract(id: u128, name: &str) -> TestInstance {
 }
 
 fn contracts() -> Vec<TestValue> {
-    let bare = contract(BARE, "Bare");
+    let bare = contract(BARE, "Bare")
+        .value("notForRelease", TestValue::Bool(true))
+        .value("workInProgress", TestValue::Bool(false));
     let overridden = contract(OVERRIDDEN, "Overridden")
+        .value("notForRelease", TestValue::Bool(false))
+        .value("workInProgress", TestValue::Bool(true))
         .value(
             "paramOverrides",
             overrides(
@@ -128,6 +132,8 @@ fn contracts() -> Vec<TestValue> {
             TestValue::Array(vec![
                 TestValue::Struct(
                     sub_contract(SUB, "Sub")
+                        .value("notForRelease", TestValue::Bool(true))
+                        .value("workInProgress", TestValue::Bool(false))
                         .value(
                             "boolParamOverrides",
                             TestValue::Array(vec![flag("canbeshared", false)]),

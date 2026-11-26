@@ -5,3 +5,4 @@
   the original Generator arenas or publishing the property and NPC spawn text tables.
 - Contract summaries also carry the canonical debug name, fixed payouts, cooldowns, buy-in,
   reacceptance, standing bounds, authored scoped reputation requirements and protected descriptions.
+  The `notForRelease` and `workInProgress` flags use the same parent values as full contracts.

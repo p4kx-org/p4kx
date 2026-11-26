@@ -80,6 +80,8 @@ fn contract_structs() -> Vec<TestStruct> {
     let mut sub = TestStruct::new("SubContract")
         .field("id", TestType::Guid)
         .field("debugName", TestType::String)
+        .field("notForRelease", TestType::Bool)
+        .field("workInProgress", TestType::Bool)
         .array("additionalPrerequisites", pointer("ContractPrerequisite"));
     for (field, kind) in params() {
         overrides = overrides.array(field, class(kind));
@@ -96,6 +98,8 @@ fn contract_structs() -> Vec<TestStruct> {
         TestStruct::new("CareerContract")
             .field("id", TestType::Guid)
             .field("debugName", TestType::String)
+            .field("notForRelease", TestType::Bool)
+            .field("workInProgress", TestType::Bool)
             .field("template", TestType::Reference)
             .field("paramOverrides", class("ContractParamOverrides"))
             .array("subContracts", class("SubContract"))

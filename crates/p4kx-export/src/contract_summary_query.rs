@@ -33,6 +33,10 @@ pub struct ContractSummary<'source> {
     pub sub_contract_guid: SourcedValue<CatalogGuid>,
     /// The original contract or sub-contract debug name, when stated.
     pub debug_name: Option<&'source str>,
+    /// The parent contract's release exclusion flag, when stated.
+    pub not_for_release: Option<bool>,
+    /// The parent contract's work-in-progress flag, when stated.
+    pub work_in_progress: Option<bool>,
     /// Blueprint pool links and their stated chances.
     pub blueprint_rewards: Vec<BlueprintReward>,
     /// The ordered successful fixed payouts of the parent contract.
@@ -80,6 +84,8 @@ impl<'source> ContractSummary<'source> {
             guid: base.guid,
             sub_contract_guid: base.sub_contract_guid,
             debug_name: base.debug_name,
+            not_for_release: base.not_for_release,
+            work_in_progress: base.work_in_progress,
             blueprint_rewards: base.blueprint_rewards,
             fixed_rewards: base.fixed_rewards,
             giver_faction: base.giver_faction,

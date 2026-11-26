@@ -93,6 +93,10 @@ and protected localized title and description. The result includes the shared au
 location-query rows, protected text lookups and coverage. Blueprint rewards link to their
 original pool IDs. Runtime results of location rules are outside this Archive query.
 
+`notForRelease` and `workInProgress` copy the parent contract's flags for both parent
+and sub-contract rows, with `null` for an absent flag. The SDK returns the same
+canonical rows regardless of these flags, so callers can apply their own visibility rules.
+
 The parent contract's standing bounds use `minStandingGuid` and `maxStandingGuid`.
 `standingRequirements` retains the authored reputation prerequisites at the handler, contract and
 sub-contract levels, in that order. A row carries its faction and scope GUIDs, standing bounds
