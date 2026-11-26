@@ -503,10 +503,21 @@ active. The job log and the final original ARM64 receipt were unavailable.
 On head `f301ec7e8`, the ARM64 runner-fuse and dynamic parent-chain controls reached
 their deliberately imposed 60-second step deadlines. Both uploaded diagnostics one
 second later. This confirms that ordinary step timeouts can preserve evidence on
-the hosted ARM64 runner. The last confirmed state of the real MSI remains the
-pre-Finish checkpoint.
+the hosted ARM64 runner.
 [Runner-fuse job](https://github.com/p4kx-org/p4kx/actions/runs/45758595624/job/139703109461) ·
 [Parent-chain job](https://github.com/p4kx-org/p4kx/actions/runs/45758595630/job/139703108446)
+
+On PR #1117 head `194592a2a`, both native Windows controls verified the
+WaitFinish entrypoint's refusal of stale and foreign launch receipts. The outer
+host accepted a timely original observation and stopped only its owned child
+in the separate timeout case.
+The real ARM64 consumer also completed the original MSI lifecycle. Its outer host,
+supervisor and Finish caller exited zero. Its terminal journal contains 174 events
+and closes all active phases. The original terminal receipt and executed package
+were published for merge `4e2e192e8733aef7300dd6f048807b92ac180e86`.
+[Control and release run](https://github.com/p4kx-org/p4kx/actions/runs/45762183499) ·
+[ARM64 terminal receipt](https://github.com/p4kx-org/p4kx/actions/runs/45762183499/artifacts/15092710377) ·
+[ARM64 executed package](https://github.com/p4kx-org/p4kx/actions/runs/45762183499/artifacts/15091853493)
 
 The real consumer records the prepared allowance, source hashes, checkpoints and parent controls
 on the runner. It refreshes admission under the original deadline before launching the installer.

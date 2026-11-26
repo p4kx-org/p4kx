@@ -43,6 +43,12 @@ the hand grip's `offset()` accessor. Stored empty arrays, null pointers, and abs
 or unsupported declarations have separate source states. These components keep their
 original coordinate representation.
 
+On PTU `13284307`, an independent read of one backpack's original Carryable
+component matched all 24 coordinate values across its two grips and four hands.
+Full and MarkersOnly returned the same stored bits and encryption markers. Full
+also matched the original physical coordinates of each Single. The selective
+comparison ran in 12.35 seconds and peaked at 1,114,005,504 private bytes.
+
 Polymorphic predicates, dispatchers, animated parameters and other modifiers retain their
 concrete source types and raw original members. Additional fields also preserve point
 presentation and unmodeled source extensions. The inventory configuration's interaction link
