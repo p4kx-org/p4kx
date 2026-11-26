@@ -27,6 +27,7 @@ mod number;
 mod plan;
 mod record_identity;
 mod record_targets;
+mod resource_groups;
 mod selected_texts;
 mod ship;
 mod ship_cargo;
@@ -38,6 +39,8 @@ mod shops;
 mod cargo_globals_tests;
 #[cfg(test)]
 mod contract_scope_tests;
+#[cfg(test)]
+mod resource_group_tests;
 #[cfg(test)]
 mod entity_tests;
 #[cfg(test)]

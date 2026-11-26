@@ -234,6 +234,20 @@ null pointer differs from an absent declaration. The label references feed
 the shared English and German public-name closure. Icons and additional
 source members are outside this selection.
 
+## Internal ResourceGroup producer slice
+
+The three ResourceGroup tables use the canonical SDK's definitions, ordered
+memberships and first-parent projection. Name references feed the selected
+English and German public-name closure. Membership slots keep their direct
+Record references, including repeated and null slots and the source status
+of dangling links. A physically resolved wrong-family Record keeps its
+original target type and index. A link to the selected target family must
+resolve to the same physical Record in that reduced table.
+
+The parent projection checks the group survey it depends on. It retains
+separate physical rows for aliases and preserves the source state and
+encryption marker of each selected parent choice.
+
 ## Acceptance
 
 #1177 tracks the wire contract, generation and import. Use a distinct versioned

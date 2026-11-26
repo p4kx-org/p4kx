@@ -7,6 +7,8 @@ use p4kx_testkit::{
     TestStruct, TestType, TestValue, test_key,
 };
 
+use serde_json::Value;
+
 use super::contract_scope;
 use super::selected_texts::SelectedTexts;
 use crate::catalog_queries::{CatalogLanguageSelection, CatalogQuerySession};
@@ -38,28 +40,43 @@ fn contract_scope_retains_labels_and_localization_with_null_and_absent_slots() -
     let texts = serde_json::to_value(texts)?;
     let row = table.pointer("/rows/0").ok_or("contract scope row")?;
     assert_eq!(
-        row["location"]["value"]["displayName"]["containsEncryptedSource"],
-        true
+        row.pointer("/location/value/displayName/containsEncryptedSource")
+            .and_then(Value::as_bool),
+        Some(true)
     );
-    assert_eq!(row["cluster"]["state"], "null");
-    assert_eq!(row["universe"]["state"], "absent");
+    assert_eq!(
+        row.pointer("/cluster/state").and_then(Value::as_str),
+        Some("null")
+    );
+    assert_eq!(
+        row.pointer("/universe/state").and_then(Value::as_str),
+        Some("absent")
+    );
     assert!(row.get("additionalFields").is_none());
-    assert!(row["location"]["value"].get("icon").is_none());
+    assert!(row.pointer("/location/value/icon").is_none());
 
     let name = texts.pointer("/publicNames/0").ok_or("selected label")?;
     assert_eq!(
-        row["location"]["value"]["displayName"]["value"],
-        name["id"]["value"]
+        row.pointer("/location/value/displayName/value"),
+        name.pointer("/id/value")
     );
     assert_eq!(
-        name["translations"]["value"]["en"]["displayText"]["value"],
-        "Location"
+        name.pointer("/translations/value/en/displayText/value")
+            .and_then(Value::as_str),
+        Some("Location")
     );
     assert_eq!(
-        name["translations"]["value"]["de"]["displayText"]["value"],
-        "Ort"
+        name.pointer("/translations/value/de/displayText/value")
+            .and_then(Value::as_str),
+        Some("Ort")
     );
-    assert_eq!(texts["gameTexts"].as_array().map(Vec::len), Some(0));
+    assert_eq!(
+        texts
+            .get("gameTexts")
+            .and_then(Value::as_array)
+            .map(Vec::len),
+        Some(0)
+    );
     Ok(())
 }
 
