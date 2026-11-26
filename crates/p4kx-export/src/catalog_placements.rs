@@ -35,7 +35,8 @@ pub(crate) struct CatalogPlacements {
     #[serde(flatten)]
     resource_network: ResourceNetworkPlacementTables,
     starmap_placements: CatalogTable<StarmapPlacement>,
-    facility_instances: CatalogTable<FacilityInstance>,
+    #[schemars(with = "CatalogTable<FacilityInstance>")]
+    facility_instances: StagedCatalogTable,
     facility_interior_coverage: Vec<InteriorRoomCoverage>,
     installed_configurations: CatalogTable<InstalledConfiguration>,
     #[schemars(with = "CatalogTable<ContainerInstance>")]
@@ -55,6 +56,7 @@ impl CatalogPlacements {
             + u128::from(self.location_instances.stored_bytes())
             + u128::from(self.unresolved_container_links.stored_bytes())
             + u128::from(self.location_physics_grids.stored_bytes())
+            + u128::from(self.facility_instances.stored_bytes())
     }
 
     pub(crate) fn take_row_spool_failure(&self) -> Option<RowSpoolError> {
@@ -63,6 +65,7 @@ impl CatalogPlacements {
             .or_else(|| self.location_instances.take_failure())
             .or_else(|| self.unresolved_container_links.take_failure())
             .or_else(|| self.location_physics_grids.take_failure())
+            .or_else(|| self.facility_instances.take_failure())
     }
 }
 

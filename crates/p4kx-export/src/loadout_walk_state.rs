@@ -106,7 +106,7 @@ impl Path {
     }
 }
 
-impl Projection<'_, '_> {
+impl Projection<'_, '_, '_> {
     pub(super) fn walk_ports(
         &mut self,
         ports: &[impl JoinPort],

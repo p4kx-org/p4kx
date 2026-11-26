@@ -26,7 +26,7 @@ pub(crate) fn collect_room_attachments(
         definitions: Definitions::Indexed(IndexedDefinitions::new()),
         origins,
         cancel,
-        rows: Vec::new(),
+        emit_instance: &mut |_| Ok(()),
     };
     let mut attachments = Vec::new();
     projection.loadout(
@@ -56,7 +56,7 @@ pub(crate) fn project_room_coverage<'lookup>(
         definitions: Definitions::Indexed(IndexedDefinitions::new()),
         origins,
         cancel,
-        rows: Vec::new(),
+        emit_instance: &mut |_| Ok(()),
     };
     let root = ShipContext::read(origins, root.guid, root.record_index)?;
     let capture = EntryCapture::for_input(input);

@@ -23,6 +23,7 @@ use crate::build::original_input::OriginalCatalogInput;
 use crate::catalog_origins::CatalogOrigins;
 use crate::catalog_query_session::checkpoint;
 use crate::catalog_read::original::EntryCapture;
+use crate::catalog_rows::staged::{StagedCatalogRows, StagedCatalogTable};
 use crate::catalog_table::CatalogTable;
 use crate::contract_entities::Ship;
 use crate::contract_loadout::Loadout;
@@ -73,7 +74,7 @@ pub(super) use types::InteriorFacilityPlacement;
 pub use types::InteriorRoomCoverage;
 
 pub(super) struct LoadoutPlacements {
-    pub(super) facilities: CatalogTable<FacilityInstance>,
+    pub(super) facilities: StagedCatalogTable,
     pub(super) rooms: Vec<InteriorRoomCoverage>,
     pub(super) flight: CatalogTable<InstalledConfiguration>,
 }
@@ -96,7 +97,10 @@ pub(super) fn table(
 ) -> Result<LoadoutPlacements, CatalogError> {
     let cancel = run.options.cancel;
     input.check_forge(forge)?;
-    let mut project = Projection::new(configurations.entities, input.origins(), cancel)?;
+    let scratch = std::env::temp_dir();
+    let mut facilities = StagedCatalogRows::new(&scratch, cancel);
+    let mut emit = |row| facilities.append(&row).map_err(CatalogError::from);
+    let mut project = Projection::new(configurations.entities, input.origins(), cancel, &mut emit)?;
     let mut flight_instances = InstalledConfigurations::new(configurations.flight)?;
     let rooms = RoomOwners::new(&configurations.entities.topology)?;
     let coverage = if project.indexed_definitions()?.is_empty()
@@ -128,16 +132,12 @@ pub(super) fn table(
             &capture,
         )?
     };
-    let instances = CatalogTable::matching_source_types(
-        forge,
-        |name| {
-            loadout_facility_owner_source_type(name)
-                || name == resource_topology_declarations::ITEM_ROOM
-        },
-        project.rows,
-    );
+    let facilities = facilities.finish_matching_source_types(forge, |name| {
+        loadout_facility_owner_source_type(name)
+            || name == resource_topology_declarations::ITEM_ROOM
+    })?;
     Ok(LoadoutPlacements {
-        facilities: instances,
+        facilities,
         rooms: coverage,
         flight: FlightConfigurationTables::installed_table(forge, flight_instances.rows),
     })
@@ -149,11 +149,15 @@ pub(crate) fn project_loadout<'lookup>(
     cancel: Option<&CancelToken>,
     lookup: &'lookup mut ConfigurationLookup<'lookup>,
 ) -> Result<Vec<FacilityInstance>, CatalogError> {
+    let mut rows = Vec::new();
     let mut projection = Projection {
         definitions: Definitions::Scoped(lookup),
         origins,
         cancel,
-        rows: Vec::new(),
+        emit_instance: &mut |row| {
+            rows.push(row);
+            Ok(())
+        },
     };
     projection.loadout(
         loadout,
@@ -161,7 +165,7 @@ pub(crate) fn project_loadout<'lookup>(
         &mut Vec::new(),
         &mut InstalledConfigurations::default(),
     )?;
-    Ok(projection.rows)
+    Ok(rows)
 }
 
 pub(crate) fn project_installed_configurations<'lookup>(
@@ -174,7 +178,7 @@ pub(crate) fn project_installed_configurations<'lookup>(
         definitions: Definitions::Indexed(IndexedDefinitions::new()),
         origins,
         cancel,
-        rows: Vec::new(),
+        emit_instance: &mut |_| Ok(()),
     };
     let mut flight = InstalledConfigurations::scoped(lookup);
     projection.loadout(loadout, &mut |_| Ok(false), &mut Vec::new(), &mut flight)?;
@@ -257,18 +261,21 @@ enum Definitions<'rows> {
     Scoped(&'rows mut ConfigurationLookup<'rows>),
 }
 
-struct Projection<'rows, 'origin> {
+type FacilitySink<'sink> = dyn FnMut(FacilityInstance) -> Result<(), CatalogError> + 'sink;
+
+struct Projection<'rows, 'origin, 'sink> {
     definitions: Definitions<'rows>,
     origins: &'origin CatalogOrigins,
     cancel: Option<&'origin CancelToken>,
-    rows: Vec<FacilityInstance>,
+    emit_instance: &'sink mut FacilitySink<'sink>,
 }
 
-impl<'rows, 'origin> Projection<'rows, 'origin> {
+impl<'rows, 'origin, 'sink> Projection<'rows, 'origin, 'sink> {
     fn new(
         declarations: &'rows EntityConfigurationRows<'_>,
         origins: &'origin CatalogOrigins,
         cancel: Option<&'origin CancelToken>,
+        emit_instance: &'sink mut FacilitySink<'sink>,
     ) -> Result<Self, CatalogError> {
         let mut index = IndexedDefinitions::new();
         for definition in owner_definitions(declarations) {
@@ -285,7 +292,7 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
             definitions: Definitions::Indexed(index),
             origins,
             cancel,
-            rows: Vec::new(),
+            emit_instance,
         })
     }
 
@@ -352,12 +359,11 @@ impl<'rows, 'origin> Projection<'rows, 'origin> {
             original_port,
             attached_item,
         });
-        self.rows.push(FacilityInstance {
+        (self.emit_instance)(FacilityInstance {
             ship: ship.clone(),
             source,
             configurations,
-        });
-        Ok(())
+        })
     }
 
     fn configuration_links(

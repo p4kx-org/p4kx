@@ -3,9 +3,11 @@
 
 use std::io::Read;
 
-use p4kx_export::build_catalog;
+use p4kx_export::{Compression, build_catalog, write_catalog_from};
 use p4kx_extraction::model::{SocEntity, SocEntityFile};
-use p4kx_extraction::{Archive, DataForge, DataForgeEntry, PathIndex, Value as Original};
+use p4kx_extraction::{
+    Archive, DataForge, DataForgeEntry, PathIndex, ProvenanceMode, Value as Original,
+};
 use serde_json::{Value, json};
 
 use crate::commodity_v3_fixture::{self as common, TestResult};
@@ -52,6 +54,42 @@ fn catalog_links_original_soc_entity_slots_to_their_physical_facility_owner() ->
         .validate(&catalog)
         .map_err(|error| format!("schema: {error}"))?;
     proof::closure(&catalog)
+}
+
+#[test]
+fn staged_facility_instances_replay_with_the_same_bytes_in_both_profiles() -> TestResult {
+    let (_folder, archive) = fixture::archive(fixture::Case::RepeatedStream)?;
+    let entry = DataForgeEntry::read(&archive)?;
+    let base = common::options();
+    for mode in [ProvenanceMode::MarkersOnly, ProvenanceMode::Full] {
+        let options = base.with_provenance_mode(mode);
+        let plain = build_catalog(&archive, options)?;
+        let (summary, compressed) = write_catalog_from(
+            &archive,
+            &entry,
+            options,
+            Compression::Zstd { level: 3 },
+            || Ok(Vec::new()),
+        )?;
+        let replay = zstd::stream::decode_all(compressed.as_slice())?;
+        let catalog: Value = serde_json::from_slice(&replay)?;
+        let body = catalog.get("catalog").unwrap_or(&catalog);
+        assert_eq!(
+            interior_rows(body)?.len(),
+            4,
+            "both original stream occurrences remain"
+        );
+        assert!(
+            replay == plain.json(),
+            "both passes emit the same complete JSON"
+        );
+        assert_eq!(
+            summary.size(),
+            u64::try_from(replay.len())?,
+            "counts include the staged rows"
+        );
+    }
+    Ok(())
 }
 
 #[test]

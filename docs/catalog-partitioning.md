@@ -777,6 +777,12 @@ streaming writer, with 120–123 ms and 99–100 ms elapsed. With 40,000 small r
 commit peaked at 5.2 MB and 5.9 MB, with 83–91 ms and 119–124 ms elapsed. These timings
 cover the indexed writer and its final sort. The packaged producer acceptance measures
 the complete preparation, publication and replay separately.
+Facility instances are staged in one sequential spool. Resolved Loadout occurrences precede
+original room occurrences in their existing order. The producer releases each instance after
+serialization. Room coverage, installed configuration rows and typed resource joins retain
+their existing access paths. The spool contributes to the staged bytes reported by the writer.
+
+
 Inventory item bounds are staged during the same scan in physical Record and Component order.
 Inventory storage selections stay in memory for the capacity and facility joins.
 

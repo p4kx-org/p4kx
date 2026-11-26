@@ -57,7 +57,7 @@ struct Edge {
 impl RoomReader<'_, '_> {
     pub(super) fn room(
         &mut self,
-        project: &mut Projection<'_, '_>,
+        project: &mut Projection<'_, '_, '_>,
         ship: &ShipContext,
         coverage: &mut InteriorRoomCoverage,
         room_selector: &RoomSelection<'_>,
@@ -78,7 +78,7 @@ impl RoomReader<'_, '_> {
 
     fn walk(
         &mut self,
-        project: &mut Projection<'_, '_>,
+        project: &mut Projection<'_, '_, '_>,
         ship: &ShipContext,
         coverage: &mut InteriorRoomCoverage,
         room_selector: &RoomSelection<'_>,
@@ -178,7 +178,7 @@ impl RoomReader<'_, '_> {
 
     fn inspect(
         &mut self,
-        project: &mut Projection<'_, '_>,
+        project: &mut Projection<'_, '_, '_>,
         ship: &ShipContext,
         coverage: &mut InteriorRoomCoverage,
         frame: Option<RoomFrame<'_>>,
@@ -228,7 +228,7 @@ impl RoomReader<'_, '_> {
 
     fn stream(
         &mut self,
-        project: &mut Projection<'_, '_>,
+        project: &mut Projection<'_, '_, '_>,
         ship: &ShipContext,
         coverage: &mut InteriorRoomCoverage,
         context: &StreamContext<'_>,

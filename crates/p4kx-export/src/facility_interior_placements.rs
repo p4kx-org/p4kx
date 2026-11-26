@@ -28,7 +28,7 @@ use crate::record_header_field::RecordHeaderField;
 use crate::{CatalogError, ExportAccountingError};
 
 pub(super) fn project(
-    project: &mut Projection<'_, '_>,
+    project: &mut Projection<'_, '_, '_>,
     archive: &Archive,
     forge: &DataForge<'_>,
     ships: &[Ship<'_>],
@@ -88,7 +88,7 @@ pub(super) fn project(
 }
 
 pub(super) fn coverage(
-    project: &mut Projection<'_, '_>,
+    project: &mut Projection<'_, '_, '_>,
     archive: &Archive,
     root: &ShipContext,
     rooms: &RoomOwners<'_, '_>,
@@ -131,7 +131,7 @@ pub(super) fn coverage(
 impl RoomReader<'_, '_> {
     pub(super) fn entity(
         &mut self,
-        project: &mut Projection<'_, '_>,
+        project: &mut Projection<'_, '_, '_>,
         coverage: &mut InteriorRoomCoverage,
         ship: &ShipContext,
         route: &StreamRoute<'_>,
@@ -170,12 +170,11 @@ impl RoomReader<'_, '_> {
             index,
             frame,
         )?;
-        project.rows.push(super::FacilityInstance {
+        (project.emit_instance)(super::FacilityInstance {
             ship: ship.clone(),
             source: FacilityPlacementSource::Interior(Box::new(source)),
             configurations,
-        });
-        Ok(())
+        })
     }
 }
 
@@ -228,7 +227,7 @@ impl<'room> StreamRoute<'room> {
 
     fn placement(
         &self,
-        project: &Projection<'_, '_>,
+        project: &Projection<'_, '_, '_>,
         room: InteriorRoomRef,
         fields: SocSourceFields,
         index: u32,

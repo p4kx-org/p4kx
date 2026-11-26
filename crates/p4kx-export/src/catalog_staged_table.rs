@@ -38,6 +38,19 @@ impl<'a> StagedCatalogRows<'a> {
         writer.append(row, self.cancel)
     }
 
+    pub(crate) fn finish_matching_source_types(
+        self,
+        forge: &DataForge<'_>,
+        matches_source_type: impl Fn(&str) -> bool,
+    ) -> Result<StagedCatalogTable, RowSpoolError> {
+        let availability = if self.writer.is_some() {
+            DatasetAvailability::Available
+        } else {
+            DatasetAvailability::from_source_declarations(forge, matches_source_type)
+        };
+        self.finish(availability)
+    }
+
     pub(crate) fn finish(
         self,
         availability: DatasetAvailability,

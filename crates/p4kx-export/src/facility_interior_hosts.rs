@@ -122,7 +122,7 @@ struct RoomSlot<'row> {
 impl RoomReader<'_, '_> {
     pub(super) fn project_host(
         &mut self,
-        project: &mut Projection<'_, '_>,
+        project: &mut Projection<'_, '_, '_>,
         coverage: &mut Vec<InteriorRoomCoverage>,
         rooms: &RoomOwners<'_, '_>,
         host: &RoomHost<'_>,
@@ -165,7 +165,7 @@ impl RoomSlot<'_> {
     fn project(
         self,
         reader: &mut RoomReader<'_, '_>,
-        project: &mut Projection<'_, '_>,
+        project: &mut Projection<'_, '_, '_>,
         coverage: &mut Vec<InteriorRoomCoverage>,
         host: &RoomHost<'_>,
         models: Option<&mut RoomHelperModels<'_, '_, '_>>,
