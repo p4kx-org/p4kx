@@ -137,6 +137,13 @@ libraries as well as its source tree. A shared Cargo target can reuse libraries
 across separate source snapshots with archived timestamps. Record elapsed time
 and process peaks independently of semantic comparison.
 
+A separate release-flag check at `26f3646e3` read LIVE Build 13220821 with English
+and MarkersOnly in one parsed session. The compact and full queries agreed on
+all 5,188 ordered combinations of physical Record position, parent and sub-contract
+identities, `notForRelease` and `workInProgress`. Both flags were stated on every
+row in this Build. A filter that excludes rows when either flag is `true` removed
+415 rows from that complete query.
+
 ## Coverage and cache updates
 
 The result separates selected-owner coverage, reverse-survey scope, related Generator owners,
