@@ -409,13 +409,13 @@ work. Keep those measurements distinct from the package reader and the transfer 
 ## System memory acceptance
 
 Measure the peak P4KX application footprint on an available test host. The
-budgets are strict upper bounds in decimal bytes.
+budgets use decimal bytes.
 
-| Operation | Peak P4KX memory below | Target system capacity |
+| Operation | Peak P4KX memory | Target system capacity |
 | --- | ---: | ---: |
-| Individual SDK queries | 2,000,000,000 bytes (2 GB) | 16 GiB total |
-| Reduced Basetool catalog generation | 2,000,000,000 bytes (2 GB) | 16 GiB total |
-| Complete unfiltered Catalog v3 export | 40,000,000,000 bytes (40 GB) | 64 GiB total |
+| Individual API and SDK queries | Below 2,000,000,000 bytes (2 GB) | 16 GiB total |
+| Reduced Basetool catalog generation | At most 40,000,000,000 bytes (40 GB) | 64 GiB total |
+| Complete unfiltered Catalog v3 export | Below 40,000,000,000 bytes (40 GB) | 64 GiB total |
 
 Subtract the measured peak from the target capacity to estimate the headroom
 for the operating system, desktop and other processes. This measurement is

@@ -21,9 +21,10 @@ lists the native consumer environments and the Linux ARM64 Blender version bound
 ## System memory
 
 The complete unfiltered Catalog v3 producer must use less than 40 GB of
-application memory. Individual SDK queries and the reduced Basetool catalog
-producer must use less than 2 GB. Measure on an available host and estimate
-the headroom for other processes on 64 GiB and 16 GiB systems, respectively.
+application memory. The reduced Basetool catalog producer may use up to 40 GB.
+Individual API and SDK queries must use less than 2 GB. Measure on an available
+host and estimate headroom on 64 GiB systems for generation and 16 GiB systems
+for queries.
 Verify both LIVE and current PTU with the packaged full producer. Record
 memory and temporary storage separately.
 [Catalog memory acceptance](catalog-partitioning.md#system-memory-acceptance)

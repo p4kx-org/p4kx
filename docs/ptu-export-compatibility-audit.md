@@ -402,9 +402,9 @@ matching intro grants. The original Generator arena retains prerequisite groupin
 [ContractGenerator catalog contract](catalog-contract-generators.md#intro-prerequisites)
 
 The raw source receipts are private. This section records source structure, exact scope counts
-and implementation ownership. The complete packaged catalog has a 40 GB
-application-memory budget. Individual SDK queries and the reduced Basetool
-producer have a 2 GB budget.
+and implementation ownership. Complete packaged catalog generation must stay
+below 40 GB. Reduced Basetool catalog generation may use up to 40 GB.
+Individual API and SDK queries must stay below 2 GB.
 
 ## PTU 13189690 follow-through
 

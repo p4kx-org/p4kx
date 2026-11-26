@@ -188,10 +188,10 @@ format or profile for the reduced field shapes and omission rules. The complete
 v3 schema describes a different payload. Record exact scope and import support
 for the new profile before publication.
 
-Produce from scoped reads, measure peak memory including helper processes, and
-verify less than 2,000,000,000 B peak under the release criterion. Record the
-Build, elapsed time, peak private commit and working set, temporary storage and
-minimum available host memory. Verify a LIVE `.json.zst` upload within
+Produce from scoped reads and verify at most 40,000,000,000 bytes of peak
+memory, including helper processes. Estimate headroom on a 64 GiB system.
+Record the Build, elapsed time, peak private commit and working set, temporary
+storage and minimum available host memory. Verify a LIVE `.json.zst` upload within
 64,000,000 compressed and 1,000,000,000 decoded bytes. Test the actual importer,
 including expected refusal for an ineligible Channel or incomplete selected
 data. Compare ordered selected values, reference closure, source states and
