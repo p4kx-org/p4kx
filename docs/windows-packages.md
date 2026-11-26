@@ -512,7 +512,12 @@ The real consumer records the prepared allowance, source hashes, checkpoints and
 on the runner. It refreshes admission under the original deadline before launching the installer.
 Before Finish starts, each native target uploads a checkpoint with the six allowed diagnostic
 JSON receipts. The checkpoint remains available if the runner stops reporting during Finish.
-Lifecycle WaitFinish also emits fixed hosted annotations at its process and receipt boundaries.
+The workflow saves the original Finish launch binding before waiting. A local host
+waits on the owned WaitFinish process and uses one second of the existing hosted
+cleanup reserve for process exit after an on-time observation. Its three standard
+streams point to task files. The host uses the direct child exit signal and
+retains a separate diagnostic outcome on timeout. CollectFinish validates the
+original collection cutoff and the native lifecycle receipt before publication.
 The diagnostic runner-fuse fixture records whether GitHub retains the wait-start annotation
 after a deliberate step timeout. Both observations leave native lifecycle completion unproven.
 The hosted fuse run for `e2ec43eef` retained the `predicate-wait` start annotation

@@ -49,7 +49,7 @@ function Start-P4kxMsiFinishSupervision([string]$Directory) {
         Write-P4kxDetachedReceipt (Join-Path $context.directory 'launch.json') @{
             schema=1;role='native-msi-finish-supervisor-launch';request_sha256=$context.digest
             supervisor_pid=$process.Id;supervisor_started_utc_ticks=$process.StartTime.ToUniversalTime().Ticks
-            cutoff_utc=$context.cutoff.ToString('o');mutation_authority=$false
+            cutoff_utc=$context.cutoff.ToString('o');collection_cutoff_utc=$context.collection_cutoff.ToString('o');mutation_authority=$false
         }
         Write-P4kxMsiObserverProgress finishLaunchReceipt end -RequestDigest $context.digest
     } finally { $process.Dispose() }
@@ -59,6 +59,7 @@ function Read-P4kxMsiFinishLaunch($Context) {
     $launch = Read-P4kxDetachedReceipt (Join-Path $context.directory 'launch.json')
     if ($launch.schema -ne 1 -or $launch.role -cne 'native-msi-finish-supervisor-launch' -or
         $launch.request_sha256 -cne $context.digest -or $launch.cutoff_utc -cne $context.cutoff.ToString('o') -or
+        ($launch.Contains('collection_cutoff_utc') -and $launch.collection_cutoff_utc -cne $context.collection_cutoff.ToString('o')) -or
         $launch.supervisor_pid -le 0 -or $launch.supervisor_started_utc_ticks -le 0 -or $launch.mutation_authority -ne $false) {
         throw 'Finish supervisor launch differs from the original observer.'
     }

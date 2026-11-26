@@ -67,8 +67,14 @@ Assert-FeedbackWorkflow (-not ($installer -match '(?m)^        (continue-on-erro
 $finishStart=Get-FeedbackWorkflowStep $verify 'Start the isolated original MSI Finish supervisor'
 $finishWait=Get-FeedbackWorkflowStep $verify 'Wait for the original MSI Finish receipt'
 $observerFinish=Get-FeedbackWorkflowStep $verify 'Finish the original native MSI lifecycle'
+$finishLaunchEvidence=Get-FeedbackWorkflowStep $verify 'Preserve the original MSI Finish launch binding'
 Assert-FeedbackWorkflow (-not $verify.Contains('-Stage ProbeFinish') -and
-    $verify -cmatch '(?ms)^      - name: Start the isolated original MSI Finish supervisor\r?\n(?:(?!^      - ).)*^      - name: Wait for the original MSI Finish receipt\r?$') 'The local supervisor launch must proceed directly to the mandatory terminal wait.'
+    $finishLaunchEvidence.Contains('name: windows-msi-observer-${{ github.run_id }}-${{ github.run_attempt }}-${{ env.P4KX_TARGET }}-finish-launch') -and
+    $finishLaunchEvidence.Contains('path: ${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/finish-supervision/launch.json') -and
+    $finishLaunchEvidence.Contains("always() && !cancelled() && steps.msi-finish-start.outcome == 'success'") -and
+    $finishLaunchEvidence.Contains('actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9') -and
+    $finishLaunchEvidence.Contains('overwrite: false') -and
+    $finishLaunchEvidence -cmatch '(?m)^        timeout-minutes: 1\r?$') 'The original launch binding must survive the mandatory terminal wait as an immutable checkpoint.'
 
 $prepare=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/scripts/prepare-msi-feedback.ps1')
 $observerRequest=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/scripts/msi-observer-request.ps1')
@@ -82,7 +88,9 @@ Assert-FeedbackWorkflow ($installer.Contains('id: msi-launch') -and $installer.C
     $finishStart.Contains('id: msi-finish-start') -and
     $finishStart.Contains('invoke-msi-observer.ps1 -Stage StartFinish') -and $finishStart -cmatch '(?m)^        timeout-minutes: 1\r?$' -and
     $finishWait.Contains('id: msi-finish-wait') -and
-    $finishWait.Contains('invoke-msi-observer.ps1 -Stage WaitFinish') -and
+    $finishStart.Contains('ConvertFrom-P4kxMsiBudgetTimestamp $launch.collection_cutoff_utc') -and
+    $finishWait.Contains('Invoke-P4kxMsiHostedFinishWait') -and
+    $finishWait.Contains('P4KX_MSI_FINISH_COLLECTION_CUTOFF_UTC: ${{ steps.msi-finish-start.outputs.collection_cutoff_utc }}') -and
     $finishWait -cmatch '(?m)^        timeout-minutes: \$\{\{ fromJSON\(steps\.msi-budget\.outputs\.observer_finish_minutes\) \}\}\r?$' -and
     $finishWait.Contains("always() && !cancelled() && steps.msi-finish-start.outcome == 'success'") -and
     -not $finishWait.Contains('continue-on-error') -and
@@ -150,13 +158,13 @@ $expectedFinalPaths=@(
     '${{ env.P4KX_PACKAGE_TASK }}/installer-check/observer/observer-result.json'
 )
 Assert-FeedbackWorkflow ([string]::Join([char]10,$finalPaths) -ceq [string]::Join([char]10,$expectedFinalPaths)) 'Final compact proof must contain the original checkpoint, bounded Finish progress and observer verdict.'
-$localStages=@($installer,$firstCheckpoint,$passive,$install,$preFinishUpload,$finishStart,$finishWait,$observerFinish,$finalUpload)
+$localStages=@($installer,$firstCheckpoint,$passive,$install,$preFinishUpload,$finishStart,$finishLaunchEvidence,$finishWait,$observerFinish,$finalUpload)
 $positions=@($localStages | ForEach-Object { $verify.IndexOf($_,[StringComparison]::Ordinal) })
 for ($index=1; $index -lt $positions.Count; $index++) {
     Assert-FeedbackWorkflow ($positions[$index-1] -lt $positions[$index]) 'Capture phase diagnostics before starting Finish and validate the lifecycle before the final evidence transfer.'
 }
-$beforeTransfer=$verify.Substring(0,$positions[-1]).Replace($preFinishUpload,'')
-Assert-FeedbackWorkflow (-not $beforeTransfer.Contains('uses: actions/upload-artifact@')) 'Only the original phase diagnostic allowlist can transfer before native lifecycle validation.'
+$beforeTransfer=$verify.Substring(0,$positions[-1]).Replace($preFinishUpload,'').Replace($finishLaunchEvidence,'')
+Assert-FeedbackWorkflow (-not $beforeTransfer.Contains('uses: actions/upload-artifact@')) 'Only the original phase and launch diagnostic allowlists can transfer before native lifecycle validation.'
 Assert-FeedbackWorkflow (([regex]::Matches($verify,'invoke-msi-observer\.ps1 -Stage Snapshot').Count -eq 3) -and
     -not ($verify -match 'invoke-msi-observer\.ps1 -Stage Delay|\s-WaitMilliseconds [1-9]|-ScheduledDelay')) 'The installer must not depend on a fixed observation wait.'
 $observerEntry=Get-Content -Raw -LiteralPath (Join-Path $Repository '.github/scripts/invoke-msi-observer.ps1')

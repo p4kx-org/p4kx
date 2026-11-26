@@ -57,6 +57,7 @@ jobs:
         run: |
           .github/scripts/test-msi-detached-control.ps1 -Directory ($env:P4KX_CONTROL_TASK+'-contracts')
           .github/scripts/test-msi-finish-wait-progress.ps1 -Directory ($env:P4KX_CONTROL_TASK+'-wait-progress')
+          .github/scripts/test-msi-finish-lifecycle-boundary.ps1 -Directory ($env:P4KX_CONTROL_TASK+'-lifecycle-finish-boundary')
       - name: Observe Finish progress while its harmless worker is held
         timeout-minutes: 2
         run: .github/scripts/test-msi-observer.ps1 -Directory ($env:P4KX_CONTROL_TASK+'-finish-probe') -Case Complete -DetachedFinish -LiveFinishProbe
