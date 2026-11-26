@@ -190,6 +190,10 @@ fn check_failures(report: &Value, root: &str) -> TestResult {
             "the reported WEM field keeps the original terminal selection"
         );
     }
+    check_failure_reason_origins(report, root)
+}
+
+fn check_failure_reason_origins(report: &Value, root: &str) -> TestResult {
     let declared_reason = origin(report, &format!("{root}/failures/0/reason"))?;
     let absent_id = origin(report, &format!("{root}/failures/0/wem_id"))?;
     assert_eq!(

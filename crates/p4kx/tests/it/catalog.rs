@@ -238,12 +238,33 @@ fn catalog_with_a_filter_marks_the_kind_partial_and_prints_json() -> TestResult 
     );
     let output_size = fs::metadata(&out)?.len();
     let result: serde_json::Value = serde_json::from_str(&summary)?;
-    let kinds = result["kinds"].as_array().ok_or("summary kinds")?;
+    assert_global_kind_selection(&catalog, &result)?;
+    assert_eq!(
+        result.get("size").and_then(serde_json::Value::as_u64),
+        Some(output_size),
+        "the JSON summary reports the written file size"
+    );
+    let summary = summary.replacen(
+        &format!(r#""size":{output_size}"#),
+        r#""size":"[BYTES]""#,
+        1,
+    );
+    insta::assert_snapshot!("catalog_filter_json", summary);
+    Ok(())
+}
+
+fn assert_global_kind_selection(
+    catalog: &serde_json::Value,
+    summary: &serde_json::Value,
+) -> TestResult {
+    let kinds = summary["kinds"].as_array().ok_or("summary kinds")?;
     for kind in [Kind::Tags, Kind::ShopInventories] {
         let name = kind.name();
         assert_eq!(
-            catalog["completeness"][name],
-            serde_json::json!({"status": "complete"}),
+            catalog
+                .get("completeness")
+                .and_then(|completeness| completeness.get(name)),
+            Some(&serde_json::json!({"status": "complete"})),
             "{name} retains its global selection in the filtered catalog"
         );
         let summary_complete = kinds
@@ -256,17 +277,6 @@ fn catalog_with_a_filter_marks_the_kind_partial_and_prints_json() -> TestResult 
             "{name} retains its global selection in the JSON summary"
         );
     }
-    assert_eq!(
-        result.get("size").and_then(serde_json::Value::as_u64),
-        Some(output_size),
-        "the JSON summary reports the written file size"
-    );
-    let summary = summary.replacen(
-        &format!(r#""size":{output_size}"#),
-        r#""size":"[BYTES]""#,
-        1,
-    );
-    insta::assert_snapshot!("catalog_filter_json", summary);
     Ok(())
 }
 
