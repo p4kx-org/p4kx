@@ -182,6 +182,33 @@ worker trials and the reported VerseKit timings use different execution
 conditions and cannot establish a comparable throughput change.
 
 
+The release-profile diagnostic build of `4aa8bcfa2` repeated the same LIVE
+`13220821` Loadout visit with one worker, no locales, MarkersOnly and an empty
+visitor. It completed all 10,955 owners and 10,812 rows with complete dependency
+coverage. It took 236.214 seconds for the visit and 238.002 seconds for the
+process. Native lifetime peaks were 1,091,620,864 B private commit and
+1,028,169,728 B working set. The diagnostic executable SHA-256 was
+`06a2838fc0988af546be2b630d3a004da961a24be2653e3cf8b23025aa1ac5dd`.
+
+| Measured phase | Cumulative seconds |
+| --- | ---: |
+| Port construction, excluding alignment | 152.736 |
+| Loadout resolution | 57.980 |
+| Port and constraint alignment | 18.931 |
+| Owner admission | 2.756 |
+| Resolver release and capture finish | 1.435 |
+| Shared resolver input preparation | 0.137 |
+| Per-owner source inventory finish | 0.015 |
+| Empty visitor callbacks | 0.000308 |
+
+The alignment observer saw 18,460 distinct physical Record and role pairs
+and 91,381 repeated occurrences. The Record cache counted 128,881 hits and
+68,888 misses. The observed XML byte cache counted 3,355 hits and 1,028
+misses. A byte cache hit can still require XML parsing. Prioritize port
+construction and separately verify any optimization with the same workload
+and an ordinary executable. The timers attribute cost within this instrumented
+run. The earlier uninstrumented 245.973 seconds is a separate measurement.
+
 A matched Ship-only measurement used the same ignored timing test, LIVE Archive,
 English language and single worker on both signed release-profile Builds.
 An independent Interior parity verifier ran during both measurements. The
@@ -247,11 +274,10 @@ The witness used the same Build, selection, harness and peak provider as the
 matched stopped runs. The integrated consumer refresh still needs its
 own 2 GB witness.
 
-For the next Loadout comparison, measure time to first owner, admission,
-Record and XML cache misses, semantic Loadout resolution, port construction and
-alignment in the same release-profile run. A cache can reuse original parsed
-facts while keeping each owner's selected sources and diagnostics local. For
-the Ship query, measure the selected Record plan, global playability preparation
+Repeat the attributed Loadout phases after any port construction change and
+compare ordered rows, source states, markers and coverage in both provenance
+modes. Keep each owner's selected sources and diagnostics local when reusing
+parsed facts. For the Ship query, measure the selected Record plan, global playability preparation
 and row projection separately. The measured snapshot retained decoded owner
 trees alongside the developing result. The bounded reader holds up to 32
 decoded owner trees per batch and merges newly observed owner evidence once.
