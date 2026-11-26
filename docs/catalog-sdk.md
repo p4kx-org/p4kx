@@ -3358,8 +3358,16 @@ lifetime peak was 1,091,923,968 B private commit and 1,024,147,456 B working set
 The test process elapsed time was 15.657 s with the archive-free verifier
 running on the same host. The binary SHA-256 was
 `879b1b59a248c712fb154672b8d52ac7e7b106cdc7ef4fc16a4a2b90562cb6e7`.
-Same-Build Catalog comparison and final-candidate resource validation remain
-pending.
+The release-profile test at signed revision `4aa8bcfa2` matched those 18
+coverage rows, one placement, 396 source uses and 19 physical sources against
+the complete same-Build Catalog from `e59c7410f`. The test verified the
+archive and retained producer receipt, then compared the two tables and their
+source closure in one streamed read. Its SHA-256 was
+`8bfc79fcc0227d0a419762cb12181f89ea190af6b8dfc044ad078ae6f8b2f951`.
+This verification took 554.417 s with a 1,091,801,088 B private-commit peak
+and a 1,039,769,600 B working-set peak. The elapsed time includes reading
+the complete retained frame. Fleet-wide parity and final-candidate resource
+validation remain pending.
 
 ## Installed flight configurations
 
