@@ -22,6 +22,8 @@ mod contract_scope;
 mod entities;
 mod inventory;
 mod item;
+mod jump_inventory;
+mod jump_point_configuration;
 mod manufacturer;
 mod manufacturer_definitions;
 mod number;
@@ -49,6 +51,10 @@ mod commodity_tests;
 mod contract_scope_tests;
 #[cfg(test)]
 mod entity_tests;
+#[cfg(test)]
+mod jump_inventory_tests;
+#[cfg(test)]
+mod jump_point_configuration_tests;
 #[cfg(test)]
 mod resource_group_tests;
 #[cfg(test)]

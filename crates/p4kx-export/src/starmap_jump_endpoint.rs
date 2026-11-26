@@ -95,6 +95,38 @@ impl JumpEndpoint {
         &self.route.instance_id
     }
 
+    #[cfg(test)]
+    pub(crate) const fn system(&self) -> &SourcedValue<String> {
+        &self.route.system
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn starmap_record_guid(&self) -> &SourcedValue<CatalogGuid> {
+        &self.route.starmap_record_guid
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn starmap_type(&self) -> &SourcedValue<&'static str> {
+        &self.route.starmap_type
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn world_position(&self) -> &SourcedValue<[f64; 3]> {
+        &self.pose.world_position
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn target_path(&self) -> &SourcedValue<String> {
+        &self.route.target_path
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn target_candidates(
+        &self,
+    ) -> &SourcedValue<Vec<SourcedValue<PhysicalEntryRef>>> {
+        &self.target_candidates
+    }
+
     /// Physical DataForge index of the Starmap object classifying this endpoint.
     #[must_use]
     pub const fn starmap_record_index(&self) -> &SourcedValue<u32> {

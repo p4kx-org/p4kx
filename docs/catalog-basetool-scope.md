@@ -276,6 +276,20 @@ Selected names enter the public-name closure. Descriptions and display
 types enter the protected game-text closure in English and German.
 Original authoring bodies and proof inventories are outside this selection.
 
+## Internal jump producer slice
+
+The jump placement table retains system, physical Starmap Record and
+container-instance identities, world positions, target paths, ordered
+Archive Entry candidates and the original partner state. Repeated physical
+occurrences remain distinct. The connection table preserves the canonical
+survey availability and row count. An incomplete traversal cannot certify
+an empty connection inventory.
+
+The jump configuration table retains the original Entity component ordinal
+and the sourced largest-ship-size link. A null link and an undeclared link
+keep their states. A resolved LandingPadSize target retains its physical
+identity, path and type even though its definition is outside the selection.
+
 ## Acceptance
 
 #1177 tracks the wire contract, generation and import. Use a distinct versioned

@@ -5,12 +5,14 @@ use serde::Serialize;
 
 use super::ReducedError;
 use super::cell::Cell;
+use super::completeness;
 use super::record_targets::RecordTargets;
 use crate::Kind;
 use crate::catalog_record_reference::CatalogRecordReference;
 use crate::catalog_reference;
 use crate::definition_reference::DefinitionStatus;
 use crate::guid_text::CatalogGuid;
+use crate::source_value_catalog::SourceRecordReference;
 
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -35,6 +37,19 @@ impl<'source> From<&'source CatalogRecordReference> for RecordLink<'source> {
 }
 
 impl<'source> RecordLink<'source> {
+    pub(super) fn from_source(
+        path: &'static str,
+        link: &'source SourceRecordReference<'_>,
+    ) -> Result<Self, ReducedError> {
+        Ok(Self {
+            guid: completeness::cell(path, &link.guid)?,
+            target_record_index: completeness::cell(path, link.target_record_index())?,
+            record_path: completeness::cell(path, link.record_path())?.map(|value| *value),
+            target_type: completeness::cell(path, link.target_type())?.map(|value| *value),
+            status: link.status(),
+        })
+    }
+
     pub(super) fn read(
         path: &'static str,
         link: &'source CatalogRecordReference,
