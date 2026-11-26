@@ -6,6 +6,16 @@ Keep game-text classification, typed game-media references and the immediate thr
 
 For the embedded SDK, start with one parsed session, the compact contract fields the consumer uses, Ship-root Loadouts, and one incremental batch of physical Item definitions. Measure that whole refresh before changing more internals. Then remove redundant Contract owner interpretation and make ordinary marker observations cheaper. For the complete producer, first reduce the data and proof handles kept alive from Loadout resolution through the later projections. If Full remains close to its ceiling, spill cold proof data to disk using an exact index. Encoding and parallelism are secondary to those preparation changes. The priorities below are engineering judgments. Only the measurements explicitly attributed to a run are demonstrated gains. [SDK entry points][sdk] · [Contract interpreter][interpreter] · [Staged Loadouts][staged] · [Full producer requirements][full]
 
+## Verified implementation status
+
+The compact SDK fields and physical Item-definition visitor are in `244cebb99`.
+The focused integration suite checked 25 contract, six Item-definition and three
+Loadout selection cases. Code and synthetic checks for the next slices cover
+direct marker binding, committing staged contract text registrations, packing
+idle Full DataForge uses during Loadout resolution, and filtering archive names
+before normalizing XML keys. Installed speed and memory for these slices have
+their own comparison. The measurements below predate the new implementations.
+
 ## What the measurements establish
 
 | Build, route and revision | Time | Peak private commit | Interpretation |

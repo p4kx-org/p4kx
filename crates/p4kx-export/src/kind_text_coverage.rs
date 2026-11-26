@@ -132,6 +132,15 @@ impl Totals {
         }
     }
 
+    const fn merge(&mut self, incoming: Self) {
+        self.resolved += incoming.resolved;
+        self.missing_language += incoming.missing_language;
+        self.missing_key += incoming.missing_key;
+        self.empty_source += incoming.empty_source;
+        self.empty_display += incoming.empty_display;
+        self.placeholder += incoming.placeholder;
+    }
+
     const fn summary(self, owner: TextOwner, language: Language) -> KindTextSummary {
         KindTextSummary {
             owner,
@@ -156,6 +165,20 @@ impl KindTextCoverage {
         let counts = self.by_owner.entry(owner).or_default();
         for (total, outcome) in counts.iter_mut().zip(lookup.outcomes()) {
             total.note(outcome);
+        }
+    }
+
+    pub(super) fn merge(&mut self, incoming: Self) {
+        for (owner, counts) in incoming.by_owner {
+            for (total, incoming) in self
+                .by_owner
+                .entry(owner)
+                .or_default()
+                .iter_mut()
+                .zip(counts)
+            {
+                total.merge(incoming);
+            }
         }
     }
 

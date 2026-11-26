@@ -179,12 +179,13 @@ requested group is prepared as proven, absent or failed, the same owner is retri
 requires a previously unknown key; repeating an already prepared request is an accounting error.
 There is no fixed retry quota or truncated successful result.
 
-Probe texts, rows, pools and intro grants stay private. Only the final complete owner transaction
-contributes derived rows and grants. A failed owner uses a private text registry as well; partial
-titles cannot leak into the result's text definitions. Published place names are replayed only for
-the actual Place lookups of the final owner attempt. Required body errors retain their original
+Probe texts, rows, pools and intro grants stay private. The completed attempt contributes its
+derived rows and grants directly. A successful selected owner commits its local text registrations
+and the names of the exact physical Starmap Records consulted by that attempt. Local registrations
+from outside owners, incomplete attempts and failed owners stay private. Finalization publishes
+texts needed by retained sets and dependency pools. Required body errors retain their original
 physical identity in forward coverage and canonical failure diagnostics. The complete producer
-uses its existing fully prepared inputs and does not perform the selective preparation protocol.
+uses its existing fully prepared inputs.
 
 ## Opt-in installed source witness
 

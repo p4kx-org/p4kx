@@ -186,12 +186,12 @@ impl<'source> Dependencies<'source> {
         }
     }
 
-    pub(super) fn final_objects(
-        &mut self,
+    pub(super) fn publish_place_names(
+        &self,
         consulted: &BTreeSet<DependencyKey>,
         projection: &CatalogProjection<'_, 'source>,
         cancel: Option<&CancelToken>,
-    ) -> Result<Vec<StarmapObject<'source>>, CatalogError> {
+    ) -> Result<(), CatalogError> {
         let mut positions = Vec::new();
         for key in consulted {
             if let DependencyKey::Place(guid) = key
@@ -206,24 +206,15 @@ impl<'source> Dependencies<'source> {
             }
         }
         positions.sort_unstable();
-        let mut objects = Vec::with_capacity(positions.len());
         for position in positions {
             let tree = self
                 .records
                 .get(&position)
                 .and_then(|tree| tree.as_ref().ok())
                 .ok_or(ExportAccountingError::ConflictingSourceDatum)?;
-            let (object, _) = place_rows::read(
-                self.forge,
-                &mut self.trees,
-                tree,
-                &self.types,
-                projection,
-                cancel,
-            )?;
-            objects.push(object);
+            place_rows::publish_name(self.forge, tree, projection, cancel)?;
         }
-        Ok(objects)
+        Ok(())
     }
 }
 

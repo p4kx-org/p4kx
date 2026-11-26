@@ -71,8 +71,8 @@ impl<'source> Plan<'source> {
                 plan.roots.insert(record.index());
                 if let Some((tree, survey)) = plan.survey(record, input, &mut trees, cancel)? {
                     plan.has_rows |= !survey.keys.is_empty();
-                    wanted.extend(&survey);
                     if !plan.global {
+                        wanted.extend(&survey);
                         plan.grants.merge(survey.grants.scope_only())?;
                     }
                     plan.generators.insert(record.index(), tree);

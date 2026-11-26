@@ -25,6 +25,32 @@ const XML: &[u8] = b"<Loadout/>";
 const BUDGET: usize = 4096;
 
 #[test]
+fn xml_prefilter_retains_normalized_candidates() {
+    for path in [
+        "Data/a.xml",
+        "DATA/a.XML",
+        r"Data\nested\a.xml",
+        "/Data/.xml",
+        r"Data\a.xml\.\",
+        "Data/a.xml/./",
+        "Data/a.xml/next.bin",
+        "Data/a.xml/..",
+        "Data/a.xml.backup",
+        "Data/a.xml_",
+    ] {
+        let normalized = super::key(path);
+        if std::path::Path::new(&normalized)
+            .extension()
+            .is_some_and(|extension| extension.eq_ignore_ascii_case("xml"))
+        {
+            assert!(super::may_have_xml_extension(path), "{path}");
+        }
+    }
+    assert!(!super::may_have_xml_extension("Data/object.cgf"));
+    assert!(!super::may_have_xml_extension("Data/material.xml.bak"));
+}
+
+#[test]
 fn cached_xml_reuses_the_allocation_and_preserves_physical_admission() -> TestResult {
     let (_directory, archive) = archive([entry(ROOT, XML), entry(OTHER, XML)])?;
     let files = ArchiveFiles::new(&archive)

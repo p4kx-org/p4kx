@@ -23,7 +23,7 @@ use crate::source_details::{SourceCoordinateOmission, SourceDetails};
 use crate::source_evidence_error::{self, SourceEvidenceError};
 use crate::source_registry::SourceRegistry;
 use crate::source_scope::{SourceInput, SourceScope};
-use crate::source_use::{InputScope, SourceLocation, SourceUse};
+use crate::source_use::{InputScope, SourceLocation, SourceUse, SourceUseRole};
 use crate::source_value::{SourceValue, SourcedValue};
 
 /// Per-preparation physical source and use inventory shared by parallel field projections.
@@ -165,6 +165,34 @@ impl SourceUses {
         source_set_complete: bool,
     ) -> SourcedValue<T> {
         SourcedValue::new(value, self.origin(uses, source_set_complete))
+    }
+
+    /// Binds a value directly to one observed location with the same evidence as a separate use.
+    /// A contributing scope from another inventory makes the source set incomplete.
+    ///
+    /// # Errors
+    /// Returns an error if the observed scope's inventory is sealed or interrupted.
+    pub fn value_at<T>(
+        &self,
+        scope: &SourceScope,
+        location: SourceLocation,
+        role: SourceUseRole,
+        value: SourceValue<T>,
+        source_set_complete: bool,
+    ) -> Result<SourcedValue<T>, SourceEvidenceError> {
+        if self.mode == ProvenanceMode::Full || !Arc::ptr_eq(&self.registry, &scope.registry) {
+            let used = scope.at(location, role)?;
+            return Ok(self.value(value, &[used], source_set_complete));
+        }
+        let origin = source_evidence_error::lock(&scope.registry)?.origin_at(
+            &scope.source,
+            scope.scope,
+            location,
+            role,
+            scope.encryption(),
+            source_set_complete,
+        );
+        Ok(SourcedValue::new(value, origin))
     }
 
     /// Binds navigation to its actual contributing inputs without duplicating a game value.

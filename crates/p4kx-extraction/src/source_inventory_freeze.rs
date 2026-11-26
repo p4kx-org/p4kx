@@ -12,6 +12,9 @@ use crate::source_inventory::{PackedUseRows, SourceInventory};
 use super::SourceUses;
 
 #[cfg(test)]
+#[path = "source_inventory_batch_compaction_tests.rs"]
+mod batch_compaction_tests;
+#[cfg(test)]
 #[path = "source_inventory_finish_tests.rs"]
 mod finish_tests;
 
@@ -75,9 +78,8 @@ impl SourceUses {
         Ok(buckets)
     }
 
-    /// Packs unheld DataForge coordinate uses registered since the preceding compaction.
-    /// Call after draining a batch of projected records. The checkpoint runs under the
-    /// inventory lock and must not re-enter it.
+    /// Packs unheld DataForge coordinate uses and rechecks uses deferred by batch compaction.
+    /// The checkpoint runs under the registry lock and must not re-enter it.
     ///
     /// # Errors
     /// Returns the checkpoint error or an error when the registry is sealed or interrupted.
@@ -88,6 +90,21 @@ impl SourceUses {
         source_evidence_error::lock(&self.registry)?
             .uses
             .compact_pending(check)
+    }
+
+    /// Packs unheld DataForge uses, deferring uses held by the active projection.
+    /// Call between batches of one projection. The checkpoint runs under the registry lock
+    /// and must not re-enter it. A later `compact_record_uses` rechecks deferred uses.
+    ///
+    /// # Errors
+    /// Returns the checkpoint error or an error when the registry is sealed or interrupted.
+    pub fn compact_record_use_batch<E: From<SourceEvidenceError>>(
+        &self,
+        check: impl FnMut() -> Result<(), E>,
+    ) -> Result<(), E> {
+        source_evidence_error::lock(&self.registry)?
+            .uses
+            .compact_batch(check)
     }
 
     /// Freezes sorted source/use rows after projection for repeatable serialization passes.

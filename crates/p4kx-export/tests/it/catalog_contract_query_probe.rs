@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
 use p4kx_export::catalog_queries::{
-    CatalogLanguageSelection, CatalogRecordSelection, ContractSnapshot, with_contracts,
+    CatalogLanguageSelection, CatalogQuerySession, CatalogRecordSelection, ContractSnapshot,
 };
-use p4kx_extraction::Language;
+use p4kx_extraction::{Language, ProvenanceMode};
 
 use super::TestResult;
 use crate::commodity_v3_fixture::{self, DcbOrigin};
@@ -16,13 +16,18 @@ mod fixture;
 fn contract_sdk_dependency_probes_publish_only_complete_owner_transactions() -> TestResult {
     let (_folder, archive) =
         commodity_v3_fixture::open_bytes(fixture::database(), DcbOrigin::Plain)?;
-    with_contracts(
-        &archive,
-        CatalogRecordSelection::RecordIndex(0),
-        CatalogLanguageSelection::Selected(&[Language::English]),
-        None,
-        |snapshot| verify(&snapshot),
-    )??;
+    for mode in [ProvenanceMode::MarkersOnly, ProvenanceMode::Full] {
+        CatalogQuerySession::open(
+            &archive,
+            CatalogLanguageSelection::Selected(&[Language::English]),
+            None,
+        )?
+        .with_provenance_mode(mode)
+        .with_contracts(CatalogRecordSelection::RecordIndex(0), None, |snapshot| {
+            verify(&snapshot)?;
+            verify_text_origins(&snapshot, mode)
+        })??;
+    }
     Ok(())
 }
 
@@ -125,6 +130,25 @@ fn verify_texts(snapshot: &ContractSnapshot<'_>) -> TestResult {
             title.origin().contains_encrypted_source(),
             Some(true),
             "the retained output carries the actual encrypted locale input"
+        );
+    }
+    Ok(())
+}
+
+fn verify_text_origins(snapshot: &ContractSnapshot<'_>, mode: ProvenanceMode) -> TestResult {
+    for text in &snapshot.game_texts {
+        let refs = text.key().origin().source_uses_refs();
+        assert_eq!(
+            refs.is_empty(),
+            mode == ProvenanceMode::MarkersOnly,
+            "published text has reference evidence only in Full mode"
+        );
+        assert!(
+            refs.iter().all(|reference| snapshot
+                .source_inventory
+                .iter_uses()
+                .any(|source| source.id() == reference)),
+            "the published text key has no dangling evidence reference after commit"
         );
     }
     Ok(())

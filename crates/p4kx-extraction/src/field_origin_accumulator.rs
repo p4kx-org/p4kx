@@ -82,12 +82,16 @@ impl OriginAccumulator {
 
     pub(crate) fn observe(&mut self, contribution: OriginContribution<'_>) {
         if contribution.role.contributes() {
-            self.include_completeness(!contribution.opaque);
+            self.include_source(contribution.encryption, contribution.opaque);
             if self.mode == ProvenanceMode::Full {
                 self.references.push(contribution.id.retain());
             }
-            self.encryption = self.encryption.combine(contribution.encryption);
         }
+    }
+
+    pub(crate) const fn include_source(&mut self, encryption: SourceEncryptionState, opaque: bool) {
+        self.include_completeness(!opaque);
+        self.encryption = self.encryption.combine(encryption);
     }
 
     pub(crate) fn finish(self, identity: Arc<()>) -> FieldOrigin {

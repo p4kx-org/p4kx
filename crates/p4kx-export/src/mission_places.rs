@@ -106,18 +106,11 @@ impl<'s, 'f> PlaceObjects<'s, 'f> {
 
 impl<'s, 'f> Places<'s, 'f> {
     pub(crate) fn new(objects: &'s [StarmapObject<'f>]) -> Self {
-        Self::with_dependencies(objects.iter(), PreparedDependencies::default())
-    }
-
-    pub(crate) fn with_dependencies(
-        objects: impl IntoIterator<Item = &'s StarmapObject<'f>>,
-        prepared: PreparedDependencies,
-    ) -> Self {
         Self {
-            prepared,
+            prepared: PreparedDependencies::default(),
             objects: PlaceObjects::Local(
                 objects
-                    .into_iter()
+                    .iter()
                     .map(|object| (object.guid.0, object))
                     .collect(),
             ),

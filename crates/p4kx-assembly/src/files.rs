@@ -140,6 +140,7 @@ impl<'a> ArchiveFiles<'a> {
                 .entries()
                 .iter()
                 .enumerate()
+                .filter(|(_, entry)| may_have_xml_extension(entry.path()))
                 .map(|(index, entry)| (key(entry.path()), index))
                 .filter(|(key, _)| {
                     std::path::Path::new(key)
@@ -251,6 +252,13 @@ impl ArchiveFiles<'_> {
             .map_err(|error| unreadable(error.to_string()))?;
         Ok(bytes)
     }
+}
+
+fn may_have_xml_extension(path: &str) -> bool {
+    path.rsplit(['/', '\\'])
+        .find(|part| !part.is_empty() && *part != ".")
+        .and_then(|part| part.as_bytes().last_chunk::<4>())
+        .is_some_and(|suffix| suffix.eq_ignore_ascii_case(b".xml"))
 }
 
 /// Returns a path in lower case with backslash separators and no leading separator.

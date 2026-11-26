@@ -5,7 +5,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 
 use p4kx_assembly::{ArchiveFiles, Entities};
-use p4kx_extraction::{CancelToken, Guid};
+use p4kx_extraction::{CancelToken, Guid, ProvenanceMode};
 
 use crate::catalog_v3::catalog_item_alignment::AlignmentIndex;
 use crate::contract_loadout::{EntityKind, Loadout, LoadoutPort};
@@ -17,6 +17,7 @@ pub(crate) mod alignment;
 pub(crate) mod ledger;
 
 use crate::export_ledger::ExportLedger;
+use resolution::UseCompaction;
 #[cfg(test)]
 use resolution::read_with;
 pub(crate) use resolution::{SelectedSources, Wanted};
@@ -69,6 +70,11 @@ pub(crate) fn loadouts<'f>(
         record_reader: None,
         seed: sources.ledger,
         alignment: &mut alignment,
+        use_compaction: if input.origins().uses.provenance_mode() == ProvenanceMode::Full {
+            UseCompaction::BetweenCatalogBatches
+        } else {
+            UseCompaction::AtProjectionEnd
+        },
     };
     let read = resolution::read_rows(files, entities, wanted, evidence, input, cancel, |entry| {
         summary.add_entry(&entry, known, &mut outside);

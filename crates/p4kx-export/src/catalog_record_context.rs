@@ -226,8 +226,9 @@ impl<'a> CatalogRecordContext<'a> {
         if self.cancel.is_some_and(CancelToken::is_cancelled) {
             return Err(CatalogError::Cancelled);
         }
-        let source = self.dataforge.at(location, role)?;
-        Ok(self.sources.value(value, &[source], complete))
+        Ok(self
+            .sources
+            .value_at(self.dataforge, location, role, value, complete)?)
     }
 
     fn location(&self, path: &str) -> SourceLocation {

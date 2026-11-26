@@ -8,7 +8,7 @@ use p4kx_archive::{ArchiveInputOrigin, ObservedEntryBinding};
 
 use crate::DecimalU64;
 use crate::ProvenanceMode;
-use crate::field_origin::FieldOrigin;
+use crate::field_origin::{FieldOrigin, OriginAccumulator};
 use crate::source_archive_binding::ArchiveSourceBinding;
 use crate::source_details::SourceDetails;
 use crate::source_file_input::{FileInput, FileInputRef};
@@ -325,23 +325,44 @@ impl SourceRegistry {
         }
     }
 
+    pub(crate) fn origin_at(
+        &mut self,
+        source: &PhysicalSourceRef,
+        scope: InputScope,
+        location: SourceLocation,
+        role: SourceUseRole,
+        encryption: SourceEncryptionState,
+        complete: bool,
+    ) -> FieldOrigin {
+        if self.mode == ProvenanceMode::MarkersOnly && role != SourceUseRole::Attempted {
+            let mut origin = OriginAccumulator::new(complete, self.mode);
+            if role.contributes() {
+                origin.include_source(
+                    encryption,
+                    matches!(location, SourceLocation::Opaque { .. }),
+                );
+            }
+            return origin.finish(Arc::clone(&self.identity));
+        }
+        let used = self.register_use(source, scope, location, role, encryption);
+        FieldOrigin::new(Arc::clone(&self.identity), [&used], complete, self.mode)
+    }
+
     pub(crate) fn file_metadata_value<T>(
         &mut self,
         source: &PhysicalSourceRef,
         field: String,
         value: SourceValue<T>,
     ) -> SourcedValue<T> {
-        let used = self.register_use(
+        let origin = self.origin_at(
             source,
             InputScope::FileMetadata,
             SourceLocation::Metadata { field },
             SourceUseRole::Payload,
             SourceEncryptionState::Unknown,
+            true,
         );
-        SourcedValue::new(
-            value,
-            FieldOrigin::new(Arc::clone(&self.identity), [&used], true, self.mode),
-        )
+        SourcedValue::new(value, origin)
     }
 
     pub(crate) fn metadata_value<T>(
@@ -351,16 +372,18 @@ impl SourceRegistry {
         value: SourceValue<T>,
         encryption: SourceEncryptionState,
     ) -> SourcedValue<T> {
-        let used = self.register_use(
+        let origin = self.origin_at(
             source,
             InputScope::ArchiveDirectoryMetadata,
             SourceLocation::Metadata { field },
             SourceUseRole::Payload,
             encryption,
+            true,
         );
-        SourcedValue::new(
-            value,
-            FieldOrigin::new(Arc::clone(&self.identity), [&used], true, self.mode),
-        )
+        SourcedValue::new(value, origin)
     }
 }
+
+#[cfg(test)]
+#[path = "source_registry_value_tests.rs"]
+mod value_tests;

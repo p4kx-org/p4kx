@@ -17,9 +17,6 @@ impl<'source> MissionIndex<'source> {
         self.prepared = prepared;
     }
 
-    pub(crate) fn query_dependencies(&self) -> PreparedDependencies {
-        self.prepared.clone()
-    }
 
     pub(crate) fn lookup_template(
         &self,

@@ -1,16 +1,19 @@
 // SPDX-License-Identifier: MIT OR Apache-2.0
 // SPDX-FileCopyrightText: 2026 the P4KX contributors
 
+use std::cell::Cell;
 use std::collections::HashSet;
 
-use p4kx_extraction::{Guid, SourceUses, SourceValue};
+use p4kx_extraction::{
+    Guid, InputScope, SourceInput, SourceLocation, SourceUseRole, SourceUses, SourceValue,
+};
 
 use super::Wanted;
-use super::resolution::resolve_ordered;
-use crate::LoadoutSummary;
+use super::resolution::{UseCompaction, resolve_ordered};
 use crate::contract_loadout::{EntityKind, Loadout, LoadoutPort};
 use crate::guid_text::CatalogGuid;
 use crate::loadout::staging::StagedLoadoutWriter;
+use crate::{CatalogError, LoadoutSummary};
 
 fn guid(value: u128) -> CatalogGuid {
     CatalogGuid(Guid::from_stored(value.to_le_bytes()))
@@ -68,6 +71,7 @@ fn a_guid_tie_preserves_wire_order_and_ship_ordinals() -> Result<(), Box<dyn std
             staged.append(entry)?;
             Ok(())
         },
+        |_| Ok(()),
     )?;
     assert!(failures.is_empty(), "the skipped row is not a failed read");
     let staged = staged.finish()?;
@@ -90,5 +94,56 @@ fn a_guid_tie_preserves_wire_order_and_ship_ordinals() -> Result<(), Box<dyn std
     assert_eq!(summary.ships, 2, "both Ship rows are counted");
     assert_eq!(summary.attached, 4, "each occurrence contributes");
     assert_eq!(outside.len(), 1, "one outside GUID is shared by all rows");
+    Ok(())
+}
+
+#[test]
+fn catalog_batches_count_empty_resolutions_and_stop_after_a_checkpoint_error()
+-> Result<(), Box<dyn std::error::Error>> {
+    let uses = SourceUses::with_compact_coordinates();
+    let scope = uses.observe(SourceInput::Unknown, InputScope::Payload)?;
+    let visited = Cell::new(0);
+    let owners = (0..66).map(|index| wanted(index, guid(1), EntityKind::Item));
+    let result = resolve_ordered(
+        owners,
+        None,
+        |_| {
+            visited.set(visited.get() + 1);
+            Ok(None)
+        },
+        |_| panic!("empty resolutions have no staged rows"),
+        |completed| {
+            scope.at(
+                SourceLocation::DataForge {
+                    record_index: 0,
+                    field: completed.to_string(),
+                },
+                SourceUseRole::Payload,
+            )?;
+            UseCompaction::BetweenCatalogBatches.after_owner(completed, &uses, None)?;
+            match completed {
+                63 => assert_eq!(
+                    uses.packed_use_count()?,
+                    0,
+                    "the batch is still in progress"
+                ),
+                64 => {
+                    assert_eq!(
+                        uses.packed_use_count()?,
+                        64,
+                        "all completed owner uses packed"
+                    );
+                    return Err(CatalogError::Cancelled);
+                }
+                _ => {}
+            }
+            Ok(())
+        },
+    );
+    assert!(
+        matches!(result, Err(CatalogError::Cancelled)),
+        "the checkpoint's error reaches the caller"
+    );
+    assert_eq!(visited.get(), 64, "the next original owner is untouched");
     Ok(())
 }

@@ -19,7 +19,7 @@ use crate::contract_loadout::Loadout;
 use crate::export_ledger::ExportLedger;
 use crate::loadout::Wanted;
 use crate::loadout::alignment::direct::DirectAlignment;
-use crate::loadout::resolution::{self, ResolverEvidence};
+use crate::loadout::resolution::{self, ResolverEvidence, UseCompaction};
 use crate::texts::{TextSources, Texts};
 use crate::{CatalogError, Kind};
 
@@ -196,6 +196,7 @@ impl Query<'_> {
                 seed: &seed,
                 alignment,
                 record_reader: sources.record_reader(),
+                use_compaction: UseCompaction::AtProjectionEnd,
             },
             input,
             self.cancel,

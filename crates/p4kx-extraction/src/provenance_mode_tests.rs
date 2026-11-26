@@ -15,12 +15,7 @@ type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
 #[test]
 fn marker_projection_matches_original_contributors_without_retaining_their_graph() -> TestResult {
     let directory = tempfile::tempdir()?;
-    let path = directory.path().join("Data.p4k");
-    ArchiveBuilder::new()
-        .entry(TestEntry::stored("plain.bin", b"plain"))
-        .entry(TestEntry::stored("encrypted.bin", b"encrypted").encrypted())
-        .write_to(&path)?;
-    let archive = Archive::open_with_key(&path, Some(p4kx_testkit::test_key()))?;
+    let archive = marker_archive(directory.path())?;
     for mode in [ProvenanceMode::Full, ProvenanceMode::MarkersOnly] {
         let capture = SourceUses::with_provenance_mode(mode);
         assert_original_markers(&archive, &capture)?;
@@ -135,6 +130,124 @@ fn a_marker_capture_accepts_its_original_handles_and_rejects_foreign_input() -> 
         "marker unions reject foreign origins"
     );
     Ok(())
+}
+
+#[test]
+fn direct_cells_match_separate_observations_in_both_profiles() -> TestResult {
+    let directory = tempfile::tempdir()?;
+    let archive = marker_archive(directory.path())?;
+    for mode in [ProvenanceMode::MarkersOnly, ProvenanceMode::Full] {
+        let capture = SourceUses::with_provenance_mode(mode);
+        let plain = scope(&archive, &capture, "plain.bin")?;
+        let encrypted = scope(&archive, &capture, "encrypted.bin")?;
+        let metadata = encrypted.for_scope(InputScope::ArchiveDirectoryMetadata);
+        let unknown = capture.observe(SourceInput::Unknown, InputScope::Payload)?;
+        for scope in [&plain, &encrypted, &metadata, &unknown] {
+            compare_direct_cells(&capture, scope)?;
+        }
+    }
+    Ok(())
+}
+
+fn compare_direct_cells(capture: &SourceUses, scope: &SourceScope) -> TestResult {
+    for role in [
+        SourceUseRole::Payload,
+        SourceUseRole::Selector,
+        SourceUseRole::Conversion,
+        SourceUseRole::Reference,
+        SourceUseRole::Attempted,
+    ] {
+        for site in [
+            location("value"),
+            SourceLocation::Opaque {
+                reason: SourceCoordinateOmission::Unavailable,
+            },
+        ] {
+            for complete in [true, false] {
+                let direct = capture.value_at(
+                    scope,
+                    site.clone(),
+                    role,
+                    SourceValue::Null::<u8>,
+                    complete,
+                )?;
+                let registered = capture.registered_use_count()?;
+                let used = scope.at(site.clone(), role)?;
+                assert_eq!(
+                    capture.registered_use_count()?,
+                    registered,
+                    "same retained observation"
+                );
+                if role == SourceUseRole::Attempted {
+                    capture.verify_attempted_uses(std::slice::from_ref(used.reference()))?;
+                }
+                let expected = capture.value(SourceValue::Null::<u8>, &[used], complete);
+                assert_eq!(direct.origin(), expected.origin(), "complete source facts");
+                assert_eq!(
+                    serde_json::to_vec(&direct)?,
+                    serde_json::to_vec(&expected)?,
+                    "wire cell"
+                );
+            }
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn direct_cell_rejects_sealed_scope_and_keeps_foreign_contributions_incomplete() -> TestResult {
+    for mode in [ProvenanceMode::Full, ProvenanceMode::MarkersOnly] {
+        let owner = SourceUses::with_provenance_mode(mode);
+        let foreign = SourceUses::with_provenance_mode(mode);
+        let scope = owner.observe(SourceInput::Unknown, InputScope::Payload)?;
+        let direct = foreign.value_at(
+            &scope,
+            location("foreign"),
+            SourceUseRole::Payload,
+            SourceValue::Present(0),
+            true,
+        )?;
+        assert!(
+            !direct.origin().source_set_complete(),
+            "a foreign payload is incomplete"
+        );
+        assert!(
+            direct.origin().source_uses_refs().is_empty(),
+            "foreign IDs stay out of the cell"
+        );
+        assert_eq!(
+            direct.origin().contains_encrypted_source(),
+            None,
+            "foreign encryption stays unknown"
+        );
+        let _inventory = owner.finish_with(|| Ok::<(), SourceEvidenceError>(()))?;
+        for destination in [&owner, &foreign] {
+            let binding = destination.value_at(
+                &scope,
+                location("sealed"),
+                SourceUseRole::Payload,
+                SourceValue::Present(0),
+                true,
+            );
+            assert!(
+                matches!(binding, Err(SourceEvidenceError::SealedInventory)),
+                "capture state is validated first"
+            );
+        }
+    }
+    Ok(())
+}
+
+fn marker_archive(directory: &std::path::Path) -> TestResult<Archive> {
+    let path = directory.join("Data.p4k");
+    ArchiveBuilder::new()
+        .entry(TestEntry::stored("plain.bin", b"plain"))
+        .entry(TestEntry::stored("encrypted.bin", b"encrypted").encrypted())
+        .write_to(&path)?;
+    Ok(Archive::open_with_key(
+        &path,
+        Some(p4kx_testkit::test_key()),
+    )?)
 }
 
 fn scope(archive: &Archive, capture: &SourceUses, name: &str) -> TestResult<SourceScope> {

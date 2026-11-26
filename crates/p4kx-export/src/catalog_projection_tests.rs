@@ -6,7 +6,7 @@ use std::borrow::Cow;
 use p4kx_extraction::{Language, SourceUseRole};
 use p4kx_testkit::{DataForgeBuilder, TestRecord, TestStruct, TestType, TestValue};
 
-use super::{CatalogProjection, Domain, FinishedTexts, Lookup, TextOwner};
+use super::{CatalogProjection, CatalogTextRegistry, Domain, FinishedTexts, Lookup, TextOwner};
 use crate::Kind;
 use crate::build::original_input::test_support::{self, TestResult};
 use crate::catalog_v3::catalog_text_forms;
@@ -36,7 +36,7 @@ fn placeholder_first_admission_preserves_lookup_proof_and_independent_counts() -
 }
 
 #[test]
-fn duplicate_registrations_keep_owned_display_forms_and_exact_use_order() -> TestResult {
+fn committed_text_registrations_keep_owned_display_forms_and_exact_use_order() -> TestResult {
     const KEY: &str = "@sample";
     let bytes = two_occurrences(KEY);
     let locales: [(Language, &[u8]); 2] = [
@@ -45,7 +45,10 @@ fn duplicate_registrations_keep_owned_display_forms_and_exact_use_order() -> Tes
     ];
     test_support::with_localized_projection(&bytes, &locales, |_, projection| {
         register(projection, KEY, "ordinary")?;
-        register(projection, KEY, "mission")?;
+        let staged = CatalogTextRegistry::default();
+        let transaction = projection.with_text_registry(&staged);
+        register(&transaction, KEY, "mission")?;
+        projection.commit_text_registrations(&transaction)?;
         let counts = projection.legacy_texts().summary();
         let [english, german, ..] = counts.as_slice() else {
             return Err("English and German lookup summaries".into());

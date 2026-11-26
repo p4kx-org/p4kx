@@ -22,6 +22,8 @@ use crate::{CatalogError, ExportAccountingError, Kind};
 
 #[path = "kind_text_coverage.rs"]
 mod kind_text_coverage;
+#[path = "catalog_text_registrations.rs"]
+mod registrations;
 #[path = "catalog_text_rows.rs"]
 mod text_rows;
 

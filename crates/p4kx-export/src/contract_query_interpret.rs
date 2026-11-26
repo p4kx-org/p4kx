@@ -14,7 +14,7 @@ use crate::mission_entry_source::MissionEntryContext;
 use crate::mission_index::{MissionIndex, read::CachedTree};
 use crate::mission_places::Places;
 use crate::missions::record_read::{
-    ContractAttempt, GeneratorFacets, Piece, try_project_contracts_tree,
+    ContractAttempt, GeneratorFacets, ObservedPiece, Piece, try_project_contracts_tree,
 };
 use crate::record_observation::RecordObservation;
 use crate::spawn_pools::SpawnPools;
@@ -86,12 +86,10 @@ impl<'context, 'source> Interpreter<'context, 'source> {
             crate::catalog_query_session::checkpoint(self.cancel)?;
             self.dependencies.prepared.begin_attempt()?;
             let registry = CatalogTextRegistry::default();
-            let projection = CatalogProjection::new(
-                self.projection.legacy_texts(),
-                self.projection.original(),
-                &registry,
-            )
-            .for_kind(Kind::Contracts);
+            let projection = self
+                .projection
+                .with_text_registry(&registry)
+                .for_kind(Kind::Contracts);
             let places = self.dependencies.places();
             match self.attempt(tree, role, &projection, &places)? {
                 ContractAttempt::Dependency(key) => {
@@ -111,12 +109,10 @@ impl<'context, 'source> Interpreter<'context, 'source> {
                         .prepare(key, &inputs, &mut self.index, coverage)?;
                 }
                 ContractAttempt::Complete(observed) => {
-                    let successful = matches!(&observed.piece, Piece::Contracts(_));
-                    drop(observed);
                     return self.complete(
-                        tree,
+                        *observed,
+                        &projection,
                         selected,
-                        successful,
                         transaction,
                         output,
                         coverage,
@@ -156,45 +152,24 @@ impl<'context, 'source> Interpreter<'context, 'source> {
     }
 
     fn complete(
-        &mut self,
-        tree: &RecordTree<'source>,
+        &self,
+        observed: ObservedPiece<'source>,
+        staged: &CatalogProjection<'_, 'source>,
         selected: bool,
-        successful: bool,
         transaction: &mut Transaction<'source>,
         output: &mut Projected<'source>,
         coverage: &mut ContractQueryCoverage<'source>,
     ) -> Result<(), CatalogError> {
-        let role = if selected {
-            ExportSourceRole::Selected
-        } else {
-            ExportSourceRole::Dependency
-        };
-        let consulted = self.dependencies.prepared.consulted()?;
-        let registry = CatalogTextRegistry::default();
-        let outside = CatalogProjection::new(
-            self.projection.legacy_texts(),
-            self.projection.original(),
-            &registry,
-        )
-        .for_kind(Kind::Contracts);
-        let selected_projection = self.projection.for_kind(Kind::Contracts);
-        let projection = if selected && successful {
-            &selected_projection
-        } else {
-            &outside
-        };
-        let objects = self
-            .dependencies
-            .final_objects(&consulted, projection, self.cancel)?;
-        let places = Places::with_dependencies(objects.iter(), self.index.query_dependencies());
-        match self.attempt(tree, role, projection, &places)? {
-            ContractAttempt::Complete(observed) => {
-                take_observed(*observed, selected, transaction, output, coverage)
-            }
-            ContractAttempt::Dependency(_) => {
-                Err(ExportAccountingError::ConflictingSourceDatum.into())
-            }
+        crate::catalog_query_session::checkpoint(self.cancel)?;
+        let publish_texts = selected && matches!(&observed.piece, Piece::Contracts(_));
+        take_observed(observed, selected, transaction, output, coverage)?;
+        if publish_texts {
+            let consulted = self.dependencies.prepared.consulted()?;
+            self.dependencies
+                .publish_place_names(&consulted, self.projection, self.cancel)?;
+            self.projection.commit_text_registrations(staged)?;
         }
+        Ok(())
     }
 
     pub(super) fn finish(

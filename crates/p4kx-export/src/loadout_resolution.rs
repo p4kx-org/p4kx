@@ -4,7 +4,7 @@
 use std::sync::Arc;
 
 use p4kx_assembly::{ArchiveFiles, Entities, LoadoutRecordReader, LoadoutResolver};
-use p4kx_extraction::{CancelToken, DataForge};
+use p4kx_extraction::{CancelToken, DataForge, SourceUses};
 
 use super::alignment::AlignmentLookup;
 use super::ledger::Capture;
@@ -41,6 +41,7 @@ pub(crate) fn read_rows<'source>(
         seed,
         alignment,
         record_reader,
+        use_compaction,
     } = sources;
     let capture = Arc::new(Capture::for_input(input, seed, cancel, Kind::Loadouts));
     let mut resolver =
@@ -56,6 +57,7 @@ pub(crate) fn read_rows<'source>(
         cancel,
         |want| read_with(&mut resolver, &mut reader, entities.forge(), want, &capture),
         accept,
+        |completed| use_compaction.after_owner(completed, &input.origins().uses, cancel),
     );
     drop(resolver);
     let mut ledger = capture.finish()?;
@@ -84,6 +86,29 @@ pub(crate) struct ResolverEvidence<'scope> {
     pub(crate) seed: &'scope ExportLedger,
     pub(crate) alignment: &'scope mut dyn AlignmentLookup,
     pub(crate) record_reader: Option<&'scope dyn LoadoutRecordReader>,
+    pub(crate) use_compaction: UseCompaction,
+}
+
+#[derive(Clone, Copy)]
+pub(crate) enum UseCompaction {
+    AtProjectionEnd,
+    BetweenCatalogBatches,
+}
+
+impl UseCompaction {
+    pub(super) fn after_owner(
+        self,
+        completed: usize,
+        uses: &SourceUses,
+        cancel: Option<&CancelToken>,
+    ) -> Result<(), CatalogError> {
+        const OWNERS_PER_BATCH: usize = 64;
+        if matches!(self, Self::BetweenCatalogBatches) && completed.is_multiple_of(OWNERS_PER_BATCH)
+        {
+            uses.compact_record_use_batch(|| crate::catalog_query_session::checkpoint(cancel))?;
+        }
+        Ok(())
+    }
 }
 
 pub(super) fn resolve_ordered<'source>(
@@ -91,15 +116,17 @@ pub(super) fn resolve_ordered<'source>(
     cancel: Option<&CancelToken>,
     mut read: impl FnMut(Wanted) -> Result<Option<Loadout>, CatalogReadFailure<'source>>,
     mut accept: impl FnMut(Loadout) -> Result<(), CatalogError>,
+    mut after_owner: impl FnMut(usize) -> Result<(), CatalogError>,
 ) -> Result<Vec<CatalogReadFailure<'source>>, CatalogError> {
     let mut failures = Vec::new();
-    for (position, want) in in_catalog_order(wanted) {
+    for (index, (position, want)) in in_catalog_order(wanted).into_iter().enumerate() {
         checkpoint(cancel)?;
         match read(want) {
             Ok(Some(entry)) => accept(entry)?,
             Ok(None) => {}
             Err(failure) => failures.push((position, failure)),
         }
+        after_owner(index + 1)?;
     }
     // Equal-GUID failures are deduplicated in input order by the collector.
     failures.sort_unstable_by_key(|(position, _)| *position);
